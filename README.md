@@ -17,6 +17,8 @@ Se conservan las rutas actuales para mantener las referencias entre documentaci�
 
 ## Por dónde empezar
 
+**Recorrido completo del proyecto:** [cómo construimos Barrio AI, desde los videos hasta la arquitectura de agentes](docs/como-construimos-barrio-ai.md).
+
 1. [Plan del proyecto](agentes-linkedin/infra/docs/plan-equipo-autonomo.md).
 2. [Ciclos de los cinco equipos](agentes-linkedin/infra/docs/circuitos-equipo.md).
 3. [Datos externos necesarios](agentes-linkedin/infra/docs/datos-externos-por-equipo.md).
