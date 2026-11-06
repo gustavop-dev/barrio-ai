@@ -1,0 +1,95 @@
+import { api, LOGIN_PATH, SESSION_PATH } from './client';
+import type {
+  Account,
+  Action,
+  Activity,
+  Control,
+  FeedEvent,
+  Job,
+  MemoryItem,
+  Overview,
+  Paginated,
+  Referent,
+  SearchResponse,
+  Session,
+  Unit,
+  User,
+} from './types';
+
+const OP = '/api/v1/operador';
+
+/** Lists may be paginated (`{results}`) or plain arrays; accept both. */
+export function asList<T>(data: Paginated<T> | T[] | null | undefined): T[] {
+  if (!data) return [];
+  return Array.isArray(data) ? data : (data.results ?? []);
+}
+
+const id = (value: string) => encodeURIComponent(value);
+
+// ---------------------------------------------------------------- session
+export const getSession = () => api.get<Session>(SESSION_PATH);
+export const login = (username: string, password: string) =>
+  api.post<{ user: User }>(LOGIN_PATH, { username, password });
+export const logout = () => api.post<null>('/api/v1/auth/logout');
+
+// ---------------------------------------------------------------- machine
+export const getOverview = () => api.get<Overview>(`${OP}/overview`);
+export const setControl = (paused: boolean, reason: string) =>
+  api.post<Control>(`${OP}/control`, { paused, reason });
+export const getFeed = (limit = 50) => api.get<FeedEvent[]>(`${OP}/feed?limit=${limit}`);
+export const getAccounts = () => api.get<Paginated<Account> | Account[]>(`${OP}/accounts`);
+export const setAccountPaused = (accountId: string, paused: boolean, reason = '') =>
+  api.post<Account>(`${OP}/accounts/${id(accountId)}/pause`, { paused, reason });
+
+// ---------------------------------------------------------------- actions
+export function listActions(state: string, page: number) {
+  const params = new URLSearchParams();
+  if (state) params.set('state', state);
+  if (page > 1) params.set('page', String(page));
+  const query = params.toString();
+  return api.get<Paginated<Action> | Action[]>(`${OP}/actions${query ? `?${query}` : ''}`);
+}
+export const rejectAction = (actionId: string, note: string) =>
+  api.post<Action>(`${OP}/actions/${id(actionId)}/reject`, { note });
+export const approveAction = (actionId: string, expectedHash: string, note: string) =>
+  api.post<unknown>(`${OP}/actions/${id(actionId)}/approve`, { expected_hash: expectedHash, note });
+export const resolveAction = (actionId: string, outcome: 'confirmed' | 'failed', note: string) =>
+  api.post<Action>(`${OP}/actions/${id(actionId)}/resolve`, { outcome, note });
+
+// ---------------------------------------------------------------- referents
+export const listReferents = (account: string) =>
+  api.get<Paginated<Referent> | Referent[]>(`${OP}/referents?account=${id(account)}&page_size=100`);
+export const addReferent = (account: string, identifier: string, reason: string) =>
+  api.post<Referent>(`${OP}/referents`, { account, identifier, reason });
+export const observeNow = (account: string) => api.post<Job>(`${OP}/observe`, { account });
+
+// ---------------------------------------------------------------- knowledge
+export const searchKnowledge = (query: string, limit = 10) =>
+  api.post<SearchResponse>('/api/v1/search', { query, limit, mode: 'lexical' });
+export const getUnit = (unitId: string) => api.get<Unit>(`/api/v1/units/${id(unitId)}`);
+export const getSource = (key: string) =>
+  api.get<unknown>(`/api/v1/sources/${key.split('/').map(encodeURIComponent).join('/')}`);
+
+// ---------------------------------------------------------------- memory
+export const listMemory = () => api.get<MemoryItem[] | Paginated<MemoryItem>>('/api/v1/memory');
+export const proposeMemory = (key: string, value: string, evidence: string, expectedVersion: number) =>
+  api.post<{ id: string; version: number; status: string }>('/api/v1/memory/proposals', {
+    namespace: 'user',
+    key,
+    value,
+    evidence,
+    expected_version: expectedVersion,
+  });
+export const confirmMemory = (memoryId: string, expectedVersion: number) =>
+  api.post<unknown>(`/api/v1/memory/${id(memoryId)}/confirm`, { expected_version: expectedVersion });
+
+// ---------------------------------------------------------------- office
+export const getActivity = () => api.get<Activity>('/api/v1/oficina/actividad');
+
+// ---------------------------------------------------------------- push
+export const getPushKey = () => api.get<{ public_key: string }>('/api/v1/push/key');
+export const savePushSubscription = (subscription: PushSubscriptionJSON) =>
+  api.post<unknown>('/api/v1/push/subscriptions', subscription);
+export const deletePushSubscription = (endpoint: string) =>
+  api.post<null>('/api/v1/push/unsubscribe', { endpoint });
+export const sendTestPush = () => api.post<unknown>('/api/v1/push/test');

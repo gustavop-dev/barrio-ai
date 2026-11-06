@@ -1,0 +1,67 @@
+const LOCALE = 'es-CO';
+
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleString(LOCALE, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+export function timeAgo(iso: string | null | undefined, now: number = Date.now()): string {
+  if (!iso) return '—';
+  const then = new Date(iso).getTime();
+  if (Number.isNaN(then)) return '—';
+  const seconds = Math.round((now - then) / 1000);
+  if (seconds < 0) return formatDateTime(iso);
+  if (seconds < 45) return 'hace un momento';
+  const minutes = Math.round(seconds / 60);
+  if (minutes < 60) return `hace ${minutes} min`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `hace ${hours} h`;
+  const days = Math.round(hours / 24);
+  if (days < 7) return `hace ${days} ${days === 1 ? 'día' : 'días'}`;
+  return formatDateTime(iso);
+}
+
+export function money(value: string | number | null | undefined): string {
+  const number = Number(value ?? 0);
+  return `USD ${(Number.isFinite(number) ? number : 0).toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+export function ratio(used: number, cap: number): number {
+  if (!Number.isFinite(used) || !Number.isFinite(cap) || cap <= 0) return 0;
+  return Math.min(1, Math.max(0, used / cap));
+}
+
+export function prettyValue(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) return '';
+  return JSON.stringify(value, null, 2);
+}
+
+export const CAPABILITY_LABEL: Record<string, string> = {
+  'INT-03': 'Comentario',
+  'INT-02': 'Reacción',
+};
+
+export const ACTION_STATE_LABEL: Record<string, string> = {
+  proposed: 'Propuesta',
+  approved: 'Aprobada',
+  rejected: 'Vetada',
+  superseded: 'Sustituida',
+  discarded: 'Descartada',
+  executing: 'Ejecutándose',
+  sent: 'Enviada',
+  confirmed: 'Confirmada',
+  uncertain: 'Incierta',
+  failed: 'Fallida',
+  expired: 'Caducada',
+};
+
+export function capabilityLabel(code: string): string {
+  return CAPABILITY_LABEL[code] ?? code;
+}
+
+export function actionStateLabel(state: string): string {
+  return ACTION_STATE_LABEL[state] ?? state;
+}
