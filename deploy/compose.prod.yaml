@@ -1,7 +1,11 @@
 # Barrio AI en un servidor 24/7: PWA + Django + worker + piloto automático + PostgreSQL.
-# Uso (en el servidor, desde esta carpeta):  docker compose -f compose.prod.yaml --env-file .env up -d --build
+# Uso (en el servidor, desde esta carpeta):
+#   docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d
 name: barrio-ai
+# Images are built by GitHub Actions (.github/workflows/barrio-ai.yml) and pulled from GHCR;
+# `build` stays only as a local fallback (docker compose build).
 x-app: &app
+  image: ghcr.io/gustavop-dev/barrio-ai-api:${BARRIO_TAG:-latest}
   build: ../agentes-linkedin/infra
   env_file: .env
   environment:
@@ -67,6 +71,7 @@ services:
     stop_grace_period: 30s
   web:
     # Static PWA + reverse proxy with automatic HTTPS (Let's Encrypt). Only public service.
+    image: ghcr.io/gustavop-dev/barrio-ai-web:${BARRIO_TAG:-latest}
     build: ../oficina
     environment:
       BARRIO_DOMAIN: ${BARRIO_DOMAIN:?Configurar .env}

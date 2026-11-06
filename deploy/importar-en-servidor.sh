@@ -6,6 +6,7 @@ PAQUETE=${1:?Uso: ./importar-en-servidor.sh ~/barrio-ai-migracion-XXXX.tar.gz}
 umask 077
 TMP=$(mktemp -d); tar -C "$TMP" -xzf "$PAQUETE"; DIR=$(find "$TMP" -mindepth 1 -maxdepth 1 -type d)
 mkdir -p conocimiento backups && cp -r "$DIR/conocimiento/." conocimiento/
+docker compose -f compose.prod.yaml --env-file .env pull
 docker compose -f compose.prod.yaml --env-file .env up -d db
 until docker compose -f compose.prod.yaml --env-file .env exec -T db pg_isready -U knowledge -d knowledge >/dev/null; do sleep 2; done
 if [ "$(docker compose -f compose.prod.yaml --env-file .env exec -T db psql -U knowledge -d knowledge -tAc "select count(*) from information_schema.tables where table_schema='public'")" != "0" ]; then
@@ -13,5 +14,5 @@ if [ "$(docker compose -f compose.prod.yaml --env-file .env exec -T db psql -U k
 fi
 docker compose -f compose.prod.yaml --env-file .env exec -T db pg_restore -U knowledge -d knowledge --no-owner < "$DIR/knowledge.dump"
 rm -rf "$TMP"
-docker compose -f compose.prod.yaml --env-file .env up -d --build
+docker compose -f compose.prod.yaml --env-file .env up -d
 echo "Restaurado. Revisa: docker compose -f compose.prod.yaml ps"

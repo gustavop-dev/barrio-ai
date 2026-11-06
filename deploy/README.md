@@ -4,16 +4,20 @@ Este stack levanta en un solo servidor la oficina PWA, Django, el worker, el pil
 
 ## 1. Servidor y dominio
 
-- **Servidor:** Ubuntu 24.04 LTS con 2 vCPU, 4 GB de RAM y al menos 40 GB de disco. Cualquier VPS sirve (Hetzner, DigitalOcean, Lightsail, etc.).
+- **Servidor:** Hostinger KVM 1 (1 vCPU, 4 GB, 50 GB NVMe), centro de datos en EE. UU. o Brasil, con Ubuntu 24.04 LTS. Si Hostinger ofrece la plantilla «Ubuntu 24.04 with Docker», úsala y salta la instalación de Docker. Al servidor no le toca compilar nada: GitHub Actions construye las imágenes y él solo las descarga.
 - **DNS:** un registro A (y AAAA si hay IPv6) de `barrio.tudominio.com` a la IP del servidor.
 - **Firewall:** abrir solo 22, 80 y 443. PostgreSQL y Django no publican puertos.
 - **Docker:** instalar Docker Engine y el plugin Compose (guía oficial de Docker para Ubuntu).
 
-## 2. Código y configuración
+## 2. Código, imágenes y configuración
+
+Las imágenes se publican en GitHub Container Registry (privado) en cada push a `main`: `ghcr.io/gustavop-dev/barrio-ai-api` y `-web`. El servidor necesita un token de solo lectura. Créalo en https://github.com/settings/tokens/new?scopes=read:packages (classic, únicamente `read:packages`).
 
 ```bash
+echo "<TOKEN>" | docker login ghcr.io -u gustavop-dev --password-stdin
 git clone https://github.com/gustavop-dev/barrio-ai.git && cd barrio-ai/deploy
 cp .env.example .env && chmod 600 .env   # completar todos los valores
+docker compose -f compose.prod.yaml --env-file .env pull
 docker compose -f compose.prod.yaml --env-file .env run --rm --no-deps api python manage.py vapid_claves
 # pegar VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT en .env
 ```
@@ -82,7 +86,8 @@ Desde ese momento el ciclo autónomo observa, redacta, aprueba por política, ej
 | --- | --- |
 | Parada total | Botón en la PWA (Máquina). Como emergencia sin PWA: `OPERATOR_PAUSED=true` en `.env` y `up -d`. |
 | Copias de seguridad | `crontab -e` → `0 4 * * * /ruta/barrio-ai/deploy/backup.sh` (conserva 14 días). Copia periódicamente `deploy/backups/` fuera del servidor. |
-| Actualizar | `git pull && docker compose -f compose.prod.yaml --env-file .env up -d --build`. Las migraciones se aplican solas. |
+| Actualizar | Tras el merge a `main` y el workflow en verde: `git pull && docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d`. Las migraciones se aplican solas. |
+| Volver atrás | `BARRIO_TAG=<sha de un commit anterior>` en `.env`, luego `pull` y `up -d`. Las migraciones no se deshacen solas. |
 | Logs | `docker compose -f compose.prod.yaml logs -f autopilot worker`. |
 | Admin | `https://barrio.tudominio.com/admin/`. |
 
