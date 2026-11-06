@@ -186,11 +186,50 @@ class ObservedPost(models.Model):
     def __str__(self):return f'{self.author_name}: {self.text[:60]}'
 
 OPEN_ACTION_STATES=['proposed','approved','executing','sent','uncertain']
+OPEN_PIECE_STATES=['preparing','ready']
+
+class EditorialPiece(models.Model):
+    """CONT-01..07: one own publication prepared by the editorial circuit for a local calendar day.
+    Its CONT-09 ActionProposal carries the exact text through policy approval and execution."""
+    class State(models.TextChoices):
+        PREPARING='preparing','Preparándose'
+        SKIPPED='skipped','Día sin pieza por decisión editorial'
+        BLOCKED='blocked','Bloqueada por la verificación'
+        FAILED='failed','Preparación fallida'
+        READY='ready','Lista; publicación propuesta'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='pieces')
+    slot_date=models.DateField(db_index=True)
+    scheduled_for=models.DateTimeField()
+    state=models.CharField(max_length=20,choices=State.choices,default=State.PREPARING,db_index=True)
+    stage=models.CharField(max_length=20,blank=True)
+    brief=models.JSONField(default=dict,blank=True)
+    variants=models.JSONField(default=dict,blank=True)
+    panel=models.JSONField(default=dict,blank=True)
+    selection=models.JSONField(default=dict,blank=True)
+    verification=models.JSONField(default=dict,blank=True)
+    final_text=models.TextField(blank=True)
+    citations=models.JSONField(default=list,blank=True)
+    signals=models.JSONField(default=list,blank=True)
+    usage=models.JSONField(default=list,blank=True)
+    # APRE-01, first metric: impressions read through Unipile when the publication is reconciled (null ≠ 0).
+    metrics=models.JSONField(default=dict,blank=True)
+    note=models.TextField(blank=True)
+    origin_job=models.CharField(max_length=40,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering=['-slot_date','-created_at']
+        constraints=[models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES),
+                                             name='one_open_piece_per_day')]
+    def __str__(self):return f'{self.slot_date} · {self.get_state_display()}'
 
 class ActionProposal(models.Model):
     class Capability(models.TextChoices):
         COMMENT='INT-03','Comentar en una publicación ajena'
         REACT='INT-02','Reaccionar a una publicación'
+        PUBLISH='CONT-09','Publicar una pieza propia'
     class State(models.TextChoices):
         PROPOSED='proposed','Propuesta; espera aprobación'
         APPROVED='approved','Aprobada; pendiente de ejecución'
@@ -205,7 +244,9 @@ class ActionProposal(models.Model):
         EXPIRED='expired','Caducada sin ejecutar'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='proposals')
-    post=models.ForeignKey(ObservedPost,on_delete=models.PROTECT,related_name='proposals')
+    # Target: someone else's post (INT-*) or an own editorial piece (CONT-09, post is null).
+    post=models.ForeignKey(ObservedPost,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
+    piece=models.ForeignKey(EditorialPiece,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
     capability=models.CharField(max_length=10,choices=Capability.choices)
     payload=models.JSONField()
     payload_hash=models.CharField(max_length=64)
@@ -226,9 +267,12 @@ class ActionProposal(models.Model):
     decision_note=models.TextField(blank=True)
     class Meta:
         ordering=['-created_at']
-        # One executor per action: a single open proposal per post and capability.
+        # One executor per action: a single open proposal per target (post or piece) and capability.
         constraints=[models.UniqueConstraint(fields=['post','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
-                                             name='one_open_action_per_target')]
+                                             name='one_open_action_per_target'),
+                     models.UniqueConstraint(fields=['piece','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
+                                             name='one_open_action_per_piece'),
+                     models.CheckConstraint(condition=models.Q(post__isnull=False)|models.Q(piece__isnull=False),name='action_has_target')]
     def __str__(self):return f'{self.capability} v{self.version} · {self.get_state_display()}'
 
 class ActionExecution(models.Model):

@@ -99,7 +99,8 @@ class OptionalRequestInput(serializers.Serializer):
 
 class ActionInput(serializers.Serializer):
     post=serializers.UUIDField()
-    capability=serializers.ChoiceField(choices=ActionProposal.Capability.choices)
+    # Own publications (CONT-09) are proposed by the editorial circuit, never on someone else's post.
+    capability=serializers.ChoiceField(choices=[c for c in ActionProposal.Capability.choices if c[0]!='CONT-09'])
     payload=serializers.JSONField()
     rationale=UTF8CharField(max_length=4000,required=False,allow_blank=True,default='')
 
@@ -121,13 +122,17 @@ class ExecutionOutput(serializers.ModelSerializer):
         fields=['id','state','provider','started_at','finished_at','external_id','external_url','error_kind','http_status','note','reconciled_at']
 
 class ActionOutput(serializers.ModelSerializer):
+    """`post` is null for own content (CONT-09); then `piece_id` and `scheduled_for` identify the target."""
     execution=serializers.SerializerMethodField()
-    post=PostOutput(read_only=True)
+    post=PostOutput(read_only=True,allow_null=True)
+    scheduled_for=serializers.SerializerMethodField()
     def get_execution(self,obj):
         execution=getattr(obj,'execution',None) if hasattr(obj,'execution') else None
         return ExecutionOutput(execution).data if execution else None
+    def get_scheduled_for(self,obj):
+        return serializers.DateTimeField().to_representation(obj.piece.scheduled_for) if obj.piece_id else None
     class Meta:
         model=ActionProposal
-        fields=['id','account_id','post','capability','payload','payload_hash','version','previous_id','rationale','citations',
+        fields=['id','account_id','post','piece_id','scheduled_for','capability','payload','payload_hash','version','previous_id','rationale','citations',
                 'risks','source','origin_job','model','state','created_at','approved_hash','decided_by_id','decided_at',
                 'decision_note','execution']

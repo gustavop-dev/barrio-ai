@@ -24,7 +24,7 @@ def get_or_404(model,**lookup):
     return obj
 
 def action_response(proposal,status=200):
-    proposal=ActionProposal.objects.select_related('post').get(pk=proposal.pk)
+    proposal=ActionProposal.objects.select_related('post','piece').get(pk=proposal.pk)
     return Response(ActionOutput(proposal).data,status=status)
 
 class Accounts(ListAPIView):
@@ -85,7 +85,7 @@ class Actions(ListAPIView):
     serializer_class=ActionOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=ActionProposal.objects.select_related('post')
+        qs=ActionProposal.objects.select_related('post','piece')
         state=self.request.query_params.get('state')
         return qs.filter(state=state) if state else qs
     def post(self,request):
@@ -110,7 +110,7 @@ class ActionApprove(APIView):
         if 'expected_hash' not in data:raise PermissionDenied('Aprobar requiere el hash de la versión revisada')
         get_or_404(ActionProposal,id=pid)
         job=operador.approve(request.user,pid,data['expected_hash'],data['note'])
-        return Response({'action':ActionOutput(ActionProposal.objects.select_related('post').get(pk=pid)).data,
+        return Response({'action':ActionOutput(ActionProposal.objects.select_related('post','piece').get(pk=pid)).data,
                          'job':JobOutput(job).data},status=202)
 
 class ActionReject(APIView):
