@@ -18,6 +18,14 @@ class Command(BaseCommand):
         for name, codes in roles.items():
             group, _ = Group.objects.get_or_create(name=name)
             group.permissions.set(Permission.objects.filter(content_type__app_label='team_backend', codename__in=codes))
+        # Service identity of the autonomous cycle: can operate and execute, never approve as a human.
+        group, _ = Group.objects.get_or_create(name='autopiloto')
+        group.permissions.set(Permission.objects.filter(content_type__app_label='team_backend', codename__in=[
+            'access_knowledge', 'run_agents', 'use_paid_providers', 'operate_linkedin', 'execute_actions']))
+        autopilot, created = User.objects.get_or_create(username='barrio-autopiloto')
+        if created:
+            autopilot.set_unusable_password(); autopilot.save()
+            autopilot.groups.add(group)
         token = os.environ.get('KNOWLEDGE_API_TOKEN')
         if token:
             service, created = User.objects.get_or_create(username='linkedin-service')

@@ -23,7 +23,32 @@ flowchart LR
 | ADM-04 | Pausa por cuenta, pausa global, topes diarios y detención ante 401/403/429 o una cuenta no `running`. |
 | ADM-05 | Conciliación por lectura y resolución humana de incertidumbres. |
 
-Autoridad: nivel B de la política propuesta. Gustavo aprueba una versión concreta, identificada por el hash de cuenta + capacidad + post + contenido, y el operador la ejecuta automáticamente. Editar el texto crea una versión nueva y anula la aprobación anterior. Un token de servicio puede observar y proponer, pero no aprobar, pausar ni resolver: esas decisiones exigen sesión humana.
+## Máquina autónoma (decisión de Gustavo, 2026-11-06)
+
+«Todo debe funcionar como una máquina autónoma.» Gustavo deja de estar *en* el bucle y pasa a estar *sobre* él: puede pausar, rechazar, resolver y configurar en cualquier momento, pero las acciones no esperan su clic.
+
+El servicio `autopilot` (`python manage.py autopiloto`) ejecuta un ciclo cada 60 s cuando `OPERATOR_AUTOPILOT=true`. Solo encola trabajo; el worker es quien llama a los proveedores. En cada ciclo:
+
+1. **Caduca** las propuestas no ejecutadas tras `OPERATOR_PROPOSAL_TTL_HOURS` (48).
+2. **Revisa con la política `autonomia-v1`** cada propuesta pendiente. Una compuerta automática sustituye la aprobación humana por pieza y descarta el texto que:
+   - tiene menos de 40 o más de 900 caracteres;
+   - contiene pitch o pide contacto (incluida la mención a ProjectApp), enlaces, correos, teléfonos o hashtags;
+   - incluye afirmaciones que el agente marcó como pendientes de evidencia;
+   - es un borrador del agente sin una unidad del curso citada.
+
+   Lo que pasa la compuerta queda aprobado con su hash, sin `decided_by`.
+3. **Observa** a los referentes cada `OPERATOR_OBSERVE_EVERY_MINUTES` (180).
+4. **Redacta**, de uno en uno, sobre el post más reciente de un referente activo:
+   - el post tiene menos de `OPERATOR_MAX_POST_AGE_HOURS` (72) y no es un repost;
+   - todavía no se le preparó ningún comentario;
+   - queda cupo de comentarios en la cuenta;
+   - no se superan `OPERATOR_DAILY_PROPOSALS` (6) ni `OPERATOR_DAILY_LLM_USD` (1) en el día.
+5. **Ejecuta** una acción aprobada por ciclo, solo si se cumplen la ventana `OPERATOR_WINDOW` (07:00–21:00, `OPERATOR_TIMEZONE` America/Bogota), el espaciado fijo `OPERATOR_MIN_SPACING_SECONDS` (1200) y los topes diarios y semanales de tu zona horaria. Los valores por defecto son INT-03 3/12 e INT-02 15/60, como en el reparto v1. El espaciado es fijo: no se aleatoriza para imitar a una persona.
+6. **Concilia** por lectura los envíos inciertos o pendientes de confirmar.
+
+Cuando una cuenta se pausa (429, restricción, reautenticación o estado distinto de `running`), se envía una alerta al webhook `OPERATOR_ALERT_WEBHOOK` (ntfy o compatible con Slack). Solo Gustavo la reanuda.
+
+`OPERATOR_AUTONOMY` permite volver a la aprobación humana (`approval`) o apagar (`off`) una capacidad. La aprobación manual desde `/admin/` o la API sigue disponible: un token de servicio puede observar y proponer, pero no aprobar, pausar ni resolver. Cada versión aprobada se identifica por el hash de cuenta + capacidad + post + contenido; editar el texto crea una versión nueva.
 
 ## Salvaguardas
 
@@ -31,14 +56,14 @@ Autoridad: nivel B de la política propuesta. Gustavo aprueba una versión concr
 - **Una acción abierta por post y capacidad.** Lo impone una restricción en la base de datos.
 - **Sin duplicados.** Antes de comentar se busca un comentario propio idéntico en el hilo; si existe, se confirma sin escribir otro.
 - **Sin reintentos a ciegas.** Unipile v2 no documenta claves de idempotencia. Un timeout, un 5xx o una respuesta ilegible tras escribir dejan la acción en `uncertain`, y la conciliación solo lee.
-- **Paradas.** `OPERATOR_PAUSED=true` detiene todas las escrituras; `ConnectorAccount.paused` detiene una cuenta. Los topes diarios (`OPERATOR_DAILY_LIMITS`, por defecto prudente `INT-03=3,INT-02=10`) también. Un 429, una reautenticación o una restricción pausan la cuenta hasta que Gustavo la reanude.
+- **Paradas.** `OPERATOR_PAUSED=true` detiene todo, incluido el ciclo autónomo. `ConnectorAccount.paused` detiene una cuenta. También frenan la ejecución la ventana horaria, el espaciado y los topes diarios y semanales. Un 429, una reautenticación o una restricción pausan la cuenta y envían una alerta; solo Gustavo la reanuda.
 - **El conector real está apagado por defecto.** Requiere `LIVE_LINKEDIN=true` y `UNIPILE_API_KEY`. El simulado requiere `OPERATOR_ALLOW_FAKE=true`.
 - **Coste.** El agente consulta Claude con el SDK oficial, en streaming, con salida JSON con esquema y sin reintentos automáticos. Antes de generar reserva el peor caso en el registro de gasto. Un post con una acción abierta o ya comentada no dispara otra generación.
 
 ## Activación real (pasos para Gustavo)
 
 1. Crear la cuenta en Unipile, conectar LinkedIn (credenciales y 2FA) y anotar el `account_id` (`acc_…`) y una API key limitada a esa cuenta.
-2. En el `.env` privado del runtime, añadir `UNIPILE_API_KEY=…`, `LIVE_LINKEDIN=true` y revisar `OPERATOR_DAILY_LIMITS`. Para que el agente redacte se necesitan `LIVE_PROVIDERS=true` y saldo en `ANTHROPIC_LIMIT_USD`: el techo actual de USD 1 es acumulado y cada propuesta con `claude-opus-5-5` reserva unos USD 0,2.
+2. En el `.env` privado del runtime, añadir `UNIPILE_API_KEY=…`, `LIVE_LINKEDIN=true`, `OPERATOR_AUTOPILOT=true` y `OPERATOR_ALERT_WEBHOOK=…` (por ejemplo, un tema de ntfy en el móvil), y revisar las variables `OPERATOR_*` de `.env.example`. Para que el agente redacte se necesitan `LIVE_PROVIDERS=true` y saldo en `ANTHROPIC_LIMIT_USD`: el techo actual de USD 1 es acumulado y cada propuesta con `claude-opus-5-5` reserva unos USD 0,2.
 3. Desplegar este código: aplicar la migración `0003_operador` y reiniciar api y worker.
 4. Primer uso:
    ```
@@ -47,8 +72,8 @@ Autoridad: nivel B de la política propuesta. Gustavo aprueba una versión concr
    python manage.py operador --usuario gustavo referente --cuenta <uuid> --perfil https://www.linkedin.com/in/… --motivo "…"
    python manage.py operador --usuario gustavo observar --cuenta <uuid>
    ```
-5. Pedir una propuesta: `POST /api/v1/operador/posts/<id>/propose-comment`. Revisarla y aprobarla en `/admin/` (Propuestas de acción → «Aprobar») o por la API con sesión. El worker la ejecuta y confirma.
-6. Prueba de aceptación: un comentario aprobado aparece una vez en LinkedIn, con `external_id`, estado `confirmed` y eventos de auditoría.
+5. Arrancar el servicio `autopilot` de Docker Compose. A partir de ahí el ciclo observa, redacta, aprueba por política, ejecuta y concilia solo. Lo que hace queda en `/admin/` (Propuestas de acción, Auditoría) y se puede rechazar desde allí.
+6. Prueba de aceptación: un comentario aprobado por la política aparece una vez en LinkedIn, con `external_id`, estado `confirmed` y eventos de auditoría.
 
 ## API (`/api/v1/operador/…`)
 
@@ -81,7 +106,8 @@ Permisos nuevos: `operate_linkedin`, `approve_actions` y `execute_actions`. El r
 
 ## Pendiente
 
-- Pantalla de aprobación en la oficina publicada (operaciones nuevas del puente).
+- Pantalla de supervisión en la oficina publicada (operaciones nuevas del puente).
+- Revisión por modelo (editor_verificador) como segunda compuerta de la política autónoma; hoy la compuerta es determinista.
 - Publicación propia con la API oficial (CONT-08/09).
 - Invitaciones (RED), inbox (CHAT) y edición de perfil (PERF) con el mismo patrón de propuesta, aprobación, ejecución y confirmación.
 - Programador periódico para la observación.

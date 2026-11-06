@@ -199,6 +199,7 @@ class ActionProposal(models.Model):
         CONFIRMED='confirmed','Confirmada en LinkedIn'
         UNCERTAIN='uncertain','Resultado incierto; conciliar sin repetir'
         FAILED='failed','Fallida; no aplicada'
+        EXPIRED='expired','Caducada sin ejecutar'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='proposals')
     post=models.ForeignKey(ObservedPost,on_delete=models.PROTECT,related_name='proposals')

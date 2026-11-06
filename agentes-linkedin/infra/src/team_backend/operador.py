@@ -35,13 +35,52 @@ def _audit(actor,action,target,**metadata):
 
 # --------------------------------------------------------------------------- policy
 
-def daily_limits():
-    """Prudent defaults, adjustable via OPERATOR_DAILY_LIMITS='INT-03=3,INT-02=10'."""
-    limits={'INT-03':3,'INT-02':10}
-    for item in filter(None,os.environ.get('OPERATOR_DAILY_LIMITS','').split(',')):
+# Prudent initial caps from reparto-acciones-v1 (not LinkedIn limits), per local day and week.
+DEFAULT_LIMITS={'INT-03':(3,12),'INT-02':(15,60)}
+
+def _parse_caps(variable):
+    caps={}
+    for item in filter(None,os.environ.get(variable,'').split(',')):
         key,_,value=item.partition('=')
-        if key.strip() in limits and value.strip().isdigit():limits[key.strip()]=int(value)
-    return limits
+        if value.strip().isdigit():caps[key.strip()]=int(value)
+    return caps
+
+def limits():
+    """{capability: (daily, weekly)}; OPERATOR_DAILY_LIMITS / OPERATOR_WEEKLY_LIMITS override."""
+    daily,weekly=_parse_caps('OPERATOR_DAILY_LIMITS'),_parse_caps('OPERATOR_WEEKLY_LIMITS')
+    return {cap:(daily.get(cap,d),weekly.get(cap,w)) for cap,(d,w) in DEFAULT_LIMITS.items()}
+
+def local_tz():
+    from zoneinfo import ZoneInfo
+    return ZoneInfo(os.environ.get('OPERATOR_TIMEZONE','America/Bogota'))
+
+def period_starts(now=None):
+    """Start of the local day and ISO week, in UTC-aware datetimes."""
+    local=(now or timezone.now()).astimezone(local_tz())
+    day=local.replace(hour=0,minute=0,second=0,microsecond=0)
+    return day,day-timedelta(days=day.weekday())
+
+def within_window(now=None):
+    """OPERATOR_WINDOW='07:00-21:00' in OPERATOR_TIMEZONE; '00:00-24:00' means always."""
+    start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
+    def minutes(value):
+        hours,_,mins=value.strip().partition(':');return int(hours)*60+int(mins or 0)
+    local=(now or timezone.now()).astimezone(local_tz())
+    current=local.hour*60+local.minute
+    return minutes(start)<=current<minutes(end)
+
+def min_spacing():
+    return timedelta(seconds=int(os.environ.get('OPERATOR_MIN_SPACING_SECONDS','1200')))
+
+def spacing_ok(account,now=None):
+    last=ActionExecution.objects.filter(proposal__account=account).order_by('-started_at').values_list('started_at',flat=True).first()
+    return last is None or last<=(now or timezone.now())-min_spacing()
+
+def capacity_left(account,capability,now=None):
+    daily,weekly=limits().get(capability,(0,0))
+    day,week=period_starts(now)
+    done=ActionExecution.objects.filter(proposal__account=account,proposal__capability=capability)
+    return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
 
 def globally_paused():
     return os.environ.get('OPERATOR_PAUSED','false').lower()=='true'
@@ -79,11 +118,9 @@ def check_account(account,actor=None):
     status=get_connector(account).account_status()
     account.status=status['status'];account.is_locked=status['is_locked'];account.last_checked_at=timezone.now()
     fields=['status','is_locked','last_checked_at']
-    if (status['status']!='running' or status['is_locked']) and not account.paused:
-        account.paused=True;account.paused_reason=f'Estado del conector: {status["status"]}{" (bloqueada)" if status["is_locked"] else ""}.'
-        fields+=['paused','paused_reason']
-        _audit(actor,'operator.account_paused',account.id,reason=account.paused_reason)
     account.save(update_fields=fields)
+    if (status['status']!='running' or status['is_locked']) and not account.paused:
+        set_account_pause(account,f'Estado del conector: {status["status"]}{" (bloqueada)" if status["is_locked"] else ""}.',actor)
     return account
 
 def set_paused(user,account,paused,reason=''):
@@ -141,6 +178,8 @@ def set_account_pause(account,reason,actor=None):
     ConnectorAccount.objects.filter(pk=account.pk).update(paused=True,paused_reason=reason)
     account.paused=True;account.paused_reason=reason
     _audit(actor,'operator.account_paused',account.id,reason=reason)
+    from .alerts import notify
+    notify('Barrio AI: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.')
 
 # --------------------------------------------------------------------------- proposals
 
@@ -238,10 +277,10 @@ def execute(user,proposal_id):
             raise Conflict('La versión aprobada no coincide con la propuesta; requiere nueva aprobación.')
         account=ConnectorAccount.objects.select_for_update().get(pk=proposal.account_id)
         if account.paused:raise OperatorBlocked(f'Cuenta en pausa: {account.paused_reason or "sin motivo registrado"}')
-        limit=daily_limits().get(proposal.capability,0)
-        recent=ActionExecution.objects.filter(proposal__account=account,proposal__capability=proposal.capability,
-                                              started_at__gte=timezone.now()-timedelta(days=1)).count()
-        if recent>=limit:raise OperatorBlocked(f'Tope diario de {proposal.capability} alcanzado ({limit}); queda aprobada para después.')
+        if not within_window():raise OperatorBlocked('Fuera de la ventana horaria de actividad; queda aprobada para después.')
+        if not spacing_ok(account):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
+        if capacity_left(account,proposal.capability)<=0:
+            raise OperatorBlocked(f'Tope diario o semanal de {proposal.capability} alcanzado; queda aprobada para después.')
         execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
             idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
         proposal.state=ActionProposal.State.EXECUTING;proposal.save(update_fields=['state'])

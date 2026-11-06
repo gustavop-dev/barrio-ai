@@ -15,11 +15,13 @@ from team_backend.models import ActionExecution, ActionProposal, ApiCredential, 
 
 ALL=['access_knowledge','run_agents','use_paid_providers','operate_linkedin','approve_actions','execute_actions','manage_jobs']
 
-class OperatorTests(TransactionTestCase):
+class OperatorBase(TransactionTestCase):
     def setUp(self):
         self.assertTrue(connection.settings_dict['NAME'].startswith('test_'))
         env=patch.dict(os.environ,{'LIVE_PROVIDERS':'false','LIVE_LINKEDIN':'false','OPERATOR_ALLOW_FAKE':'true',
-                                   'OPERATOR_DAILY_LIMITS':'','OPERATOR_PAUSED':'false'})
+                                   'OPERATOR_DAILY_LIMITS':'','OPERATOR_WEEKLY_LIMITS':'','OPERATOR_PAUSED':'false',
+                                   'OPERATOR_WINDOW':'00:00-24:00','OPERATOR_MIN_SPACING_SECONDS':'0','OPERATOR_AUTONOMY':'',
+                                   'OPERATOR_ALERT_WEBHOOK':'','OPERATOR_DAILY_LLM_USD':'1','OPERATOR_DAILY_PROPOSALS':'6'})
         env.start();self.addCleanup(env.stop)
         network=patch('httpx.post',side_effect=AssertionError('Network forbidden in operator tests'))
         network.start();self.addCleanup(network.stop)
@@ -64,6 +66,8 @@ class OperatorTests(TransactionTestCase):
         jobs.process_one(self.worker)
         return ActionProposal.objects.get(id=action['id'])
 
+
+class OperatorTests(OperatorBase):
     def test_observe_reads_posts_once_and_dedupes(self):
         """DESC-04 is read-only and idempotent: repeated observation does not duplicate posts."""
         posts=self.observed()
@@ -252,3 +256,117 @@ class UnipileContractTests(TransactionTestCase):
 
     def test_identifier_rejects_names(self):
         with self.assertRaises(ValueError):public_identifier('Ana María López')
+
+
+class AutopilotTests(OperatorBase):
+    """Autonomous machine: observe → draft → policy approval → spaced execution → reconcile."""
+    def setUp(self):
+        super().setUp()
+        from team_backend import autopiloto
+        self.autopiloto=autopiloto
+        self.bot=User.objects.create_user('barrio-autopiloto')
+        self.grant(self.bot,'access_knowledge','run_agents','use_paid_providers','operate_linkedin','execute_actions')
+        operador.add_referent(self.gustavo,self.account,'referente-ai','Habla de agentes en producción')
+
+    def drain(self):
+        while jobs.process_one(self.worker):pass
+
+    def draft(self,text='Evals are where most of the work hides. Which failure mode do you test first in production?',citations=('LI-03-M006-K02',),claims=()):
+        answer={'decision':'comment','language':'en','comment':text,'rationale':'Aporta un ángulo concreto.',
+                'citations':list(citations),'claims_needing_evidence':list(claims),'risks':[]}
+        return patch('knowledge.providers.claude',return_value={'text':json.dumps(answer),'model':'claude-opus-5-5'})
+
+    def test_full_cycle_runs_without_a_human(self):
+        report=self.autopiloto.tick(self.bot);self.drain()
+        self.assertEqual(report['observe'],1);self.assertEqual(ObservedPost.objects.count(),2)
+        with self.draft():
+            self.assertEqual(self.autopiloto.tick(self.bot)['propose'],1);self.drain()
+        proposal=ActionProposal.objects.get(source='agent')
+        self.assertEqual(proposal.state,'proposed')
+        report=self.autopiloto.tick(self.bot);self.drain()
+        self.assertEqual((report['reviewed'],report['execute']),(1,1))
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.state,'confirmed');self.assertIsNone(proposal.decided_by)
+        self.assertIn(self.autopiloto.POLICY_VERSION,proposal.decision_note)
+        self.assertEqual(self.fake.state['writes'],1)
+        # Ticking again neither re-drafts the same post nor writes again.
+        with self.draft():self.autopiloto.tick(self.bot);self.drain()
+        self.assertEqual(ActionProposal.objects.filter(post=proposal.post).count(),1)
+        self.assertEqual(self.fake.state['writes'],1)
+
+    def test_policy_discards_pitch_links_and_unsupported_claims(self):
+        posts=self.observed()
+        bad=[('Great insight! We build agents at ProjectApp, DM me to talk about your roadmap.',()),
+             ('Totally agree with this point, more here: https://example.com/agents and #AI tips for everyone.',()),
+             ('In my last project we cut latency by 80% with exactly this approach for a big retailer.',('80% de latencia',))]
+        for post,(text,claims) in zip(posts,bad[:2]):
+            operador.create_proposal(self.gustavo,post,'INT-03',{'text':text})
+        self.autopiloto.tick(self.bot)
+        states=sorted(ActionProposal.objects.values_list('state',flat=True))
+        self.assertEqual(states,['discarded','discarded'])
+        reasons=sum((p.risks for p in ActionProposal.objects.all()),[])
+        self.assertIn('Contiene pitch o petición de contacto',reasons);self.assertIn('Contiene enlaces',reasons)
+        self.assertIn('Contiene hashtags',reasons)
+        ActionProposal.objects.all().delete()
+        with self.draft(text=bad[2][0],claims=bad[2][1]):
+            jobs.enqueue_operation(self.bot,'propose_comment',{'post':str(posts[0].id)});self.drain()
+        self.autopiloto.tick(self.bot);self.drain()
+        self.assertEqual(ActionProposal.objects.get().state,'discarded')
+        self.assertEqual(self.fake.state['writes'],0)
+
+    def test_window_spacing_and_caps_hold_back_writes(self):
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        first,second=self.observed()
+        for post in (first,second):
+            operador.create_proposal(self.gustavo,post,'INT-03',{'text':'A concrete, useful contribution to this conversation about evals.'})
+        night=datetime(2026,11,6,3,0,tzinfo=ZoneInfo('America/Bogota'))
+        with patch.dict(os.environ,{'OPERATOR_WINDOW':'07:00-21:00','OPERATOR_MIN_SPACING_SECONDS':'1200'}):
+            self.assertEqual(self.autopiloto.tick(self.bot,now=night)['execute'],0)
+            self.assertEqual(ActionProposal.objects.filter(state='approved').count(),2)
+            with patch('team_backend.operador.within_window',return_value=True):
+                self.autopiloto.tick(self.bot);self.drain()
+                self.assertEqual(self.fake.state['writes'],1)
+                self.assertEqual(self.autopiloto.tick(self.bot)['execute'],0)  # spacing not yet met
+        with patch.dict(os.environ,{'OPERATOR_DAILY_LIMITS':'INT-03=1'}):
+            self.assertEqual(self.autopiloto.tick(self.bot)['execute'],0)  # daily cap reached
+        self.autopiloto.tick(self.bot);self.drain()
+        self.assertEqual(self.fake.state['writes'],2)
+
+    def test_expiry_budget_approval_mode_and_global_stop(self):
+        from datetime import timedelta
+        from django.utils import timezone
+        first,second=self.observed()
+        old=operador.create_proposal(self.gustavo,first,'INT-03',{'text':'A concrete, useful contribution to this conversation about evals.'})
+        ActionProposal.objects.filter(pk=old.pk).update(created_at=timezone.now()-timedelta(hours=49))
+        with patch.dict(os.environ,{'OPERATOR_AUTONOMY':'INT-03=approval'}):
+            self.assertEqual(self.autopiloto.tick(self.bot)['expired'],1)
+            human=operador.create_proposal(self.gustavo,second,'INT-03',{'text':'Another concrete and useful contribution about evals here.'})
+            self.autopiloto.tick(self.bot)
+            human.refresh_from_db();self.assertEqual(human.state,'proposed')
+        reservation=__import__('knowledge.providers',fromlist=['reserve']).reserve('anthropic','propose-comment','1')
+        self.assertTrue(reservation)
+        ActionProposal.objects.filter(pk=human.pk).update(state='rejected')
+        self.assertEqual(self.autopiloto.tick(self.bot)['propose'],0)  # daily LLM budget exhausted
+        with patch.dict(os.environ,{'OPERATOR_PAUSED':'true'}):
+            self.assertEqual(self.autopiloto.tick(self.bot).get('stopped'),'OPERATOR_PAUSED')
+
+    def test_restriction_pauses_and_alerts(self):
+        post=self.observed()[0]
+        operador.create_proposal(self.gustavo,post,'INT-03',{'text':'A concrete, useful contribution to this conversation about evals.'})
+        self.fake.state['fail_next']='rate_limit'
+        with patch('team_backend.alerts.notify') as notify:
+            self.autopiloto.tick(self.bot);self.drain()
+        self.account.refresh_from_db();self.assertTrue(self.account.paused)
+        notify.assert_called_once();self.assertIn('pausa',notify.call_args.args[0])
+        report=self.autopiloto.tick(self.bot)
+        self.assertEqual((report['observe'],report['execute']),(0,0))
+
+    def test_command_respects_switch(self):
+        from django.core.management import call_command
+        with patch.dict(os.environ,{'OPERATOR_AUTOPILOT':'false'}):
+            call_command('autopiloto','--once','--usuario','barrio-autopiloto')
+        self.assertEqual(Job.objects.filter(kind='observe').count(),0)
+        with patch.dict(os.environ,{'OPERATOR_AUTOPILOT':'true'}):
+            call_command('autopiloto','--once','--usuario','barrio-autopiloto')
+        self.assertEqual(Job.objects.filter(kind='observe').count(),1)
