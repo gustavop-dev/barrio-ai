@@ -14,12 +14,13 @@ Este stack levanta en un solo servidor la oficina PWA, Django, el worker, el pil
 Las imágenes se publican en GitHub Container Registry (privado) en cada push a `main`: `ghcr.io/gustavop-dev/barrio-ai-api` y `-web`. El servidor necesita un token de solo lectura. Créalo en https://github.com/settings/tokens/new?scopes=read:packages (classic, únicamente `read:packages`).
 
 ```bash
-echo "<TOKEN>" | docker login ghcr.io -u gustavop-dev --password-stdin
-git clone https://github.com/gustavop-dev/barrio-ai.git && cd barrio-ai/deploy
-cp .env.example .env && chmod 600 .env   # completar todos los valores
+# En la laptop (el repo es privado: el servidor no clona, recibe solo deploy/):
+rsync -a --exclude .env --exclude backups/ --exclude conocimiento/ deploy/ barrio-ai:/opt/barrio-ai/deploy/
+# En el servidor (ssh barrio-ai):
+cat ~/.barrio-ghcr.token | docker login ghcr.io -u gustavop-dev --password-stdin   # token copiado con scp, luego borrarlo
+cd /opt/barrio-ai/deploy && cp .env.example .env && chmod 600 .env   # completar todos los valores
 docker compose -f compose.prod.yaml --env-file .env pull
 docker compose -f compose.prod.yaml --env-file .env run --rm --no-deps api python manage.py vapid_claves
-# pegar VAPID_PUBLIC_KEY / VAPID_PRIVATE_KEY / VAPID_SUBJECT en .env
 ```
 
 Las contraseñas se generan con `openssl rand -base64 36`. `DJANGO_ADMIN_*` crea el usuario humano inicial solo si la base está vacía; con una base migrada se conserva el usuario existente.
@@ -86,7 +87,7 @@ Desde ese momento el ciclo autónomo observa, redacta, aprueba por política, ej
 | --- | --- |
 | Parada total | Botón en la PWA (Máquina). Como emergencia sin PWA: `OPERATOR_PAUSED=true` en `.env` y `up -d`. |
 | Copias de seguridad | `crontab -e` → `0 4 * * * /ruta/barrio-ai/deploy/backup.sh` (conserva 14 días). Copia periódicamente `deploy/backups/` fuera del servidor. |
-| Actualizar | Tras el merge a `main` y el workflow en verde: `git pull && docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d`. Las migraciones se aplican solas. |
+| Actualizar | Tras el merge a `main` y el workflow en verde: `rsync` de `deploy/` si cambió, y `docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d`. Las migraciones se aplican solas. |
 | Volver atrás | `BARRIO_TAG=<sha de un commit anterior>` en `.env`, luego `pull` y `up -d`. Las migraciones no se deshacen solas. |
 | Logs | `docker compose -f compose.prod.yaml logs -f autopilot worker`. |
 | Admin | `https://barrio.tudominio.com/admin/`. |
