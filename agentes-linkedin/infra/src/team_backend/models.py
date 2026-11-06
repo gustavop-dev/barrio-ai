@@ -251,3 +251,27 @@ class ActionExecution(models.Model):
     note=models.TextField(blank=True)
     reconciled_at=models.DateTimeField(null=True,blank=True)
     class Meta:ordering=['-started_at']
+
+
+class OperatorControl(models.Model):
+    """Singleton total stop of the autonomous machine, switched by a human from the office."""
+    id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
+    paused=models.BooleanField(default=False)
+    reason=models.TextField(blank=True)
+    updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True)
+    updated_at=models.DateTimeField(null=True,blank=True)
+    @classmethod
+    def current(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+class PushSubscription(models.Model):
+    """Web Push endpoint of an installed office PWA (VAPID)."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='push_subscriptions')
+    endpoint=models.CharField(max_length=1000,unique=True)
+    p256dh=models.CharField(max_length=200)
+    auth=models.CharField(max_length=100)
+    user_agent=models.CharField(max_length=300,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    last_success_at=models.DateTimeField(null=True,blank=True)
+    failures=models.PositiveIntegerField(default=0)

@@ -1,0 +1,30 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$BARRIO_DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "same-origin"
+		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		-Server
+	}
+
+	@backend path /api/* /admin/* /static/* /health
+	handle @backend {
+		reverse_proxy api:8787
+	}
+
+	# The service worker and manifest must always be revalidated so updates reach the phone.
+	@fresh path /sw.js /registerSW.js /manifest.webmanifest /index.html
+	header @fresh Cache-Control "no-cache"
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
