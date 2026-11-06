@@ -176,12 +176,13 @@ class FakeConnector:
     def list_user_posts(self,user_id,limit=10):
         return [_post(p) for p in self.state['posts'].values() if p['author']['id']==user_id][:limit]
 
-    def seed_own_post(self,text):
-        """A post of the connected member, as Unipile returns it for list_user_posts('me')."""
+    def seed_own_post(self,text,impressions=None):
+        """A post of the connected member, as Unipile returns it for list_user_posts('me') (opaque id)."""
         pid=f'activity:me-{len(self.state["posts"])}'
         self.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':text,
             'created_at':datetime.now(timezone.utc).isoformat(),'author':{'id':'me','display_name':'Cuenta conectada'},
-            'comments_counter':0,'reactions_counter':0,'user_reacted':None,'is_repost':False}
+            'comments_counter':0,'reactions_counter':[],'user_reacted':False,'is_repost':False,
+            'analytics':{'impressions_counter':impressions} if impressions is not None else {}}
         self.state['comments'][pid]=[]
         return pid
 

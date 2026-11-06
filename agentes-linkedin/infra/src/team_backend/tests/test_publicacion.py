@@ -316,8 +316,9 @@ class EditorialCircuitTests(EditorialBase):
         self.assertEqual(self.linkedin.state['posts'][0]['body']['commentary'],li.little_text(GOOD_POST))
         self.assertTrue(execution.external_id.startswith('urn:li:share:'));self.assertIn('/feed/update/urn:li:share:',execution.external_url)
         self.assertEqual(proposal.state,'sent')  # Unipile reads own posts but LinkedIn does not show it yet
-        self.fake.seed_own_post(GOOD_POST)
+        self.fake.seed_own_post(GOOD_POST,impressions=321)  # settled by text: Unipile ids are opaque, never URNs
         self.assertEqual(operador.reconcile(self.gustavo,proposal.id).state,'confirmed')
+        piece.refresh_from_db();self.assertEqual((piece.metrics['impressions'],piece.metrics['source']),(321,'unipile'))
         # The API exposes the action with a null post and the piece behind it.
         listed=self.human.get('/api/v1/operador/actions',{'state':'confirmed'}).json()['results']
         self.assertEqual((listed[0]['post'],listed[0]['piece_id'],listed[0]['capability']),(None,str(piece.id),'CONT-09'))
