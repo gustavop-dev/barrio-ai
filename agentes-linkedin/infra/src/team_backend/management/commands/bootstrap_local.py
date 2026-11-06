@@ -11,8 +11,9 @@ class Command(BaseCommand):
     def handle(self, **options):
         roles = {
             'lectura': ['access_knowledge'],
-            'operacion': ['access_knowledge', 'run_agents', 'use_paid_providers', 'propose_memory'],
-            'revision': ['access_knowledge', 'run_agents', 'propose_memory', 'confirm_memory'],
+            'operacion': ['access_knowledge', 'run_agents', 'use_paid_providers', 'propose_memory', 'operate_linkedin'],
+            'revision': ['access_knowledge', 'run_agents', 'propose_memory', 'confirm_memory',
+                         'operate_linkedin', 'approve_actions', 'execute_actions'],
         }
         for name, codes in roles.items():
             group, _ = Group.objects.get_or_create(name=name)

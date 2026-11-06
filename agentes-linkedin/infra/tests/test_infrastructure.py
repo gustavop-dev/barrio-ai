@@ -156,19 +156,17 @@ def test_connection_failures_are_not_billed_and_retries_bounded(monkeypatch):
         assert row['status']=='rejected' and row['usage']['request_not_sent']
 
 def test_claude_adapter_accounts_for_usage(monkeypatch):
+    from team_backend.tests.fakes import FakeAnthropic,message
     monkeypatch.setenv('LIVE_PROVIDERS','true');monkeypatch.setenv('ANTHROPIC_API_KEY','test-only')
-    calls=[]
-    def fake(url,**kw):
-        calls.append(url)
-        if url.endswith('/count_tokens'):return httpx.Response(200,json={'input_tokens':100})
-        return httpx.Response(200,json={'content':[{'type':'text','text':'Respuesta [LI-01-M006-K02]'}],
-            'usage':{'input_tokens':100,'output_tokens':20},'stop_reason':'end_turn'})
-    monkeypatch.setattr('httpx.post',fake)
+    monkeypatch.setenv('ANTHROPIC_MODEL','claude-sonnet-4-6');monkeypatch.setenv('ANTHROPIC_MAX_TOKENS','1800')
+    fake=FakeAnthropic(message('Respuesta [LI-01-M006-K02]'))
+    monkeypatch.setattr(providers,'anthropic_client',lambda key:fake)
     result=providers.claude('instrucciones','pregunta')
-    assert len(calls)==2 and result['estimated_usd']==pytest.approx(0.0006)
+    assert [c[0] for c in fake.calls]==['count_tokens','stream'] and result['estimated_usd']==pytest.approx(0.0006)
+    assert result['request_id']=='req_test'
     with db.connect() as c:
         r=c.execute('SELECT * FROM usage_ledger').fetchone()
-        assert r['status']=='complete' and r['actual_usd']<=r['reserved_usd']
+        assert r['status']=='complete' and r['actual_usd']<=r['reserved_usd'] and r['usage']['request_id']=='req_test'
 
 def test_preview_idempotency():
     rid=str(uuid.uuid4())
