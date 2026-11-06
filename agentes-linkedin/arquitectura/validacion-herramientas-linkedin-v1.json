@@ -1,0 +1,33 @@
+{
+  "version": "1.0",
+  "fecha": "2026-11-06T19:40:12.384423+00:00",
+  "alcance": "Validacion documental; fuentes primarias consultadas, sin cuentas de proveedores conectadas ni pruebas reales de operaciones.",
+  "acciones_mapeadas": 72,
+  "cobertura_documental": {
+    "diseno_interno": 21,
+    "documentada": 30,
+    "documentada_parcial": 14,
+    "sin_cobertura_especifica_verificada": 7
+  },
+  "identificadores_y_nombres_coinciden_con_catalogo": true,
+  "ninguna_integracion_nueva_probada": true,
+  "software_implementado": false,
+  "llamadas_pagadas": false,
+  "contrataciones": false,
+  "reparto_agentes_modificado": false,
+  "qa_independiente": false,
+  "revision_humana": false,
+  "limitaciones": [
+    "La capacidad publicada por el proveedor no acredita funcionamiento con la cuenta de Gustavo.",
+    "Las APIs y precios se deben revisar al contratar o implementar.",
+    "No se garantiza cobertura completa de métricas, configuración o formatos avanzados.",
+    "Se documentan restricciones de LinkedIn sobre automatización de terceros."
+  ],
+  "artefactos": {
+    "README.md": "c4a40d02bc3eb93de4ef2c6dc840aa2ba9b5e22a84f8976ca7897c5c105ca694",
+    "agentes-linkedin/infra/docs/plan-equipo-autonomo.md": "2c42928f29508869418fa46d12aec8118dfbcdf1acb4bc7c7156d16c0e701d08",
+    "agentes-linkedin/infra/docs/herramientas-linkedin-v1.md": "4025f763167079b21ab94e0b50bdccbe22fcf4acdc5d1bf117437dbc5b832b8b",
+    "agentes-linkedin/arquitectura/matriz-herramientas-linkedin-v1.json": "2484f68a16eeea62b17a206b0c30dde78792282e45044f0e913a9fa9ce04e629"
+  },
+  "enlaces_locales_comprobados": 43
+}

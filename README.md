@@ -21,6 +21,8 @@ Se conservan las rutas actuales para mantener las referencias entre documentaci�
 
 **Diseño más reciente:** [72 acciones para operar el LinkedIn de Gustavo](agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md): descubrir referentes, construir el barrio, interactuar, publicar, conversar, mantener el perfil y aprender. Primero se define el alcance; después se repartirán responsabilidades y se elegirán herramientas.
 
+**Herramientas candidatas:** [comparación, costes y cobertura de las 72 acciones](agentes-linkedin/infra/docs/herramientas-linkedin-v1.md). Propuesta documental: Unipile v2 para relaciones e inbox, Zernio para publicación/analítica y la infraestructura existente para coordinar; ninguna integración nueva conectada.
+
 1. [Plan del proyecto](agentes-linkedin/infra/docs/plan-equipo-autonomo.md).
 2. [Ciclos de los cinco equipos](agentes-linkedin/infra/docs/circuitos-equipo.md).
 3. [Datos externos necesarios](agentes-linkedin/infra/docs/datos-externos-por-equipo.md).
