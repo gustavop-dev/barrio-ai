@@ -6,6 +6,7 @@ waiting for a human; Gustavo stays on the loop (pause, reject, resolve, configur
 Each tick only enqueues work; the worker performs provider calls with the operator's
 gates (kill switch, account pause, window, spacing, daily/weekly caps, exactly-once).
 """
+import hashlib
 import os
 import re
 import uuid
@@ -28,6 +29,12 @@ URL=re.compile(r'https?://|www\.|\b[\w-]+\.(?:com|io|co|ai|dev|app)\b',re.I)
 EMAIL=re.compile(r'[\w.+-]+@[\w-]+\.[\w.]+')
 PHONE=re.compile(r'(?:\+?\d[\s().-]?){7,}')
 HASHTAG=re.compile(r'(?<!\w)#\w')
+# Own posts may name ProjectApp (modality projectapp); what they may not do is sell aggressively or ask for contact.
+POST_PITCH=re.compile(r'hire me|dm me|message me|contact me|book a call|schedule a call|link in (?:bio|comments)|reach out to me|'
+                      r'send me a (?:dm|message)|limited (?:spots|offer)|sign up now|buy now|contr[aá]tame|escr[ií]beme|'
+                      r'agenda(?:mos)? una llamada|cont[aá]ctame',re.I)
+POST_LENGTH=(200,2200)
+POST_MAX_HASHTAGS=3
 
 def setting(name,default):
     return os.environ.get(name,default)
@@ -42,8 +49,28 @@ def autonomy(capability):
 def enabled():
     return setting('OPERATOR_AUTOPILOT','false').lower()=='true'
 
+def post_issues(proposal):
+    """CONT-09: deterministic rules plus the mandatory verifier verdict on this exact text."""
+    text=proposal.payload.get('text','');issues=[]
+    low,high=POST_LENGTH
+    if not low<=len(text)<=high:issues.append(f'Longitud fuera de {low}–{high} caracteres')
+    for pattern,reason in ((EMAIL,'Contiene un correo'),(PHONE,'Contiene un número de teléfono'),(URL,'Contiene enlaces'),
+                           (POST_PITCH,'Contiene pitch agresivo o petición de contacto')):
+        if pattern.search(text):issues.append(reason)
+    if len(HASHTAG.findall(text))>POST_MAX_HASHTAGS:issues.append(f'Más de {POST_MAX_HASHTAGS} hashtags')
+    public,private=guardas.blocks()
+    issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
+    verification=proposal.piece.verification if proposal.piece_id else {}
+    if verification.get('verdict')!='ready_for_execution':issues.append('Sin veredicto ready_for_execution del verificador')
+    elif verification.get('text_sha256')!=hashlib.sha256(text.encode()).hexdigest():
+        issues.append('El veredicto del verificador no corresponde a este texto exacto')
+    if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
+    if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
+    return issues
+
 def content_issues(proposal):
     """Deterministic gate replacing per-piece human approval. Returns reasons to discard."""
+    if proposal.capability==ActionProposal.Capability.PUBLISH:return post_issues(proposal)
     if proposal.capability!=ActionProposal.Capability.COMMENT:return []
     text=proposal.payload.get('text','');issues=[]
     if not 40<=len(text)<=900:issues.append('Longitud fuera de 40–900 caracteres')
@@ -57,6 +84,7 @@ def content_issues(proposal):
 
 def policy_review(proposal):
     """Approve or discard a pending proposal according to the autonomy policy."""
+    from .alerts import notify
     mode=autonomy(proposal.capability)
     if mode=='approval':return proposal
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)
@@ -66,6 +94,9 @@ def policy_review(proposal):
         proposal.decision_note=f'Descartada por política {POLICY_VERSION}'
         proposal.save(update_fields=['state','risks','decided_at','decision_note'])
         operador._audit(None,'operator.policy_discarded',proposal.id,issues=issues)
+        if proposal.piece_id:
+            notify('Barrio AI: pieza descartada',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}: {"; ".join(issues)[:200]}',
+                   url=f'/editorial/{proposal.piece_id}',tag='barrio-pieza')
         return proposal
     if proposal.payload_hash!=operador.current_hash(proposal):
         proposal.state=ActionProposal.State.DISCARDED;proposal.decision_note='Hash inconsistente; descartada'
@@ -74,14 +105,19 @@ def policy_review(proposal):
     proposal.decision_note=f'Aprobada por política {POLICY_VERSION}'
     proposal.save(update_fields=['state','approved_hash','decided_at','decision_note'])
     operador._audit(None,'operator.policy_approved',proposal.id,payload_hash=proposal.payload_hash)
+    if proposal.piece_id:
+        when=proposal.piece.scheduled_for.astimezone(operador.local_tz())
+        notify('Barrio AI: pieza lista',f'Se publicará el {when:%d/%m a las %H:%M}. Puedes vetarla en la oficina antes de esa hora.',
+               url=f'/editorial/{proposal.piece_id}',tag='barrio-pieza')
     return proposal
 
-def llm_spent_today(now=None):
+def llm_spent_today(now=None,purpose='propose-comment'):
+    """Today's Claude spend (settled cost or pending reservation) for a ledger purpose; LIKE pattern allowed."""
     day,_=operador.period_starts(now)
     with db.connect() as c:
         row=c.execute('''SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain')
-            THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider='anthropic' AND purpose='propose-comment'
-            AND created_at>=%s''',(day,)).fetchone()
+            THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider='anthropic' AND purpose LIKE %s
+            AND created_at>=%s''',(purpose,day)).fetchone()
     return Decimal(row['spent'])
 
 def _job_id(*parts):
@@ -98,17 +134,35 @@ def tick(user,now=None):
     report['linkedin_token']=check_tokens(now)  # expiry alerts reach Gustavo even with the machine stopped
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
     ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')))
-    stale=ActionProposal.objects.filter(state__in=['proposed','approved'],created_at__lt=now-ttl).filter(execution__isnull=True)
+    # Own pieces are prepared ahead of time: their TTL runs from the scheduled hour, not from creation.
+    stale=ActionProposal.objects.filter(state__in=['proposed','approved'],execution__isnull=True).filter(
+        Q(piece__isnull=True,created_at__lt=now-ttl)|Q(piece__isnull=False,piece__scheduled_for__lt=now-ttl))
     for proposal in stale:operador._audit(None,'operator.expired',proposal.id)
     report['expired']=stale.update(state=ActionProposal.State.EXPIRED,decision_note='Caducada sin ejecutar')
-    for proposal in ActionProposal.objects.select_related('post').filter(state=ActionProposal.State.PROPOSED):
+    for proposal in ActionProposal.objects.select_related('post','piece').filter(state=ActionProposal.State.PROPOSED):
         policy_review(proposal);report['reviewed']+=1
+    try:report['plan']=_editorial(user,now)
+    except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
     for account in ConnectorAccount.objects.filter(paused=False):
         report['observe']+=_observe(user,account,now)
         report['propose']+=_propose(user,account,now)
         report['execute']+=_execute(user,account,now)
     report['reconcile']+=_reconcile(user,now)
     return report
+
+def _editorial(user,now):
+    """CONT-07: queue the preparation of the next slot (EDITORIAL_POST_TIME, EDITORIAL_LEAD_HOURS ahead), one at a time,
+    within the editorial daily budget and the CONT-09 caps. Each slot gets one automatic attempt at most."""
+    from . import editorial
+    editorial.recover_stuck()
+    if autonomy('CONT-09')=='off' or _pending('prepare_piece'):return 0
+    account=editorial.publishing_account()
+    if not editorial.can_publish(account):return 0
+    if editorial.spent_today(now)>=editorial.daily_budget():return 0
+    slot=editorial.next_slot(now)
+    if slot is None or operador.capacity_left(account,'CONT-09',editorial.scheduled_for(slot))<=0:return 0
+    _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},request_id=_job_id('piece',slot))
+    return int(created)
 
 def _observe(user,account,now):
     every=timedelta(minutes=int(setting('OPERATOR_OBSERVE_EVERY_MINUTES','180')))
@@ -137,7 +191,8 @@ def _propose(user,account,now):
 def _execute(user,account,now):
     if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0
     if _pending('execute_action'):return 0
-    for proposal in ActionProposal.objects.select_related('post').filter(account=account,state='approved',execution__isnull=True).order_by('created_at'):
+    for proposal in ActionProposal.objects.select_related('post','piece').filter(account=account,state='approved',execution__isnull=True).order_by('created_at'):
+        if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour
         if operador.capacity_left(account,proposal.capability,now)<=0:continue
         job=operador.enqueue_execution(user,proposal)
         return int(job.state==Job.State.QUEUED)

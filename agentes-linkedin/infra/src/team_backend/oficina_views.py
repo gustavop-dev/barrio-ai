@@ -13,8 +13,9 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import autopiloto, operador, push
-from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Job, ObservedPost, OperatorControl, PushSubscription, Referent
+from . import autopiloto, editorial, operador, push
+from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, EditorialPiece, Job, ObservedPost, OperatorControl,
+                     PushSubscription, Referent)
 from .operador_views import human_session, valid
 from .permissions import require
 from .serializers import AccountOutput
@@ -91,7 +92,8 @@ class Overview(APIView):
             'today':{'proposals':proposals,'llm_spent_usd':str(autopiloto.llm_spent_today(now)),
                      'llm_daily_cap_usd':str(Decimal(os.environ.get('OPERATOR_DAILY_LLM_USD','1'))),
                      'drafts':ActionProposal.objects.filter(source='agent',created_at__gte=day).count(),
-                     'drafts_daily_cap':int(os.environ.get('OPERATOR_DAILY_PROPOSALS','6'))},
+                     'drafts_daily_cap':int(os.environ.get('OPERATOR_DAILY_PROPOSALS','6')),
+                     'editorial_llm_spent_usd':str(editorial.spent_today(now)),'editorial_llm_daily_cap_usd':str(editorial.daily_budget())},
             'counts':{'referents':Referent.objects.filter(active=True).count(),'posts':ObservedPost.objects.count(),
                       'uncertain':ActionExecution.objects.filter(state='uncertain').count()}})
 
@@ -124,26 +126,41 @@ JOB_ROLES={'observe':'investigador_referentes','propose_comment':'relaciones_com
            'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta'}
 DESCRIPTIONS={'observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
-              'agent_run':'Preparando una propuesta'}
+              'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día'}
+STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',
+                    'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
+                    'verificador':'Verificando afirmaciones, voz y privacidad'}
 
-def _role(job):
-    return job.agent if job.kind=='agent_run' else JOB_ROLES.get(job.kind)
+def _roles(job):
+    """Roles doing the job. A running editorial job shows only the stage's roles (no query for finished jobs)."""
+    if job.kind=='prepare_piece':
+        if job.state!=Job.State.RUNNING:return editorial.EDITORIAL_ROLES
+        stage=EditorialPiece.objects.filter(origin_job=str(job.id)).values_list('stage',flat=True).first() or 'director'
+        return editorial.STAGE_ROLES.get(stage,['director_editorial'])
+    role=job.agent if job.kind=='agent_run' else JOB_ROLES.get(job.kind)
+    return [role] if role else []
+
+def _describe(job):
+    if job.kind=='prepare_piece' and job.state==Job.State.RUNNING:
+        stage=EditorialPiece.objects.filter(origin_job=str(job.id)).values_list('stage',flat=True).first() or 'director'
+        return STAGE_DESCRIPTIONS.get(stage,DESCRIPTIONS['prepare_piece'])
+    return DESCRIPTIONS.get(job.kind,'')
 
 class Actividad(APIView):
     def get(self,request):
-        implemented={'posicionamiento','perfil',*JOB_ROLES.values()}
+        implemented={'posicionamiento','perfil',*JOB_ROLES.values(),*editorial.EDITORIAL_ROLES}
         roles={r:{'status':'en_espera' if r in implemented else 'diseno','detail':'' if r in implemented else 'Contrato diseñado; aún sin implementar','since':None}
                for r in ROLES}
         for job in Job.objects.filter(state__in=[Job.State.QUEUED,Job.State.RUNNING]).order_by('created_at'):
-            role=_role(job)
-            if role not in roles:continue
-            if job.state==Job.State.RUNNING:
-                roles[role]={'status':'trabajando','detail':DESCRIPTIONS.get(job.kind,''),'since':job.started_at}
-            elif roles[role]['status']!='trabajando':
-                roles[role]['detail']='Trabajo en cola'
+            for role in _roles(job):
+                if role not in roles:continue
+                if job.state==Job.State.RUNNING:
+                    roles[role]={'status':'trabajando','detail':_describe(job),'since':job.started_at}
+                elif roles[role]['status']!='trabajando':
+                    roles[role]['detail']='Trabajo en cola'
         for role in implemented:
             if roles[role]['status']=='en_espera' and not roles[role]['detail']:
-                last=next((j for j in Job.objects.filter(state__in=[Job.State.COMPLETE,Job.State.FAILED]).order_by('-finished_at')[:200] if _role(j)==role),None)
+                last=next((j for j in Job.objects.filter(state__in=[Job.State.COMPLETE,Job.State.FAILED]).order_by('-finished_at')[:200] if role in _roles(j)),None)
                 if last:roles[role].update(detail=f'Último: {DESCRIPTIONS.get(last.kind,last.kind).lower()} ({last.result_status or last.state})',since=last.finished_at)
         if operador.globally_paused():
             for role in implemented:

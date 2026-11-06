@@ -87,7 +87,8 @@ class OfficeTests(OperatorBase):
         self.sign_in()
         roles=self.browser.get('/api/v1/oficina/actividad').json()['roles']
         self.assertEqual(len(roles),16)
-        self.assertEqual(roles['lector_par']['status'],'diseno')
+        self.assertEqual(roles['conversaciones_inbox']['status'],'diseno')
+        self.assertEqual(roles['lector_par']['status'],'en_espera')  # the readers panel runs in the editorial circuit
         self.assertEqual(roles['investigador_referentes']['status'],'en_espera')
         job,_=jobs.enqueue_operation(self.gustavo,'observe',{'account':str(self.account.id),'limit':5})
         Job.objects.filter(pk=job.pk).update(state=Job.State.RUNNING,worker=self.worker)

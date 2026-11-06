@@ -3,6 +3,7 @@ No network and no spend: the Posts API and OAuth run against httpx.MockTransport
 import json
 import os
 from datetime import timedelta
+from decimal import Decimal
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlparse
 import httpx
@@ -199,3 +200,237 @@ class MemoryGuardTests(PublicationBase):
         self.assertEqual(proposal.state,'discarded')
         self.assertTrue(any('orientación privada' in r for r in proposal.risks),proposal.risks)
         self.assertEqual(self.fake.state['writes'],0)
+
+
+GOOD_POST='''Before writing a line of code for a new feature, ask one question: what decision will this help someone make?
+
+Founders often arrive with a solution in mind: a dashboard, an AI assistant, a new integration. The useful work starts one step earlier, with the decision behind the request. Who makes it, how often, and what does a wrong call cost?
+
+That question changes the scope. A weekly decision rarely needs real-time data. A decision with expensive mistakes needs an audit trail before it needs automation. And an AI feature earns its place only when someone can check its output against the outcome it was meant to improve.
+
+Which decision is your product helping someone make this week?'''
+INVENTED='''Last year I built an AI pipeline for a fintech client that cut their review costs by 40% in three months.
+
+The lesson was simple: start from the decision the software supports, not from the feature list the founder brings. Who makes the call, how often, and what does a wrong call cost? Those answers decide the scope, the data you need and whether AI belongs in the product at all.
+
+Which decision is your product helping someone make this week?'''
+EDITORIAL_UNITS=['LI-04-M005-K01','LI-05-M001-K02','LI-05-M002-K04','LI-06-M002-K09','LI-05-V005-K05']
+
+def answers(final=GOOD_POST,decision='write',verdict='ready_for_execution',findings=(),claims=None,signals_used=()):
+    claims=claims if claims is not None else [{'text':'A weekly decision rarely needs real-time data.','kind':'general_knowledge','ref':''}]
+    variant=lambda angle:{'angle':angle,'text':final,'claims':claims,'uncertainties':[]}
+    assessment={'strengths':['Clear question'],'objections':[{'text':'Could use an example','severity':'preference'}]}
+    return {
+        'director':{'decision':decision,'skip_reason':'' if decision=='write' else 'No genuine material today.','primary_reader':'lector_comprador',
+                    'modality':'personal_startups','pillar':'business_to_product','thesis':'Scope features from the decision they support.',
+                    'approach':'LI-05-M001-K02','format':'text_only','reader_value':'A scoping question to reuse.',
+                    'evidence':[{'kind':'general_knowledge','ref':'','note':'Product scoping practice'}],'success_criterion':'Founders reply with their decision.',
+                    'avoid':['Inventing cases'],'signals_used':list(signals_used),'citations':['LI-04-M005-K01','LI-99-X'],'rationale':'Pillar fits; no repetition.'},
+        'redactor':{'variant_a':variant('decision'),'variant_b':variant('objection'),'citations':['LI-06-M002-K09']},
+        'lectores':{'readers':[{'reader':r,'variant_a':assessment,'variant_b':assessment} for r in
+                    ['lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par']],'summary':'A slightly stronger.','citations':[]},
+        'seleccion':{'decision':'A','final_text':final,'rationale':'Clearer hook.','claims':claims,'resolved_objections':[],
+                     'kept_objections':['Could use an example'],'citations':['LI-06-M002-K09']},
+        'verificador':{'verdict':verdict,'findings':list(findings),'checked_claims':[dict(c,status='general_knowledge') for c in claims],
+                       'summary':'Checked.','citations':['LI-06-M002-K09']}}
+
+class EditorialBase(PublicationBase):
+    def setUp(self):
+        super().setUp()
+        from knowledge import db
+        from team_backend import operador
+        with db.connect() as c:
+            for uid in EDITORIAL_UNITS:
+                c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
+                    VALUES(%s,5,%s,'{"title":"Unidad de prueba"}','abc','fixture','/units/0','{}')''',(uid,uid))
+        self.official=operador.register_account(self.gustavo,'linkedin_fake','urn:li:person:fake','LinkedIn simulado')
+        self.linkedin=li.FakeLinkedInOfficial(self.official)
+        self.autobot=self.bot();self.calls=[]
+        notify=patch('team_backend.alerts.notify');self.notify=notify.start();self.addCleanup(notify.stop)
+
+    def claude(self,plan):
+        def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run'):
+            self.assertIsNotNone(output_schema)
+            data=json.loads(message);self.calls.append((purpose,data,system));answer=plan[purpose.split('-',1)[1]]
+            if answer.get('signals_used')==['first']:answer=dict(answer,signals_used=[data['signals']['observed_posts'][0]['id']])
+            return {'text':json.dumps(answer),'model':'claude-opus-5-5','estimated_usd':0.01,'request_id':'req_'+purpose}
+        return patch('knowledge.providers.claude',side_effect=fake)
+
+    def drain(self):
+        from team_backend import jobs
+        while jobs.process_one(self.worker):pass
+
+    def plan(self,plan):
+        with self.claude(plan):
+            response=self.human.post('/api/v1/editorial/plan',{},format='json')
+            self.assertEqual(response.status_code,202,response.content)
+            self.drain()
+        from team_backend.models import EditorialPiece
+        return EditorialPiece.objects.get(slot_date=response.json()['slot_date'],origin_job=response.json()['job']['id'])
+
+    def arrive(self,piece):
+        """The scheduled hour arrives."""
+        from team_backend.models import EditorialPiece
+        EditorialPiece.objects.filter(pk=piece.pk).update(scheduled_for=timezone.now()-timedelta(minutes=1))
+
+    def ready_piece(self,days_ago,text=GOOD_POST):
+        import hashlib
+        from team_backend import operador
+        from team_backend.models import EditorialPiece
+        now=timezone.now()
+        piece=EditorialPiece.objects.create(account=self.official,slot_date=(now-timedelta(days=days_ago)).astimezone(operador.local_tz()).date(),
+            scheduled_for=now-timedelta(hours=1+days_ago),state='ready',final_text=text,
+            verification={'verdict':'ready_for_execution','text_sha256':hashlib.sha256(text.encode()).hexdigest()})
+        proposal=operador.create_proposal(self.gustavo,None,'CONT-09',{'text':text},citations=['LI-04-M005-K01'],source='agent',piece=piece)
+        return autopiloto.policy_review(proposal)
+
+
+class EditorialCircuitTests(EditorialBase):
+    def test_full_circuit_publishes_once_without_a_human(self):
+        """Director → copywriters A/B → readers → selection → verifier → policy → Posts API → reconciliation."""
+        from team_backend import operador
+        from team_backend.models import ActionProposal
+        self.observed()
+        piece=self.plan(answers(signals_used=['first']))
+        self.assertEqual((piece.state,piece.stage),('ready','verificador'))
+        self.assertEqual([c[0] for c in self.calls],['editorial-director','editorial-redactor','editorial-lectores','editorial-seleccion','editorial-verificador'])
+        director=self.calls[0][1]
+        self.assertEqual(director['public_facts'],[])  # empty memory: no experiences can be attributed
+        self.assertIn('brief.prioridad',{g['key'] for g in director['private_guidance']})
+        self.assertEqual(len(director['signals']['observed_posts']),2)
+        self.assertEqual(len(piece.signals),1)  # the observed post the director used reaches writers and verifier as a source
+        self.assertEqual(self.calls[1][1]['sources'],piece.signals);self.assertEqual(self.calls[4][1]['sources'],piece.signals)
+        self.assertEqual(self.calls[1][1]['course_units'][0]['unit_id'],'LI-05-M001-K02')  # the chosen approach grounds the writers
+        self.assertNotIn('LI-99-X',piece.citations)
+        self.assertEqual(piece.verification['text_sha256'],__import__('hashlib').sha256(GOOD_POST.encode()).hexdigest())
+        proposal=ActionProposal.objects.get(piece=piece)
+        self.assertEqual((proposal.capability,proposal.post_id,proposal.state,proposal.source),('CONT-09',None,'proposed','agent'))
+        report=autopiloto.tick(self.autobot)
+        proposal.refresh_from_db()
+        self.assertEqual((report['reviewed'],report['execute'],proposal.state),(1,0,'approved'))  # waits for its hour
+        self.assertIn('pieza lista',self.notify.call_args.args[0])
+        self.arrive(piece)
+        self.assertEqual(autopiloto.tick(self.autobot)['execute'],1);self.drain()
+        proposal.refresh_from_db();execution=proposal.execution
+        self.assertEqual(self.linkedin.state['writes'],1)
+        self.assertEqual(self.linkedin.state['posts'][0]['body']['commentary'],li.little_text(GOOD_POST))
+        self.assertTrue(execution.external_id.startswith('urn:li:share:'));self.assertIn('/feed/update/urn:li:share:',execution.external_url)
+        self.assertEqual(proposal.state,'sent')  # Unipile reads own posts but LinkedIn does not show it yet
+        self.fake.seed_own_post(GOOD_POST)
+        self.assertEqual(operador.reconcile(self.gustavo,proposal.id).state,'confirmed')
+        # The API exposes the action with a null post and the piece behind it.
+        listed=self.human.get('/api/v1/operador/actions',{'state':'confirmed'}).json()['results']
+        self.assertEqual((listed[0]['post'],listed[0]['piece_id'],listed[0]['capability']),(None,str(piece.id),'CONT-09'))
+        self.assertTrue(listed[0]['scheduled_for'])
+        detail=self.human.get(f'/api/v1/editorial/pieces/{piece.id}').json()
+        self.assertEqual((detail['status'],detail['final_text'],detail['verification']['verdict']),('published',GOOD_POST,'ready_for_execution'))
+        self.assertEqual(set(detail['variants']),{'variant_a','variant_b','citations'});self.assertEqual(len(detail['panel']['readers']),5)
+        self.assertEqual(detail['action_detail']['post'],None)
+        calendar=self.human.get('/api/v1/editorial/calendar').json()
+        day=next(d for d in calendar['days'] if d['pieces'])
+        self.assertEqual((day['pieces'][0]['status'],day['pieces'][0]['pillar']),('published','business_to_product'))
+        self.assertEqual(calendar['post_time'],'08:30')
+        # Ticking again never publishes twice.
+        autopiloto.tick(self.autobot);self.drain()
+        self.assertEqual(self.linkedin.state['writes'],1)
+
+    def test_verifier_blocks_an_invented_experience(self):
+        from team_backend.models import ActionProposal
+        finding={'issue':'invented_experience','severity':'material','quote':'Last year I built an AI pipeline','detail':'Not in public_facts.'}
+        piece=self.plan(answers(final=INVENTED,verdict='blocked',findings=[finding]))
+        self.assertEqual(piece.state,'blocked');self.assertIn('invented_experience',piece.note)
+        self.assertFalse(ActionProposal.objects.filter(piece=piece).exists())
+        self.assertIn('bloqueada',self.notify.call_args.args[0])
+        # Even if the model reviewer missed it, the deterministic guard blocks first-person experience without public facts.
+        again=self.plan(answers(final=INVENTED))
+        self.assertEqual(again.state,'blocked');self.assertIn('sin hechos públicos confirmados',again.note)
+        self.assertEqual(self.linkedin.state['writes'],0)
+
+    def test_private_guidance_never_becomes_an_attributable_fact(self):
+        from team_backend.models import ActionProposal
+        self.gustavo_memory()
+        leak=GOOD_POST.replace('Founders often arrive','Spanish-speaking founders in the US often arrive')
+        piece=self.plan(answers(final=leak))
+        for purpose,message,_ in self.calls:
+            if 'public_facts' in message:
+                self.assertEqual([f['key'] for f in message['public_facts']],['trayectoria.projectapp'],purpose)
+                self.assertNotIn('60/40',json.dumps(message['public_facts']))
+                self.assertTrue({'objetivo.prioridad','audiencia.segmento'}<={g['key'] for g in message['private_guidance']})
+        self.assertNotIn('public_facts',self.calls[2][1])  # the readers panel gets no memory at all
+        self.assertEqual(piece.state,'blocked');self.assertIn('orientación privada',piece.note)
+        self.assertFalse(ActionProposal.objects.filter(piece=piece).exists())
+
+    def test_director_may_skip_and_the_day_is_not_retried(self):
+        with patch.dict(os.environ,{'EDITORIAL_LEAD_HOURS':'24'}),self.claude(answers(decision='skip')):
+            self.assertEqual(autopiloto.tick(self.autobot)['plan'],1);self.drain()
+            from team_backend.models import EditorialPiece
+            piece=EditorialPiece.objects.get()
+            self.assertEqual((piece.state,piece.note),('skipped','No genuine material today.'))
+            self.assertEqual([c[0] for c in self.calls],['editorial-director'])
+            self.assertEqual(autopiloto.tick(self.autobot)['plan'],0);self.drain()
+        self.assertEqual(EditorialPiece.objects.count(),1)
+        calendar=self.human.get('/api/v1/editorial/calendar').json()
+        self.assertIn('skipped',[p['status'] for d in calendar['days'] for p in d['pieces']])
+
+    def test_one_piece_per_day_at_most(self):
+        from team_backend import operador
+        late,today=self.ready_piece(1),self.ready_piece(0)
+        self.assertEqual((late.state,today.state),('approved','approved'))
+        self.assertEqual(autopiloto.tick(self.autobot)['execute'],1);self.drain()
+        self.assertEqual(operador.capacity_left(self.official,'CONT-09'),0)
+        self.assertEqual(autopiloto.tick(self.autobot)['execute'],0)
+        with self.assertRaises(operador.OperatorBlocked):operador.execute(self.autobot,today.id)
+        self.assertEqual(self.linkedin.state['writes'],1)
+        # A planned slot cannot hold two open pieces either.
+        from django.db import IntegrityError
+        from team_backend.models import EditorialPiece
+        with self.assertRaises(IntegrityError):
+            EditorialPiece.objects.create(account=self.official,slot_date=today.piece.slot_date,scheduled_for=timezone.now())
+
+    def test_uncertain_publication_is_never_repeated(self):
+        from team_backend import operador
+        proposal=self.ready_piece(0)
+        self.linkedin.state['fail_next']='uncertain_applied'
+        autopiloto.tick(self.autobot);self.drain()
+        proposal.refresh_from_db();self.assertEqual(proposal.state,'uncertain')
+        self.assertIn('incierta',self.notify.call_args.args[0])
+        with patch('team_backend.operador._own_posts_reader',return_value=None):
+            execution=operador.reconcile(self.gustavo,proposal.id)
+        self.assertEqual(execution.state,'uncertain');self.assertIn('w_member_social',execution.note)
+        self.assertEqual(operador.execute(self.autobot,proposal.id).id,execution.id)
+        autopiloto.tick(self.autobot);self.drain()
+        self.assertEqual(self.linkedin.state['writes'],1)
+        self.fake.seed_own_post(GOOD_POST)  # Unipile shows Gustavo's own post: settled by text, without writing
+        self.assertEqual(operador.reconcile(self.gustavo,proposal.id).state,'confirmed')
+        self.assertEqual(self.linkedin.state['writes'],1)
+
+    def test_editorial_budget_is_separate_and_stops_spending(self):
+        from knowledge import providers as paid
+        from team_backend.models import EditorialPiece, Job
+        paid.reserve('anthropic','editorial-director','1')
+        with patch.dict(os.environ,{'EDITORIAL_LEAD_HOURS':'24'}),self.claude(answers()) as claude:
+            self.assertEqual(autopiloto.tick(self.autobot)['plan'],0)
+            self.assertEqual(self.human.post('/api/v1/editorial/plan',{},format='json').status_code,202);self.drain()
+        claude.assert_not_called()
+        job=Job.objects.get(kind='prepare_piece')
+        self.assertEqual(job.state,'failed');self.assertIn('Presupuesto editorial',job.error)
+        self.assertFalse(EditorialPiece.objects.exists())
+        self.assertEqual(autopiloto.llm_spent_today(),0)  # the comments budget is untouched
+        overview=self.human.get('/api/v1/operador/overview').json()['today']
+        self.assertEqual(Decimal(overview['editorial_llm_spent_usd']),1)
+
+    def test_vetoed_piece_is_not_published(self):
+        proposal=self.ready_piece(0)
+        response=self.human.post(f'/api/v1/operador/actions/{proposal.id}/reject',{'note':'No me representa'},format='json')
+        self.assertEqual(response.json()['state'],'rejected')
+        autopiloto.tick(self.autobot);self.drain()
+        self.assertEqual(self.linkedin.state['writes'],0)
+        detail=self.human.get(f'/api/v1/editorial/pieces/{proposal.piece_id}').json()
+        self.assertEqual(detail['status'],'vetoed')
+
+    def test_nothing_is_prepared_while_official_publishing_is_off(self):
+        self.credential()  # real API account, LIVE_LINKEDIN_OFFICIAL=false
+        with patch.dict(os.environ,{'EDITORIAL_LEAD_HOURS':'24'}),self.claude(answers()) as claude:
+            self.assertEqual(autopiloto.tick(self.autobot)['plan'],0)
+            self.assertEqual(self.human.post('/api/v1/editorial/plan',{},format='json').status_code,409)
+        claude.assert_not_called()

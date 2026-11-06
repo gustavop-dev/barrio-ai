@@ -26,6 +26,12 @@ EXPERIENCE=re.compile(r"\b(?:I|we)(?:'ve| have)?\s+(?:built|shipped|led|launched
                       r"\b(?:my|our)\s+(?:clients?|customers?|team|startup|company|agency|project|projects|product)\b|"
                       r"\b(?:last|this)\s+(?:year|month|week|quarter)\s+(?:I|we)\b",re.I)
 
+def blocks():
+    """(public_facts, private_guidance) for editorial agents: confirmed memory plus the brief's private orientation."""
+    from knowledge import memory
+    public,private=memory.confirmed_blocks()
+    return public,private+BASELINE_GUIDANCE
+
 def _words(value):
     raw=value if isinstance(value,str) else json.dumps(value,ensure_ascii=False)
     return re.findall(r'[a-z0-9áéíóúñü]+',raw.lower())
