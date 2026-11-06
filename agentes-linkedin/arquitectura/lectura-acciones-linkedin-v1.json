@@ -1,0 +1,485 @@
+{
+  "version": "1.0",
+  "fecha": "2026-11-06T19:23:10.456312+00:00",
+  "documento": "../infra/docs/catalogo-acciones-linkedin.md",
+  "alcance": "Lectura selectiva de unidades completas pertinentes; no lectura integral de 1.035 unidades ni cierre de F1.",
+  "unidades_revisadas_en_este_incremento": 19,
+  "unidades_con_lectura_previa_registrada": 15,
+  "originales_modificados": false,
+  "unidades": [
+    {
+      "id": "LI-01-M006-K02",
+      "session": 1,
+      "title": "Definir al cliente mediante cuatro dimensiones: identidad, urgencia, transformación y freno",
+      "sha256": "ea005a97e91d98c3d77008a2d74eb6656982ca2a3052706bb1a48febb5ba68bf",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/125",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-01-M006-K03",
+      "session": 1,
+      "title": "Ejercicio de definición escrita: dolor urgente, objetivo a 90 días y obstáculos previos",
+      "sha256": "c97e76c8730e7943b9714a81f838d13fb6948db2b244f97947cbd8e210aaa716",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/126",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-01-M007-K03",
+      "session": 1,
+      "title": "Las cinco frases del mensaje: del problema al resultado final con y sin compra",
+      "sha256": "5c49e469b1ffebc7131dba7ff931b3446f81991909c30231659be94a7bddb69b",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/130",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-01-M007-K04",
+      "session": 1,
+      "title": "Cuándo está bien definido el buyer persona: cuatro comprobaciones acumulativas",
+      "sha256": "710bd0bcd48f5a60a9dd8ab5ec999f1939c8ec7e8e2945f4c6392a73ad1770b4",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/131",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-01-V022-K02",
+      "session": 1,
+      "title": "Cómo hacer convivir dos buyer personas: aprender a ejecutar frente a delegar la ejecución",
+      "sha256": "ae779a5eb5d91ae1a87a33d8292e8064317b6e8f58f825c64b49f35565b4c0bc",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/88",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-02-M012-K04",
+      "session": 2,
+      "title": "Agregar, guardar, editar y ordenar contenido en Destacado: los 10 pasos del material",
+      "sha256": "e6c7463efdf6cd1a11846c5b2468f065e2f08dad507d787fa8afc79cf663b959",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/167",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-02-V016-K01",
+      "session": 2,
+      "title": "El titular como semilla de posicionamiento: usar las palabras por las que el cliente busca",
+      "sha256": "0c45b7fbf66cfb99e6cac4479b839dc6ee87c126aee8f0096e300040b76c2546",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/60",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-02-V016-K05",
+      "session": 2,
+      "title": "Explicar qué haces y para quién: el «Acerca de» articula la misión actual y no duplica «Experiencia»",
+      "sha256": "ae996eaa2321804bd70fc4503c5d795e9e2952a10d98145c46a78f9ee3c9335d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/64",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-02-V017-K04",
+      "session": 2,
+      "title": "Iniciar la prueba social: solicitar dos o tres recomendaciones y facilitar un borrador",
+      "sha256": "497555c300d4d8a77431165701d8b66319a207f52caefb5126eef4af9b94a812",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/68",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-02-V019-K01",
+      "session": 2,
+      "title": "Conectar la experiencia pasada con la actividad actual sin forzar ni inventar la trayectoria",
+      "sha256": "824d766ccd6fcb625c488a16881e4f515a490c7d4b657f9d63f48a47c1164977",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/74",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-02-V019-K02",
+      "session": 2,
+      "title": "Redactar Experiencia mediante logros, aprendizajes y utilidad para el cliente actual",
+      "sha256": "25a426738c4bd1aec5d93766bbc0b2256e991444a02f17eecc901d47bd23b5cf",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/75",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-03-M005-K05",
+      "session": 3,
+      "title": "Cinco papeles que buscar en el barrio: par, recomendador, líder, comprador y divulgador",
+      "sha256": "8d3ba01a2536edc6b5459c831f0ccca95e28d14259c0b3bfd2da25168c1f53f8",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/136",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-03-M005-K06",
+      "session": 3,
+      "title": "Filtro de conexión: cinco preguntas para evaluar la pertinencia de un perfil",
+      "sha256": "26af38ddd246b161da417fd0bed17666a0a95fd15673d0050e78e6df1759c3b8",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/137",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-M006-K01",
+      "session": 3,
+      "title": "Solicitud de conexión: entrar en relación sin vender en la puerta",
+      "sha256": "ba1e4f94ef3d96a72cc5a692bc9707ac089b2ae3a81af91f719d2fa82a55e517",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/138",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-M006-K02",
+      "session": 3,
+      "title": "Comentario estratégico: opinión, fundamento y pregunta",
+      "sha256": "e8289aec92bc7c3256c82a9a36a431a6d74eb73368ad6c9ef7d80066a43cc65b",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/139",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V005-K04",
+      "session": 3,
+      "title": "Permitir el seguimiento abierto y activar «Seguir» como acción principal sin eliminar «Conectar»",
+      "sha256": "42c24b7d75b53cbf239dd2c4171012650eaece8a46c10618a462448779d8f846",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/21",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V007-K02",
+      "session": 3,
+      "title": "Identificar, interactuar y conectar para desarrollar una relación profesional",
+      "sha256": "d83baf9240109287c49c5a544317772a37bb1326067bae8d908e6599c236ec2d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/29",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V018-K02",
+      "session": 3,
+      "title": "Descubrir perfiles a través de líderes, comentarios, inteligencia artificial y otras redes",
+      "sha256": "3297c3ce8c4992b88b346e18ad38cb81f7f868eb4b561fe51a43d56b415a7496",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/72",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V019-K03",
+      "session": 3,
+      "title": "Convertir lo observado en el perfil en preguntas que den protagonismo al contacto",
+      "sha256": "c592116b6c889bac1ad0a0104356600c3d7d429692036bdff92cace93e683d0b",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/76",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V019-K04",
+      "session": 3,
+      "title": "Permitir que la conversación evolucione hacia un proyecto y, si hay interés, hacia una propuesta",
+      "sha256": "5d8b4bf6d6fc48dc21569258bc9c758000b01af3449aeceeb94db7763da6c0f4",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/77",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V020-K01",
+      "session": 3,
+      "title": "De una necesidad expresada a una reunión: el caso de una relación comercial de tres años",
+      "sha256": "ca3d04dbb1810aa152bcb3dd74c717063b5e7fe4cd4ca69b71bb6608cc3e31cd",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/78",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V020-K04",
+      "session": 3,
+      "title": "Dónde y cuándo comentar: cuentas grandes, creadores medianos y pares que comienzan",
+      "sha256": "7968f2599ddb97c38bd1246daecff366d8846f27d6c97bb2bbbb65403df41147",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/81",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V021-K02",
+      "session": 3,
+      "title": "Pauta semanal de invitaciones: ritmo manual, cautelas y resultados esperados",
+      "sha256": "2256f079d1c99e2716bf529a7b93c2f26ca3aafaef9c1c6af263a87661602370",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/85",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-03-V022-K03",
+      "session": 3,
+      "title": "Reactivar relaciones con cafés virtuales sin confundir conversar con vender",
+      "sha256": "77ddbb1d58f8d27e76fe3163b959049059fb649d21871e1d5bfa98f69441a8c4",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/90",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-04-M005-K01",
+      "session": 4,
+      "title": "Cinco filtros para validar un pilar temático antes de usarlo",
+      "sha256": "1e842747d5ba303d8c2bdc04955547318370636a0e5d5dea9d1e6a2c4f87c968",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-04-revisada.json",
+      "pointer": "/learning_units/190",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-05-V005-K05",
+      "session": 5,
+      "title": "Revisar el post antes de publicar adoptando la perspectiva de un lector ajeno",
+      "sha256": "a6a9091baf514ba42220317d6a596f3e8e82f88d5c1b21e316b017c30bee2a2d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/15",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-05-V022-K01",
+      "session": 5,
+      "title": "Artículos y newsletters: diferencia editorial y ampliación gradual de la estrategia",
+      "sha256": "b109c3e28b77a4827eaf3ed3df0da147563fda289b2db64db1a36d0b963cf417",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/82",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-05-V022-K03",
+      "session": 5,
+      "title": "Programación editorial: simplificar según el volumen y asegurar la frecuencia",
+      "sha256": "3f1e553ab8e0aa6a554bfdd97443ab005a38b755aa905b5f804285ab7a406d1d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/84",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-06-M002-K09",
+      "session": 6,
+      "title": "Edición final: voz, recorte, transiciones y datos comprobables",
+      "sha256": "e40f00e15effa43510466b13291eb41e7ad97172f68eb6a32986814cd9cafbdd",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/159",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-06-M002-K10",
+      "session": 6,
+      "title": "Checklist previo a publicar: gancho, historia, tono y prohibidos",
+      "sha256": "8826ba03e935b060a62426e800964520535e53c84b4ead40f6e2b96d54b8bc09",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/160",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-06-M003-K06",
+      "session": 6,
+      "title": "Qué delegar a Claude y qué no: tareas editoriales con autenticidad y revisión humana",
+      "sha256": "c01c7a6a23b9e581c7b389b301ec15886cd7d1b172469f89fa31a1f1c7d87e38",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/166",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    },
+    {
+      "id": "LI-06-V008-K03",
+      "session": 6,
+      "title": "Usar las tres mejores y las tres peores publicaciones para orientar la creación",
+      "sha256": "49fab8dd54dad3f12e3832bd1f690eb65614b0b600569e7ccc197a147506732a",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/33",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-06-V010-K02",
+      "session": 6,
+      "title": "Estudiar los posts que mejor y peor funcionan para encontrar patrones y orientar el contenido",
+      "sha256": "c2bd0661f77d3a08d222face8b655eced5bde3e5f5602c1a6163f94b0e432efa",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/42",
+      "lectura": "completa_en_este_incremento",
+      "procedencia_lectura": "Consulta de original completo en PostgreSQL en transaccion de solo lectura"
+    },
+    {
+      "id": "LI-06-V020-K01",
+      "session": 6,
+      "title": "«Tú no eres el cliente»: escuchar sin convertir la empatía en proyección personal",
+      "sha256": "0b6561a738cbce65fe3ecfb63846b088a2521c151a6b39afe49233e20dc1fd0e",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/74",
+      "lectura": "completa_previamente_registrada",
+      "procedencia_lectura": "lectura-contratos-root-v1.json"
+    }
+  ],
+  "interpretaciones_y_limites": {
+    "B01": {
+      "titulo": "Dirección, comprador y dos ofertas",
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02"
+      ],
+      "limites": "Definir necesidades y mensaje; los 90 días son una pregunta del ejercicio, no una promesa. La prioridad 60/40 procede de Gustavo."
+    },
+    "B02": {
+      "titulo": "Perfil coherente y experiencia real",
+      "unit_ids": [
+        "LI-02-V016-K01",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-V019-K02"
+      ],
+      "limites": "Titular con lenguaje del cliente, Acerca de con misión actual y experiencia sin inventar trayectoria."
+    },
+    "B03": {
+      "titulo": "Barrio y filtros de pertinencia",
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06"
+      ],
+      "limites": "Pares, recomendadores, líderes, compradores y divulgadores; papeles compatibles. Los cinco filtros no son un puntaje ni exigen cumplirlos todos."
+    },
+    "B04": {
+      "titulo": "Descubrimiento y espacios de conversación",
+      "unit_ids": [
+        "LI-03-V018-K02",
+        "LI-03-V020-K04"
+      ],
+      "limites": "Explorar referentes, comentarios y otras redes; incluir cuentas grandes, medianas y pares pequeños. La IA ayuda a descubrir, no acredita identidades ni audiencias."
+    },
+    "B05": {
+      "titulo": "Conexión contextual",
+      "unit_ids": [
+        "LI-03-V007-K02",
+        "LI-03-M006-K01",
+        "LI-03-V021-K02"
+      ],
+      "limites": "Identificar, interactuar cuando haya contexto y conectar con mensaje específico sin pitch. Las cifras del ejercicio no son límites actuales ni cuotas para agentes."
+    },
+    "B06": {
+      "titulo": "Comentarios que aportan",
+      "unit_ids": [
+        "LI-03-M006-K02"
+      ],
+      "limites": "Opinión, fundamento y apertura de conversación. La pregunta de la fórmula debe tener sentido en el hilo; no convertirla en una coletilla repetida."
+    },
+    "B07": {
+      "titulo": "Conversación y oportunidad orgánica",
+      "unit_ids": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01"
+      ],
+      "limites": "Estudiar el perfil, preguntar con interés real, escuchar y avanzar a proyecto o reunión cuando exista contexto e interés. Las historias docentes no garantizan conversión."
+    },
+    "B08": {
+      "titulo": "Reactivar relaciones reales",
+      "unit_ids": [
+        "LI-03-V022-K03"
+      ],
+      "limites": "Retomar vínculos auténticos con propósito claro; el café no es un pretexto engañoso de venta ni obliga a una cuota semanal."
+    },
+    "B09": {
+      "titulo": "Visibilidad y seguimiento",
+      "unit_ids": [
+        "LI-03-V005-K04"
+      ],
+      "limites": "Distinguir seguir, conectar y notificaciones. Las rutas y advertencias históricas de la interfaz requieren comprobación antes de aplicarlas hoy."
+    },
+    "B10": {
+      "titulo": "Destacados",
+      "unit_ids": [
+        "LI-02-M012-K04"
+      ],
+      "limites": "Seleccionar y mantener evidencia útil: añadir, editar, ordenar y retirar. No asumir el orden visible de la interfaz a partir de una explicación histórica ambigua."
+    },
+    "B11": {
+      "titulo": "Recomendaciones auténticas",
+      "unit_ids": [
+        "LI-02-V017-K04"
+      ],
+      "limites": "Solicitar testimonios a personas con experiencia real de trabajo; la otra persona decide su testimonio y lo publica desde su cuenta."
+    },
+    "B12": {
+      "titulo": "Pilares de contenido",
+      "unit_ids": [
+        "LI-04-M005-K01"
+      ],
+      "limites": "Relevancia, diferenciación, disfrute, demanda activa e intercambio; sin pesos ni umbral de aprobación inventados."
+    },
+    "B13": {
+      "titulo": "Cadencia, programación y formatos",
+      "unit_ids": [
+        "LI-05-V022-K01",
+        "LI-05-V022-K03"
+      ],
+      "limites": "Planificar según capacidad, empezar con posts y ampliar formatos si se sostienen. Las herramientas mencionadas en clase no son una selección para Barrio AI."
+    },
+    "B14": {
+      "titulo": "Perspectiva del lector",
+      "unit_ids": [
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "limites": "Revisar desde fuera y escuchar al público sin proyectar gustos propios. Los lectores simulados producen hipótesis, no resultados de mercado."
+    },
+    "B15": {
+      "titulo": "Edición, voz y hechos",
+      "unit_ids": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "limites": "Verificar claridad, voz y datos. Las listas del material tienen contexto; no imponer porcentajes de recorte ni fabricar vivencias al delegar a IA."
+    },
+    "B16": {
+      "titulo": "Aprender de publicaciones y audiencia",
+      "unit_ids": [
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "limites": "Comparar rendimientos y conversaciones con historial suficiente. Estudiar variaciones; no convertir correlaciones en reglas del algoritmo ni usar likes como ventas."
+    }
+  },
+  "human_review": false,
+  "qa_independiente_de_este_incremento": false
+}

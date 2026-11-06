@@ -141,3 +141,9 @@ Dos QA independientes (Astra high) concluyeron revisión documental: [coordinaci
 ## Aclaración posterior: observar la cuenta como equipo
 
 La [observación integral de LinkedIn](observacion-integral-linkedin.md) precisa la capacidad de entrada: historial y cambios del perfil, publicaciones, métricas, interacciones, inbox y referentes alimentan contexto vivo. Observatorio transforma esos registros en evidencia para Editorial, aprendizaje y oportunidades; el Director y los escritores pueden consultar las fuentes pertinentes. No depende de que Gustavo entregue un reporte por cada ciclo. Esta ampliación es diseño posterior al QA v1, pendiente de implementación y validación de conectores. No habilita publicación, respuesta ni outbound.
+
+## Ampliación posterior: capacidades para actuar
+
+El [catálogo de acciones](catalogo-acciones-linkedin.md) define el alcance solicitado para operar la cuenta: 72 capacidades, con observación, decisión y ejecución diferenciadas. Incluye interacción pública, invitaciones y conversación contextual de la clase 03, además de publicación y perfil. Las campañas outbound siguen fuera del alcance actual.
+
+Los cinco equipos y trece contratos conservan su versión existente. El siguiente diseño repartirá quién propone, decide, ejecuta, verifica y recibe el aprendizaje por acción, y resolverá funciones sin responsable, especialmente comunidad e inbox. Luego se elegirán herramientas. Este catálogo no asigna mensajes al analista por defecto, no modifica la aprobación editorial y no activa acciones. Su recorrido documental es posterior y distinto del QA v1.

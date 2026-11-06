@@ -1,0 +1,2443 @@
+{
+  "version": "1.0",
+  "fecha": "2026-11-06T19:23:10.456312+00:00",
+  "estado": "diseno_funcional; no implementacion",
+  "alcance": "Cuenta personal de Gustavo, posicionamiento, contenido y barrio basados en clases 01–06",
+  "secuencia_acordada": [
+    "catalogar_acciones",
+    "distribuir_responsabilidades",
+    "seleccionar_y_validar_herramientas",
+    "implementar_y_probar"
+  ],
+  "total_acciones": 72,
+  "grupos": [
+    {
+      "id": "DESC",
+      "nombre": "Descubrir referentes, personas y conversaciones",
+      "total": 8
+    },
+    {
+      "id": "RED",
+      "nombre": "Construir y mantener la red",
+      "total": 9
+    },
+    {
+      "id": "INT",
+      "nombre": "Participar en publicaciones y conversaciones públicas",
+      "total": 10
+    },
+    {
+      "id": "CONT",
+      "nombre": "Crear, programar y gestionar contenido propio",
+      "total": 13
+    },
+    {
+      "id": "CHAT",
+      "nombre": "Conversar, atender y reconocer oportunidades",
+      "total": 10
+    },
+    {
+      "id": "PERF",
+      "nombre": "Mantener el perfil y sus pruebas",
+      "total": 10
+    },
+    {
+      "id": "APRE",
+      "nombre": "Medir y decidir el siguiente ciclo",
+      "total": 7
+    },
+    {
+      "id": "ADM",
+      "nombre": "Administrar la operación de la cuenta",
+      "total": 5
+    }
+  ],
+  "datos": {
+    "D01": "Dirección y preferencias confirmadas",
+    "D02": "Perfil actual",
+    "D03": "Casos y pruebas",
+    "D04": "Perfiles y referentes",
+    "D05": "Posts ajenos",
+    "D06": "Comentarios e interacciones",
+    "D07": "Posts propios",
+    "D08": "Métricas",
+    "D09": "Voz y recursos",
+    "D10": "Conversaciones y oportunidades",
+    "D11": "Decisiones y autorizaciones de versiones",
+    "D12": "Fuentes y hechos actuales",
+    "D13": "Estado de relaciones e invitaciones",
+    "D14": "Estado observable de acciones y programaciones",
+    "D15": "Capacidades, permisos y salud de conexión",
+    "D16": "Disponibilidad y compromisos de agenda"
+  },
+  "fundamentos": {
+    "B01": {
+      "titulo": "Dirección, comprador y dos ofertas",
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02"
+      ],
+      "limites": "Definir necesidades y mensaje; los 90 días son una pregunta del ejercicio, no una promesa. La prioridad 60/40 procede de Gustavo."
+    },
+    "B02": {
+      "titulo": "Perfil coherente y experiencia real",
+      "unit_ids": [
+        "LI-02-V016-K01",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-V019-K02"
+      ],
+      "limites": "Titular con lenguaje del cliente, Acerca de con misión actual y experiencia sin inventar trayectoria."
+    },
+    "B03": {
+      "titulo": "Barrio y filtros de pertinencia",
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06"
+      ],
+      "limites": "Pares, recomendadores, líderes, compradores y divulgadores; papeles compatibles. Los cinco filtros no son un puntaje ni exigen cumplirlos todos."
+    },
+    "B04": {
+      "titulo": "Descubrimiento y espacios de conversación",
+      "unit_ids": [
+        "LI-03-V018-K02",
+        "LI-03-V020-K04"
+      ],
+      "limites": "Explorar referentes, comentarios y otras redes; incluir cuentas grandes, medianas y pares pequeños. La IA ayuda a descubrir, no acredita identidades ni audiencias."
+    },
+    "B05": {
+      "titulo": "Conexión contextual",
+      "unit_ids": [
+        "LI-03-V007-K02",
+        "LI-03-M006-K01",
+        "LI-03-V021-K02"
+      ],
+      "limites": "Identificar, interactuar cuando haya contexto y conectar con mensaje específico sin pitch. Las cifras del ejercicio no son límites actuales ni cuotas para agentes."
+    },
+    "B06": {
+      "titulo": "Comentarios que aportan",
+      "unit_ids": [
+        "LI-03-M006-K02"
+      ],
+      "limites": "Opinión, fundamento y apertura de conversación. La pregunta de la fórmula debe tener sentido en el hilo; no convertirla en una coletilla repetida."
+    },
+    "B07": {
+      "titulo": "Conversación y oportunidad orgánica",
+      "unit_ids": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01"
+      ],
+      "limites": "Estudiar el perfil, preguntar con interés real, escuchar y avanzar a proyecto o reunión cuando exista contexto e interés. Las historias docentes no garantizan conversión."
+    },
+    "B08": {
+      "titulo": "Reactivar relaciones reales",
+      "unit_ids": [
+        "LI-03-V022-K03"
+      ],
+      "limites": "Retomar vínculos auténticos con propósito claro; el café no es un pretexto engañoso de venta ni obliga a una cuota semanal."
+    },
+    "B09": {
+      "titulo": "Visibilidad y seguimiento",
+      "unit_ids": [
+        "LI-03-V005-K04"
+      ],
+      "limites": "Distinguir seguir, conectar y notificaciones. Las rutas y advertencias históricas de la interfaz requieren comprobación antes de aplicarlas hoy."
+    },
+    "B10": {
+      "titulo": "Destacados",
+      "unit_ids": [
+        "LI-02-M012-K04"
+      ],
+      "limites": "Seleccionar y mantener evidencia útil: añadir, editar, ordenar y retirar. No asumir el orden visible de la interfaz a partir de una explicación histórica ambigua."
+    },
+    "B11": {
+      "titulo": "Recomendaciones auténticas",
+      "unit_ids": [
+        "LI-02-V017-K04"
+      ],
+      "limites": "Solicitar testimonios a personas con experiencia real de trabajo; la otra persona decide su testimonio y lo publica desde su cuenta."
+    },
+    "B12": {
+      "titulo": "Pilares de contenido",
+      "unit_ids": [
+        "LI-04-M005-K01"
+      ],
+      "limites": "Relevancia, diferenciación, disfrute, demanda activa e intercambio; sin pesos ni umbral de aprobación inventados."
+    },
+    "B13": {
+      "titulo": "Cadencia, programación y formatos",
+      "unit_ids": [
+        "LI-05-V022-K01",
+        "LI-05-V022-K03"
+      ],
+      "limites": "Planificar según capacidad, empezar con posts y ampliar formatos si se sostienen. Las herramientas mencionadas en clase no son una selección para Barrio AI."
+    },
+    "B14": {
+      "titulo": "Perspectiva del lector",
+      "unit_ids": [
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "limites": "Revisar desde fuera y escuchar al público sin proyectar gustos propios. Los lectores simulados producen hipótesis, no resultados de mercado."
+    },
+    "B15": {
+      "titulo": "Edición, voz y hechos",
+      "unit_ids": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "limites": "Verificar claridad, voz y datos. Las listas del material tienen contexto; no imponer porcentajes de recorte ni fabricar vivencias al delegar a IA."
+    },
+    "B16": {
+      "titulo": "Aprender de publicaciones y audiencia",
+      "unit_ids": [
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "limites": "Comparar rendimientos y conversaciones con historial suficiente. Estudiar variaciones; no convertir correlaciones en reglas del algoritmo ni usar likes como ventas."
+    }
+  },
+  "contrato_comun": "../infra/docs/catalogo-acciones-linkedin.md",
+  "acciones": [
+    {
+      "id": "DESC-01",
+      "area": "DESC",
+      "nombre": "Buscar Top Voices y referentes del nicho",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B01",
+        "B03",
+        "B04"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V018-K02",
+        "LI-03-V020-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Pregunta de investigación o renovación de referencias",
+      "datos_ids": [
+        "D01",
+        "D04",
+        "D05",
+        "D06",
+        "D12"
+      ],
+      "resultado_verificable": "Lista de autores con URL, temas, evidencia de audiencia pertinente y fecha de consulta",
+      "criterio": "La insignia es un dato opcional; popularidad no sustituye pertinencia.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "DESC-02",
+      "area": "DESC",
+      "nombre": "Buscar perfiles para ampliar el barrio",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B01",
+        "B03",
+        "B04"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V018-K02",
+        "LI-03-V020-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Necesidad de nuevas relaciones pertinentes",
+      "datos_ids": [
+        "D01",
+        "D04",
+        "D13"
+      ],
+      "resultado_verificable": "Candidatos identificables con cargo, organización, ubicación e idioma cuando consten y razón de interés",
+      "criterio": "Buscar por contexto profesional; no inferir idioma, etnia o capacidad de compra por nombre o foto.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "DESC-03",
+      "area": "DESC",
+      "nombre": "Investigar un perfil y su actividad",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B03",
+        "B04",
+        "B07"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V018-K02",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-03-V020-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Perfil candidato o interlocutor nuevo",
+      "datos_ids": [
+        "D04",
+        "D05",
+        "D06",
+        "D10",
+        "D13"
+      ],
+      "resultado_verificable": "Ficha con hechos observados, fuentes, temas, relación previa y vacíos",
+      "criterio": "La ausencia de publicaciones no descarta un perfil relevante; no inventar financiación de su startup.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "DESC-04",
+      "area": "DESC",
+      "nombre": "Leer publicaciones e hilos de referentes",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B04",
+        "B06"
+      ],
+      "unit_ids": [
+        "LI-03-M006-K02",
+        "LI-03-V018-K02",
+        "LI-03-V020-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Autor seguido, tema editorial o oportunidad de participación",
+      "datos_ids": [
+        "D04",
+        "D05",
+        "D06",
+        "D12"
+      ],
+      "resultado_verificable": "Texto accesible, contexto del hilo, preguntas, posiciones y métricas visibles fechadas",
+      "criterio": "Un feed parcial conserva su cobertura; no suponer impresiones privadas de terceros.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "DESC-05",
+      "area": "DESC",
+      "nombre": "Descubrir personas entre quienes comentan y reaccionan",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B03",
+        "B04"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V018-K02",
+        "LI-03-V020-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Conversación relevante con participantes accesibles",
+      "datos_ids": [
+        "D05",
+        "D06",
+        "D13"
+      ],
+      "resultado_verificable": "Nuevos candidatos enlazados al comentario o reacción que permitió descubrirlos",
+      "criterio": "Comentar da contexto; una reacción aislada no prueba necesidad, idioma ni interés comercial.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "DESC-06",
+      "area": "DESC",
+      "nombre": "Revisar la red y los vínculos existentes",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B03",
+        "B08"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V022-K03"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Arranque o revisión del barrio",
+      "datos_ids": [
+        "D04",
+        "D06",
+        "D10",
+        "D13"
+      ],
+      "resultado_verificable": "Mapa observable de conexiones, seguidores, relaciones previas y vínculos que conviene retomar",
+      "criterio": "Declarar listas incompletas o identidades no accesibles; no reconstruir personas a partir de contadores.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "DESC-07",
+      "area": "DESC",
+      "nombre": "Clasificar pertinencia y papeles del barrio",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B01",
+        "B03"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-03-M005-K05",
+        "LI-03-M005-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Nuevo candidato o evidencia que cambie su contexto",
+      "datos_ids": [
+        "D01",
+        "D04",
+        "D06",
+        "D10",
+        "D13"
+      ],
+      "resultado_verificable": "Clasificación razonada y revisable: par, recomendador, líder, comprador o divulgador",
+      "criterio": "Una persona puede cumplir varios papeles; comprador es hipótesis hasta conocer necesidad y encaje.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "DESC-08",
+      "area": "DESC",
+      "nombre": "Mantener referentes y un mapa de conversaciones del nicho",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B04",
+        "B12",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-03-V018-K02",
+        "LI-03-V020-K04",
+        "LI-04-M005-K01",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Nueva investigación o cambio significativo en las fuentes",
+      "datos_ids": [
+        "D04",
+        "D05",
+        "D06",
+        "D08",
+        "D12"
+      ],
+      "resultado_verificable": "Lista de seguimiento interna y dossier de temas, enfoques, preguntas y vacíos con enlaces",
+      "criterio": "Entregar contenido y contexto a escritura, no solo nombres. Tema observado no equivale a tendencia demostrada.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-01",
+      "area": "RED",
+      "nombre": "Seguir a una persona pertinente",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B03",
+        "B09"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V005-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Conviene observar su contenido sin solicitar conexión todavía",
+      "datos_ids": [
+        "D04",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Estado de seguimiento confirmado para la identidad correcta",
+      "criterio": "Seguir no implica amistad, aceptación de invitación ni disponibilidad para vender.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-02",
+      "area": "RED",
+      "nombre": "Enviar una invitación contextual a conectar",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B03",
+        "B05"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-M006-K01",
+        "LI-03-V007-K02",
+        "LI-03-V021-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Candidato pertinente y motivo real de conexión",
+      "datos_ids": [
+        "D01",
+        "D04",
+        "D05",
+        "D06",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Invitación enviada, destinatario, nota exacta cuando corresponda y estado registrado",
+      "criterio": "Sin pitch ni interacción previa ficticia; comprobar que no exista invitación pendiente o conexión.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-03",
+      "area": "RED",
+      "nombre": "Consultar el estado de invitaciones y conexiones",
+      "efecto": "lectura",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Invitación enviada, recibida o cambio observado",
+      "datos_ids": [
+        "D13",
+        "D14"
+      ],
+      "resultado_verificable": "Enviada, pendiente, aceptada, retirada o estado desconocido con evidencia y fecha",
+      "criterio": "No deducir aceptación del éxito técnico del envío ni del silencio del destinatario.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-04",
+      "area": "RED",
+      "nombre": "Aceptar una invitación recibida",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B03"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Invitación entrante pertinente",
+      "datos_ids": [
+        "D04",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Conexión confirmada y origen de la invitación conservado",
+      "criterio": "Evaluar pertinencia y contexto; aceptar no autoriza una secuencia de venta.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-05",
+      "area": "RED",
+      "nombre": "Declinar una invitación recibida",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Invitación sin encaje o indeseada",
+      "datos_ids": [
+        "D04",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Invitación resuelta y motivo interno registrado",
+      "criterio": "No rechazar por ausencia de notoriedad; distinguir falta de información de falta de encaje.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-06",
+      "area": "RED",
+      "nombre": "Retirar una invitación pendiente",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Cambio de criterio, duplicado o solicitud explícita",
+      "datos_ids": [
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Retirada confirmada, motivo y estado anterior conservados",
+      "criterio": "No retirar y reenviar para insistir automáticamente; comprobar consecuencias aplicables antes de ejecutar.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-07",
+      "area": "RED",
+      "nombre": "Dejar de seguir una cuenta",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Revisión de relevancia o preferencias",
+      "datos_ids": [
+        "D04",
+        "D05",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Seguimiento desactivado sin confundirlo con eliminar conexión",
+      "criterio": "Conservar razón; una publicación aislada con la que se discrepa no obliga a eliminar la relación.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-08",
+      "area": "RED",
+      "nombre": "Eliminar una conexión",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Decisión expresa o política específica de mantenimiento",
+      "datos_ids": [
+        "D04",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Relación actualizada y resultado confirmado",
+      "criterio": "Operación de mayor impacto: verificar identidad, conversaciones y compromisos antes de aplicarla.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "RED-09",
+      "area": "RED",
+      "nombre": "Actualizar la memoria de la relación y su siguiente paso",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B03",
+        "B07",
+        "B08"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-03-V022-K03"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Interacción, conexión, conversación o cambio relevante",
+      "datos_ids": [
+        "D04",
+        "D06",
+        "D10",
+        "D13",
+        "D14"
+      ],
+      "resultado_verificable": "Hechos, última interacción, siguiente paso con motivo y condición para detenerse",
+      "criterio": "No convertir a cada vecino en lead ni crear seguimientos sin propósito.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-01",
+      "area": "INT",
+      "nombre": "Elegir dónde y cuándo aportar",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B03",
+        "B04",
+        "B06"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-M006-K02",
+        "LI-03-V018-K02",
+        "LI-03-V020-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Hilo pertinente o pregunta relacionada con la experiencia de Gustavo",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D05",
+        "D06",
+        "D09",
+        "D14"
+      ],
+      "resultado_verificable": "Oportunidad de intervención con propósito, destinatario y aporte posible",
+      "criterio": "Incluir pares y cuentas medianas; no perseguir volumen ni horarios anecdóticos del curso.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-02",
+      "area": "INT",
+      "nombre": "Reaccionar a una publicación o comentario",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Contenido leído y reacción coherente con el criterio de Gustavo",
+      "datos_ids": [
+        "D05",
+        "D06",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Reacción, objeto e identidad confirmados",
+      "criterio": "Expresa una postura pública; no reaccionar en masa ni ejecutar solo para provocar reciprocidad.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-03",
+      "area": "INT",
+      "nombre": "Publicar un comentario propio en un post ajeno",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B04",
+        "B06",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-03-M006-K02",
+        "LI-03-V018-K02",
+        "LI-03-V020-K04",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Aporte concreto que mejora la conversación",
+      "datos_ids": [
+        "D03",
+        "D05",
+        "D06",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Comentario publicado con texto exacto, enlace o identificador y contexto de origen",
+      "criterio": "Opinión sustentada y apertura relevante; sin elogio genérico, pitch pegado ni experiencia inventada.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-04",
+      "area": "INT",
+      "nombre": "Responder comentarios en publicaciones propias",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B06",
+        "B14",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-03-M006-K02",
+        "LI-05-V005-K05",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-06-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Pregunta, objeción o aporte recibido",
+      "datos_ids": [
+        "D03",
+        "D06",
+        "D07",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Respuesta asociada al comentario correcto y asunto resuelto o pendiente identificado",
+      "criterio": "Leer contexto antes de responder; admitir un dato desconocido y conservar preguntas para futuros contenidos.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-05",
+      "area": "INT",
+      "nombre": "Continuar un intercambio en un hilo ajeno",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B06",
+        "B07"
+      ],
+      "unit_ids": [
+        "LI-03-M006-K02",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Respuesta o mención pertinente a una intervención previa",
+      "datos_ids": [
+        "D03",
+        "D05",
+        "D06",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Respuesta confirmada dentro del hilo y estado de la conversación actualizado",
+      "criterio": "Evitar monopolizar el hilo y terminar cuando ya no haya aporte o la persona pida no continuar.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-06",
+      "area": "INT",
+      "nombre": "Compartir una publicación con perspectiva propia",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B12",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-04-M005-K01",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Contenido útil que merece contextualizar para el barrio",
+      "datos_ids": [
+        "D03",
+        "D05",
+        "D06",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Publicación compartida con fuente, comentario propio y registro del resultado",
+      "criterio": "Añadir criterio y atribución; no convertir el contenido de un referente en una experiencia supuestamente propia.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-07",
+      "area": "INT",
+      "nombre": "Guardar contenido para consultarlo después",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Fuente útil que merece conservarse",
+      "datos_ids": [
+        "D05",
+        "D06",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Guardado confirmado o, si esa función no está disponible, referencia interna marcada como tal",
+      "criterio": "Guardar no equivale a recomendar públicamente; el fallback interno no se reporta como guardado en LinkedIn.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-08",
+      "area": "INT",
+      "nombre": "Editar un comentario propio",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Corrección o aclaración necesaria",
+      "datos_ids": [
+        "D03",
+        "D06",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Versión previa, versión corregida y lectura posterior del comentario",
+      "criterio": "Comprobar autoría y posibilidades del medio; no borrar el contexto de una conversación sin registrarlo.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-09",
+      "area": "INT",
+      "nombre": "Retirar un comentario propio",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Error material, duplicado o decisión de retirada",
+      "datos_ids": [
+        "D06",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Retirada confirmada y motivo conservado",
+      "criterio": "No asumir poder borrar comentarios de otras personas en publicaciones ajenas.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "INT-10",
+      "area": "INT",
+      "nombre": "Cambiar o retirar una reacción propia",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Error, cambio de criterio o petición de Gustavo",
+      "datos_ids": [
+        "D05",
+        "D06",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Estado final de la reacción confirmado",
+      "criterio": "Verificar el objeto y la reacción actual para no crear otra por error.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-01",
+      "area": "CONT",
+      "nombre": "Elegir ideas y pilares pertinentes",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B01",
+        "B12",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-04-M005-K01",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Oportunidad editorial o revisión de dirección",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D05",
+        "D06",
+        "D08",
+        "D09",
+        "D10",
+        "D12"
+      ],
+      "resultado_verificable": "Ideas priorizadas con lector, necesidad, tesis y razón para publicarlas",
+      "criterio": "Combinar relevancia con experiencia real; el 60/40 es prioridad estratégica, no cuota mecánica de posts.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-02",
+      "area": "CONT",
+      "nombre": "Investigar y preparar el brief de una pieza",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B04",
+        "B12",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-03-V018-K02",
+        "LI-03-V020-K04",
+        "LI-04-M005-K01",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Idea seleccionada",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D05",
+        "D06",
+        "D09",
+        "D10",
+        "D12"
+      ],
+      "resultado_verificable": "Brief con contexto de referentes, evidencia, ángulo propio, fuentes y afirmaciones pendientes",
+      "criterio": "Los chats aportan patrones privados; su lectura no autoriza publicar identidades ni detalles del interlocutor.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-03",
+      "area": "CONT",
+      "nombre": "Redactar y comparar alternativas de copy",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B14",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-05-V005-K05",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-06-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Brief suficiente y vigente",
+      "datos_ids": [
+        "D03",
+        "D09",
+        "D11",
+        "D12"
+      ],
+      "resultado_verificable": "Versiones comparables y elección razonada según objetivo y voz",
+      "criterio": "Dos escritores es diseño del producto, no mandato del curso; no copiar textos de referentes.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-04",
+      "area": "CONT",
+      "nombre": "Preparar los recursos visuales o audiovisuales",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Formato elegido necesita medios",
+      "datos_ids": [
+        "D03",
+        "D09",
+        "D11"
+      ],
+      "resultado_verificable": "Assets finales, procedencia, derechos y correspondencia con el texto",
+      "criterio": "No simular clientes, métricas o pantallas como evidencia real; producción de medios requiere capacidad propia por especificar.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-05",
+      "area": "CONT",
+      "nombre": "Evaluar la pieza desde los lectores del barrio",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B03",
+        "B14"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Borrador disponible para contraste",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D09",
+        "D11"
+      ],
+      "resultado_verificable": "Objeciones y fortalezas por perspectivas relevantes, con decisión editorial posterior",
+      "criterio": "La discusión entre lectores simulados no prueba reacción de personas reales ni necesita unanimidad.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-06",
+      "area": "CONT",
+      "nombre": "Revisar hechos, voz, claridad y versión final",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B14",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-05-V005-K05",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-06-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Pieza candidata a publicar o modificada",
+      "datos_ids": [
+        "D03",
+        "D09",
+        "D11",
+        "D12"
+      ],
+      "resultado_verificable": "Versión identificada, evidencias, correcciones materiales y autorización editorial según política vigente",
+      "criterio": "La revisión final humana del plan se conserva; una edición posterior cambia la versión y exige nueva validación pertinente.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-07",
+      "area": "CONT",
+      "nombre": "Organizar el calendario editorial",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B12",
+        "B13",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-04-M005-K01",
+        "LI-05-V022-K01",
+        "LI-05-V022-K03",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Piezas listas, cambios de prioridad o resultados nuevos",
+      "datos_ids": [
+        "D01",
+        "D07",
+        "D08",
+        "D11",
+        "D14"
+      ],
+      "resultado_verificable": "Calendario con piezas, objetivos, fecha propuesta, dependencias y capacidad",
+      "criterio": "Publicar diariamente es intención del usuario; no activar cadencia ni rellenar días con contenido sin fundamento.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-08",
+      "area": "CONT",
+      "nombre": "Programar, reprogramar o cancelar una publicación programada",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B13"
+      ],
+      "unit_ids": [
+        "LI-05-V022-K01",
+        "LI-05-V022-K03"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Pieza autorizada y decisión de calendario",
+      "datos_ids": [
+        "D07",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Programación y zona horaria confirmadas, o modificación/cancelación observada",
+      "criterio": "Una pieza programada todavía no está publicada; una programación cancelada no prueba que no existan otras copias.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-09",
+      "area": "CONT",
+      "nombre": "Publicar una pieza y confirmar su versión real",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B13",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-05-V022-K01",
+        "LI-05-V022-K03",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Publicación autorizada, inmediata o al llegar su programación",
+      "datos_ids": [
+        "D07",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "ID o URL, texto y medios efectivamente publicados, fecha y lectura de confirmación",
+      "criterio": "Un resultado técnico aceptado no basta si el contenido no aparece; conservar estado incierto sin repetir a ciegas.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-10",
+      "area": "CONT",
+      "nombre": "Editar una publicación propia",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Corrección o actualización justificada",
+      "datos_ids": [
+        "D03",
+        "D07",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Cambio aplicado y versión anterior conservada, con límites del formato identificados",
+      "criterio": "La analítica conserva qué versión estuvo publicada en cada periodo; comprobar qué permite editar el medio.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-11",
+      "area": "CONT",
+      "nombre": "Retirar una publicación propia",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Petición, duplicado o error que requiere retirada",
+      "datos_ids": [
+        "D07",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Publicación retirada y motivo, vínculos y métricas anteriores conservados cuando proceda",
+      "criterio": "Acción destructiva con política específica; no borrar posts solo por bajo rendimiento y perder aprendizaje.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-12",
+      "area": "CONT",
+      "nombre": "Crear y mantener un artículo",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B13",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-05-V022-K01",
+        "LI-05-V022-K03",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Tema que necesita profundidad y capacidad editorial suficiente",
+      "datos_ids": [
+        "D03",
+        "D09",
+        "D11",
+        "D12",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Artículo autorizado publicado o actualizado y resultado confirmado",
+      "criterio": "Formato de expansión; no necesario para arrancar ni prueba de posicionamiento en buscadores.",
+      "etapa": "expansion_de_formatos",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CONT-13",
+      "area": "CONT",
+      "nombre": "Crear y mantener una newsletter y sus ediciones",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B13",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-05-V022-K01",
+        "LI-05-V022-K03",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Decisión explícita de sostener una publicación recurrente",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Configuración y ediciones confirmadas con promesa editorial y cadencia sostenible",
+      "criterio": "Formato de expansión condicionado a disponibilidad y capacidad; no activarlo por existir la opción.",
+      "etapa": "expansion_de_formatos",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-01",
+      "area": "CHAT",
+      "nombre": "Consultar conversaciones y sincronizar su historial",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B07"
+      ],
+      "unit_ids": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Mensaje nuevo, preparación de respuesta o carga inicial",
+      "datos_ids": [
+        "D04",
+        "D10",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Hilo accesible con participantes, mensajes entrantes y salientes, fechas y lagunas",
+      "criterio": "Leer la conversación completa disponible, no responder al último mensaje aislado; diferenciar historial parcial.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-02",
+      "area": "CHAT",
+      "nombre": "Clasificar intención, contexto y asuntos pendientes",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B01",
+        "B07"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Mensaje o cambio significativo en una conversación",
+      "datos_ids": [
+        "D01",
+        "D04",
+        "D10",
+        "D13"
+      ],
+      "resultado_verificable": "Necesidad, pregunta, relación, compromisos y posible siguiente acción con evidencia",
+      "criterio": "Separar charla, colaboración, empleo, cliente, promoción y desconocido; un saludo no es oportunidad cualificada.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-03",
+      "area": "CHAT",
+      "nombre": "Responder un mensaje entrante",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B07",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Pregunta o intercambio que merece respuesta",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D09",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Mensaje exacto enviado al hilo correcto y asunto atendido o escalado",
+      "criterio": "No inventar disponibilidad, presupuesto, resultados ni compromisos comerciales; respuesta sensible necesita decisión de Gustavo.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-04",
+      "area": "CHAT",
+      "nombre": "Iniciar una conversación orgánica con contexto",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B05",
+        "B07"
+      ],
+      "unit_ids": [
+        "LI-03-M006-K01",
+        "LI-03-V007-K02",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-03-V021-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Interacción, conexión o afinidad concreta que justifica un intercambio",
+      "datos_ids": [
+        "D01",
+        "D04",
+        "D05",
+        "D06",
+        "D09",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Primer mensaje identificado y motivo de contacto registrado",
+      "criterio": "No enviar automáticamente por cada aceptación; interés real sin pitch encubierto ni secuencia de campaña.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-05",
+      "area": "CHAT",
+      "nombre": "Retomar una relación existente",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B08"
+      ],
+      "unit_ids": [
+        "LI-03-V022-K03"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Vínculo real y razón concreta para volver a hablar",
+      "datos_ids": [
+        "D04",
+        "D09",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Mensaje contextual enviado y estado del vínculo actualizado",
+      "criterio": "No fingir cercanía ni usar invitación a café como engaño comercial.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-06",
+      "area": "CHAT",
+      "nombre": "Compartir un recurso o caso pertinente por mensaje",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B07",
+        "B15"
+      ],
+      "unit_ids": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Pregunta, permiso o necesidad expresa que el recurso resuelve",
+      "datos_ids": [
+        "D03",
+        "D09",
+        "D10",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Mensaje y recurso correctos enviados, con permiso de uso y contexto",
+      "criterio": "Aclarar si el trabajo es personal o del equipo; no trasladar pruebas confidenciales ni inventar testimonios.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-07",
+      "area": "CHAT",
+      "nombre": "Proponer una conversación y coordinar disponibilidad",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B07",
+        "B08"
+      ],
+      "unit_ids": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-03-V022-K03"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Interés mutuo o necesidad que merece una reunión",
+      "datos_ids": [
+        "D01",
+        "D10",
+        "D11",
+        "D14",
+        "D15",
+        "D16"
+      ],
+      "resultado_verificable": "Propuesta enviada; acuerdo, zona horaria y horario confirmados si las partes los aceptan",
+      "criterio": "Sin agenda disponible, proponer o consultar sin comprometer horarios. Crear evento externo es una dependencia aparte.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-08",
+      "area": "CHAT",
+      "nombre": "Dar seguimiento a un intercambio o compromiso acordado",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B07"
+      ],
+      "unit_ids": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Respuesta, entrega o seguimiento convenido pendiente",
+      "datos_ids": [
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Seguimiento contextual confirmado o cierre razonado del pendiente",
+      "criterio": "Respetar un no o petición de detenerse; no transformar silencio en insistencia automática ni en secuencia outbound.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-09",
+      "area": "CHAT",
+      "nombre": "Registrar una oportunidad y transferir la decisión a Gustavo",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B01",
+        "B07"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Necesidad, interés en contratar, entrevista o propuesta expresados",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D10",
+        "D13"
+      ],
+      "resultado_verificable": "Oportunidad con modalidad personal/ProjectApp, hechos, dudas, origen y siguiente responsable",
+      "criterio": "60/40 orienta prioridad; salario, dedicación, oferta y aceptación de compromisos se deciden con hechos, no se negocian por inferencia.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "CHAT-10",
+      "area": "CHAT",
+      "nombre": "Organizar el inbox y el estado de atención",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Conversación atendida, pendiente o para archivo",
+      "datos_ids": [
+        "D10",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Archivo, lectura u otra organización disponible confirmada y pendientes preservados",
+      "criterio": "Leer o archivar no equivale a responder ni a resolver; etiquetas internas se distinguen de funciones reales de LinkedIn.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-01",
+      "area": "PERF",
+      "nombre": "Auditar el perfil frente al posicionamiento",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B01",
+        "B02",
+        "B10",
+        "B11"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-02-M012-K04",
+        "LI-02-V016-K01",
+        "LI-02-V016-K05",
+        "LI-02-V017-K04",
+        "LI-02-V019-K01",
+        "LI-02-V019-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Arranque o cambio material de objetivo/evidencia",
+      "datos_ids": [
+        "D01",
+        "D02",
+        "D03",
+        "D08",
+        "D09",
+        "D10"
+      ],
+      "resultado_verificable": "Diagnóstico por sección, discrepancias y propuesta priorizada",
+      "criterio": "Usar estado actual observado; mantener diferencias entre oferta personal y ProjectApp.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-02",
+      "area": "PERF",
+      "nombre": "Actualizar titular y Acerca de",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B01",
+        "B02"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-02-V016-K01",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-V019-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Posicionamiento y texto autorizados",
+      "datos_ids": [
+        "D01",
+        "D02",
+        "D03",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Secciones aplicadas con versión anterior y posterior confirmadas",
+      "criterio": "Lenguaje reconocible por el público, misión y utilidad; no anunciar habilidades o resultados no sustentados.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-03",
+      "area": "PERF",
+      "nombre": "Actualizar trayectoria, proyectos, formación y habilidades",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B02"
+      ],
+      "unit_ids": [
+        "LI-02-V016-K01",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-V019-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Hecho verificado o experiencia que necesita mejor explicación",
+      "datos_ids": [
+        "D02",
+        "D03",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Campos correctos actualizados y alcance real de la contribución conservado",
+      "criterio": "La clase fundamenta trayectoria y logros; mantenimiento de otros campos es extensión de producto. No fabricar certificaciones.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-04",
+      "area": "PERF",
+      "nombre": "Actualizar foto y banner",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Recursos autorizados y necesidad de coherencia visual",
+      "datos_ids": [
+        "D01",
+        "D02",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Assets aplicados, recorte y vista final comprobados",
+      "criterio": "Capacidad solicitada de gestión integral; no se atribuye aquí una regla visual del curso que no se haya revisado.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-05",
+      "area": "PERF",
+      "nombre": "Administrar la sección Destacados",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B10"
+      ],
+      "unit_ids": [
+        "LI-02-M012-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Cambio de oferta, evidencia o prioridad",
+      "datos_ids": [
+        "D02",
+        "D03",
+        "D07",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Recursos añadidos, editados, ordenados o retirados; enlaces y presentación comprobados",
+      "criterio": "Conservar selección útil y actual; verificar el orden realmente visible, no asumir el descrito históricamente.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-06",
+      "area": "PERF",
+      "nombre": "Mantener enlaces y datos de contacto profesionales",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Cambio confirmado de contacto o destino",
+      "datos_ids": [
+        "D01",
+        "D02",
+        "D09",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Destino correcto, visibilidad y acceso comprobados después del cambio",
+      "criterio": "No exponer datos privados ni reemplazar el sitio personal por ProjectApp sin decisión de posicionamiento.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-07",
+      "area": "PERF",
+      "nombre": "Solicitar recomendaciones a colaboradores o clientes reales",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B11"
+      ],
+      "unit_ids": [
+        "LI-02-V017-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Trabajo real terminado o relación con evidencia suficiente",
+      "datos_ids": [
+        "D03",
+        "D04",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Solicitud contextual enviada a la persona correcta",
+      "criterio": "Un borrador orientativo nunca se presenta como testimonio recibido; la persona decide qué decir y si publicarlo.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-08",
+      "area": "PERF",
+      "nombre": "Revisar y administrar recomendaciones recibidas",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B11"
+      ],
+      "unit_ids": [
+        "LI-02-V017-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Recomendación nueva o revisión de evidencia del perfil",
+      "datos_ids": [
+        "D02",
+        "D03",
+        "D10",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Visibilidad o gestión disponible confirmada y testimonio preservado fielmente",
+      "criterio": "La gestión es extensión del producto; no editar palabras de terceros como si fueran su testimonio ni darlo por recibido al solicitarlo.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-09",
+      "area": "PERF",
+      "nombre": "Revisar y ajustar visibilidad profesional y seguimiento",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [
+        "B09"
+      ],
+      "unit_ids": [
+        "LI-03-V005-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Decisión de alcance o configuración incoherente",
+      "datos_ids": [
+        "D01",
+        "D02",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Preferencias concretas aplicadas y efectos comprobados",
+      "criterio": "Separar seguir/conectar, visibilidad y avisos de cambios. No asumir que antiguos menús o advertencias siguen vigentes.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "PERF-10",
+      "area": "PERF",
+      "nombre": "Verificar el perfil después de aplicar cambios",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B02",
+        "B09",
+        "B10"
+      ],
+      "unit_ids": [
+        "LI-02-M012-K04",
+        "LI-02-V016-K01",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-V019-K02",
+        "LI-03-V005-K04"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Modificación confirmada o discrepancia visual",
+      "datos_ids": [
+        "D02",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Comparación con versión autorizada, enlaces, recortes y superficies accesibles",
+      "criterio": "Solo declarar verificadas las vistas realmente observadas; vista propia no acredita idéntica visibilidad pública.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "APRE-01",
+      "area": "APRE",
+      "nombre": "Recoger resultados de publicaciones y perfil",
+      "efecto": "lectura",
+      "fundamento_ids": [
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Corte de medición o nuevos datos disponibles",
+      "datos_ids": [
+        "D02",
+        "D07",
+        "D08",
+        "D14"
+      ],
+      "resultado_verificable": "Métricas con definición, ámbito, intervalo, captura y cobertura",
+      "criterio": "Impresiones, alcance, guardados y visitas se registran si están disponibles; dato ausente no es cero.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "APRE-02",
+      "area": "APRE",
+      "nombre": "Analizar composición y evolución del barrio",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B03",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Muestra observable de seguidores, conexiones e interacciones",
+      "datos_ids": [
+        "D01",
+        "D04",
+        "D06",
+        "D08",
+        "D13"
+      ],
+      "resultado_verificable": "Cambios y papeles observados con tamaño y sesgo de la muestra",
+      "criterio": "Comentaristas identificados no representan a toda la audiencia silenciosa; no exigir solo compradores.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "APRE-03",
+      "area": "APRE",
+      "nombre": "Evaluar calidad de interacción y conversación",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B06",
+        "B07",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-03-M006-K02",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Comentarios o mensajes vinculados a actividad propia",
+      "datos_ids": [
+        "D05",
+        "D06",
+        "D07",
+        "D08",
+        "D10"
+      ],
+      "resultado_verificable": "Preguntas, objeciones, recurrencia, recomendaciones y asuntos abiertos",
+      "criterio": "Separar volumen de respuesta y utilidad; no puntuar automáticamente toda discrepancia como negativa.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "APRE-04",
+      "area": "APRE",
+      "nombre": "Relacionar acciones y oportunidades cuando haya evidencia",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B01",
+        "B07",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-01-M006-K02",
+        "LI-01-M006-K03",
+        "LI-01-M007-K03",
+        "LI-01-M007-K04",
+        "LI-01-V022-K02",
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Oportunidad registrada o desenlace confirmado",
+      "datos_ids": [
+        "D07",
+        "D08",
+        "D10",
+        "D13",
+        "D14"
+      ],
+      "resultado_verificable": "Relación conocida con post/interacción o atribución desconocida explícita",
+      "criterio": "Un post citado en un chat es evidencia de vínculo, no prueba causal exclusiva de contratación.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "APRE-05",
+      "area": "APRE",
+      "nombre": "Comparar piezas e intervenciones con objetivos equivalentes",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Historial suficiente y ventanas comparables",
+      "datos_ids": [
+        "D01",
+        "D05",
+        "D06",
+        "D07",
+        "D08",
+        "D10",
+        "D14"
+      ],
+      "resultado_verificable": "Patrones y diferencias por tema, formato, lector y conversación con límites",
+      "criterio": "Elegir criterio antes de ordenar; no decidir por likes únicamente ni sacar reglas del primer post.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "APRE-06",
+      "area": "APRE",
+      "nombre": "Proponer el siguiente experimento o ajuste",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B12",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-04-M005-K01",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Aprendizaje suficientemente respaldado o incertidumbre concreta",
+      "datos_ids": [
+        "D01",
+        "D03",
+        "D05",
+        "D06",
+        "D07",
+        "D08",
+        "D10"
+      ],
+      "resultado_verificable": "Hipótesis, cambio acotado, resultado esperado y forma de contrastarlo",
+      "criterio": "No cambiar identidad por una mala semana ni prometer repetir resultados de una pieza exitosa.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "APRE-07",
+      "area": "APRE",
+      "nombre": "Mantener memoria de decisiones, resultados e incertidumbre",
+      "efecto": "interna",
+      "fundamento_ids": [
+        "B14",
+        "B16"
+      ],
+      "unit_ids": [
+        "LI-05-V005-K05",
+        "LI-06-V008-K03",
+        "LI-06-V010-K02",
+        "LI-06-V020-K01"
+      ],
+      "fundamento": "criterio_del_curso_y_adaptacion_de_producto",
+      "disparador": "Acción, revisión o aprendizaje material",
+      "datos_ids": [
+        "D01",
+        "D07",
+        "D08",
+        "D10",
+        "D11",
+        "D14"
+      ],
+      "resultado_verificable": "Registro fechado que diferencia observación, interpretación, decisión y simulación",
+      "criterio": "Añadir conocimiento derivado sin reescribir las unidades originales; datos privados solo llegan a quien los necesita.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "ADM-01",
+      "area": "ADM",
+      "nombre": "Revisar notificaciones y convertirlas en pendientes útiles",
+      "efecto": "lectura",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Notificación nueva o sincronización",
+      "datos_ids": [
+        "D06",
+        "D10",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Menciones, respuestas, invitaciones y alertas relevantes deduplicadas",
+      "criterio": "Notificación es señal para consultar el objeto; no prueba por sí sola su estado actual.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "ADM-02",
+      "area": "ADM",
+      "nombre": "Moderar espacios propios",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Spam, exposición indebida o incidencia en un espacio administrable",
+      "datos_ids": [
+        "D06",
+        "D07",
+        "D11",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Acción disponible de moderación confirmada y motivo registrado",
+      "criterio": "Verificar control real sobre el espacio. No ocultar críticas legítimas por desacuerdo ni asumir permisos sobre posts ajenos.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "ADM-03",
+      "area": "ADM",
+      "nombre": "Bloquear o reportar un caso justificado",
+      "efecto": "escritura_linkedin",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Incidencia identificada bajo política específica",
+      "datos_ids": [
+        "D04",
+        "D06",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Acción sobre identidad/objeto correcto confirmada, conservando evidencia pertinente",
+      "criterio": "No reportar por bajo encaje, crítica o competencia; acción de impacto con decisión y motivo verificables.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "ADM-04",
+      "area": "ADM",
+      "nombre": "Detectar restricciones y detener acciones incompatibles",
+      "efecto": "interna",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Error de acceso, restricción, desconexión o conflicto de estado",
+      "datos_ids": [
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Estado operativo, acciones detenidas y recuperación pendiente claros",
+      "criterio": "No eludir restricciones ni repetir por otra vía a ciegas; seguridad, pagos y propiedad de la cuenta permanecen con Gustavo.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    },
+    {
+      "id": "ADM-05",
+      "area": "ADM",
+      "nombre": "Exportar, conciliar y conservar el historial operativo",
+      "efecto": "interna",
+      "fundamento_ids": [],
+      "unit_ids": [],
+      "fundamento": "solicitud_del_usuario_y_diseno_de_producto",
+      "disparador": "Revisión, recuperación o necesidad de auditoría",
+      "datos_ids": [
+        "D07",
+        "D08",
+        "D10",
+        "D11",
+        "D13",
+        "D14",
+        "D15"
+      ],
+      "resultado_verificable": "Inventario de acciones, versiones, confirmaciones, pendientes y lagunas con acceso restringido",
+      "criterio": "No prometer exportación completa de LinkedIn; separar datos obtenidos de datos inexistentes y respetar retención configurada.",
+      "etapa": "alcance_principal",
+      "responsable": null,
+      "herramienta": null,
+      "politica_ejecucion": "pendiente_de_especificar; no habilitada",
+      "implementada": false
+    }
+  ]
+}

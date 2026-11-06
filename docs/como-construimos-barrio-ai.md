@@ -467,6 +467,7 @@ La herramienta completa `course_notes`, las grabaciones, las páginas renderizad
 
 ### Documentación del repositorio
 
+- [Catálogo de 72 acciones sobre LinkedIn](../agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md): ampliación posterior para descubrir referentes, conectar, interactuar, conversar y administrar la presencia profesional; reparto y herramientas pendientes.
 - [Plan maestro F0–F7](../agentes-linkedin/infra/docs/plan-equipo-autonomo.md).
 - [Ciclos conectados de los equipos](../agentes-linkedin/infra/docs/circuitos-equipo.md).
 - [Catálogo detallado de datos externos](../agentes-linkedin/infra/docs/datos-externos-por-equipo.md).

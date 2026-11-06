@@ -10,7 +10,7 @@ Construir para Gustavo un posicionamiento reconocible, autoridad profesional y u
 
 Trabajamos con las clases 01–06, conservando originales y evidencias. Las metas numéricas, oferta, nicho, línea base, voz y cadencia requieren contexto personal; permanecen sin fijar hasta trabajarlo con Gustavo. No interpretar ejemplos del curso como resultados garantizados ni tareas de alumnos como obligaciones del sistema.
 
-Outbound, campañas de calentamiento y contacto de leads quedan pendientes de las clases 07 y posteriores. Diseñar un punto de integración inactivo, sin inventar sus procedimientos. La escucha y comunidad orgánica sí pertenecen a esta primera mitad.
+Las campañas outbound, calentamientos y secuencias de prospección quedan pendientes de las clases 07 y posteriores. Diseñar un punto de integración inactivo, sin inventar sus procedimientos. La comunidad orgánica de la clase 03 sí incluye descubrimiento de perfiles, invitaciones contextualizadas, conversaciones iniciadas con motivo y seguimiento de relaciones reales. El [catálogo de acciones](catalogo-acciones-linkedin.md) precisa esa frontera; un DM iniciado no constituye por sí solo una campaña outbound.
 
 ## 2. Fundamento y decisiones de arquitectura
 
@@ -151,7 +151,7 @@ Ejecutar pruebas focalizadas al modificar código y las comprobaciones exigidas 
 
 Antes de cada sesión: identificar fase y criterio pendiente, consultar fuentes del grupo, elegir un incremento que pueda verificarse. Al terminar: registrar lo cambiado, evidencia, decisiones nuevas, pendientes y siguiente acción. Si aparece una mejora fuera del incremento, anotarla sin desplazar silenciosamente el objetivo.
 
-Siguiente incremento vigente: revisar las dependencias de datos del diseño integral, completar lectura pertinente de F1 y línea base de F2; preparar F3 sin desarrollar los trece agentes simultáneamente. Los incrementos anteriores se conservan abajo como historial.
+Siguiente incremento vigente: a partir del [catálogo de 72 acciones](catalogo-acciones-linkedin.md), repartir responsabilidades y revisar vacíos entre equipos; después seleccionar y validar herramientas por capacidad. Completar la lectura pertinente de F1 y línea base de F2 antes de cerrar esas fases; preparar F3 sin desarrollar los trece agentes simultáneamente. Los incrementos anteriores se conservan abajo como historial.
 
 Documentos relacionados: [arquitectura implementada](methodology/architecture.md), [integración de oficina](office-integration.md), [estructura inicial del equipo](../../arquitectura/ESTRUCTURA.txt), [plantilla de agente](../../arquitectura/plantilla-agente.json), [mapa de roles](../../arquitectura/equipo-autonomo.json) y [registro de lectura](../../arquitectura/registro-lectura.json).
 
@@ -212,3 +212,11 @@ Cierre documental: coordinación verificó cinco correcciones (selección de lec
 ### Aclaración de observabilidad — 2026-11-06
 
 Gustavo aclara que datos externos significa acceso operativo a lo que ocurre en su cuenta: métricas, posts, referentes, interacciones y chats. Se añade [observación integral de LinkedIn](observacion-integral-linkedin.md). El objetivo es sincronización continua y consulta por herramientas; las importaciones manuales son fallback. No cambia el reparto de 13 roles ni activa respuesta automática/outbound. F3/F5/F6 deberán concretar conectores y verificar cobertura; la documentación oficial y de proveedor consultada no prueba permisos efectivos de nuestra aplicación. Esta ampliación es posterior al QA v1 de ciclos.
+
+### Alcance de acciones solicitado — 2026-11-06
+
+El equipo debe poder actuar además de observar: buscar Top Voices y perfiles, invitar a conectar, reaccionar, comentar, publicar, conversar y mantener la cuenta profesional. Se documentan [72 capacidades en ocho áreas](catalogo-acciones-linkedin.md), con disparadores, datos, resultados, criterios y fundamentos; [especificación estructurada](../../arquitectura/catalogo-acciones-linkedin-v1.json).
+
+Orden explícito de trabajo: acciones → reparto entre equipos → herramientas y acceso efectivo → implementación. No se reasignan todavía los trece contratos ni se crean nuevos agentes. La revisión de las unidades de clase 03 precisa que las conexiones y conversaciones orgánicas forman parte del alcance actual; las campañas de la segunda mitad siguen pendientes. D13–D16 amplían los datos con relaciones, estado de ejecución, capacidades reales y disponibilidad.
+
+Se enlazan 34 unidades completas: 19 leídas para este incremento y 15 con lectura previa registrada. No se modifican originales ni se declara F1 completo. La aprobación editorial del plan sigue vigente; las políticas de delegación para nuevas acciones se especificarán al repartir responsabilidades. No se activan permisos, software ni acciones externas. Esta ampliación no hereda el resultado del QA v1; su [validación documental](../../arquitectura/validacion-catalogo-acciones-v1.json) distingue comprobaciones de estructura y recorrido de una prueba real.

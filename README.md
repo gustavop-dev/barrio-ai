@@ -19,6 +19,8 @@ Se conservan las rutas actuales para mantener las referencias entre documentaci�
 
 **Recorrido completo del proyecto:** [cómo construimos Barrio AI, desde los videos hasta la arquitectura de agentes](docs/como-construimos-barrio-ai.md).
 
+**Diseño más reciente:** [72 acciones para operar el LinkedIn de Gustavo](agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md): descubrir referentes, construir el barrio, interactuar, publicar, conversar, mantener el perfil y aprender. Primero se define el alcance; después se repartirán responsabilidades y se elegirán herramientas.
+
 1. [Plan del proyecto](agentes-linkedin/infra/docs/plan-equipo-autonomo.md).
 2. [Ciclos de los cinco equipos](agentes-linkedin/infra/docs/circuitos-equipo.md).
 3. [Datos externos necesarios](agentes-linkedin/infra/docs/datos-externos-por-equipo.md).

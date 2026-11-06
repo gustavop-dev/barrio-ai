@@ -74,7 +74,7 @@ Observar el inbox incluye leer el contexto necesario de los mensajes que llegan 
 
 El analista identifica preguntas, necesidades expresas, objeciones, compromisos, asuntos pendientes y siguiente responsable. Puede preparar un resumen interno y alertar a Gustavo. Una pregunta recurrente puede informar un brief editorial; una confusión sobre la oferta puede informar una revisión del perfil. Los escritores reciben el problema general y evidencia permitida, sin trasladar automáticamente identidades o detalles privados al contenido público.
 
-El borrador de respuesta por DM y la gestión comercial automatizada necesitarían un contrato específico de respuesta y autoridad. No se añaden silenciosamente al rol de analista ni se da por procesado el contenido outbound pendiente. Escuchar conversaciones entrantes sí pertenece a esta ampliación de observabilidad.
+La respuesta por DM y la gestión de conversaciones necesitan un contrato específico de respuesta y autoridad. El [catálogo posterior de acciones](catalogo-acciones-linkedin.md) ya incluye respuestas, conversaciones iniciadas con contexto y seguimiento orgánico, fundamentados en la clase 03. Su reparto y política de ejecución siguen pendientes; no se añaden silenciosamente al rol de analista ni se da por procesado el contenido de campañas outbound. Este documento describe la entrada de observación que esas acciones necesitan.
 
 ## Herramientas compartidas y contexto vivo
 
@@ -150,4 +150,4 @@ Eso permite que el siguiente ciclo responda a lo que está ocurriendo, mantenien
 
 La implementación futura debe proporcionar sincronización de cuenta, investigación de referentes, lectura contextual de conversaciones y consulta de resultados como capacidades centrales. D01/D03/D09 continúan aportando dirección, pruebas y voz; D02/D04–08/D10–12 describen ahora también superficies y flujos que el sistema debe poder consultar.
 
-Antes de contratar o desarrollar conectores, la siguiente especificación debe mapear cada herramienta a proveedor/endpoint, datos accesibles, permisos, actualización, coste y prueba de aceptación. Ninguna fila se marcará implementada solo porque exista documentación de un proveedor. Este documento fija la experiencia objetivo y las decisiones que cada dato debe alimentar; no reinicia extracción, no cambia presupuestos ni ejecuta acciones en LinkedIn.
+Antes de contratar o desarrollar conectores, se seguirá el orden precisado por Gustavo: [definir las acciones](catalogo-acciones-linkedin.md), repartir responsabilidades y después mapear cada capacidad a herramientas, proveedor/endpoint, datos accesibles, permisos, actualización, coste y prueba de aceptación. Ninguna fila se marcará implementada solo porque exista documentación de un proveedor. Este documento fija la experiencia objetivo y las decisiones que cada dato debe alimentar; no reinicia extracción, no cambia presupuestos ni ejecuta acciones en LinkedIn.

@@ -1,0 +1,130 @@
+{
+  "version": "1.0",
+  "fecha": "2026-11-06T19:24:09.282245+00:00",
+  "alcance": "Comprobacion documental y recorrido de diseno por el orquestador; no ejecucion de agentes ni acciones de LinkedIn.",
+  "resultado": "comprobaciones_documentales_satisfactorias",
+  "comprobaciones": {
+    "acciones_unicas": 72,
+    "areas": 8,
+    "fundamentos": 16,
+    "datos_con_ids_validos": true,
+    "campos_requeridos_completos": true,
+    "coherencia_markdown_json": true,
+    "responsables_y_herramientas_sin_asignar": true,
+    "ninguna_accion_activada": true,
+    "escrituras_con_autoridad_estado_y_capacidad": true,
+    "unidades_trazables": 34,
+    "lecturas_completas_en_incremento": 19,
+    "lecturas_completas_previamente_registradas": 15,
+    "clases_01_a_06": true,
+    "enlaces_locales_existentes": 88
+  },
+  "contraste_fuentes": {
+    "unidades_verificadas": 34,
+    "campos_verificados": [
+      "id",
+      "session",
+      "title",
+      "sha256",
+      "source_path",
+      "pointer"
+    ],
+    "consulta": "SET TRANSACTION READ ONLY",
+    "coincidencias": true
+  },
+  "ajustes_durante_revision": [
+    "Unificar D11/D14/D15 en toda accion de escritura: autoridad, estado observable y capacidad efectiva.",
+    "Precisar en plan e inbox que las conversaciones organicas de clase 03 pertenecen al alcance; las campañas 07+ siguen pendientes."
+  ],
+  "recorrido_documental": [
+    {
+      "caso": "Referente sin insignia y participante pequeno con aporte relevante",
+      "resultado_esperado": "DESC-01/05/07 permiten ambos; notoriedad no sustituye pertinencia.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Una misma persona es par y recomendador",
+      "resultado_esperado": "DESC-07 conserva varios papeles; no fuerza comprador unico.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Invitacion pendiente o conexion existente",
+      "resultado_esperado": "RED-02 consulta D13/D14 antes de enviar; RED-03 confirma estado.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Invitacion aceptada sin conversacion que abrir",
+      "resultado_esperado": "No se dispara pitch ni CHAT-04 automaticamente.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Gustavo respondio mientras existia borrador pendiente",
+      "resultado_esperado": "Refrescar CHAT-01 y D14; cancelar o revisar propuesta obsoleta.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Publicacion o mensaje con timeout y efecto incierto",
+      "resultado_esperado": "ADM-04/05 concilia antes de repetir; no declarar fallo ni exito sin evidencia.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "No hay calendario ni disponibilidad confirmada",
+      "resultado_esperado": "CHAT-07 puede consultar, sin confirmar horario ni crear evento.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Solo hay un post o metricas faltantes",
+      "resultado_esperado": "APRE-01/05 mantiene ausentes y evita conclusiones sin historial suficiente.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Un chat privado sugiere una idea editorial",
+      "resultado_esperado": "CONT-02 obtiene patron pertinente, sin trasladar identidad o detalles privados a la publicacion.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Ejercicio de invitaciones del curso usado como cuota actual",
+      "resultado_esperado": "B05 y contrato comun impiden convertirlo en limites o cadencia de automatizacion.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Oportunidad personal frente a contrato de ProjectApp",
+      "resultado_esperado": "CHAT-09 diferencia modalidades; compromisos y disponibilidad requieren hechos.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Publicacion produce preguntas y una oportunidad",
+      "resultado_esperado": "CONT-09 -> INT-04 -> CHAT-01/03/09 -> APRE-03/04 conserva vinculo conocido sin causalidad inventada.",
+      "evaluacion": "cubierto_por_el_diseno"
+    },
+    {
+      "caso": "Hallazgo recurrente exige corregir el perfil",
+      "resultado_esperado": "APRE-06 -> PERF-01/02/05/10 aplica version autorizada y confirma, sin declarar resultado comercial anticipado.",
+      "evaluacion": "cubierto_por_el_diseno"
+    }
+  ],
+  "qa_independiente": false,
+  "revision_humana": false,
+  "runtime_probado": false,
+  "solicitudes_pagadas": false,
+  "acciones_linkedin_ejecutadas": false,
+  "pendientes": [
+    "Reparto de responsabilidades",
+    "Politicas de delegacion por capacidad",
+    "Seleccion y verificacion de herramientas",
+    "Permisos efectivos",
+    "Implementacion y pruebas de comportamiento",
+    "Lectura integral F1 y linea base F2"
+  ],
+  "artefactos": {
+    "README.md": "eade1bda87136172de2768148cf74f8303415d0f48c382628628e313b8b34bd7",
+    "docs/como-construimos-barrio-ai.md": "be971c5f8c5ce1edb59e8536753aa83d8b79f5e519de15457edda1343b557bd3",
+    "agentes-linkedin/infra/docs/plan-equipo-autonomo.md": "ac824156c44eff4197de4f3be02dc89b7b85ef947ecd974b9041dfe1343d41b5",
+    "agentes-linkedin/infra/docs/circuitos-equipo.md": "7b15bd94f47ffd5420b20b10f5a5ed1437b0c1e3332649ffe1e48b7e0beb9cea",
+    "agentes-linkedin/infra/docs/datos-externos-por-equipo.md": "93a7ab0f856db981946dbead395077654ef28e87925639d8a6f2d20b65ad34f2",
+    "agentes-linkedin/infra/docs/observacion-integral-linkedin.md": "b95e662ab36fccf2954873fb123b9669443e83d0a1f37e58d5d3692df808ade0",
+    "agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md": "058ba0b8454445a393241c06809e72b61a7499d33b5ee7c39a258add9a5f15cf",
+    "agentes-linkedin/arquitectura/catalogo-acciones-linkedin-v1.json": "446ac0b525c0d88b70b57337af28e9cc81dc4a065a97d8f51b1b5ccc13e93f3d",
+    "agentes-linkedin/arquitectura/lectura-acciones-linkedin-v1.json": "8f46d0b94a98c6e1923bc8dc986121937cfadbdd16758813d8550e9d24ecc24c"
+  }
+}
