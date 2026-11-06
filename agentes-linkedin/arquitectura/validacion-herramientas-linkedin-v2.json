@@ -1,0 +1,38 @@
+{
+  "version": "2.0",
+  "fecha": "2026-11-06T19:58:01.433410+00:00",
+  "alcance": "Consistencia documental de la seleccion revisada. Fuentes oficiales consultadas; no prueba acceso de nuestra app ni integraciones.",
+  "acciones_mapeadas": 72,
+  "cobertura_documental": {
+    "diseno_interno": 22,
+    "documentada": 30,
+    "documentada_parcial": 13,
+    "sin_cobertura_especifica_verificada": 7
+  },
+  "identificadores_y_nombres_coinciden_con_catalogo": true,
+  "fuentes_por_accion_presentes_en_indice": true,
+  "proveedores_retirados_fuera_de_componentes_propuestos": true,
+  "permisos_efectivos_marcados_sin_comprobar": true,
+  "catalogo_y_matrices_v1_conservados": true,
+  "ninguna_integracion_nueva_probada": true,
+  "software_implementado": false,
+  "llamadas_pagadas": false,
+  "contrataciones": false,
+  "reparto_agentes_modificado": false,
+  "qa_independiente": false,
+  "revision_humana": false,
+  "enlaces_locales_comprobados": 49,
+  "limitaciones": [
+    "Sustitucion de analitica condicionada a aprobacion de LinkedIn; no solo a OAuth del usuario.",
+    "Las capacidades documentadas no equivalen a cobertura completa ni acceso operativo.",
+    "Programacion, ingesta RSS y biblioteca de medios son diseno pendiente.",
+    "Se preservan siete acciones sin contrato especifico y limites parciales.",
+    "Fuentes consultadas en esta fecha; repetir comprobacion contractual al implementar."
+  ],
+  "artefactos": {
+    "README.md": "d3fbfcd91124da838068ebf363492572e77296ac634e7103ff3bc6d3a27ac263",
+    "agentes-linkedin/infra/docs/plan-equipo-autonomo.md": "86b06003a66d29101fc158c66048f9fbc719c843618a4c0aef701338f57c1287",
+    "agentes-linkedin/infra/docs/herramientas-linkedin-v2.md": "f41f41efae93d77a22a4423bff481a55769a22834a5c9e90359608151b36a3cf",
+    "agentes-linkedin/arquitectura/matriz-herramientas-linkedin-v2.json": "cecac25ea31632f5b4481628084962afbe06aece59f3fd4e84422d8763771b95"
+  }
+}

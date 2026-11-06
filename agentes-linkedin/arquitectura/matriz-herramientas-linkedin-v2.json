@@ -1,0 +1,932 @@
+{
+  "version": "2.0",
+  "fecha": "2026-11-06T19:57:30.066148+00:00",
+  "estado": "seleccion_documental_pendiente_acceso_y_pruebas",
+  "catalogo_fuente": "catalogo-acciones-linkedin-v1.json",
+  "alcance": "Seleccion revisada por Gustavo para las 72 capacidades; sin implementacion, reparto nuevo ni autoridad de ejecucion.",
+  "propuesta_principal": [
+    "Unipile API v2",
+    "API oficial de LinkedIn para publicacion y analitica, sujeta a permisos",
+    "Django/PostgreSQL y cola para programacion y coordinacion",
+    "Claude Web Search y Web Fetch para noticias, blogs, opiniones y contexto",
+    "API de imagenes de OpenAI",
+    "Biblioteca propia de fotos reales"
+  ],
+  "opcionales": [
+    "Agenda Google/Microsoft",
+    "Sales Navigator si hacen falta sus filtros"
+  ],
+  "comprobacion": "Documentacion primaria; acceso de nuestra aplicacion no comprobado, sin cuentas conectadas ni llamadas autenticadas a proveedores.",
+  "cobertura_documental": {
+    "diseno_interno": 22,
+    "documentada": 30,
+    "documentada_parcial": 13,
+    "sin_cobertura_especifica_verificada": 7
+  },
+  "fuentes": {
+    "u_features": "https://developer.unipile.com/v2.0/docs/list-provider-features",
+    "u_search": "https://developer.unipile.com/docs/linkedin-search",
+    "u_posts": "https://developer.unipile.com/v2.0/docs/linkedin-retrieve-posts",
+    "u_create": "https://developer.unipile.com/v2.0/docs/linkedin-create-posts",
+    "u_post_edit": "https://developer.unipile.com/v2.0/docs/linkedin-edit-delete-posts",
+    "u_comments": "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments",
+    "u_reactions": "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-reactions",
+    "u_invites": "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations",
+    "u_profile": "https://developer.unipile.com/v2.0/docs/linkedin-edit-own-profile",
+    "u_profile_fields": "https://developer.unipile.com/v2.0/reference/updateuserprofile",
+    "u_mcp": "https://developer.unipile.com/v2.0/docs/mcp",
+    "u_price": "https://www.unipile.com/pricing-api/",
+    "u_block": "https://developer.unipile.com/changelog/v2-oulook-categories-blocked-users-message-mentions",
+    "claude_web": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool",
+    "claude_fetch": "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool",
+    "official_access": "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/community-management-overview",
+    "official_metrics": "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/members/post-statistics",
+    "linkedin_policy": "https://www.linkedin.com/help/linkedin/answer/a1340567/automated-activity-on-linkedin",
+    "official_posts": "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+    "official_post_schema": "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/post-api-schema",
+    "official_open_access": "https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access",
+    "official_permissions": "https://learn.microsoft.com/en-us/linkedin/marketing/increasing-access",
+    "official_review": "https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review",
+    "official_followers": "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/members/follower-statistics",
+    "openai_images": "https://developers.openai.com/api/docs/guides/image-generation"
+  },
+  "acciones": [
+    {
+      "accion_id": "DESC-01",
+      "componente_propuesto": "Unipile v2 + búsqueda web de Claude",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Búsqueda de personas/posts y contraste externo; elegir referentes es razonamiento del equipo, no un ranking de Top Voices proporcionado por la API.",
+      "fuentes": [
+        "https://developer.unipile.com/docs/linkedin-search",
+        "https://developer.unipile.com/v2.0/docs/list-provider-features",
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool"
+      ],
+      "integracion_probada": false,
+      "nombre": "Buscar Top Voices y referentes del nicho"
+    },
+    {
+      "accion_id": "DESC-02",
+      "componente_propuesto": "Unipile v2 + búsqueda web de Claude",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Búsqueda de personas/posts y contraste externo; elegir referentes es razonamiento del equipo, no un ranking de Top Voices proporcionado por la API.",
+      "fuentes": [
+        "https://developer.unipile.com/docs/linkedin-search",
+        "https://developer.unipile.com/v2.0/docs/list-provider-features",
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool"
+      ],
+      "integracion_probada": false,
+      "nombre": "Buscar perfiles para ampliar el barrio"
+    },
+    {
+      "accion_id": "DESC-03",
+      "componente_propuesto": "Unipile v2 + fuentes web primarias",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Perfil y actividad accesibles; financiación e idioma declarado requieren evidencia externa cuando no figuren en el perfil.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features",
+        "https://developer.unipile.com/v2.0/docs/linkedin-retrieve-posts",
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool"
+      ],
+      "integracion_probada": false,
+      "nombre": "Investigar un perfil y su actividad"
+    },
+    {
+      "accion_id": "DESC-04",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Leer posts, comentarios, respuestas y reacciones accesibles, con paginación; no métricas privadas de terceros.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-retrieve-posts",
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments",
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-reactions"
+      ],
+      "integracion_probada": false,
+      "nombre": "Leer publicaciones e hilos de referentes"
+    },
+    {
+      "accion_id": "DESC-05",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Leer posts, comentarios, respuestas y reacciones accesibles, con paginación; no métricas privadas de terceros.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-retrieve-posts",
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments",
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-reactions"
+      ],
+      "integracion_probada": false,
+      "nombre": "Descubrir personas entre quienes comentan y reaccionan"
+    },
+    {
+      "accion_id": "DESC-06",
+      "componente_propuesto": "Unipile v2 + memoria de Barrio AI",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Relaciones, seguidores y seguidos según acceso; la calidad del vínculo se reconstruye con actividad e inbox, no con el listado solo.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Revisar la red y los vínculos existentes"
+    },
+    {
+      "accion_id": "DESC-07",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Clasificar pertinencia y papeles del barrio"
+    },
+    {
+      "accion_id": "DESC-08",
+      "componente_propuesto": "Claude + Django/PostgreSQL, nutridos por Unipile y fuentes web",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Mantener referentes y conversaciones junto con actualidad y perspectivas externas. RSS/Atom cuando la fuente lo ofrezca es un complemento propuesto del backend, no una integracion existente.",
+      "fuentes": [
+        "https://developer.unipile.com/docs/linkedin-search",
+        "https://developer.unipile.com/v2.0/docs/linkedin-retrieve-posts",
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool",
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool"
+      ],
+      "integracion_probada": false,
+      "nombre": "Mantener referentes y un mapa de conversaciones del nicho"
+    },
+    {
+      "accion_id": "RED-01",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Seguir, dejar de seguir y eliminar una relación son operaciones distintas; confirmar estado después.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Seguir a una persona pertinente"
+    },
+    {
+      "accion_id": "RED-02",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Invitaciones enviadas/recibidas, aceptación y retirada; contrastar listas y relación actual. No fijar cuotas desde cifras orientativas del proveedor.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Enviar una invitación contextual a conectar"
+    },
+    {
+      "accion_id": "RED-03",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Invitaciones enviadas/recibidas, aceptación y retirada; contrastar listas y relación actual. No fijar cuotas desde cifras orientativas del proveedor.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Consultar el estado de invitaciones y conexiones"
+    },
+    {
+      "accion_id": "RED-04",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Invitaciones enviadas/recibidas, aceptación y retirada; contrastar listas y relación actual. No fijar cuotas desde cifras orientativas del proveedor.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Aceptar una invitación recibida"
+    },
+    {
+      "accion_id": "RED-05",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Invitaciones enviadas/recibidas, aceptación y retirada; contrastar listas y relación actual. No fijar cuotas desde cifras orientativas del proveedor.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Declinar una invitación recibida"
+    },
+    {
+      "accion_id": "RED-06",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Invitaciones enviadas/recibidas, aceptación y retirada; contrastar listas y relación actual. No fijar cuotas desde cifras orientativas del proveedor.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Retirar una invitación pendiente"
+    },
+    {
+      "accion_id": "RED-07",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Seguir, dejar de seguir y eliminar una relación son operaciones distintas; confirmar estado después.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Dejar de seguir una cuenta"
+    },
+    {
+      "accion_id": "RED-08",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Seguir, dejar de seguir y eliminar una relación son operaciones distintas; confirmar estado después.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-invitations"
+      ],
+      "integracion_probada": false,
+      "nombre": "Eliminar una conexión"
+    },
+    {
+      "accion_id": "RED-09",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Actualizar la memoria de la relación y su siguiente paso"
+    },
+    {
+      "accion_id": "INT-01",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Elegir dónde y cuándo aportar"
+    },
+    {
+      "accion_id": "INT-02",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Añadir o retirar reacción en post/comentario; un cambio puede necesitar retirada y nueva reacción, con conciliación intermedia.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-reactions"
+      ],
+      "integracion_probada": false,
+      "nombre": "Reaccionar a una publicación o comentario"
+    },
+    {
+      "accion_id": "INT-03",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Crear, responder, editar y borrar comentarios propios; comprobar hilo, autoría y permisos concretos.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments"
+      ],
+      "integracion_probada": false,
+      "nombre": "Publicar un comentario propio en un post ajeno"
+    },
+    {
+      "accion_id": "INT-04",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Crear, responder, editar y borrar comentarios propios; comprobar hilo, autoría y permisos concretos.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments"
+      ],
+      "integracion_probada": false,
+      "nombre": "Responder comentarios en publicaciones propias"
+    },
+    {
+      "accion_id": "INT-05",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Crear, responder, editar y borrar comentarios propios; comprobar hilo, autoría y permisos concretos.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments"
+      ],
+      "integracion_probada": false,
+      "nombre": "Continuar un intercambio en un hilo ajeno"
+    },
+    {
+      "accion_id": "INT-06",
+      "componente_propuesto": "API oficial de LinkedIn o Unipile v2; un unico ejecutor por pieza",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Repost con comentario propio documentado. Registrar la via seleccionada y conciliar el resultado; no duplicar el envio entre proveedores.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+        "https://developer.unipile.com/v2.0/docs/linkedin-create-posts"
+      ],
+      "integracion_probada": false,
+      "nombre": "Compartir una publicación con perspectiva propia",
+      "permisos_oficiales_requeridos": [
+        "w_member_social"
+      ],
+      "permisos_en_nuestra_aplicacion_comprobados": false
+    },
+    {
+      "accion_id": "INT-07",
+      "componente_propuesto": "Biblioteca interna; LinkedIn manual por ahora",
+      "estado_documentacion": "sin_cobertura_especifica_verificada",
+      "alcance_y_limite": "Conservar referencia en Barrio AI es viable; no se verificó un método para Guardar en LinkedIn. El guardado interno no se reporta como guardado nativo.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Guardar contenido para consultarlo después"
+    },
+    {
+      "accion_id": "INT-08",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Crear, responder, editar y borrar comentarios propios; comprobar hilo, autoría y permisos concretos.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments"
+      ],
+      "integracion_probada": false,
+      "nombre": "Editar un comentario propio"
+    },
+    {
+      "accion_id": "INT-09",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Crear, responder, editar y borrar comentarios propios; comprobar hilo, autoría y permisos concretos.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments"
+      ],
+      "integracion_probada": false,
+      "nombre": "Retirar un comentario propio"
+    },
+    {
+      "accion_id": "INT-10",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Añadir o retirar reacción en post/comentario; un cambio puede necesitar retirada y nueva reacción, con conciliación intermedia.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-reactions"
+      ],
+      "integracion_probada": false,
+      "nombre": "Cambiar o retirar una reacción propia"
+    },
+    {
+      "accion_id": "CONT-01",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Elegir ideas y pilares pertinentes"
+    },
+    {
+      "accion_id": "CONT-02",
+      "componente_propuesto": "Claude Web Search + Web Fetch + memoria de Barrio AI",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Investigar noticias, blogs, opiniones, estudios y contexto mundial; contrastar hechos, registrar autor/fechas/URL y explicar relevancia para Gustavo. La opinion de una fuente no es un hecho ni la voz personal de Gustavo.",
+      "fuentes": [
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-search-tool",
+        "https://platform.claude.com/docs/en/agents-and-tools/tool-use/web-fetch-tool"
+      ],
+      "integracion_probada": false,
+      "nombre": "Investigar y preparar el brief de una pieza"
+    },
+    {
+      "accion_id": "CONT-03",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Redactar y comparar alternativas de copy"
+    },
+    {
+      "accion_id": "CONT-04",
+      "componente_propuesto": "API de imagenes de OpenAI + biblioteca de fotos reales + preparacion de medios en backend",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Generacion/edicion de imagenes documentada; directrices visuales pendientes. Fotos originales con contexto y procedencia. Componer un PDF multipagina requiere preparacion adicional. Produccion audiovisual completa no cubierta.",
+      "fuentes": [
+        "https://developers.openai.com/api/docs/guides/image-generation"
+      ],
+      "integracion_probada": false,
+      "nombre": "Preparar los recursos visuales o audiovisuales"
+    },
+    {
+      "accion_id": "CONT-05",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Evaluar la pieza desde los lectores del barrio"
+    },
+    {
+      "accion_id": "CONT-06",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Revisar hechos, voz, claridad y versión final"
+    },
+    {
+      "accion_id": "CONT-07",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Organizar el calendario editorial"
+    },
+    {
+      "accion_id": "CONT-08",
+      "componente_propuesto": "Django/PostgreSQL y cola; API oficial al vencer la fecha",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Programar, reprogramar y cancelar el trabajo pendiente internamente. Posts API documenta creacion PUBLISHED, no fecha futura de ejecucion. No crea un pendiente en el programador nativo de LinkedIn; conciliar primero si el envio ya comenzo.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/post-api-schema",
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api"
+      ],
+      "integracion_probada": false,
+      "nombre": "Programar, reprogramar o cancelar una publicación programada"
+    },
+    {
+      "accion_id": "CONT-09",
+      "componente_propuesto": "API oficial de LinkedIn; confirmacion por lectura permitida o Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Crear pieza con medios preparados, guardar URN nativa y resolver URL/IDs. w_member_social permite escritura, no lectura general. Confirmacion posterior depende de lectura autorizada o Unipile. Timeout no activa un segundo ejecutor.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+        "https://learn.microsoft.com/en-us/linkedin/shared/authentication/getting-access",
+        "https://developer.unipile.com/v2.0/docs/linkedin-retrieve-posts"
+      ],
+      "integracion_probada": false,
+      "nombre": "Publicar una pieza y confirmar su versión real",
+      "permisos_oficiales_requeridos": [
+        "w_member_social"
+      ],
+      "permisos_en_nuestra_aplicacion_comprobados": false
+    },
+    {
+      "accion_id": "CONT-10",
+      "componente_propuesto": "API oficial de LinkedIn para la pieza; Unipile solo como via alternativa registrada",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Actualizacion de campos admitidos, como commentary. No asumir que permite sustituir cualquier medio. Confirmar autor, version y resultado antes de actualizar memoria.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-delete-posts"
+      ],
+      "integracion_probada": false,
+      "nombre": "Editar una publicación propia",
+      "permisos_oficiales_requeridos": [
+        "w_member_social"
+      ],
+      "permisos_en_nuestra_aplicacion_comprobados": false
+    },
+    {
+      "accion_id": "CONT-11",
+      "componente_propuesto": "API oficial de LinkedIn para la pieza; Unipile solo como via alternativa registrada",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Eliminacion de un post propio por su identificador documentada. Verificar propiedad y resultado. No confundir retirada de un post con cancelar un trabajo todavia no enviado.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-delete-posts"
+      ],
+      "integracion_probada": false,
+      "nombre": "Retirar una publicación propia",
+      "permisos_oficiales_requeridos": [
+        "w_member_social"
+      ],
+      "permisos_en_nuestra_aplicacion_comprobados": false
+    },
+    {
+      "accion_id": "CONT-12",
+      "componente_propuesto": "LinkedIn nativo, intervención manual",
+      "estado_documentacion": "sin_cobertura_especifica_verificada",
+      "alcance_y_limite": "Sin contrato especifico verificado para articulos largos nativos/newsletters y sus ediciones. El content.article de Posts API comparte una URL con vista previa; no acredita el editor nativo. Preparacion interna y operacion nativa manual por ahora.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/post-api-schema",
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Crear y mantener un artículo"
+    },
+    {
+      "accion_id": "CONT-13",
+      "componente_propuesto": "LinkedIn nativo, intervención manual",
+      "estado_documentacion": "sin_cobertura_especifica_verificada",
+      "alcance_y_limite": "Sin contrato especifico verificado para articulos largos nativos/newsletters y sus ediciones. El content.article de Posts API comparte una URL con vista previa; no acredita el editor nativo. Preparacion interna y operacion nativa manual por ahora.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api",
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/post-api-schema",
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Crear y mantener una newsletter y sus ediciones"
+    },
+    {
+      "accion_id": "CHAT-01",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Enumerar inboxes, chats y mensajes; historial inicial más eventos incrementales. No usar la antigua ruta genérica de chats como si fuera el contrato v2 de LinkedIn.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Consultar conversaciones y sincronizar su historial"
+    },
+    {
+      "accion_id": "CHAT-02",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Clasificar intención, contexto y asuntos pendientes"
+    },
+    {
+      "accion_id": "CHAT-03",
+      "componente_propuesto": "Unipile v2 + decisión de Claude",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Enviar o responder en un hilo; contexto, recursos y oportunidad de intervenir corresponden al equipo. Confirmar resultado por lectura/evento.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Responder un mensaje entrante"
+    },
+    {
+      "accion_id": "CHAT-04",
+      "componente_propuesto": "Unipile v2 + decisión de Claude",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Enviar o responder en un hilo; contexto, recursos y oportunidad de intervenir corresponden al equipo. Confirmar resultado por lectura/evento.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Iniciar una conversación orgánica con contexto"
+    },
+    {
+      "accion_id": "CHAT-05",
+      "componente_propuesto": "Unipile v2 + decisión de Claude",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Enviar o responder en un hilo; contexto, recursos y oportunidad de intervenir corresponden al equipo. Confirmar resultado por lectura/evento.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Retomar una relación existente"
+    },
+    {
+      "accion_id": "CHAT-06",
+      "componente_propuesto": "Unipile v2 + decisión de Claude",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Enviar o responder en un hilo; contexto, recursos y oportunidad de intervenir corresponden al equipo. Confirmar resultado por lectura/evento.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Compartir un recurso o caso pertinente por mensaje"
+    },
+    {
+      "accion_id": "CHAT-07",
+      "componente_propuesto": "Unipile v2 + agenda de Google/Microsoft opcional",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "El mensaje puede coordinar disponibilidad. Consultar/crear evento requiere conexión y autoridad de agenda separadas; sin ellas no prometer horarios.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Proponer una conversación y coordinar disponibilidad"
+    },
+    {
+      "accion_id": "CHAT-08",
+      "componente_propuesto": "Unipile v2 + decisión de Claude",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Enviar o responder en un hilo; contexto, recursos y oportunidad de intervenir corresponden al equipo. Confirmar resultado por lectura/evento.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Dar seguimiento a un intercambio o compromiso acordado"
+    },
+    {
+      "accion_id": "CHAT-09",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Registrar una oportunidad y transferir la decisión a Gustavo"
+    },
+    {
+      "accion_id": "CHAT-10",
+      "componente_propuesto": "Unipile v2 + estado interno de atención",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Update Chat y lectura según campos soportados. Verificar archive/mute/read por proveedor; etiquetas de Barrio AI no son etiquetas nativas.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Organizar el inbox y el estado de atención"
+    },
+    {
+      "accion_id": "PERF-01",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Auditar el perfil frente al posicionamiento"
+    },
+    {
+      "accion_id": "PERF-02",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "Titular mediante specifics de LinkedIn; Acerca de mediante bio. Confirmar esquema exacto y comprobar lectura posterior.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-own-profile",
+        "https://developer.unipile.com/v2.0/reference/updateuserprofile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Actualizar titular y Acerca de"
+    },
+    {
+      "accion_id": "PERF-03",
+      "componente_propuesto": "Unipile v2 + edición manual de campos no cubiertos",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Educación, experiencia y habilidades documentadas; proyectos y cada campo concreto se verifican por separado.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-own-profile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Actualizar trayectoria, proyectos, formación y habilidades"
+    },
+    {
+      "accion_id": "PERF-04",
+      "componente_propuesto": "Unipile v2",
+      "estado_documentacion": "documentada",
+      "alcance_y_limite": "picture y background_picture; verificar recortes y aspecto final en las vistas observables.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/reference/updateuserprofile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Actualizar foto y banner"
+    },
+    {
+      "accion_id": "PERF-05",
+      "componente_propuesto": "LinkedIn nativo, intervención manual por ahora",
+      "estado_documentacion": "sin_cobertura_especifica_verificada",
+      "alcance_y_limite": "No se verificó contrato específico para destacados, contacto, gestión de recomendaciones o preferencias generales de visibilidad; no inferirlo de Edit profile.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-own-profile",
+        "https://developer.unipile.com/v2.0/reference/updateuserprofile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Administrar la sección Destacados"
+    },
+    {
+      "accion_id": "PERF-06",
+      "componente_propuesto": "LinkedIn nativo, intervención manual por ahora",
+      "estado_documentacion": "sin_cobertura_especifica_verificada",
+      "alcance_y_limite": "No se verificó contrato específico para destacados, contacto, gestión de recomendaciones o preferencias generales de visibilidad; no inferirlo de Edit profile.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-own-profile",
+        "https://developer.unipile.com/v2.0/reference/updateuserprofile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Mantener enlaces y datos de contacto profesionales"
+    },
+    {
+      "accion_id": "PERF-07",
+      "componente_propuesto": "Unipile para mensaje contextual; solicitud nativa manual",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Pedir por chat está cubierto; activar el formulario y solicitud formal de recomendaciones de LinkedIn no quedó verificado.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Solicitar recomendaciones a colaboradores o clientes reales"
+    },
+    {
+      "accion_id": "PERF-08",
+      "componente_propuesto": "LinkedIn nativo, intervención manual por ahora",
+      "estado_documentacion": "sin_cobertura_especifica_verificada",
+      "alcance_y_limite": "No se verificó contrato específico para destacados, contacto, gestión de recomendaciones o preferencias generales de visibilidad; no inferirlo de Edit profile.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-own-profile",
+        "https://developer.unipile.com/v2.0/reference/updateuserprofile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Revisar y administrar recomendaciones recibidas"
+    },
+    {
+      "accion_id": "PERF-09",
+      "componente_propuesto": "LinkedIn nativo, intervención manual por ahora",
+      "estado_documentacion": "sin_cobertura_especifica_verificada",
+      "alcance_y_limite": "No se verificó contrato específico para destacados, contacto, gestión de recomendaciones o preferencias generales de visibilidad; no inferirlo de Edit profile.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-edit-own-profile",
+        "https://developer.unipile.com/v2.0/reference/updateuserprofile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Revisar y ajustar visibilidad profesional y seguimiento"
+    },
+    {
+      "accion_id": "PERF-10",
+      "componente_propuesto": "Lectura de perfil Unipile + revisión visual en LinkedIn",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Comparar campos leídos; verificación pública/móvil completa necesita observar esas vistas, no solo un JSON.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features",
+        "https://developer.unipile.com/v2.0/reference/updateuserprofile"
+      ],
+      "integracion_probada": false,
+      "nombre": "Verificar el perfil después de aplicar cambios"
+    },
+    {
+      "accion_id": "APRE-01",
+      "componente_propuesto": "API oficial de LinkedIn; observaciones manuales con procedencia si faltan permisos",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "memberCreatorPostAnalytics para posts propios y memberFollowersCount para seguidores. Permisos de Community Management aun sin comprobar. Ventanas y agregaciones varian; visitas atribuidas al contenido no son visitas generales al perfil. No se acredita todo el panel ni datos privados de otros autores.",
+      "fuentes": [
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/members/post-statistics",
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management/members/follower-statistics",
+        "https://learn.microsoft.com/en-us/linkedin/marketing/increasing-access",
+        "https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review"
+      ],
+      "integracion_probada": false,
+      "nombre": "Recoger resultados de publicaciones y perfil",
+      "permisos_oficiales_requeridos": [
+        "r_member_postAnalytics",
+        "r_member_profileAnalytics"
+      ],
+      "permisos_en_nuestra_aplicacion_comprobados": false
+    },
+    {
+      "accion_id": "APRE-02",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Analizar composición y evolución del barrio"
+    },
+    {
+      "accion_id": "APRE-03",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Evaluar calidad de interacción y conversación"
+    },
+    {
+      "accion_id": "APRE-04",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Relacionar acciones y oportunidades cuando haya evidencia"
+    },
+    {
+      "accion_id": "APRE-05",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Comparar piezas e intervenciones con objetivos equivalentes"
+    },
+    {
+      "accion_id": "APRE-06",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Proponer el siguiente experimento o ajuste"
+    },
+    {
+      "accion_id": "APRE-07",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Mantener memoria de decisiones, resultados e incertidumbre"
+    },
+    {
+      "accion_id": "ADM-01",
+      "componente_propuesto": "Eventos Unipile + consultas periódicas + LinkedIn manual",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Hay eventos de mensajes, relaciones y seguidores; no se verificó un espejo completo del centro de notificaciones ni eventos para cada comentario nuevo.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/list-provider-features"
+      ],
+      "integracion_probada": false,
+      "nombre": "Revisar notificaciones y convertirlas en pendientes útiles"
+    },
+    {
+      "accion_id": "ADM-02",
+      "componente_propuesto": "Unipile v2 con permisos concretos; manual para el resto",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Borrar comentarios propios y administrar comentarios de posts según control real. No asumir borrar cualquier comentario de terceros por existir Delete comment.",
+      "fuentes": [
+        "https://developer.unipile.com/v2.0/docs/linkedin-manage-post-comments"
+      ],
+      "integracion_probada": false,
+      "nombre": "Moderar espacios propios"
+    },
+    {
+      "accion_id": "ADM-03",
+      "componente_propuesto": "Unipile v2 para bloqueo; reporte manual",
+      "estado_documentacion": "documentada_parcial",
+      "alcance_y_limite": "Block/unblock documentados. No se verificó denuncia/report de contenido o cuenta; conservar esa parte manual.",
+      "fuentes": [
+        "https://developer.unipile.com/changelog/v2-oulook-categories-blocked-users-message-mentions"
+      ],
+      "integracion_probada": false,
+      "nombre": "Bloquear o reportar un caso justificado"
+    },
+    {
+      "accion_id": "ADM-04",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Detectar restricciones y detener acciones incompatibles"
+    },
+    {
+      "accion_id": "ADM-05",
+      "componente_propuesto": "Claude + Django/PostgreSQL",
+      "estado_documentacion": "diseno_interno",
+      "alcance_y_limite": "Recuperar contexto, decidir y conservar artefactos con los contratos del equipo; los datos externos siguen siendo dependencias. No implica que el ciclo autónomo ya esté implementado.",
+      "fuentes": [],
+      "integracion_probada": false,
+      "nombre": "Exportar, conciliar y conservar el historial operativo"
+    }
+  ],
+  "version_anterior": "matriz-herramientas-linkedin-v1.json",
+  "retirados_de_la_seleccion": [
+    "Zernio",
+    "Canva"
+  ],
+  "dependencias_de_acceso": [
+    {
+      "capacidad": "publicacion",
+      "producto": "Share on LinkedIn",
+      "permisos": [
+        "w_member_social"
+      ],
+      "acceso_documentado": "Producto disponible via autoservicio; requiere app y OAuth del miembro.",
+      "acceso_efectivo_comprobado": false
+    },
+    {
+      "capacidad": "analitica_propia",
+      "producto": "Community Management",
+      "permisos": [
+        "r_member_postAnalytics",
+        "r_member_profileAnalytics"
+      ],
+      "acceso_documentado": "Solicitud y revision; organizacion legal y caso comercial. ProjectApp es una posible via, no aprobacion.",
+      "acceso_efectivo_comprobado": false
+    },
+    {
+      "capacidad": "lectura_general_oficial",
+      "permisos": [
+        "r_member_social"
+      ],
+      "acceso_documentado": "Cerrado a nuevas solicitudes segun FAQ. Diferente de analitica; confirmar lectura mediante acceso permitido o Unipile.",
+      "acceso_efectivo_comprobado": false
+    }
+  ],
+  "investigacion_ampliada": {
+    "entradas": [
+      "Conversaciones y participantes accesibles de LinkedIn",
+      "Noticias mundiales y contexto tecnologico/economico/empresarial",
+      "Blogs, ensayos, newsletters publicas y opiniones",
+      "Documentacion, estudios y anuncios primarios"
+    ],
+    "herramientas": [
+      "Claude Web Search",
+      "Claude Web Fetch",
+      "RSS/Atom cuando exista, a implementar en backend"
+    ],
+    "registro": [
+      "URL",
+      "autor_o_medio",
+      "fecha_publicacion",
+      "fecha_acontecimiento_si_conocida",
+      "fecha_consulta",
+      "hecho_opinion_o_hipotesis",
+      "evidencia_y_contrastes",
+      "relevancia_para_audiencia",
+      "angulo_editorial_propuesto"
+    ],
+    "limite": "No promete cobertura exhaustiva ni acceso a contenido cerrado; la opinion de una fuente no se atribuye automaticamente a Gustavo.",
+    "implementada": false
+  },
+  "recursos_visuales": {
+    "generacion": "OpenAI Images API",
+    "fotos": "Biblioteca de originales aportados por Gustavo, contexto y versiones derivadas",
+    "directrices_infografias": "pendientes de Gustavo",
+    "composicion_multipagina": "Trabajo interno adicional si se elige PDF/carrusel",
+    "produccion_audiovisual_completa": "sin cobertura en esta seleccion",
+    "integracion_probada": false
+  },
+  "nota_cobertura": "Documentada acredita una funcion en las fuentes, no permisos efectivos ni integracion operativa. Diseno interno tampoco significa software implementado."
+}
