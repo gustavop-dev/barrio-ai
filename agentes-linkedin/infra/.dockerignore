@@ -1,0 +1,16 @@
+.env
+.venv
+artifacts
+backups
+__pycache__
+.pytest_cache
+
+staticfiles/
+.git
+.agents
+.claude
+.codex
+.github
+docs
+tasks
+tests

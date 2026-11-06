@@ -1,0 +1,231 @@
+{
+  "version": "1.0",
+  "fecha": "2026-11-06",
+  "responsable": "diseno_editorial",
+  "alcance": "Lectura completa de 17 unidades seleccionadas para este incremento documental; no lectura integral del corpus ni validación independiente de ejemplos. Títulos consultados no cuentan como contenido leído.",
+  "consulta": "SELECT id,session,title,original,sha256,source_path,pointer FROM units WHERE active AND id=ANY(ids)",
+  "lecturas_completas": 17,
+  "unidades": [
+    {
+      "id": "LI-04-M005-K01",
+      "session": 4,
+      "title": "Cinco filtros para validar un pilar temático antes de usarlo",
+      "sha256": "1e842747d5ba303d8c2bdc04955547318370636a0e5d5dea9d1e6a2c4f87c968",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-04-revisada.json",
+      "pointer": "/learning_units/190",
+      "lectura_completa": true,
+      "interpretacion": "Evaluar relevancia, diferencia, disfrute, demanda e intercambio por separado.",
+      "limites": [
+        "No hay puntuación ni aprobación por mayoría prescrita; demanda desconocida permanece hipótesis."
+      ]
+    },
+    {
+      "id": "LI-04-M005-K02",
+      "session": 4,
+      "title": "Triangular el buyer con el contenido mediante dolores, aspiraciones y objeciones",
+      "sha256": "a64daec4c717a902a4a3b1c72bfffda5861d5cf4585b9f46fe6206ae12e53fcd",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-04-revisada.json",
+      "pointer": "/learning_units/191",
+      "lectura_completa": true,
+      "interpretacion": "Nutrir temas de dolores, aspiraciones y objeciones documentados del comprador.",
+      "limites": [
+        "Las cantidades y horizonte de doce meses son ejercicio, no cuota obligatoria por post."
+      ]
+    },
+    {
+      "id": "LI-04-M007-K03",
+      "session": 4,
+      "title": "Combinar pilares imán y nicho: la propuesta 60/40 del documento",
+      "sha256": "81177f1dd02db9bf0a70355a67cb668557ee321024c15d2c4f6890b54aadd78d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-04-revisada.json",
+      "pointer": "/learning_units/199",
+      "lectura_completa": true,
+      "interpretacion": "Distinguir atracción accesible y autoridad vinculada con oferta.",
+      "limites": [
+        "60/40 imán/nicho es propuesta del adjunto, no ley; distinto del 60/40 oportunidades personales/ProjectApp confirmado por Gustavo."
+      ]
+    },
+    {
+      "id": "LI-04-V009-K04",
+      "session": 4,
+      "title": "Inteligencia artificial para líderes y operadores: anichar mediante decisiones de negocio",
+      "sha256": "6821087a36e364a4764438dfafe429f3dc430cf843750fd73ba6086bf7ddb60a",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-04-revisada.json",
+      "pointer": "/learning_units/37",
+      "lectura_completa": true,
+      "interpretacion": "Concretar IA mediante decisiones y problemas del negocio del founder.",
+      "limites": [
+        "Nombrar IA no demuestra nicho, productividad ni implementación real."
+      ]
+    },
+    {
+      "id": "LI-04-V011-K02",
+      "session": 4,
+      "title": "Demanda activa y capacidad de generar conversación: validar el tema escuchando al barrio",
+      "sha256": "5f438490404c3cf3a4545b333724374e83d7f318529b5ed4dbaeda79ecc0a9c7",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-04-revisada.json",
+      "pointer": "/learning_units/46",
+      "lectura_completa": true,
+      "interpretacion": "Solicitar señales de demanda y lenguaje del barrio para revisar ángulos.",
+      "limites": [
+        "Sin umbrales universales; interés bajo no prohíbe el tema. Investigación se asigna a Observatorio por diseño propio."
+      ]
+    },
+    {
+      "id": "LI-05-V009-K02",
+      "session": 5,
+      "title": "Procedimiento «De pilar a idea»: tema → dolor → frase",
+      "sha256": "94df3930a95082e9473e3a9324654ac5dd913475df4f2c05418475e46fd8097a",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/28",
+      "lectura_completa": true,
+      "interpretacion": "Pasar de pilar a dolor específico y frase con tensión real.",
+      "limites": [
+        "Frase inicial no es post completo; no atribuir al autor la experiencia del ejemplo."
+      ]
+    },
+    {
+      "id": "LI-05-V014-K03",
+      "session": 5,
+      "title": "Pasar del pilar temático a un ángulo de post mediante la regla del uno",
+      "sha256": "936b91fbbc7b6a8591c5c82af3c59915dad51862472674f32dab5b8a53209326",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/48",
+      "lectura_completa": true,
+      "interpretacion": "Acotar una persona, un problema y una idea para cada borrador.",
+      "limites": [
+        "No impone extensión exacta ni elimina lectores secundarios."
+      ]
+    },
+    {
+      "id": "LI-05-V016-K02",
+      "session": 5,
+      "title": "Estructurar el post como gancho, cuerpo y solución: abrir la curiosidad sin anticipar toda la conclusión",
+      "sha256": "0ea0ea4d568624c8991e3a7cbd5336075338ebfc2a4d6b54da4429aa1300b759",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/56",
+      "lectura_completa": true,
+      "interpretacion": "Conectar gancho, desarrollo y salida cumpliendo la curiosidad abierta.",
+      "limites": [
+        "Giro y CTA son recursos condicionales, no obligaciones; no inventar sorpresa."
+      ]
+    },
+    {
+      "id": "LI-05-V018-K01",
+      "session": 5,
+      "title": "Combinar estructura problema-solución con ideas emotivas y técnicas sin imponer un estilo literario",
+      "sha256": "c7bb682453420d050c07c41f53566c5fddd7ff928e96c3b9a4f2b3911febab76",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/63",
+      "lectura_completa": true,
+      "interpretacion": "Combinar explicación técnica y dimensión humana cuando ayudan a comprender.",
+      "limites": [
+        "No exigir estilo literario ni copiar la voz del ejemplo."
+      ]
+    },
+    {
+      "id": "LI-05-V018-K05",
+      "session": 5,
+      "title": "Publicar solo texto como una elección editorial válida y sencilla",
+      "sha256": "dcd8eb6b5355d554d0cc0468a8c9b6f4a8368a5bc09e110ad2e87db966ca9714",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/67",
+      "lectura_completa": true,
+      "interpretacion": "Elegir solo texto cuando expresa suficientemente la idea.",
+      "limites": [
+        "No demuestra superioridad universal del formato; conservar discrepancias entre ejemplo visible y paráfrasis oral."
+      ]
+    },
+    {
+      "id": "LI-05-V019-K04",
+      "session": 5,
+      "title": "Vídeos propios y externos: ilustrar un concepto, aportar perspectiva y dar crédito",
+      "sha256": "875de8455046591e086f2723bf6eb72e466ffd92d3d7b7df32b61f0287c224d3",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/72",
+      "lectura_completa": true,
+      "interpretacion": "Material audiovisual pertinente requiere perspectiva y crédito.",
+      "limites": [
+        "Observación de formato es temporal; crédito no equivale a autorización de reutilización, control propio adicional."
+      ]
+    },
+    {
+      "id": "LI-05-V019-K05",
+      "session": 5,
+      "title": "Carrusel: una secuencia de imágenes cuya conveniencia depende del contenido y del esfuerzo de producción",
+      "sha256": "6f1bd46d01b9c0941b28c02d7ab32b01744af393bd8c3374102d6a4db55f25cb",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/73",
+      "lectura_completa": true,
+      "interpretacion": "Elegir carrusel según beneficio secuencial y esfuerzo real de producción.",
+      "limites": [
+        "No adoptar máximas ilustrativas como hechos; tendencia del curso no acredita rendimiento actual."
+      ]
+    },
+    {
+      "id": "LI-05-V027-K01",
+      "session": 5,
+      "title": "Contar casos confidenciales mediante storytelling sin perder el aprendizaje transferible",
+      "sha256": "a9c2a66a4bb31c766efa903e740fbef12fd88dc7e30dfc4f97650dc4e3e8052d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/101",
+      "lectura_completa": true,
+      "interpretacion": "Conservar aprendizaje de experiencia real protegiendo identificadores.",
+      "limites": [
+        "Anonimizar no garantiza permiso ni confidencialidad; no alterar resultados reales para embellecer."
+      ]
+    },
+    {
+      "id": "LI-06-M001-K03",
+      "session": 6,
+      "title": "Regla 1.2: elegir un solo gancho y eliminar las aperturas que compiten",
+      "sha256": "38aeef7746ec6a0a40b4a13dd3c391846ec8d29cc8a1e43841f2b0fffc6a1512",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/137",
+      "lectura_completa": true,
+      "interpretacion": "Unificar la apertura alrededor de un gancho reconocible.",
+      "limites": [
+        "No significa una frase única ni fabricar confesión incómoda."
+      ]
+    },
+    {
+      "id": "LI-06-M001-K07",
+      "session": 6,
+      "title": "Regla 2.2: concretar con nombres, números y lugares sin inventar evidencia",
+      "sha256": "157563808cc1df50b0463141f96124c461d6bf6d265f473f3c1cf2952e9b042e",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/141",
+      "lectura_completa": true,
+      "interpretacion": "Sustituir generalidades por datos reales con fuente y alcance.",
+      "limites": [
+        "Ejemplos del manual no son pruebas del autor; cifras ausentes no se completan."
+      ]
+    },
+    {
+      "id": "LI-06-M003-K06",
+      "session": 6,
+      "title": "Qué delegar a Claude y qué no: tareas editoriales con autenticidad y revisión humana",
+      "sha256": "c01c7a6a23b9e581c7b389b301ec15886cd7d1b172469f89fa31a1f1c7d87e38",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/166",
+      "lectura_completa": true,
+      "interpretacion": "Delegar borrador, edición y adaptación preservando experiencia y revisión humana.",
+      "limites": [
+        "Sin publicación automática, historia ficticia atribuida al autor ni proveedor obligatorio."
+      ]
+    },
+    {
+      "id": "LI-06-V033-K01",
+      "session": 6,
+      "title": "Ligereza y contundencia sin convertir la brevedad en una regla absoluta",
+      "sha256": "f833a2203c4a794fe28594cc746bd604206d61f33ca3f38ca1950c6f1740578b",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/128",
+      "lectura_completa": true,
+      "interpretacion": "Editar para comprensión y atención sin limitar por longitud solamente.",
+      "limites": [
+        "Sin garantía de retención ni umbral universal de palabras."
+      ]
+    }
+  ]
+}

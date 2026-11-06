@@ -1,0 +1,4728 @@
+{
+  "schema_version": 1,
+  "session": 2,
+  "operation": "asignar_unidades_existentes_por_referencia_sin_reescribir",
+  "state": "asignacion_local_no_conectada_al_runtime",
+  "source": {
+    "path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+    "sha256": "976618b1d54f29c66a3f965f8aa08679ced957c1b37ec880224ee3c2bca9be4b",
+    "description": "Versión revisada que ya existía antes de esta tarea; se referencia sin modificarla.",
+    "scope": "Revisión independiente de hallazgos pendientes; no revisión integral nueva de cada frase."
+  },
+  "historical_extraction": {
+    "path": "LinkedIn Sales - Procesamiento completo/session-02/quality/aprendizajes.json",
+    "sha256": "356da271cffc9cc6cc828b9fddd63d1bb867006cc40b25646deb19601ea26cd1"
+  },
+  "evidence_index": {
+    "path": "LinkedIn Sales - Procesamiento completo/revision-independiente/fuentes.jsonl",
+    "sha256": "fa3c1b6dd9f674754f066af0dcb631902b92d0cf019e93a70f4a8a89fbab8015"
+  },
+  "counts": {
+    "total_units_reviewed": 192,
+    "perfil": 175,
+    "posicionamiento": 27,
+    "shared": 23,
+    "perfil_only": 152,
+    "posicionamiento_only": 4,
+    "assigned_unique": 179,
+    "other_teams_or_scope": 11,
+    "not_assigned": 2
+  },
+  "agents": {
+    "posicionamiento": {
+      "unit_ids": [
+        "LI-02-V001-K01",
+        "LI-02-V001-K02",
+        "LI-02-V002-K03",
+        "LI-02-V002-K04",
+        "LI-02-V003-K01",
+        "LI-02-V008-K02",
+        "LI-02-V008-K03",
+        "LI-02-V008-K04",
+        "LI-02-V010-K01",
+        "LI-02-V013-K01",
+        "LI-02-V016-K01",
+        "LI-02-V016-K04",
+        "LI-02-V016-K05",
+        "LI-02-V018-K04",
+        "LI-02-V019-K01",
+        "LI-02-V019-K04",
+        "LI-02-V020-K02",
+        "LI-02-V021-K01",
+        "LI-02-V022-K05",
+        "LI-02-V023-K03",
+        "LI-02-V023-K04",
+        "LI-02-V024-K01",
+        "LI-02-V024-K02",
+        "LI-02-V024-K03",
+        "LI-02-M005-K02",
+        "LI-02-M005-K03",
+        "LI-02-BATCH-AUDIT-K01"
+      ]
+    },
+    "perfil": {
+      "unit_ids": [
+        "LI-02-V001-K01",
+        "LI-02-V001-K02",
+        "LI-02-V001-K03",
+        "LI-02-V002-K01",
+        "LI-02-V002-K02",
+        "LI-02-V002-K03",
+        "LI-02-V002-K04",
+        "LI-02-V003-K02",
+        "LI-02-V003-K03",
+        "LI-02-V004-K01",
+        "LI-02-V004-K02",
+        "LI-02-V004-K03",
+        "LI-02-V004-K04",
+        "LI-02-V005-K01",
+        "LI-02-V005-K02",
+        "LI-02-V005-K03",
+        "LI-02-V005-K04",
+        "LI-02-V005-K05",
+        "LI-02-V006-K01",
+        "LI-02-V006-K02",
+        "LI-02-V006-K03",
+        "LI-02-V006-K04",
+        "LI-02-V007-K01",
+        "LI-02-V007-K02",
+        "LI-02-V007-K03",
+        "LI-02-V008-K01",
+        "LI-02-V008-K02",
+        "LI-02-V008-K03",
+        "LI-02-V008-K04",
+        "LI-02-V008-K05",
+        "LI-02-V009-K01",
+        "LI-02-V009-K02",
+        "LI-02-V009-K03",
+        "LI-02-V009-K04",
+        "LI-02-V010-K01",
+        "LI-02-V010-K02",
+        "LI-02-V010-K03",
+        "LI-02-V010-K04",
+        "LI-02-V010-K05",
+        "LI-02-V011-K01",
+        "LI-02-V011-K02",
+        "LI-02-V011-K03",
+        "LI-02-V011-K04",
+        "LI-02-V011-K05",
+        "LI-02-V012-K01",
+        "LI-02-V013-K01",
+        "LI-02-V013-K02",
+        "LI-02-V014-K01",
+        "LI-02-V014-K02",
+        "LI-02-V014-K03",
+        "LI-02-V014-K04",
+        "LI-02-V014-K05",
+        "LI-02-V014-K06",
+        "LI-02-V015-K01",
+        "LI-02-V015-K02",
+        "LI-02-V015-K03",
+        "LI-02-V015-K04",
+        "LI-02-V015-K05",
+        "LI-02-V016-K01",
+        "LI-02-V016-K02",
+        "LI-02-V016-K03",
+        "LI-02-V016-K04",
+        "LI-02-V016-K05",
+        "LI-02-V017-K01",
+        "LI-02-V017-K02",
+        "LI-02-V017-K03",
+        "LI-02-V017-K04",
+        "LI-02-V018-K01",
+        "LI-02-V018-K02",
+        "LI-02-V018-K03",
+        "LI-02-V018-K04",
+        "LI-02-V018-K05",
+        "LI-02-V019-K01",
+        "LI-02-V019-K02",
+        "LI-02-V019-K03",
+        "LI-02-V019-K04",
+        "LI-02-V019-K05",
+        "LI-02-V020-K01",
+        "LI-02-V020-K02",
+        "LI-02-V020-K03",
+        "LI-02-V020-K04",
+        "LI-02-V020-K05",
+        "LI-02-V021-K01",
+        "LI-02-V021-K02",
+        "LI-02-V021-K03",
+        "LI-02-V021-K04",
+        "LI-02-V022-K01",
+        "LI-02-V022-K02",
+        "LI-02-V022-K03",
+        "LI-02-V022-K04",
+        "LI-02-V022-K05",
+        "LI-02-V023-K01",
+        "LI-02-V023-K02",
+        "LI-02-V023-K03",
+        "LI-02-V024-K02",
+        "LI-02-V025-K01",
+        "LI-02-V025-K02",
+        "LI-02-V025-K03",
+        "LI-02-M001-K01",
+        "LI-02-M001-K02",
+        "LI-02-M001-K03",
+        "LI-02-M001-K04",
+        "LI-02-M001-K05",
+        "LI-02-M001-K06",
+        "LI-02-M002-K01",
+        "LI-02-M002-K02",
+        "LI-02-M002-K03",
+        "LI-02-M002-K04",
+        "LI-02-M002-K05",
+        "LI-02-M002-K06",
+        "LI-02-M003-K01",
+        "LI-02-M003-K02",
+        "LI-02-M003-K03",
+        "LI-02-M003-K04",
+        "LI-02-M004-K01",
+        "LI-02-M004-K02",
+        "LI-02-M004-K03",
+        "LI-02-M004-K04",
+        "LI-02-M004-K05",
+        "LI-02-M005-K01",
+        "LI-02-M005-K02",
+        "LI-02-M005-K03",
+        "LI-02-M005-K04",
+        "LI-02-M005-K05",
+        "LI-02-M005-K06",
+        "LI-02-M005-K07",
+        "LI-02-M005-K08",
+        "LI-02-M006-K01",
+        "LI-02-M006-K02",
+        "LI-02-M006-K03",
+        "LI-02-M007-K01",
+        "LI-02-M007-K02",
+        "LI-02-M007-K03",
+        "LI-02-M007-K04",
+        "LI-02-M008-K01",
+        "LI-02-M008-K02",
+        "LI-02-M008-K03",
+        "LI-02-M008-K04",
+        "LI-02-M008-K05",
+        "LI-02-M008-K06",
+        "LI-02-M009-K01",
+        "LI-02-M009-K02",
+        "LI-02-M009-K03",
+        "LI-02-M009-K04",
+        "LI-02-M009-K05",
+        "LI-02-M010-K01",
+        "LI-02-M010-K02",
+        "LI-02-M010-K03",
+        "LI-02-M011-K01",
+        "LI-02-M011-K03",
+        "LI-02-M011-K04",
+        "LI-02-M011-K05",
+        "LI-02-M012-K04",
+        "LI-02-M012-K05",
+        "LI-02-M012-K06",
+        "LI-02-M013-K01",
+        "LI-02-M013-K02",
+        "LI-02-M013-K03",
+        "LI-02-M013-K04",
+        "LI-02-M013-K05",
+        "LI-02-M013-K06",
+        "LI-02-M013-K07",
+        "LI-02-M014-K01",
+        "LI-02-M014-K02",
+        "LI-02-M014-K03",
+        "LI-02-M014-K04",
+        "LI-02-M015-K01",
+        "LI-02-M015-K02",
+        "LI-02-M015-K03",
+        "LI-02-M016-K01",
+        "LI-02-M016-K02",
+        "LI-02-BATCH-AUDIT-K01",
+        "LI-02-BATCH-AUDIT-K02",
+        "LI-02-BATCH-AUDIT-K03",
+        "LI-02-BATCH-AUDIT-K04"
+      ]
+    }
+  },
+  "interpretation": "Los motivos y etiquetas son metadatos de asignación, no sustituyen ni reformulan el conocimiento. Cada referencia apunta a la unidad completa con explicación, aplicación, ejemplos, límites y evidencias originales. No son instrucciones nuevas ni activan tareas administrativas o acciones externas.",
+  "review_scope": "Se revisaron títulos y aplicaciones de las 192 unidades, límites de las unidades indicadas y explicaciones completas de los núcleos compartidos. Revisión de pertinencia para reparto, no nueva auditoría integral de fidelidad ni verificación externa de interfaces.",
+  "assignments": [
+    {
+      "unit_id": "LI-02-V001-K01",
+      "title": "Conocer al buyer persona no equivale a tener una comunicación optimizada",
+      "source_pointer": "/learning_units/0",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Conecta la definición estratégica del comprador con la comunicación que redacta Perfil.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00007",
+        "02:qt00008",
+        "02:qt00009",
+        "02:qt00010",
+        "02:qt00011",
+        "02:ee759999a5ddefebd36e:p031",
+        "02:qt00012",
+        "02:qt00016"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V001-K02",
+      "title": "Revisión transversal de mensajes: dolores, soluciones y transformaciones conectadas",
+      "source_pointer": "/learning_units/1",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "La coherencia dolor-solución-transformación corresponde a Posicionamiento; su expresión en LinkedIn corresponde a Perfil.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00012",
+        "02:qt00013",
+        "02:qt00014",
+        "02:qt00015",
+        "02:qt00016",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:qt00009",
+        "02:qt00010"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V001-K03",
+      "title": "El perfil de LinkedIn como tienda y landing de venta",
+      "source_pointer": "/learning_units/2",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00018",
+        "02:qt00019",
+        "02:qt00020",
+        "02:qt00021",
+        "02:qt00022",
+        "02:qt00023",
+        "02:qt00003"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V002-K01",
+      "title": "El perfil como tienda descubrible: aprovechar la credibilidad de la plataforma exige claridad propia",
+      "source_pointer": "/learning_units/3",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00024",
+        "02:qt00025",
+        "02:qt00026",
+        "02:qt00027",
+        "02:qt00028",
+        "02:ee759999a5ddefebd36e:p015"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V002-K02",
+      "title": "La prueba de autonomía comercial: ¿el perfil habla por ti cuando tú no estás?",
+      "source_pointer": "/learning_units/4",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00029",
+        "02:qt00030",
+        "02:qt00031",
+        "02:qt00040",
+        "02:qt00076",
+        "02:qv0007",
+        "02:qv0008"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V002-K03",
+      "title": "No exigir arqueología al visitante: buyer persona prioritario y lectura sin ambigüedad",
+      "source_pointer": "/learning_units/5",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Prioridad del comprador y claridad de lectura conectan decisiones estratégicas y redacción.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00032",
+        "02:qt00033",
+        "02:qt00034",
+        "02:qt00035",
+        "02:qt00036",
+        "02:qt00037",
+        "02:qt00038",
+        "02:qt00039",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V002-K04",
+      "title": "Objetivo y secuencia de trabajo: comprador, dolor y transformación antes de ampliar conexiones",
+      "source_pointer": "/learning_units/6",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Establece la dependencia entre definición del comprador, perfil y trabajo posterior de comunidad.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00042",
+        "02:qt00043",
+        "02:qt00044",
+        "02:qt00045",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V003-K01",
+      "title": "El entorno de la tienda en LinkedIn puede mejorarse mediante las propias acciones",
+      "source_pointer": "/learning_units/7",
+      "agents": [
+        "posicionamiento"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Contexto de la comunidad que rodea al negocio; no contiene un procedimiento de networking.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00046"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V003-K02",
+      "title": "Revisar el perfil desde el cliente ideal y evitar que tenga que hacer arqueología",
+      "source_pointer": "/learning_units/8",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00047",
+        "02:qt00048",
+        "02:qt00049",
+        "02:qt00050",
+        "02:qt00051",
+        "02:qt00052",
+        "02:qt00053",
+        "02:qt00054",
+        "02:qt00055",
+        "02:qt00056",
+        "02:qt00057",
+        "02:qt00058",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V003-K03",
+      "title": "Auditoría del titular, el banner y el «Acerca de»: cliente, problema y resultado",
+      "source_pointer": "/learning_units/9",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00059",
+        "02:qt00060",
+        "02:qt00061",
+        "02:qt00062",
+        "02:qt00065",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V004-K01",
+      "title": "La prueba de la tienda: que el perfil hable por ti cuando no estás",
+      "source_pointer": "/learning_units/10",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00076",
+        "02:qt00077",
+        "02:qt00078",
+        "02:qt00079",
+        "02:qv0007",
+        "02:qv0008",
+        "02:qv0009",
+        "02:qt00080",
+        "02:qt00029"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V004-K02",
+      "title": "Autoauditoría del perfil: cliente visible, problema claro y resultado comunicado",
+      "source_pointer": "/learning_units/11",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00080",
+        "02:qt00081",
+        "02:qt00082",
+        "02:qv0006",
+        "02:qv0010",
+        "02:qv0011",
+        "02:qs00930000"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V004-K03",
+      "title": "Banner y titular coordinados: el ejemplo de marca personal, resultado y método",
+      "source_pointer": "/learning_units/12",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00083",
+        "02:qt00084",
+        "02:qt00085",
+        "02:qt00086",
+        "02:qt00087",
+        "02:qt00088",
+        "02:qt00089",
+        "02:qt00090",
+        "02:qv0012",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:qt00080",
+        "02:qt00082"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V004-K04",
+      "title": "Adaptar el banner: contacto, credibilidad de clientes y contenido que no tape la foto",
+      "source_pointer": "/learning_units/13",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "contacto_en_banner_con_variantes_entre_audio_y_PDF"
+      ],
+      "source_keys": [
+        "02:qt00091",
+        "02:qt00092",
+        "02:qt00093",
+        "02:qt00094",
+        "02:qt00095",
+        "02:qv0012",
+        "02:ee759999a5ddefebd36e:p014",
+        "02:qt00084",
+        "02:qt00088",
+        "02:qt00090",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:qt00188"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V005-K01",
+      "title": "La parte superior como gancho: diseñar el banner y comprobarlo en computador y teléfono",
+      "source_pointer": "/learning_units/14",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00096",
+        "02:qt00097",
+        "02:qt00098",
+        "02:ee759999a5ddefebd36e:p014"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V005-K02",
+      "title": "Autodiagnóstico antes de editar: comprador, dolor y resultado visibles",
+      "source_pointer": "/learning_units/15",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00099",
+        "02:qt00100",
+        "02:qt00101",
+        "02:qt00102",
+        "02:qt00103",
+        "02:qv0013",
+        "02:qs01290000"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V005-K03",
+      "title": "No hacer adivinar al cliente: relevancia para su problema antes que admiración por la trayectoria",
+      "source_pointer": "/learning_units/16",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00104",
+        "02:qt00105",
+        "02:qt00106",
+        "02:qt00107",
+        "02:qt00108",
+        "02:qv0014",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V005-K04",
+      "title": "Diagnóstico con IA «Tu primera impresión en LinkedIn»: propósito, entradas y condiciones de uso",
+      "source_pointer": "/learning_units/17",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Diagnóstico de claridad y función comercial del perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00109",
+        "02:qt00110",
+        "02:qt00111",
+        "02:qt00112",
+        "02:qt00113",
+        "02:qt00114",
+        "02:qt00115",
+        "02:qv0015"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V005-K05",
+      "title": "Nombre limpio para facilitar la búsqueda y ubicación del titular",
+      "source_pointer": "/learning_units/18",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Nombre, titular y apertura del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:qt00116",
+        "02:qt00117",
+        "02:qt00118",
+        "02:qt00119",
+        "02:qv0016",
+        "02:ee759999a5ddefebd36e:p022"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V006-K01",
+      "title": "Del cargo a la utilidad: distinguir un titular comercial de una placa de oficina",
+      "source_pointer": "/learning_units/19",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Nombre, titular y apertura del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00120",
+        "02:qt00121",
+        "02:qt00122",
+        "02:qt00123",
+        "02:qt00124",
+        "02:qv0016",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:qt00117",
+        "02:qt00119"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V006-K02",
+      "title": "Las primeras palabras del titular como oportunidad de descubrimiento y posicionamiento",
+      "source_pointer": "/learning_units/20",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Nombre, titular y apertura del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00125",
+        "02:qt00126",
+        "02:qt00127",
+        "02:qt00128",
+        "02:qt00129",
+        "02:qt00130",
+        "02:qt00131",
+        "02:qt00132",
+        "02:qt00133",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V006-K03",
+      "title": "El banner como valla de soluciones: detectar espacios vacíos o mensajes que no ayudan a vender",
+      "source_pointer": "/learning_units/21",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Nombre, titular y apertura del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00134",
+        "02:qt00135",
+        "02:qt00136",
+        "02:qt00137",
+        "02:qv0017",
+        "02:ee759999a5ddefebd36e:p014",
+        "02:ee759999a5ddefebd36e:p016"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V006-K04",
+      "title": "El inicio del «Acerca de»: gancho, relevancia para el cliente y primera impresión",
+      "source_pointer": "/learning_units/22",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Nombre, titular y apertura del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00138",
+        "02:qt00139",
+        "02:qt00140",
+        "02:qt00141",
+        "02:qv0018",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p031",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V007-K01",
+      "title": "Abrir el Acerca de con un gancho: la analogía del comienzo de una conferencia",
+      "source_pointer": "/learning_units/23",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Nombre, titular y apertura del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00142",
+        "02:qt00143",
+        "02:qt00144",
+        "02:qt00145",
+        "02:qt00146",
+        "02:qt00147",
+        "02:qt00148",
+        "02:qt00149",
+        "02:qt00150",
+        "02:qv0018",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V007-K02",
+      "title": "No obligar al lector a deducir el beneficio desde una declaración de pasión personal",
+      "source_pointer": "/learning_units/24",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Nombre, titular y apertura del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00151",
+        "02:qt00152",
+        "02:qt00153",
+        "02:qt00154",
+        "02:qt00155",
+        "02:qv0018",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V007-K03",
+      "title": "Activar Destacados y convertirlo en un escaparate de enlaces, metodología y conocimiento experto",
+      "source_pointer": "/learning_units/25",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:qt00156",
+        "02:qt00157",
+        "02:qt00158",
+        "02:qt00159",
+        "02:qt00160",
+        "02:qt00161",
+        "02:qt00162",
+        "02:qt00163",
+        "02:qt00164",
+        "02:qv0019",
+        "02:qv0020",
+        "02:ee759999a5ddefebd36e:p069",
+        "02:ee759999a5ddefebd36e:p074"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V008-K01",
+      "title": "Priorizar las piezas comerciales del perfil: la trayectoria apoya la venta, no la reemplaza",
+      "source_pointer": "/learning_units/26",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00165",
+        "02:qt00166",
+        "02:qt00167",
+        "02:qt00168",
+        "02:qv0020",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V008-K02",
+      "title": "Conectar el pasado con el negocio actual sin borrar ni alterar la trayectoria",
+      "source_pointer": "/learning_units/27",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "La trayectoria real aporta fundamento al posicionamiento y contenido a Perfil.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00169",
+        "02:qt00170",
+        "02:qt00171",
+        "02:qt00172",
+        "02:qt00173",
+        "02:qt00174",
+        "02:qt00175",
+        "02:qt00176",
+        "02:qt00177",
+        "02:qt00178",
+        "02:qt00179",
+        "02:qt00180",
+        "02:qt00181",
+        "02:ee759999a5ddefebd36e:p086",
+        "02:ee759999a5ddefebd36e:p087",
+        "02:ee759999a5ddefebd36e:p088",
+        "02:qt00168"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V008-K03",
+      "title": "Las primeras tres piezas de la tienda: cliente, dolor y promesa de solución",
+      "source_pointer": "/learning_units/28",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "Cliente, dolor y promesa conectan la definición de la oferta con su presentación.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00182",
+        "02:qv0021",
+        "02:qs02340000",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V008-K04",
+      "title": "La prueba: mostrar resultados de clientes dentro de la historia comercial",
+      "source_pointer": "/learning_units/29",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "La prueba disponible delimita lo que Posicionamiento puede prometer y lo que Perfil puede mostrar.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00183",
+        "02:qt00184",
+        "02:qt00185",
+        "02:qt00186",
+        "02:qs02370000",
+        "02:ee759999a5ddefebd36e:p031",
+        "02:ee759999a5ddefebd36e:p059"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V008-K05",
+      "title": "La puerta: facilitar el siguiente paso con enlaces en destacados",
+      "source_pointer": "/learning_units/30",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00187",
+        "02:ee759999a5ddefebd36e:p074",
+        "02:ee759999a5ddefebd36e:p080"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V009-K01",
+      "title": "La puerta comercial del perfil: convertir el interés en una vía de contacto",
+      "source_pointer": "/learning_units/31",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "contacto_en_banner_con_variantes_entre_audio_y_PDF"
+      ],
+      "source_keys": [
+        "02:qt00188",
+        "02:qt00189",
+        "02:qt00204",
+        "02:qt00205",
+        "02:qv0032",
+        "02:qs06750000",
+        "02:qt00187",
+        "02:ee759999a5ddefebd36e:p074",
+        "02:ee759999a5ddefebd36e:p015"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V009-K02",
+      "title": "Triangular las cinco piezas comerciales con las secciones del perfil",
+      "source_pointer": "/learning_units/32",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00190",
+        "02:qt00191",
+        "02:qt00192",
+        "02:qt00193",
+        "02:qt00194",
+        "02:qt00195",
+        "02:qv0022",
+        "02:qs02460000",
+        "02:qs02490000",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V009-K03",
+      "title": "Cómo conectar piezas distribuidas: repetición en dos sitios y adaptación al recorrido del visitante",
+      "source_pointer": "/learning_units/33",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Arquitectura comercial, prueba y acceso al contacto",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00196",
+        "02:qt00197",
+        "02:qt00198",
+        "02:qt00199",
+        "02:qt00200",
+        "02:qt00201",
+        "02:qt00202",
+        "02:qt00203",
+        "02:qt00204",
+        "02:qt00205",
+        "02:qt00206",
+        "02:qt00207",
+        "02:qt00208",
+        "02:qv0022",
+        "02:qs02520000",
+        "02:qs02550000",
+        "02:qs02670000",
+        "02:ee759999a5ddefebd36e:p022"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V009-K04",
+      "title": "Señales visuales y confianza: lo que una foto o los colores pueden aportar a la impresión",
+      "source_pointer": "/learning_units/34",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00209",
+        "02:qt00210",
+        "02:qt00211",
+        "02:ee759999a5ddefebd36e:p009",
+        "02:qv0021"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V010-K01",
+      "title": "Integrar valores personales en el contenido y en el perfil, además de la especialidad técnica",
+      "source_pointer": "/learning_units/35",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Los valores propios afectan a la identidad estratégica y a su expresión en el perfil.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00212",
+        "02:qt00213",
+        "02:qt00214",
+        "02:qt00215",
+        "02:qt00216",
+        "02:qt00217",
+        "02:qt00218",
+        "02:qt00219",
+        "02:ee759999a5ddefebd36e:p031",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V010-K02",
+      "title": "Distribuir pistas comerciales porque no se controla el recorrido de lectura del visitante",
+      "source_pointer": "/learning_units/36",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00221",
+        "02:qt00222",
+        "02:qt00223",
+        "02:qv0022",
+        "02:qv0024",
+        "02:qt00191",
+        "02:qt00194",
+        "02:qt00200",
+        "02:qt00207",
+        "02:qv0023"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V010-K03",
+      "title": "Cuidar el perfil completo: el visitante puede juzgar la tienda por un detalle inesperado",
+      "source_pointer": "/learning_units/37",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00224",
+        "02:qt00225",
+        "02:qt00226",
+        "02:qt00227",
+        "02:qt00228",
+        "02:qt00229"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V010-K04",
+      "title": "La ortografía y el estilo del perfil funcionan como muestras de la calidad del servicio",
+      "source_pointer": "/learning_units/38",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00230",
+        "02:qt00231",
+        "02:qt00232"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V010-K05",
+      "title": "La prospección automatizada depende de la calidad del perfil que respalda los mensajes",
+      "source_pointer": "/learning_units/39",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "referencia_a_outbound_futuro_sin_procedimiento"
+      ],
+      "source_keys": [
+        "02:qt00232",
+        "02:qt00233"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V011-K01",
+      "title": "Por qué la claridad del perfil debe preceder a la automatización comercial",
+      "source_pointer": "/learning_units/40",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "referencia_a_outbound_futuro_sin_procedimiento"
+      ],
+      "source_keys": [
+        "02:qt00234",
+        "02:qt00235",
+        "02:qt00236",
+        "02:qt00237",
+        "02:qt00238",
+        "02:qt00239"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V011-K02",
+      "title": "La fotografía como recepción de la tienda: accesibilidad sin simpatía forzada",
+      "source_pointer": "/learning_units/41",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00239",
+        "02:qt00240",
+        "02:qt00241",
+        "02:qt00242",
+        "02:qt00243",
+        "02:ee759999a5ddefebd36e:p006"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V011-K03",
+      "title": "Diseñar el banner con cuidado: coherencia de marca, mantenimiento y menos saturación",
+      "source_pointer": "/learning_units/42",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00243",
+        "02:qt00244",
+        "02:qt00245",
+        "02:qt00246",
+        "02:qt00247",
+        "02:qt00248",
+        "02:ee759999a5ddefebd36e:p014",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:ee759999a5ddefebd36e:p016"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V011-K04",
+      "title": "Evitar el abandono digital y pensar la estrategia antes de rellenar el perfil",
+      "source_pointer": "/learning_units/43",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00249",
+        "02:qt00250",
+        "02:qt00251",
+        "02:qt00252",
+        "02:qt00253",
+        "02:qt00254",
+        "02:qv0024",
+        "02:qs03210000"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V011-K05",
+      "title": "Usar la IA para auditar claridad, presencia del cliente y fuerza del mensaje",
+      "source_pointer": "/learning_units/44",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00254",
+        "02:qt00255",
+        "02:qt00256",
+        "02:qt00257",
+        "02:ee759999a5ddefebd36e:p090"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V012-K01",
+      "title": "Usar la IA como auditora: preguntas críticas, edición humana y revisión del conjunto de mensajes del perfil",
+      "source_pointer": "/learning_units/45",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00258",
+        "02:qt00259",
+        "02:qt00260",
+        "02:qt00261",
+        "02:qt00262",
+        "02:qt00263",
+        "02:qt00264",
+        "02:qt00265",
+        "02:qt00266",
+        "02:qv0024",
+        "02:ee759999a5ddefebd36e:p090",
+        "02:qt00182",
+        "02:qt00194"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V012-K02",
+      "title": "Responder a la duda sobre publicaciones con IA: el problema es el contenido genérico sin voz, historia ni punto de vista",
+      "source_pointer": "/learning_units/46",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "La unidad trata la producción y revisión de publicaciones con IA; corresponde principalmente a esos equipos.",
+      "other_destination": [
+        "mesa_editorial y revision"
+      ],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00267",
+        "02:qt00268",
+        "02:qt00269",
+        "02:qt00270",
+        "02:qt00271",
+        "02:qt00272",
+        "02:qt00273",
+        "02:qt00274",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V013-K01",
+      "title": "Del diagnóstico del perfil a una propuesta que atienda criterios técnicos y personales de compra",
+      "source_pointer": "/learning_units/47",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Valores, coherencia, cuidado y auditoría de mensajes",
+      "assignment_reason": "Relaciona competencia técnica, afinidad y motivos de elección con la propuesta y su comunicación.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00282",
+        "02:qt00283",
+        "02:qt00284",
+        "02:qt00285",
+        "02:qt00286",
+        "02:qt00287",
+        "02:qt00288",
+        "02:qt00101",
+        "02:qt00103",
+        "02:qt00212",
+        "02:qt00219"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V013-K02",
+      "title": "Una foto natural, amigable y bien iluminada sin exigir una producción costosa",
+      "source_pointer": "/learning_units/48",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00289",
+        "02:qt00290",
+        "02:qt00291",
+        "02:qt00292",
+        "02:qt00293",
+        "02:qt00294",
+        "02:qt00295",
+        "02:qv0030",
+        "02:qv0031",
+        "02:qs03750000",
+        "02:qs03780000",
+        "02:qs03810000",
+        "02:qs03870000",
+        "02:ee759999a5ddefebd36e:p004",
+        "02:ee759999a5ddefebd36e:p006"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V014-K01",
+      "title": "Iluminación de la foto: hacer visible el rostro con una toma preparada",
+      "source_pointer": "/learning_units/49",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00296",
+        "02:qt00297",
+        "02:qt00298",
+        "02:qt00299",
+        "02:qt00300",
+        "02:qv0031",
+        "02:ee759999a5ddefebd36e:p005",
+        "02:ee759999a5ddefebd36e:p006"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V014-K02",
+      "title": "Fondo limpio y color de marca: concentrar la atención y facilitar el reconocimiento",
+      "source_pointer": "/learning_units/50",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00301",
+        "02:qt00302",
+        "02:qt00306",
+        "02:qt00307",
+        "02:qt00308",
+        "02:qt00309",
+        "02:qt00310",
+        "02:qt00311",
+        "02:qv0031",
+        "02:ee759999a5ddefebd36e:p005",
+        "02:ee759999a5ddefebd36e:p007",
+        "02:qt00297",
+        "02:qt00300"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V014-K03",
+      "title": "Expresión amigable sin imponer una sonrisa ni una pose uniforme",
+      "source_pointer": "/learning_units/51",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "expresion_amigable_no_sonrisa_obligatoria_en_audio"
+      ],
+      "source_keys": [
+        "02:qt00303",
+        "02:qt00304",
+        "02:qt00305",
+        "02:qv0031",
+        "02:ee759999a5ddefebd36e:p006"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V014-K04",
+      "title": "La fotografía como filtro inicial de confianza, no como motivo suficiente de contratación",
+      "source_pointer": "/learning_units/52",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00311",
+        "02:qt00312",
+        "02:qt00313",
+        "02:qt00314",
+        "02:qv0031",
+        "02:qt00297",
+        "02:qt00300",
+        "02:qt00301",
+        "02:qt00302",
+        "02:qt00303",
+        "02:qt00305",
+        "02:qt00306",
+        "02:qt00310",
+        "02:qt00315"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V014-K05",
+      "title": "Banner con sustancia comercial: destinatario, problema y transformación",
+      "source_pointer": "/learning_units/53",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00315",
+        "02:qt00316",
+        "02:qt00317",
+        "02:qt00318",
+        "02:qv0032",
+        "02:qv0033",
+        "02:qv0034",
+        "02:qv0035",
+        "02:qv0036",
+        "02:qv0037",
+        "02:qv0038",
+        "02:ee759999a5ddefebd36e:p014",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:ee759999a5ddefebd36e:p016",
+        "02:qt00312",
+        "02:qt00314"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V014-K06",
+      "title": "Comprobar el banner en el teléfono: solapamientos, tamaño de letra y empatía visual",
+      "source_pointer": "/learning_units/54",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00319",
+        "02:qt00320",
+        "02:qt00321",
+        "02:qt00322",
+        "02:qv0036",
+        "02:qv0037",
+        "02:qv0038",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:qt00318"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V015-K01",
+      "title": "Comprobar el banner en el teléfono y diseñarlo para que el visitante siga explorando",
+      "source_pointer": "/learning_units/55",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00323",
+        "02:qt00324",
+        "02:qv0039",
+        "02:qv0040",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:ee759999a5ddefebd36e:p016",
+        "02:ee759999a5ddefebd36e:p020",
+        "02:qt00319",
+        "02:qt00322"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V015-K02",
+      "title": "La segunda foto del banner es opcional: preferir una imagen real y reservar la IA para cuando haga falta",
+      "source_pointer": "/learning_units/56",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00325",
+        "02:qt00326",
+        "02:qt00327",
+        "02:qt00328",
+        "02:qt00329",
+        "02:qt00330",
+        "02:qv0041",
+        "02:qv0042",
+        "02:qv0043",
+        "02:ee759999a5ddefebd36e:p005",
+        "02:ee759999a5ddefebd36e:p006",
+        "02:ee759999a5ddefebd36e:p011"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V015-K03",
+      "title": "Ordenar el titular: primero qué haces y cómo ayudas; después, si hace falta, tu cargo",
+      "source_pointer": "/learning_units/57",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00331",
+        "02:qt00332",
+        "02:qv0044",
+        "02:qs04320000",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:qt00121",
+        "02:qt00133"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V015-K04",
+      "title": "Hacer presente al buyer persona en el titular sin imponer el tuteo",
+      "source_pointer": "/learning_units/58",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00333",
+        "02:qt00334",
+        "02:qt00335",
+        "02:qt00336",
+        "02:qv0044",
+        "02:qs04320000",
+        "02:qs04350000",
+        "02:qs04410000",
+        "02:ee759999a5ddefebd36e:p023"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V015-K05",
+      "title": "Nombre y titular limpios: priorizar palabras clave y distinguir los usos de los emojis",
+      "source_pointer": "/learning_units/59",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:qt00337",
+        "02:qt00338",
+        "02:qt00339",
+        "02:qt00340",
+        "02:qt00341",
+        "02:qt00342",
+        "02:qt00343",
+        "02:qt00344",
+        "02:qs04410000",
+        "02:qs04440000",
+        "02:qs04470000",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V016-K01",
+      "title": "El titular como semilla de posicionamiento: usar las palabras por las que el cliente busca",
+      "source_pointer": "/learning_units/60",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "Posicionamiento define la asociación buscada; Perfil la expresa con términos reconocibles en el titular.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00345",
+        "02:qv0044",
+        "02:qs04500000",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:ee759999a5ddefebd36e:p024"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V016-K02",
+      "title": "Abrir el «Acerca de» con una tensión que genere curiosidad y encaje con el recorrido de llegada",
+      "source_pointer": "/learning_units/61",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00346",
+        "02:qt00347",
+        "02:qt00348",
+        "02:qt00349",
+        "02:qt00350",
+        "02:qt00351",
+        "02:qt00352",
+        "02:qt00353",
+        "02:qt00354",
+        "02:qv0045",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V016-K03",
+      "title": "Del relato propio al beneficio del cliente: alternar misión, prueba y transformación",
+      "source_pointer": "/learning_units/62",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00355",
+        "02:qt00356",
+        "02:qt00357",
+        "02:qt00358",
+        "02:qt00359",
+        "02:qt00360",
+        "02:qt00361",
+        "02:qt00371",
+        "02:qv0045",
+        "02:qs04650000",
+        "02:qs04680000",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V016-K04",
+      "title": "Mostrar la herida del cliente con sutileza y conservar un punto de vista personal",
+      "source_pointer": "/learning_units/63",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "La necesidad real del cliente y el punto de vista personal conectan posicionamiento y mensaje.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00355",
+        "02:qt00362",
+        "02:qt00363",
+        "02:qt00364",
+        "02:qt00365",
+        "02:qt00366",
+        "02:qt00367",
+        "02:qs04710000",
+        "02:qs04740000",
+        "02:ee759999a5ddefebd36e:p031",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V016-K05",
+      "title": "Explicar qué haces y para quién: el «Acerca de» articula la misión actual y no duplica «Experiencia»",
+      "source_pointer": "/learning_units/64",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Titular, asociación profesional y mensaje del Acerca de",
+      "assignment_reason": "La misión, las modalidades de servicio y sus destinatarios deben coincidir con la oferta definida.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00368",
+        "02:qt00369",
+        "02:qt00370",
+        "02:qv0045",
+        "02:qs04770000",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V017-K01",
+      "title": "Puertas directas e indirectas: conectar las secciones del perfil para facilitar una conversación",
+      "source_pointer": "/learning_units/65",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00372",
+        "02:qt00373",
+        "02:qt00374",
+        "02:qt00375",
+        "02:qt00376",
+        "02:qt00377",
+        "02:qt00378",
+        "02:qt00379",
+        "02:qt00380",
+        "02:qv0045",
+        "02:qs04830000",
+        "02:qs04860000",
+        "02:qs04890000",
+        "02:qs04920000",
+        "02:ee759999a5ddefebd36e:p074"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V017-K02",
+      "title": "Legibilidad móvil, estructura y emojis: presentar el «Acerca de» para que se siga leyendo",
+      "source_pointer": "/learning_units/66",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00381",
+        "02:qt00382",
+        "02:qt00383",
+        "02:qt00384",
+        "02:qt00385",
+        "02:qt00386",
+        "02:qt00387",
+        "02:qt00388",
+        "02:qt00389",
+        "02:qs04950000",
+        "02:qs04980000",
+        "02:qs05010000",
+        "02:ee759999a5ddefebd36e:p048",
+        "02:ee759999a5ddefebd36e:p039",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V017-K03",
+      "title": "Destacado como vitrina y el recorrido de exploración desde la cabecera del perfil",
+      "source_pointer": "/learning_units/67",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00390",
+        "02:qt00391",
+        "02:qt00392",
+        "02:qt00393",
+        "02:qv0046",
+        "02:qv0047",
+        "02:ee759999a5ddefebd36e:p069",
+        "02:ee759999a5ddefebd36e:p074"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V017-K04",
+      "title": "Iniciar la prueba social: solicitar dos o tres recomendaciones y facilitar un borrador",
+      "source_pointer": "/learning_units/68",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00394",
+        "02:qt00395",
+        "02:ee759999a5ddefebd36e:p060",
+        "02:ee759999a5ddefebd36e:p066",
+        "02:ee759999a5ddefebd36e:p067"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V018-K01",
+      "title": "Redactar recomendaciones con resultados concretos y publicarlas mediante la voz de otra persona",
+      "source_pointer": "/learning_units/69",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00396",
+        "02:qt00397",
+        "02:qt00398",
+        "02:ee759999a5ddefebd36e:p066",
+        "02:ee759999a5ddefebd36e:p067"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V018-K02",
+      "title": "Organizar una campaña pequeña y periódica de recomendaciones",
+      "source_pointer": "/learning_units/70",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "cadencia_trimestral_oral",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00399",
+        "02:qt00400",
+        "02:ee759999a5ddefebd36e:p067"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V018-K03",
+      "title": "Usar Destacado como anclaje del mensaje y como acceso a un documento de autoridad",
+      "source_pointer": "/learning_units/71",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00401",
+        "02:qt00402",
+        "02:qt00403",
+        "02:qv0047",
+        "02:qv0048",
+        "02:ee759999a5ddefebd36e:p069"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V018-K04",
+      "title": "La experiencia como respaldo de la especialidad del autor antes de distribuir contenido",
+      "source_pointer": "/learning_units/72",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "La especialidad declarada debe tener respaldo en la experiencia y coherencia con los temas.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00404",
+        "02:qt00405",
+        "02:qt00406",
+        "02:qt00407",
+        "02:qt00408",
+        "02:qt00409",
+        "02:qt00413",
+        "02:qt00414",
+        "02:ee759999a5ddefebd36e:p083"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V018-K05",
+      "title": "Conectar aprendizajes, resultados y palabras clave de la trayectoria con el valor que se ofrece hoy",
+      "source_pointer": "/learning_units/73",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Recorrido por el perfil, prueba social y especialidad",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00410",
+        "02:qt00411",
+        "02:qt00412",
+        "02:qt00415",
+        "02:qt00416",
+        "02:qt00417",
+        "02:qv0049",
+        "02:ee759999a5ddefebd36e:p086",
+        "02:ee759999a5ddefebd36e:p087",
+        "02:ee759999a5ddefebd36e:p088"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V019-K01",
+      "title": "Conectar la experiencia pasada con la actividad actual sin forzar ni inventar la trayectoria",
+      "source_pointer": "/learning_units/74",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Relaciona la actividad actual con la trayectoria auténtica sin inventar conexiones.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00418",
+        "02:qt00419",
+        "02:qt00420",
+        "02:qt00421",
+        "02:qt00422",
+        "02:ee759999a5ddefebd36e:p086",
+        "02:ee759999a5ddefebd36e:p087",
+        "02:ee759999a5ddefebd36e:p088"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V019-K02",
+      "title": "Redactar Experiencia mediante logros, aprendizajes y utilidad para el cliente actual",
+      "source_pointer": "/learning_units/75",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00424",
+        "02:qt00425",
+        "02:qt00426",
+        "02:qt00427",
+        "02:qt00428",
+        "02:qt00429",
+        "02:qv0049",
+        "02:qs05490000",
+        "02:ee759999a5ddefebd36e:p085",
+        "02:ee759999a5ddefebd36e:p086"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V019-K03",
+      "title": "Diagnosticar Conocimientos y aptitudes: activar la sección y evitar tanto la escasez como el exceso",
+      "source_pointer": "/learning_units/76",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:qt00430",
+        "02:qt00431",
+        "02:qt00432",
+        "02:qt00433",
+        "02:qt00434",
+        "02:qt00435",
+        "02:qt00436",
+        "02:qt00437",
+        "02:qt00438",
+        "02:qt00439",
+        "02:qt00440",
+        "02:qv0050",
+        "02:qv0051",
+        "02:qv0052",
+        "02:qs05580000",
+        "02:qs05610000",
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p051"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V019-K04",
+      "title": "Seleccionar aptitudes que definan la especialidad, no un inventario de capacidades generales",
+      "source_pointer": "/learning_units/77",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "La selección de aptitudes depende de la especialidad definida y de cómo Perfil la presenta.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00441",
+        "02:qt00442",
+        "02:qt00443",
+        "02:qt00444",
+        "02:qt00445",
+        "02:qs05640000",
+        "02:qs05670000",
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p051"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V019-K05",
+      "title": "Respaldar las aptitudes relevantes con validaciones de personas que conocen el trabajo",
+      "source_pointer": "/learning_units/78",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00446",
+        "02:qv0052",
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p051",
+        "02:qt00447"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V020-K01",
+      "title": "Seleccionar las aptitudes ahora y construir su respaldo a lo largo del tiempo",
+      "source_pointer": "/learning_units/79",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "quince_aptitudes_como_orientacion",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00447",
+        "02:qt00448",
+        "02:qt00449",
+        "02:qt00450",
+        "02:qt00455",
+        "02:qt00456",
+        "02:qt00457",
+        "02:qt00458",
+        "02:qt00459",
+        "02:qv0052",
+        "02:qs05820000",
+        "02:ee759999a5ddefebd36e:p051",
+        "02:ee759999a5ddefebd36e:p057"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V020-K02",
+      "title": "La triangulación de autoridad: qué sabes, cuántos lo respaldan y quiénes son",
+      "source_pointer": "/learning_units/80",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "El respaldo de la especialidad y la pertinencia de la red aportan contexto a ambos; no certifican el algoritmo.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00447",
+        "02:qt00450",
+        "02:qt00451",
+        "02:qt00452",
+        "02:qt00453",
+        "02:qt00454",
+        "02:qt00455",
+        "02:qv0052",
+        "02:ee759999a5ddefebd36e:p050"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V020-K03",
+      "title": "Conseguir recomendaciones útiles: aprovechar la satisfacción y orientar el testimonio cuando haga falta",
+      "source_pointer": "/learning_units/81",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00460",
+        "02:qt00461",
+        "02:qt00462",
+        "02:qt00463",
+        "02:qt00464",
+        "02:qv0053",
+        "02:ee759999a5ddefebd36e:p059",
+        "02:ee759999a5ddefebd36e:p061",
+        "02:ee759999a5ddefebd36e:p066",
+        "02:ee759999a5ddefebd36e:p067"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V020-K04",
+      "title": "Detectar lenguaje «vainilla» que no diferencia ni aclara el valor del perfil",
+      "source_pointer": "/learning_units/82",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00465",
+        "02:qt00466",
+        "02:qt00467",
+        "02:qt00468",
+        "02:qv0054",
+        "02:ee759999a5ddefebd36e:p024",
+        "02:ee759999a5ddefebd36e:p030"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V020-K05",
+      "title": "Ejercicio de diagnóstico: justificar cada cambio desde lo que busca el buyer persona",
+      "source_pointer": "/learning_units/83",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Experiencia, aptitudes, respaldo y diagnóstico",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00469",
+        "02:qv0055"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V021-K01",
+      "title": "Diagnosticar qué debe cambiar en el perfil: del protagonismo propio al resultado que busca el comprador",
+      "source_pointer": "/learning_units/84",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "El diagnóstico exige relacionar la necesidad del comprador con el resultado que comunica el perfil.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00470",
+        "02:qt00471",
+        "02:qt00472",
+        "02:qt00473",
+        "02:qt00474",
+        "02:qt00475",
+        "02:qt00476",
+        "02:qt00477",
+        "02:qt00478",
+        "02:qt00479",
+        "02:qt00480",
+        "02:qv0055",
+        "02:qs06090000"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V021-K02",
+      "title": "Usar el semáforo de primera impresión como diagnóstico orientativo, no como autoridad infalible",
+      "source_pointer": "/learning_units/85",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00481",
+        "02:qt00482",
+        "02:qt00483",
+        "02:qt00484",
+        "02:qt00485",
+        "02:qt00486",
+        "02:qt00487",
+        "02:qt00488",
+        "02:qv0056",
+        "02:qv0057",
+        "02:qv0058",
+        "02:ee759999a5ddefebd36e:p014",
+        "02:qt00112"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V021-K03",
+      "title": "Profundizar con la masterclass escrita y trasladar el método de empleo a oportunidades comerciales",
+      "source_pointer": "/learning_units/86",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00489",
+        "02:qt00490",
+        "02:qt00491",
+        "02:qt00492",
+        "02:qt00495",
+        "02:qt00496",
+        "02:qt00497",
+        "02:qv0059",
+        "02:ee759999a5ddefebd36e:p001",
+        "02:ee759999a5ddefebd36e:p002"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V021-K04",
+      "title": "Ejecutar la optimización del fin de semana con una lista concreta de cambios y un doble destinatario",
+      "source_pointer": "/learning_units/87",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:qt00493",
+        "02:qt00494",
+        "02:qt00495",
+        "02:ee759999a5ddefebd36e:p051",
+        "02:ee759999a5ddefebd36e:p067"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V022-K01",
+      "title": "Adaptar el método sin copiar un perfil: lectura crítica del banner de Eduardo Vargas",
+      "source_pointer": "/learning_units/88",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00505",
+        "02:qt00506",
+        "02:qt00507",
+        "02:qt00508",
+        "02:qt00509",
+        "02:qt00510",
+        "02:qv0063",
+        "02:qv0064",
+        "02:ee759999a5ddefebd36e:p014",
+        "02:ee759999a5ddefebd36e:p015",
+        "02:ee759999a5ddefebd36e:p016"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V022-K02",
+      "title": "Priorizar el titular: servicio, transformación, sector y llamada a otro canal",
+      "source_pointer": "/learning_units/89",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00511",
+        "02:qt00512",
+        "02:qt00513",
+        "02:qt00514",
+        "02:qv0065",
+        "02:qv0067",
+        "02:qv0069",
+        "02:qs06450000",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:ee759999a5ddefebd36e:p024"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V022-K03",
+      "title": "Destacado como vitrina de interacción y puerta hacia una newsletter",
+      "source_pointer": "/learning_units/90",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00515",
+        "02:qt00516",
+        "02:qt00517",
+        "02:qt00518",
+        "02:qt00519",
+        "02:qv0070",
+        "02:qv0071",
+        "02:qv0072",
+        "02:qv0073",
+        "02:qv0074",
+        "02:ee759999a5ddefebd36e:p069",
+        "02:ee759999a5ddefebd36e:p073",
+        "02:ee759999a5ddefebd36e:p074"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V022-K04",
+      "title": "Abrir el «Acerca de» con el dolor y agitarlo antes de presentar la solución",
+      "source_pointer": "/learning_units/91",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00520",
+        "02:qt00521",
+        "02:qt00522",
+        "02:qt00523",
+        "02:qt00524",
+        "02:qt00525",
+        "02:qv0075",
+        "02:qv0076",
+        "02:qv0077",
+        "02:qv0078",
+        "02:qv0079",
+        "02:qs06540000",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p031",
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V022-K05",
+      "title": "Pasar del diagnóstico a una promesa concreta y separar «qué consigo» de «con quién trabajo»",
+      "source_pointer": "/learning_units/92",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Distinguir qué se consigue y con quién se trabaja requiere claridad de oferta y de redacción.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00526",
+        "02:qt00527",
+        "02:qt00528",
+        "02:qv0078",
+        "02:qv0079",
+        "02:qv0080",
+        "02:qv0081",
+        "02:qv0082",
+        "02:qv0083",
+        "02:ee759999a5ddefebd36e:p031",
+        "02:ee759999a5ddefebd36e:p032",
+        "02:qt00523",
+        "02:qt00525"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V023-K01",
+      "title": "Cerrar el «Acerca de» con voz propia y una puerta comercial: el ejemplo de Eduardo Vargas",
+      "source_pointer": "/learning_units/93",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00529",
+        "02:qt00530",
+        "02:qt00531",
+        "02:qt00532",
+        "02:qv0084",
+        "02:qv0085",
+        "02:qv0086",
+        "02:ee759999a5ddefebd36e:p032",
+        "02:ee759999a5ddefebd36e:p039",
+        "02:qt00520",
+        "02:qt00528"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V023-K02",
+      "title": "Símbolos en el nombre: una excepción condicionada por ubicación y presencia previa",
+      "source_pointer": "/learning_units/94",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Aplicación del método y ejemplos de perfil",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00534",
+        "02:qt00535",
+        "02:qt00536",
+        "02:qt00537",
+        "02:qv0089",
+        "02:qv0090",
+        "02:qs06690000",
+        "02:qt00117",
+        "02:qt00118",
+        "02:qt00119",
+        "02:qt00337",
+        "02:qt00338",
+        "02:qt00342",
+        "02:qt00343",
+        "02:qt00120"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V023-K03",
+      "title": "Cambiar de director comercial a vendedor de equipos: el perfil debe responder al comprador actual",
+      "source_pointer": "/learning_units/95",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "El cambio de comprador obliga a revisar tanto la estrategia como su expresión en el perfil.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00543",
+        "02:qt00544",
+        "02:qt00545",
+        "02:qt00546",
+        "02:qt00547",
+        "02:qt00548",
+        "02:qt00549",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:ee759999a5ddefebd36e:p024",
+        "02:qt00550"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V023-K04",
+      "title": "Un nicho técnico puede construir comunidad si conecta con la audiencia relevante",
+      "source_pointer": "/learning_units/96",
+      "agents": [
+        "posicionamiento"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Relaciona un nicho técnico con personas relevantes sin asumir que el canal sea inviable.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00550",
+        "02:qt00551",
+        "02:qt00552",
+        "02:qt00553",
+        "02:qt00554",
+        "02:ee759999a5ddefebd36e:p072"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V024-K01",
+      "title": "Construir comunidad en un nicho técnico: importa cómo se comunica y con quién se conecta",
+      "source_pointer": "/learning_units/97",
+      "agents": [
+        "posicionamiento"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Vincula conocimiento técnico, audiencia y pertinencia; el desarrollo editorial corresponde a otro equipo.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00556",
+        "02:qt00560",
+        "02:qt00561",
+        "02:qt00562",
+        "02:qt00563",
+        "02:qt00564",
+        "02:qt00565",
+        "02:qt00566",
+        "02:qt00567",
+        "02:qt00543",
+        "02:qt00545",
+        "02:qt00546",
+        "02:qt00548",
+        "02:qt00549"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V024-K02",
+      "title": "Aclarar la oferta antes de buscar un tono atractivo: el elevator pitch de cinco segundos",
+      "source_pointer": "/learning_units/98",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "La claridad de la oferta precede a elegir una frase atractiva para presentarla.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00557",
+        "02:qt00558",
+        "02:qt00559",
+        "02:qt00568",
+        "02:qt00569",
+        "02:qt00570",
+        "02:qt00571"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V024-K03",
+      "title": "La falta de referentes idénticos puede ser una oportunidad de posicionamiento",
+      "source_pointer": "/learning_units/99",
+      "agents": [
+        "posicionamiento"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Permite explorar diferenciación sin exigir un referente idéntico ni asumir que la ausencia demuestra demanda.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00572",
+        "02:qt00573",
+        "02:qt00574",
+        "02:qt00575"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V024-K04",
+      "title": "Usar comunidades de actividades próximas para aprender y descubrir contactos relevantes",
+      "source_pointer": "/learning_units/100",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Investigar comunidades próximas y sus participantes corresponde al Observatorio; Posicionamiento recibirá sus hallazgos.",
+      "other_destination": [
+        "observatorio"
+      ],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00555",
+        "02:qt00575",
+        "02:qt00576",
+        "02:qt00577",
+        "02:qt00578",
+        "02:qt00579",
+        "02:qt00581",
+        "02:qt00582",
+        "02:qt00583",
+        "02:qt00584",
+        "02:qs07140000",
+        "02:qv0093",
+        "02:qv0095",
+        "02:qt00553",
+        "02:qt00554"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V024-K05",
+      "title": "Evaluar críticamente cada recurso de un referente: una comunidad útil no valida todas sus imágenes",
+      "source_pointer": "/learning_units/101",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Evalúa críticamente recursos de referentes; es parte de la investigación y revisión de referencias.",
+      "other_destination": [
+        "observatorio y revision"
+      ],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00580",
+        "02:qt00581",
+        "02:qs07170000"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V025-K01",
+      "title": "Un mismo objetivo comercial admite distintos estilos: el caso de Ángel Serrano Ceballos",
+      "source_pointer": "/learning_units/102",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00586",
+        "02:qt00587",
+        "02:qt00589",
+        "02:qt00590",
+        "02:qt00596",
+        "02:qt00597",
+        "02:qt00600",
+        "02:qt00601",
+        "02:qt00604",
+        "02:qt00605",
+        "02:qv0096",
+        "02:qv0097",
+        "02:qv0099",
+        "02:qv0103",
+        "02:qv0106",
+        "02:qv0108",
+        "02:qs07260000",
+        "02:qs07350000",
+        "02:ee759999a5ddefebd36e:p014",
+        "02:ee759999a5ddefebd36e:p016",
+        "02:ee759999a5ddefebd36e:p032",
+        "02:ee759999a5ddefebd36e:p074",
+        "02:qt00029",
+        "02:qt00040"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V025-K02",
+      "title": "Destacado como vitrina y puerta: newsletter externa, artículos y destinos de conversión",
+      "source_pointer": "/learning_units/103",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00591",
+        "02:qt00592",
+        "02:qt00593",
+        "02:qt00594",
+        "02:qv0100",
+        "02:qv0101",
+        "02:ee759999a5ddefebd36e:p069",
+        "02:ee759999a5ddefebd36e:p074",
+        "02:ee759999a5ddefebd36e:p080",
+        "02:qt00187",
+        "02:qt00189",
+        "02:qt00204",
+        "02:qt00205"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V025-K03",
+      "title": "Cómo evaluar un perfil consolidado sin copiar sus carencias: aptitudes, experiencias y recomendaciones",
+      "source_pointer": "/learning_units/104",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00594",
+        "02:qt00595",
+        "02:qt00598",
+        "02:qt00599",
+        "02:qv0102",
+        "02:qv0107",
+        "02:qs07380000",
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p051",
+        "02:ee759999a5ddefebd36e:p059",
+        "02:ee759999a5ddefebd36e:p083",
+        "02:qt00394",
+        "02:qt00400",
+        "02:qt00408",
+        "02:qt00422",
+        "02:qt00437",
+        "02:qt00445",
+        "02:qt00456",
+        "02:qt00460",
+        "02:qt00464"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V025-K04",
+      "title": "Top Voices: selección atribuida a LinkedIn y categoría vinculada a los temas publicados",
+      "source_pointer": "/learning_units/105",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Contextualiza la identificación Top Voice; no aporta una tarea de optimización ni garantiza conseguir la insignia.",
+      "other_destination": [
+        "observatorio"
+      ],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00588",
+        "02:qt00607",
+        "02:qt00608",
+        "02:qt00609",
+        "02:qt00610",
+        "02:qv0097",
+        "02:qv0098",
+        "02:qs07470000",
+        "02:qt00587"
+      ]
+    },
+    {
+      "unit_id": "LI-02-V026-K01",
+      "title": "Tarea de cierre: aplicar la optimización al perfil propio durante el fin de semana",
+      "source_pointer": "/learning_units/106",
+      "agents": [],
+      "status": "fuera_de_asignacion",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Cambio de comprador, nichos técnicos y referentes",
+      "assignment_reason": "Encargo de realizar la tarea el fin de semana; no añade conocimiento específico a las unidades ya asignadas.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00615"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M001-K01",
+      "title": "Marco del material: optimizar el perfil de LinkedIn según la trayectoria y las metas profesionales",
+      "source_pointer": "/learning_units/107",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p001",
+        "02:ee759999a5ddefebd36e:p002"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M001-K02",
+      "title": "Foto de perfil: importancia inicial y diagnóstico de diez errores",
+      "source_pointer": "/learning_units/108",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p003",
+        "02:ee759999a5ddefebd36e:p004"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M001-K03",
+      "title": "Técnicas 1 a 5: preparar la fotografía, la iluminación, la altura y el fondo",
+      "source_pointer": "/learning_units/109",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p005"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M001-K04",
+      "title": "Técnicas 6 y 7: postura natural, rostro visible y actitud amigable",
+      "source_pointer": "/learning_units/110",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "sonrisa_en_material_con_matiz_distinto_en_audio",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p006"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M001-K05",
+      "title": "Técnica 8: nitidez, mínimo de 400 × 400 píxeles y precaución con los filtros",
+      "source_pointer": "/learning_units/111",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p006"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M001-K06",
+      "title": "Técnicas 9 y 10: pocos elementos, colores coherentes y encuadre equilibrado",
+      "source_pointer": "/learning_units/112",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p007"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M002-K01",
+      "title": "Foto de Juliana Rueda: un gesto memorable que refuerza la especialidad en audio",
+      "source_pointer": "/learning_units/113",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p008"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M002-K02",
+      "title": "Foto de Miguel Morillon: fondo neutro, expresión amigable y coherencia del atuendo",
+      "source_pointer": "/learning_units/114",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p009"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M002-K03",
+      "title": "Foto de Elena Gonzalez y comparación de tres estilos efectivos",
+      "source_pointer": "/learning_units/115",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p008",
+        "02:ee759999a5ddefebd36e:p009",
+        "02:ee759999a5ddefebd36e:p010"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M002-K04",
+      "title": "Cinco herramientas para editar, generar y evaluar la foto de perfil",
+      "source_pointer": "/learning_units/116",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p011"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M002-K05",
+      "title": "Actualizar la foto en LinkedIn: siete pasos, encuadre del rostro y revisión móvil",
+      "source_pointer": "/learning_units/117",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p012"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M002-K06",
+      "title": "Banner o foto de fondo: función estratégica y cinco errores que impiden comunicar la especialidad",
+      "source_pointer": "/learning_units/118",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p013",
+        "02:ee759999a5ddefebd36e:p014"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M003-K01",
+      "title": "Cinco acciones para convertir el banner en un mensaje de valor profesional",
+      "source_pointer": "/learning_units/119",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "contacto_en_banner_con_variantes_entre_audio_y_PDF",
+        "dimensiones_con_discrepancia_en_material",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p015",
+        "02:ee759999a5ddefebd36e:p016",
+        "02:qt00091",
+        "02:qt00188",
+        "02:qv0032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M003-K02",
+      "title": "Ejemplo de Renata Faria: misión centrada en el cliente y diseño neutro coherente",
+      "source_pointer": "/learning_units/120",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p017"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M003-K03",
+      "title": "Ejemplo de Omar Suarez: beneficio explícito, fotografía relevante y contraste legible",
+      "source_pointer": "/learning_units/121",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p017",
+        "02:ee759999a5ddefebd36e:p018"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M003-K04",
+      "title": "Procedimiento de nueve pasos para crear el banner en Canva y actualizarlo en LinkedIn",
+      "source_pointer": "/learning_units/122",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de fotografía y banner",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "dimensiones_con_discrepancia_en_material",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p015",
+        "02:ee759999a5ddefebd36e:p016",
+        "02:ee759999a5ddefebd36e:p019",
+        "02:ee759999a5ddefebd36e:p020"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M004-K01",
+      "title": "Función del titular: una presentación visible dentro y fuera del perfil",
+      "source_pointer": "/learning_units/123",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de titular",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p022"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M004-K02",
+      "title": "Cinco tácticas de redacción: especialidad, concisión, claridad, relevancia y recuerdo",
+      "source_pointer": "/learning_units/124",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de titular",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p023",
+        "02:ee759999a5ddefebd36e:p024"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M004-K03",
+      "title": "Preparar la biografía personal antes de usar ChatGPT para el titular",
+      "source_pointer": "/learning_units/125",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de titular",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "biografia_personal_sin_maquina_en_este_ejercicio",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p025"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M004-K04",
+      "title": "Generar diez ideas de titular con ChatGPT: comando completo y resultados del ejemplo",
+      "source_pointer": "/learning_units/126",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de titular",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "diez_ideas_y_120_caracteres_son_el_prompt_del_ejemplo",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p025",
+        "02:ee759999a5ddefebd36e:p026",
+        "02:ee759999a5ddefebd36e:p027"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M004-K05",
+      "title": "Actualizar el titular en LinkedIn y verificarlo en escritorio y móvil",
+      "source_pointer": "/learning_units/127",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de titular",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p028"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K01",
+      "title": "Función estratégica de «Acerca de» y diagnóstico de sus siete errores habituales",
+      "source_pointer": "/learning_units/128",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p030"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K02",
+      "title": "Acción 1: expresar el valor profesional como beneficio para otras personas",
+      "source_pointer": "/learning_units/129",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "La relación entre capacidades, evidencias y beneficio conecta propuesta de valor y presentación.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K03",
+      "title": "Acción 2: mostrar personalidad y pasión mediante detalles personales relevantes",
+      "source_pointer": "/learning_units/130",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "La selección de detalles personales relevantes conecta valores e identidad con su expresión.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p031"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K04",
+      "title": "Acción 3: construir una historia RIA —Relevante, Intrigante y Auténtica—",
+      "source_pointer": "/learning_units/131",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K05",
+      "title": "Acción 4: reflejar una voz profesional, directa y cercana",
+      "source_pointer": "/learning_units/132",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p032"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K06",
+      "title": "Acción 5: identificar e incluir las palabras clave del trabajo objetivo",
+      "source_pointer": "/learning_units/133",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p033"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K07",
+      "title": "Contraejemplo de «Acerca de»: seis fallos de un texto genérico y centrado en sí mismo",
+      "source_pointer": "/learning_units/134",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p034"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M005-K08",
+      "title": "Estructura «Puente»: conectar necesidades de dos partes en el ejemplo de Elena González",
+      "source_pointer": "/learning_units/135",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p035"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M006-K01",
+      "title": "Estructura «Puente»: cinco criterios de eficacia y posicionamiento como conexión entre personas y empresas",
+      "source_pointer": "/learning_units/136",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p036",
+        "02:ee759999a5ddefebd36e:p035"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M006-K02",
+      "title": "Estructura «Maestro»: demostrar especialidad enseñando soluciones, con el ejemplo completo de Alex Cuevas",
+      "source_pointer": "/learning_units/137",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p037",
+        "02:ee759999a5ddefebd36e:p038",
+        "02:ee759999a5ddefebd36e:p039"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M006-K03",
+      "title": "Estructura «Metáfora»: comunicar enfoque y valores mediante los héroes empresariales y sus siete dimensiones",
+      "source_pointer": "/learning_units/138",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p040",
+        "02:ee759999a5ddefebd36e:p041",
+        "02:ee759999a5ddefebd36e:p042"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M007-K01",
+      "title": "Estructura «Simetría» del «Acerca de»: relacionar desafíos empresariales y capacidades de respuesta",
+      "source_pointer": "/learning_units/139",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p043",
+        "02:ee759999a5ddefebd36e:p044"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M007-K02",
+      "title": "Estructura «Embajador» del «Acerca de»: destacar el papel y las contribuciones dentro de una marca reconocida",
+      "source_pointer": "/learning_units/140",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p045",
+        "02:ee759999a5ddefebd36e:p046"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M007-K03",
+      "title": "Herramientas para redactar y refinar el «Acerca de»: estilo, caracteres y borrador con ChatGPT",
+      "source_pointer": "/learning_units/141",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p047"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M007-K04",
+      "title": "Seis pasos para activar, actualizar y comprobar la sección «Acerca de» en LinkedIn",
+      "source_pointer": "/learning_units/142",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Acerca de y estructuras narrativas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p048"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M008-K01",
+      "title": "Conocimientos y aptitudes: función de la sección y tres errores de optimización",
+      "source_pointer": "/learning_units/143",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de aptitudes y palabras clave",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p051",
+        "02:ee759999a5ddefebd36e:p052",
+        "02:ee759999a5ddefebd36e:p053"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M008-K02",
+      "title": "Seleccionar, ordenar y respaldar las habilidades principales",
+      "source_pointer": "/learning_units/144",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de aptitudes y palabras clave",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "diez_o_quince_como_orientacion",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p051",
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p054",
+        "02:ee759999a5ddefebd36e:p055",
+        "02:ee759999a5ddefebd36e:p056"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M008-K03",
+      "title": "Ejemplo de Augusto Rozo: competencias con respaldo amplio y diverso",
+      "source_pointer": "/learning_units/145",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de aptitudes y palabras clave",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p052",
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p051"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M008-K04",
+      "title": "Ejemplo de Juliana Rueda: coherencia de especialidad, trayectoria y validaciones",
+      "source_pointer": "/learning_units/146",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de aptitudes y palabras clave",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p053",
+        "02:ee759999a5ddefebd36e:p050",
+        "02:ee759999a5ddefebd36e:p051",
+        "02:ee759999a5ddefebd36e:p052"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M008-K05",
+      "title": "Técnica 1 con ChatGPT: obtener palabras clave desde el rol y el sector",
+      "source_pointer": "/learning_units/147",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de aptitudes y palabras clave",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p054",
+        "02:ee759999a5ddefebd36e:p055",
+        "02:ee759999a5ddefebd36e:p051",
+        "02:ee759999a5ddefebd36e:p056"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M008-K06",
+      "title": "Técnica 2 con ChatGPT: extraer palabras clave de al menos tres descripciones de trabajo",
+      "source_pointer": "/learning_units/148",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de aptitudes y palabras clave",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p056",
+        "02:ee759999a5ddefebd36e:p054",
+        "02:ee759999a5ddefebd36e:p055"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M009-K01",
+      "title": "Conocimientos y Aptitudes: cinco pasos para seleccionar habilidades y conseguir validaciones",
+      "source_pointer": "/learning_units/149",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de aptitudes y palabras clave",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p057"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M009-K02",
+      "title": "Recomendaciones como respaldo social: fundamento y cuatro errores que debilitan el perfil",
+      "source_pointer": "/learning_units/150",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de recomendaciones",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p058",
+        "02:ee759999a5ddefebd36e:p059"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M009-K03",
+      "title": "Activar Recomendaciones y solicitar respaldo a contactos diversos y relevantes",
+      "source_pointer": "/learning_units/151",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de recomendaciones",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p060"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M009-K04",
+      "title": "Calidad, manejo de objeciones y actualización semestral de las recomendaciones",
+      "source_pointer": "/learning_units/152",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de recomendaciones",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "cadencia_semestral_del_material",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p061"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M009-K05",
+      "title": "Ejemplo real de recomendación: contexto, alcance, metodología y capacidades profesionales",
+      "source_pointer": "/learning_units/153",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de recomendaciones",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p062",
+        "02:ee759999a5ddefebd36e:p063"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M010-K01",
+      "title": "Cinco dimensiones para que una recomendación describa de forma completa el trabajo y la aportación profesional",
+      "source_pointer": "/learning_units/154",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de recomendaciones",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p064",
+        "02:ee759999a5ddefebd36e:p065",
+        "02:ee759999a5ddefebd36e:p066",
+        "02:ee759999a5ddefebd36e:p067"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M010-K02",
+      "title": "Solicitar, revisar y publicar recomendaciones en doce pasos, con una cadencia de actualización constante",
+      "source_pointer": "/learning_units/155",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de recomendaciones",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "continuidad_trimestral_del_material",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes",
+        "contiene_ejercicio_o_acciones_no_activadas_por_la_asignacion"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p066",
+        "02:ee759999a5ddefebd36e:p067",
+        "02:ee759999a5ddefebd36e:p064",
+        "02:ee759999a5ddefebd36e:p065"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M010-K03",
+      "title": "Destacado como vitrina: seis errores de selección y presentación y tres buenas prácticas iniciales",
+      "source_pointer": "/learning_units/156",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p068",
+        "02:ee759999a5ddefebd36e:p069",
+        "02:ee759999a5ddefebd36e:p070"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M011-K01",
+      "title": "Destacado: seleccionar por calidad y mantener la sección actualizada",
+      "source_pointer": "/learning_units/157",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p071"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M011-K02",
+      "title": "Por qué crear contenido aporta valor a la búsqueda de empleo",
+      "source_pointer": "/learning_units/158",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "La unidad aborda producir contenido como demostración de capacidades; Perfil selecciona después qué mostrar.",
+      "other_destination": [
+        "mesa_editorial"
+      ],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p072"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M011-K03",
+      "title": "Ejemplo gráfico de Eduardo Vargas: publicaciones y artículos como ventanas a la actividad profesional",
+      "source_pointer": "/learning_units/159",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p073"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M011-K04",
+      "title": "Ejemplo gráfico de Álvaro Bohorquez: medios, entrevistas y participación como ponente",
+      "source_pointer": "/learning_units/160",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p073"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M011-K05",
+      "title": "Ejemplo de Daniela Luque y principio común: Destacado como conjunto de ventanas de contenido",
+      "source_pointer": "/learning_units/161",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p074"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M011-K06",
+      "title": "Crear un artículo de LinkedIn con ChatGPT: definición, diez prompts y verificación obligatoria",
+      "source_pointer": "/learning_units/162",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Producción y verificación de artículos; Perfil puede solicitar una pieza para Destacado sin asumir su autoría.",
+      "other_destination": [
+        "mesa_editorial y revision"
+      ],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p075",
+        "02:ee759999a5ddefebd36e:p076"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M011-K07",
+      "title": "Crear una presentación con SlidesAI y Google Slides para convertirla en un PDF destacado",
+      "source_pointer": "/learning_units/163",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Producción de una presentación/PDF; Perfil define la necesidad y selecciona la pieza para su vitrina.",
+      "other_destination": [
+        "mesa_editorial"
+      ],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p077"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M012-K01",
+      "title": "Publicar un post: expresar una perspectiva profesional y decidir su visibilidad",
+      "source_pointer": "/learning_units/164",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Creación y publicación de posts; no asignar esa ejecución a Posicionamiento ni Perfil.",
+      "other_destination": [
+        "mesa_editorial"
+      ],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p078"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M012-K02",
+      "title": "Crear un carrusel en PDF para ofrecer un recorrido visual por las ideas",
+      "source_pointer": "/learning_units/165",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Producción de carruseles; pertenece al equipo de contenido.",
+      "other_destination": [
+        "mesa_editorial"
+      ],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p078"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M012-K03",
+      "title": "Publicar videos propios y utilizar el directo con relevancia profesional",
+      "source_pointer": "/learning_units/166",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Producción de video/directos; pertenece al equipo de contenido.",
+      "other_destination": [
+        "mesa_editorial"
+      ],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p079"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M012-K04",
+      "title": "Agregar, guardar, editar y ordenar contenido en Destacado: los 10 pasos del material",
+      "source_pointer": "/learning_units/167",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Destacado y creación de piezas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "tres_ultimos_y_tres_primeros_en_la_misma_unidad",
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p080",
+        "02:ee759999a5ddefebd36e:p081"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M012-K05",
+      "title": "Experiencia como pieza central del perfil: función y seis errores que deben corregirse",
+      "source_pointer": "/learning_units/168",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p082",
+        "02:ee759999a5ddefebd36e:p083"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M012-K06",
+      "title": "Describir cada rol con siete preguntas: desarrollar el «dónde» y el «qué»",
+      "source_pointer": "/learning_units/169",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p084"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M013-K01",
+      "title": "Describir el impacto de un rol mediante el cómo, el cuándo y el quién",
+      "source_pointer": "/learning_units/170",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p085"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M013-K02",
+      "title": "Cuantificar el alcance de responsabilidades y logros: incluir el cuánto",
+      "source_pointer": "/learning_units/171",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p086"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M013-K03",
+      "title": "Explicar el porqué de una experiencia con el esquema pasado-presente-futuro",
+      "source_pointer": "/learning_units/172",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p086",
+        "02:ee759999a5ddefebd36e:p087"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M013-K04",
+      "title": "Conectar experiencias sucesivas mediante transiciones que expliquen la progresión profesional",
+      "source_pointer": "/learning_units/173",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p087",
+        "02:ee759999a5ddefebd36e:p088"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M013-K05",
+      "title": "Obtener borradores de Experiencia con ChatGPT combinando una oferta de trabajo y el CV",
+      "source_pointer": "/learning_units/174",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p089",
+        "02:ee759999a5ddefebd36e:p090"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M013-K06",
+      "title": "Recursos de apoyo para el CV y criterios para personalizar las descripciones",
+      "source_pointer": "/learning_units/175",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p090"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M013-K07",
+      "title": "Incorporar a LinkedIn el contenido preparado para Experiencia: pasos 1 a 5",
+      "source_pointer": "/learning_units/176",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p091",
+        "02:ee759999a5ddefebd36e:p092"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M014-K01",
+      "title": "Completar una experiencia con medios demostrativos y guardar los cambios",
+      "source_pointer": "/learning_units/177",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Experiencia",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p092"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M014-K02",
+      "title": "Educación como oportunidad de indexación: diagnóstico y primera medida de optimización",
+      "source_pointer": "/learning_units/178",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Educación, certificaciones e idiomas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p093",
+        "02:ee759999a5ddefebd36e:p094"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M014-K03",
+      "title": "Conectar la formación con las habilidades actuales y con la trayectoria profesional",
+      "source_pointer": "/learning_units/179",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Educación, certificaciones e idiomas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p095"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M014-K04",
+      "title": "Añadir certificaciones e idiomas explicando su valor profesional",
+      "source_pointer": "/learning_units/180",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Educación, certificaciones e idiomas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p096"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M014-K05",
+      "title": "Elegir formación adicional y alternativas prácticas a partir de las habilidades demandadas",
+      "source_pointer": "/learning_units/181",
+      "agents": [],
+      "status": "reservada_para_otro_equipo_o_alcance",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Educación, certificaciones e idiomas",
+      "assignment_reason": "Elección de formación adicional; no es una tarea actual de estos dos agentes.",
+      "other_destination": [
+        "desarrollo_profesional_fuera_del_alcance_actual"
+      ],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p097",
+        "02:ee759999a5ddefebd36e:p098"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M015-K01",
+      "title": "Describir la formación con evidencias de preparación profesional: tres ejemplos del material",
+      "source_pointer": "/learning_units/182",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Material de Educación, certificaciones e idiomas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p099",
+        "02:ee759999a5ddefebd36e:p100"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M015-K02",
+      "title": "Actualizar Educación en LinkedIn: siete pasos, campos y contenido multimedia opcional",
+      "source_pointer": "/learning_units/183",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Material de Educación, certificaciones e idiomas",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p099",
+        "02:ee759999a5ddefebd36e:p100",
+        "02:ee759999a5ddefebd36e:p101",
+        "02:ee759999a5ddefebd36e:p102"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M015-K03",
+      "title": "Personalizar la URL: brevedad, facilidad de recuerdo e identidad más allá del cargo",
+      "source_pointer": "/learning_units/184",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "URL y cierre del material",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p104",
+        "02:ee759999a5ddefebd36e:p105"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M016-K01",
+      "title": "Acceder a la edición de la URL personalizada de LinkedIn",
+      "source_pointer": "/learning_units/185",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "URL y cierre del material",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial",
+        "interfaz_cifras_o_condiciones_del_material_no_verificadas_como_vigentes"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p106"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M016-K02",
+      "title": "Finalidad de la optimización integral: un perfil que represente la trayectoria y funcione como carta de presentación",
+      "source_pointer": "/learning_units/186",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "URL y cierre del material",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [
+        "material_con_enfoque_laboral_consultar_pertinencia_comercial"
+      ],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p107"
+      ]
+    },
+    {
+      "unit_id": "LI-02-M016-K03",
+      "title": "Recursos de contacto comercial ofrecidos al cierre del material",
+      "source_pointer": "/learning_units/187",
+      "agents": [],
+      "status": "fuera_de_asignacion",
+      "use": "conocimiento_de_trabajo",
+      "topic": "URL y cierre del material",
+      "assignment_reason": "Canales de contacto comercial de la docente; no son datos ni instrucciones para los agentes del usuario.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:ee759999a5ddefebd36e:p108"
+      ]
+    },
+    {
+      "unit_id": "LI-02-BATCH-AUDIT-K01",
+      "title": "Completar el itinerario visual: del cliente al catálogo y a la función comercial del contenido",
+      "source_pointer": "/learning_units/188",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "conocimiento_de_trabajo",
+      "topic": "Evidencia complementaria recuperada previamente",
+      "assignment_reason": "Ubica las responsabilidades de cliente y perfil y sus dependencias con los siguientes equipos.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qt00029",
+        "02:qt00076",
+        "02:qv0007",
+        "02:qv0008"
+      ]
+    },
+    {
+      "unit_id": "LI-02-BATCH-AUDIT-K02",
+      "title": "Enlaces directos de las newsletters utilizadas en la demostración",
+      "source_pointer": "/learning_units/189",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Evidencia complementaria recuperada previamente",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qv0072",
+        "02:qv0100",
+        "02:qv0101"
+      ]
+    },
+    {
+      "unit_id": "LI-02-BATCH-AUDIT-K03",
+      "title": "Qué desarrolla el Acerca de de Ángel: datos, consultoría, tecnología y continuidad de trayectoria",
+      "source_pointer": "/learning_units/190",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "ejemplo_o_contraejemplo",
+      "topic": "Evidencia complementaria recuperada previamente",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qv0099",
+        "02:qs07260000",
+        "02:qs07350000"
+      ]
+    },
+    {
+      "unit_id": "LI-02-BATCH-AUDIT-K04",
+      "title": "Completar el ejemplo de Daniela: alcance digital, afirmaciones de resultado y cierre de transformación",
+      "source_pointer": "/learning_units/191",
+      "agents": [
+        "perfil"
+      ],
+      "status": "asignada",
+      "use": "contexto_o_recurso_opcional",
+      "topic": "Evidencia complementaria recuperada previamente",
+      "assignment_reason": "Corresponde a la evaluación, presentación, organización o mantenimiento del perfil; no redefine por sí sola al comprador.",
+      "other_destination": [],
+      "context_markers": [],
+      "source_keys": [
+        "02:qv0045",
+        "02:qs04650000",
+        "02:qt00607",
+        "02:qt00609",
+        "02:qt00610"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,781 @@
+{
+  "version": "1.0",
+  "estado": "registro_de_lectura_selectiva_de_diseno",
+  "grupo": "observatorio",
+  "fecha": "2026-11-06",
+  "metodo": "uv run python; knowledge.db.connect; SET TRANSACTION READ ONLY; SELECT id,session,title,original,sha256,source_path,pointer FROM units WHERE active AND id=ANY(...). Solo consultas; sin modificar corpus, memoria o ledger.",
+  "alcance": {
+    "unidades_leidas_completas": 29,
+    "por_clase": {
+      "01": 2,
+      "03": 12,
+      "06": 15
+    },
+    "lectura_integral_del_corpus": false,
+    "advertencia": "Lectura completa de estas 29 unidades, no de todas las unidades pertinentes posibles ni de clases completas. Índices/títulos consultados no cuentan como lectura. F1 sigue parcial; ampliación contextual requerida antes de nuevas reglas."
+  },
+  "unidades": [
+    {
+      "unidad_id": "LI-01-M006-K02",
+      "clase": 1,
+      "titulo": "Definir al cliente mediante cuatro dimensiones: identidad, urgencia, transformación y freno",
+      "hash": "ea005a97e91d98c3d77008a2d74eb6656982ca2a3052706bb1a48febb5ba68bf",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Investigar contexto, urgencia, transformación y freno por audiencia.",
+      "limites_y_excepciones": [
+        "No inferir urgencia por cargo ni exigir cifras no disponibles."
+      ],
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/125",
+      "fuentes_con_prefijo_de_clase": [
+        "clase01:7f89013f7843c6458b38:p037",
+        "clase01:7f89013f7843c6458b38:p038",
+        "clase01:7f89013f7843c6458b38:p039",
+        "clase01:7f89013f7843c6458b38:p040"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-01-V022-K02",
+      "clase": 1,
+      "titulo": "Cómo hacer convivir dos buyer personas: aprender a ejecutar frente a delegar la ejecución",
+      "hash": "ae779a5eb5d91ae1a87a33d8292e8064317b6e8f58f825c64b49f35565b4c0bc",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Distinguir motivos de compra dentro de una especialidad compartida.",
+      "limites_y_excepciones": [
+        "Ejemplo de academia/ejecución no equivale a las ofertas de Gustavo; 60/40 procede del usuario."
+      ],
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/88",
+      "fuentes_con_prefijo_de_clase": [
+        "clase01:qt00509",
+        "clase01:qt00510",
+        "clase01:qt00511",
+        "clase01:qt00512"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-M001-K02",
+      "clase": 3,
+      "titulo": "Objetivos del trabajo de barrio: visibilidad pertinente, diversidad de actores e interacción sin venta inmediata",
+      "hash": "79f48aa8894fae0955827dcb34c0765e84e4c536a63e9e0979d407e26eadb2ba",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Evaluar visibilidad pertinente y diversidad del barrio.",
+      "limites_y_excepciones": [
+        "Agenda, sin cuotas ni garantía comercial."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/108",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:c7f1f10c349724396998:p004"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-M003-K06",
+      "clase": 3,
+      "titulo": "Dos funciones de los vecinos: prospectos y divulgadores",
+      "hash": "eb3f32a767ff97d20635b233e2cd1fc2996b6274b3b53b1a11887d4f7533a7fc",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Reconocer valor comercial y de divulgación.",
+      "limites_y_excepciones": [
+        "Prospecto no es cliente pagado; papeles no exclusivos."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/123",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:c7f1f10c349724396998:p020"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-M003-K07",
+      "clase": 3,
+      "titulo": "Los líderes de opinión no se reducen a figuras de admiración",
+      "hash": "c475d94216ca188d2f45e8f6148626a4e2807ee807b59c944dae1508a37f2ebe",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Tratar referentes como parte del ecosistema y no solo admiración.",
+      "limites_y_excepciones": [
+        "La lámina no da tácticas ni nombres."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/124",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:c7f1f10c349724396998:p021"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-M004-K04",
+      "clase": 3,
+      "titulo": "Escuchar los «chismes» del barrio para comprender a la audiencia",
+      "hash": "98a2681cd14316065611028bae31e63335d0da9726ec596a477a4329775c4eb7",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Escuchar necesidades, objeciones y lenguaje en conversaciones.",
+      "limites_y_excepciones": [
+        "No rumores ni información privada indiscriminada; sin sistema cuantitativo prescrito."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/128",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:c7f1f10c349724396998:p025",
+        "clase03:qt00237",
+        "clase03:qt00238",
+        "clase03:qt00239",
+        "clase03:qt00240",
+        "clase03:qt00241",
+        "clase03:qt00242",
+        "clase03:qt00243",
+        "clase03:qt00244"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-M005-K05",
+      "clase": 3,
+      "titulo": "Cinco papeles que buscar en el barrio: par, recomendador, líder, comprador y divulgador",
+      "hash": "8d3ba01a2536edc6b5459c831f0ccca95e28d14259c0b3bfd2da25168c1f53f8",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Mapear pares, recomendadores, líderes, compradores y divulgadores.",
+      "limites_y_excepciones": [
+        "No jerarquía, exclusividad ni proporciones obligatorias."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/136",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:c7f1f10c349724396998:p034"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-M005-K06",
+      "clase": 3,
+      "titulo": "Filtro de conexión: cinco preguntas para evaluar la pertinencia de un perfil",
+      "hash": "26af38ddd246b161da417fd0bed17666a0a95fd15673d0050e78e6df1759c3b8",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Examinar audiencia útil, tema, conversación y vínculo con cliente.",
+      "limites_y_excepciones": [
+        "No umbral de seguidores ni puntaje universal."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/137",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:c7f1f10c349724396998:p035",
+        "clase03:qt00385",
+        "clase03:qt00386",
+        "clase03:qt00387",
+        "clase03:qt00388",
+        "clase03:qt00389"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-V009-K04",
+      "clase": 3,
+      "titulo": "Participar en las publicaciones de líderes que también lee el cliente",
+      "hash": "87ed7dfc86d9171bf7ea06000364d92e5135b43cc8df1ddc482b27858067d5c6",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Buscar referentes de industria cuya conversación interese al público buscado.",
+      "limites_y_excepciones": [
+        "Fama no acredita encaje; no garantía de alcance o venta."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/39",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:qt00201",
+        "clase03:qt00202",
+        "clase03:qt00203",
+        "clase03:c7f1f10c349724396998:p021",
+        "clase03:c7f1f10c349724396998:p022",
+        "clase03:qs02670000",
+        "clase03:qv0020"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-V018-K02",
+      "clase": 3,
+      "titulo": "Descubrir perfiles a través de líderes, comentarios, inteligencia artificial y otras redes",
+      "hash": "3297c3ce8c4992b88b346e18ad38cb81f7f868eb4b561fe51a43d56b415a7496",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Ampliar descubrimiento a comentarios y otras comunidades pertinentes.",
+      "limites_y_excepciones": [
+        "Substack es ejemplo hipotético; IA no verifica identidades ni autoriza importación."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/72",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:qt00376",
+        "clase03:qt00377",
+        "clase03:qt00378",
+        "clase03:qt00379",
+        "clase03:qt00380",
+        "clase03:qt00381",
+        "clase03:qt00382",
+        "clase03:qt00383"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-V020-K02",
+      "clase": 3,
+      "titulo": "Comentario estratégico: postura, fundamento y una pregunta que abra conversación",
+      "hash": "3c7fc9b2fa0c0d11e8810a11c60940ed4487de9056941b685a9656f170b2043c",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Proponer comentario con postura y fundamento que abra conversación.",
+      "limites_y_excepciones": [
+        "No visitas garantizadas; pregunta pertinente, no interrogación ritual."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/79",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:qt00417",
+        "clase03:qt00418",
+        "clase03:qt00419",
+        "clase03:c7f1f10c349724396998:p037",
+        "clase03:qs05700000",
+        "clase03:qv0037"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-V020-K04",
+      "clase": 3,
+      "titulo": "Dónde y cuándo comentar: cuentas grandes, creadores medianos y pares que comienzan",
+      "hash": "7968f2599ddb97c38bd1246daecff366d8846f27d6c97bb2bbbb65403df41147",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Considerar cuentas grandes, medianas y pares emergentes.",
+      "limites_y_excepciones": [
+        "Hora y prioridad de comentario son relato situado, no algoritmo o horario universal."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/81",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:qt00423",
+        "clase03:qt00424",
+        "clase03:qt00425",
+        "clase03:qt00426",
+        "clase03:qt00427",
+        "clase03:qt00428",
+        "clase03:qt00429",
+        "clase03:qt00430",
+        "clase03:qt00431"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-V020-K05",
+      "clase": 3,
+      "titulo": "Leer y registrar el barrio: convertir interacciones en información utilizable",
+      "hash": "ee58aa3d87a1601bb54119e6d28961746779bda7c35f2ed7c74fc64488e2bb17",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Registrar señales de comunidades propias y ajenas para decisiones posteriores.",
+      "limites_y_excepciones": [
+        "No demuestra que un comentario haya causado una visita."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/82",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:qt00432",
+        "clase03:qt00433",
+        "clase03:qt00434",
+        "clase03:qt00435",
+        "clase03:c7f1f10c349724396998:p038",
+        "clase03:qv0038"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-03-V022-K01",
+      "clase": 3,
+      "titulo": "Usar IA para localizar referentes y descubrir personas en sus conversaciones",
+      "hash": "aa960b608541e5930e28690d36c5ededbb2c793e9e872a2c1cc3a6587327d646",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Descubrir referentes por sector, función o región y luego leer conversaciones.",
+      "limites_y_excepciones": [
+        "20 personas es ejercicio, no cuota; automatización posterior no se activa aquí."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/88",
+      "fuentes_con_prefijo_de_clase": [
+        "clase03:qt00463",
+        "clase03:qt00464",
+        "clase03:qt00465",
+        "clase03:qt00466",
+        "clase03:qt00484",
+        "clase03:c7f1f10c349724396998:p040",
+        "clase03:qt00456",
+        "clase03:qt00457",
+        "clase03:qt00458",
+        "clase03:qt00459"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V006-K03",
+      "clase": 6,
+      "titulo": "Después de publicar, escuchar para mejorar la siguiente pieza",
+      "hash": "a99e3cccea051fa09672610e076cf380cf0e716237ec24f9c33280a8c6996798",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Cerrar publicación con escucha sobre tema, dolor, lenguaje, ejemplo y cierre.",
+      "limites_y_excepciones": [
+        "Likes solos no evalúan; acceso a mensajes no se presume."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/24",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00131",
+        "clase06:qt00132",
+        "clase06:qt00133",
+        "clase06:3e72f0613de5539a1305:p017",
+        "clase06:qt00134",
+        "clase06:qt00137",
+        "clase06:qv0016"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V006-K04",
+      "clase": 6,
+      "titulo": "Interpretar señales: utilidad, movilización, interés y apertura de conversación",
+      "hash": "fc74949261d544a7b005d90dd57c4e8151f5aa667e268abbbe340982f5c735ae",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Separar tipos de acción y posibles significados.",
+      "limites_y_excepciones": [
+        "Motivos son hipótesis cualitativas; DM no prueba venta."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/25",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00131",
+        "clase06:qt00133",
+        "clase06:qt00134",
+        "clase06:qt00135",
+        "clase06:qt00136",
+        "clase06:qt00137",
+        "clase06:3e72f0613de5539a1305:p019",
+        "clase06:qs01770000",
+        "clase06:3e72f0613de5539a1305:p020",
+        "clase06:qs01800000",
+        "clase06:qt00124",
+        "clase06:qv0017"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V007-K01",
+      "clase": 6,
+      "titulo": "Encontrar nuevas publicaciones en los comentarios, las objeciones y el lenguaje de la audiencia",
+      "hash": "e0a0fcf9b8c158cd433adbb2d877a17c341fba4f6d294c9fc152029f50b8ad50",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Convertir preguntas, objeciones y frases reales en candidatos editoriales.",
+      "limites_y_excepciones": [
+        "No todo comentario merece post ni autoriza reutilización identificable."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/26",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00138",
+        "clase06:qt00139",
+        "clase06:3e72f0613de5539a1305:p024",
+        "clase06:qv0018"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V007-K05",
+      "clase": 6,
+      "titulo": "Leer quién está llegando y ajustar contenido y perfil sin exigir que todos sean compradores",
+      "hash": "d925faf2799c34bcd50ea28d81895e723ad8912de407ddf5c5037e25474890ed",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Revisar quién llega sin exigir que todos compren.",
+      "limites_y_excepciones": [
+        "No porcentaje ideal de compradores; ajuste de perfil se propone."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/30",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00157",
+        "clase06:qt00158",
+        "clase06:qt00159",
+        "clase06:qt00160",
+        "clase06:qt00161",
+        "clase06:3e72f0613de5539a1305:p027",
+        "clase06:qv0021",
+        "clase06:qs02070000"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V008-K01",
+      "clase": 6,
+      "titulo": "Separar el efecto del contenido de la composición del público",
+      "hash": "c4294955b8cc1553aaa72e1bfb6d161e8722bba9a96e97ed6ebf839f8f5eecfa",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Separar desempeño del contenido y composición del público.",
+      "limites_y_excepciones": [
+        "Divulgadores son pertinentes aunque no compradores."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/31",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00162",
+        "clase06:3e72f0613de5539a1305:p027",
+        "clase06:qv0021"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V008-K02",
+      "clase": 6,
+      "titulo": "Elegir la ventana temporal, guardar análisis y exportar los datos",
+      "hash": "0e2073d49ae418a337dd770c06190bad0443c9bfcd988955487697e7fa37b40d",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Registrar ventanas y conservar observaciones comparables.",
+      "limites_y_excepciones": [
+        "Interfaz/exportación histórica no asegura disponibilidad actual; sin frecuencia universal."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/32",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00163",
+        "clase06:qt00164",
+        "clase06:qt00165",
+        "clase06:qt00166",
+        "clase06:qt00167",
+        "clase06:qt00168",
+        "clase06:qt00169",
+        "clase06:qt00170",
+        "clase06:3e72f0613de5539a1305:p028",
+        "clase06:qv0022"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V008-K03",
+      "clase": 6,
+      "titulo": "Usar las tres mejores y las tres peores publicaciones para orientar la creación",
+      "hash": "49fab8dd54dad3f12e3832bd1f690eb65614b0b600569e7ccc197a147506732a",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Con historial suficiente contrastar mejores y peores y proponer variaciones.",
+      "limites_y_excepciones": [
+        "Tres y tres es ejercicio; no forzar con pocos posts ni garantía de repetición."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/33",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00170",
+        "clase06:qt00171",
+        "clase06:qt00172",
+        "clase06:qt00173",
+        "clase06:qt00174"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V009-K02",
+      "clase": 6,
+      "titulo": "Impresiones: medir apariciones en pantalla sin confundirlas con lectura o negocio",
+      "hash": "3e0896d27b2cceeb1f8159f8eeb5523e9f91e5aa56c2250b1a48f1a4adbe1090",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Leer impresiones como apariciones.",
+      "limites_y_excepciones": [
+        "No lecturas, personas únicas, compradores ni cierres."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/37",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00186",
+        "clase06:qt00187",
+        "clase06:qt00188",
+        "clase06:qt00189",
+        "clase06:qt00190",
+        "clase06:qt00191",
+        "clase06:3e72f0613de5539a1305:p031",
+        "clase06:qt00185",
+        "clase06:qt00192",
+        "clase06:qt00197",
+        "clase06:qt00198",
+        "clase06:qt00204",
+        "clase06:qv0025"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V009-K03",
+      "clase": 6,
+      "titulo": "Interacciones: identificar qué hizo la audiencia después de ver el contenido",
+      "hash": "48793d286fed06f095379f8f20cf7762fd391601cf45cbf494f8f653550482cd",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Separar acciones observadas de exposición.",
+      "limites_y_excepciones": [
+        "No tasa estándar ni inferencia causal; campos dependen de acceso real."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/38",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00192",
+        "clase06:qt00193",
+        "clase06:qt00194",
+        "clase06:qt00195",
+        "clase06:qt00196",
+        "clase06:qt00197",
+        "clase06:3e72f0613de5539a1305:p032",
+        "clase06:qt00185",
+        "clase06:qt00186",
+        "clase06:qt00191",
+        "clase06:qt00205",
+        "clase06:qt00207",
+        "clase06:qv0026"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V009-K04",
+      "clase": 6,
+      "titulo": "Miembros alcanzados: distinguir personas únicas de exposiciones repetidas",
+      "hash": "3a811c4c029d5d76ed3567f954db256a8137c03674339c311116469c7a7674d5",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Distinguir miembros únicos e impresiones por alcance medido.",
+      "limites_y_excepciones": [
+        "No sumar únicos entre posts; IP y motivación de repeticiones no verificadas."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/39",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00198",
+        "clase06:qt00199",
+        "clase06:qt00200",
+        "clase06:qt00201",
+        "clase06:qt00202",
+        "clase06:qt00203",
+        "clase06:qt00204",
+        "clase06:qt00205",
+        "clase06:3e72f0613de5539a1305:p033",
+        "clase06:qt00186",
+        "clase06:qt00191",
+        "clase06:qv0027"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V010-K02",
+      "clase": 6,
+      "titulo": "Estudiar los posts que mejor y peor funcionan para encontrar patrones y orientar el contenido",
+      "hash": "c2bd0661f77d3a08d222face8b655eced5bde3e5f5602c1a6163f94b0e432efa",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Comparar tema, dolor, frase, formato, conversación y quién respondió.",
+      "limites_y_excepciones": [
+        "Patrón observado no revela el algoritmo ni demuestra causalidad."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/42",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00212",
+        "clase06:qt00213",
+        "clase06:qt00214",
+        "clase06:qt00215",
+        "clase06:qt00216",
+        "clase06:qt00217",
+        "clase06:qt00218",
+        "clase06:3e72f0613de5539a1305:p035",
+        "clase06:qv0029"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V026-K05",
+      "clase": 6,
+      "titulo": "Reconocer la utilidad comercial de un post de nicho aunque circule poco",
+      "hash": "a9381c6ae89ee77fdc8976a9ec50b640ebeb2485d3cfa55370cb0faa33df2a3c",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Evaluar pieza de nicho por función y destinatario.",
+      "limites_y_excepciones": [
+        "Alcance menor no prueba fracaso ni especialización garantiza eficacia."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/103",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00720",
+        "clase06:qt00721",
+        "clase06:qt00722"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V029-K02",
+      "clase": 6,
+      "titulo": "Por qué una explicación técnica de nicho no se compara igual que una lección empresarial general",
+      "hash": "a9352046e9fff58a10e24f0829d72de3e92c04d27f22f50e853eabedc58af657",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Contextualizar comparación por especialización y conocimiento del lector.",
+      "limites_y_excepciones": [
+        "Especificidad no garantiza originalidad; no volúmenes de mercado medidos."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/112",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00785",
+        "clase06:qt00786",
+        "clase06:qt00787",
+        "clase06:qt00788",
+        "clase06:qt00789",
+        "clase06:qt00790",
+        "clase06:qt00791",
+        "clase06:qt00792",
+        "clase06:qt00793",
+        "clase06:qt00794",
+        "clase06:qt00795",
+        "clase06:qt00796",
+        "clase06:qt00797",
+        "clase06:qt00798",
+        "clase06:qt00799",
+        "clase06:qt00800",
+        "clase06:qt00503",
+        "clase06:qt00514",
+        "clase06:qt00781"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V033-K02",
+      "clase": 6,
+      "titulo": "Elegir entre vídeos e imágenes mediante series de prueba",
+      "hash": "bf37a05d79e26d42fba2b47c0971c1a99e393c07cc0794a739c6b5f6b2063aea",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Proponer series para contrastar formatos.",
+      "limites_y_excepciones": [
+        "Sin mínimo numérico ni superioridad actual del vídeo demostrada."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/129",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00922",
+        "clase06:qt00923",
+        "clase06:qt00924",
+        "clase06:qt00925",
+        "clase06:qt00926",
+        "clase06:qt00927",
+        "clase06:qt00928"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    },
+    {
+      "unidad_id": "LI-06-V033-K03",
+      "clase": 6,
+      "titulo": "Experimentar con horarios y periodos sin copiar una fórmula universal",
+      "hash": "8789a34714692aaa2f999237ccfb82681f9d8ec1ffc38723d7a1227a5f9b18c9",
+      "lectura_completa": true,
+      "lectura": "original completo en salida SQL; algunas consultas se repitieron en lotes menores para evitar truncamiento",
+      "fecha": "2026-11-06",
+      "criterio_derivado": "Diseñar prueba situada de horarios y formatos.",
+      "limites_y_excepciones": [
+        "Una semana, 15 días y 3 pm son ejemplos; no experimento controlado universal."
+      ],
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/130",
+      "fuentes_con_prefijo_de_clase": [
+        "clase06:qt00929",
+        "clase06:qt00930",
+        "clase06:qt00931",
+        "clase06:qt00932",
+        "clase06:qt00933",
+        "clase06:qt00934",
+        "clase06:qt00935",
+        "clase06:qt00926"
+      ],
+      "evidencia_visual": "referencias contenidas en la unidad; no se inspeccionaron imágenes en esta tarea"
+    }
+  ],
+  "relaciones_transversales": [
+    {
+      "desde": "LI-01-M006-K02",
+      "hacia": [
+        "LI-03-M005-K06",
+        "LI-06-V007-K01"
+      ],
+      "uso": "Preguntas y objeciones reales contrastan buyer persona; cargos solos no lo validan."
+    },
+    {
+      "desde": "LI-03-V022-K01",
+      "hacia": [
+        "LI-03-V020-K04",
+        "LI-06-V007-K05"
+      ],
+      "uso": "Referentes permiten descubrir diversidad; tamaño no sustituye pertinencia."
+    },
+    {
+      "desde": "LI-06-V010-K02",
+      "hacia": [
+        "LI-06-V026-K05",
+        "LI-06-V029-K02",
+        "LI-06-V033-K03"
+      ],
+      "uso": "Comparar según finalidad, público y contexto; proponer experimentos situados."
+    }
+  ],
+  "no_convertido_en_regla": [
+    "cuotas de conexiones o número de referentes",
+    "horarios universales",
+    "observaciones del algoritmo como hechos vigentes",
+    "ejemplos personales del curso como resultados de Gustavo",
+    "navegación histórica del panel como capacidad técnica confirmada"
+  ]
+}

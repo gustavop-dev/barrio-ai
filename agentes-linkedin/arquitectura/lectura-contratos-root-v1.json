@@ -1,0 +1,160 @@
+{
+  "unidades": [
+    {
+      "id": "LI-01-M006-K02",
+      "session": 1,
+      "title": "Definir al cliente mediante cuatro dimensiones: identidad, urgencia, transformación y freno",
+      "sha256": "ea005a97e91d98c3d77008a2d74eb6656982ca2a3052706bb1a48febb5ba68bf",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/125",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-01-M006-K03",
+      "session": 1,
+      "title": "Ejercicio de definición escrita: dolor urgente, objetivo a 90 días y obstáculos previos",
+      "sha256": "c97e76c8730e7943b9714a81f838d13fb6948db2b244f97947cbd8e210aaa716",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/126",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-01-M007-K03",
+      "session": 1,
+      "title": "Las cinco frases del mensaje: del problema al resultado final con y sin compra",
+      "sha256": "5c49e469b1ffebc7131dba7ff931b3446f81991909c30231659be94a7bddb69b",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/130",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-01-M007-K04",
+      "session": 1,
+      "title": "Cuándo está bien definido el buyer persona: cuatro comprobaciones acumulativas",
+      "sha256": "710bd0bcd48f5a60a9dd8ab5ec999f1939c8ec7e8e2945f4c6392a73ad1770b4",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/131",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-01-V022-K02",
+      "session": 1,
+      "title": "Cómo hacer convivir dos buyer personas: aprender a ejecutar frente a delegar la ejecución",
+      "sha256": "ae779a5eb5d91ae1a87a33d8292e8064317b6e8f58f825c64b49f35565b4c0bc",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/88",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-02-V016-K01",
+      "session": 2,
+      "title": "El titular como semilla de posicionamiento: usar las palabras por las que el cliente busca",
+      "sha256": "0c45b7fbf66cfb99e6cac4479b839dc6ee87c126aee8f0096e300040b76c2546",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/60",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-02-V016-K05",
+      "session": 2,
+      "title": "Explicar qué haces y para quién: el «Acerca de» articula la misión actual y no duplica «Experiencia»",
+      "sha256": "ae996eaa2321804bd70fc4503c5d795e9e2952a10d98145c46a78f9ee3c9335d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/64",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-02-V019-K01",
+      "session": 2,
+      "title": "Conectar la experiencia pasada con la actividad actual sin forzar ni inventar la trayectoria",
+      "sha256": "824d766ccd6fcb625c488a16881e4f515a490c7d4b657f9d63f48a47c1164977",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/74",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-02-V019-K02",
+      "session": 2,
+      "title": "Redactar Experiencia mediante logros, aprendizajes y utilidad para el cliente actual",
+      "sha256": "25a426738c4bd1aec5d93766bbc0b2256e991444a02f17eecc901d47bd23b5cf",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/75",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-03-M005-K05",
+      "session": 3,
+      "title": "Cinco papeles que buscar en el barrio: par, recomendador, líder, comprador y divulgador",
+      "sha256": "8d3ba01a2536edc6b5459c831f0ccca95e28d14259c0b3bfd2da25168c1f53f8",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/136",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-05-V005-K05",
+      "session": 5,
+      "title": "Revisar el post antes de publicar adoptando la perspectiva de un lector ajeno",
+      "sha256": "a6a9091baf514ba42220317d6a596f3e8e82f88d5c1b21e316b017c30bee2a2d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-05-revisada.json",
+      "pointer": "/learning_units/15",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-06-M002-K09",
+      "session": 6,
+      "title": "Edición final: voz, recorte, transiciones y datos comprobables",
+      "sha256": "e40f00e15effa43510466b13291eb41e7ad97172f68eb6a32986814cd9cafbdd",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/159",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-06-M002-K10",
+      "session": 6,
+      "title": "Checklist previo a publicar: gancho, historia, tono y prohibidos",
+      "sha256": "8826ba03e935b060a62426e800964520535e53c84b4ead40f6e2b96d54b8bc09",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/160",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-06-M003-K06",
+      "session": 6,
+      "title": "Qué delegar a Claude y qué no: tareas editoriales con autenticidad y revisión humana",
+      "sha256": "c01c7a6a23b9e581c7b389b301ec15886cd7d1b172469f89fa31a1f1c7d87e38",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/166",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    },
+    {
+      "id": "LI-06-V020-K01",
+      "session": 6,
+      "title": "«Tú no eres el cliente»: escuchar sin convertir la empatía en proyección personal",
+      "sha256": "0b6561a738cbce65fe3ecfb63846b088a2521c151a6b39afe49233e20dc1fd0e",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-06-revisada.json",
+      "pointer": "/learning_units/74",
+      "lectura": "completa",
+      "alcance": "Unidades seleccionadas leídas por orquestador en esta sesión o sesiones previas de este hilo; no lectura integral del curso."
+    }
+  ],
+  "nuevo_en_esta_sesion": [
+    "LI-06-M002-K09",
+    "LI-06-M002-K10",
+    "LI-06-V020-K01"
+  ],
+  "human_review": false
+}

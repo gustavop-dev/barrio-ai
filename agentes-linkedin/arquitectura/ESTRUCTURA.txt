@@ -1,0 +1,71 @@
+LINKEDIN TEAM — ESTRUCTURA DE DISEÑO v0.1
+Estado: propuesta de arquitectura. No activa agentes, llamadas pagadas ni publicación.
+
+PROPÓSITO
+Construir posicionamiento y autoridad reconocible, y una audiencia grande y pertinente para Gustavo. La audiencia incluye compradores, pares, recomendadores, líderes y divulgadores. El tamaño importa junto con la composición y las relaciones que se construyen. Metas numéricas, línea base, oferta y nicho siguen pendientes de trabajar con Gustavo.
+
+UNIDAD DE DISEÑO
+Primero se diseña el equipo: resultado que persigue, ciclo, decisiones, entradas y entregables. Después se diseña cada agente usando plantilla-agente.json. Un agente tiene responsabilidades continuas y condiciones para actuar; una tarea es una ejecución concreta dentro de esa responsabilidad.
+
+MAPA PROPUESTO — 13 AGENTES + ORQUESTACIÓN
+1. Estrategia y perfil: posicionamiento; perfil. Mantienen coherencia entre negocio, audiencia, promesa, pruebas y presentación. Sus diseños previos son insumos que deben adaptarse al contrato común; no equivalen a autonomía ya implementada.
+2. Observatorio: investigador de referentes; analista de barrio y resultados. El primero descubre referentes del nicho, temas y conversaciones relevantes, sin limitarse a insignias Top Voice o cuentas enormes. El segundo observa audiencia real, preguntas, objeciones y composición del barrio; propone participación orgánica y analiza resultados. Investigación de mercado y medición real son distintas de la simulación de lectores.
+3. Dirección editorial y escritura: director editorial; copywriter A; copywriter B. El director convierte estrategia y evidencia en pilares, oportunidades y briefs. Los dos escritores desarrollan alternativas independientes con el mismo brief y evidencia. Sus especialidades se definirán al leer sus unidades; no deben competir inventando hechos o cambiando el objetivo.
+4. Mesa de lectores: cinco perspectivas simuladas — par, recomendador, líder, comprador, divulgador. Son papeles funcionales, no identidades reales ni categorías excluyentes. Examinan claridad, relevancia, credibilidad y valor para su perspectiva. No producen predicciones fiables de engagement ni sustituyen investigación real.
+5. Revisión: un editor/verificador comprueba afirmaciones, fuentes, voz, coherencia y promesa del gancho. Devuelve problemas materiales y correcciones concretas; no bloquea por preferencias cosméticas.
+Orquestación: coordina estos grupos, dependencias, prioridades, memoria y presupuesto. En esta etapa yo conduzco el diseño y la lectura transversal. La orquestación autónoma del backend es un componente por implementar, distinto de mi presencia en esta conversación.
+
+CICLO AUTÓNOMO PROPUESTO
+- Parte de un brief personal confirmado y objetivos acordados. Si faltan, prepara un conjunto concreto de preguntas; no inventa identidad, experiencia o nicho.
+- Estrategia y perfil mantienen las versiones de referencia. Observatorio aporta evidencia de referentes, audiencia y conversaciones.
+- Dirección editorial prioriza oportunidades y prepara briefs: destinatario principal, aporte al barrio, pilar, problema, ángulo, evidencia, formato y criterio de éxito.
+- Copywriters producen alternativas independientes. Lectores evalúan primero por separado y después contrastan objeciones específicas.
+- Director elige, combina o descarta con una justificación. No hay obligación de elegir un texto insuficiente ni de satisfacer a los cinco lectores con cada post. La intención de cada pieza determina qué perspectivas pesan más.
+- Revisión verifica la propuesta; una objeción material sin resolver impide pasar a lista para aprobación. La revisión humana final corresponde a Gustavo.
+- La publicación confirmada y sus datos reales alimentan el aprendizaje y el siguiente ciclo. Sin datos accesibles se informa evidencia insuficiente; no se inventan métricas ni se supone que un borrador fue publicado.
+
+El orden, reparto de agentes y mecanismo de debate son decisiones de diseño nuestras. El curso aporta métodos y límites, no prescribe esta arquitectura multiagente.
+
+AUTONOMÍA Y LÍMITES
+Eventos previstos: nuevo contexto confirmado; evidencia relevante nueva; llegada de una fecha editorial acordada; resultados disponibles; cambio de estrategia que vuelve obsoleto un entregable. Cada evento tiene identificador y versión para evitar trabajo duplicado.
+El campo de tarea manual será una intervención opcional: el sistema debe mostrar objetivo, siguiente acción justificada, trabajo de cada grupo, bloqueos, aprobaciones y resultados.
+Propuesta inicial de control: dos rondas como máximo de deliberación/revisión por pieza; si sigue habiendo desacuerdo material, registrar alternativas y escalar. Esta cifra es un límite operativo propuesto, no una regla del curso.
+No se activan frecuencia ni gasto nuevos con este documento. Se conservarán límites y reservas vigentes del backend; las reservas inciertas no se liberan ni se reintentan automáticamente. Alcanzar un límite o faltar una dependencia detiene la ejecución afectada sin borrar el trabajo.
+Los agentes podrán investigar con herramientas habilitadas, proponer, redactar, comparar y revisar dentro de la autorización vigente. Publicar, modificar el perfil, comentar o contactar personas requiere autorización explícita aplicable. Los borradores y la validación técnica no son aprobación humana.
+
+MEMORIA COMPARTIDA
+- Conocimiento del curso: unidades originales inmutables, clases 01–06, con identificador, hash y fuentes. Etiquetas, relaciones y afinidades ayudan a recuperar; no son propiedad exclusiva de un agente.
+- Contexto personal: hechos confirmados separados de hipótesis, preferencias, experiencias y pruebas documentales. Un agente propone cambios; no convierte una inferencia en verdad del usuario.
+- Trabajo del equipo: briefs, borradores, decisiones, objeciones y dependencias con versiones.
+- Observación: fuentes externas fechadas y resultados reales, separados de las valoraciones de lectores simulados.
+Toda entrega identifica sus versiones de entrada. Una modificación del posicionamiento marca para revisión lo dependiente; no reescribe históricos ni invalida sin criterio todo el corpus.
+
+QUÉ SIGNIFICA QUE UN AGENTE ESTÁ DISEÑADO
+Tiene misión, responsabilidad propia, límites, entradas, disparadores, flujo, decisiones, herramientas, salidas verificables, memoria, coordinación, calidad, métricas y condiciones de parada. Sus reglas enlazan unidades leídas completas y conservan contexto y excepciones. Distingue métodos útiles de tareas de alumnos y logística del curso.
+Estado independiente por agente: propuesta -> lectura de unidades -> diseño fundamentado -> validación del diseño -> implementación -> pruebas -> activo. Un personaje de la oficina no acredita ninguno de estos estados.
+Casos de evaluación deben incluir datos personales faltantes, evidencia contradictoria, afirmaciones sin fuente, presión por likes, dependencia obsoleta y desacuerdo entre lectores. Se comprobarán comportamientos, no solo que un prompt contenga palabras.
+
+MEDICIÓN
+Seguir crecimiento y composición de audiencia, conversaciones pertinentes, recurrencia de personas y señales de utilidad/autoridad cuando existan datos. Separar resultados de una publicación de resultados del equipo. Registrar ventana temporal, fuente y limitaciones; no atribuir causalidad a una sola pieza. Metas y cadencia se acuerdan con contexto personal, no se extraen de ejemplos o ejercicios como cuotas obligatorias.
+
+ORDEN DE DISEÑO DETALLADO
+1. Adaptar Estrategia y Perfil al contrato común, revisando sus unidades de clases 01 y 02 y conexiones pertinentes con clases posteriores.
+2. Observatorio y barrio, incorporando investigación y medición de clases 03 y 06.
+3. Dirección editorial y copywriters, con clases 04, 05 y 06 y dependencias de estrategia.
+4. Lectores, con barrio, revisión editorial y límites de simulación.
+5. Revisión y cierre del ciclo; comprobar que las responsabilidades no tengan vacíos ni duplicaciones contradictorias.
+La lectura transversal es responsabilidad del orquestador. El registro distingue catálogo de lectura completa; la lectura integral de las 1035 unidades aún no está terminada. Antes de cerrar el diseño del conjunto se debe resolver el estado de cada unidad, incluidas las excluidas por logística, y sus conexiones entre grupos.
+
+AMPLIACIÓN FUTURA: OUTBOUND
+Clases 07 y posteriores quedan fuera del conocimiento operativo actual. Reservar un módulo inactivo que pueda consumir posicionamiento, perfiles de audiencia, pruebas y contenido aprobado, y devolver conversaciones y objeciones observadas. Calentamiento, campañas, contacto de leads, cadencias y procedimientos de outbound se definirán después de incorporar y revisar esa mitad del curso. El barrio y la escucha orgánica sí pertenecen al alcance actual; no autorizan por sí solos campañas ni mensajes.
+
+FUENTES INICIALES LEÍDAS COMPLETAS PARA ESTA ESTRUCTURA
+LI-03-M002-K01: conexión, seguidor y barrio no equivalen; vínculo no garantiza compra.
+LI-03-M005-K05: cinco papeles del barrio; no exclusivos ni jerárquicos.
+LI-04-M005-K01: cinco filtros de pilares; sin pesos ni umbral numérico prescrito.
+LI-05-V005-K05: revisar como lector ajeno; valoración cualitativa, no predicción.
+LI-06-M003-K06: ayuda editorial de IA, experiencias auténticas, datos comprobados y filtro humano final.
+LI-06-M008-K07: recordatorio de cliente, perfil, barrio, catálogo, post y aprendizaje; no prescribe una secuencia causal.
+LI-06-V007-K05: leer composición del público y ajustar contenido/perfil; no todos deben ser compradores.
+LI-01-BATCH-AUDIT-K01: logística de clase; preservada como conocimiento, no convertida en tarea del agente.
+Ver registro-lectura.json para hashes y alcance exacto de esta revisión. Estas referencias fundamentan la estructura inicial, no sustituyen la lectura para cada especialidad.

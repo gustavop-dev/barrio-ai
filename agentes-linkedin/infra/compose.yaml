@@ -1,0 +1,78 @@
+name: linkedin-knowledge
+x-app: &app
+  build: .
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://knowledge:${POSTGRES_PASSWORD}@db:5432/knowledge
+    SOURCE_ROOT: /workspace
+  volumes:
+    - "${SOURCE_ROOT:?Configure SOURCE_ROOT}/LinkedIn Sales - Entrega clase 01:/workspace/LinkedIn Sales - Entrega clase 01:ro"
+    - "${SOURCE_ROOT}/LinkedIn Sales - Procesamiento completo:/workspace/LinkedIn Sales - Procesamiento completo:ro"
+    - "${SOURCE_ROOT}/agentes-linkedin/equipos:/workspace/agentes-linkedin/equipos:ro"
+services:
+  db:
+    image: pgvector/pgvector:0.8.2-pg17
+    environment:
+      POSTGRES_USER: knowledge
+      POSTGRES_DB: knowledge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configure .env}
+    ports: ["127.0.0.1:55439:5432"]
+    volumes: ["knowledge-db:/var/lib/postgresql/data"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledge -d knowledge"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  migrate:
+    <<: *app
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py bootstrap_local"]
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+  api:
+    <<: *app
+    command: ["sh", "-c", "python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 2 --timeout 120"]
+    ports: ["127.0.0.1:8787:8787"]
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
+      interval: 10s
+      timeout: 6s
+      retries: 10
+    restart: unless-stopped
+  worker:
+    <<: *app
+    command: ["python", "manage.py", "runworker"]
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "worker_health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    stop_grace_period: 180s
+    restart: unless-stopped
+  office:
+    <<: *app
+    command: ["python", "manage.py", "officebridge"]
+    environment:
+      DATABASE_URL: postgresql://knowledge:${POSTGRES_PASSWORD}@db:5432/knowledge
+      SOURCE_ROOT: /workspace
+      OFFICE_LOCAL_URL: http://api:8787
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import time,pathlib; assert time.time()-float(pathlib.Path('/tmp/linkedin-office-bridge-heartbeat').read_text())<60"]
+      interval: 20s
+      timeout: 5s
+      retries: 3
+    stop_grace_period: 150s
+    restart: unless-stopped
+volumes:
+  knowledge-db:

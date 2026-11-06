@@ -1,0 +1,99 @@
+name: MySQL migration compatibility
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'backend/accounts/migrations/**'
+      - 'backend/content/migrations/**'
+      - 'backend/monitoring/migrations/**'
+      - 'backend/secure_links/migrations/**'
+      - 'scripts/ci/mysql-delivery-migration-check.py'
+      - 'scripts/ci/mysql-project-retention-check.py'
+      - '.github/workflows/mysql-migration-compat.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'backend/accounts/migrations/**'
+      - 'backend/content/migrations/**'
+      - 'backend/monitoring/migrations/**'
+      - 'backend/secure_links/migrations/**'
+      - 'scripts/ci/mysql-delivery-migration-check.py'
+      - 'scripts/ci/mysql-project-retention-check.py'
+      - '.github/workflows/mysql-migration-compat.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mysql-migration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mysql-delivery-migration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      mysql:
+        # Docker Hub's anonymous pull rate limit failed these jobs on GitHub-hosted runners.
+        # mirror.gcr.io serves the same official image.
+        image: mirror.gcr.io/library/mysql:8.4
+        env:
+          MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+          MYSQL_DATABASE: test_projectapp_delivery_migration
+          MYSQL_USER: migration_fixture
+          MYSQL_PASSWORD: isolated-ci-fixture
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install MySQL build dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev libssl-dev
+          python -m pip install 'Django==6.1' 'mysqlclient>=2.2,<3.0'
+      - name: Verify legacy and current MySQL collations
+        env:
+          MYSQL_FIXTURE_PASSWORD: isolated-ci-fixture
+        run: python scripts/ci/mysql-delivery-migration-check.py
+
+  mysql-project-retention:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      mysql:
+        image: mirror.gcr.io/library/mysql:8.4
+        env:
+          MYSQL_RANDOM_ROOT_PASSWORD: 'yes'
+          MYSQL_DATABASE: test_projectapp_retention
+          MYSQL_USER: retention_fixture
+          MYSQL_PASSWORD: isolated-ci-fixture
+        ports:
+          - 33306:3306
+        options: >-
+          --health-cmd="mysqladmin ping --silent"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install application and MySQL dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq pkg-config default-libmysqlclient-dev libssl-dev
+          python -m pip install -r backend/requirements.txt
+      - name: Upgrade populated project tables and verify retention constraints
+        env:
+          MYSQL_FIXTURE_PASSWORD: isolated-ci-fixture
+        run: python scripts/ci/mysql-project-retention-check.py

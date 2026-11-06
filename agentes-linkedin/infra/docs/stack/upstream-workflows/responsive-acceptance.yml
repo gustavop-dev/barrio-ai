@@ -1,0 +1,98 @@
+name: Responsive acceptance
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'frontend/**'
+      - '.testquality.yml'
+      - 'docs/RESPONSIVE_QA_TEST_SCRIPT.md'
+      - 'docs/methodology/responsive-**'
+      - '.github/workflows/responsive-acceptance.yml'
+  push:
+    branches: [main, master]
+    paths:
+      - 'frontend/**'
+      - '.testquality.yml'
+      - 'docs/RESPONSIVE_QA_TEST_SCRIPT.md'
+      - '.github/workflows/responsive-acceptance.yml'
+  schedule:
+    - cron: '0 6 1 * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: responsive-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify responsive ownership and five-width contract
+        working-directory: frontend
+        run: npm run check:responsive-contract
+
+  discover:
+    runs-on: ubuntu-latest
+    outputs:
+      batches: ${{ steps.batches.outputs.batches }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Resolve affected modules
+        id: batches
+        working-directory: frontend
+        env:
+          RESPONSIVE_ALL: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_dispatch') && '1' || '0' }}
+          RESPONSIVE_BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          RESPONSIVE_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: node scripts/run-responsive-changed.mjs --github-output
+
+  responsive-e2e:
+    needs: [contract, discover]
+    if: needs.discover.outputs.batches != '{"include":[]}'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.discover.outputs.batches) }}
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dependencies
+        run: npm ci
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Run ${{ matrix.batch }} (${{ matrix.tests }} catalog/profile cells)
+        run: npm run e2e:responsive:batch -- --batch=${{ matrix.batch }}
+        env:
+          CI: 'true'
+      - name: Upload failure evidence
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: responsive-${{ matrix.batch }}-evidence
+          path: |
+            frontend/test-results/
+            frontend/playwright-report/
+          retention-days: 7

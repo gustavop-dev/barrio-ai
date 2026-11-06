@@ -1,0 +1,11 @@
+{
+  "repository": "https://github.com/gustavop-dev/ai_skills_project.git",
+  "commit": "23babe0a74f64a51b4f8ee050ed7ec26aee17234",
+  "copied": [
+    ".agents",
+    ".claude",
+    ".codex"
+  ],
+  "workflow_templates": "docs/stack/upstream-workflows",
+  "adaptation": "CI adaptada a PostgreSQL/Django; sin modificar perfiles globales ni registrar un fleet remoto."
+}

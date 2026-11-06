@@ -1,0 +1,30 @@
+{
+  "status": "passed",
+  "source_units": 192,
+  "all_units_classified": true,
+  "titles_and_ids_unchanged": true,
+  "all_evidence_references_resolve": true,
+  "protected_files_unchanged": {
+    "agentes-linkedin/equipos/estrategia-perfil/base-clase-01.json": "0f02cfc245d32b03388b88aae131dbb26040f70246f8cf966601c31fb9f75428",
+    "agentes-linkedin/equipos/estrategia-perfil/posicionamiento.json": "a8593c5decf389389dc899a7e5b29eff4383d913382dd8e634538d606d1e909e",
+    "agentes-linkedin/equipos/estrategia-perfil/perfil.json": "13fd7e8cdea3b9eab8f9cc15b9bf48d5c3dcc9e1d866972491d952907c3a23e6",
+    "agentes-linkedin/equipos/estrategia-perfil/memoria-compartida.json": "5ce9dff906925677e3a5b68a651492302c789cc5e78cfe375d82b5d9239d8b2b",
+    "agentes-linkedin/equipos/estrategia-perfil/manifest.json": "27f9d15c602a46eae1ac4109f0921144aca6817e0c7bbcb2c01ac4d4de301f1c",
+    "agentes-linkedin/equipos/estrategia-perfil/preparar_clase_01.py": "9a40db81fc3b3019859b806fd53d0d50c7095fc2552a58f4da52096da7c8ab01",
+    "agentes-linkedin/equipos/estrategia-perfil/clase-01-fuentes.json": "bdbc32c969e2dc41af3083eb70485604f866206fbd1add580c8e6aeed9e3e100",
+    "agentes-linkedin/equipos/estrategia-perfil/clase-01-unidades.json": "5477bc4c9c0614d32a73f64c528085fe35b7fb9596ef348b3814bf25ea583d41",
+    "agentes-linkedin/equipos/estrategia-perfil/LEEME.txt": "b52c092d40e1ac10d66d7030df781dd06a10f9becc2b2ee2d418cdfab65eddc2",
+    "agentes-linkedin/equipos/estrategia-perfil/clase-01-evidencia-visual.json": "61be4361b96515c56f8bfd2cf21324468fc5f904560cd27824ea262089e23a61",
+    "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json": "976618b1d54f29c66a3f965f8aa08679ced957c1b37ec880224ee3c2bca9be4b",
+    "LinkedIn Sales - Procesamiento completo/session-02/quality/aprendizajes.json": "356da271cffc9cc6cc828b9fddd63d1bb867006cc40b25646deb19601ea26cd1",
+    "LinkedIn Sales - Procesamiento completo/revision-independiente/fuentes.jsonl": "fa3c1b6dd9f674754f066af0dcb631902b92d0cf019e93a70f4a8a89fbab8015"
+  },
+  "new_rules_or_prompts": 0,
+  "paid_calls": 0,
+  "runtime_changes": false,
+  "personalization": false,
+  "output_sha256": {
+    "asignacion-clase-02.json": "87d286bc57de0426690f397343775525d6ce5727ca1c35acd70a08e755cf6cb2",
+    "ASIGNACION-CLASE-02.txt": "e7a2907366a16fe06adbc80b66f8e146b48a2b9a2c10d21d8352812503460147"
+  }
+}

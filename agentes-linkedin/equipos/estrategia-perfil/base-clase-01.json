@@ -1,0 +1,1695 @@
+{
+  "schema_version": 1,
+  "course": "LinkedIn Sales 30X",
+  "session": 1,
+  "status": "base_preparada_para_configuracion_no_ejecucion",
+  "scope": "Solo clase 01; no incluye datos personales del usuario, ni outbound, ni conocimiento supuesto de otras clases.",
+  "rules": [
+    {
+      "id": "C01",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "title": "Cliente antes que perfil",
+      "instruction": "Definir al destinatario y la ayuda que busca antes de decidir cómo presentarla. Mantener coherencia entre cliente, perfil, barrio, temas y publicaciones.",
+      "unit_ids": [
+        "LI-01-V010-K01",
+        "LI-01-V011-K01",
+        "LI-01-V016-K02",
+        "LI-01-V024-K07"
+      ],
+      "limitation": "La clase anuncia las otras etapas; no las desarrolla todas. Perfil puede detectar vacíos, pero no inventar el cliente para poder redactar.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "C02",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "title": "Marca personal al servicio del comprador",
+      "instruction": "Comunicar la capacidad de ayudar a quien aún no conoce al profesional. Vincular experiencia y credenciales con esa ayuda. Mantener la identidad del profesional sin convertir su trayectoria en el único argumento.",
+      "unit_ids": [
+        "LI-01-V002-K05",
+        "LI-01-V012-K04",
+        "LI-01-V018-K05"
+      ],
+      "limitation": "No borrar la experiencia ni suponer que todo logro es irrelevante.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "C03",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "title": "Asociación profesional reconocible",
+      "instruction": "Elegir por qué conocimiento y solución debe ser recordada la persona. Hacer convivir ofertas y negocios solo cuando exista un eje comprensible para la audiencia.",
+      "unit_ids": [
+        "LI-01-V008-K02",
+        "LI-01-V012-K02",
+        "LI-01-V012-K03",
+        "LI-01-V013-K01"
+      ],
+      "limitation": "La marca personal no obliga a exponer intimidad ni a describir todos los intereses del profesional.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "C04",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "title": "El barrio incluye a quienes no compran",
+      "instruction": "Distinguir comprador prioritario de comunidad: incluir aliados y divulgadores que aportan conversación y difusión aunque no contraten. Escuchar sus preguntas para entender mejor al cliente.",
+      "unit_ids": [
+        "LI-01-V010-K03",
+        "LI-01-V011-K04"
+      ],
+      "limitation": "La clase 01 no desarrolla una taxonomía exhaustiva ni tácticas de búsqueda. Los cinco lectores de nuestra arquitectura son un diseño del proyecto, no una lista literal de esta clase.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "C05",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "title": "Cliente protagonista y profesional guía",
+      "instruction": "Mostrar el problema y recorrido del cliente; el profesional aporta comprensión, capacidad y camino. Usar la trayectoria como evidencia relevante de esa capacidad.",
+      "unit_ids": [
+        "LI-01-V017-K02",
+        "LI-01-V017-K03",
+        "LI-01-V018-K01",
+        "LI-01-M007-K02"
+      ],
+      "limitation": "No inventar experiencias personales para mostrar empatía ni convertir la analogía de Gandalf en una regla psicológica demostrada.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "C06",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "title": "Las cinco frases del mensaje",
+      "instruction": "Articular problema central, empatía, respuesta que resuelve el problema, cambio que permite al cliente y resultado final con y sin solución. Usar las cinco funciones como marco, adaptando el estilo al caso.",
+      "unit_ids": [
+        "LI-01-M007-K03",
+        "LI-01-V018-K02",
+        "LI-01-V018-K03",
+        "LI-01-V019-K02",
+        "LI-01-V019-K03",
+        "LI-01-V020-K02"
+      ],
+      "limitation": "No exige cinco frases literales en cada titular. Seis meses es un horizonte ilustrativo del marco, no una garantía. No inventar consecuencias ni miedo para forzar la compra.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "C07",
+      "agents": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "title": "Siete componentes narrativos",
+      "instruction": "Distinguir personaje, problema, guía, plan, acción, éxito y fracaso evitado. Utilizarlos para comprobar que la ayuda y el recorrido resulten comprensibles.",
+      "unit_ids": [
+        "LI-01-V017-K01",
+        "LI-01-M007-K01"
+      ],
+      "limitation": "Es un marco narrativo distinto de las cinco frases; no son siete etapas obligatorias del servicio ni una ley de todas las historias.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "P01",
+      "agents": [
+        "posicionamiento"
+      ],
+      "title": "Cuatro dimensiones del comprador",
+      "instruction": "Documentar quién es (cargo, industria, tamaño y momento profesional cuando sean pertinentes), problema urgente, transformación deseada y freno u objeción. Diferenciar el problema de aquello que impide actuar.",
+      "unit_ids": [
+        "LI-01-V015-K04",
+        "LI-01-V016-K01",
+        "LI-01-M006-K02",
+        "LI-01-M006-K03"
+      ],
+      "limitation": "Cuantificar solo con base real. Los 90 días concretan lo que desea el cliente; no fijan la duración del servicio.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "P02",
+      "agents": [
+        "posicionamiento"
+      ],
+      "title": "Persona, situación y consecuencia",
+      "instruction": "Pasar de una categoría de mercado a la persona que vive una situación concreta y su consecuencia. Identificar el detonante de búsqueda de ayuda y la urgencia real.",
+      "unit_ids": [
+        "LI-01-V014-K03",
+        "LI-01-V015-K02",
+        "LI-01-M005-K03"
+      ],
+      "limitation": "No copiar el millón de dólares, dos semanas o edades de los ejemplos como filtros universales. No fabricar urgencia.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "P03",
+      "agents": [
+        "posicionamiento"
+      ],
+      "title": "Puente hacia la mejoría",
+      "instruction": "Relacionar estado actual, dolor y sus causas con la ayuda que se puede prestar, el estado deseado y el beneficio que importa al comprador. Separar el método del resultado vivido por el cliente.",
+      "unit_ids": [
+        "LI-01-V015-K03",
+        "LI-01-V019-K03",
+        "LI-01-M006-K01",
+        "LI-01-M008-K01"
+      ],
+      "limitation": "La metáfora de puente corto y confiable no autoriza a prometer ser el más rápido ni a garantizar resultados.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "P04",
+      "agents": [
+        "posicionamiento"
+      ],
+      "title": "Priorizar sin imponer un único comprador",
+      "instruction": "Elegir qué audiencias merecen prioridad y explicar su relación con ofertas distintas dentro de una especialidad común. Distinguir, cuando aplique, aprender a ejecutar frente a delegar.",
+      "unit_ids": [
+        "LI-01-V022-K01",
+        "LI-01-V022-K02",
+        "LI-01-V022-K03"
+      ],
+      "limitation": "Máximo dos se propone para una tarea y después se habla de priorizar dos o tres: no establecer un máximo universal ni copiar los segmentos de Daniela.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "P05",
+      "agents": [
+        "posicionamiento"
+      ],
+      "title": "Comprobar la definición",
+      "instruction": "Describir su semana en dos oraciones, nombrar cuándo buscaría ayuda y su objeción para contratar hoy; solicitar reconocimiento de esa descripción por alguien con conocimiento real del cliente.",
+      "unit_ids": [
+        "LI-01-V020-K03",
+        "LI-01-M007-K04"
+      ],
+      "limitation": "La cuarta prueba se expresa en clase como reconocimiento en la sala. Un acuerdo entre lectores simulados puede detectar ambigüedad, pero no acredita validación real de mercado.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "P06",
+      "agents": [
+        "posicionamiento"
+      ],
+      "title": "Investigar sin delegar el criterio a una herramienta",
+      "instruction": "Usar preguntas reales, conversaciones y antecedentes de captación como insumos. AnswerThePublic, Value Proposition Canvas y Make My Persona se mencionan como apoyos opcionales para preguntas, valor y contexto.",
+      "unit_ids": [
+        "LI-01-V013-K04",
+        "LI-01-V014-K01",
+        "LI-01-V016-K03",
+        "LI-01-V020-K05",
+        "LI-01-V021-K01"
+      ],
+      "limitation": "La clase no aporta un tutorial completo, precios vigentes ni resultados verificados para el cliente. Un avatar generado por IA es una hipótesis.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "F01",
+      "agents": [
+        "perfil"
+      ],
+      "title": "Perfil como escaparate completo",
+      "instruction": "Revisar qué entiende un visitante nuevo sobre destinatario, ayuda y credibilidad. Coordinar titular, acerca de, experiencia, destacados y demás secciones bajo el posicionamiento recibido.",
+      "unit_ids": [
+        "LI-01-V005-K03",
+        "LI-01-V005-K04",
+        "LI-01-V010-K02"
+      ],
+      "limitation": "La clase 01 aporta criterios estratégicos; no acredita optimización técnica completa de foto, banner o secciones. Completar esa base con la clase 02 antes de darla por terminada.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "F02",
+      "agents": [
+        "perfil"
+      ],
+      "title": "Titular concreto y comprensible",
+      "instruction": "Revisar si el titular deja reconocer una persona o contexto, su problema o resultado y una ayuda pertinente. Cuestionar términos amplios como empresas, líderes, resultados o transformación digital y precisar lo relevante al caso.",
+      "unit_ids": [
+        "LI-01-V021-K02",
+        "LI-01-V021-K03",
+        "LI-01-V023-K03",
+        "LI-01-V023-K04",
+        "LI-01-M008-K04"
+      ],
+      "limitation": "No exigir país, edad, cargo y sector en toda frase. No basta con añadir etiquetas si continúa sin entenderse la necesidad.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "F03",
+      "agents": [
+        "perfil"
+      ],
+      "title": "Simplicidad con voz propia",
+      "instruction": "Proponer redacciones claras y directas, elegir un foco y eliminar enumeraciones que lo diluyen. Conservar la voz del profesional: ayudo, trabajo con u otra formulación pueden funcionar.",
+      "unit_ids": [
+        "LI-01-V018-K02",
+        "LI-01-V024-K01",
+        "LI-01-V024-K06"
+      ],
+      "limitation": "No prohibir comas ni imponer ayudo. Brevedad no equivale a vaguedad; los ejemplos finales son mejoras relativas, no fórmulas perfectas.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "F04",
+      "agents": [
+        "perfil"
+      ],
+      "title": "Acerca de y banner deben hacer visible la ayuda",
+      "instruction": "Comenzar por la necesidad reconocible, desarrollar comprensión, ayuda y transformación, y respaldarlas con experiencia pertinente. Si se usa un logo desconocido, acompañarlo de información que explique la especialidad.",
+      "unit_ids": [
+        "LI-01-V015-K01",
+        "LI-01-V016-K02",
+        "LI-01-V018-K03",
+        "LI-01-V018-K05"
+      ],
+      "limitation": "No inventar textos completos de ejemplos incompletos. Este criterio no sustituye instrucciones gráficas ni una estructura detallada de la clase 02.",
+      "origin": "síntesis operativa de la clase 01"
+    },
+    {
+      "id": "F05",
+      "agents": [
+        "perfil"
+      ],
+      "title": "Diagnosticar y devolver vacíos",
+      "instruction": "Leer como alguien que no conoce al autor. Identificar huecos, ambigüedades o servicios que el lector podría imaginar por error. Devolver a Posicionamiento las dudas de audiencia u oferta antes de resolverlas por estilo.",
+      "unit_ids": [
+        "LI-01-V015-K04",
+        "LI-01-V023-K03",
+        "LI-01-V023-K04"
+      ],
+      "limitation": "Los tres segundos ilustran comprensión rápida; no certifican una prueba de usuarios. Una auditoría simulada no demuestra conversiones.",
+      "origin": "síntesis operativa de la clase 01"
+    }
+  ],
+  "routing": [
+    {
+      "unit_id": "LI-01-V001-K01",
+      "title": "Alcance del programa: optimizar la marca personal dentro de una estrategia comercial en LinkedIn",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V001-K02",
+      "title": "Punto de partida: revisar los fundamentos y no dar por terminado el perfil",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V001-K03",
+      "title": "Orientación inicial al buyer persona: explicar qué se hace por él",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V002-K01",
+      "title": "Participación como señal de comprensión y espacio para el trabajo práctico",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V002-K02",
+      "title": "Mostrarse en clase como práctica inicial de marca personal",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V002-K03",
+      "title": "Identificar las asociaciones positivas con LinkedIn antes de replantear su uso",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V002-K04",
+      "title": "Contrastar las percepciones negativas y seleccionar «egoteca» y «currículum» como problemas de enfoque",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V002-K05",
+      "title": "Reorientar el perfil: de estantería de trofeos y currículum a atención al buyer persona",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V003-K01",
+      "title": "La evaluación del cliente empieza antes del contacto: por qué el recorrido comienza por el comprador",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V003-K02",
+      "title": "Del público genérico a un cliente que se puede verbalizar: saber no equivale a saber contarlo",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V003-K03",
+      "title": "La relevancia comercial de LinkedIn: decisores presentes y actividades profesionales",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V003-K04",
+      "title": "La auditoría previa a la compra: personas, autoridad, comunidad y recomendaciones",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V003-K05",
+      "title": "Marca personal, networking y negocio: el costo de no ser encontrado",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V004-K01",
+      "title": "De tener conocimientos a contarlos con intención para la audiencia ideal",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V004-K02",
+      "title": "Caso de Daniela: construir visibilidad, confianza y negocio mediante contenido orgánico",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V004-K03",
+      "title": "Priorizar el perfil personal sin confundirlo con el perfil de empresa",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V004-K04",
+      "title": "El perfil optimizado como tarjeta de presentación que llega antes del encuentro",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V005-K01",
+      "title": "Ser descubierto sin presencia física: especializar la presentación profesional en LinkedIn",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V005-K02",
+      "title": "El perfil de LinkedIn como fuente de descubrimiento mediante inteligencia artificial",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V005-K03",
+      "title": "Auditar lo que comunica el perfil: confianza y autoridad antes de la primera conversación",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V005-K04",
+      "title": "Del descubrimiento a la conversación: perfil como landing, publicaciones y comunidad",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V006-K01",
+      "title": "El coste invisible de no aparecer: oportunidades comerciales e ingresos que nunca llegan",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V006-K02",
+      "title": "La ausencia del fundador también puede costar oportunidades de atraer talento",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V006-K03",
+      "title": "Resolver la fricción de tiempo: reservar espacio comercial para un activo que siga trabajando",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V006-K04",
+      "title": "Sembrar durante años: del aprendizaje gratuito a la intención de contratar una estrategia",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V007-K01",
+      "title": "Constancia, prioridades y retorno diferido de la marca personal",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V007-K02",
+      "title": "Vergüenza al publicar: reconocer el miedo al juicio de los conocidos",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V007-K03",
+      "title": "Separar visibilidad de vanidad y orientar la marca a quienes aún no te conocen",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V007-K04",
+      "title": "Publicar conocimiento que ayuda: industria, soluciones y método de transformación",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V008-K01",
+      "title": "Publicar como servicio: ser el puente entre la dificultad del cliente y su mejoría",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V008-K02",
+      "title": "Marca personal profesional: qué se quiere que los interlocutores del negocio asocien al propio nombre",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V008-K03",
+      "title": "Convertir conversaciones profesionales privadas en conocimiento compartido en LinkedIn",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V008-K04",
+      "title": "Miedo a saturar a la audiencia: distinguir publicación de exposición efectiva",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V009-K01",
+      "title": "El feed se interpreta desde el consumidor: por qué publicar más no equivale automáticamente a saturar",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V009-K02",
+      "title": "Consistencia con criterio: aumentar oportunidades de descubrimiento y construir autoridad sectorial",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V009-K03",
+      "title": "Caso del fundador del trabajo flexible: contrastar «estás muy pesado» con la audiencia y sus respuestas",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V009-K04",
+      "title": "Caso de Sami: no confundir la sorpresa de los amigos con el objetivo de atraer una audiencia nueva",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V009-K05",
+      "title": "Insistir e iterar: variar formatos y enfoques sin abandonar el foco",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V010-K01",
+      "title": "El mapa de autoridad comienza por el cliente: a quién se le habla y a quién se le vende",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V010-K02",
+      "title": "La tienda: entender el perfil de LinkedIn como landing y escaparate digital",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V010-K03",
+      "title": "El barrio: construir una comunidad estratégica de clientes y divulgadores",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V010-K04",
+      "title": "El catálogo: alinear los temas con el perfil y con lo que se sabe resolver",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V010-K05",
+      "title": "El producto I: convertir el catálogo en posts con gancho, conocimiento y llamado a la acción",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V010-K06",
+      "title": "El producto II: taller práctico de escritura y estructura de publicaciones",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V011-K01",
+      "title": "Articular cliente, perfil, comunidad, temas y publicaciones en un mismo recorrido",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V011-K02",
+      "title": "Reconocer cambios de perspectiva y contrastar lo «obvio» con la aplicación real",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V011-K03",
+      "title": "Aprender de las preguntas y respuestas de otros participantes",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V011-K04",
+      "title": "La comunidad activa como semillero de contenido, conocimiento y comprensión del cliente",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V012-K01",
+      "title": "Una identidad personal y un solo perfil de LinkedIn",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V012-K02",
+      "title": "Elegir un nicho para que el nombre profesional tenga una asociación reconocible",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V012-K03",
+      "title": "Hacer convivir varios negocios sin romper la coherencia con la audiencia",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V012-K04",
+      "title": "Traducir la experiencia propia en valor para el buyer persona, no en una egoteca",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V013-K01",
+      "title": "Mantener la cohesión entre la orientación hacia la audiencia y el conjunto de negocios",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V013-K02",
+      "title": "Preparar la disposición emocional y corporal para retomar el aprendizaje",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V013-K03",
+      "title": "Orientar la estrategia de marca personal al servicio y a la transformación del comprador",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V013-K04",
+      "title": "Ejercicio de partida: identificar cómo llegó el último cliente nuevo",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V014-K01",
+      "title": "Del origen de los clientes al descubrimiento mediante autoridad digital",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V014-K02",
+      "title": "Buyer persona como base: un perfil que permita al cliente entender quién eres en tres segundos",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V014-K03",
+      "title": "El avatar con el pelo en llamas: identificar la necesidad que debe resolverse ahora",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V014-K04",
+      "title": "Especialización sin miedo: concretar la solución y el momento del cliente",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V015-K01",
+      "title": "Especializar el perfil para ser recordado: del título «abogado» a una situación de cliente reconocible",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V015-K02",
+      "title": "Segmentar por persona, situación y consecuencia: el fundador cuya consultora depende de sus llamadas",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V015-K03",
+      "title": "Comunicar la mejoría: el perfil y el contenido como puente entre problema y transformación",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V015-K04",
+      "title": "Autoanalizar el perfil con rigor: quién es el comprador y qué problema necesita resolver ya",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P01",
+        "F05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V016-K01",
+      "title": "Completar el buyer persona con la transformación deseada, el horizonte de 90 días y las barreras",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V016-K02",
+      "title": "Usar la definición del cliente como base del perfil: del relato de pasiones a una ayuda reconocible",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C01",
+        "F04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V016-K03",
+      "title": "Investigar preguntas e intereses del cliente con AnswerThePublic",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V017-K01",
+      "title": "La estructura narrativa reconocible como base del mensaje dirigido al buyer persona",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C07"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V017-K02",
+      "title": "El cliente es el héroe y el profesional es el guía: plan, acción y metáfora de la cuerda",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V017-K03",
+      "title": "Cómo comunicar autoridad como guía mediante el perfil y el contenido de LinkedIn",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V018-K01",
+      "title": "Posicionarse como Gandalf: el profesional guía y el cliente protagoniza",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V018-K02",
+      "title": "Primera frase del mensaje: un problema, no una lista de capacidades",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C06",
+        "F03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V018-K03",
+      "title": "Segunda frase: empatizar antes de ofrecer y usar la experiencia para crear vínculo",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C06",
+        "F04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V018-K04",
+      "title": "Respuesta a la duda del chat: no es solo para el «Acerca de», es un cambio de perspectiva",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V018-K05",
+      "title": "La experiencia sí importa: debe respaldar una ayuda comprensible y aparecer después",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C02",
+        "F04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V019-K01",
+      "title": "Pensar primero en el comprador: un cambio de perspectiva para comunicar la oferta, no solo para escribir el «acerca de»",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V019-K02",
+      "title": "Tercera frase, «Respuesta»: elevar el valor posicionando el problema antes de nombrar la solución",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V019-K03",
+      "title": "Cuarta frase, «Cambio»: expresar en qué se convierte la persona y para qué le sirve la solución",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C06",
+        "P03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V020-K01",
+      "title": "Comunicar el cambio: del nombre del servicio a la situación mejorada del cliente",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V020-K02",
+      "title": "Resultado final: mostrar el futuro con y sin la solución y ordenar las cinco frases",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V020-K03",
+      "title": "Cuatro señales de que el buyer persona está suficientemente definido",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V020-K04",
+      "title": "Entregable previo al jueves: buyer persona escrito, dolores explicados y transformación definida",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V020-K05",
+      "title": "Value Proposition Canvas: traducir la oferta al idioma del cliente",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V021-K01",
+      "title": "Herramientas opcionales para definir al comprador y traducir el servicio a su idioma",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V021-K02",
+      "title": "Primer diagnóstico de titulares: perspectiva del proveedor y exceso de generalidad",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V021-K03",
+      "title": "Segundo diagnóstico: precisar líderes, resultados y mercados sin imponer delimitadores innecesarios",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V021-K04",
+      "title": "Tercer diagnóstico y objeción abierta: «si me especializo, pierdo negocio»",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V022-K01",
+      "title": "Varios segmentos pueden compartir un conocimiento, pero no necesariamente el mismo resultado de compra",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V022-K02",
+      "title": "Cómo hacer convivir dos buyer personas: aprender a ejecutar frente a delegar la ejecución",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V022-K03",
+      "title": "Escoger y priorizar audiencias: por qué «emprendedores que quieren crecer» sigue siendo genérico",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P04"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V022-K04",
+      "title": "«Profesionales» no identifica una necesidad: distinguir etapa de carrera y problema de marca personal",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V022-K05",
+      "title": "Pasar del diagnóstico a la reescritura: profesionales senior 50+ y recién graduados",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V023-K01",
+      "title": "Amplitud del mensaje y relevancia para el comprador no son lo mismo",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V023-K02",
+      "title": "Trabajo para la próxima sesión: definir el buyer persona y recuperar los materiales de apoyo",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-V023-K03",
+      "title": "Evaluar un titular por su claridad, su diferenciación actual y la situación concreta del comprador",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F02",
+        "F05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V023-K04",
+      "title": "No escribir desde lo que uno ya sabe: el lector puede imaginar un servicio diferente",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F02",
+        "F05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V023-K05",
+      "title": "Testimonio del sector financiero: foco de la oferta, valor de los cierres y claridad para decidir comprar",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V024-K01",
+      "title": "Especializar el mensaje: valor percibido, renuncia inicial y libertad de expresión",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V024-K02",
+      "title": "Ejemplo de mejora relativa: CEOs B2B y crecimiento comercial predecible",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V024-K03",
+      "title": "Dos dolores comerciales distintos: no llegar a objetivos y depender del fundador para vender",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V024-K04",
+      "title": "Precisar el momento profesional: ejecutivos senior con poca visibilidad",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V024-K05",
+      "title": "De «transformación digital» a automatizar procesos manuales",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-V024-K06",
+      "title": "Criterios de cierre: claridad, simplicidad y decisión",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-V024-K07",
+      "title": "Entregable previo al perfil: llegar con el buyer persona definido",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M001-K01",
+      "title": "Ejercicio de apertura: reconocer las asociaciones iniciales con LinkedIn",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-M001-K02",
+      "title": "Objetivos de la sesión y mapa de trabajo: del cliente al producto de contenido",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M001-K03",
+      "title": "LinkedIn como combinación de marca personal, networking y negocio",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M001-K04",
+      "title": "Caso gráfico: descubrimiento de LinkedIn, primer post viral y evolución del perfil",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M001-K05",
+      "title": "Primer paso antes de contratar: búsqueda en Google y mención de la IA",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M002-K01",
+      "title": "Evaluación previa del comprador: descubrimiento, revisión de LinkedIn, lectura y decisión de conversar",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M002-K02",
+      "title": "El coste de la oportunidad comercial que no llega a convertirse en ingreso",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M002-K03",
+      "title": "Revisar la objeción de falta de tiempo mediante la dedicación mensual a buscar clientes nuevos",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M003-K01",
+      "title": "Fricción de publicación: temor a parecer oportunista o prepotente",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M003-K02",
+      "title": "Fricción de límites: no querer mezclar lo personal con lo profesional",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M003-K03",
+      "title": "Fricción de frecuencia: temor a agobiar o saturar a la audiencia",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M003-K04",
+      "title": "Mapa progresivo de las primeras cuatro paradas: cliente, tienda, barrio y catálogo",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M004-K01",
+      "title": "Mapa de la estrategia: del cliente al contenido que construye negocio",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M004-K02",
+      "title": "Diagnóstico de captación: cómo llegó el último cliente nuevo",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M004-K03",
+      "title": "La red como posible techo del crecimiento",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M004-K04",
+      "title": "Primera parada: definir al cliente antes de desarrollar el resto de la estrategia",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M005-K01",
+      "title": "Parada 1: empezar por el cliente que tiene una necesidad urgente",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M005-K02",
+      "title": "La falsa amplitud de «Le vendo a todo el mundo»",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M005-K03",
+      "title": "Del cliente genérico al avatar situado: fundador de una consultora con dependencia comercial",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M005-K04",
+      "title": "El proveedor como puente entre el problema actual y el resultado deseado del cliente",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M006-K01",
+      "title": "Comunicar la mejoría: del problema del cliente al resultado mediante un puente",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M006-K02",
+      "title": "Definir al cliente mediante cuatro dimensiones: identidad, urgencia, transformación y freno",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M006-K03",
+      "title": "Ejercicio de definición escrita: dolor urgente, objetivo a 90 días y obstáculos previos",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P01"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M006-K04",
+      "title": "AnswerThePublic como recurso para investigar preguntas del público y palabras clave",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M007-K01",
+      "title": "Los siete círculos de la historia: personaje, problema, guía, plan, acción, éxito y fracaso",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C07"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M007-K02",
+      "title": "Asignación de los papeles: el cliente es el héroe y la marca personal es el guía",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M007-K03",
+      "title": "Las cinco frases del mensaje: del problema al resultado final con y sin compra",
+      "status": "base_operativa",
+      "agents": [
+        "perfil",
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "C06"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M007-K04",
+      "title": "Cuándo está bien definido el buyer persona: cuatro comprobaciones acumulativas",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P05"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M008-K01",
+      "title": "Entregable previo a la siguiente sesión: buyer persona escrito, dolores y transformación",
+      "status": "base_operativa",
+      "agents": [
+        "posicionamiento"
+      ],
+      "rule_ids": [
+        "P03"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M008-K02",
+      "title": "Value Proposition Canvas: traducir el servicio al idioma del cliente",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M008-K03",
+      "title": "HubSpot Make My Persona: dar cara, contexto y dolor a un comprador genérico",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-M008-K04",
+      "title": "Cinco mensajes genéricos: cómo detectar que el comprador y su problema quedan indeterminados",
+      "status": "base_operativa",
+      "agents": [
+        "perfil"
+      ],
+      "rule_ids": [
+        "F02"
+      ],
+      "reason": "Sustenta criterios asignados."
+    },
+    {
+      "unit_id": "LI-01-M008-K05",
+      "title": "Cinco mensajes más específicos: cargo, contexto y necesidad reconocible",
+      "status": "consulta_contextual",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Contexto, repetición, testimonio o contenido de otros equipos; consultar con sus límites, no cargar como obligación."
+    },
+    {
+      "unit_id": "LI-01-BATCH-AUDIT-K01",
+      "title": "Calendario regular y organización de las consultas durante la sesión",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    },
+    {
+      "unit_id": "LI-01-BATCH-AUDIT-K02",
+      "title": "Recuperar la sesión: correo de acceso, calendario y soporte",
+      "status": "fuera_de_instrucciones",
+      "agents": [],
+      "rule_ids": [],
+      "reason": "Dinámica de clase, logística o acceso; no es una tarea para nuestros agentes."
+    }
+  ],
+  "shared_knowledge_file": "clase-01-unidades.json",
+  "evidence_files": [
+    "clase-01-fuentes.json",
+    "clase-01-evidencia-visual.json"
+  ],
+  "evidence_root_relative_to_package": "../../../LinkedIn Sales - Entrega clase 01/01 - Clase 01",
+  "authority_order": [
+    "Instrucciones explícitas del usuario",
+    "Hechos del usuario confirmados y con procedencia",
+    "Reglas operativas respaldadas por la clase, con sus límites",
+    "Hipótesis identificadas como tales"
+  ],
+  "interpretation_policy": [
+    "Las tareas de los alumnos se convierten en resultados de trabajo útiles; eliminar plazos del curso, gestos, cámaras, horarios y entregas a docentes.",
+    "Mantener separados conocimiento del curso, datos del usuario, hipótesis de audiencia y decisiones aprobadas.",
+    "Los ejemplos ajenos nunca se convierten en hechos del usuario, promesas propias ni nichos ya elegidos.",
+    "Los testimonios, cifras, funcionamiento del algoritmo, descubrimiento por IA y políticas de plataforma no son hechos actuales verificados por este paquete.",
+    "No reabrir detalles administrativos como bloqueos. Las incertidumbres de citas se conservan en evidencia y solo se elevan si afectan una decisión.",
+    "Cada recomendación debe citar regla y unidad; si hace falta una fuente externa, identificarla como externa y verificarla antes de usarla.",
+    "Las propuestas y revisiones de un agente no equivalen a aprobación humana ni a validación real de demanda."
+  ],
+  "documented_limits": [
+    "La revisión histórica pasó controles estructurales y una muestra semántica; no certificó escucha integral ni revisión humana.",
+    "En qt00111 hay un referente no recuperado; no se necesita para los criterios asignados.",
+    "Conservar diferencias CEO/COO, tres sesiones/tres semanas y cronología de seguidores como variantes de fuente; no hacerlas reglas.",
+    "No atribuir a la clase 01 el desarrollo completo del barrio ni las técnicas de optimización del perfil de la clase 02."
+  ]
+}

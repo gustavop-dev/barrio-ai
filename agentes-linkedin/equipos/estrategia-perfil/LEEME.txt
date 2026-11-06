@@ -1,0 +1,96 @@
+LINKEDIN TEAM — ESTRATEGIA Y PERFIL
+Base de conocimiento de la clase 01
+
+ESTADO
+Conocimiento asignado en archivos locales de configuración. No hay agentes
+ejecutándose, conexión al motor de IA ni actualización del apartamento web.
+La información propia del usuario se trabajará después; la memoria sigue vacía.
+No se realizaron solicitudes pagadas ni se modificaron los originales del curso.
+
+LO QUE CAMBIA EN LA PLANEACIÓN
+La primera clase desarrolla el cliente y el posicionamiento. Para Perfil aporta
+criterios de mensaje, diagnóstico de titulares y relación con el destinatario.
+La optimización detallada de foto, banner y secciones requiere incorporar la clase 02.
+Por eso Posicionamiento recibe una base más desarrollada y Perfil una base inicial.
+
+ASIGNACIÓN
+Compartido — 7 reglas:
+Cliente antes que perfil; experiencia al servicio del comprador; asociación
+profesional reconocible; barrio que incluye aliados y divulgadores; cliente
+protagonista y profesional guía; cinco frases del mensaje; siete componentes
+narrativos. Las cinco frases y los siete componentes son marcos distintos.
+
+Posicionamiento — 6 reglas propias, además de las 7 comunes:
+1. Quién es el comprador, problema urgente, transformación deseada y freno.
+2. Persona, situación, consecuencia y detonante de búsqueda.
+3. Puente entre estado actual y mejoría, respaldado por la oferta real.
+4. Audiencias prioritarias que pueden convivir bajo una especialidad común.
+5. Comprobaciones: semana en dos oraciones, momento de búsqueda, objeción
+   actual y reconocimiento de la descripción por alguien que conozca al cliente.
+6. Investigación y herramientas opcionales como apoyo al criterio.
+
+Perfil — 5 reglas propias, además de las 7 comunes:
+1. Perfil como escaparate coherente que permite comprender y evaluar la ayuda.
+2. Titular concreto: destinatario/contexto y necesidad o resultado reconocible.
+3. Claridad, simplicidad y voz propia; no es obligatorio escribir «ayudo».
+4. Acerca de y mensaje del banner conectados con la ayuda y su respaldo.
+5. Diagnóstico desde un visitante nuevo; devolver vacíos estratégicos al otro agente.
+
+RELEVANCIA DEL BARRIO
+La clase menciona posibles clientes, aliados y divulgadores, incluidos quienes
+no comprarán. No asigna literalmente los cinco lectores de nuestro diseño.
+Esos roles y su desarrollo posterior pertenecen a la arquitectura del proyecto
+y deberán completarse con las clases pertinentes.
+
+QUÉ ENTREGARÁN CUANDO TRABAJEMOS CON EL USUARIO
+Posicionamiento: alternativas justificadas, definición del comprador, mapa
+inicial del barrio, propuesta de valor, mensaje base y brief para Perfil.
+Perfil: diagnóstico de claridad, alternativas de titular, estructura del mensaje,
+evidencias profesionales pertinentes y pendientes para completar con clase 02.
+La decisión de nicho y audiencia necesita al usuario; ninguno la inventará.
+
+MEMORIA Y COORDINACIÓN
+Una base del curso compartida; dos responsabilidades. Posicionamiento define
+la propuesta estratégica; Perfil la expresa y devuelve ambigüedades. La memoria
+distingue hechos, hipótesis y decisiones aprobadas. Si cambia el posicionamiento,
+los borradores de Perfil deben revisarse. Un consenso de lectores simulados no
+equivale a una validación real de mercado.
+
+MATICES QUE SE CONSERVAN
+- Noventa días corresponde al objetivo preguntado al comprador; seis meses,
+  al escenario del marco narrativo. Ninguno obliga a prometer esos plazos.
+- Cuantificar resultados solo si hay fundamento. No copiar cifras de ejemplos.
+- Pueden convivir varias audiencias; la clase no establece un máximo universal.
+- Geografía, edad y tamaño de empresa se usan cuando ayudan a precisar el caso.
+- La experiencia sí importa, vinculada a lo que el cliente necesita.
+- Herramientas externas son opcionales. La clase no verifica sus precios actuales.
+- Los testimonios y explicaciones del algoritmo no son garantías de resultados.
+
+QUÉ SE FILTRÓ
+Horarios, acceso a plataforma, cámaras, reacciones, gestos y otras dinámicas de
+alumnos no son instrucciones para los agentes. Se conservan en el archivo fuente.
+Las tareas útiles se traducen a resultados de trabajo, sin sus fechas del curso.
+Las discrepancias menores quedan documentadas, sin bloquear decisiones a las
+que no afectan. Las limitaciones sobre promesas y alcance sí se mantienen.
+
+ARCHIVOS
+base-clase-01.json: 18 reglas con citas y distribución de las 139 unidades.
+posicionamiento.json / perfil.json: responsabilidades, flujo y criterios de salida.
+memoria-compartida.json: estructura pendiente de personalización.
+clase-01-unidades.json: copia íntegra del conocimiento extraído, compartida.
+clase-01-fuentes.json: transcripción y texto de materiales para consultar citas.
+clase-01-evidencia-visual.json: inventario visual; las imágenes permanecen en la
+entrega original, bajo la raíz indicada en base-clase-01.json.
+manifest.json: procedencia, hashes, alcance de revisión y estado de conexión.
+preparar_clase_01.py: reconstruye el paquete; conserva la memoria si ya existe.
+
+ALCANCE DE LA REVISIÓN
+Se leyeron los aprendizajes pertinentes, sus aplicaciones y límites, se revisó
+la evaluación histórica y se contrastaron los criterios centrales con la
+transcripción y el texto del PDF. No se volvió a escuchar toda la grabación ni
+se afirma una revisión humana. La extracción original conserva sus 139 unidades;
+56 respaldan directamente las 18 reglas y 11 unidades de dinámica/logística
+quedan fuera de las instrucciones. Las restantes se conservan para consulta.
+
+DISEÑO OPERATIVO VIGENTE
+Los contratos completos están en contratos-v1/posicionamiento.json y contratos-v1/perfil.json, indexados en arquitectura/indice-agentes-v1.json. Las fichas raíz y memoria-compartida.json son antecedentes de diseño; su estado inicial vacío no describe el contexto ya recogido en infra/docs/brief-gustavo-posicionamiento.md. No se han sincronizado a memoria runtime. Curso original y asignaciones históricas intactos.

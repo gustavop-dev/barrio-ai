@@ -1,0 +1,2201 @@
+{
+  "created_at": "2026-11-06T16:12:12.906547+00:00",
+  "type": "initial_source_snapshot",
+  "original_locations_unchanged": true,
+  "repositories": [
+    {
+      "path": "agentes-linkedin/infra",
+      "base_commit": "88ab0a01946e56c277b8661ed5958cf04667f96d",
+      "includes_working_tree_changes": true
+    },
+    {
+      "path": "apartamento-agentes",
+      "base_commit": "73de89780582510adf0dabcae96de75a29531d71",
+      "includes_working_tree_changes": true
+    }
+  ],
+  "copied_files": 544,
+  "checks": {
+    "known_local_secrets_and_token_patterns": "no matches",
+    "file_contents_unchanged": true,
+    "runtime_tests": "not rerun; source files copied without code changes"
+  },
+  "files": [
+    {
+      "path": "agentes-linkedin/arquitectura/ESTRUCTURA.txt",
+      "sha256": "52e04a1b9da1bf28a49bb899c49bbd93d1ced2635004724dca70893344658b82"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/equipo-autonomo.json",
+      "sha256": "96d61272b79e4e7fa2952550e58c4e82a5deaf09e382d97350ea338b63cb954f"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/evaluacion-ciclo-estrategia-perfil.json",
+      "sha256": "e3ba7344d5f9aa10334b1502c71bcbae442a23e4898fd194015f40907bc0a380"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/indice-agentes-v1.json",
+      "sha256": "4c12fe771bae8749fad1a6205116e6e106b8873df805a558b1ab68da256931fc"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/lectura-contratos-root-v1.json",
+      "sha256": "9383fd5e9ba18ac47928ed991ffc189f3198a0b3ea4dca72430f0e9f43a9056e"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/lectura-posicionamiento-v1.json",
+      "sha256": "d74d60d2878c445fb0529c3065e721aa131855e6b501ef7a988a60773c52a3d2"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/plantilla-agente.json",
+      "sha256": "7740a1163f3587b524ff17bf32c64de48e7c616e90ffeb5830b914582e3a09b6"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/recorrido-mesa-manifest.json",
+      "sha256": "4b645f4f2f0c75437ec1d51c37509ecee9cd1c3dc0d223ebc103e4dd3b7987c7"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/registro-lectura.json",
+      "sha256": "41385b0bd13f1d3da63eaf8ed05fd67339ac172c170ebde77670ff2df6bee0e2"
+    },
+    {
+      "path": "agentes-linkedin/arquitectura/validacion-diseno-equipo-v1.json",
+      "sha256": "ec94a0fb817de996445b840c198acd548a1914c9b734497510c95f755b65699b"
+    },
+    {
+      "path": "agentes-linkedin/equipos/editorial/copywriter_a.json",
+      "sha256": "b9f5420bc2b2f06f0dba6ebf8be41e502c8bef503344af4dc20e2ec7a31a3aa3"
+    },
+    {
+      "path": "agentes-linkedin/equipos/editorial/copywriter_b.json",
+      "sha256": "bb26a46cbc4032d2cb2e22c24e72b9c574aebbfdb74872d5087377ec1d96530b"
+    },
+    {
+      "path": "agentes-linkedin/equipos/editorial/datos-externos.json",
+      "sha256": "0666ff044263dcd9375001bdc8733d8e0f1a4d368954888689e9ebead74c1bf1"
+    },
+    {
+      "path": "agentes-linkedin/equipos/editorial/director_editorial.json",
+      "sha256": "0f5ef0bc953285b30e5bdcbdf570e7bca18b39756aab5783ce3afd6dd0c66b3c"
+    },
+    {
+      "path": "agentes-linkedin/equipos/editorial/registro-lectura.json",
+      "sha256": "29dd9d0e269a84271c83f4fcd342e605665bb68d1da25f41d8fb6173aec92ccb"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/ASIGNACION-CLASE-02.txt",
+      "sha256": "e7a2907366a16fe06adbc80b66f8e146b48a2b9a2c10d21d8352812503460147"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/LEEME.txt",
+      "sha256": "dfa11f85d1481b5c40448a554461c72e530e1e29faaed47035030a99ba440c75"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/asignacion-clase-02.json",
+      "sha256": "87d286bc57de0426690f397343775525d6ce5727ca1c35acd70a08e755cf6cb2"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/base-clase-01.json",
+      "sha256": "0f02cfc245d32b03388b88aae131dbb26040f70246f8cf966601c31fb9f75428"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/clase-01-evidencia-visual.json",
+      "sha256": "61be4361b96515c56f8bfd2cf21324468fc5f904560cd27824ea262089e23a61"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/clase-01-fuentes.json",
+      "sha256": "bdbc32c969e2dc41af3083eb70485604f866206fbd1add580c8e6aeed9e3e100"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/clase-01-unidades.json",
+      "sha256": "5477bc4c9c0614d32a73f64c528085fe35b7fb9596ef348b3814bf25ea583d41"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/contratos-v1/perfil.json",
+      "sha256": "5d15ae23ed456649920c24742e102f0e07e6717ac4983069711838dceacf0306"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/contratos-v1/posicionamiento.json",
+      "sha256": "df3dbcc1191721bc2691ef805e60f4b29a5a3570017a64b972de486cd20f9b1a"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/manifest.json",
+      "sha256": "27f9d15c602a46eae1ac4109f0921144aca6817e0c7bbcb2c01ac4d4de301f1c"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/memoria-compartida.json",
+      "sha256": "5ce9dff906925677e3a5b68a651492302c789cc5e78cfe375d82b5d9239d8b2b"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/perfil.json",
+      "sha256": "13fd7e8cdea3b9eab8f9cc15b9bf48d5c3dcc9e1d866972491d952907c3a23e6"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/posicionamiento.json",
+      "sha256": "a8593c5decf389389dc899a7e5b29eff4383d913382dd8e634538d606d1e909e"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/preparar_clase_01.py",
+      "sha256": "9a40db81fc3b3019859b806fd53d0d50c7095fc2552a58f4da52096da7c8ab01"
+    },
+    {
+      "path": "agentes-linkedin/equipos/estrategia-perfil/verificacion-asignacion-clase-02.json",
+      "sha256": "32480c73450fb3bb38428f7ff3e39af68fb1c8cebb04614668674261f22222d0"
+    },
+    {
+      "path": "agentes-linkedin/equipos/lectores/lector_comprador.json",
+      "sha256": "94a95b5febd35d7e9a2b5721c27050ecd2af7d56348fdb32e9e326f080a0ded3"
+    },
+    {
+      "path": "agentes-linkedin/equipos/lectores/lector_divulgador.json",
+      "sha256": "f79ade5878a31ca10825cb1830b5e9f6db6cc0aeb1350a71c8aa5b76fbd2f4e2"
+    },
+    {
+      "path": "agentes-linkedin/equipos/lectores/lector_lider.json",
+      "sha256": "98986aa7b8778f67882cc6af009a4ce5e67431a950b4c77f0a294af589b8945b"
+    },
+    {
+      "path": "agentes-linkedin/equipos/lectores/lector_par.json",
+      "sha256": "dd5da9d7a95f865fb0a62aa16e928f691e03d56123606777f5872edfb98b0f3c"
+    },
+    {
+      "path": "agentes-linkedin/equipos/lectores/lector_recomendador.json",
+      "sha256": "7ee19619d935a3afc7476f5099e63163da0b042e757bd4a798bfb08d3d6cd26b"
+    },
+    {
+      "path": "agentes-linkedin/equipos/observatorio/analista_barrio_resultados.json",
+      "sha256": "6fc6f2d0181840c988447c683e6ad6351acc12e5d6a772a49579078528128699"
+    },
+    {
+      "path": "agentes-linkedin/equipos/observatorio/investigador_referentes.json",
+      "sha256": "a5d40c69e6cdfbc9a51b3e4c64b359affb5a1327bb3fa6eba56a612cd68b41bf"
+    },
+    {
+      "path": "agentes-linkedin/equipos/observatorio/registro-lectura.json",
+      "sha256": "b1a45d5d24a516406d073c71b96c5a44c4a13374e0564f57daeeb450653be8f0"
+    },
+    {
+      "path": "agentes-linkedin/equipos/revision/editor_verificador.json",
+      "sha256": "069491cce0bf9fc97c9e09a53beabf0b352d6bb1c5b113a8af564d81782be599"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/all-in-base/SKILL.md",
+      "sha256": "4ff659f9b51482b9f482d7aeae15c5cfb96ea7827cc6640165224dd135ea0295"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/all-in-base/agents/openai.yaml",
+      "sha256": "751ea2a9770b228e5a62b4485743691a8a35396279e9bc88cb6c4eddc7299249"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/backend-test-coverage/SKILL.md",
+      "sha256": "013932e08cb234abd92d4623afe9e71c9f051e89036e7b8910317d5ee2e0f924"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/backend-test-coverage/agents/openai.yaml",
+      "sha256": "341e6b8ecf85dd6eceaee270392e0d602bfaa82db52bc92aedf41f9cc4e412bd"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/ci-optimize/SKILL.md",
+      "sha256": "aded7dde76a12a36a8c08e91805ddd407b78b5f3b35fdd36163951d2d04d8c61"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/ci-optimize/agents/openai.yaml",
+      "sha256": "e3af20e56725cccf211a672b6a91a1d96248799a7aa1787ec1ee947e91352d6f"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/debug/SKILL.md",
+      "sha256": "eb88a959413df9ba930003d81324f0752db28383df232f3011610e904fa69d51"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/debug/agents/openai.yaml",
+      "sha256": "6f7ce41d74d57d1716f00b8b7f67bded095a3d89f99239dd4870766cb35f9c84"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/debugme/SKILL.md",
+      "sha256": "566a636cc0327a10ba1a09b21d886562ffb96fca8cda87ad6ba11173879d1dfd"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/debugme/agents/openai.yaml",
+      "sha256": "d7e30b5840458a389f790af07ca0f9a62c8885b9f6dd3a8ebe0d93d80bae4f71"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/deploy-and-check/SKILL.md",
+      "sha256": "cbf2856eae4d8241df982d425b1aad0b28ad0171677b6d570bc5b6142bb6d71e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/deploy-and-check/agents/openai.yaml",
+      "sha256": "eef6fe96cfa171f5093b6cce92bf6b983c4c477e7a2342f99683257def1fe31c"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/dev-down/SKILL.md",
+      "sha256": "5464df7d11b838000af068eafebe35b7dc91b88ae61aba13b64ce9bcf09a7b82"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/dev-down/agents/openai.yaml",
+      "sha256": "186a6ddaa9cc854942f0a87e1ec4848eaa0dd8207ee025a7dc0ec356c5d63aaf"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/dev-up/SKILL.md",
+      "sha256": "c72b82b698a72ca0d2c7ddad2976bab8f4988f047c0fe778df677db015003b83"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/dev-up/agents/openai.yaml",
+      "sha256": "050981a2679e4d50971ca936874742dc784b7c3815412874b941b3115d657f0c"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/e2e-user-flows-check/SKILL.md",
+      "sha256": "391c5519d9d453b305a0765f5bc1a86c6ac38eac2ba02ce286ecef2111f53f4b"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/e2e-user-flows-check/agents/openai.yaml",
+      "sha256": "c6395d44977e37cda8e59ea6df58e0a785cf4e315871a057cd334c8d553d7212"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/fake-data-refresh/SKILL.md",
+      "sha256": "606d4cfdf3497356c630db09117d3962fd48845c07168f654872e0008c5afc98"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/fake-data-refresh/agents/openai.yaml",
+      "sha256": "bb7a2007fa5a63c6565a622767d5d1b17a7d14d5aca290991127428b4420e016"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/fix-broken-tests/SKILL.md",
+      "sha256": "eeede65b60be20b8673dc06105e8d9599a7554151b9dbd2cb9d299f2d7e86e47"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/fix-broken-tests/agents/openai.yaml",
+      "sha256": "c7cf7c4d80e1e99dbbfcc28356a1ece3eb0b47a282253fe259cbc915e4e8afa9"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/frontend-e2e-test-coverage/SKILL.md",
+      "sha256": "7f64db9987a58d756a2a18f0ee53f94bad71512f553b8a38839c193b6bf28b72"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/frontend-e2e-test-coverage/agents/openai.yaml",
+      "sha256": "d19be8778bdb8d90a31c46f373f818c59d7dddafdc405c713418893333fc7b51"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/frontend-unit-test-coverage/SKILL.md",
+      "sha256": "edca56404b020474652c4ad58332c149b47fefa36552a74dc2b7c0c3830777e9"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/frontend-unit-test-coverage/agents/openai.yaml",
+      "sha256": "2515426efc3dadf88944cd579a5ae18b75998086723b0f0e0e321ad7b50f181c"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/git-commit/SKILL.md",
+      "sha256": "f135302841972f9c9e0051a69228c858fccb268503cf48d94da72db9c41e5d93"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/git-commit/agents/openai.yaml",
+      "sha256": "f287500f5b80e26031254b0fb606137ddb6f2bb2628f46a3fb06cfc6a632fbed"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/git-sync/SKILL.md",
+      "sha256": "6054bd3fc96c6d4d6416834bafa8c4beacc4a203413ad2cf7cb7deee1de78e21"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/git-sync/agents/openai.yaml",
+      "sha256": "b9eff01052f19103e39671bddcaed6a2476890c030c9e8b215459b802a3a2d97"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/human/SKILL.md",
+      "sha256": "3490cd2ea3eb2659f026f7026bdbeb32b7d3269892bd94c8af52a30aa5dd5065"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/human/agents/openai.yaml",
+      "sha256": "36a35366cdd15041018fa09e8195e80ea6f1c3020f7d5e64af60b677a0f391b7"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/implement/SKILL.md",
+      "sha256": "2641ffaee16a2f68a8b7791aaebfbef7fafcb9457c2c90fd354d7ac582230869"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/implement/agents/openai.yaml",
+      "sha256": "805dc22b7f3e2e9c3835e39e19133f9a25bf503f201ed8e3fcfe627feb1b9b3a"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/improvement-pass/SKILL.md",
+      "sha256": "b15976d1ca2bf33972ddc39c4d84bda4a26cba6defc7fb3f7a880837a73aa468"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/improvement-pass/agents/openai.yaml",
+      "sha256": "506d468c8f0021ee0b5251120b88ece8095d342fe6ae931e754415904fee2385"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/local-ci/SKILL.md",
+      "sha256": "023e61663ab13a30ed5c98f1b9c124fb83bdff915af34449c5d15b6cdc76710a"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/local-ci/agents/openai.yaml",
+      "sha256": "e025f5f84432e885fe7777056579cbae6f2ac0d1a2eb3d07358124be81b1dbb8"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/maintainability-pass/SKILL.md",
+      "sha256": "cf6f67010f32340df0db78c7168c9389d85af0bc9eb6223604f8bc7a51e65baa"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/maintainability-pass/agents/openai.yaml",
+      "sha256": "10829ed35022c7de68021b822aaacb944e3bcbde8b85bc8be4e092b14d51454b"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/merge-queue/SKILL.md",
+      "sha256": "32a79c36256aa5a4a178d14f2e558d007adb6da5ec4e8bebf23e526f865827c5"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/merge-queue/agents/openai.yaml",
+      "sha256": "e6b3099bca1c5e0ad570af982cfbcc28528a444f373b61483374764168dfed0f"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/merge-when-green/SKILL.md",
+      "sha256": "44f474269d55540222b904987ce1700a3f4f34060e8c5a837d4bb97d818c1512"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/merge-when-green/agents/openai.yaml",
+      "sha256": "03e26320b092a767514e8d6e8edaed9516504f205a3133b5757aa1e5ec5c0a5c"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/methodology-setup/SKILL.md",
+      "sha256": "28963ff4797c11b5f35c4a30ec506764352ad686484f90fc74b4700ee2eb3fec"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/methodology-setup/agents/openai.yaml",
+      "sha256": "3b8c000c8e2a04529b42d8ece3c14ec9c935b619bae513190d3ba586b8b7fb18"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/methodology-setup-guide/SKILL.md",
+      "sha256": "7eaff996dbd8294503ff5980f1e22c7e0409afd4d9aac364285e6a27397b8559"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/methodology-setup-guide/agents/openai.yaml",
+      "sha256": "828f4f81f7ef9a5ef67910d8a009d00292d02e37c45366fd41382b68b13aa0e8"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/migrate-project/SKILL.md",
+      "sha256": "7a6476fafa440af9f8d96b6c322ab8d3fa8a19decaed3966df71f08a8938b5b3"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/migrate-project/agents/openai.yaml",
+      "sha256": "37f68f38a67723c4ad0b5fd93861ed8cae26d2d4a6da2e5698fd4d2ff4758c45"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/new-feature-checklist/SKILL.md",
+      "sha256": "b21474316e9d7035118784e0a86c5ef46d3f8a9481fd9876520bc9c7212ccdde"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/new-feature-checklist/agents/openai.yaml",
+      "sha256": "3292cefb64950797ac0286cbcf0f4021d6a52d6067e7da5d6c13b2623e8606c4"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/observability-pass/SKILL.md",
+      "sha256": "6e2f78b1706a2777de7dc5eedefb1946177dd08fddc54a08e58294f7a5fb6d22"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/observability-pass/agents/openai.yaml",
+      "sha256": "23feb2a29cf18827999a13aa0ecdee7f5f7832570fcef838c15ff855390324a4"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/output-protocol/SKILL.md",
+      "sha256": "a2bad76ce2c5f9dbb0c58e978d943a02e1361a526db5c481d567f2dbc7112700"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/output-protocol/agents/openai.yaml",
+      "sha256": "584a58d08e47a4d31ddca3ca8570e50f785461ef137a1308555e4d66bbec7272"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/perf-pass/SKILL.md",
+      "sha256": "ddab5e32ba3c263840ddb9a58e795ba342e17cd85a10bd96181541c9ef1d64cf"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/perf-pass/agents/openai.yaml",
+      "sha256": "6b5ff04e7c485ab938b96ba95f9debbadd6533be2b2550ba3db31741deb854d6"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/plan/SKILL.md",
+      "sha256": "8d7b61862eb9de08706e20e5bee95f95ccea3a5ab242d0d535ce685218eaccf8"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/plan/agents/openai.yaml",
+      "sha256": "9baa0b29d3a7a45de845e6705df333e2291efa192000dbdebf8404831847fd21"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/plan-task/SKILL.md",
+      "sha256": "9a7b16554d4916813762e98f1ccc310a30caffba2ab65a12e71cb613b29734bf"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/plan-task/agents/openai.yaml",
+      "sha256": "548fd959b546cc521f9495e2a2c663211e80ea15ba5c2e349f1a9313970c45f5"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/playwright-validation/SKILL.md",
+      "sha256": "b2daf3e48028e794951f9ac102f3844a1db9596eebd81bd9b28cef16656c0423"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/playwright-validation/agents/openai.yaml",
+      "sha256": "b520b6de89cc80b6aaf16ec4fd04673168f3a59a4c6662515307d32f0a120b27"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/pr-green/SKILL.md",
+      "sha256": "9f0992d8a207fbc35673a3d4d22e76e0d205f1cb61bf8c38b1546f4a750d2456"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/pr-green/agents/openai.yaml",
+      "sha256": "72d00c9eccaedcb6746776847c9a5dba425e7a09d7f58faf9fd60dd6859e6a74"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/qa/SKILL.md",
+      "sha256": "bbe9ef788ac2807fc20bfbb76fbf6a80ce5c17c13d965e82e1cf65fa2d47190e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/qa/agents/openai.yaml",
+      "sha256": "2c3e397ca08903d354386348838eac4297ca52001a4e63182e72e26562d2eb74"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/release-context/SKILL.md",
+      "sha256": "309f5c643f4711e02480db8a88b50b67d6b5a02d944f91a673eeb28b6c2c0304"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/release-context/agents/openai.yaml",
+      "sha256": "4fdb685690e88de2235d905a45c130fa3f049493325aa37020b41ded564fcd52"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/repo-cleanup/SKILL.md",
+      "sha256": "3d25590062462dcc70dd5e33692f27ebd1b83b7844335abbc724bc7ae262a223"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/repo-cleanup/agents/openai.yaml",
+      "sha256": "7f4ce8643694a8997094faf0b6963e813724f8cc8a45c43a3ae27bcb3470517b"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/responsive-pass/SKILL.md",
+      "sha256": "3463776e52ac547519a1f96c1c1dc2f46bc061756a8973e7aaa8f3c5e0925c6f"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/responsive-pass/agents/openai.yaml",
+      "sha256": "791e36cc8542be8e4825b53a2d7d0d43c57c9fb7c2f4fd8bf6c72ed3786684b2"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/security-pass/SKILL.md",
+      "sha256": "89798f6d96f5d6a856267d54c48b3ce0b99961f90b7912bb60cf7e59e36dc745"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/security-pass/agents/openai.yaml",
+      "sha256": "3988428aa6b2e6a4b783cfd96c9119e56158eebae087629d25d61cb73a1f4d0a"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/skills-help/SKILL.md",
+      "sha256": "65814456c52573765553269ed68c98f57f978d767361c017d69a81fd6cd4e80e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/skills-help/agents/openai.yaml",
+      "sha256": "2fbc4b49f152cf4c7263c22a4b162dcd3780404dc283861630663aee6625bf02"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/tailscale-connect/SKILL.md",
+      "sha256": "d42bdfdcd217cb30671d2ae1949dd0a6402f6b1af9ac15cb6d14e572064cd649"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/tailscale-connect/agents/openai.yaml",
+      "sha256": "56e715fb5ab67be11ad46e439b439fd063ceaf8d1e793d3ee716226f836e16d9"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/test-audit/SKILL.md",
+      "sha256": "90b860f6c203147d7dfa8ba536621241a46a56172a7697b2e6aceed84b778f0a"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/test-audit/agents/openai.yaml",
+      "sha256": "b4eb4acb52f4d07c6370aabc8af50da5869bdedb3030c6f0b01462aee34c8126"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/test-quality-gate/SKILL.md",
+      "sha256": "f8477eb28eab0543969fb8fbbeb860d84462ad17457ff88f75b42f78968e1440"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/test-quality-gate/agents/openai.yaml",
+      "sha256": "c319cdfed02823268994fab6365e60d435a3994431ff0b799ebdaa0131d5445a"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/user-walkthrough/SKILL.md",
+      "sha256": "0608c5e34dc3d925d92d22bdff02f83a45f55e6e08b69afc57fd9c185a5e00d7"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/user-walkthrough/agents/openai.yaml",
+      "sha256": "84bebdd3ac8e9ac61813de892dfe6cddb516841a25f03a6cc0f0514a0764e96e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/view-map-audit/SKILL.md",
+      "sha256": "c0249408217ce91eb70e29158515a87478846244cc9c429bb172bfd9f316d0ed"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/view-map-audit/agents/openai.yaml",
+      "sha256": "3e9cd48a66eca5b313b41c2e99a6f728a4e6e1d36397b46d7bf214a775595096"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/view-map-update/SKILL.md",
+      "sha256": "7e6b2dfc1b46151f227d2a8e977316afbf2df91f3e923265a8c638a1bfd7569c"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/view-map-update/agents/openai.yaml",
+      "sha256": "6c1b73221a012e1a23de790a540e601fbbefe8a7a6e0d8f7eeee7297fcff2e06"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/vuln-audit/SKILL.md",
+      "sha256": "7652b6e0766c6e13cc5253ce92c52b3e038edf1c3836d69663fca0e8b1b99dbb"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/vuln-audit/agents/openai.yaml",
+      "sha256": "bb83b8f87f91fb3cee28af8eb6cc35d2b94d50dac1f249ab933c682c9e7e241b"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/where-are-we/SKILL.md",
+      "sha256": "98c319f57f76c16caef42be955dd7ba56747f8490cf1ef27b5b86f7ab7ebd559"
+    },
+    {
+      "path": "agentes-linkedin/infra/.agents/skills/where-are-we/agents/openai.yaml",
+      "sha256": "ae6d039607551b85e57b27d8abed60b9c9ec95ef168eec7b0cedfbbea8c3d2f0"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/perf-scout.md",
+      "sha256": "e79117f279c66fc224f411ee52fffa0aacdb2abb85eb098d58a73af565baf053"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-analyst.md",
+      "sha256": "444f79846b68a7648f1d25f1f11102bac8d9256fedabcaf10c0ca33b000fdf10"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-architect.md",
+      "sha256": "71dd2841825e9679d4df8836469960e27290b49b0606fa6f79c522f2722539fb"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-auditor.md",
+      "sha256": "cd6d9f45b1f6f1f4402398ee39e647064702618b313f174464bb4010d92b01bc"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-engineer-backend.md",
+      "sha256": "4039cd04ffdd30344abbc25c55de7f2f91fd39d6875602695587579c9c2181e8"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-engineer-e2e.md",
+      "sha256": "c4541e5523ed5f849cb1a56a86858d3ab5f95cff3ce97dd10df577523656260e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-engineer-unit.md",
+      "sha256": "37c08ed86eed9b8a7afe7a6d25aaab2aa3ffbc12d496ed38dfeb8c6427dc4564"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-healer.md",
+      "sha256": "6059ec4b9ec2425ce450dffb66efbf5fcd2e585f99b9dee36682d68f90fa267f"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/agents/qa-verifier.md",
+      "sha256": "65ad623ba2cdb629101495d3182d553e339dfc0f7fda1db53cb88b65245c8732"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/commands/human.md",
+      "sha256": "2739b0596adce9977e9dccdc686fddc06190caacc97b408f68f21cb229a3f8c9"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/hooks/fleet-env.sh",
+      "sha256": "91a07176a7fffa07dd7cc1157640cc22458005adb01deb8a91b596b1727357e7"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/settings.json",
+      "sha256": "b1a43d7e932e9f6107b898222e6cc9c67cc97e5d6d94023b1544da364f371a90"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/_output-protocol/SKILL.md",
+      "sha256": "5799bcc2a201bb8431d0d96d98de545b03b6dcb94ef8e3be6b8402fcee13af61"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/all-in-base/SKILL.md",
+      "sha256": "c0848bbd9b4bb88bade8d77382cd6ad3cbf0d78dbe6fae2ffd02efb662afd05c"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/backend-test-coverage/SKILL.md",
+      "sha256": "c2df6402b695db97053fb065381ed7c1a017aadc46b0a241c5aa95ee8868fbd4"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/backend-test-coverage/agents/openai.yaml",
+      "sha256": "61caebcda907e3c2844d5e6ab53a7f5262311b09387f18ec7b6c0f416dc6692e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/ci-optimize/SKILL.md",
+      "sha256": "f72e7c7287492c97b03d3c2c08d492dcc748ec107736ed0c63f1ffa5b8d61613"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/debug/SKILL.md",
+      "sha256": "be86f51a6830fcdbc193a8a637abc100fc9f6f6e1c65f9b2f8147042cf984580"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/debug/agents/openai.yaml",
+      "sha256": "175229746d5ed5aae58ba4ce8420546cfc6eaaaafb45a0a422ea648dd396e3f2"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/debugme/SKILL.md",
+      "sha256": "4b4fe3977ee3a71e69ad0fd14a10354a793aacfe08a90d2b34b887bf9646e15e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/debugme/agents/openai.yaml",
+      "sha256": "c263920608325d7bec56328cf0239dd28c3c9827af14879ccecc95c92a3da415"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/deploy-and-check/SKILL.md",
+      "sha256": "81432be6d2e8e46fd0bfa3be76c7e3df5a62f3d4ca8c6f037333cb2dd0c6c830"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/deploy-and-check/agents/openai.yaml",
+      "sha256": "b906e1059c29d7e48748eac4ef08a6f1f3f667460d571bc348f914c022306c0d"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/dev-down/SKILL.md",
+      "sha256": "9e2629d6e498fa7f4d7d6a8fe695aa4eeabc94051a22cb8cc42632b3e5262f48"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/dev-up/SKILL.md",
+      "sha256": "088d50b717fdb97f8b532cc06685e245d536ebc1374bd40994f018a71bee0d25"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/e2e-user-flows-check/SKILL.md",
+      "sha256": "844ca79ce12507366e4b96591a80ee9a24f6ba0693b567dc0c8ae81ad092d472"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/e2e-user-flows-check/agents/openai.yaml",
+      "sha256": "591e1829625d2cb5dd9cf1834593cab8cfa12a02739e7ab0410a37d6841bfbc6"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/fake-data-refresh/SKILL.md",
+      "sha256": "0c22a0d4890da3d18919ee7f437a527cd52542faf02e768af9bc046ae170d203"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/fix-broken-tests/SKILL.md",
+      "sha256": "315ff3cc60e4079b84646003b9e3704e428afa7bd88503e77a3e91a047c6a380"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/fix-broken-tests/agents/openai.yaml",
+      "sha256": "f32deb11961335b9d04197186d10f05345885e71e38fc50bea76e4b2f4f3a9c1"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/frontend-e2e-test-coverage/SKILL.md",
+      "sha256": "223f806dc44c87f0e24429b5430bb8c450fe906177fda0746f4b37d5a4d2f3e9"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/frontend-e2e-test-coverage/agents/openai.yaml",
+      "sha256": "58483b8d2c3c9edc04000a3e500c9d6695380ab5ce80efab8b70d117b846c30d"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/frontend-unit-test-coverage/SKILL.md",
+      "sha256": "f61fb705c5e565c2c4516558cbfda9bd01985f96455614bbbd9d2ce5b0ae2cda"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/frontend-unit-test-coverage/agents/openai.yaml",
+      "sha256": "0de85099c56f5b38573383f3c478cd4cf5b0a5ec8d6ed716ae41724714007571"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/git-commit/SKILL.md",
+      "sha256": "33b1ec56d43f67aafd9f1b2001b152f70ba592748fc712e6da583cbf1040e882"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/git-commit/agents/openai.yaml",
+      "sha256": "7a5cbdc68873c0315ff64680f3d9fa3494a1d7893d511d94e83eca74c583b2cd"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/git-sync/SKILL.md",
+      "sha256": "8012145ebf7a541711fcaeefffd1792c7b2823308059ea375a5dc6d3788f3d69"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/git-sync/agents/openai.yaml",
+      "sha256": "ecc5abc9692159afe83d5bda4f81f04f73f0836dcebdd1cba5a59b23ef29a363"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/human/SKILL.md",
+      "sha256": "6a10f667033a62a1aee10e35308bebe94daa8aae5eece3ecf6d8901a8e1091b1"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/implement/SKILL.md",
+      "sha256": "0cc97b002c553e7481da5a41824d79b4d2db1370211ed60272fc7a22cf355c31"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/implement/agents/openai.yaml",
+      "sha256": "e43f99b76e9e06ed435431b9e02f1092974b2d0e8ec8cef1ab871815ac3d0380"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/improvement-pass/SKILL.md",
+      "sha256": "238a1e6c47ef357a9d02a176e752c84ee203732a49df5f7909ba347858fbd459"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/local-ci/SKILL.md",
+      "sha256": "441299898d258bb67097e00dc0b155263a667d2dbc57c09f644cbbf34cb88df7"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/maintainability-pass/SKILL.md",
+      "sha256": "4e0fcc5518c3cb42e4908cf917eacfb181ba2a59b2159b185767b72f5112c66b"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/merge-queue/SKILL.md",
+      "sha256": "9541fa58a611898f0ea2cc3b24d23b2e0fefd3f9b31d64f5e6b210d3d4a5bbaf"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/merge-when-green/SKILL.md",
+      "sha256": "d71c9de7ab26bce3321c727386aeb2a6859be250cf24f53a6331d5851980164d"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/methodology-setup/SKILL.md",
+      "sha256": "c8d4d8862857f2d4d4c04d7cef5c3e9479ebf7c949440fb02d650371a1f433a4"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/methodology-setup/agents/openai.yaml",
+      "sha256": "4d0a1d0757a60deba19f6354ca5045bae5d0fe55d2f21184c17937cf116ed8e9"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/migrate-project/SKILL.md",
+      "sha256": "3392dfc80c4cac4ddb62ac9578e72d06a152b70cedc6148cecea954433c06d00"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/new-feature-checklist/SKILL.md",
+      "sha256": "0d4cae52b5663474de1cee5c6ea7bc4d174c28d218329b8ad559838695d319b6"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/new-feature-checklist/agents/openai.yaml",
+      "sha256": "35648c739d3bc87dfe5d747a80a2dbabc585a09a79c9da30c1b4262226ffb846"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/observability-pass/SKILL.md",
+      "sha256": "6bdf30117fc64565e5dda4bca01324e42a5f89e0f4dcc32bac2b7bc81e49ac42"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/perf-pass/SKILL.md",
+      "sha256": "00fe225e82ccbcd6696eabe53ca5aab4a58398d4051164e29ca4d1ffa15152ee"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/plan/SKILL.md",
+      "sha256": "8807464301bcdbd3f6690afea58f474bc4cd3d2be72760b54bf21cbe0597cb61"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/plan/agents/openai.yaml",
+      "sha256": "60abbbbd8e52dd891bbeb30d1f2a38d5bfa5e09f8166fb286eb6426a9c9e1636"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/plan-task/SKILL.md",
+      "sha256": "7de8eee3c54a8cf50ed212dc198ccd81dffdefbb11c2012f6e29ea1672712676"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/playwright-validation/SKILL.md",
+      "sha256": "7ce79fc6ef0726fd85ba7e0859be0f555a303c35b472a4f22805bf75dbb7179b"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/pr-green/SKILL.md",
+      "sha256": "d374ae8fcec0068ae0e8c3ff18437071603c499fef0f8b9e87869f3db7bbd8eb"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/qa/SKILL.md",
+      "sha256": "ba57206eb52a55dccf7201a7746b9ac8de33adf75caeed3f209ced8c954014f0"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/release-context/SKILL.md",
+      "sha256": "93f3fbb1fa74f9b4ce7d232324ea547d7fc26f732eeab4bfa9e73f94843c7229"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/repo-cleanup/SKILL.md",
+      "sha256": "9351b60a5e9716455a65d3117b99062225d66975bf5c165ea4520aae0e0f97ac"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/repo-cleanup/agents/openai.yaml",
+      "sha256": "e2b27e813cbea098d0d81b9e954b3bc05e54fcdd7292bfa8338a8f34950fe1a7"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/responsive-pass/SKILL.md",
+      "sha256": "74d980246439217075289316d8997c03186cc3ea381f412a37b545b5edfd0bde"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/security-pass/SKILL.md",
+      "sha256": "eccbc1b8a11766da68784d0e385b18a0c011b9f0e22471ee1b353c0940e51769"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/skills-help/SKILL.md",
+      "sha256": "b98e67d8d3bcbb2bde772b685d701e6fa6458470ad225ec26a4ce5e3e1f00aac"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/skills-help/ignore.txt",
+      "sha256": "0f80bd442d6c623dc6db92ef5e6a22dba1b639e2c507dc2129427b7e7750ea68"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/tailscale-connect/SKILL.md",
+      "sha256": "f2a10a7be3503000c5b621c4e30ad54b218089c18e73c4109a4d1e1b2b9f8764"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/test-audit/SKILL.md",
+      "sha256": "63f31fc779f431e5dc8022381e1fefec16311c9d20542fefbc42c2b5fe5509d2"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/test-quality-gate/SKILL.md",
+      "sha256": "c113dc0d65523409262e86a06d67cf9cb79a852be228c7d5743112f001fd2581"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/test-quality-gate/agents/openai.yaml",
+      "sha256": "0c0e595bccc331165ef2798b70344c19d8d092bc30d791b391403942817abf22"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/user-walkthrough/SKILL.md",
+      "sha256": "b6f302ac7edaadd7f7321dc26090bc299b4175c43794fb21f7e366a2619941fc"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/view-map-audit/SKILL.md",
+      "sha256": "c77f0eed8df94893d5f51a1a22b9100250192e600605a58185b508f25dc8048e"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/view-map-update/SKILL.md",
+      "sha256": "1fda91cb7882a076ab68448681db0095b184775178e9262fe38e6e565114ba57"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/vuln-audit/SKILL.md",
+      "sha256": "4ce288d56f7d66b947714829d74906c4132c888e927a9546c93b67fa34512008"
+    },
+    {
+      "path": "agentes-linkedin/infra/.claude/skills/where-are-we/SKILL.md",
+      "sha256": "8872f7becc41ff80c5cc80e3f77329c48ac5f77605005aa867a77991afe25112"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/perf-scout.toml",
+      "sha256": "59e5be0eccb140b53132692ea16569a4a7832ec7c9fb6cb292fb81063ae9b9b4"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-analyst.toml",
+      "sha256": "47f1d43c7637285c0a507631682f3d76565ed0e4d499d91b7cb8080c1f42a671"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-architect.toml",
+      "sha256": "0d92c0708838a39e966dbda07f799e7911da6a7851a61e2f1e41d4eef58ee4b9"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-auditor.toml",
+      "sha256": "f491f83d5f8dd708d5d8e59115477637b7589c0ae61d4d287d410645b88985ee"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-engineer-backend.toml",
+      "sha256": "84705a8fd1d537b506efc778fa36aa899ef2494977a441b705623be1ee0ac573"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-engineer-e2e.toml",
+      "sha256": "30746799dcfb8e1142b6f30924503105fc96c5eac096868519b173418869a5fd"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-engineer-unit.toml",
+      "sha256": "afe27ff4de343402f72ddd5425bd113f8932a7600a42e7e43808e0eb98a30e10"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-healer.toml",
+      "sha256": "67614fd0dad97140007bdcc7ac8f0ae7e3c13734922401fde793acac8938ed71"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/agents/qa-verifier.toml",
+      "sha256": "29f86f42d38ab0cbc0588d0401995e51c01e5302e5a03474ec59ef052fa7a981"
+    },
+    {
+      "path": "agentes-linkedin/infra/.codex/config.toml",
+      "sha256": "138fb90fa26384c603180f0d79d91bc52ef6d650b4d1f85d08fad8bfc5b77009"
+    },
+    {
+      "path": "agentes-linkedin/infra/.coveragerc",
+      "sha256": "4f8f871079fb01ab349d6161e7f5c79e40f262e21e1d0a0a8e9adef7d852bce8"
+    },
+    {
+      "path": "agentes-linkedin/infra/.dockerignore",
+      "sha256": "8e541b4af04fb564670ee3dda0cecc9b8882febb7346084990831f4411cb3aeb"
+    },
+    {
+      "path": "agentes-linkedin/infra/.env.example",
+      "sha256": "aab918255d1550b7ac0513379cf4b358af95ebec9936931b19aaa7568e4ba07f"
+    },
+    {
+      "path": "agentes-linkedin/infra/.github/workflows/backend.yml",
+      "sha256": "7f073e981cd4cf97ee020ac4fd528366e38153937110d2afa6fc8f9631134c4d"
+    },
+    {
+      "path": "agentes-linkedin/infra/.gitignore",
+      "sha256": "b39a8f5884c348889b307ca4c541227e825e38a1447151e8ec008c087fbb6203"
+    },
+    {
+      "path": "agentes-linkedin/infra/AGENTS.md",
+      "sha256": "d5c4990d680390adc0bd5a0e0a832cb018eb074216559420915824d8659e8831"
+    },
+    {
+      "path": "agentes-linkedin/infra/Dockerfile",
+      "sha256": "d27e5e5856e3899c21a1476bfe91b777e64c2a2f18cf03bcd286c6ef2f52a8d4"
+    },
+    {
+      "path": "agentes-linkedin/infra/LEEME.txt",
+      "sha256": "1ca020cf1781089dfe1c6ca088a36c467e1d3af91499c7bc3a31ba409187764a"
+    },
+    {
+      "path": "agentes-linkedin/infra/assets/tiktoken/9b5ad71b2ce5302211f9c61530b329a4922fc6a4",
+      "sha256": "223921b76ee99bde995b7ff738513eef100fb51d18c93597a113bcffe865b2a7"
+    },
+    {
+      "path": "agentes-linkedin/infra/assets/tiktoken/PROVENANCE.txt",
+      "sha256": "224d7fa7d87fb04fb5468b2476f681be6b0ef82233c07a92e5bdd831433c4b6a"
+    },
+    {
+      "path": "agentes-linkedin/infra/backup.sh",
+      "sha256": "5bb4d3a9a6d27af7650caf51bfc0f70a3dac5db5bad6f814c1e409de04d78544"
+    },
+    {
+      "path": "agentes-linkedin/infra/compose.yaml",
+      "sha256": "5f018feea1c05f2c92cadf586c3ccd08b8ee4fbe1532407abcecbed2bf4959f5"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/PERFORMANCE_STANDARDS.md",
+      "sha256": "fe6b10c4d28a59a77c6a64dd20f2c6c731e4873e9ee97a0d2219f5d75812e195"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/TESTING_QUALITY_STANDARDS.md",
+      "sha256": "276f05bee8c93c19960ae684495dd3fcab97a88c377909551ae64eab219cd52d"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/brief-gustavo-posicionamiento.md",
+      "sha256": "6c50aaa40097a282713d9f2e8f365ec7f173c5bf957f95cf3bab56a8b96a2f5b"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/ciclo-editorial.md",
+      "sha256": "5dc87948bf02cd00f47ae2c3ff7b8dca7a2c57cb18f511d7f8f575d575d86b8d"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/ciclo-estrategia-perfil.md",
+      "sha256": "2f12170d4ef13088701d3780ca71825df3d42c8c656af2d65d4a421161c0469a"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/ciclo-lectores.md",
+      "sha256": "daa55617fc8ea528c01cf9888ea9366ac7a18203670338acd365bfb423ea31a7"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/ciclo-observatorio-aprendizaje.md",
+      "sha256": "82be9848d6b55e54c13efb01420c6715eb81a6bc47aae183b6b411287d355e50"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/ciclo-revision.md",
+      "sha256": "3bc45d04b67e3bbb5fdcb8c8f89f1fb58766ee046c38a1028d0d3937aa462b1b"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/circuitos-equipo.md",
+      "sha256": "8f420744749e89f356650314eac337e77fd0d36c71132bb8dba92114e023fe8d"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/datos-externos-por-equipo.md",
+      "sha256": "903d19fd4f11cae91d175400395956b230577a4e4906d77c29511cbcbc3d8136"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/datos-y-resultados-del-equipo.md",
+      "sha256": "ab4c4d1e518f30528072ad93594dfb5d8e3a75f11b36366d8cf030c6f1350420"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/django-migration.md",
+      "sha256": "b6ff4f3d832cd008c5175080585ba1b1c77f4978244758a5c068b5efbd398931"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/methodology/architecture.md",
+      "sha256": "b80da46fc1f0c350dcf3caf06ed8c31b006800e0bad193d2a75103fde6435b16"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/methodology/error-documentation.md",
+      "sha256": "b8fe968e59ef4dfc06bd2bbd160937d25042e6a925d43b5bdd10cd7a03f78bed"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/methodology/lessons-learned.md",
+      "sha256": "ff1d51c39e76af134533165b6808456b1725a99d993eb8f55bdb838d557a0a9c"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/methodology/product_requirement_docs.md",
+      "sha256": "5b3aeddbde1fd173d87ef3a0e2a4cd1d58b0783d1f424ac76ad0f80ba57260b7"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/methodology/technical.md",
+      "sha256": "2aa6640223ec41261aa9cd252361ca7ad79d3fab5e06d737db995763cde354db"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/office-integration.md",
+      "sha256": "4fd8dde649d441ce1bc5fb4968138652dec9dbd53059313bb2ca2bf2a39554c3"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/plan-equipo-autonomo.md",
+      "sha256": "a4e4c5f94c4c1fcacb1067f01e923026a7adb725f2d51e6d0d46914f0c84ac8a"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/propuesta-posicionamiento-gustavo-v1.md",
+      "sha256": "f0d0598fe8b78e8086e5e21926629101df24242e7423eecb4f8f0d6297eea92a"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/qa-api.md",
+      "sha256": "c8eb49cf283bc993a990e71316972e1a12b5fd21f94479f40d2dfaa02c570b8e"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/qa-backend.md",
+      "sha256": "1198917b18148d6f0d6fbc6a547fc7039c74fcf2ee3ea81a032ea6612d7c0d65"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/qa-circuitos-conocimiento-datos.md",
+      "sha256": "99e403970a3982dfe5aad9faba36b1b6f490fc920074b05f06a27cdf79d20639"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/qa-circuitos-coordinacion.md",
+      "sha256": "55aeed901a0db1ea7a20d2d6f90aa4a85b100a5c0206c17afa5d3c66dac285bc"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/qa-worker.md",
+      "sha256": "7b53d1a4bb24b059b8e48cb02b413df619adb20fccdf8300f0e32a1a1d85efd8"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/recorrido-mesa-equipo-completo.md",
+      "sha256": "ddf563b695ba2a73b66c6bbc33ab8fa9f579435d70f860348b4d3f38c00e9e61"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/recorrido-mesa-estrategia-perfil.md",
+      "sha256": "6c607a0e037102ca174e91aa125b3dad612326e780bc57365920b69303b67cc0"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/stack/source.json",
+      "sha256": "5330b6a7f459554c67b5081a36e6fdc2361a6979abd8990d6bb40aa68458ce6f"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/stack/upstream-workflows/ci.yml",
+      "sha256": "9464be8c61cb6909805f495ff68c2ded9ffab1322d8bfd2068c6d9876effd309"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/stack/upstream-workflows/mysql-migration-compat.yml",
+      "sha256": "3b63aa66669a9d29e7de5f795b56036e5c73e65723dd00125e5f10097ff17578"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/stack/upstream-workflows/project-collaboration.yml",
+      "sha256": "3459e8586cca14e8059e25926ec81f86ecb19c530017eb53a5d704754275d3ba"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/stack/upstream-workflows/responsive-acceptance.yml",
+      "sha256": "45b6f4d5451814c304669a00a4ad7cfbc5e34881fb68d3c08a38c37217131410"
+    },
+    {
+      "path": "agentes-linkedin/infra/docs/stack/upstream-workflows/test-quality-gate.yml",
+      "sha256": "4e9aebe9938e4a6ec3854451db5a2427a224b69f22c3cfaa2376e2bda51c21bf"
+    },
+    {
+      "path": "agentes-linkedin/infra/manage.py",
+      "sha256": "fc533ae2fb7e955e0204d6e3d918c68c56d04fc2dbcb9b4d96264cc51528dd23"
+    },
+    {
+      "path": "agentes-linkedin/infra/pyproject.toml",
+      "sha256": "e1d092183da6b4cb4494034eb0a5731f868f33f9e22fb1e9abc6ee4b2a30a2f5"
+    },
+    {
+      "path": "agentes-linkedin/infra/scripts/snapshot_knowledge.py",
+      "sha256": "2524a4b8ac732e5df4f3cea38cea5cff9e9fea63ae25598e9c364d50344b19b4"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/__init__.py",
+      "sha256": "6a8c389529306809022f50528e1b077b88b2338cd31ecbb5e44b9721ca3622f2"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/agents.py",
+      "sha256": "dddd0230937939e1f49abea5e2ff56782cd5ce2277a24b18070412f9b19e2ad1"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/cli.py",
+      "sha256": "71aa3f6dcabc5af9066cdc6640ce1876a1cd2f3ad330ff0b559924644c36c305"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/config.py",
+      "sha256": "77da8da155d2fd5f390ac375dae02f6d2ace6ea6e113dcce0f8302ddd38b17c6"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/console.html",
+      "sha256": "2d181ed977dfd5e2bb7574dfb2d447250de3445d9e6d71a1388333d611fa627c"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/db.py",
+      "sha256": "e56180052deebee47295d1a68e57bd2be48f9f16eef7aefc0cc1f0037351f48c"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/evaluation.py",
+      "sha256": "8377e0c67abe72bedf1e0bdcbf200571e14055143c54ca5a4bf849162098fc2c"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/ingest.py",
+      "sha256": "3487d8085d77eebb4785b3413bf3e4201895cfb8f910bae415894ac3c5f3f438"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/memory.py",
+      "sha256": "802f67f90dea83d8af13af4b94cc455243be12d18403184c30647ee9f4d1cf68"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/providers.py",
+      "sha256": "bfb7280a0a1c2317c9e4396914402505fb4c576ca35048fae7e5cdc49ac0aa0b"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/retrieval.py",
+      "sha256": "7bef61b894d4a6e37b626cc71aa62e45467d3a3b30ddfdb0b77601b791a1cf57"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/knowledge/schema.sql",
+      "sha256": "e5ca7cb8c741c097393666097f3cdec6ae187e9b06d52bd25187b475652120b1"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/linkedin_backend/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/linkedin_backend/settings.py",
+      "sha256": "825808dc5037de2305361756e937c99315e5a9a1b950dff096c224b7c3d8c34b"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/linkedin_backend/urls.py",
+      "sha256": "8ef4fb6628162c59d65233a414f95691ae24eb041b449fca8dae87c1e3226aed"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/linkedin_backend/wsgi.py",
+      "sha256": "36de02cfc19e0472216614c85f8769da166848ee0fe3e823c66a40f588a467a9"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/admin.py",
+      "sha256": "3d0b7f13399a971c7c50b38bfc2ddc70137a252676d0d5e7d681a707ba392003"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/apps.py",
+      "sha256": "a897d72fe411c39150afedaeca0b7322dad66cdbb7174798447bc4f6589190a9"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/authentication.py",
+      "sha256": "0674439070578e9c39c3805bafdfadc41b9f327850ee2ed0f00eed9917f6aac4"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/exceptions.py",
+      "sha256": "55ae696ccdebbd0f02f144bbac4f07851a8defed156bb8dcce26c4b69c853d39"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/jobs.py",
+      "sha256": "7190fe3639a2326a88ecbc25c1a902eec597592d706c58366ecf3c441ebc9fce"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/management/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/management/commands/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/management/commands/bootstrap_local.py",
+      "sha256": "aff584b9361b72247903299113912365d662ed95cb20c91f5ece1a28d377b783"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/management/commands/officebridge.py",
+      "sha256": "ea1fa11062b4fd6c25f0e9e8f18cb29dd43c920406cee712f524dd99c7bc20f9"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/management/commands/runworker.py",
+      "sha256": "ea6cb1de7c1face31c03614a20491dfb1abf5cd1bb7f7f3844675771422c1fc0"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/management/commands/worker_health.py",
+      "sha256": "468a5f16fd6c98265bd52eef096ca5c7edcbe6e83119cd041f37f5ca87b84fde"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/middleware.py",
+      "sha256": "e9e4d34f9ba03881f2ac5505cb433bd2c2005554dcbe30ffa7c67adab1e6e5f7"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/migrations/0001_initial.py",
+      "sha256": "ad6fa8ce64c5bb4b4638ca5afb461411990d1a41ee8757c2fe3a4c137236a9a2"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/migrations/0002_adopt_knowledge.py",
+      "sha256": "6c29dbcc963b5f8aa080bef67255f47e17bdd68ebf73f8ae12e499a1a7305070"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/migrations/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/migrations/legacy_schema.sql",
+      "sha256": "e5ca7cb8c741c097393666097f3cdec6ae187e9b06d52bd25187b475652120b1"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/models.py",
+      "sha256": "7d92ba2e6834080dcba79e68e05b8ea35dfe48b59cf82606b8ef37038bf33d73"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/office_bridge.py",
+      "sha256": "b92d8f215f331a378651c81665b4c38a60068321bb68bae804ee75a4befad8e6"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/pagination.py",
+      "sha256": "0e2560e3b1f96a403de3deb2d950018c501d5281f2642a4ca2b7cd8ea5cf97af"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/permissions.py",
+      "sha256": "8fd38a83d28b6c80c13505b8c5d78ed8a36fc9c99cff4dd473b4a8d71887950b"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/serializers.py",
+      "sha256": "36bef760289e2b6b338e815d1e71f772d6fb6dd0018016cea4ade8797b0293f5"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/tests/__init__.py",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/tests/test_backend.py",
+      "sha256": "c9c21201210f8f952887bf6a3e2066e083c5a44dd237e3eeb79bbbb69ce6e75b"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/tests/test_office_bridge.py",
+      "sha256": "412697bdd09823b5c213a924b3c6b8f2c05cfe0e6f4d44cb92995b7da3688965"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/tests/test_qa_api.py",
+      "sha256": "983dfc8309627b8202be1bdc36ca02f7cd69ee1fa39e5c92b8ab32f965b06ff2"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/tests/test_qa_worker.py",
+      "sha256": "5e88cef6ae8921460cb6b9e8724573646ba4a5d9e0aa1891857c657a7082f950"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/urls.py",
+      "sha256": "5ed2c6edea1347f07e40291d53f7d436aa2f7735f961dd5a0ee2e1118fb33fbb"
+    },
+    {
+      "path": "agentes-linkedin/infra/src/team_backend/views.py",
+      "sha256": "0ed8af90948969eb3a99e87d82c73d69714d453cf49ff0b1d7db8476a2924f29"
+    },
+    {
+      "path": "agentes-linkedin/infra/tasks/active_context.md",
+      "sha256": "cf715d4d61e1d9a63ab217935328b9e5524945d13cf7ba1a0e326000cc0d67d2"
+    },
+    {
+      "path": "agentes-linkedin/infra/tasks/tasks_plan.md",
+      "sha256": "5a6dd165d30e2596c1ba4f07a82d5131c6a674452e5ec23fdd87adb1c0d95ad8"
+    },
+    {
+      "path": "agentes-linkedin/infra/tests/conftest.py",
+      "sha256": "c9244d4372f221e7a942ad7dbf7430697083897e77231231699ea9d5574cdb19"
+    },
+    {
+      "path": "agentes-linkedin/infra/tests/test_infrastructure.py",
+      "sha256": "9cb1e6d1304e272625624638c42bc4261be555eb279e3e5163b20249686d2e69"
+    },
+    {
+      "path": "agentes-linkedin/infra/uv.lock",
+      "sha256": "ad31a2a6664c1991ff3dd51385a6d6b7ead37dfc26a8ae8aaa71daf1c2ea1d7e"
+    },
+    {
+      "path": "apartamento-agentes/.gitignore",
+      "sha256": "5ca3c39bdc1288c108a1931b3f6bc5795464b6253e9457390617774259deed0c"
+    },
+    {
+      "path": "apartamento-agentes/.npmrc",
+      "sha256": "a3909ac0447c469fda12c57374993be70f47ce73e49fd3124678c7c047f2214d"
+    },
+    {
+      "path": "apartamento-agentes/.openai/hosting.json",
+      "sha256": "e0ac9f3428c53bec56704904301fdb85d7b5f2cfd963868fd58dc9c4fb7644b6"
+    },
+    {
+      "path": "apartamento-agentes/README.md",
+      "sha256": "93b76f2fad796315eb3faa222a1570dd3389936efe39c7416cae85f12911918e"
+    },
+    {
+      "path": "apartamento-agentes/app/api/office/[...path]/route.ts",
+      "sha256": "43de64931ff492272889b54b05d36260bc0d2463d8c02ad4b1e327fe424ff8ba"
+    },
+    {
+      "path": "apartamento-agentes/app/chatgpt-auth.ts",
+      "sha256": "4265a2e7c2dcb3a6f4b7026f762bf5b6e4caec76cc13c0a45987ee9a9f2e42cc"
+    },
+    {
+      "path": "apartamento-agentes/app/globals.css",
+      "sha256": "8546d9b115f0addd582f7ceaaa6b1c069310bcc77c43ee7b8acfe0020be3afd7"
+    },
+    {
+      "path": "apartamento-agentes/app/layout.tsx",
+      "sha256": "ab33937c3e4058752f38b717b2c1596c9f16dacc336a5cf8fb56b2d97cbbbc5c"
+    },
+    {
+      "path": "apartamento-agentes/app/page.tsx",
+      "sha256": "90d3e8eb540b8f766b77d0ace825d6842f555eea35f303d4f3af3f576fe37739"
+    },
+    {
+      "path": "apartamento-agentes/cloudflare-env.d.ts",
+      "sha256": "47c9b4b9c1058e0908e95781cdb6e7058061a63ffc89048ba72bd5531ca30bf6"
+    },
+    {
+      "path": "apartamento-agentes/components/connector-error.tsx",
+      "sha256": "2d0d04559952ce9c9a327cca499f4b99f35d885cccfce375230e116695d3f155"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/accordion.tsx",
+      "sha256": "a4f153089ba886dfcf73fac26b5c01ca933fa12fbe88df6fb723912bfffdfbb0"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/alert-dialog.tsx",
+      "sha256": "9a8d950f2b9b4352d5ebb762fb44d5c28c2d353aa29712071973656a8736e311"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/alert.tsx",
+      "sha256": "2cc59b5f7bda91c1670884b1bf46bfc8a2a6f226cef184f5762acc037188885b"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/aspect-ratio.tsx",
+      "sha256": "b1c157886236782cb92d8fbcd4749532aaf6d8aabefd6e157ca40358f902f407"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/attachment.tsx",
+      "sha256": "ae8a25dd1a896d3964e3ef54d97e51221b418cde287dfd794428b89951c5c790"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/avatar.tsx",
+      "sha256": "58a846bf1617b94b9681921db9b8461d0145f311424663d11678a06b6153cb34"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/badge.tsx",
+      "sha256": "46a0de5224f6a5d5d63d45246534288518dce888f031064bff925bbc7fe6ad97"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/breadcrumb.tsx",
+      "sha256": "d4c0831bba2212e778248f54a6ace6ef378df8bba4616d1abf27787a31eabae5"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/bubble.tsx",
+      "sha256": "870cc0c5cfc8a515053f7e41e706a6bd017a909b45f1305fd3b164a52cc4483b"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/button-group.tsx",
+      "sha256": "784c89d8ee683e1bc972ae69e6ea8225a7f63abe22aa1b5fc3423ae8a2a399c0"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/button.tsx",
+      "sha256": "cc36af0f8b5019c33cc039fbf03bb952a513072b15b55b53c592b78af3e5f4c4"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/calendar.tsx",
+      "sha256": "3855fbe0d3f8ad3a4b93071f98b76a9f6782d46ec8b05f5d2ddbee1e4e39bc84"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/card.tsx",
+      "sha256": "c48dd3b96be90a7066f1aebf294f0af9d00ebcdc367d5d4aca55429ade570c1c"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/carousel.tsx",
+      "sha256": "b7ea0dda3903d972c186f739e23da61f547bc83b5a0bf13b16856577846d5fc3"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/chart.tsx",
+      "sha256": "45aa5ea4a386f4fb5b8869ff4bab3a08cf89255190ee322043baf84c3e950b6a"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/checkbox.tsx",
+      "sha256": "b23ab9d4deeedf2ac8f512c368361ede681aa383437ef48563a6f9b7dbe95f27"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/collapsible.tsx",
+      "sha256": "c6598e5584f4258b5d9fefadbc5ad6a66888ad58729f4b634a0bb2d9c513188b"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/combobox.tsx",
+      "sha256": "2d68e78b2dc7e38a085f222dede60a80b4f8229a6e91732c484605e204d46735"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/command.tsx",
+      "sha256": "361193df1e3d64a9e9b5048f045264782fcb387aab3f00f2b805fdcbf538b16a"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/context-menu.tsx",
+      "sha256": "2cf1fcf59df0649a3e2a126d1df2f639145f6b6bf5689ee54af1f40ab1245017"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/dialog.tsx",
+      "sha256": "dce39c6adc47d997bd2567f8b7a72f466b0134715105cd42f9194007b8ecdb14"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/direction.tsx",
+      "sha256": "84ae2ad658207f0e0f367978e5508cd8027cd00c29c41d3d13db21a708c3d1e6"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/drawer.tsx",
+      "sha256": "cb6eaf58eb0757ca91af284e5d925b89a42ad7eb19cb3f44c575a3487aa9350f"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/dropdown-menu.tsx",
+      "sha256": "98f0dcdae38225b73734aceeb9213dd751fea2c72ea520df31003cd133deac8a"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/empty.tsx",
+      "sha256": "ae95bdcf367a076ae02e7925f14522a148798f72d9651749c6d55497dba584c0"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/field.tsx",
+      "sha256": "ba67d76f017ac059fc86cf8c344e0b2991c4322d3619e125498c19b87f6eefbd"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/form.tsx",
+      "sha256": "315b46bb75ab7d1c6061b5d750aa4bedf6e7a455e15e2d7f9182f053d5972b1e"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/hover-card.tsx",
+      "sha256": "f5d8df42c59370ec14d61bcc54f7d68e9bb7dfa0d6a872b2f7cffc2aafbf23b8"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/input-group.tsx",
+      "sha256": "6afbd58fea4c438e6252dc4568bddc122e84ababead4ad5cee50ace01100c9a0"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/input-otp.tsx",
+      "sha256": "161946daa89f0eda2575b9271c0494e35807c4ffb55598a49f67160c17fec299"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/input.tsx",
+      "sha256": "8c4612a7c41319ac5049daa3b34b080f9784b6245c17780eb87c127e58e473db"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/item.tsx",
+      "sha256": "6e2144d6d87142dbbe56d568810bf546318c8aa661447ebb0d76ebbf382cb45f"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/kbd.tsx",
+      "sha256": "6088c3a5432338b1719c17e9b5d0e1fa74fd1f66060f248fc88909d33a82cd13"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/label.tsx",
+      "sha256": "a476e41f08b9de5bd447de66a33d8bc2ad18f2fa6b96c064778bab4b6f439f4c"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/marker.tsx",
+      "sha256": "3d798763f094b2bb5e7ade2d5cd1b9bab498bc8ca7fd4cfaf4e5835bdedc34a0"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/menubar.tsx",
+      "sha256": "9243af8afcea03703398ccd1c2a8c0a87ad6cbaf2bd272fb609f5b79fe46aebb"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/message-scroller.tsx",
+      "sha256": "bb7660a248e4e9589c3816c7c1c199ea1381a70d2c8476ae895b567a7a4d86cf"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/message.tsx",
+      "sha256": "9d2952bf3b641081f09aa2739535e6bbd1be0a4946789752a2c20d8aaef43185"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/native-select.tsx",
+      "sha256": "007516b111fca8c98a6c40c94ab91bb68cc5b52afce1ed1f5e510c3d86e7347c"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/navigation-menu.tsx",
+      "sha256": "889d358a77de88e9cb6f39ea4895ea4c76eaf01d731b74e44f1c41e97a78a044"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/pagination.tsx",
+      "sha256": "374ad135c3d4ff3ec080a0009cd9745cdd0e12faa89d2b0e86074f11e5127fd1"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/popover.tsx",
+      "sha256": "31c350309ff5d3034e6ecf1b0eda75ba8855bdbf987fc7ad6d71f0ef07c5a447"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/progress.tsx",
+      "sha256": "c8c26e8f5f041c3cdf4915347dc1d9c022f9448f149990fadcaf303e952fa57d"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/radio-group.tsx",
+      "sha256": "fe5ce39636d0818c2bf9c4eebddff893d1225fa2c81b5fa4bb8cbb39a8c913ce"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/resizable.tsx",
+      "sha256": "bc63958467aa00557c551bb0d96a5ae4c965c1e1ba2380e595949d933b132f7c"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/scroll-area.tsx",
+      "sha256": "8bd9d986b2844c9a87de825c6de4787b6739b36c3dc9a05ccf3eb107160e4043"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/select.tsx",
+      "sha256": "0b796a108a4eb5ba52d9ad938b7aea36dc56ae66c703a6d0a23dbc24f96daff3"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/separator.tsx",
+      "sha256": "6da346505c8629a4668420d2a5ca48891383bbe0b0ceb14163537c671879427e"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/sheet.tsx",
+      "sha256": "63863cf2df8f8973e52b3459ac9bdbf81be1262dbc70eb53d5271ffb03488e16"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/sidebar.tsx",
+      "sha256": "4a8d73e7730a2b1fcecfca31299ed26db65c2307b84197a59c6ec7c01c7ad28e"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/skeleton.tsx",
+      "sha256": "ba48dd5be5a6a1378bd4e011028654b5bf419f1e7d20ee4b9f8330c1264e7239"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/slider.tsx",
+      "sha256": "0e37484f4b416e79ac18c655cac961aefacf6e67085cfc2b320ea8af545635a3"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/sonner.tsx",
+      "sha256": "13ccc9b0fe4248e622f83a1d3b2f0566b72b5e04162d7d0c8db8945ecc71b55f"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/spinner.tsx",
+      "sha256": "3e6e6e8d37fb4069f8e43e55318f8db06fbc36e6c8be0096da3c9337c1c798b9"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/switch.tsx",
+      "sha256": "386d4d4deb39f34126f9700fe9bf5393d238485dd94018bba9d154dda84c62ae"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/table.tsx",
+      "sha256": "20e5a7f224959c6b75802995706a97e9da171f693d4b6b1b436388fcd9df96f3"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/tabs.tsx",
+      "sha256": "865d0194331b9b2be36723fa79d3575dc83078b4cb941cafee87cb72fc2cff46"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/textarea.tsx",
+      "sha256": "253cdeb487c73beaaccdf47fc163e36e7d5b7ae6ddf09a4f64998a109a112979"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/toggle-group.tsx",
+      "sha256": "69f643e889e933f05c1439084480d8646f66a161c7d1cf0730ee926382ade35e"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/toggle.tsx",
+      "sha256": "ba4d0b0a2b2fee75dc36dfc19e32082e721024b919050c97fd5dc70faa924e16"
+    },
+    {
+      "path": "apartamento-agentes/components/ui/tooltip.tsx",
+      "sha256": "a0784eb77831a799fad7991df4f1b666f876201565a80175e1aa68733574a2e4"
+    },
+    {
+      "path": "apartamento-agentes/components.json",
+      "sha256": "31f4ca67a4a62572571003d3d5aac85ee6fbfca67a192924bac6b168d95e98fd"
+    },
+    {
+      "path": "apartamento-agentes/db/index.ts",
+      "sha256": "dc7610b00b918e0ffff1360a63626f16655ced3064b2eaf96095a4101fb14bcd"
+    },
+    {
+      "path": "apartamento-agentes/db/schema.ts",
+      "sha256": "60d3da6a1968b8eedaa5ef84021a77e693d47aa904c2da3f549147030ea871d2"
+    },
+    {
+      "path": "apartamento-agentes/drizzle/0000_acoustic_gideon.sql",
+      "sha256": "c6e4c769e1a9827637b75bc2cceb84dbb9c41a743136438e79b4aaa4aa7f1b1b"
+    },
+    {
+      "path": "apartamento-agentes/drizzle/meta/0000_snapshot.json",
+      "sha256": "83b6766bf92cc0c1a8256ca1f9cda7945345a9e0b4f455e7b8bfe9389facf1f8"
+    },
+    {
+      "path": "apartamento-agentes/drizzle/meta/_journal.json",
+      "sha256": "1b6e97a04057d4f7f30c20a3766fbb338243b6c44c392ea539fc65392fe3db63"
+    },
+    {
+      "path": "apartamento-agentes/drizzle.config.ts",
+      "sha256": "af081f7384aaeb0082cf422e29f139d137ca2f6a57c69b2c37b9fb1f8479867b"
+    },
+    {
+      "path": "apartamento-agentes/eslint.config.mjs",
+      "sha256": "eeda7faabe9560fa9fdb26675b0011fa78461ca7061989732f5da9245b87e315"
+    },
+    {
+      "path": "apartamento-agentes/examples/d1/app/api/notes/route.ts",
+      "sha256": "a3d4a74fd53b7bf53e2df41f169d9d9d44a8b22aeb6d92f4e754956079af8909"
+    },
+    {
+      "path": "apartamento-agentes/examples/d1/db/schema.ts",
+      "sha256": "d89eabd95716ce404f5f7ca2a254220435be8ddce7c899d7ef461ff22ec80454"
+    },
+    {
+      "path": "apartamento-agentes/hooks/use-mobile.ts",
+      "sha256": "ad0936f84f1df79d3697bfbff9c18f8ad58431c1cbaf2359c6a853b0fcc9f28b"
+    },
+    {
+      "path": "apartamento-agentes/lib/connector-context.ts",
+      "sha256": "bbddff68689cb0f6926fecd4b8b96f12f2054277c296e97b0df07d4ad5ece24e"
+    },
+    {
+      "path": "apartamento-agentes/lib/connector-contract.mts",
+      "sha256": "e1a7b24a8793af34b595690d9b1300c897c7321c14f215cedf58ad95799d7c3e"
+    },
+    {
+      "path": "apartamento-agentes/lib/connector-errors.mts",
+      "sha256": "a22edf13d6873ae832c4a2a0d579fc666c73ec996ef0722d39172649d38f0871"
+    },
+    {
+      "path": "apartamento-agentes/lib/connector-preview.d.ts",
+      "sha256": "abd69a94f7f61f1359063bb557574faae35e8ff5a028cc4c04b9ee248ef52642"
+    },
+    {
+      "path": "apartamento-agentes/lib/connectors.ts",
+      "sha256": "1c93d747e384c8e17e3e3dd5361b24412babf5eba2a11d2ae7a75f4e0924112c"
+    },
+    {
+      "path": "apartamento-agentes/lib/office-relay.mjs",
+      "sha256": "e1480da72577f598320de8fea62bcb433e47db748a04cee4e521866bb03a4948"
+    },
+    {
+      "path": "apartamento-agentes/lib/utils.ts",
+      "sha256": "53f3d3d070f0a9082934da25b875f9499855c2b0693868dd28be8c23d8730f68"
+    },
+    {
+      "path": "apartamento-agentes/next.config.ts",
+      "sha256": "614bce25b089c3f19b1e17a6346c74b858034040154c6621e7d35303004767cc"
+    },
+    {
+      "path": "apartamento-agentes/package-lock.json",
+      "sha256": "eedaeab6870c0f70f9db869fcaa24abae9b0f945cbc9acb8a43b6e7ed6bcbfca"
+    },
+    {
+      "path": "apartamento-agentes/package.json",
+      "sha256": "eb7b53ec5bdce1db5a8576b2ffc3b63ddd8c5fdee0f97dcb341674abbf69843a"
+    },
+    {
+      "path": "apartamento-agentes/postcss.config.mjs",
+      "sha256": "dfac7ac2d86d326a0e5adb024e7943c181393ed17a5fcb8f0315b24c7da6ddde"
+    },
+    {
+      "path": "apartamento-agentes/public/app.js",
+      "sha256": "972a5d5e6a81e9fa952a7c6dd06504c194f6cd6418da359b9e7de72f4db63613"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/CREDITS.txt",
+      "sha256": "6281b4af648053de0ee907af3851e4ada9bac67ad1f18015664ea9863dbffa6e"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/board.png",
+      "sha256": "8ca34e99529bc2a66b16136d02d86fd30886077dd07fec229baf5e54722e82d3"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/book.png",
+      "sha256": "3b128e0cd2ea77dd41cac69638191f3a41631e78c7df50a5ad293ab16909ea83"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/books.png",
+      "sha256": "2fb8002bb4b79e4a55f6a9f60a43494e16486e961dcd536bb6001a60727374d9"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/cabinet.png",
+      "sha256": "133bc5f24e212ae868605eb5e833f48e4d51acac2747d7a8c8da594947fdc85f"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/chair.png",
+      "sha256": "47112f616c5ec9b12552f78c26bf446554359ec8f785038ed230982f90c6abfd"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/chairBack.png",
+      "sha256": "a6a276f0a77ecf8aff820ddda2464f52b4886af6512f4542b804e7c033135118"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/chairNorth.png",
+      "sha256": "80534d586720e627f72dda70549ef775f3340ca81b1ae2cafb0aa6eb83d00988"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/chairNorthGold.png",
+      "sha256": "a4ebf125a04b8e944a6816fb93fef2a88b05cd9370146bae85c8e1df64726326"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/coffee.png",
+      "sha256": "dee5fc9aef874ec3840d4813ce079616593e2119351126136cb3c40cf1ed7d87"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/coffeeTable.png",
+      "sha256": "511ed55e6cd19c5a652835b25f21ce6a7274800e1956cc75a4b0717d60dad78d"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/cup.png",
+      "sha256": "1b21835d584d1c6a95c346f0805a99acfaca7a4bc8bf5ef4a45a1b4f52a58279"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/desk.png",
+      "sha256": "0fc22c9cd27e237a88cdcfc3815b65918298f9e469001f96287afb8a03ed6b06"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/deskLight.png",
+      "sha256": "2b3385923ee3c99e63d16c66a50ce6cb834daaff3b66b7d754909f3d6975b710"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/door.png",
+      "sha256": "3b10ebc3025087e434b1ff0ec36914d8236637bf2213b8d21b17e690cb21571c"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/floor.png",
+      "sha256": "dabcf68cd2eff73c86d14dd03f5cd020b8b668e51672ff52acfd82bb9a476dfa"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/fridge.png",
+      "sha256": "aa9acac154e14c3df61fe7b3f29384cfda1bee40d2372fa832ed11bf800b94d6"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/fruit.png",
+      "sha256": "dd0afab59bf4ec35e0d13a0738d84a904bc5ff9a212770df99f549542e693136"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/lamp.png",
+      "sha256": "82c7fea29136d31c4ddf951db88cb3507367eef2afae3d8d8e80a4b401c1c3bb"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/laptop.png",
+      "sha256": "c11b4e1b415b1c6324df2ca2221adc7b24d6569cd1bda6794e14f3190af85f49"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/library.png",
+      "sha256": "c66d34028bb796f1ae07c198bad2c5622899911bb9c1e5ee022bfe73e06e898f"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/manifest.json",
+      "sha256": "0689ffc4746b120f90f768e98c90cefa66aa93117f3c1777e2a71f189af87acd"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/map.png",
+      "sha256": "c87ce1c38d3ab5b4e00f165528851af469345fa81e088b6d70d1eb557387f307"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/monitor.png",
+      "sha256": "8057f608f36cc0e61f75f14a0c541eea9f65b1e42a9b7adfce3886dcf2a0d0f1"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/monitorFront.png",
+      "sha256": "954e66aebe34bab3c83574333b2132dc16717db7444f85bb9ad9cac6e6a234e8"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/palm.png",
+      "sha256": "5198dcb64db29305d3d23dbe78e17b0e817c8509473178735f1ac0ed98ff06fd"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person0-idle_anim.png",
+      "sha256": "caeaa1587b54fb6252a0fba9422f5bb16964e7df6b637e8c7639dc5947352ef9"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person0-reading.png",
+      "sha256": "9592d2e8a533827333217c590a29cef607bc4aa6df49fc2222fb3ddcda547efc"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person0-run.png",
+      "sha256": "909ab23a877196af444a234a5c5ce4e7378f12d3cd41fe189f6e23541fc0048a"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person0-sit.png",
+      "sha256": "eab9894b8d13aa7bebb6e7dbaefd64d17435c4d45fa9c465ddeae6ad0009d103"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person1-idle_anim.png",
+      "sha256": "240b9191d5de84f109450de16c2fd7d1bc6206aeec47e500055f9474b7b12749"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person1-reading.png",
+      "sha256": "ff488959fe318ea6719e1dd8d225706009ba1bfd2735e630f0d9b18f66bf4426"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person1-run.png",
+      "sha256": "9751bd875df4e85093d67ff24bf9fcd7888446fbe72d1781d915303a66c86fe1"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person1-sit.png",
+      "sha256": "12633f2183f10aa4c00afe0fd094630a0c314b38d30a77cc6935b8846586ffed"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person10-idle_anim.png",
+      "sha256": "5cd1748e1f4b9dbbee859ec824f69560c725c4470965b1a75b02c0b94d95196d"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person10-reading.png",
+      "sha256": "515646df7bc45198bbdccfc1ddcfaaa9ffc5d0c9eddc94b5337c15fed1c77d51"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person10-run.png",
+      "sha256": "488463de4896fe6273f2cde89d1ed96f18b3bd4160bc8d634a8f2e26fa6004d0"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person10-sit.png",
+      "sha256": "4b776e5cefa580fe5d37c28b236c169eca7380ceee2723a3c1b872cdb7f2df02"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person11-idle_anim.png",
+      "sha256": "a8f86f932ae1a8ed666a9057cb37361d46a785290b004660ce5451e3ffaff4da"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person11-run.png",
+      "sha256": "04091f676600d807214b74adc26b9c99aaecebe6db5c225a1f354bd128ed91f6"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person11-sit.png",
+      "sha256": "904e50d3a2b702396f348dc77741a7cd6a5a0110a00c67106494cbd663979ba0"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person12-idle_anim.png",
+      "sha256": "da04ae7714a3b2ccba48826c6978fc707f7650c61d8df90cca8890629549c956"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person12-reading.png",
+      "sha256": "97d280ffd5efe231af2ea9ec52b2202eee00356c57ce69260a92bf78f3d3cb06"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person12-run.png",
+      "sha256": "03d91ac65200bff634adc52b6b6d41b305f621fa6fd7880652122355f02e74b0"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person12-sit.png",
+      "sha256": "d59721ee53234e62a90907c1c2e46b660b067c2719920da96546a31eb6f1853b"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person2-idle_anim.png",
+      "sha256": "cc357f3792b57b33cb9a92d2f68ffd95aef623843e728889c01b2faed693b181"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person2-reading.png",
+      "sha256": "5b732b9e480c303407e2df426a1413ae88bd2eb23678abcfdb44227ce04073ca"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person2-run.png",
+      "sha256": "4cf6b4f2faa8cec175f0c2a118b88cdeef42037d202d7ddb6013c841e1a1d3b7"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person2-sit.png",
+      "sha256": "6a53ab27d361afd736bdc660758da947792b2ccd15644bb7393ade5f5d7d74d8"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person3-idle_anim.png",
+      "sha256": "d19c846dd81167652d587cb95c5e962f467a3257d3e959509ad26e99f554922b"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person3-reading.png",
+      "sha256": "77f3399cfff4a8d8305855fd6072771221ee6f189307818b4e7e3d773cf3b9d6"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person3-run.png",
+      "sha256": "ac76468022c2235d34bd14dc528976e969e2072298900a822420c11b7c5d524a"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person3-sit.png",
+      "sha256": "5558b080cce7b7224a7075b73867c53d9de83428ed5d18d9ac1f734114e076a5"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person4-idle_anim.png",
+      "sha256": "0f28d70e21d8173ebfb34063762c7e14d582c5d0e3887d228a293a307eaf4a90"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person4-reading.png",
+      "sha256": "7682c39f420e63a6799077e125c2e828bb144d301069e8070690afa0e83f88a2"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person4-run.png",
+      "sha256": "addeba1e783a212fdac69cdf140ac8d95f04ea9f9cdc9231482bf37fd2e88bbf"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person4-sit.png",
+      "sha256": "8160ede10ab72c87694943c50d0ac0c1913c6cf499496dfb8962f898476c2aff"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person5-idle_anim.png",
+      "sha256": "4475e505b8b538f592951ba79e76fd9b4e7cc5ad1283c6528de8c21607d8a47a"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person5-reading.png",
+      "sha256": "b1a40d49b7b5cc67fe03a613a18eb6e36904900bfe9ba79059fd3a59b64b672d"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person5-run.png",
+      "sha256": "0e33eb4aff08436af6e493629faa99c51298828767332a7ddd69130cb8816fcc"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person5-sit.png",
+      "sha256": "001370baa5beff9c32a67e911b318ff14504b45452083ebc61d9d0ef744bb85e"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person6-idle_anim.png",
+      "sha256": "a4a484be8d29386d1585fb00ab8c91ce1493751ee170141b6e33eb433097e208"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person6-reading.png",
+      "sha256": "08f8fa898a854d581a0d7337d133967a8e491d6c1e3d6ef9cb7f5bae42b81271"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person6-run.png",
+      "sha256": "4cd7e0e3f3bd01c5dfbcfb4677ef361c5a45177e28c016523576c22ea03cb054"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person6-sit.png",
+      "sha256": "c7647de31fb3d5ecf06e40d2635084596dfecdfe55583825f88c0c59057e4518"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person7-idle_anim.png",
+      "sha256": "e6372662cc40f2679ccb6e0bbcfaadcee732f354dc71971b2912453516ef8123"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person7-reading.png",
+      "sha256": "d06e7bf7c22aeb4d1b4e538364ac10d89d7d7c3fb397dbd79e2a3f6d68cda950"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person7-run.png",
+      "sha256": "e3f5f3014cb982c4e27b6e3c033759ab0fca3bf8189104cdba47ee1d840bb2f6"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person7-sit.png",
+      "sha256": "ef3ee0772620903fa9ea5824b6cdac5f3146d0c6fb2531af912edc77b54780c4"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person8-idle_anim.png",
+      "sha256": "f3fead5bcef2b73489e3f8021a3bbd597246d7494a8292dbb5061a5463469b1c"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person8-reading.png",
+      "sha256": "b586f1af0962f92031f4b664e70815e9be258f26812a30b246d4913310ca1ebe"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person8-run.png",
+      "sha256": "10449e9f916fbd55618812efc0ea2319b84df8b6b9256ac2090009db6668e326"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person8-sit.png",
+      "sha256": "6ec9053001397761b2351488a6a44625e72174d7993ceb9ff8d6add43c445c5d"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person9-idle_anim.png",
+      "sha256": "ce72a87beac4980baccfaca5e65b97969225503bd41368ff24a1f7c69a12d4d1"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person9-reading.png",
+      "sha256": "1ac463e000742a6a29b9cb0cde0553f251abe1515d039989bfff5f52e4f124f9"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person9-run.png",
+      "sha256": "06dc581e48374ee10f7e241d9fb7db18659d34280f94dfc693c4ad36830d0b73"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/person9-sit.png",
+      "sha256": "5ac3ed1d0c7aaddfd525b9c99098f9103dcda2e036bccb473ce5f2b7902ffd0e"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/plant.png",
+      "sha256": "ec64cc97e08993ddd57a2c2435a9b4c96d239c3e99768d469ff00341999d3f5c"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/plantSmall.png",
+      "sha256": "1bd429d4e9b7abf7880563cf2c24108fecd37f6e3babec897fca3cf244d41cb2"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait0.png",
+      "sha256": "7ab1d203b6272e559448a35a90f7c2d2cb3ea04b6d0ed2491bb0e5fca154f616"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait1.png",
+      "sha256": "db67d3d95ddce16630098880e32ca6397d0b7c01f97ba5d8a87d67d7f62fe813"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait10.png",
+      "sha256": "f726659381a70b7736095a2b33dd44dd619e758c682cccf8c1b5b5b66508c641"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait11.png",
+      "sha256": "8aa764c0cbcdeefee8ee8aa479a64f164a900dc3cc82ffe972b8401b6f94f742"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait12.png",
+      "sha256": "0044983292276d2c7fbbea8acf81366f16fc594f42b9357c296801c32a384c60"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait2.png",
+      "sha256": "ccd116a82bef38c58e5364579b9377cff3e9fa765cea52e62836325ba30288a7"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait3.png",
+      "sha256": "92860be3df0255761eccf1d62548668c2dae6ecc20ae73dc024e30079c6e752a"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait4.png",
+      "sha256": "0369e2f6131c629339bc22614f378ae3977bf1e12f84ece8c15a4b727efd7d56"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait5.png",
+      "sha256": "f81f9729618abdc555a9b9f9c88a63c72095d4f733a9a15f2776ab4b4dd96825"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait6.png",
+      "sha256": "c36831d614397297d35269ee1557a637f6948a47794747dd5bb78c0765c134d3"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait7.png",
+      "sha256": "8e85fd50e5ed9e61455e0237bfb378c4910f7fdfa54382567d22d6b4ff895281"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait8.png",
+      "sha256": "0c8b42442dcdeccad74742f47843b684eccf003b845ee177d98fea999e9d1a80"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/portrait9.png",
+      "sha256": "81d77ec41d9adb2477edda53baf1e6e233dd136862a6cacb43c1bb8e14bc7c99"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/printer.png",
+      "sha256": "0c0a1167b3bdcee2125e80518c9df4923b6bdb515846d96de615b21c096493c5"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/roundChair.png",
+      "sha256": "575d6991bdecac095652b59c1255d23f4c2cb28bf8bfc2db4f734304036a74fe"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/rugBlue.png",
+      "sha256": "e43ad53c78bf627ace0ee16b70927ada52f5e191bfa6c10536b2918a21efaa0b"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/rugGreen.png",
+      "sha256": "b7408998f59dbe1283da739b0a7cb63f0fa103492526de8e426355fa6d43d404"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/rugRust.png",
+      "sha256": "5bdd7560a64fd34300902a6e1919d67813ce3459fc3f9e781fc48121d7d1a9d3"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/sink.png",
+      "sha256": "84ffc916bddea59e5cbd555d341edb716bc7968712c4e4b8271092583ee9175d"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/sofa.png",
+      "sha256": "08e546407bd56b976e5e8cc097488127467350f3d4a244711c009b44631091b9"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/stove.png",
+      "sha256": "a90a20b0cf585c1a5f863067a2a468b0d1926ad00c1385612b47e6ddde4f8bd7"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/table.png",
+      "sha256": "40cf39260f0b25be16ebb510095d275344195c039edfb5d82d44febebf6bc598"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/tile.png",
+      "sha256": "fa540f77066502473bb9445240569718a5b726189f2f831a265b6203ef73abf5"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/wallCabinet.png",
+      "sha256": "537aea1374d8da39fc365de4a065c2df9f3f9cb99459f6dcacfd82e308abce52"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/window.png",
+      "sha256": "3a733819617d69c7ebb627f468386591e3538e426657743b75f13ba2e8b84f92"
+    },
+    {
+      "path": "apartamento-agentes/public/assets/windowSmall.png",
+      "sha256": "8aecf1dbf4107da6dc40daf8ad2170e1a7d22593e91443fe649e0e7067b701f0"
+    },
+    {
+      "path": "apartamento-agentes/public/connection.js",
+      "sha256": "f537c070133a28ea952e46c9c90dcb69af339e63f97d215577f7abc39b51060f"
+    },
+    {
+      "path": "apartamento-agentes/public/office.html",
+      "sha256": "95360aea86077a139cf3f1c4536d48d508bd69dbe2c209966951b7e562706042"
+    },
+    {
+      "path": "apartamento-agentes/public/scene.js",
+      "sha256": "e4de6c4cfb0bf73b9e0e896ee0cb8bcaacf7fe09584907af99be05cc50f47380"
+    },
+    {
+      "path": "apartamento-agentes/public/style.css",
+      "sha256": "fe28bf52809aea2c2bac73f0f46b013cea707e547305da051994b66455933144"
+    },
+    {
+      "path": "apartamento-agentes/scripts/build-verified.sh",
+      "sha256": "2ae5329ac860076070c9217a43106a15cb5ecf907a0f7baeb9ef903f76b53c68"
+    },
+    {
+      "path": "apartamento-agentes/scripts/connector-preview/connector-preview-session.mjs",
+      "sha256": "57224ad185a25115a14fccc68d3217e55b199260c3dd98a2c807beffec1a0a9b"
+    },
+    {
+      "path": "apartamento-agentes/scripts/connector-preview/host-binding.mjs",
+      "sha256": "9e44ab6864133a5c82f834a5904ebb7d6104cb783c24efba3c0fe1a161182cea"
+    },
+    {
+      "path": "apartamento-agentes/scripts/connector-preview/protocol.mjs",
+      "sha256": "111e062ebf08d3f180130f5bc3dcb3c1414c1d7be3c032c9d675a61c0c7513a8"
+    },
+    {
+      "path": "apartamento-agentes/scripts/connector-preview/worker.mjs",
+      "sha256": "bd9c98fc68f29d975fe10508dfc9029bb681dc5789a62861d5c938bdea2064bb"
+    },
+    {
+      "path": "apartamento-agentes/scripts/execution-profile.mjs",
+      "sha256": "2e71116f4d2b70cff8bb70436f8dd5c709ec7ff62893424530f404e0193d3630"
+    },
+    {
+      "path": "apartamento-agentes/scripts/install-ci.mjs",
+      "sha256": "4a5a92d60a08d0ba54effd8373da2da06284312c55b767287c68a0bec7200da7"
+    },
+    {
+      "path": "apartamento-agentes/scripts/install-ci.sh",
+      "sha256": "10d8764a61be50351dc3496e13588270de7956f0aa5f1189c49cabb2d89fe5c0"
+    },
+    {
+      "path": "apartamento-agentes/scripts/install-pnpm.sh",
+      "sha256": "a684c02c2b493dfbf262a66252a5cd36f81ca995a4024761728662ae63aa40c0"
+    },
+    {
+      "path": "apartamento-agentes/scripts/npm-install.mjs",
+      "sha256": "9715c6a32d1d4a0289ef6376a0e819c3b6a6416b8a9877733d9fb4339ce626b6"
+    },
+    {
+      "path": "apartamento-agentes/scripts/pnpm-install.mjs",
+      "sha256": "a83164e344c1947053def83b546be8115deaa827314bbaead7afe6b6451c5cdf"
+    },
+    {
+      "path": "apartamento-agentes/scripts/run-framework.mjs",
+      "sha256": "9bf9f41a29314cabe0238b8e9c540ec3f7b5a6adafc7c8fb6c3940722d061dca"
+    },
+    {
+      "path": "apartamento-agentes/scripts/sites-env.mjs",
+      "sha256": "21d7bde6acb9f716287e652c1b0e43ae4803d79be367ca2192fcba14740b5338"
+    },
+    {
+      "path": "apartamento-agentes/scripts/sites-env.sh",
+      "sha256": "d18af7b222db748c9de257d5955b9d7f77ec350dab6321f114f0bc44c20388ac"
+    },
+    {
+      "path": "apartamento-agentes/scripts/tool-environment.mjs",
+      "sha256": "6da99286e0eb7905595ca851e68983bedf94a0f93814819d61f2b1f3a0342ba2"
+    },
+    {
+      "path": "apartamento-agentes/scripts/vite/connector-preview-plugin.mjs",
+      "sha256": "a6a9fe2086e302f94a3f91e3c1a68a45bb3aa07d4a79faf01b14732191eb4e80"
+    },
+    {
+      "path": "apartamento-agentes/scripts/vite/sites-vite-plugin.LICENSE",
+      "sha256": "7de1e115d165f176e68f962acdb809b5ab8d8ae78d3981e0701392b2ac50c713"
+    },
+    {
+      "path": "apartamento-agentes/scripts/vite/sites-vite-plugin.ts",
+      "sha256": "07af20e7097d9ed1d76f7c446d02997550b8fc5ca89668b249e25eabd62c6834"
+    },
+    {
+      "path": "apartamento-agentes/tests/relay.test.mjs",
+      "sha256": "2b7c0e23597604460a47a0ac198d1f0531a948d39423e52a34906f58d5eb6a00"
+    },
+    {
+      "path": "apartamento-agentes/tsconfig.json",
+      "sha256": "a4c1cc83b63ef9d39641d3babaefffa063dccbbc93338e18017b5013d713163e"
+    },
+    {
+      "path": "apartamento-agentes/vendor/shadcn-tailwind-4.13.0.LICENSE.md",
+      "sha256": "1564074e13439397221ffd522e2e504d56561994a23d371aa5e3ad43e4f5423f"
+    },
+    {
+      "path": "apartamento-agentes/vendor/shadcn-tailwind-4.13.0.css",
+      "sha256": "bc7d83425702955b4cb67cb14ede9d603f9d912376d57a2d81d661094d2a782a"
+    },
+    {
+      "path": "apartamento-agentes/vite.config.ts",
+      "sha256": "22ff558b1636d251e076f74c1697c7166079861667af10922d6bc505cb8f8290"
+    },
+    {
+      "path": "apartamento-agentes/worker/index.ts",
+      "sha256": "a0a10229cdda6f5fdb32234e3539007412233bb4938a671866c9295a44a3bdb6"
+    }
+  ]
+}

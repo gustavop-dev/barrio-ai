@@ -1,0 +1,28 @@
+{
+  "tipo": "evidencia_de_revision_documental_no_runtime",
+  "archivos_finales": [
+    {
+      "path": "docs/brief-gustavo-posicionamiento.md",
+      "sha256": "6c50aaa40097a282713d9f2e8f365ec7f173c5bf957f95cf3bab56a8b96a2f5b"
+    },
+    {
+      "path": "docs/propuesta-posicionamiento-gustavo-v1.md",
+      "sha256": "f0d0598fe8b78e8086e5e21926629101df24242e7423eecb4f8f0d6297eea92a"
+    },
+    {
+      "path": "docs/ciclo-estrategia-perfil.md",
+      "sha256": "f1603af56f648089691706707473a64bf7aedb376367722c3e7bfd294826c6fa"
+    },
+    {
+      "path": "docs/datos-y-resultados-del-equipo.md",
+      "sha256": "ab4c4d1e518f30528072ad93594dfb5d8e3a75f11b36366d8cf030c6f1350420"
+    },
+    {
+      "path": "docs/recorrido-mesa-estrategia-perfil.md",
+      "sha256": "6c607a0e037102ca174e91aa125b3dad612326e780bc57365920b69303b67cc0"
+    }
+  ],
+  "casos": "evaluacion-ciclo-estrategia-perfil.json",
+  "aprobacion_usuario_del_posicionamiento": false,
+  "datos_ficticios_importados": false
+}

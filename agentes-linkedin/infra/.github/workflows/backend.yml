@@ -1,0 +1,33 @@
+name: Django backend
+on: [push, pull_request]
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg17
+        env:
+          POSTGRES_USER: knowledge
+          POSTGRES_DB: knowledge
+          POSTGRES_PASSWORD: test-only-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U knowledge -d knowledge"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://knowledge:test-only-ci-password@127.0.0.1:5432/knowledge
+      DJANGO_SECRET_KEY: ci-only-non-production-secret-0123456789
+      LIVE_PROVIDERS: 'false'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+      - run: uv sync --frozen --extra test
+      - run: uv run python manage.py check
+      - run: uv run python manage.py makemigrations --check --dry-run
+      - run: uv run python manage.py collectstatic --noinput --verbosity 0
+      - run: uv run coverage run manage.py test team_backend.tests --noinput
+      - run: uv run coverage report
+# The original corpus integration tests require private class files. Run locally:
+# uv run pytest -q. Private course documents are not uploaded to GitHub.

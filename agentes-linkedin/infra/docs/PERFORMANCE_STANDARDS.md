@@ -1,0 +1,2 @@
+# Presupuestos locales
+API POST runs solo valida y persiste (sin llamadas LLM). Listas paginadas máximo 100, sin cargar payloads grandes en listados. Reclamo de trabajos con SELECT FOR UPDATE SKIP LOCKED, sin retener la transacción durante llamadas remotas. Contexto LLM ≤16000 tokens. Jobs: máximo 100 en cola por configuración, sin retry automático. Medir latencia local de salud, listados y enqueue con proveedores simulados antes del cierre.

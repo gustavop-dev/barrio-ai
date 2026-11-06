@@ -1,0 +1,136 @@
+{
+  "version": "0.2",
+  "estado": "diseno_no_activado",
+  "objetivo": "Oportunidades personales en startups (60%) y contratos ProjectApp (40%), apoyados por autoridad y comunidad pertinente.",
+  "conocimiento": {
+    "clases_activas": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "unidades": 1035,
+    "fuentes_inmutables": true,
+    "afinidad_no_exclusiva": true
+  },
+  "grupos": [
+    {
+      "id": "estrategia_perfil",
+      "agentes": [
+        "posicionamiento",
+        "perfil"
+      ],
+      "estado": "contratos_disenados_no_activos"
+    },
+    {
+      "id": "observatorio",
+      "agentes": [
+        "investigador_referentes",
+        "analista_barrio_resultados"
+      ],
+      "estado": "contratos_disenados_no_activos"
+    },
+    {
+      "id": "editorial",
+      "agentes": [
+        "director_editorial",
+        "copywriter_a",
+        "copywriter_b"
+      ],
+      "estado": "contratos_disenados_no_activos"
+    },
+    {
+      "id": "lectores",
+      "agentes": [
+        "lector_par",
+        "lector_recomendador",
+        "lector_lider",
+        "lector_comprador",
+        "lector_divulgador"
+      ],
+      "estado": "contratos_disenados_no_activos",
+      "resultados": "simulaciones, no datos de mercado"
+    },
+    {
+      "id": "revision",
+      "agentes": [
+        "editor_verificador"
+      ],
+      "estado": "contratos_disenados_no_activos"
+    }
+  ],
+  "orquestacion": {
+    "tipo": "componente transversal por implementar",
+    "responsabilidades": [
+      "priorizar según objetivo",
+      "resolver dependencias",
+      "coordinar entregas y versiones",
+      "controlar coste y duplicados",
+      "consolidar bloqueos y aprobaciones",
+      "activar aprendizaje con datos reales"
+    ],
+    "disparadores": [
+      "contexto confirmado actualizado",
+      "evidencia nueva relevante",
+      "fecha editorial acordada",
+      "resultados reales disponibles",
+      "entrada versionada modificada"
+    ],
+    "contrato": "../infra/docs/circuitos-equipo.md"
+  },
+  "artefactos": [
+    "brief_personal",
+    "posicionamiento",
+    "propuesta_perfil",
+    "mapa_barrio",
+    "informe_referentes",
+    "observaciones_audiencia",
+    "pilares",
+    "brief_editorial",
+    "borrador",
+    "evaluacion_lectores",
+    "decision_editorial",
+    "verificacion",
+    "pieza_para_aprobacion",
+    "registro_publicacion",
+    "resultados",
+    "aprendizaje"
+  ],
+  "control_editorial": {
+    "borradores_independientes": 2,
+    "max_rondas_propuesto": 2,
+    "decisor": "director_editorial",
+    "bloqueo_por_evidencia_material": "editor_verificador",
+    "aprobacion_final": "usuario",
+    "consenso_unanime_obligatorio": false,
+    "publicacion_automatica_activada": false,
+    "lectores": "cinco perspectivas disponibles; subset justificado en brief"
+  },
+  "metas": {
+    "linea_base": null,
+    "objetivos_numericos": null,
+    "cadencia": null,
+    "pendiente": "Línea base, objetivos cuantitativos y cadencia operativa; contexto personal inicial ya recibido."
+  },
+  "outbound": {
+    "estado": "inactivo_pendiente_curso",
+    "clases_desde": 7,
+    "entradas_futuras": [
+      "posicionamiento confirmado",
+      "audiencias",
+      "pruebas",
+      "contenido aprobado",
+      "observaciones reales"
+    ],
+    "retorno_futuro": [
+      "objeciones observadas",
+      "resultados de conversaciones"
+    ],
+    "procedimientos": null,
+    "permiso_contactar": false
+  },
+  "nota": "Reparto, eventos y controles son decisiones de arquitectura; no instrucciones atribuidas al curso. No modifica el runtime ni límites de gasto.",
+  "indice_contratos": "indice-agentes-v1.json"
+}

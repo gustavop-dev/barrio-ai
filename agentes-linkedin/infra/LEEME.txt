@@ -1,0 +1,174 @@
+LINKEDIN TEAM — INFRAESTRUCTURA LOCAL
+
+Propósito
+Biblioteca común de las clases 01–06 para agentes especializados. Las unidades
+originales no se reescriben; se importan con evidencia, hash y revisiones. Clase
+07 queda fuera. Las afinidades de agente son preferencias, nunca permisos.
+
+Componentes
+- PostgreSQL 17 + pgvector, volumen Docker persistente y puerto local 55439.
+- Django 5.2 LTS + DRF + Gunicorn y consola de inspección en http://127.0.0.1:8787.
+- Búsqueda textual española ponderada por frecuencia documental y título.
+- Búsqueda híbrida: RRF ponderado (k=20, textual=1, semántico=2) por unidad.
+  El contexto acotado conserva además la primera coincidencia semántica.
+- Embeddings OpenAI, llamadas directas (NO Batch API), caché por texto/modelo/
+  dimensiones. Un cambio de modelo conserva los vectores anteriores y construye
+  otro índice. Búsqueda vectorial exacta: suficiente para este corpus inicial.
+- Relaciones explícitas tomadas de IDs presentes en related_learning. Las
+  remisiones ambiguas y relaciones semánticas nuevas no se inventan.
+- Metadatos temáticos iniciales derivados por palabras clave, pendientes de
+  afinamiento. No son una clasificación semántica validada por humanos.
+- Posicionamiento y Perfil: contexto acotado con unidades completas, fuentes,
+  límites y memoria confirmada. Vista previa local y adaptador ejecutable Claude.
+- Memoria versionada: user/proposed, user/confirmed y working/proposed.
+  Solo el endpoint humano autenticado confirma hechos. Una nueva propuesta no
+  sustituye el último hecho confirmado en el contexto de los agentes.
+- Trazas de ejecución, comprobación de IDs citados y registro de consumo.
+
+Arranque (desde esta carpeta)
+  uv sync --extra test --frozen
+  docker compose up -d db
+  docker compose up -d --build
+  # Solo si se trata de una biblioteca nueva:
+  uv run knowledge ingest
+  uv run knowledge verify
+
+El .env local se creó con permisos 600 y credenciales locales aleatorias.
+En una instalación nueva, copiar .env.example y generar los secretos locales y configurar SOURCE_ROOT.
+No guardar claves en el código ni en el frontend. .env está excluido de Git y
+del contexto de construcción Docker. Los directorios del curso se montan como
+solo lectura. Ningún proceso altera informes o conocimientos originales.
+
+Uso sin proveedores
+  uv run knowledge search 'compradores referidores divulgadores barrio'
+  uv run knowledge run perfil 'Elegir palabras del comprador para mi titular'
+  uv run knowledge embed
+  uv run knowledge status
+  uv run knowledge evaluate
+
+La consola acepta sesión de Django o KNOWLEDGE_API_TOKEN del .env.
+Panel humano: http://127.0.0.1:8787/admin/. El usuario y contraseña inicial
+están en DJANGO_ADMIN_USERNAME y DJANGO_ADMIN_PASSWORD del .env privado.
+El bootstrap solo crea la cuenta inicial: no restablece contraseñas ni tokens
+revocados. El token original pertenece a linkedin-service con rol operacion.
+La integridad global y el historial anterior requieren permisos de administrador.
+Sus botones solo realizan búsqueda textual, integridad y vistas previas. El
+token queda en memoria de la pestaña; no se almacena en localStorage.
+
+Activación de proveedores
+Guardar localmente OPENAI_API_KEY y ANTHROPIC_API_KEY en .env. Habilitar
+LIVE_PROVIDERS=true y recrear la API con docker compose up -d --force-recreate api worker.
+Las claves facilitadas por el usuario se guardaron en .env por autorización explícita.
+No se incluyen en el código, los artefactos ni las imágenes Docker.
+  uv run knowledge embed --execute
+  uv run knowledge evaluate --mode hybrid
+  uv run knowledge run perfil 'Elegir palabras del comprador para mi titular' --mode hybrid --execute
+
+Usar --request-id UUID en ejecuciones que puedan repetirse por un fallo de red:
+el mismo identificador devuelve el estado guardado, sin volver a generar.
+Los errores al establecer conexión se reintentan hasta dos veces, antes de enviar
+la petición HTTP. Las respuestas ambiguas nunca se reintentan automáticamente.
+Las reservas inciertas siguen contando contra el límite; conciliar con el proveedor
+antes de liberarlas. Un operador puede permitir una nueva tentativa mediante:
+  uv run knowledge authorize-retry UUID --reason "Revisión y motivo"
+Esta acción conserva íntegra la reserva incierta original y registra la revisión;
+si la nueva tentativa vuelve a ser incierta, el proceso se detiene de nuevo.
+No cambiar arbitrariamente un estado a rejected: puede ocultar consumo real.
+
+Modelos y gasto
+- text-embedding-3-small, 1536 dimensiones: USD 0.02/millón tokens.
+- text-embedding-3-large puede seleccionarse en EMBEDDING_MODEL; se solicitan
+  1536 dimensiones también, con tarifa USD 0.13/millón tokens.
+- Claude Sonnet 4.6 como modelo inicial explícito: USD 3 entrada / USD 15 salida
+  por millón tokens. No se utiliza prompt caching remoto ni razonamiento extra.
+  La selección puede ampliarse añadiendo tarifas verificadas y pruebas.
+- Techos iniciales locales: USD 1 OpenAI y USD 1 Anthropic. Son límites del piloto
+  de infraestructura, independientes del presupuesto anterior del curso.
+- El ledger cuenta consumo estimado y reservas de esta aplicación. No consulta
+  la factura ni confirma los créditos promocionales de Anthropic. No controla
+  otras aplicaciones o claves de la misma organización. Los límites no se
+  restablecen automáticamente. El saldo promocional se comprueba en Console.
+- No hay recargas automáticas, programadores ni publicación a LinkedIn.
+
+Fuentes de tarifas y contratos API consultadas al implementar
+https://developers.openai.com/api/docs/models/text-embedding-3-small
+https://developers.openai.com/api/docs/models/text-embedding-3-large
+https://developers.openai.com/api/reference/resources/embeddings/methods/create
+https://platform.claude.com/docs/en/models/sonnet-4-6/overview
+https://platform.claude.com/docs/en/api/messages
+https://github.com/pgvector/pgvector
+
+Contrato HTTP (Authorization: Bearer KNOWLEDGE_API_TOKEN)
+GET /status, /integrity, /units/{id}, /sources/{clase:source_id}, /memory
+POST /search {query,agent?,limit:6,mode:'lexical'|'hybrid'}
+POST /runs {agent,task,execute:false,mode:'lexical',request_id?:UUID}
+GET /runs/{UUID}
+POST /memory/proposals {namespace,key,value,evidence,expected_version:0}
+POST /memory/{UUID}/confirm {expected_version:N}  — reservado a la interfaz humana
+GET /health solo indica disponibilidad. La documentación automática se desactiva.
+Todos los endpoints de datos requieren usuario con permisos; / y /health son públicos locales.
+La ruta canónica es /api/v1; se conservan alias sin prefijo. POST /runs devuelve
+202 en cola; GET /runs/{UUID} devuelve el estado y luego el resultado. Reenviar
+la misma tarea con el mismo UUID devuelve 200 sin duplicar. Cancelación:
+POST /runs/{UUID}/cancel, solo antes de comenzar. Listados /units, /runs y /audit
+paginan 25 registros (máximo 100). La confirmación de memoria exige sesión humana
+y CSRF: un Bearer token no puede confirmar, incluso si tiene ese permiso.
+
+Alcance y pendientes
+La infraestructura es local, no está conectada al sitio publicado del apartamento.
+No habilitar CORS amplio ni incrustar claves del backend en ese sitio. La conexión
+remota necesita un backend accesible y autenticación por usuario.
+La extracción y revisión histórica no se vuelven a ejecutar. Una verificación
+técnica prueba integridad/referencias, no la verdad de cada afirmación.
+Las credenciales se activaron y se completaron embeddings con small, pruebas
+reales de Claude y evaluación híbrida. Resultados de desarrollo: textual 24/32,
+híbrida inicial 24/32 e híbrida calibrada 26/32 (referencia presente en top 10).
+El MRR pasó de 0.612 textual a 0.607 calibrado: mayor cobertura no significa que
+todos los resultados queden mejor ordenados. Esta calibración usó las mismas
+consultas y necesita un conjunto ciego y revisión humana antes de producción.
+La comparación con text-embedding-3-large permanece pendiente.
+El contexto no incorpora todo el curso: unidades que no caben se reportan como
+omitted_for_budget. Los agentes aún no tienen una ronda autónoma de investigación
+adicional; los resultados insuficientes requieren otra consulta.
+El grafo semántico ampliado, la revisión de etiquetas, el reranker, el benchmark
+ciego, los demás equipos y la personalización del usuario son etapas siguientes.
+
+Verificación
+  uv run pytest -q
+  uv run python manage.py test team_backend.tests --noinput
+  uv run python manage.py makemigrations --check --dry-run
+Los tests usan un esquema PostgreSQL temporal y proveedores simulados: no gastan
+créditos ni escriben en los datos operativos. Cubren integridad, alcance, acceso
+compartido, memoria, autenticación, caché, reservas concurrentes e idempotencia.
+
+Copias de seguridad
+  ./backup.sh
+Incluyen memoria, caché, trazas y ledger; guardarlas como datos privados. No borrar
+el volumen con docker compose down -v. Para parar conservando datos:
+  docker compose stop
+Para volver a iniciar:
+  docker compose up -d
+
+Operación Django
+Las migraciones adoptan las tablas originales sin reescribirlas. El motor de IA
+continúa en knowledge; Django añade usuarios, roles, credenciales hash, cola y
+auditoría. Las clases siguen siendo biblioteca compartida dentro de un equipo;
+esto no es aislamiento multiempresa. Cada trabajo sí tiene propietario.
+El worker reclama trabajos con bloqueos cortos SKIP LOCKED y mantiene latidos.
+Tras 180 segundos sin latido, un trabajo en ejecución queda interrupted: nunca
+se reencola automáticamente. Revisar runs y usage_ledger antes de repetirlo.
+Un resultado complete puede contener validation_failed: hay que revisar
+result_status, las citas y el contenido; no significa aprobación humana.
+El límite de 120 peticiones/minuto es por proceso (protección local básica).
+Los límites monetarios persistentes se siguen aplicando de forma atómica en DB.
+La búsqueda híbrida directa puede invocar embeddings; las ejecuciones largas de
+agentes se procesan en el worker. La consola no activa llamadas pagadas.
+La imagen corre como usuario sin privilegios. Solo se exponen puertos loopback.
+El stack del repositorio ai_skills_project está integrado como presets del
+proyecto; docs/stack/source.json fija el commit. Los workflows originales quedan
+como referencia y .github/workflows/backend.yml usa PostgreSQL real. No se han
+modificado ~/.bashrc, ~/.profile ni otros proyectos del fleet.
+
+Oficina conectada: servicio Docker office, enlace saliente a Sites sin publicar
+puertos locales. Ver docs/office-integration.md y los nombres OFFICE_* de .env.example.
+Las credenciales de Django usadas por el puente deben estar vigentes.

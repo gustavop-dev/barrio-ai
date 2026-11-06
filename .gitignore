@@ -1,0 +1,43 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.dev.vars
+.dev.vars.*
+*.pem
+*.key
+
+# Dependencies, generated files and tooling state
+.venv/
+node_modules/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.next/
+.vinext/
+.wrangler/
+.sites-runtime/
+dist/
+staticfiles/
+outputs/
+*.tsbuildinfo
+.coverage
+.coverage.*
+htmlcov/
+coverage/
+
+# Durable local data is backed up outside Git
+artifacts/
+backups/
+*.sqlite
+*.sqlite3
+*.dump
+*.bak
+*.log
+
+# Original course and source asset libraries stay local
+/LinkedIn Sales*/
+/Recursos visuales/
+/agentes-linkedin/ai_skills_project/
+.DS_Store

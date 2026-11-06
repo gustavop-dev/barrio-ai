@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "estado": "diseno_no_implementado",
+  "agentes": [
+    {
+      "id": "posicionamiento",
+      "grupo": "estrategia_perfil",
+      "contrato": "equipos/estrategia-perfil/contratos-v1/posicionamiento.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "perfil",
+      "grupo": "estrategia_perfil",
+      "contrato": "equipos/estrategia-perfil/contratos-v1/perfil.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "investigador_referentes",
+      "grupo": "observatorio",
+      "contrato": "equipos/observatorio/investigador_referentes.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "analista_barrio_resultados",
+      "grupo": "observatorio",
+      "contrato": "equipos/observatorio/analista_barrio_resultados.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "director_editorial",
+      "grupo": "editorial",
+      "contrato": "equipos/editorial/director_editorial.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "copywriter_a",
+      "grupo": "editorial",
+      "contrato": "equipos/editorial/copywriter_a.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "copywriter_b",
+      "grupo": "editorial",
+      "contrato": "equipos/editorial/copywriter_b.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "lector_comprador",
+      "grupo": "lectores",
+      "contrato": "equipos/lectores/lector_comprador.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "lector_divulgador",
+      "grupo": "lectores",
+      "contrato": "equipos/lectores/lector_divulgador.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "lector_lider",
+      "grupo": "lectores",
+      "contrato": "equipos/lectores/lector_lider.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "lector_par",
+      "grupo": "lectores",
+      "contrato": "equipos/lectores/lector_par.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "lector_recomendador",
+      "grupo": "lectores",
+      "contrato": "equipos/lectores/lector_recomendador.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "editor_verificador",
+      "grupo": "revision",
+      "contrato": "equipos/revision/editor_verificador.json",
+      "estado": "diseno_no_activo"
+    }
+  ],
+  "orquestacion": "infra/docs/circuitos-equipo.md",
+  "datos_externos": "infra/docs/datos-externos-por-equipo.md",
+  "nota": "No configura runtime ni confirma estrategia/publicación; contratos nuevos de Estrategia/Perfil son referencia vigente de diseño, fichas raíz anteriores históricas."
+}

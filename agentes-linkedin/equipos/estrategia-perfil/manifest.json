@@ -1,0 +1,27 @@
+{
+  "session": 1,
+  "original_files": {
+    "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json": "2866822a991c25e348e195977bddabeb817863984c7d88ff7c3a2b9591958cc3",
+    "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/sources.json": "d43b0c019aa7e736c81b00aaf6f3af80f824db91b62de02aa3d88fd76f5edb79",
+    "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/visual/evidence.json": "4d04127206cfd306c76230db25566da328172f6b2cbfbe4cb3b6fe2d17921f4a",
+    "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/final-review.json": "2c952b2d5e816a9151f9a7b67dbde730d83f709465f3d2b333f4103ef20abff6",
+    "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/final-validation.json": "d2e53df285ecc4a056d25ce5b0334a2a6ead5bda5e3b215dc0446387660bf723"
+  },
+  "package_files": {
+    "base-clase-01.json": "0f02cfc245d32b03388b88aae131dbb26040f70246f8cf966601c31fb9f75428",
+    "clase-01-evidencia-visual.json": "61be4361b96515c56f8bfd2cf21324468fc5f904560cd27824ea262089e23a61",
+    "clase-01-fuentes.json": "bdbc32c969e2dc41af3083eb70485604f866206fbd1add580c8e6aeed9e3e100",
+    "clase-01-unidades.json": "5477bc4c9c0614d32a73f64c528085fe35b7fb9596ef348b3814bf25ea583d41",
+    "memoria-compartida.json": "5ce9dff906925677e3a5b68a651492302c789cc5e78cfe375d82b5d9239d8b2b",
+    "perfil.json": "13fd7e8cdea3b9eab8f9cc15b9bf48d5c3dcc9e1d866972491d952907c3a23e6",
+    "posicionamiento.json": "a8593c5decf389389dc899a7e5b29eff4383d913382dd8e634538d606d1e909e"
+  },
+  "learning_units_preserved": 139,
+  "operational_units": 56,
+  "operational_rules": 18,
+  "administrative_or_class_dynamics_excluded": 11,
+  "review_scope": "Lectura de las unidades relevantes y sus límites, revisión de la evaluación previa y contraste textual de buyer persona, barrio, marcos y matices con transcripción/PDF extraído. No nueva escucha integral ni revisión humana.",
+  "api_calls": 0,
+  "runtime_connected": false,
+  "user_personalization_started": false
+}

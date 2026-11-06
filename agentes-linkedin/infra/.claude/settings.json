@@ -1,0 +1,17 @@
+{
+  "model": "opus",
+  "effortLevel": "high",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/fleet-env.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+[run]
+branch = True
+source = team_backend
+omit =
+    */tests/*
+    */migrations/*
+
+[report]
+omit =
+    */tests/*
+    */migrations/*
+show_missing = True

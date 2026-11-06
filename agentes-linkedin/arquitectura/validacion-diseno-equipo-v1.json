@@ -1,0 +1,145 @@
+{
+  "version": 1,
+  "checked_at": "2026-11-06T07:54:51.406270+00:00",
+  "scope": "validación documental y comparación local de integridad; no ejecución de agentes",
+  "passed": true,
+  "contracts": 13,
+  "groups": {
+    "estrategia_perfil": 2,
+    "observatorio": 2,
+    "editorial": 3,
+    "lectores": 5,
+    "revision": 1
+  },
+  "template_sections_present": true,
+  "knowledge_references": 104,
+  "distinct_referenced_units": 57,
+  "allowed_classes": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6
+  ],
+  "source_integrity": {
+    "active_units_compared": 1035,
+    "source_files_compared": 6,
+    "compared": "JSON original y hash unitario coinciden con DB; hash de cada archivo fuente coincide con importación",
+    "semantic_full_corpus_read": false
+  },
+  "local_links_checked": 55,
+  "errors": [],
+  "qa": {
+    "coordination": "infra/docs/qa-circuitos-coordinacion.md",
+    "knowledge_and_data": "infra/docs/qa-circuitos-conocimiento-datos.md",
+    "agents": "dos subagentes gpt-6-astra high",
+    "resolved_p2": 6,
+    "open_p1_p2_identified_in_scope": 0,
+    "runtime_tested": false,
+    "human_acceptance": false
+  },
+  "snapshots": [
+    {
+      "path": "equipos/estrategia-perfil/contratos-v1/posicionamiento.json",
+      "sha256": "df3dbcc1191721bc2691ef805e60f4b29a5a3570017a64b972de486cd20f9b1a"
+    },
+    {
+      "path": "equipos/estrategia-perfil/contratos-v1/perfil.json",
+      "sha256": "5d15ae23ed456649920c24742e102f0e07e6717ac4983069711838dceacf0306"
+    },
+    {
+      "path": "equipos/observatorio/investigador_referentes.json",
+      "sha256": "a5d40c69e6cdfbc9a51b3e4c64b359affb5a1327bb3fa6eba56a612cd68b41bf"
+    },
+    {
+      "path": "equipos/observatorio/analista_barrio_resultados.json",
+      "sha256": "6fc6f2d0181840c988447c683e6ad6351acc12e5d6a772a49579078528128699"
+    },
+    {
+      "path": "equipos/editorial/director_editorial.json",
+      "sha256": "0f5ef0bc953285b30e5bdcbdf570e7bca18b39756aab5783ce3afd6dd0c66b3c"
+    },
+    {
+      "path": "equipos/editorial/copywriter_a.json",
+      "sha256": "b9f5420bc2b2f06f0dba6ebf8be41e502c8bef503344af4dc20e2ec7a31a3aa3"
+    },
+    {
+      "path": "equipos/editorial/copywriter_b.json",
+      "sha256": "bb26a46cbc4032d2cb2e22c24e72b9c574aebbfdb74872d5087377ec1d96530b"
+    },
+    {
+      "path": "equipos/lectores/lector_comprador.json",
+      "sha256": "94a95b5febd35d7e9a2b5721c27050ecd2af7d56348fdb32e9e326f080a0ded3"
+    },
+    {
+      "path": "equipos/lectores/lector_divulgador.json",
+      "sha256": "f79ade5878a31ca10825cb1830b5e9f6db6cc0aeb1350a71c8aa5b76fbd2f4e2"
+    },
+    {
+      "path": "equipos/lectores/lector_lider.json",
+      "sha256": "98986aa7b8778f67882cc6af009a4ce5e67431a950b4c77f0a294af589b8945b"
+    },
+    {
+      "path": "equipos/lectores/lector_par.json",
+      "sha256": "dd5da9d7a95f865fb0a62aa16e928f691e03d56123606777f5872edfb98b0f3c"
+    },
+    {
+      "path": "equipos/lectores/lector_recomendador.json",
+      "sha256": "7ee19619d935a3afc7476f5099e63163da0b042e757bd4a798bfb08d3d6cd26b"
+    },
+    {
+      "path": "equipos/revision/editor_verificador.json",
+      "sha256": "069491cce0bf9fc97c9e09a53beabf0b352d6bb1c5b113a8af564d81782be599"
+    },
+    {
+      "path": "infra/docs/circuitos-equipo.md",
+      "sha256": "8f420744749e89f356650314eac337e77fd0d36c71132bb8dba92114e023fe8d"
+    },
+    {
+      "path": "infra/docs/datos-externos-por-equipo.md",
+      "sha256": "903d19fd4f11cae91d175400395956b230577a4e4906d77c29511cbcbc3d8136"
+    },
+    {
+      "path": "infra/docs/ciclo-estrategia-perfil.md",
+      "sha256": "2f12170d4ef13088701d3780ca71825df3d42c8c656af2d65d4a421161c0469a"
+    },
+    {
+      "path": "infra/docs/ciclo-observatorio-aprendizaje.md",
+      "sha256": "82be9848d6b55e54c13efb01420c6715eb81a6bc47aae183b6b411287d355e50"
+    },
+    {
+      "path": "infra/docs/ciclo-editorial.md",
+      "sha256": "5dc87948bf02cd00f47ae2c3ff7b8dca7a2c57cb18f511d7f8f575d575d86b8d"
+    },
+    {
+      "path": "infra/docs/ciclo-lectores.md",
+      "sha256": "daa55617fc8ea528c01cf9888ea9366ac7a18203670338acd365bfb423ea31a7"
+    },
+    {
+      "path": "infra/docs/ciclo-revision.md",
+      "sha256": "3bc45d04b67e3bbb5fdcb8c8f89f1fb58766ee046c38a1028d0d3937aa462b1b"
+    },
+    {
+      "path": "infra/docs/plan-equipo-autonomo.md",
+      "sha256": "a4e4c5f94c4c1fcacb1067f01e923026a7adb725f2d51e6d0d46914f0c84ac8a"
+    },
+    {
+      "path": "infra/docs/recorrido-mesa-equipo-completo.md",
+      "sha256": "ddf563b695ba2a73b66c6bbc33ab8fa9f579435d70f860348b4d3f38c00e9e61"
+    },
+    {
+      "path": "infra/docs/qa-circuitos-coordinacion.md",
+      "sha256": "55aeed901a0db1ea7a20d2d6f90aa4a85b100a5c0206c17afa5d3c66dac285bc"
+    },
+    {
+      "path": "infra/docs/qa-circuitos-conocimiento-datos.md",
+      "sha256": "99e403970a3982dfe5aad9faba36b1b6f490fc920074b05f06a27cdf79d20639"
+    }
+  ],
+  "limits": [
+    "No se ejecutaron modelos/proveedores, conectores, pruebas de backend ni publicaciones.",
+    "Lectura semántica selectiva; F1 integral pendiente.",
+    "Comprobaciones estructurales no validan por sí solas interpretación ni comportamiento."
+  ]
+}

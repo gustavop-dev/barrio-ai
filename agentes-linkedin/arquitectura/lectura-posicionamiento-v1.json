@@ -1,0 +1,194 @@
+{
+  "version": 1,
+  "fecha_utc": "2026-11-06T07:10:52.035601+00:00",
+  "alcance": "Solo unidades indicadas. Lectura por el asistente, no revisión humana ni lectura integral de las clases.",
+  "propuesta": "../infra/docs/propuesta-posicionamiento-gustavo-v1.md",
+  "originales_modificados": false,
+  "unidades": [
+    {
+      "id": "LI-01-M006-K02",
+      "session": 1,
+      "title": "Definir al cliente mediante cuatro dimensiones: identidad, urgencia, transformación y freno",
+      "sha256": "ea005a97e91d98c3d77008a2d74eb6656982ca2a3052706bb1a48febb5ba68bf",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/125",
+      "fuentes": [
+        "01:7f89013f7843c6458b38:p037",
+        "01:7f89013f7843c6458b38:p038",
+        "01:7f89013f7843c6458b38:p039",
+        "01:7f89013f7843c6458b38:p040"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-01-M006-K03",
+      "session": 1,
+      "title": "Ejercicio de definición escrita: dolor urgente, objetivo a 90 días y obstáculos previos",
+      "sha256": "c97e76c8730e7943b9714a81f838d13fb6948db2b244f97947cbd8e210aaa716",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/126",
+      "fuentes": [
+        "01:7f89013f7843c6458b38:p041"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-01-M007-K03",
+      "session": 1,
+      "title": "Las cinco frases del mensaje: del problema al resultado final con y sin compra",
+      "sha256": "5c49e469b1ffebc7131dba7ff931b3446f81991909c30231659be94a7bddb69b",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/130",
+      "fuentes": [
+        "01:7f89013f7843c6458b38:p043",
+        "01:7f89013f7843c6458b38:p044",
+        "01:7f89013f7843c6458b38:p045"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-01-M007-K04",
+      "session": 1,
+      "title": "Cuándo está bien definido el buyer persona: cuatro comprobaciones acumulativas",
+      "sha256": "710bd0bcd48f5a60a9dd8ab5ec999f1939c8ec7e8e2945f4c6392a73ad1770b4",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/131",
+      "fuentes": [
+        "01:7f89013f7843c6458b38:p046",
+        "01:7f89013f7843c6458b38:p047",
+        "01:7f89013f7843c6458b38:p048",
+        "01:7f89013f7843c6458b38:p049"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-01-V022-K02",
+      "session": 1,
+      "title": "Cómo hacer convivir dos buyer personas: aprender a ejecutar frente a delegar la ejecución",
+      "sha256": "ae779a5eb5d91ae1a87a33d8292e8064317b6e8f58f825c64b49f35565b4c0bc",
+      "source_path": "LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/aprendizajes.json",
+      "pointer": "/learning_units/88",
+      "fuentes": [
+        "01:qt00509",
+        "01:qt00510",
+        "01:qt00511",
+        "01:qt00512"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-02-V016-K01",
+      "session": 2,
+      "title": "El titular como semilla de posicionamiento: usar las palabras por las que el cliente busca",
+      "sha256": "0c45b7fbf66cfb99e6cac4479b839dc6ee87c126aee8f0096e300040b76c2546",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/60",
+      "fuentes": [
+        "02:qt00345",
+        "02:qv0044",
+        "02:qs04500000",
+        "02:ee759999a5ddefebd36e:p022",
+        "02:ee759999a5ddefebd36e:p023",
+        "02:ee759999a5ddefebd36e:p024"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-02-V016-K05",
+      "session": 2,
+      "title": "Explicar qué haces y para quién: el «Acerca de» articula la misión actual y no duplica «Experiencia»",
+      "sha256": "ae996eaa2321804bd70fc4503c5d795e9e2952a10d98145c46a78f9ee3c9335d",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/64",
+      "fuentes": [
+        "02:qt00368",
+        "02:qt00369",
+        "02:qt00370",
+        "02:qv0045",
+        "02:qs04770000",
+        "02:ee759999a5ddefebd36e:p030",
+        "02:ee759999a5ddefebd36e:p031"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-02-V019-K01",
+      "session": 2,
+      "title": "Conectar la experiencia pasada con la actividad actual sin forzar ni inventar la trayectoria",
+      "sha256": "824d766ccd6fcb625c488a16881e4f515a490c7d4b657f9d63f48a47c1164977",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/74",
+      "fuentes": [
+        "02:qt00418",
+        "02:qt00419",
+        "02:qt00420",
+        "02:qt00421",
+        "02:qt00422",
+        "02:ee759999a5ddefebd36e:p086",
+        "02:ee759999a5ddefebd36e:p087",
+        "02:ee759999a5ddefebd36e:p088"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-02-V019-K02",
+      "session": 2,
+      "title": "Redactar Experiencia mediante logros, aprendizajes y utilidad para el cliente actual",
+      "sha256": "25a426738c4bd1aec5d93766bbc0b2256e991444a02f17eecc901d47bd23b5cf",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json",
+      "pointer": "/learning_units/75",
+      "fuentes": [
+        "02:qt00424",
+        "02:qt00425",
+        "02:qt00426",
+        "02:qt00427",
+        "02:qt00428",
+        "02:qt00429",
+        "02:qv0049",
+        "02:qs05490000",
+        "02:ee759999a5ddefebd36e:p085",
+        "02:ee759999a5ddefebd36e:p086"
+      ],
+      "lectura": "completa",
+      "momento": "preparacion_propuesta_v1"
+    },
+    {
+      "id": "LI-03-M005-K05",
+      "session": 3,
+      "title": "Cinco papeles que buscar en el barrio: par, recomendador, líder, comprador y divulgador",
+      "sha256": "8d3ba01a2536edc6b5459c831f0ccca95e28d14259c0b3bfd2da25168c1f53f8",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-03-revisada.json",
+      "pointer": "/learning_units/136",
+      "fuentes": [
+        "03:c7f1f10c349724396998:p034"
+      ],
+      "lectura": "completa",
+      "momento": "sesion_previa_estructura"
+    },
+    {
+      "id": "LI-04-M005-K01",
+      "session": 4,
+      "title": "Cinco filtros para validar un pilar temático antes de usarlo",
+      "sha256": "1e842747d5ba303d8c2bdc04955547318370636a0e5d5dea9d1e6a2c4f87c968",
+      "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-04-revisada.json",
+      "pointer": "/learning_units/190",
+      "fuentes": [
+        "04:187ff9d6762ef6fd981a:p029",
+        "04:187ff9d6762ef6fd981a:p030",
+        "04:187ff9d6762ef6fd981a:p031",
+        "04:187ff9d6762ef6fd981a:p032",
+        "04:187ff9d6762ef6fd981a:p033"
+      ],
+      "lectura": "completa",
+      "momento": "sesion_previa_estructura"
+    }
+  ]
+}

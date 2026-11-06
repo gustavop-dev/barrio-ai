@@ -1,0 +1,127 @@
+{
+  "version": "0.1",
+  "tipo": "plantilla_de_diseno_no_ejecutable",
+  "id": null,
+  "nombre": null,
+  "grupo": null,
+  "estado": "propuesta",
+  "proposito": {
+    "mision": null,
+    "contribucion_al_objetivo_del_equipo": null,
+    "resultado_del_que_responde": null,
+    "fuera_de_responsabilidad": []
+  },
+  "conocimiento": {
+    "clases_permitidas": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6
+    ],
+    "unidades": [],
+    "formato_referencia": {
+      "unidad_id": null,
+      "hash": null,
+      "lectura_completa": false,
+      "criterio_derivado": null,
+      "limites_y_excepciones": [],
+      "fuentes_con_prefijo_de_clase": []
+    },
+    "temas_prioritarios": [],
+    "relaciones_con_otras_unidades": [],
+    "acceso_no_exclusivo": true,
+    "decisiones_de_diseno_que_no_provienen_del_curso": []
+  },
+  "entradas": {
+    "obligatorias": [],
+    "opcionales": [],
+    "versiones_requeridas": [],
+    "si_falta_informacion": null
+  },
+  "iniciativa": {
+    "eventos_que_lo_activan": [],
+    "condiciones_para_actuar": [],
+    "criterio_de_prioridad": null,
+    "clave_de_deduplicacion": null,
+    "cuando_no_actuar": []
+  },
+  "funcionamiento": {
+    "pasos": [],
+    "reglas_de_decision": [],
+    "alternativas_ante_incertidumbre": [],
+    "condicion_de_finalizacion": null
+  },
+  "herramientas_y_autoridad": {
+    "herramientas_necesarias": [],
+    "acciones_autorizadas": [],
+    "acciones_que_requieren_aprobacion": [],
+    "acciones_prohibidas": []
+  },
+  "entregables": {
+    "tipos": [],
+    "formato_comun": {
+      "artefacto_id": null,
+      "version": null,
+      "autor_agente": null,
+      "tipo": null,
+      "estado": "propuesto",
+      "entradas_versionadas": [],
+      "contenido": null,
+      "hechos_confirmados": [],
+      "hipotesis": [],
+      "fuentes": [],
+      "limitaciones": [],
+      "criterio_de_aceptacion": null,
+      "decision_y_motivo": null,
+      "destinatario": null,
+      "aprobacion_humana": null
+    }
+  },
+  "memoria": {
+    "lee": [],
+    "puede_proponer": [],
+    "puede_confirmar": [],
+    "no_puede_modificar": [
+      "unidades originales del curso",
+      "hechos personales confirmados sin confirmación del usuario"
+    ],
+    "politica_de_caducidad": null,
+    "dependencias_a_revisar_si_cambia_una_entrada": []
+  },
+  "coordinacion": {
+    "recibe_de": [],
+    "entrega_a": [],
+    "responsable_de_resolver_desacuerdos": null,
+    "criterio_de_escalamiento": null
+  },
+  "calidad": {
+    "criterios_materiales": [],
+    "preferencias_no_bloqueantes": [],
+    "casos_de_evaluacion": [],
+    "evidencia_de_validacion": []
+  },
+  "medicion": {
+    "resultados_observables": [],
+    "fuente_de_datos": null,
+    "linea_base": null,
+    "objetivos": null,
+    "ventana": null,
+    "limitaciones_de_atribucion": []
+  },
+  "controles": {
+    "presupuesto": "heredar límites y reservas vigentes; no autoriza gasto nuevo",
+    "max_rondas_propuesto": 2,
+    "timeout": null,
+    "condiciones_de_parada": [],
+    "tratamiento_de_fallo_incierto": "conservar reserva y estado; no repetir automáticamente la solicitud pagada"
+  },
+  "pendientes_para_activacion": [
+    "lectura completa de unidades pertinentes",
+    "diseño detallado del grupo",
+    "contexto personal suficiente",
+    "implementación y evaluación",
+    "autorización y límites operativos aplicables"
+  ]
+}

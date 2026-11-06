@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "status": "pendiente_de_informacion_del_usuario",
+  "record_format": {
+    "value": null,
+    "status": "pendiente | hipotesis | confirmado | aprobado",
+    "source": null,
+    "updated_at": null,
+    "owner": null
+  },
+  "user_facts": {
+    "oferta": null,
+    "capacidades": null,
+    "casos_y_resultados": null,
+    "restricciones": null,
+    "voz_y_preferencias": null,
+    "perfil_actual": null
+  },
+  "positioning": {
+    "version": 0,
+    "status": "pendiente",
+    "asociacion_profesional": null,
+    "audiencias_prioritarias": [],
+    "buyer_personas": [],
+    "barrio": [],
+    "propuesta_de_valor": null,
+    "mensaje_base": null
+  },
+  "profile": {
+    "positioning_version": null,
+    "status": "pendiente",
+    "diagnostico": null,
+    "titulares": [],
+    "mensaje_acerca_de": null
+  },
+  "decisions": [],
+  "open_questions": [],
+  "coordination": [
+    "Posicionamiento propone cambios de audiencia/oferta; Perfil propone cambios de expresión y devuelve contradicciones.",
+    "Ninguno sobrescribe hechos confirmados ni decisiones aprobadas sin registrar el cambio y solicitar aprobación.",
+    "Si cambia el posicionamiento aprobado, marcar los borradores del perfil como pendientes de revisión.",
+    "La comunidad y el Observatorio podrán aportar evidencia nueva; una conversación o simulación aislada no representa a todo el mercado."
+  ]
+}

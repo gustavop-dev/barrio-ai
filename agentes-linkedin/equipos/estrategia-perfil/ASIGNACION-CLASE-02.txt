@@ -1,0 +1,275 @@
+ASIGNACIÓN DE UNIDADES EXISTENTES — CLASE 02
+
+Este documento es un índice de reparto. Los títulos e IDs se conservan tal cual.
+No reescribe, resume ni reemplaza las unidades. Las explicaciones completas permanecen en:
+LinkedIn Sales - Procesamiento completo/revision-independiente/session-02-revisada.json
+
+No se modificaron la clase 1, los archivos originales de clase 2, las instrucciones de los agentes ni la memoria del usuario.
+La asignación no conecta todavía agentes al runtime ni modifica el apartamento web.
+
+CONTEO
+{"total_units_reviewed": 192, "perfil": 175, "posicionamiento": 27, "shared": 23, "perfil_only": 152, "posicionamiento_only": 4, "assigned_unique": 179, "other_teams_or_scope": 11, "not_assigned": 2}
+Los totales de cada agente incluyen las unidades compartidas; no deben sumarse como unidades únicas.
+
+CRITERIO DE REPARTO
+Posicionamiento: correspondencia entre comprador, oferta, especialidad, valores, pruebas y audiencia.
+Perfil: presentación y evaluación de foto, banner, nombre, titular, Acerca de, Destacado, trayectoria, aptitudes, recomendaciones y URL.
+Los ejemplos son material de consulta; sus cifras o biografías no pasan a ser hechos del usuario.
+Los procedimientos y condiciones de herramientas se conservan como aparecen en el curso, sin afirmar vigencia actual.
+El material complementario tiene enfoque de empleo. Sus unidades siguen intactas; su aplicación comercial deberá decidirse en el caso concreto.
+Las diferencias documentadas entre audio y PDF se conservan como etiquetas de contexto, sin intentar resolverlas reescribiendo.
+Las acciones de publicar, contactar, solicitar recomendaciones o cambiar el perfil no se ejecutan por añadir una referencia.
+
+COMPARTIDAS
+LI-02-V001-K01 — Conocer al buyer persona no equivale a tener una comunicación optimizada
+  Motivo: Conecta la definición estratégica del comprador con la comunicación que redacta Perfil.
+LI-02-V001-K02 — Revisión transversal de mensajes: dolores, soluciones y transformaciones conectadas
+  Motivo: La coherencia dolor-solución-transformación corresponde a Posicionamiento; su expresión en LinkedIn corresponde a Perfil.
+LI-02-V002-K03 — No exigir arqueología al visitante: buyer persona prioritario y lectura sin ambigüedad
+  Motivo: Prioridad del comprador y claridad de lectura conectan decisiones estratégicas y redacción.
+LI-02-V002-K04 — Objetivo y secuencia de trabajo: comprador, dolor y transformación antes de ampliar conexiones
+  Motivo: Establece la dependencia entre definición del comprador, perfil y trabajo posterior de comunidad.
+LI-02-V008-K02 — Conectar el pasado con el negocio actual sin borrar ni alterar la trayectoria
+  Motivo: La trayectoria real aporta fundamento al posicionamiento y contenido a Perfil.
+LI-02-V008-K03 — Las primeras tres piezas de la tienda: cliente, dolor y promesa de solución
+  Motivo: Cliente, dolor y promesa conectan la definición de la oferta con su presentación.
+LI-02-V008-K04 — La prueba: mostrar resultados de clientes dentro de la historia comercial
+  Motivo: La prueba disponible delimita lo que Posicionamiento puede prometer y lo que Perfil puede mostrar.
+LI-02-V010-K01 — Integrar valores personales en el contenido y en el perfil, además de la especialidad técnica
+  Motivo: Los valores propios afectan a la identidad estratégica y a su expresión en el perfil.
+LI-02-V013-K01 — Del diagnóstico del perfil a una propuesta que atienda criterios técnicos y personales de compra
+  Motivo: Relaciona competencia técnica, afinidad y motivos de elección con la propuesta y su comunicación.
+LI-02-V016-K01 — El titular como semilla de posicionamiento: usar las palabras por las que el cliente busca
+  Motivo: Posicionamiento define la asociación buscada; Perfil la expresa con términos reconocibles en el titular.
+LI-02-V016-K04 — Mostrar la herida del cliente con sutileza y conservar un punto de vista personal
+  Motivo: La necesidad real del cliente y el punto de vista personal conectan posicionamiento y mensaje.
+LI-02-V016-K05 — Explicar qué haces y para quién: el «Acerca de» articula la misión actual y no duplica «Experiencia»
+  Motivo: La misión, las modalidades de servicio y sus destinatarios deben coincidir con la oferta definida.
+LI-02-V018-K04 — La experiencia como respaldo de la especialidad del autor antes de distribuir contenido
+  Motivo: La especialidad declarada debe tener respaldo en la experiencia y coherencia con los temas.
+LI-02-V019-K01 — Conectar la experiencia pasada con la actividad actual sin forzar ni inventar la trayectoria
+  Motivo: Relaciona la actividad actual con la trayectoria auténtica sin inventar conexiones.
+LI-02-V019-K04 — Seleccionar aptitudes que definan la especialidad, no un inventario de capacidades generales
+  Motivo: La selección de aptitudes depende de la especialidad definida y de cómo Perfil la presenta.
+LI-02-V020-K02 — La triangulación de autoridad: qué sabes, cuántos lo respaldan y quiénes son
+  Motivo: El respaldo de la especialidad y la pertinencia de la red aportan contexto a ambos; no certifican el algoritmo.
+LI-02-V021-K01 — Diagnosticar qué debe cambiar en el perfil: del protagonismo propio al resultado que busca el comprador
+  Motivo: El diagnóstico exige relacionar la necesidad del comprador con el resultado que comunica el perfil.
+LI-02-V022-K05 — Pasar del diagnóstico a una promesa concreta y separar «qué consigo» de «con quién trabajo»
+  Motivo: Distinguir qué se consigue y con quién se trabaja requiere claridad de oferta y de redacción.
+LI-02-V023-K03 — Cambiar de director comercial a vendedor de equipos: el perfil debe responder al comprador actual
+  Motivo: El cambio de comprador obliga a revisar tanto la estrategia como su expresión en el perfil.
+LI-02-V024-K02 — Aclarar la oferta antes de buscar un tono atractivo: el elevator pitch de cinco segundos
+  Motivo: La claridad de la oferta precede a elegir una frase atractiva para presentarla.
+LI-02-M005-K02 — Acción 1: expresar el valor profesional como beneficio para otras personas
+  Motivo: La relación entre capacidades, evidencias y beneficio conecta propuesta de valor y presentación.
+LI-02-M005-K03 — Acción 2: mostrar personalidad y pasión mediante detalles personales relevantes
+  Motivo: La selección de detalles personales relevantes conecta valores e identidad con su expresión.
+LI-02-BATCH-AUDIT-K01 — Completar el itinerario visual: del cliente al catálogo y a la función comercial del contenido
+  Motivo: Ubica las responsabilidades de cliente y perfil y sus dependencias con los siguientes equipos.
+
+SOLO POSICIONAMIENTO
+LI-02-V003-K01 — El entorno de la tienda en LinkedIn puede mejorarse mediante las propias acciones
+  Motivo: Contexto de la comunidad que rodea al negocio; no contiene un procedimiento de networking.
+  Uso: contexto o recurso opcional.
+LI-02-V023-K04 — Un nicho técnico puede construir comunidad si conecta con la audiencia relevante
+  Motivo: Relaciona un nicho técnico con personas relevantes sin asumir que el canal sea inviable.
+LI-02-V024-K01 — Construir comunidad en un nicho técnico: importa cómo se comunica y con quién se conecta
+  Motivo: Vincula conocimiento técnico, audiencia y pertinencia; el desarrollo editorial corresponde a otro equipo.
+LI-02-V024-K03 — La falta de referentes idénticos puede ser una oportunidad de posicionamiento
+  Motivo: Permite explorar diferenciación sin exigir un referente idéntico ni asumir que la ausencia demuestra demanda.
+
+SOLO PERFIL
+LI-02-V001-K03 — El perfil de LinkedIn como tienda y landing de venta
+LI-02-V002-K01 — El perfil como tienda descubrible: aprovechar la credibilidad de la plataforma exige claridad propia
+LI-02-V002-K02 — La prueba de autonomía comercial: ¿el perfil habla por ti cuando tú no estás?
+LI-02-V003-K02 — Revisar el perfil desde el cliente ideal y evitar que tenga que hacer arqueología
+LI-02-V003-K03 — Auditoría del titular, el banner y el «Acerca de»: cliente, problema y resultado
+LI-02-V004-K01 — La prueba de la tienda: que el perfil hable por ti cuando no estás
+LI-02-V004-K02 — Autoauditoría del perfil: cliente visible, problema claro y resultado comunicado
+LI-02-V004-K03 — Banner y titular coordinados: el ejemplo de marca personal, resultado y método
+LI-02-V004-K04 — Adaptar el banner: contacto, credibilidad de clientes y contenido que no tape la foto
+LI-02-V005-K01 — La parte superior como gancho: diseñar el banner y comprobarlo en computador y teléfono
+LI-02-V005-K02 — Autodiagnóstico antes de editar: comprador, dolor y resultado visibles
+LI-02-V005-K03 — No hacer adivinar al cliente: relevancia para su problema antes que admiración por la trayectoria
+LI-02-V005-K04 — Diagnóstico con IA «Tu primera impresión en LinkedIn»: propósito, entradas y condiciones de uso
+  Uso: contexto o recurso opcional.
+LI-02-V005-K05 — Nombre limpio para facilitar la búsqueda y ubicación del titular
+LI-02-V006-K01 — Del cargo a la utilidad: distinguir un titular comercial de una placa de oficina
+LI-02-V006-K02 — Las primeras palabras del titular como oportunidad de descubrimiento y posicionamiento
+LI-02-V006-K03 — El banner como valla de soluciones: detectar espacios vacíos o mensajes que no ayudan a vender
+LI-02-V006-K04 — El inicio del «Acerca de»: gancho, relevancia para el cliente y primera impresión
+LI-02-V007-K01 — Abrir el Acerca de con un gancho: la analogía del comienzo de una conferencia
+LI-02-V007-K02 — No obligar al lector a deducir el beneficio desde una declaración de pasión personal
+LI-02-V007-K03 — Activar Destacados y convertirlo en un escaparate de enlaces, metodología y conocimiento experto
+LI-02-V008-K01 — Priorizar las piezas comerciales del perfil: la trayectoria apoya la venta, no la reemplaza
+LI-02-V008-K05 — La puerta: facilitar el siguiente paso con enlaces en destacados
+LI-02-V009-K01 — La puerta comercial del perfil: convertir el interés en una vía de contacto
+LI-02-V009-K02 — Triangular las cinco piezas comerciales con las secciones del perfil
+LI-02-V009-K03 — Cómo conectar piezas distribuidas: repetición en dos sitios y adaptación al recorrido del visitante
+LI-02-V009-K04 — Señales visuales y confianza: lo que una foto o los colores pueden aportar a la impresión
+LI-02-V010-K02 — Distribuir pistas comerciales porque no se controla el recorrido de lectura del visitante
+LI-02-V010-K03 — Cuidar el perfil completo: el visitante puede juzgar la tienda por un detalle inesperado
+LI-02-V010-K04 — La ortografía y el estilo del perfil funcionan como muestras de la calidad del servicio
+LI-02-V010-K05 — La prospección automatizada depende de la calidad del perfil que respalda los mensajes
+  Uso: contexto o recurso opcional.
+LI-02-V011-K01 — Por qué la claridad del perfil debe preceder a la automatización comercial
+  Uso: contexto o recurso opcional.
+LI-02-V011-K02 — La fotografía como recepción de la tienda: accesibilidad sin simpatía forzada
+LI-02-V011-K03 — Diseñar el banner con cuidado: coherencia de marca, mantenimiento y menos saturación
+LI-02-V011-K04 — Evitar el abandono digital y pensar la estrategia antes de rellenar el perfil
+LI-02-V011-K05 — Usar la IA para auditar claridad, presencia del cliente y fuerza del mensaje
+LI-02-V012-K01 — Usar la IA como auditora: preguntas críticas, edición humana y revisión del conjunto de mensajes del perfil
+LI-02-V013-K02 — Una foto natural, amigable y bien iluminada sin exigir una producción costosa
+LI-02-V014-K01 — Iluminación de la foto: hacer visible el rostro con una toma preparada
+LI-02-V014-K02 — Fondo limpio y color de marca: concentrar la atención y facilitar el reconocimiento
+LI-02-V014-K03 — Expresión amigable sin imponer una sonrisa ni una pose uniforme
+LI-02-V014-K04 — La fotografía como filtro inicial de confianza, no como motivo suficiente de contratación
+LI-02-V014-K05 — Banner con sustancia comercial: destinatario, problema y transformación
+LI-02-V014-K06 — Comprobar el banner en el teléfono: solapamientos, tamaño de letra y empatía visual
+LI-02-V015-K01 — Comprobar el banner en el teléfono y diseñarlo para que el visitante siga explorando
+LI-02-V015-K02 — La segunda foto del banner es opcional: preferir una imagen real y reservar la IA para cuando haga falta
+LI-02-V015-K03 — Ordenar el titular: primero qué haces y cómo ayudas; después, si hace falta, tu cargo
+LI-02-V015-K04 — Hacer presente al buyer persona en el titular sin imponer el tuteo
+LI-02-V015-K05 — Nombre y titular limpios: priorizar palabras clave y distinguir los usos de los emojis
+LI-02-V016-K02 — Abrir el «Acerca de» con una tensión que genere curiosidad y encaje con el recorrido de llegada
+LI-02-V016-K03 — Del relato propio al beneficio del cliente: alternar misión, prueba y transformación
+LI-02-V017-K01 — Puertas directas e indirectas: conectar las secciones del perfil para facilitar una conversación
+LI-02-V017-K02 — Legibilidad móvil, estructura y emojis: presentar el «Acerca de» para que se siga leyendo
+LI-02-V017-K03 — Destacado como vitrina y el recorrido de exploración desde la cabecera del perfil
+LI-02-V017-K04 — Iniciar la prueba social: solicitar dos o tres recomendaciones y facilitar un borrador
+LI-02-V018-K01 — Redactar recomendaciones con resultados concretos y publicarlas mediante la voz de otra persona
+LI-02-V018-K02 — Organizar una campaña pequeña y periódica de recomendaciones
+LI-02-V018-K03 — Usar Destacado como anclaje del mensaje y como acceso a un documento de autoridad
+LI-02-V018-K05 — Conectar aprendizajes, resultados y palabras clave de la trayectoria con el valor que se ofrece hoy
+LI-02-V019-K02 — Redactar Experiencia mediante logros, aprendizajes y utilidad para el cliente actual
+LI-02-V019-K03 — Diagnosticar Conocimientos y aptitudes: activar la sección y evitar tanto la escasez como el exceso
+LI-02-V019-K05 — Respaldar las aptitudes relevantes con validaciones de personas que conocen el trabajo
+LI-02-V020-K01 — Seleccionar las aptitudes ahora y construir su respaldo a lo largo del tiempo
+LI-02-V020-K03 — Conseguir recomendaciones útiles: aprovechar la satisfacción y orientar el testimonio cuando haga falta
+LI-02-V020-K04 — Detectar lenguaje «vainilla» que no diferencia ni aclara el valor del perfil
+LI-02-V020-K05 — Ejercicio de diagnóstico: justificar cada cambio desde lo que busca el buyer persona
+LI-02-V021-K02 — Usar el semáforo de primera impresión como diagnóstico orientativo, no como autoridad infalible
+  Uso: contexto o recurso opcional.
+LI-02-V021-K03 — Profundizar con la masterclass escrita y trasladar el método de empleo a oportunidades comerciales
+LI-02-V021-K04 — Ejecutar la optimización del fin de semana con una lista concreta de cambios y un doble destinatario
+LI-02-V022-K01 — Adaptar el método sin copiar un perfil: lectura crítica del banner de Eduardo Vargas
+LI-02-V022-K02 — Priorizar el titular: servicio, transformación, sector y llamada a otro canal
+LI-02-V022-K03 — Destacado como vitrina de interacción y puerta hacia una newsletter
+LI-02-V022-K04 — Abrir el «Acerca de» con el dolor y agitarlo antes de presentar la solución
+LI-02-V023-K01 — Cerrar el «Acerca de» con voz propia y una puerta comercial: el ejemplo de Eduardo Vargas
+LI-02-V023-K02 — Símbolos en el nombre: una excepción condicionada por ubicación y presencia previa
+LI-02-V025-K01 — Un mismo objetivo comercial admite distintos estilos: el caso de Ángel Serrano Ceballos
+LI-02-V025-K02 — Destacado como vitrina y puerta: newsletter externa, artículos y destinos de conversión
+LI-02-V025-K03 — Cómo evaluar un perfil consolidado sin copiar sus carencias: aptitudes, experiencias y recomendaciones
+LI-02-M001-K01 — Marco del material: optimizar el perfil de LinkedIn según la trayectoria y las metas profesionales
+  Uso: contexto o recurso opcional.
+LI-02-M001-K02 — Foto de perfil: importancia inicial y diagnóstico de diez errores
+LI-02-M001-K03 — Técnicas 1 a 5: preparar la fotografía, la iluminación, la altura y el fondo
+LI-02-M001-K04 — Técnicas 6 y 7: postura natural, rostro visible y actitud amigable
+LI-02-M001-K05 — Técnica 8: nitidez, mínimo de 400 × 400 píxeles y precaución con los filtros
+LI-02-M001-K06 — Técnicas 9 y 10: pocos elementos, colores coherentes y encuadre equilibrado
+LI-02-M002-K01 — Foto de Juliana Rueda: un gesto memorable que refuerza la especialidad en audio
+LI-02-M002-K02 — Foto de Miguel Morillon: fondo neutro, expresión amigable y coherencia del atuendo
+LI-02-M002-K03 — Foto de Elena Gonzalez y comparación de tres estilos efectivos
+LI-02-M002-K04 — Cinco herramientas para editar, generar y evaluar la foto de perfil
+  Uso: contexto o recurso opcional.
+LI-02-M002-K05 — Actualizar la foto en LinkedIn: siete pasos, encuadre del rostro y revisión móvil
+LI-02-M002-K06 — Banner o foto de fondo: función estratégica y cinco errores que impiden comunicar la especialidad
+LI-02-M003-K01 — Cinco acciones para convertir el banner en un mensaje de valor profesional
+LI-02-M003-K02 — Ejemplo de Renata Faria: misión centrada en el cliente y diseño neutro coherente
+LI-02-M003-K03 — Ejemplo de Omar Suarez: beneficio explícito, fotografía relevante y contraste legible
+LI-02-M003-K04 — Procedimiento de nueve pasos para crear el banner en Canva y actualizarlo en LinkedIn
+LI-02-M004-K01 — Función del titular: una presentación visible dentro y fuera del perfil
+LI-02-M004-K02 — Cinco tácticas de redacción: especialidad, concisión, claridad, relevancia y recuerdo
+LI-02-M004-K03 — Preparar la biografía personal antes de usar ChatGPT para el titular
+LI-02-M004-K04 — Generar diez ideas de titular con ChatGPT: comando completo y resultados del ejemplo
+LI-02-M004-K05 — Actualizar el titular en LinkedIn y verificarlo en escritorio y móvil
+LI-02-M005-K01 — Función estratégica de «Acerca de» y diagnóstico de sus siete errores habituales
+LI-02-M005-K04 — Acción 3: construir una historia RIA —Relevante, Intrigante y Auténtica—
+LI-02-M005-K05 — Acción 4: reflejar una voz profesional, directa y cercana
+LI-02-M005-K06 — Acción 5: identificar e incluir las palabras clave del trabajo objetivo
+LI-02-M005-K07 — Contraejemplo de «Acerca de»: seis fallos de un texto genérico y centrado en sí mismo
+LI-02-M005-K08 — Estructura «Puente»: conectar necesidades de dos partes en el ejemplo de Elena González
+LI-02-M006-K01 — Estructura «Puente»: cinco criterios de eficacia y posicionamiento como conexión entre personas y empresas
+LI-02-M006-K02 — Estructura «Maestro»: demostrar especialidad enseñando soluciones, con el ejemplo completo de Alex Cuevas
+LI-02-M006-K03 — Estructura «Metáfora»: comunicar enfoque y valores mediante los héroes empresariales y sus siete dimensiones
+LI-02-M007-K01 — Estructura «Simetría» del «Acerca de»: relacionar desafíos empresariales y capacidades de respuesta
+LI-02-M007-K02 — Estructura «Embajador» del «Acerca de»: destacar el papel y las contribuciones dentro de una marca reconocida
+LI-02-M007-K03 — Herramientas para redactar y refinar el «Acerca de»: estilo, caracteres y borrador con ChatGPT
+LI-02-M007-K04 — Seis pasos para activar, actualizar y comprobar la sección «Acerca de» en LinkedIn
+LI-02-M008-K01 — Conocimientos y aptitudes: función de la sección y tres errores de optimización
+LI-02-M008-K02 — Seleccionar, ordenar y respaldar las habilidades principales
+LI-02-M008-K03 — Ejemplo de Augusto Rozo: competencias con respaldo amplio y diverso
+LI-02-M008-K04 — Ejemplo de Juliana Rueda: coherencia de especialidad, trayectoria y validaciones
+LI-02-M008-K05 — Técnica 1 con ChatGPT: obtener palabras clave desde el rol y el sector
+LI-02-M008-K06 — Técnica 2 con ChatGPT: extraer palabras clave de al menos tres descripciones de trabajo
+LI-02-M009-K01 — Conocimientos y Aptitudes: cinco pasos para seleccionar habilidades y conseguir validaciones
+LI-02-M009-K02 — Recomendaciones como respaldo social: fundamento y cuatro errores que debilitan el perfil
+LI-02-M009-K03 — Activar Recomendaciones y solicitar respaldo a contactos diversos y relevantes
+LI-02-M009-K04 — Calidad, manejo de objeciones y actualización semestral de las recomendaciones
+LI-02-M009-K05 — Ejemplo real de recomendación: contexto, alcance, metodología y capacidades profesionales
+LI-02-M010-K01 — Cinco dimensiones para que una recomendación describa de forma completa el trabajo y la aportación profesional
+LI-02-M010-K02 — Solicitar, revisar y publicar recomendaciones en doce pasos, con una cadencia de actualización constante
+LI-02-M010-K03 — Destacado como vitrina: seis errores de selección y presentación y tres buenas prácticas iniciales
+LI-02-M011-K01 — Destacado: seleccionar por calidad y mantener la sección actualizada
+LI-02-M011-K03 — Ejemplo gráfico de Eduardo Vargas: publicaciones y artículos como ventanas a la actividad profesional
+LI-02-M011-K04 — Ejemplo gráfico de Álvaro Bohorquez: medios, entrevistas y participación como ponente
+LI-02-M011-K05 — Ejemplo de Daniela Luque y principio común: Destacado como conjunto de ventanas de contenido
+LI-02-M012-K04 — Agregar, guardar, editar y ordenar contenido en Destacado: los 10 pasos del material
+LI-02-M012-K05 — Experiencia como pieza central del perfil: función y seis errores que deben corregirse
+LI-02-M012-K06 — Describir cada rol con siete preguntas: desarrollar el «dónde» y el «qué»
+LI-02-M013-K01 — Describir el impacto de un rol mediante el cómo, el cuándo y el quién
+LI-02-M013-K02 — Cuantificar el alcance de responsabilidades y logros: incluir el cuánto
+LI-02-M013-K03 — Explicar el porqué de una experiencia con el esquema pasado-presente-futuro
+LI-02-M013-K04 — Conectar experiencias sucesivas mediante transiciones que expliquen la progresión profesional
+LI-02-M013-K05 — Obtener borradores de Experiencia con ChatGPT combinando una oferta de trabajo y el CV
+LI-02-M013-K06 — Recursos de apoyo para el CV y criterios para personalizar las descripciones
+  Uso: contexto o recurso opcional.
+LI-02-M013-K07 — Incorporar a LinkedIn el contenido preparado para Experiencia: pasos 1 a 5
+LI-02-M014-K01 — Completar una experiencia con medios demostrativos y guardar los cambios
+LI-02-M014-K02 — Educación como oportunidad de indexación: diagnóstico y primera medida de optimización
+LI-02-M014-K03 — Conectar la formación con las habilidades actuales y con la trayectoria profesional
+LI-02-M014-K04 — Añadir certificaciones e idiomas explicando su valor profesional
+LI-02-M015-K01 — Describir la formación con evidencias de preparación profesional: tres ejemplos del material
+LI-02-M015-K02 — Actualizar Educación en LinkedIn: siete pasos, campos y contenido multimedia opcional
+LI-02-M015-K03 — Personalizar la URL: brevedad, facilidad de recuerdo e identidad más allá del cargo
+LI-02-M016-K01 — Acceder a la edición de la URL personalizada de LinkedIn
+LI-02-M016-K02 — Finalidad de la optimización integral: un perfil que represente la trayectoria y funcione como carta de presentación
+  Uso: contexto o recurso opcional.
+LI-02-BATCH-AUDIT-K02 — Enlaces directos de las newsletters utilizadas en la demostración
+  Uso: contexto o recurso opcional.
+LI-02-BATCH-AUDIT-K03 — Qué desarrolla el Acerca de de Ángel: datos, consultoría, tecnología y continuidad de trayectoria
+LI-02-BATCH-AUDIT-K04 — Completar el ejemplo de Daniela: alcance digital, afirmaciones de resultado y cierre de transformación
+  Uso: contexto o recurso opcional.
+
+RESERVADAS PARA OTROS EQUIPOS O ALCANCES
+LI-02-V012-K02 — Responder a la duda sobre publicaciones con IA: el problema es el contenido genérico sin voz, historia ni punto de vista
+  Motivo: La unidad trata la producción y revisión de publicaciones con IA; corresponde principalmente a esos equipos.
+LI-02-V024-K04 — Usar comunidades de actividades próximas para aprender y descubrir contactos relevantes
+  Motivo: Investigar comunidades próximas y sus participantes corresponde al Observatorio; Posicionamiento recibirá sus hallazgos.
+LI-02-V024-K05 — Evaluar críticamente cada recurso de un referente: una comunidad útil no valida todas sus imágenes
+  Motivo: Evalúa críticamente recursos de referentes; es parte de la investigación y revisión de referencias.
+LI-02-V025-K04 — Top Voices: selección atribuida a LinkedIn y categoría vinculada a los temas publicados
+  Motivo: Contextualiza la identificación Top Voice; no aporta una tarea de optimización ni garantiza conseguir la insignia.
+LI-02-M011-K02 — Por qué crear contenido aporta valor a la búsqueda de empleo
+  Motivo: La unidad aborda producir contenido como demostración de capacidades; Perfil selecciona después qué mostrar.
+LI-02-M011-K06 — Crear un artículo de LinkedIn con ChatGPT: definición, diez prompts y verificación obligatoria
+  Motivo: Producción y verificación de artículos; Perfil puede solicitar una pieza para Destacado sin asumir su autoría.
+LI-02-M011-K07 — Crear una presentación con SlidesAI y Google Slides para convertirla en un PDF destacado
+  Motivo: Producción de una presentación/PDF; Perfil define la necesidad y selecciona la pieza para su vitrina.
+LI-02-M012-K01 — Publicar un post: expresar una perspectiva profesional y decidir su visibilidad
+  Motivo: Creación y publicación de posts; no asignar esa ejecución a Posicionamiento ni Perfil.
+LI-02-M012-K02 — Crear un carrusel en PDF para ofrecer un recorrido visual por las ideas
+  Motivo: Producción de carruseles; pertenece al equipo de contenido.
+LI-02-M012-K03 — Publicar videos propios y utilizar el directo con relevancia profesional
+  Motivo: Producción de video/directos; pertenece al equipo de contenido.
+LI-02-M014-K05 — Elegir formación adicional y alternativas prácticas a partir de las habilidades demandadas
+  Motivo: Elección de formación adicional; no es una tarea actual de estos dos agentes.
+
+FUERA DE LA ASIGNACIÓN
+LI-02-V026-K01 — Tarea de cierre: aplicar la optimización al perfil propio durante el fin de semana
+  Motivo: Encargo de realizar la tarea el fin de semana; no añade conocimiento específico a las unidades ya asignadas.
+LI-02-M016-K03 — Recursos de contacto comercial ofrecidos al cierre del material
+  Motivo: Canales de contacto comercial de la docente; no son datos ni instrucciones para los agentes del usuario.
+
