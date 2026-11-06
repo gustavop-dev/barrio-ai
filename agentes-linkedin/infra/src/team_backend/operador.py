@@ -306,10 +306,11 @@ def execute(user,proposal_id):
                            reconciled_at=timezone.now() if found else None,
                            note='' if found else 'Aceptado por el proveedor; aún no visible al releer.')
         reaction=proposal.payload['reaction']
-        if connector.get_post(post_id).get('user_reacted')==reaction:
-            return _finish(execution,'confirmed',user,note='La reacción ya estaba aplicada.',reconciled_at=timezone.now())
+        # LinkedIn only tells whether we reacted: never stack a second reaction on the same post.
+        if connector.get_post(post_id).get('user_reacted'):
+            return _finish(execution,'confirmed',user,note='Ya había una reacción propia; no se añadió otra.',reconciled_at=timezone.now())
         connector.add_reaction(post_id,reaction)
-        confirmed=connector.get_post(post_id).get('user_reacted')==reaction
+        confirmed=bool(connector.get_post(post_id).get('user_reacted'))
         return _finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=timezone.now() if confirmed else None)
     except ConnectorUncertain as exc:
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
@@ -332,7 +333,7 @@ def reconcile(user,proposal_id):
         found=_find_own_comment(connector,post_id,proposal.payload['text'],execution.external_id or None)
         if found:
             return _finish(execution,'confirmed',user,external_id=found['id'],external_url=proposal.post.share_url,reconciled_at=timezone.now())
-    elif connector.get_post(post_id).get('user_reacted')==proposal.payload['reaction']:
+    elif connector.get_post(post_id).get('user_reacted'):
         return _finish(execution,'confirmed',user,reconciled_at=timezone.now())
     state='uncertain' if stale else execution.state
     note='No encontrado al releer; no se repite automáticamente. Decide Gustavo.'

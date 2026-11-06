@@ -173,7 +173,7 @@ class OperatorTests(OperatorBase):
         post=self.observed()[0]
         action=self.api.post('/api/v1/operador/actions',{'post':str(post.id),'capability':'INT-02','payload':{'reaction':'linkedin_insightful'}},format='json').json()
         self.assertEqual(self.approve(action).state,'confirmed')
-        self.assertEqual(self.fake.get_post(post.provider_post_id)['user_reacted'],'linkedin_insightful')
+        self.assertTrue(self.fake.get_post(post.provider_post_id)['user_reacted'])
         invalid=self.api.post('/api/v1/operador/actions',{'post':str(post.id),'capability':'INT-02','payload':{'reaction':'like'}},format='json')
         self.assertEqual(invalid.status_code,400)
 
@@ -253,6 +253,16 @@ class UnipileContractTests(TransactionTestCase):
         def rejected(request):return httpx.Response(422,json={'type':'provider/unprocessable_entity'})
         with self.assertRaises(ConnectorError) as ctx:self.connector(rejected).create_comment('p','x')
         self.assertFalse(ctx.exception.pause)
+
+    def test_real_post_payload_is_normalized(self):
+        """Shape observed from Unipile v2 on 2026-11-06: reactions are a per-type list, user_reacted a bool."""
+        from team_backend.connectors import _post
+        post=_post({'object':'Post','id':'WyJhY3Rpdml0eTo3NDk3Il0=','share_url':'https://www.linkedin.com/feed/update/x','text':'t',
+                    'created_at':'2026-08-23T12:00:00.000Z','user_reacted':False,'comments_counter':2,'reposts_counter':0,
+                    'reactions_counter':[{'reaction':'like','count':3},{'reaction':'celebrate','count':1}],'is_repost':False,
+                    'author':{'id':'ACo1','display_name':'Ana','public_identifier':'ana'},'analytics':{'impressions_counter':321}})
+        self.assertEqual((post['reactions_counter'],post['comments_counter'],post['user_reacted'],post['impressions']),(4,2,False,321))
+        self.assertEqual(_post({'id':'x','reactions_counter':[],'user_reacted':True})['reactions_counter'],0)
 
     def test_identifier_rejects_names(self):
         with self.assertRaises(ValueError):public_identifier('Ana María López')
