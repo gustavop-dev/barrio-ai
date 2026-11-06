@@ -23,6 +23,8 @@ Se conservan las rutas actuales para mantener las referencias entre documentaci�
 
 **Herramientas seleccionadas para validar:** [selección revisada y huecos de cobertura](agentes-linkedin/infra/docs/herramientas-linkedin-v2.md). Unipile v2, API oficial de LinkedIn, programación en Django, investigación de noticias/blogs/opiniones con Claude, imágenes de OpenAI y fotos reales. La analítica oficial depende de permisos aún no comprobados; ninguna integración nueva conectada. La comparación v1 queda como historial.
 
+**Búsqueda de prospectos:** [lemlist frente a Unipile y Sales Navigator](agentes-linkedin/infra/docs/comparacion-lemlist-unipile.md). Diferencias entre base B2B, búsqueda de la cuenta, cobertura operativa y costes; recomendación pendiente de piloto.
+
 1. [Plan del proyecto](agentes-linkedin/infra/docs/plan-equipo-autonomo.md).
 2. [Ciclos de los cinco equipos](agentes-linkedin/infra/docs/circuitos-equipo.md).
 3. [Datos externos necesarios](agentes-linkedin/infra/docs/datos-externos-por-equipo.md).

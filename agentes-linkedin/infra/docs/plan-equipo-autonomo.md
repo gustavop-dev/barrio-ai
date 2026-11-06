@@ -236,3 +236,9 @@ Gustavo mantiene Unipile y sustituye Zernio por la API oficial de LinkedIn con p
 Amplía la investigación a noticias, blogs, opiniones y contexto del mundo, preservando pertinencia editorial y procedencia. Descarta Canva: generación/edición mediante OpenAI y una biblioteca de fotos reales, con directrices de infografías pendientes. Agenda continúa opcional. [Decisión y límites](herramientas-linkedin-v2.md), [matriz de las 72 acciones](../../arquitectura/matriz-herramientas-linkedin-v2.json), [validación documental](../../arquitectura/validacion-herramientas-linkedin-v2.json).
 
 La elección de herramientas no cambia los trece contratos ni concede autoridad de ejecución. Los siete huecos sin contrato específico siguen visibles; analítica depende de aprobación y las capacidades parciales se verificarán en el piloto. No hay implementación, conexiones, consumo pagado ni cambios presupuestarios en este incremento. Los artefactos v1 se conservan como historial; su validación no cubre esta revisión.
+
+### Comparación de lemlist y Unipile — 2026-11-06
+
+Gustavo solicita comparar cobertura y búsqueda de prospectos. [Investigación](comparacion-lemlist-unipile.md): lemlist ofrece base de perfiles públicos, API de búsqueda, enriquecimiento, señales y campañas; no se acredita que su base sea la de Sales Navigator. Unipile permite búsqueda Classic y Sales Navigator según la suscripción de la cuenta. Dos diferencias relevantes: lemlist documenta su inbox limitado a conversaciones iniciadas allí, y el comentario del último post como tarea manual.
+
+Se mantiene Unipile como recomendación para operar los ciclos propios. Lemlist queda como candidato a fuente complementaria de prospectos/señales o plataforma de campañas futuras, no contratación ni sustitución aprobada. Se comparan costes y criterios de piloto; no se asignan agentes, conectan cuentas ni ejecutan búsquedas autenticadas. La matriz de 72 acciones v2 permanece sin cambios.
