@@ -41,11 +41,19 @@ def _user(data):
     return {'id':str(data.get('id') or ''),'public_identifier':data.get('public_identifier') or '',
             'display_name':data.get('display_name') or '','profile_url':data.get('profile_url') or ''}
 
+def _count(value):
+    """Unipile v2 reports reactions as [{reaction, count}]; older shapes use an int."""
+    if isinstance(value,list):return sum(int(item.get('count') or 0) for item in value if isinstance(item,dict))
+    return value if isinstance(value,int) and not isinstance(value,bool) else None
+
 def _post(data):
+    analytics=data.get('analytics') or {}
     return {'id':str(data['id']),'share_url':data.get('share_url') or '','text':data.get('text') or '',
             'created_at':_when(data.get('created_at')),'author':_user(data.get('author')),
-            'comments_counter':data.get('comments_counter'),'reactions_counter':data.get('reactions_counter'),
-            'user_reacted':data.get('user_reacted'),'is_repost':bool(data.get('is_repost'))}
+            'comments_counter':_count(data.get('comments_counter')),'reactions_counter':_count(data.get('reactions_counter')),
+            # A boolean: LinkedIn exposes whether we reacted, not which reaction.
+            'user_reacted':bool(data.get('user_reacted')),'is_repost':bool(data.get('is_repost')),
+            'impressions':_count(analytics.get('impressions_counter'))}
 
 def _comment(data):
     return {'id':str(data['id']),'text':data.get('text') or '','created_at':_when(data.get('created_at')),
@@ -147,7 +155,7 @@ class FakeConnector:
             pid=f'activity:{public_id}-{i}'
             self.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':text,
                 'created_at':datetime(2026,11,6,12,i,tzinfo=timezone.utc).isoformat(),'author':user,'comments_counter':0,
-                'reactions_counter':0,'user_reacted':None,'is_repost':False}
+                'reactions_counter':[],'user_reacted':False,'is_repost':False}
             self.state['comments'][pid]=[]
         return user
 
@@ -196,7 +204,7 @@ class FakeConnector:
         if reaction not in REACTIONS:raise ConnectorError('Reacción no admitida.',kind='invalid')
         mode=self._fail();self.get_post(post_id)
         if mode!='uncertain_not_applied':
-            self.state['posts'][post_id]['user_reacted']=reaction;self.state['writes']+=1
+            self.state['posts'][post_id]['user_reacted']=True;self.state['writes']+=1
         if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
         return {'reaction':reaction}
 
