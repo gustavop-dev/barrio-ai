@@ -28,6 +28,25 @@ class PublicationBase(OperatorBase):
         transport=patch.object(li,'TRANSPORT',httpx.MockTransport(forbidden));transport.start();self.addCleanup(transport.stop)
         li.FakeLinkedInOfficial.reset();self.addCleanup(li.FakeLinkedInOfficial.reset)
 
+    def remember(self,key,value):
+        import uuid
+        from psycopg.types.json import Jsonb
+        from knowledge import db
+        with db.connect() as c:
+            c.execute("INSERT INTO memory(id,namespace,key,version,value,status,author,evidence) VALUES(%s,'user',%s,1,%s,'confirmed','user','prueba')",
+                      (str(uuid.uuid4()),key,Jsonb(value)))
+
+    def gustavo_memory(self):
+        self.remember('trayectoria.projectapp',{'texto':'Founder of ProjectApp, a custom software studio.','uso_publico':True})
+        self.remember('objetivo.prioridad',{'texto':'Prioridad 60/40 entre oportunidades personales y ProjectApp.','uso_publico':False})
+        self.remember('audiencia.segmento','Founders hispanohablantes de startups presemilla en EE. UU.')  # legacy value: private
+
+    def bot(self):
+        from django.contrib.auth.models import User
+        bot,_=User.objects.get_or_create(username='barrio-autopiloto')
+        self.grant(bot,'access_knowledge','run_agents','use_paid_providers','operate_linkedin','execute_actions')
+        return bot
+
     def credential(self,expires_in=timedelta(days=60),token='AQ-live-token-never-logged'):
         account=ConnectorAccount.objects.create(provider='linkedin',external_account_id='urn:li:person:abc123',label='LinkedIn oficial')
         return LinkedInCredential.objects.create(account=account,member_urn='urn:li:person:abc123',member_name='Gustavo',
@@ -158,8 +177,25 @@ class PostsApiContractTests(PublicationBase):
         self.assertTrue(credential.account.paused);self.assertIn(li.TOKEN_PAUSE,credential.account.paused_reason)
         self.assertIn('pausa',notify.call_args.args[0])
 
-    def bot(self):
-        from django.contrib.auth.models import User
-        bot=User.objects.create_user('barrio-autopiloto')
-        self.grant(bot,'access_knowledge','run_agents','use_paid_providers','operate_linkedin','execute_actions')
-        return bot
+
+class MemoryGuardTests(PublicationBase):
+    """uso_publico: only public facts are attributable; private guidance orients and never leaks."""
+    def test_comment_receives_split_memory_and_the_gate_blocks_a_leak(self):
+        from team_backend import jobs
+        from team_backend.models import ActionProposal
+        self.gustavo_memory();post=self.observed()[0];bot=self.bot()
+        leak='Evals first, always. That is exactly what Spanish-speaking founders ask me about. Which failure mode do you test first?'
+        answer={'decision':'comment','language':'en','comment':leak,'rationale':'r','citations':['LI-03-M006-K02'],
+                'claims_needing_evidence':[],'risks':[]}
+        with patch('knowledge.providers.claude',return_value={'text':json.dumps(answer),'model':'claude-opus-5-5'}) as claude:
+            jobs.enqueue_operation(bot,'propose_comment',{'post':str(post.id)});jobs.process_one(self.worker)
+        system,message=claude.call_args.args[0],json.loads(claude.call_args.args[1])
+        self.assertNotIn('confirmed_user_memory',message);self.assertIn('private_guidance',system)
+        self.assertEqual(message['public_facts'],[{'key':'trayectoria.projectapp','version':1,'fact':'Founder of ProjectApp, a custom software studio.'}])
+        self.assertEqual({g['key'] for g in message['private_guidance']},{'objetivo.prioridad','audiencia.segmento'})
+        self.assertNotIn('60/40',json.dumps(message['public_facts']))
+        autopiloto.tick(bot)
+        proposal=ActionProposal.objects.get(post=post)
+        self.assertEqual(proposal.state,'discarded')
+        self.assertTrue(any('orientación privada' in r for r in proposal.risks),proposal.risks)
+        self.assertEqual(self.fake.state['writes'],0)

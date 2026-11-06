@@ -13,8 +13,8 @@ from datetime import timedelta
 from decimal import Decimal
 from django.db.models import Q
 from django.utils import timezone
-from knowledge import db
-from . import operador
+from knowledge import db, memory
+from . import guardas, operador
 from .jobs import enqueue_operation
 from .models import ActionExecution, ActionProposal, ConnectorAccount, Job, ObservedPost
 
@@ -52,6 +52,7 @@ def content_issues(proposal):
         if pattern.search(text):issues.append(reason)
     if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
+    issues+=guardas.private_leaks(text,memory.confirmed_blocks()[1])
     return issues
 
 def policy_review(proposal):

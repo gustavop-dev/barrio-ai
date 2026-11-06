@@ -381,7 +381,10 @@ Criterio (catálogo INT-03, fundamentos B04/B06/B15 del curso en el contexto):
 - Aporta una opinión sustentada y, cuando tenga sentido en ese hilo, una apertura a conversar.
 - Sin elogio genérico, sin pitch, sin mencionar servicios ni pedir contacto.
 - No inventes experiencias, clientes, cifras ni resultados. Solo puedes atribuir a Gustavo hechos
-  presentes en confirmed_user_memory; si está vacío, aporta perspectiva o una pregunta, no vivencias.
+  presentes en public_facts; si está vacío, aporta perspectiva o una pregunta, no vivencias.
+- private_guidance solo orienta qué aportar y qué evitar (prioridades, audiencia, cadencia, límites).
+  Nunca lo menciones, cites ni parafrasees en el comentario: ni prioridades como 60/40 ni el tipo de
+  founders o clientes que Gustavo busca.
 - Escribe en el idioma de la publicación (por defecto inglés). 2–5 frases, máximo 900 caracteres,
   sin hashtags y como mucho un emoji si encaja con el tono del hilo.
 - No repitas lo que ya dicen otros comentarios.
@@ -411,8 +414,9 @@ def propose_comment(user,post_id,origin_job=''):
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     try:others=[{'author':c['author']['display_name'],'text':c['text'][:600]} for c in get_connector(post.account).list_comments(post.provider_post_id,limit=10)]
     except ConnectorError:others=[]
-    message=json.dumps({'post':{'author':post.author_name,'text':post.text,'url':post.share_url},
-        'existing_comments':others,'confirmed_user_memory':memory.latest(True),'course_units':units},ensure_ascii=False,default=str)
+    public_facts,private_guidance=memory.confirmed_blocks()
+    message=json.dumps({'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':others,
+        'public_facts':public_facts,'private_guidance':private_guidance,'course_units':units},ensure_ascii=False,default=str)
     answer=providers.claude(COMMENT_SYSTEM,message,output_schema=COMMENT_SCHEMA,effort='medium',purpose='propose-comment')
     try:data=json.loads(answer['text'])
     except json.JSONDecodeError:raise ValueError('La respuesta del agente no es JSON válido.') from None
