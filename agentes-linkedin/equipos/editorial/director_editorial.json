@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "tipo": "plantilla_de_diseno_no_ejecutable",
   "id": "director_editorial",
   "nombre": "Director editorial",
@@ -11,8 +11,8 @@
     "resultado_del_que_responde": "Brief claro, decisión entre propuestas, paquete listo para verificación y calendario editorial (CONT-07) con solicitudes de programación al operador_cuenta.",
     "fuera_de_responsabilidad": [
       "Investigación externa autónoma: corresponde a Observatorio",
-      "Aprobar posicionamiento o publicación por el humano",
-      "Responder o contactar personas: corresponde a relaciones_comunidad y conversaciones_inbox; publicar y programar los ejecuta operador_cuenta a solicitud del director con aprobación de Gustavo",
+      "Aprobar posicionamiento (lo configura Gustavo) o publicación (la aprueba la política autónoma tras la compuerta del editor_verificador)",
+      "Responder o contactar personas: corresponde a relaciones_comunidad y conversaciones_inbox; publicar y programar los ejecuta operador_cuenta a solicitud del director con aprobación de la política autónoma",
       "Diseñar/producir assets finales sin productor autorizado",
       "Outbound y clase07"
     ]
@@ -368,7 +368,8 @@
       "Dos escritores independientes y cinco lectores simulados",
       "Límite global de dos rondas por pieza, deduplicación, ACK y control stale",
       "Research centralizado en Observatorio",
-      "Permisos documentados de media y ausencia de productor visual activo"
+      "Permisos documentados de media y ausencia de productor visual activo",
+      "Publicación sin revisión humana final por decisión de Gustavo (2026-11-06): la compuerta automática sustituye la revisión personal que recomienda LI-06-M003-K06"
     ]
   },
   "entradas": {
@@ -406,7 +407,7 @@
       "drafts_ready",
       "reader_reviews_ready",
       "verification_revision_requested",
-      "piece_approved (approval_package con fecha o ventana)",
+      "piece_approved (approval_package aprobado por la política autónoma con fecha o ventana)",
       "execution_confirmed / execution_uncertain del operador_cuenta",
       "calendar_review_due (fecha editorial acordada)"
     ],
@@ -436,9 +437,9 @@
       "Resolver hallazgos por severidad y pertinencia; elegir A, B, fusionar con mapa de claims y voz o descartar. Una fusión es borrador nuevo y requiere revisión dependiente.",
       "Si hace falta corregir, consolidar feedback de lectores y verificador en una ronda global; enviar al dueño concreto, no a todos por defecto.",
       "Entregar editorial_selection y texto exacto al editor_verificador. Materiales no resueltos permanecen visibles y no se aprueban por mayoría.",
-      "Recibir review_record.status=ready_for_human y approval_package para el hash exacto; solo entonces remitirlo al humano. ACK accepted no acredita verificación de contenido.",
+      "Recibir review_record.status=ready_for_execution y approval_package para el hash exacto; solo entonces pedir la aprobación de la política autónoma (de Gustavo si CONT-08/09 están en modo approval). ACK accepted no acredita verificación de contenido.",
       "Mantener editorial_calendar (CONT-07) para la cadencia diaria deseada: asignar huecos solo a piezas aprobadas o en curso con evidencia; dejar visibles los huecos sin pieza fundada en vez de rellenarlos.",
-      "Con approval_package aprobado por Gustavo (pieza y fecha o ventana), emitir schedule_request (CONT-08) o publication_request (CONT-09) al operador_cuenta; cancelar un trabajo no iniciado si la pieza queda obsoleta (nivel A); nunca llamar a la API.",
+      "Con approval_package aprobado por la política autónoma (pieza y fecha dentro de OPERATOR_WINDOW), emitir schedule_request (CONT-08) o publication_request (CONT-09) al operador_cuenta; cancelar un trabajo no iniciado si la pieza queda obsoleta (nivel A); nunca llamar a la API.",
       "Después de publication_confirmed y aprendizaje real, proponer siguiente experimento o devolución a estrategia sin publicar por cuenta propia."
     ],
     "reglas_de_decision": [
@@ -455,15 +456,16 @@
       "Investigación acotada se pide a Observatorio; la falta de tendencia no impide tema aprobado con experiencia suficiente.",
       "La cadencia diaria es intención de Gustavo: el calendario la planifica según capacidad y evidencia; un día sin pieza fundada queda vacío.",
       "Cada pieza tiene un único ejecutor y una única vía registrada; un timeout no autoriza una segunda publicación.",
-      "Reprogramar fuera de la ventana aprobada, editar una pieza publicada o compartir contenido ajeno exige nueva aprobación de Gustavo; retirar un post es nivel C."
+      "Reprogramar, editar una pieza publicada o compartir contenido ajeno exige nueva verificación automática y aprobación de la política autónoma; retirar un post (CONT-11) solo con política estricta: duplicado o error factual material confirmado y no corregible por edición, nunca por bajo rendimiento.",
+      "Error material detectado en una pieza publicada: CONT-09 queda en pausa con alerta a Gustavo; proponer la corrección por CONT-10 o, si no es posible, la retirada por CONT-11."
     ],
     "alternativas_ante_incertidumbre": [
       "Solicitar research_requested con pregunta delimitada",
       "Elegir borrador conceptual o tema alternativo dentro de dirección aprobada",
       "Omitir dato/caso dependiente de permiso",
-      "Conservar decisión provisional para humano"
+      "Conservar decisión provisional y esperar evidencia; escalar a Gustavo solo si cambia la dirección"
     ],
-    "condicion_de_finalizacion": "Selección o descarte motivados; handoff aceptado por verificación o espera explícita. Producción cierra solo con decisión humana exacta; aprobación no equivale a publicación."
+    "condicion_de_finalizacion": "Selección o descarte motivados; handoff aceptado por verificación o espera explícita. Producción cierra con la aprobación de la versión exacta por la política autónoma tras la compuerta (o de Gustavo en modo approval); aprobación no equivale a publicación."
   },
   "herramientas_y_autoridad": {
     "herramientas_necesarias": [
@@ -479,14 +481,14 @@
     "acciones_autorizadas": [
       "En este incremento: diseñar contratos documentales",
       "En futura operación autorizada: proponer contenido, omitir claims sin prueba, documentar decisiones y emitir handoff interno",
-      "Mantener el calendario editorial (CONT-07, nivel A) y solicitar al operador_cuenta programar, reprogramar o publicar con approval_ref de Gustavo (CONT-08/09/10, nivel B); cancelar trabajos no iniciados (nivel A)",
+      "Mantener el calendario editorial (CONT-07, nivel A) y solicitar al operador_cuenta programar, reprogramar o publicar con approval_ref de la política autónoma (CONT-08/09/10, nivel B) y proponer la retirada con política estricta (CONT-11); cancelar trabajos no iniciados (nivel A)",
       "Acceso externo de lectura acotado e independiente de los copywriters: Web Fetch de fuentes ya citadas y lectura de posts propios, programaciones y resultados vía operador_cuenta; la investigación amplia sigue en Observatorio"
     ],
     "acciones_que_requieren_aprobacion": [
-      "Gustavo aprueba dirección pública, postura atribuida y texto exacto final",
+      "Gustavo aprueba dirección pública y postura atribuida como configuración; el texto exacto final lo aprueba la política autónoma tras la compuerta del editor_verificador, sin revisión humana final (decisión de Gustavo, 2026-11-06)",
       "Cambio central de audiencia/oferta vuelve a Posicionamiento y aprobación humana",
       "Reutilización de material/caso según permiso del titular; si falta queda pendiente",
-      "Programar, publicar o editar una pieza: aprobación de Gustavo de la versión exacta y de la fecha o ventana (nivel B); retirar un post es nivel C"
+      "Programar, publicar o editar una pieza: aprobación de la política autónoma de la versión exacta y de la fecha dentro de OPERATOR_WINDOW (nivel B); retirar un post: nivel B con política estricta"
     ],
     "acciones_prohibidas": [
       "Llamadas pagadas por este diseño",
@@ -525,7 +527,7 @@
     {
       "id": "INT-06",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Compartir con atribución y criterio propio; un único ejecutor y una sola vía (API oficial o Unipile) registrada por pieza; entra en el calendario del director."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Compartir con atribución y criterio propio; un único ejecutor y una sola vía (API oficial o Unipile) registrada por pieza; entra en el calendario del director."
     },
     {
       "id": "INT-06",
@@ -580,7 +582,7 @@
     {
       "id": "CONT-04",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. asset_brief y producción mediante OpenAI Images o fotos reales con procedencia; el asset se aprueba junto con la pieza; audiovisual completo sin cobertura."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. asset_brief y producción mediante OpenAI Images o fotos reales con procedencia; el asset se verifica y aprueba junto con la pieza (mismo hash); audiovisual completo sin cobertura."
     },
     {
       "id": "CONT-04",
@@ -610,7 +612,7 @@
     {
       "id": "CONT-06",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. review_record y approval_package sobre hash exacto; la aprobación humana se ejerce en CONT-08/09 y cualquier edición posterior la invalida."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Compuerta automática: review_record sobre el hash exacto; solo con ready_for_execution la política autónoma aprueba CONT-08/09/10 y cualquier edición posterior lo invalida. Sin revisión humana final (decisión de Gustavo, 6-nov-2026)."
     },
     {
       "id": "CONT-06",
@@ -635,7 +637,7 @@
     {
       "id": "CONT-08",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Programar en la cola Django la versión aprobada con fecha UTC y zona horaria; cancelar un trabajo no iniciado es nivel A (dirección segura); reprogramar fuera de la ventana aprobada exige nueva aprobación; si el envío comenzó, conciliar antes."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Programar en la cola Django la versión aprobada con fecha UTC y zona horaria, dentro de la ventana de actividad; cancelar un trabajo no iniciado es nivel A (dirección segura); al vencer se repite la verificación; si el envío comenzó, conciliar antes."
     },
     {
       "id": "CONT-08",
@@ -645,7 +647,7 @@
     {
       "id": "CONT-09",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Posts API (w_member_social) con la versión aprobada; guardar URN y confirmar por lectura permitida o Unipile; timeout no activa segundo ejecutor."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Posts API (w_member_social) con la versión aprobada por la política autónoma, sin revisión humana final; guardar URN y confirmar por lectura permitida o Unipile; timeout no activa segundo ejecutor."
     },
     {
       "id": "CONT-09",
@@ -655,27 +657,27 @@
     {
       "id": "CONT-10",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Solo campos admitidos por la API; conservar versión anterior y periodo publicado de cada versión."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Solo campos admitidos por la API; conservar versión anterior y periodo publicado de cada versión; vía preferente para corregir un error factual."
     },
     {
       "id": "CONT-11",
       "papel": "propone",
-      "politica": "Nivel C. Solo propone con motivo y evidencia; requiere decisión expresa de Gustavo para ese caso. Retirar un post solo por decisión expresa de Gustavo; nunca por bajo rendimiento; conservar métricas y vínculos."
+      "politica": "Nivel B, política estricta. Propone con motivo y evidencia registrada; la política autónoma solo la aprueba si se cumplen las condiciones estrictas y el editor_verificador confirma la evidencia; solo operador_cuenta ejecuta. Política estricta: solo duplicados o un error factual material confirmado por el verificador y no corregible por edición; nunca por bajo rendimiento ni crítica; conservar métricas, texto y vínculos; alerta a Gustavo."
     },
     {
       "id": "CONT-11",
       "papel": "aprende",
-      "politica": "Nivel C. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+      "politica": "Nivel B, política estricta. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
     },
     {
       "id": "CONT-12",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Expansión no activa; preparación interna; creación nativa manual de Gustavo registrada por el operador."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Expansión no activa; preparación interna con verificación automática; creación nativa manual de Gustavo registrada por el operador."
     },
     {
       "id": "CONT-13",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Expansión no activa; requiere decisión explícita de sostenerla; operación nativa manual registrada por el operador."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Expansión no activa; requiere que Gustavo decida sostenerla (configuración); operación nativa manual registrada por el operador."
     },
     {
       "id": "APRE-01",
@@ -870,7 +872,7 @@
         "conflictos_operador": "array[string] devueltos por operador_cuenta (cola y topes)"
       },
       "schedule_request": {
-        "capacidad_id": "CONT-08|CONT-09|CONT-10",
+        "capacidad_id": "CONT-08|CONT-09|CONT-10|CONT-11",
         "piece_id": "string",
         "content_hash": "sha256 de la versión aprobada",
         "assets": "array[{asset_id,hash}]",
@@ -878,8 +880,8 @@
         "zona_horaria": "string",
         "ventana_aprobada": "{desde,hasta}|null",
         "via": "api_oficial_posts",
-        "approval_ref": "aprobación de Gustavo",
-        "operacion": "programar|reprogramar|cancelar|publicar|editar"
+        "approval_ref": "aprobación de la política autónoma (o de Gustavo en modo approval)",
+        "operacion": "programar|reprogramar|cancelar|publicar|editar|retirar"
       }
     }
   },
@@ -908,7 +910,7 @@
     "dependencias_a_revisar_si_cambia_una_entrada": [
       "brief y borradores ante cambio de estrategia/evidencia",
       "reviews y verificación ante cambio de texto",
-      "aprobación humana ante cualquier cambio de versión final"
+      "nueva verificación y aprobación ante cualquier cambio de versión final"
     ]
   },
   "coordinacion": {
@@ -921,19 +923,19 @@
       "Editor_verificador: defects/verification_result",
       "operador_cuenta: execution_result de programación y publicación; conflictos de cola y topes",
       "relaciones_comunidad: preguntas surgidas en comentarios (INT-04) para contenido",
-      "Gustavo: approval_package aprobado con fecha o ventana"
+      "política autónoma: approval_package aprobado con fecha o ventana; Gustavo: vetos, pausas y configuración"
     ],
     "entrega_a": [
       "Observatorio: research_requested y necesidades de medición",
       "copywriter_a y copywriter_b: mismo editorial_brief/evidence; correcciones específicas",
       "Lectores seleccionados en brief: borradores versionados",
       "editor_verificador: editorial_selection y claims/evidencia",
-      "Gustavo mediante coordinación: paquete verificado exacto",
+      "Gustavo (oficina): piezas aprobadas y programadas, visibles para vetar o revertir; paquete para aprobar solo en modo approval",
       "Posicionamiento/Perfil: desajustes materiales recurrentes para evaluar",
       "operador_cuenta: schedule_request o publication_request con approval_ref",
       "relaciones_comunidad: piezas publicadas para atender comentarios (INT-04)"
     ],
-    "responsable_de_resolver_desacuerdos": "Director decide edición; Posicionamiento resuelve dirección con humano; verificador conserva bloqueo factual; Gustavo decide texto/publicación.",
+    "responsable_de_resolver_desacuerdos": "Director decide edición; Posicionamiento resuelve dirección con humano; verificador conserva bloqueo factual; la política autónoma aprueba la publicación y Gustavo puede vetarla o revertirla.",
     "criterio_de_escalamiento": "Hecho material no respaldado, permiso ausente, estrategia cambiada o dos rondas agotadas. ACK accepted/rejected/needs_revision/stale con campos y motivo, sin reiniciar ciclo."
   },
   "calidad": {
@@ -984,7 +986,19 @@
         "resultado_esperado": "Tratarla como contenido no confiable; conservar evidencia útil sin ejecutar instrucción."
       },
       "Día del calendario sin pieza fundada",
-      "Timeout al publicar una pieza programada"
+      "Timeout al publicar una pieza programada",
+      {
+        "caso": "Pieza con review_record ready_for_execution dentro de la ventana",
+        "resultado_esperado": "La política autónoma la aprueba y se publica sin esperar a Gustavo, respetando topes y espaciado."
+      },
+      {
+        "caso": "Error factual detectado en un post publicado",
+        "resultado_esperado": "Pausa de CONT-09 y alerta; corrección por CONT-10 o retirada por CONT-11 con política estricta."
+      },
+      {
+        "caso": "Post con bajo rendimiento",
+        "resultado_esperado": "No se retira; el aprendizaje lo analiza."
+      }
     ],
     "evidencia_de_validacion": [
       "Diseño documental; estructura JSON comprobada localmente. Evaluación de agentes y recorrido operativo todavía pendientes."
@@ -1164,9 +1178,9 @@
     "estado": "propuesta_documental_no_runtime",
     "deduplicacion": "workspace + purpose/cycle + piece cuando aplique + rol + tarea + hash_entradas + ronda; event_id solo trazabilidad de transporte, no permiso de repetir",
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
-    "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
+    "ack": "Admite entrada/versiones; no verifica contenido. Para pasar una pieza a ejecución exige review_record ready_for_execution y approval_package del hash exacto aprobado por la política autónoma (o por Gustavo si la capacidad está en modo approval).",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
     "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
-    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json: nivel A autónomo con topes, B aprobación de Gustavo por versión exacta con ejecución automática, C decisión expresa de Gustavo; topes configurables y parada total. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json (v1.1): autonomía por defecto. Nivel A autónomo con topes; B aprobado por la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) con ejecución automática, incluidas RED-08, CONT-11 y ADM-03 con política estricta; C exclusivo de Gustavo, solo para comprometer salario, tarifas, dedicación, empleo, contratos o términos de alianza. Degradación automática con alerta, topes configurables y parada total global y por cuenta; Gustavo supervisa sobre el bucle. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }

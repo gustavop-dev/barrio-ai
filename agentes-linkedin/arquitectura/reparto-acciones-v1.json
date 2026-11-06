@@ -1,11 +1,11 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "fecha": "2026-11-06",
   "estado": "diseno_no_activado",
   "documento": "../infra/docs/reparto-acciones-v1.md",
   "catalogo_fuente": "catalogo-acciones-linkedin-v1.json",
   "matriz_herramientas": "matriz-herramientas-linkedin-v2.json",
-  "alcance": "Quién propone, decide, ejecuta, verifica y aprende en cada una de las 72 capacidades, con nivel de autoridad, topes y parada total. No implementa software, no conecta cuentas ni concede permisos efectivos.",
+  "alcance": "Quién propone, decide, ejecuta, verifica y aprende en cada una de las 72 capacidades, con nivel de autoridad, verificación automática, degradación, topes, alertas y parada total. La versión 1.1 aplica la decisión de autonomía de Gustavo del 6 de noviembre de 2026. No implementa software, no conecta cuentas ni concede permisos efectivos.",
   "decisiones_de_gustavo_2026_11_06": [
     "Acepta escrituras automatizadas en su cuenta principal mediante Unipile, con el riesgo de términos de LinkedIn que conlleva.",
     "Entregará credenciales y 2FA a Unipile; ningún agente ni el operador las ve, cambia ni resuelve retos.",
@@ -13,6 +13,21 @@
     "Unipile se mantiene como conector operativo frente a lemlist.",
     "Se mantienen los cinco equipos y los trece roles; se añaden dos roles de relaciones y un servicio operador."
   ],
+  "decision_de_autonomia_2026_11_06": {
+    "cita": "todo debe funcionar como una máquina autónoma",
+    "antecedente": "Gustavo ya había aceptado el riesgo de automatizar escrituras con Unipile sobre su cuenta principal y de entregar credenciales y 2FA.",
+    "puntos": [
+      "Autonomía por defecto: las capacidades de nivel B ya no esperan aprobación humana por versión; las aprueba la política autónoma tras la verificación automática (reglas deterministas y editor_verificador para los textos). Gustavo pasa de estar en el bucle a estar sobre el bucle: puede pausar, vetar, revertir o configurar en cualquier momento.",
+      "La graduación por N ejecuciones se sustituye por la degradación automática: ante una incidencia se pausa la capacidad afectada o la cuenta y se alerta a Gustavo; solo él reanuda.",
+      "RED-08, CONT-11 y ADM-03 (antes nivel C) pasan a autónomas con política estricta y condiciones concretas.",
+      "Nivel C exclusivo de Gustavo, única excepción: comprometer salario, tarifas o disponibilidad de dedicación, aceptar un empleo o contrato y firmar acuerdos o términos de alianza. El sistema mantiene viva la conversación, prepara la decisión con hechos y escala. Coordinar una reunión dentro de la disponibilidad configurada (D16) es autónomo.",
+      "Publicaciones (CONT-08/09/10/12/13) autónomas, sin revisión humana final; las reglas de contenido se mantienen como verificación automática.",
+      "Topes: la tabla vigente queda como valores por defecto configurables; ventana 07:00–21:00 en America/Bogota, con día y semana contados en esa zona; espaciado fijo de 20 minutos entre escrituras públicas, nunca aleatorio; las propuestas no ejecutadas caducan a las 48 h; no se comentan posts de más de 72 h; las notas de invitación automáticas se limitan al cupo mensual real de la cuenta gratuita y ya no pasan por aprobación.",
+      "Alertas por webhook configurable (OPERATOR_ALERT_WEBHOOK, compatible con ntfy o Slack) y en la oficina ante toda pausa, degradación o parada total; la parada total sigue existiendo, global y por cuenta.",
+      "Acepta que leer perfiles pueda registrarse como visita visible.",
+      "Tope diario de gasto en modelos para el piloto automático (OPERATOR_DAILY_LLM_USD), además del techo acumulado existente, que Gustavo debe subir para operar."
+    ]
+  },
   "roles": {
     "posicionamiento": {
       "grupo": "estrategia_perfil",
@@ -85,54 +100,71 @@
       "grupo": "humano",
       "naturaleza": "titular_de_la_cuenta",
       "contrato": null
+    },
+    "politica_autonoma": {
+      "grupo": "operacion",
+      "naturaleza": "regla_determinista_del_backend_no_rol_ni_llm",
+      "contrato": "equipos/operacion/operador_cuenta.json"
     }
   },
   "papeles": {
     "propone": "Prepara la operación o el artefacto exacto con destino, motivo, evidencia y versión.",
-    "decide": "Autoriza la operación: el rol dueño en nivel A; Gustavo por versión exacta en nivel B; Gustavo de forma expresa en nivel C.",
+    "decide": "Autoriza la operación: el rol dueño en nivel A; la política autónoma en nivel B, tras la verificación automática (o Gustavo por versión exacta si la capacidad está en modo approval); Gustavo en nivel C.",
     "ejecuta": "Realiza el trabajo. Toda escritura en LinkedIn o en la API oficial la ejecuta solo operador_cuenta (o Gustavo manualmente cuando no hay cobertura, con registro del operador).",
-    "verifica": "Comprueba la versión antes de decidir (editor_verificador según riesgo) o el resultado después de ejecutar (operador_cuenta por relectura).",
+    "verifica": "Comprueba la versión antes de ejecutar (verificación automática: reglas deterministas y editor_verificador según riesgo) o el resultado después de ejecutar (operador_cuenta por relectura).",
     "aprende": "Recibe el resultado confirmado o incierto para el siguiente ciclo; ejecución y logro del objetivo se registran por separado."
   },
   "niveles": {
     "A": {
       "nombre": "Autónomo con topes",
-      "alcance": "Lecturas, seguir y dejar de seguir, reaccionar y cambiar la reacción, organización interna (memoria, calendario, estados del inbox) y capacidades de nivel B graduadas por Gustavo.",
+      "alcance": "Lecturas, seguir y dejar de seguir, reaccionar y cambiar la reacción, y organización interna (memoria, calendario, estados del inbox).",
       "requisitos": [
         "política y criterios vigentes del rol dueño",
         "topes por día y semana disponibles",
         "D15 sin restricción ni parada total",
         "precondiciones del objeto comprobadas por el operador"
       ],
-      "registro": "Cada ejecución queda en D14 con politica_ref o delegacion_ref."
+      "registro": "Cada ejecución queda en D14 con politica_ref."
     },
     "B": {
-      "nombre": "Aprobación de Gustavo por versión exacta y ejecución automática del operador",
-      "alcance": "Comentarios, invitaciones (y su gestión), mensajes, respuestas, publicaciones, programación y cambios de perfil.",
+      "nombre": "Autónomo con verificación automática y ejecución del operador",
+      "alcance": "Comentarios, invitaciones y su gestión, mensajes, respuestas, publicaciones, programación, cambios de perfil y moderación; con política estricta, eliminar conexiones (RED-08), retirar posts (CONT-11) y bloquear o reportar (ADM-03).",
+      "aprueba": "politica_autonoma; Gustavo por versión exacta solo si la capacidad está en modo approval",
       "requisitos": [
         "approval_package con hash del contenido exacto, destinatario u objeto y contexto",
-        "review_record del editor_verificador cuando el riesgo lo exige",
-        "aprobación vigente de Gustavo ligada a ese hash",
-        "topes, D14 y D15 comprobados al ejecutar"
+        "verificación automática superada: reglas deterministas y, cuando hay texto o el riesgo es medio o alto, review_record ready_for_execution del editor_verificador para ese hash",
+        "capacidad en modo auto (OPERATOR_AUTONOMY) y sin pausa",
+        "en RED-08, CONT-11 y ADM-03, condiciones estrictas cumplidas y evidencia confirmada por el editor_verificador",
+        "topes, ventana, espaciado, caducidad, D14 y D15 comprobados al ejecutar"
       ],
       "invalidacion": [
         "edición posterior del texto o del asset",
         "contexto cambiado (nueva respuesta en el hilo, invitación ya aceptada, post retirado)",
-        "intervención manual de Gustavo sobre el mismo objeto",
-        "caducidad configurada vencida",
-        "parada total o pausa de la capacidad"
+        "intervención manual o veto de Gustavo sobre el mismo objeto",
+        "caducidad vencida (OPERATOR_PROPOSAL_TTL_HOURS)",
+        "parada total o pausa de la cuenta o de la capacidad"
       ],
-      "aprobacion_por_lotes": "Permitida en la bandeja de aprobación; cada elemento conserva su propio hash y puede rechazarse por separado."
+      "modo_approval": "Si Gustavo pasa una capacidad a approval, se aplica el flujo de la v1.0: aprueba él cada versión exacta en la bandeja de la oficina, por lotes si quiere (cada elemento conserva su hash y se rechaza por separado), y el operador ejecuta sin intervención adicional."
     },
     "C": {
-      "nombre": "Solo con decisión expresa de Gustavo",
-      "alcance": "Eliminar conexiones (RED-08), retirar posts (CONT-11), bloquear o reportar (ADM-03) y cualquier compromiso económico o laboral (decisión transferida por CHAT-09, confirmación de franja en CHAT-07, términos de alianza).",
+      "nombre": "Exclusivo de Gustavo",
+      "alcance": "Comprometer salario, tarifas o disponibilidad de dedicación; aceptar un empleo o contrato; firmar acuerdos o términos de alianza. Es la única excepción a la autonomía.",
       "requisitos": [
         "decisión expresa de Gustavo para ese caso concreto, con motivo registrado",
-        "nunca graduable",
-        "los agentes solo proponen con evidencia; el operador ejecuta lo que tenga ejecución automática"
+        "ninguna capacidad del catálogo lo ejecuta por sí misma: aparece dentro de CHAT-03/06/07/09 y de las alianzas",
+        "el sistema mantiene viva la conversación sin comprometer, prepara la decisión con hechos (CHAT-09) y escala con alerta",
+        "coordinar una reunión dentro de la disponibilidad configurada (D16) no es nivel C"
       ]
-    }
+    },
+    "resumen": "39 capacidades de nivel A (22 internas, 11 lecturas y 6 escrituras de bajo impacto) y 33 de nivel B, 3 de ellas con política estricta. Ninguna fila es de nivel C: es una clase de decisión reservada dentro de conversaciones y alianzas."
+  },
+  "gustavo_sobre_el_bucle": {
+    "pausar": "Parada total global (OPERATOR_PAUSED), por cuenta o por capacidad, en cualquier momento.",
+    "vetar": "Una propuesta pendiente (no se ejecuta), un destinatario o tema, o una capacidad entera (modo off).",
+    "revertir": "Pide la acción inversa cuando existe (retirar comentario INT-09, editar o retirar post CONT-10/11, retirar invitación RED-06, dejar de seguir RED-07, cambiar reacción INT-10); el operador la ejecuta como nueva solicitud referenciada, sin reintentos. Eliminar una conexión o bloquear no tienen inversa automática.",
+    "configurar": "Modo por capacidad (OPERATOR_AUTONOMY: auto | approval | off; por defecto auto), topes, ventana, espaciado, caducidad, presupuesto de modelos, alertas, neighborhood_criteria y disponibilidad D16.",
+    "reanudar": "Solo Gustavo reanuda tras una pausa, una degradación o una parada.",
+    "decidir_nivel_C": "Compromisos económicos o laborales y términos de alianza."
   },
   "aprobacion_por_version": {
     "artefacto": "approval_package",
@@ -145,51 +177,86 @@
       "content_hash y hashes de medios",
       "contexto_version (hilo, post o perfil leído)",
       "riesgo y review_record_ref si aplica",
+      "verificacion_ref: reglas deterministas aplicadas y resultado",
       "fecha_programada y zona horaria si aplica",
-      "caduca_en (configurable)",
-      "aprobado_por: Gustavo",
+      "caduca_en (OPERATOR_PROPOSAL_TTL_HOURS)",
+      "aprobado_por: politica_autonoma o Gustavo (modo approval)",
       "fecha y canal de aprobación"
     ],
-    "regla": "El operador ejecuta solo si el hash recibido coincide con el aprobado y las condiciones de invalidez no se cumplen; un visto bueno del verificador nunca sustituye la aprobación de Gustavo."
+    "regla": "El operador ejecuta solo si el hash recibido coincide con el aprobado y no se cumple ninguna condición de invalidez. El review_record es condición necesaria para los textos, no suficiente: la aprobación la emite la política autónoma tras comprobar también las reglas deterministas."
   },
-  "graduacion": {
-    "descripcion": "Tras N ejecuciones confirmadas sin incidencias de una capacidad (y subtipo), Gustavo puede delegarla a nivel A con topes. La delegación es expresa, registrada y revocable.",
-    "N": {
-      "valor": null,
-      "configurable_por": "Gustavo",
-      "ambito": "por capacidad y subtipo (p. ej. RED-02 sin nota y RED-02 con nota cuentan por separado)"
-    },
-    "cuenta_como_ejecucion_valida": "Ejecución confirmada por relectura, con el contenido aprobado sin cambios por Gustavo en la aprobación y sin incidencia posterior en la ventana de observación configurada.",
-    "incidencias": [
-      "resultado incierto no conciliado",
+  "verificacion_automatica": {
+    "descripcion": "Compuerta previa a toda escritura de nivel B. Sustituye a la revisión humana final antes de publicar y a la aprobación de Gustavo por versión (decisión del 6-nov-2026).",
+    "reglas_deterministas": [
+      "capacidad en modo auto y sin pausa; sin parada total ni pausa de la cuenta",
+      "D15 sano: identidad conectada correcta, permiso efectivo y sin restricción",
+      "topes por día, semana, tipo y destinatario disponibles",
+      "dentro de OPERATOR_WINDOW en OPERATOR_TIMEZONE",
+      "OPERATOR_MIN_SPACING_SECONDS cumplido desde la última escritura pública",
+      "propuesta dentro de OPERATOR_PROPOSAL_TTL_HOURS",
+      "comentarios: post de no más de OPERATOR_MAX_POST_AGE_HOURS",
+      "precondiciones del objeto en D13/D14: sin conexión ni invitación pendiente, hilo sin cambios, post existente, sin intervención de Gustavo",
+      "cupo mensual de notas disponible para RED-02 con nota",
+      "condiciones estrictas en RED-08, CONT-11 y ADM-03",
+      "OPERATOR_DAILY_LLM_USD disponible para los pasos que llaman a un modelo",
+      "hash del contenido igual al revisado"
+    ],
+    "editor_verificador": "Compuerta para todo texto o riesgo medio o alto: emite review_record ready_for_execution, needs_revision, needs_evidence o discard_recommended sobre el hash exacto. Sin ready_for_execution no hay aprobación.",
+    "reglas_de_contenido": [
+      "no inventar experiencias, cifras ni testimonios: solo los que constan en el contexto confirmado (D01) o en pruebas con permiso (D03)",
+      "no exponer datos privados: nada de D10 ni datos de terceros en texto público",
+      "afirmaciones factuales con fuente citada y vigente",
+      "ningún compromiso de nivel C",
+      "sin pitch, interacción previa ficticia ni secuencias en notas y mensajes"
+    ]
+  },
+  "politica_estricta": {
+    "aplica_a": [
+      "RED-08",
+      "CONT-11",
+      "ADM-03"
+    ],
+    "descripcion": "Acciones destructivas que eran nivel C. Son autónomas solo si se cumplen todas las condiciones de su fila (campo condiciones_estrictas); ante duda no se ejecutan. Cada ejecución se avisa a Gustavo para que pueda revisarla.",
+    "comunes": [
+      "motivo dentro de la lista cerrada de la capacidad y evidencia registrada",
+      "el editor_verificador confirma que la evidencia prueba el motivo; nunca rebaja el riesgo",
+      "nunca por bajo rendimiento, bajo encaje, silencio, crítica legítima, desacuerdo o competencia",
+      "sin oportunidad abierta ni compromiso pendiente con la persona u objeto",
+      "tope propio y alerta de cada ejecución"
+    ],
+    "estado": "condiciones propuestas en la v1.1; pendientes de confirmación de Gustavo"
+  },
+  "degradacion": {
+    "descripcion": "Sustituye a la graduación B→A de la v1.0: sin contador N ni delegaciones. Toda capacidad nace en modo auto; ante una incidencia se pausa la capacidad afectada o la cuenta y se alerta a Gustavo. Solo él reanuda.",
+    "disparadores_de_cuenta": [
+      "restricción o advertencia de la cuenta",
+      "HTTP 429 o límite de frecuencia de cualquier proveedor",
+      "reto de seguridad: checkpoint, captcha, verificación o 2FA solicitado",
+      "desconexión o credenciales inválidas",
+      "identidad conectada distinta de la cuenta de Gustavo",
+      "ejecución duplicada detectada",
+      "incidencias acumuladas por encima del umbral configurado (sin valor fijado)"
+    ],
+    "disparadores_de_capacidad": [
+      "queja, petición de detenerse o informe de spam de un destinatario",
+      "error material detectado después (editor_verificador, Gustavo o tercero)",
       "destinatario u objeto equivocado",
-      "duplicado",
-      "defecto material detectado después (verificador, Gustavo o tercero)",
-      "queja o petición de detenerse del destinatario",
-      "restricción, 429 o reto de seguridad asociado",
+      "resultado incierto no conciliado",
       "retirada o corrección posterior por error"
     ],
-    "delegacion": [
-      "delegacion_id",
-      "capacidad_id y subtipo",
-      "condiciones (p. ej. sin afirmaciones de experiencia, cifras ni casos)",
-      "topes delegados (iguales o menores que los generales)",
-      "evidencia: ejecuciones que cumplieron N",
-      "fecha, vigencia y revisión periódica",
-      "revocar_si"
-    ],
-    "revocacion": "Automática a nivel B ante cualquier incidencia de esa capacidad, parada total o cambio material de posicionamiento; Gustavo puede revocarla en cualquier momento.",
-    "valores_de_graduable": {
-      "si": "puede delegarse con topes",
-      "condicionado": "solo el subtipo indicado en la política (p. ej. sin afirmaciones de experiencia ni datos sensibles)",
-      "requiere_cambio_del_plan": "publicaciones: el plan mantiene revisión humana final; delegarlas exige que Gustavo cambie esa decisión",
-      "no": "siempre nivel B o C",
-      "no_aplica": "ya es nivel A"
+    "efecto": "La capacidad o la cuenta queda en pausa y se rechazan sus escrituras; las propuestas pendientes se retienen hasta caducar; los inciertos siguen conciliándose sin reintentar; se envía alerta con disparador, evidencia y objetos afectados.",
+    "ambito_en_duda": "Si la incidencia no puede atribuirse a una capacidad, se pausa la cuenta.",
+    "correccion": "La pausa de una capacidad no impide corregir el objeto afectado con otra capacidad no pausada (CONT-10, INT-08, INT-09 o CONT-11 con política estricta); la corrección también genera alerta. Con la cuenta pausada no se corrige nada.",
+    "reanudacion": "Solo Gustavo, tras revisar el informe; puede reanudar en auto o dejar la capacidad en approval u off.",
+    "valores_por_fila": {
+      "capacidad_y_cuenta": "escrituras: las incidencias de capacidad la pausan y las de cuenta pausan todo",
+      "cuenta": "lecturas: solo los disparadores de cuenta",
+      "no_aplica": "trabajo interno sin efecto externo"
     }
   },
   "topes_operativos": {
-    "advertencia": "Los valores iniciales son una propuesta prudente de diseño para el piloto. No son límites publicados por LinkedIn ni por Unipile, ni objetivos de actividad. Gustavo los ajusta; si el estado real de la cuenta (D15) impone un límite menor, prevalece el menor. El sistema nunca intenta acercarse al máximo de LinkedIn.",
-    "unidad_de_tiempo": "día y semana naturales en la zona horaria configurada de Gustavo",
+    "advertencia": "Gustavo decidió el 6-nov-2026 mantener esta tabla como valores por defecto, configurables con OPERATOR_DAILY_LIMITS y OPERATOR_WEEKLY_LIMITS. No son límites publicados por LinkedIn ni por Unipile, ni objetivos de actividad. Si el estado real de la cuenta (D15) impone un límite menor, prevalece el menor. El sistema nunca intenta acercarse al máximo de LinkedIn.",
+    "unidad_de_tiempo": "día y semana naturales (semana de lunes a domingo) en OPERATOR_TIMEZONE, America/Bogota por defecto",
     "tipos": [
       {
         "clave": "seguir",
@@ -198,11 +265,11 @@
         ],
         "unidad": "acciones",
         "por_dia": {
-          "valor_inicial_prudente": 10,
+          "valor_por_defecto": 10,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 40,
+          "valor_por_defecto": 40,
           "configurado": null
         },
         "nota": null
@@ -214,11 +281,11 @@
         ],
         "unidad": "acciones",
         "por_dia": {
-          "valor_inicial_prudente": 10,
+          "valor_por_defecto": 10,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 30,
+          "valor_por_defecto": 30,
           "configurado": null
         },
         "nota": null
@@ -230,14 +297,14 @@
         ],
         "unidad": "invitaciones enviadas (con y sin nota)",
         "por_dia": {
-          "valor_inicial_prudente": 5,
+          "valor_por_defecto": 5,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 20,
+          "valor_por_defecto": 20,
           "configurado": null
         },
-        "nota": "Las invitaciones con nota consumen además el cupo mensual de notas de la cuenta gratuita, que se configura con el dato real (D15 o Gustavo); valor inicial prudente de notas automáticas: 0 (toda nota pasa por aprobación)."
+        "nota": "Las invitaciones con nota consumen además el cupo mensual real de notas de la cuenta gratuita, configurable con el dato de D15 o de Gustavo. Las notas automáticas llegan hasta ese cupo y ya no pasan por aprobación; con el cupo desconocido, sin nota."
       },
       {
         "clave": "gestion_invitaciones",
@@ -248,11 +315,11 @@
         ],
         "unidad": "decisiones ejecutadas",
         "por_dia": {
-          "valor_inicial_prudente": 10,
+          "valor_por_defecto": 10,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 40,
+          "valor_por_defecto": 40,
           "configurado": null
         },
         "nota": null
@@ -265,11 +332,11 @@
         ],
         "unidad": "reacciones y cambios",
         "por_dia": {
-          "valor_inicial_prudente": 15,
+          "valor_por_defecto": 15,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 60,
+          "valor_por_defecto": 60,
           "configurado": null
         },
         "nota": null
@@ -282,11 +349,11 @@
         ],
         "unidad": "comentarios en posts ajenos",
         "por_dia": {
-          "valor_inicial_prudente": 3,
+          "valor_por_defecto": 3,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 12,
+          "valor_por_defecto": 12,
           "configurado": null
         },
         "nota": "Máximo dos intervenciones propias por hilo ajeno sin nueva respuesta de otra persona."
@@ -298,11 +365,11 @@
         ],
         "unidad": "respuestas en posts propios",
         "por_dia": {
-          "valor_inicial_prudente": 10,
+          "valor_por_defecto": 10,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 40,
+          "valor_por_defecto": 40,
           "configurado": null
         },
         "nota": null
@@ -315,11 +382,11 @@
         ],
         "unidad": "ediciones o retiradas",
         "por_dia": {
-          "valor_inicial_prudente": 3,
+          "valor_por_defecto": 3,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 6,
+          "valor_por_defecto": 6,
           "configurado": null
         },
         "nota": null
@@ -331,11 +398,11 @@
         ],
         "unidad": "compartidos con perspectiva",
         "por_dia": {
-          "valor_inicial_prudente": 1,
+          "valor_por_defecto": 1,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 3,
+          "valor_por_defecto": 3,
           "configurado": null
         },
         "nota": null
@@ -349,11 +416,11 @@
         ],
         "unidad": "publicaciones",
         "por_dia": {
-          "valor_inicial_prudente": 1,
+          "valor_por_defecto": 1,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 7,
+          "valor_por_defecto": 7,
           "configurado": null
         },
         "nota": "Coherente con la intención diaria declarada; el calendario no rellena días sin fundamento."
@@ -365,11 +432,11 @@
         ],
         "unidad": "trabajos programados pendientes",
         "por_dia": {
-          "valor_inicial_prudente": null,
+          "valor_por_defecto": null,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 7,
+          "valor_por_defecto": 7,
           "configurado": null
         },
         "nota": "Tope de trabajos pendientes simultáneos en la cola, no de llamadas."
@@ -381,11 +448,11 @@
         ],
         "unidad": "ediciones",
         "por_dia": {
-          "valor_inicial_prudente": 1,
+          "valor_por_defecto": 1,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 3,
+          "valor_por_defecto": 3,
           "configurado": null
         },
         "nota": null
@@ -399,11 +466,11 @@
         ],
         "unidad": "primeros mensajes o reactivaciones",
         "por_dia": {
-          "valor_inicial_prudente": 3,
+          "valor_por_defecto": 3,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 10,
+          "valor_por_defecto": 10,
           "configurado": null
         },
         "nota": null
@@ -417,11 +484,11 @@
         ],
         "unidad": "mensajes en hilos activos",
         "por_dia": {
-          "valor_inicial_prudente": 15,
+          "valor_por_defecto": 15,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 60,
+          "valor_por_defecto": 60,
           "configurado": null
         },
         "nota": null
@@ -433,11 +500,11 @@
         ],
         "unidad": "seguimientos",
         "por_dia": {
-          "valor_inicial_prudente": 2,
+          "valor_por_defecto": 2,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 5,
+          "valor_por_defecto": 5,
           "configurado": null
         },
         "nota": "Uno como máximo por hilo sin respuesta."
@@ -449,11 +516,11 @@
         ],
         "unidad": "cambios de estado nativo",
         "por_dia": {
-          "valor_inicial_prudente": 30,
+          "valor_por_defecto": 30,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 150,
+          "valor_por_defecto": 150,
           "configurado": null
         },
         "nota": null
@@ -471,11 +538,11 @@
         ],
         "unidad": "lotes de cambios aprobados",
         "por_dia": {
-          "valor_inicial_prudente": 1,
+          "valor_por_defecto": 1,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 2,
+          "valor_por_defecto": 2,
           "configurado": null
         },
         "nota": null
@@ -487,14 +554,62 @@
         ],
         "unidad": "acciones de moderación",
         "por_dia": {
-          "valor_inicial_prudente": 3,
+          "valor_por_defecto": 3,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 10,
+          "valor_por_defecto": 10,
           "configurado": null
         },
         "nota": null
+      },
+      {
+        "clave": "eliminacion_conexiones",
+        "capacidades": [
+          "RED-08"
+        ],
+        "unidad": "conexiones eliminadas",
+        "por_dia": {
+          "valor_por_defecto": 1,
+          "configurado": null
+        },
+        "por_semana": {
+          "valor_por_defecto": 3,
+          "configurado": null
+        },
+        "nota": "Propuesta nueva de la v1.1 para una acción con política estricta; por confirmar."
+      },
+      {
+        "clave": "retiradas_publicacion",
+        "capacidades": [
+          "CONT-11"
+        ],
+        "unidad": "publicaciones retiradas",
+        "por_dia": {
+          "valor_por_defecto": 1,
+          "configurado": null
+        },
+        "por_semana": {
+          "valor_por_defecto": 2,
+          "configurado": null
+        },
+        "nota": "Propuesta nueva de la v1.1 para una acción con política estricta; por confirmar."
+      },
+      {
+        "clave": "bloqueos",
+        "capacidades": [
+          "ADM-03"
+        ],
+        "unidad": "bloqueos",
+        "por_dia": {
+          "valor_por_defecto": 2,
+          "configurado": null
+        },
+        "por_semana": {
+          "valor_por_defecto": 5,
+          "configurado": null
+        },
+        "nota": "Propuesta nueva de la v1.1 para una acción con política estricta; por confirmar."
       },
       {
         "clave": "lecturas_perfil",
@@ -504,14 +619,14 @@
         ],
         "unidad": "consultas de perfil",
         "por_dia": {
-          "valor_inicial_prudente": 30,
+          "valor_por_defecto": 30,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 150,
+          "valor_por_defecto": 150,
           "configurado": null
         },
-        "nota": "Ajustar si el piloto confirma que la consulta se registra como visita visible."
+        "nota": "Gustavo acepta que la consulta pueda registrarse como visita visible."
       },
       {
         "clave": "lecturas_busqueda",
@@ -521,11 +636,11 @@
         ],
         "unidad": "búsquedas",
         "por_dia": {
-          "valor_inicial_prudente": 20,
+          "valor_por_defecto": 20,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 80,
+          "valor_por_defecto": 80,
           "configurado": null
         },
         "nota": null
@@ -538,11 +653,11 @@
         ],
         "unidad": "consultas de posts/hilos",
         "por_dia": {
-          "valor_inicial_prudente": 60,
+          "valor_por_defecto": 60,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 300,
+          "valor_por_defecto": 300,
           "configurado": null
         },
         "nota": null
@@ -555,11 +670,11 @@
         ],
         "unidad": "sincronizaciones de red",
         "por_dia": {
-          "valor_inicial_prudente": 4,
+          "valor_por_defecto": 4,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": 20,
+          "valor_por_defecto": 20,
           "configurado": null
         },
         "nota": null
@@ -572,11 +687,11 @@
         ],
         "unidad": "sincronizaciones",
         "por_dia": {
-          "valor_inicial_prudente": null,
+          "valor_por_defecto": null,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": null,
+          "valor_por_defecto": null,
           "configurado": null
         },
         "nota": "Webhooks más consultas periódicas con intervalo configurable; sin valor inicial propuesto."
@@ -588,11 +703,11 @@
         ],
         "unidad": "consultas de métricas",
         "por_dia": {
-          "valor_inicial_prudente": null,
+          "valor_por_defecto": null,
           "configurado": null
         },
         "por_semana": {
-          "valor_inicial_prudente": null,
+          "valor_por_defecto": null,
           "configurado": null
         },
         "nota": "Según límites de la API oficial cuando se concedan; sin valor inicial propuesto."
@@ -606,57 +721,158 @@
       "Un único ejecutor por objeto y evento; dos roles no actúan sobre el mismo destinatario a la vez."
     ],
     "horario": {
-      "ventana_de_actividad": null,
-      "zona_horaria": null,
-      "nota": "Por configurar con Gustavo; fuera de ventana las acciones quedan pendientes, no se descartan."
+      "ventana_de_actividad": "07:00-21:00",
+      "zona_horaria": "America/Bogota",
+      "variables": [
+        "OPERATOR_WINDOW",
+        "OPERATOR_TIMEZONE"
+      ],
+      "nota": "Las escrituras y las lecturas activas (búsquedas y consultas de perfiles o contenido) solo se ejecutan dentro de la ventana; fuera de ella quedan pendientes, no se descartan, hasta su caducidad. Webhooks entrantes, conciliación y comprobación de salud no dependen de la ventana."
     },
     "espaciado": {
-      "intervalo_minimo_entre_escrituras_del_mismo_tipo": null,
-      "nota": "Configurable para evitar ráfagas. Prohibido aleatorizar o imitar comportamiento humano para evitar la detección."
+      "intervalo_minimo_entre_escrituras_publicas_segundos": 1200,
+      "variable": "OPERATOR_MIN_SPACING_SECONDS",
+      "aleatorio": false,
+      "aplica_a": [
+        "publicaciones",
+        "ediciones_post",
+        "retiradas_publicacion",
+        "compartidos",
+        "comentarios_publicos",
+        "respuestas_publicas",
+        "correcciones_comentarios",
+        "reacciones",
+        "cambios_perfil",
+        "moderacion"
+      ],
+      "nota": "Espaciado fijo y global entre dos escrituras públicas cualesquiera, para evitar ráfagas. Prohibido aleatorizar o imitar comportamiento humano para eludir la detección. Las escrituras privadas (invitaciones y su gestión, mensajes, organización del inbox, seguir, eliminar conexiones, bloquear) se rigen por sus topes; qué cuenta como público es propuesta de la v1.1."
+    },
+    "caducidad": {
+      "propuestas_horas": 48,
+      "variable": "OPERATOR_PROPOSAL_TTL_HOURS",
+      "cuenta_desde": "la creación de la propuesta; en una programación (CONT-08), su fecha programada",
+      "nota": "Una propuesta caducada no se ejecuta; si sigue siendo pertinente, el rol dueño la propone de nuevo y repite la verificación."
+    },
+    "antiguedad_maxima_post": {
+      "horas": 72,
+      "variable": "OPERATOR_MAX_POST_AGE_HOURS",
+      "aplica_a": [
+        "INT-03",
+        "INT-04",
+        "INT-05"
+      ],
+      "nota": "No se comentan posts publicados hace más de 72 h. En posts propios (INT-04) el plazo se cuenta desde el comentario al que se responde (interpretación de la v1.1, por confirmar)."
     },
     "cupo_notas_invitacion": {
       "mensual_real_de_la_cuenta": null,
       "reserva_para_uso_manual_de_gustavo": null,
-      "notas_automaticas_valor_inicial_prudente": 0,
-      "nota": "Cuenta gratuita sin Premium: dato real por confirmar en D15 o por Gustavo."
+      "notas_automaticas": "hasta el cupo mensual real configurado; ya no pasan por aprobación",
+      "si_desconocido": "sin nota",
+      "nota": "Cuenta gratuita sin Premium: dato real por confirmar en D15 o por Gustavo; configurable."
     }
+  },
+  "presupuesto_modelos": {
+    "tope_diario_usd": null,
+    "variable": "OPERATOR_DAILY_LLM_USD",
+    "techo_acumulado_existente": "OPENAI_LIMIT_USD y ANTHROPIC_LIMIT_USD, techos del piloto de infraestructura (1 USD cada uno en infra/.env.example)",
+    "nota": "Se aplican los dos. Al alcanzar el tope diario se detienen las llamadas nuevas a modelos hasta el día siguiente en America/Bogota y se alerta; la compuerta no aprueba textos sin revisión. Sin tope diario configurado, el piloto automático no hace llamadas pagadas: un límite sin configurar no significa ilimitado. Gustavo debe subir el techo acumulado para operar; ningún agente puede cambiar estos valores."
+  },
+  "configuracion_operador": {
+    "nota": "Variables que usa la implementación en código; el formato exacto de cada una lo fija esa implementación.",
+    "OPERATOR_AUTONOMY": {
+      "valor_por_defecto": "auto",
+      "valores": [
+        "auto",
+        "approval",
+        "off"
+      ],
+      "efecto": "Modo por capacidad: auto aprueba la política autónoma; approval aprueba Gustavo por versión exacta; off desactiva la capacidad."
+    },
+    "OPERATOR_WINDOW": {
+      "valor_por_defecto": "07:00-21:00",
+      "efecto": "Ventana de actividad."
+    },
+    "OPERATOR_TIMEZONE": {
+      "valor_por_defecto": "America/Bogota",
+      "efecto": "Zona de la ventana y de los contadores de día y semana."
+    },
+    "OPERATOR_MIN_SPACING_SECONDS": {
+      "valor_por_defecto": 1200,
+      "efecto": "Espaciado fijo entre escrituras públicas; nunca aleatorio."
+    },
+    "OPERATOR_PROPOSAL_TTL_HOURS": {
+      "valor_por_defecto": 48,
+      "efecto": "Caducidad de las propuestas no ejecutadas."
+    },
+    "OPERATOR_MAX_POST_AGE_HOURS": {
+      "valor_por_defecto": 72,
+      "efecto": "Antigüedad máxima de un post para comentarlo."
+    },
+    "OPERATOR_DAILY_LIMITS": {
+      "valor_por_defecto": "columna por_dia de topes_operativos.tipos",
+      "efecto": "Topes diarios por tipo."
+    },
+    "OPERATOR_WEEKLY_LIMITS": {
+      "valor_por_defecto": "columna por_semana de topes_operativos.tipos",
+      "efecto": "Topes semanales por tipo."
+    },
+    "OPERATOR_DAILY_LLM_USD": {
+      "valor_por_defecto": null,
+      "efecto": "Tope diario de gasto en modelos del piloto automático; lo fija Gustavo."
+    },
+    "OPERATOR_ALERT_WEBHOOK": {
+      "valor_por_defecto": null,
+      "efecto": "URL de alertas compatible con ntfy o Slack; la configura Gustavo."
+    },
+    "OPERATOR_PAUSED": {
+      "valor_por_defecto": "desactivada",
+      "efecto": "Parada total global."
+    }
+  },
+  "alertas": {
+    "canales": [
+      "OPERATOR_ALERT_WEBHOOK (configurable; compatible con ntfy y Slack)",
+      "oficina"
+    ],
+    "avisa_de": [
+      "toda pausa o degradación de una capacidad o de la cuenta, con disparador, evidencia y objetos afectados",
+      "parada total, global o por cuenta",
+      "cada ejecución de RED-08, CONT-11 o ADM-03",
+      "asunto de nivel C preparado para decidir (CHAT-09)",
+      "tope diario de modelos alcanzado"
+    ],
+    "entrega": "Si el webhook falla o no está configurado, la alerta queda en la oficina y se reintenta su entrega; un fallo de entrega nunca reanuda nada."
   },
   "parada_total": {
     "ambitos": [
-      "global (todas las escrituras y las lecturas no esenciales)",
+      "global (OPERATOR_PAUSED): todas las escrituras y las lecturas no esenciales",
+      "por cuenta",
       "por proveedor (Unipile o API oficial)",
       "por capacidad"
     ],
     "activa": [
-      "Gustavo en cualquier momento (oficina/admin)",
-      "operador_cuenta automáticamente"
+      "Gustavo en cualquier momento (oficina, admin u OPERATOR_PAUSED)",
+      "operador_cuenta automáticamente por degradación (pausa de la cuenta o de la capacidad)"
     ],
-    "disparadores_automaticos_globales": [
-      "restricción o advertencia de la cuenta",
-      "HTTP 429 o límite de frecuencia de cualquier proveedor",
-      "reto de seguridad: checkpoint, captcha, verificación o 2FA solicitado",
-      "desconexión o credenciales inválidas",
-      "identidad conectada distinta de la cuenta de Gustavo",
-      "ejecución duplicada detectada",
-      "incidencias acumuladas por encima del umbral configurado (sin valor fijado)"
-    ],
-    "efecto": "Rechaza nuevas escrituras; los trabajos programados quedan retenidos (vencidos durante la parada vuelven a requerir fecha aprobada); las lecturas se limitan a la comprobación de salud que autorice Gustavo; los inciertos siguen en conciliación sin reintentar.",
+    "disparadores_automaticos": "Los de degradacion.disparadores_de_cuenta pausan la cuenta; los de degradacion.disparadores_de_capacidad pausan la capacidad.",
+    "efecto": "Rechaza nuevas escrituras del ámbito; los trabajos programados quedan retenidos y, al reanudar, repiten la verificación automática y caducan si superan OPERATOR_PROPOSAL_TTL_HOURS desde su fecha; las lecturas se limitan a la comprobación de salud que autorice Gustavo; los inciertos siguen en conciliación sin reintentar.",
+    "alerta": "Toda pausa, degradación o parada se avisa por OPERATOR_ALERT_WEBHOOK y en la oficina.",
     "reanudacion": "Solo Gustavo, tras revisar el informe de incidencia. Nunca automática. Los retos de seguridad los resuelve Gustavo directamente en LinkedIn/Unipile."
   },
   "ejecucion_del_operador": [
-    "Recibir execution_request con capacidad_id, operación, objeto, contenido y hash, approval_ref (B), delegacion_ref o politica_ref (A) y clave de idempotencia.",
-    "Comprobar parada total, pausas, D15 (identidad, permisos efectivos y salud), topes, vigencia de la aprobación y precondiciones del objeto en D13/D14.",
+    "Recibir execution_request con capacidad_id, operación, objeto, contenido y hash, approval_ref (B: política autónoma, o Gustavo en modo approval) o politica_ref (A), review_record_ref si hay texto y clave de idempotencia.",
+    "Comprobar parada total y pausas, modo de la capacidad, D15 (identidad, permisos efectivos y salud), topes, ventana, espaciado, caducidad, antigüedad del post, condiciones estrictas y precondiciones del objeto en D13/D14.",
     "Registrar la intención con la clave de idempotencia antes de llamar; si existe un registro con la misma clave en curso, confirmado o incierto, no llamar.",
     "Llamar una sola vez a un único proveedor.",
     "Confirmar releyendo el estado (invitación, mensaje, comentario, reacción, campo de perfil o URN del post).",
-    "Clasificar: confirmado, sin_efecto_confirmado o incierto. Lo incierto se concilia por lectura en la ventana configurada; si no se resuelve, se escala a Gustavo. Nunca se reintenta a ciegas ni por otra vía.",
+    "Clasificar: confirmado, sin_efecto_confirmado o incierto. Lo incierto se concilia por lectura en la ventana configurada; si no se resuelve, se pausa la capacidad, se bloquea el objeto y se alerta a Gustavo. Nunca se reintenta a ciegas ni por otra vía.",
     "Notificar el resultado al proponente y al aprendizaje (D14)."
   ],
   "verificacion_por_riesgo": {
-    "alto": "Revisión completa del editor_verificador: publicaciones, compartidos, comentarios en posts ajenos, primeros mensajes, recursos o casos, cambios de perfil, solicitudes de recomendación, moderación y cualquier texto con afirmaciones de experiencia, cifras, clientes, oportunidades, condiciones o datos de terceros.",
-    "medio": "Revisión ligera (privacidad, coherencia con el hilo, tono, ausencia de afirmaciones nuevas): notas de invitación, respuestas en posts propios, respuestas a mensajes sin afirmaciones nuevas, seguimientos, reactivaciones y ediciones de comentario.",
-    "bajo": "Sin revisión del verificador; comprobación determinista del operador: invitación sin nota, seguir, reaccionar, aceptar o declinar.",
-    "regla": "El proponente declara el riesgo; el backend lo eleva por reglas (tipo de acción, presencia de afirmaciones, datos D10); el verificador puede elevarlo, nunca rebajarlo."
+    "alto": "Revisión completa del editor_verificador con review_record ready_for_execution obligatorio: publicaciones, compartidos, comentarios en posts ajenos, primeros mensajes, recursos o casos, cambios de perfil, solicitudes de recomendación, moderación, evidencia de RED-08, CONT-11 y ADM-03, y cualquier texto con afirmaciones de experiencia, cifras, clientes, oportunidades, condiciones o datos de terceros.",
+    "medio": "Revisión ligera obligatoria (privacidad, coherencia con el hilo, tono, ausencia de afirmaciones nuevas) con review_record ready_for_execution: notas de invitación, respuestas en posts propios, respuestas a mensajes sin afirmaciones nuevas, seguimientos, reactivaciones y ediciones de comentario.",
+    "bajo": "Sin revisión del verificador; solo reglas deterministas del backend y del operador: invitación sin nota, seguir, reaccionar, aceptar o declinar.",
+    "regla": "El proponente declara el riesgo; el backend lo eleva por reglas (tipo de acción, presencia de afirmaciones, datos D10); el verificador puede elevarlo, nunca rebajarlo. Ninguna versión se ejecuta con un review_record de otro hash, caducado o distinto de ready_for_execution."
   },
   "politica_invitaciones_sin_premium": {
     "por_defecto": "sin nota",
@@ -667,11 +883,12 @@
       "relación previa fuera de LinkedIn que necesita contexto para reconocerse",
       "continuación de una conversación pública sustantiva"
     ],
+    "notas_automaticas": "Dentro del cupo mensual real configurado de la cuenta gratuita; ya no pasan por aprobación de Gustavo; revisión ligera del editor_verificador.",
     "secuencia_recomendada": "seguir u observar → aportar en un hilo cuando haya contexto → invitar sin nota → si acepta, conversación solo con motivo real (CHAT-04), nunca automática",
     "si_cupo_agotado_o_desconocido": "invitar sin nota o esperar; nunca forzar la nota"
   },
   "criterios_de_barrio": {
-    "dueno": "posicionamiento (artefacto neighborhood_criteria, aprobado por Gustavo)",
+    "dueno": "posicionamiento (artefacto neighborhood_criteria, aprobado por Gustavo como configuración)",
     "usuarios": [
       "investigador_referentes (DESC-01/02/05/07)",
       "relaciones_comunidad (RED-01/02/04/05, INT-01)",
@@ -696,7 +913,7 @@
     "Presentar simulaciones como métricas.",
     "Llevar datos privados a texto público.",
     "Inventar experiencias o testimonios.",
-    "Comprometer salario, disponibilidad o contratos.",
+    "Comprometer salario, tarifas, disponibilidad de dedicación, empleo, contratos o términos de alianza (nivel C, exclusivo de Gustavo).",
     "Tocar credenciales, 2FA, pagos o la propiedad de la cuenta.",
     "Editar el curso o los presupuestos.",
     "Escribir en LinkedIn o en la API oficial sin pasar por operador_cuenta."
@@ -729,9 +946,11 @@
       "herramienta_matriz_v2": "Unipile v2 + búsqueda web de Claude",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_busqueda",
       "politica": "Lectura vía pasarela del operador (Unipile) y web; aplica criterios de barrio por modalidad de posicionamiento; la insignia es opcional y la popularidad no sustituye pertinencia.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D04",
@@ -768,9 +987,11 @@
       "herramienta_matriz_v2": "Unipile v2 + búsqueda web de Claude",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_busqueda",
       "politica": "Busca por contexto profesional con los criterios de barrio por modalidad (60/40 y alianzas); afinidad hispanohablante solo con información declarada; nunca por nombre o foto.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D04",
@@ -808,9 +1029,11 @@
       "herramienta_matriz_v2": "Unipile v2 + fuentes web primarias",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_perfil",
-      "politica": "Ficha con hechos observados y vacíos; relaciones e inbox solo refrescan la ficha antes de actuar. No inventar financiación; comprobar en piloto si la consulta se registra como visita visible.",
+      "politica": "Ficha con hechos observados y vacíos; relaciones e inbox solo refrescan la ficha antes de actuar. No inventar financiación; Gustavo acepta que la consulta pueda registrarse como visita visible.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D05",
@@ -848,9 +1071,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_contenido",
       "politica": "Leer el hilo completo accesible antes de usarlo; feed parcial se declara parcial; no suponer métricas privadas.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D05",
@@ -887,9 +1112,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_contenido",
       "politica": "Investigador en posts ajenos y analista en posts propios; una reacción aislada no prueba necesidad, idioma ni interés comercial.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D05",
         "D06",
@@ -924,9 +1151,11 @@
       "herramienta_matriz_v2": "Unipile v2 + memoria de Barrio AI",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_red",
       "politica": "Mapa de conexiones, seguidores y vínculos a retomar con cobertura declarada; no reconstruir personas a partir de contadores.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D06",
@@ -961,9 +1190,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Clasificación revisable por papel y modalidad según neighborhood_criteria; comprador es hipótesis hasta conocer necesidad y encaje.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D04",
@@ -999,9 +1230,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL, nutridos por Unipile y fuentes web",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Lista de seguimiento y dossier con enlaces y fechas; tema observado no equivale a tendencia demostrada.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D05",
@@ -1037,9 +1270,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "seguir",
       "politica": "Autónomo con topes para candidatos que cumplen criterios de barrio; seguir no implica conexión ni interés comercial.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D11",
@@ -1059,7 +1294,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1077,9 +1312,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo sin nota; medio con nota",
-      "graduable_a_nivel_A": "si",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "invitaciones",
-      "politica": "Sin nota por defecto (cuenta gratuita); nota solo en casos de alto valor dentro del cupo mensual configurado. Motivo real registrado, sin pitch; el operador comprueba que no exista conexión ni invitación pendiente y no reinvita tras retirada o rechazo.",
+      "politica": "Sin nota por defecto (cuenta gratuita); nota automática solo en casos de alto valor dentro del cupo mensual real configurado. Motivo real registrado, sin pitch; el operador comprueba que no exista conexión ni invitación pendiente y no reinvita tras retirada o rechazo.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D04",
@@ -1120,9 +1357,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_red",
       "politica": "Sincronización y consulta de estados; no deducir aceptación del envío ni del silencio.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D13",
         "D14"
@@ -1139,7 +1378,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1155,9 +1394,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "si",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "gestion_invitaciones",
       "politica": "Aceptar solo con pertinencia evaluada; aceptar no activa mensajes ni secuencias. Dejar una invitación pendiente es decisión interna de nivel A.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D10",
@@ -1178,7 +1419,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1193,9 +1434,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "si",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "gestion_invitaciones",
       "politica": "No declinar por falta de notoriedad; distinguir falta de información de falta de encaje.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D11",
@@ -1215,7 +1458,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1230,9 +1473,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "si",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "gestion_invitaciones",
       "politica": "Retirada con motivo; prohibido retirar y reenviar para insistir. Comprobar consecuencias aplicables antes de ejecutar.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D11",
         "D13",
@@ -1266,9 +1511,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "dejar_de_seguir",
       "politica": "Autónomo con topes; no equivale a eliminar conexión ni responde a una discrepancia aislada.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D05",
@@ -1284,17 +1531,18 @@
       "nombre": "Eliminar una conexión",
       "area": "RED",
       "efecto": "escritura_linkedin",
-      "nivel": "C",
+      "nivel": "B",
       "propone": [
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
       ],
       "verifica": [
+        "editor_verificador",
         "operador_cuenta"
       ],
       "aprende": [
@@ -1305,9 +1553,17 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
-      "tope": "por_decision_expresa",
-      "politica": "Solo con decisión expresa de Gustavo para esa persona; verificar identidad, conversaciones y compromisos antes de ejecutar.",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
+      "tope": "eliminacion_conexiones",
+      "politica": "Política estricta: solo cuentas falsas, spam o acoso documentados con evidencia confirmada por el verificador; nunca por bajo encaje, silencio, crítica o competencia; verificar identidad, conversaciones y compromisos antes de ejecutar; alerta a Gustavo.",
+      "condiciones_estrictas": [
+        "motivo admitido: cuenta falsa (suplantación o identidad fabricada), spam (al menos dos mensajes o comentarios promocionales no solicitados registrados, o enlaces maliciosos) o acoso (insultos, amenazas o contenido sexual no deseado registrados)",
+        "evidencia registrada (ids del proveedor, texto o captura fechada en D06, D10 o D14) y confirmada por editor_verificador",
+        "identidad verificada por ids del proveedor; sin oportunidad abierta (D10/CHAT-09), compromiso pendiente ni relación previa confirmada fuera de LinkedIn",
+        "nunca por bajo encaje, silencio, crítica, desacuerdo o competencia",
+        "tope eliminacion_conexiones; alerta a Gustavo en cada ejecución; sin inversa automática"
+      ],
       "datos_ids": [
         "D04",
         "D10",
@@ -1345,9 +1601,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Memoria de relación con hechos, última interacción, siguiente paso y condición de parada; el operador concilia lo registrado con D13/D14.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D06",
@@ -1382,9 +1640,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Elige hilos con señales del Observatorio y criterios por modalidad; incluye pares y cuentas medianas; no persigue volumen.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -1420,9 +1680,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "reacciones",
       "politica": "Autónomo con topes tras leer el contenido; sin reacciones en masa ni para provocar reciprocidad; evitar temas que Gustavo marque sensibles.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D05",
         "D06",
@@ -1443,7 +1705,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1460,9 +1722,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "comentarios_publicos",
-      "politica": "Comentario con opinión sustentada y apertura pertinente; sin pitch ni experiencia inventada. Graduable solo para comentarios sin afirmaciones de experiencia, cifras ni casos.",
+      "politica": "Comentario con opinión sustentada y apertura pertinente; sin pitch ni experiencia inventada; solo en posts de 72 h o menos.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D05",
@@ -1484,7 +1748,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1501,9 +1765,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "medio; alto si afirma hechos o casos",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "respuestas_publicas",
-      "politica": "Leer el contexto del comentario; admitir lo desconocido; preguntas valiosas se registran para Editorial.",
+      "politica": "Leer el contexto del comentario; admitir lo desconocido; preguntas valiosas se registran para Editorial; el plazo de 72 h se cuenta desde el comentario al que se responde.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D06",
@@ -1525,7 +1791,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1541,9 +1807,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "comentarios_publicos",
-      "politica": "No monopolizar el hilo; terminar cuando no haya aporte o la persona pida no continuar.",
+      "politica": "No monopolizar el hilo; terminar cuando no haya aporte o la persona pida no continuar; solo en posts de 72 h o menos.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D05",
@@ -1566,7 +1834,7 @@
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1583,9 +1851,11 @@
       "herramienta_matriz_v2": "API oficial de LinkedIn o Unipile v2; un unico ejecutor por pieza",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "requiere_cambio_del_plan",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "compartidos",
       "politica": "Compartir con atribución y criterio propio; un único ejecutor y una sola vía (API oficial o Unipile) registrada por pieza; entra en el calendario del director.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D05",
@@ -1624,9 +1894,11 @@
       "herramienta_matriz_v2": "Biblioteca interna; LinkedIn manual por ahora",
       "cobertura_documental": "sin_cobertura_especifica_verificada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "interna",
       "politica": "Biblioteca interna; el guardado nativo no tiene cobertura verificada: tarea manual de Gustavo que el operador registra; nunca reportar el interno como guardado en LinkedIn.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D05",
         "D06",
@@ -1646,7 +1918,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1662,9 +1934,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "correcciones_comentarios",
-      "politica": "Conservar versión anterior y comprobar autoría; nueva versión exacta aprobada.",
+      "politica": "Conservar versión anterior y comprobar autoría; la nueva versión exacta pasa la verificación automática.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D06",
@@ -1685,7 +1959,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -1701,9 +1975,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "correcciones_comentarios",
-      "politica": "Retirar solo comentario propio por error, duplicado o decisión; conservar motivo y contexto.",
+      "politica": "Retirar solo comentario propio por error, duplicado o veto de Gustavo; conservar motivo y contexto.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D06",
         "D11",
@@ -1737,9 +2013,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "reacciones",
       "politica": "Verificar objeto y reacción vigente antes de cambiar para no duplicar; conciliar entre retirada y nueva reacción.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D05",
         "D06",
@@ -1774,9 +2052,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Ideas dentro de la dirección aprobada; 60/40 orienta prioridad, no cuota de posts; cambiar pilares vuelve a posicionamiento y Gustavo.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -1814,9 +2094,11 @@
       "herramienta_matriz_v2": "Claude Web Search + Web Fetch + memoria de Barrio AI",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Brief único con evidencia del Observatorio; los chats aportan patrones anonimizados, nunca identidades.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -1855,9 +2137,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Dos borradores independientes con el mismo brief; sin copiar referentes ni inventar vivencias.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D09",
@@ -1893,9 +2177,11 @@
       "herramienta_matriz_v2": "API de imagenes de OpenAI + biblioteca de fotos reales + preparacion de medios en backend",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
-      "politica": "asset_brief y producción mediante OpenAI Images o fotos reales con procedencia; el asset se aprueba junto con la pieza; audiovisual completo sin cobertura.",
+      "politica": "asset_brief y producción mediante OpenAI Images o fotos reales con procedencia; el asset se verifica y aprueba junto con la pieza (mismo hash); audiovisual completo sin cobertura.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D09",
@@ -1928,9 +2214,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Lectores seleccionados en el brief; simulación, no mercado; ninguna mayoría equivale a verificación.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -1949,7 +2237,7 @@
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "editor_verificador"
       ],
       "ejecuta": [
         "editor_verificador"
@@ -1965,9 +2253,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
-      "politica": "review_record y approval_package sobre hash exacto; la aprobación humana se ejerce en CONT-08/09 y cualquier edición posterior la invalida.",
+      "politica": "Compuerta automática: review_record sobre el hash exacto; solo con ready_for_execution la política autónoma aprueba CONT-08/09/10 y cualquier edición posterior lo invalida. Sin revisión humana final (decisión de Gustavo, 6-nov-2026).",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D09",
@@ -2001,9 +2291,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Calendario para la cadencia diaria deseada: huecos, piezas listas, dependencias y capacidad; no rellenar días sin fundamento; el operador señala conflictos con la cola y los topes.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D07",
@@ -2023,7 +2315,7 @@
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2039,9 +2331,11 @@
       "herramienta_matriz_v2": "Django/PostgreSQL y cola; API oficial al vencer la fecha",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "programaciones",
-      "politica": "Programar en la cola Django la versión aprobada con fecha UTC y zona horaria; cancelar un trabajo no iniciado es nivel A (dirección segura); reprogramar fuera de la ventana aprobada exige nueva aprobación; si el envío comenzó, conciliar antes.",
+      "politica": "Programar en la cola Django la versión aprobada con fecha UTC y zona horaria, dentro de la ventana de actividad; cancelar un trabajo no iniciado es nivel A (dirección segura); al vencer se repite la verificación; si el envío comenzó, conciliar antes.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D07",
         "D09",
@@ -2061,7 +2355,7 @@
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2078,9 +2372,11 @@
       "herramienta_matriz_v2": "API oficial de LinkedIn; confirmacion por lectura permitida o Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "requiere_cambio_del_plan",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "publicaciones",
-      "politica": "Posts API (w_member_social) con la versión aprobada; guardar URN y confirmar por lectura permitida o Unipile; timeout no activa segundo ejecutor.",
+      "politica": "Posts API (w_member_social) con la versión aprobada por la política autónoma, sin revisión humana final; guardar URN y confirmar por lectura permitida o Unipile; timeout no activa segundo ejecutor.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D07",
         "D09",
@@ -2100,7 +2396,7 @@
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2116,9 +2412,11 @@
       "herramienta_matriz_v2": "API oficial de LinkedIn para la pieza; Unipile solo como via alternativa registrada",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "requiere_cambio_del_plan",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "ediciones_post",
-      "politica": "Solo campos admitidos por la API; conservar versión anterior y periodo publicado de cada versión.",
+      "politica": "Solo campos admitidos por la API; conservar versión anterior y periodo publicado de cada versión; vía preferente para corregir un error factual.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D07",
@@ -2134,17 +2432,18 @@
       "nombre": "Retirar una publicación propia",
       "area": "CONT",
       "efecto": "escritura_linkedin",
-      "nivel": "C",
+      "nivel": "B",
       "propone": [
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
       ],
       "verifica": [
+        "editor_verificador",
         "operador_cuenta"
       ],
       "aprende": [
@@ -2155,9 +2454,17 @@
       "herramienta_matriz_v2": "API oficial de LinkedIn para la pieza; Unipile solo como via alternativa registrada",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
-      "tope": "por_decision_expresa",
-      "politica": "Retirar un post solo por decisión expresa de Gustavo; nunca por bajo rendimiento; conservar métricas y vínculos.",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
+      "tope": "retiradas_publicacion",
+      "politica": "Política estricta: solo duplicados o un error factual material confirmado por el verificador y no corregible por edición; nunca por bajo rendimiento ni crítica; conservar métricas, texto y vínculos; alerta a Gustavo.",
+      "condiciones_estrictas": [
+        "motivo admitido: duplicado (la misma pieza publicada dos veces: mismo content_hash o URN repetido en D07/D14) o error factual material confirmado por editor_verificador con fuente y no corregible por edición (CONT-10)",
+        "nunca por bajo rendimiento, comentarios críticos ni cambio de preferencia editorial",
+        "antes de retirar se conservan texto, URN, métricas disponibles (APRE-01) y vínculos; en duplicados se conserva la publicación con más interacción y, en empate, la primera",
+        "el error material también degrada CONT-09 (pausa y alerta)",
+        "tope retiradas_publicacion; alerta a Gustavo en cada ejecución"
+      ],
       "datos_ids": [
         "D07",
         "D11",
@@ -2176,7 +2483,7 @@
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2191,9 +2498,11 @@
       "herramienta_matriz_v2": "LinkedIn nativo, intervención manual",
       "cobertura_documental": "sin_cobertura_especifica_verificada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "publicaciones",
-      "politica": "Expansión no activa; preparación interna; creación nativa manual de Gustavo registrada por el operador.",
+      "politica": "Expansión no activa; preparación interna con verificación automática; creación nativa manual de Gustavo registrada por el operador.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D09",
@@ -2214,7 +2523,7 @@
         "director_editorial"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2229,9 +2538,11 @@
       "herramienta_matriz_v2": "LinkedIn nativo, intervención manual",
       "cobertura_documental": "sin_cobertura_especifica_verificada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "publicaciones",
-      "politica": "Expansión no activa; requiere decisión explícita de sostenerla; operación nativa manual registrada por el operador.",
+      "politica": "Expansión no activa; requiere que Gustavo decida sostenerla (configuración); operación nativa manual registrada por el operador.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -2269,9 +2580,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_inbox",
       "politica": "Sincronización inicial e incremental por Unipile; leer el hilo completo disponible; acceso restringido a conversaciones_inbox y extractos mínimos para otros roles.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D10",
@@ -2307,9 +2620,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Separar charla, colaboración, alianza, empleo, cliente, promoción y desconocido; un saludo no es oportunidad.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D04",
@@ -2328,7 +2643,7 @@
         "conversaciones_inbox"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2345,9 +2660,11 @@
       "herramienta_matriz_v2": "Unipile v2 + decisión de Claude",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "medio; alto si toca oportunidad, condiciones o datos privados",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "respuestas_mensaje",
-      "politica": "Sin inventar disponibilidad, presupuesto ni compromisos; temas sensibles los redacta o decide Gustavo y no son graduables.",
+      "politica": "Sin inventar disponibilidad, presupuesto ni compromisos; ante salario, tarifas, dedicación, empleo, contratos o alianzas (nivel C) responde sin comprometer, mantiene la conversación y escala por CHAT-09.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -2370,7 +2687,7 @@
         "conversaciones_inbox"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2388,9 +2705,11 @@
       "herramienta_matriz_v2": "Unipile v2 + decisión de Claude",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "mensajes_iniciados",
       "politica": "Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D04",
@@ -2415,7 +2734,7 @@
         "conversaciones_inbox"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2432,9 +2751,11 @@
       "herramienta_matriz_v2": "Unipile v2 + decisión de Claude",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "mensajes_iniciados",
       "politica": "Vínculo real y razón concreta; no fingir cercanía ni usar el café como pretexto comercial.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D04",
         "D09",
@@ -2456,7 +2777,7 @@
         "conversaciones_inbox"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2472,9 +2793,11 @@
       "herramienta_matriz_v2": "Unipile v2 + decisión de Claude",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "respuestas_mensaje",
       "politica": "Recurso con permiso de uso y atribución personal/equipo; sin pruebas confidenciales ni testimonios inventados.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D09",
@@ -2495,7 +2818,7 @@
         "conversaciones_inbox"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2511,9 +2834,11 @@
       "herramienta_matriz_v2": "Unipile v2 + agenda de Google/Microsoft opcional",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "respuestas_mensaje",
-      "politica": "Proponer conversación sin comprometer horarios; confirmar una franja es nivel C salvo disponibilidad confirmada por Gustavo en D16 para ese caso; agenda opcional no conectada.",
+      "politica": "Proponer conversación y confirmar una franja solo dentro de la disponibilidad configurada por Gustavo en D16; sin D16 o fuera de ella, proponer sin comprometer horarios; una reunión no compromete condiciones; agenda opcional no conectada.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D10",
@@ -2534,7 +2859,7 @@
         "conversaciones_inbox"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2550,9 +2875,11 @@
       "herramienta_matriz_v2": "Unipile v2 + decisión de Claude",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "condicionado",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "seguimientos",
       "politica": "Un seguimiento como máximo sin respuesta salvo decisión de Gustavo; respetar un no; nunca secuencia outbound.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D10",
         "D11",
@@ -2588,9 +2915,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
-      "politica": "Registro interno de nivel A; la decisión sobre la oportunidad (salario, dedicación, oferta, contrato o alianza) es nivel C y la toma Gustavo con hechos.",
+      "politica": "Registro interno de nivel A; la decisión sobre la oportunidad (salario, tarifas, dedicación, oferta, contrato o alianza) es nivel C: el sistema prepara los hechos, alerta a Gustavo y mantiene la conversación sin comprometer.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -2625,9 +2954,11 @@
       "herramienta_matriz_v2": "Unipile v2 + estado interno de atención",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "bajo",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "organizacion_inbox",
       "politica": "Estados internos libres; archivar nativamente solo hilos cerrados; nunca marcar como leído un mensaje no atendido; campos nativos por verificar en Unipile.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D10",
         "D11",
@@ -2661,9 +2992,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Diagnóstico por sección sobre el perfil leído (D02); diferenciar oferta personal y ProjectApp.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D02",
@@ -2684,7 +3017,7 @@
         "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2701,9 +3034,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "cambios_perfil",
-      "politica": "Titular (specifics) y Acerca de (bio) vía Unipile; versión anterior y posterior confirmadas por lectura (PERF-10).",
+      "politica": "Titular (specifics) y Acerca de (bio) vía Unipile tras la verificación automática; versión anterior y posterior confirmadas por lectura (PERF-10).",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D02",
@@ -2725,7 +3060,7 @@
         "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2742,9 +3077,11 @@
       "herramienta_matriz_v2": "Unipile v2 + edición manual de campos no cubiertos",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "cambios_perfil",
       "politica": "Experiencia, educación y habilidades vía Unipile; proyectos y campos no cubiertos quedan como tarea manual de Gustavo; no fabricar certificaciones.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D02",
         "D03",
@@ -2765,7 +3102,7 @@
         "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2781,9 +3118,11 @@
       "herramienta_matriz_v2": "Unipile v2",
       "cobertura_documental": "documentada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "cambios_perfil",
       "politica": "picture y background_picture vía Unipile con assets autorizados; comprobar recorte en vistas observables.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D02",
@@ -2804,7 +3143,7 @@
         "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2820,9 +3159,11 @@
       "herramienta_matriz_v2": "LinkedIn nativo, intervención manual por ahora",
       "cobertura_documental": "sin_cobertura_especifica_verificada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "cambios_perfil",
-      "politica": "Sin cobertura verificada: Gustavo aplica manualmente la versión aprobada y el operador registra la confirmación.",
+      "politica": "Sin cobertura verificada: Gustavo aplica manualmente la versión aprobada por la política autónoma y el operador registra la confirmación.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D02",
         "D03",
@@ -2844,7 +3185,7 @@
         "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2860,9 +3201,11 @@
       "herramienta_matriz_v2": "LinkedIn nativo, intervención manual por ahora",
       "cobertura_documental": "sin_cobertura_especifica_verificada",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "cambios_perfil",
       "politica": "Sin cobertura verificada: aplicación manual registrada; no exponer datos privados ni reemplazar el sitio personal por ProjectApp sin decisión.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D02",
@@ -2883,7 +3226,7 @@
         "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2900,9 +3243,11 @@
       "herramienta_matriz_v2": "Unipile para mensaje contextual; solicitud nativa manual",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "mensajes_iniciados",
       "politica": "Solo a personas con trabajo real verificable; mensaje contextual vía Unipile; formulario nativo manual; un borrador orientativo nunca es testimonio recibido.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D03",
         "D04",
@@ -2921,10 +3266,10 @@
       "efecto": "escritura_linkedin",
       "nivel": "B",
       "propone": [
-        "Gustavo"
+        "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2939,9 +3284,11 @@
       "herramienta_matriz_v2": "LinkedIn nativo, intervención manual por ahora",
       "cobertura_documental": "sin_cobertura_especifica_verificada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "cambios_perfil",
-      "politica": "Perfil solo señala recomendaciones recibidas y su encaje; Gustavo decide y aplica manualmente; no editar palabras de terceros.",
+      "politica": "Perfil señala recomendaciones recibidas y su encaje; mostrar u ocultar lo aprueba la política autónoma y Gustavo lo aplica a mano (sin cobertura verificada); no editar palabras de terceros.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D02",
         "D03",
@@ -2962,7 +3309,7 @@
         "perfil"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -2977,9 +3324,11 @@
       "herramienta_matriz_v2": "LinkedIn nativo, intervención manual por ahora",
       "cobertura_documental": "sin_cobertura_especifica_verificada",
       "riesgo_para_verificacion": "medio",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "cambios_perfil",
       "politica": "Sin cobertura verificada: preferencias aplicadas manualmente por Gustavo y registradas por el operador.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D02",
@@ -3006,7 +3355,7 @@
         "perfil"
       ],
       "verifica": [
-        "Gustavo"
+        "operador_cuenta"
       ],
       "aprende": [
         "posicionamiento"
@@ -3015,9 +3364,11 @@
       "herramienta_matriz_v2": "Lectura de perfil Unipile + revisión visual en LinkedIn",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_perfil",
-      "politica": "Comparar campos leídos con la versión aprobada; la vista pública/móvil la confirma Gustavo; vista propia no acredita visibilidad pública.",
+      "politica": "Comparar campos leídos con la versión aprobada; vista propia no acredita visibilidad pública; Gustavo puede confirmar la vista pública o móvil sin bloquear el ciclo.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D02",
         "D11",
@@ -3052,9 +3403,11 @@
       "herramienta_matriz_v2": "API oficial de LinkedIn; observaciones manuales con procedencia si faltan permisos",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_metricas",
       "politica": "API oficial (memberCreatorPostAnalytics, memberFollowersCount) solo si Community Management se aprueba; si no, importación manual con procedencia; dato ausente no es cero.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D02",
         "D07",
@@ -3089,9 +3442,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Composición por papeles y modalidad con muestra y sesgo; mide la distribución 60/40 del esfuerzo de relaciones sin convertirla en cuota.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D04",
@@ -3128,9 +3483,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Separar volumen de utilidad; la discrepancia no es automáticamente negativa.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D05",
         "D06",
@@ -3166,9 +3523,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Vincular acciones ejecutadas (D14) con oportunidades (D10) solo con evidencia; atribución desconocida explícita.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D07",
         "D08",
@@ -3203,9 +3562,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Comparar con criterio fijado antes de ordenar; no decidir por likes ni reglas del primer post.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D05",
@@ -3245,9 +3606,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Experimento acotado; el director decide lo editorial, posicionamiento lo estratégico y Gustavo cualquier cambio central.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D03",
@@ -3288,9 +3651,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Registro fechado que separa observación, interpretación, decisión, ejecución y simulación; datos privados solo a quien los necesita.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D01",
         "D07",
@@ -3328,9 +3693,11 @@
       "herramienta_matriz_v2": "Eventos Unipile + consultas periódicas + LinkedIn manual",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "cuenta",
       "tope": "lecturas_inbox",
       "politica": "Eventos Unipile y consultas periódicas convertidos en pendientes deduplicados y enrutados al rol dueño; la notificación es señal, no estado.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D06",
         "D10",
@@ -3350,7 +3717,7 @@
         "relaciones_comunidad"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
@@ -3367,9 +3734,11 @@
       "herramienta_matriz_v2": "Unipile v2 con permisos concretos; manual para el resto",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
       "tope": "moderacion",
       "politica": "Solo spam o exposición indebida en espacios con control real; nunca ocultar críticas legítimas ni actuar sobre posts ajenos.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D06",
         "D07",
@@ -3384,18 +3753,19 @@
       "nombre": "Bloquear o reportar un caso justificado",
       "area": "ADM",
       "efecto": "escritura_linkedin",
-      "nivel": "C",
+      "nivel": "B",
       "propone": [
         "relaciones_comunidad",
         "conversaciones_inbox"
       ],
       "decide": [
-        "Gustavo"
+        "politica_autonoma"
       ],
       "ejecuta": [
         "operador_cuenta"
       ],
       "verifica": [
+        "editor_verificador",
         "operador_cuenta"
       ],
       "aprende": [
@@ -3406,9 +3776,17 @@
       "herramienta_matriz_v2": "Unipile v2 para bloqueo; reporte manual",
       "cobertura_documental": "documentada_parcial",
       "riesgo_para_verificacion": "alto",
-      "graduable_a_nivel_A": "no",
-      "tope": "por_decision_expresa",
-      "politica": "Bloqueo vía Unipile y reporte manual solo con decisión expresa de Gustavo; nunca por bajo encaje, crítica o competencia.",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "capacidad_y_cuenta",
+      "tope": "bloqueos",
+      "politica": "Política estricta: bloqueo vía Unipile solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; el reporte sigue siendo manual de Gustavo; alerta a Gustavo.",
+      "condiciones_estrictas": [
+        "motivo admitido: spam, acoso o suplantación, con evidencia registrada (ids del proveedor, texto o captura fechada)",
+        "evidencia confirmada por editor_verificador; sin oportunidad abierta ni relación previa confirmada",
+        "nunca por bajo encaje, crítica, desacuerdo o competencia",
+        "bloqueo vía Unipile por el operador; el reporte sigue siendo tarea manual de Gustavo (sin cobertura verificada)",
+        "tope bloqueos; alerta a Gustavo en cada ejecución"
+      ],
       "datos_ids": [
         "D04",
         "D06",
@@ -3449,9 +3827,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
-      "politica": "Parada total automática ante restricción, 429, reto de seguridad, desconexión o identidad distinta; solo Gustavo reanuda; nunca eludir ni reintentar por otra vía.",
+      "politica": "Pausa automática de la cuenta ante restricción, 429, reto de seguridad, desconexión o identidad distinta, y de la capacidad ante quejas o errores materiales, con alerta; solo Gustavo reanuda; nunca eludir ni reintentar por otra vía.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D14",
         "D15"
@@ -3483,9 +3863,11 @@
       "herramienta_matriz_v2": "Claude + Django/PostgreSQL",
       "cobertura_documental": "diseno_interno",
       "riesgo_para_verificacion": "n/a",
-      "graduable_a_nivel_A": "no_aplica",
+      "modo_autonomia_por_defecto": "auto",
+      "degradacion": "no_aplica",
       "tope": "interna",
       "politica": "Inventario de ejecuciones, versiones, confirmaciones e inciertos con acceso restringido; no prometer exportación completa de LinkedIn.",
+      "condiciones_estrictas": null,
       "datos_ids": [
         "D07",
         "D08",
@@ -3498,15 +3880,23 @@
       "implementada": false
     }
   ],
+  "cuestiones_cerradas_2026_11_06": [
+    "Valor de N y ventana de observación: sustituidos por la degradación automática.",
+    "Topes iniciales: se mantienen como valores por defecto configurables; ventana 07:00–21:00 en America/Bogota.",
+    "Cupo de notas: las notas automáticas se limitan al cupo mensual real configurado, sin aprobación.",
+    "Caducidad: 48 h para toda propuesta no ejecutada.",
+    "Revisión humana final antes de publicar: se elimina; la sustituye la verificación automática.",
+    "Canal: alertas por OPERATOR_ALERT_WEBHOOK y en la oficina; la bandeja de aprobación solo se usa en modo approval.",
+    "Visitas al perfil: aceptadas."
+  ],
   "cuestiones_abiertas_para_gustavo": [
-    "Valor de N para la graduación y ventana de observación sin incidencias.",
-    "Ajuste de los topes iniciales prudentes y de la ventana horaria y zona horaria de actividad.",
-    "Cupo mensual real de notas de invitación de la cuenta gratuita y reserva para su uso manual.",
-    "Caducidad de las aprobaciones por tipo de acción.",
-    "Si desea, más adelante, cambiar la revisión humana final antes de publicar para permitir graduar publicaciones.",
+    "Cupo mensual real de notas de invitación de la cuenta gratuita y si reserva una parte para uso manual.",
+    "Valor de OPERATOR_DAILY_LLM_USD y subida del techo acumulado (OPENAI_LIMIT_USD, ANTHROPIC_LIMIT_USD) para operar.",
+    "URL de OPERATOR_ALERT_WEBHOOK.",
+    "Umbral de incidencias acumuladas que pausa la cuenta.",
+    "Disponibilidad configurada en D16 para coordinar reuniones; sin ella CHAT-07 no confirma franjas.",
     "Proporción del esfuerzo dedicada a comunidad/autoridad fuera del 60/40 y peso de las alianzas en cada vía.",
-    "Canal de aprobación (bandeja en la oficina, admin de Django u otro) y aviso de la parada total.",
-    "Si acepta que las lecturas de perfil puedan registrarse como visitas visibles, una vez el piloto lo compruebe."
+    "Confirmar las propuestas de la v1.1: condiciones estrictas y topes de RED-08, CONT-11 y ADM-03; qué escrituras cuentan como públicas para el espaciado; plazo de 72 h en INT-04 contado desde el comentario."
   ],
   "recomendaciones_no_aplicadas": [
     "Evaluar tras el piloto si mantener dos copywriters y cinco lectores compensa su coste frente a uno y un subconjunto; la decisión vigente es conservarlos."

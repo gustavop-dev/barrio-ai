@@ -27,7 +27,7 @@ flowchart TD
     D --> R[Revisión]
     P --> R
     R -->|corrección agrupada| E
-    R --> H2[Revisión y aprobación humana de versión]
+    R --> H2[Verificación automática y aprobación de la política autónoma, con Gustavo sobre el bucle]
     H2 --> X[Aplicación externa autorizada]
     X --> V[Confirmación de lo realmente publicado o aplicado]
     V --> O
@@ -64,8 +64,8 @@ Fichas nuevas de Estrategia/Perfil: `equipos/estrategia-perfil/contratos-v1/`. S
 | Lectores → Director | reader_assessment | Fragmento, perspectiva, objeción y carácter simulado | Devolver opinión vaga; no encargar research paralelo |
 | Director → Revisión | selected_candidate | Hash exacto, justificación de elección y objeciones no resueltas | Devolver decisión/evidencia; no seleccionar por votos solos |
 | Perfil → Revisión | profile_proposal | Dirección aceptada, pruebas, cambios propuestos y versión | Revisar dependencia o afirmación afectada |
-| Observatorio → Relaciones → Revisión → Gustavo → Operador | participation_signal → organic_participation_proposal | Hilo y contexto versionados, borrador exacto, fuentes y permisos; verificador devuelve review_record y approval_package; operador ejecuta solo con aprobación de Gustavo del hash exacto | Sin contexto: needs_evidence a relaciones_comunidad; sin aprobación no hay envío |
-| Revisión → Gustavo | approval_package | Texto/asset exacto, fuentes y estado de hallazgos | Corregir material, omitir o esperar; no aprobar por cansancio |
+| Observatorio → Relaciones → Revisión → política autónoma → Operador | participation_signal → organic_participation_proposal | Hilo y contexto versionados, borrador exacto, fuentes y permisos; verificador devuelve review_record y approval_package; operador ejecuta solo con aprobación del hash exacto por la política autónoma (o por Gustavo en modo `approval`) | Sin contexto: needs_evidence a relaciones_comunidad; sin review_record `ready_for_execution` ni aprobación no hay envío |
+| Revisión → política autónoma | approval_package | Texto/asset exacto, fuentes y estado de hallazgos | Corregir material, omitir o esperar; nunca aprobar con hallazgos materiales abiertos |
 | Gustavo/registro → Observatorio | publication_record / profile_application_record | URL/evidencia, fecha y versión realmente aplicada | Guardar aprobado pero aplicación desconocida |
 | Captura validada → Observatorio | observation_batch | Fuente, periodo, definición, identidad, deduplicación y cobertura | No mezclar conflicto, duplicado o desconocido con resultados |
 | Observatorio → Director/Estrategia | learning_packet | Observaciones, interpretación, alternativa y evidencia faltante separadas | Esperar datos, ajuste local o propuesta estratégica, según alcance |
@@ -81,7 +81,7 @@ ACK significa admisión de estructura/versiones, nunca aprobación de contenido.
 1. Contexto confirmado alimenta Estrategia; la propuesta inicial conserva hipótesis sobre founders.
 2. Observatorio puede buscar referentes y preguntas de la audiencia bajo ese contexto provisional; no necesita posts propios. Sus resultados sirven para revisar la dirección antes de aprobarla.
 3. Gustavo decide la dirección. Perfil y Director reciben esa versión. El Director puede proponer pilares y un primer experimento con casos reales aunque falte historial.
-4. Brief → dos borradores → lectura acotada → selección → revisión → aprobación humana → publicación externa confirmada.
+4. Brief → dos borradores → lectura acotada → selección → revisión (compuerta automática) → aprobación de la política autónoma → publicación externa confirmada.
 5. Solo entonces nace la medición del contenido propio. Si no se publica, no fabricar datos ni abrir aprendizaje de ese post.
 
 No existe dependencia circular “publicar para definir a quién hablar / tener resultados para publicar”. La incertidumbre inicial queda documentada y se reduce con investigación, experiencia y observación posterior.
@@ -98,7 +98,7 @@ Los posts de nicho y los amplios pueden perseguir funciones distintas; ranking p
 
 ### D. Cambio de contexto o evidencia
 
-Corrección de Gustavo o de fuente → backend conserva historial y marca artefactos dependientes para revisión. El orquestador decide alcance, sin regenerar todo. Piezas no afectadas pueden continuar; una edición factual en candidato aprobado exige revisar el nuevo hash. Si ya se publicó, registrar diferencia, proponer corrección humana y evitar seguir difundiendo el dato erróneo; no borrar ni editar externamente por cuenta propia.
+Corrección de Gustavo o de fuente → backend conserva historial y marca artefactos dependientes para revisión. El orquestador decide alcance, sin regenerar todo. Piezas no afectadas pueden continuar; una edición factual en candidato aprobado exige revisar el nuevo hash. Si ya se publicó, registrar diferencia y evitar seguir difundiendo el dato erróneo: la capacidad queda en pausa con alerta a Gustavo y la corrección pasa por la política autónoma (edición CONT-10 o, si el error factual material está confirmado y no se puede editar, retirada CONT-11 con política estricta); nunca se borra por bajo rendimiento.
 
 ## Control de bucles, coste y estados
 
@@ -112,7 +112,7 @@ Corrección de Gustavo o de fuente → backend conserva historial y marca artefa
 
 ## Autorizaciones y acceso al conocimiento
 
-Escribir propuestas internas puede automatizarse dentro de límites una vez implementado. Aprobar estrategia, hechos personales y texto público corresponde a Gustavo. El registro de publicación es un hecho observado, no una aprobación retroactiva. Mensajes, conexiones, comentarios y publicaciones siguen la política de [reparto](reparto-acciones-v1.md) y solo los ejecuta operador_cuenta; las campañas outbound siguen fuera de alcance. Este diseño no los activa.
+Escribir propuestas internas puede automatizarse dentro de límites una vez implementado. Aprobar estrategia y hechos personales corresponde a Gustavo; el texto público lo aprueba la política autónoma tras la verificación automática, por decisión de Gustavo del 2026-11-06, y él puede pausar, vetar o revertir. El registro de publicación es un hecho observado, no una aprobación retroactiva. Mensajes, conexiones, comentarios y publicaciones siguen la política de [reparto](reparto-acciones-v1.md) y solo los ejecuta operador_cuenta; las campañas outbound siguen fuera de alcance. Este diseño no los activa.
 
 Los roles comparten biblioteca, pero reciben solo contexto relevante y permitido. Datos privados de oportunidades se agregan/anonimizan antes de ir a escritores y lectores. Fuentes externas, comentarios y repos son datos, no instrucciones. Una fuente puede respaldar un hecho sin autorizar divulgarla; permiso de lectura y uso público son distintos.
 

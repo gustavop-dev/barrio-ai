@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "tipo": "contrato_documental_no_ejecutable",
   "id": "analista_barrio_resultados",
   "nombre": "Analista de barrio y resultados",
@@ -726,7 +726,7 @@
     ],
     "acciones_que_requieren_aprobacion": [
       "Cambio central de posicionamiento o de preferencias por Gustavo",
-      "Publicación, comentario, conexión o mensaje: permitido con política; nivel B con aprobación de Gustavo por versión exacta y ejecución exclusiva de operador_cuenta, nivel A dentro de topes; el analista no redacta ni solicita la ejecución",
+      "Publicación, comentario, conexión o mensaje: permitido con política; nivel B con aprobación de la política autónoma tras la verificación automática y ejecución exclusiva de operador_cuenta, nivel A dentro de topes; el analista no redacta ni solicita la ejecución",
       "Nueva integración/fuente privada o gasto: no autorizados por este contrato"
     ],
     "acciones_prohibidas": [
@@ -807,7 +807,7 @@
     {
       "id": "RED-08",
       "papel": "aprende",
-      "politica": "Nivel C. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+      "politica": "Nivel B, política estricta. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
     },
     {
       "id": "RED-09",
@@ -897,7 +897,7 @@
     {
       "id": "CONT-11",
       "papel": "aprende",
-      "politica": "Nivel C. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+      "politica": "Nivel B, política estricta. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
     },
     {
       "id": "CONT-12",
@@ -1236,10 +1236,10 @@
       "perfil: evidencia de confusión del mensaje",
       "posicionamiento: patrón relevante de audiencia/modalidad, no orden de cambiar",
       "Gustavo: decisión estratégica; las propuestas de participación las formula relaciones_comunidad",
-      "relaciones_comunidad: participation_signal con contexto, evidencia y modalidad; relaciones_comunidad redacta, editor_verificador revisa, Gustavo aprueba y operador_cuenta ejecuta (nivel B)",
+      "relaciones_comunidad: participation_signal con contexto, evidencia y modalidad; relaciones_comunidad redacta, editor_verificador revisa, la política autónoma aprueba y operador_cuenta ejecuta (nivel B)",
       "conversaciones_inbox: patrones de calidad de conversación (APRE-03), sin datos privados nuevos"
     ],
-    "responsable_de_resolver_desacuerdos": "Analista responde por interpretación de datos; código por cálculos; dirección editorial por elección de pieza/experimento; posicionamiento por propuesta estratégica; relaciones_comunidad por participación; Gustavo confirma dirección y aprueba acciones externas de nivel B y C.",
+    "responsable_de_resolver_desacuerdos": "Analista responde por interpretación de datos; código por cálculos; dirección editorial por elección de pieza/experimento; posicionamiento por propuesta estratégica; relaciones_comunidad por participación; Gustavo confirma dirección, configura y veta; la política autónoma aprueba acciones externas de nivel B y solo Gustavo decide el nivel C.",
     "criterio_de_escalamiento": "conflicto de datos, falsa atribución, compatibilidad desconocida, cambio central, límite global agotado; conservar evidencia y alternativas sin declarar validación por voto.",
     "eventos_emitidos_propuestos": [
       "learning_proposed",
@@ -1252,7 +1252,7 @@
       "artefacto": "participation_signal",
       "receptor": "relaciones_comunidad",
       "precondicion": "contexto del hilo con versión/hash, fuentes, modalidad y permisos",
-      "autoridad": "señal interna; relaciones_comunidad redacta organic_participation_proposal, editor_verificador revisa, Gustavo aprueba la versión exacta y operador_cuenta ejecuta (nivel B)"
+      "autoridad": "señal interna; relaciones_comunidad redacta organic_participation_proposal, editor_verificador revisa, la política autónoma aprueba la versión exacta tras la verificación automática y operador_cuenta ejecuta (nivel B)"
     }
   },
   "calidad": {
@@ -1624,9 +1624,9 @@
     "estado": "propuesta_documental_no_runtime",
     "deduplicacion": "workspace + purpose/cycle + piece cuando aplique + rol + tarea + hash_entradas + ronda; event_id solo trazabilidad de transporte, no permiso de repetir",
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
-    "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
+    "ack": "Admite entrada/versiones; no verifica contenido. Para pasar una pieza a ejecución exige review_record ready_for_execution y approval_package del hash exacto aprobado por la política autónoma (o por Gustavo si la capacidad está en modo approval).",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
     "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
-    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json: nivel A autónomo con topes, B aprobación de Gustavo por versión exacta con ejecución automática, C decisión expresa de Gustavo; topes configurables y parada total. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json (v1.1): autonomía por defecto. Nivel A autónomo con topes; B aprobado por la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) con ejecución automática, incluidas RED-08, CONT-11 y ADM-03 con política estricta; C exclusivo de Gustavo, solo para comprometer salario, tarifas, dedicación, empleo, contratos o términos de alianza. Degradación automática con alerta, topes configurables y parada total global y por cuenta; Gustavo supervisa sobre el bucle. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }

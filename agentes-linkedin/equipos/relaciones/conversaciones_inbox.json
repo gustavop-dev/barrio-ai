@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "tipo": "contrato_documental_no_ejecutable",
   "id": "conversaciones_inbox",
   "nombre": "Conversaciones e inbox",
@@ -189,16 +189,16 @@
     "pasos": [
       "Sincronizar y leer el hilo completo disponible; declarar lagunas.",
       "Clasificar intención (charla, colaboración, alianza, empleo, cliente ProjectApp, promoción, desconocido), modalidad, compromisos y asuntos pendientes (CHAT-02).",
-      "Si hay necesidad, interés de contratar, entrevista, propuesta o alianza: registrar opportunity_record (CHAT-09) y transferir la decisión a Gustavo.",
+      "Si hay necesidad, interés de contratar, entrevista, propuesta o alianza: registrar opportunity_record (CHAT-09), preparar la decisión con hechos y alertar a Gustavo; la conversación sigue viva sin comprometer condiciones.",
       "Redactar message_proposal con texto exacto en el idioma usado por el interlocutor en el hilo, motivo, riesgo y alternativa de no responder.",
-      "Pedir revisión al editor_verificador según riesgo y remitir approval_package a Gustavo; temas sensibles los redacta o decide Gustavo.",
-      "Con aprobación vigente, emitir execution_request al operador_cuenta; tras la confirmación actualizar estado del hilo (CHAT-10) e informar a relaciones_comunidad.",
+      "Pedir revisión al editor_verificador según riesgo y remitir approval_package a la política autónoma; ante salario, tarifas, dedicación, empleo, contratos o alianzas (nivel C) responder solo sin comprometer (acusar recibo, pedir información o proponer una conversación) y escalar a Gustavo.",
+      "Con aprobación vigente de la política autónoma, emitir execution_request al operador_cuenta; tras la confirmación actualizar estado del hilo (CHAT-10) e informar a relaciones_comunidad.",
       "Si Gustavo intervino, refrescar el hilo y retirar borradores obsoletos."
     ],
     "reglas_de_decision": [
       "Leer la conversación completa disponible; nunca responder al último mensaje aislado.",
-      "No inventar disponibilidad, presupuesto, resultados, experiencia ni compromisos; salario, tarifa, dedicación, contratos y términos de alianza son nivel C.",
-      "Proponer una conversación sin comprometer franjas; confirmar una franja solo con disponibilidad confirmada por Gustavo en D16 para ese caso.",
+      "No inventar disponibilidad, presupuesto, resultados, experiencia ni compromisos; salario, tarifa, dedicación, empleo, contratos y términos de alianza son nivel C, exclusivo de Gustavo: el mensaje no los compromete ni los niega, mantiene la conversación y escala.",
+      "Proponer una conversación y coordinar la reunión de forma autónoma dentro de la disponibilidad configurada por Gustavo en D16; sin D16 o fuera de ella, proponer sin comprometer franjas. Una reunión no compromete condiciones.",
       "Un seguimiento como máximo sin respuesta salvo decisión de Gustavo; una negativa cierra el hilo.",
       "Ningún mensaje automático por aceptación de invitación; CHAT-04 solo con interacción, conexión o afinidad declarada concreta.",
       "Datos privados del hilo no pasan a texto público ni a escritores o lectores salvo patrón anonimizado.",
@@ -218,16 +218,16 @@
     "herramientas_necesarias": [
       "pasarela de lectura de operador_cuenta: Unipile v2 (inboxes, chats y mensajes; historial inicial y eventos incrementales)",
       "operador_cuenta para enviar, responder y cambiar estados nativos del chat",
-      "Django/PostgreSQL: oportunidades, estados internos del inbox, propuestas y bandeja de aprobación (por implementar)",
+      "Django/PostgreSQL: oportunidades, estados internos del inbox, propuestas, política autónoma y bandeja de la oficina para vetos, modo approval y asuntos de nivel C (por implementar)",
       "agenda Google/Microsoft opcional, no conectada"
     ],
     "acciones_autorizadas": [
       "Nivel A: sincronizar y leer (CHAT-01), clasificar (CHAT-02), registrar oportunidades (CHAT-09) y organizar estados internos y nativos permitidos (CHAT-10)",
-      "Proponer mensajes de nivel B con versión exacta"
+      "Proponer mensajes de nivel B con versión exacta, incluida la coordinación de reuniones dentro de D16"
     ],
     "acciones_que_requieren_aprobacion": [
-      "Nivel B: responder (CHAT-03), iniciar (CHAT-04), retomar (CHAT-05), compartir recurso (CHAT-06), proponer conversación (CHAT-07) y seguimiento (CHAT-08): aprobación de Gustavo por versión exacta y ejecución de operador_cuenta; graduables solo en subtipos no sensibles",
-      "Nivel C: cualquier decisión sobre oportunidad, condiciones, disponibilidad confirmada o alianza"
+      "Nivel B: responder (CHAT-03), iniciar (CHAT-04), retomar (CHAT-05), compartir recurso (CHAT-06), proponer conversación y coordinar reunión dentro de D16 (CHAT-07) y seguimiento (CHAT-08): aprobación de la política autónoma por versión exacta tras la verificación automática y ejecución de operador_cuenta; Gustavo puede pasar cualquiera a modo approval u off",
+      "Nivel C, exclusivo de Gustavo: comprometer salario, tarifas o disponibilidad de dedicación, aceptar un empleo o contrato, firmar acuerdos o términos de alianza"
     ],
     "acciones_prohibidas": [
       "Outbound, campañas, calentamientos y secuencias de clases 07+",
@@ -249,7 +249,7 @@
     {
       "id": "DESC-03",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Ficha con hechos observados y vacíos; relaciones e inbox solo refrescan la ficha antes de actuar. No inventar financiación; comprobar en piloto si la consulta se registra como visita visible."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Ficha con hechos observados y vacíos; relaciones e inbox solo refrescan la ficha antes de actuar. No inventar financiación; Gustavo acepta que la consulta pueda registrarse como visita visible."
     },
     {
       "id": "DESC-03",
@@ -314,7 +314,7 @@
     {
       "id": "CHAT-03",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Sin inventar disponibilidad, presupuesto ni compromisos; temas sensibles los redacta o decide Gustavo y no son graduables."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Sin inventar disponibilidad, presupuesto ni compromisos; ante salario, tarifas, dedicación, empleo, contratos o alianzas (nivel C) responde sin comprometer, mantiene la conversación y escala por CHAT-09."
     },
     {
       "id": "CHAT-03",
@@ -324,7 +324,7 @@
     {
       "id": "CHAT-04",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia."
     },
     {
       "id": "CHAT-04",
@@ -334,27 +334,27 @@
     {
       "id": "CHAT-05",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Vínculo real y razón concreta; no fingir cercanía ni usar el café como pretexto comercial."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Vínculo real y razón concreta; no fingir cercanía ni usar el café como pretexto comercial."
     },
     {
       "id": "CHAT-06",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Recurso con permiso de uso y atribución personal/equipo; sin pruebas confidenciales ni testimonios inventados."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Recurso con permiso de uso y atribución personal/equipo; sin pruebas confidenciales ni testimonios inventados."
     },
     {
       "id": "CHAT-07",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Proponer conversación sin comprometer horarios; confirmar una franja es nivel C salvo disponibilidad confirmada por Gustavo en D16 para ese caso; agenda opcional no conectada."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Proponer conversación y confirmar una franja solo dentro de la disponibilidad configurada por Gustavo en D16; sin D16 o fuera de ella, proponer sin comprometer horarios; una reunión no compromete condiciones; agenda opcional no conectada."
     },
     {
       "id": "CHAT-08",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; Gustavo aprueba por hash; solo operador_cuenta ejecuta. Un seguimiento como máximo sin respuesta salvo decisión de Gustavo; respetar un no; nunca secuencia outbound."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Un seguimiento como máximo sin respuesta salvo decisión de Gustavo; respetar un no; nunca secuencia outbound."
     },
     {
       "id": "CHAT-09",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Registro interno de nivel A; la decisión sobre la oportunidad (salario, dedicación, oferta, contrato o alianza) es nivel C y la toma Gustavo con hechos."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Registro interno de nivel A; la decisión sobre la oportunidad (salario, tarifas, dedicación, oferta, contrato o alianza) es nivel C: el sistema prepara los hechos, alerta a Gustavo y mantiene la conversación sin comprometer."
     },
     {
       "id": "CHAT-09",
@@ -404,12 +404,12 @@
     {
       "id": "ADM-03",
       "papel": "propone",
-      "politica": "Nivel C. Solo propone con motivo y evidencia; requiere decisión expresa de Gustavo para ese caso. Bloqueo vía Unipile y reporte manual solo con decisión expresa de Gustavo; nunca por bajo encaje, crítica o competencia."
+      "politica": "Nivel B, política estricta. Propone con motivo y evidencia registrada; la política autónoma solo la aprueba si se cumplen las condiciones estrictas y el editor_verificador confirma la evidencia; solo operador_cuenta ejecuta. Política estricta: bloqueo vía Unipile solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; el reporte sigue siendo manual de Gustavo; alerta a Gustavo."
     },
     {
       "id": "ADM-03",
       "papel": "aprende",
-      "politica": "Nivel C. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+      "politica": "Nivel B, política estricta. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
     },
     {
       "id": "ADM-04",
@@ -486,7 +486,7 @@
       "capacidad_id": "ID del catálogo de acciones",
       "nivel": "A|B|C según reparto-acciones-v1",
       "riesgo": "alto|medio|bajo",
-      "status": "propuesto|revisado|aprobado|rechazado|supersedido|stale; no implica ejecución",
+      "status": "propuesto|revisado|aprobado|rechazado|vetado|caducado|supersedido|stale; no implica ejecución",
       "input_refs": "lista id/version/hash de contexto, relación, hilo y artefactos",
       "source_refs": "localizador, fecha de captura, hash y permiso de uso",
       "facts": "hechos con soporte",
@@ -494,7 +494,7 @@
       "missing_data": "campos desconocidos y efecto",
       "decision": "acción propuesta, motivo y alternativa sin acción",
       "recipient": "responsable siguiente",
-      "approval_ref": "null hasta aprobación de Gustavo del hash exacto (nivel B/C) o politica_ref/delegacion_ref (nivel A)",
+      "approval_ref": "null hasta aprobación del hash exacto por la política autónoma tras la verificación automática (nivel B) o por Gustavo en modo approval; politica_ref en nivel A",
       "execution_ref": "null hasta registro de operador_cuenta",
       "supersedes": "versión previa si existe"
     }
@@ -533,18 +533,18 @@
       "operador_cuenta: mensajes nuevos, estados y execution_result",
       "relaciones_comunidad: contexto para iniciar o retomar (CHAT-04/05)",
       "perfil: contexto de PERF-07",
-      "Gustavo: aprobaciones, disponibilidad confirmada, decisiones sobre oportunidades"
+      "Gustavo: disponibilidad configurada (D16), vetos y decisiones de nivel C sobre oportunidades; aprobaciones solo en modo approval"
     ],
     "entrega_a": [
-      "operador_cuenta: execution_request aprobado",
+      "operador_cuenta: execution_request con approval_ref de la política autónoma",
       "editor_verificador: message_proposal según riesgo con extracto mínimo del hilo",
-      "Gustavo: approval_package y opportunity_record con decisión transferida",
+      "Gustavo: opportunity_record con la decisión de nivel C preparada con hechos y alerta; approval_package solo en modo approval",
       "relaciones_comunidad: resultado de la conversación para RED-09",
       "analista_barrio_resultados: oportunidades (D10) y extractos permitidos minimizados",
       "director_editorial: patrones anonimizados de preguntas, sin identidades"
     ],
-    "responsable_de_resolver_desacuerdos": "conversaciones_inbox decide nivel A; editor_verificador conserva bloqueo material; Gustavo decide mensajes y toda oportunidad.",
-    "criterio_de_escalamiento": "oportunidad, condiciones, datos sensibles, petición de reunión con franja concreta, queja, posible conflicto con un compromiso existente o pregunta sobre automatización."
+    "responsable_de_resolver_desacuerdos": "conversaciones_inbox decide nivel A; editor_verificador conserva bloqueo material; la política autónoma aprueba los mensajes de nivel B; Gustavo veta, configura y decide toda oportunidad (nivel C).",
+    "criterio_de_escalamiento": "oportunidad, condiciones, datos sensibles, petición de reunión fuera de la disponibilidad configurada (D16), queja, posible conflicto con un compromiso existente o pregunta sobre automatización."
   },
   "calidad": {
     "criterios_materiales": [
@@ -559,7 +559,7 @@
     "casos_de_evaluacion": [
       {
         "caso": "Founder pregunta tarifa y disponibilidad",
-        "resultado_esperado": "opportunity_record y transferencia a Gustavo; no cita banda interna.",
+        "resultado_esperado": "opportunity_record, respuesta sin compromiso que mantiene la conversación y alerta a Gustavo; no cita banda interna.",
         "estado": "propuesto_no_ejecutado"
       },
       {
@@ -586,6 +586,16 @@
         "caso": "Envío con timeout",
         "resultado_esperado": "Estado incierto; conciliación del operador, sin reenviar.",
         "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Founder propone una reunión en una franja libre de D16",
+        "resultado_esperado": "Confirma la franja tras la verificación automática; no compromete condiciones.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Interlocutor se queja de los mensajes",
+        "resultado_esperado": "Cierra el hilo, pausa la capacidad afectada y alerta a Gustavo.",
+        "estado": "propuesto_no_ejecutado"
       }
     ],
     "evidencia_de_validacion": [
@@ -597,7 +607,7 @@
       "conversaciones con respuesta sustantiva",
       "oportunidades registradas por modalidad y etapa",
       "tiempo de atención",
-      "correcciones de Gustavo"
+      "vetos, reversiones y correcciones de Gustavo"
     ],
     "fuente_de_datos": "D10/D14 y registros de oportunidades",
     "linea_base": null,
@@ -619,15 +629,15 @@
       "petición de la persona",
       "intervención de Gustavo",
       "tope alcanzado",
-      "tema sensible sin decisión"
+      "compromiso de nivel C sin decisión de Gustavo (solo para ese compromiso)"
     ],
     "tratamiento_de_fallo_incierto": "esperar la conciliación del operador; nunca reenviar"
   },
   "pendientes_para_activacion": [
     "revisión humana del diseño y de reparto-acciones-v1",
-    "aprobación por Gustavo de neighborhood_criteria, topes iniciales y N de graduación",
+    "aprobación por Gustavo de neighborhood_criteria; configuración del cupo real de notas y del webhook de alertas",
     "conectar la cuenta en Unipile con credenciales y 2FA de Gustavo y probar cada operación en piloto",
-    "implementar operador_cuenta, pasarela de lectura y bandeja de aprobación en Django",
+    "implementar en Django operador_cuenta, pasarela de lectura, política autónoma, degradación y alertas",
     "implementar y evaluar con casos adversos antes de activar",
     "definir retención y acceso a chats",
     "decidir si se conecta una agenda (D16)"
@@ -670,10 +680,10 @@
     },
     {
       "catalogo_id": "D11",
-      "uso": "Aprobaciones vigentes",
-      "necesidad": "nivel B/C",
+      "uso": "Aprobaciones vigentes por versión (política autónoma o Gustavo en modo approval) y vetos",
+      "necesidad": "nivel B",
       "si_falta": "no solicitar envío",
-      "fuente_y_campos": "Bandeja de aprobación en Django."
+      "fuente_y_campos": "Registro de aprobaciones en Django y bandeja de la oficina."
     },
     {
       "catalogo_id": "D13",
@@ -698,7 +708,7 @@
     },
     {
       "catalogo_id": "D16",
-      "uso": "Disponibilidad confirmada, zona horaria y compromisos",
+      "uso": "Disponibilidad configurada por Gustavo, zona horaria y compromisos",
       "necesidad": "solo para confirmar franjas",
       "si_falta": "proponer o consultar sin comprometer horarios",
       "fuente_y_campos": "Gustavo o agenda autorizada cuando se conecte; crear un evento es acción separada."
@@ -709,9 +719,9 @@
     "estado": "propuesta_documental_no_runtime",
     "deduplicacion": "workspace + purpose/cycle + piece cuando aplique + rol + tarea + hash_entradas + ronda; event_id solo trazabilidad de transporte, no permiso de repetir",
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
-    "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
+    "ack": "Admite entrada/versiones; no verifica contenido. Para pasar una pieza a ejecución exige review_record ready_for_execution y approval_package del hash exacto aprobado por la política autónoma (o por Gustavo si la capacidad está en modo approval).",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
     "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
-    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json: nivel A autónomo con topes, B aprobación de Gustavo por versión exacta con ejecución automática, C decisión expresa de Gustavo; topes configurables y parada total. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json (v1.1): autonomía por defecto. Nivel A autónomo con topes; B aprobado por la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) con ejecución automática, incluidas RED-08, CONT-11 y ADM-03 con política estricta; C exclusivo de Gustavo, solo para comprometer salario, tarifas, dedicación, empleo, contratos o términos de alianza. Degradación automática con alerta, topes configurables y parada total global y por cuenta; Gustavo supervisa sobre el bucle. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }

@@ -1,5 +1,5 @@
 {
-  "version": "0.3",
+  "version": "0.4",
   "estado": "diseno_no_activado",
   "objetivo": "Oportunidades personales en startups (60%) y contratos ProjectApp (40%), apoyados por autoridad y comunidad pertinente.",
   "conocimiento": {
@@ -129,30 +129,31 @@
     "max_rondas_propuesto": 2,
     "decisor": "director_editorial",
     "bloqueo_por_evidencia_material": "editor_verificador",
-    "aprobacion_final": "usuario",
+    "aprobacion_final": "politica_autonoma tras la compuerta del editor_verificador; sin revisión humana final (decisión de Gustavo, 2026-11-06)",
     "consenso_unanime_obligatorio": false,
     "publicacion_automatica_activada": false,
     "lectores": "cinco perspectivas disponibles; subset justificado en brief",
-    "publicacion_tras_aprobacion": "diseñada (nivel B): Gustavo aprueba la versión exacta y la fecha; operador_cuenta publica una sola vez; no activada"
+    "publicacion_tras_aprobacion": "diseñada (nivel B): la política autónoma aprueba la versión exacta y la fecha dentro de la ventana; operador_cuenta publica una sola vez; no activada"
   },
   "autoridad": {
     "referencia": "../infra/docs/reparto-acciones-v1.md",
     "niveles": {
       "A": "autónomo con topes",
-      "B": "aprobación de Gustavo por versión exacta y ejecución automática del operador",
-      "C": "solo con decisión expresa de Gustavo"
+      "B": "autónomo: lo aprueba la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) y lo ejecuta el operador; incluye RED-08, CONT-11 y ADM-03 con política estricta",
+      "C": "exclusivo de Gustavo: comprometer salario, tarifas o dedicación, aceptar un empleo o contrato, firmar acuerdos o términos de alianza"
     },
+    "modo_por_capacidad": "OPERATOR_AUTONOMY: auto | approval | off; por defecto auto",
     "ejecutor_unico_de_escrituras": "operador_cuenta",
-    "graduacion": "B→A por capacidad tras N ejecuciones confirmadas sin incidencias; N configurable por Gustavo",
-    "topes": "por día, semana, tipo y destinatario; valores iniciales prudentes y ajustables",
-    "parada_total": "Gustavo o automática ante restricción, 429 o reto de seguridad; solo Gustavo reanuda",
+    "degradacion": "pausa automática de la capacidad o de la cuenta ante incidencias, con alerta; solo Gustavo reanuda (sustituye a la graduación B→A)",
+    "topes": "por día, semana, tipo y destinatario; valores por defecto configurables; ventana 07:00-21:00 en America/Bogota; espaciado fijo de 20 minutos entre escrituras públicas; caducidad de 48 h",
+    "parada_total": "global y por cuenta; la activa Gustavo o el operador por degradación, con alerta por webhook y en la oficina; solo Gustavo reanuda",
     "activada": false
   },
   "metas": {
     "linea_base": null,
     "objetivos_numericos": null,
     "cadencia": "intención diaria declarada por Gustavo; la planifica director_editorial en CONT-07 sin rellenar días; no activada",
-    "pendiente": "Línea base y objetivos cuantitativos; topes, N de graduación y horario de actividad por confirmar con Gustavo."
+    "pendiente": "Línea base y objetivos cuantitativos; cupo real de notas, presupuesto diario de modelos y webhook de alertas por configurar con Gustavo."
   },
   "outbound": {
     "estado": "inactivo_pendiente_curso",

@@ -1,6 +1,6 @@
 # Plan maestro del equipo autónomo de LinkedIn
 
-Fecha: 2026-11-06. Versión: 1.0. Estado: planificación; autonomía aún no implementada.
+Fecha: 2026-11-06. Versión: 1.1. Estado: planificación; autonomía aún no implementada.
 
 Este documento guía el diseño y la implementación. Antes de trabajar en un grupo, consultar su fase, dependencias y criterio de salida. Registrar aquí cambios de rumbo; los documentos de cada agente desarrollan este plan, no lo sustituyen.
 
@@ -29,7 +29,7 @@ Decisiones propias del proyecto:
 - Dos borradores y lectores independientes cuando la comparación aporte valor; decisión editorial razonada, sin exigir unanimidad.
 - Dos rondas de revisión como límite inicial propuesto, configurable después de evaluar; nunca atribuirlo al curso.
 - Los lectores simulados generan hipótesis y objeciones, no métricas de mercado.
-- Revisión humana final antes de publicación. Este plan no activa publicación, comentarios, cambios de perfil ni mensajes externos.
+- Sin revisión humana final antes de publicar, por decisión de Gustavo del 2026-11-06 que sustituye al principio anterior de revisión humana final: publica la política autónoma tras una verificación automática y Gustavo supervisa sobre el bucle (ver registro de decisiones). Este plan no activa publicación, comentarios, cambios de perfil ni mensajes externos.
 
 ## 3. Punto de partida y brechas
 
@@ -45,7 +45,7 @@ La prueba anterior de generación con Claude terminó con timeout y reserva inci
 | --- | --- | --- | --- |
 | Posicionamiento | Contexto personal confirmado o cambio material | Posicionamiento propone; perfil deriva una propuesta coherente | Referencia aprobada o preguntas concretas pendientes |
 | Investigación y barrio | Pregunta editorial, evidencia nueva o revisión acordada | Observatorio entrega hallazgos fechados, fuentes, incertidumbre y oportunidades | Pregunta suficientemente respondida o límites de investigación alcanzados |
-| Producción editorial | Oportunidad priorizada y entradas vigentes | Director prepara brief; escritura propone; lectores contrastan; revisión verifica | Pieza lista para aprobación o descarte justificado |
+| Producción editorial | Oportunidad priorizada y entradas vigentes | Director prepara brief; escritura propone; lectores contrastan; revisión verifica | Pieza verificada y aprobada por la política autónoma, o descarte justificado |
 | Aprendizaje | Publicación confirmada y ventana de datos disponible | Observatorio interpreta; dirección propone ajustes; estrategia interviene si cambia el enfoque | Aprendizaje registrado y siguiente experimento definido, o evidencia insuficiente |
 
 El disparador no ejecuta trabajo ilimitado. Se comprobarán novedad, relevancia, presupuesto y dependencias. Una revisión periódica sin evidencia nueva puede terminar sin llamar al modelo.
@@ -80,7 +80,7 @@ Salida: contexto suficiente para un primer ciclo y rúbrica versionada. Comparar
 
 Reutilizar cola, identidad, permisos, caché, memoria y ledger. Añadir con migraciones los conceptos que falten: objetivo, versión de contrato, ciclo, paso/dependencia, evento, artefacto versionado, decisión/aprobación y observación de resultado. Los nombres definitivos se ajustan al código existente para evitar tablas duplicadas.
 
-Separar servicios de planificación, validación y ejecución. Cada paso referencia un trabajo existente y conserva entradas, versión del prompt/modelo, fuentes, salida y coste. Una aprobación corresponde a una versión específica; editar la pieza obliga a revisar su aprobación.
+Separar servicios de planificación, validación y ejecución. Cada paso referencia un trabajo existente y conserva entradas, versión del prompt/modelo, fuentes, salida y coste. Una aprobación, de la política autónoma o de Gustavo si la capacidad está en modo `approval`, corresponde a una versión específica; editar la pieza obliga a repetir la verificación.
 
 Estado de ciclo propuesto: planificado, ejecutándose, esperando información, esperando aprobación, bloqueado, completado o cancelado. Los trabajos mantienen sus estados técnicos existentes; no confundir trabajo completado con objetivo alcanzado o publicación realizada.
 
@@ -134,7 +134,7 @@ No cargar las 1.035 unidades en cada llamada. La lectura transversal durante el 
 
 - Ingeniería: trabajos concurrentes, deduplicación, reinicio, cancelación, permisos, reservas inciertas y memoria versionada.
 - Conocimiento: fuentes correctas con prefijo de clase, originales intactos, excepciones conservadas y distinción entre curso e investigación actual.
-- Comportamiento: hechos faltantes, instrucciones hostiles dentro de fuentes, resultados contradictorios y presión para publicar sin aprobar.
+- Comportamiento: hechos faltantes, instrucciones hostiles dentro de fuentes, resultados contradictorios y presión para publicar sin superar la verificación automática.
 - Calidad editorial: relevancia, voz, prueba, claridad, promesa cumplida y utilidad para el destinatario de la pieza.
 - Operación: coste por resultado aceptado, tiempo, correcciones humanas y contribución de cada rol. El acuerdo entre modelos no equivale a verificación factual.
 
@@ -247,4 +247,12 @@ Se mantiene Unipile como recomendación para operar los ciclos propios. Lemlist 
 
 Gustavo acepta escrituras automatizadas en su cuenta principal mediante Unipile, con el riesgo de términos de LinkedIn que conlleva; entregará credenciales y 2FA a Unipile; no tendrá Premium por ahora (invitaciones sobre todo sin nota); mantiene Unipile frente a lemlist y los cinco equipos con sus trece roles. [Reparto de las 72 acciones](reparto-acciones-v1.md) y [especificación](../../arquitectura/reparto-acciones-v1.json): quién propone, decide, ejecuta, verifica y aprende; niveles A (autónomo con topes), B (aprobación por versión exacta y ejecución automática) y C (decisión expresa); graduación B→A con N configurable; topes y parada total.
 
-Se añaden `relaciones_comunidad`, `conversaciones_inbox` y el servicio determinista `operador_cuenta`, único ejecutor de escrituras. Los dieciséis contratos incorporan `capacidades_catalogo`, D13–D16 donde corresponde y las herramientas reales. La revisión humana final antes de publicar se conserva como aprobación de nivel B. Estado: diseño, no activado; sin conexiones, llamadas pagadas ni ejecución.
+Se añaden `relaciones_comunidad`, `conversaciones_inbox` y el servicio determinista `operador_cuenta`, único ejecutor de escrituras. Los dieciséis contratos incorporan `capacidades_catalogo`, D13–D16 donde corresponde y las herramientas reales. La revisión humana final antes de publicar se conserva como aprobación de nivel B (sustituido por la decisión de autonomía de abajo). Estado: diseño, no activado; sin conexiones, llamadas pagadas ni ejecución.
+
+### Decisión de autonomía — 2026-11-06
+
+Gustavo decide, literal: «todo debe funcionar como una máquina autónoma». Esta decisión sustituye el principio de la sección 2 que exigía revisión humana final antes de publicar y la aprobación de Gustavo por versión de cada pieza, comentario, invitación o mensaje. Las capacidades de nivel B las aprueba una política autónoma tras una verificación automática: reglas deterministas y, para los textos, el editor_verificador. Gustavo pasa a estar sobre el bucle: puede pausar, vetar, revertir o configurar en cualquier momento. La graduación B→A se sustituye por una degradación automática: ante una restricción, un 429, un reto de seguridad, una queja o informe de spam o un error material, se pausa la capacidad afectada o la cuenta y se le alerta; solo él reanuda. RED-08, CONT-11 y ADM-03 pasan a autónomas con política estricta. Sigue siendo exclusivo de Gustavo (nivel C) comprometer salario, tarifas o disponibilidad de dedicación, aceptar un empleo o contrato y firmar acuerdos o términos de alianza; coordinar una reunión dentro de la disponibilidad configurada (D16) es autónomo.
+
+Valores por defecto: la tabla de topes vigente, ventana de 07:00 a 21:00 en America/Bogota, espaciado fijo de 20 minutos entre escrituras públicas (sin aleatorizar), caducidad de 48 h, ningún comentario en posts de más de 72 h y notas de invitación automáticas dentro del cupo mensual real. Alertas por `OPERATOR_ALERT_WEBHOOK` y en la oficina; parada total global y por cuenta; tope diario de modelos `OPERATOR_DAILY_LLM_USD`, además del techo acumulado, que Gustavo debe subir para operar. Acepta que leer perfiles se registre como visita visible. Las reglas de contenido (no inventar experiencias, cifras ni testimonios; no exponer datos privados; afirmaciones con fuente) y las prohibiciones de eludir restricciones o aleatorizar para imitar comportamiento humano se mantienen.
+
+La decisión se aparta del filtro humano final que recomienda el curso (LI-06-M003-K06). Como compensación, el verificador bloquea toda experiencia, cifra o testimonio que no conste en el contexto confirmado o en pruebas con permiso. Se actualizaron el [reparto v1.1](reparto-acciones-v1.md), su [especificación](../../arquitectura/reparto-acciones-v1.json) y los contratos; la implementación en código va por separado. Estado: diseño, no activado. Pendientes: cupo real de notas, valor del tope diario y subida del techo acumulado, URL del webhook, umbral de incidencias, disponibilidad D16 y confirmación de las condiciones estrictas propuestas.

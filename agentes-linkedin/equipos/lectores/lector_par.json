@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "tipo": "plantilla_de_diseno_no_ejecutable",
   "id": "lector_par",
   "nombre": "Lector: Par",
@@ -345,9 +345,9 @@
     "estado": "propuesta_documental_no_runtime",
     "deduplicacion": "workspace + purpose/cycle + piece cuando aplique + rol + tarea + hash_entradas + ronda; event_id solo trazabilidad de transporte, no permiso de repetir",
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
-    "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
+    "ack": "Admite entrada/versiones; no verifica contenido. Para pasar una pieza a ejecución exige review_record ready_for_execution y approval_package del hash exacto aprobado por la política autónoma (o por Gustavo si la capacidad está en modo approval).",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
     "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
-    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json: nivel A autónomo con topes, B aprobación de Gustavo por versión exacta con ejecución automática, C decisión expresa de Gustavo; topes configurables y parada total. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json (v1.1): autonomía por defecto. Nivel A autónomo con topes; B aprobado por la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) con ejecución automática, incluidas RED-08, CONT-11 y ADM-03 con política estricta; C exclusivo de Gustavo, solo para comprometer salario, tarifas, dedicación, empleo, contratos o términos de alianza. Degradación automática con alerta, topes configurables y parada total global y por cuenta; Gustavo supervisa sobre el bucle. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }
