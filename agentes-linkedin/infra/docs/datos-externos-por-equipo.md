@@ -1,8 +1,8 @@
-# Catálogo de datos externos para LinkedIn Team
+# Datos externos: observación continua de LinkedIn y contexto del equipo
 
-Estado: diseño de necesidades, no conexión habilitada ni capacidad de API verificada. Este es el catálogo transversal que complementa [datos y resultados](datos-y-resultados-del-equipo.md). Clases01–06; outbound no activado.
+Estado: diseño de necesidades, sin conexiones habilitadas ni permisos efectivos verificados. Las capacidades documentadas de proveedores se distinguen de una integración probada. Este es el catálogo transversal que complementa [datos y resultados](datos-y-resultados-del-equipo.md). Clases01–06; outbound no activado.
 
-La prioridad inicial es poder observar y aprender. No hace falta acceso irrestricto a una cuenta ni a cada conversación. La captura manual, archivos y enlaces aportados por Gustavo son vías iniciales previstas; un proveedor/API solo se elegirá tras comprobar acceso, permisos, campos y costes. Ningún agente puede inventar datos privados de referentes ni inferir etnia/idioma por nombre o foto.
+Aclaración vigente de Gustavo: el equipo debe comprender la actividad de su cuenta como si trabajara dentro de ella, con acceso contextual a publicaciones, métricas, audiencia, conversaciones y referentes del nicho. La capacidad objetivo es consultar y sincronizar estas fuentes de forma continua; los aportes manuales son un recurso de arranque o recuperación. El diseño ampliado está en [observación integral de LinkedIn](observacion-integral-linkedin.md), con métricas, herramientas, ciclos y comprobación documental de APIs. Las integraciones todavía no están conectadas. Acceso para observar y autoridad para actuar se mantienen separados.
 
 ## Diccionario de entradas
 
@@ -46,12 +46,12 @@ Equivalencias con el catálogo del Observatorio: OBS-EXT-01→D04; 02→D05/D06;
 
 Frecuencia de captura, ventanas y presupuesto quedan pendientes de acordar con la línea base; no se activa sondeo diario por el deseo de publicar diario.
 
-## Orden para habilitar datos después del diseño
+## Secuencia inicial de datos, complementada por sincronización continua
 
 1. Contexto confirmado, estado de perfil y dos o tres casos/ejemplos de voz autorizados (D01–03/D09).
 2. Muestra inicial de referentes y conversaciones pertinentes (D04–06), con trazabilidad y límites. Se puede arrancar sin analytics propios.
 3. Registro real de publicaciones/cambios (D07/D11) y una línea base de campos disponibles de D08.
 4. Registro simple de oportunidades por modalidad (D10), sin exigir mensajes completos.
-5. Conectores para reducir captura manual únicamente tras verificar capacidades reales. Investigación actual D12 se usa cuando la pieza la necesita.
+5. Habilitar los conectores de observación como capacidad central, tras verificar campos, acceso y costes. Importar historial y continuar con sincronización incremental; no convertir la captura manual en el flujo objetivo. Investigación actual D12 se usa cuando la pieza la necesita.
 
-Esta lista es el pedido futuro de datos, no una pregunta pendiente para el usuario que está ausente. La investigación comercial real, concesión de accesos y publicación permanecen sin ejecutar.
+Estas categorías son necesidades del sistema, no un cuestionario para que Gustavo produzca reportes manuales. La investigación comercial real, concesión de accesos y publicación permanecen sin ejecutar. La revisión de observación integral es posterior al QA v1 de este catálogo.

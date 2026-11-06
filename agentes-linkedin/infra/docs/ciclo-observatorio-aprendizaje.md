@@ -30,7 +30,7 @@ Eventos, esquemas, verificación de fuentes, sesgos, privacidad, estados y lími
 
 ## Datos externos que necesita el grupo
 
-Los campos exactos, metadatos comunes y políticas están en `datos_externos` de cada contrato. Todas las fuentes son **candidatas no verificadas**; esta tarea no consultó fuentes externas. Inicio viable: material seleccionado por Gustavo, capturas/manual e importaciones disponibles. API/conector se considerará únicamente después de comprobar capacidad, permisos, alcance y definición de datos; no promesa de scraping ni acceso a inbox/analytics completos.
+Los campos exactos, metadatos comunes y políticas están en `datos_externos` de cada contrato. En el diseño v1 las fuentes quedaron como **candidatas no verificadas** y no se consultaron fuentes externas. La ampliación posterior de observación integral añade comprobación documental de proveedores, sin validar todavía acceso operativo. Inicio viable: material seleccionado por Gustavo, capturas/manual e importaciones disponibles. API/conector se considerará únicamente después de comprobar capacidad, permisos, alcance y definición de datos; no promesa de scraping ni acceso a inbox/analytics completos.
 
 | ID | Agente | Datos y decisión | Necesidad/fallback |
 | --- | --- | --- | --- |
@@ -148,3 +148,7 @@ Rúbrica material: procedencia completa, incertidumbre visible, respeto de modal
 En esta tarea: contratos y registro revisados como documentos; JSON parseables y referencias de lectura verificadas localmente. No se ejecutaron agentes, escenarios de proveedor, pruebas de backend ni experimento de mercado. Los casos de evaluación permanecen propuestos, no aprobados ni superados por un sistema operativo. Pendientes: aceptación de diseño, ampliar lectura según decisiones, verificar fuentes, fijar captura/cadencia/límites e implementar/evaluar.
 
 Reglas transversales: [circuito común](circuitos-equipo.md). El hash de entradas para deduplicación incluye pregunta/entidad, alcance y ventana; un nuevo ID de evento no habilita repetir trabajo. Ronda0 es la elaboración inicial; ronda1/2 son correctivas compartidas. La verificación final de ronda2 ocurre, pero si falla no permite otra edición u omisión; esperar evidencia o descartar.
+
+## Aclaración posterior de las fuentes de observación
+
+La [capa de observación integral](observacion-integral-linkedin.md) amplía el flujo previsto hacia sincronización continua de actividad, métricas e inbox, además de herramientas para descubrir referentes y leer posts/hilos del nicho. Los datos manuales son una alternativa de arranque o recuperación. Investigación entrega a Editorial fuentes y contexto consultables; el analista lee conversaciones pertinentes de ambas partes y deriva preguntas, objeciones y oportunidades. La gestión automática de respuestas por DM requeriría contrato propio; este rol no la asume. Es una ampliación documental posterior al QA v1 y no un conector activo.

@@ -137,3 +137,7 @@ Deduplicación semántica: workspace + purpose/cycle + piece si aplica + rol + t
 ## Estado de revisión del diseño
 
 Dos QA independientes (Astra high) concluyeron revisión documental: [coordinación](qa-circuitos-coordinacion.md) y [conocimiento/datos](qa-circuitos-conocimiento-datos.md). Seis hallazgos P2 corregidos y revalidados; ningún P1/P2 abierto identificado dentro del alcance. [Recorrido global](recorrido-mesa-equipo-completo.md) registra conexiones y fallos. La validación de estructura/referencias se conserva en el [registro local](../../arquitectura/validacion-diseno-equipo-v1.json). Aceptación humana, pruebas de comportamiento e implementación siguen pendientes.
+
+## Aclaración posterior: observar la cuenta como equipo
+
+La [observación integral de LinkedIn](observacion-integral-linkedin.md) precisa la capacidad de entrada: historial y cambios del perfil, publicaciones, métricas, interacciones, inbox y referentes alimentan contexto vivo. Observatorio transforma esos registros en evidencia para Editorial, aprendizaje y oportunidades; el Director y los escritores pueden consultar las fuentes pertinentes. No depende de que Gustavo entregue un reporte por cada ciclo. Esta ampliación es diseño posterior al QA v1, pendiente de implementación y validación de conectores. No habilita publicación, respuesta ni outbound.

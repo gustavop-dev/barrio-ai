@@ -357,6 +357,8 @@ El Observatorio también puede proponer un comentario orgánico. El borrador y e
 
 ## 12. Datos externos y aprendizaje
 
+**Aclaración posterior de Gustavo:** el objetivo es que el equipo observe de forma continua su cuenta: perfil, publicaciones, métricas, interacciones, inbox y contenido de referentes. Los datos manuales son una alternativa de arranque, no el funcionamiento objetivo. El [diseño de observación integral](../agentes-linkedin/infra/docs/observacion-integral-linkedin.md) concreta qué consulta cada grupo y distingue necesidad de acceso y disponibilidad real de APIs.
+
 El curso enseña métodos, pero no contiene los datos de nuestra cuenta ni la realidad actual del mercado. Definimos un catálogo de doce categorías:
 
 | ID | Datos | Uso principal |
