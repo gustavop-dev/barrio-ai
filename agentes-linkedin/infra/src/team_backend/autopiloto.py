@@ -93,6 +93,8 @@ def _pending(kind,**params):
 def tick(user,now=None):
     """One autonomous cycle. Idempotent: deterministic job ids prevent duplicate work."""
     now=now or timezone.now();report={'expired':0,'reviewed':0,'observe':0,'propose':0,'execute':0,'reconcile':0}
+    from .connectors_linkedin import check_tokens
+    report['linkedin_token']=check_tokens(now)  # expiry alerts reach Gustavo even with the machine stopped
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
     ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')))
     stale=ActionProposal.objects.filter(state__in=['proposed','approved'],created_at__lt=now-ttl).filter(execution__isnull=True)

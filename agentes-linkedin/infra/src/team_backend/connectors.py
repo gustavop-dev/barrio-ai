@@ -168,6 +168,15 @@ class FakeConnector:
     def list_user_posts(self,user_id,limit=10):
         return [_post(p) for p in self.state['posts'].values() if p['author']['id']==user_id][:limit]
 
+    def seed_own_post(self,text):
+        """A post of the connected member, as Unipile returns it for list_user_posts('me')."""
+        pid=f'activity:me-{len(self.state["posts"])}'
+        self.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':text,
+            'created_at':datetime.now(timezone.utc).isoformat(),'author':{'id':'me','display_name':'Cuenta conectada'},
+            'comments_counter':0,'reactions_counter':0,'user_reacted':None,'is_repost':False}
+        self.state['comments'][pid]=[]
+        return pid
+
     def get_post(self,post_id):
         if post_id not in self.state['posts']:raise ConnectorError('Simulado: post no encontrado.',status=404,kind='provider/resource_not_found')
         return _post(self.state['posts'][post_id])
@@ -195,4 +204,7 @@ class FakeConnector:
 def get_connector(account):
     if account.provider=='unipile':return UnipileConnector(account.external_account_id)
     if account.provider=='fake':return FakeConnector(account.external_account_id)
+    if account.provider in ('linkedin','linkedin_fake'):
+        from .connectors_linkedin import connector_for
+        return connector_for(account)
     raise ConnectorError('Proveedor de LinkedIn desconocido.',kind='config')

@@ -130,6 +130,9 @@ class ConnectorAccount(models.Model):
     class Provider(models.TextChoices):
         UNIPILE='unipile','Unipile v2'
         FAKE='fake','Simulado (pruebas)'
+        # Official API (Share on LinkedIn): own publications only; external_account_id is the member URN.
+        LINKEDIN='linkedin','API oficial de LinkedIn'
+        LINKEDIN_FAKE='linkedin_fake','API oficial simulada (pruebas)'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     provider=models.CharField(max_length=20,choices=Provider.choices)
     external_account_id=models.CharField(max_length=120)
@@ -275,3 +278,18 @@ class PushSubscription(models.Model):
     created_at=models.DateTimeField(default=timezone.now)
     last_success_at=models.DateTimeField(null=True,blank=True)
     failures=models.PositiveIntegerField(default=0)
+
+class LinkedInCredential(models.Model):
+    """OAuth token of the official API for one member, encrypted at rest (Fernet, FIELD_ENCRYPTION_KEY).
+    Share on LinkedIn tokens last about 60 days and are not refreshed programmatically."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.OneToOneField(ConnectorAccount,on_delete=models.PROTECT,related_name='linkedin_credential')
+    member_urn=models.CharField(max_length=120,unique=True)
+    member_name=models.CharField(max_length=200,blank=True)
+    scopes=models.CharField(max_length=300,blank=True)
+    token_encrypted=models.TextField(editable=False)
+    expires_at=models.DateTimeField()
+    connected_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    connected_at=models.DateTimeField(default=timezone.now)
+    expiry_alerted_at=models.DateTimeField(null=True,blank=True)
+    def __str__(self):return self.member_urn
