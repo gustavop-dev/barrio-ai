@@ -79,9 +79,29 @@
       "grupo": "revision",
       "contrato": "equipos/revision/editor_verificador.json",
       "estado": "diseno_no_activo"
+    },
+    {
+      "id": "relaciones_comunidad",
+      "grupo": "relaciones",
+      "contrato": "equipos/relaciones/relaciones_comunidad.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "conversaciones_inbox",
+      "grupo": "relaciones",
+      "contrato": "equipos/relaciones/conversaciones_inbox.json",
+      "estado": "diseno_no_activo"
+    },
+    {
+      "id": "operador_cuenta",
+      "grupo": "operacion",
+      "contrato": "equipos/operacion/operador_cuenta.json",
+      "estado": "diseno_no_activo",
+      "naturaleza": "servicio_determinista_no_llm"
     }
   ],
   "orquestacion": "infra/docs/circuitos-equipo.md",
   "datos_externos": "infra/docs/datos-externos-por-equipo.md",
-  "nota": "No configura runtime ni confirma estrategia/publicación; contratos nuevos de Estrategia/Perfil son referencia vigente de diseño, fichas raíz anteriores históricas."
+  "reparto_acciones": "infra/docs/reparto-acciones-v1.md; arquitectura/reparto-acciones-v1.json",
+  "nota": "No configura runtime ni confirma estrategia/publicación; contratos nuevos de Estrategia/Perfil son referencia vigente de diseño, fichas raíz anteriores históricas. 2026-11-06: se mantienen los trece roles y se añaden relaciones_comunidad, conversaciones_inbox y el servicio operador_cuenta (único ejecutor de escrituras) según reparto-acciones-v1; ningún contrato está activado."
 }

@@ -4,7 +4,7 @@ Estado: diseño propuesto. Agente `editor_verificador`, ficha en `equipos/revisi
 
 ## Entradas y activación
 
-`candidate_selected` (post), `profile_proposal_ready` (perfil) u `organic_participation_proposed` (borrador de comentario contextual del analista): candidato con hash exacto; brief/dirección vigentes; registro de decisión editorial cuando corresponda; pruebas por afirmación; permisos de uso de recursos; voz confirmada y objeciones no resueltas. Sin pruebas de una afirmación accesoria, proponer omisión; sin brief o dirección aceptada, devolver dependencia.
+`candidate_selected` (post), `profile_proposal_ready` (perfil) u `organic_participation_proposed` (borrador de comentario contextual de relaciones_comunidad; también notas de invitación y mensajes según riesgo, ver [reparto](reparto-acciones-v1.md)): candidato con hash exacto; brief/dirección vigentes; registro de decisión editorial cuando corresponda; pruebas por afirmación; permisos de uso de recursos; voz confirmada y objeciones no resueltas. Sin pruebas de una afirmación accesoria, proponer omisión; sin brief o dirección aceptada, devolver dependencia.
 
 Para participación orgánica se recibe `organic_participation_proposal`: referencia del hilo, contexto leído con versión/hash y fecha, propósito y pertinencia, borrador exacto, afirmaciones, fuentes y permisos. D06 aporta contexto suficiente del hilo; un fragmento aislado no autoriza inferir el resto. Si falta contexto se devuelve `needs_evidence` al analista. Si cambia el hilo se marca la dependencia afectada como desactualizada. La revisión conserva el carácter de propuesta: pasa a Gustavo y nunca envía el comentario.
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "tipo": "contrato_documental_no_ejecutable",
   "id": "investigador_referentes",
   "nombre": "Investigador de referentes",
@@ -11,7 +11,7 @@
     "resultado_del_que_responde": "research_packet con candidatos verificados o claramente pendientes, mapa de cobertura y señales sustentadas.",
     "fuera_de_responsabilidad": [
       "elegir identidad/oferta sin Gustavo",
-      "publicar o contactar perfiles",
+      "publicar o contactar perfiles: lo proponen relaciones_comunidad y conversaciones_inbox y lo ejecuta operador_cuenta según reparto-acciones-v1",
       "construir campañas outbound de clases 07+",
       "certificar demanda, tendencia de mercado o algoritmo por intuición"
     ]
@@ -451,7 +451,7 @@
       },
       {
         "responsable": "agente",
-        "accion": "formular búsqueda por problema, industria/nicho, función y mercado; marcar idioma declarado y diversidad de papeles"
+        "accion": "formular búsqueda por problema, industria/nicho, función y mercado; marcar idioma declarado y diversidad de papeles; asignar modalidad (personal_startups, projectapp, alianzas, comunidad_autoridad) según neighborhood_criteria vigente"
       },
       {
         "responsable": "agente",
@@ -480,7 +480,10 @@
       "No afirmar que el cliente lee una cuenta por afinidad aparente: usar evidencia observable o etiquetar hipótesis.",
       "Una señal aislada puede abrir una pregunta editorial; no basta para declarar demanda o tendencia de toda industria.",
       "Documentar sesgos de red, idioma, geografía, búsqueda, cuentas activas y selección manual; papeles pueden solaparse.",
-      "No inventar scoring del curso. Si se usa ranking futuro, criterios/pesos deberán ser diseño propio visible."
+      "No inventar scoring del curso. Si se usa ranking futuro, criterios/pesos deberán ser diseño propio visible.",
+      "Aplicar neighborhood_criteria aprobado por posicionamiento en DESC-01/02/05/07; el 60/40 orienta la distribución del esfuerzo de búsqueda, no una cuota por perfil.",
+      "Afinidad hispanohablante solo con información declarada (idioma del perfil o del contenido, idiomas listados, ubicación, grupos o comunidades declarados); sin dato, afinidad_desconocida.",
+      "Antes de entregar un candidato a relaciones_comunidad, registrar su estado de relación conocido (D13) para evitar duplicados."
     ],
     "alternativas_ante_incertidumbre": [
       "plan de búsqueda sin nombres no verificados",
@@ -494,20 +497,23 @@
     "herramientas_necesarias": [
       "recuperación readonly de corpus y contexto versionado",
       "lector de registros/importaciones autorizados",
-      "futuro lector de fuentes accesibles con permisos verificados",
-      "almacenamiento de propuestas versionadas, aún no implementado para estos roles"
+      "Unipile v2 en lectura mediante la pasarela de operador_cuenta: búsqueda Classic de personas y posts (Sales Navigator solo si se contrata), perfiles, posts, comentarios y reacciones con paginación",
+      "Django/PostgreSQL: propuestas versionadas y biblioteca interna de contenido guardado (INT-07), por implementar",
+      "Claude Web Search y Web Fetch para noticias, blogs, opiniones y fuentes primarias",
+      "RSS/Atom en backend cuando la fuente lo ofrezca (por implementar)"
     ],
     "acciones_autorizadas": [
       "En este encargo únicamente diseño documental local; no activar agente.",
-      "Autonomía futura propuesta: seleccionar evidencia accesible, analizar y producir artefactos internos dentro de límites configurados."
+      "Autonomía futura propuesta: seleccionar evidencia accesible, analizar y producir artefactos internos dentro de límites configurados.",
+      "Publicar, comentar, reaccionar, conectar o enviar mensajes: permitido con política para el sistema (reparto-acciones-v1); este rol entrega candidatos y señales a relaciones_comunidad y no es ejecutor"
     ],
     "acciones_que_requieren_aprobacion": [
       "Cambio central de posicionamiento o de preferencias por Gustavo",
-      "Cualquier aplicación/publicación/comentario/conexión o mensaje: fuera de este diseño; autorización separada y versión exacta",
+      "Publicación, comentario, conexión o mensaje: permitido con política; nivel B con aprobación de Gustavo por versión exacta y ejecución exclusiva de operador_cuenta, nivel A dentro de topes; el investigador no redacta texto público y remite a relaciones_comunidad",
       "Nueva integración/fuente privada o gasto: no autorizados por este contrato"
     ],
     "acciones_prohibidas": [
-      "Publicar, comentar, reaccionar, conectar, enviar mensajes o iniciar outbound",
+      "Iniciar outbound, campañas o secuencias de clases 07+",
       "Scraping asumido, evasión de acceso y acceso a inbox sin permiso",
       "Ejecutar llamadas pagadas o scheduler en esta tarea",
       "Modificar curso, hechos confirmados, presupuestos, reservas o permisos",
@@ -515,6 +521,143 @@
       "Inferir etnia, idioma por nombre/foto o rasgos psicológicos individuales"
     ]
   },
+  "capacidades_catalogo": [
+    {
+      "id": "DESC-01",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Lectura vía pasarela del operador (Unipile) y web; aplica criterios de barrio por modalidad de posicionamiento; la insignia es opcional y la popularidad no sustituye pertinencia."
+    },
+    {
+      "id": "DESC-01",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "DESC-01",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Lee mediante la pasarela de lectura de operador_cuenta; sin escrituras."
+    },
+    {
+      "id": "DESC-02",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Busca por contexto profesional con los criterios de barrio por modalidad (60/40 y alianzas); afinidad hispanohablante solo con información declarada; nunca por nombre o foto."
+    },
+    {
+      "id": "DESC-02",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "DESC-02",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Lee mediante la pasarela de lectura de operador_cuenta; sin escrituras."
+    },
+    {
+      "id": "DESC-03",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Ficha con hechos observados y vacíos; relaciones e inbox solo refrescan la ficha antes de actuar. No inventar financiación; comprobar en piloto si la consulta se registra como visita visible."
+    },
+    {
+      "id": "DESC-03",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "DESC-03",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Lee mediante la pasarela de lectura de operador_cuenta; sin escrituras."
+    },
+    {
+      "id": "DESC-03",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "DESC-04",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Leer el hilo completo accesible antes de usarlo; feed parcial se declara parcial; no suponer métricas privadas."
+    },
+    {
+      "id": "DESC-04",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "DESC-04",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Lee mediante la pasarela de lectura de operador_cuenta; sin escrituras."
+    },
+    {
+      "id": "DESC-04",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "DESC-05",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Investigador en posts ajenos y analista en posts propios; una reacción aislada no prueba necesidad, idioma ni interés comercial."
+    },
+    {
+      "id": "DESC-05",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "DESC-05",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Lee mediante la pasarela de lectura de operador_cuenta; sin escrituras."
+    },
+    {
+      "id": "DESC-07",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Clasificación revisable por papel y modalidad según neighborhood_criteria; comprador es hipótesis hasta conocer necesidad y encaje."
+    },
+    {
+      "id": "DESC-07",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "DESC-07",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "DESC-08",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Lista de seguimiento y dossier con enlaces y fechas; tema observado no equivale a tendencia demostrada."
+    },
+    {
+      "id": "DESC-08",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "DESC-08",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "INT-07",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara la solicitud con objeto, motivo y criterio aplicado. Biblioteca interna; el guardado nativo no tiene cobertura verificada: tarea manual de Gustavo que el operador registra; nunca reportar el interno como guardado en LinkedIn."
+    },
+    {
+      "id": "INT-07",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política, los criterios vigentes y los topes; registra politica_ref."
+    },
+    {
+      "id": "INT-07",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Mantiene la parte interna; la parte nativa la ejecuta operador_cuenta o Gustavo manualmente con registro."
+    },
+    {
+      "id": "INT-07",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    }
+  ],
   "entregables": {
     "tipos": [
       {
@@ -552,7 +695,9 @@
           "prueba_tematica_y_audiencia",
           "estado_verificacion",
           "razones",
-          "siguiente_observacion"
+          "siguiente_observacion",
+          "afinidad_declarada_o_desconocida",
+          "estado_relacion_D13"
         ]
       },
       {
@@ -625,12 +770,15 @@
     "recibe_de": [
       "posicionamiento: dirección/contexto y vacíos",
       "dirección editorial: research_requested con misión/lector",
-      "analista: preguntas y contradicciones de observaciones"
+      "analista: preguntas y contradicciones de observaciones",
+      "posicionamiento: neighborhood_criteria aprobado",
+      "relaciones_comunidad: necesidades de candidatos (DESC-02) y refresco de fichas"
     ],
     "entrega_a": [
-      "analista_barrio_resultados: mapa y señales para escucha/participación propuesta",
+      "analista_barrio_resultados: mapa y señales para escucha y aprendizaje",
       "dirección editorial: research_packet con asuntos trazables",
-      "estrategia/perfil: evidencia de desajuste, sin cambiar dirección"
+      "estrategia/perfil: evidencia de desajuste, sin cambiar dirección",
+      "relaciones_comunidad: candidate_map con papel, modalidad, afinidad declarada, estado de relación y evidencia para RED/INT"
     ],
     "responsable_de_resolver_desacuerdos": "Investigador resuelve calidad de descubrimiento; analista evalúa pertinencia de señales; dirección editorial prioriza piezas; Gustavo decide cambios de mercado/identidad. Revisión factual conserva objeción material.",
     "criterio_de_escalamiento": "fuentes contradictorias sin resolución, datos sensibles, decisión estratégica o límite global alcanzado; conservar alternativas.",
@@ -686,6 +834,11 @@
       {
         "caso": "Referentes solo del círculo inicial",
         "resultado_esperado": "Declara sesgo y propone explorar nichos, tamaños y papeles faltantes dentro del límite; no cuota inventada.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Candidato ya conectado o con invitación pendiente",
+        "resultado_esperado": "Marca estado D13 y no lo propone como nueva invitación.",
         "estado": "propuesto_no_ejecutado"
       }
     ],
@@ -781,7 +934,7 @@
         "selection_status": "candidato|verificado|descartado con motivo"
       },
       "obligatoriedad": "Necesarios localizador, procedencia y evidencia profesional para recomendar un perfil real. Cargo, idioma, tamaño y distintivo son opcionales; desconocido explícito.",
-      "fuente_y_captura_candidata": "Selección manual del usuario; material público aportado; búsqueda web/perfiles accesibles en futura fase; importación permitida. API/conector de LinkedIn solo tras verificar acceso y permisos.",
+      "fuente_y_captura_candidata": "Unipile v2 (búsqueda Classic y perfiles; Sales Navigator solo si se contrata) mediante operador_cuenta; Claude Web Search/Fetch para contraste; lista aportada por Gustavo. Acceso efectivo por probar en piloto.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Descubrir líderes, referentes y participantes pertinentes al mercado y a las dos modalidades.",
       "frescura": "Comprobar actividad, cargo y distintivo antes de usar recomendación; registrar fecha y marcar pendiente si no se puede revalidar. Caducidad operativa por acordar.",
@@ -821,7 +974,7 @@
         "audience_role_evidence": "papel profesional observable con incertidumbre"
       },
       "obligatoriedad": "Necesario contenido contextual y fecha para analizar una conversación concreta; números de interacción opcionales.",
-      "fuente_y_captura_candidata": "Enlaces y fragmentos aportados, captura manual o exportación lícita disponible. API futura no garantizada; sin promesa de scraping ni acceso completo.",
+      "fuente_y_captura_candidata": "Unipile v2: posts, comentarios, respuestas y reacciones accesibles con paginación (lectura vía operador_cuenta); enlaces aportados como alternativa. Sin métricas privadas de terceros.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Encontrar preguntas, problemas, objeciones, ejemplos y lugares donde aportar.",
       "frescura": "Registrar edad de conversación y fecha de captura; revisar si cambió/eliminó antes de proponer participación.",
@@ -861,13 +1014,37 @@
         "status": "señal|patrón_muestral|hipótesis_de_tendencia|hecho_acotado"
       },
       "obligatoriedad": "Obligatorio respaldo accesible para afirmar hechos actuales. Opcional si la salida es solo pregunta/hipótesis sin afirmación externa.",
-      "fuente_y_captura_candidata": "Fuentes primarias candidatas: documentación de proveedor, anuncios originales de empresa/inversor, estudios con método; comunidades/newsletters como descubrimiento. Aporte manual o futura búsqueda/importación autorizada.",
+      "fuente_y_captura_candidata": "Claude Web Search y Web Fetch sobre fuentes primarias (documentación de proveedor, anuncios de empresa o inversor, estudios con método); comunidades y newsletters como descubrimiento; RSS/Atom en backend cuando exista.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Separar conversación popular de hechos y evaluar pertinencia de tecnología/producto/contratación para startups.",
       "frescura": "Contrastar fecha del hecho y vigencia antes de incorporarlo al brief; noticia antigua recirculada no es tendencia nueva.",
       "comparabilidad": "Varias copias de una nota son una fuente; contar fuentes/autores y registrar dependencia. No proclamar tendencia de mercado desde muestra de feed.",
       "si_falta": "Etiquetar señal aislada o no verificado; omitir dato si material; entregar pregunta para investigación futura.",
       "minimizacion_y_privacidad": "No recopilar documentos privados; financiación pública no prueba caja disponible ni vacante; no bases de contactos."
+    },
+    {
+      "id": "D13",
+      "nombre": "Estado de relaciones e invitaciones de candidatos",
+      "obligatoriedad": "Necesario antes de entregar un candidato para RED-02.",
+      "fuente_y_captura_candidata": "Sincronización de relaciones de operador_cuenta (Unipile v2) y memoria de relaciones_comunidad.",
+      "disponibilidad": "no verificada; sin cuenta conectada en este diseño",
+      "finalidad": "Evitar duplicados y proponer el siguiente paso pertinente.",
+      "frescura": "Fecha de última sincronización; lista parcial no prueba ausencia de relación.",
+      "comparabilidad": "No equiparar seguidor, conexión e invitación.",
+      "si_falta": "Marcar estado desconocido; relaciones_comunidad lo comprueba antes de actuar.",
+      "minimizacion_y_privacidad": "Solo estado y fecha; sin contenido de chats."
+    },
+    {
+      "id": "D15",
+      "nombre": "Capacidades efectivas de búsqueda y lectura",
+      "obligatoriedad": "Necesario para declarar cobertura.",
+      "fuente_y_captura_candidata": "Estado de conexión y permisos que publica operador_cuenta.",
+      "disponibilidad": "no verificada",
+      "finalidad": "Saber si la búsqueda es Classic o Sales Navigator y si hay restricciones o parada total.",
+      "frescura": "Consultar antes de cada lote.",
+      "comparabilidad": "Resultados de vías distintas se declaran por separado.",
+      "si_falta": "Entregar search_plan sin ejecutar búsquedas.",
+      "minimizacion_y_privacidad": "Nunca recibe tokens ni credenciales."
     }
   ],
   "contrato_transversal": {
@@ -877,6 +1054,7 @@
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
     "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
-    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true."
+    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json: nivel A autónomo con topes, B aprobación de Gustavo por versión exacta con ejecución automática, C decisión expresa de Gustavo; topes configurables y parada total. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }

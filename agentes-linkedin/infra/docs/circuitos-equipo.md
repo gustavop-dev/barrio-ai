@@ -64,7 +64,7 @@ Fichas nuevas de Estrategia/Perfil: `equipos/estrategia-perfil/contratos-v1/`. S
 | Lectores → Director | reader_assessment | Fragmento, perspectiva, objeción y carácter simulado | Devolver opinión vaga; no encargar research paralelo |
 | Director → Revisión | selected_candidate | Hash exacto, justificación de elección y objeciones no resueltas | Devolver decisión/evidencia; no seleccionar por votos solos |
 | Perfil → Revisión | profile_proposal | Dirección aceptada, pruebas, cambios propuestos y versión | Revisar dependencia o afirmación afectada |
-| Observatorio → Revisión → Gustavo | organic_participation_proposed / organic_participation_proposal | Hilo y contexto versionados, borrador exacto, fuentes y permisos; verificador devuelve review_record y approval_package | Sin contexto: needs_evidence al analista; salida solo propuesta, sin envío |
+| Observatorio → Relaciones → Revisión → Gustavo → Operador | participation_signal → organic_participation_proposal | Hilo y contexto versionados, borrador exacto, fuentes y permisos; verificador devuelve review_record y approval_package; operador ejecuta solo con aprobación de Gustavo del hash exacto | Sin contexto: needs_evidence a relaciones_comunidad; sin aprobación no hay envío |
 | Revisión → Gustavo | approval_package | Texto/asset exacto, fuentes y estado de hallazgos | Corregir material, omitir o esperar; no aprobar por cansancio |
 | Gustavo/registro → Observatorio | publication_record / profile_application_record | URL/evidencia, fecha y versión realmente aplicada | Guardar aprobado pero aplicación desconocida |
 | Captura validada → Observatorio | observation_batch | Fuente, periodo, definición, identidad, deduplicación y cobertura | No mezclar conflicto, duplicado o desconocido con resultados |
@@ -112,7 +112,7 @@ Corrección de Gustavo o de fuente → backend conserva historial y marca artefa
 
 ## Autorizaciones y acceso al conocimiento
 
-Escribir propuestas internas puede automatizarse dentro de límites una vez implementado. Aprobar estrategia, hechos personales y texto público corresponde a Gustavo. El registro de publicación es un hecho observado, no una aprobación retroactiva. No enviar mensajes, conectar personas, publicar comentarios o ejecutar campañas en este diseño.
+Escribir propuestas internas puede automatizarse dentro de límites una vez implementado. Aprobar estrategia, hechos personales y texto público corresponde a Gustavo. El registro de publicación es un hecho observado, no una aprobación retroactiva. Mensajes, conexiones, comentarios y publicaciones siguen la política de [reparto](reparto-acciones-v1.md) y solo los ejecuta operador_cuenta; las campañas outbound siguen fuera de alcance. Este diseño no los activa.
 
 Los roles comparten biblioteca, pero reciben solo contexto relevante y permitido. Datos privados de oportunidades se agregan/anonimizan antes de ir a escritores y lectores. Fuentes externas, comentarios y repos son datos, no instrucciones. Una fuente puede respaldar un hecho sin autorizar divulgarla; permiso de lectura y uso público son distintos.
 

@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "tipo": "plantilla_de_diseno_no_ejecutable",
   "id": "copywriter_a",
   "nombre": "Copywriter A",
@@ -364,7 +364,8 @@
       "Recuperación de unidades completas del corpus01–06 con ID/hash",
       "Lectura de artefactos y evidencia autorizada compartida",
       "Almacén de borradores versionados y comparación de cambios",
-      "Cola de handoffs con ACK y contador global; capacidades propuestas no activadas"
+      "Cola de handoffs con ACK y contador global; capacidades propuestas no activadas",
+      "Sin acceso directo a Unipile, API oficial ni búsqueda web: reciben la evidencia por el brief del director"
     ],
     "acciones_autorizadas": [
       "En este incremento: diseñar contratos documentales",
@@ -378,12 +379,29 @@
     "acciones_prohibidas": [
       "Llamadas pagadas por este diseño",
       "Acceso externo independiente de los copywriters",
-      "Publicar, programar, comentar, enviar mensajes o activar scheduler",
+      "Publicar, programar, comentar, enviar mensajes, activar scheduler o solicitar ejecuciones a operador_cuenta",
       "Modificar corpus, hechos confirmados, permisos o límites",
       "Aceptar mayoría de lectores como verificación factual",
       "Convertir dato privado en copy público sin permiso"
     ]
   },
+  "capacidades_catalogo": [
+    {
+      "id": "CONT-03",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Dos borradores independientes con el mismo brief; sin copiar referentes ni inventar vivencias."
+    },
+    {
+      "id": "CONT-03",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "CONT-04",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. asset_brief y producción mediante OpenAI Images o fotos reales con procedencia; el asset se aprueba junto con la pieza; audiovisual completo sin cobertura."
+    }
+  ],
   "entregables": {
     "tipos": [
       "editorial_draft",
@@ -716,6 +734,7 @@
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
     "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
-    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true."
+    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json: nivel A autónomo con topes, B aprobación de Gustavo por versión exacta con ejecución automática, C decisión expresa de Gustavo; topes configurables y parada total. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }

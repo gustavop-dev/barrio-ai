@@ -1,16 +1,16 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "tipo": "contrato_documental_no_ejecutable",
   "id": "analista_barrio_resultados",
   "nombre": "Analista de barrio y resultados",
   "grupo": "observatorio",
   "estado": "propuesta_no_activa",
   "proposito": {
-    "mision": "Transformar escucha, respuestas y resultados reales en oportunidades editoriales, propuestas de participación orgánica y aprendizaje verificable.",
+    "mision": "Transformar escucha, respuestas y resultados reales en oportunidades editoriales, señales de participación para relaciones_comunidad y aprendizaje verificable.",
     "contribucion_al_objetivo_del_equipo": "Distinguir crecimiento, audiencia pertinente y resultados personales/ProjectApp para orientar el siguiente ciclo sin cambiar identidad por fluctuaciones.",
-    "resultado_del_que_responde": "observation_packet, learning_proposal y organic_participation_proposal con cobertura y evidencia explícitas.",
+    "resultado_del_que_responde": "observation_packet, learning_proposal y participation_signal con cobertura y evidencia explícitas.",
     "fuera_de_responsabilidad": [
-      "responder/comentar o conectar realmente",
+      "responder, comentar o conectar: lo proponen relaciones_comunidad o conversaciones_inbox y lo ejecuta operador_cuenta",
       "iniciar outbound o calentar leads",
       "calcular cifras mentalmente o rellenar métricas",
       "aprobar cambios de estrategia o declarar resultados no confirmados"
@@ -685,7 +685,7 @@
       },
       {
         "responsable": "agente",
-        "accion": "formular candidatos editoriales o propuesta orgánica con aporte contextual, sin ejecutarla"
+        "accion": "formular candidatos editoriales y participation_signal (hilo, pertinencia, modalidad y aporte posible) para relaciones_comunidad; el texto lo redacta relaciones_comunidad"
       },
       {
         "responsable": "agente",
@@ -701,7 +701,8 @@
       "Con historial escaso no forzar tres mejores/tres peores ni series inventadas. Cualquier serie futura tendrá criterio y límite antes de observar resultados.",
       "No juzgar pieza de nicho por el alcance de contenido general ni inferir fracaso de ausencia de negocio registrado.",
       "Cualificación exige necesidad, modalidad, presupuesto/dedicación y compatibilidad suficientes; financiación por sí sola no basta.",
-      "Participación orgánica propuesta aporta opinión/fundamento y apertura pertinente; no venta en la puerta, guion fingiendo experiencia, respuesta automática ni obligación de pregunta ritual."
+      "Una participation_signal identifica hilo, pertinencia, modalidad y aporte posible con evidencia; no redacta el comentario ni decide su envío, que corresponden a relaciones_comunidad y a la política de reparto.",
+      "Medir la distribución del esfuerzo de relaciones y conversaciones por modalidad (60/40 y alianzas) e informar desviaciones sin convertirla en cuota."
     ],
     "alternativas_ante_incertidumbre": [
       "informe descriptivo con límites y resolución evidencia_insuficiente",
@@ -714,21 +715,22 @@
   "herramientas_y_autoridad": {
     "herramientas_necesarias": [
       "recuperación readonly de corpus y contexto versionado",
-      "lector de registros/importaciones autorizados",
-      "futuro cálculo determinista de observaciones validadas",
-      "almacenamiento de propuestas versionadas, aún no implementado para estos roles"
+      "lector de registros/importaciones autorizados como alternativa manual con procedencia",
+      "pasarela de lectura de operador_cuenta: Unipile v2 (posts propios, comentarios, reacciones, relaciones y seguidores) y API oficial (memberCreatorPostAnalytics, memberFollowersCount) sujeta a aprobación de Community Management",
+      "Django/PostgreSQL: cálculo determinista de observaciones validadas y propuestas versionadas (por implementar)"
     ],
     "acciones_autorizadas": [
       "En este encargo únicamente diseño documental local; no activar agente.",
-      "Autonomía futura propuesta: seleccionar evidencia accesible, analizar y producir artefactos internos dentro de límites configurados."
+      "Autonomía futura propuesta: seleccionar evidencia accesible, analizar y producir artefactos internos dentro de límites configurados.",
+      "Publicar, comentar, reaccionar, conectar o enviar mensajes: permitido con política para el sistema (reparto-acciones-v1); el analista entrega participation_signal a relaciones_comunidad y no es ejecutor"
     ],
     "acciones_que_requieren_aprobacion": [
       "Cambio central de posicionamiento o de preferencias por Gustavo",
-      "Cualquier aplicación/publicación/comentario/conexión o mensaje: fuera de este diseño; autorización separada y versión exacta",
+      "Publicación, comentario, conexión o mensaje: permitido con política; nivel B con aprobación de Gustavo por versión exacta y ejecución exclusiva de operador_cuenta, nivel A dentro de topes; el analista no redacta ni solicita la ejecución",
       "Nueva integración/fuente privada o gasto: no autorizados por este contrato"
     ],
     "acciones_prohibidas": [
-      "Publicar, comentar, reaccionar, conectar, enviar mensajes o iniciar outbound",
+      "Iniciar outbound, campañas, calentamiento de leads o secuencias de clases 07+",
       "Scraping asumido, evasión de acceso y acceso a inbox sin permiso",
       "Ejecutar llamadas pagadas o scheduler en esta tarea",
       "Modificar curso, hechos confirmados, presupuestos, reservas o permisos",
@@ -736,6 +738,363 @@
       "Inferir etnia, idioma por nombre/foto o rasgos psicológicos individuales"
     ]
   },
+  "capacidades_catalogo": [
+    {
+      "id": "DESC-01",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "DESC-02",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "DESC-04",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "DESC-05",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Investigador en posts ajenos y analista en posts propios; una reacción aislada no prueba necesidad, idioma ni interés comercial."
+    },
+    {
+      "id": "DESC-05",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Lee mediante la pasarela de lectura de operador_cuenta; sin escrituras."
+    },
+    {
+      "id": "DESC-06",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "DESC-06",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "DESC-07",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "DESC-08",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "RED-01",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "RED-02",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "RED-03",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "RED-04",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "RED-08",
+      "papel": "aprende",
+      "politica": "Nivel C. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "RED-09",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "INT-01",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "INT-01",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "INT-02",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "INT-03",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "INT-04",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "INT-05",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "INT-06",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "INT-09",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-01",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-02",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-04",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-06",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-07",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-08",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-09",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-10",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-11",
+      "papel": "aprende",
+      "politica": "Nivel C. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-12",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CONT-13",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-01",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-02",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "CHAT-02",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-03",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-04",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-05",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-06",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-07",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-08",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "CHAT-09",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "CHAT-09",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "PERF-02",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "PERF-03",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "PERF-05",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "APRE-01",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. API oficial (memberCreatorPostAnalytics, memberFollowersCount) solo si Community Management se aprueba; si no, importación manual con procedencia; dato ausente no es cero."
+    },
+    {
+      "id": "APRE-01",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "APRE-01",
+      "papel": "verifica",
+      "politica": "Nivel A. Comprueba pertinencia, vigencia y evidencia antes de usar el resultado; devuelve hallazgos al dueño."
+    },
+    {
+      "id": "APRE-02",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Composición por papeles y modalidad con muestra y sesgo; mide la distribución 60/40 del esfuerzo de relaciones sin convertirla en cuota."
+    },
+    {
+      "id": "APRE-02",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "APRE-02",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "APRE-03",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Separar volumen de utilidad; la discrepancia no es automáticamente negativa."
+    },
+    {
+      "id": "APRE-03",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "APRE-03",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "APRE-04",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Vincular acciones ejecutadas (D14) con oportunidades (D10) solo con evidencia; atribución desconocida explícita."
+    },
+    {
+      "id": "APRE-04",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "APRE-04",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "APRE-05",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Comparar con criterio fijado antes de ordenar; no decidir por likes ni reglas del primer post."
+    },
+    {
+      "id": "APRE-05",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "APRE-05",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "APRE-06",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Experimento acotado; el director decide lo editorial, posicionamiento lo estratégico y Gustavo cualquier cambio central."
+    },
+    {
+      "id": "APRE-06",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "APRE-07",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Registro fechado que separa observación, interpretación, decisión, ejecución y simulación; datos privados solo a quien los necesita."
+    },
+    {
+      "id": "APRE-07",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "APRE-07",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "ADM-02",
+      "papel": "aprende",
+      "politica": "Nivel B. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "ADM-04",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    },
+    {
+      "id": "ADM-05",
+      "papel": "aprende",
+      "politica": "Nivel A. Recibe el resultado confirmado o incierto para el siguiente ciclo; no confunde ejecución con logro del objetivo."
+    }
+  ],
   "entregables": {
     "tipos": [
       {
@@ -755,18 +1114,17 @@
         ]
       },
       {
-        "tipo": "organic_participation_proposal",
+        "tipo": "participation_signal",
         "campos": [
           "conversation_ref",
           "version_contexto_leido",
           "papel_y_pertinencia",
-          "aporte_fundamentado",
-          "borrador_en_ingles_si_corresponde",
-          "pregunta_opcional_con_motivo",
-          "pruebas_y_permisos",
-          "estado_propuesto",
-          "requiere_revision_humana",
-          "no_ejecutado"
+          "modalidad",
+          "aporte_posible",
+          "evidencia_y_permisos",
+          "caducidad",
+          "destinatario: relaciones_comunidad",
+          "no_redactado_ni_ejecutado"
         ]
       },
       {
@@ -833,7 +1191,8 @@
       "approval_ref": "null hasta decisión humana sobre versión/hash",
       "applied_ref": "null hasta confirmación externa autorizada",
       "supersedes": "versión previa si existe"
-    }
+    },
+    "nota_de_traslado": "organic_participation_proposal pasó a relaciones_comunidad en la versión 1.1 (reparto-acciones-v1)."
   },
   "memoria": {
     "lee": [
@@ -843,7 +1202,7 @@
       "evidencias externas permitidas y observaciones reales separadas de simulación"
     ],
     "puede_proponer": [
-      "aprendizajes, revisión acotada y experimentos"
+      "aprendizajes, revisión acotada, experimentos y señales de participación"
     ],
     "puede_confirmar": [
       "Que una evidencia concreta fue leída y qué afirma; no su verdad universal ni su resultado comercial."
@@ -867,29 +1226,33 @@
       "investigador: señales y comunidad con evidencia",
       "captura validada: publicaciones/observaciones/oportunidades",
       "dirección editorial: misión, hipótesis y piezas exactas",
-      "Gustavo: contexto, resultados y correcciones autorizados"
+      "Gustavo: contexto, resultados y correcciones autorizados",
+      "operador_cuenta: execution_record (D14) y métricas recolectadas",
+      "relaciones_comunidad y conversaciones_inbox: resultados de relaciones y conversaciones"
     ],
     "entrega_a": [
       "dirección editorial: preguntas y experimentos pertinentes",
       "investigador: vacíos/contradicciones específicas",
       "perfil: evidencia de confusión del mensaje",
       "posicionamiento: patrón relevante de audiencia/modalidad, no orden de cambiar",
-      "Gustavo: propuesta orgánica o decisión estratégica, nunca enviada automáticamente",
-      "verificador: borrador de comentario orgánico con contexto, afirmaciones y permisos; después Gustavo revisa versión exacta; ningún envío"
+      "Gustavo: decisión estratégica; las propuestas de participación las formula relaciones_comunidad",
+      "relaciones_comunidad: participation_signal con contexto, evidencia y modalidad; relaciones_comunidad redacta, editor_verificador revisa, Gustavo aprueba y operador_cuenta ejecuta (nivel B)",
+      "conversaciones_inbox: patrones de calidad de conversación (APRE-03), sin datos privados nuevos"
     ],
-    "responsable_de_resolver_desacuerdos": "Analista responde por interpretación de datos; código por cálculos; dirección editorial por elección de pieza/experimento; posicionamiento por propuesta estratégica; Gustavo confirma dirección y acciones externas.",
+    "responsable_de_resolver_desacuerdos": "Analista responde por interpretación de datos; código por cálculos; dirección editorial por elección de pieza/experimento; posicionamiento por propuesta estratégica; relaciones_comunidad por participación; Gustavo confirma dirección y aprueba acciones externas de nivel B y C.",
     "criterio_de_escalamiento": "conflicto de datos, falsa atribución, compatibilidad desconocida, cambio central, límite global agotado; conservar evidencia y alternativas sin declarar validación por voto.",
     "eventos_emitidos_propuestos": [
       "learning_proposed",
       "research_requested con vacío concreto",
-      "editorial_opportunity_proposed; alias por normalizar con circuito común"
+      "editorial_opportunity_proposed; alias por normalizar con circuito común",
+      "participation_signal_ready"
     ],
     "evento_de_participacion_organica": {
-      "evento": "organic_participation_proposed",
-      "artefacto": "organic_participation_proposal",
-      "receptor": "editor_verificador",
-      "precondicion": "borrador y contexto del hilo con versión/hash, fuentes y permisos",
-      "autoridad": "propuesta interna; no envío ni aprobación en nombre de Gustavo"
+      "evento": "participation_signal_ready",
+      "artefacto": "participation_signal",
+      "receptor": "relaciones_comunidad",
+      "precondicion": "contexto del hilo con versión/hash, fuentes, modalidad y permisos",
+      "autoridad": "señal interna; relaciones_comunidad redacta organic_participation_proposal, editor_verificador revisa, Gustavo aprueba la versión exacta y operador_cuenta ejecuta (nivel B)"
     }
   },
   "calidad": {
@@ -958,7 +1321,7 @@
       },
       {
         "caso": "Propuesta de comentar en cuenta pertinente",
-        "resultado_esperado": "Devuelve texto propuesto con evidencia y aprobación pendiente; no envía.",
+        "resultado_esperado": "Entrega participation_signal a relaciones_comunidad con evidencia; no redacta ni solicita la ejecución.",
         "estado": "propuesto_no_ejecutado"
       },
       {
@@ -1059,7 +1422,7 @@
         "neighborhood_role_mix": "interpretación con soporte, admite varios papeles"
       },
       "obligatoriedad": "Opcional para investigar inicialmente; necesaria evidencia de composición para afirmar quién está llegando.",
-      "fuente_y_captura_candidata": "Captura del panel, exportación que efectivamente esté disponible o muestra manual de red aportada. Conector/API aún no verificado.",
+      "fuente_y_captura_candidata": "Unipile v2 (relaciones, seguidores y seguidos) y API oficial memberFollowersCount si Community Management lo concede, ambos vía operador_cuenta; captura o exportación manual como alternativa. Acceso por verificar en piloto.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Contrastar audiencia pertinente con posición sin excluir pares/recomendadores/divulgadores.",
       "frescura": "Guardar fecha de corte y periodo; composición vieja no prueba audiencia actual.",
@@ -1098,7 +1461,7 @@
         "distribution_context": "orgánico/pagado/desconocido; colaboraciones externas o cambios relevantes si conocidos"
       },
       "obligatoriedad": "Publicación confirmada y versión son obligatorias para atribuir resultados a pieza propia; resto puede ser desconocido y limita comparación.",
-      "fuente_y_captura_candidata": "Registro manual de Gustavo, URL/captura; importación de historial disponible; futura API no verificada.",
+      "fuente_y_captura_candidata": "Registro de operador_cuenta (URN/ID, versión publicada vía Posts API y confirmación por lectura, D14); registro manual de Gustavo como alternativa.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Vincular resultados con piezas efectivamente publicadas y su misión.",
       "frescura": "Registro en momento de confirmación y revisión al conocer edición; no confundir fecha de captura con publicación.",
@@ -1140,7 +1503,7 @@
         "correction_reason": "cambio de cifra/definición o null"
       },
       "obligatoriedad": "Necesarios valores validados, definición, entidad, tipo y ventana para cálculos; todos los nombres posibles son opcionales, no una capacidad garantizada.",
-      "fuente_y_captura_candidata": "Captura manual, exportación real disponible; extracción de captura revisada por humano; API futura únicamente si acceso permitido y definición verificados.",
+      "fuente_y_captura_candidata": "API oficial memberCreatorPostAnalytics y memberFollowersCount solo si Community Management concede acceso; si no, captura o exportación manual revisada con procedencia.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Describir exposición y respuesta; comparar resultados sin atribución falsa.",
       "frescura": "Snapshots conservan fecha; ventanas según plan de medición antes de observar resultados. No existe cadencia activa.",
@@ -1181,9 +1544,9 @@
         "origin_link_strength": "referencia explícita a post/perfil|declaración|inferencia|desconocida"
       },
       "obligatoriedad": "Necesario fragmento/contexto/origen/permiso para llamar real a una señal; opcional para plan inicial.",
-      "fuente_y_captura_candidata": "Comentarios públicos aportados o importados con acceso permitido; fragmento de DM o reunión seleccionado por Gustavo. No acceso automático a inbox.",
+      "fuente_y_captura_candidata": "Comentarios públicos vía Unipile v2 (lectura mediante operador_cuenta). Fragmentos de mensajes directos preparados por conversaciones_inbox desde el inbox sincronizado (D10), minimizados y con permiso de uso; fragmento de reunión aportado por Gustavo.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
-      "finalidad": "Escucha, propuestas de participación orgánica y temas; separar señales reales de lectores simulados.",
+      "finalidad": "Escucha, señales de participación y temas; separar señales reales de lectores simulados.",
       "frescura": "Fecha de conversación/captura; antes de proponer respuesta verificar que el asunto sigue abierto.",
       "comparabilidad": "Una persona/hilo repetidos no son varias voces independientes; agrupar recurrencia con conteo de fuentes y muestra, conservar contradicciones.",
       "si_falta": "No inventar comentarios ni proyectar lectores simulados al mercado; proponer preguntas de investigación.",
@@ -1210,7 +1573,7 @@
       ],
       "campos_especificos": {
         "opportunity_id": "identificador estable",
-        "modality": "personal|ProjectApp|por_clasificar",
+        "modality": "personal|ProjectApp|alianza (con vía que alimenta)|por_clasificar",
         "channel_and_dates": "origen, fecha inicial y fechas de etapas",
         "counterparty_ref": "id privado mínimo",
         "need_and_product": "necesidad expresada y contexto",
@@ -1223,13 +1586,37 @@
         "outcome_type": "oferta|contrato_firmado|trabajo_iniciado|ingreso_recibido separados"
       },
       "obligatoriedad": "Necesarios modalidad, necesidad y soporte para clasificar; presupuesto/dedicación/compatibilidad para cualificación, nunca inferidos. Opcional para escucha sin oportunidades.",
-      "fuente_y_captura_candidata": "Registro mínimo de Gustavo; importación autorizada de tracker existente; futuro CRM/conector solo tras comprobar permisos.",
+      "fuente_y_captura_candidata": "opportunity_record de conversaciones_inbox (CHAT-09) y registro mínimo de Gustavo; importación autorizada de tracker existente.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Medir 60/40 como prioridad estratégica, resultados por vía, pertinencia y compatibilidad.",
       "frescura": "Actualizar al existir evidencia de cambio; conservar historial y reapertura.",
       "comparabilidad": "No contar mensajes ni snapshots de etapa como oportunidades nuevas. No equiparar inversión con presupuesto ni salario personal con tarifa ProjectApp. Asociación documentada no prueba causalidad exclusiva.",
       "si_falta": "Candidata/pendiente con faltantes; ausencia de registro no prueba cero negocio. Sin cifras, analizar cualitativamente pertinencia.",
       "minimizacion_y_privacidad": "Identidad, compensación y acuerdos restringidos a usuario/analista/estrategia según permiso; editorial recibe tema agregado sin datos comerciales privados."
+    },
+    {
+      "id": "D13",
+      "nombre": "Estado de relaciones e invitaciones",
+      "obligatoriedad": "Necesario para APRE-02 y para medir la distribución por modalidad.",
+      "fuente_y_captura_candidata": "Sincronización de operador_cuenta (Unipile v2) y memoria de relaciones_comunidad.",
+      "disponibilidad": "no verificada; sin cuenta conectada en este diseño",
+      "finalidad": "Composición y evolución del barrio; invitación enviada no es conexión.",
+      "frescura": "Fecha de sincronización.",
+      "comparabilidad": "No equiparar seguidor, conexión e invitación; lista parcial se declara.",
+      "si_falta": "Composición como hipótesis.",
+      "minimizacion_y_privacidad": "Preferir agregados; sin contenido de chats."
+    },
+    {
+      "id": "D14",
+      "nombre": "Estado de acciones ejecutadas",
+      "obligatoriedad": "Necesario para vincular acciones con resultados (APRE-04/05).",
+      "fuente_y_captura_candidata": "Registro de ejecución de operador_cuenta.",
+      "disponibilidad": "no verificada",
+      "finalidad": "Separar ejecución, aceptación, respuesta y oportunidad; detectar inciertos.",
+      "frescura": "Última confirmación registrada.",
+      "comparabilidad": "Inciertos no cuentan como ejecutados.",
+      "si_falta": "Atribución desconocida.",
+      "minimizacion_y_privacidad": "Identificadores mínimos."
     }
   ],
   "contrato_transversal": {
@@ -1239,6 +1626,7 @@
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
     "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
-    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true."
+    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json: nivel A autónomo con topes, B aprobación de Gustavo por versión exacta con ejecución automática, C decisión expresa de Gustavo; topes configurables y parada total. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }
