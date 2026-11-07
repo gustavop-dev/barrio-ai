@@ -4,9 +4,9 @@ name: Barrio AI
 on:
   push:
     branches: [main]
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'deploy/**', '.github/workflows/barrio-ai.yml']
+    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
   pull_request:
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'deploy/**', '.github/workflows/barrio-ai.yml']
+    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -60,7 +60,7 @@ jobs:
           cache-dependency-path: oficina/package-lock.json
       - if: steps.present.outputs.pwa == 'true'
         working-directory: oficina
-        run: npm ci && npm run typecheck && npm test -- --run && npm run build
+        run: npm ci && npm run typecheck && npm run lint && npm test -- --run && npm run build
 
   images:
     if: github.event_name != 'pull_request'
@@ -92,7 +92,9 @@ jobs:
       - if: steps.present.outputs.web == 'true'
         uses: docker/build-push-action@v6
         with:
-          context: oficina
+          # The PWA imports compartido/: build from the repository root (see the root .dockerignore).
+          context: .
+          file: oficina/Dockerfile
           platforms: linux/amd64
           push: true
           tags: |

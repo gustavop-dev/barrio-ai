@@ -1,6 +1,12 @@
+import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
+import { searchForWorkspaceRoot } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 import { defineConfig } from 'vitest/config';
+
+// API types, endpoints, hooks and pure logic shared with the native app (movil/). It has no
+// node_modules of its own: `dedupe` makes its imports of TanStack Query use this app's single copy.
+const COMPARTIDO = fileURLToPath(new URL('../compartido', import.meta.url));
 
 // Django runs on 8787 in development. The host header is kept (changeOrigin
 // false) so Django's CSRF origin check sees the same origin as the browser.
@@ -50,12 +56,13 @@ export default defineConfig({
       devOptions: { enabled: false },
     }),
   ],
+  resolve: { dedupe: ['@tanstack/react-query'] },
   build: {
     // `/static/` belongs to Django; the app's bundles go to `/_app/`.
     assetsDir: '_app',
     sourcemap: false,
   },
-  server: { proxy },
+  server: { proxy, fs: { allow: [searchForWorkspaceRoot(process.cwd()), COMPARTIDO] } },
   preview: { proxy },
   test: {
     environment: 'jsdom',

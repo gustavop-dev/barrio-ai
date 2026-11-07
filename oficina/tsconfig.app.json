@@ -18,7 +18,12 @@
     "verbatimModuleSyntax": true,
     "moduleDetection": "force",
     "skipLibCheck": true,
-    "noEmit": true
+    "noEmit": true,
+    // compartido/ (shared with the native app) has no node_modules: its one peer import resolves to this
+    // app's copy. Types only; at runtime Vite dedupes it (vite.config.ts). Same file the app gets today.
+    "paths": {
+      "@tanstack/react-query": ["./node_modules/@tanstack/react-query/build/modern/index.d.ts"]
+    }
   },
   "include": ["src"],
   "exclude": ["src/sw.ts"]

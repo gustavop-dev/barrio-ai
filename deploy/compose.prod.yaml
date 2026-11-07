@@ -90,7 +90,10 @@ services:
   web:
     # Static PWA + reverse proxy with automatic HTTPS (Let's Encrypt). Only public service.
     image: ghcr.io/gustavop-dev/barrio-ai-web:${BARRIO_TAG:-latest}
-    build: ../oficina
+    build:
+      # The PWA imports compartido/ (shared with the native app): build from the repository root.
+      context: ..
+      dockerfile: oficina/Dockerfile
     environment:
       BARRIO_DOMAIN: ${BARRIO_DOMAIN:?Configurar .env}
     ports: ["80:80", "443:443", "443:443/udp"]

@@ -1,0 +1,9 @@
+{
+  "name": "@0ff1ce/compartido",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Código de 0ff1ce que comparten la PWA (oficina/) y la app nativa (movil/): tipos, endpoints, claves y hooks de la API, y lógica pura. Sin node_modules propios: cada app resuelve @tanstack/react-query con su copia. Se revisa desde movil/ (lint, typecheck, jest) y la PWA lo vuelve a tipar.",
+  "peerDependencies": {
+    "@tanstack/react-query": "5.107.0"
+  }
+}

@@ -2,54 +2,16 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { captureKeys, isProcessing, sameOrigin, undoCaptura, useCapturaLive, useCapturas, type CaptureOutput } from '../api/capturas';
+import { captureKeys, sameOrigin, undoCaptura, useCapturaLive, useCapturas, type CaptureOutput } from '../api/capturas';
 import { keys } from '../api/queryClient';
 import { IconChevronLeft, IconPausa, IconPlay } from '../components/icons';
-import { Badge, Button, EmptyState, ErrorRetry, Skeleton, errorMessage, useToast, type Tone } from '../components/ui';
+import { Badge, Button, EmptyState, ErrorRetry, Skeleton, errorMessage, useToast } from '../components/ui';
 import { excerpt } from '../lib/format';
-import { fotosLabel, useAudioPlayback, whenLabel } from './parts';
-import { mmss } from './recorder';
+import { canUndo, CONTEXT_PREFIX, contentsOf, purposeOf, STATE_TONE } from '../../../compartido/src/logic/capturas';
+import { useAudioPlayback, whenLabel } from './parts';
 
-const STATE_TONE: Record<string, Tone> = {
-  recibida: 'info',
-  transcribiendo: 'info',
-  procesando: 'info',
-  dato_guardado: 'ok',
-  anotado: 'ok',
-  idea: 'ok',
-  usado: 'ok',
-  sin_usar: 'muted',
-  error: 'bad',
-  deshecha: 'muted',
-};
-
-const CONTEXT_PREFIX: Record<string, string> = {
-  pregunta: 'Responde a',
-  persona: 'Sobre',
-  pieza: 'Sobre la pieza',
-};
-
-/** «AUDIO 0:42», «2 FOTOS», «NOTA». */
-export function contentsOf(capture: Pick<CaptureOutput, 'has_audio' | 'audio_duration_s' | 'photos' | 'note'>): string[] {
-  const parts: string[] = [];
-  if (capture.has_audio) parts.push(capture.audio_duration_s ? `Audio ${mmss(capture.audio_duration_s)}` : 'Audio');
-  if (capture.photos?.length) parts.push(fotosLabel(capture.photos.length));
-  if (capture.note?.trim()) parts.push('Nota');
-  return parts;
-}
-
-/** «Idea para un post», «Dato sobre mí · lo decidió el equipo», «El equipo decide». */
-export function purposeOf(capture: Pick<CaptureOutput, 'purpose_label' | 'team_decided' | 'state'>): string {
-  if (capture.purpose_label) return capture.purpose_label;
-  if (capture.team_decided?.label) return `${capture.team_decided.label} · lo decidió el equipo`;
-  return isProcessing(capture.state) ? 'El equipo lo transcribe y decide' : 'Sin elegir';
-}
-
-function canUndo(capture: CaptureOutput, now: number): boolean {
-  if (!capture.can_undo || !capture.undo_until) return false;
-  const until = Date.parse(capture.undo_until);
-  return Number.isFinite(until) && until > now;
-}
+// Labels shared with the native app (compartido/src/logic/capturas.ts).
+export { contentsOf, purposeOf };
 
 function Listen({ url }: { url: string }) {
   const { playing, toggle } = useAudioPlayback(url);

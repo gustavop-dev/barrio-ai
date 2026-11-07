@@ -19,6 +19,7 @@ import {
   IconTuTurno,
 } from './icons';
 import { EXTERNAL_HINT_ID } from './ui/ExternalLink';
+import { turnoAnchor } from '../../../compartido/src/logic/turno';
 
 type IconComponent = typeof IconOficina;
 
@@ -50,10 +51,8 @@ const ART_CREDIT_URL = 'https://limezu.itch.io/moderninteriors';
 
 // ---------------------------------------------------------------- shell helpers
 
-/** Anchor id of a Tu turno card, so other views can link to it: `/tu-turno#${turnoAnchor(card.id)}`. */
-export function turnoAnchor(cardId: string): string {
-  return `turno-${cardId.replace(/[^A-Za-z0-9_-]/g, '-')}`;
-}
+/** Anchor id of a Tu turno card (shared with the native app: compartido/src/logic/turno.ts). */
+export { turnoAnchor };
 
 function subscribeOnline(callback: () => void) {
   window.addEventListener('online', callback);
