@@ -2,23 +2,9 @@ import { useState } from 'react';
 import { usePlanPiece, useVeto } from '../../api/hooks';
 import { Button, ConfirmModal, Note, useToast } from '../../components/ui';
 import { longDay } from './dates';
+import { vetoConsequence, type VetoTarget } from './events';
 
-export interface VetoTarget {
-  /** The action to reject: the piece's CONT-09 or a queued action. */
-  actionId: string;
-  kind: 'pieza' | 'accion';
-  /** «a las 09:00»: when the piece would go out. */
-  when?: string;
-  /** A network action (RED-*): vetoing it discards the person for good. */
-  network?: boolean;
-  person?: string | null;
-}
-
-function consequence(target: VetoTarget): string {
-  if (target.kind === 'pieza') return `La pieza no saldrá${target.when ? ` ${target.when}` : ''} y ese día quedará sin publicación. Queda registrada con tu nota.`;
-  if (target.network) return `No saldrá, y vetar una acción de red descarta a ${target.person || 'esa persona'} para siempre: el equipo no la volverá a proponer.`;
-  return 'La acción no saldrá. Queda registrada con tu nota.';
-}
+export type { VetoTarget };
 
 /** «Vetar» with the mandatory-note modal (POST /operador/actions/<id>/reject). */
 export function VetoButton({
@@ -67,7 +53,7 @@ export function VetoButton({
             )
           }
         >
-          <p>{consequence(target)}</p>
+          <p>{vetoConsequence(target)}</p>
         </ConfirmModal>
       ) : null}
     </>

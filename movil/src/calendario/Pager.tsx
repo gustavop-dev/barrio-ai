@@ -1,0 +1,148 @@
+// Horizontal paging for the week strip and the month («Deslizar la tira cambia de semana»): the page
+// follows the finger with the previous and next pages beside it, and past gestures.pager.commitFraction
+// (or a flick) it turns with the pageSnap spring; otherwise it springs back. The header arrows animate
+// the same way through the ref, and screen readers get «anterior» and «siguiente» actions.
+//
+// Pages are keyed by an absolute index and placed at index × width, so when the parent moves its date
+// the page that slid in keeps its place: nothing jumps between the spring and the new render.
+import { useCallback, useEffect, useImperativeHandle, useState, type ReactNode, type Ref } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { gestures, haptic, spring } from '@/theme/motion';
+
+export type PageOffset = -1 | 0 | 1;
+
+export interface PagerHandle {
+  /** Turns the page with the same spring as a swipe. */
+  go: (direction: 1 | -1) => void;
+}
+
+/** Whether a released drag turns the page, and which way (1: next, -1: previous). Pure, so it can be tested. */
+export function pageDirection(translationX: number, velocityX: number, width: number): 1 | -1 | 0 {
+  'worklet';
+  const { commitFraction, commitVelocity } = gestures.pager;
+  if (width <= 0) return 0;
+  if (translationX <= -width * commitFraction || (velocityX <= -commitVelocity && translationX < 0)) return 1;
+  if (translationX >= width * commitFraction || (velocityX >= commitVelocity && translationX > 0)) return -1;
+  return 0;
+}
+
+export interface PagerProps {
+  renderPage: (offset: PageOffset) => ReactNode;
+  /** The page turned: move the date by one week or month. */
+  onShift: (direction: 1 | -1) => void;
+  previousLabel: string;
+  nextLabel: string;
+  testID?: string;
+  ref?: Ref<PagerHandle>;
+}
+
+export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, ref }: PagerProps) {
+  const [width, setWidth] = useState(0);
+  const [index, setIndex] = useState(0);
+  /** index × width, also on the UI thread. */
+  const base = useSharedValue(0);
+  /** What the strip shows: base minus the finger's travel. */
+  const offset = useSharedValue(0);
+
+  useEffect(() => {
+    base.set(index * width);
+    offset.set(index * width);
+    // Only when the width changes (rotation): turns keep base and offset in step themselves.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [width]);
+
+  const commit = useCallback(
+    (direction: 1 | -1) => {
+      setIndex((current) => current + direction);
+      onShift(direction);
+    },
+    [onShift],
+  );
+
+  const swiped = useCallback(
+    (direction: 1 | -1) => {
+      haptic('pageChange');
+      commit(direction);
+    },
+    [commit],
+  );
+
+  const go = useCallback(
+    (direction: 1 | -1) => {
+      const target = base.get() + direction * width;
+      base.set(target);
+      offset.set(withSpring(target, spring('pageSnap')));
+      commit(direction);
+    },
+    [base, offset, width, commit],
+  );
+
+  useImperativeHandle(ref, () => ({ go }), [go]);
+
+  const pan = usePanGesture({
+    testID: testID ? `${testID}-swipe` : undefined,
+    activeOffsetX: [-gestures.pager.activeOffsetX, gestures.pager.activeOffsetX],
+    failOffsetY: [-gestures.pager.failOffsetY, gestures.pager.failOffsetY],
+    onUpdate: (event) => {
+      'worklet';
+      offset.set(base.value - event.translationX);
+    },
+    onDeactivate: (event) => {
+      'worklet';
+      const direction = pageDirection(event.translationX, event.velocityX, width);
+      const target = base.value + direction * width;
+      base.set(target);
+      offset.set(withSpring(target, spring('pageSnap')));
+      if (direction !== 0) runOnJS(swiped)(direction);
+    },
+  });
+
+  const strip = useAnimatedStyle(() => ({ transform: [{ translateX: -offset.value }] }));
+  const pages: { key: number; offset: PageOffset }[] = width ? [-1, 0, 1].map((step) => ({ key: index + step, offset: step as PageOffset })) : [{ key: index, offset: 0 }];
+
+  return (
+    <View
+      style={styles.frame}
+      onLayout={(event: LayoutChangeEvent) => setWidth(Math.round(event.nativeEvent.layout.width))}
+      accessibilityActions={[
+        { name: 'previous', label: previousLabel },
+        { name: 'next', label: nextLabel },
+      ]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'previous') go(-1);
+        if (event.nativeEvent.actionName === 'next') go(1);
+      }}
+      testID={testID}
+    >
+      <GestureDetector gesture={pan}>
+        <Animated.View style={strip}>
+          {pages.map((page) =>
+            page.offset === 0 ? (
+              <View key={page.key} style={[styles.current, { left: page.key * width }]}>
+                {renderPage(0)}
+              </View>
+            ) : (
+              <View
+                key={page.key}
+                style={[styles.side, { left: page.key * width, width }]}
+                accessibilityElementsHidden
+                importantForAccessibility="no-hide-descendants"
+                pointerEvents="none"
+              >
+                {renderPage(page.offset)}
+              </View>
+            ),
+          )}
+        </Animated.View>
+      </GestureDetector>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  frame: { overflow: 'hidden' },
+  current: { position: 'relative' },
+  side: { position: 'absolute', top: 0 },
+});

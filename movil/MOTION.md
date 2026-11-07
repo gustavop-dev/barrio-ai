@@ -22,6 +22,7 @@ Si una pieza nueva necesita un movimiento que no existe, se añade aquí primero
 | `sheetOpen` | 24 · 260 · 1 | Las hojas inferiores suben y vuelven a su sitio tras arrastrarlas sin cerrar: captura, confirmaciones, oportunidad y datos (`components/ui/Sheet.tsx`). |
 | `press` | 18 · 420 · 0.6 | Botón al soltarlo y píldora de la pestaña activa en la barra inferior (`components/ui/Button.tsx`, `components/shell/BottomBar.tsx`). |
 | `toast` | 20 · 260 · 0.9 | El aviso inferior entra subiendo (`layout.toastIn`, en `components/ui/Toast.tsx`). |
+| `pageSnap` | 26 · 240 · 1 | Calendario: la tira de la semana o el mes se asientan en la página siguiente o anterior tras deslizar, o vuelven a su sitio (`calendario/Pager.tsx`). |
 | `dragLift` | 18 · 300 · 0.8 | Personas › Oportunidades: la tarjeta crece al levantarla con una pulsación larga y vuelve al soltarla (`personas/Oportunidades.tsx`). |
 | `zoomSettle` | 22 · 240 · 1 | El visor de fotos de la Galería: el zoom con doble toque, la foto que vuelve dentro de sus bordes tras pellizcar o arrastrar, y la foto que vuelve a su sitio si el arrastre para cerrar no llega (`galeria/PhotoViewer.tsx`). |
 
@@ -47,6 +48,8 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `spriteFrameMs` | 200 | Un fotograma del bibliotecario en reposo de los estados vacíos: 6 fotogramas en 1,2 s (`components/ui/Sprite.tsx`). |
 | `toastDurations.withUndo` | 5000 | Lo que dura un aviso con «Deshacer» o «Recuperar», la ventana de acción reversible (`components/ui/Toast.tsx`). |
 | `toastDurations.plain` | 4000 | Lo que dura un aviso sin acción. |
+| `toastDurations.withUndo` (veto) | 5000 | El veto de una pieza o de una acción en cola espera esta ventana antes de enviarse, para que «Deshacer» lo anule (`calendario/pendingVeto.ts`). |
+| `copiedLabelMs` | 2000 | Lo que dura «Copiado» en el botón Copiar del texto final (`pieza/FinalText.tsx`). |
 | `viewerFade` | 180 · enter | El visor de fotos a pantalla completa aparece y desaparece (`layout.viewerIn` y `layout.viewerOut`, en `galeria/PhotoViewer.tsx`). |
 | `progress` | 240 · standard | La barra de «Subir fotos» avanza cada vez que entra una petición de hasta diez fotos (`galeria/UploadProgressCard.tsx`). |
 
@@ -67,6 +70,10 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `capture.maxLift` | 60 pt | Altura máxima que el botón y el candado siguen al dedo. |
 | `sheet.dismissDistance` | 120 pt | Arrastrar la hoja hacia abajo esta distancia la cierra (`components/ui/Sheet.tsx`). |
 | `sheet.dismissVelocity` | 1000 pt/s | O lanzarla hacia abajo a esta velocidad. |
+| `pager.activeOffsetX` | 16 pt | Calendario: recorrido horizontal antes de que la semana o el mes sigan al dedo (`calendario/Pager.tsx`). |
+| `pager.failOffsetY` | 14 pt | Recorrido vertical que deja el toque al scroll de la página. |
+| `pager.commitFraction` | 0.25 | Fracción del ancho que pasa de página al soltar. |
+| `pager.commitVelocity` | 700 pt/s | O un gesto rápido a esta velocidad. |
 | `drag.longPressMs` | 400 ms | Personas › Oportunidades: mantener una tarjeta este tiempo la levanta para arrastrarla a otra etapa (`personas/Oportunidades.tsx`). |
 | `drag.liftScale` | 1.03 | Escala de la tarjeta levantada. |
 | `drag.autoScrollEdge` | 80 pt | Cerca del borde superior o inferior de la lista, la tarjeta arrastrada la desplaza. |
@@ -100,6 +107,8 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `dragOver` | selección | La tarjeta arrastrada pasa sobre otra etapa. |
 | `dragDrop` | impacto ligero | La tarjeta se suelta en una etapa nueva. |
 | `toggle` | sin vibración | Marcar un chip o una opción (`components/ui/Chip.tsx`, `components/ui/Options.tsx`). |
+| `pageChange` | selección | Calendario: deslizar pasa la semana o el mes (`calendario/Pager.tsx`). |
+| `copied` | éxito | El texto final quedó en el portapapeles (`pieza/FinalText.tsx`). |
 | `switchToggle` | sin vibración | Cambiar un interruptor de fila: Ajustes y la hoja de la foto (`components/ui/SwitchRow.tsx`). |
 | `uploadDone` | éxito | Las fotos llegaron a la Galería (`galeria/upload.ts`). |
 
@@ -142,6 +151,8 @@ enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas 
 | `officeGestures.sheetActivation` | 8 dp | Inicio del arrastre del asa de `SnapSheet`. |
 | `officeGestures.sheetHalf` / `sheetFull` | 0.5 / 0.88 | Puntos de ajuste de `SnapSheet`, sobre el espacio disponible. |
 | `haptics.officePick` | selección | Selección de un personaje, zona o equipo. |
+
+El panel del día del Calendario también es un `SnapSheet` (`calendario/CalendarioScreen.tsx`), con los mismos tokens.
 
 `SnapSheet` reutiliza `springs.sheetOpen`, `timings.sheetClose` y `gestures.sheet` para volver a un
 punto de ajuste o cerrar; ofrece ampliar/reducir mediante acciones de accesibilidad y Cerrar.

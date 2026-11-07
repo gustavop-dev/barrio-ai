@@ -44,6 +44,8 @@ export const springs = {
   press: { damping: 18, stiffness: 420, mass: 0.6 },
   /** The toast rising from the bottom. */
   toast: { damping: 20, stiffness: 260, mass: 0.9 },
+  /** Calendario: the week strip or the month settling on the next page after a swipe (or back to its place). */
+  pageSnap: { damping: 26, stiffness: 240, mass: 1 },
   /** An opportunity card lifting under the finger when its drag starts (and settling when dropped). */
   dragLift: { damping: 18, stiffness: 300, mass: 0.8 },
   /** The photo viewer: double-tap zoom, the photo settling back inside its bounds, a drag-to-close that did not close. */
@@ -116,6 +118,9 @@ export const spriteFrameMs = 200;
 /** How long a toast stays: 5 s with «Deshacer»/«Recuperar» (the reversible-action window), 4 s otherwise. */
 export const toastDurations = { withUndo: 5000, plain: 4000 } as const;
 
+/** How long «Copiado» stays on a copy button before it says «Copiar» again. */
+export const copiedLabelMs = 2000;
+
 // ---------------------------------------------------------------- gestures
 
 export const gestures = {
@@ -150,6 +155,16 @@ export const gestures = {
     dismissDistance: 120,
     /** Or flick it down this fast. */
     dismissVelocity: 1000,
+  },
+  pager: {
+    /** Horizontal travel before the week strip or the month follows the finger (points). */
+    activeOffsetX: 16,
+    /** Vertical travel that leaves the touch to the page scroll instead (points). */
+    failOffsetY: 14,
+    /** Travel that turns the page when the finger lifts (fraction of the width). */
+    commitFraction: 0.25,
+    /** Or a flick this fast (points per second). */
+    commitVelocity: 700,
   },
   drag: {
     /** Hold an opportunity card this long before it lifts and follows the finger (ms). */
@@ -212,6 +227,10 @@ export const haptics = {
   tabChange: { type: 'selection' },
   /** Toggling a chip or option. */
   toggle: null,
+  /** Calendario: a swipe turns the week or the month. */
+  pageChange: { type: 'selection' },
+  /** The text went to the clipboard. */
+  copied: { type: 'notification', style: 'success' },
   /** An opportunity card lifts after the long press. */
   dragStart: { type: 'impact', style: 'medium' },
   /** The dragged card moves over another stage. */

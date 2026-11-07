@@ -15,6 +15,7 @@ export { Note, type NoteTone } from './Note';
 export { Options, type Option } from './Options';
 export { PageHeader, pageContent } from './Screen';
 export { Section } from './Section';
+export { Segmented } from './Segmented';
 export { Sheet } from './Sheet';
 export { Skeleton } from './Skeleton';
 export { AgentPortrait, IdleLibrarian, roleName } from './Sprite';

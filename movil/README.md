@@ -9,9 +9,10 @@ En esta fase ya funcionan:
 - **Tu turno**, completo, con acciones deslizando la tarjeta;
 - **la captura**: mantener pulsado para grabar, foto, nota y envío con «Deshacer»;
 - el registro de avisos push;
-- **Galería**, **Ajustes** y **Notificaciones**, completas.
+- **Galería**, **Ajustes** y **Notificaciones**, completas;
+- **Calendario** (Mes, Semana y Lista, deslizando la semana o el mes y con el panel del día en una hoja) y **el detalle de una pieza**, con el veto y su «Deshacer».
 
-Las demás vistas (Oficina, Resultados, Personas, Calendario, la ficha de una persona y el detalle de una pieza) se ven por ahora como «En construcción».
+Las demás vistas (Oficina, Resultados, Personas y la ficha de una persona) se ven por ahora como «En construcción».
 
 ## Probarla en tu Android con Expo Go (desde este portátil con WSL)
 
@@ -91,6 +92,8 @@ movil/
     auth/               sesión con token del dispositivo
     capture/            botón para mantener pulsado, hoja de captura, grabadora
     turno/              Tu turno: lista, tarjetas, deslizar, preguntas, «lo que sabe»
+    calendario/         Calendario: semana, mes, lista, panel del día, veto con «Deshacer»
+    pieza/              detalle de una pieza: cortes, texto final, comentarios, «Cómo se escribió»
     components/         interfaz (ui/), barras (shell/) e iconos
     push/               registro de avisos y rutas de data.url
     theme/              tokens.ts (colores, tipos, espacios) y motion.ts
