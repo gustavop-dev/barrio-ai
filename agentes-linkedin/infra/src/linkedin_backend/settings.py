@@ -62,7 +62,9 @@ LOGIN_URL='/admin/login/'
 JOB_QUEUE_LIMIT=100
 WORKER_STALE_SECONDS=180
 REST_FRAMEWORK={
- 'DEFAULT_AUTHENTICATION_CLASSES':['team_backend.authentication.CredentialAuthentication','rest_framework.authentication.SessionAuthentication'],
+ # Device tokens of the mobile app first: they only claim `Bearer 0ff1ce_dt_…`, so service credentials are never shadowed.
+ 'DEFAULT_AUTHENTICATION_CLASSES':['team_backend.authentication.DeviceTokenAuthentication','team_backend.authentication.CredentialAuthentication',
+                                   'rest_framework.authentication.SessionAuthentication'],
  'DEFAULT_PERMISSION_CLASSES':['team_backend.permissions.KnowledgeAccess'],
  'DEFAULT_RENDERER_CLASSES':['rest_framework.renderers.JSONRenderer'],
  'DEFAULT_PARSER_CLASSES':['rest_framework.parsers.JSONParser'],

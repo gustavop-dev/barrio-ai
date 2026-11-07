@@ -731,3 +731,37 @@ class WeeklySummary(models.Model):
     updated_at=models.DateTimeField(auto_now=True)
     class Meta:ordering=['-week_start']
     def __str__(self):return f'{self.week_start} · {self.get_state_display()}'
+
+
+class DeviceToken(models.Model):
+    """Login of the 0ff1ce mobile app on one device (docs/app-movil-backend.md): a human session without cookies or
+    CSRF. Separate from ApiCredential on purpose: a service credential never decides, a device token is Gustavo himself.
+    Only the SHA-256 digest is stored; the plain token (authentication.DEVICE_PREFIX…) is shown once, when issued."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='device_tokens')
+    name=models.CharField(max_length=120)
+    digest=models.CharField(max_length=64,unique=True,editable=False)
+    created_at=models.DateTimeField(default=timezone.now,editable=False)
+    last_used_at=models.DateTimeField(null=True,blank=True)
+    revoked_at=models.DateTimeField(null=True,blank=True,db_index=True)
+    class Meta:ordering=['-created_at']
+    def __str__(self):return self.name
+
+
+class ExpoPushToken(models.Model):
+    """Native push of the mobile app through Expo (expo.py). Registering the same token again updates it; revoking
+    its device login or Expo's DeviceNotRegistered deactivates it."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='expo_push_tokens')
+    device=models.ForeignKey(DeviceToken,on_delete=models.CASCADE,null=True,blank=True,related_name='expo_push_tokens')
+    token=models.CharField(max_length=200,unique=True)
+    device_name=models.CharField(max_length=120,blank=True)
+    active=models.BooleanField(default=True,db_index=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    last_success_at=models.DateTimeField(null=True,blank=True)
+    # Last per-message error from Expo, or why the token was deactivated (DeviceNotRegistered, device_revoked).
+    last_error=models.CharField(max_length=80,blank=True)
+    # Push tickets waiting for their receipt: [[ticket_id, iso]], newest last, at most expo.MAX_TICKETS.
+    tickets=models.JSONField(default=list,blank=True)
+    def __str__(self):return self.device_name or str(self.id)
