@@ -249,15 +249,17 @@ class FakeConnector:
         return _comment(comment)
 
     # -- network
-    def seed_person(self,public_id,display_name,headline='',distance='SECOND_DEGREE',comment_on=None,comment='',search=None):
+    def seed_person(self,public_id,display_name,headline='',distance='SECOND_DEGREE',comment_on=None,comment='',search=None,kind='individual'):
         """A LinkedIn member who may comment on a seeded post and/or appear in a keyword search."""
         user={'id':'ACo'+public_id,'public_identifier':public_id,'display_name':display_name,'headline':headline,
-              'profile_url':'https://www.linkedin.com/in/'+public_id,'type':'individual'}
+              'profile_url':'https://www.linkedin.com/in/'+public_id,'type':kind}
         self.state['users'][public_id]=user;self.state['users'][user['id']]=user
         self.state['network'][user['id']]={'network_distance':distance,'is_following':False,'relation_request_status':''}
         if comment_on:
+            # Like Unipile v2, a comment author carries name, id and URL but no headline.
+            author={k:user[k] for k in ('id','display_name','profile_url','type')}
             self.state['comments'][comment_on].append({'id':'comment:'+uuid.uuid4().hex[:12],'text':comment,'is_sender':False,
-                'created_at':datetime(2026,11,6,13,0,tzinfo=timezone.utc).isoformat(),'author':user})
+                'created_at':datetime(2026,11,6,13,0,tzinfo=timezone.utc).isoformat(),'author':author})
         if search:self.state['search'].setdefault(search,[]).append(user['id'])
         return user
 
