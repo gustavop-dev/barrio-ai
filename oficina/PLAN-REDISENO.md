@@ -20,11 +20,11 @@ Lo que hizo el equipo, por qué lo hizo y cuánto costó queda como consulta sec
 | **Tu turno** | `/tu-turno` | Lo que depende de ti: preguntas del equipo, tareas y avisos. Lleva un contador en la navegación. |
 | **Resultados** | `/resultados` | Dashboard para saber si vamos bien. |
 | **Personas** | `/personas` | Prospectos, red y conversaciones, cada uno con su siguiente paso. |
-| **Actividad** | `/actividad` | Lo que hizo y hará el equipo. Solo lectura, con veto opcional en lo programado. |
+| **Calendario** | `/calendario` | Día a día: lo que hizo el equipo, lo que tiene programado y lo que te toca. Con veto opcional en lo programado. |
 | **Ajustes** | `/ajustes` | Conexiones, notificaciones, parada total, autonomía, gasto de IA y referentes. |
 
 - **Escritorio:** las 6 vistas en la barra lateral.
-- **Móvil:** barra inferior con 5 (Oficina, Tu turno, Resultados, Personas y Actividad); Ajustes va en un icono de la barra superior.
+- **Móvil:** barra inferior con 5 (Oficina, Tu turno, Resultados, Personas y Calendario); Ajustes va en un icono de la barra superior.
 - El banner de pausa sigue visible en todas las vistas.
 
 ## 1. Oficina (inicio)
@@ -72,7 +72,7 @@ Lo que se rompe sin ti:
 
 **Estado vacío:** «Nada depende de ti hoy», con un resumen de lo que hizo el equipo.
 
-La pieza del día **no** entra: sale sola. Aparece en Actividad con «Vetar» hasta su hora y llega por push.
+La pieza del día **no** entra: sale sola. Aparece en el Calendario con «Vetar» hasta su hora y llega por push.
 
 ## 3. Resultados
 
@@ -129,16 +129,27 @@ Nace de la vista Red y absorbe Referentes.
 - **Oportunidades:** Gustavo marca a una persona como oportunidad y mueve su etapa a mano. Cuando exista la lectura del inbox, el analista podrá proponerlo.
 - **Acciones:** *Descartar*, que ya existe. Para referentes: añadir, desactivar y quitar.
 
-## 5. Actividad
+## 5. Calendario
 
-Junta Acciones, el calendario de Contenido y el feed de Máquina en una sola línea de tiempo.
+Junta Acciones, el calendario de Contenido y el feed de Máquina. Sustituye a la vista Actividad que se había planteado.
 
-- **Próximo:** la pieza programada, con su hora y «Vetar».
-- **Hecho:** posts, comentarios, reacciones, seguimientos, invitaciones y aceptaciones.
-  - Cada elemento lleva el texto, a quién iba, el enlace a LinkedIn y, cuando aplique, «por qué» (justificación).
-  - Se puede filtrar por tipo.
-- **Detalle de una pieza:** la página actual de Pieza, aligerada. Arriba quedan el texto final y el resultado; el brief, las variantes, el panel de lectores y el verificador pasan a secciones plegadas, bajo «Cómo se escribió».
-- **Inciertas:** no se resuelven aquí, sino desde Tu turno.
+- **Vistas Mes, Semana y Lista.** En móvil, por defecto, una semana compacta con el detalle del día debajo.
+- **Capas de color que se pueden ocultar:**
+  - Tuyo: plazos de Tu turno, reuniones y caducidad de LinkedIn.
+  - Publicaciones.
+  - Red.
+  - Conversaciones y oportunidades.
+  - Sistema: pausas y acciones inciertas o fallidas.
+- **En la cuadrícula solo va lo importante.** Comentarios, reacciones, seguimientos e invitaciones salen como conteo en el resumen del día.
+- **Panel del día:**
+  - el resumen («1 post · 6 comentarios · 4 seguidos»);
+  - tu parte;
+  - la publicación del día, con «Vetar» si aún no salió;
+  - lo programado y lo importante;
+  - «Ver todo lo del día».
+- **Vista Lista:** la línea de tiempo completa, con el bloque «Próximo» (pieza programada y acciones en cola) arriba.
+- **Detalle de una pieza** (`/calendario/pieza/:id`): la página actual de Pieza, aligerada. Arriba quedan el texto final y el resultado; el brief, las variantes, el panel de lectores y el verificador pasan a secciones plegadas, bajo «Cómo se escribió».
+- **Inciertas:** se ven aquí, pero se resuelven desde Tu turno.
 
 ## 6. Ajustes
 
@@ -155,10 +166,10 @@ Junta Acciones, el calendario de Contenido y el feed de Máquina en una sola lí
 | Vista actual | Destino |
 |---|---|
 | Oficina | Se queda como inicio, con acceso a Tu turno. |
-| Máquina | Se reparte: la parada total, el gasto, los topes y la ventana van a Ajustes; el feed va a Actividad. |
-| Acciones | Pasa a Actividad. Las inciertas van a Tu turno. Sin aprobaciones. |
-| Contenido | La pieza programada y el historial pasan a Actividad. |
-| Pieza | Queda como detalle dentro de Actividad, aligerado. |
+| Máquina | Se reparte: la parada total, el gasto, los topes y la ventana van a Ajustes; el feed va al Calendario. |
+| Acciones | Pasa al Calendario. Las inciertas van a Tu turno. Sin aprobaciones. |
+| Contenido | Su calendario pasa al Calendario, que ahora incluye todo lo del equipo. |
+| Pieza | Queda como detalle dentro del Calendario, aligerado. |
 | Referentes | Se integra en Personas. |
 | Red | Pasa a ser Personas. Los topes y lecturas de red van a Ajustes, plegados. |
 | Conocimiento | **Desaparece de la interfaz.** Sigue en el backend como base de datos de los agentes. Las citas del curso se muestran como texto, sin enlace. |
@@ -185,6 +196,7 @@ Junta Acciones, el calendario de Contenido y el feed de Máquina en una sola lí
 | Oportunidades | Un modelo de oportunidad con etapas, modalidad y procedencia, y su registro manual desde Personas. |
 | Tareas de perfil | Implementar el ciclo de Estrategia y Perfil (`agentes-linkedin/infra/docs/ciclo-estrategia-perfil.md`) para que entregue tareas completas. |
 | Tu turno | Un endpoint que agregue preguntas, tareas y avisos con su contador. |
+| Calendario | `GET /api/v1/calendario?desde=&hasta=` con los eventos importantes y los conteos de cada día (forma en `DISENO-VISTAS.md`). |
 
 ## Fases
 
@@ -192,7 +204,7 @@ Junta Acciones, el calendario de Contenido y el feed de Máquina en una sola lí
    - la nueva navegación;
    - la Oficina con acceso a Tu turno;
    - Tu turno con avisos, inciertas y memoria;
-   - Actividad unificada;
+   - el Calendario con las capas Publicaciones, Red y Sistema;
    - Personas sobre la red y los referentes;
    - una primera versión de Resultados con el embudo de la red;
    - Ajustes con lo que viene de Máquina;
@@ -207,5 +219,6 @@ Junta Acciones, el calendario de Contenido y el feed de Máquina en una sola lí
 - Conocimiento sale de la interfaz y queda en el backend. *(Gustavo)*
 - Las preguntas del equipo tienen su propio espacio para responderlas, dentro de Tu turno. *(Gustavo)*
 - Sin aprobaciones: los agentes actúan solos, con veto opcional y parada total. *(Gustavo)*
+- Una vista de calendario para ver día a día las tareas y las acciones importantes del equipo. *(Gustavo)* Sustituye a Actividad, que mostraba lo mismo en lista; la lista queda como modo del calendario.
 - La red pasa a `auto` junto con lo demás. *(Por defecto, cambiable)*
 - Al principio, Gustavo registra las oportunidades a mano; el analista las propondrá cuando exista el inbox. *(Por defecto, cambiable)*

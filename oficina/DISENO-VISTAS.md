@@ -16,7 +16,7 @@ Detalle de cada pantalla de la oficina rediseñada: bloques, campos de cada elem
 3. [Tu turno](#2-tu-turno)
 4. [Resultados](#3-resultados)
 5. [Personas](#4-personas)
-6. [Actividad](#5-actividad)
+6. [Calendario](#5-calendario)
 7. [Ajustes](#6-ajustes)
 8. [Login](#7-login)
 9. [Notificaciones push](#notificaciones-push)
@@ -35,7 +35,7 @@ Detalle de cada pantalla de la oficina rediseñada: bloques, campos de cada elem
 | 2 | Tu turno | `/tu-turno` | Tu turno |
 | 3 | Resultados | `/resultados` | Resultados |
 | 4 | Personas | `/personas` | Personas |
-| 5 | Actividad | `/actividad` | Actividad |
+| 5 | Calendario | `/calendario` | Calendario |
 | 6 | Ajustes | `/ajustes` | — (icono en la barra superior) |
 
 - **Escritorio (≥ 900 px):**
@@ -43,7 +43,7 @@ Detalle de cada pantalla de la oficina rediseñada: bloques, campos de cada elem
   - La vista activa se resalta.
 - **Móvil (< 900 px):**
   - Barra superior con el logo a la izquierda y el icono de Ajustes a la derecha.
-  - Barra inferior fija con 5 entradas (Oficina, Tu turno, Resultados, Personas y Actividad), cada una con icono y etiqueta corta.
+  - Barra inferior fija con 5 entradas (Oficina, Tu turno, Resultados, Personas y Calendario), cada una con icono y etiqueta corta.
   - Respetar el área segura inferior del iPhone (PWA instalada).
 - **Contador de Tu turno:** número de pendientes en la entrada de navegación (escritorio y móvil).
   - Rojo si hay algún aviso crítico; neutro si solo hay preguntas o tareas.
@@ -63,7 +63,7 @@ Aparece debajo de la barra superior, en todas las vistas, mientras la máquina e
 - **Sesión caducada:** cualquier 401 o 403 lleva a Login con `?next=` y vuelve a la misma ruta después de entrar.
 - **Sin conexión:** franja discreta «Sin conexión. Mostrando lo último que cargó». Los datos ya cargados siguen visibles.
 - **Confirmaciones:** después de una acción, toast abajo («Guardado», «Vetada», «Marcada como hecha»). Las acciones reversibles muestran «Deshacer» durante 5 s.
-- **Refresco automático:** escena cada 15 s; Tu turno, Actividad y Pieza cada 30 s; Personas y Resultados cada 60 s; LinkedIn cada 5 min. No hace falta mostrar un indicador de recarga; sí «actualizado hace X» donde se indique.
+- **Refresco automático:** escena cada 15 s; Tu turno, Calendario y Pieza cada 30 s; Personas y Resultados cada 60 s; LinkedIn cada 5 min. No hace falta mostrar un indicador de recarga; sí «actualizado hace X» donde se indique.
 - **Enlaces externos** (LinkedIn): se abren en otra pestaña con el icono ↗. Solo se muestran si la URL es https.
 - **Accesibilidad:** «Saltar al contenido» al inicio; foco visible; el contraste de los tonos debe cumplir AA; respetar `prefers-reduced-motion`.
 
@@ -127,7 +127,7 @@ Aparece debajo de la barra superior, en todas las vistas, mientras la máquina e
 - **Misión.**
 - **Estado real:** estado, detalle y desde cuándo. Si no hay datos: «Sin datos de actividad…».
 - Si está en diseño, la nota correspondiente.
-- **Opcional (nuevo):** «Lo último que hizo», con 3 elementos de Actividad filtrados por ese rol y el enlace «Ver en Actividad».
+- **Opcional (nuevo):** «Lo último que hizo», con 3 elementos importantes filtrados por ese rol y el enlace «Ver en el Calendario».
 - Botón «Ver su equipo · {equipo}».
 
 ### Estados
@@ -156,7 +156,7 @@ Aparece debajo de la barra superior, en todas las vistas, mientras la máquina e
 
 **Se llega desde:** la navegación (con contador), la tarjeta de la Oficina y las notificaciones push.
 
-**Regla de entrada:** un elemento solo aparece si nadie más que Gustavo puede resolverlo. Lo informativo (una pieza bloqueada, invitaciones en pausa por límite) va a Actividad o a Personas, no aquí.
+**Regla de entrada:** un elemento solo aparece si nadie más que Gustavo puede resolverlo. Lo informativo (una pieza bloqueada, invitaciones en pausa por límite) va al Calendario o a Personas, no aquí.
 
 ### Estructura
 
@@ -276,7 +276,7 @@ Aquí Gustavo responde lo que los agentes necesitan saber de él. Las respuestas
 
 ### Estados de la vista
 
-- **Nada pendiente:** ilustración (personaje idle) con «Nada depende de ti hoy», el resumen del día («Hoy el equipo publicó 1 post, comentó en 6 y siguió a 4 personas») y el enlace a Actividad.
+- **Nada pendiente:** ilustración (personaje idle) con «Nada depende de ti hoy», el resumen del día («Hoy el equipo publicó 1 post, comentó en 6 y siguió a 4 personas») y el enlace al Calendario.
 - **Cargando:** esqueleto de 3 tarjetas.
 - **Error en una sección:** solo esa sección muestra el error con «Reintentar»; las demás siguen funcionando.
 
@@ -381,7 +381,7 @@ Aquí Gustavo responde lo que los agentes necesitan saber de él. Las respuestas
 
 **Objetivo:** con quién estamos hablando y cuál es el siguiente paso con cada persona.
 
-**Se llega desde:** la navegación, las tarjetas de conversación de Tu turno, Actividad (al tocar a una persona) y Resultados (oportunidades y recurrentes).
+**Se llega desde:** la navegación, las tarjetas de conversación de Tu turno, el Calendario (al tocar a una persona) y Resultados (oportunidades y recurrentes).
 
 ### Estructura
 
@@ -430,7 +430,7 @@ Aquí Gustavo responde lo que los agentes necesitan saber de él. Las respuestas
 3. **Siguiente paso:** una frase, y de quién depende.
    - Del equipo: «El equipo la invitará a partir del {followed_at + 48 h}», «Esperando que acepte la invitación (enviada hace 3 días)» o «Se aceptará su invitación».
    - De Gustavo: «Te toca: responder su mensaje», con enlace a Tu turno.
-   - Si hay una acción abierta: el tipo, el estado y el enlace a Actividad.
+   - Si hay una acción abierta: el tipo, el estado y el enlace al Calendario.
 4. **Por qué encaja:** rol, modalidad, afinidad, el motivo (texto del modelo) y la confianza en %. Debajo, «Clasificada el {fecha}».
 5. **De dónde salió:**
    - Comentó en un post: el referente, un extracto del comentario y el enlace al post.
@@ -486,36 +486,126 @@ Aquí Gustavo responde lo que los agentes necesitan saber de él. Las respuestas
 
 ---
 
-## 5. Actividad
+## 5. Calendario
 
-**Objetivo:** ver qué hizo y qué hará el equipo, y poder vetar lo que aún no salió. Solo lectura, salvo el veto.
+**Objetivo:** ver día a día las tareas y las acciones importantes: lo que hizo el equipo, lo que tiene programado y lo que te toca a ti. Desde aquí se puede vetar lo que aún no salió.
 
-**Se llega desde:** la navegación, las notificaciones de piezas, la ficha de una persona (acción abierta) y Resultados (posts).
+Sustituye a la vista Actividad. El calendario es la vista principal, cada día abre su detalle y el modo **Lista** muestra lo mismo como una línea de tiempo continua.
+
+**Se llega desde:**
+- la navegación;
+- las notificaciones de piezas;
+- la ficha de una persona (su acción abierta);
+- Resultados (al tocar un post);
+- el resumen del día en Tu turno;
+- «Lo último que hizo» de un rol en la Oficina.
 
 **Datos:**
-- **Existe:** `GET /api/v1/operador/actions?state=&capability=&page=`, `GET /api/v1/editorial/calendar`, `GET /api/v1/editorial/pieces/<id>` y el feed `GET /api/v1/operador/feed`.
-- **Nuevo:** un endpoint que mezcle acciones y eventos editoriales en una sola línea de tiempo. Mientras no exista, el frontend los combina.
+- **Existe:**
+  - `GET /api/v1/editorial/calendar?desde=&dias=`: piezas por día.
+  - `GET /api/v1/operador/actions`: acciones; paginado y sin filtro de fechas.
+  - `GET /api/v1/operador/feed`: eventos del operador, como pausas y reanudaciones.
+  - `GET /api/v1/red/contacts`: fechas de seguir, invitar y conectar.
+  - `GET /api/v1/linkedin/status`: `expires_at`.
+- **Nuevo:**
+  - un endpoint que devuelva, por día, los eventos importantes y los conteos (forma propuesta al final de esta sección);
+  - los plazos de Tu turno;
+  - las fechas de las oportunidades (reuniones y siguientes acciones).
+
+### Qué aparece en el calendario
+
+Cada evento pertenece a una **capa**, con su color, y cada capa se puede ocultar. En la cuadrícula solo se ven los eventos **importantes**. Lo menudo (comentarios, reacciones, seguimientos e invitaciones enviadas) aparece como conteo en el resumen del día y completo en «Ver todo lo del día».
+
+| Capa | Color sugerido | Eventos importantes | Datos |
+|---|---|---|---|
+| **Tuyo** | Naranja (foco) | Plazos de preguntas y tareas de Tu turno. Reuniones y siguientes acciones de oportunidades. Día en que caduca LinkedIn. Tareas que marcaste como hechas. | Nuevo, salvo la caducidad de LinkedIn (existe) |
+| **Publicaciones** | Verde | Pieza publicada (hora e impresiones), programada (hora), preparándose, día sin pieza, bloqueada, vetada, fallida o incierta. | Existe |
+| **Red** | Azul | Conexiones nuevas que encajan (agrupadas: «3 conexiones nuevas»). Invitaciones recibidas y aceptadas. Invitaciones previstas: personas seguidas cuyo plazo de 48 h vence ese día, como estimación sujeta a los topes. | Existe (fechas de contactos); la previsión se calcula |
+| **Conversaciones** | Latón | Conversación nueva con alguien que encaja. Oportunidad nueva o que cambia de etapa. | Nuevo |
+| **Sistema** | Óxido | Parada total y reanudación. Cuenta en pausa. Acción incierta o fallida. LinkedIn caducado. | Existe |
+
+**Prioridad**, cuando no caben todos en una celda: Tuyo > Sistema > Publicaciones > Conversaciones > Red.
 
 ### Estructura
 
-- **Bloque «Próximo»** arriba, y debajo la **línea de tiempo** agrupada por día: Hoy, Ayer, «Martes 4 de noviembre»…
-- **Filtros (chips):** Todo · Publicaciones · Comentarios · Reacciones · Red (seguir, invitar y aceptar).
-- **Interruptor** «Mostrar lo que no salió» (vetadas, descartadas, caducadas y sustituidas). Apagado por defecto. Las fallidas y las inciertas se ven siempre.
-- **Paginación:** «Cargar más» al final, o scroll infinito.
-- **Escritorio:** una columna de unos 760 px. **Móvil:** una columna.
+- **Cabecera:**
+  - el título «Calendario» y el rango visible («Noviembre 2026» o «3–9 nov 2026»);
+  - la navegación «←», «Hoy» y «→»;
+  - el selector de vista: **Mes · Semana · Lista**;
+  - los chips de capa, alternables y con su color, todos activos por defecto.
+- **URL:** `/calendario?vista=mes&fecha=2026-11-06&capas=tuyo,publicaciones`, para volver al mismo sitio.
+- **Escritorio (≥ 1100 px):**
+  - el calendario a la izquierda, ocupando el ancho disponible;
+  - el **panel del día** a la derecha (unos 380 px), con el día seleccionado (hoy por defecto).
+- **Móvil:**
+  - **Semana compacta por defecto:** una tira de 7 días arriba, con un punto de color por cada capa que tenga eventos, y debajo el detalle del día seleccionado. Deslizar la tira cambia de semana.
+  - **Mes:** una cuadrícula compacta con solo puntos, sin texto. Tocar un día lo abre.
+  - **Lista:** días seguidos con scroll.
+- **Zona horaria:** los días se calculan en la del calendario editorial (`America/Bogota`), no en la del dispositivo. Si el dispositivo está en otra zona, la cabecera dice «Horas de Bogotá».
+
+### Vista Mes
+
+- Cuadrícula de lunes a domingo, con 5 o 6 filas. Los días de otro mes van atenuados y hoy va resaltado.
+- **Celda:**
+  - el número del día;
+  - hasta 3 eventos como chips: icono, hora si la tiene y texto corto. Por ejemplo, «09:00 Post: IA sin rehacer el producto», «Reunión con Ana» o «3 conexiones nuevas».
+  - «+N más» si no caben;
+  - un punto naranja si ese día hay algo tuyo pendiente;
+  - en los días pasados sin publicación, una marca sutil «sin post».
+- **Interacción:** tocar la celda selecciona el día y muestra su panel. Tocar un chip abre su destino directamente: la pieza, la persona o Tu turno.
+
+### Vista Semana
+
+- 7 columnas.
+- **Franja «todo el día»** arriba, para lo que no tiene hora: plazos, conexiones agrupadas y conteos.
+- **Eje horario** debajo, acotado a la ventana de actividad (por ejemplo, 07:00–21:00), con los eventos que tienen hora: la publicación, las acciones importantes ejecutadas y las reuniones.
+- Una línea «ahora» en el día de hoy.
+
+### Vista Lista
+
+Es la antigua línea de tiempo de Actividad.
+
+- **Arriba, el bloque «Próximo»:** la pieza programada y lo que espera su turno (ver más abajo).
+- **Debajo, los días** del más reciente al más antiguo (Hoy, Ayer, «Martes 4 de noviembre»…), con **todo** lo que pasó, no solo lo importante.
+- **Filtros por tipo:** Todo · Publicaciones · Comentarios · Reacciones · Red.
+- **Interruptor** «Mostrar lo que no salió» (vetadas, descartadas, caducadas y sustituidas), apagado por defecto. Las fallidas y las inciertas se ven siempre.
+- **Paginación:** «Cargar más» al final.
+
+### Panel del día
+
+Las secciones aparecen solo si tienen contenido:
+
+1. **Cabecera:** «Jueves 6 de noviembre», con el badge Hoy, Pasado o Programado.
+2. **Resumen** (hoy y días pasados), en una línea: «1 post · 6 comentarios · 3 reacciones · 4 seguidos · 2 invitaciones · 1 conexión nueva que encaja». Cada número se puede tocar y filtra «Ver todo lo del día».
+3. **Tu parte:**
+   - los elementos de Tu turno con plazo ese día y las reuniones, con el botón «Ir a Tu turno»;
+   - lo que resolviste ese día, marcado con ✓.
+4. **Publicación del día:** la tarjeta de la pieza.
+   - Estado, hora, tesis y las 3 primeras líneas.
+   - Si está publicada: impresiones y resultado.
+   - Si aún no salió: **Vetar**.
+   - «Ver cómo se escribió».
+   - **Sin pieza en un día pasado:** «Sin publicación», con el motivo si el director decidió no publicar.
+   - **Sin pieza en un día futuro:** «Hueco libre. El equipo prepara cada pieza {lead_hours} h antes de su hora».
+5. **Programado** (hoy y días futuros):
+   - las acciones que esperan la ventana horaria o el espaciado, con **Vetar**;
+   - las invitaciones previstas, como estimación, con la lista de personas.
+6. **Lo importante del día:** los eventos importantes de las capas visibles, en orden horario, con el componente de elemento de la línea de tiempo.
+7. **Ver todo lo del día:** despliega la línea de tiempo completa de ese día, con los filtros por tipo.
 
 ### Bloque «Próximo»
 
+Está arriba en la vista Lista, y en el panel del día de hoy como «Publicación del día» y «Programado».
+
 **Pieza programada:**
-- Fecha y hora («Hoy a las 09:00 (America/Bogota)»), con cuenta atrás: «sale en 5 h 20 min».
+- Fecha y hora («Hoy a las 09:00»), con cuenta atrás: «sale en 5 h 20 min».
 - Badge de estado: Programada, Preparándose (con su etapa) o Publicándose.
-- Tesis, en negrita.
-- Las 3 primeras líneas del texto final, con «Ver todo».
+- Tesis en negrita y las 3 primeras líneas del texto final, con «Ver todo».
 - Pilar, modalidad y lector principal.
-- **Vetar:** un modal con nota obligatoria. «La pieza no saldrá y ese día quedará sin publicación». Existe: `POST …/actions/<id>/reject`.
+- **Vetar:** un modal con nota obligatoria. «La pieza no saldrá y ese día quedará sin publicación». Existe: `POST /api/v1/operador/actions/<id>/reject`.
 - «Ver cómo se escribió» lleva al detalle de la pieza.
 
-**En cola:** acciones aprobadas que esperan la ventana horaria o el espaciado. Cada una en una línea (tipo, destino y «saldrá cuando abra la ventana, a las 08:00»), con **Vetar**.
+**En cola:** acciones aprobadas que esperan la ventana o el espaciado. Una línea por acción (tipo, destino y «saldrá cuando abra la ventana, a las 08:00»), con **Vetar**. Vetar una acción de red descarta a esa persona para siempre, y el modal lo avisa.
 
 **Sin pieza programada:** «No hay pieza programada para los próximos días», con el botón secundario **Preparar la siguiente pieza**.
 - Abre un modal de confirmación: «Tiene coste: cada etapa llama a Claude y gasta del presupuesto editorial».
@@ -523,19 +613,27 @@ Aquí Gustavo responde lo que los agentes necesitan saber de él. Las respuestas
 
 ### Elementos de la línea de tiempo
 
-Todos los elementos comparten: icono del tipo, hora, la frase principal, el badge de estado (si no es un éxito normal) y el retrato del rol que lo hizo, opcional.
+Se usan en «Lo importante del día», en «Ver todo lo del día» y en la vista Lista.
 
-| Tipo | Frase principal | Contenido | Toque |
-|---|---|---|---|
-| Publicación | «Publicaste: {tesis}» | Primera línea del texto, pilar e impresiones, si las hay. Enlace ↗ al post. | Detalle de la pieza |
-| Comentario | «Comentaste en el post de {autor}» | Extracto del post original (2 líneas, en gris), tu comentario completo, el enlace ↗ y «Por qué» plegable (`rationale`) | Se expande en el sitio |
-| Reacción | «Reaccionaste {reacción} al post de {autor}» | Extracto del post y el enlace ↗ | Se expande en el sitio |
-| Seguir | «Seguiste a {persona}» | Titular y chip del rol | Ficha en Personas |
-| Invitación | «Invitaste a {persona} (sin nota)» | Titular y chip del rol | Ficha en Personas |
-| Aceptar | «Aceptaste la invitación de {persona}» | Titular y chip del rol | Ficha en Personas |
-| Día sin pieza | «El {fecha} no hubo publicación» | Motivo del director (`skip_reason`) | Detalle de la pieza |
-| Pieza bloqueada | «El verificador bloqueó la pieza del {fecha}» | El primer motivo del bloqueo | Detalle de la pieza |
-| Pieza descartada | «La política no aprobó la pieza del {fecha}» | Motivos | Detalle de la pieza |
+Todos comparten: icono del tipo, hora, la frase principal, el badge de estado (si no es un éxito normal) y, opcionalmente, el retrato del rol que lo hizo.
+
+| Tipo | ¿Importante? | Frase principal | Contenido | Al tocar |
+|---|---|---|---|---|
+| Publicación | Sí | «Publicaste: {tesis}» | Primera línea del texto, pilar, impresiones si las hay y enlace ↗ al post | Detalle de la pieza |
+| Día sin pieza | Sí | «Ese día no hubo publicación» | Motivo del director (`skip_reason`) | Detalle de la pieza |
+| Pieza bloqueada | Sí | «El verificador bloqueó la pieza» | El primer motivo del bloqueo | Detalle de la pieza |
+| Pieza descartada | Sí | «La política no aprobó la pieza» | Motivos | Detalle de la pieza |
+| Conexión nueva que encaja | Sí (agrupada) | «{persona} aceptó tu invitación» | Titular y chip del rol | Ficha en Personas |
+| Aceptar | Sí | «Aceptaste la invitación de {persona}» | Titular y chip del rol | Ficha en Personas |
+| Conversación nueva | Sí | «{persona} te escribió» | Resumen de una línea | Ficha en Personas |
+| Oportunidad | Sí | «Oportunidad con {persona}: {etapa}» | Modalidad y siguiente paso | Ficha en Personas |
+| Parada o reanudación | Sí | «Detuviste la máquina» o «Se reanudó la máquina» | Motivo y quién | Ajustes → Máquina |
+| Comentario | No | «Comentaste en el post de {autor}» | Extracto del post original (2 líneas, en gris), tu comentario completo, enlace ↗ y «Por qué» plegable (`rationale`) | Se expande en el sitio |
+| Reacción | No | «Reaccionaste {reacción} al post de {autor}» | Extracto del post y enlace ↗ | Se expande en el sitio |
+| Seguir | No | «Seguiste a {persona}» | Titular y chip del rol | Ficha en Personas |
+| Invitación | No | «Invitaste a {persona} (sin nota)» | Titular y chip del rol | Ficha en Personas |
+
+Una acción incierta o fallida pasa a ser importante, sea del tipo que sea.
 
 **Estado de cada elemento** (los estados de acción traducidos a lo que ve Gustavo):
 
@@ -548,13 +646,13 @@ Todos los elementos comparten: icono del tipo, hora, la frase principal, el badg
 | `rejected` | Badge gris «Vetada por ti», con tu nota. |
 | `discarded` | Badge gris «Descartada por la política», con el motivo. |
 | `expired`, `superseded` | Badge gris «Caducada» o «Sustituida». |
-| `proposed`, `approved` | No aparecen en la línea de tiempo: se ven en «Próximo / En cola». |
+| `proposed`, `approved` | No aparecen como hechos: se ven en «Próximo / En cola» o en «Programado» del día. |
 
-### Detalle de una pieza (`/actividad/pieza/:id`)
+### Detalle de una pieza (`/calendario/pieza/:id`)
 
 Mantiene todo el contenido de la página Pieza actual (campos completos en [`VISTAS.md`](VISTAS.md), sección 6), reordenado y aligerado.
 
-1. **Cabecera:** «← Actividad», «Pieza del {día}», el badge de estado y la hora de salida.
+1. **Cabecera:** «← Calendario» (vuelve al día de la pieza), «Pieza del {día}», el badge de estado y la hora de salida.
 2. **Resultado** (si está publicada):
    - Tabla de cortes a 24 h, 72 h y 7 días: impresiones, reacciones, comentarios, republicaciones e interacción % (nuevo).
    - Quién comentó, con chips por rol del barrio (nuevo).
@@ -570,14 +668,46 @@ Mantiene todo el contenido de la página Pieza actual (campos completos en [`VIS
    - **Fuentes y coste:** citas como texto, señales de terceros y coste por etapa.
 - **Preparándose:** muestra la etapa actual como un indicador de 5 pasos (Director → Redactores → Lectores → Selección → Verificador).
 
-Redirecciones: `/editorial/:id` y `/contenido/:id` llevan a `/actividad/pieza/:id`.
+Redirecciones: `/editorial/:id` y `/contenido/:id` llevan a `/calendario/pieza/:id`; `/contenido`, `/acciones` y `/maquina` llevan a `/calendario`.
+
+### Endpoint nuevo (forma propuesta)
+
+`GET /api/v1/calendario?desde=2026-11-01&hasta=2026-11-30`
+
+```json
+{
+  "timezone": "America/Bogota",
+  "today": "2026-11-06",
+  "days": [
+    {
+      "date": "2026-11-06",
+      "counts": { "comments": 6, "reactions": 3, "follows": 4, "invites": 2, "accepts": 0, "connections_fit": 1 },
+      "events": [
+        {
+          "id": "…",
+          "layer": "tuyo | publicaciones | red | conversaciones | sistema",
+          "kind": "piece_published | piece_scheduled | piece_skipped | piece_blocked | connection_fit | invite_expected | deadline | meeting | machine_paused | action_uncertain | …",
+          "at": "ISO | null",
+          "title": "…",
+          "state": "…",
+          "important": true,
+          "link": "/calendario/pieza/… | /personas/… | /tu-turno"
+        }
+      ]
+    }
+  ]
+}
+```
+
+Mientras no exista, el frontend puede montar las capas Publicaciones (calendario editorial), Sistema (feed) y Red (fechas de los contactos), y dejar Tuyo y Conversaciones con el estado «aún no disponible».
 
 ### Estados
 
-- **Vacío:** «El equipo aún no ha hecho nada en este periodo».
-- **Filtro sin resultados:** «No hay {tipo} todavía».
-- **Cargando:** esqueleto.
-- **Error:** con «Reintentar».
+- **Cargando:** esqueleto de la cuadrícula o de la tira semanal.
+- **Mes sin eventos:** «No hay nada registrado en este mes».
+- **Futuro lejano** (más de 15 días): «Todavía no hay nada programado tan lejos».
+- **Capa sin datos todavía** (fase 1): su chip aparece desactivado, con «Aún no disponible».
+- **Error:** con «Reintentar», sin perder la cuadrícula.
 
 ---
 
@@ -615,7 +745,7 @@ Redirecciones: `/editorial/:id` y `/contenido/:id` llevan a `/actividad/pieza/:i
 | Invitar sin nota | ídem |
 | Aceptar invitaciones | ídem |
 
-- Debajo: «El equipo actúa solo en modo Auto. Puedes vetar lo programado desde Actividad».
+- Debajo: «El equipo actúa solo en modo Auto. Puedes vetar lo programado desde el Calendario».
 - **Ventana horaria:** horario, zona, abierta o cerrada ahora, y el espaciado mínimo entre acciones.
 - **Topes de hoy y de la semana:** un medidor por capacidad (usados y tope), en verde, ámbar desde el 80 % y rojo al 100 %.
 - **Lecturas de la red** frente a sus topes: comentarios, búsquedas, perfiles y sincronizaciones.
@@ -680,10 +810,10 @@ El título, el texto y el destino al tocarla. Las URLs del backend que hoy apunt
 
 | Notificación | Texto | Destino nuevo | Estado |
 |---|---|---|---|
-| Pieza lista | «Se publicará el {d/m a las h:mm}. Puedes vetarla antes de esa hora.» | `/actividad/pieza/:id` | Existe (hoy apunta a `/editorial/:id`) |
-| Pieza publicada | Las primeras 140 letras del texto | `/actividad/pieza/:id` | Existe |
-| Pieza bloqueada | «El verificador bloqueó la pieza del {d/m}: {motivo}» | `/actividad/pieza/:id` | Existe |
-| Pieza descartada | «La política no aprobó la pieza del {d/m}: {motivos}» | `/actividad/pieza/:id` | Existe |
+| Pieza lista | «Se publicará el {d/m a las h:mm}. Puedes vetarla antes de esa hora.» | `/calendario/pieza/:id` | Existe (hoy apunta a `/editorial/:id`) |
+| Pieza publicada | Las primeras 140 letras del texto | `/calendario/pieza/:id` | Existe |
+| Pieza bloqueada | «El verificador bloqueó la pieza del {d/m}: {motivo}» | `/calendario/pieza/:id` | Existe |
+| Pieza descartada | «La política no aprobó la pieza del {d/m}: {motivos}» | `/calendario/pieza/:id` | Existe |
 | Acción incierta | «{capacidad}: el proveedor no confirmó…» | `/tu-turno` | Existe (hoy apunta a `/acciones?state=uncertain`) |
 | Cuenta en pausa | «{cuenta}: {motivo}. Solo Gustavo puede reanudarla.» | `/tu-turno` | Existe (hoy apunta a `/maquina`) |
 | LinkedIn caduca pronto | «El permiso de publicación caduca el {fecha}…» | `/tu-turno` | Existe (hoy apunta a `/ajustes`) |
@@ -708,6 +838,9 @@ Se diseñan una vez y se reutilizan:
 | **Embudo** | Barras horizontales con el recuento y la conversión entre pasos. |
 | **Medidor** | Barra con el tope: verde por debajo del 80 %, ámbar desde el 80 % y rojo al 100 %. |
 | **Elemento de línea de tiempo** | Icono, hora, frase, badge, contenido expandible y enlace. |
+| **Celda de calendario** | Número del día, hoy resaltado, día de otro mes atenuado, hasta 3 chips de evento, «+N más», el punto «te toca» y la marca «sin post». Versión compacta con solo puntos para móvil. |
+| **Chip de evento** | Color de la capa, icono, hora opcional y texto corto truncado. Estados normal, pasado (más tenue) y crítico. |
+| **Tira semanal (móvil)** | 7 días con su inicial, número y puntos de capa. El día seleccionado se resalta y se desliza para cambiar de semana. |
 | **Fila de persona** | Avatar con iniciales, nombre, titular, badges y última actividad. |
 | **Recorrido de etapas** | Pasos con su fecha. Horizontal en escritorio y vertical en móvil. |
 | **Comparador antes/después** | Dos bloques de texto con su etiqueta, un contador de caracteres y **Copiar**. |
@@ -799,6 +932,16 @@ Conversación → Necesidad identificada → Cualificada → Reunión → Propue
 | Pilar | Del negocio al producto, IA aplicada, Arquitectura y entrega |
 | Modalidad (editorial) | Personal · startups, ProjectApp, Alianzas, Comunidad |
 | Lector principal | Lector comprador, recomendador, divulgador, líder de opinión, par profesional |
+
+### Capas del calendario
+
+| Capa | Color sugerido | Contenido |
+|---|---|---|
+| Tuyo | Naranja (foco) | Plazos de Tu turno, reuniones y caducidad de LinkedIn |
+| Publicaciones | Verde | Piezas y su estado |
+| Red | Azul | Conexiones que encajan, invitaciones recibidas y previstas |
+| Conversaciones | Latón | Conversaciones nuevas y oportunidades |
+| Sistema | Óxido | Pausas, acciones inciertas o fallidas, LinkedIn caducado |
 
 ### Tipos de elemento en Tu turno
 
