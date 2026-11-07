@@ -287,9 +287,19 @@ def enqueue_execution(user,proposal):
     # ActionExecution (OneToOne); a job stopped by a gate before any execution may be queued again.
     params={'proposal':str(proposal.id)}
     jid=uuid.uuid5(EXECUTION_NAMESPACE,f'{proposal.id}:{proposal.approved_hash}')
-    job,created=enqueue_operation(user,'execute_action',params,request_id=jid)
     retryable=(Job.State.FAILED,Job.State.CANCELLED,Job.State.INTERRUPTED)
-    if not created and job.state in retryable and not ActionExecution.objects.filter(proposal=proposal).exists():
+    def retry_allowed(job):
+        return job.state in retryable and not ActionExecution.objects.filter(proposal=proposal).exists()
+    existing=Job.objects.filter(id=jid).first()
+    if existing and existing.owner_id!=user.pk:
+        # Another actor queued this version (Gustavo approving by hand, then the autopilot, or the reverse). While
+        # that job is pending it is the one; once a gate stopped it before any execution, this actor queues a new one.
+        if retry_allowed(existing):
+            job,_=enqueue_operation(user,'execute_action',params)
+            return job
+        return existing
+    job,created=enqueue_operation(user,'execute_action',params,request_id=jid)
+    if not created and retry_allowed(job):
         job,_=enqueue_operation(user,'execute_action',params)
     return job
 
