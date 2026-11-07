@@ -6,7 +6,7 @@ import { CAPTURE_LIMITS, isAcceptedPhoto, sameOrigin, useGaleria, useUploadFotos
 import { IconGaleria } from '../components/icons';
 import { Badge, Button, ChipStrip, EmptyState, ErrorRetry, FilterChip, Note, Page, Skeleton, useToast } from '../components/ui';
 import { PhotoSheet } from './galeria/PhotoSheet';
-import { FILTERS, isFiltro, photoName, photoTone } from './galeria/photo';
+import { FILTERS, isFiltro, photoName, photoTone, rejectedMessage, uploadedMessage } from './galeria/photo';
 import '../capture/capture.css';
 import './galeria/galeria.css';
 
@@ -51,12 +51,11 @@ export function Galeria() {
     if (!files.length) return;
     const ok = files.filter((file) => isAcceptedPhoto(file) && file.size <= CAPTURE_LIMITS.photoBytes);
     const bad = files.filter((file) => !ok.includes(file)).map((file) => file.name || 'una foto');
-    setRejected(bad.length ? `No se subió ${bad.join(', ')}: solo JPEG, PNG, WebP o HEIC de hasta 10 MB.` : null);
+    setRejected(rejectedMessage(bad));
     if (!ok.length) return;
     upload.mutate(ok, {
       onSuccess: (created) => {
-        const n = created.length || ok.length;
-        toast.show(n === 1 ? 'Foto subida. El equipo la verá en su próxima ronda.' : `${n} fotos subidas. El equipo las verá en su próxima ronda.`);
+        toast.show(uploadedMessage(created.length || ok.length));
       },
     });
   };

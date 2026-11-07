@@ -43,6 +43,8 @@ export const springs = {
   press: { damping: 18, stiffness: 420, mass: 0.6 },
   /** The toast rising from the bottom. */
   toast: { damping: 20, stiffness: 260, mass: 0.9 },
+  /** The photo viewer: double-tap zoom, the photo settling back inside its bounds, a drag-to-close that did not close. */
+  zoomSettle: { damping: 22, stiffness: 240, mass: 1 },
 } as const satisfies Record<string, SpringToken>;
 
 export type SpringName = keyof typeof springs;
@@ -95,6 +97,10 @@ export const timings = {
   skeleton: { duration: 1100, easing: 'pulse' },
   /** Screen transitions of the stack (detail views). */
   screen: { duration: 260, easing: 'standard' },
+  /** The full-screen photo viewer fading in and out. */
+  viewerFade: { duration: 180, easing: 'enter' },
+  /** An upload progress bar moving to its new value. */
+  progress: { duration: 240, easing: 'standard' },
 } as const satisfies Record<string, TimingToken>;
 
 export type TimingName = keyof typeof timings;
@@ -140,6 +146,26 @@ export const gestures = {
     /** Or flick it down this fast. */
     dismissVelocity: 1000,
   },
+  zoom: {
+    /** Pinch-zoom limit of the photo viewer (1 = fitted to the screen). */
+    maxScale: 4,
+    /** Where a double tap zooms to (and a second double tap goes back to 1). */
+    doubleTapScale: 2.5,
+    /** Longest gap between the two taps of a double tap (ms). */
+    doubleTapMaxDelayMs: 250,
+  },
+  viewer: {
+    /** Vertical travel before the unzoomed photo follows the finger down to close (points). */
+    activeOffsetY: 16,
+    /** Horizontal travel that hands the touch to the pager instead (points). */
+    failOffsetX: 14,
+    /** Drag the photo down this far to close the viewer. */
+    dismissDistance: 140,
+    /** Or flick it down this fast. */
+    dismissVelocity: 1000,
+    /** How much the photo fades (0–1) by the time the drag reaches dismissDistance. */
+    dragFade: 0.4,
+  },
 } as const;
 
 // ---------------------------------------------------------------- haptics
@@ -171,6 +197,10 @@ export const haptics = {
   tabChange: { type: 'selection' },
   /** Toggling a chip or option. */
   toggle: null,
+  /** Flipping a switch row (Ajustes, the photo sheet). */
+  switchToggle: null,
+  /** The photos reached the gallery. */
+  uploadDone: { type: 'notification', style: 'success' },
 } as const satisfies Record<string, HapticKind | null>;
 
 export type HapticEvent = keyof typeof haptics;
@@ -251,4 +281,7 @@ export const layout = {
   /** The hold overlay of the capture button. */
   overlayIn: () => FadeIn.duration(timings.holdOverlay.duration).reduceMotion(reduce()),
   overlayOut: () => FadeOut.duration(timings.holdOverlay.duration).reduceMotion(reduce()),
+  /** The full-screen photo viewer of the Galería. */
+  viewerIn: () => FadeIn.duration(timings.viewerFade.duration).reduceMotion(reduce()),
+  viewerOut: () => FadeOut.duration(timings.viewerFade.duration).reduceMotion(reduce()),
 };

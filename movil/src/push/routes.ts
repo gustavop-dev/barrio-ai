@@ -9,6 +9,12 @@ export interface AppRoute {
 /** The capture_processed link: «Lo que enviaste» in the capture sheet. */
 export const CAPTURE_HISTORY_PARAM = 'enviado';
 
+/** As oficina/src/App.tsx (and its App.test.tsx): `/maquina` goes to the Calendario, `/memoria` to «Lo que el equipo sabe de ti». */
+const LEGACY_AJUSTES: Record<string, AppRoute> = {
+  '/maquina': { pathname: '/calendario', params: {} },
+  '/memoria': { pathname: '/tu-turno', params: { tab: 'sabe' } },
+};
+
 export function isInAppPath(url: unknown): url is string {
   return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/api/');
 }
@@ -37,6 +43,12 @@ export function routeForUrl(url: unknown): AppRoute | null {
   if (pathname === '/tu-turno/sabe') {
     pathname = '/tu-turno';
     params.tab = 'sabe';
+  }
+  // Legacy paths of the machine and the memory, redirected as the PWA does.
+  const legacy = LEGACY_AJUSTES[pathname];
+  if (legacy) {
+    pathname = legacy.pathname;
+    Object.assign(params, legacy.params);
   }
   return { pathname, params };
 }

@@ -22,6 +22,7 @@ Si una pieza nueva necesita un movimiento que no existe, se añade aquí primero
 | `sheetOpen` | 24 · 260 · 1 | Las hojas inferiores suben y vuelven a su sitio tras arrastrarlas sin cerrar: captura, confirmaciones, oportunidad y datos (`components/ui/Sheet.tsx`). |
 | `press` | 18 · 420 · 0.6 | Botón al soltarlo y píldora de la pestaña activa en la barra inferior (`components/ui/Button.tsx`, `components/shell/BottomBar.tsx`). |
 | `toast` | 20 · 260 · 0.9 | El aviso inferior entra subiendo (`layout.toastIn`, en `components/ui/Toast.tsx`). |
+| `zoomSettle` | 22 · 240 · 1 | El visor de fotos de la Galería: el zoom con doble toque, la foto que vuelve dentro de sus bordes tras pellizcar o arrastrar, y la foto que vuelve a su sitio si el arrastre para cerrar no llega (`galeria/PhotoViewer.tsx`). |
 
 ## Duraciones y curvas (`timings`, `easings`)
 
@@ -45,6 +46,8 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `spriteFrameMs` | 200 | Un fotograma del bibliotecario en reposo de los estados vacíos: 6 fotogramas en 1,2 s (`components/ui/Sprite.tsx`). |
 | `toastDurations.withUndo` | 5000 | Lo que dura un aviso con «Deshacer» o «Recuperar», la ventana de acción reversible (`components/ui/Toast.tsx`). |
 | `toastDurations.plain` | 4000 | Lo que dura un aviso sin acción. |
+| `viewerFade` | 180 · enter | El visor de fotos a pantalla completa aparece y desaparece (`layout.viewerIn` y `layout.viewerOut`, en `galeria/PhotoViewer.tsx`). |
+| `progress` | 240 · standard | La barra de «Subir fotos» avanza cada vez que entra una petición de hasta diez fotos (`galeria/UploadProgressCard.tsx`). |
 
 ## Umbrales de gestos (`gestures`)
 
@@ -63,6 +66,14 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `capture.maxLift` | 60 pt | Altura máxima que el botón y el candado siguen al dedo. |
 | `sheet.dismissDistance` | 120 pt | Arrastrar la hoja hacia abajo esta distancia la cierra (`components/ui/Sheet.tsx`). |
 | `sheet.dismissVelocity` | 1000 pt/s | O lanzarla hacia abajo a esta velocidad. |
+| `zoom.maxScale` | 4 | Máximo del pellizco en el visor de fotos; 1 es la foto ajustada a la pantalla (`galeria/PhotoViewer.tsx`). |
+| `zoom.doubleTapScale` | 2.5 | A dónde acerca un doble toque; otro doble toque vuelve a 1. |
+| `zoom.doubleTapMaxDelayMs` | 250 ms | Separación máxima entre los dos toques del doble toque. |
+| `viewer.activeOffsetY` | 16 pt | Recorrido vertical antes de que la foto sin zoom siga al dedo para cerrar el visor. |
+| `viewer.failOffsetX` | 14 pt | Recorrido horizontal que deja el gesto al paginador (pasar de foto). |
+| `viewer.dismissDistance` | 140 pt | Arrastrar la foto hacia arriba o abajo esta distancia cierra el visor. |
+| `viewer.dismissVelocity` | 1000 pt/s | O lanzarla a esta velocidad. |
+| `viewer.dragFade` | 0.4 | Cuánto se desvanece la foto (0–1) al llegar a `viewer.dismissDistance` mientras se arrastra para cerrar. |
 
 ## Vibraciones (`haptics`)
 
@@ -80,3 +91,14 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `actionError` | error | Una acción o un envío fallaron. |
 | `tabChange` | selección | Cambiar de pestaña en la barra inferior o en las pestañas de una vista. |
 | `toggle` | sin vibración | Marcar un chip o una opción (`components/ui/Chip.tsx`, `components/ui/Options.tsx`). |
+| `switchToggle` | sin vibración | Cambiar un interruptor de fila: Ajustes y la hoja de la foto (`components/ui/SwitchRow.tsx`). |
+| `uploadDone` | éxito | Las fotos llegaron a la Galería (`galeria/upload.ts`). |
+
+## Usos en Galería, Ajustes y Notificaciones
+
+Estas vistas reutilizan tokens que ya existían, sin valores nuevos:
+
+- `listEnter` y `listMove`: las miniaturas de la Galería y las filas de Notificaciones al entrar y al moverse.
+- `fold`: los plegables «Autonomía y límites» y «Por tipo de notificación» de Ajustes.
+- `sheetOpen`, `backdrop` y `sheetClose`: la hoja de la foto y las confirmaciones de Ajustes.
+- `actionSuccess` y `actionError`: guardar o quitar una foto, la parada y la reanudación de la máquina, la pausa de una cuenta, la orientación y «Probar notificación».

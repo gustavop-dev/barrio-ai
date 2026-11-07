@@ -1,5 +1,7 @@
 import type { ReactNode } from 'react';
-import { ApiError } from '../../api/client';
+
+// Shared with the native app: compartido/src/logic/ajustes.ts.
+export { isUnavailable } from '../../../../compartido/src/logic/ajustes';
 
 /** A key/value row («Origen · Desde la app»). */
 export function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
@@ -9,11 +11,6 @@ export function Row({ label, children }: { label: ReactNode; children: ReactNode
       <span>{children}</span>
     </div>
   );
-}
-
-/** The backend does not have this endpoint yet (404/501): DISENO-VISTAS «Aún no disponible». */
-export function isUnavailable(error: unknown): boolean {
-  return error instanceof ApiError && (error.status === 404 || error.status === 501);
 }
 
 /** The intentional «Aún no disponible» state: muted, dashed, never an error. */

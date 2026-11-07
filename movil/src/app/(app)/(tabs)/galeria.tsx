@@ -1,5 +1,3 @@
-import { Placeholder } from '@/components/shell/Placeholder';
+import { GaleriaScreen } from '@/galeria/GaleriaScreen';
 
-export default function GaleriaScreen() {
-  return <Placeholder testID="screen-galeria" title="Galería" subtitle="Tus fotos para las publicaciones." />;
-}
+export default GaleriaScreen;
