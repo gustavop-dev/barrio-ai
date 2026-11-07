@@ -9,6 +9,7 @@ executes it automatically, once, and confirms by reading LinkedIn back.
 import hashlib
 import json
 import os
+import re
 import uuid
 from datetime import timedelta
 from django.db import IntegrityError, transaction
@@ -22,6 +23,8 @@ from .permissions import require
 from . import voz
 
 COMMENT_MAX_CHARS=1250
+USER_ID=re.compile(r'[A-Za-z0-9_\-]{3,200}')
+NETWORK=('RED-01','RED-02','RED-04')
 POST_MAX_CHARS=3000  # LinkedIn's limit for a post's text
 STALE_EXECUTION=timedelta(seconds=300)
 # Catalogue grounding for INT-03 (B04, B06, B15): discovery, contributing comments, editing and facts.
@@ -39,7 +42,7 @@ def _audit(actor,action,target,**metadata):
 # --------------------------------------------------------------------------- policy
 
 # Prudent initial caps from reparto-acciones-v1 (not LinkedIn limits), per local day and week.
-DEFAULT_LIMITS={'INT-03':(3,12),'INT-02':(15,60),'CONT-09':(1,7)}
+DEFAULT_LIMITS={'INT-03':(3,12),'INT-02':(15,60),'CONT-09':(1,7),'RED-01':(10,40),'RED-02':(5,20),'RED-04':(10,40)}
 
 def _parse_caps(variable):
     caps={}
@@ -120,6 +123,14 @@ def validate_payload(capability,payload):
         if set(payload)!={'text'} or not isinstance(text,str) or not text.strip():raise ValueError('La publicación requiere texto')
         if len(text.strip())>POST_MAX_CHARS or '\x00' in text:raise ValueError(f'La publicación supera {POST_MAX_CHARS} caracteres o contiene NUL')
         return {'text':text.strip()}
+    if capability in (ActionProposal.Capability.FOLLOW,ActionProposal.Capability.INVITE):
+        # RED-02 carries no note: the free account only has a handful of notes a month.
+        if set(payload)!={'user_id'} or not USER_ID.fullmatch(str(payload.get('user_id'))):raise ValueError('La acción requiere solo user_id')
+        return {'user_id':payload['user_id']}
+    if capability==ActionProposal.Capability.ACCEPT:
+        if set(payload)!={'request_id','user_id'} or not USER_ID.fullmatch(str(payload.get('user_id'))) or not str(payload.get('request_id') or '').strip():
+            raise ValueError('Aceptar requiere request_id y user_id')
+        return {'request_id':str(payload['request_id']),'user_id':payload['user_id']}
     raise ValueError('Capacidad no implementada en el operador')
 
 def payload_hash(account_id,capability,target,payload):
@@ -127,11 +138,13 @@ def payload_hash(account_id,capability,target,payload):
                    sort_keys=True,ensure_ascii=False)
     return hashlib.sha256(raw.encode()).hexdigest()
 
-def target_of(post=None,piece=None):
-    return post.provider_post_id if post is not None else f'piece:{piece.id}'
+def target_of(post=None,piece=None,contact=None):
+    if post is not None:return post.provider_post_id
+    if contact is not None:return f'user:{contact.provider_user_id}'
+    return f'piece:{piece.id}'
 
 def current_hash(proposal):
-    return payload_hash(proposal.account_id,proposal.capability,target_of(proposal.post,proposal.piece),proposal.payload)
+    return payload_hash(proposal.account_id,proposal.capability,target_of(proposal.post,proposal.piece,proposal.contact),proposal.payload)
 
 # --------------------------------------------------------------------------- accounts and observation
 
@@ -211,16 +224,18 @@ def set_account_pause(account,reason,actor=None):
 
 # --------------------------------------------------------------------------- proposals
 
-def create_proposal(user,post,capability,payload,rationale='',citations=(),risks=(),source='human',origin_job='',model='',previous=None,state=None,piece=None):
+def create_proposal(user,post,capability,payload,rationale='',citations=(),risks=(),source='human',origin_job='',model='',previous=None,state=None,piece=None,contact=None):
     require(user,'operate_linkedin')
-    if (capability==ActionProposal.Capability.PUBLISH)!=(piece is not None and post is None):
-        raise ValueError('CONT-09 se propone sobre una pieza propia; INT-* sobre una publicación observada')
+    targets=(post is not None,piece is not None,contact is not None)
+    expected=(False,False,True) if capability in NETWORK else (False,True,False) if capability==ActionProposal.Capability.PUBLISH else (True,False,False)
+    if targets!=expected:
+        raise ValueError('CONT-09 se propone sobre una pieza propia; RED-* sobre una persona; INT-* sobre una publicación observada')
     payload=validate_payload(capability,payload) if state!=ActionProposal.State.DISCARDED else payload
-    account_id=post.account_id if post is not None else piece.account_id
-    digest=payload_hash(account_id,capability,target_of(post,piece),payload)
+    account_id=(post or piece or contact).account_id
+    digest=payload_hash(account_id,capability,target_of(post,piece,contact),payload)
     try:
         with transaction.atomic():
-            proposal=ActionProposal.objects.create(account_id=account_id,post=post,piece=piece,capability=capability,payload=payload,
+            proposal=ActionProposal.objects.create(account_id=account_id,post=post,piece=piece,contact=contact,capability=capability,payload=payload,
                 payload_hash=digest,rationale=rationale,citations=list(citations),risks=list(risks),source=source,
                 origin_job=origin_job,model=model,created_by=user,previous=previous,version=(previous.version+1 if previous else 1),
                 state=state or ActionProposal.State.PROPOSED)
@@ -233,18 +248,18 @@ def revise(user,proposal_id,payload,note=''):
     """Editing a proposal creates a new version; any earlier approval no longer applies."""
     require(user,'operate_linkedin')
     with transaction.atomic():
-        old=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece').get(id=proposal_id)
+        old=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
         if old.state not in (ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED):
             raise Conflict('Solo se revisan propuestas aún no ejecutadas.')
         old.state=ActionProposal.State.SUPERSEDED;old.decision_note=note;old.save(update_fields=['state','decision_note'])
         return create_proposal(user,old.post,old.capability,payload,rationale=old.rationale,citations=old.citations,
-                               risks=old.risks,source='human',previous=old,piece=old.piece)
+                               risks=old.risks,source='human',previous=old,piece=old.piece,contact=old.contact)
 
 def approve(user,proposal_id,expected_hash,note=''):
     """Human decision on an exact version. Returns the execution job (enqueued)."""
     require(user,'approve_actions')
     with transaction.atomic():
-        proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece').get(id=proposal_id)
+        proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
         if proposal.state!=ActionProposal.State.PROPOSED:raise Conflict('La propuesta no está pendiente de aprobación.')
         if not (expected_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('El contenido cambió: revisa la versión actual antes de aprobar.')
@@ -276,6 +291,9 @@ def reject(user,proposal_id,note=''):
         proposal.state=ActionProposal.State.REJECTED;proposal.decided_by=user;proposal.decided_at=timezone.now();proposal.decision_note=note
         proposal.save(update_fields=['state','decided_by','decided_at','decision_note'])
         _audit(user,'operator.rejected',proposal.id)
+        if proposal.contact_id:
+            from . import red
+            red.on_rejected(proposal,note)
     return proposal
 
 # --------------------------------------------------------------------------- execution
@@ -285,6 +303,10 @@ def _finish(execution,state,actor,**fields):
     for key,value in fields.items():setattr(execution,key,value)
     execution.save()
     ActionProposal.objects.filter(pk=execution.proposal_id).update(state=state)
+    proposal=execution.proposal
+    if state=='confirmed' and proposal.contact_id:
+        from . import red
+        red.on_confirmed(proposal,execution)
     _audit(actor,'operator.execution_'+state,execution.proposal_id,external_id=execution.external_id,
            error_kind=execution.error_kind,http_status=execution.http_status)
     return execution
@@ -342,7 +364,7 @@ def execute(user,proposal_id):
     require(user,'execute_actions')
     if globally_paused():raise OperatorBlocked('Operación global pausada (OPERATOR_PAUSED).')
     with transaction.atomic():
-        proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece').get(id=proposal_id)
+        proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
         existing=ActionExecution.objects.filter(proposal=proposal).first()
         if existing:return existing
         if proposal.state!=ActionProposal.State.APPROVED:raise Conflict('Solo se ejecutan propuestas aprobadas.')
@@ -369,6 +391,9 @@ def execute(user,proposal_id):
             return _finish(execution,'failed',user,error_kind='account_not_running',note='No se envió: la cuenta no está operativa.')
         if proposal.capability==ActionProposal.Capability.PUBLISH:
             return _publish(execution,proposal,connector,user)
+        if proposal.capability in NETWORK:
+            from . import red
+            return red.execute_action(execution,proposal,connector,user)
         if proposal.capability==ActionProposal.Capability.COMMENT:
             text=proposal.payload['text']
             # Protect against duplicates written manually or by an earlier unknown attempt.
@@ -402,7 +427,7 @@ def execute(user,proposal_id):
 def reconcile(user,proposal_id):
     """ADM-05: settle sent/uncertain/stale executions by reading LinkedIn. Never writes."""
     require(user,'operate_linkedin')
-    proposal=ActionProposal.objects.select_related('post','piece','account').get(id=proposal_id)
+    proposal=ActionProposal.objects.select_related('post','piece','contact','account').get(id=proposal_id)
     execution=ActionExecution.objects.filter(proposal=proposal).first()
     if not execution:raise Conflict('La propuesta no tiene ejecución que conciliar.')
     stale=execution.state=='executing' and execution.started_at<timezone.now()-STALE_EXECUTION
@@ -417,6 +442,9 @@ def reconcile(user,proposal_id):
               'Sin lectura permitida (w_member_social) ni cuenta Unipile para comprobarla')+'; no se repite. Decide Gustavo.'
         return _finish(execution,'uncertain' if stale else execution.state,user,note=note,reconciled_at=timezone.now())
     connector=get_connector(proposal.account)
+    if proposal.capability in NETWORK:
+        from . import red
+        return red.reconcile_action(execution,proposal,connector,user,stale)
     post_id=proposal.post.provider_post_id
     if proposal.capability==ActionProposal.Capability.COMMENT:
         found=_find_own_comment(connector,post_id,proposal.payload['text'],execution.external_id or None)
@@ -506,6 +534,8 @@ def propose_comment(user,post_id,origin_job=''):
 
 # --------------------------------------------------------------------------- worker entry point
 
+NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','plan_network':'plan','sync_network':'sync'}
+
 def run_job(job):
     """Returns (job_state, result_status, safe_error). Known failures carry our own messages."""
     params=job.params or {};user=job.owner
@@ -522,6 +552,14 @@ def run_job(job):
             return ('complete' if execution.state!='failed' else 'failed'),execution.state,execution.note
         if job.kind=='reconcile_action':
             return 'complete',reconcile(user,params['proposal']).state,''
+        if job.kind in NETWORK_JOBS:
+            from . import red
+            account=ConnectorAccount.objects.get(id=params['account'])
+            r=getattr(red,NETWORK_JOBS[job.kind])(user,account)
+            status={'discover_network':lambda:f"nuevos:{r['new']}",'classify_contacts':lambda:f"encajan:{r['fit']}/{r['classified']}",
+                    'plan_network':lambda:f"seg:{r['follow']} inv:{r['invite']} acep:{r['accept']}",
+                    'sync_network':lambda:f"recibidas:{r['received']} conexiones:{r['connected']}"}[job.kind]()
+            return 'complete',status[:30],r.get('stopped','')
         if job.kind=='prepare_piece':
             from datetime import date
             from .editorial import prepare

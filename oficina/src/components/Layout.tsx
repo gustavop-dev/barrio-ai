@@ -7,6 +7,7 @@ export const NAV = [
   { to: '/acciones', label: 'Acciones', short: 'Acciones', icon: '✓' },
   { to: '/contenido', label: 'Contenido', short: 'Piezas', icon: '✎' },
   { to: '/referentes', label: 'Referentes', short: 'Referentes', icon: '☆' },
+  { to: '/red', label: 'Red', short: 'Red', icon: '☍' },
   { to: '/conocimiento', label: 'Conocimiento', short: 'Fuentes', icon: '▤' },
   { to: '/memoria', label: 'Memoria', short: 'Memoria', icon: '◈' },
   { to: '/ajustes', label: 'Ajustes', short: 'Ajustes', icon: '⚙' },

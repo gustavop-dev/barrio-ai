@@ -56,7 +56,7 @@ class AuditOutput(serializers.ModelSerializer):
 
 
 # --------------------------------------------------------------------------- account operator
-from .models import ConnectorAccount,Referent,ObservedPost,ActionProposal,ActionExecution
+from .models import OPEN_ACTION_STATES,ConnectorAccount,Contact,Referent,ObservedPost,ActionProposal,ActionExecution
 
 class AccountInput(serializers.Serializer):
     provider=serializers.ChoiceField(choices=ConnectorAccount.Provider.choices)
@@ -121,10 +121,31 @@ class ExecutionOutput(serializers.ModelSerializer):
         model=ActionExecution
         fields=['id','state','provider','started_at','finished_at','external_id','external_url','error_kind','http_status','note','reconciled_at']
 
+class ContactBrief(serializers.ModelSerializer):
+    class Meta:
+        model=Contact
+        fields=['id','display_name','headline','profile_url','public_identifier','network_distance','stage','source','evidence','classification']
+
+class ContactOutput(serializers.ModelSerializer):
+    open_action=serializers.SerializerMethodField()
+    def get_open_action(self,obj):
+        proposal=obj.proposals.filter(state__in=OPEN_ACTION_STATES).order_by('-created_at').first()
+        return {'id':str(proposal.id),'capability':proposal.capability,'state':proposal.state} if proposal else None
+    class Meta:
+        model=Contact
+        fields=['id','account_id','provider_user_id','public_identifier','display_name','headline','profile_url','location','source',
+                'evidence','network_distance','is_following','stage','classification','history','followed_at','invited_at',
+                'connected_at','discovered_at','updated_at','open_action']
+
+class DiscardInput(serializers.Serializer):
+    note=serializers.CharField(max_length=1000)
+
 class ActionOutput(serializers.ModelSerializer):
-    """`post` is null for own content (CONT-09); then `piece_id` and `scheduled_for` identify the target."""
+    """`post` is null for own content (CONT-09), then `piece_id` and `scheduled_for` identify the target, and for
+    network actions (RED-*), then `contact` is the person."""
     execution=serializers.SerializerMethodField()
     post=PostOutput(read_only=True,allow_null=True)
+    contact=ContactBrief(read_only=True,allow_null=True)
     scheduled_for=serializers.SerializerMethodField()
     def get_execution(self,obj):
         execution=getattr(obj,'execution',None) if hasattr(obj,'execution') else None
@@ -133,6 +154,6 @@ class ActionOutput(serializers.ModelSerializer):
         return serializers.DateTimeField().to_representation(obj.piece.scheduled_for) if obj.piece_id else None
     class Meta:
         model=ActionProposal
-        fields=['id','account_id','post','piece_id','scheduled_for','capability','payload','payload_hash','version','previous_id','rationale','citations',
+        fields=['id','account_id','post','piece_id','contact','scheduled_for','capability','payload','payload_hash','version','previous_id','rationale','citations',
                 'risks','source','origin_job','model','state','created_at','approved_hash','decided_by_id','decided_at',
                 'decision_note','execution']

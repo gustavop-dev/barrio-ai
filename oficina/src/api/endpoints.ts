@@ -4,6 +4,8 @@ import type {
   Action,
   Activity,
   Capability,
+  Contact,
+  ContactStage,
   Control,
   EditorialCalendar,
   FeedEvent,
@@ -14,6 +16,7 @@ import type {
   Paginated,
   PieceDetail,
   PlanResponse,
+  RedSummary,
   Referent,
   SearchResponse,
   Session,
@@ -94,6 +97,31 @@ export const listReferents = (account: string) =>
 export const addReferent = (account: string, identifier: string, reason: string) =>
   api.post<Referent>(`${OP}/referents`, { account, identifier, reason });
 export const observeNow = (account: string) => api.post<Job>(`${OP}/observe`, { account });
+
+// ---------------------------------------------------------------- network (Red)
+const RED = '/api/v1/red';
+
+export interface ContactFilters {
+  stage?: ContactStage | '';
+  source?: string;
+  account?: string;
+  page?: number;
+}
+
+/** Paginated, newest `updated_at` first. Empty filters are not sent. */
+export function listContacts({ stage = '', source = '', account = '', page = 1 }: ContactFilters = {}) {
+  const params = new URLSearchParams();
+  if (stage) params.set('stage', stage);
+  if (source) params.set('source', source);
+  if (account) params.set('account', account);
+  if (page > 1) params.set('page', String(page));
+  const query = params.toString();
+  return api.get<Paginated<Contact> | Contact[]>(`${RED}/contacts${query ? `?${query}` : ''}`);
+}
+export const getContact = (contactId: string) => api.get<Contact>(`${RED}/contacts/${id(contactId)}`);
+/** Human session and `approve_actions`; the note is mandatory. Also rejects the contact's open action. 409 once invited or later. */
+export const discardContact = (contactId: string, note: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/discard`, { note });
+export const getRedSummary = () => api.get<RedSummary>(`${RED}/summary`);
 
 // ---------------------------------------------------------------- knowledge
 export const searchKnowledge = (query: string, limit = 10) =>

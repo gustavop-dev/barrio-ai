@@ -141,8 +141,8 @@ def index(execute=False):
         plan['remaining']=index_plan()[1]['missing_chunks']
     return plan
 
-def claude_model():
-    model=os.environ.get('ANTHROPIC_MODEL',DEFAULT_CLAUDE_MODEL)
+def claude_model(override=None):
+    model=override or os.environ.get('ANTHROPIC_MODEL',DEFAULT_CLAUDE_MODEL)
     if model not in MODEL_PRICES:raise ValueError('Modelo Claude sin tarifa verificada: añadir tarifa y pruebas antes de activarlo')
     return model
 
@@ -153,9 +153,10 @@ def anthropic_client(key):
     return anthropic.Anthropic(api_key=key,max_retries=0,
         timeout=anthropic.Timeout(600.0,connect=10.0,read=90.0,write=30.0))
 
-def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run'):
+def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None):
+    """`model` overrides ANTHROPIC_MODEL for one call (e.g. a cheaper classifier); it must have a verified price."""
     import anthropic
-    key=live('anthropic');model=claude_model()
+    key=live('anthropic');model=claude_model(model)
     max_tokens=max_tokens or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
     if not 1<=max_tokens<=64000:raise ValueError('max_tokens fuera de rango')
     client=anthropic_client(key)

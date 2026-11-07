@@ -163,8 +163,8 @@ main { padding: 16px 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)
   inset: auto 0 0 0;
   z-index: 20;
   display: grid;
-  /* Eight sections: below 352px the bar scrolls sideways instead of shrinking targets under 44px. */
-  grid-template-columns: repeat(8, minmax(44px, 1fr));
+  /* Nine sections: below 396px the bar scrolls sideways instead of shrinking targets under 44px. */
+  grid-template-columns: repeat(9, minmax(44px, 1fr));
   overflow-x: auto;
   background: var(--rail);
   padding-bottom: env(safe-area-inset-bottom);
@@ -490,6 +490,19 @@ summary { cursor: pointer; min-height: 44px; display: flex; align-items: center;
 .proposed { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 2px dashed #b9c8a8; border-radius: var(--radius); background: #fbfcf4; }
 .risks { margin: 4px 0; padding-left: 20px; }
 .execution { margin-top: 12px; padding-top: 8px; border-top: 2px solid var(--line); }
+
+/* ---------------------------------------------------------------- network (Red) */
+
+.contact h3 { min-width: 0; overflow-wrap: anywhere; }
+.contact h3 a, .personname a { display: inline-block; min-height: 44px; padding: 10px 0; }
+.contact p, .person p, .classification p, .evidence p { overflow-wrap: anywhere; }
+.personname { margin: 0; }
+.classification .facts { margin-top: 0; }
+.history { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; font-size: 14px; }
+.history li { overflow-wrap: anywhere; }
+.capblock .cardhead { align-items: center; }
+.capblock .cardhead .sectionlabel { margin: 0; }
+button.chip[aria-pressed='true'] { background: var(--sage); border-color: #8fa77e; color: #22371f; }
 
 /* ---------------------------------------------------------------- content (daily own publication) */
 

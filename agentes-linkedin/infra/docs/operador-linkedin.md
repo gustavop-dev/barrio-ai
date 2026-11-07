@@ -110,7 +110,7 @@ Permisos nuevos: `operate_linkedin`, `approve_actions` y `execute_actions`. El r
 - Pantalla de supervisión en la oficina publicada (operaciones nuevas del puente).
 - Revisión por modelo (editor_verificador) como segunda compuerta de la política autónoma; hoy la compuerta es determinista.
 - Programación nativa y edición o retirada de publicaciones propias (CONT-08/10/11). La publicación diaria (CONT-01..07 y CONT-09) ya está implementada: ver [publicación diaria](publicacion-diaria.md).
-- Invitaciones (RED), inbox (CHAT) y edición de perfil (PERF) con el mismo patrón de propuesta, aprobación, ejecución y confirmación.
+- Inbox (CHAT) y edición de perfil (PERF) con el mismo patrón de propuesta, aprobación, ejecución y confirmación. La red (DESC-02/03/05/07, RED-01/02/03/04/09) ya está implementada: ver [red del barrio](red-barrio.md).
 - Programador periódico para la observación.
 - Unificar el runtime con este repositorio, para que Docker construya desde `barrio-ai`.
 - Prueba real con la cuenta de Unipile.
