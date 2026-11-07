@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>0ff1ce · Movimiento · Calendario</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#00715e}a:hover{color:#1e1e2b}
+.retrato{background-image:url(/_blob/9aa3da587c44b923cd4c0161de1156bc);background-repeat:no-repeat;background-size:1024px 2920px;image-rendering:pixelated}
+.retrato3{background-image:url(/_blob/9aa3da587c44b923cd4c0161de1156bc);background-repeat:no-repeat;background-size:1536px 4380px;image-rendering:pixelated}
+.saltar{position:absolute;left:-9999px;top:8px;z-index:5;background:#1e1e2b;color:#f7f6f0;padding:12px 16px;border-radius:6px;font-size:16px}
+.saltar:focus{left:8px}
+summary::-webkit-details-marker{display:none}
+details[open] > summary svg{transform:rotate(180deg)}
+.tira{scrollbar-width:none}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #00715e;outline-offset:2px}
+textarea,input,select{font-family:inherit}
+
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; background: #f7f6f0; color: #1e1e2b; font-family: Ubuntu, 'Segoe UI', system-ui, sans-serif; overflow: hidden">
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<header style="height: 56px; flex: none; box-sizing: border-box; padding: 0 4px 0 12px; display: flex; align-items: center; justify-content: space-between; background: #fffef8; border-bottom: 1px solid #dedfd4">
+<a href="Oficina.dc.html" aria-label="0ff1ce, ir a la Oficina" style="display: flex; align-items: center; min-height: 44px"><img src="/_blob/4479d1116e14b182306b566e8849750a" alt="0ff1ce" style="height: 28px; width: auto; display: block"></a>
+<div style="display: flex; align-items: center; gap: 0"><a href="TuTurno.dc.html" aria-label="Tu turno, 6 pendientes, 1 urgente" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"></path></svg><span id="tt-badge" aria-hidden="true" style="position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; box-sizing: border-box; padding: 0 5px; border-radius: 999px; font-size: 12px; line-height: 18px; text-align: center; background: #a54e35; color: #ffffff; overflow: hidden"><span id="tt-badge-n" style="display: block">6</span></span></a><a id="nt-bell" href="Notificaciones.dc.html" aria-label="Notificaciones, hay novedades" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg><span id="nt-dot" aria-hidden="true" style="position: absolute; top: 9px; right: 10px; width: 9px; height: 9px; border-radius: 999px; background: #0ff1ce; box-shadow: 0 0 0 1.5px #1e1e2b"></span></a><a href="Calendario.dc.html" aria-label="Calendario" aria-current="page" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; background: #d2fbf3; color: #1e1e2b"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg></a><a href="Ajustes.dc.html" aria-label="Ajustes" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></a></div>
+</header>
+<sc-if value="{{enPausa}}" hint-placeholder-val="{{ false }}">
+<a href="Ajustes.dc.html" style="flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #fffef8; border-bottom: 1px solid #a54e35; color: #1e1e2b; text-decoration: none">
+<span style="width: 32px; height: 32px; flex: none; border-radius: 999px; background: #a54e35; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5v14M15 5v14"></path></svg></span>
+<span style="flex: 1; min-width: 0; font-size: 14px; line-height: 20px"><span style="color: #a54e35">Máquina en pausa</span> · Revisando los topes de la semana</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+</sc-if>
+<main id="contenido" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden">
+<div style="padding: 20px 16px 32px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; flex-direction: column; gap: 2px"><h1 style="margin: 0; font-size: 32px; line-height: 40px; font-weight: 400; letter-spacing: -0.01em">Calendario</h1><p style="margin: 0; font-size: 16px; line-height: 24px; color: #565972"><span id="ca-rango">2–8 nov 2026</span></p></div>
+<div style="position: relative; display: flex; gap: 4px; padding: 4px; background: #dedfd4; border-radius: 12px">
+<span id="ca-seg-ind" aria-hidden="true" style="position: absolute; left: 4px; top: 4px; height: 40px; width: 50%; border-radius: 6px; background: #fffef8"></span>
+<button type="button" id="ca-s-semana" onClick="{{v_semana}}" style="position: relative; z-index: 1; flex: 1; min-height: 40px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b">Semana</button><button type="button" id="ca-s-mes" onClick="{{v_mes}}" style="position: relative; z-index: 1; flex: 1; min-height: 40px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #565972">Mes</button>
+</div>
+<div id="ca-days" style="position: relative; height: 64px">
+<span id="ca-pill" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 46px; height: 64px; border-radius: 12px; background: #1e1e2b"></span>
+<div id="ca-week" style="position: absolute; left: 0; right: 0; top: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px"><button type="button" id="ca-w0" onClick="{{w_0}}" style="position: relative; z-index: 1; height: 64px; border: 0; background: transparent; border-radius: 12px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: #1e1e2b"><span style="font-size: 12px; line-height: 16px">L</span><span id="ca-wn0" style="font-size: 16px; line-height: 24px">2</span></button><button type="button" id="ca-w1" onClick="{{w_1}}" style="position: relative; z-index: 1; height: 64px; border: 0; background: transparent; border-radius: 12px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: #1e1e2b"><span style="font-size: 12px; line-height: 16px">M</span><span id="ca-wn1" style="font-size: 16px; line-height: 24px">3</span></button><button type="button" id="ca-w2" onClick="{{w_2}}" style="position: relative; z-index: 1; height: 64px; border: 0; background: transparent; border-radius: 12px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: #1e1e2b"><span style="font-size: 12px; line-height: 16px">X</span><span id="ca-wn2" style="font-size: 16px; line-height: 24px">4</span></button><button type="button" id="ca-w3" onClick="{{w_3}}" style="position: relative; z-index: 1; height: 64px; border: 0; background: transparent; border-radius: 12px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: #1e1e2b"><span style="font-size: 12px; line-height: 16px">J</span><span id="ca-wn3" style="font-size: 16px; line-height: 24px">5</span></button><button type="button" id="ca-w4" onClick="{{w_4}}" style="position: relative; z-index: 1; height: 64px; border: 0; background: transparent; border-radius: 12px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: #1e1e2b"><span style="font-size: 12px; line-height: 16px">V</span><span id="ca-wn4" style="font-size: 16px; line-height: 24px">6</span></button><button type="button" id="ca-w5" onClick="{{w_5}}" style="position: relative; z-index: 1; height: 64px; border: 0; background: transparent; border-radius: 12px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: #1e1e2b"><span style="font-size: 12px; line-height: 16px">S</span><span id="ca-wn5" style="font-size: 16px; line-height: 24px">7</span></button><button type="button" id="ca-w6" onClick="{{w_6}}" style="position: relative; z-index: 1; height: 64px; border: 0; background: transparent; border-radius: 12px; font-family: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; cursor: pointer; color: #1e1e2b"><span style="font-size: 12px; line-height: 16px">D</span><span id="ca-wn6" style="font-size: 16px; line-height: 24px">8</span></button></div>
+<div id="ca-month" style="position: absolute; left: 0; right: 0; top: 22px; display: none; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 2px"><button type="button" id="ca-m0" onClick="{{m_0}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #565972; opacity: 0">26</button><button type="button" id="ca-m1" onClick="{{m_1}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #565972; opacity: 0">27</button><button type="button" id="ca-m2" onClick="{{m_2}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #565972; opacity: 0">28</button><button type="button" id="ca-m3" onClick="{{m_3}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #565972; opacity: 0">29</button><button type="button" id="ca-m4" onClick="{{m_4}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #565972; opacity: 0">30</button><button type="button" id="ca-m5" onClick="{{m_5}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #565972; opacity: 0">31</button><button type="button" id="ca-m6" onClick="{{m_6}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">1</button><button type="button" id="ca-m7" onClick="{{m_7}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">2</button><button type="button" id="ca-m8" onClick="{{m_8}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">3</button><button type="button" id="ca-m9" onClick="{{m_9}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">4</button><button type="button" id="ca-m10" onClick="{{m_10}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">5</button><button type="button" id="ca-m11" onClick="{{m_11}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">6</button><button type="button" id="ca-m12" onClick="{{m_12}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">7</button><button type="button" id="ca-m13" onClick="{{m_13}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">8</button><button type="button" id="ca-m14" onClick="{{m_14}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">9</button><button type="button" id="ca-m15" onClick="{{m_15}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">10</button><button type="button" id="ca-m16" onClick="{{m_16}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">11</button><button type="button" id="ca-m17" onClick="{{m_17}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">12</button><button type="button" id="ca-m18" onClick="{{m_18}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">13</button><button type="button" id="ca-m19" onClick="{{m_19}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">14</button><button type="button" id="ca-m20" onClick="{{m_20}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">15</button><button type="button" id="ca-m21" onClick="{{m_21}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">16</button><button type="button" id="ca-m22" onClick="{{m_22}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">17</button><button type="button" id="ca-m23" onClick="{{m_23}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">18</button><button type="button" id="ca-m24" onClick="{{m_24}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">19</button><button type="button" id="ca-m25" onClick="{{m_25}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">20</button><button type="button" id="ca-m26" onClick="{{m_26}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">21</button><button type="button" id="ca-m27" onClick="{{m_27}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">22</button><button type="button" id="ca-m28" onClick="{{m_28}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">23</button><button type="button" id="ca-m29" onClick="{{m_29}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">24</button><button type="button" id="ca-m30" onClick="{{m_30}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">25</button><button type="button" id="ca-m31" onClick="{{m_31}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">26</button><button type="button" id="ca-m32" onClick="{{m_32}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">27</button><button type="button" id="ca-m33" onClick="{{m_33}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">28</button><button type="button" id="ca-m34" onClick="{{m_34}}" style="position: relative; z-index: 1; height: 50px; border: 0; background: transparent; border-radius: 6px; font-family: inherit; font-size: 14px; cursor: pointer; color: #1e1e2b; opacity: 0">29</button></div>
+<div id="ca-dow" aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; display: none; grid-template-columns: repeat(7, minmax(0, 1fr)); text-align: center; font-size: 12px; line-height: 16px; color: #565972"><span>L</span><span>M</span><span>X</span><span>J</span><span>V</span><span>S</span><span>D</span></div>
+</div>
+<div style="position: relative; height: 64px; overflow: hidden"><div id="ca-pa" style="position: absolute; left: 0; right: 0; top: 0; display: flex; flex-direction: column; gap: 6px; opacity: 1"><h2 id="ca-pa-t" style="margin: 0; font-size: 22px; line-height: 30px; font-weight: 400">Sábado 7 de noviembre</h2><p id="ca-pa-r" style="margin: 0; font-size: 16px; line-height: 24px; color: #565972">1 post · 6 comentarios · 1 conexión nueva que encaja</p></div><div id="ca-pb" style="position: absolute; left: 0; right: 0; top: 0; display: flex; flex-direction: column; gap: 6px; opacity: 0"><h2 id="ca-pb-t" style="margin: 0; font-size: 22px; line-height: 30px; font-weight: 400">Sábado 7 de noviembre</h2><p id="ca-pb-r" style="margin: 0; font-size: 16px; line-height: 24px; color: #565972">1 post · 6 comentarios · 1 conexión nueva que encaja</p></div></div>
+</div>
+</main>
+<nav aria-label="Secciones" style="height: 64px; flex: none; box-sizing: border-box; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; background: #fffef8; border-top: 1px solid #dedfd4">
+<a href="Oficina.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #565972">Oficina</span></a><a href="Resultados.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #565972">Resultados</span></a><div style="height: 64px; display: flex; justify-content: center; align-items: flex-start"><a href="Captura.dc.html" aria-label="Capturar: mantén oprimido para grabar audio, o toca para foto o nota" style="width: 60px; height: 60px; margin-top: -22px; border-radius: 999px; background: #0ff1ce; color: #1e1e2b; border: 4px solid #fffef8; display: flex; align-items: center; justify-content: center; text-decoration: none"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></a></div><a href="Personas.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #565972">Personas</span></a><a href="Galeria.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #565972">Galería</span></a>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"velocidad": {"editor": "enum", "options": ["1x", "0.5x", "0.25x"], "default": "1x", "section": "Movimiento"}, "menos_movimiento": {"editor": "boolean", "default": false, "section": "Movimiento"}, "maquina_en_pausa": {"editor": "boolean", "default": false, "section": "Marco"}, "$preview": {"width": 390, "height": 844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = {}; }
+  componentDidMount() {
+    var self = this;
+    // ---- Motor de movimiento de 0ff1ce (aproximación web de Reanimated) ----
+    var TOK = { instant: 100, fast: 180, base: 260, slow: 400,
+      firm: { k: 260, c: 20 }, soft: { k: 160, c: 14 } };
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function rubber(x, lim) { return x <= lim ? x : lim + (x - lim) * 0.35; }
+    // Curva cúbica de Bézier (x1, y1, x2, y2), resuelta por Newton.
+    function bezier(x1, y1, x2, y2) {
+      function A(a1, a2) { return 1 - 3 * a2 + 3 * a1; }
+      function B(a1, a2) { return 3 * a2 - 6 * a1; }
+      function C(a1) { return 3 * a1; }
+      function calc(t, a1, a2) { return ((A(a1, a2) * t + B(a1, a2)) * t + C(a1)) * t; }
+      function slope(t, a1, a2) { return 3 * A(a1, a2) * t * t + 2 * B(a1, a2) * t + C(a1); }
+      return function (x) {
+        if (x <= 0) return 0; if (x >= 1) return 1;
+        var t = x;
+        for (var i = 0; i < 6; i++) { var s = slope(t, x1, x2); if (s === 0) break; t -= (calc(t, x1, x2) - x) / s; }
+        return calc(t, y1, y2);
+      };
+    }
+    var EASE_OUT = bezier(0.2, 0, 0, 1);   // entra: rápido al principio, se asienta
+    var EASE_IN = bezier(0.3, 0, 1, 1);    // sale: arranca suave, se va rápido
+    function Spring(v, cfg) { this.x = v; this.v = 0; this.t = v; this.cfg = cfg; }
+    Spring.prototype.to = function (t, cfg) { this.t = t; if (cfg) this.cfg = cfg; return this; };
+    Spring.prototype.set = function (v) { this.x = v; this.t = v; this.v = 0; return this; };
+    Spring.prototype.step = function (dt) {
+      var n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+      for (var i = 0; i < n; i++) { var f = -this.cfg.k * (this.x - this.t) - this.cfg.c * this.v; this.v += f * h; this.x += this.v * h; }
+      if (Math.abs(this.v) < 0.0005 && Math.abs(this.x - this.t) < 0.0005) { this.x = this.t; this.v = 0; }
+    };
+    Spring.prototype.idle = function () { return this.x === this.t && this.v === 0; };
+    function Tween(v) { this.x = v; this.from = v; this.t = v; this.d = 1; this.e = 0; this.ease = EASE_OUT; }
+    Tween.prototype.to = function (t, ms, ease) { this.from = this.x; this.t = t; this.d = Math.max(1, ms); this.e = 0; this.ease = ease || EASE_OUT; return this; };
+    Tween.prototype.set = function (v) { this.x = v; this.from = v; this.t = v; this.e = this.d; return this; };
+    Tween.prototype.step = function (dtMs) { if (this.x === this.t) return; this.e += dtMs; var p = clamp(this.e / this.d, 0, 1); this.x = lerp(this.from, this.t, this.ease(p)); if (p >= 1) this.x = this.t; };
+    function speedOf(v) { return v === '0.25x' ? 0.25 : (v === '0.5x' ? 0.5 : 1); }
+    // ---- Programador de animaciones por elemento (sobre motion_lib) ----
+    var RUN = [];
+    function anim(ms, ease, step, done, delay) {
+      RUN.push({ t: -(delay || 0), d: Math.max(1, ms), ease: ease || EASE_OUT, step: step, done: done });
+    }
+    function tick(dtMs) {
+      var cur = RUN; RUN = [];
+      for (var i = 0; i < cur.length; i++) {
+        var a = cur[i]; a.t += dtMs;
+        if (a.t < 0) { RUN.push(a); continue; }
+        var p = clamp(a.t / a.d, 0, 1); a.step(a.ease(p), p);
+        if (p < 1) RUN.push(a); else if (a.done) a.done();
+      }
+    }
+
+    var $ = function (id) { return document.getElementById(id); };
+    var RES = {"2": "1 post · 5 comentarios · 3 conexiones nuevas que encajan", "3": "1 post · 4 comentarios · Marta Inventada te escribió", "4": "Sin publicación · 2 conexiones nuevas que encajan", "5": "1 post · 6 comentarios", "6": "Pieza bloqueada por el verificador · 1 acción incierta", "7": "1 post · 6 comentarios · 1 conexión nueva que encaja", "8": "Programada: Turning a sales call into a product spec.", "10": "Caduca el permiso de LinkedIn", "12": "Siguiente paso con Lucía Ficticia"}, MES = ["2026-10-26", "2026-10-27", "2026-10-28", "2026-10-29", "2026-10-30", "2026-10-31", "2026-11-01", "2026-11-02", "2026-11-03", "2026-11-04", "2026-11-05", "2026-11-06", "2026-11-07", "2026-11-08", "2026-11-09", "2026-11-10", "2026-11-11", "2026-11-12", "2026-11-13", "2026-11-14", "2026-11-15", "2026-11-16", "2026-11-17", "2026-11-18", "2026-11-19", "2026-11-20", "2026-11-21", "2026-11-22", "2026-11-23", "2026-11-24", "2026-11-25", "2026-11-26", "2026-11-27", "2026-11-28", "2026-11-29"], DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+    var M = { view: 'semana', date: '2026-11-07', weekStart: '2026-11-02', front: 'a',
+      px: new Spring(0, TOK.firm), py: new Spring(0, TOK.firm), pw: new Spring(46, TOK.firm), ph: new Spring(64, TOK.firm), seg: new Spring(0, TOK.firm), h: new Tween(64) };
+    function rm() { return !!self.props.menos_movimiento; }
+    function sp() { return speedOf(self.props.velocidad); }
+    var days = $('ca-days');
+    function rel(el) { var a = el.getBoundingClientRect(), b = days.getBoundingClientRect(), k = b.width / days.offsetWidth; return { x: (a.left - b.left) / k, y: (a.top - b.top) / k, w: a.width / k, h: a.height / k }; }
+    function addDays(iso, n) { var d = new Date(iso + 'T12:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0, 10); }
+    function label(iso) { var d = new Date(iso + 'T12:00:00'); return DIAS[(d.getDay() + 6) % 7] + ' ' + d.getDate() + ' de noviembre'.replace('noviembre', ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][d.getMonth()]); }
+    function selEl() {
+      if (M.view === 'semana') { var i = Math.round((new Date(M.date) - new Date(M.weekStart)) / 864e5); return $('ca-w' + i); }
+      return $('ca-m' + MES.indexOf(M.date));
+    }
+    function movePill(instant) {
+      var r = rel(selEl());
+      [['px', r.x], ['py', r.y], ['pw', r.w], ['ph', r.h]].forEach(function (q) { if (instant || rm()) M[q[0]].set(q[1]); else M[q[0]].to(q[1], TOK.firm); });
+    }
+    function colors() {
+      for (var i = 0; i < 7; i++) { var iso = addDays(M.weekStart, i); $('ca-w' + i).style.color = iso === M.date ? '#f7f6f0' : '#1e1e2b'; }
+      MES.forEach(function (iso, i) { var el = $('ca-m' + i); var inM = iso.slice(5, 7) === '11'; el.style.color = iso === M.date ? '#f7f6f0' : (inM ? '#1e1e2b' : '#565972'); });
+    }
+    // Panel del día: entra desde el lado hacia el que avanzó la fecha.
+    function panel(oldIso) {
+      var dir = M.date > oldIso ? 1 : -1, oK = M.front, nK = oK === 'a' ? 'b' : 'a'; M.front = nK;
+      var o = $('ca-p' + oK), n = $('ca-p' + nK), d = parseInt(M.date.slice(8), 10);
+      $('ca-p' + nK + '-t').textContent = label(M.date);
+      $('ca-p' + nK + '-r').textContent = RES[d] && M.date.slice(5, 7) === '11' ? RES[d] : 'Nada registrado ese día.';
+      if (rm()) { o.style.opacity = '0'; n.style.opacity = '1'; n.style.transform = 'none'; return; }
+      anim(120, EASE_IN, function (e) { o.style.opacity = String(1 - e); o.style.transform = 'translateX(' + (-12 * dir * e) + 'px)'; });
+      anim(TOK.fast, EASE_OUT, function (e) { n.style.opacity = String(e); n.style.transform = 'translate(' + (12 * dir * (1 - e)) + 'px,' + (8 * (1 - e)) + 'px)'; }, null, 60);
+    }
+    function pick(iso) {
+      if (iso === M.date) return; var old = M.date; M.date = iso; colors(); movePill(); panel(old);
+      $('ca-haptic') && 0;
+    }
+    function weekOf(iso) { var d = new Date(iso + 'T12:00:00'); var wd = (d.getDay() + 6) % 7; return addDays(iso, -wd); }
+    function setWeek(ws) {
+      M.weekStart = ws;
+      for (var i = 0; i < 7; i++) $('ca-wn' + i).textContent = String(parseInt(addDays(ws, i).slice(8), 10));
+      var a = parseInt(ws.slice(8), 10), b = parseInt(addDays(ws, 6).slice(8), 10);
+      $('ca-rango').textContent = a + '–' + b + ' ' + (addDays(ws, 6).slice(5, 7) === '11' ? 'nov' : 'dic') + ' 2026';
+    }
+    function setView(v) {
+      if (v === M.view) return;
+      M.view = v;
+      M.seg.to(v === 'mes' ? 1 : 0, TOK.firm);
+      $('ca-s-semana').style.color = v === 'semana' ? '#1e1e2b' : '#565972'; $('ca-s-mes').style.color = v === 'mes' ? '#1e1e2b' : '#565972';
+      var wk = $('ca-week'), mo = $('ca-month'), dow = $('ca-dow');
+      if (v === 'mes') {
+        $('ca-rango').textContent = 'Noviembre 2026';
+        mo.style.display = 'grid'; dow.style.display = 'grid';
+        M.h.to(22 + 5 * 52, rm() ? 0 : TOK.base);
+        // La semana se va; el mes entra fila por fila; la selección viaja a su celda del mes.
+        anim(120, EASE_IN, function (e) { wk.style.opacity = String(1 - e); }, function () { wk.style.display = 'none'; });
+        MES.forEach(function (iso, i) {
+          var el = $('ca-m' + i), r = Math.floor(i / 7);
+          if (rm()) { el.style.opacity = '1'; return; }
+          el.style.opacity = '0';
+          anim(TOK.fast, EASE_OUT, function (e) { el.style.opacity = String(e); el.style.transform = 'translateY(' + (-6 * (1 - e)) + 'px)'; }, null, 60 + r * 30);
+        });
+        anim(1, null, function () {}, function () { movePill(); }, 0);
+      } else {
+        setWeek(weekOf(M.date));
+        wk.style.display = 'grid'; wk.style.opacity = '0';
+        M.h.to(64, rm() ? 0 : TOK.base);
+        MES.forEach(function (iso, i) { var el = $('ca-m' + i); anim(120, EASE_IN, function (e) { el.style.opacity = String(1 - e); }); });
+        anim(TOK.fast, EASE_OUT, function (e) { wk.style.opacity = String(e); }, function () { mo.style.display = 'none'; dow.style.display = 'none'; }, 80);
+        anim(1, null, function () {}, function () { movePill(); }, 0);
+      }
+      colors();
+    }
+    self.api = { pickWeek: function (i) { pick(addDays(M.weekStart, i)); }, pickMonth: function (i) { pick(MES[i]); }, view: setView };
+    colors(); movePill(true);
+    var last = 0;
+    function frame(now) {
+      var dtMs = last ? Math.min(50, now - last) : 16; last = now; dtMs *= sp(); var dt = dtMs / 1000; var R = rm();
+      tick(R ? 1e6 : dtMs);
+      [M.px, M.py, M.pw, M.ph, M.seg].forEach(function (s) { if (R) s.set(s.t); else s.step(dt); });
+      M.h.step(R ? 1e6 : dtMs);
+      var pill = $('ca-pill');
+      pill.style.transform = 'translate(' + M.px.x + 'px,' + M.py.x + 'px)'; pill.style.width = M.pw.x + 'px'; pill.style.height = M.ph.x + 'px';
+      pill.style.borderRadius = (M.ph.x > 56 ? 12 : 6) + 'px';
+      days.style.height = M.h.x + 'px';
+      var ind = $('ca-seg-ind'); ind.style.width = 'calc(50% - 6px)'; ind.style.transform = 'translateX(' + (M.seg.x * 100) + '%) translateX(' + (M.seg.x * 4) + 'px)';
+      self.raf = requestAnimationFrame(frame);
+    }
+    self.raf = requestAnimationFrame(frame);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); }
+  renderVals() {
+    var self = this;
+    var v = { enPausa: !!this.props.maquina_en_pausa,
+      v_semana: function () { if (self.api) self.api.view('semana'); }, v_mes: function () { if (self.api) self.api.view('mes'); } };
+    for (var i = 0; i < 7; i++) (function (k) { v['w_' + k] = function () { if (self.api) self.api.pickWeek(k); }; })(i);
+    for (var j = 0; j < 35; j++) (function (k) { v['m_' + k] = function () { if (self.api) self.api.pickMonth(k); }; })(j);
+    return v;
+  }
+}
+</script>
+</body>
+</html>

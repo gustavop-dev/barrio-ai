@@ -1,0 +1,784 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>0ff1ce · Movimiento · Oficina</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#00715e}a:hover{color:#1e1e2b}
+.retrato{background-image:url(/_blob/9aa3da587c44b923cd4c0161de1156bc);background-repeat:no-repeat;background-size:1024px 2920px;image-rendering:pixelated}
+.retrato3{background-image:url(/_blob/9aa3da587c44b923cd4c0161de1156bc);background-repeat:no-repeat;background-size:1536px 4380px;image-rendering:pixelated}
+.saltar{position:absolute;left:-9999px;top:8px;z-index:5;background:#1e1e2b;color:#f7f6f0;padding:12px 16px;border-radius:6px;font-size:16px}
+.saltar:focus{left:8px}
+summary::-webkit-details-marker{display:none}
+details[open] > summary svg{transform:rotate(180deg)}
+.tira{scrollbar-width:none}
+button:focus-visible,a:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible{outline:2px solid #00715e;outline-offset:2px}
+textarea,input,select{font-family:inherit}
+.mapa{image-rendering:pixelated}.retrato{background-image:url(/_blob/9aa3da587c44b923cd4c0161de1156bc);background-repeat:no-repeat;background-size:1024px 2920px;image-rendering:pixelated}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; position: relative; display: flex; flex-direction: column; background: #f7f6f0; color: #1e1e2b; font-family: Ubuntu, 'Segoe UI', system-ui, sans-serif; overflow: hidden">
+<a class="saltar" href="#contenido">Saltar al contenido</a>
+<header style="height: 56px; flex: none; box-sizing: border-box; padding: 0 4px 0 12px; display: flex; align-items: center; justify-content: space-between; background: #fffef8; border-bottom: 1px solid #dedfd4">
+<a href="Oficina.dc.html" aria-label="0ff1ce, ir a la Oficina" style="display: flex; align-items: center; min-height: 44px"><img src="/_blob/4479d1116e14b182306b566e8849750a" alt="0ff1ce" style="height: 28px; width: auto; display: block"></a>
+<div style="display: flex; align-items: center; gap: 0"><a href="TuTurno.dc.html" aria-label="Tu turno, 6 pendientes, 1 urgente" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-6l-2 3h-4l-2-3H2"></path><path d="M5.5 5h13L22 12v6a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-6z"></path></svg><span id="tt-badge" aria-hidden="true" style="position: absolute; top: 4px; right: 2px; min-width: 18px; height: 18px; box-sizing: border-box; padding: 0 5px; border-radius: 999px; font-size: 12px; line-height: 18px; text-align: center; background: #a54e35; color: #ffffff; overflow: hidden"><span id="tt-badge-n" style="display: block">6</span></span></a><a id="nt-bell" href="Notificaciones.dc.html" aria-label="Notificaciones, hay novedades" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4z"></path><path d="M10 20a2 2 0 0 0 4 0"></path></svg><span id="nt-dot" aria-hidden="true" style="position: absolute; top: 9px; right: 10px; width: 9px; height: 9px; border-radius: 999px; background: #0ff1ce; box-shadow: 0 0 0 1.5px #1e1e2b"></span></a><a href="Calendario.dc.html" aria-label="Calendario" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2"></rect><path d="M16 2v4M8 2v4M3 10h18"></path></svg></a><a href="Ajustes.dc.html" aria-label="Ajustes" style="position: relative; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; border-radius: 999px; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"></path></svg></a></div>
+</header>
+<sc-if value="{{enPausa}}" hint-placeholder-val="{{ false }}">
+<a href="Ajustes.dc.html" style="flex: none; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: #fffef8; border-bottom: 1px solid #a54e35; color: #1e1e2b; text-decoration: none">
+<span style="width: 32px; height: 32px; flex: none; border-radius: 999px; background: #a54e35; color: #ffffff; display: flex; align-items: center; justify-content: center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5v14M15 5v14"></path></svg></span>
+<span style="flex: 1; min-width: 0; font-size: 14px; line-height: 20px"><span style="color: #a54e35">Máquina en pausa</span> · Revisando los topes de la semana</span><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"></path></svg>
+</a>
+</sc-if>
+<main id="contenido" style="flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden">
+<div style="position: relative; width: 384px; height: 672px; margin: 12px 3px 0; border-radius: 12px; overflow: hidden; background: #4b5655">
+<canvas id="of-mapa" class="mapa" onClick="{{tocar}}" width="384" height="672" aria-label="La oficina en pixel art. Toca a un personaje o una zona." style="width: 384px; height: 672px; display: block; cursor: pointer"></canvas>
+<span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 10px; top: 96px">BIBLIOTECA</span><span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 158px; top: 128px">OPERACIÓN</span><span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 280px; top: 112px">RELACIONES</span><span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 10px; top: 214px">OBSERVATORIO</span><span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 226px; top: 214px">ESTRATEGIA</span><span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 10px; top: 354px">MESA EDITORIAL</span><span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 226px; top: 354px">REVISIÓN</span><span aria-hidden="true" style="position: absolute; font-size: 12px; line-height: 16px; letter-spacing: 0.06em; color: #1e1e2b; background: #fffef8; border: 1px solid #dedfd4; border-radius: 999px; padding: 1px 7px; white-space: nowrap; pointer-events: none; left: 70px; top: 528px">EL BARRIO</span>
+<div id="of-cap" aria-live="polite" style="position: absolute; left: 8px; right: 8px; top: 8px; height: 52px; border-radius: 12px; background: #fffef8; border: 1px solid #dedfd4; overflow: hidden; pointer-events: none"><div id="of-cap-a" style="position: absolute; left: 6px; right: 10px; top: 6px; bottom: 6px; display: flex; gap: 10px; align-items: center; opacity: 1"><div id="of-cap-a-p" class="retrato" aria-hidden="true" style="width: 32px; height: 40px; flex: none; background-position: 0px -2724px"></div><p id="of-cap-a-t" style="flex: 1; min-width: 0; margin: 0; font-size: 14px; line-height: 20px; color: #1e1e2b">Abriendo la oficina…</p></div><div id="of-cap-b" style="position: absolute; left: 6px; right: 10px; top: 6px; bottom: 6px; display: flex; gap: 10px; align-items: center; opacity: 0"><div id="of-cap-b-p" class="retrato" aria-hidden="true" style="width: 32px; height: 40px; flex: none; background-position: 0px -2724px"></div><p id="of-cap-b-t" style="flex: 1; min-width: 0; margin: 0; font-size: 14px; line-height: 20px; color: #1e1e2b">Abriendo la oficina…</p></div></div>
+</div>
+<div style="padding: 12px 16px 0; display: flex; gap: 8px; flex-wrap: wrap"><button type="button" onClick="{{envio}}" style="border: 1px dashed #565972; border-radius: 999px; background: transparent; color: #565972; font-family: inherit; font-size: 12px; letter-spacing: 0.06em; cursor: pointer; min-height: 36px; padding: 0 12px">SIMULAR UN ENVÍO</button></div>
+<div class="tira" role="group" aria-label="Equipos" style="margin-top: 12px; padding: 0 16px 24px; display: flex; gap: 8px; overflow-x: auto"><button type="button" id="of-t-estrategia" onClick="{{team_estrategia}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #dedfd4; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap">Estrategia y perfil</button><button type="button" id="of-t-observatorio" onClick="{{team_observatorio}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #dedfd4; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap">Observatorio</button><button type="button" id="of-t-editorial" onClick="{{team_editorial}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #dedfd4; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap">Mesa editorial</button><button type="button" id="of-t-barrio" onClick="{{team_barrio}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #dedfd4; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap">El barrio</button><button type="button" id="of-t-revision" onClick="{{team_revision}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #dedfd4; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap">Revisión</button><button type="button" id="of-t-relaciones" onClick="{{team_relaciones}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #dedfd4; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap">Relaciones</button><button type="button" id="of-t-operacion" onClick="{{team_operacion}}" style="flex: none; min-height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid #dedfd4; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 14px; cursor: pointer; white-space: nowrap">Operación</button></div>
+</main>
+<nav aria-label="Secciones" style="height: 64px; flex: none; box-sizing: border-box; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); align-items: center; background: #fffef8; border-top: 1px solid #dedfd4">
+<a href="Oficina.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; background: #d2fbf3; color: #1e1e2b"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-6h6v6"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #1e1e2b">Oficina</span></a><a href="Resultados.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #565972">Resultados</span></a><div style="height: 64px; display: flex; justify-content: center; align-items: flex-start"><a href="Captura.dc.html" aria-label="Capturar: mantén oprimido para grabar audio, o toca para foto o nota" style="width: 60px; height: 60px; margin-top: -22px; border-radius: 999px; background: #0ff1ce; color: #1e1e2b; border: 4px solid #fffef8; display: flex; align-items: center; justify-content: center; text-decoration: none"><svg aria-hidden="true" width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg></a></div><a href="Personas.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #565972">Personas</span></a><a href="Galeria.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; text-decoration: none; min-height: 56px"><span style="position: relative; width: 56px; height: 28px; border-radius: 999px; display: flex; align-items: center; justify-content: center; color: #565972"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><circle cx="9" cy="10" r="2"></circle><path d="M21 16l-5-5-9 9"></path></svg></span><span style="font-size: 12px; line-height: 16px; color: #565972">Galería</span></a>
+</nav>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"velocidad": {"editor": "enum", "options": ["1x", "0.5x", "0.25x"], "default": "1x", "section": "Movimiento"}, "menos_movimiento": {"editor": "boolean", "default": false, "section": "Movimiento"}, "maquina_en_pausa": {"editor": "boolean", "default": false, "section": "Marco"}, "$preview": {"width": 390, "height": 844}}'>
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = {}; }
+  componentDidMount() {
+    var self = this;
+    // ---- Motor de movimiento de 0ff1ce (aproximación web de Reanimated) ----
+    var TOK = { instant: 100, fast: 180, base: 260, slow: 400,
+      firm: { k: 260, c: 20 }, soft: { k: 160, c: 14 } };
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function lerp(a, b, t) { return a + (b - a) * t; }
+    function rubber(x, lim) { return x <= lim ? x : lim + (x - lim) * 0.35; }
+    // Curva cúbica de Bézier (x1, y1, x2, y2), resuelta por Newton.
+    function bezier(x1, y1, x2, y2) {
+      function A(a1, a2) { return 1 - 3 * a2 + 3 * a1; }
+      function B(a1, a2) { return 3 * a2 - 6 * a1; }
+      function C(a1) { return 3 * a1; }
+      function calc(t, a1, a2) { return ((A(a1, a2) * t + B(a1, a2)) * t + C(a1)) * t; }
+      function slope(t, a1, a2) { return 3 * A(a1, a2) * t * t + 2 * B(a1, a2) * t + C(a1); }
+      return function (x) {
+        if (x <= 0) return 0; if (x >= 1) return 1;
+        var t = x;
+        for (var i = 0; i < 6; i++) { var s = slope(t, x1, x2); if (s === 0) break; t -= (calc(t, x1, x2) - x) / s; }
+        return calc(t, y1, y2);
+      };
+    }
+    var EASE_OUT = bezier(0.2, 0, 0, 1);   // entra: rápido al principio, se asienta
+    var EASE_IN = bezier(0.3, 0, 1, 1);    // sale: arranca suave, se va rápido
+    function Spring(v, cfg) { this.x = v; this.v = 0; this.t = v; this.cfg = cfg; }
+    Spring.prototype.to = function (t, cfg) { this.t = t; if (cfg) this.cfg = cfg; return this; };
+    Spring.prototype.set = function (v) { this.x = v; this.t = v; this.v = 0; return this; };
+    Spring.prototype.step = function (dt) {
+      var n = Math.max(1, Math.ceil(dt / (1 / 240))), h = dt / n;
+      for (var i = 0; i < n; i++) { var f = -this.cfg.k * (this.x - this.t) - this.cfg.c * this.v; this.v += f * h; this.x += this.v * h; }
+      if (Math.abs(this.v) < 0.0005 && Math.abs(this.x - this.t) < 0.0005) { this.x = this.t; this.v = 0; }
+    };
+    Spring.prototype.idle = function () { return this.x === this.t && this.v === 0; };
+    function Tween(v) { this.x = v; this.from = v; this.t = v; this.d = 1; this.e = 0; this.ease = EASE_OUT; }
+    Tween.prototype.to = function (t, ms, ease) { this.from = this.x; this.t = t; this.d = Math.max(1, ms); this.e = 0; this.ease = ease || EASE_OUT; return this; };
+    Tween.prototype.set = function (v) { this.x = v; this.from = v; this.t = v; this.e = this.d; return this; };
+    Tween.prototype.step = function (dtMs) { if (this.x === this.t) return; this.e += dtMs; var p = clamp(this.e / this.d, 0, 1); this.x = lerp(this.from, this.t, this.ease(p)); if (p >= 1) this.x = this.t; };
+    function speedOf(v) { return v === '0.25x' ? 0.25 : (v === '0.5x' ? 0.5 : 1); }
+    // ---- Programador de animaciones por elemento (sobre motion_lib) ----
+    var RUN = [];
+    function anim(ms, ease, step, done, delay) {
+      RUN.push({ t: -(delay || 0), d: Math.max(1, ms), ease: ease || EASE_OUT, step: step, done: done });
+    }
+    function tick(dtMs) {
+      var cur = RUN; RUN = [];
+      for (var i = 0; i < cur.length; i++) {
+        var a = cur[i]; a.t += dtMs;
+        if (a.t < 0) { RUN.push(a); continue; }
+        var p = clamp(a.t / a.d, 0, 1); a.step(a.ease(p), p);
+        if (p < 1) RUN.push(a); else if (a.done) a.done();
+      }
+    }
+
+    /* 0ff1ce — escena de la oficina para móvil.
+       Mapa vertical de 192×336 px lógicos, dibujado a escala entera.
+       Sprites: LimeZu Modern Interiors (atlas). Bibliotecario: person9 recoloreado. */
+    function createOffice(canvas, atlas, A, opts) {
+      opts = opts || {};
+      var W = 192, H = 336, CX = 96;
+      var A1 = 110, A2 = 178, A3 = 254;
+      var C = {
+        tinta: '#1e1e2b', papel: '#f7f6f0', ofc: '#0ff1ce', hondo: '#00715e', claro: '#d2fbf3',
+        postit: '#f8d47d', alerta: '#a54e35'
+      };
+
+      // ---------- roles ----------
+      // via: puntos desde el pasillo (x = 96) hasta el asiento; el primero siempre en el pasillo.
+      var ROLES = [
+        { id: 'bibliotecario', name: 'Bibliotecario', team: 'biblioteca', sprite: 13, home: [42, 84], facing: 3, chair: null, service: true,
+          via: [[CX, A1], [42, A1]] },
+        { id: 'operador_cuenta', name: 'Operador de cuenta', team: 'operacion', sprite: 4, home: [CX, 58], facing: 3, chair: null, service: true,
+          via: [[CX, 58]] },
+        { id: 'relaciones_comunidad', name: 'Relaciones con la comunidad', team: 'relaciones', sprite: 5, home: [146, 100], facing: 1, chair: 'gold',
+          via: [[CX, A1], [146, A1], [146, 100]] },
+        { id: 'conversaciones_inbox', name: 'Conversaciones e inbox', team: 'relaciones', sprite: 10, home: [170, 100], facing: 1, chair: 'gold',
+          via: [[CX, A1], [170, A1], [170, 100]] },
+        { id: 'investigador_referentes', name: 'Investigador de referentes', team: 'observatorio', sprite: 2, home: [24, 166], facing: 1, chair: 'north', monitor: [9, 116],
+          via: [[CX, A2], [24, A2], [24, 166]] },
+        { id: 'analista_barrio_resultados', name: 'Analista del barrio', team: 'observatorio', sprite: 3, home: [60, 166], facing: 1, chair: 'north', monitor: [45, 116],
+          via: [[CX, A2], [60, A2], [60, 166]] },
+        { id: 'posicionamiento', name: 'Posicionamiento', team: 'estrategia', sprite: 0, home: [132, 166], facing: 1, chair: 'north', monitor: [117, 116],
+          via: [[CX, A2], [132, A2], [132, 166]] },
+        { id: 'perfil', name: 'Perfil', team: 'estrategia', sprite: 1, home: [168, 166], facing: 1, chair: 'north', monitor: [153, 116],
+          via: [[CX, A2], [168, A2], [168, 166]] },
+        { id: 'director_editorial', name: 'Director editorial', team: 'editorial', sprite: 4, home: [26, 208], facing: 3, chair: 'back',
+          via: [[CX, A2], [26, A2], [26, 208]] },
+        { id: 'copywriter_a', name: 'Copywriter A', team: 'editorial', sprite: 5, home: [58, 208], facing: 3, chair: 'back',
+          via: [[CX, A2], [58, A2], [58, 208]] },
+        { id: 'copywriter_b', name: 'Copywriter B', team: 'editorial', sprite: 6, home: [42, 248], facing: 1, chair: 'north',
+          via: [[CX, A3], [42, A3], [42, 248]] },
+        { id: 'editor_verificador', name: 'Editor verificador', team: 'revision', sprite: 12, home: [156, 240], facing: 1, chair: 'north', monitor: [141, 190],
+          via: [[CX, A3], [156, A3], [156, 240]] },
+        { id: 'lector_comprador', name: 'Lector comprador', team: 'barrio', sprite: 7, home: [80, 286], facing: 3, chair: null,
+          via: [[CX, A3], [124, A3], [124, 294], [80, 294], [80, 286]] },
+        { id: 'lector_recomendador', name: 'Lector recomendador', team: 'barrio', sprite: 8, home: [96, 286], facing: 3, chair: null,
+          via: [[CX, A3], [124, A3], [124, 294], [96, 294], [96, 286]] },
+        { id: 'lector_divulgador', name: 'Lector divulgador', team: 'barrio', sprite: 9, home: [112, 286], facing: 3, chair: null,
+          via: [[CX, A3], [124, A3], [124, 294], [112, 294], [112, 286]] },
+        { id: 'lector_lider', name: 'Lector líder de opinión', team: 'barrio', sprite: 10, home: [52, 322], facing: 0, chair: 'pouf',
+          via: [[CX, A3], [52, A3], [52, 322]] },
+        { id: 'lector_par', name: 'Lector par profesional', team: 'barrio', sprite: 11, home: [140, 322], facing: 2, chair: 'pouf',
+          via: [[CX, A3], [140, A3], [140, 322]] }
+      ];
+      var TEAMS = [
+        { id: 'estrategia', n: '01', name: 'Estrategia y perfil', place: 'Los escritorios compartidos', purpose: 'Encontrar tu posición y hacer que tu perfil la comunique.', box: [112, 112, 76, 68] },
+        { id: 'observatorio', n: '02', name: 'Observatorio', place: 'Junto a la biblioteca', purpose: 'Escuchar al barrio y descubrir referentes, preguntas y oportunidades.', box: [4, 112, 76, 68] },
+        { id: 'editorial', n: '03', name: 'Mesa editorial', place: 'La mesa larga', purpose: 'Elegir una idea con intención y explorar dos maneras de contarla.', box: [4, 182, 76, 72] },
+        { id: 'barrio', n: '04', name: 'El barrio', place: 'El sofá y la mesa de centro', purpose: 'Cinco perspectivas lectoras para cuestionar y mejorar las ideas. Son simulaciones, no datos de mercado.', box: [28, 258, 136, 76] },
+        { id: 'revision', n: '05', name: 'Revisión', place: 'El rincón tranquilo', purpose: 'Comprobar claridad, coherencia y evidencia antes de entregar.', box: [112, 182, 76, 72] },
+        { id: 'relaciones', n: '06', name: 'Relaciones', place: 'La mesa de la cocina', purpose: 'Cuidar la conversación con la comunidad: comentarios, respuestas y mensajes.', box: [112, 30, 76, 80], isNew: true },
+        { id: 'operacion', n: '07', name: 'Operación', place: 'Junto a la puerta', purpose: 'Llevar a LinkedIn solo lo aprobado, dentro de topes, ventana horaria y pausas.', box: [80, 30, 32, 52], isNew: true }
+      ];
+      var LIBRARY_BOX = [4, 30, 76, 80];
+      var BY = {};
+      ROLES.forEach(function (r, i) { BY[r.id] = r; r.index = i; });
+
+      // Lugares a los que se va de visita.
+      var PLACES = {
+        biblioteca1: { via: [[CX, A1], [32, A1], [32, 112]], facing: 1 },
+        biblioteca2: { via: [[CX, A1], [54, A1], [54, 112]], facing: 1 },
+        cafe: { via: [[CX, A1], [126, A1], [126, 70]], facing: 1 },
+        editorial: { via: [[CX, 214], [82, 214]], facing: 2 },
+        revision: { via: [[CX, A3], [134, A3], [134, 240]], facing: 0 },
+        barrio: { via: [[CX, A3], [128, A3], [128, 290]], facing: 2 },
+        estrategia: { via: [[CX, A2], [150, A2], [150, 168]], facing: 0 },
+        operacion: { via: [[CX, A1], [CX, 74]], facing: 1 },
+        puerta: { via: [[CX, 58], [CX, 34]], facing: 1 }
+      };
+
+      // ---------- estado ----------
+      var actors = ROLES.map(function (r) {
+        return { role: r, x: r.home[0], y: r.home[1], dir: r.facing, anim: 'idle_anim', moving: false,
+          status: 'en_espera', since: Date.now(), busy: false, away: false, bubble: null, alpha: 1, path: null, onArrive: null, reading: false };
+      });
+      var AB = {};
+      actors.forEach(function (a) { AB[a.role.id] = a; });
+
+      var clock = 0, last = 0, raf = 0, paused = false, night = false, stopped = false, frozen = false, selected = null, selectedTeam = null;
+      var hopAt = -1e9, teamAt = -1e9, mail = null; // salto del personaje, corchetes y sobre
+      var timers = [];
+      var scale = 2;
+
+      function st(a, s) { if (a.status !== s) { a.status = s; a.since = Date.now(); } }
+      function setStatus(id, s) { st(AB[id], s); }
+
+      // ---------- rutas ----------
+      function homeVia(a) { return a.role.via; }
+      function pathTo(a, via) {
+        // Desde donde está: si está en casa, sale por su via al revés.
+        var out = [];
+        var from = a.atPlace ? a.atPlace.slice().reverse() : homeVia(a).slice().reverse();
+        out = out.concat(from);
+        var start = from[from.length - 1];
+        var end = via[0];
+        if (start[0] !== end[0] || start[1] !== end[1]) out.push([CX, end[1]]);
+        out = out.concat(via);
+        // quitar duplicados seguidos
+        var clean = [];
+        out.forEach(function (p) {
+          var q = clean[clean.length - 1];
+          if (!q || q[0] !== p[0] || q[1] !== p[1]) clean.push(p);
+        });
+        return clean;
+      }
+      var SPEED = 40; // px lógicos por segundo
+      function walk(a, via, facing, placeVia, raw) {
+        return new Promise(function (resolve) {
+          if (raw) { a.path = via.slice(); }
+          else { a.path = pathTo(a, via); a.path.shift(); }
+          a.moving = true; a.away = true; a.anim = 'run';
+          a.onArrive = function () {
+            a.moving = false; a.anim = 'idle_anim'; a.dir = facing;
+            a.atPlace = placeVia || via;
+            resolve();
+          };
+        });
+      }
+      function goPlace(a, name) { var p = PLACES[name]; return walk(a, p.via, p.facing, p.via); }
+      function goHome(a) {
+        return walk(a, homeVia(a), a.role.facing, null).then(function () {
+          a.atPlace = null; a.away = false; a.anim = 'idle_anim';
+        });
+      }
+      function wait(ms) {
+        return new Promise(function (resolve) { timers.push({ at: clock + ms, fn: resolve }); });
+      }
+      function say(a, icon, ms) {
+        a.bubble = { icon: icon, until: clock + (ms || 2400) };
+      }
+      function narrate(text, id) { if (opts.onNarrate) opts.onNarrate(text, id || null); }
+
+      // ---------- biblioteca ----------
+      var queue = [], librarianBusy = false, spots = { biblioteca1: null, biblioteca2: null };
+      function consult(id, topic) {
+        var a = AB[id];
+        a.busy = true; a.doing = 'Consultando la biblioteca: «' + topic + '»';
+        narrate(a.role.name + ' va a la biblioteca: «' + topic + '».', id);
+        var spot = spots.biblioteca1 ? 'biblioteca2' : 'biblioteca1';
+        spots[spot] = id;
+        return goPlace(a, spot).then(function () {
+          say(a, 'pregunta', 1800);
+          return new Promise(function (resolve) { queue.push({ a: a, resolve: resolve }); serve(); });
+        }).then(function () {
+          say(a, 'libro', 2200);
+          a.reading = true; a.anim = 'reading';
+          return wait(1600);
+        }).then(function () {
+          a.reading = false; spots[spot] = null;
+          return goHome(a);
+        }).then(function () { a.busy = false; st(a, 'trabajando'); a.doing = null; });
+      }
+      function serve() {
+        if (librarianBusy || !queue.length) return;
+        librarianBusy = true;
+        var job = queue.shift();
+        var L = AB.bibliotecario;
+        L.reading = false;
+        var shelf = job.a.role.index % 2 ? [[42, 66], [20, 66]] : [[42, 66], [62, 66]];
+        walk(L, shelf, 1, null, true).then(function () {
+          say(L, 'busca', 1400);
+          return wait(1400);
+        }).then(function () {
+          return walk(L, [[42, 66], [42, 84]], 3, null, true);
+        }).then(function () {
+          L.atPlace = null; L.away = false;
+          say(L, 'libro', 1200);
+          return wait(900);
+        }).then(function () {
+          L.reading = true;
+          librarianBusy = false;
+          job.resolve();
+          serve();
+        });
+      }
+
+      // ---------- entregas entre equipos ----------
+      function handoff(fromId, place, toId, text, icon) {
+        var a = AB[fromId], b = AB[toId];
+        a.busy = true; a.doing = 'Entregando trabajo a ' + b.role.name;
+        narrate(text, fromId);
+        return goPlace(a, place).then(function () {
+          say(a, icon || 'hoja', 2200);
+          return wait(900);
+        }).then(function () {
+          say(b, 'charla', 1800);
+          return wait(1500);
+        }).then(function () {
+          return goHome(a);
+        }).then(function () { a.busy = false; a.doing = null; });
+      }
+      function whenFree(a) {
+        return new Promise(function (resolve) {
+          (function check() { if (!a.busy) resolve(); else timers.push({ at: clock + 300, fn: check }); })();
+        });
+      }
+      function publish() {
+        var o = AB.operador_cuenta;
+        return whenFree(o).then(function () { return publish2(o); });
+      }
+      function publish2(o) {
+        o.busy = true; o.doing = 'Publicando en LinkedIn';
+        narrate('Operación lleva la pieza aprobada a LinkedIn.', 'operador_cuenta');
+        return goPlace(o, 'puerta').then(function () {
+          o.fade = -1; return wait(1300);
+        }).then(function () {
+          say(o, 'listo', 2000); o.fade = 1;
+          return wait(800);
+        }).then(function () { return goHome(o); }).then(function () {
+          o.busy = false; o.doing = null;
+          narrate('Publicado. La pieza ya está en tu perfil.', 'operador_cuenta');
+        });
+      }
+
+      // ---------- llega una captura de Gustavo ----------
+      function receiveCapture() {
+        var o = AB.operador_cuenta;
+        mail = { x: CX + 2, y: -6, vy: 0, landed: false };
+        narrate('Llegó tu captura a la oficina.', 'operador_cuenta');
+        return new Promise(function (resolve) {
+          (function fall() {
+            if (mail.y < 68) { mail.vy += 0.9; mail.y = Math.min(68, mail.y + mail.vy); timers.push({ at: clock + 16, fn: fall }); }
+            else { mail.landed = true; resolve(); }
+          })();
+        }).then(function () { return whenFree(o); }).then(function () {
+          o.busy = true; o.doing = 'Recogiendo tu captura';
+          o.dir = 3; say(o, 'pregunta', 700);
+          return wait(700);
+        }).then(function () {
+          mail = null; say(o, 'hoja', 1600);
+          return wait(500);
+        }).then(function () {
+          o.doing = 'Llevando tu captura a Mesa editorial';
+          narrate('Operación lleva tu captura a Mesa editorial.', 'operador_cuenta');
+          return goPlace(o, 'editorial');
+        }).then(function () {
+          say(o, 'hoja', 1800); say(AB.director_editorial, 'charla', 1800);
+          narrate('Director editorial recibe tu captura.', 'director_editorial');
+          return wait(1500);
+        }).then(function () { return goHome(o); }).then(function () { o.busy = false; o.doing = null; });
+      }
+
+      // ---------- guion: el ciclo editorial ----------
+      var running = false, started = false;
+      function cycle() {
+        if (running) return; running = true;
+        var all = function (ps) { return Promise.all(ps); };
+        setStatus('analista_barrio_resultados', 'trabajando');
+        narrate('Observatorio lee lo que se habla en tu barrio.', 'analista_barrio_resultados');
+        wait(2600)
+          .then(function () { return consult('analista_barrio_resultados', 'señales del barrio'); })
+          .then(function () { return handoff('analista_barrio_resultados', 'editorial', 'director_editorial', 'Observatorio entrega su informe a Mesa editorial.', 'hoja'); })
+          .then(function () {
+            setStatus('director_editorial', 'trabajando');
+            narrate('Director editorial fija el brief con los copywriters.', 'director_editorial');
+            say(AB.director_editorial, 'charla', 2200);
+            return wait(1200).then(function () { say(AB.copywriter_a, 'charla', 1600); return wait(1500); });
+          })
+          .then(function () {
+            return all([consult('copywriter_a', 'clase 03: ganchos'), wait(700).then(function () { return consult('copywriter_b', 'clase 05: objeciones'); })]);
+          })
+          .then(function () {
+            narrate('Copywriter A y B escriben dos versiones.', 'copywriter_a');
+            AB.copywriter_a.reading = true; AB.copywriter_b.reading = true;
+            return wait(3600);
+          })
+          .then(function () {
+            AB.copywriter_a.reading = false; AB.copywriter_b.reading = false;
+            return handoff('director_editorial', 'barrio', 'lector_recomendador', 'Director lleva las dos versiones a El barrio.', 'hoja');
+          })
+          .then(function () {
+            narrate('El barrio lee y busca objeciones.', 'lector_comprador');
+            ['lector_comprador', 'lector_recomendador', 'lector_divulgador', 'lector_lider', 'lector_par'].forEach(function (id) {
+              AB[id].reading = true; st(AB[id], 'trabajando');
+            });
+            return wait(4200);
+          })
+          .then(function () {
+            ['lector_comprador', 'lector_recomendador', 'lector_divulgador', 'lector_par'].forEach(function (id) { AB[id].reading = false; st(AB[id], 'en_espera'); });
+            AB.lector_lider.reading = false;
+            return handoff('lector_lider', 'editorial', 'director_editorial', 'Lector líder devuelve las objeciones del barrio.', 'charla');
+          })
+          .then(function () { st(AB.lector_lider, 'en_espera'); return handoff('director_editorial', 'revision', 'editor_verificador', 'Director pasa la versión elegida a Revisión.', 'hoja'); })
+          .then(function () { setStatus('editor_verificador', 'trabajando'); return consult('editor_verificador', 'comprobar afirmaciones'); })
+          .then(function () {
+            narrate('Revisión aprueba el texto exacto.', 'editor_verificador');
+            say(AB.editor_verificador, 'listo', 2200);
+            return wait(2000);
+          })
+          .then(function () { return handoff('editor_verificador', 'operacion', 'operador_cuenta', 'Revisión entrega el paquete aprobado a Operación.', 'hoja'); })
+          .then(function () { return publish(); })
+          .then(function () {
+            ['analista_barrio_resultados', 'director_editorial', 'copywriter_a', 'copywriter_b', 'editor_verificador'].forEach(function (id) { st(AB[id], 'en_espera'); });
+            return wait(5000);
+          })
+          .then(function () { running = false; if (!stopped) cycle(); });
+      }
+
+      // Ambiente: quien está en espera va por café o conversa.
+      var nextAmbient = 9000;
+      function ambient() {
+        if (clock < nextAmbient || stopped) return;
+        nextAmbient = clock + 11000;
+        var free = actors.filter(function (a) {
+          return !a.busy && !a.away && a.status === 'en_espera' && !a.role.service && ['posicionamiento', 'perfil', 'investigador_referentes', 'lector_par', 'lector_divulgador'].indexOf(a.role.id) >= 0;
+        });
+        if (free.length) {
+          var a = free[Math.floor((clock / 1000) % free.length)];
+          a.busy = true; a.doing = 'Por un café';
+          goPlace(a, 'cafe').then(function () { say(a, 'cafe', 2600); return wait(2600); })
+            .then(function () { return goHome(a); }).then(function () { a.busy = false; a.doing = null; });
+        }
+        // Relaciones conversan en la mesa de la cocina.
+        if (AB.conversaciones_inbox.status !== 'diseno') {
+          say(AB.relaciones_comunidad, 'charla', 2000);
+          timers.push({ at: clock + 2200, fn: function () { say(AB.conversaciones_inbox, 'charla', 2000); } });
+        }
+      }
+
+      // ---------- dibujo ----------
+      var ctx = canvas.getContext('2d');
+      function S(name, x, y) {
+        var r = A[name]; if (!r) return;
+        ctx.drawImage(atlas, r[0], r[1], r[2], r[3], Math.round(x), Math.round(y), r[2], r[3]);
+      }
+      function R(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); }
+      function tile(name, x, y, w, h) {
+        var r = A[name];
+        ctx.save(); ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+        for (var yy = y; yy < y + h; yy += r[3]) for (var xx = x; xx < x + w; xx += r[2]) S(name, xx, yy);
+        ctx.restore();
+      }
+      // Alfombra en nueve partes: esquinas fijas, bordes y centro repetidos sin escalar.
+      function rug(name, x, y, w, h, k) {
+        var r = A[name];
+        var sx = r[0], sy = r[1], rw = r[2], rh = r[3];
+        function part(px, py, pw, ph, dx, dy, dw, dh) {
+          ctx.save(); ctx.beginPath(); ctx.rect(dx, dy, dw, dh); ctx.clip();
+          for (var yy = dy; yy < dy + dh; yy += ph) for (var xx = dx; xx < dx + dw; xx += pw)
+            ctx.drawImage(atlas, sx + px, sy + py, pw, ph, xx, yy, pw, ph);
+          ctx.restore();
+        }
+        var mw = rw - 2 * k, mh = rh - 2 * k;
+        part(0, 0, k, k, x, y, k, k);
+        part(rw - k, 0, k, k, x + w - k, y, k, k);
+        part(0, rh - k, k, k, x, y + h - k, k, k);
+        part(rw - k, rh - k, k, k, x + w - k, y + h - k, k, k);
+        part(k, 0, 1, k, x + k, y, w - 2 * k, k);
+        part(k, rh - k, 1, k, x + k, y + h - k, w - 2 * k, k);
+        part(0, k, k, 1, x, y + k, k, h - 2 * k);
+        part(rw - k, k, k, 1, x + w - k, y + k, k, h - 2 * k);
+        part(k + Math.floor(mw / 2), k + Math.floor(mh / 2), 1, 1, x + k, y + k, w - 2 * k, h - 2 * k);
+      }
+      function monitor(x, y, lit) {
+        S('monitorFront', x, y);
+        if (!lit) { R(x + 2, y + 2, 25, 12, '#33403f'); R(x + 3, y + 3, 23, 1, '#3f4e4c'); return; }
+        R(x + 2, y + 2, 25, 12, C.claro);
+        R(x + 2, y + 2, 25, 2, C.ofc);
+        R(x + 4, y + 6, 13, 1, C.hondo); R(x + 4, y + 9, 17, 1, '#7fd9c9'); R(x + 4, y + 12, 9, 1, '#7fd9c9');
+      }
+
+      function background() {
+        R(0, 0, W, H, '#4b5655');
+        tile('floor', 4, 30, 184, 302);
+        // cocina con baldosa
+        tile('tile', 112, 30, 76, 76);
+        R(110, 30, 2, 76, '#aa987f');
+        // muro superior: yeso, zócalo y rodapié
+        R(0, 0, W, 22, '#eee5cc'); R(0, 0, W, 2, '#fff5dd');
+        R(0, 22, W, 6, '#9ba998'); R(0, 28, W, 2, '#667b70');
+        R(0, 0, 4, H, '#536b61'); R(3, 2, 1, H - 4, '#b9c5ae');
+        R(188, 0, 4, H, '#536b61'); R(188, 2, 1, H - 4, '#b9c5ae');
+        R(0, H - 4, W, 4, '#526c61');
+        // alfombras de cada equipo
+        rug('rugBlue', 6, 114, 72, 60, 8);
+        rug('rugGreen', 114, 114, 72, 60, 6);
+        rug('rugRust', 6, 184, 72, 68, 8);
+        rug('rugGreen', 114, 184, 72, 64, 6);
+        rug('rugBlue', 30, 260, 132, 72, 8);
+        // entrada
+        S('door', 88, 2);
+        S('windowSmall', 52, 4);
+        S('board', 160, 6);
+        S('wallCabinet', 116, 8); S('wallCabinet', 134, 8);
+      }
+
+      function furnitureBack(stp) {
+        // biblioteca
+        S('library', 6, 22); S('books', 40, 28);
+        S('plantSmall', 78, 30);
+        // cocina
+        S('cabinet', 113, 42); S('coffee', 120, 32); S('sink', 144, 40); S('stove', 152, 30); S('fridge', 171, 22);
+        S('deskLight', 142, 58); S('fruit', 150, 62); S('cup', 168, 66);
+        // observatorio y estrategia
+        [[8, 114], [44, 114], [116, 114], [152, 114]].forEach(function (p) { S('deskLight', p[0], p[1]); });
+        // mesa editorial
+        S('chair', 18, 186); S('chair', 50, 186);
+        S('desk', 10, 196); S('desk', 42, 196);
+        S('laptop', 18, 210); S('laptop', 50, 210); S('cup', 66, 220);
+        // revisión
+        S('deskLight', 140, 188); S('plant', 114, 190); S('printer', 172, 226);
+        // el barrio
+        S('sofa', 72, 262); S('lamp', 158, 266); S('palm', 8, 292); S('plant', 164, 298);
+        S('roundChair', 45, 314); S('roundChair', 133, 314);
+        S('coffeeTable', 81, 300);
+        // monitores
+        actors.forEach(function (a) {
+          if (a.role.monitor) monitor(a.role.monitor[0], a.role.monitor[1], !stp && !frozen && a.status === 'trabajando' && !a.away);
+        });
+      }
+
+      function person(a) {
+        var anim = a.moving ? 'run' : (a.reading && A['p' + a.role.sprite + '-reading'] ? 'reading' : a.anim);
+        var key = 'p' + a.role.sprite + '-' + anim;
+        var r = A[key] || A['p' + a.role.sprite + '-idle_anim'];
+        var dir = anim === 'reading' ? 2 : a.dir;
+        var animate = !paused && !stopped && !frozen && (a.moving || a.status !== 'diseno');
+        var speed = a.moving ? 110 : 220;
+        var frame = animate ? Math.floor(clock / speed + a.role.index) % 6 : 0;
+        ctx.save();
+        ctx.globalAlpha = a.alpha * (a.status === 'diseno' ? 0.45 : 1);
+        var hop = 0;
+        if (a.role.id === selected) { var ht = clock - hopAt; hop = ht < 90 ? 2 : (ht < 180 ? 1 : 0); }
+        ctx.drawImage(atlas, r[0] + (dir * 6 + frame) * 16, r[1], 16, 32, Math.round(a.x - 8), Math.round(a.y - 29) - hop, 16, 32);
+        ctx.restore();
+      }
+      function chairFor(a) {
+        var x = a.role.home[0], y = a.role.home[1];
+        if (a.role.chair === 'north') S('chairNorth', x - 11, y - 6);
+        if (a.role.chair === 'gold') S('chairNorthGold', x - 11, y - 6);
+      }
+
+      function icon(kind, x, y) {
+        // íconos de 7×6 dentro del globo
+        var t = C.tinta;
+        if (kind === 'libro') { R(x, y + 1, 7, 5, '#a54e35'); R(x + 1, y + 2, 5, 3, C.papel); R(x + 3, y + 1, 1, 5, '#7a3624'); }
+        else if (kind === 'hoja') { R(x + 1, y, 5, 6, '#ffffff'); R(x + 1, y, 5, 6, '#ffffff'); R(x + 2, y + 2, 3, 1, '#565972'); R(x + 2, y + 4, 3, 1, '#565972'); }
+        else if (kind === 'cafe') { R(x + 1, y + 2, 4, 4, '#ffffff'); R(x + 5, y + 3, 1, 2, '#ffffff'); R(x + 2, y + 3, 2, 1, '#8a6552'); R(x + 2, y, 1, 1, '#b9b5ad'); R(x + 3, y + 1, 1, 1, '#b9b5ad'); }
+        else if (kind === 'listo') { R(x + 5, y + 1, 1, 1, C.hondo); R(x + 4, y + 2, 1, 1, C.hondo); R(x + 3, y + 3, 1, 1, C.hondo); R(x + 2, y + 4, 1, 1, C.hondo); R(x + 1, y + 3, 1, 1, C.hondo); R(x, y + 2, 1, 1, C.hondo); R(x + 2, y + 5, 1, 1, C.hondo); }
+        else if (kind === 'pregunta') { R(x + 2, y, 3, 1, t); R(x + 5, y + 1, 1, 1, t); R(x + 4, y + 2, 1, 1, t); R(x + 3, y + 3, 1, 1, t); R(x + 3, y + 5, 1, 1, t); }
+        else if (kind === 'busca') { R(x + 1, y, 3, 1, t); R(x, y + 1, 1, 2, t); R(x + 4, y + 1, 1, 2, t); R(x + 1, y + 3, 3, 1, t); R(x + 4, y + 4, 1, 1, t); R(x + 5, y + 5, 1, 1, t); }
+        else { var f = Math.floor(clock / 300) % 3; for (var d = 0; d < 3; d++) R(x + d * 3, y + 3 - (f === d && !paused ? 1 : 0), 1, 1, '#565972'); }
+      }
+      function bubble(a) {
+        var b = a.bubble; if (!b) return;
+        if (clock > b.until) { a.bubble = null; return; }
+        var x = Math.round(a.x), y = Math.round(a.y - 42);
+        R(x - 7, y, 13, 10, C.tinta); R(x - 6, y + 1, 11, 8, '#ffffff'); R(x - 1, y + 10, 3, 2, C.tinta); R(x, y + 9, 1, 2, '#ffffff');
+        icon(b.icon, x - 3, y + 2);
+      }
+      function light(a) {
+        if (a.status !== 'trabajando' || a.away || stopped || frozen) return;
+        var on = paused || Math.floor(clock / 700 + a.role.index) % 3 !== 0;
+        var x = Math.round(a.x + 6), y = Math.round(a.y - 30);
+        R(x - 1, y - 1, 4, 4, C.tinta); R(x, y, 2, 2, on ? C.ofc : C.hondo);
+      }
+      function pointer(a) {
+        var x = Math.round(a.x), y = Math.round(a.y - 46 - (a.bubble ? 12 : 0));
+        R(x - 4, y, 9, 1, C.tinta); R(x - 3, y + 1, 7, 1, C.tinta); R(x - 2, y + 2, 5, 1, C.tinta); R(x - 1, y + 3, 3, 1, C.tinta); R(x, y + 4, 1, 1, C.tinta);
+        R(x - 3, y, 7, 1, C.postit); R(x - 2, y + 1, 5, 1, C.postit); R(x - 1, y + 2, 3, 1, C.postit); R(x, y + 3, 1, 1, C.postit);
+      }
+
+      function brackets(b) {
+        var x = b[0] + 1, y = b[1] + 1, w = b[2] - 2, h = b[3] - 2, L = Math.max(1, Math.round(7 * Math.min(1, (clock - teamAt) / 120)));
+        [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]].forEach(function (c) {
+          var cx = c[0], cy = c[1], dx = c[2], dy = c[3];
+          R(Math.min(cx, cx + dx * L), dy > 0 ? cy : cy - 2, L, 3, C.tinta);
+          R(dx > 0 ? cx : cx - 2, Math.min(cy, cy + dy * L), 3, L, C.tinta);
+          R(Math.min(cx, cx + dx * L) + (dx > 0 ? 1 : 0), dy > 0 ? cy + 1 : cy - 1, L - 1, 1, C.postit);
+          R(dx > 0 ? cx + 1 : cx - 1, Math.min(cy, cy + dy * L) + (dy > 0 ? 1 : 0), 1, L - 1, C.postit);
+        });
+      }
+      function drawMail() {
+        var x = Math.round(mail.x - 5), y = Math.round(mail.y - 4);
+        R(x, y, 11, 8, C.tinta); R(x + 1, y + 1, 9, 6, '#ffffff');
+        R(x + 1, y + 1, 1, 1, C.tinta); R(x + 2, y + 2, 1, 1, C.tinta); R(x + 3, y + 3, 1, 1, C.tinta); R(x + 4, y + 4, 3, 1, C.tinta);
+        R(x + 7, y + 3, 1, 1, C.tinta); R(x + 8, y + 2, 1, 1, C.tinta); R(x + 9, y + 1, 1, 1, C.tinta);
+        R(x + 4, y + 5, 3, 1, C.ofc);
+      }
+      function draw() {
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        ctx.imageSmoothingEnabled = false;
+        background();
+        furnitureBack(stopped);
+        var list = actors.slice().sort(function (a, b) { return a.y - b.y; });
+        list.forEach(function (a) {
+          if (a.role.chair === 'back' && !a.away) {} // la silla ya está detrás
+          if (a.away && (a.role.chair === 'north' || a.role.chair === 'gold')) chairFor(a);
+        });
+        list.forEach(function (a) {
+          person(a);
+          if (!a.away && (a.role.chair === 'north' || a.role.chair === 'gold')) chairFor(a);
+          if (a.role.id === 'bibliotecario') S('book', 28, 70);
+        });
+        if (AB.bibliotecario.away) S('book', 28, 70);
+        // pufs delante de los lectores laterales
+        actors.forEach(light);
+        actors.forEach(bubble);
+        if (mail) drawMail();
+        if (selectedTeam) brackets(selectedTeam === 'biblioteca' ? LIBRARY_BOX : TEAMS.filter(function (t) { return t.id === selectedTeam; })[0].box);
+        if (selected && AB[selected]) pointer(AB[selected]);
+        // luz de tarde
+        if (night) {
+          ctx.fillStyle = 'rgba(23,34,68,0.30)'; ctx.fillRect(0, 0, W, H);
+          ctx.globalCompositeOperation = 'screen';
+          [[42, 70], [132, 140], [60, 140], [168, 140], [156, 214], [164, 276], [40, 214]].forEach(function (p) {
+            var g = ctx.createRadialGradient(p[0], p[1], 0, p[0], p[1], 30);
+            g.addColorStop(0, 'rgba(255,200,117,0.25)'); g.addColorStop(1, 'rgba(255,200,117,0)');
+            ctx.fillStyle = g; ctx.fillRect(p[0] - 30, p[1] - 30, 60, 60);
+          });
+          ctx.globalCompositeOperation = 'source-over';
+        }
+        if (stopped) { ctx.fillStyle = 'rgba(30,30,43,0.28)'; ctx.fillRect(0, 0, W, H); }
+      }
+
+      function step(dt) {
+        clock += dt;
+        // Los temporizadores vencidos se sacan antes de ejecutarlos: así los que agenden otros no se pierden.
+        var due = timers.filter(function (t) { return clock >= t.at; });
+        timers = timers.filter(function (t) { return clock < t.at; });
+        due.forEach(function (t) { t.fn(); });
+        actors.forEach(function (a) {
+          if (a.fade) { a.alpha = Math.max(0, Math.min(1, a.alpha + a.fade * dt / 500)); if (a.alpha <= 0 || a.alpha >= 1) a.fade = 0; }
+          if (!a.moving || !a.path) return;
+          var left = SPEED * dt / 1000;
+          while (left > 0 && a.path.length) {
+            var t = a.path[0], dx = t[0] - a.x, dy = t[1] - a.y, d = Math.abs(dx) + Math.abs(dy);
+            if (Math.abs(dx) > Math.abs(dy)) a.dir = dx > 0 ? 0 : 2; else if (d > 0) a.dir = dy > 0 ? 3 : 1;
+            if (d <= left) { a.x = t[0]; a.y = t[1]; a.path.shift(); left -= d; }
+            else {
+              if (Math.abs(dx) > 0) { var mx = Math.min(Math.abs(dx), left); a.x += Math.sign(dx) * mx; left -= mx; }
+              if (left > 0 && Math.abs(dy) > 0) { var my = Math.min(Math.abs(dy), left); a.y += Math.sign(dy) * my; left -= my; }
+            }
+          }
+          if (!a.path.length) { a.path = null; var f = a.onArrive; a.onArrive = null; if (f) f(); }
+        });
+        ambient();
+      }
+
+      function frame(t) {
+        var dt = last ? Math.min(60, t - last) : 16;
+        last = t;
+        if (opts.speed) dt *= opts.speed();
+        if (!paused && !stopped && !frozen) step(dt);
+        draw();
+        raf = requestAnimationFrame(frame);
+      }
+
+      function resize() {
+        var dpr = (typeof window !== 'undefined' && window.devicePixelRatio) || 1;
+        scale = Math.max(1, Math.round(2 * dpr));
+        canvas.width = W * scale; canvas.height = H * scale;
+      }
+
+      // Estado inicial de demostración.
+      ['bibliotecario', 'operador_cuenta', 'relaciones_comunidad', 'investigador_referentes', 'posicionamiento'].forEach(function (id) { setStatus(id, 'trabajando'); });
+      AB.bibliotecario.reading = true;
+      setStatus('conversaciones_inbox', 'diseno');
+
+      return {
+        W: W, H: H, roles: ROLES,
+        start: function () { resize(); started = true; if (!stopped && !frozen) cycle(); raf = requestAnimationFrame(frame); },
+        stop: function () { cancelAnimationFrame(raf); },
+        advance: function (ms, noDraw) { var n = Math.ceil(ms / 16); for (var i = 0; i < n; i++) step(16); if (!noDraw) draw(); },
+        setPaused: function (v) { paused = !!v; last = 0; },
+        setNight: function (v) { night = !!v; },
+        setStopped: function (v) { stopped = !!v; if (stopped) narrate('La máquina está en pausa. Nadie toca tu LinkedIn.', 'operador_cuenta'); else { narrate('La oficina vuelve al trabajo.', 'operador_cuenta'); if (!running && started && !frozen) cycle(); } },
+        select: function (id) { if (id && id !== selected) hopAt = clock; selected = id; },
+        receiveCapture: function () { return receiveCapture(); },
+        hit: function (px, py) {
+          var hits = actors.filter(function (a) { return px >= a.x - 8 && px <= a.x + 8 && py >= a.y - 28 && py <= a.y + 2 && a.alpha > 0.2; });
+          hits.sort(function (a, b) { return b.y - a.y; });
+          return hits.length ? hits[0].role.id : null;
+        },
+        statusOf: function (id) { var a = AB[id]; if (!a) return null; return frozen ? 'desconocido' : a.status; },
+        sinceOf: function (id) { var a = AB[id]; return a ? a.since : null; },
+        teams: TEAMS,
+        selectTeam: function (id) { if (id && id !== selectedTeam) teamAt = clock; selectedTeam = id; },
+        hitZone: function (px, py) {
+          if (px >= LIBRARY_BOX[0] && px < LIBRARY_BOX[0] + LIBRARY_BOX[2] && py >= LIBRARY_BOX[1] && py < LIBRARY_BOX[1] + LIBRARY_BOX[3]) return 'biblioteca';
+          for (var i = 0; i < TEAMS.length; i++) { var b = TEAMS[i].box; if (px >= b[0] && px < b[0] + b[2] && py >= b[1] && py < b[1] + b[3]) return TEAMS[i].id; }
+          return null;
+        },
+        designed: function () { return actors.filter(function (a) { return a.status === 'diseno'; }).map(function (a) { return { id: a.role.id, x: a.role.home[0], y: a.role.home[1] }; }); },
+        setFrozen: function (v) { frozen = !!v; last = 0; if (!frozen && !running && !stopped && started) cycle(); },
+        activityOf: function (id) {
+          var a = AB[id]; if (!a) return '';
+          if (frozen) return 'Sin datos de actividad';
+          if (stopped) return 'Quieto: la máquina está en pausa';
+          if (a.status === 'diseno') return 'Todavía no trabaja';
+          if (a.doing) return a.doing;
+          if (id === 'bibliotecario') return 'Ordenando la biblioteca';
+          if (a.reading) return 'Leyendo un borrador';
+          return a.status === 'trabajando' ? 'Trabajando en su puesto' : 'En espera, sin encargo';
+        },
+        draw: draw
+      };
+    }
+    var ATLAS = {"p0-idle_anim":[0,0,384,32],"p0-run":[0,33,384,32],"p0-reading":[0,66,288,32],"p1-idle_anim":[0,99,384,32],"p1-run":[0,132,384,32],"p1-reading":[0,165,288,32],"p2-idle_anim":[0,198,384,32],"p2-run":[0,231,384,32],"p2-reading":[0,264,288,32],"p3-idle_anim":[0,297,384,32],"p3-run":[0,330,384,32],"p3-reading":[0,363,288,32],"p4-idle_anim":[0,396,384,32],"p4-run":[0,429,384,32],"p4-reading":[0,462,288,32],"p5-idle_anim":[0,495,384,32],"p5-run":[0,528,384,32],"p5-reading":[0,561,288,32],"p6-idle_anim":[0,594,384,32],"p6-run":[0,627,384,32],"p6-reading":[0,660,288,32],"p7-idle_anim":[0,693,384,32],"p7-run":[0,726,384,32],"p7-reading":[0,759,288,32],"p8-idle_anim":[0,792,384,32],"p8-run":[0,825,384,32],"p8-reading":[0,858,288,32],"p9-idle_anim":[0,891,384,32],"p9-run":[0,924,384,32],"p9-reading":[0,957,288,32],"p10-idle_anim":[0,990,384,32],"p10-run":[0,1023,384,32],"p10-reading":[0,1056,288,32],"p11-idle_anim":[0,1089,384,32],"p11-run":[0,1122,384,32],"p12-idle_anim":[0,1155,384,32],"p12-run":[0,1188,384,32],"p12-reading":[0,1221,288,32],"p13-idle_anim":[0,1254,384,32],"p13-run":[0,1287,384,32],"p13-reading":[0,1320,288,32],"portrait0":[289,1320,16,32],"portrait1":[306,1320,16,32],"portrait2":[323,1320,16,32],"portrait3":[340,1320,16,32],"portrait4":[357,1320,16,32],"portrait5":[374,1320,16,32],"portrait6":[391,1320,16,32],"portrait7":[408,1320,16,32],"portrait8":[425,1320,16,32],"portrait9":[442,1320,16,32],"portrait10":[459,1320,16,32],"portrait11":[476,1320,16,32],"portrait12":[493,1320,16,32],"portrait13":[0,1353,16,32],"plant":[17,1353,23,30],"plantSmall":[41,1353,22,30],"coffeeTable":[64,1353,30,18],"lamp":[95,1353,15,33],"books":[111,1353,32,33],"library":[144,1353,32,39],"board":[177,1353,26,13],"map":[204,1353,32,19],"book":[237,1353,28,35],"fridge":[266,1353,16,35],"sink":[283,1353,24,14],"stove":[308,1353,16,24],"coffee":[325,1353,16,16],"cup":[342,1353,9,15],"cabinet":[352,1353,29,14],"wallCabinet":[382,1353,16,10],"fruit":[399,1353,14,17],"roundChair":[414,1353,14,15],"printer":[429,1353,15,16],"desk":[445,1353,32,37],"deskLight":[478,1353,32,37],"sofa":[0,1393,48,26],"chair":[49,1393,16,26],"window":[66,1393,44,26],"windowSmall":[111,1393,25,15],"rugRust":[137,1393,60,40],"rugBlue":[198,1393,60,40],"rugGreen":[259,1393,30,46],"table":[290,1393,32,37],"door":[323,1393,16,28],"palm":[340,1393,23,31],"floor":[364,1393,32,32],"tile":[397,1393,32,32],"laptop":[430,1393,16,16],"monitor":[447,1393,32,32],"chairBack":[480,1393,14,22],"chairNorth":[0,1440,22,19],"chairNorthGold":[23,1440,22,19],"monitorFront":[46,1440,29,20]};
+    var SPRITE = {"bibliotecario": 13, "operador_cuenta": 4, "relaciones_comunidad": 5, "conversaciones_inbox": 10, "investigador_referentes": 2, "analista_barrio_resultados": 3, "posicionamiento": 0, "perfil": 1, "director_editorial": 4, "copywriter_a": 5, "copywriter_b": 6, "editor_verificador": 12, "lector_comprador": 7, "lector_recomendador": 8, "lector_divulgador": 9, "lector_lider": 10, "lector_par": 11}, PORT = {"0": [289, 1320], "1": [306, 1320], "2": [323, 1320], "3": [340, 1320], "4": [357, 1320], "5": [374, 1320], "6": [391, 1320], "7": [408, 1320], "8": [425, 1320], "9": [442, 1320], "10": [459, 1320], "11": [476, 1320], "12": [493, 1320], "13": [0, 1353]};
+    var TEAMS = ["estrategia", "observatorio", "editorial", "barrio", "revision", "relaciones", "operacion"];
+    var $ = function (id) { return document.getElementById(id); };
+    function rm() { return !!self.props.menos_movimiento; }
+    function sp() { return speedOf(self.props.velocidad); }
+    function pos(id) { var s = SPRITE[id] !== undefined ? SPRITE[id] : 13; var p = PORT[s]; return (-2 * p[0]) + 'px ' + (-2 * (p[1] + 9)) + 'px'; }
+    // Línea de «ahora»: la vieja se va, la nueva entra subiendo 6 pt.
+    var CAP = { front: 'a' };
+    function caption(text, id) {
+      var oldK = CAP.front, newK = oldK === 'a' ? 'b' : 'a'; CAP.front = newK;
+      var o = $('of-cap-' + oldK), n = $('of-cap-' + newK);
+      $('of-cap-' + newK + '-t').textContent = text; $('of-cap-' + newK + '-p').style.backgroundPosition = pos(id);
+      if (rm()) { o.style.opacity = '0'; n.style.opacity = '1'; n.style.transform = 'none'; return; }
+      anim(120, EASE_IN, function (e) { o.style.opacity = String(1 - e); o.style.transform = 'translateY(' + (-4 * e) + 'px)'; });
+      anim(TOK.fast, EASE_OUT, function (e) { n.style.opacity = String(e); n.style.transform = 'translateY(' + (6 * (1 - e)) + 'px)'; }, null, 60);
+      // Se retira sola a los 3,5 s para no tapar la puerta y la pared.
+      var box = $('of-cap'); box.style.opacity = '1'; box.style.transform = 'none';
+      CAP.stamp = (CAP.stamp || 0) + 1; var stamp = CAP.stamp;
+      anim(TOK.fast, EASE_IN, function (e) { if (CAP.stamp !== stamp) return; box.style.opacity = String(1 - e); box.style.transform = 'translateY(' + (-6 * e) + 'px)'; }, null, 3500);
+    }
+    function markTeam(k) { TEAMS.forEach(function (t) { var b = $('of-t-' + t); var on = t === k; b.style.background = on ? '#1e1e2b' : '#fffef8'; b.style.color = on ? '#f7f6f0' : '#1e1e2b'; b.style.borderColor = on ? '#1e1e2b' : '#dedfd4'; }); }
+    var img = new Image();
+    img.onload = function () {
+      var canvas = $('of-mapa');
+      var o = createOffice(canvas, img, ATLAS, { onNarrate: function (t, id) { caption(t, id); }, speed: sp });
+      self.office = o; o.start();
+      if (rm()) o.setPaused(true);
+    };
+    img.src = '/_blob/9aa3da587c44b923cd4c0161de1156bc';
+    self.api = {
+      tap: function (e) {
+        var o = self.office; if (!o) return;
+        var r = e.currentTarget.getBoundingClientRect();
+        var x = (e.clientX - r.left) / r.width * 192, y = (e.clientY - r.top) / r.height * 336;
+        var id = o.hit(x, y);
+        if (id) {
+          var role = o.roles.filter(function (q) { return q.id === id; })[0];
+          o.select(id); o.selectTeam(id === 'bibliotecario' ? 'biblioteca' : role.team); markTeam(role.team);
+          caption(role.name + ' · ' + o.activityOf(id), id); return;
+        }
+        var z = o.hitZone(x, y);
+        if (z) self.api.team(z === 'biblioteca' ? 'biblioteca' : z);
+      },
+      team: function (k) {
+        var o = self.office; if (!o) return;
+        o.select(null); o.selectTeam(k); markTeam(k);
+      },
+      send: function () { if (self.office) self.office.receiveCapture(); }
+    };
+    var last = 0;
+    function frame(now) {
+      var dtMs = last ? Math.min(50, now - last) : 16; last = now; dtMs *= sp();
+      tick(rm() ? 1e6 : dtMs);
+      if (self.office) self.office.setPaused(rm());
+      self.raf = requestAnimationFrame(frame);
+    }
+    self.raf = requestAnimationFrame(frame);
+  }
+  componentWillUnmount() { cancelAnimationFrame(this.raf); if (this.office) this.office.stop(); }
+  renderVals() {
+    var self = this;
+    var v = { enPausa: !!this.props.maquina_en_pausa,
+      tocar: function (e) { if (self.api) self.api.tap(e); }, envio: function () { if (self.api) self.api.send(); } };
+    ["estrategia", "observatorio", "editorial", "barrio", "revision", "relaciones", "operacion"].forEach(function (k) { v['team_' + k] = function () { if (self.api) self.api.team(k); }; });
+    return v;
+  }
+}
+</script>
+</body>
+</html>

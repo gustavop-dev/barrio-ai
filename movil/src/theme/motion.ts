@@ -23,6 +23,29 @@ const REDUCE: Record<ReduceMotionChoice, ReduceMotion> = {
   never: ReduceMotion.Never,
 };
 
+// ---------------------------------------------------------------- design base (Claude Design, «0ff1ce — Vistas móviles»)
+// The motion design in `movil/diseno-movimiento/` runs one engine on every board: `TOK` there is this
+// block. Its springs integrate force = −k·(x − target) − c·v with mass 1, exactly Reanimated's model, so
+// k is `stiffness` and c is `damping`. Every token below builds on these values.
+
+/** The four durations of the design (ms): `instant` taps, `fast` most tweens, `base` screens and panels, `slow` big reveals. */
+export const durations = { instant: 100, fast: 180, base: 260, slow: 400 } as const;
+
+/** Sheets, pushes, navigation, selections and anything that follows the finger (TOK.firm). */
+export const FIRM = { damping: 20, stiffness: 260, mass: 1 } as const;
+/** Presses, pulses, counters and morphs (TOK.soft). */
+export const SOFT = { damping: 14, stiffness: 160, mass: 1 } as const;
+
+/** Past an edge, a drag keeps this fraction of the extra distance (the design's `rubber`). */
+export const RUBBER = 0.35;
+
+/** The design's rubber band: free up to `limit`, then resisting. Worklet-safe. */
+export function rubberBand(x: number, limit: number): number {
+  'worklet';
+  if (x <= limit) return x;
+  return limit + (x - limit) * RUBBER;
+}
+
 // ---------------------------------------------------------------- springs (damping, stiffness, mass)
 
 export interface SpringToken {
@@ -33,19 +56,19 @@ export interface SpringToken {
 
 export const springs = {
   /** A swiped card that did not commit goes back to its place. */
-  snapBack: { damping: 20, stiffness: 260, mass: 1 },
+  snapBack: FIRM,
   /** The capture button grows to 72 px (and shrinks back) under the finger. */
-  captureGrow: { damping: 15, stiffness: 320, mass: 0.7 },
+  captureGrow: SOFT,
   /** The capture button and lock follow the finger while sliding up. */
-  captureFollow: { damping: 24, stiffness: 420, mass: 0.6 },
+  captureFollow: FIRM,
   /** Bottom sheets (capture, confirm) rising into place. */
-  sheetOpen: { damping: 24, stiffness: 260, mass: 1 },
+  sheetOpen: FIRM,
   /** Pressed buttons, tab pills and chips scaling back. */
-  press: { damping: 18, stiffness: 420, mass: 0.6 },
+  press: SOFT,
   /** The toast rising from the bottom. */
-  toast: { damping: 20, stiffness: 260, mass: 0.9 },
+  toast: FIRM,
   /** Calendario: the week strip or the month settling on the next page after a swipe (or back to its place). */
-  pageSnap: { damping: 26, stiffness: 240, mass: 1 },
+  pageSnap: FIRM,
   /** An opportunity card lifting under the finger when its drag starts (and settling when dropped). */
   dragLift: { damping: 18, stiffness: 300, mass: 0.8 },
   /** The photo viewer: double-tap zoom, the photo settling back inside its bounds, a drag-to-close that did not close. */
@@ -59,10 +82,10 @@ export type SpringName = keyof typeof springs;
 export const easings = {
   /** Most UI moves: quick start, soft landing. */
   standard: Easing.bezier(0.2, 0, 0, 1),
-  /** Things arriving (fade in, sheet backdrop). */
-  enter: Easing.out(Easing.cubic),
-  /** Things leaving (card out after a swipe, sheet down). */
-  exit: Easing.in(Easing.cubic),
+  /** Things arriving: fast start, settles (the design's EASE_OUT). */
+  enter: Easing.bezier(0.2, 0, 0, 1),
+  /** Things leaving: soft start, gone fast (the design's EASE_IN). */
+  exit: Easing.bezier(0.3, 0, 1, 1),
   /** Breathing loops (recording dot, pulsing ball, skeleton). */
   pulse: Easing.inOut(Easing.sin),
 } as const;
@@ -77,23 +100,23 @@ export interface TimingToken {
 
 export const timings = {
   /** Press feedback on buttons and chips. */
-  press: { duration: 90, easing: 'standard' },
+  press: { duration: durations.instant, easing: 'standard' },
   /** A swiped card flying off screen once committed. */
-  swipeExit: { duration: 200, easing: 'exit' },
+  swipeExit: { duration: durations.fast, easing: 'exit' },
   /** A card leaving the list (answered, done, postponed) and the gap closing. */
-  listExit: { duration: 220, easing: 'exit' },
+  listExit: { duration: durations.fast, easing: 'exit' },
   /** A card entering the list. */
-  listEnter: { duration: 240, easing: 'enter' },
+  listEnter: { duration: durations.base, easing: 'enter' },
   /** Fold open/close («Pospuestas», «Hecho recientemente»). */
-  fold: { duration: 200, easing: 'standard' },
+  fold: { duration: durations.fast, easing: 'standard' },
   /** Sheet and modal backdrop fading in or out. */
-  backdrop: { duration: 180, easing: 'enter' },
+  backdrop: { duration: durations.fast, easing: 'enter' },
   /** Bottom sheet leaving. */
-  sheetClose: { duration: 200, easing: 'exit' },
+  sheetClose: { duration: durations.fast, easing: 'exit' },
   /** Toast leaving. */
-  toastOut: { duration: 160, easing: 'exit' },
+  toastOut: { duration: durations.fast, easing: 'exit' },
   /** The hold overlay (lock, strip) appearing over the bar. */
-  holdOverlay: { duration: 140, easing: 'enter' },
+  holdOverlay: { duration: durations.instant, easing: 'enter' },
   /** Red recording dot: one blink (in + out). */
   recordDot: { duration: 1000, easing: 'pulse' },
   /** Locked recording: one heartbeat of the brand ball. */
@@ -101,13 +124,13 @@ export const timings = {
   /** Skeleton shimmer: one cycle. */
   skeleton: { duration: 1100, easing: 'pulse' },
   /** Screen transitions of the stack (detail views). */
-  screen: { duration: 260, easing: 'standard' },
+  screen: { duration: durations.base, easing: 'enter' },
   /** The full-screen photo viewer fading in and out. */
-  viewerFade: { duration: 180, easing: 'enter' },
+  viewerFade: { duration: durations.fast, easing: 'enter' },
   /** An upload progress bar moving to its new value. */
-  progress: { duration: 240, easing: 'standard' },
-  officeNowIn: { duration: 240, easing: 'enter' },
-  officeNowOut: { duration: 160, easing: 'exit' },
+  progress: { duration: durations.base, easing: 'standard' },
+  officeNowIn: { duration: durations.base, easing: 'enter' },
+  officeNowOut: { duration: durations.fast, easing: 'exit' },
 } as const satisfies Record<string, TimingToken>;
 
 export type TimingName = keyof typeof timings;

@@ -4,6 +4,21 @@ Todo valor de movimiento de la app vive en un solo archivo: [`src/theme/motion.t
 
 Si una pieza nueva necesita un movimiento que no existe, se añade aquí primero: un token con nombre y una fila en esta tabla.
 
+## Base del diseño (Claude Design)
+
+El diseño de movimiento de Gustavo está en [`diseno-movimiento/`](diseno-movimiento/README.md) y es la fuente. Todos sus tableros usan el mismo motor, y estos son sus valores. Los resortes del diseño integran `−k·(x − destino) − c·v` con masa 1, el mismo modelo de Reanimated: `k` es `stiffness` y `c` es `damping`.
+
+| Token | Valor | Qué es |
+|---|---|---|
+| `durations.instant` / `fast` / `base` / `slow` | 100 / 180 / 260 / 400 ms | Las cuatro duraciones. `fast` es la de casi todas las transiciones. `base` es para pantallas y paneles, y `slow` para las revelaciones grandes. |
+| `FIRM` | 20 · 260 · 1 | Hojas, pushes, navegación, selecciones y todo lo que sigue al dedo (`TOK.firm`). |
+| `SOFT` | 14 · 160 · 1 | Pulsaciones, latidos, contadores y transformaciones (`TOK.soft`). |
+| `easings.enter` | bezier(0.2, 0, 0, 1) | Lo que entra: arranca rápido y se asienta (`EASE_OUT`). |
+| `easings.exit` | bezier(0.3, 0, 1, 1) | Lo que sale: arranca suave y se va rápido (`EASE_IN`). |
+| `RUBBER` / `rubberBand()` | 0.35 | Pasado un borde, el arrastre conserva el 35 % de la distancia extra. |
+
+Los resortes y tiempos genéricos de las tablas de abajo ya apuntan a esta base (`snapBack`, `sheetOpen`, `press`…). La coreografía de cada pantalla se afina en su sección.
+
 ## Movimiento reducido
 
 | Token | Valor | Qué hace |
@@ -16,13 +31,13 @@ Si una pieza nueva necesita un movimiento que no existe, se añade aquí primero
 
 | Token | Valores | Dónde se usa |
 |---|---|---|
-| `snapBack` | 20 · 260 · 1 | Tu turno: la tarjeta deslizada que no llega al umbral vuelve a su sitio (`turno/SwipeableCard.tsx`). |
-| `captureGrow` | 15 · 320 · 0.7 | El botón de captura crece a 72 px al mantenerlo y vuelve a 60 px (`capture/CaptureButton.tsx`). |
-| `captureFollow` | 24 · 420 · 0.6 | El botón y el candado siguen al dedo hacia arriba y vuelven abajo (`capture/CaptureButton.tsx`). |
-| `sheetOpen` | 24 · 260 · 1 | Las hojas inferiores suben y vuelven a su sitio tras arrastrarlas sin cerrar: captura, confirmaciones, oportunidad y datos (`components/ui/Sheet.tsx`). |
-| `press` | 18 · 420 · 0.6 | Botón al soltarlo y píldora de la pestaña activa en la barra inferior (`components/ui/Button.tsx`, `components/shell/BottomBar.tsx`). |
-| `toast` | 20 · 260 · 0.9 | El aviso inferior entra subiendo (`layout.toastIn`, en `components/ui/Toast.tsx`). |
-| `pageSnap` | 26 · 240 · 1 | Calendario: la tira de la semana o el mes se asientan en la página siguiente o anterior tras deslizar, o vuelven a su sitio (`calendario/Pager.tsx`). |
+| `snapBack` | FIRM (20 · 260 · 1) | Tu turno: la tarjeta deslizada que no llega al umbral vuelve a su sitio (`turno/SwipeableCard.tsx`). |
+| `captureGrow` | SOFT (14 · 160 · 1) | El botón de captura crece a 72 px al mantenerlo y vuelve a 60 px (`capture/CaptureButton.tsx`). |
+| `captureFollow` | FIRM (20 · 260 · 1) | El botón y el candado siguen al dedo hacia arriba y vuelven abajo (`capture/CaptureButton.tsx`). |
+| `sheetOpen` | FIRM (20 · 260 · 1) | Las hojas inferiores suben y vuelven a su sitio tras arrastrarlas sin cerrar: captura, confirmaciones, oportunidad y datos (`components/ui/Sheet.tsx`). |
+| `press` | SOFT (14 · 160 · 1) | Botón al soltarlo y píldora de la pestaña activa en la barra inferior (`components/ui/Button.tsx`, `components/shell/BottomBar.tsx`). |
+| `toast` | FIRM (20 · 260 · 1) | El aviso inferior entra subiendo (`layout.toastIn`, en `components/ui/Toast.tsx`). |
+| `pageSnap` | FIRM (20 · 260 · 1) | Calendario: la tira de la semana o el mes se asientan en la página siguiente o anterior tras deslizar, o vuelven a su sitio (`calendario/Pager.tsx`). |
 | `dragLift` | 18 · 300 · 0.8 | Personas › Oportunidades: la tarjeta crece al levantarla con una pulsación larga y vuelve al soltarla (`personas/Oportunidades.tsx`). |
 | `zoomSettle` | 22 · 240 · 1 | El visor de fotos de la Galería: el zoom con doble toque, la foto que vuelve dentro de sus bordes tras pellizcar o arrastrar, y la foto que vuelve a su sitio si el arrastre para cerrar no llega (`galeria/PhotoViewer.tsx`). |
 
@@ -32,26 +47,26 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 
 | Token | ms · curva | Dónde se usa |
 |---|---|---|
-| `press` | 90 · standard | El botón se encoge al 97 % al pulsarlo (`components/ui/Button.tsx`). |
-| `swipeExit` | 200 · exit | La tarjeta deslizada sale de la pantalla cuando la acción se confirma (`turno/SwipeableCard.tsx`). |
-| `listExit` | 220 · exit | Una tarjeta sale de la lista y las demás cierran el hueco (`layout.listExit` y `layout.listMove`, en `turno/TuTurnoScreen.tsx`). |
-| `listEnter` | 240 · enter | Las tarjetas y las etiquetas de grupo entran en la lista (`layout.listEnter`). |
-| `fold` | 200 · standard | Los plegables «Pospuestas», «Hecho recientemente» y «Cómo se ordena»: giro del chevrón y aparición del contenido (`components/ui/Fold.tsx`). También abre la lista de opciones de un selector (`components/ui/Select.tsx`) y las semanas anteriores del resumen (`resultados/ResumenSemanal.tsx`). |
-| `backdrop` | 180 · enter | El fondo oscuro de las hojas aparece y desaparece (`components/ui/Sheet.tsx`). |
-| `sheetClose` | 200 · exit | La hoja baja al cerrarse (`components/ui/Sheet.tsx`). |
-| `toastOut` | 160 · exit | El aviso inferior se desvanece (`layout.toastOut`). |
-| `holdOverlay` | 140 · enter | Aparecen la banda de grabación, el candado y su pista al mantener el botón (`layout.overlayIn` y `layout.overlayOut`, en `capture/CaptureButton.tsx`). |
+| `press` | 100 (instant) · standard | El botón se encoge al 97 % al pulsarlo (`components/ui/Button.tsx`). |
+| `swipeExit` | 180 (fast) · exit | La tarjeta deslizada sale de la pantalla cuando la acción se confirma (`turno/SwipeableCard.tsx`). |
+| `listExit` | 180 (fast) · exit | Una tarjeta sale de la lista y las demás cierran el hueco (`layout.listExit` y `layout.listMove`, en `turno/TuTurnoScreen.tsx`). |
+| `listEnter` | 260 (base) · enter | Las tarjetas y las etiquetas de grupo entran en la lista (`layout.listEnter`). |
+| `fold` | 180 (fast) · standard | Los plegables «Pospuestas», «Hecho recientemente» y «Cómo se ordena»: giro del chevrón y aparición del contenido (`components/ui/Fold.tsx`). También abre la lista de opciones de un selector (`components/ui/Select.tsx`) y las semanas anteriores del resumen (`resultados/ResumenSemanal.tsx`). |
+| `backdrop` | 180 (fast) · enter | El fondo oscuro de las hojas aparece y desaparece (`components/ui/Sheet.tsx`). |
+| `sheetClose` | 180 (fast) · exit | La hoja baja al cerrarse (`components/ui/Sheet.tsx`). |
+| `toastOut` | 180 (fast) · exit | El aviso inferior se desvanece (`layout.toastOut`). |
+| `holdOverlay` | 100 (instant) · enter | Aparecen la banda de grabación, el candado y su pista al mantener el botón (`layout.overlayIn` y `layout.overlayOut`, en `capture/CaptureButton.tsx`). |
 | `recordDot` | 1000 · pulse | Un parpadeo completo del punto rojo mientras se mantiene el botón (`capture/Pulse.tsx`). |
 | `recordPulse` | 1400 · pulse | Un latido completo de la bola 0ff1ce con la grabación bloqueada (`capture/Pulse.tsx`, en `capture/CaptureSheet.tsx`). |
 | `skeleton` | 1100 · pulse | Un ciclo de respiración de los esqueletos de carga (`components/ui/Skeleton.tsx`). |
-| `screen` | 260 · standard | La transición de las pantallas de detalle (pieza, persona) en la pila (`app/_layout.tsx`, `app/(app)/_layout.tsx`). Android usa su animación nativa; la duración solo se aplica en iOS. |
+| `screen` | 260 (base) · enter | La transición de las pantallas de detalle (pieza, persona) en la pila (`app/_layout.tsx`, `app/(app)/_layout.tsx`). Android usa su animación nativa; la duración solo se aplica en iOS. |
 | `spriteFrameMs` | 200 | Un fotograma del bibliotecario en reposo de los estados vacíos: 6 fotogramas en 1,2 s (`components/ui/Sprite.tsx`). |
 | `toastDurations.withUndo` | 5000 | Lo que dura un aviso con «Deshacer» o «Recuperar», la ventana de acción reversible (`components/ui/Toast.tsx`). |
 | `toastDurations.plain` | 4000 | Lo que dura un aviso sin acción. |
 | `toastDurations.withUndo` (veto) | 5000 | El veto de una pieza o de una acción en cola espera esta ventana antes de enviarse, para que «Deshacer» lo anule (`calendario/pendingVeto.ts`). |
 | `copiedLabelMs` | 2000 | Lo que dura «Copiado» en el botón Copiar del texto final (`pieza/FinalText.tsx`). |
-| `viewerFade` | 180 · enter | El visor de fotos a pantalla completa aparece y desaparece (`layout.viewerIn` y `layout.viewerOut`, en `galeria/PhotoViewer.tsx`). |
-| `progress` | 240 · standard | La barra de «Subir fotos» avanza cada vez que entra una petición de hasta diez fotos (`galeria/UploadProgressCard.tsx`). |
+| `viewerFade` | 180 (fast) · enter | El visor de fotos a pantalla completa aparece y desaparece (`layout.viewerIn` y `layout.viewerOut`, en `galeria/PhotoViewer.tsx`). |
+| `progress` | 260 (base) · standard | La barra de «Subir fotos» avanza cada vez que entra una petición de hasta diez fotos (`galeria/UploadProgressCard.tsx`). |
 
 ## Umbrales de gestos (`gestures`)
 
@@ -130,7 +145,7 @@ enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas 
 
 | Token | Valor | Dónde se usa |
 |---|---|---|
-| `timings.officeNowIn` / `officeNowOut`, `officeLayout.nowIn/nowOut` | 240 ms enter / 160 ms exit | Entrada y salida de la narración flotante en `scene/OficinaScreen.tsx`. |
+| `timings.officeNowIn` / `officeNowOut`, `officeLayout.nowIn/nowOut` | 260 (base) enter / 180 (fast) exit | Entrada y salida de la narración flotante en `scene/OficinaScreen.tsx`. |
 | `officeMotion.walkSpeed` | 40 px lógicos/s | Caminatas del motor compartido (`scene/runtime.ts`). |
 | `officeMotion.startGap` / `summaryHold` | 1800 / 2600 ms | Espaciado de eventos y resúmenes. |
 | `officeMotion.ambientFirst` / `ambientEvery` | 9000 / 20000 ms | Café y charla únicamente para roles en espera. |
