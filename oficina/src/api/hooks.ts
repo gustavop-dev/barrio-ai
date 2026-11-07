@@ -220,7 +220,8 @@ export function useTurnoAction() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ action, note }: { action: TurnoAction; note?: string }) => runTurnoAction(action, note),
-    onSettled: () => invalidate(client, keys.tuTurno, keys.overview, keys.actionsAll, keys.calendarioAll, keys.actividadAll, keys.linkedin),
+    // redAll: closing a conversation card changes «Te toca» on the person card.
+    onSettled: () => invalidate(client, keys.tuTurno, keys.overview, keys.actionsAll, keys.calendarioAll, keys.actividadAll, keys.linkedin, keys.redAll),
   });
 }
 
@@ -293,7 +294,8 @@ export function useCreateOportunidad() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: (input: OpportunityInput) => createOportunidad(input),
-    onSettled: () => invalidate(client, keys.oportunidadesAll, keys.redAll, keys.resultadosAll, keys.calendarioAll),
+    // tuTurno: a conversation card stops offering «Marcar como oportunidad» once the person has one.
+    onSettled: () => invalidate(client, keys.oportunidadesAll, keys.redAll, keys.resultadosAll, keys.calendarioAll, keys.tuTurno),
   });
 }
 

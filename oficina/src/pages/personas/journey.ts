@@ -47,8 +47,10 @@ export function journey(contact: Contact): Stage[] {
     return [...reached.map((step): Stage => ({ key: step.key, label: step.label, date: shortDate(step.date) || null, state: 'done' })), end];
   }
 
-  // Conversations arrive with the inbox; an opportunity implies there was one.
-  steps.push({ key: 'conversation', label: 'En conversación', reached: Boolean(opportunity) });
+  // A conversation read from the inbox, or an opportunity (which implies there was one).
+  const conversation = contact.conversation ?? null;
+  const talked = Boolean(conversation?.messages.length || conversation?.last_message_preview);
+  steps.push({ key: 'conversation', label: 'En conversación', reached: Boolean(opportunity) || talked, date: talked ? conversation?.messages[0]?.at : null });
   steps.push({ key: 'opportunity', label: 'Oportunidad', reached: Boolean(opportunity), detail: opportunity?.stage_label ?? null });
 
   const last = steps.map((step) => step.reached).lastIndexOf(true);

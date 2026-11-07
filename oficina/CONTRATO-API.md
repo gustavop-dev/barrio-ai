@@ -734,3 +734,53 @@ Cada evento lo emite el backend en un momento concreto:
 | `publicacion` | Cuando LinkedIn confirma un post propio o un comentario |
 
 Un `desde` inválido devuelve 400.
+
+## Conversaciones e inbox (solo lectura)
+
+El agente `conversaciones_inbox` lee el inbox de LinkedIn con Unipile y propone a Gustavo las conversaciones que le tocan. Nunca envía mensajes ni crea oportunidades. Detalle en `agentes-linkedin/infra/docs/conversaciones-inbox.md`. Está apagado por defecto (`INBOX_ENABLED=false`): mientras lo esté, no hay tarjetas y `conversation` es `null` en las personas sin conversación leída.
+
+**`Conversation`**, tal como lo devuelven la ficha y la tarjeta:
+
+```json
+{ "id": "uuid", "chat_url": "https://www.linkedin.com/messaging/thread/2-…/ | https://www.linkedin.com/messaging/",
+  "attendee_name": "Lucía Ficticia", "contact_id": "uuid" | null,
+  "last_message_at": "iso" | null, "last_from_me": false, "last_message_preview": "…",
+  "messages": [{ "id": "…", "at": "iso" | null, "from_me": false, "text": "…", "attachments": 1 }],
+  "assessment": { "message_id": "…", "opportunity": true, "awaiting_reply": true, "pitch": false,
+                  "modality": "personal_startups | projectapp | por_clasificar",
+                  "answers": { "oportunidad": 0.86, "espera": 0.81, "venta": 0.04, "startups": 0.2, "projectapp": 0.9 },
+                  "model": "jev-1.14.0", "at": "iso" } | null,
+  "why": "Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)", "needs_you": true }
+```
+
+- `messages`: los últimos 3 mensajes visibles, del más antiguo al más reciente. Son texto de terceros: se muestran tal cual y nunca como HTML. `attachments` solo aparece si el mensaje trae adjuntos.
+- `assessment`: la lectura de Jev del último mensaje de la otra persona, o `null` si aún no se juzgó. `modality` es un valor de `Opportunity.modality`.
+- `needs_you`: la conversación es ahora una tarjeta de Tu turno.
+
+**Personas.** `ContactOutput` suma `conversation: Conversation | null`, la conversación más reciente de la persona. `your_turn` es `true` mientras esa conversación sea tarjeta, y entonces `next_step` es `{ "owner": "gustavo", "text": "Te toca: responder su mensaje", "at": null }`.
+
+**Tu turno.** Las conversaciones que le tocan van en `tasks.conversaciones` y en `items`, y cuentan en `counts.tareas`.
+
+- **Tarjeta:** `type: "conversacion"`, prioridad `importante`, `agent: "conversaciones_inbox"`, `title: "{persona} te escribió"`, `body` con la lectura del equipo, y `created_at` igual a la hora de su último mensaje.
+- **Id:** `conversation:<id>:<huella del mensaje>`. Cambia con cada mensaje nuevo de la persona, que vuelve a salir como Nueva.
+- **Campo `conversation`:** un `Conversation` más `person: { id, display_name, headline, profile_url, role, modality } | null`.
+- **Acciones:**
+
+```json
+[{ "label": "Abrir en LinkedIn", "href": "<chat_url>", "primary": true },
+ { "label": "Hecho, respondí", "endpoint": "/api/v1/conversaciones/<id>/cerrar", "body": { "how": "respondi" } },
+ { "label": "Marcar como oportunidad", "opportunity": { "contact": "uuid", "display_name": "…", "headline": "…",
+   "modality": "projectapp", "channel": "linkedin", "notes": "Detectada por el equipo en una conversación de LinkedIn." } },
+ { "label": "No responder", "endpoint": "/api/v1/conversaciones/<id>/cerrar", "body": { "how": "no_responder" }, "note_optional": true }]
+```
+
+- **Dos claves nuevas en las acciones.** Con `note_optional`, la oficina pide antes una nota opcional y la envía como `note`. Con `opportunity`, abre el formulario de oportunidad relleno; nada se guarda hasta que Gustavo pulsa «Registrar oportunidad» (`POST /api/v1/oportunidades`).
+- **«Marcar como oportunidad»** solo aparece si la persona está en Personas y no tiene una oportunidad abierta.
+- **Hecho recientemente.** `recent` suma `{ "kind": "conversation", "id": "conversation:<id>", "title": "{persona} te escribió", "how": "Respondiste | Sin responder | Respondiste en LinkedIn" }`.
+
+**`POST /api/v1/conversaciones/<id>/cerrar`** recibe `{ "how": "respondi | no_responder", "note": "…" }` (la nota es opcional, de hasta 1000 caracteres). Exige sesión humana: un token de servicio recibe 403.
+- Quita la tarjeta hasta que llegue otro mensaje de la persona y devuelve el `Conversation`.
+- Responde 400 si `how` no es válido y 409 si la conversación no tiene un mensaje de la persona.
+- Si Gustavo responde en LinkedIn, la tarjeta desaparece sola en la lectura siguiente.
+
+**Push.** El tipo `conversation` («Conversación que te toca», Tu turno) envía una sola push por cada mensaje nuevo que le toca. Lleva el nombre y la lectura del equipo, nunca el texto del mensaje.

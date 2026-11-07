@@ -124,7 +124,7 @@ Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo P
 - [ ] Un solo artefacto de posicionamiento para director, clasificador y líder
 - [ ] Resultados de las piezas en el historial del director
 - [ ] Alerta si la aprobación del líder cae a cero en una capacidad
-- [ ] Agente de inbox de solo lectura que proponga oportunidades
+- [x] Agente de inbox de solo lectura que proponga oportunidades ([conversaciones-inbox.md](conversaciones-inbox.md)). Apagado por defecto (`INBOX_ENABLED`). Jev juzga, pero no escribe: la tarjeta muestra su lectura y los mensajes literales, sin el resumen ni el borrador que pide DISENO-VISTAS. El origen «inbox» va en la nota de la oportunidad, porque Oportunidades no tiene campo de origen.
 - [ ] C1 a C3, validados con las evaluaciones
 
 ## Cómo confirmarlo en producción

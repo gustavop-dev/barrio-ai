@@ -146,6 +146,20 @@ class ContactOutput(serializers.ModelSerializer):
     next_step=serializers.SerializerMethodField()
     your_turn=serializers.SerializerMethodField()
     last_event=serializers.SerializerMethodField()
+    conversation=serializers.SerializerMethodField()
+    def _conversation(self,obj):
+        if not hasattr(obj,'_conversation_cache'):
+            from . import conversaciones
+            obj._conversation_cache=conversaciones.for_contact(obj)
+        return obj._conversation_cache
+    def _waiting(self,obj):
+        from . import conversaciones
+        conversation=self._conversation(obj)
+        return bool(conversation and conversaciones.enabled() and conversaciones.needs_gustavo(conversation))
+    def get_conversation(self,obj):
+        from . import conversaciones
+        conversation=self._conversation(obj)
+        return conversaciones.payload(conversation) if conversation else None
     def _open_action(self,obj):
         if not hasattr(obj,'_open_action_cache'):
             obj._open_action_cache=obj.proposals.filter(state__in=OPEN_ACTION_STATES).order_by('-created_at').first()
@@ -164,12 +178,13 @@ class ContactOutput(serializers.ModelSerializer):
     def get_display_stage(self,obj):
         return 'opportunity' if self._opportunity(obj) else obj.stage
     def get_your_turn(self,obj):
-        return False  # conversations that need Gustavo arrive with the inbox
+        return self._waiting(obj)  # a conversation of this person is a Tu turno card
     def get_last_event(self,obj):
         return obj.history[-1] if obj.history else None
     def get_next_step(self,obj):
         from . import red
         o=self._opportunity(obj);action=self._open_action(obj)
+        if self._waiting(obj):return {'owner':'gustavo','text':'Te toca: responder su mensaje','at':None}
         if o:return {'owner':'gustavo','text':f'Oportunidad: {o.get_stage_display()}'+(f' · {o.next_action}' if o.next_action else ''),'at':o.next_action_at}
         if action:
             labels={'RED-01':'seguirla','RED-02':'invitarla sin nota','RED-04':'aceptar su invitación'}
@@ -195,7 +210,8 @@ class ContactOutput(serializers.ModelSerializer):
         model=Contact
         fields=['id','account_id','provider_user_id','public_identifier','display_name','headline','profile_url','location','source',
                 'evidence','network_distance','is_following','stage','display_stage','classification','history','notes','followed_at',
-                'invited_at','connected_at','discovered_at','updated_at','open_action','opportunity','next_step','your_turn','last_event']
+                'invited_at','connected_at','discovered_at','updated_at','open_action','opportunity','next_step','your_turn','last_event',
+                'conversation']
 
 class NoteInput(serializers.Serializer):
     text=serializers.CharField(max_length=4000)

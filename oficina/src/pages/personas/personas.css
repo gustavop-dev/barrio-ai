@@ -712,3 +712,24 @@
   gap: 8px;
   align-items: center;
 }
+
+/* Conversación: the last messages, Gustavo's own indented. */
+.persona-messages {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.persona-messages li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-papel);
+}
+.persona-messages li.mine {
+  margin-left: 24px;
+  background: transparent;
+  border: 1px solid var(--color-linea);
+}

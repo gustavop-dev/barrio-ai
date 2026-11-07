@@ -118,7 +118,7 @@ Además, la respuesta trae:
 - lo resuelto en los últimos 7 días;
 - el resumen del día para el estado vacío.
 
-Las tareas de perfil y de conversaciones llegan con las fases del ciclo de Perfil y del inbox.
+Las conversaciones que le tocan a Gustavo llegan como tareas (`tasks.conversaciones`, tipo `conversacion`, Importante) cuando el inbox está encendido; ver [conversaciones e inbox](conversaciones-inbox.md). Las tareas de perfil llegan con la fase del ciclo de Perfil.
 
 **Calendario** (`GET /api/v1/calendario`) devuelve, por día local, los conteos menudos y los eventos importantes, en cinco capas:
 

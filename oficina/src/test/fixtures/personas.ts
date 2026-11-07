@@ -1,5 +1,5 @@
 // Personas data shaped like CONTRATO-API («Red», «Personas»). Invented people only.
-import type { Account, Contact, Opportunity, RedSummary, Referent } from '../../api/types';
+import type { Account, Contact, Conversation, Opportunity, RedSummary, Referent } from '../../api/types';
 
 export function redSummaryFixture(extra: Partial<RedSummary> = {}): RedSummary {
   return {
@@ -118,4 +118,35 @@ export function accountFixture(id = 'acc-1', label = 'LinkedIn de Gustavo'): Acc
 /** A DRF page. */
 export function page<T>(results: T[], next: string | null = null) {
   return { body: { count: results.length, next, previous: null, results } };
+}
+
+/** A LinkedIn conversation read by conversaciones_inbox (CONTRATO-API «Conversaciones»). */
+export function conversationFixture(extra: Partial<Conversation> = {}): Conversation {
+  return {
+    id: 'conv-1',
+    chat_url: 'https://www.linkedin.com/messaging/thread/2-SHVlcnRhTGFicw==/',
+    attendee_name: 'Lucía Ficticia',
+    contact_id: 'c-1',
+    last_message_at: '2026-10-06T15:12:00Z',
+    last_from_me: false,
+    last_message_preview: 'Hola Gustavo, ¿tienes disponibilidad para un proyecto corto de IA en enero?',
+    messages: [
+      { id: 'm-1', at: '2026-10-05T14:00:00Z', from_me: true, text: 'Thanks Lucía! Happy to share how we scoped it if useful.' },
+      { id: 'm-2', at: '2026-10-05T16:00:00Z', from_me: false, text: 'Would love that. We are stuck on where AI actually helps.' },
+      { id: 'm-3', at: '2026-10-06T15:12:00Z', from_me: false, text: 'Hola Gustavo, ¿tienes disponibilidad para un proyecto corto de IA en enero?' },
+    ],
+    assessment: {
+      message_id: 'm-3',
+      opportunity: true,
+      awaiting_reply: true,
+      pitch: false,
+      modality: 'projectapp',
+      answers: { oportunidad: 0.86, espera: 0.81, venta: 0.04, startups: 0.2, projectapp: 0.9 },
+      model: 'jev-1.14.0',
+      at: '2026-10-06T16:00:00Z',
+    },
+    why: 'Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)',
+    needs_you: true,
+    ...extra,
+  };
 }

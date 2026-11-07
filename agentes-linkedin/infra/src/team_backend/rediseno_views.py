@@ -166,6 +166,26 @@ def alerts(now=None):
             priority='importante'))
     return out
 
+def _conversation_card(conversation,now):
+    """C2 «Conversación que te toca» (DISENO-VISTAS 2.C2): who wrote, the team's read, the latest message and the links.
+    Gustavo answers on LinkedIn himself; «Marcar como oportunidad» opens the opportunity form, prefilled."""
+    from . import conversaciones
+    contact=conversation.contact;inbound=conversaciones.latest_inbound(conversation)
+    name=conversation.attendee_name or (contact.display_name if contact else 'Alguien')
+    close=f'/api/v1/conversaciones/{conversation.id}/cerrar'
+    actions=[{'label':'Abrir en LinkedIn','href':conversaciones.chat_url(conversation.provider_chat_id),'primary':True},
+             {'label':'Hecho, respondí','endpoint':close,'body':{'how':'respondi'}}]
+    if contact and not contact.opportunities.exclude(stage__in=oportunidades.CLOSED).exists():
+        actions.append({'label':'Marcar como oportunidad','opportunity':{'contact':str(contact.id),'display_name':contact.display_name,
+                        'headline':contact.headline,'modality':(conversation.assessment or {}).get('modality'),'channel':'linkedin',
+                        'notes':'Detectada por el equipo en una conversación de LinkedIn.'}})
+    actions.append({'label':'No responder','endpoint':close,'body':{'how':'no_responder'},'note_optional':True})
+    person={'id':str(contact.id),'display_name':contact.display_name,'headline':contact.headline,'profile_url':contact.profile_url,
+            'role':(contact.classification or {}).get('role'),'modality':(contact.classification or {}).get('modality')} if contact else None
+    return _card(conversaciones.card_id(conversation),'conversacion',f'{name} te escribió',conversaciones.why(conversation),actions,
+                 agent='conversaciones_inbox',priority='importante',created_at=conversaciones._at(inbound.get('at')) if inbound else conversation.last_message_at,
+                 conversation=dict(conversaciones.payload(conversation,now),person=person))
+
 def _question_priority(q,now):
     """Rises to Importante when less than 48 h remain before its deadline (rev 18 «Escalada»)."""
     return 'importante' if q.deadline and now<=q.deadline<=now+timedelta(hours=48) else 'cuando_puedas'
@@ -219,17 +239,19 @@ class TuTurno(APIView):
         open_questions=list(TeamQuestion.objects.filter(state='open').order_by('deadline','created_at'))
         pending=[q for q in open_questions if preguntas.is_pending(q,now)]
         later_q=[q for q in open_questions if not preguntas.is_pending(q,now)]
-        tasks={'perfil':[],'conversaciones':[]}  # profile cycle (PERF) and inbox (CHAT): later phases of the plan
+        from . import conversaciones
+        conversation_cards=[_conversation_card(c,now) for c in conversaciones.needing_gustavo(now)]
+        tasks={'perfil':[],'conversaciones':conversation_cards}  # profile cycle (PERF): a later phase of the plan
         question_cards=[_question_card(q,now) for q in pending];later=[_question_card(q,now) for q in later_q]
-        seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in warnings+question_cards]).values_list('item_id',flat=True))
-        items=_ordered(_with_state(warnings+question_cards,seen));_with_state(later,seen)
+        seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in warnings+question_cards+conversation_cards]).values_list('item_id',flat=True))
+        items=_ordered(_with_state(warnings+question_cards+conversation_cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]
         return Response({'count':len(active),'critical':any(c['priority']=='urgente' for c in active),
                          'urgent_count':sum(1 for c in active if c['priority']=='urgente'),
                          'counts':{'avisos':len(warnings),'preguntas':len(pending),'tareas':sum(len(v) for v in tasks.values())},
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
-                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts(),
+                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved(),
                          'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
 
 class TuTurnoSeen(APIView):
@@ -242,6 +264,20 @@ class TuTurnoSeen(APIView):
             raise ValidationError('ids debe ser una lista de identificadores de tarjetas')
         for item in set(ids):InboxSeen.objects.get_or_create(item_id=item)
         return Response({'seen':len(set(ids))})
+
+class ConversationClose(APIView):
+    """POST /api/v1/conversaciones/<id>/cerrar {how: respondi | no_responder, note?}: Gustavo closes the card."""
+    def post(self,request,cid):
+        human_session(request)
+        from . import conversaciones
+        from .models import Conversation
+        data=request.data if isinstance(request.data,dict) else {}
+        note=data.get('note') or ''
+        if data.get('how') not in conversaciones.CLOSE_HOW or not isinstance(note,str) or len(note)>1000:
+            raise ValidationError('how debe ser respondi o no_responder; note, un texto de hasta 1000 caracteres')
+        get_or_404(Conversation,id=cid)
+        conversation=conversaciones.close(request.user,cid,data['how'],note)
+        return Response(conversaciones.payload(conversation))
 
 class Notifications(APIView):
     """GET /api/v1/notificaciones?filtro=todas|sin_leer: what is coming or happened, 7 days, with its read state."""
