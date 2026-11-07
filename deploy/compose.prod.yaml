@@ -1,0 +1,90 @@
+# Barrio AI en un servidor 24/7: PWA + Django + worker + piloto automático + PostgreSQL.
+# Uso (en el servidor, desde esta carpeta):
+#   docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d
+name: barrio-ai
+# Images are built by GitHub Actions (.github/workflows/barrio-ai.yml) and pulled from GHCR;
+# `build` stays only as a local fallback (docker compose build).
+x-app: &app
+  image: ghcr.io/gustavop-dev/barrio-ai-api:${BARRIO_TAG:-latest}
+  build: ../agentes-linkedin/infra
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql://knowledge:${POSTGRES_PASSWORD}@db:5432/knowledge
+    SOURCE_ROOT: /workspace
+    DJANGO_HTTPS: "true"
+    DJANGO_ALLOWED_HOSTS: ${BARRIO_DOMAIN},api,127.0.0.1,localhost
+    DJANGO_CSRF_TRUSTED_ORIGINS: https://${BARRIO_DOMAIN}
+  volumes:
+    - ./conocimiento:/workspace:ro
+  restart: unless-stopped
+  logging: &logging
+    driver: json-file
+    options: {max-size: "10m", max-file: "5"}
+services:
+  db:
+    image: pgvector/pgvector:0.8.2-pg17
+    environment:
+      POSTGRES_USER: knowledge
+      POSTGRES_DB: knowledge
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configurar .env}
+    volumes: ["knowledge-db:/var/lib/postgresql/data", "./backups:/backups"]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U knowledge -d knowledge"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+    logging: *logging
+  migrate:
+    <<: *app
+    command: ["sh", "-c", "python manage.py migrate --noinput && python manage.py bootstrap_local"]
+    depends_on: {db: {condition: service_healthy}}
+    restart: "no"
+  api:
+    <<: *app
+    command: ["sh", "-c", "python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 2 --timeout 120 --forwarded-allow-ips='*'"]
+    depends_on: {migrate: {condition: service_completed_successfully}}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
+      interval: 15s
+      timeout: 6s
+      retries: 10
+  worker:
+    <<: *app
+    command: ["python", "manage.py", "runworker"]
+    depends_on: {api: {condition: service_healthy}}
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "worker_health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    stop_grace_period: 180s
+  autopilot:
+    <<: *app
+    command: ["python", "manage.py", "autopiloto"]
+    depends_on: {api: {condition: service_healthy}}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import time,pathlib; assert time.time()-float(pathlib.Path('/tmp/barrio-autopilot-heartbeat').read_text())<180"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+    stop_grace_period: 30s
+  web:
+    # Static PWA + reverse proxy with automatic HTTPS (Let's Encrypt). Only public service.
+    image: ghcr.io/gustavop-dev/barrio-ai-web:${BARRIO_TAG:-latest}
+    build: ../oficina
+    environment:
+      BARRIO_DOMAIN: ${BARRIO_DOMAIN:?Configurar .env}
+      ACME_EMAIL: ${ACME_EMAIL:?Configurar .env}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: {api: {condition: service_healthy}}
+    restart: unless-stopped
+    logging: *logging
+volumes:
+  knowledge-db:
+  caddy-data:
+  caddy-config:

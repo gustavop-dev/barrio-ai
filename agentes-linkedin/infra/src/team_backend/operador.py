@@ -82,8 +82,24 @@ def capacity_left(account,capability,now=None):
     done=ActionExecution.objects.filter(proposal__account=account,proposal__capability=capability)
     return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
 
-def globally_paused():
+def env_paused():
     return os.environ.get('OPERATOR_PAUSED','false').lower()=='true'
+
+def globally_paused():
+    """Total stop: the environment switch or the human switch in the office."""
+    from .models import OperatorControl
+    return env_paused() or OperatorControl.objects.filter(pk=1,paused=True).exists()
+
+def set_global_pause(user,paused,reason=''):
+    from .models import OperatorControl
+    require(user,'approve_actions')
+    if paused and not reason.strip():raise ValueError('Indica el motivo de la parada')
+    if not paused and env_paused():raise Conflict('La parada está fijada en el entorno (OPERATOR_PAUSED); se levanta en el servidor.')
+    control=OperatorControl.current()
+    control.paused=paused;control.reason=reason.strip() if paused else '';control.updated_by=user;control.updated_at=timezone.now()
+    control.save()
+    _audit(user,'operator.machine_'+('paused' if paused else 'resumed'),'machine',reason=control.reason)
+    return control
 
 def validate_payload(capability,payload):
     if not isinstance(payload,dict):raise ValueError('La acción requiere un objeto')
@@ -313,6 +329,9 @@ def execute(user,proposal_id):
         confirmed=bool(connector.get_post(post_id).get('user_reacted'))
         return _finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=timezone.now() if confirmed else None)
     except ConnectorUncertain as exc:
+        from .alerts import notify
+        notify('Barrio AI: acción incierta',f'{proposal.get_capability_display()}: el proveedor no confirmó. Se conciliará sin repetir.',
+               url='/acciones?state=uncertain',tag='barrio-incierta')
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
         if exc.pause:set_account_pause(account,f'Detenida por el proveedor: {exc}',user)

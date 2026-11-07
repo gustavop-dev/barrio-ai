@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views
 from . import operador_views as op
+from . import oficina_views as of
 urlpatterns=[
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
  path('units',views.Units.as_view()),path('units/<str:uid>',views.UnitDetail.as_view()),
@@ -11,6 +12,12 @@ urlpatterns=[
  path('memory/<uuid:mid>/confirm',views.ConfirmMemory.as_view()),
  path('integrity',views.Integrity.as_view()),path('audit',views.Audit.as_view()),
  # Account operator (DESC-04, INT-02, INT-03, ADM-04/05).
+ # Self-hosted office PWA (oficina/CONTRATO-API.md).
+ path('auth/session',of.session_view),path('auth/login',of.login_view),path('auth/logout',of.logout_view),
+ path('operador/overview',of.Overview.as_view()),path('operador/control',of.Control.as_view()),
+ path('operador/feed',of.Feed.as_view()),path('oficina/actividad',of.Actividad.as_view()),
+ path('push/key',of.PushKey.as_view()),path('push/subscriptions',of.PushSubscriptions.as_view()),
+ path('push/unsubscribe',of.PushUnsubscribe.as_view()),path('push/test',of.PushTest.as_view()),
  path('operador/accounts',op.Accounts.as_view()),
  path('operador/accounts/<uuid:aid>/check',op.AccountCheck.as_view()),
  path('operador/accounts/<uuid:aid>/pause',op.AccountPause.as_view()),
