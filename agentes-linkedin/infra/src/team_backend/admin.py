@@ -150,3 +150,22 @@ class EditorialPieceAdmin(ReadOnlyAdmin):
     readonly_fields=['account','slot_date','scheduled_for','state','stage','brief','variants','panel','selection','verification',
                      'final_text','citations','signals','usage','metrics','note','origin_job','created_by','created_at']
     fields=readonly_fields
+
+from .models import DeviceToken,ExpoPushToken
+
+@admin.register(DeviceToken)
+class DeviceTokenAdmin(admin.ModelAdmin):
+    """Logins of the mobile app. Setting revoked_at logs the device out and stops its Expo push."""
+    list_display=['name','user','created_at','last_used_at','revoked_at']
+    fields=['name','user','created_at','last_used_at','revoked_at']
+    readonly_fields=['name','user','created_at','last_used_at']
+    list_select_related=['user']
+    def has_add_permission(self,request):return False
+    def has_delete_permission(self,request,obj=None):return False
+
+@admin.register(ExpoPushToken)
+class ExpoPushTokenAdmin(ReadOnlyAdmin):
+    """The push token itself is never shown."""
+    list_display=['device_name','user','active','last_success_at','last_error','created_at']
+    fields=['device_name','user','device','active','created_at','updated_at','last_success_at','last_error']
+    readonly_fields=fields

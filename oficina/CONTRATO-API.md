@@ -860,3 +860,61 @@ Un `href` que empieza por `/` y no por `/api/` es una vista de la oficina: la PW
 **Notificación.** El tipo `weekly_summary` («Resumen de la semana listo», capa `tuyo`, con push por defecto) llega cuando hay un resumen nuevo. Lleva el titular como `detail`, `link: "/resultados#resumen"` y `ref: "weekly_summary:<AAAA-MM-DD>"`.
 
 **Escena.** El trabajo `weekly_summary` aparece en `analista_barrio_resultados` («Escribiendo el resumen de la semana»). Al terminar, `GET /api/v1/oficina/eventos` trae una `entrega` del analista a `director_editorial`.
+
+## App móvil: login por dispositivo y push nativo
+
+La app nativa (React Native + Expo) usa todas las rutas de este contrato sin cambios, incluidas las subidas `multipart/form-data` a `/api/v1/capturas` y `/api/v1/galeria` y los archivos de audio e imagen. Solo cambia cómo se autentica. Detalle del backend en `agentes-linkedin/infra/docs/app-movil-backend.md`.
+
+**Autenticación:**
+- Cada petición lleva `Authorization: Bearer <token>`, sin cookies ni `X-CSRFToken`.
+- El token empieza por `0ff1ce_dt_` y es una **sesión humana**: las decisiones que rechazan los tokens de servicio (403) lo aceptan.
+- Los permisos son los del usuario, como con la sesión.
+- Un token revocado o desconocido recibe 401 en cualquier ruta.
+
+### Login por dispositivo
+
+| Método y ruta | Cuerpo | Respuesta |
+| --- | --- | --- |
+| POST `/api/v1/auth/token` | `{ username, password, device_name }` | 201 `{ token, user, device: { id, name, created_at } }`. `user` tiene la misma forma que en `/auth/session`. El token se muestra solo esta vez. 400 si las credenciales son inválidas; 429 si hay demasiados intentos. |
+| GET `/api/v1/auth/session` | — | Con el Bearer: `{ authenticated: true, user }`. Con un token revocado o desconocido: `{ authenticated: false, user: null }` (200). |
+| POST `/api/v1/auth/token/revocar` | — | 204. Revoca el token de la petición (cerrar sesión) y apaga la push de ese dispositivo. 400 si la petición no viene con un token de dispositivo. |
+| GET `/api/v1/auth/dispositivos` | — | `[{ id, name, created_at, last_used_at, current, push }]`: los dispositivos con sesión abierta del usuario, del más nuevo al más viejo. `current` marca el de la petición y `push` dice si recibe notificaciones. |
+| DELETE `/api/v1/auth/dispositivos/<id>` | — | 204. Cierra la sesión de ese dispositivo y apaga su push. 404 si no existe, ya estaba revocado o es de otro usuario. 403 con un token de servicio. |
+
+- `POST /auth/token` no exige CSRF y comparte el contador de intentos con `POST /auth/login`: diez fallos por IP y usuario en 15 minutos bloquean las dos puertas.
+- `device_name` es opcional. Si llega vacío, el dispositivo se llama «App móvil». Se guardan hasta 120 caracteres.
+
+### Push nativo (Expo)
+
+| Método y ruta | Cuerpo | Respuesta |
+| --- | --- | --- |
+| POST `/api/v1/push/expo` | `{ token: "ExponentPushToken[…]", device_name }` | 201 `{ id }`. Registrar otra vez el mismo token lo actualiza y lo reactiva, con el mismo `id`. 400 si el token no tiene el formato de Expo; 403 con un token de servicio. |
+| DELETE `/api/v1/push/expo` | `{ token }` | 204. Lo quita, si es del usuario. |
+
+- El token de push queda ligado al dispositivo con el que se registró.
+- Todo aviso que hoy envía Web Push (`notificaciones.avisar`) llega también a los tokens de Expo activos, con los mismos interruptores por tipo de Ajustes › Notificaciones.
+- **El mensaje** es el mismo de la Web Push:
+
+```json
+{ "to": "ExponentPushToken[…]", "title": "…", "body": "…",
+  "data": { "url": "/tu-turno", "tag": "0ff1ce-uncertain" },
+  "channelId": "default", "priority": "high | default", "sound": "default", "ttl": 86400 }
+```
+
+- `data.url` es la ruta dentro de la app: `/tu-turno` para lo que va a Tu turno, el `link` del aviso para lo que va a Notificaciones (por ejemplo `/calendario/pieza/<id>`) o `/notificaciones`.
+- `priority` es `high` en los tipos urgentes de Tu turno y en la prueba.
+- La app debe crear el canal Android `default`.
+- `POST /api/v1/push/test` («Probar notificación») llega también a los teléfonos del usuario y responde `{ sent }` con el total. Sin VAPID y sin teléfonos registrados responde 403.
+
+### Ajustes
+
+`GET /api/v1/ajustes` añade dos claves para «Dispositivos con la app»:
+
+```json
+{ "devices": [{ "id": "uuid", "name": "Pixel de Gustavo", "created_at": "iso", "last_used_at": "iso|null", "current": false, "push": true }],
+  "expo_push": { "active": 1, "last_success_at": "iso|null", "last_error": "" } }
+```
+
+- `devices` tiene la misma forma que `GET /api/v1/auth/dispositivos`.
+- `expo_push.active` cuenta los tokens de push activos del usuario.
+- `last_error` es el último error de Expo en un token activo (por ejemplo `MessageRateExceeded`), o vacío.

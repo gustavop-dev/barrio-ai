@@ -16,6 +16,8 @@ from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccou
                      OperatorControl, TeamQuestion)
 from .operador_views import get_or_404, human_session, valid
 from .permissions import require
+from . import expo
+from .movil_views import devices_payload
 
 LABELS={'INT-03':'Comentario','INT-02':'Reacción','CONT-09':'Publicación','RED-01':'Seguimiento','RED-02':'Invitación sin nota',
         'RED-04':'Invitación aceptada'}
@@ -619,4 +621,6 @@ class Settings(APIView):
                              'lead_month_usd':_spend('%',month,provider='typesafe'),
                              'transcription_month_usd':_spend('%',month,provider='assemblyai')},
                          'facts_count':len(preguntas.facts()),'push_types':notificaciones.push_types(),
-                         'orientation':_orientation_payload()})
+                         'orientation':_orientation_payload(),
+                         # «Dispositivos con la app» (docs/app-movil-backend.md).
+                         'devices':devices_payload(request),'expo_push':expo.status(request.user)})

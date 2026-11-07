@@ -1,9 +1,11 @@
 """API of the self-hosted office PWA (see oficina/CONTRATO-API.md).
-Same origin as the PWA: Django session + CSRF. Human decisions never accept a Bearer token."""
+Same origin as the PWA: Django session + CSRF. Human decisions never accept a service Bearer token; the mobile app's
+device token is a human session too (movil_views.py, docs/app-movil-backend.md)."""
 import json
 import os
 from decimal import Decimal
 from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
@@ -13,7 +15,8 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import autopiloto, editorial, operador, push
+from . import autopiloto, editorial, expo, operador, push
+from .authentication import device_bearer, device_for
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, EditorialPiece, Job, ObservedPost, OperatorControl,
                      PushSubscription, Referent)
 from .operador_views import human_session, valid
@@ -29,10 +32,26 @@ def _user_payload(user):
     perms=sorted(p.split('.',1)[1] for p in user.get_all_permissions() if p.startswith('team_backend.'))
     return {'username':user.get_username(),'is_superuser':user.is_superuser,'permissions':perms}
 
+def check_login(request,username,password):
+    """Shared by the session login and the mobile app's device-token login: one lockout counter per client and
+    username. Returns (user, None) or (None, (status, detail))."""
+    client=request.META.get('REMOTE_ADDR','')
+    key=f'login-attempts:{client}:{username.lower()}'
+    if cache.get(key,0)>=LOGIN_ATTEMPTS:return None,(429,'Demasiados intentos; espera unos minutos.')
+    user=authenticate(request,username=username,password=password)
+    if not user or not user.is_active:
+        cache.set(key,cache.get(key,0)+1,LOGIN_WINDOW)
+        return None,(400,'Usuario o contraseña incorrectos.')
+    cache.delete(key)
+    return user,None
+
 @require_GET
 @ensure_csrf_cookie
 def session_view(request):
     user=request.user
+    token=device_bearer(request)
+    if token:  # the mobile app: a device token instead of the session cookie
+        device=device_for(token);user=device.user if device else AnonymousUser()
     return JsonResponse({'authenticated':user.is_authenticated,'user':_user_payload(user) if user.is_authenticated else None})
 
 @require_POST
@@ -41,14 +60,9 @@ def login_view(request):
     try:data=json.loads(request.body or b'{}')
     except json.JSONDecodeError:return JsonResponse({'detail':'JSON inválido'},status=400)
     username=str(data.get('username',''))[:150];password=str(data.get('password',''))[:256]
-    client=request.META.get('REMOTE_ADDR','')
-    key=f'login-attempts:{client}:{username.lower()}'
-    if cache.get(key,0)>=LOGIN_ATTEMPTS:return JsonResponse({'detail':'Demasiados intentos; espera unos minutos.'},status=429)
-    user=authenticate(request,username=username,password=password)
-    if not user or not user.is_active:
-        cache.set(key,cache.get(key,0)+1,LOGIN_WINDOW)
-        return JsonResponse({'detail':'Usuario o contraseña incorrectos.'},status=400)
-    cache.delete(key);login(request,user)
+    user,error=check_login(request,username,password)
+    if error:return JsonResponse({'detail':error[1]},status=error[0])
+    login(request,user)
     AuditEvent.objects.create(actor=user,action='auth.login',target='office',metadata={})
     return JsonResponse({'user':_user_payload(user)})
 
@@ -208,10 +222,14 @@ class PushUnsubscribe(APIView):
         return Response(status=204)
 
 class PushTest(APIView):
+    """«Probar notificación»: the user's PWA subscriptions (Web Push) and phones with the app (Expo)."""
     def post(self,request):
         human_session(request)
-        if not push.configured():raise PermissionDenied('Notificaciones no configuradas en el servidor (VAPID).')
-        sent=push.broadcast('Barrio AI','Notificación de prueba: las alertas llegarán aquí.',url='/ajustes',tag='barrio-prueba',users=[request.user])
+        if not push.configured() and not expo.targets([request.user]).exists():
+            raise PermissionDenied('Notificaciones no configuradas en el servidor (VAPID).')
+        title,body='Barrio AI','Notificación de prueba: las alertas llegarán aquí.'
+        sent=push.broadcast(title,body,url='/ajustes',tag='barrio-prueba',users=[request.user])
+        sent+=expo.broadcast(title,body,url='/ajustes',tag='barrio-prueba',users=[request.user],urgent=True)
         return Response({'sent':sent},status=202)
 
 

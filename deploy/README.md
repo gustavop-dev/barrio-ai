@@ -105,6 +105,6 @@ Detalle completo en [publicación diaria](../agentes-linkedin/infra/docs/publica
 
 - `.env`, `backups/` y `conocimiento/` no se versionan.
 - Las claves nunca llegan a la PWA.
-- Las decisiones humanas (parada, veto, resolución, confirmar memoria, suscribir push) exigen sesión con CSRF.
-- El login limita intentos por IP y usuario.
+- Las decisiones humanas (parada, veto, resolución, confirmar memoria, suscribir push) exigen sesión humana: la de la PWA con CSRF o el token de dispositivo de la app móvil ([app-movil-backend.md](../agentes-linkedin/infra/docs/app-movil-backend.md)). Un token de servicio nunca decide.
+- El login limita intentos por IP y usuario, y el de la app móvil comparte ese contador.
 - HSTS se envía solo para el dominio exacto. `DJANGO_HSTS_SUBDOMAINS=true` lo extiende a los subdominios, solo si todos usan HTTPS.

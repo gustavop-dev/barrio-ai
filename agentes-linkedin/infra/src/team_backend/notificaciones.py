@@ -59,7 +59,8 @@ def avisar(kind,title,detail='',link='',ref=None):
             except IntegrityError:return None  # the same event was already recorded
         elif kind not in INBOX_KINDS:return None
         if push_enabled(kind):
-            notify(title[:120],detail[:200] or title[:200],url='/tu-turno' if kind in INBOX_KINDS else (link or '/notificaciones'),tag=f'0ff1ce-{kind}')
+            notify(title[:120],detail[:200] or title[:200],url='/tu-turno' if kind in INBOX_KINDS else (link or '/notificaciones'),tag=f'0ff1ce-{kind}',
+                   urgent=INBOX_KINDS.get(kind,('',))[0]=='urgente')
         return created
     except Exception:
         return None

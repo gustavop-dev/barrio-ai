@@ -8,6 +8,7 @@ from . import red_views as rd
 from . import resultados_views as rs
 from . import rediseno_views as rv
 from . import capturas_views as cv
+from . import movil_views as mv
 urlpatterns=[
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
  path('units',views.Units.as_view()),path('units/<str:uid>',views.UnitDetail.as_view()),
@@ -73,4 +74,8 @@ urlpatterns=[
  path('resultados/resumen-semanal/<uuid:sid>/aplicar',rs.WeeklySummaryApply.as_view()),
  path('resultados/resumen-semanal/<uuid:sid>/descartar',rs.WeeklySummaryDiscard.as_view()),
  path('resultados/resumen-semanal/<uuid:sid>/deshacer',rs.WeeklySummaryUndo.as_view()),
+ # Mobile app (docs/app-movil-backend.md): device-token login (a human session without CSRF) and Expo push.
+ path('auth/token',mv.TokenIssue.as_view()),path('auth/token/revocar',mv.TokenRevoke.as_view()),
+ path('auth/dispositivos',mv.Devices.as_view()),path('auth/dispositivos/<uuid:did>',mv.DeviceDetail.as_view()),
+ path('push/expo',mv.ExpoPush.as_view()),
 ]
