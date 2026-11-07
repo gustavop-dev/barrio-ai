@@ -71,3 +71,63 @@ class RunAdmin(ReadOnlyAdmin):
 
 admin.site.register(Worker,ReadOnlyAdmin)
 admin.site.register(SourceEvidence,ReadOnlyAdmin)
+
+
+# --------------------------------------------------------------------------- account operator
+from django.contrib import messages
+from . import operador
+from .models import ConnectorAccount,Referent,ObservedPost,ActionProposal,ActionExecution
+
+@admin.register(ConnectorAccount)
+class ConnectorAccountAdmin(ReadOnlyAdmin):
+    list_display=['label','provider','status','is_locked','paused','paused_reason','last_checked_at']
+    actions=['pause_writes','resume_writes']
+    @admin.action(description='Pausar escrituras en estas cuentas')
+    def pause_writes(self,request,queryset):
+        for account in queryset:operador.set_paused(request.user,account,True,'Pausa manual desde el panel')
+    @admin.action(description='Reanudar escrituras en estas cuentas')
+    def resume_writes(self,request,queryset):
+        for account in queryset:operador.set_paused(request.user,account,False)
+
+@admin.register(Referent)
+class ReferentAdmin(ReadOnlyAdmin):
+    list_display=['display_name','public_identifier','active','last_observed_at']
+    search_fields=['display_name','public_identifier']
+
+@admin.register(ObservedPost)
+class ObservedPostAdmin(ReadOnlyAdmin):
+    list_display=['author_name','posted_at','comments_count','reactions_count','observed_at']
+    search_fields=['author_name','text']
+
+class ExecutionInline(admin.StackedInline):
+    model=ActionExecution
+    extra=0;can_delete=False
+    readonly_fields=['state','provider','started_at','finished_at','external_id','external_url','error_kind','http_status','note','reconciled_at']
+    fields=readonly_fields
+    def has_add_permission(self,request,obj=None):return False
+    def has_change_permission(self,request,obj=None):return False
+
+@admin.register(ActionProposal)
+class ActionProposalAdmin(ReadOnlyAdmin):
+    """Approving here approves exactly the version shown (its payload hash)."""
+    list_display=['created_at','capability','state','source','post','short_payload','version']
+    list_filter=['state','capability','source']
+    list_select_related=['post']
+    readonly_fields=['capability','state','post','payload','payload_hash','version','rationale','citations','risks','source','model','decision_note']
+    fields=readonly_fields
+    inlines=[ExecutionInline]
+    actions=['approve_selected','reject_selected']
+    def short_payload(self,obj):return (obj.payload.get('text') or obj.payload.get('reaction') or '')[:80]
+    short_payload.short_description='Contenido'
+    @admin.action(description='Aprobar (se ejecutará automáticamente una vez)')
+    def approve_selected(self,request,queryset):
+        for proposal in queryset:
+            try:
+                operador.approve(request.user,proposal.id,proposal.payload_hash,'Aprobada desde el panel')
+                self.message_user(request,f'Aprobada y en cola: {proposal}',messages.SUCCESS)
+            except Exception as exc:self.message_user(request,f'{proposal}: {getattr(exc,"detail",exc)}',messages.ERROR)
+    @admin.action(description='Rechazar')
+    def reject_selected(self,request,queryset):
+        for proposal in queryset:
+            try:operador.reject(request.user,proposal.id,'Rechazada desde el panel')
+            except Exception as exc:self.message_user(request,f'{proposal}: {getattr(exc,"detail",exc)}',messages.ERROR)

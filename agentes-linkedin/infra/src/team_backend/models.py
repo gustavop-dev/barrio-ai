@@ -34,6 +34,9 @@ class Job(models.Model):
     task=models.TextField()
     execute=models.BooleanField(default=False)
     mode=models.CharField(max_length=12,default='lexical')
+    # agent_run keeps the original behaviour; other kinds are account-operator steps.
+    kind=models.CharField(max_length=30,default='agent_run')
+    params=models.JSONField(default=dict,blank=True)
     state=models.CharField(max_length=20,choices=State.choices,default=State.QUEUED,db_index=True)
     worker=models.ForeignKey(Worker,on_delete=models.PROTECT,null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
@@ -46,7 +49,10 @@ class Job(models.Model):
         indexes=[models.Index(fields=['state','created_at'],name='job_queue_order')]
         permissions=[('access_knowledge','Consultar biblioteca del equipo'),('run_agents','Preparar ejecuciones de agentes'),
           ('use_paid_providers','Usar proveedores pagados'),('propose_memory','Proponer memoria'),
-          ('confirm_memory','Confirmar hechos personales'),('manage_jobs','Administrar trabajos de todo el equipo')]
+          ('confirm_memory','Confirmar hechos personales'),('manage_jobs','Administrar trabajos de todo el equipo'),
+          ('operate_linkedin','Leer la cuenta de LinkedIn conectada y preparar acciones'),
+          ('approve_actions','Aprobar acciones externas en LinkedIn'),
+          ('execute_actions','Ejecutar acciones externas aprobadas')]
 
 class AuditEvent(models.Model):
     actor=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True)
@@ -114,3 +120,134 @@ class UsageEntry(models.Model):
     request_hash=models.TextField(null=True)
     created_at=models.DateTimeField()
     class Meta:managed=False;db_table='usage_ledger';ordering=['-created_at']
+
+
+# ---------------------------------------------------------------------------
+# Account operator: the single executor of external LinkedIn actions.
+# Proposal -> approval of an exact payload hash -> one execution -> confirmation.
+
+class ConnectorAccount(models.Model):
+    class Provider(models.TextChoices):
+        UNIPILE='unipile','Unipile v2'
+        FAKE='fake','Simulado (pruebas)'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    provider=models.CharField(max_length=20,choices=Provider.choices)
+    external_account_id=models.CharField(max_length=120)
+    label=models.CharField(max_length=120)
+    status=models.CharField(max_length=20,default='unknown')
+    is_locked=models.BooleanField(default=False)
+    # Per-account kill switch: no external write runs while paused.
+    paused=models.BooleanField(default=False)
+    paused_reason=models.TextField(blank=True)
+    last_checked_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
+    def __str__(self):return f'{self.label} ({self.provider})'
+
+class Referent(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='referents')
+    public_identifier=models.CharField(max_length=100)
+    provider_user_id=models.CharField(max_length=200,blank=True)
+    display_name=models.CharField(max_length=200,blank=True)
+    profile_url=models.TextField(blank=True)
+    reason=models.TextField(help_text='Por qué conviene observar a esta persona (pertinencia, no popularidad).')
+    active=models.BooleanField(default=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    last_observed_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        ordering=['display_name']
+        constraints=[models.UniqueConstraint(fields=['account','public_identifier'],name='unique_referent_per_account')]
+    def __str__(self):return self.display_name or self.public_identifier
+
+class ObservedPost(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='posts')
+    referent=models.ForeignKey(Referent,on_delete=models.SET_NULL,null=True,blank=True,related_name='posts')
+    provider_post_id=models.CharField(max_length=200)
+    share_url=models.TextField(blank=True)
+    author_name=models.CharField(max_length=200,blank=True)
+    author_public_identifier=models.CharField(max_length=100,blank=True)
+    author_provider_id=models.CharField(max_length=200,blank=True)
+    text=models.TextField(blank=True)
+    posted_at=models.DateTimeField(null=True,blank=True)
+    comments_count=models.IntegerField(null=True,blank=True)
+    reactions_count=models.IntegerField(null=True,blank=True)
+    is_repost=models.BooleanField(default=False)
+    observed_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-posted_at','-observed_at']
+        constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]
+    def __str__(self):return f'{self.author_name}: {self.text[:60]}'
+
+OPEN_ACTION_STATES=['proposed','approved','executing','sent','uncertain']
+
+class ActionProposal(models.Model):
+    class Capability(models.TextChoices):
+        COMMENT='INT-03','Comentar en una publicación ajena'
+        REACT='INT-02','Reaccionar a una publicación'
+    class State(models.TextChoices):
+        PROPOSED='proposed','Propuesta; espera aprobación'
+        APPROVED='approved','Aprobada; pendiente de ejecución'
+        REJECTED='rejected','Rechazada'
+        SUPERSEDED='superseded','Sustituida por otra versión'
+        DISCARDED='discarded','Descartada por el agente'
+        EXECUTING='executing','Ejecutándose'
+        SENT='sent','Enviada; confirmación pendiente'
+        CONFIRMED='confirmed','Confirmada en LinkedIn'
+        UNCERTAIN='uncertain','Resultado incierto; conciliar sin repetir'
+        FAILED='failed','Fallida; no aplicada'
+        EXPIRED='expired','Caducada sin ejecutar'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='proposals')
+    post=models.ForeignKey(ObservedPost,on_delete=models.PROTECT,related_name='proposals')
+    capability=models.CharField(max_length=10,choices=Capability.choices)
+    payload=models.JSONField()
+    payload_hash=models.CharField(max_length=64)
+    version=models.PositiveIntegerField(default=1)
+    previous=models.ForeignKey('self',on_delete=models.PROTECT,null=True,blank=True,related_name='revisions')
+    rationale=models.TextField(blank=True)
+    citations=models.JSONField(default=list,blank=True)
+    risks=models.JSONField(default=list,blank=True)
+    source=models.CharField(max_length=10,default='human')
+    origin_job=models.CharField(max_length=40,blank=True)
+    model=models.CharField(max_length=40,blank=True)
+    state=models.CharField(max_length=20,choices=State.choices,default=State.PROPOSED,db_index=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    approved_hash=models.CharField(max_length=64,blank=True)
+    decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    decided_at=models.DateTimeField(null=True,blank=True)
+    decision_note=models.TextField(blank=True)
+    class Meta:
+        ordering=['-created_at']
+        # One executor per action: a single open proposal per post and capability.
+        constraints=[models.UniqueConstraint(fields=['post','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
+                                             name='one_open_action_per_target')]
+    def __str__(self):return f'{self.capability} v{self.version} · {self.get_state_display()}'
+
+class ActionExecution(models.Model):
+    class State(models.TextChoices):
+        EXECUTING='executing','Ejecutándose'
+        SENT='sent','Enviada; confirmación pendiente'
+        CONFIRMED='confirmed','Confirmada'
+        UNCERTAIN='uncertain','Incierta'
+        FAILED='failed','Fallida'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    # OneToOne: an approved proposal can only ever be executed once.
+    proposal=models.OneToOneField(ActionProposal,on_delete=models.PROTECT,related_name='execution')
+    idempotency_key=models.CharField(max_length=64,unique=True)
+    provider=models.CharField(max_length=20)
+    state=models.CharField(max_length=20,choices=State.choices,default=State.EXECUTING)
+    executed_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    started_at=models.DateTimeField(default=timezone.now)
+    finished_at=models.DateTimeField(null=True,blank=True)
+    external_id=models.CharField(max_length=200,blank=True)
+    external_url=models.TextField(blank=True)
+    error_kind=models.CharField(max_length=80,blank=True)
+    http_status=models.IntegerField(null=True,blank=True)
+    note=models.TextField(blank=True)
+    reconciled_at=models.DateTimeField(null=True,blank=True)
+    class Meta:ordering=['-started_at']

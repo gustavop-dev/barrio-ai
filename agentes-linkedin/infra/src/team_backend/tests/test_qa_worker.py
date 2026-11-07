@@ -17,6 +17,7 @@ from psycopg.types.json import Jsonb
 
 from knowledge import db, memory, providers
 from team_backend import jobs
+from team_backend.tests.fakes import FakeAnthropic, message, timeout_error
 from team_backend.models import AuditEvent, Job, Worker
 
 NOW = datetime(2026, 11, 6, 0, 0, tzinfo=timezone.utc)
@@ -29,7 +30,8 @@ class WorkerQATests(TransactionTestCase):
         self.environment = patch.dict(os.environ, {
             'LIVE_PROVIDERS': 'false', 'ANTHROPIC_API_KEY': 'test-only',
             'OPENAI_API_KEY': 'test-only', 'OPENAI_LIMIT_USD': '1',
-            'ANTHROPIC_LIMIT_USD': '1',
+            'ANTHROPIC_LIMIT_USD': '1', 'ANTHROPIC_MODEL': 'claude-sonnet-4-6',
+            'ANTHROPIC_MAX_TOKENS': '1800',
         })
         self.environment.start(); self.addCleanup(self.environment.stop)
         network = patch('httpx.post', side_effect=AssertionError('Paid network forbidden'))
@@ -59,18 +61,12 @@ class WorkerQATests(TransactionTestCase):
             return c.execute('SELECT status,actual_usd,reserved_usd FROM usage_ledger ORDER BY id').fetchall()
 
     def response(self, input_tokens=100, output_tokens=20, text='Consejo [LI-01-M001-K01]', stop_reason='end_turn'):
-        return {'content': [{'type': 'text', 'text': text}],
-                'usage': {'input_tokens': input_tokens, 'output_tokens': output_tokens},
-                'stop_reason': stop_reason}
+        return message(text=text, input_tokens=input_tokens, output_tokens=output_tokens, stop_reason=stop_reason)
 
-    def simulated_claude(self, payload, before_generation=None):
-        def request(url, **kwargs):
-            if url.endswith('/count_tokens'):
-                return httpx.Response(200, json={'input_tokens': 100})
-            if before_generation:
-                before_generation()
-            return httpx.Response(200, json=payload)
-        return request
+    def simulated_claude(self, payload, before_generation=None, input_tokens=100):
+        # The SDK transport is replaced; httpx.post stays blocked by setUp.
+        return patch('knowledge.providers.anthropic_client',
+                     return_value=FakeAnthropic(payload, input_tokens=input_tokens, before_generation=before_generation))
 
     def test_concurrent_enqueue_persists_one_job_and_one_audit(self):
         """Duplicate simultaneous requests must not create two chargeable jobs."""
@@ -117,18 +113,14 @@ class WorkerQATests(TransactionTestCase):
     def test_provider_failure_retains_uncertain_cost_and_never_requeues(self):
         """An ambiguous HTTP failure must preserve its reserve without an automatic second execution."""
         job, _ = jobs.enqueue(self.user, dict(self.task, execute=True))
-        def timeout(url, **kwargs):
-            if url.endswith('/count_tokens'):
-                return httpx.Response(200, json={'input_tokens': 100})
-            raise httpx.ReadTimeout('Simulated ambiguous response')
         worker = Worker.objects.create()
-        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), patch('httpx.post', side_effect=timeout):
+        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), self.simulated_claude(timeout_error()):
             jobs.process_one(worker)
             again = jobs.process_one(worker)
         job.refresh_from_db()
         self.assertEqual(job.state, 'failed')
         self.assertIsNone(again)
-        self.assertEqual(self.ledger(), [{'status': 'uncertain', 'actual_usd': None, 'reserved_usd': Decimal('0.028068')}])
+        self.assertEqual(self.ledger(), [{'status': 'uncertain', 'actual_usd': None, 'reserved_usd': Decimal('0.028335')}])
         with db.connect() as c:
             run = c.execute('SELECT status FROM runs WHERE id=%s', (job.pk,)).fetchone()
         self.assertEqual(run['status'], 'failed')
@@ -137,7 +129,7 @@ class WorkerQATests(TransactionTestCase):
         """A technically completed answer with an unknown citation must remain validation_failed."""
         job, _ = jobs.enqueue(self.user, dict(self.task, execute=True))
         response = self.response(text='Consejo [LI-07-V001-K01]')
-        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), patch('httpx.post', side_effect=self.simulated_claude(response)):
+        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), self.simulated_claude(response):
             jobs.process_one(Worker.objects.create())
         job.refresh_from_db()
         self.assertEqual((job.state, job.result_status), ('complete', 'validation_failed'))
@@ -151,7 +143,7 @@ class WorkerQATests(TransactionTestCase):
         """A late provider answer must not change an interrupted job back to complete."""
         worker = Worker.objects.create(last_seen=NOW-timedelta(seconds=181))
         job, _ = jobs.enqueue(self.user, dict(self.task, execute=True))
-        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), patch('team_backend.jobs.timezone.now', return_value=NOW), patch('httpx.post', side_effect=self.simulated_claude(self.response(), jobs.reconcile_interrupted)):
+        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), patch('team_backend.jobs.timezone.now', return_value=NOW), self.simulated_claude(self.response(), jobs.reconcile_interrupted):
             jobs.process_one(worker)
         job.refresh_from_db()
         self.assertEqual(job.state, 'interrupted')
@@ -191,10 +183,10 @@ class WorkerQATests(TransactionTestCase):
     def test_claude_negative_usage_cannot_credit_the_budget(self):
         """Malformed provider token counts must not create a negative charge and expand the spending allowance."""
         response = self.response(input_tokens=-100, output_tokens=-20)
-        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), patch('httpx.post', side_effect=self.simulated_claude(response)):
+        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), self.simulated_claude(response):
             with self.assertRaisesRegex(ValueError, 'inválida'):
                 providers.claude('instructions', 'question')
-        self.assertEqual(self.ledger(), [{'status': 'uncertain', 'actual_usd': None, 'reserved_usd': Decimal('0.028068')}])
+        self.assertEqual(self.ledger(), [{'status': 'uncertain', 'actual_usd': None, 'reserved_usd': Decimal('0.028335')}])
 
     def test_embedding_negative_usage_cannot_credit_or_cache(self):
         """Malformed embedding usage must retain its reserve and leave the vector uncommitted."""
@@ -239,8 +231,7 @@ class WorkerQATests(TransactionTestCase):
 
     def test_preflight_boolean_token_count_cannot_start_generation(self):
         """A boolean token count must not be coerced to one token and allow generation."""
-        response = httpx.Response(200, json={'input_tokens': True})
-        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), patch('httpx.post', return_value=response):
+        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), self.simulated_claude(self.response(), input_tokens=True):
             with self.assertRaises(ValueError):
                 providers.claude('instructions', 'question')
         self.assertEqual(self.ledger(), [])
@@ -248,10 +239,10 @@ class WorkerQATests(TransactionTestCase):
     def test_fractional_claude_usage_cannot_be_settled(self):
         """A fractional token count must not be accepted as billable provider usage."""
         response = self.response(input_tokens=1.5)
-        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), patch('httpx.post', side_effect=self.simulated_claude(response)):
+        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), self.simulated_claude(response):
             with self.assertRaisesRegex(ValueError, 'inválida'):
                 providers.claude('instructions', 'question')
-        self.assertEqual(self.ledger(), [{'status': 'uncertain', 'actual_usd': None, 'reserved_usd': Decimal('0.028068')}])
+        self.assertEqual(self.ledger(), [{'status': 'uncertain', 'actual_usd': None, 'reserved_usd': Decimal('0.028335')}])
 
     def test_string_embedding_usage_cannot_be_coerced(self):
         """A numeric string in embedding usage must not bypass the provider schema validation."""

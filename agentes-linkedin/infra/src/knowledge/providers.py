@@ -11,7 +11,12 @@ from .db import connect
 from .ingest import ENC, digest
 
 EMBEDDING_PRICES={'text-embedding-3-small':Decimal('0.02'),'text-embedding-3-large':Decimal('0.13')}
-MODEL_PRICES={'claude-sonnet-4-6':(Decimal('3'),Decimal('15'))}
+# USD per million input/output tokens (Anthropic first-party API, verified 2026-11-06).
+# Cache writes cost 1.25x input and cache reads 0.1x input.
+MODEL_PRICES={'claude-opus-5-5':(Decimal('4'),Decimal('20')),'claude-sonnet-5-5':(Decimal('2'),Decimal('10')),
+              'claude-haiku-5-5':(Decimal('0.10'),Decimal('0.50')),'claude-sonnet-4-6':(Decimal('3'),Decimal('15'))}
+DEFAULT_CLAUDE_MODEL='claude-opus-5-5'
+CACHE_WRITE=Decimal('1.25');CACHE_READ=Decimal('0.1')
 DIMENSIONS=1536
 REQUEST_SIZE=128
 
@@ -136,26 +141,65 @@ def index(execute=False):
         plan['remaining']=index_plan()[1]['missing_chunks']
     return plan
 
-def claude(system,message,max_tokens=1800):
-    key=live('anthropic');model=os.environ.get('ANTHROPIC_MODEL','claude-sonnet-4-6')
+def claude_model():
+    model=os.environ.get('ANTHROPIC_MODEL',DEFAULT_CLAUDE_MODEL)
     if model not in MODEL_PRICES:raise ValueError('Modelo Claude sin tarifa verificada: añadir tarifa y pruebas antes de activarlo')
-    headers={'x-api-key':key,'anthropic-version':'2023-06-01'}
-    payload={'model':model,'system':system,'messages':[{'role':'user','content':message}]}
+    return model
+
+def anthropic_client(key):
+    """Official SDK client. Paid generations are never retried automatically, and
+    streaming keeps the read timeout per event instead of for the whole answer."""
+    import anthropic
+    return anthropic.Anthropic(api_key=key,max_retries=0,
+        timeout=anthropic.Timeout(600.0,connect=10.0,read=90.0,write=30.0))
+
+def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run'):
+    import anthropic
+    key=live('anthropic');model=claude_model()
+    max_tokens=max_tokens or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
+    if not 1<=max_tokens<=64000:raise ValueError('max_tokens fuera de rango')
+    client=anthropic_client(key)
+    # Stable instructions first so they can be cached; the variable task goes in messages.
+    params={'model':model,'system':[{'type':'text','text':system,'cache_control':{'type':'ephemeral'}}],
+            'messages':[{'role':'user','content':message}]}
+    output_config={}
+    if effort:output_config['effort']=effort
+    if output_schema:output_config['format']={'type':'json_schema','schema':output_schema}
+    if output_config:params['output_config']=output_config
     # Use the provider tokenizer before reserving; counting doesn't generate an answer.
-    try:
-        response=post('https://api.anthropic.com/v1/messages/count_tokens',headers=headers,json=payload,timeout=30)
-        if response.status_code!=200:raise ValueError('No se pudo contar tokens de Claude; no se envió la generación.')
-        input_tokens=validate_token_count(response.json()['input_tokens'])
-    except (httpx.HTTPError,KeyError,TypeError,ValueError):
+    try:input_tokens=validate_token_count(client.messages.count_tokens(**params).input_tokens)
+    except (anthropic.APIError,AttributeError,TypeError,ValueError):
         raise ValueError('Conteo de Claude no disponible; no se envió la generación.') from None
     ip,op=MODEL_PRICES[model]
-    rid=reserve('anthropic','agent-run',(Decimal(input_tokens+256)*ip+Decimal(max_tokens)*op)/1000000)
-    data=request('anthropic','https://api.anthropic.com/v1/messages',dict(payload,max_tokens=max_tokens),rid,headers)
+    # Worst case: every input token is a cache write.
+    rid=reserve('anthropic',purpose,(Decimal(input_tokens+256)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000)
+    request_id=None
     try:
-        usage=data['usage'];cost=(Decimal(validate_token_count(usage['input_tokens']))*ip+Decimal(validate_token_count(usage['output_tokens']))*op)/1000000
-        answer='\n'.join(b['text'] for b in data['content'] if b['type']=='text')
-        if not answer:raise ValueError('Respuesta vacía')
-        settle(rid,'complete',usage,cost)
-        return {'text':answer,'usage':usage,'estimated_usd':float(cost),'model':model,'stop_reason':data['stop_reason']}
-    except (KeyError,TypeError,ValueError):
-        settle(rid,'uncertain');raise ValueError('Respuesta Claude inválida; reserva retenida.') from None
+        with client.messages.stream(max_tokens=max_tokens,**params) as stream:
+            request_id=stream.request_id
+            message=stream.get_final_message()
+    except anthropic.APIStatusError as exc:
+        # Do not expose provider bodies (may contain inputs); do not retry paid calls.
+        definite=exc.status_code in (400,401,403,404,413,422,429)
+        settle(rid,'rejected' if definite else 'uncertain',{'http_status':exc.status_code,'request_id':getattr(exc,'request_id',None)})
+        raise ValueError(f'anthropic: HTTP {exc.status_code}. Sin reintento automático.') from None
+    except (anthropic.APIError,httpx.HTTPError) as exc:
+        # Includes timeouts: the request may have been processed and billed.
+        settle(rid,'uncertain',{'error_type':type(exc).__name__,'request_id':request_id})
+        raise ValueError('anthropic: respuesta incierta. Reserva retenida; revisar antes de repetir.') from None
+    try:
+        usage=message.usage
+        tokens={'input_tokens':validate_token_count(usage.input_tokens),'output_tokens':validate_token_count(usage.output_tokens),
+                'cache_creation_input_tokens':validate_token_count(getattr(usage,'cache_creation_input_tokens',None) or 0),
+                'cache_read_input_tokens':validate_token_count(getattr(usage,'cache_read_input_tokens',None) or 0)}
+        cost=(Decimal(tokens['input_tokens'])*ip+Decimal(tokens['cache_creation_input_tokens'])*ip*CACHE_WRITE
+              +Decimal(tokens['cache_read_input_tokens'])*ip*CACHE_READ+Decimal(tokens['output_tokens'])*op)/1000000
+        answer='\n'.join(b.text for b in message.content if b.type=='text')
+        stop_reason=message.stop_reason
+    except (AttributeError,TypeError,ValueError):
+        settle(rid,'uncertain',{'request_id':request_id});raise ValueError('Respuesta Claude inválida; reserva retenida.') from None
+    record=dict(tokens,request_id=request_id,stop_reason=stop_reason)
+    settle(rid,'complete',record,cost)
+    if stop_reason=='refusal':raise ValueError('Claude declinó la solicitud; no se generó contenido.')
+    if not answer:raise ValueError('Respuesta Claude vacía.')
+    return {'text':answer,'usage':record,'estimated_usd':float(cost),'model':model,'stop_reason':stop_reason,'request_id':request_id}

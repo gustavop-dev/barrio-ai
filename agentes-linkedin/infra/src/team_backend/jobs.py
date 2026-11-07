@@ -46,6 +46,33 @@ def enqueue(user,data,request_id=''):
         audit(user,'job.enqueued',job.id,request_id,execute=job.execute,mode=job.mode)
         return job,True
 
+OPERATION_PERMISSIONS={
+    'observe':['operate_linkedin'],
+    'propose_comment':['operate_linkedin','run_agents','use_paid_providers'],
+    'execute_action':['execute_actions'],
+    'reconcile_action':['operate_linkedin'],
+}
+
+def enqueue_operation(user,kind,params,request_id=None,audit_request_id=''):
+    """Queue an account-operator step with the same idempotency rules as agent runs."""
+    if kind not in OPERATION_PERMISSIONS:raise ValueError('Operación desconocida')
+    for codename in OPERATION_PERMISSIONS[kind]:require(user,codename)
+    params=json.loads(json.dumps(params,default=str))
+    fingerprint=hashlib.sha256(json.dumps({'kind':kind,'params':params},sort_keys=True).encode()).hexdigest()
+    jid=request_id or uuid.uuid4()
+    with transaction.atomic():
+        with connection.cursor() as c:c.execute('SELECT pg_advisory_xact_lock(103506)')
+        old=Job.objects.filter(id=jid).first()
+        if old:
+            if old.owner_id!=user.pk:raise NotFound()
+            if old.request_hash!=fingerprint:raise Conflict('request_id ya corresponde a otra tarea')
+            return old,False
+        if Job.objects.filter(state=Job.State.QUEUED).count()>=settings.JOB_QUEUE_LIMIT:raise Conflict('La cola está llena; espera a que terminen trabajos')
+        job=Job.objects.create(id=jid,owner=user,request_hash=fingerprint,agent='operador',task=kind,
+                               execute=kind=='propose_comment',kind=kind,params=params)
+        audit(user,'job.enqueued',job.id,audit_request_id,kind=kind)
+        return job,True
+
 def cancel(user,jid,request_id=''):
     require(user,'run_agents')
     with transaction.atomic():
@@ -82,12 +109,17 @@ def process_one(worker):
     try:
         user=job.owner
         if not user.is_active:raise ValueError('Usuario desactivado antes de ejecutar')
-        require(user,'run_agents')
-        if job.execute or job.mode=='hybrid':require(user,'use_paid_providers')
-        result=agents.run(job.agent,job.task,execute=job.execute,mode=job.mode,request_id=str(job.id))
-        result_status=result['status']
-        state=Job.State.COMPLETE if result_status in ['preview','needs_review','validation_failed'] else Job.State.INTERRUPTED
-        error='' if state==Job.State.COMPLETE else 'La ejecución ya existe sin resultado terminal; no se repitió.'
+        if job.kind!='agent_run':
+            from . import operador
+            for codename in OPERATION_PERMISSIONS.get(job.kind,['manage_jobs']):require(user,codename)
+            state,result_status,error=operador.run_job(job)
+        else:
+            require(user,'run_agents')
+            if job.execute or job.mode=='hybrid':require(user,'use_paid_providers')
+            result=agents.run(job.agent,job.task,execute=job.execute,mode=job.mode,request_id=str(job.id))
+            result_status=result['status']
+            state=Job.State.COMPLETE if result_status in ['preview','needs_review','validation_failed'] else Job.State.INTERRUPTED
+            error='' if state==Job.State.COMPLETE else 'La ejecución ya existe sin resultado terminal; no se repitió.'
     except Exception:
         # Provider errors and user task content are not leaked through public job logs.
         state=Job.State.FAILED;result_status='failed'
