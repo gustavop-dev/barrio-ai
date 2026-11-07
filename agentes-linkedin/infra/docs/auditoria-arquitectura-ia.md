@@ -102,11 +102,13 @@ Conviene conservar: salidas estructuradas con esquema, texto de terceros tratado
 
 **Fase 1: errores y cuello del worker**
 
-- [ ] E1 y E5: `max_tokens` suficiente, comprobar `stop_reason` y `effort='low'` en los clasificadores
-- [ ] E2: contar comentarios aprobados pendientes antes de redactar otro
-- [ ] E3: que solo cuenten como cupo las ejecuciones que escribieron
-- [ ] E6: marcar una idea como usada solo cuando su pieza queda lista
-- [ ] B1: separar la cola en dos carriles
+Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo PR.
+
+- [x] E1 y E5: `max_tokens` suficiente, comprobar `stop_reason` y `effort` en los clasificadores (`low` en captura; `medium` en red, para no perder juicio)
+- [x] E2: contar comentarios aprobados pendientes antes de redactar otro
+- [x] E3: que solo cuenten como cupo las ejecuciones que escribieron (`ActionExecution.wrote`)
+- [x] E6: la idea vuelve a la mesa si su pieza se salta, se bloquea, falla, se descarta, se veta o LinkedIn no la publica
+- [x] B1: separar la cola en dos carriles (`worker` general y `worker-acciones`)
 
 **Fase 2: reprocesos**
 

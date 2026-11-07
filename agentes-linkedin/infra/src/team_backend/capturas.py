@@ -6,7 +6,8 @@ audio with AssemblyAI and routes the text (the note plus the transcript):
 - context persona   -> a note on the contact;
 - context pieza     -> a comment for the team on the piece (piece detail `team_comments`, director feedback);
 - purpose dato      -> a private confirmed fact `nota.captura-<id>`;
-- purpose post      -> an idea for the editorial director (marked «usado» when a brief uses it);
+- purpose post      -> an idea for the editorial director (marked «usado» when a brief uses it, and back to the
+                       table if that piece does not go out);
 - purpose galeria   -> its photos go to the Galería with the text as their note;
 - nothing chosen    -> only photos go to the Galería; otherwise one cheap Sonnet classification (post, dato, galeria).
 Photos are always saved as GalleryPhoto rows. `routed_to` records what was created so «Deshacer» (2 minutes) can
@@ -244,8 +245,9 @@ def classify(text,photos):
     options=['post','dato']+(['galeria'] if photos else [])
     schema={'type':'object','additionalProperties':False,'required':['destino','motivo'],
             'properties':{'destino':{'type':'string','enum':options},'motivo':{'type':'string'}}}
-    answer=providers.claude(ROUTE_SYSTEM,json.dumps({'texto':_clip(text,6000),'fotos':photos},ensure_ascii=False),max_tokens=400,
-                            output_schema=schema,model=ROUTE_MODEL,purpose='capture-route')
+    # A three-way choice: low effort, and room for the thinking that counts against max_tokens.
+    answer=providers.claude(ROUTE_SYSTEM,json.dumps({'texto':_clip(text,6000),'fotos':photos},ensure_ascii=False),max_tokens=2000,
+                            output_schema=schema,effort='low',model=ROUTE_MODEL,purpose='capture-route')
     try:data=json.loads(answer['text'])
     except (json.JSONDecodeError,TypeError,KeyError):raise ValueError('la clasificación no devolvió JSON válido') from None
     destination=data.get('destino') if isinstance(data,dict) else None
@@ -454,6 +456,17 @@ def mark_used(ids,piece):
         capture.outcome=_outcome('usado',f'El Director editorial lo usó en el brief del {day_label(piece.slot_date)}',f'/calendario/pieza/{piece.id}')
         capture.routed_to=dict(capture.routed_to or {},used_in=str(piece.id))
         capture.save(update_fields=['state','outcome','routed_to'])
+
+def release_ideas(piece,why):
+    """The piece that used Gustavo's ideas did not go out (skipped, blocked, failed, discarded or vetoed): they go back
+    to the editorial table, with their 14 days counted from when he sent them."""
+    released=0
+    for capture in Capture.objects.filter(state=Capture.State.USED,routed_to__used_in=str(piece.id)):
+        routed=dict(capture.routed_to or {});routed.pop('used_in',None)
+        capture.state=Capture.State.IDEA;capture.routed_to=routed
+        capture.outcome=_outcome('idea',f'Vuelve a la mesa editorial: la pieza del {day_label(piece.slot_date)} no salió ({why})')
+        capture.save(update_fields=['state','outcome','routed_to']);released+=1
+    return released
 
 def piece_comments(piece):
     """`team_comments` of the piece detail: what Gustavo told the team about it."""

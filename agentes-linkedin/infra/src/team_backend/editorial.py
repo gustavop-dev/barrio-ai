@@ -189,12 +189,14 @@ Cita en citations solo IDs de unidades del contexto.'''
 # Stages that write or edit the public text receive Gustavo's voice (voz.py).
 VOICED_STAGES=('redactor','seleccion')
 # (system, schema, course units in priority order, token budget, max output tokens, effort)
+# Opus 5.5 always thinks and its thinking counts against max_tokens: the caps leave room for it, so a
+# long deliberation never cuts the JSON (the answer is streamed and billed by what is actually used).
 STAGES={
-    'director':(DIRECTOR_SYSTEM,BRIEF_SCHEMA,PILLAR_UNITS+CADENCE_UNITS+APPROACH_UNITS+[TEXT_FORMAT_UNIT],22000,4000,'medium'),
-    'redactor':(WRITER_SYSTEM,WRITER_SCHEMA,[TEXT_FORMAT_UNIT]+EDIT_UNITS+GUIDE_UNITS,26000,6000,'medium'),
-    'lectores':(PANEL_SYSTEM,PANEL_SCHEMA,READER_UNITS,5000,4000,'low'),
-    'seleccion':(SELECTION_SYSTEM,SELECTION_SCHEMA,EDIT_UNITS+READER_UNITS,9000,4000,'medium'),
-    'verificador':(VERIFIER_SYSTEM,VERIFIER_SCHEMA,EDIT_UNITS+['LI-06-M001-K04','LI-06-M001-K07'],8000,4000,'high'),
+    'director':(DIRECTOR_SYSTEM,BRIEF_SCHEMA,PILLAR_UNITS+CADENCE_UNITS+APPROACH_UNITS+[TEXT_FORMAT_UNIT],22000,16000,'medium'),
+    'redactor':(WRITER_SYSTEM,WRITER_SCHEMA,[TEXT_FORMAT_UNIT]+EDIT_UNITS+GUIDE_UNITS,26000,16000,'medium'),
+    'lectores':(PANEL_SYSTEM,PANEL_SCHEMA,READER_UNITS,5000,12000,'low'),
+    'seleccion':(SELECTION_SYSTEM,SELECTION_SCHEMA,EDIT_UNITS+READER_UNITS,9000,16000,'medium'),
+    'verificador':(VERIFIER_SYSTEM,VERIFIER_SCHEMA,EDIT_UNITS+['LI-06-M001-K04','LI-06-M001-K07'],8000,16000,'high'),
 }
 
 # --------------------------------------------------------------------------- configuration and calendar
@@ -289,9 +291,14 @@ def recover_stuck():
 
 # --------------------------------------------------------------------------- circuit
 
+RELEASE_REASON={'skipped':'el director la saltó','blocked':'el verificador la bloqueó','failed':'falló la preparación'}
+
 def _close(piece,state,note):
     piece.state=state;piece.note=note[:2000];piece.save(update_fields=['state','note','updated_at'])
     operador._audit(None,'editorial.piece_'+state,piece.id,slot=piece.slot_date.isoformat(),stage=piece.stage)
+    if state in RELEASE_REASON:
+        from . import capturas
+        capturas.release_ideas(piece,RELEASE_REASON[state])
     return piece
 
 def _guard():

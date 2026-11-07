@@ -4,7 +4,7 @@ import threading
 from django.core.management.base import BaseCommand
 from django.db import close_old_connections
 from django.utils import timezone
-from team_backend.jobs import process_one, reconcile_interrupted
+from team_backend.jobs import LANES, process_one, reconcile_interrupted
 from team_backend.models import Worker
 
 HEARTBEAT_SECONDS = 5
@@ -16,10 +16,12 @@ class Command(BaseCommand):
     help = 'Procesa la cola PostgreSQL sin reintentar automáticamente trabajos interrumpidos.'
     def add_arguments(self, parser):
         parser.add_argument('--once', action='store_true')
+        parser.add_argument('--lane', choices=LANES, default='todas',
+                            help='acciones: solo ejecuciones y conciliaciones en LinkedIn; general: el resto; todas: todo.')
     def handle(self, **options):
         stopping = threading.Event()
         heartbeat_stop = threading.Event()
-        worker = Worker.objects.create()
+        worker = Worker.objects.create(lane=options['lane'])
         def stop(signum, frame): stopping.set()
         previous = {}
         if threading.current_thread() is threading.main_thread():
@@ -36,7 +38,7 @@ class Command(BaseCommand):
             finally: close_old_connections()
         thread = threading.Thread(target=heartbeat, daemon=True)
         thread.start()
-        self.stdout.write('Worker iniciado: ' + str(worker.pk))
+        self.stdout.write(f'Worker iniciado: {worker.pk} (carril {worker.lane})')
         try:
             while not stopping.is_set():
                 close_old_connections()

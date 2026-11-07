@@ -409,7 +409,7 @@ def next_execution_time(now=None):
     start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
     def at(day,value):
         h,_,m=value.strip().partition(':');return datetime.combine(day,time(int(h)%24,int(m or 0)),tzinfo=tz)
-    last=ActionExecution.objects.order_by('-started_at').values_list('started_at',flat=True).first()
+    last=ActionExecution.objects.filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
     candidate=max(now,last+operador.min_spacing()) if last else now
     if not operador.within_window(candidate):
         local=candidate.astimezone(tz);opening=at(local.date(),start)

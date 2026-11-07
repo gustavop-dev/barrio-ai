@@ -15,6 +15,8 @@ class ApiCredential(models.Model):
 
 class Worker(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    # Which jobs it takes (jobs.LANES): 'acciones' runs LinkedIn executions, 'general' the rest, 'todas' everything.
+    lane=models.CharField(max_length=20,default='todas')
     started_at=models.DateTimeField(default=timezone.now)
     last_seen=models.DateTimeField(default=timezone.now,db_index=True)
     stopped_at=models.DateTimeField(null=True,blank=True)
@@ -396,6 +398,9 @@ class ActionExecution(models.Model):
     http_status=models.IntegerField(null=True,blank=True)
     note=models.TextField(blank=True)
     reconciled_at=models.DateTimeField(null=True,blank=True)
+    # False when the pre-check found nothing to write (already following, already connected, invitation gone,
+    # account not running…): such an execution does not use the daily cap or the spacing between writes.
+    wrote=models.BooleanField(default=True)
     class Meta:ordering=['-started_at']
 
 

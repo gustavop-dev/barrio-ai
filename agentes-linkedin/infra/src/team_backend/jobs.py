@@ -91,9 +91,21 @@ def cancel(user,jid,request_id=''):
         audit(user,'job.cancelled',job.id,request_id)
     return job
 
+# Lanes: LinkedIn executions and their reconciliation run on their own worker, so a write never waits behind
+# minutes of LLM calls, profile reads or a transcription. 'todas' (one worker for everything) is the default.
+ACTION_KINDS=('execute_action','reconcile_action')
+LANES=('todas','acciones','general')
+
+def lane_jobs(lane):
+    queued=Job.objects.filter(state=Job.State.QUEUED)
+    if lane=='acciones':return queued.filter(kind__in=ACTION_KINDS)
+    if lane=='general':return queued.exclude(kind__in=ACTION_KINDS)
+    if lane=='todas':return queued
+    raise ValueError(f'Carril desconocido: {lane}')
+
 def claim(worker):
     with transaction.atomic():
-        job=Job.objects.select_for_update(skip_locked=True).filter(state=Job.State.QUEUED).order_by('created_at','id').first()
+        job=lane_jobs(worker.lane).select_for_update(skip_locked=True).order_by('created_at','id').first()
         if not job:return None
         job.state=Job.State.RUNNING;job.worker=worker;job.started_at=timezone.now()
         job.save(update_fields=['state','worker','started_at'])
