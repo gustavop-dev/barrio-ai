@@ -1,18 +1,22 @@
 """HTTP API of the account operator. Decisions (approve, reject, pause, resolve) require a
-human session with CSRF; a Bearer credential can observe and prepare but never decide."""
+human session: the PWA's with CSRF or the mobile app's device token. A service credential can observe and prepare
+but never decide."""
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from . import operador
 from .jobs import enqueue_operation
-from .models import ActionProposal, ApiCredential, ConnectorAccount, ObservedPost, Referent
+from .models import ActionProposal, ConnectorAccount, DeviceToken, ObservedPost, Referent
 from .permissions import require
 from .serializers import (AccountInput, AccountOutput, ActionInput, ActionOutput, DecisionInput, JobOutput, ObserveInput,
                           OptionalRequestInput, PauseInput, PostOutput, ReferentInput, ReferentOutput, ReferentPatch, ResolveInput, ReviseInput)
 
 def human_session(request):
-    if isinstance(request.auth,ApiCredential):raise PermissionDenied('Esta decisión requiere una sesión humana con CSRF')
+    """A Django session (request.auth is None) or a device token of the mobile app; anything else, such as a service
+    ApiCredential, is refused."""
+    if request.auth is not None and not isinstance(request.auth,DeviceToken):
+        raise PermissionDenied('Esta decisión requiere una sesión humana con CSRF')
 
 def valid(serializer_class,request):
     data=serializer_class(data=request.data);data.is_valid(raise_exception=True)
