@@ -15,9 +15,9 @@ from decimal import Decimal
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, memory
-from . import guardas, operador
+from . import guardas, operador, red
 from .jobs import enqueue_operation
-from .models import ActionExecution, ActionProposal, ConnectorAccount, Job, ObservedPost
+from .models import ActionExecution, ActionProposal, ConnectorAccount, Contact, Job, ObservedPost
 
 POLICY_VERSION='autonomia-v1'
 TICK_NAMESPACE=uuid.UUID('0b7f2c3e-1d7a-4c55-8f0e-2a6b9d4e8c31')
@@ -39,12 +39,16 @@ POST_MAX_HASHTAGS=3
 def setting(name,default):
     return os.environ.get(name,default)
 
+# Capabilities that existed when Gustavo chose the autonomous machine default to auto; any newer capability
+# (the network block RED-*) waits for human approval until OPERATOR_AUTONOMY lists it.
+AUTO_BY_DEFAULT=('INT-03','INT-02','CONT-09')
+
 def autonomy(capability):
-    """OPERATOR_AUTONOMY='INT-03=auto,INT-02=auto'; modes auto | approval | off. Default auto."""
+    """OPERATOR_AUTONOMY='INT-03=auto,RED-01=approval'; modes auto | approval | off."""
     for item in filter(None,setting('OPERATOR_AUTONOMY','').split(',')):
         key,_,mode=item.partition('=')
         if key.strip()==capability and mode.strip() in ('auto','approval','off'):return mode.strip()
-    return 'auto'
+    return 'auto' if capability in AUTO_BY_DEFAULT else 'approval'
 
 def enabled():
     return setting('OPERATOR_AUTOPILOT','false').lower()=='true'
@@ -71,6 +75,7 @@ def post_issues(proposal):
 def content_issues(proposal):
     """Deterministic gate replacing per-piece human approval. Returns reasons to discard."""
     if proposal.capability==ActionProposal.Capability.PUBLISH:return post_issues(proposal)
+    if proposal.contact_id:return red.network_issues(proposal)
     if proposal.capability!=ActionProposal.Capability.COMMENT:return []
     text=proposal.payload.get('text','');issues=[]
     if not 40<=len(text)<=900:issues.append('Longitud fuera de 40–900 caracteres')
@@ -140,13 +145,14 @@ def tick(user,now=None):
         Q(piece__isnull=True,created_at__lt=now-ttl)|Q(piece__isnull=False,piece__scheduled_for__lt=now-ttl))
     for proposal in stale:operador._audit(None,'operator.expired',proposal.id)
     report['expired']=stale.update(state=ActionProposal.State.EXPIRED,decision_note='Caducada sin ejecutar')
-    for proposal in ActionProposal.objects.select_related('post','piece').filter(state=ActionProposal.State.PROPOSED):
+    for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(state=ActionProposal.State.PROPOSED):
         policy_review(proposal);report['reviewed']+=1
     try:report['plan']=_editorial(user,now)
     except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
     for account in ConnectorAccount.objects.filter(paused=False):
         report['observe']+=_observe(user,account,now)
         report['propose']+=_propose(user,account,now)
+        report['network']=report.get('network',0)+_network(user,account,now)
         report['execute']+=_execute(user,account,now)
     report['reconcile']+=_reconcile(user,now)
     return report
@@ -177,7 +183,7 @@ def _propose(user,account,now):
     if autonomy('INT-03')=='off' or operador.capacity_left(account,'INT-03',now)<=0:return 0
     if llm_spent_today(now)>=Decimal(setting('OPERATOR_DAILY_LLM_USD','1')):return 0
     day,_=operador.period_starts(now)
-    drafted=ActionProposal.objects.filter(account=account,source='agent',created_at__gte=day).count()
+    drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
     pending=Job.objects.filter(kind='propose_comment',state__in=[Job.State.QUEUED,Job.State.RUNNING]).count()
     room=int(setting('OPERATOR_DAILY_PROPOSALS','6'))-drafted-pending
     if room<=0 or pending:return 0  # one paid draft at a time keeps spend within the daily cap
@@ -189,10 +195,31 @@ def _propose(user,account,now):
         return int(created)
     return 0
 
+def _every(name,default):
+    return timedelta(minutes=int(setting(name,default)))
+
+def _network(user,account,now):
+    """DESC/RED: queue discovery, classification, planning and sync for the Unipile account, each on its own clock.
+    Reads and the cheaper classifier run on their own; follows, invitations and acceptances become proposals."""
+    if not red.enabled() or account.provider not in ('unipile','fake'):return 0
+    queued=0
+    def enqueue(kind,every,condition=True):
+        nonlocal queued
+        if not condition or _pending(kind,account=str(account.id)):return
+        bucket=int(now.timestamp()//every.total_seconds())
+        _,created=enqueue_operation(user,kind,{'account':str(account.id)},request_id=_job_id(kind,account.id,bucket))
+        queued+=int(created)
+    enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'))
+    unclassified=Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).exists()
+    enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),unclassified and red.spent_today(now)<red.daily_budget())
+    enqueue('plan_network',_every('NETWORK_PLAN_EVERY_MINUTES','60'))
+    enqueue('sync_network',_every('NETWORK_SYNC_EVERY_MINUTES','360'))
+    return queued
+
 def _execute(user,account,now):
     if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0
     if _pending('execute_action'):return 0
-    for proposal in ActionProposal.objects.select_related('post','piece').filter(account=account,state='approved',execution__isnull=True).order_by('created_at'):
+    for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(account=account,state='approved',execution__isnull=True).order_by('created_at'):
         if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour
         if operador.capacity_left(account,proposal.capability,now)<=0:continue
         job=operador.enqueue_execution(user,proposal)

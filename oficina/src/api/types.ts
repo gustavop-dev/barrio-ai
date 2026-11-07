@@ -125,15 +125,22 @@ export interface Execution {
   reconciled_at?: string | null;
 }
 
-/** INT-03 comment and INT-02 reaction on someone else's post; CONT-09 own publication. */
-export const CAPABILITIES = ['INT-03', 'INT-02', 'CONT-09'] as const;
+/**
+ * INT-03 comment and INT-02 reaction on someone else's post; CONT-09 own publication; RED-01 follow,
+ * RED-02 connection invitation without a note and RED-04 accepting a received invitation (network block).
+ */
+export const CAPABILITIES = ['INT-03', 'INT-02', 'CONT-09', 'RED-01', 'RED-02', 'RED-04'] as const;
 export type Capability = (typeof CAPABILITIES)[number];
+
+export const NETWORK_CAPABILITIES = ['RED-01', 'RED-02', 'RED-04'] as const;
+export type NetworkCapability = (typeof NETWORK_CAPABILITIES)[number];
 
 export interface Action {
   id: string;
   account_id?: string;
   capability: Capability;
-  payload: { text?: string; reaction?: string };
+  /** `text` (INT-03, CONT-09), `reaction` (INT-02), `user_id` and, for RED-04, `request_id` (network). */
+  payload: { text?: string; reaction?: string; user_id?: string; request_id?: string };
   payload_hash: string;
   version: number;
   previous_id?: string | null;
@@ -153,6 +160,118 @@ export interface Action {
   piece_id: string | null;
   scheduled_for: string | null;
   execution: Execution | null;
+  /** RED-* only: the person the action targets; null on INT-* and CONT-09 (absent on backends without the network block). */
+  contact?: ContactBrief | null;
+}
+
+// ---------------------------------------------------------------- network (Red)
+
+export type ContactStage = 'candidate' | 'fit' | 'discarded' | 'followed' | 'invited' | 'connected' | 'closed' | 'incoming';
+
+/** Funnel order, used by the filter chips. */
+export const CONTACT_STAGES: readonly ContactStage[] = ['candidate', 'fit', 'followed', 'invited', 'connected', 'incoming', 'closed', 'discarded'];
+
+export type ContactSource = 'commenter' | 'search' | 'incoming' | 'manual';
+
+export type NetworkDistance = 'FIRST_DEGREE' | 'SECOND_DEGREE' | 'THIRD_DEGREE' | 'OUT_OF_NETWORK' | '';
+
+/** Why the contact was found; a field that does not apply to its `source` is null. */
+export interface ContactEvidence {
+  post_id?: string | null;
+  post_url?: string | null;
+  referent?: string | null;
+  comment?: string | null;
+  query?: string | null;
+  invitation_message?: string | null;
+}
+
+/** `{}` until the model has classified the contact, so every field is optional. */
+export interface ContactClassification {
+  fit?: boolean;
+  role?: string;
+  modality?: string;
+  affinity?: string;
+  reason?: string;
+  confidence?: number;
+  model?: string;
+  classified_at?: string;
+}
+
+/** The contact as embedded in a RED-* action. */
+export interface ContactBrief {
+  id: string;
+  display_name: string;
+  headline: string;
+  profile_url: string;
+  public_identifier: string;
+  network_distance: NetworkDistance;
+  stage: ContactStage;
+  source: ContactSource;
+  evidence: ContactEvidence;
+  classification: ContactClassification;
+}
+
+export type ContactEvent =
+  | 'discovered'
+  | 'classified'
+  | 'followed'
+  | 'invited'
+  | 'connected'
+  | 'closed'
+  | 'discarded'
+  | 'rejected'
+  | 'incoming'
+  | 'note';
+
+export interface ContactHistoryEntry {
+  at: string;
+  event: ContactEvent;
+  detail: string;
+}
+
+export interface ContactOpenAction {
+  id: string;
+  capability: Capability;
+  state: ActionState;
+}
+
+/** `GET /api/v1/red/contacts` and `/api/v1/red/contacts/<id>`. */
+export interface Contact extends ContactBrief {
+  account_id: string;
+  provider_user_id: string;
+  location: string;
+  is_following: boolean;
+  history: ContactHistoryEntry[];
+  followed_at: string | null;
+  invited_at: string | null;
+  connected_at: string | null;
+  discovered_at: string;
+  updated_at: string;
+  open_action: ContactOpenAction | null;
+}
+
+export type AutonomyMode = 'auto' | 'approval' | 'off';
+
+export interface NetworkCapacity extends CapacityInfo {
+  mode: AutonomyMode;
+}
+
+export type NetworkRead = 'comments' | 'search' | 'profile' | 'sync';
+
+/** `GET /api/v1/red/summary`. */
+export interface RedSummary {
+  /** False when the block is off (`NETWORK_ENABLED=false`). */
+  enabled: boolean;
+  stages: Partial<Record<ContactStage, number>>;
+  capacity: Partial<Record<NetworkCapability, NetworkCapacity>>;
+  reads_today: Partial<Record<NetworkRead, number>>;
+  read_caps: Partial<Record<NetworkRead, number>>;
+  /** USD as JSON numbers (the overview sends its budget as decimal strings). */
+  llm: { spent_today: number; daily: number; model: string };
+  /** LinkedIn rejected invitations for hitting its limit in the last 7 days: invitations are paused. */
+  invites_blocked: { blocked: boolean; reason: string };
+  last_discovery_at: string | null;
+  last_sync_at: string | null;
 }
 
 // ---------------------------------------------------------------- editorial (daily own publication)

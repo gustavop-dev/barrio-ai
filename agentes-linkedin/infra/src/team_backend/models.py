@@ -180,10 +180,57 @@ class ObservedPost(models.Model):
     reactions_count=models.IntegerField(null=True,blank=True)
     is_repost=models.BooleanField(default=False)
     observed_at=models.DateTimeField(default=timezone.now)
+    # DESC-05: when its commenters were last read to discover people (each post is scanned once).
+    commenters_scanned_at=models.DateTimeField(null=True,blank=True)
     class Meta:
         ordering=['-posted_at','-observed_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]
     def __str__(self):return f'{self.author_name}: {self.text[:60]}'
+
+class Contact(models.Model):
+    """A person of Gustavo's neighborhood (RED-09 relationship memory): discovered, classified and moved
+    through follow -> invitation without note -> connection. Only the operator writes to LinkedIn."""
+    class Stage(models.TextChoices):
+        CANDIDATE='candidate','Descubierto; pendiente de clasificar'
+        FIT='fit','Encaja; pendiente de seguir'
+        DISCARDED='discarded','Descartado'
+        FOLLOWED='followed','Seguido; calentando antes de invitar'
+        INVITED='invited','Invitación enviada'
+        CONNECTED='connected','Conectado'
+        CLOSED='closed','Invitación ignorada o retirada; no se reinvita'
+        INCOMING='incoming','Invitación recibida pendiente'
+    class Source(models.TextChoices):
+        COMMENTER='commenter','Comentó en un post de un referente'
+        SEARCH='search','Búsqueda'
+        INCOMING='incoming','Invitación recibida'
+        MANUAL='manual','Añadido a mano'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='contacts')
+    provider_user_id=models.CharField(max_length=200)
+    public_identifier=models.CharField(max_length=100,blank=True)
+    display_name=models.CharField(max_length=200,blank=True)
+    headline=models.TextField(blank=True)
+    profile_url=models.TextField(blank=True)
+    location=models.CharField(max_length=200,blank=True)
+    source=models.CharField(max_length=20,choices=Source.choices)
+    evidence=models.JSONField(default=dict,blank=True)
+    network_distance=models.CharField(max_length=20,blank=True)
+    is_following=models.BooleanField(default=False)
+    # Provider id of the pending invitation (sent by us or received), used to accept or to track it.
+    invitation_id=models.CharField(max_length=200,blank=True)
+    classification=models.JSONField(default=dict,blank=True)
+    stage=models.CharField(max_length=20,choices=Stage.choices,default=Stage.CANDIDATE,db_index=True)
+    history=models.JSONField(default=list,blank=True)
+    profile_checked_at=models.DateTimeField(null=True,blank=True)
+    followed_at=models.DateTimeField(null=True,blank=True)
+    invited_at=models.DateTimeField(null=True,blank=True)
+    connected_at=models.DateTimeField(null=True,blank=True)
+    discovered_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-updated_at']
+        constraints=[models.UniqueConstraint(fields=['account','provider_user_id'],name='unique_contact_per_account')]
+    def __str__(self):return self.display_name or self.provider_user_id
 
 OPEN_ACTION_STATES=['proposed','approved','executing','sent','uncertain']
 OPEN_PIECE_STATES=['preparing','ready']
@@ -230,6 +277,9 @@ class ActionProposal(models.Model):
         COMMENT='INT-03','Comentar en una publicación ajena'
         REACT='INT-02','Reaccionar a una publicación'
         PUBLISH='CONT-09','Publicar una pieza propia'
+        FOLLOW='RED-01','Seguir a una persona'
+        INVITE='RED-02','Invitar a conectar sin nota'
+        ACCEPT='RED-04','Aceptar una invitación recibida'
     class State(models.TextChoices):
         PROPOSED='proposed','Propuesta; espera aprobación'
         APPROVED='approved','Aprobada; pendiente de ejecución'
@@ -247,6 +297,8 @@ class ActionProposal(models.Model):
     # Target: someone else's post (INT-*) or an own editorial piece (CONT-09, post is null).
     post=models.ForeignKey(ObservedPost,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
     piece=models.ForeignKey(EditorialPiece,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
+    # Network actions (RED-*) target a person instead of a post or a piece.
+    contact=models.ForeignKey(Contact,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
     capability=models.CharField(max_length=10,choices=Capability.choices)
     payload=models.JSONField()
     payload_hash=models.CharField(max_length=64)
@@ -267,12 +319,15 @@ class ActionProposal(models.Model):
     decision_note=models.TextField(blank=True)
     class Meta:
         ordering=['-created_at']
-        # One executor per action: a single open proposal per target (post or piece) and capability.
+        # One executor per action: a single open proposal per target (post, piece or contact) and capability.
         constraints=[models.UniqueConstraint(fields=['post','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
                                              name='one_open_action_per_target'),
                      models.UniqueConstraint(fields=['piece','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
                                              name='one_open_action_per_piece'),
-                     models.CheckConstraint(condition=models.Q(post__isnull=False)|models.Q(piece__isnull=False),name='action_has_target')]
+                     models.UniqueConstraint(fields=['contact','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
+                                             name='one_open_action_per_contact'),
+                     models.CheckConstraint(condition=models.Q(post__isnull=False)|models.Q(piece__isnull=False)|models.Q(contact__isnull=False),
+                                            name='action_has_target')]
     def __str__(self):return f'{self.capability} v{self.version} · {self.get_state_display()}'
 
 class ActionExecution(models.Model):

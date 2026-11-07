@@ -4,6 +4,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { approveAction, asList, listActions, rejectAction, resolveAction } from '../api/endpoints';
 import { keys } from '../api/queryClient';
 import { ACTION_STATES, type Action, type Capability, type Paginated } from '../api/types';
+import { ContactClassificationView, ContactPerson } from '../components/Contact';
 import { Badge, Empty, ErrorNote, ExternalLink, Loading, Modal, PageHeader, type Tone } from '../components/ui';
 import { actionStateLabel, capabilityLabel, formatDateTime, timeAgo } from '../lib/format';
 
@@ -26,9 +27,30 @@ export const CAPABILITY_FILTERS: readonly { value: string; code: Capability; lab
   { value: 'comentarios', code: 'INT-03', label: 'Comentarios' },
   { value: 'reacciones', code: 'INT-02', label: 'Reacciones' },
   { value: 'publicaciones', code: 'CONT-09', label: 'Publicaciones propias' },
+  { value: 'seguimientos', code: 'RED-01', label: 'Seguimientos' },
+  { value: 'invitaciones', code: 'RED-02', label: 'Invitaciones sin nota' },
+  { value: 'invitaciones-recibidas', code: 'RED-04', label: 'Invitaciones recibidas' },
 ];
 
+/** /acciones filtered by a capability and a state, e.g. the open action of a contact. */
+export function actionsHref(capability: string, state = ''): string {
+  const search = new URLSearchParams();
+  if (state) search.set('state', state);
+  const filter = CAPABILITY_FILTERS.find((f) => f.code === capability);
+  if (filter) search.set('capacidad', filter.value);
+  const query = search.toString();
+  return `/acciones${query ? `?${query}` : ''}`;
+}
+
 export const isOwnPublication = (action: Action) => action.capability === 'CONT-09';
+/** RED-01/02/04: they target a contact, never a post (`post` and `piece_id` are null). */
+export const isNetworkAction = (action: Action) => action.capability.startsWith('RED-') || Boolean(action.contact);
+
+const NETWORK_ACTION_TEXT: Record<string, string> = {
+  'RED-01': 'Seguir su perfil, sin pedir conexión.',
+  'RED-02': 'Enviar una invitación de conexión sin nota.',
+  'RED-04': 'Aceptar la invitación de conexión que te envió.',
+};
 
 export const canVeto = (action: Action) => action.state === 'proposed' || action.state === 'approved';
 export const canApprove = (action: Action) => action.state === 'proposed';
@@ -50,12 +72,15 @@ function DecisionModal({ action, kind, onClose }: { action: Action; kind: Decisi
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: keys.actionsAll });
       void queryClient.invalidateQueries({ queryKey: keys.editorialAll });
+      // A vetoed network action discards its contact.
+      void queryClient.invalidateQueries({ queryKey: keys.redAll });
       void queryClient.invalidateQueries({ queryKey: keys.overview });
       void queryClient.invalidateQueries({ queryKey: keys.feed });
       onClose();
     },
   });
   const noteRequired = kind !== 'approve';
+  const network = isNetworkAction(action);
   const valid = (!noteRequired || note.trim()) && (kind !== 'resolve' || outcome);
   const own = isOwnPublication(action);
   const title =
@@ -67,19 +92,25 @@ function DecisionModal({ action, kind, onClose }: { action: Action; kind: Decisi
   return (
     <Modal title={title} onClose={onClose}>
       <form onSubmit={submit}>
-        {kind === 'veto' ? (
+        {kind === 'veto' && network ? (
+          <p>La acción no se ejecutará y el contacto pasa a «Descartado»: la máquina no volverá a proponerlo. Queda registrada con tu nota.</p>
+        ) : kind === 'veto' ? (
           <p>
             {own ? 'La pieza no se publicará y ese día quedará sin publicación.' : 'La acción no se ejecutará.'} Queda registrada con tu
             nota.
           </p>
         ) : null}
-        {kind === 'approve' ? <p>Apruebas exactamente esta versión del texto (hash {action.payload_hash.slice(0, 10)}…). Si cambia, habrá que volver a aprobar.</p> : null}
+        {kind === 'approve' && network ? (
+          <p>Apruebas exactamente esta acción (hash {action.payload_hash.slice(0, 10)}…). Si cambia, habrá que volver a aprobar.</p>
+        ) : kind === 'approve' ? (
+          <p>Apruebas exactamente esta versión del texto (hash {action.payload_hash.slice(0, 10)}…). Si cambia, habrá que volver a aprobar.</p>
+        ) : null}
         {kind === 'resolve' ? (
           <fieldset className="radios">
             <legend>¿Qué pasó en LinkedIn?</legend>
             <label className="radio">
               <input type="radio" name="outcome" value="confirmed" checked={outcome === 'confirmed'} onChange={() => setOutcome('confirmed')} />
-              Se publicó: confirmar
+              {network ? 'Se aplicó: confirmar' : 'Se publicó: confirmar'}
             </label>
             <label className="radio">
               <input type="radio" name="outcome" value="failed" checked={outcome === 'failed'} onChange={() => setOutcome('failed')} />
@@ -94,7 +125,7 @@ function DecisionModal({ action, kind, onClose }: { action: Action; kind: Decisi
           maxLength={2000}
           required={noteRequired}
           onChange={(event) => setNote(event.target.value)}
-          placeholder={kind === 'veto' ? 'Por qué no debe publicarse' : kind === 'resolve' ? 'Qué comprobaste' : ''}
+          placeholder={kind === 'veto' ? (network ? 'Por qué no encaja' : 'Por qué no debe publicarse') : kind === 'resolve' ? 'Qué comprobaste' : ''}
         />
         <ErrorNote error={mutation.error} />
         <div className="buttonrow">
@@ -114,6 +145,8 @@ export function ActionCard({ action }: { action: Action }) {
   const [decision, setDecision] = useState<Decision | null>(null);
   const post = action.post;
   const own = isOwnPublication(action);
+  const network = isNetworkAction(action);
+  const contact = action.contact ?? null;
   const execution = action.execution;
   return (
     <article className="card action" aria-labelledby={`action-${action.id}`}>
@@ -145,6 +178,16 @@ export function ActionCard({ action }: { action: Action }) {
             </p>
           ) : null}
         </div>
+      ) : network ? (
+        contact ? (
+          <>
+            <ContactPerson contact={contact} />
+            <p className="sectionlabel">CLASIFICACIÓN</p>
+            <ContactClassificationView classification={contact.classification} />
+          </>
+        ) : (
+          <p className="muted small">Sin datos del contacto.</p>
+        )
       ) : post ? (
         <div className="origin">
           <p className="sectionlabel">POST DE ORIGEN · {post.author_name || 'Autor desconocido'}</p>
@@ -156,13 +199,22 @@ export function ActionCard({ action }: { action: Action }) {
         </div>
       ) : null}
 
-      <p className="sectionlabel">{own ? 'TEXTO FINAL' : action.payload.reaction ? 'REACCIÓN PROPUESTA' : 'TEXTO PROPUESTO'}</p>
-      {action.payload.text ? (
-        <p className="proposed" lang={own ? 'en' : undefined}>
-          {action.payload.text}
-        </p>
-      ) : null}
-      {action.payload.reaction ? <p className="proposed">{action.payload.reaction}</p> : null}
+      {network ? (
+        <>
+          <p className="sectionlabel">ACCIÓN PROPUESTA</p>
+          <p className="proposed">{NETWORK_ACTION_TEXT[action.capability] ?? capabilityLabel(action.capability)}</p>
+        </>
+      ) : (
+        <>
+          <p className="sectionlabel">{own ? 'TEXTO FINAL' : action.payload.reaction ? 'REACCIÓN PROPUESTA' : 'TEXTO PROPUESTO'}</p>
+          {action.payload.text ? (
+            <p className="proposed" lang={own ? 'en' : undefined}>
+              {action.payload.text}
+            </p>
+          ) : null}
+          {action.payload.reaction ? <p className="proposed">{action.payload.reaction}</p> : null}
+        </>
+      )}
 
       {action.rationale ? (
         <>
@@ -272,8 +324,8 @@ export function Acciones() {
   return (
     <div className="stack">
       <PageHeader eyebrow="LO QUE HACE LA MÁQUINA" title="Acciones">
-        Comentarios, reacciones y publicaciones propias: propuestas, aprobaciones y ejecuciones en LinkedIn. Puedes vetar lo pendiente y
-        resolver lo incierto.
+        Comentarios, reacciones, publicaciones propias y acciones de red (seguir, invitar sin nota, aceptar invitaciones): propuestas,
+        aprobaciones y ejecuciones en LinkedIn. Puedes aprobar o vetar lo pendiente y resolver lo incierto.
       </PageHeader>
       <div className="filters">
         <div className="filter">
