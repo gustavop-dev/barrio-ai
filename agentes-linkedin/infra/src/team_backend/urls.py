@@ -4,6 +4,7 @@ from . import operador_views as op
 from . import oficina_views as of
 from . import linkedin_views as li
 from . import editorial_views as ed
+from . import red_views as rd
 urlpatterns=[
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
  path('units',views.Units.as_view()),path('units/<str:uid>',views.UnitDetail.as_view()),
@@ -23,6 +24,8 @@ urlpatterns=[
  # Official LinkedIn API: member OAuth and token status (docs/publicacion-diaria.md).
  path('linkedin/oauth/start',li.OAuthStart.as_view()),path('linkedin/oauth/callback',li.oauth_callback),
  path('linkedin/status',li.Status.as_view()),
+ path('red/contacts',rd.Contacts.as_view()),path('red/contacts/<uuid:cid>',rd.ContactDetail.as_view()),
+ path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/summary',rd.Summary.as_view()),
  # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).
  path('editorial/calendar',ed.Calendar.as_view()),path('editorial/pieces/<uuid:pid>',ed.PieceDetail.as_view()),
  path('editorial/plan',ed.Plan.as_view()),

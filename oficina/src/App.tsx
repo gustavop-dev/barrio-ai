@@ -11,6 +11,7 @@ import { Maquina } from './pages/Maquina';
 import { Memoria } from './pages/Memoria';
 import { Oficina } from './pages/Oficina';
 import { Pieza } from './pages/Pieza';
+import { Red } from './pages/Red';
 import { Referentes } from './pages/Referentes';
 
 export function AppRoutes() {
@@ -33,6 +34,7 @@ export function AppRoutes() {
         <Route path="editorial" element={<EditorialRedirect />} />
         <Route path="editorial/:pieceId" element={<EditorialRedirect />} />
         <Route path="referentes" element={<Referentes />} />
+        <Route path="red" element={<Red />} />
         <Route path="conocimiento" element={<Conocimiento />} />
         <Route path="memoria" element={<Memoria />} />
         <Route path="ajustes" element={<Ajustes />} />

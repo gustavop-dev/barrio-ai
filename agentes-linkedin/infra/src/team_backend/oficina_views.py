@@ -123,10 +123,14 @@ ROLES=['posicionamiento','perfil','investigador_referentes','analista_barrio_res
        'editor_verificador','relaciones_comunidad','conversaciones_inbox','operador_cuenta']
 # Real work behind each implemented role. Roles without work here are contracts in design.
 JOB_ROLES={'observe':'investigador_referentes','propose_comment':'relaciones_comunidad',
-           'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta'}
+           'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta',
+           'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
+           'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad'}
 DESCRIPTIONS={'observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
-              'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día'}
+              'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día',
+              'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',
+              'plan_network':'Preparando seguimientos e invitaciones','sync_network':'Revisando invitaciones y conexiones'}
 STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',
                     'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
                     'verificador':'Verificando afirmaciones, voz y privacidad'}

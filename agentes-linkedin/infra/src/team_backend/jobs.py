@@ -52,8 +52,12 @@ OPERATION_PERMISSIONS={
     'execute_action':['execute_actions'],
     'reconcile_action':['operate_linkedin'],
     'prepare_piece':['operate_linkedin','run_agents','use_paid_providers'],
+    'discover_network':['operate_linkedin'],
+    'classify_contacts':['operate_linkedin','run_agents','use_paid_providers'],
+    'plan_network':['operate_linkedin'],
+    'sync_network':['operate_linkedin'],
 }
-PAID_OPERATIONS=('propose_comment','prepare_piece')
+PAID_OPERATIONS=('propose_comment','prepare_piece','classify_contacts')
 
 def enqueue_operation(user,kind,params,request_id=None,audit_request_id=''):
     """Queue an account-operator step with the same idempotency rules as agent runs."""

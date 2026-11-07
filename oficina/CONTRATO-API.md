@@ -66,7 +66,7 @@ Cada acción (`serializers.ActionOutput`) tiene esta forma:
 
 - **Comentario (INT-03) y reacción (INT-02):** `post` es la publicación ajena; `piece_id` y `scheduled_for` son `null`.
 - **Publicación propia (CONT-09):** `post` es **siempre `null`**. `piece_id` y `scheduled_for` identifican la pieza editorial y su hora de salida, `payload.text` es el texto final en inglés y, una vez publicada, `execution.external_url` es `https://www.linkedin.com/feed/update/urn:li:share:…/`. No se puede crear a mano: la propone el circuito editorial.
-- El listado solo filtra por `state`. La PWA envía además `capability=<código>&page_size=100` (hoy el backend los ignora salvo `page_size`) y filtra en cliente las capacidades que recibe (`/acciones?capacidad=comentarios|reacciones|publicaciones`).
+- El listado filtra por `state` y por `capability`. La PWA envía `capability=<código>&page_size=100` y, por compatibilidad, vuelve a filtrar en cliente las capacidades que recibe (`/acciones?capacidad=comentarios|reacciones|publicaciones`).
 
 Estados de una acción: `proposed`, `approved`, `rejected`, `superseded`, `discarded`, `executing`, `sent`, `confirmed`, `uncertain`, `failed` y `expired`.
 
@@ -140,6 +140,104 @@ GET `/api/v1/linkedin/oauth/callback`: lo llama LinkedIn. Como la cookie de sesi
 | `canje` | Falló el canje del código o la lectura de `/v2/userinfo`. |
 
 La PWA muestra un mensaje en español para cada motivo y quita `linkedin` y `motivo` de la URL.
+
+## Red (crecer la red)
+
+Fuente del bloque: DESC-02/05/07 y RED-01/02/03/04/09. La máquina descubre a quien comenta en los posts de los referentes y a quien sale en búsquedas por palabras clave, clasifica a cada candidato con un modelo y propone seguirlo, invitarlo sin nota o aceptar su invitación. Toda acción pasa por el flujo de siempre (propuesta → aprobación → ejecución). En el modo de ensayo, cada capacidad está en `approval` y espera a Gustavo en `/acciones`.
+
+### Acciones de red
+
+| Código | Etiqueta en la PWA | `payload` | Objetivo |
+| --- | --- | --- | --- |
+| `RED-01` | Seguir | `{ "user_id": "ACo…" }` | `contact` |
+| `RED-02` | Invitación sin nota | `{ "user_id": "ACo…" }` | `contact` |
+| `RED-04` | Aceptar invitación | `{ "request_id": "…", "user_id": "ACo…" }` | `contact` |
+
+En estas acciones, `post` y `piece_id` son **siempre `null`**. Se aprueban, vetan y resuelven con las rutas de siempre (`/api/v1/operador/actions/<id>/approve|reject|resolve`), con `expected_hash` al aprobar. Si Gustavo veta una acción de red, el contacto pasa a `discarded` y no vuelve a proponerse; la PWA lo avisa en el diálogo del veto.
+
+`ActionOutput` añade `contact`, que es `null` en INT-* y CONT-09:
+```json
+"contact": { "id": "uuid", "display_name": "…", "headline": "…", "profile_url": "https://www.linkedin.com/in/…", "public_identifier": "…",
+             "network_distance": "FIRST_DEGREE|SECOND_DEGREE|THIRD_DEGREE|OUT_OF_NETWORK|", "stage": "fit", "source": "commenter",
+             "evidence": { "post_id": "uuid|null", "post_url": "https://…|null", "referent": "…|null", "comment": "…|null",
+                           "query": "…|null", "invitation_message": "…|null" },
+             "classification": { "fit": true, "role": "comprador", "modality": "projectapp", "affinity": "desconocida",
+                                 "reason": "…", "confidence": 0.8, "model": "…", "classified_at": "ISO" } }
+```
+
+`GET /api/v1/operador/actions?capability=RED-01` filtra por capacidad. La PWA la sigue filtrando también en cliente (`/acciones?capacidad=seguimientos|invitaciones|invitaciones-recibidas`). En `/acciones`, una acción de red muestra la persona (nombre enlazado al perfil en otra pestaña, titular, grado y origen; si comentó, el referente y un extracto del comentario), su clasificación (rol, modalidad y motivo), la acción propuesta y la justificación del agente.
+
+### Contactos
+
+`GET /api/v1/red/contacts?stage=&source=&account=` (permiso `operate_linkedin`) devuelve una lista paginada, ordenada por `updated_at` descendente. `GET /api/v1/red/contacts/<id>` devuelve un contacto. Cada contacto (`ContactOutput`) tiene esta forma:
+```text
+{ "id": "uuid", "account_id": "uuid", "provider_user_id": "ACo…", "public_identifier": "…", "display_name": "…",
+  "headline": "…", "profile_url": "https://www.linkedin.com/in/…", "location": "…",
+  "source": "commenter|search|incoming|manual",
+  "evidence": { "post_id", "post_url", "referent", "comment", "query", "invitation_message" },
+  "network_distance": "FIRST_DEGREE|SECOND_DEGREE|THIRD_DEGREE|OUT_OF_NETWORK|", "is_following": false,
+  "stage": "candidate|fit|discarded|followed|invited|connected|closed|incoming",
+  "classification": {} | { "fit", "role", "modality", "affinity", "reason", "confidence", "model", "classified_at" },
+  "history": [ { "at": "ISO", "event": "discovered|classified|followed|invited|connected|closed|discarded|rejected|incoming|note", "detail": "…" } ],
+  "followed_at": "ISO|null", "invited_at": "ISO|null", "connected_at": "ISO|null", "discovered_at": "ISO", "updated_at": "ISO",
+  "open_action": { "id": "uuid", "capability": "RED-01", "state": "proposed" } | null }
+```
+
+`classification` vale `{}` mientras no se haya clasificado (la PWA muestra «Sin clasificar todavía»). En `evidence`, el campo que no corresponde a su `source` llega `null`.
+
+| `stage` | Etiqueta en la PWA | Significado |
+| --- | --- | --- |
+| `candidate` | Por clasificar | Descubierto; pendiente de clasificar. |
+| `fit` | Encaja | Encaja; se propondrá seguirlo. |
+| `discarded` | Descartado | No encaja o Gustavo lo descartó; no se vuelve a proponer. |
+| `followed` | Seguido | Seguido; se espera al menos 48 h antes de invitar. |
+| `invited` | Invitado | Invitación sin nota enviada. |
+| `connected` | Conectado | Conexión de primer grado. |
+| `closed` | Cerrado | Invitación ignorada o retirada; no se reinvita sin Gustavo. |
+| `incoming` | Te invitó | Te invitó; se aceptará si encaja. |
+
+Valores que muestra la PWA:
+- `role`: `par` → Par, `recomendador` → Recomendador, `lider` → Líder, `comprador` → Comprador, `divulgador` → Divulgador, `aliado` → Aliado.
+- `modality`: `personal_startups` → «Startups (personal)», `projectapp` → «ProjectApp», `alianzas` → «Alianzas», `comunidad_autoridad` → «Comunidad». Son las modalidades de la red; el calendario editorial usa las suyas (`comunidad`, «Personal · startups»).
+- `affinity`: `hispanohablante_declarada` → «Hispanohablante (declarado)», `otra` → «Otra», `desconocida` → «Sin dato».
+- `source`: `commenter` → «Comentó en un post de <referent>», `search` → «Búsqueda: <query>», `incoming` → «Te invitó», `manual` → «Añadido a mano».
+- `network_distance`: «1.er grado», «2.º grado», «3.er grado», «Fuera de tu red»; vacío no se muestra.
+- `confidence` (0 a 1) se muestra como porcentaje entero.
+
+POST `/api/v1/red/contacts/<id>/discard` con `{ note }`, nota obligatoria. Requiere sesión humana con CSRF y el permiso `approve_actions`. Pone el contacto en `discarded`, veta su acción abierta si la tiene y devuelve `ContactOutput`. Responde 409 si el contacto ya está en `connected`, `invited`, `closed` o `discarded`; por eso la PWA solo ofrece «Descartar» en `candidate`, `fit`, `followed` e `incoming`.
+
+### Resumen
+
+GET `/api/v1/red/summary` (permiso `operate_linkedin`):
+```json
+{ "enabled": true,
+  "stages": { "candidate": 3, "fit": 5, "discarded": 9, "followed": 2, "invited": 1, "connected": 0, "closed": 0, "incoming": 1 },
+  "capacity": { "RED-01": { "daily": 10, "daily_used": 2, "weekly": 40, "weekly_used": 6, "left": 8, "mode": "approval" },
+                "RED-02": { "…": "…" }, "RED-04": { "…": "…" } },
+  "reads_today": { "comments": 4, "search": 1, "profile": 7, "sync": 1 },
+  "read_caps": { "comments": 60, "search": 20, "profile": 30, "sync": 4 },
+  "llm": { "spent_today": 0.04, "daily": 0.3, "model": "…" },
+  "invites_blocked": { "blocked": false, "reason": "" },
+  "last_discovery_at": "ISO|null", "last_sync_at": "ISO|null" }
+```
+
+- `mode` es el modo de autonomía de la capacidad: `auto`, `approval` u `off` (la PWA muestra «Modo auto», «Modo aprobación» o «Modo apagado»).
+- `llm` llega en números JSON, no en cadenas decimales como el gasto del overview.
+- `invites_blocked.blocked=true` significa que LinkedIn rechazó invitaciones por límite en los últimos 7 días y que las invitaciones están en pausa. La PWA lo avisa siempre, con `reason`.
+- `enabled=false` significa que el bloque está apagado (`NETWORK_ENABLED=false`). La PWA lo avisa y sigue mostrando lo guardado.
+
+La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente a su presupuesto y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
+
+### Trabajos y roles (escena de la oficina)
+
+Hay cuatro trabajos nuevos (`Job.kind`). Sus roles se derivan en `/api/v1/oficina/actividad`, sin cambios en la PWA:
+
+| Trabajo | Rol |
+| --- | --- |
+| `discover_network` | `investigador_referentes` |
+| `classify_contacts` | `investigador_referentes` |
+| `plan_network` | `relaciones_comunidad` |
+| `sync_network` | `relaciones_comunidad` |
 
 ## Oficina (escena)
 

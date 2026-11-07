@@ -39,7 +39,23 @@ def _when(value):
 def _user(data):
     data=data or {}
     return {'id':str(data.get('id') or ''),'public_identifier':data.get('public_identifier') or '',
-            'display_name':data.get('display_name') or '','profile_url':data.get('profile_url') or ''}
+            'display_name':data.get('display_name') or '','profile_url':data.get('profile_url') or '',
+            'headline':data.get('headline') or data.get('description') or '','type':data.get('type') or ''}
+
+def _profile(data):
+    """Network view of a profile (DESC-03): distance, follow and invitation status, restrictions."""
+    specifics=data.get('specifics') or {}
+    request=specifics.get('relation_request') or {}
+    return dict(_user(data),location=data.get('location') or '',
+                network_distance=specifics.get('network_distance') or data.get('network_distance') or '',
+                is_following=bool(data.get('is_following')),
+                relation_request_status=specifics.get('relation_request_status') or '',
+                invitation_id=str(request.get('id') or ''),
+                is_restricted=bool(specifics.get('is_restricted')))
+
+def _invitation(data):
+    return {'id':str(data['id']),'type':data.get('type') or '','created_at':_when(data.get('created_at')),
+            'message':data.get('message') or '','user':_user(data.get('user'))}
 
 def _count(value):
     """Unipile v2 reports reactions as [{reaction, count}]; older shapes use an int."""
@@ -94,6 +110,13 @@ class UnipileConnector:
         if response.status_code>=400:raise self._error(response)
         return response.json()
 
+    def _query(self,path,body,params=None):
+        """A read sent as POST (search): failures are definite, never uncertain."""
+        try:response=self.http.post(path,json=body,params=params)
+        except httpx.HTTPError as exc:raise ConnectorError(f'Unipile no respondió: {type(exc).__name__}.',kind='network') from None
+        if response.status_code>=400:raise self._error(response)
+        return response.json()
+
     def _write(self,path,body):
         try:response=self.http.post(path,json=body)
         except (httpx.ConnectError,httpx.ConnectTimeout):
@@ -131,6 +154,29 @@ class UnipileConnector:
         self._write(self._path('posts',post_id,'reactions'),{'reaction':reaction})
         return {'reaction':reaction}
 
+    # -- network (DESC-02/03, RED-01/02/03/04); profile reads do not notify a visit
+    def get_profile(self,user_id):return _profile(self._read(self._path('users',user_id)))
+
+    def search_people(self,keywords):
+        data=self._query(self._path('linkedin','search','people'),{'keywords':keywords})
+        return [dict(_user(p),location=p.get('location') or '',network_distance=p.get('network_distance') or '')
+                for p in data.get('data',[]) if p.get('id')]
+
+    def follow_user(self,user_id):
+        self._write(self._path('users','me','follow',user_id),{});return {'user_id':user_id}
+
+    def send_invitation(self,user_id):
+        # No note: the free account only has a handful of notes a month (reparto v1.1).
+        return _invitation(self._write(self._path('users','me','relation-requests'),{'user_id':user_id}))
+
+    def list_invitations(self,kind,limit=100):
+        if kind not in ('sent','received'):raise ConnectorError('Tipo de invitación inválido.',kind='invalid')
+        data=self._read(self._path('users','me','relation-requests'),{'type':kind,'limit':limit})
+        return [_invitation(i) for i in data.get('data',[])]
+
+    def accept_invitation(self,request_id):
+        self._write(self._path('users','me','relation-requests',request_id,'accept'),{});return {'request_id':request_id}
+
 
 class FakeConnector:
     """In-memory LinkedIn for tests and local rehearsals. Never touches the network.
@@ -143,7 +189,8 @@ class FakeConnector:
         if os.environ.get('OPERATOR_ALLOW_FAKE','false').lower()!='true':
             raise ConnectorError('Conector simulado desactivado (OPERATOR_ALLOW_FAKE).',kind='disabled')
         self.account_id=account_id
-        self.state=self.store.setdefault(account_id,{'status':'running','is_locked':False,'users':{},'posts':{},'comments':{},'reactions':{},'fail_next':None,'writes':0})
+        self.state=self.store.setdefault(account_id,{'status':'running','is_locked':False,'users':{},'posts':{},'comments':{},'reactions':{},'fail_next':None,'writes':0,
+                                                     'network':{},'invitations':{'sent':{},'received':{}},'search':{}})
 
     @classmethod
     def reset(cls):cls.store.clear()
@@ -200,6 +247,72 @@ class FakeConnector:
             self.state['comments'][post_id].append(comment);self.state['writes']+=1
         if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
         return _comment(comment)
+
+    # -- network
+    def seed_person(self,public_id,display_name,headline='',distance='SECOND_DEGREE',comment_on=None,comment='',search=None):
+        """A LinkedIn member who may comment on a seeded post and/or appear in a keyword search."""
+        user={'id':'ACo'+public_id,'public_identifier':public_id,'display_name':display_name,'headline':headline,
+              'profile_url':'https://www.linkedin.com/in/'+public_id,'type':'individual'}
+        self.state['users'][public_id]=user;self.state['users'][user['id']]=user
+        self.state['network'][user['id']]={'network_distance':distance,'is_following':False,'relation_request_status':''}
+        if comment_on:
+            self.state['comments'][comment_on].append({'id':'comment:'+uuid.uuid4().hex[:12],'text':comment,'is_sender':False,
+                'created_at':datetime(2026,11,6,13,0,tzinfo=timezone.utc).isoformat(),'author':user})
+        if search:self.state['search'].setdefault(search,[]).append(user['id'])
+        return user
+
+    def receive_invitation(self,user_id,message=''):
+        rid='inv:'+uuid.uuid4().hex[:10]
+        self.state['invitations']['received'][rid]={'id':rid,'type':'received','message':message,
+            'created_at':datetime(2026,11,6,14,0,tzinfo=timezone.utc).isoformat(),'user':self.state['users'][user_id]}
+        return rid
+
+    def get_profile(self,user_id):
+        user=self.state['users'].get(user_id)
+        if not user:raise ConnectorError('Simulado: perfil no encontrado.',status=404,kind='provider/resource_not_found')
+        net=self.state['network'].setdefault(user['id'],{'network_distance':'THIRD_DEGREE','is_following':False,'relation_request_status':''})
+        sent=next((i for i in self.state['invitations']['sent'].values() if i['user']['id']==user['id']),None)
+        return dict(_user(user),location='',network_distance=net['network_distance'],is_following=net['is_following'],
+                    relation_request_status=net['relation_request_status'],invitation_id=sent['id'] if sent else '',is_restricted=False)
+
+    def search_people(self,keywords):
+        return [dict(_user(self.state['users'][uid]),location='',network_distance=self.state['network'][uid]['network_distance'])
+                for uid in self.state['search'].get(keywords,[])]
+
+    def follow_user(self,user_id):
+        mode=self._fail();self.get_profile(user_id)
+        if mode!='uncertain_not_applied':self.state['network'][user_id]['is_following']=True;self.state['writes']+=1
+        if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
+        return {'user_id':user_id}
+
+    def send_invitation(self,user_id):
+        mode=self._fail();self.get_profile(user_id)
+        rid='inv:'+uuid.uuid4().hex[:10]
+        invitation={'id':rid,'type':'sent','message':'','created_at':datetime.now(timezone.utc).isoformat(),'user':self.state['users'][user_id]}
+        if mode!='uncertain_not_applied':
+            self.state['invitations']['sent'][rid]=invitation;self.state['network'][user_id]['relation_request_status']='PENDING'
+            self.state['writes']+=1
+        if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
+        return _invitation(invitation)
+
+    def list_invitations(self,kind,limit=100):
+        return [_invitation(i) for i in self.state['invitations'][kind].values()][:limit]
+
+    def accept_invitation(self,request_id):
+        mode=self._fail()
+        invitation=self.state['invitations']['received'].get(request_id)
+        if not invitation:raise ConnectorError('Simulado: invitación inexistente.',status=404,kind='provider/resource_not_found')
+        if mode!='uncertain_not_applied':
+            del self.state['invitations']['received'][request_id]
+            self.state['network'][invitation['user']['id']]['network_distance']='FIRST_DEGREE';self.state['writes']+=1
+        if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
+        return {'request_id':request_id}
+
+    def accept_sent(self,user_id):
+        """Simulate the other person accepting our invitation."""
+        for rid,inv in list(self.state['invitations']['sent'].items()):
+            if inv['user']['id']==user_id:del self.state['invitations']['sent'][rid]
+        self.state['network'][user_id].update(network_distance='FIRST_DEGREE',relation_request_status='')
 
     def add_reaction(self,post_id,reaction):
         if reaction not in REACTIONS:raise ConnectorError('Reacción no admitida.',kind='invalid')
