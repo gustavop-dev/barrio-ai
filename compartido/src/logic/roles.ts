@@ -145,18 +145,22 @@ export const ROLE_BY_ID: Readonly<Record<RoleId, AgentRole>> = Object.fromEntrie
 export const CHARACTER_BY_ID: Readonly<Record<CharacterId, Role>> = { ...ROLE_BY_ID, [LIBRARIAN_ID]: LIBRARIAN };
 
 export function isRoleId(value: unknown): value is RoleId {
+  'worklet';
   return typeof value === 'string' && (ROLE_IDS as readonly string[]).includes(value);
 }
 
 export function isCharacterId(value: unknown): value is CharacterId {
+  'worklet';
   return value === LIBRARIAN_ID || isRoleId(value);
 }
 
 export function rolesOfTeam(team: TeamId): AgentRole[] {
+  'worklet';
   return ROLES.filter((r) => r.team === team);
 }
 
 export function teamById(team: TeamId): Team {
+  'worklet';
   const found = TEAMS.find((t) => t.id === team);
   if (!found) throw new Error(`Equipo desconocido: ${team}`);
   return found;
@@ -164,6 +168,7 @@ export function teamById(team: TeamId): Team {
 
 /** «Mesa editorial», or «Biblioteca» for the library. */
 export function zoneName(zone: ZoneId): string {
+  'worklet';
   return zone === 'biblioteca' ? LIBRARY.name : teamById(zone).name;
 }
 

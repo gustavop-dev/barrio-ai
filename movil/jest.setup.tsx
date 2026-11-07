@@ -66,6 +66,7 @@ jest.mock('expo-router', () => {
     useRouter: () => router,
     useLocalSearchParams: () => state.params,
     usePathname: () => state.pathname,
+    useIsFocused: () => state.pathname === '/',
     Redirect: ({ href }: { href: string }) => {
       const { Text } = require('react-native');
       return <Text testID="redirect">{String(href)}</Text>;

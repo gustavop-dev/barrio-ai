@@ -18,3 +18,4 @@ export { AgentPortrait, IdleLibrarian, roleName } from './Sprite';
 export { TabBar } from './TabBar';
 export { T } from './Text';
 export { ToastProvider, useToast, type ToastOptions } from './Toast';
+export { SnapSheet, type SnapSheetProps } from './SnapSheet';

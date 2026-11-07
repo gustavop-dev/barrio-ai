@@ -1,42 +1,17 @@
 // The team and role panels of the Oficina (DISENO-VISTAS «1. Oficina», F and G), shown in the bottom
 // sheet on the phone and in the 340 px side panel on desktop.
 
+import { detailOf, SERVICE_NOTE, type PanelData } from '../../../compartido/src/scene/panels';
+export { detailOf, type PanelData } from '../../../compartido/src/scene/panels';
 import { Link } from 'react-router-dom';
-import type { Activity } from '../api/types';
 import { AgentPortrait, Badge, Button, Note } from '../components/ui';
 import { timeAgo } from '../lib/format';
 import { STATUS_LABEL, STATUS_TONE, roleActivity, summarize, summaryText, type SceneStatus } from './activity';
-import type { EngineSnapshot } from './engine';
 import { CHARACTER_BY_ID, LIBRARIAN_ID, rolesOfTeam, teamById, zoneName, type CharacterId, type TeamId } from './roles';
-
-export interface PanelData {
-  statusOf: (id: CharacterId) => SceneStatus;
-  activity: Activity | undefined;
-  snapshot: EngineSnapshot;
-  /** Wall clock, for «hace X». */
-  now: number;
-}
 
 export function StatusBadge({ status }: { status: SceneStatus }) {
   return <Badge tone={STATUS_TONE[status]}>{STATUS_LABEL[status]}</Badge>;
 }
-
-/** What a character is doing: the event it is playing, else the backend's detail, else its mission. */
-export function detailOf(id: CharacterId, data: PanelData): string {
-  const doing = data.snapshot.doing[id];
-  if (doing) return doing;
-  const status = data.statusOf(id);
-  if (status === 'desconocido') return 'Sin datos de actividad';
-  const detail = roleActivity(data.activity, id)?.detail?.trim();
-  if (detail) return detail;
-  if (id === LIBRARIAN_ID) return status === 'trabajando' ? 'Busca un libro' : 'Esperando la próxima consulta';
-  return CHARACTER_BY_ID[id].purpose;
-}
-
-const SERVICE_NOTE: Partial<Record<CharacterId, string>> = {
-  operador_cuenta: 'Es un servicio de software, no un agente de IA. Solo ejecuta lo que el equipo ya decidió.',
-  [LIBRARIAN_ID]: 'Es un servicio de software, no un agente de IA: la búsqueda en la base de conocimiento. Cada visita a la biblioteca es una consulta real de un agente.',
-};
 
 export function TeamPanel({ team: teamId, data, onRole, headingId }: { team: TeamId; data: PanelData; onRole: (id: CharacterId) => void; headingId: string }) {
   const team = teamById(teamId);
