@@ -102,6 +102,11 @@ GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendar
 - `panel`: `{ readers: [{ reader, variant_a: { strengths: [], objections: [{ text, severity: "material|preference|missing_data" }] }, variant_b: {…} }], summary, citations }`.
 - `selection`: `{ decision: "A|B|merge|discard", final_text, rationale, claims, resolved_objections: [], kept_objections: [], citations }`.
 - `verification`: `{ verdict: "ready_for_execution|blocked", model_verdict, blocking_reasons: [], findings: [{ issue, severity: "material|minor", quote, detail }], checked_claims: [{ text, status, ref }], summary, citations, text_sha256 }`. `verdict` es el final (modelo más guardas deterministas) sobre el hash del texto exacto.
+- Auditoría, fase 2 (campos aditivos; `docs/publicacion-diaria.md`):
+  - `verification.rules: [texto]` son los motivos de las reglas deterministas de CONT-09, que ahora corren antes del verificador (R3). Si no está vacío, el verificador no corrió y `model_verdict`, `findings` y `checked_claims` faltan.
+  - `verification.repair` (solo si hubo ronda de reparación, R4): `{ trigger: "reglas|verificador", findings: [{ source: "reglas|verificador", issue, quote, detail }], original_text, original_sha256, first_review: { verdict, findings, checked_claims, summary, blocking_reasons } | null, decision: "repaired|discard", changes: [{ finding, change }], rationale, model, outcome: "reparada|bloqueada|descartada|sin_cambios|sin_presupuesto", note?, repaired_sha256?, repaired_text? }`. `final_text` es entonces el texto reparado (si llegó a verificarse) y `selection.final_text` conserva el de la selección.
+  - `stage` puede valer también `reparacion`, y `usage` trae una fila `reparacion` y una segunda `verificador` cuando hubo ronda.
+  - `brief.positioning_version` (por ejemplo `posicionamiento-v1`) dice con qué versión de `team_backend/posicionamiento.py` se escribió la pieza.
 - `final_text`, `citations: [unitId]`, `signals: [{ id, author, why_followed, posted_at, reactions, comments, text }]` (datos de terceros), `usage: [{ stage, model, estimated_usd, request_id, units, missing_units }]` y `action_detail`: la acción CONT-09 completa o `null`.
 
 Los bloques de una etapa que aún no ha corrido llegan como `{}`. `metrics` lleva los últimos valores leídos del post (ver la sección «Resultados»), y `snapshots` y `commenters` traen los cortes a 24 h, 72 h y 7 días y quién comentó. Un dato ausente no es cero.
@@ -214,7 +219,7 @@ GET `/api/v1/red/summary` (permiso `operate_linkedin`):
   "stages": { "candidate": 3, "fit": 5, "discarded": 9, "followed": 2, "invited": 1, "connected": 0, "closed": 0, "incoming": 1 },
   "capacity": { "RED-01": { "daily": 10, "daily_used": 2, "weekly": 40, "weekly_used": 6, "left": 8, "mode": "approval" },
                 "RED-02": { "…": "…" }, "RED-04": { "…": "…" } },
-  "reads_today": { "comments": 4, "search": 1, "profile": 7, "sync": 1 },
+  "reads_today": { "comments": 4, "search": 1, "profile": 7, "sync": 1, "execution": 6 },
   "read_caps": { "comments": 60, "search": 20, "profile": 30, "sync": 4 },
   "llm": { "spent_today": 0.04, "daily": 0.3, "model": "…" },
   "invites_blocked": { "blocked": false, "reason": "" },
@@ -225,6 +230,7 @@ GET `/api/v1/red/summary` (permiso `operate_linkedin`):
 - `llm` llega en números JSON, no en cadenas decimales como el gasto del overview.
 - `invites_blocked.blocked=true` significa que LinkedIn rechazó invitaciones por límite en los últimos 7 días y que las invitaciones están en pausa. La PWA lo avisa siempre, con `reason`.
 - `enabled=false` significa que el bloque está apagado (`NETWORK_ENABLED=false`). La PWA lo avisa y sigue mostrando lo guardado.
+- `reads_today.execution` cuenta las lecturas de las ejecuciones de red: la comprobación previa, la relectura y la conciliación. No tiene tope (no aparece en `read_caps`), porque ninguna escritura sale sin su comprobación previa.
 
 La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente a su presupuesto y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
 
@@ -705,6 +711,7 @@ Reglas de prioridad:
 
 - Los elementos de `upcoming` se calculan en cada consulta y nunca cuentan como no leídos.
 - `capture_processed` enlaza a `/?enviado=1`, que abre «Lo que enviaste».
+- `lead_silent` (capa `sistema`, push activada por defecto) avisa de que el agente líder lleva 7 días sin aprobar nada en una capacidad. Llega una vez por capacidad y semana, y enlaza a `/calendario?vista=lista&tipo=<tipo>&no_salio=1`.
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
 

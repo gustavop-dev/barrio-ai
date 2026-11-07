@@ -3,6 +3,7 @@ import math
 import os
 import uuid
 import time
+from functools import lru_cache
 from decimal import Decimal
 import httpx
 from psycopg.types.json import Jsonb
@@ -151,23 +152,36 @@ def claude_model(override=None):
     if model not in MODEL_PRICES:raise ValueError('Modelo Claude sin tarifa verificada: añadir tarifa y pruebas antes de activarlo')
     return model
 
-def anthropic_client(key):
-    """Official SDK client. Paid generations are never retried automatically, and
-    streaming keeps the read timeout per event instead of for the whole answer."""
+@lru_cache(maxsize=4)
+def _anthropic_client(key):
     import anthropic
     return anthropic.Anthropic(api_key=key,max_retries=0,
         timeout=anthropic.Timeout(600.0,connect=10.0,read=90.0,write=30.0))
 
-def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None):
-    """`model` overrides ANTHROPIC_MODEL for one call (e.g. a cheaper classifier); it must have a verified price."""
+def anthropic_client(key):
+    """Official SDK client, built once per key and reused (it keeps its connection pool). Paid generations are
+    never retried automatically, and streaming keeps the read timeout per event instead of for the whole answer."""
+    return _anthropic_client(key)
+
+def system_blocks(system,context=None):
+    """System prompt as cacheable blocks: the instructions, then any stable context (str or list of str, e.g. course
+    units). The instructions and the end of the context each carry a breakpoint (2 of the 4 allowed), so calls that
+    repeat them read them at the cache price."""
+    extra=[context] if isinstance(context,str) else list(context or [])
+    blocks=[{'type':'text','text':system}]+[{'type':'text','text':text} for text in extra if text]
+    for block in (blocks[0],blocks[-1]):block['cache_control']={'type':'ephemeral'}
+    return blocks
+
+def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
+    """`model` overrides ANTHROPIC_MODEL for one call (e.g. a cheaper classifier); it must have a verified price.
+    `context` is stable text (str or list of str) sent after the instructions and cached with them."""
     import anthropic
     key=live('anthropic');model=claude_model(model)
     max_tokens=max_tokens or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
     if not 1<=max_tokens<=64000:raise ValueError('max_tokens fuera de rango')
     client=anthropic_client(key)
-    # Stable instructions first so they can be cached; the variable task goes in messages.
-    params={'model':model,'system':[{'type':'text','text':system,'cache_control':{'type':'ephemeral'}}],
-            'messages':[{'role':'user','content':message}]}
+    # Stable instructions and context first so they can be cached; the variable task goes in messages.
+    params={'model':model,'system':system_blocks(system,context),'messages':[{'role':'user','content':message}]}
     output_config={}
     if effort:output_config['effort']=effort
     if output_schema:output_config['format']={'type':'json_schema','schema':output_schema}

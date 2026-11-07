@@ -142,8 +142,11 @@ class InvitationTests(NetworkBase):
     def test_previous_ignored_invitation_closes_the_person(self):
         eva=self.contact('founder-eva','Eva Founder',stage='followed',followed_hours=60)
         self.fake.state['network']['ACofounder-eva']['relation_request_status']='IGNORED'
-        self.job('plan_network');eva.refresh_from_db()
-        self.assertEqual(eva.stage,'closed');self.assertFalse(ActionProposal.objects.filter(contact=eva).exists())
+        self.job('plan_network')  # the plan reads nothing (audit R1): the execution's pre-check closes the person
+        invite=self.approve_open(eva,'RED-02')
+        self.assertEqual((invite.state,invite.execution.error_kind,invite.execution.wrote),('failed','previous_invitation',False))
+        self.assertEqual(eva.stage,'closed');self.assertEqual(self.fake.state['writes'],0)
+        self.job('plan_network');self.assertEqual(ActionProposal.objects.filter(contact=eva).count(),1)  # never re-invited
 
 
 class IncomingTests(NetworkBase):

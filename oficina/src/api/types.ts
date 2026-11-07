@@ -501,6 +501,35 @@ export interface Verification {
   summary?: string;
   citations?: string[];
   text_sha256?: string;
+  /** R3: deterministic CONT-09 rules on this text; when not empty the verifier did not run (no model_verdict). */
+  rules?: string[];
+  /** R4: the one repair round, when the rules or the verifier found concrete problems. */
+  repair?: Repair;
+}
+
+export interface RepairFinding {
+  source: 'reglas' | 'verificador';
+  issue: string;
+  quote?: string;
+  detail?: string;
+}
+
+export interface Repair {
+  trigger: 'reglas' | 'verificador';
+  findings: RepairFinding[];
+  original_text: string;
+  original_sha256?: string;
+  /** The verifier's first verdict, when it was the verifier that found the problems. */
+  first_review?: Pick<Verification, 'verdict' | 'findings' | 'checked_claims' | 'summary' | 'blocking_reasons'> | null;
+  decision?: 'repaired' | 'discard';
+  changes?: { finding: string; change: string }[];
+  rationale?: string;
+  model?: string;
+  /** reparada: verified again and approved; bloqueada: still blocked; descartada, sin_cambios, sin_presupuesto: not re-verified. */
+  outcome: 'reparada' | 'bloqueada' | 'descartada' | 'sin_cambios' | 'sin_presupuesto';
+  note?: string;
+  repaired_sha256?: string;
+  repaired_text?: string;
 }
 
 export interface Signal {

@@ -232,7 +232,10 @@ def answers(final=GOOD_POST,decision='write',verdict='ready_for_execution',findi
         'seleccion':{'decision':'A','final_text':final,'rationale':'Clearer hook.','claims':claims,'resolved_objections':[],
                      'kept_objections':['Could use an example'],'citations':['LI-06-M002-K09']},
         'verificador':{'verdict':verdict,'findings':list(findings),'checked_claims':[dict(c,status='general_knowledge') for c in claims],
-                       'summary':'Checked.','citations':['LI-06-M002-K09']}}
+                       'summary':'Checked.','citations':['LI-06-M002-K09']},
+        # R4: by default the repair round returns the same text, so a blocked piece stays blocked without re-verifying.
+        'reparacion':{'decision':'repaired','final_text':final,'changes':[],'rationale':'Nothing safe to change.','claims':claims,
+                      'citations':['LI-06-M002-K09']}}
 
 class EditorialBase(PublicationBase):
     def setUp(self):
@@ -340,15 +343,21 @@ class EditorialCircuitTests(EditorialBase):
         self.assertEqual(self.linkedin.state['writes'],1)
 
     def test_verifier_blocks_an_invented_experience(self):
+        """R3/R4: the verifier catches what the rules cannot see; one repair round that changes nothing leaves it blocked."""
         from team_backend.models import ActionProposal
-        finding={'issue':'invented_experience','severity':'material','quote':'Last year I built an AI pipeline','detail':'Not in public_facts.'}
-        piece=self.plan(answers(final=INVENTED,verdict='blocked',findings=[finding]))
+        anecdote=GOOD_POST.replace('Founders often arrive','I thought scoping was the easy part. Founders often arrive')
+        finding={'issue':'invented_experience','severity':'material','quote':'I thought scoping was the easy part','detail':'Not in public_facts.'}
+        piece=self.plan(answers(final=anecdote,verdict='blocked',findings=[finding]))
         self.assertEqual(piece.state,'blocked');self.assertIn('invented_experience',piece.note)
+        self.assertEqual(piece.verification['repair']['outcome'],'sin_cambios')
         self.assertFalse(ActionProposal.objects.filter(piece=piece).exists())
         self.assertIn('bloqueó',self.notify.call_args.args[0])
-        # Even if the model reviewer missed it, the deterministic guard blocks first-person experience without public facts.
+        # Even if the model reviewer would miss it, the deterministic guard stops first-person experience without public
+        # facts before the verifier is paid (R3).
+        before=len(self.calls)
         again=self.plan(answers(final=INVENTED))
         self.assertEqual(again.state,'blocked');self.assertIn('sin hechos públicos confirmados',again.note)
+        self.assertNotIn('editorial-verificador',[c[0] for c in self.calls[before:]])
         self.assertEqual(self.linkedin.state['writes'],0)
 
     def test_private_guidance_never_becomes_an_attributable_fact(self):
