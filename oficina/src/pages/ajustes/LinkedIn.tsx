@@ -3,30 +3,16 @@
 import { LINKEDIN_OAUTH_START } from '../../api/endpoints';
 import { useLinkedInStatus } from '../../api/hooks';
 import { useSession } from '../../auth/session';
-import { shortDay } from '../../capture/parts';
 import { Badge, Button, ButtonLink, Card, ErrorRetry, Note, Section, Skeleton } from '../../components/ui';
-import { days, linkedinBadge, useLinkedInReturn } from './linkedin';
+import { canConnectLinkedIn, days, linkedinBadge, linkedinLongDate as longDate, linkedinScopesText, linkedinShortDate as shortDate, useLinkedInReturn } from './linkedin';
 import { Row } from './shared';
-
-const LOCALE = 'es-CO';
-
-function longDate(iso: string): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return iso;
-  return date.toLocaleDateString(LOCALE, { weekday: 'long', day: 'numeric', month: 'long' });
-}
-
-function shortDate(iso: string): string {
-  const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? iso : shortDay(date, true);
-}
 
 export function LinkedInSection() {
   const session = useSession();
   const status = useLinkedInStatus();
   const [notice, dismiss] = useLinkedInReturn();
   const user = session.data?.user;
-  const canConnect = Boolean(user && (user.is_superuser || user.permissions.includes('approve_actions')));
+  const canConnect = canConnectLinkedIn(user);
   const data = status.data;
   const badge = data ? linkedinBadge(data) : null;
   const known = Boolean(data?.member_urn);
@@ -108,7 +94,7 @@ export function LinkedInSection() {
                 {known ? 'Reconectar LinkedIn' : 'Conectar LinkedIn'}
               </ButtonLink>
               <p className="t-detalle text-suave">
-                Te lleva a LinkedIn para autorizar la publicación ({(data.scopes_required.length ? data.scopes_required : ['w_member_social']).join(', ')}) y
+                Te lleva a LinkedIn para autorizar la publicación ({linkedinScopesText(data)}) y
                 vuelve aquí. El token se guarda cifrado en tu servidor; esta app nunca lo ve.
               </p>
             </>

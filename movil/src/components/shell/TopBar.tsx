@@ -50,7 +50,7 @@ export function PauseBanner() {
     <Pressable
       accessibilityRole="link"
       accessibilityLiveRegion="polite"
-      onPress={() => router.push(control?.paused ? '/ajustes' : { pathname: '/tu-turno', params: { ancla: turnoAnchor(`account_paused:${account?.id ?? ''}`) } })}
+      onPress={() => router.push(control?.paused ? { pathname: '/ajustes', params: { ancla: 'maquina' } } : { pathname: '/tu-turno', params: { ancla: turnoAnchor(`account_paused:${account?.id ?? ''}`) } })}
       style={styles.pause}
     >
       <View style={styles.pauseIcon}>

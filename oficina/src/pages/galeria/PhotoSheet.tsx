@@ -6,7 +6,7 @@ import { Sheet } from '../../capture/Sheet';
 import { IconCerrar } from '../../components/icons';
 import { Badge, Button, ConfirmModal, ErrorRetry, useToast } from '../../components/ui';
 import { SwitchRow } from '../ajustes/shared';
-import { photoTone } from './photo';
+import { inUseWarning, photoPatch, photoTone } from './photo';
 
 export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: () => void }) {
   const toast = useToast();
@@ -17,10 +17,8 @@ export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: ()
   const [allowAi, setAllowAi] = useState(photo.allow_ai_edit);
   const [confirming, setConfirming] = useState(false);
   const src = sameOrigin(photo.url);
-  const inUse = photo.display_state === 'elegida' || photo.display_state === 'editada';
-  const patch: PhotoPatch = {};
-  if (note.trim() !== (photo.note ?? '').trim()) patch.note = note.trim();
-  if (allowAi !== photo.allow_ai_edit) patch.allow_ai_edit = allowAi;
+  const warning = inUseWarning(photo);
+  const patch: PhotoPatch = photoPatch(photo, note, allowAi);
   const dirty = Object.keys(patch).length > 0;
 
   const save = () =>
@@ -98,7 +96,7 @@ export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: ()
           onClose={() => setConfirming(false)}
         >
           <p>Se borran la foto y su archivo; el equipo ya no podrá usarla.</p>
-          {inUse && photo.used_in?.text ? <p>Ojo: {photo.used_in.text.charAt(0).toLowerCase() + photo.used_in.text.slice(1)}.</p> : null}
+          {warning ? <p>{warning}</p> : null}
         </ConfirmModal>
       ) : null}
     </>

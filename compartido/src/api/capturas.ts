@@ -298,15 +298,26 @@ export function useGaleria(filtro: GaleriaFiltro) {
   return { ...query, items, count: totalOf(query.data?.pages) };
 }
 
-export function useUploadFotos() {
+/** Where an upload is: `done` photos already in, `sending` in the request on its way, of `total`. */
+export interface UploadProgress {
+  done: number;
+  sending: number;
+  total: number;
+}
+
+/** `onProgress` hears before each request of up to ten photos and once at the end (the native app draws it). */
+export function useUploadFotos({ onProgress }: { onProgress?: (progress: UploadProgress) => void } = {}) {
   const client = useQueryClient();
   return useMutation({
     mutationFn: async (files: UploadFile[]) => {
       // Ten parts per request at most, as in a capture.
       const created: PhotoOutput[] = [];
       for (let start = 0; start < files.length; start += CAPTURE_LIMITS.photosPerCapture) {
-        created.push(...asList(await uploadFotos(files.slice(start, start + CAPTURE_LIMITS.photosPerCapture))));
+        const batch = files.slice(start, start + CAPTURE_LIMITS.photosPerCapture);
+        onProgress?.({ done: start, sending: batch.length, total: files.length });
+        created.push(...asList(await uploadFotos(batch)));
       }
+      onProgress?.({ done: files.length, sending: 0, total: files.length });
       return created;
     },
     onSettled: () => client.invalidateQueries({ queryKey: captureKeys.galeriaAll }),

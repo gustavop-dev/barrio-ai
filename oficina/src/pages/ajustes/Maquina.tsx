@@ -1,33 +1,24 @@
 // Ajustes › Máquina: total stop and resume (overview.control) and the Unipile account pause.
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { accountStatus, controlReason, providerLabel, stoppedFromServer, unipileAccounts } from '../../../../compartido/src/logic/ajustes';
 import { useOverview, useSetAccountPaused, useSetControl } from '../../api/hooks';
 import { keys } from '../../api/queryClient';
 import type { Account, Control, Overview } from '../../api/types';
 import { whenLabel } from '../../capture/parts';
-import { Badge, Button, Card, ConfirmModal, ErrorRetry, Note, Section, Skeleton, useToast, type Tone } from '../../components/ui';
+import { Badge, Button, Card, ConfirmModal, ErrorRetry, Note, Section, Skeleton, useToast } from '../../components/ui';
 import { timeAgo } from '../../lib/format';
 import { Row } from './shared';
 
-const ACCOUNT_STATUS: Record<string, { label: string; tone: Tone }> = {
-  running: { label: 'Conectada', tone: 'ok' },
-  unknown: { label: 'Sin comprobar', tone: 'muted' },
-  token_expired: { label: 'Token caducado', tone: 'bad' },
-};
-
-const PROVIDER_LABEL: Record<string, string> = { unipile: 'Unipile', fake: 'simulada' };
-
-/** The accounts the machine acts with through Unipile; the official LinkedIn one lives in its own section. */
-export function unipileAccounts(accounts: Account[] | undefined): Account[] {
-  return (accounts ?? []).filter((account) => !account.provider.startsWith('linkedin'));
-}
+// Shared with the native app: compartido/src/logic/ajustes.ts.
+export { unipileAccounts } from '../../../../compartido/src/logic/ajustes';
 
 function ControlCard({ control }: { control: Control }) {
   const client = useQueryClient();
   const toast = useToast();
   const mutation = useSetControl();
   const [asking, setAsking] = useState(false);
-  const fromEnv = control.paused && control.source === 'env';
+  const fromEnv = stoppedFromServer(control);
 
   const submit = (note: string) =>
     mutation.mutate(
@@ -84,7 +75,7 @@ function ControlCard({ control }: { control: Control }) {
           Detenida
         </Badge>
       </div>
-      <p className="t-cuerpo">Motivo: {control.reason ? control.reason.replace(/\.$/, '') : 'sin motivo indicado'}.</p>
+      <p className="t-cuerpo">{controlReason(control)}</p>
       <div className="aj-rows">
         <Row label="Origen">{fromEnv ? 'Desde el servidor' : 'Desde la app'}</Row>
         {control.updated_by ? <Row label="Quién">{control.updated_by}</Row> : null}
@@ -121,8 +112,8 @@ function AccountCard({ account }: { account: Account }) {
   const toast = useToast();
   const mutation = useSetAccountPaused();
   const [asking, setAsking] = useState(false);
-  const status = ACCOUNT_STATUS[account.status] ?? { label: account.status, tone: 'warn' as Tone };
-  const provider = PROVIDER_LABEL[account.provider] ?? account.provider;
+  const status = accountStatus(account);
+  const provider = providerLabel(account);
 
   const setPaused = (paused: boolean, reason = '') =>
     mutation.mutate(

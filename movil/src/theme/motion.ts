@@ -7,6 +7,7 @@
 // that for the whole app; `useMotion()` gives components the same decision for what Reanimated does
 // not animate by itself (pulses, the hold overlay, the toast slide).
 import * as Haptics from 'expo-haptics';
+import { SCENE_MOTION } from '@compartido/scene/motion';
 import { Easing, FadeIn, FadeInDown, FadeOut, LinearTransition, ReduceMotion, useReducedMotion, type WithSpringConfig, type WithTimingConfig } from 'react-native-reanimated';
 
 // ---------------------------------------------------------------- reduced motion
@@ -45,6 +46,8 @@ export const springs = {
   toast: { damping: 20, stiffness: 260, mass: 0.9 },
   /** An opportunity card lifting under the finger when its drag starts (and settling when dropped). */
   dragLift: { damping: 18, stiffness: 300, mass: 0.8 },
+  /** The photo viewer: double-tap zoom, the photo settling back inside its bounds, a drag-to-close that did not close. */
+  zoomSettle: { damping: 22, stiffness: 240, mass: 1 },
 } as const satisfies Record<string, SpringToken>;
 
 export type SpringName = keyof typeof springs;
@@ -97,6 +100,12 @@ export const timings = {
   skeleton: { duration: 1100, easing: 'pulse' },
   /** Screen transitions of the stack (detail views). */
   screen: { duration: 260, easing: 'standard' },
+  /** The full-screen photo viewer fading in and out. */
+  viewerFade: { duration: 180, easing: 'enter' },
+  /** An upload progress bar moving to its new value. */
+  progress: { duration: 240, easing: 'standard' },
+  officeNowIn: { duration: 240, easing: 'enter' },
+  officeNowOut: { duration: 160, easing: 'exit' },
 } as const satisfies Record<string, TimingToken>;
 
 export type TimingName = keyof typeof timings;
@@ -152,6 +161,26 @@ export const gestures = {
     /** Speed of that scroll (points per second). */
     autoScrollSpeed: 700,
   },
+  zoom: {
+    /** Pinch-zoom limit of the photo viewer (1 = fitted to the screen). */
+    maxScale: 4,
+    /** Where a double tap zooms to (and a second double tap goes back to 1). */
+    doubleTapScale: 2.5,
+    /** Longest gap between the two taps of a double tap (ms). */
+    doubleTapMaxDelayMs: 250,
+  },
+  viewer: {
+    /** Vertical travel before the unzoomed photo follows the finger down to close (points). */
+    activeOffsetY: 16,
+    /** Horizontal travel that hands the touch to the pager instead (points). */
+    failOffsetX: 14,
+    /** Drag the photo down this far to close the viewer. */
+    dismissDistance: 140,
+    /** Or flick it down this fast. */
+    dismissVelocity: 1000,
+    /** How much the photo fades (0–1) by the time the drag reaches dismissDistance. */
+    dragFade: 0.4,
+  },
 } as const;
 
 // ---------------------------------------------------------------- haptics
@@ -189,6 +218,11 @@ export const haptics = {
   dragOver: { type: 'selection' },
   /** The card is dropped on a new stage. */
   dragDrop: { type: 'impact', style: 'light' },
+  /** Flipping a switch row (Ajustes, the photo sheet). */
+  switchToggle: null,
+  /** The photos reached the gallery. */
+  uploadDone: { type: 'notification', style: 'success' },
+  officePick: { type: 'selection' },
 } as const satisfies Record<string, HapticKind | null>;
 
 export type HapticEvent = keyof typeof haptics;
@@ -269,4 +303,19 @@ export const layout = {
   /** The hold overlay of the capture button. */
   overlayIn: () => FadeIn.duration(timings.holdOverlay.duration).reduceMotion(reduce()),
   overlayOut: () => FadeOut.duration(timings.holdOverlay.duration).reduceMotion(reduce()),
+  /** The full-screen photo viewer of the Galería. */
+  viewerIn: () => FadeIn.duration(timings.viewerFade.duration).reduceMotion(reduce()),
+  viewerOut: () => FadeOut.duration(timings.viewerFade.duration).reduceMotion(reduce()),
+};
+
+// Oficina: choreography is shared with the PWA; all native overrides belong here.
+export const officeMotion = { ...SCENE_MOTION };
+export const officeFrames = { stepMs: 16, maxDeltaMs: 64, reportFrames: 300, slowFrameMs: 1000 / 60 } as const;
+export const officeGestures = {
+  minZoom: 1, maxZoom: 3, panDistance: 8, tapDistance: 10, tapDurationMs: 250, doubleTapMs: 280,
+  touchTarget: 48, sheetActivation: 8, sheetHalf: 0.5, sheetFull: 0.88,
+} as const;
+export const officeLayout = {
+  nowIn: () => FadeIn.duration(timings.officeNowIn.duration).reduceMotion(reduce()),
+  nowOut: () => FadeOut.duration(timings.officeNowOut.duration).reduceMotion(reduce()),
 };
