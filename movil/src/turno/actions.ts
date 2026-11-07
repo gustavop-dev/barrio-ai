@@ -1,0 +1,135 @@
+// Rules of the Tu turno card actions (the PWA's TurnoCardView), apart from the views so they can be
+// tested: which actions ask first, what the toast says, and what a swipe does on each card.
+import type { TurnoAction, TurnoCard, TurnoCardType, TurnoPriority } from '@compartido/api/types';
+import type { IconName } from '@/components/icons';
+
+export const TYPE_LABEL: Record<TurnoCardType, string> = {
+  aviso: 'Aviso',
+  pregunta: 'Pregunta',
+  perfil: 'Perfil',
+  conversacion: 'Conversación',
+  resumen: 'Resumen semanal',
+};
+
+export const TYPE_ICON: Record<TurnoCardType, IconName> = {
+  aviso: 'aviso',
+  pregunta: 'pregunta',
+  perfil: 'perfil',
+  conversacion: 'conversacion',
+  resumen: 'resultados',
+};
+
+/** Colour of the type label: alerta for urgent notices, info for questions and conversations, hondo for profile tasks. */
+export function typeTone(card: TurnoCard, priority: TurnoPriority | null): 'suave' | 'alerta' | 'hondo' | 'info' {
+  if (!priority) return 'suave';
+  if (card.type === 'aviso') return priority === 'urgente' ? 'alerta' : 'suave';
+  if (card.type === 'perfil') return 'hondo';
+  return 'info';
+}
+
+/** «Comprueba si salió tu comentario» for an uncertain action; the backend's title otherwise. */
+const UNCERTAIN_TITLE: Record<string, string> = {
+  'INT-03': 'Comprueba si salió tu comentario',
+  'INT-02': 'Comprueba si salió tu reacción',
+  'CONT-09': 'Comprueba si salió tu publicación',
+  'RED-01': 'Comprueba si se aplicó el seguimiento',
+  'RED-02': 'Comprueba si salió tu invitación',
+  'RED-04': 'Comprueba si se aceptó la invitación',
+};
+
+export function cardTitle(card: TurnoCard): string {
+  if (card.question?.question) return card.question.question;
+  if (card.attempt && UNCERTAIN_TITLE[card.attempt.capability]) return UNCERTAIN_TITLE[card.attempt.capability]!;
+  return card.title;
+}
+
+export const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;
+export const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsWith('/resolve'));
+export const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
+
+export function successMessage(action: TurnoAction): string {
+  if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
+  if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
+  if (isMachineResume(action)) return 'Máquina reanudada';
+  if (action.endpoint?.endsWith('/pause') && action.body?.paused === false) return 'Cuenta reanudada';
+  if (action.endpoint?.startsWith('/api/v1/resultados/resumen-semanal/') && action.endpoint.endsWith('/descartar')) return 'Resumen descartado';
+  return 'Hecho';
+}
+
+export interface ModalSpec {
+  title: string;
+  text: string | null;
+  note: 'required' | 'optional';
+  noteLabel: string;
+  placeholder?: string;
+}
+
+/** Which actions ask first: a required note (uncertain actions and any `note_required`) or the optional reason to resume. */
+export function modalFor(action: TurnoAction): ModalSpec | null {
+  if (isResolve(action) && action.note_required) {
+    const applied = action.body?.outcome !== 'failed';
+    return {
+      title: applied ? 'Confirmar que se aplicó' : 'Confirmar que no se aplicó',
+      text: applied ? 'La acción queda como hecha en LinkedIn.' : 'La acción queda como no aplicada.',
+      note: 'required',
+      noteLabel: 'Qué comprobaste',
+      placeholder: applied ? 'Por ejemplo: el comentario aparece en el post.' : 'Por ejemplo: no aparece en el post ni en mi actividad.',
+    };
+  }
+  if (action.note_required) return { title: action.label, text: null, note: 'required', noteLabel: 'Nota' };
+  if (action.note_optional) {
+    return {
+      title: action.label,
+      text: isConversationClose(action) ? 'La tarjeta sale de Tu turno hasta que te vuelva a escribir. Nadie le responde por ti.' : null,
+      note: 'optional',
+      noteLabel: 'Motivo',
+    };
+  }
+  if (isMachineResume(action)) {
+    return { title: 'Reanudar la máquina', text: 'El equipo vuelve a trabajar dentro de la ventana horaria y los topes.', note: 'optional', noteLabel: 'Motivo' };
+  }
+  return null;
+}
+
+/** The body to POST: the machine takes its optional reason as `reason`, the rest as `note`. */
+export function withNote(action: TurnoAction, note: string): { action: TurnoAction; note?: string } {
+  if (isMachineResume(action)) return { action: { ...action, body: { ...action.body, ...(note ? { reason: note } : {}) } } };
+  return note ? { action, note } : { action };
+}
+
+/** The primary action first, then the rest in order: first and second are buttons, the rest ghost links. */
+export function orderedActions(actions: readonly TurnoAction[]): TurnoAction[] {
+  if (!actions.length) return [];
+  const primaryIndex = Math.max(
+    0,
+    actions.findIndex((action) => action.primary),
+  );
+  return [actions[primaryIndex]!, ...actions.filter((_, index) => index !== primaryIndex)];
+}
+
+// ---------------------------------------------------------------- swipe
+
+/** What a committed swipe does. `run` POSTs the action (or opens its modal first); `postpone` is «Más tarde». */
+export type SwipeIntent = { kind: 'run'; action: TurnoAction; label: string } | { kind: 'postpone'; questionId: string; label: string };
+
+export interface SwipeIntents {
+  /** Swipe right: the card's primary action («done»). */
+  right: SwipeIntent | null;
+  /** Swipe left: «Más tarde» (questions; the other cards have no postpone in the API). */
+  left: SwipeIntent | null;
+}
+
+/**
+ * Right runs the card's first request action, the primary one when it is a request (links and the
+ * opportunity form are left to their buttons): «Hecho, respondí» on a conversation, «Sí, se aplicó»
+ * (with its note) on an uncertain action. Left postpones a question 3 days. Expired cards and
+ * questions have no «done» swipe: a question needs its answer typed.
+ */
+export function swipeIntents(card: TurnoCard, expired = false): SwipeIntents {
+  if (expired) return { right: null, left: null };
+  if (card.question) {
+    return { right: null, left: card.question.state === 'open' || !card.question.state ? { kind: 'postpone', questionId: card.question.id, label: 'Más tarde' } : null };
+  }
+  const runnable = orderedActions(card.actions ?? []).find((action) => action.endpoint && !action.href && !action.opportunity) ?? null;
+  return { right: runnable ? { kind: 'run', action: runnable, label: runnable.label } : null, left: null };
+}

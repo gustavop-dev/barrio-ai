@@ -1,0 +1,64 @@
+{
+  "expo": {
+    "name": "0ff1ce",
+    "slug": "oficina-0ff1ce",
+    "scheme": "oficina0ff1ce",
+    "version": "0.1.0",
+    "description": "La oficina de 0ff1ce: el equipo de agentes de IA que trabaja tu LinkedIn, y sus avisos.",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "backgroundColor": "#f7f6f0",
+    "primaryColor": "#00715e",
+    "ios": {
+      "supportsTablet": false
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#0FF1CE",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
+    },
+    "plugins": [
+      "expo-router",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 120,
+          "resizeMode": "contain",
+          "backgroundColor": "#f7f6f0"
+        }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "0ff1ce usa el micrófono solo mientras grabas un audio para el equipo."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "0ff1ce abre tus fotos solo para adjuntar las que elijas a una captura.",
+          "cameraPermission": "0ff1ce usa la cámara solo para tomar la foto que adjuntas a una captura."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#0FF1CE"
+        }
+      ],
+      "expo-secure-store",
+      "expo-font",
+      "expo-asset"
+    ],
+    "experiments": {
+      "tsconfigPaths": false
+    }
+  }
+}

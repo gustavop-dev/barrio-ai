@@ -4,9 +4,9 @@ name: Barrio AI
 on:
   push:
     branches: [main]
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
+    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
   pull_request:
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
+    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -61,6 +61,36 @@ jobs:
       - if: steps.present.outputs.pwa == 'true'
         working-directory: oficina
         run: npm ci && npm run typecheck && npm run lint && npm test -- --run && npm run build
+
+  # The native app (Expo) and compartido/ (shared with the PWA, linted, typed and tested from movil/).
+  movil:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # Only when movil/, compartido/ or this workflow changed (always on a manual run).
+      - id: changes
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          if [ "$EVENT" = "workflow_dispatch" ] || [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
+            echo "movil=true" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE" HEAD | grep -qE '^(movil|compartido)/|^\.github/workflows/barrio-ai\.yml$'; then
+            echo "movil=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "movil=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.changes.outputs.movil == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: movil/package-lock.json
+      - if: steps.changes.outputs.movil == 'true'
+        working-directory: movil
+        run: npm ci && npm run typecheck && npm run lint && npm test -- --ci && npx expo export --platform android --output-dir ../movil-export
 
   images:
     if: github.event_name != 'pull_request'

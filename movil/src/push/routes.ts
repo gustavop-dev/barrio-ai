@@ -1,0 +1,42 @@
+// In-app paths (the PWA's: `data.url` of a push, a notification's `link`, a card's `href`) mapped to
+// Expo Router. Only relative app paths are accepted; API routes and other origins never open in-app.
+
+export interface AppRoute {
+  pathname: string;
+  params: Record<string, string>;
+}
+
+/** The capture_processed link: «Lo que enviaste» in the capture sheet. */
+export const CAPTURE_HISTORY_PARAM = 'enviado';
+
+export function isInAppPath(url: unknown): url is string {
+  return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/api/');
+}
+
+/**
+ * «/tu-turno#turno-question-7» → { pathname: '/tu-turno', params: { ancla: 'turno-question-7' } };
+ * «/tu-turno/sabe» → the Sabe tab; «/?enviado=1» → Oficina with the capture history. Null when the
+ * URL is not an app path.
+ */
+export function routeForUrl(url: unknown): AppRoute | null {
+  if (!isInAppPath(url)) return null;
+  const [beforeHash = '', hash = ''] = url.split('#', 2);
+  const [rawPath = '/', query = ''] = beforeHash.split('?', 2);
+  const params: Record<string, string> = {};
+  for (const pair of query.split('&')) {
+    if (!pair) continue;
+    const [key = '', value = ''] = pair.split('=', 2);
+    try {
+      params[decodeURIComponent(key)] = decodeURIComponent(value.replace(/\+/g, ' '));
+    } catch {
+      params[key] = value;
+    }
+  }
+  if (hash) params.ancla = decodeURIComponent(hash);
+  let pathname = rawPath.replace(/\/+$/, '') || '/';
+  if (pathname === '/tu-turno/sabe') {
+    pathname = '/tu-turno';
+    params.tab = 'sabe';
+  }
+  return { pathname, params };
+}
