@@ -23,6 +23,7 @@ Si una pieza nueva necesita un movimiento que no existe, se añade aquí primero
 | `press` | 18 · 420 · 0.6 | Botón al soltarlo y píldora de la pestaña activa en la barra inferior (`components/ui/Button.tsx`, `components/shell/BottomBar.tsx`). |
 | `toast` | 20 · 260 · 0.9 | El aviso inferior entra subiendo (`layout.toastIn`, en `components/ui/Toast.tsx`). |
 | `pageSnap` | 26 · 240 · 1 | Calendario: la tira de la semana o el mes se asientan en la página siguiente o anterior tras deslizar, o vuelven a su sitio (`calendario/Pager.tsx`). |
+| `zoomSettle` | 22 · 240 · 1 | El visor de fotos de la Galería: el zoom con doble toque, la foto que vuelve dentro de sus bordes tras pellizcar o arrastrar, y la foto que vuelve a su sitio si el arrastre para cerrar no llega (`galeria/PhotoViewer.tsx`). |
 
 ## Duraciones y curvas (`timings`, `easings`)
 
@@ -48,6 +49,8 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `toastDurations.plain` | 4000 | Lo que dura un aviso sin acción. |
 | `toastDurations.withUndo` (veto) | 5000 | El veto de una pieza o de una acción en cola espera esta ventana antes de enviarse, para que «Deshacer» lo anule (`calendario/pendingVeto.ts`). |
 | `copiedLabelMs` | 2000 | Lo que dura «Copiado» en el botón Copiar del texto final (`pieza/FinalText.tsx`). |
+| `viewerFade` | 180 · enter | El visor de fotos a pantalla completa aparece y desaparece (`layout.viewerIn` y `layout.viewerOut`, en `galeria/PhotoViewer.tsx`). |
+| `progress` | 240 · standard | La barra de «Subir fotos» avanza cada vez que entra una petición de hasta diez fotos (`galeria/UploadProgressCard.tsx`). |
 
 ## Umbrales de gestos (`gestures`)
 
@@ -70,6 +73,14 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `pager.failOffsetY` | 14 pt | Recorrido vertical que deja el toque al scroll de la página. |
 | `pager.commitFraction` | 0.25 | Fracción del ancho que pasa de página al soltar. |
 | `pager.commitVelocity` | 700 pt/s | O un gesto rápido a esta velocidad. |
+| `zoom.maxScale` | 4 | Máximo del pellizco en el visor de fotos; 1 es la foto ajustada a la pantalla (`galeria/PhotoViewer.tsx`). |
+| `zoom.doubleTapScale` | 2.5 | A dónde acerca un doble toque; otro doble toque vuelve a 1. |
+| `zoom.doubleTapMaxDelayMs` | 250 ms | Separación máxima entre los dos toques del doble toque. |
+| `viewer.activeOffsetY` | 16 pt | Recorrido vertical antes de que la foto sin zoom siga al dedo para cerrar el visor. |
+| `viewer.failOffsetX` | 14 pt | Recorrido horizontal que deja el gesto al paginador (pasar de foto). |
+| `viewer.dismissDistance` | 140 pt | Arrastrar la foto hacia arriba o abajo esta distancia cierra el visor. |
+| `viewer.dismissVelocity` | 1000 pt/s | O lanzarla a esta velocidad. |
+| `viewer.dragFade` | 0.4 | Cuánto se desvanece la foto (0–1) al llegar a `viewer.dismissDistance` mientras se arrastra para cerrar. |
 
 ## Vibraciones (`haptics`)
 
@@ -89,6 +100,17 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `toggle` | sin vibración | Marcar un chip o una opción (`components/ui/Chip.tsx`, `components/ui/Options.tsx`). |
 | `pageChange` | selección | Calendario: deslizar pasa la semana o el mes (`calendario/Pager.tsx`). |
 | `copied` | éxito | El texto final quedó en el portapapeles (`pieza/FinalText.tsx`). |
+| `switchToggle` | sin vibración | Cambiar un interruptor de fila: Ajustes y la hoja de la foto (`components/ui/SwitchRow.tsx`). |
+| `uploadDone` | éxito | Las fotos llegaron a la Galería (`galeria/upload.ts`). |
+
+## Usos en Galería, Ajustes y Notificaciones
+
+Estas vistas reutilizan tokens que ya existían, sin valores nuevos:
+
+- `listEnter` y `listMove`: las miniaturas de la Galería y las filas de Notificaciones al entrar y al moverse.
+- `fold`: los plegables «Autonomía y límites» y «Por tipo de notificación» de Ajustes.
+- `sheetOpen`, `backdrop` y `sheetClose`: la hoja de la foto y las confirmaciones de Ajustes.
+- `actionSuccess` y `actionError`: guardar o quitar una foto, la parada y la reanudación de la máquina, la pausa de una cuenta, la orientación y «Probar notificación».
 
 ## Oficina · escena y hoja de detalle
 

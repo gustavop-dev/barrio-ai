@@ -1,11 +1,12 @@
 // Ajustes › Orientación para el equipo (GET/PUT /api/v1/orientacion): how Gustavo steers the team.
 import { useId, useState } from 'react';
+import { ORIENTATION_MAX, orientationCounter, orientationUpdated } from '../../../../compartido/src/logic/ajustes';
 import { useOrientacion, useSaveOrientacion } from '../../api/hooks';
 import { Button, Card, ErrorRetry, Section, Skeleton, useToast } from '../../components/ui';
-import { timeAgo } from '../../lib/format';
 import { isUnavailable, Unavailable } from './shared';
 
-export const ORIENTATION_MAX = 4000;
+// Shared with the native app: compartido/src/logic/ajustes.ts.
+export { ORIENTATION_MAX } from '../../../../compartido/src/logic/ajustes';
 
 export function OrientacionSection() {
   const orientacion = useOrientacion();
@@ -61,7 +62,7 @@ export function OrientacionSection() {
                 onChange={(event) => setDraft(event.target.value)}
               />
               <p id={hintId} className={tooLong ? 'field-error' : 'field-hint'}>
-                {text.length} de {ORIENTATION_MAX} caracteres. Es privada: orienta las decisiones y nunca aparece en un texto público.
+                {orientationCounter(text.length)}
               </p>
             </div>
             <ErrorRetry error={save.error} />
@@ -76,9 +77,7 @@ export function OrientacionSection() {
               ) : null}
             </div>
             <p className="t-detalle text-suave">
-              {orientacion.data.updated_at
-                ? `Actualizada ${timeAgo(orientacion.data.updated_at)}${orientacion.data.updated_by ? ` por ${orientacion.data.updated_by}` : ''}.`
-                : 'Todavía no has escrito ninguna orientación.'}
+              {orientationUpdated(orientacion.data)}
             </p>
           </form>
         </Card>

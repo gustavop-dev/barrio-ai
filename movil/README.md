@@ -8,9 +8,10 @@ En esta fase ya funcionan:
 - la entrada con el token del dispositivo;
 - **Tu turno**, completo, con acciones deslizando la tarjeta;
 - **la captura**: mantener pulsado para grabar, foto, nota y envío con «Deshacer»;
-- el registro de avisos push.
+- el registro de avisos push;
+- **Galería**, **Ajustes** y **Notificaciones**, completas.
 
-Las demás vistas (Oficina, Resultados, Personas, Galería, Notificaciones, Calendario, Ajustes, la ficha de una persona y el detalle de una pieza) se ven por ahora como «En construcción». Ajustes ya tiene la sesión, los dispositivos y el estado de los avisos.
+Las demás vistas (Oficina, Resultados, Personas, Calendario, la ficha de una persona y el detalle de una pieza) se ven por ahora como «En construcción».
 
 ## Probarla en tu Android con Expo Go (desde este portátil con WSL)
 
@@ -61,12 +62,13 @@ Funciona en Expo Go:
 - el token en el almacén seguro (`expo-secure-store`);
 - grabar audio (`expo-audio`), con el permiso del micrófono explicado antes de que lo pida el sistema;
 - la cámara y la galería (`expo-image-picker`);
+- las fotos privadas de la Galería con el token (`expo-image`) y el navegador dentro de la app para conectar LinkedIn (`expo-web-browser`);
 - la conexión de red (`@react-native-community/netinfo`);
 - las notificaciones *locales*, y abrir la vista correcta al tocar una notificación.
 
 Necesitará una **build de desarrollo** (`eas build --profile development` o `npx expo run:android`, con tu cuenta de Expo):
 
-- **Los avisos push reales.** Expo Go para Android no recibe notificaciones remotas desde el SDK 53. Además, el token de Expo necesita un proyecto de EAS (`extra.eas.projectId` en `app.json`) y las credenciales de FCM de Google. Mientras tanto, la app no falla: Ajustes › «Sesión y este teléfono» explica por qué todavía no llegan avisos.
+- **Los avisos push reales.** Expo Go para Android no recibe notificaciones remotas desde el SDK 53. Además, el token de Expo necesita un proyecto de EAS (`extra.eas.projectId` en `app.json`) y las credenciales de FCM de Google. Mientras tanto, la app no falla: Ajustes › Notificaciones explica por qué todavía no llegan avisos.
   - En cada arranque con sesión, la app registra su token con `POST /api/v1/push/expo`. El canal de Android se llama `default`.
   - Al tocar un aviso, se abre su `data.url` dentro de la app.
 - El icono, la pantalla de inicio y el nombre propios de la app. En Expo Go se ven los de Expo Go; en una build salen de `app.json` y de `assets/`.

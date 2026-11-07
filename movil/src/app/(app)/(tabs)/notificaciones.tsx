@@ -1,5 +1,3 @@
-import { Placeholder } from '@/components/shell/Placeholder';
+import { NotificacionesScreen } from '@/notificaciones/NotificacionesScreen';
 
-export default function NotificacionesScreen() {
-  return <Placeholder testID="screen-notificaciones" title="Notificaciones" subtitle="Lo que viene o ya pasó, sin pedirte nada." />;
-}
+export default NotificacionesScreen;

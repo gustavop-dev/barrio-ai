@@ -1,0 +1,87 @@
+// The pure rules of Ajustes and Galería both apps draw: caps and reads never turn «sin dato» into 0,
+// the spend rows, the push switches and what the photo sheet PATCHes.
+import type { PushType } from '../api/capturas';
+import { ApiError } from '../api/client';
+import type { Ajustes, Overview, RedSummary } from '../api/types';
+import { capLines, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
+import { inUseWarning, isFiltro, photoPatch, rejectedMessage, uploadedMessage } from './galeria';
+import { linkedinReconnected, linkedinReturnMessage } from './linkedin';
+
+const overview = { accounts: [{ provider: 'unipile', capacity: { 'INT-03': { daily: 3, weekly: 12, daily_used: 1, weekly_used: 4, left: 2 } } }] } as unknown as Overview;
+const ajustes = { limits: { 'INT-02': { daily: 20, weekly: 80 } } } as unknown as Ajustes;
+
+describe('Ajustes', () => {
+  it('builds the caps from the usage, or the cap alone without usage', () => {
+    expect(capLines(ajustes, overview, undefined, 'daily')).toEqual([
+      { key: 'INT-03', label: 'Comentarios', used: 1, max: 3 },
+      { key: 'INT-02', label: 'Reacciones', text: 'Tope 20 · sin dato de uso' },
+    ]);
+    expect(capLines(undefined, undefined, undefined, 'weekly')).toEqual([]);
+  });
+
+  it('builds the network reads and the checks around every write', () => {
+    const red = { read_caps: { comments: 60, search: 20, profile: 0 }, reads_today: { comments: 4, execution: 6 } } as unknown as RedSummary;
+    expect(readLines(red)).toEqual({
+      lines: [
+        { key: 'comments', label: 'Comentarios leídos', used: 4, max: 60 },
+        { key: 'search', label: 'Búsquedas', text: 'Tope 20 · sin dato de uso' },
+      ],
+      execution: '6 hoy · sin tope: ninguna escritura sale sin ellas',
+    });
+  });
+
+  it('says the spend, never 0 for what is unknown', () => {
+    expect(spendLine({ budget: 'red', label: 'Red', spent_usd: 0.3, limit_usd: 0 })).toEqual({ label: 'Red', text: '0,30 USD' });
+    expect(spendRows({ today: [], month_usd: null, total_usd: 98, limit_usd: 120, lead_month_usd: null })).toEqual([
+      { label: 'Este mes', text: 'sin dato' },
+      { label: 'Desde el inicio', text: '98,00 USD' },
+    ]);
+  });
+
+  it('lists every push kind switched off', () => {
+    const types = [
+      { kind: 'a', enabled: true },
+      { kind: 'b', enabled: false },
+      { kind: 'c', enabled: true },
+    ] as PushType[];
+    expect(disabledKinds(types, { a: false, b: true })).toEqual(['a']);
+  });
+
+  it('knows the anchors, the unavailable endpoints and the small labels', () => {
+    expect(isAjustesSection('maquina')).toBe(true);
+    expect(isAjustesSection('nada')).toBe(false);
+    expect(isUnavailable(new ApiError(501, 'x'))).toBe(true);
+    expect(isUnavailable(new ApiError(500, 'x'))).toBe(false);
+    expect(spacingLabel(1200)).toBe('20 min entre acciones');
+    expect(controlReason({ reason: 'Revisando.' })).toBe('Motivo: Revisando.');
+    expect(factsLabel(1)).toBe('1 dato confirmado');
+    expect(factsLabel(undefined)).toBe('Los datos que confirmaste y su visibilidad');
+  });
+
+  it('notices a new LinkedIn credential and reads the OAuth return', () => {
+    const off = { connected: false, connected_at: undefined, expires_at: null } as never;
+    const on = { connected: true, connected_at: '2026-11-07T10:00:00Z', expires_at: '2027-01-06T10:00:00Z' } as never;
+    expect(linkedinReconnected(off, on)).toBe(true);
+    expect(linkedinReconnected(on, on)).toBe(false);
+    expect(linkedinReturnMessage('error', 'raro')?.text).toBe('No se pudo completar la conexión (motivo: raro). Vuelve a intentarlo.');
+    expect(linkedinReturnMessage(undefined, undefined)).toBeNull();
+  });
+});
+
+describe('Galería', () => {
+  it('PATCHes only what changed', () => {
+    const photo = { note: 'Recórtala', allow_ai_edit: true };
+    expect(photoPatch(photo, ' Recórtala ', true)).toEqual({});
+    expect(photoPatch(photo, 'Otra', true)).toEqual({ note: 'Otra' });
+    expect(photoPatch(photo, 'Recórtala', false)).toEqual({ allow_ai_edit: false });
+  });
+
+  it('warns where a removed photo is used, and words the upload', () => {
+    expect(inUseWarning({ display_state: 'elegida', used_in: { piece_id: 'p', date: 'd', text: 'Elegida para el post del jueves 12' } })).toBe('Ojo: elegida para el post del jueves 12.');
+    expect(inUseWarning({ display_state: 'publicada', used_in: { piece_id: 'p', date: 'd', text: 'Publicada' } })).toBeNull();
+    expect(uploadedMessage(1)).toBe('Foto subida. El equipo la verá en su próxima ronda.');
+    expect(rejectedMessage([])).toBeNull();
+    expect(isFiltro('elegidas')).toBe(true);
+    expect(isFiltro(undefined)).toBe(false);
+  });
+});

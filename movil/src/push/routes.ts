@@ -9,6 +9,12 @@ export interface AppRoute {
 /** The capture_processed link: «Lo que enviaste» in the capture sheet. */
 export const CAPTURE_HISTORY_PARAM = 'enviado';
 
+/** As oficina/src/App.tsx (and its App.test.tsx): `/maquina` goes to the Calendario, `/memoria` to «Lo que el equipo sabe de ti». */
+const LEGACY_AJUSTES: Record<string, AppRoute> = {
+  '/maquina': { pathname: '/calendario', params: {} },
+  '/memoria': { pathname: '/tu-turno', params: { tab: 'sabe' } },
+};
+
 export function isInAppPath(url: unknown): url is string {
   return typeof url === 'string' && url.startsWith('/') && !url.startsWith('//') && !url.startsWith('/api/');
 }
@@ -39,20 +45,27 @@ export function routeForUrl(url: unknown): AppRoute | null {
     pathname = '/tu-turno';
     params.tab = 'sabe';
   }
-  const legacy = legacyCalendarRoute(pathname, params);
-  if (legacy) return legacy;
+  // Legacy paths of the machine and the memory, redirected as the PWA does.
+  const legacy = LEGACY_AJUSTES[pathname];
+  if (legacy) {
+    pathname = legacy.pathname;
+    Object.assign(params, legacy.params);
+  }
+  const calendar = legacyCalendarRoute(pathname, params);
+  if (calendar) return calendar;
   return { pathname, params };
 }
 
 /**
  * Old PWA paths that oficina/src/App.tsx redirects (without their query): /editorial/<id> and
- * /contenido/<id> (old piece pushes) open the piece; /contenido, /editorial and /maquina the calendar;
- * /acciones the calendar, or Tu turno for ?state=uncertain (the old target of an uncertain action).
+ * /contenido/<id> (old piece pushes) open the piece; /contenido and /editorial the calendar (/maquina
+ * is in LEGACY_AJUSTES); /acciones the calendar, or Tu turno for ?state=uncertain (the old target of an
+ * uncertain action).
  */
 export function legacyCalendarRoute(pathname: string, params: Record<string, string>): AppRoute | null {
   const piece = /^\/(?:editorial|contenido)\/([^/]+)$/.exec(pathname);
   if (piece) return { pathname: `/calendario/pieza/${piece[1]}`, params: {} };
-  if (pathname === '/editorial' || pathname === '/contenido' || pathname === '/maquina') return { pathname: '/calendario', params: {} };
+  if (pathname === '/editorial' || pathname === '/contenido') return { pathname: '/calendario', params: {} };
   if (pathname === '/acciones') return { pathname: params.state === 'uncertain' ? '/tu-turno' : '/calendario', params: {} };
   return null;
 }
