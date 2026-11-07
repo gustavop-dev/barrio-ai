@@ -2,15 +2,15 @@
 
 Inventario de las vistas de la PWA (`oficina/`) y de lo que hace cada una hoy, sacado del código. Sirve de base para el rediseño.
 
-La app tiene **10 vistas**, un marco común y un conjunto de componentes que se repiten.
+La app tiene **11 vistas**, un marco común y un conjunto de componentes que se repiten.
 
 ---
 
 ## 0. Marco común (todas las vistas)
 
-- **Navegación con 8 secciones:** Oficina, Máquina, Acciones, Contenido, Referentes, Conocimiento, Memoria y Ajustes.
+- **Navegación con 9 secciones:** Oficina, Máquina, Acciones, Contenido, Referentes, Red, Conocimiento, Memoria y Ajustes.
   - En escritorio va en una barra lateral con el logo y el crédito de arte de LimeZu.
-  - En móvil va en una barra superior con el logo y una barra inferior con las 8 entradas y etiquetas cortas.
+  - En móvil va en una barra superior con el logo y una barra inferior con las 9 entradas y etiquetas cortas.
 - **Banner de pausa:** aparece en todas las vistas cuando la máquina está detenida. Muestra el motivo, avisa si la pausa viene del servidor y lleva a Máquina.
 - **Rutas especiales:**
   - Sin sesión → Login, que luego te devuelve a donde ibas.
@@ -60,13 +60,14 @@ La app tiene **10 vistas**, un marco común y un conjunto de componentes que se 
 ## 4. Acciones (`/acciones`)
 
 - **Filtros** que se guardan en la URL:
-  - Capacidad: comentarios, reacciones o publicaciones propias.
+  - Capacidad: comentarios, reacciones, publicaciones propias, seguimientos, invitaciones sin nota o invitaciones recibidas.
   - Estado, 11 en total: propuesta, aprobada, vetada, sustituida, descartada, ejecutándose, enviada, confirmada, incierta, fallida y caducada.
   - Muestra el total.
 - **Tarjeta de acción:**
   - Capacidad, versión, estado, origen (Tuya o Agente) y hace cuánto se creó.
   - Si es una publicación propia: día y hora programados, aviso de autonomía y enlace a la pieza.
   - Si es un comentario o una reacción: el post de origen (autor, texto, fecha y enlace a LinkedIn).
+  - Si es una acción de red (seguir, invitar o aceptar): la persona (nombre, titular, grado y origen; si comentó, el referente y un extracto) y su clasificación (rol, modalidad y motivo). Vetarla descarta a la persona para siempre.
   - El texto o la reacción propuestos, la justificación, las citas del curso (chips que llevan a Conocimiento), los riesgos y la nota de decisión.
   - La ejecución: estado, código HTTP, fecha, nota y enlace a LinkedIn.
 - **Botones según el estado:**
@@ -123,6 +124,21 @@ Son 8 secciones apiladas; se refresca cada 30 s.
   - Errores junto a cada campo.
 - **Lista con contador:** nombre, Activo o Inactivo, motivo, «Observado hace X» o «Aún sin observar», y enlace al perfil.
 
+## 7b. Red (`/red`)
+
+- **Avisos:** el bloque está apagado en el servidor (`NETWORK_ENABLED=false`), o las invitaciones están en pausa 7 días porque LinkedIn las limitó.
+- **Hoy:**
+  - Por cada capacidad (seguir, invitar sin nota, aceptar): su modo (auto, aprobación o apagado) y un medidor diario y otro semanal.
+  - Lecturas en LinkedIn frente a sus topes: comentarios, búsquedas, perfiles y sincronizaciones.
+  - Gasto del modelo que clasifica, frente a su presupuesto.
+- **Contactos:**
+  - Filtro por etapa con su recuento: por clasificar, encaja, seguido, invitado, conectado, cerrado, te invitó y descartado.
+  - Ficha de cada persona: nombre enlazado al perfil, etapa, titular, grado, ubicación y si la sigues.
+  - De dónde salió: comentó en un post de un referente (con extracto), una búsqueda o te invitó.
+  - Clasificación: rol del barrio, modalidad, afinidad, motivo y confianza.
+  - Los tres últimos eventos de su historial y su acción abierta, con enlace a Acciones.
+  - «Descartar», con nota obligatoria, mientras no esté invitada ni conectada.
+
 ## 8. Conocimiento (`/conocimiento`)
 
 - **Buscador textual** sin coste en las unidades de las clases 01–06: hasta 12 resultados y los avisos del backend.
@@ -175,7 +191,7 @@ Son 8 secciones apiladas; se refresca cada 30 s.
 
 ## Cosas que vale la pena tener en cuenta al rediseñar
 
-- **Navegación móvil:** las 8 entradas van todas en la barra inferior.
+- **Navegación móvil:** las 9 entradas van todas en la barra inferior.
 - **No hay una bandeja de pendientes.** Lo que espera una decisión tuya está repartido: inciertas y propuestas en Acciones, memoria por confirmar en Memoria, LinkedIn a punto de caducar en Ajustes y pausas en Máquina.
 - **Datos en bruto:** Conocimiento, Memoria y el feed de Máquina muestran el contenido en JSON o texto preformateado.
 - **Pieza es muy larga:** 8 secciones apiladas sin índice ni pestañas.
