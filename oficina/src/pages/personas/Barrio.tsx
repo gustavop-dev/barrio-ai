@@ -1,35 +1,17 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
+import { lastActivity, stageCount, totalCount } from '../../../../compartido/src/logic/barrio';
 import { asList } from '../../api/endpoints';
 import { useRedSummary } from '../../api/hooks';
 import type { Contact, ContactStage, RedSummary } from '../../api/types';
 import { IconFilter, IconSearch } from '../../components/icons';
 import { Avatar, Badge, Button, ChipStrip, EmptyState, ErrorRetry, FilterChip, LabelChip, Note, Skeleton } from '../../components/ui';
-import { CONTACT_EVENT_LABEL, CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, contactSourceLabel, labelOf, timeAgo } from '../../lib/format';
+import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, contactSourceLabel, labelOf } from '../../lib/format';
 import { useContactPages } from './api';
 import { FUNNEL_ASIDE, FUNNEL_MAIN, MODALITY_SHORT, personStage, SOURCE_FILTER, type PersonStage } from './labels';
 
-const CONTACT_STAGE_KEYS: readonly ContactStage[] = ['candidate', 'fit', 'followed', 'invited', 'connected', 'incoming', 'closed', 'discarded'];
-
-/** Count of a funnel chip from red/summary; null for «En conversación» until the inbox arrives. */
-function stageCount(summary: RedSummary | undefined, stage: PersonStage): number | null | undefined {
-  if (!summary) return undefined;
-  if (stage === 'conversation') return summary.stages.conversation ?? null;
-  if (stage === 'opportunity') return summary.stages.opportunity ?? 0;
-  return summary.stages[stage] ?? 0;
-}
-
-function totalCount(summary: RedSummary | undefined): number | undefined {
-  if (!summary) return undefined;
-  return CONTACT_STAGE_KEYS.reduce((sum, stage) => sum + (summary.stages[stage] ?? 0), 0);
-}
-
-/** «Seguido hace 2 días», from the last event (or the last update). */
-export function lastActivity(contact: Contact): string {
-  const event = contact.last_event ?? contact.history?.[contact.history.length - 1] ?? null;
-  if (event) return `${CONTACT_EVENT_LABEL[event.event] ?? event.event} ${timeAgo(event.at)}`;
-  return `Actualizado ${timeAgo(contact.updated_at)}`;
-}
+// Shared with the native app (compartido/src/logic/barrio.ts).
+export { lastActivity };
 
 /** Warnings on top: the network off and invitations paused (red/summary). */
 export function NetworkWarnings({ summary }: { summary: RedSummary | undefined }) {

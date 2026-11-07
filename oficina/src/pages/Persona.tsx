@@ -34,10 +34,10 @@ import {
   CONTACT_ROLE_LABEL,
   contactSourceLabel,
   excerpt,
-  formatTime,
   labelOf,
   networkDistanceLabel,
 } from '../lib/format';
+import { displayName, suggestedModality } from '../../../compartido/src/logic/barrio';
 import { journey } from './personas/journey';
 import {
   ATTRIBUTION_LABEL,
@@ -46,6 +46,7 @@ import {
   DISCARDABLE,
   labelFrom,
   longDate,
+  messageWhen as when,
   personStage,
   relativeDay,
   shortDate,
@@ -53,22 +54,6 @@ import {
 import { ConversationBlock } from './personas/ConversationBlock';
 import { OportunidadForm } from './personas/OportunidadForm';
 import './personas/personas.css';
-
-function displayName(contact: Contact): string {
-  return contact.display_name || contact.public_identifier || 'Sin nombre';
-}
-
-/** «hoy 10:12», «ayer 18:03» or «6 nov». */
-function when(iso: string): string {
-  const day = relativeDay(iso);
-  return day === 'hoy' || day === 'ayer' ? `${day} ${formatTime(iso)}` : day;
-}
-
-/** The modality the team read in their conversation when it looks like business; otherwise their classification's. */
-function suggestedModality(contact: Contact): string | null | undefined {
-  const read = contact.conversation?.assessment;
-  return read?.opportunity && read.modality && read.modality !== 'por_clasificar' ? read.modality : contact.classification?.modality;
-}
 
 function NextStep({ contact }: { contact: Contact }) {
   const step = contact.next_step;

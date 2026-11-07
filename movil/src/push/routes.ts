@@ -38,5 +38,11 @@ export function routeForUrl(url: unknown): AppRoute | null {
     pathname = '/tu-turno';
     params.tab = 'sabe';
   }
+  // The old network views, as the PWA redirects them (App.tsx KeepSearch): the query stays.
+  if (pathname === '/red') pathname = '/personas';
+  if (pathname === '/referentes') {
+    pathname = '/personas';
+    params.pestana = 'referentes';
+  }
   return { pathname, params };
 }

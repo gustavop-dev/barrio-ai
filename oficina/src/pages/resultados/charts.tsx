@@ -2,10 +2,9 @@
 // the 60/40 modality split and the impressions per post with the median line.
 import { useId, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { barRows, impressionsChart, MODALITY_SPLIT_MISSING, modalitySplit } from '../../../../compartido/src/logic/resultados';
 import type { Resultados } from '../../api/types';
 import { IconInfo } from '../../components/icons';
-import { formatNumber } from '../../lib/format';
-import { shortDate } from '../personas/labels';
 import type { NegocioOn } from './types';
 
 /** An ⓘ toggle that shows the definition (and formula) of a chart or a compact stat. */
@@ -62,55 +61,42 @@ export interface BarItem {
 
 /** Horizontal bars relative to the largest value, like the Funnel but with any value format. */
 export function BarList({ items, color, label }: { items: BarItem[]; color?: string; label: string }) {
-  const max = Math.max(0, ...items.map((item) => item.value ?? 0));
   return (
     <ul className="funnel-steps res-bars" aria-label={label}>
-      {items.map((item) => {
-        const text = item.value === null ? '—' : (item.display ?? formatNumber(item.value));
-        const width = item.value && max > 0 ? Math.max(2, (item.value / max) * 100) : item.value === null ? 0 : 2;
-        return (
-          <li key={item.key} className="funnel-step">
-            <div className="funnel-head">
-              <span>{item.label}</span>
-              <span>
-                {text}
-                {item.value === null ? <span className="vh">, sin dato</span> : null}
-              </span>
-            </div>
-            <div className="funnel-track" aria-hidden="true">
-              <div className="funnel-bar" style={{ width: `${width}%`, background: color }} />
-            </div>
-          </li>
-        );
-      })}
+      {barRows(items).map((item) => (
+        <li key={item.key} className="funnel-step">
+          <div className="funnel-head">
+            <span>{item.label}</span>
+            <span>
+              {item.text}
+              {item.value === null ? <span className="vh">, sin dato</span> : null}
+            </span>
+          </div>
+          <div className="funnel-track" aria-hidden="true">
+            <div className="funnel-bar" style={{ width: `${item.width}%`, background: color }} />
+          </div>
+        </li>
+      ))}
     </ul>
   );
 }
 
 /** Stacked Startups / ProjectApp bar against the 60/40 target, marked with a line. */
 export function ModalitySplit({ data }: { data: NegocioOn['modalidades'] }) {
-  const startups = data.pct.personal_startups ?? null;
-  const projectapp = data.pct.projectapp ?? null;
-  const target = data.objetivo.personal_startups ?? 60;
-  const pending = data.counts.por_clasificar ?? 0;
-  const pendingNote =
-    pending > 0 ? (
-      <p className="res-muted">
-        {pending} {pending === 1 ? 'oportunidad por clasificar no cuenta' : 'oportunidades por clasificar no cuentan'} en el reparto.
-      </p>
-    ) : null;
+  const view = modalitySplit(data);
+  const { startups, projectapp, target } = view;
+  const pendingNote = view.pendingNote ? <p className="res-muted">{view.pendingNote}</p> : null;
   if (startups === null || projectapp === null) {
     return (
       <>
-        <p className="res-muted">Sin dato: aún no hay oportunidades con modalidad Startups o ProjectApp.</p>
+        <p className="res-muted">{MODALITY_SPLIT_MISSING}</p>
         {pendingNote}
       </>
     );
   }
-  const spoken = `Startups ${formatNumber(startups, 0)} %, ProjectApp ${formatNumber(projectapp, 0)} %, objetivo ${target}/${100 - target}`;
   return (
     <>
-      <div className="res-split" role="img" aria-label={spoken}>
+      <div className="res-split" role="img" aria-label={view.spoken}>
         <div className="res-split-bar">
           {startups > 0 ? <span className="res-split-a" style={{ width: `${startups}%` }} /> : null}
           {projectapp > 0 ? <span className="res-split-b" style={{ width: `${projectapp}%` }} /> : null}
@@ -120,15 +106,13 @@ export function ModalitySplit({ data }: { data: NegocioOn['modalidades'] }) {
       <div className="res-legend" aria-hidden="true">
         <span className="res-legend-item">
           <span className="res-dot a" />
-          Startups {formatNumber(startups, 0)} % · {data.counts.personal_startups ?? 0}
+          {view.legendStartups}
         </span>
         <span className="res-legend-item">
           <span className="res-dot b" />
-          ProjectApp {formatNumber(projectapp, 0)} % · {data.counts.projectapp ?? 0}
+          {view.legendProjectapp}
         </span>
-        <span className="res-legend-target">
-          Objetivo {target}/{100 - target}
-        </span>
+        <span className="res-legend-target">{view.legendTarget}</span>
       </div>
       {pendingNote}
     </>
@@ -139,35 +123,22 @@ type Chart = Resultados['contenido']['chart'];
 
 /** Impressions per post over the period with the median of the 4 previous weeks; each bar opens the piece. */
 export function ImpressionsChart({ chart, cut }: { chart: Chart; cut: '7d' | '24h' | null }) {
-  const bars = chart.bars ?? [];
-  const reference = (cut ? chart.median_previous_4_weeks?.[cut] : chart.median_previous_4_weeks?.['7d']) ?? null;
-  const max = Math.max(1, reference ?? 0, ...bars.map((bar) => bar.impressions ?? 0)) * 1.08;
-  const title = cut === '24h' ? 'Impresiones por post a las 24 h' : 'Impresiones por post a los 7 días';
-  const anyFallback = bars.some((bar) => bar.fallback);
+  const { title, reference, referenceHeight, bars, anyFallback, caption } = impressionsChart(chart, cut);
 
   return (
     <ChartCard title={title} definition={chart.definition}>
       {bars.length ? (
         <>
           <div className="res-chart">
-            {bars.map((bar, index) => {
-              const value = bar.impressions;
-              const height = value === null ? 0 : Math.max(2, (value / max) * 100);
-              const above = reference === null || (value ?? 0) >= reference;
-              const label = `Post ${index + 1}, ${shortDate(bar.date)}: ${value === null ? 'sin dato' : `${formatNumber(value)} impresiones`}${bar.fallback ? ' a las 24 h' : ''}`;
-              return (
-                <Link
-                  key={`${bar.piece_id}-${index}`}
-                  to={`/calendario/pieza/${encodeURIComponent(bar.piece_id)}`}
-                  className="res-bar-slot"
-                  aria-label={label}
-                  title={label}
-                >
-                  <span className={['res-bar', above ? 'above' : 'below', bar.fallback ? 'fallback' : '', value === null ? 'empty' : ''].filter(Boolean).join(' ')} style={{ height: `${height}%` }} />
-                </Link>
-              );
-            })}
-            {reference !== null ? <span className="res-median" aria-hidden="true" style={{ bottom: `${(reference / max) * 100}%` }} /> : null}
+            {bars.map((bar) => (
+              <Link key={bar.key} to={`/calendario/pieza/${encodeURIComponent(bar.pieceId)}`} className="res-bar-slot" aria-label={bar.label} title={bar.label}>
+                <span
+                  className={['res-bar', bar.above ? 'above' : 'below', bar.fallback ? 'fallback' : '', bar.empty ? 'empty' : ''].filter(Boolean).join(' ')}
+                  style={{ height: `${bar.height}%` }}
+                />
+              </Link>
+            ))}
+            {referenceHeight !== null ? <span className="res-median" aria-hidden="true" style={{ bottom: `${referenceHeight}%` }} /> : null}
           </div>
           <div className="res-legend" aria-hidden="true">
             {reference !== null ? (
@@ -188,11 +159,7 @@ export function ImpressionsChart({ chart, cut }: { chart: Chart; cut: '7d' | '24
               </span>
             ) : null}
           </div>
-          <p className="res-muted">
-            {reference !== null
-              ? `La línea es la mediana de las 4 semanas anteriores (${formatNumber(reference)}). Toca una barra para ver la pieza.`
-              : 'Aún no hay mediana de las 4 semanas anteriores. Toca una barra para ver la pieza.'}
-          </p>
+          <p className="res-muted">{caption}</p>
         </>
       ) : (
         <p className="res-muted">Sin posts publicados en el periodo.</p>

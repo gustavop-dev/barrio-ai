@@ -59,7 +59,7 @@ jest.mock('expo-audio', () => require('./src/test/fakeAudio').expoAudioMock);
 
 // expo-router: screens are rendered on their own; navigation calls are recorded.
 jest.mock('expo-router', () => {
-  const router = { push: jest.fn(), navigate: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true) };
+  const router = { push: jest.fn(), navigate: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true), setParams: jest.fn() };
   const state = { params: {} as Record<string, string>, pathname: '/' };
   return {
     router,

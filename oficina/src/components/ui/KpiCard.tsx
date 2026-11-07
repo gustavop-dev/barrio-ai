@@ -1,9 +1,10 @@
 import { useId, useState } from 'react';
-import type { Kpi, KpiPoint } from '../../api/types';
-import { formatNumber, formatPct, formatUsd } from '../../lib/format';
+import { formatKpiValue as formatValue, kpiDelta, sparklinePoints, type KpiUnit } from '../../../../compartido/src/logic/resultados';
+import type { Kpi } from '../../api/types';
 import { IconInfo } from '../icons';
 
-export type KpiUnit = 'number' | 'percent' | 'usd';
+// The KPI rules are shared with the native app (compartido/src/logic/resultados.ts).
+export { kpiDelta, sparklinePoints, type KpiUnit };
 
 export interface KpiCardProps {
   label: string;
@@ -21,53 +22,6 @@ export interface KpiCardProps {
   missingText?: string;
   /** Custom value formatter, overrides `unit`. */
   format?: (value: number) => string;
-}
-
-function formatValue(value: number, unit: KpiUnit, format?: (value: number) => string): string {
-  if (format) return format(value);
-  if (unit === 'percent') return formatPct(value);
-  if (unit === 'usd') return formatUsd(value);
-  return formatNumber(value);
-}
-
-type DeltaView = { text: string; spoken: string; tone: 'good' | 'bad' | 'flat' };
-
-/** The variation line, per the contract: grey «sin comparación» unless `comparable`. */
-export function kpiDelta(kpi: Kpi, unit: KpiUnit = 'number', better: 'up' | 'down' | 'none' = 'up', asPercent = false): DeltaView {
-  if (!kpi.comparable || kpi.delta === null || kpi.delta === undefined) {
-    return { text: 'sin comparación', spoken: 'Sin comparación con el periodo anterior', tone: 'flat' };
-  }
-  const delta = asPercent && kpi.delta_pct !== null && kpi.delta_pct !== undefined ? kpi.delta_pct : kpi.delta;
-  if (delta === 0) return { text: '= igual que antes', spoken: 'Igual que en el periodo anterior', tone: 'flat' };
-  const up = delta > 0;
-  const magnitude = Math.abs(delta);
-  let amount: string;
-  if (asPercent && kpi.delta_pct !== null && kpi.delta_pct !== undefined) amount = formatPct(magnitude);
-  else if (unit === 'percent') amount = `${formatNumber(magnitude)} pts`;
-  else if (unit === 'usd') amount = formatUsd(magnitude);
-  else amount = formatNumber(magnitude);
-  const good = better === 'none' ? null : better === 'up' ? up : !up;
-  return {
-    text: up ? `▲ ${amount}` : `▼ −${amount}`,
-    spoken: `${up ? 'Sube' : 'Baja'} ${amount} frente al periodo anterior`,
-    tone: good === null ? 'flat' : good ? 'good' : 'bad',
-  };
-}
-
-/** Points of the minichart in a 100×30 box; null values are skipped. */
-export function sparklinePoints(series: KpiPoint[] | null | undefined): string | null {
-  const values = (series ?? []).map((p, i) => ({ i, v: p.value })).filter((p): p is { i: number; v: number } => typeof p.v === 'number' && Number.isFinite(p.v));
-  if (!series || values.length < 2) return null;
-  const min = Math.min(...values.map((p) => p.v));
-  const max = Math.max(...values.map((p) => p.v));
-  const last = Math.max(1, series.length - 1);
-  return values
-    .map(({ i, v }) => {
-      const x = (i / last) * 100;
-      const y = max === min ? 16 : 28 - ((v - min) / (max - min)) * 24;
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    })
-    .join(' ');
 }
 
 /**

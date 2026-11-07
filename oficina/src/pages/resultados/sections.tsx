@@ -1,9 +1,27 @@
 import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  activeLink,
+  activeNext,
+  bestPostMeta,
+  consistencyFormat,
+  contenidoCut,
+  definitionLines,
+  NEGOCIO_PENDING_TEXT,
+  networkFunnelAside,
+  networkFunnelSteps,
+  postsCount,
+  recurrentTop,
+  roleSteps,
+  sortPillars,
+  spendSummary,
+  teamCount,
+  withPeriod,
+} from '../../../../compartido/src/logic/resultados';
 import type { Kpi, Resultados } from '../../api/types';
 import { Avatar, Button, EmptyState, ErrorRetry, Funnel, KpiCard, LabelChip } from '../../components/ui';
-import { CONTACT_ROLE_LABEL, contactStageLabel, formatNumber, formatPct, formatUsd } from '../../lib/format';
-import { MODALITY_SHORT, relativeDay, shortDate } from '../personas/labels';
+import { formatNumber, formatPct } from '../../lib/format';
+import { MODALITY_SHORT } from '../personas/labels';
 import { BarList, ChartCard, ImpressionsChart, InfoToggle, ModalitySplit } from './charts';
 import { pillarLabel, PostsTable } from './PostsTable';
 import { readNegocio, type NegocioOn } from './types';
@@ -44,11 +62,6 @@ export class SectionBoundary extends Component<BoundaryProps, { error: Error | n
   }
 }
 
-function withPeriod(text: string): string {
-  const clean = text.trim();
-  return /[.!?…]$/.test(clean) ? clean : `${clean}.`;
-}
-
 // ---------------------------------------------------------------- 1 · negocio
 
 function ActiveOpportunities({ items }: { items: NegocioOn['activas'] }) {
@@ -57,10 +70,10 @@ function ActiveOpportunities({ items }: { items: NegocioOn['activas'] }) {
       {items.length ? (
         <ul className="res-activas">
           {items.map((item) => {
-            const next = [item.next_action, relativeDay(item.next_action_at)].filter(Boolean).join(' · ');
+            const next = activeNext(item);
             return (
               <li key={item.id}>
-                <Link to={item.contact_id ? `/personas/${encodeURIComponent(item.contact_id)}` : '/personas?pestana=oportunidades'} className="res-activa">
+                <Link to={activeLink(item)} className="res-activa">
                   <Avatar name={item.person} />
                   <span className="res-activa-body">
                     <span className="res-activa-name">{item.person || 'Sin nombre'}</span>
@@ -91,7 +104,7 @@ export function Negocio({ data, onRegister }: { data: Resultados['negocio']; onR
         <div className="res-card res-pending">
           <EmptyState
             align="start"
-            title={withPeriod(negocio.motivo || 'Mediremos oportunidades cuando registres la primera o conectemos el inbox')}
+            title={withPeriod(negocio.motivo || NEGOCIO_PENDING_TEXT)}
             action={
               <Button block onClick={onRegister}>
                 Registrar una oportunidad
@@ -134,20 +147,11 @@ export function Negocio({ data, onRegister }: { data: Resultados['negocio']; onR
 
 // ---------------------------------------------------------------- 2 · gente
 
-const ROLE_ORDER = ['comprador', 'par', 'recomendador', 'divulgador', 'lider', 'aliado'];
-const ASIDE_LABEL: Record<string, string> = { discarded: 'Descartados', closed: 'Cerrados', incoming: 'Te invitaron' };
-
 export function Gente({ data }: { data: Resultados['audiencia'] }) {
   const roles = data.roles;
-  const roleItems = roles?.items
-    ? [...roles.items].sort((a, b) => {
-        const ia = ROLE_ORDER.indexOf(a.role);
-        const ib = ROLE_ORDER.indexOf(b.role);
-        return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-      })
-    : null;
+  const roleItems = roleSteps(roles?.items);
   const funnel = data.funnel;
-  const top = data.recurrent_people?.top ?? [];
+  const top = recurrentTop(data.recurrent_people);
   return (
     <div className="res-stack">
       <div className="kpi-grid">
@@ -162,7 +166,7 @@ export function Gente({ data }: { data: Resultados['audiencia'] }) {
         <ChartCard title="Conexiones nuevas que encajan, por rol" definition={roles?.definition}>
           {roleItems ? (
             <Funnel
-              steps={roleItems.map((item) => ({ key: item.role, label: CONTACT_ROLE_LABEL[item.role] ?? (item.role === 'sin_rol' ? 'Sin rol' : item.role), value: item.value }))}
+              steps={roleItems}
               showConversion={false}
               color="var(--color-azul-sprite)"
             />
@@ -174,22 +178,15 @@ export function Gente({ data }: { data: Resultados['audiencia'] }) {
           )}
         </ChartCard>
         <ChartCard title="Embudo de la red" definition={funnel?.definition}>
-          <Funnel
-            steps={(funnel?.order ?? []).map((stage) => ({ key: stage, label: contactStageLabel(stage), value: funnel.stages[stage] ?? 0 }))}
-            color="var(--color-azul-sprite)"
-            aside={(funnel?.aside ?? []).map((stage) => `${ASIDE_LABEL[stage] ?? contactStageLabel(stage)}: ${formatNumber(funnel.stages[stage] ?? 0)}`).join(' · ')}
-          />
+          <Funnel steps={networkFunnelSteps(funnel)} color="var(--color-azul-sprite)" aside={networkFunnelAside(funnel)} />
         </ChartCard>
       </div>
       {top.length ? (
         <ChartCard title="Personas recurrentes" definition={data.recurrent_people.definition}>
           <ul className="res-top">
-            {top.slice(0, 5).map((person, index) => {
-              const count = person.interactions ?? person.count;
-              const id = person.contact_id ?? person.id;
-              const label = `${person.name}${typeof count === 'number' ? ` · ${count} interacciones` : ''}`;
-              return <li key={id ?? `${person.name}-${index}`}>{id ? <Link to={`/personas/${encodeURIComponent(id)}`}>{label}</Link> : label}</li>;
-            })}
+            {top.map((person) => (
+              <li key={person.key}>{person.contactId ? <Link to={`/personas/${encodeURIComponent(person.contactId)}`}>{person.label}</Link> : person.label}</li>
+            ))}
           </ul>
         </ChartCard>
       ) : null}
@@ -199,21 +196,12 @@ export function Gente({ data }: { data: Resultados['audiencia'] }) {
 
 // ---------------------------------------------------------------- 3 · contenido
 
-/** «24 de 28» when the ratio brings its parts. */
-function consistencyFormat(kpi: Kpi | undefined) {
-  if (kpi && typeof kpi.numerator === 'number' && typeof kpi.denominator === 'number') {
-    const { numerator, denominator } = kpi;
-    return () => `${formatNumber(numerator)} de ${formatNumber(denominator)}`;
-  }
-  return undefined;
-}
-
 export function Contenido({ data }: { data: Resultados['contenido'] }) {
   const kpis = data.kpis;
-  const cut = kpis?.median_impressions?.cut ?? data.by_pillar?.cut ?? null;
+  const cut = contenidoCut(data);
   const best = data.best_post;
   // Highest engagement first; pillars without data last.
-  const pillars = [...(data.by_pillar?.items ?? [])].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+  const pillars = sortPillars(data.by_pillar?.items);
   return (
     <div className="res-stack">
       <div className="kpi-grid">
@@ -228,16 +216,7 @@ export function Contenido({ data }: { data: Resultados['contenido'] }) {
           {best ? (
             <>
               <p className="res-best-text">{best.first_line || 'Pieza sin texto'}</p>
-              <p className="res-muted">
-                {[
-                  shortDate(best.date),
-                  best.pillar ? pillarLabel(best.pillar) : '',
-                  best.impressions !== null ? `${formatNumber(best.impressions)} impresiones` : '',
-                  best.engagement_pct !== null ? formatPct(best.engagement_pct) : '',
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </p>
+              <p className="res-muted">{bestPostMeta(best)}</p>
               <Link to={`/calendario/pieza/${encodeURIComponent(best.piece_id)}`} className="res-link">
                 Ver la pieza
               </Link>
@@ -255,7 +234,7 @@ export function Contenido({ data }: { data: Resultados['contenido'] }) {
                 label: (
                   <>
                     {pillarLabel(item.pillar)}
-                    <span className="res-muted"> · {item.posts} {item.posts === 1 ? 'post' : 'posts'}</span>
+                    <span className="res-muted"> · {postsCount(item.posts)}</span>
                   </>
                 ),
                 value: item.value,
@@ -278,8 +257,8 @@ export function Contenido({ data }: { data: Resultados['contenido'] }) {
 // ---------------------------------------------------------------- 4 · equipo
 
 function Value({ kpi, one, many }: { kpi: Kpi | undefined; one: string; many: string }) {
-  const value = kpi?.value;
-  if (value === null || value === undefined) {
+  const text = teamCount(kpi, one, many);
+  if (text === null) {
     return (
       <span>
         <span aria-hidden="true">—</span>
@@ -287,24 +266,15 @@ function Value({ kpi, one, many }: { kpi: Kpi | undefined; one: string; many: st
       </span>
     );
   }
-  return (
-    <span>
-      {formatNumber(value)} {value === 1 ? one : many}
-    </span>
-  );
+  return <span>{text}</span>;
 }
 
 function Definitions({ items }: { items: [string, Kpi | undefined][] }) {
   return (
     <ul className="res-deflist">
-      {items
-        .filter(([, kpi]) => kpi?.definition)
-        .map(([label, kpi]) => (
-          <li key={label}>
-            {label}: {kpi?.definition}
-            {kpi?.value === null && kpi.unavailable_reason ? ` ${kpi.unavailable_reason}` : ''}
-          </li>
-        ))}
+      {definitionLines(items).map((line) => (
+        <li key={line}>{line}</li>
+      ))}
     </ul>
   );
 }
@@ -321,21 +291,9 @@ function Stat({ label, definition, children }: { label: string; definition?: Rea
   );
 }
 
-/** «3,10»: money with two decimals, without the unit. */
-function amount(value: number): string {
-  return value.toLocaleString('es-CO', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-function sum(values: (number | null | undefined)[]): number {
-  return values.reduce<number>((total, value) => total + (typeof value === 'number' ? value : 0), 0);
-}
-
 export function Equipo({ data }: { data: Resultados['equipo'] }) {
   const spend = data.spend;
-  const today = Object.values(spend?.today ?? {});
-  const todaySpent = sum(today.map((line) => line.spent));
-  const todayBudget = sum(today.map((line) => line.budget));
-  const month = (spend?.month as Record<string, { spent: number; budget: number | null }> | undefined)?.total?.spent ?? null;
+  const summary = spendSummary(spend);
   return (
     <div className="res-stats-row">
       <Stat
@@ -382,10 +340,10 @@ export function Equipo({ data }: { data: Resultados['equipo'] }) {
         <Value kpi={data.pieces_vetoed} one="vetada" many="vetadas" />
       </Stat>
       <Stat label="Gasto de IA" definition={spend?.definition}>
-        {spend ? (
+        {summary ? (
           <>
-            {todayBudget > 0 ? `${amount(todaySpent)} de ${formatUsd(todayBudget)} hoy` : `${formatUsd(todaySpent)} hoy`}
-            {month !== null ? <span className="res-stat-sub">{formatUsd(month)} este mes</span> : null}
+            {summary.today}
+            {summary.month !== null ? <span className="res-stat-sub">{summary.month}</span> : null}
           </>
         ) : (
           <>
