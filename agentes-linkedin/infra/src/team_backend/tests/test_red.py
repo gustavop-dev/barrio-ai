@@ -60,8 +60,7 @@ class DiscoveryAndFollowTests(NetworkBase):
         self.fake.seed_person('founder-ana','Ana Founder',headline='Co-founder & CEO at Tiny (pre-seed)',
                               comment_on=posts[0].provider_post_id,comment=SUBSTANTIVE)
         self.fake.seed_person('saludo-bob','Bob Saludo',comment_on=posts[0].provider_post_id,comment='Gran post!')
-        org=self.fake.seed_person('empresa-x','Empresa X',comment_on=posts[0].provider_post_id,comment=SUBSTANTIVE)
-        org['type']='organization'
+        self.fake.seed_person('empresa-x','Empresa X',comment_on=posts[0].provider_post_id,comment=SUBSTANTIVE,kind='organization')
         self.fake.seed_person('cto-carla','Carla CTO',headline='CTO',search='founder pre-seed')
         self.fake.seed_person('amigo-dan','Dan Amigo',distance='FIRST_DEGREE',search='founder pre-seed')
         self.job('discover_network')
@@ -76,6 +75,10 @@ class DiscoveryAndFollowTests(NetworkBase):
         with self.classifier({'Ana Founder':(True,0.9),'Carla CTO':(True,0.5)}):self.job('classify_contacts')
         call=self.classifier_calls[0]
         self.assertEqual((call['purpose'],call['model']),('network-classify','claude-sonnet-5-5'))
+        # Comment authors come without a headline: the profile is read first (1 read; the search result already had one).
+        headlines={p['name']:p['headline'] for p in call['data']['people']}
+        self.assertEqual(headlines,{'Ana Founder':'Co-founder & CEO at Tiny (pre-seed)','Carla CTO':'CTO'})
+        self.assertEqual(red.reads_today(self.account,'profile'),1)
         self.assertIn('Nunca la infieras por nombre',call['system'])
         self.assertIn('brief.prioridad',{g['key'] for g in call['data']['private_guidance']})
         ana.refresh_from_db()
@@ -218,3 +221,25 @@ class CommentRoomTests(NetworkBase):
         with patch('team_backend.autopiloto.enqueue_operation',wraps=autopiloto.enqueue_operation) as enqueue:
             autopiloto.tick(self.bot)
         self.assertIn('propose_comment',[c.args[1] for c in enqueue.call_args_list])
+
+
+class EnrichmentTests(NetworkBase):
+    def test_commenters_without_a_readable_profile_wait_instead_of_being_judged_blind(self):
+        posts=self.observed()
+        self.fake.seed_person('founder-ana','Ana Founder',headline='Founder',comment_on=posts[0].provider_post_id,comment=SUBSTANTIVE)
+        with patch.dict(os.environ,{'NETWORK_SEARCH_QUERIES':''}):self.job('discover_network')
+        with patch.dict(os.environ,{'NETWORK_READ_CAPS':'profile=0'}),self.classifier({'Ana Founder':(True,0.9)}):
+            job=self.job('classify_contacts')
+        self.assertEqual(self.classifier_calls,[]);self.assertIn('mañana',job.error)
+        self.assertEqual(Contact.objects.get().classification,{})
+        with self.classifier({'Ana Founder':(True,0.9)}):self.job('classify_contacts')
+        self.assertEqual(Contact.objects.get().stage,'fit')
+
+    def test_commenters_leave_room_for_the_search(self):
+        posts=self.observed()
+        for i in range(12):
+            self.fake.seed_person(f'persona-{i}',f'Persona {i}',comment_on=posts[0].provider_post_id,comment=SUBSTANTIVE)
+        self.fake.seed_person('cto-carla','Carla CTO',headline='CTO',search='founder pre-seed')
+        self.job('discover_network')
+        self.assertEqual(Contact.objects.filter(source='commenter').count(),10)
+        self.assertTrue(Contact.objects.filter(source='search').exists())

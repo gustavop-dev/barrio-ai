@@ -24,10 +24,11 @@ flowchart LR
 ```
 
 1. **Descubrir** (`discover_network`, cada `NETWORK_DISCOVER_EVERY_MINUTES`, por defecto 360).
-   - **De los comentarios de los referentes.** Lee una sola vez los comentarios de los posts recientes de los referentes: hasta `NETWORK_POSTS_PER_RUN` posts de los últimos `NETWORK_SCAN_DAYS` días. Convierte en candidatos a quienes comentaron con sustancia, es decir, con al menos `NETWORK_MIN_COMMENT_CHARS` caracteres. Quedan fuera los saludos, las cuentas de empresa, los referentes, Gustavo y quien ya es contacto.
+   - **De los comentarios de los referentes.** Lee una sola vez los comentarios de los posts recientes de los referentes: hasta `NETWORK_POSTS_PER_RUN` posts de los últimos `NETWORK_SCAN_DAYS` días. Convierte en candidatos a quienes comentaron con sustancia, es decir, con al menos `NETWORK_MIN_COMMENT_CHARS` caracteres (por defecto 80). Si hay búsquedas configuradas, los comentaristas ocupan como mucho dos tercios del cupo del turno, para que la búsqueda siempre tenga espacio. Quedan fuera los saludos, las cuentas de empresa, los referentes, Gustavo y quien ya es contacto.
    - **De una búsqueda.** Ejecuta además una búsqueda de `NETWORK_SEARCH_QUERIES` por turno, rotando entre ellas, y omite las conexiones de primer grado.
    - **Evidencia.** Cada contacto guarda de dónde salió: el post, el referente y su comentario, o la consulta de búsqueda.
 2. **Clasificar** (`classify_contacts`). Una llamada con `NETWORK_CLASSIFIER_MODEL` (por defecto `claude-sonnet-5-5`) clasifica hasta 10 personas.
+   - **Perfil antes de clasificar.** Unipile v2 entrega a quien comenta sin titular: solo nombre e id. Sin titular, el clasificador descartaba a gente valiosa. Por eso, antes de clasificar a alguien sin titular, se lee su perfil (DESC-03), lo que gasta una lectura del cupo `profile`. Quien no puede leerse hoy espera a mañana en lugar de juzgarse a ciegas.
    - **Criterio.** Usa los criterios de barrio por modalidad y la orientación privada del brief. La afinidad hispanohablante se toma solo de lo declarado, nunca del nombre ni de la apariencia.
    - **Resultado.** Una persona encaja si el modelo dice que sí con confianza de al menos `NETWORK_MIN_CONFIDENCE`. Si no, queda `discarded`.
    - **Presupuesto propio.** El gasto va contra `NETWORK_DAILY_LLM_USD` (por defecto 0,3 USD) con `purpose='network-classify'`.
