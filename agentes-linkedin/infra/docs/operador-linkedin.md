@@ -36,13 +36,16 @@ El servicio `autopilot` (`python manage.py autopiloto`) ejecuta un ciclo cada 60
    - incluye afirmaciones que el agente marcó como pendientes de evidencia;
    - es un borrador del agente sin una unidad del curso citada.
 
-   Lo que pasa la compuerta queda aprobado con su hash, sin `decided_by`.
+   Lo que pasa la compuerta queda aprobado con su hash, sin `decided_by`. Con el agente líder activo, Jev juzga además cada propuesta ([rediseño](rediseno-backend.md#agente-líder-liderpy)), como máximo `LEAD_MAX_REVIEWS_PER_TICK` (5) por ciclo y empezando por las más antiguas.
 3. **Observa** a los referentes cada `OPERATOR_OBSERVE_EVERY_MINUTES` (180).
 4. **Redacta**, de uno en uno, sobre el post más reciente de un referente activo:
    - el post tiene menos de `OPERATOR_MAX_POST_AGE_HOURS` (72) y no es un repost;
    - todavía no se le preparó ningún comentario;
    - queda cupo de comentarios en la cuenta;
-   - no se superan `OPERATOR_DAILY_PROPOSALS` (6) ni `OPERATOR_DAILY_LLM_USD` (1) en el día.
+   - no se superan `OPERATOR_DAILY_PROPOSALS` (6) ni `OPERATOR_DAILY_LLM_USD` (1) en el día;
+   - con el agente líder activo, Jev confirma antes que el post merece un comentario de Gustavo: tiene sustancia, es de su barrio y no es una vacante, una promoción pura ni un hito personal. Si no, se prueba el siguiente post, y el veredicto se recuerda (prefiltro de comentarios, en el [rediseño](rediseno-backend.md#agente-líder-liderpy)).
+
+   El redactor recibe las instrucciones, la voz y las 6 unidades del curso como bloques de `system` cacheados, y el post con su contexto en el mensaje. Así, los borradores seguidos leen las unidades a precio de caché. Si el borrador solo incumple una regla fija de la compuerta (hashtag, enlace, longitud, pitch, afirmación sin evidencia, falta de cita, filtración), se pide **una** reescritura que nombra cada regla incumplida, dentro del mismo presupuesto diario y solo en modo `auto`. La propuesta lo anota en sus riesgos. Si la reescritura vuelve a fallar, la compuerta la descarta como antes.
 5. **Ejecuta** una acción aprobada por ciclo, solo si se cumplen la ventana `OPERATOR_WINDOW` (07:00–21:00, `OPERATOR_TIMEZONE` America/Bogota), el espaciado fijo `OPERATOR_MIN_SPACING_SECONDS` (1200) y los topes diarios y semanales de tu zona horaria. Los valores por defecto son INT-03 3/12 e INT-02 15/60, como en el reparto v1. El espaciado es fijo: no se aleatoriza para imitar a una persona.
 6. **Concilia** por lectura los envíos inciertos o pendientes de confirmar.
 
@@ -60,7 +63,7 @@ Cuando una cuenta se pausa (429, restricción, reautenticación o estado distint
 - **El conector real está apagado por defecto.** Requiere `LIVE_LINKEDIN=true` y `UNIPILE_API_KEY`. El simulado requiere `OPERATOR_ALLOW_FAKE=true`.
 - **Un comentario por persona a la vez.** Nunca se comenta a un mismo referente más de una vez dentro de `OPERATOR_AUTHOR_COOLDOWN_HOURS` (48 h por defecto). El redactor salta sus posts mientras tenga un comentario abierto o reciente, y la compuerta descarta un segundo comentario si el primero ya está aprobado o publicado.
 - **Voz.** El redactor de comentarios escribe con el documento «Tono de voz» de Gustavo (`voz.py`; detalle en [publicación diaria](publicacion-diaria.md)). La compuerta descarta además cualquier experiencia en primera persona, en inglés o en español, que no esté respaldada por un hecho público confirmado.
-- **Coste.** El agente consulta Claude con el SDK oficial, en streaming, con salida JSON con esquema y sin reintentos automáticos. Antes de generar reserva el peor caso en el registro de gasto. Un post con una acción abierta o ya comentada no dispara otra generación.
+- **Coste.** El agente consulta Claude con el SDK oficial, en streaming, con salida JSON con esquema y sin reintentos automáticos. Antes de generar reserva el peor caso en el registro de gasto. Un post con una acción abierta o ya comentada no dispara otra generación. La única segunda llamada es la reescritura por una regla fija, una vez por borrador y dentro de `OPERATOR_DAILY_LLM_USD`.
 
 ## Activación real (pasos para Gustavo)
 
@@ -101,7 +104,7 @@ Permisos nuevos: `operate_linkedin`, `approve_actions` y `execute_actions`. El r
 
 ## Decisiones técnicas
 
-- **Proveedor de Claude.** `knowledge.providers.claude` pasa al SDK oficial `anthropic`. Usa streaming con timeouts separados (conexión 10 s, lectura 90 s por evento), guarda el `request-id` de cada llamada en el registro de gasto y aplica caché al prompt de sistema. Así se corrige la causa probable del ReadTimeout anterior, que esperaba la respuesta completa sin streaming con un límite de 120 s.
+- **Proveedor de Claude.** `knowledge.providers.claude` pasa al SDK oficial `anthropic`. Usa streaming con timeouts separados (conexión 10 s, lectura 90 s por evento), guarda el `request-id` de cada llamada en el registro de gasto y aplica caché al prompt de sistema. Así se corrige la causa probable del ReadTimeout anterior, que esperaba la respuesta completa sin streaming con un límite de 120 s. Quien llama puede añadir contexto estable (`context=`, por ejemplo las unidades del curso) como bloques de `system` cacheados detrás de las instrucciones. El cliente se crea una vez por clave y se reutiliza.
 - **Modelos.** Por defecto `claude-opus-5-5`, y se puede configurar con `ANTHROPIC_MODEL`. Hay tarifas verificadas para opus-5-5, sonnet-5-5, haiku-5-5 y sonnet-4-6. El runtime conserva el valor de su `.env` hasta que Gustavo lo cambie.
 - **Rechazos.** No se activó el `fallbacks` de servidor. Si Claude rechaza una petición, la propuesta falla y no se publica nada. Se dejó así para no tarifar en el registro de gasto una llamada servida por otro modelo.
 - **Contexto personal.** Solo se usa la memoria confirmada. Mientras esté vacía, el agente aporta perspectiva o preguntas y no vivencias de Gustavo.
