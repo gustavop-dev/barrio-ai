@@ -20,7 +20,7 @@ from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, get_conne
 from .exceptions import Conflict
 from .models import (OPEN_ACTION_STATES, ActionExecution, ActionProposal, ConnectorAccount, ObservedPost, Referent)
 from .permissions import require
-from . import voz
+from . import orientacion, voz
 
 COMMENT_MAX_CHARS=1250
 USER_ID=re.compile(r'[A-Za-z0-9_\-]{3,200}')
@@ -484,6 +484,8 @@ Criterio (catálogo INT-03, fundamentos B04/B06/B15 del curso en el contexto):
 - private_guidance solo orienta qué aportar y qué evitar (prioridades, audiencia, cadencia, límites).
   Nunca lo menciones, cites ni parafrasees en el comentario: ni prioridades como 60/40 ni el tipo de
   founders o clientes que Gustavo busca.
+- orientation es la dirección vigente que Gustavo le da al equipo. Síguela al elegir qué aportar; igual que
+  private_guidance, nunca la cites ni la parafrasees.
 - Escribe en el idioma de la publicación (por defecto inglés) y en la voz de Gustavo descrita al final.
   2–5 frases, máximo 900 caracteres, sin hashtags y como mucho un emoji si encaja con el tono del hilo.
 - No repitas lo que ya dicen otros comentarios.
@@ -516,7 +518,8 @@ def propose_comment(user,post_id,origin_job=''):
     except ConnectorError:others=[]
     public_facts,private_guidance=memory.confirmed_blocks()
     message=json.dumps({'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':others,
-        'public_facts':public_facts,'private_guidance':private_guidance,'course_units':units},ensure_ascii=False,default=str)
+        'public_facts':public_facts,'private_guidance':private_guidance,'orientation':orientacion.text(),'course_units':units},
+        ensure_ascii=False,default=str)
     answer=providers.claude(voz.with_voice(COMMENT_SYSTEM),message,output_schema=COMMENT_SCHEMA,effort='medium',purpose='propose-comment')
     try:data=json.loads(answer['text'])
     except json.JSONDecodeError:raise ValueError('La respuesta del agente no es JSON válido.') from None

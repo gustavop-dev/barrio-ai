@@ -277,3 +277,93 @@ El payload de cada push es JSON `{ title, body, url, tag }`. El service worker m
 - `POST /api/v1/memory/proposals` con `{ namespace: "user", key, value, evidence, expected_version }`.
 - `POST /api/v1/memory/<id>/confirm` con `{ expected_version }`, que requiere sesión humana.
 - `POST /api/v1/runs` con `{ agent: "posicionamiento|perfil", task, execute: false, mode: "lexical" }` responde 202 con un trabajo. `GET /api/v1/runs/<id>` devuelve el trabajo con `result.payload`, que es una vista previa con contexto. Ejecutar con IA (`execute: true`) cuesta dinero y solo se ofrece con una confirmación explícita.
+
+
+## Rediseño: Tu turno, preguntas, memoria, orientación, oportunidades, actividad y ajustes
+
+Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las escrituras requieren sesión humana con CSRF; un token de servicio recibe 403.
+
+**`GET /api/v1/tu-turno`**
+
+```json
+{ "count": 3,
+  "questions": [QuestionOutput],
+  "tasks": { "perfil": [], "conversaciones": [] },
+  "alerts": [ { "id": "linkedin_token | uncertain:<proposal_id> | machine_paused | account_paused:<id> | invites_blocked | ai_budget",
+                "severity": "alta | media", "title": "¿Salió o no?", "detail": "…",
+                "action": { "label": "Resolver", "endpoint": "/api/v1/operador/actions/<id>/resolve", "proposal_id": "uuid" } | { "label": "Reconectar", "href": "/api/v1/linkedin/oauth/start" } | null } ],
+  "summary": { "done_today": { "INT-03": 2, "RED-01": 4 }, "next_piece": { "id": "uuid", "scheduled_for": "iso" } | null } }
+```
+
+- `count` es la suma de preguntas abiertas y avisos.
+- Un aviso `uncertain` se cierra con el `resolve` existente (`{outcome:"confirmed"|"failed", note}`).
+
+**Preguntas del equipo**
+- `GET /api/v1/preguntas?state=open|answered|declined` devuelve una lista paginada.
+- `QuestionOutput`:
+
+```json
+{ "id": "uuid", "kind": "ask | confirm", "agent": "director_editorial", "question": "¿Qué aprendiste al integrar IA en un ERP real?",
+  "purpose": "Para escribir un post con una experiencia propia", "memory_key": "experiencia.ia_erp",
+  "proposed_value": { "texto": "…", "uso_publico": true }, "suggested_public": true, "origin": "piece:<id> | memoria",
+  "state": "open", "answer": "", "public_use": null, "answered_at": null, "created_at": "iso" }
+```
+
+- `POST /api/v1/preguntas/<id>/responder` recibe `{ "text": "…", "public_use": true|false|null, "accept": false }`.
+  - Con `kind=confirm`, `{ "accept": true }` confirma el dato propuesto; `public_use` cambia si puede usarse en público.
+  - Responde 409 si la pregunta ya no está abierta.
+- `POST /api/v1/preguntas/<id>/no-compartir` cierra la clave para siempre.
+
+**Lo que el equipo sabe de ti**
+- `GET /api/v1/memoria/hechos` devuelve `[{ "key": "identidad.rol", "text": "…", "public_use": true, "version": 3, "updated_at": "iso" }]`.
+- `POST /api/v1/memoria/hechos/<key>/corregir` recibe `{ "text": "…", "public_use": true }`.
+- `POST /api/v1/memoria/hechos/<key>/retirar` recibe `{ "reason": "…" }`.
+- Las dos devuelven la lista actualizada.
+
+**Orientación**
+- `GET /api/v1/orientacion` devuelve `{ "text": "…", "updated_at": "iso" | null, "updated_by": "gustavo" | null }`.
+- `PUT /api/v1/orientacion` recibe `{ "text": "…" }`, de 4000 caracteres como máximo; vacío borra la orientación.
+
+**Oportunidades**
+- `GET /api/v1/oportunidades?stage=&modality=&contact=` devuelve una lista paginada. `OpportunityOutput`:
+
+```json
+{ "id": "uuid", "title": "ERP para retail", "modality": "personal_startups | projectapp",
+  "stage": "conversacion | necesidad | cualificada | reunion | propuesta | acuerdo | perdida",
+  "origin": "inbound | outbound | referido | otro", "notes": "…",
+  "contact": { "id": "uuid", "display_name": "…", "headline": "…", "profile_url": "…", "stage": "connected" } | null,
+  "history": [{ "at": "iso", "event": "created | stage", "detail": "Conversación → Reunión" }],
+  "created_at": "iso", "updated_at": "iso", "closed_at": "iso" | null }
+```
+
+- `POST /api/v1/oportunidades` recibe `{ title, modality, origin?, stage?, contact?, notes? }` y devuelve 201.
+- `PATCH /api/v1/oportunidades/<id>` recibe cualquiera de `{ title, modality, origin, stage, notes }`.
+
+**`GET /api/v1/actividad?tipo=comentarios|reacciones|publicaciones|seguimientos|invitaciones|aceptaciones&limit=50&descartadas=1`**
+
+```json
+{ "upcoming": { "pieces": [{ "piece_id": "uuid", "scheduled_for": "iso", "text": "…", "action": { "id": "uuid", "state": "approved" } | null, "vetoable": true }],
+                "queued": [ActivityItem] },
+  "done": [ActivityItem], "discarded": [ActivityItem] }
+```
+
+`ActivityItem`:
+
+```json
+{ "id": "uuid", "capability": "INT-03", "label": "Comentario", "state": "confirmed", "at": "iso", "text": "…" | null,
+  "target": { "kind": "post | person | own", "name": "…", "headline": "…", "url": "…" }, "url": "enlace en LinkedIn",
+  "rationale": "…", "decided_by": "gustavo | lider | politica | null", "decision_note": "Aprobada por el líder (jev-1.14.0) · …",
+  "review": { "decision": "approve | discard", "answers": { "aporta": 0.92 }, "reasons": [], "model": "jev-1.14.0" }, "piece_id": "uuid" | null }
+```
+
+`discarded` solo aparece con `descartadas=1`. Un `tipo` desconocido devuelve 404.
+
+**`GET /api/v1/ajustes`**
+
+```json
+{ "autonomy": { "INT-03": "auto", "RED-02": "auto" },
+  "lead": { "enabled": true, "capabilities": ["INT-03","CONT-09","RED-01","RED-02","RED-04"], "model": "jev-1.14.0" },
+  "limits": { "INT-03": { "daily": 3, "weekly": 12 } }, "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota" },
+  "ai_spend": { "anthropic_month_usd": 4.2, "anthropic_total_usd": 9.8, "anthropic_limit_usd": 50 },
+  "orientation": { "text": "…", "updated_at": "iso", "updated_by": "gustavo" } }
+```
