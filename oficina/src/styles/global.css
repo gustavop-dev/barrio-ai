@@ -131,6 +131,7 @@ label.radio input { width: 22px; min-height: 22px; height: 22px; accent-color: v
 .filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
 .filters label { margin: 0; }
 .filters select { width: auto; min-width: 180px; }
+.filter { display: flex; align-items: center; gap: 8px; }
 
 /* ---------------------------------------------------------------- shell */
 

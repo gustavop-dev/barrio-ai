@@ -42,6 +42,7 @@ export function prettyValue(value: unknown): string {
 export const CAPABILITY_LABEL: Record<string, string> = {
   'INT-03': 'Comentario',
   'INT-02': 'Reacción',
+  'CONT-09': 'Publicación propia',
 };
 
 export const ACTION_STATE_LABEL: Record<string, string> = {

@@ -22,9 +22,28 @@ function action(id: string, state: ActionState, extra: Partial<Action> = {}): Ac
     decided_at: null,
     created_at: '2026-11-06T18:00:00Z',
     post: { id: `p-${id}`, author_name: 'Ana Referente', text: 'Así lanzamos nuestro producto.', share_url: 'https://www.linkedin.com/feed/update/urn:li:activity:1', posted_at: '2026-11-06T12:00:00Z' },
+    piece_id: null,
+    scheduled_for: null,
     execution: null,
     ...extra,
   };
+}
+
+const FINAL_TEXT = 'Before writing a line of code for a new feature, ask one question: what decision will this help someone make?';
+
+/** An own publication as the backend serializes it: no post, the piece and its hour instead. */
+function ownPublication(id: string, state: ActionState, extra: Partial<Action> = {}): Action {
+  return action(id, state, {
+    capability: 'CONT-09',
+    payload: { text: FINAL_TEXT },
+    rationale: 'Scope features from the decision they support. — Clearer hook.',
+    citations: ['LI-04-M005-K01'],
+    risks: ['Objeción conservada: Could use an example'],
+    post: null,
+    piece_id: 'piece-1',
+    scheduled_for: '2026-11-07T13:30:00Z',
+    ...extra,
+  });
 }
 
 const routes = [{ path: '/acciones', element: <Acciones /> }];
@@ -98,6 +117,99 @@ describe('Acciones', () => {
     await user.type(within(dialog).getByLabelText('Nota'), 'Tarde');
     await user.click(within(dialog).getByRole('button', { name: 'Vetar' }));
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('La acción ya se está ejecutando.');
+  });
+
+  it('renders an own publication (CONT-09, post null) with its final text, day and published link', async () => {
+    fakeServer({
+      'GET /api/v1/operador/actions': {
+        body: {
+          count: 3,
+          next: null,
+          previous: null,
+          results: [
+            ownPublication('o1', 'approved'),
+            ownPublication('o2', 'confirmed', {
+              piece_id: 'piece-2',
+              execution: {
+                state: 'confirmed',
+                external_id: 'urn:li:share:7400000000000000001',
+                external_url: 'https://www.linkedin.com/feed/update/urn:li:share:7400000000000000001/',
+                note: '',
+                http_status: 201,
+                started_at: '2026-11-06T13:30:00Z',
+                finished_at: '2026-11-06T13:30:02Z',
+              },
+            }),
+            action('a1', 'proposed'),
+          ],
+        },
+      },
+    });
+    renderAt('/acciones', routes);
+    const cards = await screen.findAllByRole('article');
+    const [scheduled, published, comment] = cards as [HTMLElement, HTMLElement, HTMLElement];
+
+    expect(within(scheduled).getByRole('heading', { name: /Publicación propia/ })).toBeInTheDocument();
+    expect(within(scheduled).getByText('TEXTO FINAL')).toBeInTheDocument();
+    expect(within(scheduled).getByText(FINAL_TEXT)).toHaveAttribute('lang', 'en');
+    expect(within(scheduled).getByText(/Día programado/).parentElement).toHaveTextContent(/2026/);
+    expect(within(scheduled).getByText(/Sale sola a esa hora/)).toBeInTheDocument();
+    expect(within(scheduled).getByRole('link', { name: /Ver la pieza/ })).toHaveAttribute('href', '/contenido/piece-1');
+    expect(within(scheduled).queryByText(/POST DE ORIGEN/)).not.toBeInTheDocument();
+    expect(within(scheduled).getAllByRole('button').map((b) => b.textContent)).toEqual(['Vetar']);
+
+    expect(within(published).getByRole('link', { name: /Ver el post publicado en LinkedIn/ })).toHaveAttribute(
+      'href',
+      'https://www.linkedin.com/feed/update/urn:li:share:7400000000000000001/',
+    );
+    expect(within(published).queryByRole('button')).not.toBeInTheDocument();
+    expect(within(comment).getByRole('heading', { name: /Comentario/ })).toBeInTheDocument();
+    expect(within(comment).getByText(/POST DE ORIGEN/)).toBeInTheDocument();
+  });
+
+  it('vetoes an own publication: the day stays without a post', async () => {
+    let vetoed = false;
+    const server = fakeServer({
+      'GET /api/v1/operador/actions': () => ({ body: [ownPublication('o1', vetoed ? 'rejected' : 'approved')] }),
+      'POST /api/v1/operador/actions/o1/reject': () => {
+        vetoed = true;
+        return { body: ownPublication('o1', 'rejected', { decision_note: 'No me representa' }) };
+      },
+    });
+    const user = userEvent.setup();
+    renderAt('/acciones', routes);
+    await user.click(await screen.findByRole('button', { name: 'Vetar' }));
+    const dialog = screen.getByRole('dialog', { name: 'Vetar la publicación' });
+    expect(dialog).toHaveTextContent('ese día quedará sin publicación');
+    await user.type(within(dialog).getByLabelText('Nota'), 'No me representa');
+    await user.click(within(dialog).getByRole('button', { name: 'Vetar' }));
+    await waitFor(() => expect(within(screen.getByRole('article')).getByText('Vetada')).toBeInTheDocument());
+    expect(server.find('POST', '/api/v1/operador/actions/o1/reject')[0]?.body).toEqual({ note: 'No me representa' });
+  });
+
+  it('filters by capability: comments, reactions or own publications', async () => {
+    const mixed = [action('a1', 'proposed'), action('r1', 'proposed', { capability: 'INT-02', payload: { reaction: 'like' } }), ownPublication('o1', 'approved')];
+    const server = fakeServer({ 'GET /api/v1/operador/actions': { body: { count: 3, next: null, previous: null, results: mixed } } });
+    const user = userEvent.setup();
+    renderAt('/acciones', routes);
+    expect(await screen.findAllByRole('article')).toHaveLength(3);
+
+    await user.selectOptions(screen.getByLabelText('Capacidad'), 'publicaciones');
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(1));
+    expect(screen.getByRole('heading', { name: /Publicación propia/ })).toBeInTheDocument();
+    expect(screen.getByTestId('location')).toHaveTextContent('/acciones?capacidad=publicaciones');
+    expect(server.requests.at(-1)?.search.get('capability')).toBe('CONT-09');
+
+    await user.selectOptions(screen.getByLabelText('Capacidad'), 'reacciones');
+    await waitFor(() => expect(screen.getAllByRole('article')).toHaveLength(1));
+    expect(screen.getByRole('heading', { name: /Reacción/ })).toBeInTheDocument();
+
+    await user.selectOptions(screen.getByLabelText('Estado'), 'failed');
+    expect(screen.getByTestId('location')).toHaveTextContent('/acciones?state=failed&capacidad=reacciones');
+
+    await user.selectOptions(screen.getByLabelText('Capacidad'), 'comentarios');
+    expect(screen.getByTestId('location')).toHaveTextContent('/acciones?state=failed&capacidad=comentarios');
+    expect(server.requests.at(-1)?.search.get('capability')).toBe('INT-03');
   });
 
   it('filters by state through the query string', async () => {

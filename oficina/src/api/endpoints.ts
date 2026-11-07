@@ -3,6 +3,7 @@ import type {
   Account,
   Action,
   Activity,
+  Capability,
   Control,
   FeedEvent,
   Job,
@@ -42,9 +43,17 @@ export const setAccountPaused = (accountId: string, paused: boolean, reason = ''
   api.post<Account>(`${OP}/accounts/${id(accountId)}/pause`, { paused, reason });
 
 // ---------------------------------------------------------------- actions
-export function listActions(state: string, page: number) {
+/**
+ * The backend filters by `state` only. `capability` is sent for when it learns to filter too; until
+ * then the page filters what it receives, asking for bigger pages so the filter has more to work with.
+ */
+export function listActions(state: string, page: number, capability: Capability | '' = '') {
   const params = new URLSearchParams();
   if (state) params.set('state', state);
+  if (capability) {
+    params.set('capability', capability);
+    params.set('page_size', '100');
+  }
   if (page > 1) params.set('page', String(page));
   const query = params.toString();
   return api.get<Paginated<Action> | Action[]>(`${OP}/actions${query ? `?${query}` : ''}`);

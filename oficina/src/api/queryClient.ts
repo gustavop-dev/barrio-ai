@@ -7,12 +7,13 @@ export const keys = {
   feed: ['feed'] as const,
   activity: ['activity'] as const,
   accounts: ['accounts'] as const,
-  actions: (state: string, page: number) => ['actions', state, page] as const,
+  actions: (state: string, page: number, capability = '') => ['actions', state, page, capability] as const,
   actionsAll: ['actions'] as const,
   referents: (account: string) => ['referents', account] as const,
   unit: (id: string) => ['unit', id] as const,
   source: (key: string) => ['source', key] as const,
   memory: ['memory'] as const,
+  editorialAll: ['editorial'] as const,
 };
 
 /** Client errors (4xx) are answers, not glitches: never retry them. */

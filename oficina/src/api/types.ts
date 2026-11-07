@@ -109,30 +109,46 @@ export interface ObservedPost {
 }
 
 export interface Execution {
+  id?: string;
   state: string;
+  provider?: string;
   external_id: string | null;
   external_url: string | null;
+  error_kind?: string;
   note: string;
   http_status: number | null;
   started_at: string | null;
   finished_at: string | null;
+  reconciled_at?: string | null;
 }
+
+/** INT-03 comment and INT-02 reaction on someone else's post; CONT-09 own publication. */
+export const CAPABILITIES = ['INT-03', 'INT-02', 'CONT-09'] as const;
+export type Capability = (typeof CAPABILITIES)[number];
 
 export interface Action {
   id: string;
-  capability: 'INT-03' | 'INT-02' | string;
+  account_id?: string;
+  capability: Capability;
   payload: { text?: string; reaction?: string };
   payload_hash: string;
   version: number;
+  previous_id?: string | null;
   state: ActionState;
   source: 'agent' | 'human';
   rationale: string;
   citations: string[];
   risks: string[];
+  model?: string;
+  approved_hash?: string;
   decision_note: string;
   decided_at: string | null;
   created_at: string;
+  /** Someone else's post for INT-03/INT-02; always null for an own publication (CONT-09). */
   post: ObservedPost | null;
+  /** CONT-09 only: the editorial piece and its scheduled hour; null otherwise. */
+  piece_id: string | null;
+  scheduled_for: string | null;
   execution: Execution | null;
 }
 
