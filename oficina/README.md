@@ -1,6 +1,6 @@
 # Oficina de Barrio AI (PWA)
 
-App React + PWA que sustituye a la oficina pixel-art de `apartamento-agentes`. Muestra la oficina con la actividad real de los 16 roles, supervisa la máquina autónoma (parada total, cuenta, topes, gasto, ventana, feed), las acciones, los referentes, el conocimiento y la memoria, y recibe las alertas como notificaciones push.
+App React + PWA que sustituye a la oficina pixel-art de `apartamento-agentes`. Muestra la oficina con la actividad real de los 16 roles, supervisa la máquina autónoma (parada total, cuenta, topes, gasto, ventana, feed), las acciones, la publicación diaria (calendario editorial, detalle de cada pieza y veto), los referentes, el conocimiento y la memoria, conecta la cuenta oficial de LinkedIn y recibe las alertas como notificaciones push.
 
 El contrato con Django está en [`CONTRATO-API.md`](CONTRATO-API.md). La app solo habla con el backend propio (mismo origen), sin secretos, analítica ni llamadas a LinkedIn o a proveedores.
 
@@ -31,7 +31,7 @@ En `npm run dev` no hay service worker. Para probar la instalación y las notifi
 
 - `src/api/`: cliente `fetch` (`credentials: 'same-origin'`, cabecera `X-CSRFToken` desde la cookie `csrftoken`, 401/403 → login, `detail` de los 409), tipos del contrato y consultas con TanStack Query.
 - `src/scene/`: la escena portada a TypeScript. `roles.ts` define equipos, roles y posiciones; `simulation.ts`, la lógica pura (estado real → pose, paseos); `render.ts` dibuja en canvas con los sprites de LimeZu; `OfficeCanvas.tsx` es el componente.
-- `src/pages/`: Login, Oficina, Máquina, Acciones, Referentes, Conocimiento, Memoria y Ajustes.
+- `src/pages/`: Login, Oficina, Máquina, Acciones, Contenido (calendario editorial) y Pieza (detalle), Referentes, Conocimiento, Memoria y Ajustes (LinkedIn oficial y push). `/editorial/<id>`, la URL de las notificaciones de piezas, redirige a `/contenido/<id>`.
 - `src/sw.ts`: service worker propio (`injectManifest`). Precarga el shell y los sprites, maneja `push` y `notificationclick`, y nunca cachea `/api/`.
 - `public/assets/`: arte original de LimeZu, copiado tal cual con su `CREDITS.txt`.
 

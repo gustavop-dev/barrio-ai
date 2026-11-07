@@ -24,17 +24,20 @@ GET `/api/v1/operador/overview`:
   "autopilot": { "enabled": true, "policy_version": "autonomia-v1" },
   "control": { "paused": false, "reason": "", "source": "db|env|none", "updated_at": "ISO|null", "updated_by": "username|null" },
   "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota", "open_now": true, "min_spacing_seconds": 1200 },
-  "accounts": [ { "id": "uuid", "label": "…", "provider": "unipile|fake", "status": "running|…", "is_locked": false,
-                  "paused": false, "paused_reason": "", "last_checked_at": "ISO|null",
+  "accounts": [ { "id": "uuid", "label": "…", "provider": "unipile|fake|linkedin|linkedin_fake", "status": "running|token_expired|…",
+                  "is_locked": false, "paused": false, "paused_reason": "", "last_checked_at": "ISO|null",
                   "capacity": { "INT-03": { "daily": 3, "weekly": 12, "daily_used": 1, "weekly_used": 4, "left": 2 },
-                                "INT-02": { "…": "…" } } } ],
+                                "INT-02": { "…": "…" }, "CONT-09": { "daily": 1, "weekly": 7, "…": "…" } } } ],
   "today": { "proposals": { "proposed": 0, "approved": 1, "discarded": 2, "confirmed": 1, "…": 0 },
-             "llm_spent_usd": "0.42", "llm_daily_cap_usd": "1", "drafts": 3, "drafts_daily_cap": 6 },
+             "llm_spent_usd": "0.42", "llm_daily_cap_usd": "1", "drafts": 3, "drafts_daily_cap": 6,
+             "editorial_llm_spent_usd": "0.43", "editorial_llm_daily_cap_usd": "1" },
   "counts": { "referents": 7, "posts": 31, "uncertain": 0 }
 }
 ```
 
 POST `/api/v1/operador/control` con `{ paused: bool, reason: string }`. Es la parada total de la máquina y requiere sesión humana. Responde con el objeto `control`. Si `OPERATOR_PAUSED=true` está en el entorno, la parada no se puede levantar desde la app: responde 409 con su explicación.
+
+`editorial_llm_*` es el presupuesto propio de la publicación diaria (`EDITORIAL_DAILY_LLM_USD`), separado del de comentarios. La PWA solo lo muestra si llega; el overview no trae la próxima pieza, que se lee del calendario editorial.
 
 GET `/api/v1/operador/feed?limit=50` devuelve los eventos recientes de `operator.*` y `job.*`, en orden descendente:
 `[ { id, action, target, created_at, actor: "username|null", metadata: {…} } ]`
@@ -48,8 +51,22 @@ Rutas existentes (ver `agentes-linkedin/infra/docs/operador-linkedin.md`):
 - `POST /api/v1/operador/posts/<id>/propose-comment`
 - `GET /api/v1/operador/actions?state=` y `GET /api/v1/operador/actions/<id>`
 
-Cada acción tiene esta forma:
-`{ id, capability: "INT-03|INT-02", payload: { text } | { reaction }, payload_hash, version, state, source: "agent|human", rationale, citations: [unitId], risks: [string], decision_note, decided_at, created_at, post: { id, author_name, text, share_url, posted_at }, execution: null | { state, external_id, external_url, note, http_status, started_at, finished_at } }`
+Cada acción (`serializers.ActionOutput`) tiene esta forma:
+```text
+{ "id": "uuid", "account_id": "uuid", "capability": "INT-03|INT-02|CONT-09",
+  "post": { "id", "account_id", "referent_id", "provider_post_id", "share_url", "author_name", "author_public_identifier",
+            "text", "posted_at", "comments_count", "reactions_count", "is_repost", "observed_at" } | null,
+  "piece_id": "uuid|null", "scheduled_for": "ISO|null",
+  "payload": { "text": "…" } | { "reaction": "…" }, "payload_hash": "sha256", "version": 1, "previous_id": "uuid|null",
+  "rationale": "…", "citations": ["unitId"], "risks": ["…"], "source": "agent|human", "origin_job": "…", "model": "…",
+  "state": "proposed|…", "created_at": "ISO", "approved_hash": "…", "decided_by_id": 1, "decided_at": "ISO|null", "decision_note": "…",
+  "execution": null | { "id", "state", "provider", "started_at", "finished_at", "external_id", "external_url", "error_kind",
+                        "http_status", "note", "reconciled_at" } }
+```
+
+- **Comentario (INT-03) y reacción (INT-02):** `post` es la publicación ajena; `piece_id` y `scheduled_for` son `null`.
+- **Publicación propia (CONT-09):** `post` es **siempre `null`**. `piece_id` y `scheduled_for` identifican la pieza editorial y su hora de salida, `payload.text` es el texto final en inglés y, una vez publicada, `execution.external_url` es `https://www.linkedin.com/feed/update/urn:li:share:…/`. No se puede crear a mano: la propone el circuito editorial.
+- El listado solo filtra por `state`. La PWA envía además `capability=<código>&page_size=100` (hoy el backend los ignora salvo `page_size`) y filtra en cliente las capacidades que recibe (`/acciones?capacidad=comentarios|reacciones|publicaciones`).
 
 Estados de una acción: `proposed`, `approved`, `rejected`, `superseded`, `discarded`, `executing`, `sent`, `confirmed`, `uncertain`, `failed` y `expired`.
 
@@ -59,6 +76,70 @@ Decisiones, todas con sesión humana:
 - `POST /api/v1/operador/actions/<id>/resolve` con `{ outcome: "confirmed|failed", note }`.
 - `POST /api/v1/operador/actions/<id>/revise` con `{ payload }`.
 - `POST /api/v1/operador/actions/<id>/reconcile`.
+
+## Publicación diaria (editorial)
+
+Fuente: `agentes-linkedin/infra/src/team_backend/editorial_views.py` y `docs/publicacion-diaria.md`. Lectura con el permiso `operate_linkedin`. Cada pieza sale **sola** a su hora si la política `autonomia-v1` la aprueba; la única intervención humana es el veto.
+
+GET `/api/v1/editorial/calendar?desde=AAAA-MM-DD&dias=15` (por defecto `desde` = hoy − 7 y `dias` = 15; `dias` va de 1 a 60; parámetros inválidos → 400):
+```json
+{ "timezone": "America/Bogota", "post_time": "08:30|null", "lead_hours": 12.0, "config_error": "texto|null", "today": "2026-11-06",
+  "days": [ { "date": "2026-11-07",
+              "pieces": [ { "id": "uuid", "slot_date": "2026-11-07", "scheduled_for": "ISO", "state": "preparing|skipped|blocked|failed|ready",
+                            "status": "…", "stage": "director|redactor|lectores|seleccion|verificador|", "note": "…",
+                            "modality": "personal_startups|projectapp|alianzas|comunidad|null",
+                            "pillar": "business_to_product|applied_ai|architecture_delivery|null",
+                            "primary_reader": "lector_comprador|…|null", "thesis": "…|null", "approach": "LI-05-M001-K02|null",
+                            "action": { "id": "uuid", "state": "proposed|approved|…", "payload_hash": "sha256" } | null,
+                            "external_url": "https://www.linkedin.com/feed/update/…|null", "created_at": "ISO" } ] } ] }
+```
+
+Un día con `pieces: []` es un hueco visible: nunca se rellena sin motivo. `status` vale `preparing`, `skipped`, `blocked` o `failed` mientras no existe la acción CONT-09; después sigue a la acción: `awaiting_approval` (proposed), `scheduled` (approved), `publishing` (executing), `published` (sent o confirmed), `uncertain`, `failed`, `vetoed` (rejected), `discarded`, `expired` o `superseded`.
+
+GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendario más:
+- `brief`: `{ decision: "write|skip", skip_reason, primary_reader, modality, pillar, thesis, approach, format: "text_only", reader_value, evidence: [{ kind, ref, note }], success_criterion, avoid: [], signals_used: [], citations: [], rationale }`.
+- `variants`: `{ variant_a: { angle, text, claims: [{ text, kind, ref }], uncertainties: [] }, variant_b: {…}, citations: [] }`.
+- `panel`: `{ readers: [{ reader, variant_a: { strengths: [], objections: [{ text, severity: "material|preference|missing_data" }] }, variant_b: {…} }], summary, citations }`.
+- `selection`: `{ decision: "A|B|merge|discard", final_text, rationale, claims, resolved_objections: [], kept_objections: [], citations }`.
+- `verification`: `{ verdict: "ready_for_execution|blocked", model_verdict, blocking_reasons: [], findings: [{ issue, severity: "material|minor", quote, detail }], checked_claims: [{ text, status, ref }], summary, citations, text_sha256 }`. `verdict` es el final (modelo más guardas deterministas) sobre el hash del texto exacto.
+- `final_text`, `citations: [unitId]`, `signals: [{ id, author, why_followed, posted_at, reactions, comments, text }]` (datos de terceros), `usage: [{ stage, model, estimated_usd, request_id, units, missing_units }]` y `action_detail`: la acción CONT-09 completa o `null`.
+
+Los bloques de una etapa que aún no ha corrido llegan como `{}`. Las impresiones (`EditorialPiece.metrics = { impressions, source: "unipile" }`) se guardan al conciliar, pero **hoy no se serializan** en esta respuesta; la PWA muestra `metrics.impressions` solo si algún día llega (un dato ausente no es cero).
+
+POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco.
+
+**Vetar** una pieza es rechazar su acción antes de la hora: `POST /api/v1/operador/actions/<action.id>/reject` con `{ note }` (sesión humana y `approve_actions`). Solo vale con la acción en `proposed` o `approved`; si ya se está ejecutando, 409. El día queda sin publicación (`status: "vetoed"`).
+
+Las notificaciones de piezas (lista, bloqueada, descartada, publicada) abren `/editorial/<id>`; la PWA redirige esa ruta a `/contenido/<id>`.
+
+## LinkedIn oficial
+
+Fuente: `agentes-linkedin/infra/src/team_backend/linkedin_views.py` y `connectors_linkedin.status_payload()`.
+
+GET `/api/v1/linkedin/status` (permiso `operate_linkedin`). Nunca incluye el token:
+```json
+{ "configured": true, "live": false, "api_version": "202610|null", "scopes_required": ["openid", "profile", "w_member_social"],
+  "connected": true, "member_urn": "urn:li:person:…|null", "member_name": "…|null", "scopes": ["openid", "profile", "w_member_social"],
+  "expires_at": "ISO|null", "days_left": 59, "expired": false, "expiring_soon": false,
+  "account": { "id": "uuid", "paused": false, "paused_reason": "" } | null, "connected_at": "ISO" }
+```
+`connected_at` solo aparece cuando hay credencial. `connected` es falso con el token caducado (`expired: true`); `expiring_soon` se activa siete días antes de caducar. `live: false` significa que el servidor no publica nada (`LIVE_LINKEDIN_OFFICIAL=false`).
+
+GET `/api/v1/linkedin/oauth/start`: **navegación completa** del navegador (un enlace, nunca `fetch`). Exige sesión humana (con Bearer, 403) y `approve_actions`. Guarda un `state` de un solo uso y válido diez minutos y responde 302 a LinkedIn con `scope=openid profile w_member_social`; si la app de LinkedIn no está configurada responde 503 `{ detail }`. La PWA solo ofrece el botón si `configured` es cierto y el usuario tiene `approve_actions`.
+
+GET `/api/v1/linkedin/oauth/callback`: lo llama LinkedIn. Como la cookie de sesión es `SameSite=Strict`, la primera llegada rebota una vez por una página mínima del mismo sitio. Termina con 302 a `/ajustes?linkedin=ok` o a `/ajustes?linkedin=error&motivo=…`:
+
+| `motivo` | Qué pasó |
+| --- | --- |
+| `sesion` | La sesión no volvió con la redirección o había caducado. |
+| `permiso` | El usuario no tiene `approve_actions`. |
+| `state` | `state` ausente, falsificado, caducado (10 min) o ya usado. |
+| `denegado` | Gustavo canceló o denegó la autorización en LinkedIn. |
+| `code` | Falta el `code` o es inválido. |
+| `scope` | LinkedIn no concedió `w_member_social`; no se guarda nada. |
+| `canje` | Falló el canje del código o la lectura de `/v2/userinfo`. |
+
+La PWA muestra un mensaje en español para cada motivo y quita `linkedin` y `motivo` de la URL.
 
 ## Oficina (escena)
 
@@ -88,7 +169,7 @@ El estado `diseno` significa que el rol tiene contrato pero aún no está implem
 | POST `/api/v1/push/unsubscribe` | `{ endpoint }` | 204 |
 | POST `/api/v1/push/test` | — | 202, y envía una notificación de prueba a las suscripciones del usuario. |
 
-El payload de cada push es JSON `{ title, body, url, tag }`. El service worker muestra la notificación y, al tocarla, abre o enfoca `url` (por ejemplo `/maquina` o `/acciones?state=uncertain`).
+El payload de cada push es JSON `{ title, body, url, tag }`. El service worker muestra la notificación y, al tocarla, abre o enfoca `url` (por ejemplo `/maquina`, `/acciones?state=uncertain`, `/editorial/<id>` o `/ajustes` cuando LinkedIn caduca pronto).
 
 ## Conocimiento y memoria (rutas existentes)
 
