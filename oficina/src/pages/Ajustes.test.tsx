@@ -87,7 +87,7 @@ const RED = {
   enabled: true,
   stages: {},
   capacity: { 'RED-01': { daily: 15, weekly: 60, daily_used: 13, weekly_used: 20, left: 2, mode: 'auto' } },
-  reads_today: { comments: 4, search: 1, profile: 7 },
+  reads_today: { comments: 4, search: 1, profile: 7, execution: 6 },
   read_caps: { comments: 60, search: 20, profile: 30 },
   llm: { spent_today: 0.04, daily: 0.3, model: 'x' },
   invites_blocked: { blocked: false, reason: '' },
@@ -258,6 +258,7 @@ describe('Ajustes · Autonomía y límites', () => {
     expect(read('Topes de hoy')).toEqual(['Comentarios: 1 de 3', 'Reacciones: 20 de 20', 'Seguir: 13 de 15']);
     expect(read('Topes de la semana')).toEqual(['Comentarios: 4 de 12', 'Reacciones: 30 de 80', 'Seguir: 20 de 60']);
     expect(read('Lecturas de la red')).toEqual(['Comentarios leídos: 4 de 60', 'Búsquedas: 1 de 20', 'Perfiles: 7 de 30']);
+    expect(within(within(section).getByRole('group', { name: 'Lecturas de la red' })).getByText('6 hoy · sin tope: ninguna escritura sale sin ellas')).toBeInTheDocument();
     expect(within(within(section).getByRole('group', { name: 'Topes de hoy' })).getByRole('meter', { name: 'Reacciones' })).toHaveClass('bad');
   });
 

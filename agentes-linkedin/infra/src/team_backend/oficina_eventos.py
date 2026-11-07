@@ -12,7 +12,7 @@ from .models import AuditEvent
 
 TYPES=('consulta_biblioteca','entrega','publicacion')
 NEXT_ROLE={'director':'copywriter_a','redactor':'lector_comprador','lectores':'director_editorial','seleccion':'editor_verificador',
-           'verificador':'operador_cuenta'}
+           'verificador':'operador_cuenta','reparacion':'editor_verificador'}
 
 def emit(kind,role,target='',detail=''):
     """Never breaks the work that emits it."""
