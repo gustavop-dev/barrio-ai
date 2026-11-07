@@ -33,9 +33,10 @@ CHECKS={
             ('idioma','min',0.7,'no está en el idioma de la publicación')],
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
-    CAP.FOLLOW:[('encaja','min',0.6,'no encaja con el barrio'),('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
-    CAP.INVITE:[('encaja','min',0.7,'no encaja con el barrio'),('riesgo','max',0.2,'parece vendedor, reclutador o cuenta ajena al nicho')],
-    CAP.ACCEPT:[('encaja','min',0.5,'no encaja con el barrio'),('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
+    # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues; the lead weighs risk.
+    CAP.FOLLOW:[('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
+    CAP.INVITE:[('riesgo','max',0.2,'parece vendedor, reclutador o cuenta ajena al nicho')],
+    CAP.ACCEPT:[('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
 }
 ORIENTATION_CHECK=('orientacion','min',0.4,'contradice la orientación de Gustavo')
 
@@ -84,14 +85,15 @@ def _questions(proposal,orientation):
         }
         kind='post'
     else:
+        # Whether the person fits is judged once, by the classifier, and checked by red.network_issues (audit R2).
+        # The lead only weighs the risk of the person and, when there is one, Gustavo's orientation; the niche in
+        # `criterios_del_barrio` is the context for «ajena al nicho» and for the orientation.
         contact=proposal.contact;evidence=contact.evidence or {}
         state={'persona':{'nombre':contact.display_name,'titular':contact.headline[:400],'ubicacion':contact.location,
                           'grado':contact.network_distance,'origen':contact.source,
                           'evidencia':evidence.get('comment') or evidence.get('invitation_message') or evidence.get('query') or ''},
                'criterios_del_barrio':CRITERIA_DEL_BARRIO}
         questions={
-            'encaja':_noul('Según `persona.titular`, `persona.ubicacion` y `persona.evidencia`, ¿esta persona encaja en el barrio de '
-                           'Gustavo descrito en `criterios_del_barrio`?'),
             'riesgo':_noul('¿`persona` parece un reclutador masivo, un vendedor que busca venderle a Gustavo, una cuenta de empresa, una '
                            'cuenta falsa o alguien sin relación con producto, software, startups o negocio?'),
         }
@@ -123,3 +125,45 @@ def review(proposal):
     return {'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
             'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
             'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat()}
+
+# --------------------------------------------------------------------------- R5: comment prefilter
+# Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.
+# Positive checks need «yes» >= COMMENT_PREFILTER_THRESHOLD; the noise checks need «yes» <= 1 - threshold.
+PREFILTER_CHECKS=[('sustancia','min','no plantea una idea con sustancia a la que aportar'),('tema','min','no es de los temas del barrio'),
+                  ('vacante','max','es un anuncio de vacantes o de contratación'),('promocion','max','es una promoción pura'),
+                  ('hito','max','es un hito personal donde un comentario sería ruido')]
+
+def prefilter_threshold():
+    try:value=float(os.environ.get('COMMENT_PREFILTER_THRESHOLD','0.5'))
+    except ValueError:value=0.5
+    return min(max(value,0.0),1.0) if value==value else 0.5  # NaN falls back to the default
+
+def comment_worthy(post):
+    """{'decision': 'comment' | 'skip' | 'unavailable', 'reasons': [...], 'answers': {...}, 'model': ..., 'at': ...}"""
+    now=timezone.now();orientation=_orientation()
+    state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':CRITERIA_DEL_BARRIO}
+    topic=('¿El tema de la `publicacion` interesa al barrio de Gustavo descrito en `criterios_del_barrio`: producto, software, '
+           'IA aplicada, startups o negocio')
+    if orientation:
+        state['orientacion_de_gustavo']=orientation;topic+=', o lo que pide `orientacion_de_gustavo`'
+    questions={
+        'sustancia':_noul('¿La `publicacion` desarrolla una idea, una experiencia o una opinión concreta a la que alguien podría aportar '
+                          'un matiz, un dato o una pregunta específica?','Plantea algo concreto que admite una aportación',
+                          'Es una frase suelta, un enlace sin contexto, un meme o un texto sin nada que discutir'),
+        'tema':_noul(topic+'?'),
+        'vacante':_noul('¿La `publicacion` es sobre todo un anuncio de vacantes, de contratación o de búsqueda de empleo?'),
+        'promocion':_noul('¿La `publicacion` es sobre todo la promoción de un producto, un servicio, un evento, un curso o un lanzamiento, '
+                          'sin una idea que discutir?'),
+        'hito':_noul('¿La `publicacion` es sobre todo un hito personal o un saludo: nuevo empleo, ascenso, aniversario, cumpleaños, '
+                     'premio o agradecimiento?'),
+    }
+    try:result=providers.typesafe(state,questions,purpose='comment-prefilter')
+    except ValueError as exc:return {'decision':'unavailable','reasons':[str(exc)],'at':now.isoformat()}
+    answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
+    threshold=prefilter_threshold();failed=[]
+    for qid,bound,label in PREFILTER_CHECKS:
+        value=answers.get(qid);limit=threshold if bound=='min' else round(1-threshold,3)
+        if value is None or (bound=='min' and value<limit) or (bound=='max' and value>limit):
+            failed.append(f'Prefiltro: {label} ({qid}={value if value is not None else "sin respuesta"})')
+    return {'decision':'skip' if failed else 'comment','reasons':failed,'answers':answers,'threshold':threshold,
+            'model':result['model'],'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat()}
