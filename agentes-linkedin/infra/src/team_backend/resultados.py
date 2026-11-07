@@ -97,17 +97,64 @@ def _modality(qs,modality):
 
 # --------------------------------------------------------------------------- 1. negocio
 
+STAGES=['conversacion','necesidad','cualificada','reunion','propuesta','acuerdo']
+TARGET={'personal_startups':60,'projectapp':40}
+
+def _reached(item):
+    """[(stage, moment)] each time the opportunity entered a stage (created or moved), from its history."""
+    out=[]
+    for event in item.history:
+        if event.get('event') in ('created','stage') and event.get('stage'):
+            out.append((event['stage'],datetime.fromisoformat(event['at'])))
+    return out or [(item.stage,item.created_at)]
+
 def negocio(current,previous,modality,coverage):
-    # TODO(oportunidades): when the opportunity model lands (another session adds it), set disponible=True and add the
-    # KPIs (conversaciones pertinentes, oportunidades abiertas, reuniones, propuestas, acuerdos), the funnel
-    # conversación → necesidad → cualificada → reunión → propuesta → acuerdo (closed without agreement apart), the
-    # split personal_startups / projectapp against the 60/40 target and the 5 latest active opportunities.
+    """Opportunities registered by Gustavo (Personas → Oportunidades) and the inbound from the network."""
+    from .models import Opportunity
     def inbound(w):
         return _modality(Contact.objects.filter(source=Contact.Source.INCOMING,classification__fit=True,**_between('discovered_at',w)),modality).count()
-    return {'disponible':False,'motivo':OPPORTUNITIES_PENDING,
-            'inbound':counted(inbound,lambda w:coverage.network(w,('network.synced',)),coverage.sync_since,current,previous,
-                              'Personas que encajan y te invitaron sin que las buscáramos: invitaciones recibidas que la red registró en el periodo.',
-                              'La red no sincronizó invitaciones en este periodo.')}
+    inbound_kpi=counted(inbound,lambda w:coverage.network(w,('network.synced',)),coverage.sync_since,current,previous,
+                        'Personas que encajan y te invitaron sin que las buscáramos: invitaciones recibidas que la red registró en el periodo.',
+                        'La red no sincronizó invitaciones en este periodo.')
+    everything=list(Opportunity.objects.select_related('contact'))
+    if not everything:return {'disponible':False,'motivo':OPPORTUNITIES_PENDING,'inbound':inbound_kpi}
+    since=min(o.created_at for o in everything)
+    scoped=[o for o in everything if modality=='todo' or o.modality==modality]
+    comparable=Coverage.covers(since,previous)
+    def open_at(w):
+        return sum(1 for o in scoped if o.created_at<w.end and not (o.closed_at and o.closed_at<w.end))
+    def entered(stage,w):
+        return sum(1 for o in scoped if any(s==stage and w.start<=at<w.end for s,at in _reached(o)))
+    def tracked(w):return since<w.end
+    def card(measure,definition,stage=None):
+        return kpi(measure(current) if tracked(current) else None,measure(previous) if tracked(previous) else None,definition,
+                   reason='Aún no habías registrado oportunidades en ese periodo.',comparable=comparable)
+    # Funnel over the opportunities alive in the current period: how many reached each stage, and the conversion.
+    alive=[o for o in scoped if o.created_at<current.end and not (o.closed_at and o.closed_at<current.start)]
+    furthest=[max((STAGES.index(s) for s,_ in _reached(o) if s in STAGES),default=0) for o in alive]
+    steps=[]
+    for i,stage in enumerate(STAGES):
+        n=sum(1 for f in furthest if f>=i)
+        steps.append({'stage':stage,'label':Opportunity.Stage(stage).label,'count':n,
+                      'conversion_pct':percent(n,steps[-1]['count']) if steps and steps[-1]['count'] else None})
+    split={m:sum(1 for o in everything if o.modality==m and o.stage!='sin_acuerdo') for m in ('personal_startups','projectapp','por_clasificar')}
+    classified=split['personal_startups']+split['projectapp']
+    active=sorted((o for o in scoped if o.stage not in ('acuerdo','sin_acuerdo')),key=lambda o:o.updated_at,reverse=True)[:5]
+    return {'disponible':True,
+            'conversaciones':kpi(None,None,'Conversaciones con personas que encajan abiertas en el periodo.',
+                                 reason='Disponible cuando conectemos el inbox.'),
+            'abiertas':card(open_at,'Oportunidades abiertas al final del periodo (sin acuerdo ni cierre).'),
+            'reuniones':card(lambda w:entered('reunion',w),'Oportunidades que llegaron a reunión en el periodo.'),
+            'propuestas':card(lambda w:entered('propuesta',w),'Oportunidades a las que se envió una propuesta en el periodo.'),
+            'acuerdos':card(lambda w:entered('acuerdo',w),'Oportunidades que terminaron en acuerdo en el periodo.'),
+            'embudo':{'steps':steps,'sin_acuerdo':sum(1 for o in alive if o.stage=='sin_acuerdo'),
+                      'definition':'Oportunidades vivas en el periodo según la etapa más lejana que alcanzaron; la conversión es el paso frente al anterior.'},
+            'modalidades':{'counts':split,'pct':{m:percent(split[m],classified) for m in TARGET},'objetivo':TARGET,
+                           'definition':'Oportunidades abiertas o ganadas por modalidad frente al objetivo 60/40 (sin las «por clasificar»).'},
+            'inbound':inbound_kpi,
+            'activas':[{'id':str(o.id),'person':o.contact.display_name if o.contact else o.person_name,'contact_id':str(o.contact_id) if o.contact_id else None,
+                        'company':o.company,'modality':o.modality,'stage':o.stage,'stage_label':o.get_stage_display(),
+                        'next_action':o.next_action,'next_action_at':o.next_action_at} for o in active]}
 
 # --------------------------------------------------------------------------- 2. audiencia
 

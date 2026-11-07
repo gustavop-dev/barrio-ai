@@ -400,3 +400,25 @@ class ResultadosTests(MetricsBase):
         self.assertEqual(body['equipo']['comments_published']['value'],0)
         rate=body['audiencia']['acceptance_rate']
         self.assertEqual((rate['value'],rate['denominator'],rate['unavailable_reason']),(None,0,'Ninguna invitación se resolvió en el periodo.'))
+
+
+class BusinessSectionTests(OperatorBase):
+    def test_opportunities_feed_the_business_section(self):
+        from team_backend import oportunidades, resultados
+        self.grant(self.gustavo,'approve_actions')
+        empty=resultados.build('28')['negocio']
+        self.assertFalse(empty['disponible'])
+        a=oportunidades.create(self.gustavo,{'person_name':'Laura','modality':'projectapp'})
+        oportunidades.update(self.gustavo,a.id,{'stage':'reunion'})
+        oportunidades.create(self.gustavo,{'person_name':'Marta','modality':'personal_startups','stage':'acuerdo'})
+        oportunidades.create(self.gustavo,{'person_name':'Pedro','modality':'por_clasificar'})
+        business=resultados.build('28')['negocio']
+        self.assertTrue(business['disponible'])
+        self.assertEqual((business['abiertas']['value'],business['reuniones']['value'],business['acuerdos']['value']),(2,1,1))
+        self.assertIsNone(business['conversaciones']['value']);self.assertIn('inbox',business['conversaciones']['unavailable_reason'])
+        steps={s['stage']:s['count'] for s in business['embudo']['steps']}
+        self.assertEqual((steps['conversacion'],steps['reunion'],steps['acuerdo']),(3,2,1))
+        self.assertEqual(business['modalidades']['pct'],{'personal_startups':50.0,'projectapp':50.0})
+        self.assertEqual({o['person'] for o in business['activas']},{'Laura','Pedro'})
+        only=resultados.build('28',modalidad='projectapp')['negocio']
+        self.assertEqual(only['abiertas']['value'],1)

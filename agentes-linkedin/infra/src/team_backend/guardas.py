@@ -32,10 +32,13 @@ EXPERIENCE=re.compile(r"\b(?:I|we)(?:'ve| have)?\s+(?:built|shipped|led|launched
                       r"\b(?:mis|mi|nuestr[oa]s?)\s+(?:clientes?|equipo|startup|empresa|agencia|proyectos?|producto)\b",re.I)
 
 def blocks():
-    """(public_facts, private_guidance) for editorial agents: confirmed memory plus the brief's private orientation."""
+    """(public_facts, private_guidance): confirmed memory, the brief's private orientation and Gustavo's current
+    orientation, so the leak checks also protect what he tells the team."""
     from knowledge import memory
+    from .orientacion import text
     public,private=memory.confirmed_blocks()
-    return public,private+BASELINE_GUIDANCE
+    current=text()
+    return public,private+BASELINE_GUIDANCE+([{'key':'orientacion','guidance':current}] if current else [])
 
 def _words(value):
     raw=value if isinstance(value,str) else json.dumps(value,ensure_ascii=False)

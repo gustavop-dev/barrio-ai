@@ -41,12 +41,32 @@ def confirm(mid,expected_version,on_write=None):
 def publishable(value):
     return isinstance(value,dict) and value.get('uso_publico') is True
 
+def retired(value):
+    """A confirmed tombstone ({'retirado': true}) withdraws a fact without deleting its history."""
+    return isinstance(value,dict) and value.get('retirado') is True
+
+def current_version(namespace,key):
+    with connect() as c:
+        return c.execute('SELECT coalesce(max(version),0) AS v FROM memory WHERE namespace=%s AND key=%s',(namespace,key)).fetchone()['v']
+
+def confirmed_history(namespace,key):
+    """Confirmed versions of one key, newest first."""
+    with connect() as c:
+        return c.execute("SELECT version,value,created_at FROM memory WHERE namespace=%s AND key=%s AND status='confirmed' ORDER BY version DESC",
+                         (namespace,key)).fetchall()
+
+def set_fact(key,value,author,evidence,on_write=None):
+    """Human-only: propose and confirm a user fact in one step (an answer, a correction or a withdrawal)."""
+    proposed=propose('user',key,value,author,evidence,expected_version=current_version('user',key))
+    return confirm(proposed['id'],proposed['version'],on_write=on_write)
+
 def confirmed_blocks():
     """Confirmed user facts split by `uso_publico`. Only a dict value with uso_publico=true may be
     attributed to the user in public text; anything else is private guidance (the safe default)."""
     public,private=[],[]
     for row in latest(True):
         value=row['value'];base={'key':row['key'],'version':row['version']}
+        if retired(value):continue
         if publishable(value):
             fact=value['texto'] if isinstance(value.get('texto'),str) else {k:v for k,v in value.items() if k!='uso_publico'}
             public.append(dict(base,fact=fact))

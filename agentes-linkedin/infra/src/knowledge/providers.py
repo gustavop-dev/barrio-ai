@@ -204,3 +204,42 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
     if stop_reason=='refusal':raise ValueError('Claude declinó la solicitud; no se generó contenido.')
     if not answer:raise ValueError('Respuesta Claude vacía.')
     return {'text':answer,'usage':record,'estimated_usd':float(cost),'model':model,'stop_reason':stop_reason,'request_id':request_id}
+
+# --------------------------------------------------------------------------- TypeSafe (Jev)
+# System One model: typed judgments with calibrated probabilities; it does not generate text.
+# Contract: https://docs.typesafe.ai/api/system-one.md and /models.md (consulted 2026-11-07): POST /v1/systemone
+# with {model, state, questions}; answers by question name; billed per input token, output free.
+TYPESAFE_URL='https://api.typesafe.ai/v1/systemone'
+TYPESAFE_PRICES={'jev-1.14.0':Decimal('0.042'),'jev-1.13.0':Decimal('0.042')}  # USD per million input tokens
+DEFAULT_TYPESAFE_MODEL='jev-1.14.0'
+TYPESAFE_TRANSPORT=None  # tests inject an httpx.MockTransport
+
+def typesafe(state,questions,purpose='lead-review'):
+    """One Jev request, never retried automatically; reserved and settled in the usage ledger like any paid call."""
+    key=live('typesafe')
+    model=os.environ.get('TYPESAFE_MODEL',DEFAULT_TYPESAFE_MODEL)
+    if model not in TYPESAFE_PRICES:raise ValueError('Modelo TypeSafe sin tarifa verificada: añadir tarifa y pruebas antes de activarlo')
+    raw=json.dumps({'model':model,'state':state,'questions':questions},ensure_ascii=False)
+    price=TYPESAFE_PRICES[model]
+    # No tokenizer endpoint: a token is never longer than one character, so characters bound the input.
+    rid=reserve('typesafe',purpose,Decimal(len(raw))*price/1000000)
+    try:
+        with httpx.Client(transport=TYPESAFE_TRANSPORT,timeout=httpx.Timeout(60.0,connect=10.0)) as http:
+            response=http.post(TYPESAFE_URL,content=raw.encode(),headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
+    except (httpx.ConnectError,httpx.ConnectTimeout):
+        settle(rid,'rejected',{'error_type':'connect'});raise ValueError('TypeSafe: no fue posible conectar; no se envió.') from None
+    except httpx.HTTPError as exc:
+        settle(rid,'uncertain',{'error_type':type(exc).__name__});raise ValueError('TypeSafe: respuesta incierta.') from None
+    if response.status_code>=400:
+        settle(rid,'uncertain' if response.status_code>=500 else 'rejected',{'http_status':response.status_code})
+        raise ValueError(f'TypeSafe: HTTP {response.status_code}. Sin reintento automático.')
+    try:
+        data=response.json();answers=data['answers']
+        tokens={'input_tokens':validate_token_count(data['usage']['input_tokens']),
+                'output_tokens':validate_token_count(data['usage'].get('output_tokens',0))}
+        if not isinstance(answers,dict):raise TypeError
+    except (ValueError,KeyError,TypeError):
+        settle(rid,'uncertain',{});raise ValueError('TypeSafe: respuesta ilegible; reserva retenida.') from None
+    cost=Decimal(tokens['input_tokens'])*price/1000000
+    settle(rid,'complete',dict(tokens,model=data.get('model')),cost)
+    return {'answers':answers,'model':data.get('model') or model,'usage':tokens,'estimated_usd':float(cost)}
