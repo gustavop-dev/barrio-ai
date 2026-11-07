@@ -22,11 +22,13 @@ Sustituye la aprobación humana de cada acción. Se activa con `LEAD_ENABLED=tru
    | --- | --- |
    | Comentario (INT-03) | `aporta` ≥ 0,7, `pitch` ≤ 0,2, `inventa` ≤ 0,2, `respeto` ≥ 0,8, `idioma` ≥ 0,7 |
    | Publicación (CONT-09), además del verificador con Opus | `clara` ≥ 0,6, `pitch` ≤ 0,2, `inventa` ≤ 0,2 |
-   | Seguir (RED-01) | `encaja` ≥ 0,6, `riesgo` ≤ 0,3 |
-   | Invitar (RED-02) | `encaja` ≥ 0,7, `riesgo` ≤ 0,2 |
-   | Aceptar (RED-04) | `encaja` ≥ 0,5, `riesgo` ≤ 0,3 |
+   | Seguir (RED-01) | `riesgo` ≤ 0,3 |
+   | Invitar (RED-02) | `riesgo` ≤ 0,2 |
+   | Aceptar (RED-04) | `riesgo` ≤ 0,3 |
 
    Si hay orientación, se añade `orientacion` ≥ 0,4 (que no la contradiga).
+
+   En la red, Jev no vuelve a juzgar si la persona encaja: lo decide una sola vez el clasificador de la red, y `red.network_issues` descarta antes cualquier RED-* sin ese veredicto (auditoría, R2). Ver [red-barrio.md](red-barrio.md).
 3. **Decide el código.** Si todo pasa con claridad, aprueba. Si no, descarta y registra qué falló. **No escala nada a Gustavo.** Lo dudoso no se hace y el equipo prepara otra cosa.
 
 Cada juicio queda en `ActionProposal.review` con las probabilidades, los umbrales, el modelo, el coste y la fecha. La nota de la decisión dice «Aprobada por el líder (jev-1.14.0)» o «Descartada por el líder». Actividad muestra lo descartado con `?descartadas=1`.

@@ -6,9 +6,12 @@ neighborhood criteria. A fitting person is followed first (RED-01). After at lea
 they get an invitation without a note (RED-02). A received invitation from a fitting person is accepted (RED-04).
 No action ever sends a message, re-invites after an ignored or withdrawn invitation, declines or removes anyone.
 
-Reads (comment lists, searches, profiles, invitation syncs) count against daily caps through the audit log.
-Writes go through the operator like any other action: proposal -> policy or human approval -> one execution ->
-confirmation by reading the profile back. The autopilot only queues jobs; the worker runs these functions."""
+Reads (comment lists, searches, profiles, invitation syncs) count against daily caps through the audit log. The
+reads of an execution (pre-check, read-back, reconciliation) are counted too, under `execution`, but never capped:
+a write never goes without its pre-check. Writes go through the operator like any other action: proposal ->
+policy or human approval -> one execution -> confirmation by reading the profile back. The plan reads nothing; the
+pre-check of each execution settles the person's stage. The autopilot only queues jobs; the worker runs these
+functions."""
 import json
 import os
 import re
@@ -26,6 +29,7 @@ from .permissions import require
 RED=ActionProposal.Capability
 NETWORK_CAPABILITIES=(RED.FOLLOW,RED.INVITE,RED.ACCEPT)
 READ_CAPS={'comments':60,'search':20,'profile':30,'sync':4}  # reparto v1.1: lecturas_contenido/busqueda/perfil/red
+READ_KINDS=(*READ_CAPS,'execution')  # execution reads are counted, never capped
 ROLES=['par','recomendador','lider','comprador','divulgador','aliado']
 MODALITIES=['personal_startups','projectapp','alianzas','comunidad_autoridad']
 AFFINITIES=['hispanohablante_declarada','otra','desconocida']
@@ -52,6 +56,9 @@ def min_confidence():
 
 def invite_after():
     return timedelta(hours=int(setting('NETWORK_INVITE_AFTER_HOURS','48')))
+
+def retry_after():
+    return timedelta(hours=int(setting('NETWORK_RETRY_AFTER_HOURS','48')))
 
 def search_queries():
     return [q.strip() for q in setting('NETWORK_SEARCH_QUERIES','').split(';') if q.strip()]
@@ -103,14 +110,28 @@ def _pause_on(account,exc):
 
 # --------------------------------------------------------------------------- DESC-05 / DESC-02: discovery
 
+def unclassified_backlog(account):
+    return Contact.objects.filter(account=account,stage='candidate',classification={}).count()
+
+def discovery_room(account):
+    """B4: how many people discovery may still add. Classification needs a profile read per commenter (30 a day), so
+    discovery waits while NETWORK_DISCOVER_MAX_BACKLOG candidates are unclassified and never queues beyond that."""
+    return int(setting('NETWORK_DISCOVER_MAX_BACKLOG','40'))-unclassified_backlog(account)
+
 def discover(user,account,now=None):
     """Candidates from substantive commenters on referents' recent posts, plus one configured search per run."""
     require(user,'operate_linkedin')
-    now=now or timezone.now();connector=get_connector(account)
+    now=now or timezone.now()
     summary={'posts':0,'searches':0,'new':0,'skipped':0,'stopped':''}
+    room=discovery_room(account)
+    if room<=0:
+        summary['held']=f'{unclassified_backlog(account)} candidatos esperan clasificación; se descubre cuando baje la cola.'
+        operador._audit(user,'network.discovery_held',account.id,**summary)  # not a discovery: last_discovery_at stays
+        return summary
+    connector=get_connector(account)
     known=set(Contact.objects.filter(account=account).values_list('provider_user_id',flat=True))
     known|=set(Referent.objects.filter(account=account).exclude(provider_user_id='').values_list('provider_user_id',flat=True))
-    max_new=int(setting('NETWORK_MAX_NEW_PER_RUN','15'));min_chars=int(setting('NETWORK_MIN_COMMENT_CHARS','80'))
+    max_new=min(room,int(setting('NETWORK_MAX_NEW_PER_RUN','15')));min_chars=int(setting('NETWORK_MIN_COMMENT_CHARS','80'))
     queries=search_queries()
     # Commenters must leave room for the configured search, or busy threads would crowd it out every run.
     commenter_cap=max_new-(min(5,max_new//3) if queries else 0)
@@ -275,59 +296,67 @@ def _propose(user,contact,capability,payload):
     note(contact,'proposed',f'{capability} propuesto');contact.save()
     return proposal
 
-def _refresh(account,connector,contact):
-    """DESC-03 before acting: the profile tells whether the action still makes sense."""
-    _read(account,'profile')
-    profile=connector.get_profile(contact.provider_user_id)
+def _seen(contact,profile):
+    """RED-09: keep what the profile shows (identity, distance, follow, our pending invitation)."""
     _apply_profile(contact,profile)
-    if profile.get('invitation_id'):contact.invitation_id=profile['invitation_id']
+    if profile.get('invitation_id') and contact.stage!='incoming':contact.invitation_id=profile['invitation_id']
+
+def _settle(contact,profile):
+    """DESC-03: move the person to the stage the profile shows. Returns (error_kind, note) when nothing should be written."""
     status=profile.get('relation_request_status') or ''
     if profile.get('network_distance')=='FIRST_DEGREE':
         contact.connected_at=contact.connected_at or timezone.now();_stage(contact,'connected','connected','Ya es conexión de primer grado.')
-    elif status=='PENDING' and contact.stage!='incoming':
+        return 'already_connected','Ya era conexión de primer grado; no se envió nada.'
+    if status=='PENDING' and contact.stage!='incoming':
         contact.invited_at=contact.invited_at or timezone.now();_stage(contact,'invited','invited','Ya había una invitación pendiente.')
-    elif status in ('IGNORED','WITHDRAWN'):
+        return 'invitation_pending','Ya había una invitación pendiente; no se envió nada.'
+    if status in ('IGNORED','WITHDRAWN'):
         _stage(contact,'closed','closed',f'Invitación previa {status.lower()}; no se reinvita sin Gustavo.')
-    elif profile.get('is_restricted'):
+        return 'previous_invitation','Hubo una invitación previa; no se reinvita sin Gustavo.'
+    if profile.get('is_restricted'):
         _stage(contact,'discarded','discarded','Perfil restringido.')
-    contact.save()
+        return 'restricted','Perfil restringido; no se envió nada.'
+    return None
+
+def _refresh(account,connector,contact):
+    """DESC-03 in the sync: the profile settles an invitation that left the lists (a capped read)."""
+    _read(account,'profile')
+    profile=connector.get_profile(contact.provider_user_id)
+    _seen(contact,profile);_settle(contact,profile);contact.save()
     return profile
 
+def _resting(capability,now):
+    """People whose last attempt wrote nothing and left them in the same stage (out of reach, unreadable profile)
+    rest NETWORK_RETRY_AFTER_HOURS; without a refresh in the plan they would be proposed again every hour."""
+    return (ActionExecution.objects.filter(proposal__capability=capability,proposal__contact__isnull=False,state='failed',wrote=False,
+                                           started_at__gte=now-retry_after()).exclude(error_kind='account_not_running')
+            .values('proposal__contact_id'))
+
 def plan(user,account,now=None):
-    """Turn classified contacts into proposals within capacity: follow, invite after the warm-up, accept."""
+    """Turn classified contacts into proposals within capacity: follow, invite after the warm-up, accept.
+    It reads nothing from LinkedIn (R1): the pre-check of each execution reads the profile right before writing and
+    settles the person's stage when there is nothing to write (already followed, connected, invited, closed...)."""
     from .autopiloto import autonomy
     require(user,'operate_linkedin')
-    now=now or timezone.now();connector=get_connector(account)
-    summary={'follow':0,'invite':0,'accept':0,'refreshed':0,'stopped':''}
+    now=now or timezone.now()
+    summary={'follow':0,'invite':0,'accept':0}
     def room(capability):return operador.capacity_left(account,capability,now)-_open(capability,account)
-    try:
-        if autonomy(RED.FOLLOW)!='off':
-            for contact in Contact.objects.filter(account=account,stage='fit').exclude(proposals__state__in=OPEN_ACTION_STATES).order_by('discovered_at'):
-                if room(RED.FOLLOW)<=0:break
-                profile=_refresh(account,connector,contact);summary['refreshed']+=1
-                if contact.stage!='fit':continue
-                if profile.get('is_following'):
-                    contact.followed_at=now;_stage(contact,'followed','followed','Ya lo seguías; empieza la espera antes de invitar.');contact.save()
-                    continue
-                summary['follow']+=bool(_propose(user,contact,RED.FOLLOW,{'user_id':contact.provider_user_id}))
-        if autonomy(RED.INVITE)!='off' and not invites_blocked(now)[0]:
-            ready=(Contact.objects.filter(account=account,stage='followed',followed_at__lte=now-invite_after())
-                   .exclude(proposals__state__in=OPEN_ACTION_STATES).order_by('followed_at'))
-            for contact in ready:
-                if room(RED.INVITE)<=0:break
-                profile=_refresh(account,connector,contact);summary['refreshed']+=1
-                if contact.stage!='followed':continue
-                if profile.get('network_distance') not in ('SECOND_DEGREE','THIRD_DEGREE'):
-                    note(contact,'note','Fuera de la red alcanzable; no se invita.');contact.save();continue
-                summary['invite']+=bool(_propose(user,contact,RED.INVITE,{'user_id':contact.provider_user_id}))
-        if autonomy(RED.ACCEPT)!='off':
-            for contact in (Contact.objects.filter(account=account,stage='incoming',classification__fit=True).exclude(invitation_id='')
-                            .exclude(proposals__state__in=OPEN_ACTION_STATES)):
-                if room(RED.ACCEPT)<=0:break
-                summary['accept']+=bool(_propose(user,contact,RED.ACCEPT,{'request_id':contact.invitation_id,'user_id':contact.provider_user_id}))
-    except ReadCapReached as exc:summary['stopped']=str(exc)
-    except ConnectorError as exc:
-        _pause_on(account,exc);summary['stopped']=str(exc)
+    def waiting(capability,**filters):
+        return (Contact.objects.filter(account=account,**filters).exclude(proposals__state__in=OPEN_ACTION_STATES)
+                .exclude(id__in=_resting(capability,now)))
+    if autonomy(RED.FOLLOW)!='off':
+        for contact in waiting(RED.FOLLOW,stage='fit').order_by('discovered_at'):
+            if room(RED.FOLLOW)<=0:break
+            summary['follow']+=bool(_propose(user,contact,RED.FOLLOW,{'user_id':contact.provider_user_id}))
+    if autonomy(RED.INVITE)!='off' and not invites_blocked(now)[0]:
+        for contact in waiting(RED.INVITE,stage='followed',followed_at__lte=now-invite_after()).order_by('followed_at'):
+            if room(RED.INVITE)<=0:break
+            summary['invite']+=bool(_propose(user,contact,RED.INVITE,{'user_id':contact.provider_user_id}))
+    if autonomy(RED.ACCEPT)!='off':
+        # Incoming people are classified like candidates (classify takes stage incoming): only a fitting verdict is accepted.
+        for contact in waiting(RED.ACCEPT,stage='incoming',classification__fit=True).exclude(invitation_id=''):
+            if room(RED.ACCEPT)<=0:break
+            summary['accept']+=bool(_propose(user,contact,RED.ACCEPT,{'request_id':contact.invitation_id,'user_id':contact.provider_user_id}))
     operador._audit(user,'network.planned',account.id,**summary)
     return summary
 
@@ -375,46 +404,73 @@ def sync(user,account,now=None):
 
 # --------------------------------------------------------------------------- execution (called by operador.execute)
 
+def _execution_read(proposal,read):
+    """Reads of an execution (pre-check, read-back, reconciliation) count in the day's totals under `execution` and
+    are never refused: a write never goes without its pre-check, and the write caps already bound them."""
+    AuditEvent.objects.create(action='network.read',target=str(proposal.account_id),
+                              metadata={'kind':'execution','read':read,'capability':proposal.capability})
+
+def _look(proposal,connector):
+    _execution_read(proposal,'profile')
+    return connector.get_profile(proposal.payload['user_id'])
+
+def _precheck(proposal,connector):
+    """DESC-03 right before writing (it replaces the plan's refresh): the person's memory takes what the profile shows."""
+    profile=_look(proposal,connector)
+    contact=proposal.contact;contact.refresh_from_db();_seen(contact,profile)
+    return contact,profile
+
+def _unreachable(contact,profile):
+    if profile.get('network_distance') in ('SECOND_DEGREE','THIRD_DEGREE'):return None
+    note(contact,'note','Fuera de la red alcanzable; no se invita.')
+    return 'out_of_network','Fuera de la red alcanzable (2.º o 3.er grado); no se envió.'
+
 def execute_action(execution,proposal,connector,user):
-    """One write with a profile pre-check (never duplicate) and a profile read-back to confirm."""
-    contact=proposal.contact;uid=proposal.payload['user_id'];now=timezone.now
+    """One write with a profile pre-check (never duplicate) and a profile read-back to confirm. The pre-check settles
+    the person's stage when there is nothing to write. Until the write starts, the execution counts as one that wrote
+    nothing: a pre-check that fails or finds nothing to do uses neither the daily cap nor the spacing."""
+    uid=proposal.payload['user_id'];now=timezone.now
+    execution.wrote=False
     if proposal.capability==RED.FOLLOW:
-        before=connector.get_profile(uid)
+        contact,before=_precheck(proposal,connector)
+        settled=_settle(contact,before);contact.save()
         if before.get('is_following'):
+            # on_confirmed moves a fit person to followed with followed_at: the warm-up before inviting starts now.
             return operador._finish(execution,'confirmed',user,note='Ya lo seguías; no se volvió a seguir.',reconciled_at=now(),wrote=False)
-        connector.follow_user(uid)
-        confirmed=bool(connector.get_profile(uid).get('is_following'))
+        if settled:
+            return operador._finish(execution,'failed',user,error_kind=settled[0],note=settled[1],wrote=False)
+        execution.wrote=True;connector.follow_user(uid)
+        confirmed=bool(_look(proposal,connector).get('is_following'))
     elif proposal.capability==RED.INVITE:
-        before=connector.get_profile(uid);status=before.get('relation_request_status') or ''
-        if before.get('network_distance')=='FIRST_DEGREE':
-            contact.connected_at=now();_stage(contact,'connected','connected','Ya era conexión; no se invitó.');contact.save()
-            return operador._finish(execution,'failed',user,error_kind='already_connected',note='Ya era conexión de primer grado; no se envió.',wrote=False)
-        if status=='PENDING':
+        contact,before=_precheck(proposal,connector)
+        if before.get('relation_request_status')=='PENDING' and before.get('network_distance')!='FIRST_DEGREE':
+            contact.save()
             return operador._finish(execution,'confirmed',user,external_id=before.get('invitation_id',''),
                                     note='Ya había una invitación pendiente; no se envió otra.',reconciled_at=now(),wrote=False)
-        if status in ('IGNORED','WITHDRAWN'):
-            _stage(contact,'closed','closed',f'Invitación previa {status.lower()}.');contact.save()
-            return operador._finish(execution,'failed',user,error_kind='previous_invitation',note='Hubo una invitación previa; no se reinvita sin Gustavo.',wrote=False)
-        created=connector.send_invitation(uid)
+        settled=_settle(contact,before) or _unreachable(contact,before);contact.save()
+        if settled:
+            return operador._finish(execution,'failed',user,error_kind=settled[0],note=settled[1],wrote=False)
+        execution.wrote=True;created=connector.send_invitation(uid)
         execution.external_id=created.get('id','')
-        after=connector.get_profile(uid)
+        after=_look(proposal,connector)
         confirmed=after.get('relation_request_status')=='PENDING' or after.get('network_distance')=='FIRST_DEGREE'
     elif proposal.capability==RED.ACCEPT:
-        request_id=proposal.payload['request_id']
+        contact=proposal.contact;request_id=proposal.payload['request_id']
+        _execution_read(proposal,'invitations')
         if request_id not in {i['id'] for i in connector.list_invitations('received')}:
-            if connector.get_profile(uid).get('network_distance')=='FIRST_DEGREE':
+            if _look(proposal,connector).get('network_distance')=='FIRST_DEGREE':
                 return operador._finish(execution,'confirmed',user,note='Ya era conexión; no había nada que aceptar.',reconciled_at=now(),wrote=False)
             _stage(contact,'closed','closed','La invitación recibida ya no estaba pendiente.');contact.save()
             return operador._finish(execution,'failed',user,error_kind='invitation_gone',note='La invitación ya no estaba pendiente; no se envió nada.',wrote=False)
-        connector.accept_invitation(request_id)
-        confirmed=connector.get_profile(uid).get('network_distance')=='FIRST_DEGREE'
+        execution.wrote=True;connector.accept_invitation(request_id)
+        confirmed=_look(proposal,connector).get('network_distance')=='FIRST_DEGREE'
     else:
         raise ValueError('Capacidad de red desconocida')
     return operador._finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=now() if confirmed else None,
                             note='' if confirmed else 'Aceptado por el proveedor; aún no visible al releer el perfil.')
 
 def reconcile_action(execution,proposal,connector,user,stale):
-    profile=connector.get_profile(proposal.payload['user_id'])
+    profile=_look(proposal,connector)
     done={RED.FOLLOW:bool(profile.get('is_following')),
           RED.INVITE:profile.get('relation_request_status')=='PENDING' or profile.get('network_distance')=='FIRST_DEGREE',
           RED.ACCEPT:profile.get('network_distance')=='FIRST_DEGREE'}[proposal.capability]
@@ -504,7 +560,7 @@ def summary(account=None,now=None):
     def last(action):
         return AuditEvent.objects.filter(action=action).order_by('-created_at').values_list('created_at',flat=True).first()
     return {'enabled':enabled(),'stages':stages,'capacity':capacity,
-            'reads_today':{k:reads.filter(metadata__kind=k).count() for k in READ_CAPS},'read_caps':read_caps(),
+            'reads_today':{k:reads.filter(metadata__kind=k).count() for k in READ_KINDS},'read_caps':read_caps(),
             'llm':{'spent_today':float(spent_today(now)),'daily':float(daily_budget()),'model':classifier_model()},
             'invites_blocked':{'blocked':blocked,'reason':reason},
             'last_discovery_at':last('network.discovered'),'last_sync_at':last('network.synced')}
