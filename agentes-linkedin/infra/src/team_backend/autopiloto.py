@@ -252,7 +252,7 @@ def _network(user,account,now):
         bucket=int(now.timestamp()//every.total_seconds())
         _,created=enqueue_operation(user,kind,{'account':str(account.id)},request_id=_job_id(kind,account.id,bucket))
         queued+=int(created)
-    enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'))
+    enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'),red.discovery_room(account)>0)  # B4
     unclassified=Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).exists()
     enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),unclassified and red.spent_today(now)<red.daily_budget())
     enqueue('plan_network',_every('NETWORK_PLAN_EVERY_MINUTES','60'))

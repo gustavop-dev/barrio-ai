@@ -112,8 +112,9 @@ Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo P
 
 **Fase 2: reprocesos**
 
-- [ ] R1: quitar el refresh de perfil del plan y contar las lecturas de ejecución
-- [ ] R2: un solo juez de encaje para la red
+- [x] R1: quitar el refresh de perfil del plan y contar las lecturas de ejecución. La comprobación previa de la ejecución hace ahora todos los cambios de etapa que hacía el plan, incluidos el perfil restringido y, al invitar, quien está fuera del 2.º y 3.er grado. Quien queda en la misma etapa sin que se escribiera nada descansa `NETWORK_RETRY_AFTER_HOURS` (48) antes de proponerse otra vez. Las lecturas de ejecución se cuentan aparte (`reads_today.execution`), no en el cupo `profile`, y ningún tope las frena. Si contaran en los cupos, en un día de topes llenos las ~40 lecturas de perfil de las ejecuciones le quitarían el cupo a la clasificación, y las comprobaciones de las aceptaciones agotarían las 4 sincronizaciones del día.
+- [x] R2: un solo juez de encaje para la red. Se queda el clasificador (Sonnet), no Jev como proponía la tabla, porque su razón es la que muestra la ficha de la persona. El líder solo pregunta `riesgo` (y la orientación) en RED-01, RED-02 y RED-04, con los mismos umbrales. Las invitaciones recibidas ya pasaban por el clasificador, y `red.network_issues` descarta cualquier RED-* sin su veredicto.
+- [x] B4: frenar `discover` mientras haya `NETWORK_DISCOVER_MAX_BACKLOG` candidatos sin clasificar (por defecto 40, poco más de un día de lecturas de perfil); cada turno añade como mucho lo que falta hasta esa cifra
 - [ ] R3 y R4: reglas deterministas antes del verificador y una ronda de reparación
 - [ ] R5: prefiltro con Jev antes de redactar un comentario
 - [ ] B3: tope de revisiones del líder por tick
