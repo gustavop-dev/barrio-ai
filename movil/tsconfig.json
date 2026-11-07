@@ -1,0 +1,23 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "types": ["jest", "node"],
+    // Aliases for TypeScript only. Metro resolves the same ones in metro.config.js and Jest in
+    // jest.config.js (app.json turns off Expo's tsconfig paths so the TanStack line stays types-only).
+    "paths": {
+      "@/*": ["./src/*"],
+      "@compartido/*": ["../compartido/src/*"],
+      // compartido/ has no node_modules: its one peer import resolves to this app's copy.
+      "@tanstack/react-query": ["./node_modules/@tanstack/react-query/build/modern/index.d.ts"]
+    }
+  },
+  "include": ["src", "../compartido/src", "jest.setup.tsx", "expo-env.d.ts"]
+}

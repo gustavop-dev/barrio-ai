@@ -281,9 +281,16 @@ class PositioningTests(EditorialAuditBase):
         root=Path(__file__).resolve().parents[5]/'oficina'/'src'
         if not root.exists():raise SkipTest('oficina/ no está en este árbol')
         def keys(path,table):
-            source=(root/path).read_text(encoding='utf-8')
-            body=re.search(table+r'[^=]*=\s*\{(.*?)\n\};',source,re.S).group(1)
-            return set(re.findall(r'^\s*([a-z_]+):',body,re.M))
+            # Follow `export * from '…'` re-exports: shared tables live in compartido/ (used by the PWA and the app).
+            file=(root/path).resolve()
+            for _ in range(3):
+                source=file.read_text(encoding='utf-8')
+                found=re.search(table+r'[^=]*=\s*\{(.*?)\n\};',source,re.S)
+                if found:return set(re.findall(r'^\s*([a-z_]+):',found.group(1),re.M))
+                again=re.search(r"export \* from '([^']+)'",source)
+                if not again:break
+                file=(file.parent/again.group(1)).with_suffix('.ts').resolve()
+            self.fail(f'{table} no está en {path} ni en lo que reexporta')
         self.assertLessEqual(set(posicionamiento.modalities('editorial')),keys('lib/editorial.ts','MODALITY_LABEL'))
         self.assertLessEqual(set(posicionamiento.modalities('red')),keys('lib/format.ts','CONTACT_MODALITY_LABEL'))
         self.assertLessEqual(set(posicionamiento.modalities('red')),keys('pages/personas/labels.ts','MODALITY_SHORT'))

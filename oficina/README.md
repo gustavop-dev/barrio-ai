@@ -70,8 +70,11 @@ El service worker muestra `{title, body, tag}` y guarda `url` en la notificació
 ## Despliegue
 
 ```sh
-docker build -t barrio-oficina .
+# Desde la raíz del repositorio: la PWA importa ../compartido (código compartido con la app nativa).
+docker build -f oficina/Dockerfile -t barrio-oficina .
 ```
+
+Los tipos, endpoints, hooks y la lógica pura de la API viven en `../compartido/src` y los comparte la app nativa (`../movil`). Los módulos de `src/api/*`, `src/lib/format.ts` y similares los reexportan, así que los imports de la PWA no cambian. El `.dockerignore` de la raíz deja solo `oficina/` y `compartido/` en el contexto.
 
 El `Dockerfile` es multi-etapa: compila con `node:24-alpine` y copia `dist/` a `/srv` de una imagen `caddy:2`. El Caddyfile de producción se escribe aparte. Para que la PWA funcione, ese Caddyfile debe:
 

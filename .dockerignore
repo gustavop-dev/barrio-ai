@@ -1,0 +1,13 @@
+# Only root-context build: the PWA image (docker build -f oficina/Dockerfile .). Send only the PWA and
+# the shared code. The API image builds from agentes-linkedin/infra with its own .dockerignore.
+*
+!oficina/
+!compartido/
+oficina/node_modules
+oficina/dist
+oficina/dev-dist
+oficina/coverage
+oficina/Dockerfile
+oficina/.dockerignore
+**/*.log
+**/node_modules

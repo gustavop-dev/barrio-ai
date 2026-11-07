@@ -1,26 +1,16 @@
 // «Conversación» of the person card (DISENO-VISTAS, Personas, ficha 6): the team's read of the latest message, the
 // last messages with author and date, and «Abrir en LinkedIn». Read-only: the app never sends messages.
-import type { Conversation, ConversationAssessment, ConversationMessage } from '../../api/types';
+import { messageText, messageWhen } from '../../../../compartido/src/logic/personas';
+import type { Conversation, ConversationAssessment } from '../../api/types';
 import { Badge, Card, ExternalLink, LabelChip } from '../../components/ui';
-import { formatTime } from '../../lib/format';
-import { OPPORTUNITY_MODALITY_LABEL, relativeDay } from './labels';
-
-/** «hoy 10:12», «ayer 18:03» or «6 nov». */
-export function messageWhen(iso: string | null | undefined): string {
-  if (!iso) return '';
-  const day = relativeDay(iso);
-  return day === 'hoy' || day === 'ayer' ? `${day} ${formatTime(iso)}` : day;
-}
+import { OPPORTUNITY_MODALITY_LABEL } from './labels';
 
 function percent(value: number | undefined): string | null {
   return typeof value === 'number' ? `${Math.round(Math.min(1, Math.max(0, value)) * 100)} %` : null;
 }
 
-/** The message text, or what it carried when it has none. */
-export function messageText(message: ConversationMessage): string {
-  if (message.text) return message.text;
-  return message.attachments ? 'Envió un adjunto.' : 'Mensaje sin texto.';
-}
+// Shared with the native app (compartido/src/logic/personas.ts).
+export { messageText, messageWhen };
 
 /** The team's read as chips, then the probabilities behind them. */
 export function TeamRead({ assessment }: { assessment: ConversationAssessment | null }) {

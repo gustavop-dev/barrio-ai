@@ -79,33 +79,5 @@ export function FileThumb({ file, alt }: { file: File; alt: string }) {
   return <img ref={image} alt={alt} />;
 }
 
-const LOCALE = 'es-CO';
-
-function sameDay(a: Date, b: Date): boolean {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
-/** «3 nov», «10 nov 2026»: the short day of the designs (es-CO writes «3 de nov.»). */
-export function shortDay(date: Date, withYear = false): string {
-  const options: Intl.DateTimeFormatOptions = { day: 'numeric', month: 'short' };
-  if (withYear) options.year = 'numeric';
-  return date.toLocaleDateString(LOCALE, options).replace(/\./g, '').replace(/ de /g, ' ');
-}
-
-/** «Hoy, 10:40», «Ayer, 19:05», «3 nov» (and the year when it is not this one). */
-export function whenLabel(iso: string | null | undefined, now: Date = new Date()): string {
-  if (!iso) return '—';
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  const time = date.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false });
-  if (sameDay(date, now)) return `Hoy, ${time}`;
-  const yesterday = new Date(now);
-  yesterday.setDate(now.getDate() - 1);
-  if (sameDay(date, yesterday)) return `Ayer, ${time}`;
-  return shortDay(date, date.getFullYear() !== now.getFullYear());
-}
-
-/** «1 foto», «3 fotos». */
-export function fotosLabel(count: number): string {
-  return `${count} ${count === 1 ? 'foto' : 'fotos'}`;
-}
+// Pure labels shared with the native app (compartido/src/logic/capturas.ts).
+export { fotosLabel, shortDay, whenLabel } from '../../../compartido/src/logic/capturas';

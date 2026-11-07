@@ -1,0 +1,342 @@
+// Capture and Galería (CONTRATO-API.md «Captura y Galería») plus the Ajustes preferences:
+// shapes, calls and hooks. Uploads are multipart (api.postForm: the web transport keeps the CSRF
+// header, the native one sends the bearer token). Files are browser Blobs/Files on the web and
+// `{uri, name, type}` parts in React Native (NativeFile).
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api } from './client';
+import { asList } from './endpoints';
+import { keys } from './queryClient';
+import type { Ajustes, Paginated } from './types';
+
+// ================================================================ shapes
+
+export type CapturePurpose = 'post' | 'dato' | 'respuesta' | 'galeria';
+export type CaptureContextKind = 'pregunta' | 'persona' | 'pieza';
+
+export type CaptureState =
+  | 'recibida'
+  | 'transcribiendo'
+  | 'procesando'
+  | 'dato_guardado'
+  | 'anotado'
+  | 'idea'
+  | 'usado'
+  | 'sin_usar'
+  | 'error'
+  | 'deshecha';
+
+/** While a capture is in one of these, the PWA polls GET /api/v1/capturas/<id> every 2–3 s. */
+export const CAPTURE_PROCESSING: readonly CaptureState[] = ['recibida', 'transcribiendo', 'procesando'];
+
+export function isProcessing(state: string): boolean {
+  return (CAPTURE_PROCESSING as readonly string[]).includes(state);
+}
+
+export interface CaptureOutput {
+  id: string;
+  created_at: string;
+  note: string;
+  purpose: CapturePurpose | null;
+  purpose_label: string | null;
+  team_decided: { purpose: CapturePurpose; label: string; reason: string } | null;
+  context: { tipo: CaptureContextKind; id: string; label: string } | null;
+  has_audio: boolean;
+  audio_duration_s: number | null;
+  audio_mime: string | null;
+  audio_url: string | null;
+  transcript: string;
+  transcript_language: string | null;
+  state: CaptureState | string;
+  state_label: string;
+  outcome: { kind: string; text: string; link: string | null; reason?: string } | null;
+  photos: { id: string; url: string }[];
+  error: string | null;
+  undo_until: string | null;
+  can_undo: boolean;
+}
+
+/**
+ * A file part as React Native's FormData takes it: a local `uri` (file://, content://) with its name
+ * and type. Browsers append a Blob or File instead.
+ */
+export interface NativeFile {
+  uri: string;
+  name: string;
+  type: string;
+}
+
+/** What a photo field accepts: a browser File or a native part. */
+export type UploadFile = File | NativeFile;
+
+function isNativeFile(file: Blob | NativeFile): file is NativeFile {
+  return typeof (file as NativeFile).uri === 'string' && !(typeof Blob !== 'undefined' && file instanceof Blob);
+}
+
+/** Appends a file part: a Blob with its filename on the web, the `{uri, name, type}` object in React Native. */
+function appendFile(form: FormData, field: string, file: Blob | NativeFile, filename: string) {
+  if (isNativeFile(file)) {
+    // React Native's FormData reads uri/name/type from the object; the DOM typing only knows Blob.
+    form.append(field, { ...file, name: filename } as unknown as Blob);
+    return;
+  }
+  form.append(field, file, filename);
+}
+
+/** The multipart fields of POST /api/v1/capturas. Everything is optional, but it cannot go empty. */
+export interface CaptureInput {
+  audio?: { blob: Blob | NativeFile; filename: string; durationS: number } | null;
+  fotos?: UploadFile[];
+  nota?: string;
+  para?: CapturePurpose | null;
+  contexto?: { tipo: CaptureContextKind; id: string } | null;
+  /** Only for a question: the visibility chosen. Not sent when null (the question's suggestion is used). */
+  publicUse?: boolean | null;
+}
+
+export type PhotoDisplayState = 'nueva' | 'sin_usar' | 'elegida' | 'editada' | 'publicada';
+export type PhotoTone = 'info' | 'muted' | 'ok';
+
+export interface PhotoOutput {
+  id: string;
+  url: string;
+  created_at: string;
+  state: 'sin_usar' | 'elegida' | 'editada' | 'publicada' | string;
+  display_state: PhotoDisplayState | string;
+  label: string;
+  tone: PhotoTone | string;
+  note: string;
+  allow_ai_edit: boolean;
+  used_in: { piece_id: string; date: string; text: string } | null;
+  capture_id: string | null;
+  mime: string;
+  size_bytes: number;
+  width: number | null;
+  height: number | null;
+}
+
+export type GaleriaFiltro = 'todas' | 'sin_usar' | 'elegidas' | 'publicadas';
+
+export interface PhotoPatch {
+  note?: string;
+  allow_ai_edit?: boolean;
+}
+
+export interface Preferencias {
+  gallery_ai_edit_default: boolean;
+  updated_at: string | null;
+  /** Kinds whose push is off (PATCH accepts it; GET may not return it). */
+  push_disabled?: string[];
+}
+
+export interface PreferenciasPatch {
+  gallery_ai_edit_default?: boolean;
+  push_disabled?: string[];
+}
+
+/** One push type of GET /api/v1/ajustes `push_types` (Ajustes › Notificaciones, a switch each). */
+export interface PushType {
+  kind: string;
+  label: string;
+  goes_to: 'tu_turno' | 'notificaciones' | string;
+  default: boolean;
+  enabled: boolean;
+}
+
+/** GET /api/v1/ajustes with the `push_types` added for the per-type switches. */
+export type AjustesConPush = Ajustes & { push_types?: PushType[] };
+
+// ================================================================ limits (contract)
+
+export const CAPTURE_LIMITS = {
+  audioBytes: 25 * 1024 * 1024,
+  audioSeconds: 1800,
+  photoBytes: 10 * 1024 * 1024,
+  photosPerCapture: 10,
+  noteChars: 4000,
+} as const;
+
+export const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/heic', 'image/heif'];
+
+/** JPEG, PNG, WebP or HEIC (some phones send HEIC without a type: trust the extension then). */
+export function isAcceptedPhoto(file: { type: string; name: string }): boolean {
+  if (file.type) return PHOTO_TYPES.includes(file.type.toLowerCase());
+  return /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+}
+
+// ================================================================ calls
+
+const CAP = '/api/v1/capturas';
+const GAL = '/api/v1/galeria';
+const PREFS = '/api/v1/ajustes/preferencias';
+const id = (value: string) => encodeURIComponent(value);
+
+/** The FormData of a capture, exactly as the contract names the parts. */
+export function captureForm(input: CaptureInput): FormData {
+  const form = new FormData();
+  if (input.audio) {
+    appendFile(form, 'audio', input.audio.blob, input.audio.filename);
+    form.append('audio_duration_s', String(Math.min(CAPTURE_LIMITS.audioSeconds, Math.round(input.audio.durationS * 10) / 10)));
+  }
+  for (const foto of input.fotos ?? []) appendFile(form, 'fotos', foto, foto.name);
+  const nota = (input.nota ?? '').trim();
+  if (nota) form.append('nota', nota);
+  if (input.para) form.append('para', input.para);
+  if (input.contexto) {
+    form.append('contexto_tipo', input.contexto.tipo);
+    form.append('contexto_id', input.contexto.id);
+    if (input.contexto.tipo === 'pregunta' && typeof input.publicUse === 'boolean') form.append('public_use', input.publicUse ? 'true' : 'false');
+  }
+  return form;
+}
+
+/** 201 with the capture in `recibida`; 400 empty or invalid, 409 question no longer open, 413 too big. */
+export const createCaptura = (input: CaptureInput) => api.postForm<CaptureOutput>(CAP, captureForm(input));
+/** «Lo que enviaste»: newest first, without the undone ones. */
+export const listCapturas = (page = 1) => api.get<Paginated<CaptureOutput> | CaptureOutput[]>(`${CAP}${page > 1 ? `?page=${page}` : ''}`);
+export const getCaptura = (captureId: string) => api.get<CaptureOutput>(`${CAP}/${id(captureId)}`);
+/** «Deshacer»: only within `undo_until` (2 minutes); 409 afterwards. */
+export const undoCaptura = (captureId: string) => api.delete<CaptureOutput>(`${CAP}/${id(captureId)}`);
+
+export const listGaleria = (filtro: GaleriaFiltro = 'todas', page = 1) =>
+  api.get<Paginated<PhotoOutput> | PhotoOutput[]>(`${GAL}?filtro=${filtro}${page > 1 ? `&page=${page}` : ''}`);
+export function uploadFotos(files: UploadFile[]) {
+  const form = new FormData();
+  for (const file of files) appendFile(form, 'fotos', file, file.name);
+  return api.postForm<PhotoOutput[] | Paginated<PhotoOutput>>(GAL, form);
+}
+export const getFoto = (photoId: string) => api.get<PhotoOutput>(`${GAL}/${id(photoId)}`);
+export const updateFoto = (photoId: string, patch: PhotoPatch) => api.patch<PhotoOutput>(`${GAL}/${id(photoId)}`, patch);
+export const deleteFoto = (photoId: string) => api.delete(`${GAL}/${id(photoId)}`);
+
+export const getPreferencias = () => api.get<Preferencias>(PREFS);
+export const savePreferencias = (patch: PreferenciasPatch) => api.patch<Preferencias>(PREFS, patch);
+
+/**
+ * Images and audio are served to the session (cookie or bearer token) only; never trust an absolute URL
+ * from elsewhere. The native app prefixes the API origin and sends its token with the image request.
+ */
+export function sameOrigin(url: string | null | undefined): string | null {
+  return url && url.startsWith('/') && !url.startsWith('//') ? url : null;
+}
+
+// ================================================================ hooks
+
+export const captureKeys = {
+  all: ['capturas'] as const,
+  list: ['capturas', 'list'] as const,
+  item: (captureId: string) => ['capturas', 'item', captureId] as const,
+  galeriaAll: ['galeria'] as const,
+  galeria: (filtro: GaleriaFiltro) => ['galeria', filtro] as const,
+  preferencias: ['ajustes', 'preferencias'] as const,
+};
+
+function nextPage(data: Paginated<unknown> | unknown[], page: number): number | undefined {
+  return !Array.isArray(data) && data.next ? page + 1 : undefined;
+}
+
+function totalOf<T>(pages: (Paginated<T> | T[])[] | undefined): number | null {
+  const first = pages?.[0];
+  if (!first) return null;
+  return Array.isArray(first) ? first.length : first.count;
+}
+
+/** «Lo que enviaste», page by page. `count` is the total for the counter in the sheet header. */
+export function useCapturas(enabled = true) {
+  const query = useInfiniteQuery({
+    queryKey: captureKeys.list,
+    queryFn: ({ pageParam }) => listCapturas(pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, _all, page) => nextPage(last, page),
+    enabled,
+  });
+  const items = (query.data?.pages ?? []).flatMap((page) => asList(page));
+  return { ...query, items, count: totalOf(query.data?.pages) };
+}
+
+/** One capture of the history, polled every 2.5 s while it is being processed. */
+export function useCapturaLive(initial: CaptureOutput) {
+  return useQuery({
+    queryKey: captureKeys.item(initial.id),
+    queryFn: () => getCaptura(initial.id),
+    initialData: initial,
+    enabled: isProcessing(initial.state),
+    refetchInterval: (query) => (query.state.data && isProcessing(query.state.data.state) ? 2500 : false),
+  });
+}
+
+export function useCreateCaptura() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: createCaptura,
+    onSettled: () => Promise.all([client.invalidateQueries({ queryKey: captureKeys.all }), client.invalidateQueries({ queryKey: captureKeys.galeriaAll })]),
+  });
+}
+
+export function useUndoCaptura() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: undoCaptura,
+    onSettled: () =>
+      Promise.all([
+        client.invalidateQueries({ queryKey: captureKeys.all }),
+        client.invalidateQueries({ queryKey: captureKeys.galeriaAll }),
+        client.invalidateQueries({ queryKey: keys.tuTurno }),
+        client.invalidateQueries({ queryKey: keys.hechos }),
+      ]),
+  });
+}
+
+/** The gallery for one filter, newest first, with «Cargar más». */
+export function useGaleria(filtro: GaleriaFiltro) {
+  const query = useInfiniteQuery({
+    queryKey: captureKeys.galeria(filtro),
+    queryFn: ({ pageParam }) => listGaleria(filtro, pageParam),
+    initialPageParam: 1,
+    getNextPageParam: (last, _all, page) => nextPage(last, page),
+  });
+  const items = (query.data?.pages ?? []).flatMap((page) => asList(page));
+  return { ...query, items, count: totalOf(query.data?.pages) };
+}
+
+export function useUploadFotos() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: async (files: UploadFile[]) => {
+      // Ten parts per request at most, as in a capture.
+      const created: PhotoOutput[] = [];
+      for (let start = 0; start < files.length; start += CAPTURE_LIMITS.photosPerCapture) {
+        created.push(...asList(await uploadFotos(files.slice(start, start + CAPTURE_LIMITS.photosPerCapture))));
+      }
+      return created;
+    },
+    onSettled: () => client.invalidateQueries({ queryKey: captureKeys.galeriaAll }),
+  });
+}
+
+export function useUpdateFoto() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ photoId, patch }: { photoId: string; patch: PhotoPatch }) => updateFoto(photoId, patch),
+    onSettled: () => client.invalidateQueries({ queryKey: captureKeys.galeriaAll }),
+  });
+}
+
+export function useDeleteFoto() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: deleteFoto, onSettled: () => client.invalidateQueries({ queryKey: captureKeys.galeriaAll }) });
+}
+
+export function usePreferencias() {
+  return useQuery({ queryKey: captureKeys.preferencias, queryFn: getPreferencias });
+}
+
+export function useSavePreferencias() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: savePreferencias,
+    onSuccess: (data) => {
+      if (data && typeof data === 'object') client.setQueryData(captureKeys.preferencias, data);
+    },
+    onSettled: () => Promise.all([client.invalidateQueries({ queryKey: captureKeys.preferencias }), client.invalidateQueries({ queryKey: keys.ajustes })]),
+  });
+}
