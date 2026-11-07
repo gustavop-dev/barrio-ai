@@ -152,6 +152,200 @@ export interface Action {
   execution: Execution | null;
 }
 
+// ---------------------------------------------------------------- editorial (daily own publication)
+
+/** Circuit state of a piece; once its CONT-09 action exists, `status` follows the action. */
+export type PieceState = 'preparing' | 'skipped' | 'blocked' | 'failed' | 'ready';
+
+export type PieceStatus =
+  | 'preparing'
+  | 'skipped'
+  | 'blocked'
+  | 'failed'
+  | 'awaiting_approval'
+  | 'scheduled'
+  | 'publishing'
+  | 'published'
+  | 'uncertain'
+  | 'vetoed'
+  | 'discarded'
+  | 'expired'
+  | 'superseded';
+
+export type EditorialStage = '' | 'director' | 'redactor' | 'lectores' | 'seleccion' | 'verificador';
+
+export interface PieceActionRef {
+  id: string;
+  state: ActionState;
+  payload_hash: string;
+}
+
+export interface PieceSummary {
+  id: string;
+  slot_date: string;
+  scheduled_for: string;
+  state: PieceState;
+  status: PieceStatus;
+  stage: EditorialStage;
+  note: string;
+  modality: string | null;
+  pillar: string | null;
+  primary_reader: string | null;
+  thesis: string | null;
+  approach: string | null;
+  action: PieceActionRef | null;
+  external_url: string | null;
+  created_at: string;
+}
+
+export interface CalendarDay {
+  date: string;
+  pieces: PieceSummary[];
+}
+
+export interface EditorialCalendar {
+  timezone: string;
+  post_time: string | null;
+  lead_hours: number;
+  config_error: string | null;
+  today: string;
+  days: CalendarDay[];
+}
+
+// The JSON blocks below are written by each stage of the circuit (model output with a schema). A
+// stage that has not run yet leaves its block empty (`{}`), so every field is optional.
+
+export interface Claim {
+  text: string;
+  kind?: string;
+  status?: string;
+  ref?: string;
+}
+
+export interface Brief {
+  decision?: 'write' | 'skip';
+  skip_reason?: string;
+  primary_reader?: string;
+  modality?: string;
+  pillar?: string;
+  thesis?: string;
+  approach?: string;
+  format?: string;
+  reader_value?: string;
+  evidence?: { kind: string; ref: string; note: string }[];
+  success_criterion?: string;
+  avoid?: string[];
+  signals_used?: string[];
+  citations?: string[];
+  rationale?: string;
+}
+
+export interface Variant {
+  angle?: string;
+  text?: string;
+  claims?: Claim[];
+  uncertainties?: string[];
+}
+
+export interface Variants {
+  variant_a?: Variant;
+  variant_b?: Variant;
+  citations?: string[];
+}
+
+export type ObjectionSeverity = 'material' | 'preference' | 'missing_data';
+
+export interface Assessment {
+  strengths?: string[];
+  objections?: { text: string; severity: ObjectionSeverity }[];
+}
+
+export interface ReaderAssessment {
+  reader: string;
+  variant_a?: Assessment;
+  variant_b?: Assessment;
+}
+
+export interface Panel {
+  readers?: ReaderAssessment[];
+  summary?: string;
+  citations?: string[];
+}
+
+export interface Selection {
+  decision?: 'A' | 'B' | 'merge' | 'discard';
+  final_text?: string;
+  rationale?: string;
+  claims?: Claim[];
+  resolved_objections?: string[];
+  kept_objections?: string[];
+  citations?: string[];
+}
+
+export interface Finding {
+  issue: string;
+  severity: 'material' | 'minor';
+  quote?: string;
+  detail?: string;
+}
+
+export interface Verification {
+  /** Final verdict: the model's plus the deterministic guards, computed on `text_sha256`. */
+  verdict?: 'ready_for_execution' | 'blocked';
+  model_verdict?: 'ready_for_execution' | 'blocked';
+  blocking_reasons?: string[];
+  findings?: Finding[];
+  checked_claims?: Claim[];
+  summary?: string;
+  citations?: string[];
+  text_sha256?: string;
+}
+
+export interface Signal {
+  id: string;
+  author?: string;
+  why_followed?: string;
+  posted_at?: string | null;
+  reactions?: number | null;
+  comments?: number | null;
+  text?: string;
+}
+
+export interface StageUsage {
+  stage: string;
+  model?: string | null;
+  estimated_usd?: number | string | null;
+  request_id?: string | null;
+  units?: string[];
+  missing_units?: string[];
+}
+
+/** APRE-01: impressions read through Unipile when the publication is reconciled. Missing is not zero. */
+export interface PieceMetrics {
+  impressions?: number | null;
+  source?: string;
+}
+
+export interface PieceDetail extends PieceSummary {
+  brief: Brief;
+  variants: Variants;
+  panel: Panel;
+  selection: Selection;
+  verification: Verification;
+  final_text: string;
+  citations: string[];
+  signals: Signal[];
+  usage: StageUsage[];
+  action_detail: Action | null;
+  /** Not serialized by the current backend; shown only if it ever arrives. */
+  metrics?: PieceMetrics | null;
+}
+
+export interface PlanResponse {
+  slot_date: string;
+  job: Job;
+}
+
 // ---------------------------------------------------------------- referents
 
 export interface Referent {

@@ -59,6 +59,48 @@ export const ACTION_STATE_LABEL: Record<string, string> = {
   expired: 'Caducada',
 };
 
+/** A calendar date (AAAA-MM-DD) read as such, never shifted by the device's time zone. */
+export function formatDay(date: string | null | undefined, style: 'long' | 'short' = 'long'): string {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return date || '—';
+  const value = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(value.getTime())) return date;
+  return value.toLocaleDateString(LOCALE, {
+    timeZone: 'UTC',
+    weekday: style === 'long' ? 'long' : 'short',
+    day: 'numeric',
+    month: style === 'long' ? 'long' : 'short',
+  });
+}
+
+export function capitalize(text: string): string {
+  return text.charAt(0).toLocaleUpperCase(LOCALE) + text.slice(1);
+}
+
+/** Adds whole days to an AAAA-MM-DD date. */
+export function shiftDay(date: string, days: number): string {
+  const value = new Date(`${date}T00:00:00Z`);
+  if (Number.isNaN(value.getTime())) return date;
+  value.setUTCDate(value.getUTCDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+/** Hour of an instant in the machine's time zone (falls back to the device's). */
+export function formatTime(iso: string | null | undefined, timeZone?: string): string {
+  if (!iso) return '—';
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '—';
+  const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+  try {
+    return date.toLocaleTimeString(LOCALE, timeZone ? { ...options, timeZone } : options);
+  } catch {
+    return date.toLocaleTimeString(LOCALE, options);
+  }
+}
+
+export function formatNumber(value: number): string {
+  return value.toLocaleString(LOCALE);
+}
+
 export function capabilityLabel(code: string): string {
   return CAPABILITY_LABEL[code] ?? code;
 }

@@ -5,6 +5,7 @@ export const NAV = [
   { to: '/', label: 'Oficina', short: 'Oficina', icon: '⌂' },
   { to: '/maquina', label: 'Máquina', short: 'Máquina', icon: '◉' },
   { to: '/acciones', label: 'Acciones', short: 'Acciones', icon: '✓' },
+  { to: '/contenido', label: 'Contenido', short: 'Piezas', icon: '✎' },
   { to: '/referentes', label: 'Referentes', short: 'Referentes', icon: '☆' },
   { to: '/conocimiento', label: 'Conocimiento', short: 'Fuentes', icon: '▤' },
   { to: '/memoria', label: 'Memoria', short: 'Memoria', icon: '◈' },

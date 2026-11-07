@@ -5,11 +5,14 @@ import type {
   Activity,
   Capability,
   Control,
+  EditorialCalendar,
   FeedEvent,
   Job,
   MemoryItem,
   Overview,
   Paginated,
+  PieceDetail,
+  PlanResponse,
   Referent,
   SearchResponse,
   Session,
@@ -64,6 +67,20 @@ export const approveAction = (actionId: string, expectedHash: string, note: stri
   api.post<unknown>(`${OP}/actions/${id(actionId)}/approve`, { expected_hash: expectedHash, note });
 export const resolveAction = (actionId: string, outcome: 'confirmed' | 'failed', note: string) =>
   api.post<Action>(`${OP}/actions/${id(actionId)}/resolve`, { outcome, note });
+
+// ---------------------------------------------------------------- editorial (daily own publication)
+const ED = '/api/v1/editorial';
+
+/** `desde` AAAA-MM-DD (the backend defaults to a week ago) and `dias` 1..60. */
+export function getCalendar(desde = '', dias = 15) {
+  const params = new URLSearchParams();
+  if (desde) params.set('desde', desde);
+  params.set('dias', String(dias));
+  return api.get<EditorialCalendar>(`${ED}/calendar?${params.toString()}`);
+}
+export const getPiece = (pieceId: string) => api.get<PieceDetail>(`${ED}/pieces/${id(pieceId)}`);
+/** Paid: queues the editorial circuit for the next free slot. The same `request_id` never queues twice. */
+export const planPiece = (requestId?: string) => api.post<PlanResponse>(`${ED}/plan`, requestId ? { request_id: requestId } : {});
 
 // ---------------------------------------------------------------- referents
 export const listReferents = (account: string) =>

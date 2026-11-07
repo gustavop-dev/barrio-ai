@@ -60,6 +60,8 @@ code { font-family: var(--mono); font-size: 0.9em; }
 .eyebrow { font-size: 12px; font-weight: 700; letter-spacing: 0.14em; color: var(--muted); margin: 0 0 6px; }
 .sectionlabel { font-size: 12px; font-weight: 700; letter-spacing: 0.1em; color: var(--muted); margin: 14px 0 6px; }
 
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
 .skiplink { position: absolute; left: -999px; top: 8px; background: var(--card); padding: 10px 14px; z-index: 100; border-radius: var(--radius); }
 .skiplink:focus { left: 8px; }
 
@@ -83,6 +85,9 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .secondary:hover:not(:disabled) { background: var(--sage); }
 .danger { background: var(--rust); color: #fff9f2; }
 .danger:hover:not(:disabled) { background: var(--rust-dark); }
+/* A link that navigates away (full page load), dressed as a button. */
+a.buttonlink { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
+a.buttonlink.primary, a.buttonlink.primary:hover { color: #fffdf0; }
 
 .buttonrow { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
 .pager { justify-content: space-between; }
@@ -158,7 +163,9 @@ main { padding: 16px 16px calc(var(--nav-h) + 24px + env(safe-area-inset-bottom)
   inset: auto 0 0 0;
   z-index: 20;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* Eight sections: below 352px the bar scrolls sideways instead of shrinking targets under 44px. */
+  grid-template-columns: repeat(8, minmax(44px, 1fr));
+  overflow-x: auto;
   background: var(--rail);
   padding-bottom: env(safe-area-inset-bottom);
   border-top: 2px solid #1d342b;
@@ -483,6 +490,28 @@ summary { cursor: pointer; min-height: 44px; display: flex; align-items: center;
 .proposed { white-space: pre-wrap; overflow-wrap: anywhere; padding: 12px; border: 2px dashed #b9c8a8; border-radius: var(--radius); background: #fbfcf4; }
 .risks { margin: 4px 0; padding-left: 20px; }
 .execution { margin-top: 12px; padding-top: 8px; border-top: 2px solid var(--line); }
+
+/* ---------------------------------------------------------------- content (daily own publication) */
+
+.calendar { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.day { background: var(--card); border: 2px solid var(--line); border-radius: 10px; padding: 12px 14px; box-shadow: var(--shadow); min-width: 0; }
+.day.today { border-color: #8fa77e; background: #fbfdf3; box-shadow: inset 4px 0 0 var(--brass), var(--shadow); }
+.day h3 { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 6px; }
+.day .gap { color: var(--muted); font-size: 14px; margin: 0; padding: 6px 10px; border: 2px dashed var(--line); border-radius: var(--radius); }
+.piece { padding: 10px 0; border-top: 2px solid #eef0e5; min-width: 0; }
+.day h3 + .piece { border-top: 0; padding-top: 0; }
+.piece h4 { font-size: 16px; margin: 0; overflow-wrap: anywhere; }
+.piece h4 a { display: inline-block; min-height: 44px; padding: 10px 0; }
+.piece .buttonrow { margin-top: 6px; }
+.calendarnav { margin-top: 0; }
+.finaltext { font-size: 16px; line-height: 1.6; }
+.variant { min-width: 0; }
+.variant .proposed { font-size: 15px; }
+.readers { list-style: none; margin: 0; padding: 0; }
+.readers > li { padding: 12px 0; border-top: 2px solid #eef0e5; }
+.readers h4 { margin: 4px 0; }
+.findings, .claims { margin: 4px 0; padding-left: 20px; display: grid; gap: 6px; }
+.quote { display: block; margin: 4px 0; padding: 6px 10px; border-left: 4px solid #e3b5a2; background: #fbf3ee; font-size: 15px; overflow-wrap: anywhere; }
 
 /* ---------------------------------------------------------------- knowledge */
 

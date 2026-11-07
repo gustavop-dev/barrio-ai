@@ -5,10 +5,12 @@ import { Layout } from './components/Layout';
 import { Acciones } from './pages/Acciones';
 import { Ajustes } from './pages/Ajustes';
 import { Conocimiento } from './pages/Conocimiento';
+import { Contenido, EditorialRedirect } from './pages/Contenido';
 import { Login } from './pages/Login';
 import { Maquina } from './pages/Maquina';
 import { Memoria } from './pages/Memoria';
 import { Oficina } from './pages/Oficina';
+import { Pieza } from './pages/Pieza';
 import { Referentes } from './pages/Referentes';
 
 export function AppRoutes() {
@@ -25,6 +27,11 @@ export function AppRoutes() {
         <Route index element={<Oficina />} />
         <Route path="maquina" element={<Maquina />} />
         <Route path="acciones" element={<Acciones />} />
+        <Route path="contenido" element={<Contenido />} />
+        <Route path="contenido/:pieceId" element={<Pieza />} />
+        {/* Push notifications of the backend point at /editorial/<id>. */}
+        <Route path="editorial" element={<EditorialRedirect />} />
+        <Route path="editorial/:pieceId" element={<EditorialRedirect />} />
         <Route path="referentes" element={<Referentes />} />
         <Route path="conocimiento" element={<Conocimiento />} />
         <Route path="memoria" element={<Memoria />} />

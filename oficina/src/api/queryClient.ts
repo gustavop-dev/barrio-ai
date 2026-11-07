@@ -14,6 +14,8 @@ export const keys = {
   source: (key: string) => ['source', key] as const,
   memory: ['memory'] as const,
   editorialAll: ['editorial'] as const,
+  calendar: (desde: string) => ['editorial', 'calendar', desde] as const,
+  piece: (id: string) => ['editorial', 'piece', id] as const,
 };
 
 /** Client errors (4xx) are answers, not glitches: never retry them. */
