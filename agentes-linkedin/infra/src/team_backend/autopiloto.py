@@ -15,7 +15,7 @@ from decimal import Decimal
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, memory
-from . import guardas, operador, red
+from . import guardas, lider, operador, red
 from .jobs import enqueue_operation
 from .models import ActionExecution, ActionProposal, ConnectorAccount, Contact, Job, ObservedPost
 
@@ -84,7 +84,7 @@ def content_issues(proposal):
         if pattern.search(text):issues.append(reason)
     if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
-    public,private=memory.confirmed_blocks()
+    public,private=guardas.blocks()
     issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
     return issues
 
@@ -94,27 +94,37 @@ def policy_review(proposal):
     mode=autonomy(proposal.capability)
     if mode=='approval':return proposal
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)
+    verdict=None
+    if not issues and lider.applies(proposal):
+        # The agente líder replaces the human approval: Jev judges the exact text or person; doubt means no.
+        if lider.waiting_retry(proposal):return proposal
+        verdict=lider.review(proposal);proposal.review=verdict
+        operador._audit(None,'operator.lead_reviewed',proposal.id,decision=verdict['decision'],answers=verdict.get('answers'))
+        if verdict['decision']=='retry':
+            proposal.save(update_fields=['review']);return proposal
+        issues=verdict['reasons']
     proposal.decided_at=timezone.now()
     if issues:
         proposal.state=ActionProposal.State.DISCARDED;proposal.risks=list(proposal.risks)+issues
-        proposal.decision_note=f'Descartada por política {POLICY_VERSION}'
-        proposal.save(update_fields=['state','risks','decided_at','decision_note'])
+        proposal.decision_note=f'Descartada por el líder ({verdict["model"]})' if verdict else f'Descartada por política {POLICY_VERSION}'
+        proposal.save(update_fields=['state','risks','decided_at','decision_note','review'])
         operador._audit(None,'operator.policy_discarded',proposal.id,issues=issues)
         if proposal.piece_id:
             notify('Barrio AI: pieza descartada',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}: {"; ".join(issues)[:200]}',
-                   url=f'/editorial/{proposal.piece_id}',tag='barrio-pieza')
+                   url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
         return proposal
     if proposal.payload_hash!=operador.current_hash(proposal):
         proposal.state=ActionProposal.State.DISCARDED;proposal.decision_note='Hash inconsistente; descartada'
         proposal.save(update_fields=['state','decided_at','decision_note']);return proposal
     proposal.state=ActionProposal.State.APPROVED;proposal.approved_hash=proposal.payload_hash
-    proposal.decision_note=f'Aprobada por política {POLICY_VERSION}'
-    proposal.save(update_fields=['state','approved_hash','decided_at','decision_note'])
+    proposal.decision_note=(f'Aprobada por el líder ({verdict["model"]}) · política {POLICY_VERSION}' if verdict
+                            else f'Aprobada por política {POLICY_VERSION}')
+    proposal.save(update_fields=['state','approved_hash','decided_at','decision_note','review'])
     operador._audit(None,'operator.policy_approved',proposal.id,payload_hash=proposal.payload_hash)
     if proposal.piece_id:
         when=proposal.piece.scheduled_for.astimezone(operador.local_tz())
         notify('Barrio AI: pieza lista',f'Se publicará el {when:%d/%m a las %H:%M}. Puedes vetarla en la oficina antes de esa hora.',
-               url=f'/editorial/{proposal.piece_id}',tag='barrio-pieza')
+               url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
     return proposal
 
 def llm_spent_today(now=None,purpose='propose-comment'):

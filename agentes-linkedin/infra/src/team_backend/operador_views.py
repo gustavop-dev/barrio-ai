@@ -9,7 +9,7 @@ from .jobs import enqueue_operation
 from .models import ActionProposal, ApiCredential, ConnectorAccount, ObservedPost, Referent
 from .permissions import require
 from .serializers import (AccountInput, AccountOutput, ActionInput, ActionOutput, DecisionInput, JobOutput, ObserveInput,
-                          OptionalRequestInput, PauseInput, PostOutput, ReferentInput, ReferentOutput, ResolveInput, ReviseInput)
+                          OptionalRequestInput, PauseInput, PostOutput, ReferentInput, ReferentOutput, ReferentPatch, ResolveInput, ReviseInput)
 
 def human_session(request):
     if isinstance(request.auth,ApiCredential):raise PermissionDenied('Esta decisión requiere una sesión humana con CSRF')
@@ -58,6 +58,24 @@ class Referents(ListAPIView):
         data=valid(ReferentInput,request)
         referent,created=operador.add_referent(request.user,get_or_404(ConnectorAccount,id=data['account']),data['identifier'],data['reason'])
         return Response(ReferentOutput(referent).data,status=201 if created else 200)
+
+class ReferentDetail(APIView):
+    """Personas → Referentes: deactivate, reactivate, change the reason or remove a referent."""
+    def patch(self,request,rid):
+        human_session(request);require(request.user,'operate_linkedin');data=valid(ReferentPatch,request)
+        referent=get_or_404(Referent,id=rid)
+        for field in ('active','reason'):
+            if field in data:setattr(referent,field,data[field])
+        referent.save()
+        from .jobs import audit
+        audit(request.user,'operator.referent_updated',referent.id,active=referent.active)
+        return Response(ReferentOutput(referent).data)
+    def delete(self,request,rid):
+        human_session(request);require(request.user,'approve_actions')
+        referent=get_or_404(Referent,id=rid)
+        from .jobs import audit
+        referent.delete();audit(request.user,'operator.referent_removed',str(rid))
+        return Response(status=204)
 
 class Observe(APIView):
     def post(self,request):

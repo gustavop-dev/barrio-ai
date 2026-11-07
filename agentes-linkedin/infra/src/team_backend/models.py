@@ -221,6 +221,8 @@ class Contact(models.Model):
     classification=models.JSONField(default=dict,blank=True)
     stage=models.CharField(max_length=20,choices=Stage.choices,default=Stage.CANDIDATE,db_index=True)
     history=models.JSONField(default=list,blank=True)
+    # Gustavo's own notes about the person (Personas): [{id, at, text, by}].
+    notes=models.JSONField(default=list,blank=True)
     profile_checked_at=models.DateTimeField(null=True,blank=True)
     followed_at=models.DateTimeField(null=True,blank=True)
     invited_at=models.DateTimeField(null=True,blank=True)
@@ -317,6 +319,8 @@ class ActionProposal(models.Model):
     decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     decided_at=models.DateTimeField(null=True,blank=True)
     decision_note=models.TextField(blank=True)
+    # Agente líder (lider.py): the typed judgments, thresholds and decision that replaced a human approval.
+    review=models.JSONField(default=dict,blank=True)
     class Meta:
         ordering=['-created_at']
         # One executor per action: a single open proposal per target (post, piece or contact) and capability.
@@ -392,3 +396,114 @@ class LinkedInCredential(models.Model):
     connected_at=models.DateTimeField(default=timezone.now)
     expiry_alerted_at=models.DateTimeField(null=True,blank=True)
     def __str__(self):return self.member_urn
+
+
+# ---------------------------------------------------------------------------
+# Office redesign (oficina/PLAN-REDISENO.md): Gustavo steers from results; agents ask him only what nobody else knows.
+
+class Orientation(models.Model):
+    """Singleton: Gustavo's high-level direction for the team (audiences, topics, things to avoid or pause).
+    Writers, the classifier and the agente líder read it; it never appears verbatim in public text."""
+    id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
+    text=models.TextField(blank=True)
+    updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True)
+    updated_at=models.DateTimeField(null=True,blank=True)
+    @classmethod
+    def current(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+class TeamQuestion(models.Model):
+    """«Preguntas del equipo» (Tu turno): what an agent needs to know from Gustavo, delivered complete.
+    The answer becomes confirmed user memory; «No quiero compartir esto» closes the key for good."""
+    class Kind(models.TextChoices):
+        ASK='ask','El equipo necesita un dato'
+        CONFIRM='confirm','Confirmar un dato propuesto'
+    class State(models.TextChoices):
+        OPEN='open','Abierta'
+        ANSWERED='answered','Respondida'
+        DECLINED='declined','No quiere compartirlo'
+        WITHDRAWN='withdrawn','Retirada por el equipo'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    kind=models.CharField(max_length=10,choices=Kind.choices,default=Kind.ASK)
+    agent=models.CharField(max_length=60)
+    question=models.TextField()
+    purpose=models.TextField(blank=True,help_text='Para qué lo necesita el equipo.')
+    memory_key=models.CharField(max_length=120)
+    proposed_value=models.JSONField(default=dict,blank=True)
+    memory_id=models.UUIDField(null=True,blank=True,help_text='Fila de memoria propuesta que se confirma (kind=confirm).')
+    class AnswerType(models.TextChoices):
+        TEXT='text','Texto libre'
+        YES_NO='yes_no','Sí o no, con detalle opcional'
+        CHOICE='choice','Una opción de una lista'
+        NUMBER='number','Número'
+        DATE='date','Fecha'
+    answer_type=models.CharField(max_length=10,choices=AnswerType.choices,default=AnswerType.TEXT)
+    options=models.JSONField(default=list,blank=True,help_text='Opciones cuando answer_type=choice.')
+    suggested_public=models.BooleanField(default=False)
+    origin=models.CharField(max_length=120,blank=True)
+    # Useful before this moment (e.g. the piece it was asked for); afterwards it stays useful but not urgent.
+    deadline=models.DateTimeField(null=True,blank=True)
+    postponed_until=models.DateTimeField(null=True,blank=True)
+    memory_version=models.PositiveIntegerField(null=True,blank=True,help_text='Versión confirmada que creó la respuesta.')
+    state=models.CharField(max_length=12,choices=State.choices,default=State.OPEN,db_index=True)
+    answer=models.TextField(blank=True)
+    public_use=models.BooleanField(null=True,blank=True)
+    answered_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    answered_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-created_at']
+        constraints=[models.UniqueConstraint(fields=['memory_key'],condition=models.Q(state='open'),name='one_open_question_per_key')]
+    def __str__(self):return self.question[:80]
+
+class Opportunity(models.Model):
+    """A business opportunity (Personas → Oportunidades; Resultados → «¿Genera negocio?»). Gustavo registers and
+    moves them by hand for now; the analyst will propose them once the inbox is read."""
+    class Stage(models.TextChoices):
+        CONVERSATION='conversacion','Conversación'
+        NEED='necesidad','Necesidad identificada'
+        QUALIFIED='cualificada','Cualificada'
+        MEETING='reunion','Reunión'
+        PROPOSAL='propuesta','Propuesta'
+        AGREEMENT='acuerdo','Acuerdo'
+        NO_DEAL='sin_acuerdo','Cerrada sin acuerdo'
+    class Modality(models.TextChoices):
+        PERSONAL='personal_startups','Startups (personal)'
+        PROJECTAPP='projectapp','ProjectApp'
+        UNKNOWN='por_clasificar','Por clasificar'
+    class Channel(models.TextChoices):
+        LINKEDIN='linkedin','LinkedIn'
+        EMAIL='email','Email'
+        CALL='llamada','Llamada'
+        EVENT='evento','Evento'
+        OTHER='otro','Otro'
+    class Attribution(models.TextChoices):
+        CITED='cito_contenido','Citó un post o el perfil'
+        SAID='lo_dijo','Lo dijo la persona'
+        INFERRED='inferido','Se infiere'
+        UNKNOWN='desconocido','Se desconoce'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    contact=models.ForeignKey(Contact,on_delete=models.SET_NULL,null=True,blank=True,related_name='opportunities')
+    # Someone outside the network: name and company instead of a contact.
+    person_name=models.CharField(max_length=200,blank=True)
+    company=models.CharField(max_length=200,blank=True)
+    modality=models.CharField(max_length=20,choices=Modality.choices)
+    channel=models.CharField(max_length=20,choices=Channel.choices,default=Channel.LINKEDIN)
+    stage=models.CharField(max_length=20,choices=Stage.choices,default=Stage.CONVERSATION,db_index=True)
+    attribution=models.CharField(max_length=20,choices=Attribution.choices,default=Attribution.UNKNOWN)
+    need=models.TextField(blank=True)
+    budget=models.CharField(max_length=200,blank=True)
+    dedication=models.CharField(max_length=200,blank=True)
+    next_action=models.CharField(max_length=300,blank=True)
+    next_action_at=models.DateTimeField(null=True,blank=True)
+    notes=models.TextField(blank=True)
+    history=models.JSONField(default=list,blank=True)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    stage_changed_at=models.DateTimeField(default=timezone.now)
+    closed_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        ordering=['-updated_at']
+        constraints=[models.CheckConstraint(condition=models.Q(contact__isnull=False)|~models.Q(person_name=''),name='opportunity_has_person')]
+    def __str__(self):return self.person_name or str(self.contact or self.id)

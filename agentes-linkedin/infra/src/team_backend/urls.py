@@ -5,6 +5,7 @@ from . import oficina_views as of
 from . import linkedin_views as li
 from . import editorial_views as ed
 from . import red_views as rd
+from . import rediseno_views as rv
 urlpatterns=[
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
  path('units',views.Units.as_view()),path('units/<str:uid>',views.UnitDetail.as_view()),
@@ -26,6 +27,15 @@ urlpatterns=[
  path('linkedin/status',li.Status.as_view()),
  path('red/contacts',rd.Contacts.as_view()),path('red/contacts/<uuid:cid>',rd.ContactDetail.as_view()),
  path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/summary',rd.Summary.as_view()),
+ path('tu-turno',rv.TuTurno.as_view()),path('preguntas',rv.Questions.as_view()),
+ path('preguntas/<uuid:qid>/responder',rv.QuestionAnswer.as_view()),path('preguntas/<uuid:qid>/no-compartir',rv.QuestionDecline.as_view()),
+ path('preguntas/<uuid:qid>/deshacer',rv.QuestionUndo.as_view()),path('preguntas/<uuid:qid>/mas-tarde',rv.QuestionPostpone.as_view()),
+ path('memoria/hechos',rv.Facts.as_view()),path('memoria/hechos/<str:key>/corregir',rv.FactCorrect.as_view()),
+ path('memoria/hechos/<str:key>/retirar',rv.FactRetire.as_view()),path('orientacion',rv.OrientationView.as_view()),
+ path('oportunidades',rv.Opportunities.as_view()),path('oportunidades/<uuid:oid>',rv.OpportunityDetail.as_view()),
+ path('actividad',rv.Activity.as_view()),path('calendario',rv.Calendar.as_view()),path('ajustes',rv.Settings.as_view()),
+ path('red/contacts/<uuid:cid>/notas',rd.ContactNotes.as_view()),
+ path('operador/referents/<uuid:rid>',op.ReferentDetail.as_view()),
  # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).
  path('editorial/calendar',ed.Calendar.as_view()),path('editorial/pieces/<uuid:pid>',ed.PieceDetail.as_view()),
  path('editorial/plan',ed.Plan.as_view()),
