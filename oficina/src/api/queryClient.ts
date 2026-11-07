@@ -16,6 +16,7 @@ export const keys = {
   editorialAll: ['editorial'] as const,
   calendar: (desde: string) => ['editorial', 'calendar', desde] as const,
   piece: (id: string) => ['editorial', 'piece', id] as const,
+  linkedin: ['linkedin-status'] as const,
 };
 
 /** Client errors (4xx) are answers, not glitches: never retry them. */

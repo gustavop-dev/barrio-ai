@@ -8,6 +8,7 @@ import type {
   EditorialCalendar,
   FeedEvent,
   Job,
+  LinkedInStatus,
   MemoryItem,
   Overview,
   Paginated,
@@ -81,6 +82,11 @@ export function getCalendar(desde = '', dias = 15) {
 export const getPiece = (pieceId: string) => api.get<PieceDetail>(`${ED}/pieces/${id(pieceId)}`);
 /** Paid: queues the editorial circuit for the next free slot. The same `request_id` never queues twice. */
 export const planPiece = (requestId?: string) => api.post<PlanResponse>(`${ED}/plan`, requestId ? { request_id: requestId } : {});
+
+// ---------------------------------------------------------------- official LinkedIn
+export const getLinkedInStatus = () => api.get<LinkedInStatus>('/api/v1/linkedin/status');
+/** Opened with a full navigation (never fetch): Django redirects to LinkedIn and back to /ajustes. */
+export const LINKEDIN_OAUTH_START = '/api/v1/linkedin/oauth/start';
 
 // ---------------------------------------------------------------- referents
 export const listReferents = (account: string) =>

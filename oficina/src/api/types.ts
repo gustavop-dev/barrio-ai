@@ -346,6 +346,25 @@ export interface PlanResponse {
   job: Job;
 }
 
+// ---------------------------------------------------------------- official LinkedIn
+
+export interface LinkedInStatus {
+  configured: boolean;
+  live: boolean;
+  api_version: string | null;
+  scopes_required: string[];
+  connected: boolean;
+  member_urn: string | null;
+  member_name: string | null;
+  scopes: string[];
+  expires_at: string | null;
+  days_left: number | null;
+  expired: boolean;
+  expiring_soon: boolean;
+  account: { id: string; paused: boolean; paused_reason: string } | null;
+  connected_at?: string;
+}
+
 // ---------------------------------------------------------------- referents
 
 export interface Referent {
