@@ -2,7 +2,8 @@
 // the iPhone steps, and one switch per push type (`push_types`, PATCH /preferencias push_disabled).
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { useSavePreferencias, type AjustesConPush, type PushType } from '../../api/capturas';
+import { disabledKinds, pushToggledMessage, pushTypeHint, pushTypesOf } from '../../../../compartido/src/logic/ajustes';
+import { useSavePreferencias, type PushType } from '../../api/capturas';
 import { sendTestPush } from '../../api/endpoints';
 import { useAjustes } from '../../api/hooks';
 import { IconChevronDown } from '../../components/icons';
@@ -125,18 +126,18 @@ function PerType() {
   const save = useSavePreferencias();
   const toast = useToast();
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
-  const types: PushType[] | undefined = (ajustes.data as AjustesConPush | undefined)?.push_types;
+  const types: PushType[] | undefined = pushTypesOf(ajustes.data);
   const enabled = (type: PushType) => overrides[type.kind] ?? type.enabled;
 
   const toggle = (type: PushType, next: boolean) => {
     const previous = overrides;
     const updated = { ...overrides, [type.kind]: next };
     setOverrides(updated);
-    const disabled = (types ?? []).filter((t) => !(updated[t.kind] ?? t.enabled)).map((t) => t.kind);
+    const disabled = disabledKinds(types ?? [], updated);
     save.mutate(
       { push_disabled: disabled },
       {
-        onSuccess: () => toast.show(next ? `Push activada: ${type.label}.` : `Push apagada: ${type.label}.`),
+        onSuccess: () => toast.show(pushToggledMessage(type, next)),
         onError: (error) => {
           setOverrides(previous);
           toast.show(errorMessage(error), { tone: 'error' });
@@ -162,7 +163,7 @@ function PerType() {
                 <SwitchRow
                   key={type.kind}
                   label={type.label}
-                  hint={type.goes_to === 'tu_turno' ? 'Va a Tu turno' : type.goes_to === 'notificaciones' ? 'Va a Notificaciones' : undefined}
+                  hint={pushTypeHint(type)}
                   checked={enabled(type)}
                   disabled={save.isPending}
                   onChange={(next) => toggle(type, next)}

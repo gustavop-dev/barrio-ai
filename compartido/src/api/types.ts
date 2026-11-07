@@ -34,7 +34,8 @@ export interface Device {
 
 /** Ajustes › `expo_push`: how native pushes are doing. */
 export interface ExpoPushStatus {
-  active: boolean;
+  /** How many active Expo push tokens the user has (CONTRATO-API «App móvil · Ajustes»: `"active": 1`). */
+  active: number;
   last_success_at: string | null;
   last_error: string | null;
 }
