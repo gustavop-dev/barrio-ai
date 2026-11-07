@@ -81,6 +81,15 @@ docker compose -f compose.prod.yaml exec api python manage.py operador --usuario
 
 Desde ese momento el ciclo autónomo observa, redacta, aprueba por política, ejecuta y concilia. La PWA muestra todo y permite la parada total.
 
+### Publicación diaria con la API oficial
+
+1. En LinkedIn Developers, crea la app con los productos **Share on LinkedIn** y **Sign In with LinkedIn using OpenID Connect**. Añade la URL de retorno `https://barrio.tudominio.com/api/v1/linkedin/oauth/callback`.
+2. En `.env`, completa `LINKEDIN_CLIENT_ID`, `LINKEDIN_CLIENT_SECRET`, `LINKEDIN_REDIRECT_URI` y `FIELD_ENCRYPTION_KEY`, y revisa `EDITORIAL_*`. Después, `up -d`.
+3. Con la sesión iniciada en la PWA, abre `https://barrio.tudominio.com/api/v1/linkedin/oauth/start` y autoriza.
+4. Cuando quieras que salgan las piezas, pon `LIVE_LINKEDIN_OFFICIAL=true` y haz `up -d`. El token dura unos 60 días: una push avisa 7 días antes de que caduque.
+
+Detalle completo en [publicación diaria](../agentes-linkedin/infra/docs/publicacion-diaria.md).
+
 ## 6. Operación
 
 | Tarea | Cómo |

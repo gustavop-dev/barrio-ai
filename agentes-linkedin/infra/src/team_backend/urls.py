@@ -2,6 +2,8 @@ from django.urls import path
 from . import views
 from . import operador_views as op
 from . import oficina_views as of
+from . import linkedin_views as li
+from . import editorial_views as ed
 urlpatterns=[
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
  path('units',views.Units.as_view()),path('units/<str:uid>',views.UnitDetail.as_view()),
@@ -18,6 +20,12 @@ urlpatterns=[
  path('operador/feed',of.Feed.as_view()),path('oficina/actividad',of.Actividad.as_view()),
  path('push/key',of.PushKey.as_view()),path('push/subscriptions',of.PushSubscriptions.as_view()),
  path('push/unsubscribe',of.PushUnsubscribe.as_view()),path('push/test',of.PushTest.as_view()),
+ # Official LinkedIn API: member OAuth and token status (docs/publicacion-diaria.md).
+ path('linkedin/oauth/start',li.OAuthStart.as_view()),path('linkedin/oauth/callback',li.oauth_callback),
+ path('linkedin/status',li.Status.as_view()),
+ # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).
+ path('editorial/calendar',ed.Calendar.as_view()),path('editorial/pieces/<uuid:pid>',ed.PieceDetail.as_view()),
+ path('editorial/plan',ed.Plan.as_view()),
  path('operador/accounts',op.Accounts.as_view()),
  path('operador/accounts/<uuid:aid>/check',op.AccountCheck.as_view()),
  path('operador/accounts/<uuid:aid>/pause',op.AccountPause.as_view()),

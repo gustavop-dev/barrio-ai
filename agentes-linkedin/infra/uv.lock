@@ -976,6 +976,7 @@ version = "0.1.0"
 source = { editable = "." }
 dependencies = [
     { name = "anthropic" },
+    { name = "cryptography" },
     { name = "django" },
     { name = "djangorestframework" },
     { name = "gunicorn" },
@@ -997,6 +998,7 @@ test = [
 requires-dist = [
     { name = "anthropic", specifier = ">=1,<2" },
     { name = "coverage", marker = "extra == 'test'", specifier = ">=7,<8" },
+    { name = "cryptography", specifier = ">=43" },
     { name = "django", specifier = ">=5.2,<5.3" },
     { name = "djangorestframework", specifier = ">=3.16,<4" },
     { name = "gunicorn", specifier = ">=23,<24" },

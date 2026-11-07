@@ -17,6 +17,7 @@ dependencies = [
     "python-dotenv>=1,<2",
     "anthropic>=1,<2",
     "pywebpush>=2,<3",
+    "cryptography>=43",
 ]
 
 [project.optional-dependencies]

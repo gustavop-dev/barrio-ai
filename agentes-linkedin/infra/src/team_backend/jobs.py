@@ -51,7 +51,9 @@ OPERATION_PERMISSIONS={
     'propose_comment':['operate_linkedin','run_agents','use_paid_providers'],
     'execute_action':['execute_actions'],
     'reconcile_action':['operate_linkedin'],
+    'prepare_piece':['operate_linkedin','run_agents','use_paid_providers'],
 }
+PAID_OPERATIONS=('propose_comment','prepare_piece')
 
 def enqueue_operation(user,kind,params,request_id=None,audit_request_id=''):
     """Queue an account-operator step with the same idempotency rules as agent runs."""
@@ -69,7 +71,7 @@ def enqueue_operation(user,kind,params,request_id=None,audit_request_id=''):
             return old,False
         if Job.objects.filter(state=Job.State.QUEUED).count()>=settings.JOB_QUEUE_LIMIT:raise Conflict('La cola está llena; espera a que terminen trabajos')
         job=Job.objects.create(id=jid,owner=user,request_hash=fingerprint,agent='operador',task=kind,
-                               execute=kind=='propose_comment',kind=kind,params=params)
+                               execute=kind in PAID_OPERATIONS,kind=kind,params=params)
         audit(user,'job.enqueued',job.id,audit_request_id,kind=kind)
         return job,True
 

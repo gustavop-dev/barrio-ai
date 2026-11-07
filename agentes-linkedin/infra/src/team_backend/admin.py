@@ -131,3 +131,22 @@ class ActionProposalAdmin(ReadOnlyAdmin):
         for proposal in queryset:
             try:operador.reject(request.user,proposal.id,'Rechazada desde el panel')
             except Exception as exc:self.message_user(request,f'{proposal}: {getattr(exc,"detail",exc)}',messages.ERROR)
+
+from .models import LinkedInCredential
+
+@admin.register(LinkedInCredential)
+class LinkedInCredentialAdmin(ReadOnlyAdmin):
+    """The encrypted token is never shown."""
+    list_display=['member_urn','member_name','expires_at','connected_at','expiry_alerted_at']
+    fields=['account','member_urn','member_name','scopes','expires_at','connected_by','connected_at','expiry_alerted_at']
+    readonly_fields=fields
+
+from .models import EditorialPiece
+
+@admin.register(EditorialPiece)
+class EditorialPieceAdmin(ReadOnlyAdmin):
+    list_display=['slot_date','scheduled_for','state','stage','created_at']
+    list_filter=['state']
+    readonly_fields=['account','slot_date','scheduled_for','state','stage','brief','variants','panel','selection','verification',
+                     'final_text','citations','signals','usage','metrics','note','origin_job','created_by','created_at']
+    fields=readonly_fields

@@ -37,3 +37,18 @@ def confirm(mid,expected_version,on_write=None):
         result={'id':new_id,'version':version+1,'status':'confirmed'}
         if on_write:on_write(c,result)
     return result
+
+def publishable(value):
+    return isinstance(value,dict) and value.get('uso_publico') is True
+
+def confirmed_blocks():
+    """Confirmed user facts split by `uso_publico`. Only a dict value with uso_publico=true may be
+    attributed to the user in public text; anything else is private guidance (the safe default)."""
+    public,private=[],[]
+    for row in latest(True):
+        value=row['value'];base={'key':row['key'],'version':row['version']}
+        if publishable(value):
+            fact=value['texto'] if isinstance(value.get('texto'),str) else {k:v for k,v in value.items() if k!='uso_publico'}
+            public.append(dict(base,fact=fact))
+        else:private.append(dict(base,guidance=value))
+    return public,private
