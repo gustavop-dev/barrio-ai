@@ -5,6 +5,7 @@
   "nombre": "Relaciones y comunidad",
   "grupo": "relaciones",
   "estado": "diseno_propuesto_no_activo",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "fecha": "2026-11-06",
   "proposito": {
     "mision": "Construir y cuidar el barrio de Gustavo: decidir a quién seguir, con quién conectar, dónde aportar públicamente y qué relación retomar, con motivo real y dentro de la política de reparto.",

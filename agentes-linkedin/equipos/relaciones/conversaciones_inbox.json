@@ -5,6 +5,7 @@
   "nombre": "Conversaciones e inbox",
   "grupo": "relaciones",
   "estado": "diseno_propuesto_no_activo",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "fecha": "2026-11-06",
   "proposito": {
     "mision": "Atender el inbox de Gustavo con el historial completo disponible, responder y conversar con motivo real, y reconocer oportunidades y alianzas para transferir su decisión a Gustavo.",
