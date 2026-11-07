@@ -237,6 +237,10 @@ def status(piece,action=None):
 def plan(user,request_id=None,audit_request_id=''):
     """POST /editorial/plan: queue the preparation of the next free slot."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
+    if request_id:
+        # A retry of the same request returns its job; never recompute the slot (that would be a 409).
+        previous=Job.objects.filter(id=request_id,owner=user,kind='prepare_piece').first()
+        if previous:return previous,False,date.fromisoformat(previous.params['slot'])
     account=publishing_account()
     if account is None:raise Conflict('Conecta LinkedIn (API oficial) antes de planificar piezas.')
     if not can_publish(account):raise Conflict('La publicación está en pausa o desactivada (LIVE_LINKEDIN_OFFICIAL); no se prepara una pieza que no saldría.')

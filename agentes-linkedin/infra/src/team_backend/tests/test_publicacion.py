@@ -325,6 +325,10 @@ class EditorialCircuitTests(EditorialBase):
         self.assertTrue(listed[0]['scheduled_for'])
         detail=self.human.get(f'/api/v1/editorial/pieces/{piece.id}').json()
         self.assertEqual((detail['status'],detail['final_text'],detail['verification']['verdict']),('published',GOOD_POST,'ready_for_execution'))
+        self.assertEqual(detail['metrics']['impressions'],321)
+        only_posts=self.human.get('/api/v1/operador/actions',{'capability':'CONT-09'}).json()['results']
+        self.assertEqual({a['capability'] for a in only_posts},{'CONT-09'})
+        self.assertEqual(self.human.get('/api/v1/operador/actions',{'capability':'INT-03'}).json()['count'],0)
         self.assertEqual(set(detail['variants']),{'variant_a','variant_b','citations'});self.assertEqual(len(detail['panel']['readers']),5)
         self.assertEqual(detail['action_detail']['post'],None)
         calendar=self.human.get('/api/v1/editorial/calendar').json()
@@ -372,6 +376,15 @@ class EditorialCircuitTests(EditorialBase):
         self.assertEqual(EditorialPiece.objects.count(),1)
         calendar=self.human.get('/api/v1/editorial/calendar').json()
         self.assertIn('skipped',[p['status'] for d in calendar['days'] for p in d['pieces']])
+
+    def test_plan_retry_with_same_request_returns_the_same_job(self):
+        import uuid
+        rid=str(uuid.uuid4())
+        with self.claude(answers()):
+            first=self.human.post('/api/v1/editorial/plan',{'request_id':rid},format='json')
+            again=self.human.post('/api/v1/editorial/plan',{'request_id':rid},format='json')
+        self.assertEqual((first.status_code,again.status_code),(202,200))
+        self.assertEqual((first.json()['job']['id'],first.json()['slot_date']),(again.json()['job']['id'],again.json()['slot_date']))
 
     def test_one_piece_per_day_at_most(self):
         from team_backend import operador

@@ -46,7 +46,7 @@ class PieceDetail(APIView):
         action=editorial.latest_action(piece)
         return Response(dict(summary(piece,action),brief=piece.brief,variants=piece.variants,panel=piece.panel,
             selection=piece.selection,verification=piece.verification,final_text=piece.final_text,citations=piece.citations,
-            signals=piece.signals,usage=piece.usage,action_detail=ActionOutput(action).data if action is not None else None))
+            signals=piece.signals,usage=piece.usage,metrics=piece.metrics,action_detail=ActionOutput(action).data if action is not None else None))
 
 class Plan(APIView):
     """Queue the preparation of the next free slot (paid: the editorial circuit calls Claude)."""

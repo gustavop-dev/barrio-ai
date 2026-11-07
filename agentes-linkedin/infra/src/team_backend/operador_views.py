@@ -86,8 +86,9 @@ class Actions(ListAPIView):
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
         qs=ActionProposal.objects.select_related('post','piece')
-        state=self.request.query_params.get('state')
-        return qs.filter(state=state) if state else qs
+        state=self.request.query_params.get('state');capability=self.request.query_params.get('capability')
+        if state:qs=qs.filter(state=state)
+        return qs.filter(capability=capability) if capability else qs
     def post(self,request):
         data=valid(ActionInput,request)
         post=get_or_404(ObservedPost,id=data['post'])
