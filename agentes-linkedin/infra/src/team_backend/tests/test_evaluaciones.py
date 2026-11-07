@@ -13,11 +13,12 @@ from django.core.management import CommandError, call_command
 from django.utils import timezone
 
 from knowledge import db
-from team_backend import evaluaciones, operador
+from team_backend import editorial, evaluaciones, operador
 from team_backend.models import ActionProposal, AuditEvent, Contact, EditorialPiece, Job, ObservedPost, PostMetric
 from team_backend.tests.fakes import FakeAnthropic, message
 from team_backend.tests.test_operador import OperatorBase
-from team_backend.tests.test_publicacion import EDITORIAL_UNITS, GOOD_POST, EditorialBase, answers
+from team_backend.tests.test_auditoria_editorial import WITH_LINK, EditorialAuditBase
+from team_backend.tests.test_publicacion import EDITORIAL_UNITS, GOOD_POST, answers
 from team_backend.tests.test_red import NetworkBase
 
 PAID_ENV={'LIVE_PROVIDERS':'true','ANTHROPIC_API_KEY':'test-only','TYPESAFE_API_KEY':'test-only','EVAL_LIMIT_USD':'5',
@@ -35,9 +36,10 @@ def forbidden(*args,**kwargs):
 
 def recorder(calls,answer):
     """A providers.claude double that records each request and answers `answer(purpose, data)`."""
-    def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None):
+    def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
         data=json.loads(message)
-        calls.append({'system':system,'data':data,'max_tokens':max_tokens,'output_schema':output_schema,'effort':effort,'purpose':purpose,'model':model})
+        calls.append({'system':system,'data':data,'max_tokens':max_tokens,'output_schema':output_schema,'effort':effort,'purpose':purpose,
+                      'model':model,'context':context})
         return {'text':json.dumps(answer(purpose,data)),'model':model or 'claude-opus-5-5','estimated_usd':0.01,'request_id':'req_eval'}
     return fake
 
@@ -199,7 +201,7 @@ class DryRunTests(EvalBase):
         report=self.evaluate(['verificador'])
         self.assertEqual(report['salida_tipica']['tokens']['editorial-verificador'],1000)
         run=evaluaciones.Run(None)
-        tokens=evaluaciones.input_tokens(evaluaciones.verifier_request(run,piece))
+        tokens=evaluaciones.input_tokens(evaluaciones.verifier_request(run,piece,*evaluaciones.gate_input(piece)))
         expected=(Decimal(tokens)*Decimal('4')*Decimal('1.25')+Decimal(1000)*Decimal('20'))/Decimal(1_000_000)
         self.assertAlmostEqual(report['agentes']['verificador']['coste_estimado']['claude-opus-5-5']['usd'],float(expected),places=3)
 
@@ -267,14 +269,38 @@ class PaidRunTests(EvalBase):
         self.assertEqual(metrics['evaluados'],4)
         self.assertEqual(metrics['acuerdo_compuerta']['aciertos'],3)
         self.assertEqual(metrics['matriz_compuerta']['positivo_que_falto'],1)
+        self.assertEqual(metrics['acuerdo_modelo']['aciertos'],3)
+        self.assertEqual((metrics['paradas_por_reglas'],metrics['reparaciones']),(0,{}))  # no findings: nothing to repair
         self.assertEqual(metrics['esquema_valido'],{'aciertos':4,'total':4,'pct':100.0})
         self.assertEqual(report['gasto_usd'],0.04)
         self.assertEqual(report['detenida'],'')
 
+    def test_the_gate_runs_the_rules_first_and_one_repair_round_as_in_production(self):
+        piece=self.piece(fate='confirmed',final=WITH_LINK);calls=[]
+        repaired=dict(answers()['reparacion'],final_text=GOOD_POST,changes=[{'finding':'Contiene enlaces','change':'Quité el enlace.'}])
+        answer=lambda purpose,data:repaired if 'findings' in data else verdict()
+        with patch('knowledge.providers.claude',side_effect=recorder(calls,answer)):
+            report=self.evaluate(['verificador'],execute=True,max_usd=Decimal('2'),models=['claude-sonnet-5-5'])
+        # The rules stop the link before the verifier is paid; the repair keeps the production model; the verifier sees the fix.
+        self.assertEqual([('findings' in c['data'],c['model']) for c in calls],[(True,'claude-opus-5-5'),(False,'claude-sonnet-5-5')])
+        self.assertEqual(calls[0]['data']['findings'],[{'source':'reglas','issue':'regla','quote':'','detail':'Contiene enlaces'}])
+        self.assertIn('<tono_de_voz',calls[0]['system'])
+        self.assertEqual((calls[0]['data']['text'],calls[1]['data']['text']),(WITH_LINK,GOOD_POST))
+        self.assertEqual({c['purpose'] for c in calls},{'eval-verificador'})
+        case=report['agentes']['verificador']['resultados']['claude-sonnet-5-5']['casos'][0]
+        self.assertEqual((case['id'],case['compuerta'],case['modelo'],case['reparacion'],case['reglas']),
+                         (str(piece.id),'ready_for_execution',None,'reparada',['Contiene enlaces']))
+        metrics=report['agentes']['verificador']['resultados']['claude-sonnet-5-5']['metricas']
+        self.assertEqual((metrics['paradas_por_reglas'],metrics['reparaciones'],metrics['acuerdo_modelo']['total']),(1,{'reparada':1},0))
+        with patch.dict(os.environ,{'EDITORIAL_REPAIR':'false'}),patch('knowledge.providers.claude',side_effect=forbidden):
+            report=self.evaluate(['verificador'],execute=True,max_usd=Decimal('2'))
+        self.assertEqual(report['agentes']['verificador']['resultados']['claude-opus-5-5']['casos'][0]['compuerta'],'blocked')
+
     def test_comment_drafts_are_graded_by_the_rules_and_the_lead_without_creating_proposals(self):
         self.draft(1,'confirmado');self.draft(2,'descartado_lider');self.draft(3,'saltado')
         before=(ActionProposal.objects.count(),Job.objects.count(),EditorialPiece.objects.count())
-        drafts=iter(['',GOOD_COMMENT,GOOD_COMMENT+' #evals'])  # newest case first: the skip, the lead discard, the confirmed one
+        # Newest case first: the skip, the lead discard, then the confirmed one, whose hashtag survives its one redraft.
+        drafts=iter(['',GOOD_COMMENT,GOOD_COMMENT+' #evals',GOOD_COMMENT+' #evals #again'])
         calls=[];jev_calls=[]
         def answer(purpose,data):
             text=next(drafts)
@@ -286,12 +312,17 @@ class PaidRunTests(EvalBase):
         self.assertEqual({c['purpose'] for c in calls},{'eval-comentarios'})
         self.assertEqual({c['purpose'] for c in jev_calls},{'eval-comentarios'})
         self.assertEqual(calls[0]['data']['existing_comments'],[])  # LinkedIn is never read
+        self.assertIn('course_units',calls[0]['context'])  # the units go in the cached system context, as in production
+        self.assertEqual(calls[3]['data']['revision'],{'previous_comment':GOOD_COMMENT+' #evals','rule_violations':['Contiene hashtags'],
+                                                       'claims_needing_evidence':[]})
         cases={c['etiqueta']:c for c in report['agentes']['comentarios']['resultados']['claude-opus-5-5']['casos']}
         self.assertEqual(cases['saltado']['nuevo'],'saltado')
         self.assertEqual(cases['descartado_lider']['nuevo'],'pasa')
-        self.assertEqual((cases['confirmado']['nuevo'],cases['confirmado']['reglas']),('no_pasa',['Contiene hashtags']))
+        self.assertEqual((cases['confirmado']['nuevo'],cases['confirmado']['reglas'],cases['confirmado']['reescrito']),
+                         ('no_pasa',['Contiene hashtags'],True))
+        self.assertFalse(cases['descartado_lider']['reescrito'])
         metrics=report['agentes']['comentarios']['resultados']['claude-opus-5-5']['metricas']
-        self.assertEqual((metrics['mejoras'],metrics['regresiones']),(1,1))
+        self.assertEqual((metrics['mejoras'],metrics['regresiones'],metrics['reescritos']),(1,1,1))
         self.assertEqual(metrics['lider_aprueba'],{'aciertos':2,'total':2,'pct':100.0})
 
     def test_the_lead_can_fail_a_draft_that_passes_the_rules(self):
@@ -377,18 +408,10 @@ class PaidRunTests(EvalBase):
 
 class GraderTests(EvalBase):
     def test_schema_errors_follow_the_production_schemas(self):
-        from team_backend import editorial
         self.assertEqual(evaluaciones.schema_errors(verdict(),editorial.VERIFIER_SCHEMA),[])
         broken=dict(answers()['verificador'],verdict='maybe',extra=1);broken.pop('summary')
         self.assertEqual(sorted(evaluaciones.schema_errors(broken,editorial.VERIFIER_SCHEMA)),
                          ['$.checked_claims[0].kind: no permitido','$.extra: no permitido','$.summary: falta','$.verdict: valor fuera de la lista'])
-
-    def test_post_rules_are_the_deterministic_policy_rules(self):
-        self.assertEqual(evaluaciones.post_rules(GOOD_POST,[],[]),[])
-        issues=evaluaciones.post_rules(GOOD_POST+'\n\nDM me at hello@example.com #a #b #c #d',[],[])
-        self.assertEqual(issues[:3],['Contiene un correo','Contiene enlaces','Contiene pitch agresivo o petición de contacto'])
-        self.assertIn('Más de 3 hashtags',issues)
-        self.assertTrue(any('Atribuye experiencia' in i for i in evaluaciones.post_rules(GOOD_POST+' I built it for my clients.',[],[])))
 
     def test_jev_verdict_uses_the_lead_thresholds(self):
         checks=[('aporta','min',0.7,'no aporta'),('pitch','max',0.2,'pitch')]
@@ -396,17 +419,27 @@ class GraderTests(EvalBase):
         self.assertEqual(evaluaciones.jev_verdict({'aporta':{'noul':0.8}},checks)[:2],(False,['pitch']))
 
 
-class MirrorEditorialTests(EditorialBase):
+class MirrorEditorialTests(EditorialAuditBase):
     """The eval requests are the production requests: same system, payload, units, caps and effort."""
 
-    def test_verifier_and_selection_requests_mirror_the_circuit(self):
+    def test_verifier_repair_and_selection_requests_mirror_the_circuit(self):
         self.observed()
-        piece=self.plan(answers(signals_used=['first']))
-        sent={purpose:(data,system) for purpose,data,system in self.calls}
+        finding={'issue':'unsourced_figure','severity':'material','quote':'a weekly decision','detail':'Needs a source.'}
+        blocked=dict(answers()['verificador'],verdict='blocked',findings=[finding])
+        plan=answers()
+        plan['reparacion']=dict(plan['reparacion'],final_text=GOOD_POST+'\n\nWho makes it?')
+        piece=self.plan_with(plan,verificador=[blocked,plan['verificador']])
+        self.assertEqual(piece.verification['repair']['outcome'],'reparada')
+        sent={}
+        for purpose,data,system in self.calls:sent.setdefault(purpose,(data,system))  # the first call of each stage
         run=evaluaciones.Run(None)
-        verifier=evaluaciones.verifier_request(run,piece)
+        text,claims=evaluaciones.gate_input(piece)
+        self.assertEqual(text,GOOD_POST)  # the selection's text, not the repaired piece.final_text
+        verifier=evaluaciones.verifier_request(run,piece,text,claims)
         self.assertEqual((json.loads(verifier['message']),verifier['system']),sent['editorial-verificador'])
-        self.assertEqual(verifier['max_tokens'],16000)
+        self.assertEqual((verifier['max_tokens'],verifier['effort']),(16000,'high'))
+        repair=evaluaciones.repair_request(run,piece,text,claims,editorial._findings(blocked,[]))
+        self.assertEqual((json.loads(repair['message']),repair['system']),sent['editorial-reparacion'])
         selection=evaluaciones.selection_request(run,piece,panel=True)
         self.assertEqual((json.loads(selection['message']),selection['system']),sent['editorial-seleccion'])
         without=json.loads(evaluaciones.selection_request(run,piece,panel=False)['message'])
@@ -423,7 +456,18 @@ class MirrorCommentTests(OperatorBase):
         request,_=evaluaciones.comment_request(evaluaciones.Run(None),post)
         production=calls[0]
         self.assertEqual(json.loads(request['message']),production['data'])  # the fake post has no comments to read
-        for key in ('system','max_tokens','output_schema','effort'):self.assertEqual(request[key],production[key],key)
+        for key in ('system','max_tokens','output_schema','effort','context'):self.assertEqual(request[key],production[key],key)
+
+    def test_the_redraft_request_mirrors_the_rules_redraft(self):
+        post=self.observed()[0];calls=[]
+        texts=iter([GOOD_COMMENT+' #evals',GOOD_COMMENT])
+        answer=lambda purpose,data:{'decision':'comment','language':'en','comment':next(texts),'rationale':'r','citations':['LI-03-M006-K02'],
+                                    'claims_needing_evidence':[],'risks':[]}
+        with patch('knowledge.providers.claude',side_effect=recorder(calls,answer)):operador.propose_comment(self.gustavo,post.id)
+        self.assertEqual(len(calls),2)
+        revision=calls[1]['data']['revision']
+        request,_=evaluaciones.comment_request(evaluaciones.Run(None),post,revision)
+        self.assertEqual(json.loads(request['message']),calls[1]['data'])
 
 
 class MirrorClassifierTests(NetworkBase):

@@ -23,7 +23,7 @@
         "max_tokens": "ANTHROPIC_MAX_TOKENS (8000)",
         "proposito_ledger": "agent-run",
         "activacion": "A mano. La salida queda en runs (needs_review) y no llega al bucle autónomo.",
-        "difiere_del_contrato": "No produce positioning_proposal ni neighborhood_criteria versionados. La dirección vive copiada en editorial.DIRECTION, red.CLASSIFY_SYSTEM y lider.CRITERIA_DEL_BARRIO."
+        "difiere_del_contrato": "No produce positioning_proposal ni neighborhood_criteria. La dirección que leen los demás está escrita a mano en team_backend/posicionamiento.py (posicionamiento-v1); de ahí salen editorial.DIRECTION, red.CLASSIFY_SYSTEM y lider.CRITERIA_DEL_BARRIO."
       }
     },
     {
@@ -55,7 +55,7 @@
         "max_tokens": 16000,
         "proposito_ledger": "network-classify",
         "activacion": "autopiloto._network: classify_contacts en lotes de 10, dentro de NETWORK_DAILY_LLM_USD.",
-        "difiere_del_contrato": "Solo clasifica personas descubiertas; los referentes los añade Gustavo (operador.add_referent). Sin search_plan, research_packet ni signal_card. El líder vuelve a juzgar el encaje (R2)."
+        "difiere_del_contrato": "Solo clasifica personas descubiertas; los referentes los añade Gustavo (operador.add_referent). Sin search_plan, research_packet ni signal_card. Es el único juez del encaje (R2): red.network_issues exige su fit y el líder solo mira el riesgo. Sus criterios salen de posicionamiento.network_criteria."
       }
     },
     {
@@ -69,7 +69,7 @@
         "modelo": "ninguno",
         "effort": "no aplica",
         "activacion": "autopiloto._metrics: collect_metrics cada METRICS_EVERY_MINUTES.",
-        "difiere_del_contrato": "Solo recoge métricas. No propone aprendizaje ni participation_signal, y editorial._history no pasa resultados al director."
+        "difiere_del_contrato": "Solo recoge métricas. No propone aprendizaje ni participation_signal. El resumen de resultados que ahora recibe el director (editorial._performance y _history) lo calcula editorial.py, no este rol."
       }
     },
     {
@@ -79,13 +79,13 @@
       "contrato_ejecutable": false,
       "estado": "activo",
       "runtime": {
-        "implementa": ["team_backend/editorial.py: DIRECTOR_SYSTEM / _stage('director')", "team_backend/editorial.py: SELECTION_SYSTEM / _stage('seleccion')"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "implementa": ["team_backend/editorial.py: DIRECTOR_SYSTEM / _stage('director')", "team_backend/editorial.py: SELECTION_SYSTEM / _stage('seleccion')", "team_backend/editorial.py: REPAIR_SYSTEM / _stage('reparacion') en _repair_round (R4)"],
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5); EDITORIAL_MODEL_<ETAPA> la cambia por etapa (la reparación sigue a la selección)",
         "effort": "medium",
         "max_tokens": 16000,
-        "proposito_ledger": "editorial-director, editorial-seleccion",
+        "proposito_ledger": "editorial-director, editorial-seleccion, editorial-reparacion",
         "activacion": "autopiloto._editorial: prepare_piece EDITORIAL_LEAD_HOURS antes de EDITORIAL_POST_TIME, un intento por día, dentro de EDITORIAL_DAILY_LLM_USD.",
-        "difiere_del_contrato": "Sin ACK, eventos ni rondas correctivas (el contrato prevé hasta 2). Pide siempre los cinco lectores, solo text_only, sin calendario ni experimentos, y su historial no trae resultados."
+        "difiere_del_contrato": "Sin ACK ni eventos. Hace una sola ronda de reparación tras las reglas o el verificador (el contrato prevé hasta 2 correctivas). Pide siempre los cinco lectores, solo text_only y sin calendario ni experimentos. Recibe los resultados de 30 días por pilar y modalidad."
       }
     },
     {
@@ -96,7 +96,7 @@
       "estado": "activo",
       "runtime": {
         "implementa": ["team_backend/editorial.py: WRITER_SYSTEM / _stage('redactor') (variant_a)"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_REDACTOR",
         "effort": "medium",
         "max_tokens": 16000,
         "proposito_ledger": "editorial-redactor",
@@ -111,7 +111,7 @@
       "estado": "activo",
       "runtime": {
         "implementa": ["team_backend/editorial.py: WRITER_SYSTEM / _stage('redactor') (variant_b)"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_REDACTOR",
         "effort": "medium",
         "max_tokens": 16000,
         "proposito_ledger": "editorial-redactor",
@@ -126,7 +126,7 @@
       "estado": "activo",
       "runtime": {
         "implementa": ["team_backend/editorial.py: PANEL_SYSTEM / _stage('lectores')"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_LECTORES",
         "effort": "low",
         "max_tokens": 12000,
         "proposito_ledger": "editorial-lectores",
@@ -141,7 +141,7 @@
       "estado": "activo",
       "runtime": {
         "implementa": ["team_backend/editorial.py: PANEL_SYSTEM / _stage('lectores')"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_LECTORES",
         "effort": "low",
         "max_tokens": 12000,
         "proposito_ledger": "editorial-lectores",
@@ -156,7 +156,7 @@
       "estado": "activo",
       "runtime": {
         "implementa": ["team_backend/editorial.py: PANEL_SYSTEM / _stage('lectores')"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_LECTORES",
         "effort": "low",
         "max_tokens": 12000,
         "proposito_ledger": "editorial-lectores",
@@ -171,7 +171,7 @@
       "estado": "activo",
       "runtime": {
         "implementa": ["team_backend/editorial.py: PANEL_SYSTEM / _stage('lectores')"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_LECTORES",
         "effort": "low",
         "max_tokens": 12000,
         "proposito_ledger": "editorial-lectores",
@@ -186,7 +186,7 @@
       "estado": "activo",
       "runtime": {
         "implementa": ["team_backend/editorial.py: PANEL_SYSTEM / _stage('lectores')"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_LECTORES",
         "effort": "low",
         "max_tokens": 12000,
         "proposito_ledger": "editorial-lectores",
@@ -200,12 +200,12 @@
       "contrato_ejecutable": false,
       "estado": "activo",
       "runtime": {
-        "implementa": ["team_backend/editorial.py: VERIFIER_SYSTEM / _stage('verificador')", "team_backend/editorial.py: _blocking (con team_backend/guardas.py)", "team_backend/autopiloto.py: post_issues"],
-        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
+        "implementa": ["team_backend/editorial.py: text_rules (R3, antes del verificador)", "team_backend/editorial.py: VERIFIER_SYSTEM / _stage('verificador')", "team_backend/editorial.py: _check, _blocking, _findings, _repair_round (R4)", "team_backend/autopiloto.py: post_issues"],
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) o EDITORIAL_MODEL_VERIFICADOR",
         "effort": "high",
         "max_tokens": 16000,
         "proposito_ledger": "editorial-verificador",
-        "difiere_del_contrato": "Solo revisa la pieza propia (CONT-09). Comentarios y acciones de red pasan por reglas deterministas y el líder. Sin evidence_request ni ronda de reparación (R4); las reglas deterministas corren después del modelo (R3)."
+        "difiere_del_contrato": "Solo revisa la pieza propia (CONT-09); comentarios y acciones de red pasan por reglas deterministas y el líder. Las reglas corren antes del modelo y sus hallazgos, o los del verificador, reciben una ronda de reparación; no hay evidence_request."
       }
     },
     {
@@ -215,13 +215,13 @@
       "contrato_ejecutable": false,
       "estado": "activo",
       "runtime": {
-        "implementa": ["team_backend/operador.py: COMMENT_SYSTEM / propose_comment (INT-03)", "team_backend/red.py: plan (RED-01, RED-02, RED-04; determinista)", "team_backend/red.py: sync (RED-03; determinista)"],
+        "implementa": ["team_backend/operador.py: COMMENT_SYSTEM / propose_comment, _draft_comment (INT-03)", "team_backend/red.py: plan (RED-01, RED-02, RED-04; determinista)", "team_backend/red.py: sync (RED-03; determinista)"],
         "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) para los comentarios",
         "effort": "medium",
         "max_tokens": "ANTHROPIC_MAX_TOKENS (8000)",
         "proposito_ledger": "propose-comment",
-        "activacion": "autopiloto._propose (un borrador cada vez, OPERATOR_DAILY_PROPOSALS, OPERATOR_DAILY_LLM_USD, enfriamiento por autor) y autopiloto._network.",
-        "difiere_del_contrato": "No propone reacciones (INT-02 solo a mano), mensajes ni notas (RED-05 a RED-08). Sin relationship_record con seguimiento, y no recibe participation_signal del analista."
+        "activacion": "autopiloto._propose: prefiltro de Jev (lider.comment_worthy, R5), un borrador cada vez, OPERATOR_DAILY_PROPOSALS, OPERATOR_DAILY_LLM_USD y enfriamiento por autor; autopiloto._network para la red.",
+        "difiere_del_contrato": "Las unidades del curso van en el contexto de sistema cacheado (C1) y un borrador que rompe una regla fija se reescribe una vez (R4). No propone reacciones (INT-02 solo a mano), mensajes ni notas (RED-05 a RED-08). Sin relationship_record con seguimiento, y no recibe participation_signal del analista."
       }
     },
     {
@@ -229,11 +229,14 @@
       "grupo": "relaciones",
       "contrato": "equipos/relaciones/conversaciones_inbox.json",
       "contrato_ejecutable": false,
-      "estado": "no_implementado",
+      "estado": "parcial",
       "runtime": {
-        "implementa": [],
-        "modelo": "ninguno",
-        "difiere_del_contrato": "No hay código: el inbox no se lee."
+        "implementa": ["team_backend/conversaciones.py: read_inbox (lecturas por Unipile con topes diarios)", "team_backend/conversaciones.py: _questions / assess (Jev)"],
+        "modelo": "TYPESAFE_MODEL (jev-1.14.0) vía providers.typesafe",
+        "effort": "no aplica: juicios tipados con probabilidad",
+        "proposito_ledger": "inbox-assess",
+        "activacion": "INBOX_ENABLED=true (false por defecto); autopiloto._inbox encola read_inbox cada INBOX_EVERY_MINUTES.",
+        "difiere_del_contrato": "Solo lee y propone atención: una tarjeta en Tu turno y un aviso por mensaje nuevo. No responde, no marca como leído ni crea oportunidades; CHAT-* y comprometer términos siguen en Gustavo."
       }
     },
     {
@@ -259,12 +262,12 @@
       "estado": "activo",
       "naturaleza": "compuerta_autonoma_jev",
       "runtime": {
-        "implementa": ["team_backend/lider.py: review, _questions (CHECKS, ORIENTATION_CHECK, CRITERIA_DEL_BARRIO)", "team_backend/autopiloto.py: policy_review"],
+        "implementa": ["team_backend/lider.py: review, _questions (CHECKS, ORIENTATION_CHECK, CRITERIA_DEL_BARRIO)", "team_backend/lider.py: comment_worthy (prefiltro de comentarios, R5)", "team_backend/autopiloto.py: policy_review, lead_silence"],
         "modelo": "TYPESAFE_MODEL (jev-1.14.0) vía providers.typesafe",
         "effort": "no aplica: juicios tipados con probabilidad",
-        "proposito_ledger": "lead-review",
-        "activacion": "LEAD_ENABLED=true y LEAD_CAPABILITIES (INT-03, CONT-09, RED-01, RED-02, RED-04). En el código y en deploy/.env.example LEAD_ENABLED es false por defecto.",
-        "difiere_del_contrato": "Sin contrato. Solo puede descartar: no lidera ni prioriza."
+        "proposito_ledger": "lead-review, comment-prefilter",
+        "activacion": "LEAD_ENABLED=true y LEAD_CAPABILITIES (INT-03, CONT-09, RED-01, RED-02, RED-04), como mucho LEAD_MAX_REVIEWS_PER_TICK (5) revisiones por tick. En el código y en deploy/.env.example LEAD_ENABLED es false por defecto.",
+        "difiere_del_contrato": "Sin contrato. Solo puede descartar: no lidera ni prioriza. En red solo juzga el riesgo (R2). lead_silence avisa si en 7 días no aprueba nada en una capacidad."
       }
     },
     {
@@ -289,5 +292,5 @@
   "evaluaciones": "infra/docs/evaluaciones-agentes.md (manage.py evaluar)",
   "datos_externos": "infra/docs/datos-externos-por-equipo.md",
   "reparto_acciones": "infra/docs/reparto-acciones-v1.md; arquitectura/reparto-acciones-v1.json",
-  "nota": "Los contratos de equipos/ son diseño y el runtime no los lee: usa prompts cortos en Python. 2026-11-07: el índice marca el estado real de cada rol y enlaza el código que lo implementa; se añaden agente_lider y ruteador_capturas, que no tienen contrato. 2026-11-06: se añadieron relaciones_comunidad, conversaciones_inbox y el servicio operador_cuenta según reparto-acciones-v1."
+  "nota": "Los contratos de equipos/ son diseño y el runtime no los lee: usa prompts cortos en Python. 2026-11-07: el índice marca el estado real de cada rol y enlaza el código que lo implementa, ya con las fases 2 y 3 de la auditoría; se añaden agente_lider y ruteador_capturas, que no tienen contrato. 2026-11-06: se añadieron relaciones_comunidad, conversaciones_inbox y el servicio operador_cuenta según reparto-acciones-v1."
 }

@@ -3,10 +3,11 @@
 Cases are built at run time from the history in the database where the command runs (production, on the server):
 nothing is exported, no dataset is committed, and the report goes to stdout or to a path given on the command line.
 Per agent, the case and the known outcome it is graded against:
-- verificador   pieces that reached the verifier with a known fate: published and not vetoed, blocked, vetoed by
-                Gustavo or discarded by the policy. Agreement of a re-run verdict with that fate.
-- comentarios   posts that got an agent draft, with the fate of that draft. The new draft is graded by the
-                deterministic rules of the policy plus the lead's questions (Jev), the production gate.
+- verificador   pieces that reached the gate with a known fate: published and not vetoed, blocked, vetoed by Gustavo
+                or discarded by the policy. The selection's text goes through the production gate again (deterministic
+                rules, verifier, one repair round, rules and verifier once more) and its verdict is compared with the fate.
+- comentarios   posts that got an agent draft, with the fate of that draft. The new draft (with its one rules redraft,
+                as in production) is graded by the deterministic rules plus the lead's questions (Jev).
 - clasificador  classified contacts with a later signal: Gustavo discarded or vetoed them, or the lead discarded an
                 action for riesgo (no fit); the person accepted the invitation or commented on an own post (fit).
 - lectores      ablation: the selection is re-run with and without the stored panel, and the difference is
@@ -21,8 +22,8 @@ Paid execution needs `execute` and a `max_usd` cap. Every call goes through prov
 under purpose eval-<agente>, inside the monthly EVAL_LIMIT_USD (default 0: no paid evaluation until it is set).
 The run reads the database and only writes usage ledger rows: no proposal, job or piece is created.
 
-The request builders mirror the production calls (editorial._stage, operador.propose_comment, red.classify,
-lider.review): keep them in step. tests/test_evaluaciones.py compares them with the real calls."""
+The request builders mirror the production calls (editorial._stage/_check/_repair_round, operador.propose_comment,
+red.classify, lider.review): keep them in step. tests/test_evaluaciones.py compares them with the real calls."""
 import difflib
 import json
 import math
@@ -40,10 +41,13 @@ from .models import ActionProposal, AuditEvent, Contact, EditorialPiece, PostMet
 GO_LIVE=date(2026,11,6)  # the machine went live in production
 TARGET=(20,30)
 AGENTS=('verificador','comentarios','clasificador','lectores','director')
-JEV='jev'  # --modelo jev: the classifier judged by Jev with the lead's questions (audit C3 and R2)
+JEV='jev'  # --modelo jev: the classifier judged by Jev (audit C3): the lead's risk question plus a fit question
 TOKEN_FACTOR=1.2  # Claude's tokenizer counts ~15–20% more than cl100k (audit, «Costos»)
 # Typical output tokens (thinking included) when the ledger has no history for the production purpose.
-DEFAULT_OUTPUT={'editorial-verificador':4000,'editorial-seleccion':5000,'propose-comment':2000,'network-classify':4000}
+DEFAULT_OUTPUT={'editorial-verificador':4000,'editorial-seleccion':5000,'editorial-reparacion':5000,'propose-comment':2000,
+                'network-classify':4000}
+REWRITTEN='Reescrito una vez por las reglas fijas'  # risk operador.propose_comment adds after its rules redraft
+FIT_CHECK=('encaja','min',0.6,'no encaja con el barrio')  # the follow threshold the lead used before R2
 CLASSIFY_BATCH=10  # as red.classify
 FROZEN_KEYS=('primary_reader','modality','pillar','thesis','approach','format','reader_value','evidence','success_criterion','avoid')
 PASSED=('aprobado','confirmado')
@@ -90,9 +94,8 @@ def verifier_cases(run):
     for piece in run.pieces().exclude(final_text='').exclude(verification={}):
         fate=piece_fate(piece)
         if fate is None:continue
-        verification=piece.verification
         cases.append({'id':str(piece.id),'label':fate,'expected':'ready_for_execution' if fate=='publicada' else 'blocked',
-                      'baseline':verification.get('model_verdict') or verification.get('verdict'),'piece':piece})
+                      'baseline':piece.verification.get('verdict'),'piece':piece})
     return cases
 
 def comment_fate(proposal):
@@ -168,23 +171,32 @@ def stage_request(run,name,payload,unit_ids=None):
     message=json.dumps(dict(payload,course_units=units),ensure_ascii=False,default=str)
     return {'system':system,'message':message,'max_tokens':max_tokens,'output_schema':schema,'effort':effort}
 
-def verifier_request(run,piece):
-    return stage_request(run,'verificador',dict(run.editorial_memory(),text=piece.final_text,brief=_frozen(piece.brief),
-                         claims=(piece.selection or {}).get('claims',[]),sources=piece.signals))
+def gate_input(piece):
+    """The text and claims the gate received: the selection's, before any repair changed piece.final_text."""
+    selection=piece.selection or {}
+    return (selection.get('final_text') or piece.final_text or '').strip(),selection.get('claims',[])
+
+def verifier_request(run,piece,text,claims):
+    return stage_request(run,'verificador',dict(run.editorial_memory(),text=text,brief=_frozen(piece.brief),claims=claims,sources=piece.signals))
+
+def repair_request(run,piece,text,claims,findings):
+    return stage_request(run,'reparacion',dict(run.editorial_memory(),brief=_frozen(piece.brief),text=text,claims=claims,findings=findings,
+                         sources=piece.signals))
 
 def selection_request(run,piece,panel=True):
     extra={'panel':piece.panel} if panel else {}
     return stage_request(run,'seleccion',dict(run.editorial_memory(),brief=_frozen(piece.brief),variants=piece.variants,**extra,sources=piece.signals))
 
-def comment_request(run,post):
-    """operador.propose_comment without reading LinkedIn: existing_comments stays empty."""
-    units,missing=run.context(operador.COMMENT_UNITS,12000)
+def comment_request(run,post,revision=None):
+    """operador._draft_comment without reading LinkedIn (existing_comments stays empty): instructions, voice and course
+    units in cached system blocks; `revision` makes it the redraft after a rule violation."""
+    units,_=run.context(operador.COMMENT_UNITS,12000)
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
-    message=json.dumps({'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':[],
-        'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation,'course_units':units},
-        ensure_ascii=False,default=str)
-    return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':message,'max_tokens':None,'output_schema':operador.COMMENT_SCHEMA,
-            'effort':'medium'},units
+    inputs={'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':[],
+            'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation}
+    if revision:inputs['revision']=revision
+    return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
+            'output_schema':operador.COMMENT_SCHEMA,'effort':'medium','context':operador.course_block(units)},units
 
 def classify_request(run,contacts):
     """red.classify for a batch, with the profile data stored today."""
@@ -198,9 +210,14 @@ def lead_request(post,text,orientation):
     """The lead's questions on a comment draft (state, questions, checks), as lider.review asks them."""
     return lider._questions(ActionProposal(capability=ActionProposal.Capability.COMMENT,post=post,payload={'text':text}),orientation)
 
+FIT_QUESTION=('Según `persona.titular`, `persona.ubicacion` y `persona.evidencia`, ¿esta persona encaja en el barrio de Gustavo '
+              'descrito en `criterios_del_barrio`?')
+
 def jev_classify_request(contact,orientation):
-    """The lead's follow questions (encaja, riesgo) as a classifier."""
-    return lider._questions(ActionProposal(capability=ActionProposal.Capability.FOLLOW,contact=contact),orientation)
+    """Jev as the classifier: the lead's follow state and risk question (and orientation), plus a fit question of its
+    own, since R2 left the lead judging only risk. Fit needs encaja >= 0.6 and the lead's thresholds."""
+    state,questions,checks=lider._questions(ActionProposal(capability=ActionProposal.Capability.FOLLOW,contact=contact),orientation)
+    return state,dict({'encaja':lider._noul(FIT_QUESTION)},**questions),[FIT_CHECK]+checks
 
 def jev_verdict(answers,checks):
     """(passes, failed labels, probabilities) with lider.review's thresholds."""
@@ -212,8 +229,8 @@ def jev_verdict(answers,checks):
 # --------------------------------------------------------------------------- cost estimates (no API call)
 
 def input_tokens(request):
-    raw=len(ENC.encode(request['system'],disallowed_special=()))+len(ENC.encode(request['message'],disallowed_special=()))
-    return math.ceil(raw*TOKEN_FACTOR)
+    parts=(request['system'],request.get('context') or '',request['message'])
+    return math.ceil(sum(len(ENC.encode(part,disallowed_special=())) for part in parts)*TOKEN_FACTOR)
 
 def max_tokens(request):
     return request.get('max_tokens') or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
@@ -246,7 +263,17 @@ def typical_outputs():
     return {p:measured.get(p,(d,0))[0] for p,d in DEFAULT_OUTPUT.items()},{p:n for p,(_,n) in measured.items()}
 
 def production_model(agent):
-    return red.classifier_model() if agent=='clasificador' else providers.claude_model()
+    if agent=='clasificador':return red.classifier_model()
+    stage={'verificador':'verificador','lectores':'seleccion'}.get(agent)
+    return (stage and editorial.stage_model(stage)) or providers.claude_model()
+
+def repair_model():
+    """The repair is the director's job: it keeps its production model whatever verifier model is evaluated."""
+    return editorial.stage_model('reparacion') or providers.claude_model()
+
+def expects_repair(run,piece,text):
+    """Whether a run will likely pay a repair round: the rules stop the text, or the piece needed one before."""
+    return editorial.repair_enabled() and bool(editorial.text_rules(text,run.public,run.private) or (piece.verification or {}).get('repair'))
 
 def models_for(agent):
     if agent=='director':return []
@@ -254,18 +281,27 @@ def models_for(agent):
     return [first]+[m for m in providers.MODEL_PRICES if m!=first]+([JEV] if agent=='clasificador' else [])
 
 def planned_calls(run,agent,cases):
-    """Model-independent work of one run: Claude calls (production purpose, request, input tokens) and Jev calls."""
+    """Model-independent work of one run: Claude calls (production purpose, request, fixed model or None for the model
+    being compared) and Jev calls. Returned with the input tokens of each Claude call."""
     claude=[];jev=[]
-    if agent=='verificador':claude=[('editorial-verificador',verifier_request(run,c['piece'])) for c in cases]
+    if agent=='verificador':
+        for c in cases:
+            piece=c['piece'];text,claims=gate_input(piece)
+            claude.append(('editorial-verificador',verifier_request(run,piece,text,claims),None))
+            if expects_repair(run,piece,text):
+                claude+=[('editorial-reparacion',repair_request(run,piece,text,claims,[]),repair_model()),
+                         ('editorial-verificador',verifier_request(run,piece,text,claims),None)]
     elif agent=='comentarios':
         for c in cases:
-            claude.append(('propose-comment',comment_request(run,c['post'])[0]))
+            request=comment_request(run,c['post'])[0]
+            claude+=[('propose-comment',request,None)]*(2 if any(REWRITTEN in str(r) for r in c['proposal'].risks) else 1)
             if run.lead:jev.append(lead_request(c['post'],c['proposal'].payload.get('text') or '',run.orientation)[:2])
     elif agent=='clasificador':
-        claude=[('network-classify',classify_request(run,[c['contact'] for c in cases[i:i+CLASSIFY_BATCH]])) for i in range(0,len(cases),CLASSIFY_BATCH)]
+        claude=[('network-classify',classify_request(run,[c['contact'] for c in cases[i:i+CLASSIFY_BATCH]]),None)
+                for i in range(0,len(cases),CLASSIFY_BATCH)]
     elif agent=='lectores':
-        for c in cases:claude+=[('editorial-seleccion',selection_request(run,c['piece'],panel)) for panel in (True,False)]
-    return [(p,r,input_tokens(r)) for p,r in claude],jev
+        for c in cases:claude+=[('editorial-seleccion',selection_request(run,c['piece'],panel),None) for panel in (True,False)]
+    return [(p,r,fixed,input_tokens(r)) for p,r,fixed in claude],jev
 
 def estimate(run,agent,cases,outputs):
     claude,jev=planned_calls(run,agent,cases);rows={}
@@ -274,9 +310,9 @@ def estimate(run,agent,cases,outputs):
             costs=[jev_usd(*jev_classify_request(c['contact'],run.orientation)[:2]) for c in cases]
             rows[model]={'usd':_money(sum(costs,Decimal(0))),'llamadas_claude':0,'llamadas_jev':len(costs),'tokens_entrada':0,'tokens_salida':0}
             continue
-        usd=sum((claude_usd(t,model,outputs[p]) for p,_,t in claude),Decimal(0))+sum((jev_usd(s,q) for s,q in jev),Decimal(0))
+        usd=sum((claude_usd(t,fixed or model,outputs[p]) for p,_,fixed,t in claude),Decimal(0))+sum((jev_usd(s,q) for s,q in jev),Decimal(0))
         rows[model]={'usd':_money(usd),'llamadas_claude':len(claude),'llamadas_jev':len(jev),
-                     'tokens_entrada':sum(t for _,_,t in claude),'tokens_salida':sum(outputs[p] for p,_,_ in claude)}
+                     'tokens_entrada':sum(t for *_,t in claude),'tokens_salida':sum(outputs[p] for p,*_ in claude)}
     return rows
 
 def _money(value):
@@ -360,16 +396,6 @@ def schema_errors(value,schema,path='$'):
         for i,item in enumerate(value):errors+=schema_errors(item,schema.get('items',{}),f'{path}[{i}]')
     return errors
 
-def post_rules(text,public,private):
-    """The deterministic CONT-09 rules of the policy (autopiloto.post_issues without the verifier checks)."""
-    low,high=autopiloto.POST_LENGTH;issues=[]
-    if not low<=len(text)<=high:issues.append(f'Longitud fuera de {low}–{high} caracteres')
-    for pattern,reason in ((autopiloto.EMAIL,'Contiene un correo'),(autopiloto.PHONE,'Contiene un número de teléfono'),
-                           (autopiloto.URL,'Contiene enlaces'),(autopiloto.POST_PITCH,'Contiene pitch agresivo o petición de contacto')):
-        if pattern.search(text):issues.append(reason)
-    if len(autopiloto.HASHTAG.findall(text))>autopiloto.POST_MAX_HASHTAGS:issues.append(f'Más de {autopiloto.POST_MAX_HASHTAGS} hashtags')
-    return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
-
 def rate(values):
     values=list(values);hits=sum(1 for v in values if v)
     return {'aciertos':hits,'total':len(values),'pct':round(100*hits/len(values),1) if values else None}
@@ -391,19 +417,21 @@ def _ok(results):
     return [r for r in results if 'error' not in r]
 
 def grade_verifier(results):
-    ok=_ok(results)
+    ok=_ok(results);seen=[r for r in ok if r['modelo'] is not None]
     return {'evaluados':len(ok),'errores':len(results)-len(ok),
-            'acuerdo_modelo':rate(r['modelo']==r['esperado'] for r in ok),
             'acuerdo_compuerta':rate(r['compuerta']==r['esperado'] for r in ok),
+            'acuerdo_modelo':rate(r['modelo']==r['esperado'] for r in seen),
             'matriz_compuerta':confusion([(r['esperado'],r['compuerta']) for r in ok],'blocked'),
             'por_desenlace':{label:rate(r['compuerta']==r['esperado'] for r in ok if r['etiqueta']==label) for label in sorted({r['etiqueta'] for r in ok})},
-            'esquema_valido':rate(not r['esquema'] for r in ok),
-            'reglas_que_el_modelo_no_vio':sum(1 for r in ok if r['modelo']=='ready_for_execution' and r['reglas'])}
+            'paradas_por_reglas':sum(1 for r in ok if r['reglas']),
+            'reparaciones':dict(Counter(r['reparacion'] for r in ok if r['reparacion'])),
+            'esquema_valido':rate(not r['esquema'] for r in seen)}
 
 def grade_comments(results):
     ok=_ok(results);drafts=[r for r in ok if r['nuevo']!='saltado']
     return {'evaluados':len(ok),'errores':len(results)-len(ok),
             'pasa_la_compuerta':rate(r['nuevo']=='pasa' for r in ok),'saltados':rate(r['nuevo']=='saltado' for r in ok),
+            'reescritos':sum(1 for r in ok if r['reescrito']),
             'viola_reglas':rate(bool(r['reglas']) for r in drafts),
             'lider_aprueba':rate(r['lider']['aprueba'] for r in drafts if r['lider']),
             'acuerdo_con_el_desenlace':rate(r['nuevo']==r['esperado'] for r in ok),
@@ -446,31 +474,66 @@ def _each(cases,results,one):
         try:results.append(dict(base,**one(case)))
         except ValueError as exc:results.append(dict(base,error=str(exc)[:300]))
 
+def _check(run,piece,text,claims,model):
+    """editorial._check: the rules first, then the verifier only for a text they let through."""
+    issues=editorial.text_rules(text,run.public,run.private)
+    if issues:return None,issues,issues
+    review=run.claude('verificador',verifier_request(run,piece,text,claims),model)
+    return review,editorial._blocking(review),[]
+
+def gate(run,piece,model):
+    """The production gate on the selection's text (editorial._check and _repair_round): rules, verifier, one repair
+    with the exact findings, rules and verifier once more. `model` is the verifier's; the repair keeps its own."""
+    text,claims=gate_input(piece)
+    first,reasons,issues=_check(run,piece,text,claims,model)
+    review,repair,rules=first,None,issues
+    findings=editorial._findings(first,issues) if reasons and editorial.repair_enabled() else []
+    if findings:
+        data=run.claude('verificador',repair_request(run,piece,text,claims,findings),repair_model())
+        repaired=(data.get('final_text') or '').strip()
+        if data.get('decision')!='repaired' or not repaired:repair='descartada'
+        elif repaired==text:repair='sin_cambios'
+        else:
+            review,reasons,_=_check(run,piece,repaired,data.get('claims') or [],model)
+            repair='bloqueada' if reasons else 'reparada'
+    return first,review,reasons,rules,repair
+
 def run_verifier(run,cases,model,results):
     def one(case):
-        piece=case['piece']
-        data=run.claude('verificador',verifier_request(run,piece),model)
-        reasons=editorial._blocking(data,piece.final_text,run.public,run.private)  # model verdict plus the guards, as in production
-        return {'esperado':case['expected'],'modelo':data.get('verdict'),'compuerta':'blocked' if reasons else 'ready_for_execution',
-                'esquema':schema_errors(data,editorial.VERIFIER_SCHEMA)[:5],'reglas':post_rules(piece.final_text,run.public,run.private)}
+        first,review,reasons,rules,repair=gate(run,case['piece'],model)
+        return {'esperado':case['expected'],'compuerta':'blocked' if reasons else 'ready_for_execution',
+                'modelo':first.get('verdict') if first else None,  # the verifier alone on the selection's text, before any repair
+                'reglas':rules,'reparacion':repair,'esquema':schema_errors(first,editorial.VERIFIER_SCHEMA)[:5] if first else []}
     _each(cases,results,one)
+
+def _comment_rules(data,units):
+    """The comment text and the rules a redraft can fix (autopiloto.comment_text_issues); the author cooldown is
+    scheduling, not content, and is left out. None when the agent chose to skip."""
+    text=(data.get('comment') or '').strip()
+    if data.get('decision')!='comment' or not text:return None,[]
+    known={u['unit_id'] for u in units}
+    draft=ActionProposal(capability=ActionProposal.Capability.COMMENT,payload={'text':text},source='agent',
+                         citations=[c for c in data.get('citations',[]) if c in known],
+                         risks=list(data.get('risks',[]))+[f'Afirmación por verificar: {c}' for c in data.get('claims_needing_evidence',[])])
+    try:
+        operador.validate_payload(ActionProposal.Capability.COMMENT,{'text':text})
+        return text,autopiloto.comment_text_issues(draft)
+    except ValueError as exc:return text,[str(exc)]
 
 def run_comments(run,cases,model,results):
     def one(case):
         post=case['post']
         request,units=comment_request(run,post)
         data=run.claude('comentarios',request,model)
-        text=(data.get('comment') or '').strip()
-        out={'original':case['label'],'esperado':case['expected'],'esquema':schema_errors(data,operador.COMMENT_SCHEMA)[:5]}
-        if data.get('decision')!='comment' or not text:return dict(out,nuevo='saltado',reglas=[],lider=None)
-        known={u['unit_id'] for u in units}
-        draft=ActionProposal(capability=ActionProposal.Capability.COMMENT,payload={'text':text},source='agent',
-                             citations=[c for c in data.get('citations',[]) if c in known],
-                             risks=list(data.get('risks',[]))+[f'Afirmación por verificar: {c}' for c in data.get('claims_needing_evidence',[])])
-        try:
-            operador.validate_payload(ActionProposal.Capability.COMMENT,{'text':text})
-            issues=autopiloto.content_issues(draft)  # no post on the draft: the author cooldown is scheduling, not content
-        except ValueError as exc:issues=[str(exc)]
+        out={'original':case['label'],'esperado':case['expected'],'esquema':schema_errors(data,operador.COMMENT_SCHEMA)[:5],'reescrito':False}
+        text,issues=_comment_rules(data,units)
+        if text and issues:
+            # operador.propose_comment: one redraft naming the fixed rules the first draft broke.
+            revision={'previous_comment':data['comment'],'rule_violations':issues,'claims_needing_evidence':list(data.get('claims_needing_evidence',[]))}
+            data=run.claude('comentarios',comment_request(run,post,revision)[0],model)
+            out.update(reescrito=True,reglas_primer_borrador=issues)
+            text,issues=_comment_rules(data,units)
+        if not text:return dict(out,nuevo='saltado',reglas=[],lider=None)
         lead=None
         if run.lead:
             state,questions,checks=lead_request(post,text,run.orientation)
@@ -510,7 +573,7 @@ def run_panel(run,cases,model,results):
         with_panel=run.claude('lectores',selection_request(run,piece,True),model)
         without=run.claude('lectores',selection_request(run,piece,False),model)
         stored,first,second=((x.get('final_text') or '').strip() for x in (original,with_panel,without))
-        rules=lambda text:post_rules(text,run.public,run.private) if text else []
+        rules=lambda text:editorial.text_rules(text,run.public,run.private) if text else []
         return {'original':original.get('decision'),'con_panel':with_panel.get('decision'),'sin_panel':without.get('decision'),
                 'similitud_ablacion':similarity(first,second),'similitud_ruido':similarity(first,stored),
                 'reglas_con_panel':rules(first),'reglas_sin_panel':rules(second),
@@ -631,7 +694,8 @@ def _gap(entry):
         return 'objetivo cubierto' if not entry['faltan']['para_30'] else f'faltan {entry["faltan"]["para_30"]} para 30'
     return f'faltan {entry["faltan"]["para_20"]} para 20 y {entry["faltan"]["para_30"]} para 30'
 
-METRIC_LABELS={'acuerdo_modelo':'acuerdo del veredicto del modelo','acuerdo_compuerta':'acuerdo de la compuerta (modelo y guardas)',
+METRIC_LABELS={'acuerdo_compuerta':'acuerdo de la compuerta (reglas, verificador y reparación)',
+               'acuerdo_modelo':'acuerdo del verificador solo (antes de reparar)',
                'pasa_la_compuerta':'pasa reglas y líder','saltados':'saltados','viola_reglas':'viola reglas','lider_aprueba':'el líder aprueba',
                'acuerdo_con_el_desenlace':'acuerdo con el desenlace','acuerdo_encaje':'acuerdo de encaje','acuerdo_linea_base':'línea base',
                'cambia_la_decision':'el panel cambia la decisión','ruido_entre_corridas':'ruido entre corridas','esquema_valido':'esquema válido'}
@@ -667,7 +731,7 @@ def render(report):
                 if key in metrics:out.append(f'    {label}: {_pct(metrics[key])}')
             for key in ('matriz_compuerta','matriz'):
                 if key in metrics:out.append(f'    matriz: {_labels(metrics[key])}')
-            for key in ('reglas_que_el_modelo_no_vio','mejoras','regresiones','sin_resultado','similitud_con_y_sin_panel','similitud_ruido',
+            for key in ('paradas_por_reglas','reparaciones','reescritos','mejoras','regresiones','sin_resultado','similitud_con_y_sin_panel','similitud_ruido',
                         'reglas_violadas_con_panel','reglas_violadas_sin_panel'):
                 if key in metrics:out.append(f'    {key.replace("_"," ")}: {metrics[key]}')
             if 'veredicto' in metrics:out.append(f'    {metrics["veredicto"]}')

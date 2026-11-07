@@ -16,8 +16,8 @@ El historial empieza el 6 de noviembre de 2026, cuando la máquina entró en pro
 
 | Agente | Caso | Contra qué se califica | Calificación |
 | --- | --- | --- | --- |
-| verificador | Piezas que llegaron al verificador con un destino conocido: publicada y no vetada, bloqueada, vetada por Gustavo o descartada por la política (no cuentan los descartes por hash o por capacidad apagada) | Se vuelve a pedir el veredicto. Se compara el del modelo solo y el de la compuerta completa (modelo y guardas, como `editorial._blocking`) con el destino: publicada → `ready_for_execution`; el resto → `blocked` | Acuerdo, matriz de confusión, esquema válido y reglas deterministas que el modelo dejó pasar |
-| comentarios | Publicaciones con un borrador del agente, con su destino: confirmado, aprobado, descartado por el líder (con motivos), descartado por las reglas, vetado o saltado | Se redacta un borrador nuevo y se le aplican las reglas deterministas de la política (`autopiloto.content_issues`, sin el enfriamiento por autor) y las preguntas del líder (Jev) con sus umbrales | Pasa la compuerta, saltados, viola reglas, el líder aprueba, mejoras y regresiones frente al destino original |
+| verificador | Piezas que llegaron a la compuerta con un destino conocido: publicada y no vetada, bloqueada, vetada por Gustavo o descartada por la política (no cuentan los descartes por hash o por capacidad apagada) | El texto de la selección (antes de cualquier reparación) vuelve a pasar la compuerta de producción: reglas deterministas (`editorial.text_rules`), verificador solo si pasan, una ronda de reparación con los hallazgos concretos y otra vez reglas y verificador. Su veredicto se compara con el destino: publicada → `ready_for_execution`; el resto → `blocked`. `--modelo` cambia el modelo del verificador; la reparación conserva el de producción | Acuerdo de la compuerta, acuerdo del verificador solo (su primer veredicto, cuando las reglas lo dejaron llegar), matriz de confusión, paradas por reglas, resultado de las reparaciones y esquema válido |
+| comentarios | Publicaciones con un borrador del agente, con su destino: confirmado, aprobado, descartado por el líder (con motivos), descartado por las reglas, vetado o saltado | Se redacta un borrador nuevo. Si rompe una regla fija de texto, se reescribe una vez, como en producción. Al final se le aplican las reglas (`autopiloto.comment_text_issues`, sin el enfriamiento por autor) y las preguntas del líder (Jev) con sus umbrales | Pasa la compuerta, saltados, reescritos, viola reglas, el líder aprueba, mejoras y regresiones frente al destino original |
 | clasificador | Personas clasificadas con una señal posterior. No encajan: Gustavo las descartó o vetó una acción, o el líder la descartó por `riesgo`. Encajan: aceptaron la invitación o comentaron con sustancia una publicación propia | Se reclasifica en lotes de 10, con el mismo corte de confianza que `red.classify` | Acuerdo de encaje frente a la línea base (lo que se decidió en su día) |
 | lectores | Piezas con variantes, panel y selección guardados | Ablación: la selección se repite con el panel guardado y sin panel. La diferencia se compara con el ruido entre corridas (con panel frente a la selección guardada) | Cambio de decisión, ruido, similitud de textos y reglas violadas. El veredicto dice si el panel cambia la selección más que el ruido; con menos de 20 casos es solo orientativo |
 | director | Días con pieza escrita o saltada | Descriptivo: no hay un desenlace correcto conocido, así que no se llama al modelo ni hay juez | Días, saltos, mezcla de pilares y modalidades, destino de lo escrito y métricas (24 h, 72 h, 7 días) por pilar y modalidad cuando existen |
@@ -29,7 +29,7 @@ Las respuestas inválidas no se ocultan: el esquema se valida aparte, y un caso 
 **Límites:**
 
 - Las respuestas del inbox no se observan hasta que exista el agente de inbox.
-- El borrador nuevo de un comentario no ve los comentarios existentes, porque no se lee LinkedIn.
+- El borrador nuevo de un comentario no ve los comentarios existentes, porque no se lee LinkedIn. Tampoco pasa por el prefiltro de Jev (R5): el caso ya es una publicación que lo pasó.
 - La memoria y la orientación son las de hoy, no las del día del caso.
 
 ## Ensayo (por defecto): gratis
@@ -63,7 +63,7 @@ docker compose -f compose.prod.yaml --env-file .env exec -e EVAL_LIMIT_USD=25 ap
 - `--ejecutar` exige `--max-usd`. La corrida se detiene antes de cualquier llamada que, en el peor caso (todo `max_tokens`, como la reserva del proveedor), pudiera superar ese tope, y el informe dice dónde paró.
 - `EVAL_LIMIT_USD` es el presupuesto mensual de las evaluaciones: suma lo gastado en el mes con propósito `eval-*`. Vale 0 por defecto, así que nada se paga hasta fijarlo.
 - Todas las llamadas pasan por `providers.claude` y `providers.typesafe`, con propósito `eval-verificador`, `eval-comentarios`, `eval-clasificador` o `eval-lectores`. Quedan en el ledger y siguen contando para `ANTHROPIC_LIMIT_USD` y `TYPESAFE_LIMIT_USD`, pero no para los presupuestos diarios de producción, que filtran por su propio propósito.
-- `--modelo` (repetible) compara modelos, la palanca C3 de la auditoría. Sin `--modelo` se usa el de producción de cada agente. `--modelo jev` evalúa el clasificador con las preguntas de encaje y riesgo del líder (R2).
+- `--modelo` (repetible) compara modelos, la palanca C3 de la auditoría. Sin `--modelo` se usa el de producción de cada agente. `--modelo jev` evalúa el clasificador con Jev: la pregunta de riesgo del líder más una de encaje propia (desde R2 el líder ya no pregunta el encaje).
 
 ## Coste esperado
 
@@ -71,8 +71,8 @@ Calculado con los tamaños reales de las unidades del curso y los prompts:
 
 | Agente | Por caso (Opus 5.5, salvo el clasificador) | 30 casos |
 | --- | --- | --- |
-| verificador | ~$0,13 (≈10k de entrada, 4k de salida) | ~$4 |
-| comentarios | ~$0,13 más ~$0,0002 de Jev | ~$4 |
+| verificador | ~$0,13 (≈10k de entrada, 4k de salida), más una reparación y otra verificación cuando hacen falta | ~$4 |
+| comentarios | ~$0,13 más ~$0,0002 de Jev, y otro tanto si el borrador se reescribe | ~$4 |
 | clasificador (Sonnet 5.5) | ~$0,05 por lote de 10 | ~$0,15 |
 | lectores (dos selecciones por caso) | ~$0,40 | ~$12 |
 | director | $0 | $0 |
@@ -83,4 +83,4 @@ Con el historial corto de hoy hay muchos menos casos y cuesta unos pocos dólare
 
 ## Mantenimiento
 
-Las peticiones reproducen las llamadas de producción: `editorial._stage`, `operador.propose_comment`, `red.classify` y `lider.review`. `tests/test_evaluaciones.py` compara el sistema, el mensaje, el esquema, `max_tokens` y `effort` con las llamadas reales, y falla si un cambio de producción no llega aquí. El [mapa de agentes](mapa-agentes-runtime.md) describe qué corre por rol.
+Las peticiones reproducen las llamadas de producción: `editorial._stage`, `_check` y `_repair_round`, `operador.propose_comment` y `_draft_comment`, `red.classify` y `lider.review`. `tests/test_evaluaciones.py` compara el sistema, el mensaje, el esquema, `max_tokens` y `effort` con las llamadas reales, y falla si un cambio de producción no llega aquí. El [mapa de agentes](mapa-agentes-runtime.md) describe qué corre por rol.
