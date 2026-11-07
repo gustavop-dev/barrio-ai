@@ -274,6 +274,46 @@ class EditorialPiece(models.Model):
                                              name='one_open_piece_per_day')]
     def __str__(self):return f'{self.slot_date} · {self.get_state_display()}'
 
+class PostMetric(models.Model):
+    """APRE-01: cumulative counters of an own published post at a fixed age, read through Unipile (metricas.py).
+    Each age is captured once, late if need be (captured_at - published_at tells how late). Null means no data
+    (hidden by LinkedIn, absent or unread), never zero."""
+    class Kind(models.TextChoices):
+        H24='24h','24 horas'
+        H72='72h','72 horas'
+        D7='7d','7 días'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    piece=models.ForeignKey(EditorialPiece,on_delete=models.CASCADE,related_name='post_metrics')
+    provider_post_id=models.CharField(max_length=200,blank=True)  # opaque Unipile id, not the official URN
+    share_url=models.TextField(blank=True)
+    kind=models.CharField(max_length=4,choices=Kind.choices)
+    impressions=models.IntegerField(null=True,blank=True)
+    reactions=models.IntegerField(null=True,blank=True)
+    comments=models.IntegerField(null=True,blank=True)
+    reposts=models.IntegerField(null=True,blank=True)
+    # Who commented, read once per capture: [{provider_user_id, name, substantive, role, fit}]; null = not read.
+    commenters=models.JSONField(null=True,blank=True)
+    published_at=models.DateTimeField(null=True,blank=True)
+    captured_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['piece','captured_at']
+        constraints=[models.UniqueConstraint(fields=['piece','kind'],name='one_post_metric_per_age')]
+    def __str__(self):return f'{self.piece_id} · {self.kind}'
+
+class AudienceSnapshot(models.Model):
+    """APRE-01: Gustavo's own audience once per local day (OPERATOR_TIMEZONE), read through Unipile.
+    Cumulative counters: net growth is the difference between two snapshots. Null means no data, never zero."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    day=models.DateField(unique=True)
+    followers=models.IntegerField(null=True,blank=True)
+    connections=models.IntegerField(null=True,blank=True)
+    # LinkedIn reports profile views over a trailing window (List Profile Views, date_range in days).
+    profile_views=models.IntegerField(null=True,blank=True)
+    profile_views_days=models.PositiveSmallIntegerField(null=True,blank=True)
+    captured_at=models.DateTimeField(default=timezone.now)
+    class Meta:ordering=['-day']
+    def __str__(self):return str(self.day)
+
 class ActionProposal(models.Model):
     class Capability(models.TextChoices):
         COMMENT='INT-03','Comentar en una publicación ajena'

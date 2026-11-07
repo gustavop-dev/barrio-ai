@@ -5,6 +5,7 @@ from . import oficina_views as of
 from . import linkedin_views as li
 from . import editorial_views as ed
 from . import red_views as rd
+from . import resultados_views as rs
 from . import rediseno_views as rv
 urlpatterns=[
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
@@ -27,6 +28,8 @@ urlpatterns=[
  path('linkedin/status',li.Status.as_view()),
  path('red/contacts',rd.Contacts.as_view()),path('red/contacts/<uuid:cid>',rd.ContactDetail.as_view()),
  path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/summary',rd.Summary.as_view()),
+ # Resultados: own-post and audience metrics against the previous period (docs/metricas-resultados.md).
+ path('resultados',rs.Resultados.as_view()),
  path('tu-turno',rv.TuTurno.as_view()),path('preguntas',rv.Questions.as_view()),
  path('preguntas/<uuid:qid>/responder',rv.QuestionAnswer.as_view()),path('preguntas/<uuid:qid>/no-compartir',rv.QuestionDecline.as_view()),
  path('preguntas/<uuid:qid>/deshacer',rv.QuestionUndo.as_view()),path('preguntas/<uuid:qid>/mas-tarde',rv.QuestionPostpone.as_view()),

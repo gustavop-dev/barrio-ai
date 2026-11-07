@@ -163,6 +163,8 @@ def tick(user,now=None):
         report['observe']+=_observe(user,account,now)
         report['propose']+=_propose(user,account,now)
         report['network']=report.get('network',0)+_network(user,account,now)
+        try:report['metrics']=report.get('metrics',0)+_metrics(user,account,now)
+        except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
         report['execute']+=_execute(user,account,now)
     report['reconcile']+=_reconcile(user,now)
     return report
@@ -225,6 +227,17 @@ def _network(user,account,now):
     enqueue('plan_network',_every('NETWORK_PLAN_EVERY_MINUTES','60'))
     enqueue('sync_network',_every('NETWORK_SYNC_EVERY_MINUTES','360'))
     return queued
+
+def _metrics(user,account,now):
+    """APRE-01: queue collect_metrics (own posts at 24 h/72 h/7 d, daily audience) about every METRICS_EVERY_MINUTES,
+    one at a time and only when something is due, for the Unipile account. METRICS_EVERY_MINUTES=0 turns it off."""
+    from . import metricas
+    every=_every('METRICS_EVERY_MINUTES','180')
+    if account.provider not in metricas.PROVIDERS or every<=timedelta(0) or _pending('collect_metrics',account=str(account.id)):return 0
+    if not metricas.due(now):return 0
+    bucket=int(now.timestamp()//every.total_seconds())
+    _,created=enqueue_operation(user,'collect_metrics',{'account':str(account.id)},request_id=_job_id('metrics',account.id,bucket))
+    return int(created)
 
 def _execute(user,account,now):
     if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0

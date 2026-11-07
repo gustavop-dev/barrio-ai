@@ -104,7 +104,7 @@ GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendar
 - `verification`: `{ verdict: "ready_for_execution|blocked", model_verdict, blocking_reasons: [], findings: [{ issue, severity: "material|minor", quote, detail }], checked_claims: [{ text, status, ref }], summary, citations, text_sha256 }`. `verdict` es el final (modelo más guardas deterministas) sobre el hash del texto exacto.
 - `final_text`, `citations: [unitId]`, `signals: [{ id, author, why_followed, posted_at, reactions, comments, text }]` (datos de terceros), `usage: [{ stage, model, estimated_usd, request_id, units, missing_units }]` y `action_detail`: la acción CONT-09 completa o `null`.
 
-Los bloques de una etapa que aún no ha corrido llegan como `{}`. Las impresiones (`EditorialPiece.metrics = { impressions, source: "unipile" }`) se guardan al conciliar, pero **hoy no se serializan** en esta respuesta; la PWA muestra `metrics.impressions` solo si algún día llega (un dato ausente no es cero).
+Los bloques de una etapa que aún no ha corrido llegan como `{}`. `metrics` lleva los últimos valores leídos del post (ver la sección «Resultados»), y `snapshots` y `commenters` traen los cortes a 24 h, 72 h y 7 días y quién comentó. Un dato ausente no es cero.
 
 POST `/api/v1/editorial/plan` con `{ request_id? }` (requiere `use_paid_providers`: el circuito llama a Claude y cuesta dinero; la PWA pide confirmación). Encola la preparación del próximo hueco sin pieza abierta en los próximos siete días: 202 `{ slot_date: "AAAA-MM-DD", job: { id, owner_id, agent, task, execute, mode, status, result_status, error, created_at, started_at, finished_at } }`. Con un `request_id` ya usado devuelve 200 con el mismo trabajo o 409 si ya no corresponde; nunca encola una segunda preparación. 409 si LinkedIn no está conectado, si la publicación está en pausa o desactivada (`LIVE_LINKEDIN_OFFICIAL`) o si no hay hueco.
 
@@ -277,6 +277,62 @@ El payload de cada push es JSON `{ title, body, url, tag }`. El service worker m
 - `POST /api/v1/memory/proposals` con `{ namespace: "user", key, value, evidence, expected_version }`.
 - `POST /api/v1/memory/<id>/confirm` con `{ expected_version }`, que requiere sesión humana.
 - `POST /api/v1/runs` con `{ agent: "posicionamiento|perfil", task, execute: false, mode: "lexical" }` responde 202 con un trabajo. `GET /api/v1/runs/<id>` devuelve el trabajo con `result.payload`, que es una vista previa con contexto. Ejecutar con IA (`execute: true`) cuesta dinero y solo se ofrece con una confirmación explícita.
+
+## Resultados
+
+Fuente: `agentes-linkedin/infra/src/team_backend/resultados.py` y `docs/metricas-resultados.md`, donde están el ejemplo completo y las fuentes. Es solo lectura, con el permiso `operate_linkedin`.
+
+GET `/api/v1/resultados?dias=7|28|90&modalidad=todo|personal_startups|projectapp`
+- Por defecto, `dias=28` y `modalidad=todo`. Otro valor devuelve 400.
+- `modalidad` filtra solo las secciones 1 y 2 (por `classification.modality`). Seguidores, conexiones y visitas son de toda la cuenta.
+
+```json
+{ "periodo": { "desde": "AAAA-MM-DD", "hasta": "AAAA-MM-DD", "dias": 28, "datos_hasta": "ISO",
+               "anterior": { "desde": "AAAA-MM-DD", "hasta": "AAAA-MM-DD" } },
+  "modalidad": "todo", "zona_horaria": "America/Bogota",
+  "negocio": { "disponible": false, "motivo": "Mediremos oportunidades cuando registres la primera o conectemos el inbox", "inbound": KPI },
+  "audiencia": { "followers": KPI, "connections": KPI, "profile_views": KPI, "new_fit_connections": KPI,
+                 "roles": { "items": [{ "role", "value" }] | null, "definition", "unavailable_reason" },
+                 "acceptance_rate": KPI, "funnel": { "stages": { "<etapa>": n }, "order": [...], "aside": [...], "definition" },
+                 "recurrent_people": KPI },
+  "contenido": { "kpis": { "median_impressions": KPI, "engagement_pct": KPI, "substantive_comments": KPI, "consistency": KPI },
+                 "chart": { "bars": [{ "piece_id", "date", "impressions", "cut": "7d|24h|null", "fallback" }],
+                            "median_previous_4_weeks": { "7d", "24h" }, "definition" },
+                 "best_post": { "piece_id", "first_line", "date", "pillar", "impressions", "engagement_pct", "cut" } | null,
+                 "by_pillar": { "cut", "formula", "items": [{ "pillar", "value", "posts" }] },
+                 "posts": [{ "piece_id", "date", "published_at", "first_line", "pillar", "url", "impressions_24h", "impressions_7d",
+                             "reactions", "comments", "reposts", "engagement_pct", "cut", "commenters_by_role": { "<rol>": n } | null }] },
+  "equipo": { "comments_published": KPI, "comments_replied": KPI, "follows": KPI, "invites": KPI, "accepts": KPI,
+              "pieces_published": KPI, "pieces_blocked": KPI, "pieces_vetoed": KPI,
+              "spend": { "today": { "general|editorial|network": { "spent", "budget" }, "other": { "spent", "budget": null } },
+                         "month": { "general|editorial|network|other": { "spent", "budget": null }, "total": { "spent", "budget" } },
+                         "accumulated": { "spent", "budget" }, "other_providers": { "<proveedor>": { "today", "month", "accumulated", "budget" } },
+                         "month_start", "definition" } } }
+```
+
+Cada `KPI` tiene la forma `{ value, previous, delta, delta_pct, comparable, series: [{ date, value }] | null, definition, formula | null, unavailable_reason | null }`, y algunas fichas añaden campos:
+- `numerator` y `denominator` en las proporciones;
+- `cut`, `posts_measured` y `posts_total` en el contenido;
+- `measured: { from, to }` en la audiencia;
+- `window_days` en las visitas;
+- `top` en `recurrent_people`.
+
+Reglas para la PWA:
+- **Sin dato.** `value: null` es «sin dato»: la ficha muestra un guion largo y `unavailable_reason`, nunca 0. Una proporción con denominador 0 o ausente también llega en `null`, con su motivo.
+- **Variación.** `delta` y `delta_pct` solo llegan con `comparable: true`, es decir, cuando los dos periodos tienen dato y el anterior quedó cubierto entero por su fuente. Si no, la variación va en gris: «sin comparación».
+  - `delta_pct` está en % con un decimal y es `null` si el valor anterior es 0.
+  - En las fichas en %, `delta` va en puntos porcentuales.
+- **Contenido.** Se compara a la misma edad: `cut` vale `7d`, o `24h` mientras ningún post del periodo cumpla 7 días. En `chart.bars`, `fallback: true` marca un post que aún no cumple 7 días y se pinta con sus impresiones a 24 h.
+- **Gasto.** `spend` llega en números JSON. `ANTHROPIC_LIMIT_USD` (el `budget` de `month.total` y de `accumulated`) es un techo **acumulado** sobre todo el ledger, no mensual.
+- **Oportunidades.** Mientras `negocio.disponible` sea `false`, la sección 1 muestra un único bloque con `motivo` y la ficha de inbound.
+
+**Detalle de una pieza.** `GET /api/v1/editorial/pieces/<id>` añade dos campos:
+- `snapshots: [{ kind: "24h|72h|7d", impressions, reactions, comments, reposts, engagement_pct, captured_at, age_hours }]`;
+- `commenters: [{ provider_user_id, name, substantive, role, fit }] | null`, que es `null` si los comentarios nunca se leyeron.
+
+`metrics` sí se serializa: lleva los últimos valores leídos (`impressions`, `reactions`, `comments`, `reposts`, `observed_at`, `source`, `unipile_post_id` y `share_url`).
+
+Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos cada `METRICS_EVERY_MINUTES`. No tiene rol en la escena de la oficina.
 
 
 ## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes

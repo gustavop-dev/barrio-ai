@@ -568,6 +568,10 @@ def run_job(job):
             from .editorial import prepare
             piece=prepare(user,date.fromisoformat(params['slot']),origin_job=str(job.id))
             return ('failed' if piece.state=='failed' else 'complete'),piece.state,piece.note if piece.state=='failed' else ''
+        if job.kind=='collect_metrics':
+            from . import metricas
+            r=metricas.collect(user,ConnectorAccount.objects.get(id=params['account']))
+            return 'complete',f"cortes:{r['captured']} audiencia:{r['audience']}"[:30],r['stopped']
         return 'failed','failed','Tipo de trabajo desconocido.'
     except OperatorBlocked as exc:return 'failed','blocked',str(exc)
     except (Conflict,ValueError,ConnectorError) as exc:return 'failed','failed',str(getattr(exc,'detail',exc))

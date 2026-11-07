@@ -69,7 +69,19 @@ def _post(data):
             'comments_counter':_count(data.get('comments_counter')),'reactions_counter':_count(data.get('reactions_counter')),
             # A boolean: LinkedIn exposes whether we reacted, not which reaction.
             'user_reacted':bool(data.get('user_reacted')),'is_repost':bool(data.get('is_repost')),
-            'impressions':_count(analytics.get('impressions_counter'))}
+            # reposts_counter: number, or null when hidden (Unipile v2 «Get a post», consulted 2026-11-06).
+            'reposts_counter':_count(data.get('reposts_counter')),'impressions':_count(analytics.get('impressions_counter'))}
+
+def _audience(data):
+    """Own profile counters. GET users/me returns followers_count and relations_count at the top level
+    (confirmed against the real account on 2026-11-06); light user objects carry them in specifics."""
+    specifics=data.get('specifics') or {}
+    def pick(key):return _count(data[key] if key in data else specifics.get(key))
+    return {'followers':pick('followers_count'),'connections':pick('relations_count')}
+
+def _profile_views(data):
+    """List Profile Views: analytics.views_count covers the requested date_range; analytics is optional."""
+    return _count((data.get('analytics') or {}).get('views_count'))
 
 def _comment(data):
     return {'id':str(data['id']),'text':data.get('text') or '','created_at':_when(data.get('created_at')),
@@ -177,6 +189,13 @@ class UnipileConnector:
     def accept_invitation(self,request_id):
         self._write(self._path('users','me','relation-requests',request_id,'accept'),{});return {'request_id':request_id}
 
+    # -- own audience (APRE-01, metricas.py): reads only
+    def own_audience(self):return _audience(self._read(self._path('users','me')))
+
+    def profile_views(self,days=14):
+        # date_range accepts 14, 28, 90 or 365; a free account gets analytics.views_count (checked 2026-11-06).
+        return _profile_views(self._read(self._path('linkedin','analytics','profile-views'),{'date_range':days,'limit':1}))
+
 
 class FakeConnector:
     """In-memory LinkedIn for tests and local rehearsals. Never touches the network.
@@ -202,7 +221,7 @@ class FakeConnector:
             pid=f'activity:{public_id}-{i}'
             self.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':text,
                 'created_at':datetime(2026,11,6,12,i,tzinfo=timezone.utc).isoformat(),'author':user,'comments_counter':0,
-                'reactions_counter':[],'user_reacted':False,'is_repost':False}
+                'reactions_counter':[],'reposts_counter':0,'user_reacted':False,'is_repost':False}
             self.state['comments'][pid]=[]
         return user
 
@@ -228,10 +247,30 @@ class FakeConnector:
         pid=f'activity:me-{len(self.state["posts"])}'
         self.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':text,
             'created_at':datetime.now(timezone.utc).isoformat(),'author':{'id':'me','display_name':'Cuenta conectada'},
-            'comments_counter':0,'reactions_counter':[],'user_reacted':False,'is_repost':False,
+            'comments_counter':0,'reactions_counter':[],'reposts_counter':0,'user_reacted':False,'is_repost':False,
             'analytics':{'impressions_counter':impressions} if impressions is not None else {}}
         self.state['comments'][pid]=[]
         return pid
+
+    def set_post_counters(self,post_id,impressions=None,reactions=None,comments=None,reposts=None):
+        """Counters as Unipile v2 returns them; None means hidden or absent (null), never zero."""
+        post=self.state['posts'][post_id]
+        post.update(reactions_counter=[{'reaction':'👍','count':reactions}] if reactions is not None else None,
+                    comments_counter=comments,reposts_counter=reposts,
+                    analytics={'impressions_counter':impressions} if impressions is not None else {})
+
+    def seed_audience(self,followers=None,connections=None,views=None):
+        """Own profile (GET users/me) and List Profile Views; a None leaves the field out, as when LinkedIn hides it."""
+        me={'object':'UserProfile','id':'me','display_name':'Cuenta conectada','provider':'LINKEDIN','specifics':{'network_distance':'SELF'}}
+        if followers is not None:me['followers_count']=followers
+        if connections is not None:me['relations_count']=connections
+        self.state['me']=me
+        self.state['profile_views']={'object':'ProfileViews','entities':[],
+            **({'analytics':{'object':'ProfileViewsAnalytics','views_count':views}} if views is not None else {})}
+
+    def own_audience(self):return _audience(self.state.get('me') or {})
+
+    def profile_views(self,days=14):return _profile_views(self.state.get('profile_views') or {})
 
     def get_post(self,post_id):
         if post_id not in self.state['posts']:raise ConnectorError('Simulado: post no encontrado.',status=404,kind='provider/resource_not_found')

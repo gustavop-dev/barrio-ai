@@ -12,8 +12,10 @@ TEXT_FIELDS={'person_name':200,'company':200,'need':4000,'budget':200,'dedicatio
 CHOICES={'modality':Opportunity.Modality.values,'channel':Opportunity.Channel.values,'attribution':Opportunity.Attribution.values}
 CLOSED=('acuerdo','sin_acuerdo')
 
-def _note(item,event,detail=''):
-    item.history=(list(item.history)+[{'at':timezone.now().isoformat(),'event':event,'detail':(detail or '')[:300]}])[-50:]
+def _note(item,event,detail='',stage=None):
+    entry={'at':timezone.now().isoformat(),'event':event,'detail':(detail or '')[:300]}
+    if stage:entry['stage']=stage  # lets Resultados count when each stage was reached
+    item.history=(list(item.history)+[entry])[-50:]
 
 def _apply(item,data):
     for field,limit in TEXT_FIELDS.items():
@@ -35,7 +37,7 @@ def _set_stage(item,stage):
     previous=item.get_stage_display() if item.pk else None
     item.stage=stage;item.stage_changed_at=timezone.now()
     item.closed_at=timezone.now() if stage in CLOSED else None
-    _note(item,'stage' if previous else 'created',f'{previous} → {item.get_stage_display()}' if previous else f'Etapa inicial: {item.get_stage_display()}')
+    _note(item,'stage' if previous else 'created',f'{previous} → {item.get_stage_display()}' if previous else f'Etapa inicial: {item.get_stage_display()}',stage)
 
 def create(user,data):
     require(user,'approve_actions')
