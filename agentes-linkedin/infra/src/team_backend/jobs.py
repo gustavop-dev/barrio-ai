@@ -56,6 +56,7 @@ OPERATION_PERMISSIONS={
     'classify_contacts':['operate_linkedin','run_agents','use_paid_providers'],
     'plan_network':['operate_linkedin'],
     'sync_network':['operate_linkedin'],
+    'collect_metrics':['operate_linkedin'],
 }
 PAID_OPERATIONS=('propose_comment','prepare_piece','classify_contacts')
 
