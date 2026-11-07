@@ -58,6 +58,7 @@ Cuando una cuenta se pausa (429, restricción, reautenticación o estado distint
 - **Sin reintentos a ciegas.** Unipile v2 no documenta claves de idempotencia. Un timeout, un 5xx o una respuesta ilegible tras escribir dejan la acción en `uncertain`, y la conciliación solo lee.
 - **Paradas.** `OPERATOR_PAUSED=true` detiene todo, incluido el ciclo autónomo. `ConnectorAccount.paused` detiene una cuenta. También frenan la ejecución la ventana horaria, el espaciado y los topes diarios y semanales. Un 429, una reautenticación o una restricción pausan la cuenta y envían una alerta; solo Gustavo la reanuda.
 - **El conector real está apagado por defecto.** Requiere `LIVE_LINKEDIN=true` y `UNIPILE_API_KEY`. El simulado requiere `OPERATOR_ALLOW_FAKE=true`.
+- **Voz.** El redactor de comentarios escribe con el documento «Tono de voz» de Gustavo (`voz.py`; detalle en [publicación diaria](publicacion-diaria.md)). La compuerta descarta además cualquier experiencia en primera persona, en inglés o en español, que no esté respaldada por un hecho público confirmado.
 - **Coste.** El agente consulta Claude con el SDK oficial, en streaming, con salida JSON con esquema y sin reintentos automáticos. Antes de generar reserva el peor caso en el registro de gasto. Un post con una acción abierta o ya comentada no dispara otra generación.
 
 ## Activación real (pasos para Gustavo)

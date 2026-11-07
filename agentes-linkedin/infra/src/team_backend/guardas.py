@@ -20,11 +20,16 @@ BASELINE_GUIDANCE=[
 PRIVATE=re.compile(r'\b60\s*/\s*40\b|\b60\s*%[^.\n]{0,80}\b40\s*%|\b40\s*%[^.\n]{0,80}\b60\s*%|hispanohablante|'
                    r'(?:spanish[- ]speaking|hispanic|latin[oa]s?|latinx|latam|latin[- ]american)\s+(?:founders?|ceos?|entrepreneurs?|startups?)|'
                    r'\$?\s?5[,.]?000\s*(?:-|–|to)\s*\$?\s?7[,.]?999|\bLLC\b|\bbeloz\b',re.I)
-# First-person lived experience; with no public facts confirmed it cannot be attributed to Gustavo.
+# First-person lived experience; with no public facts confirmed it cannot be attributed to Gustavo. Spanish
+# forms matter because comments follow the language of the post and Gustavo's voice tells stories in first person.
 EXPERIENCE=re.compile(r"\b(?:I|we)(?:'ve| have)?\s+(?:built|shipped|led|launched|delivered|migrated|scaled|grew|founded|hired|"
                       r"cut|reduced|increased|deployed|rebuilt|rewrote|implemented|designed|managed|closed|raised)\b|"
                       r"\b(?:my|our)\s+(?:clients?|customers?|team|startup|company|agency|project|projects|product)\b|"
-                      r"\b(?:last|this)\s+(?:year|month|week|quarter)\s+(?:I|we)\b",re.I)
+                      r"\b(?:last|this)\s+(?:year|month|week|quarter)\s+(?:I|we)\b|"
+                      r"\b(?:constru[ií]|lanc[ée]|lider[ée]|implement[ée]|dise[ñn][ée]|migr[ée]|escal[ée]|fund[ée]|contrat[ée]|"
+                      r"desplegu[ée]|reescrib[ií]|entregu[ée]|constru[ií]mos|lanzamos|lideramos|implementamos|dise[ñn]amos|"
+                      r"migramos|escalamos|fundamos|contratamos|desplegamos|reescribimos|entregamos)\b|"
+                      r"\b(?:mis|mi|nuestr[oa]s?)\s+(?:clientes?|equipo|startup|empresa|agencia|proyectos?|producto)\b",re.I)
 
 def blocks():
     """(public_facts, private_guidance) for editorial agents: confirmed memory plus the brief's private orientation."""

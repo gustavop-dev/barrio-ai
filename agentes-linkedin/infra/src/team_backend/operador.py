@@ -19,6 +19,7 @@ from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, get_conne
 from .exceptions import Conflict
 from .models import (OPEN_ACTION_STATES, ActionExecution, ActionProposal, ConnectorAccount, ObservedPost, Referent)
 from .permissions import require
+from . import voz
 
 COMMENT_MAX_CHARS=1250
 POST_MAX_CHARS=3000  # LinkedIn's limit for a post's text
@@ -455,8 +456,8 @@ Criterio (catálogo INT-03, fundamentos B04/B06/B15 del curso en el contexto):
 - private_guidance solo orienta qué aportar y qué evitar (prioridades, audiencia, cadencia, límites).
   Nunca lo menciones, cites ni parafrasees en el comentario: ni prioridades como 60/40 ni el tipo de
   founders o clientes que Gustavo busca.
-- Escribe en el idioma de la publicación (por defecto inglés). 2–5 frases, máximo 900 caracteres,
-  sin hashtags y como mucho un emoji si encaja con el tono del hilo.
+- Escribe en el idioma de la publicación (por defecto inglés) y en la voz de Gustavo descrita al final.
+  2–5 frases, máximo 900 caracteres, sin hashtags y como mucho un emoji si encaja con el tono del hilo.
 - No repitas lo que ya dicen otros comentarios.
 - Si no hay un aporte genuino, responde decision="skip" y explica por qué. Saltar es correcto.
 
@@ -488,7 +489,7 @@ def propose_comment(user,post_id,origin_job=''):
     public_facts,private_guidance=memory.confirmed_blocks()
     message=json.dumps({'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':others,
         'public_facts':public_facts,'private_guidance':private_guidance,'course_units':units},ensure_ascii=False,default=str)
-    answer=providers.claude(COMMENT_SYSTEM,message,output_schema=COMMENT_SCHEMA,effort='medium',purpose='propose-comment')
+    answer=providers.claude(voz.with_voice(COMMENT_SYSTEM),message,output_schema=COMMENT_SCHEMA,effort='medium',purpose='propose-comment')
     try:data=json.loads(answer['text'])
     except json.JSONDecodeError:raise ValueError('La respuesta del agente no es JSON válido.') from None
     known={u['unit_id'] for u in units}
