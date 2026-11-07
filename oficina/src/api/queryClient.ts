@@ -33,6 +33,7 @@ export const keys = {
   actividad: (tipo: string, desde: string, hasta: string, noSalio: boolean) => ['actividad', tipo, desde, hasta, noSalio] as const,
   resultadosAll: ['resultados'] as const,
   resultados: (dias: number, modalidad: string) => ['resultados', dias, modalidad] as const,
+  resumenSemanal: ['resultados', 'resumen-semanal'] as const,
   contactSearch: (filters: Record<string, unknown>) => ['red', 'search', filters] as const,
   oportunidadesAll: ['oportunidades'] as const,
   oportunidades: (filters: Record<string, unknown>) => ['oportunidades', filters] as const,

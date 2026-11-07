@@ -133,6 +133,8 @@ Cómo decidir:
   dirección y el lector; pon en ideas_used el id de las que uses (vacía si ninguna). Son su punto de partida, no
   hechos: nunca las cites como hechos salvo que sean hechos sobre él (y en público solo si están en public_facts).
   feedback_from_gustavo son sus comentarios sobre piezas recientes: tenlos en cuenta.
+- weekly_recommendations (o null) trae las recomendaciones del último resumen semanal del analista de resultados: una
+  pista más para elegir, no una orientación; orientation pesa más y solo Gustavo la cambia.
 Cita en citations solo IDs de unidades del contexto.'''
 
 WRITER_SYSTEM=f'''Eres el equipo de redacción de Barrio AI, copywriter_a y copywriter_b (CONT-03). Con el mismo
@@ -470,11 +472,12 @@ def _run(piece,user,now,origin_job):
     from . import preguntas
     asked={'open':[{'question':q.question,'memory_key':q.memory_key} for q in TeamQuestion.objects.filter(state='open')[:20]],
            'closed_keys':sorted(preguntas.closed_keys()|{q for q in TeamQuestion.objects.filter(state='answered').values_list('memory_key',flat=True)})}
-    from . import capturas
+    from . import capturas, resumen_semanal
     ideas=capturas.ideas_for_director(now)
     brief,_=_stage(piece,'director',dict(memory,slot={'date':piece.slot_date,'weekday':piece.slot_date.strftime('%A')},
                    signals={'observed_posts':signals},history=history,modality_mix_30d=mix,performance_30d=_performance(now),
-                   team_questions=asked,ideas_from_gustavo=ideas,feedback_from_gustavo=capturas.feedback_for_director(now)))
+                   team_questions=asked,ideas_from_gustavo=ideas,feedback_from_gustavo=capturas.feedback_for_director(now),
+                   weekly_recommendations=resumen_semanal.for_director(now)))
     brief['positioning_version']=posicionamiento.VERSION
     offered={i['id'] for i in ideas}
     used=[i for i in (brief.get('ideas_used') or []) if isinstance(i,str) and i in offered]

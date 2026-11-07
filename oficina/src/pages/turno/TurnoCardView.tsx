@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { useTurnoAction } from '../../api/hooks';
 import type { TurnoAction, TurnoCard, TurnoCardType, TurnoOpportunity, TurnoPriority } from '../../api/types';
 import { turnoAnchor } from '../../components/Layout';
-import { IconAviso, IconConversacion, IconPerfil, IconPregunta } from '../../components/icons';
+import { IconAviso, IconConversacion, IconPerfil, IconPregunta, IconResultados } from '../../components/icons';
 import { AgentPortrait, Avatar, Badge, Button, ButtonLink, ConfirmModal, ErrorRetry, ExternalLink, isHttps, LabelChip, useToast } from '../../components/ui';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '../../lib/format';
 import { messageText } from '../personas/ConversationBlock';
@@ -17,6 +17,7 @@ const TYPE_LABEL: Record<TurnoCardType, string> = {
   pregunta: 'Pregunta',
   perfil: 'Perfil',
   conversacion: 'Conversación',
+  resumen: 'Resumen semanal',
 };
 
 const TYPE_ICON: Record<TurnoCardType, typeof IconAviso> = {
@@ -24,6 +25,7 @@ const TYPE_ICON: Record<TurnoCardType, typeof IconAviso> = {
   pregunta: IconPregunta,
   perfil: IconPerfil,
   conversacion: IconConversacion,
+  resumen: IconResultados,
 };
 
 /** Colour of the type label: alerta for urgent notices, info for questions and conversations, hondo for profile tasks. */
@@ -52,6 +54,8 @@ function cardTitle(card: TurnoCard): string {
 
 // ---------------------------------------------------------------- actions
 
+/** A view of the office («/resultados#resumen»): navigates inside the app. API routes (the LinkedIn OAuth start) stay full navigations. */
+const isInApp = (href: string) => href.startsWith('/') && !href.startsWith('//') && !href.startsWith('/api/');
 const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;
 const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsWith('/resolve'));
 const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
@@ -61,6 +65,7 @@ function successMessage(action: TurnoAction): string {
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
   if (isMachineResume(action)) return 'Máquina reanudada';
   if (action.endpoint?.endsWith('/pause') && action.body?.paused === false) return 'Cuenta reanudada';
+  if (action.endpoint?.startsWith('/api/v1/resultados/resumen-semanal/') && action.endpoint.endsWith('/descartar')) return 'Resumen descartado';
   return 'Hecho';
 }
 
@@ -138,6 +143,13 @@ function CardActions({ card }: { card: TurnoCard }) {
         <Button key={action.label} variant={variant} block={variant !== 'ghost'} onClick={() => setOpportunity(prefill)}>
           {action.label}
         </Button>
+      );
+    }
+    if (action.href && isInApp(action.href)) {
+      return (
+        <ButtonLink key={action.label} to={action.href} variant={variant} block={variant !== 'ghost'}>
+          {action.label}
+        </ButtonLink>
       );
     }
     if (action.href) {

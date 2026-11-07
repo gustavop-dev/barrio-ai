@@ -653,6 +653,11 @@ def run_job(job):
             from . import conversaciones
             r=conversaciones.read_inbox(user,ConnectorAccount.objects.get(id=params['account']))
             return 'complete',f"chats:{r['chats']} leidos:{r['read']} te tocan:{r['flagged']}"[:30],r['stopped']
+        if job.kind=='weekly_summary':
+            from datetime import date
+            from . import resumen_semanal
+            summary=resumen_semanal.run(user,date.fromisoformat(params['week']),origin_job=str(job.id))
+            return 'complete',f'resumen:{summary.week_start}'[:30],''
         return 'failed','failed','Tipo de trabajo desconocido.'
     except OperatorBlocked as exc:return 'failed','blocked',str(exc)
     except (Conflict,ValueError,ConnectorError) as exc:return 'failed','failed',str(getattr(exc,'detail',exc))

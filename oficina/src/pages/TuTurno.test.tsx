@@ -461,3 +461,39 @@ describe('Tu turno · Lo que el equipo sabe de ti', () => {
     expect(screen.getByText(/responde las preguntas del equipo para que puedan usarlas/)).toBeInTheDocument();
   });
 });
+
+describe('Tu turno · resumen semanal', () => {
+  const SUMMARY_CARD = cardFixture({
+    id: 'weekly_summary:s-1',
+    type: 'resumen',
+    tone: 'info',
+    priority: 'cuando_puedas',
+    state: 'nueva',
+    agent: 'analista_barrio_resultados',
+    agent_label: 'Analista del barrio',
+    title: 'El analista propone una orientación',
+    body: 'Prioriza IA aplicada en los posts de la próxima semana.',
+    actions: [
+      { label: 'Ver el resumen', href: '/resultados#resumen', primary: true },
+      { label: 'Descartar', endpoint: '/api/v1/resultados/resumen-semanal/s-1/descartar' },
+    ],
+  });
+
+  it('shows the proposed orientation as a cuando puedas card that opens Resultados inside the app', async () => {
+    const api = server(tuTurnoFixture({ count: 1, items: [SUMMARY_CARD], tasks: { perfil: [], conversaciones: [], resumen: [SUMMARY_CARD] } }), {
+      'POST /api/v1/resultados/resumen-semanal/s-1/descartar': { body: { summary: { id: 's-1', state: 'descartado' } } },
+    });
+    renderApp('/tu-turno');
+    const view = within(await cardTitled('El analista propone una orientación'));
+    expect(view.getByText('Resumen semanal')).toBeInTheDocument();
+    expect(view.getByText('Cuando puedas')).toBeInTheDocument();
+    expect(view.getByText('Analista del barrio')).toBeInTheDocument();
+    expect(view.getByText('Prioriza IA aplicada en los posts de la próxima semana.')).toBeInTheDocument();
+    const open = view.getByRole('link', { name: 'Ver el resumen' });
+    expect(open).toHaveAttribute('href', '/resultados#resumen');
+    expect(open).not.toHaveAttribute('target');
+    await userEvent.click(view.getByRole('button', { name: 'Descartar' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/resultados/resumen-semanal/s-1/descartar')).toHaveLength(1));
+    expect(await screen.findByText('Resumen descartado')).toBeInTheDocument();
+  });
+});

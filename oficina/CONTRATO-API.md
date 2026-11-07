@@ -791,3 +791,72 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn con Unipile y propone 
 - Si Gustavo responde en LinkedIn, la tarjeta desaparece sola en la lectura siguiente.
 
 **Push.** El tipo `conversation` («Conversación que te toca», Tu turno) envía una sola push por cada mensaje nuevo que le toca. Lleva el nombre y la lectura del equipo, nunca el texto del mensaje.
+
+## Resumen semanal (analista de resultados)
+
+Cada lunes, el rol `analista_barrio_resultados` resume la semana que terminó, con cifras deterministas y una llamada a Claude, y puede proponer una orientación que solo Gustavo adopta. Detalle en `agentes-linkedin/infra/docs/resumen-semanal.md`. Leer exige `operate_linkedin`. Decidir exige sesión humana y `approve_actions`, y un token de servicio recibe 403. Generar exige sesión humana y `use_paid_providers`.
+
+**`WeeklySummary`:**
+
+```json
+{ "id": "uuid", "week_start": "AAAA-MM-DD", "week_end": "AAAA-MM-DD", "label": "Semana del 2 al 8 de noviembre",
+  "state": "nuevo | visto | aplicado | descartado", "state_label": "Nuevo | Visto | Usado como orientación | Descartado",
+  "analysis": { "titular": "…",
+                "lo_que_funciono": [{ "texto": "…", "cifra": "publicaciones.cortes.72h.medidos: 2" }],
+                "lo_que_no": [{ "texto", "cifra" }], "recomendaciones": [{ "texto", "cifra" }],
+                "orientacion_propuesta": "…" | null, "advertencias": ["Pocos datos: 2 de 3 posts con corte de 72 h."],
+                "validacion": { "ok": true, "descartado": [{ "campo", "texto", "cifras_no_encontradas": ["37"], "sin_cifra": false }] } },
+  "model": "claude-opus-5-5", "cost_usd": 0.12 | null, "created_at": "iso", "decided_at": "iso" | null,
+  "decided_by": "gustavo" | null, "can_undo": false }
+```
+
+- Las listas tienen como mucho 3 entradas. `cifra` es el dato de las estadísticas del que depende la frase.
+- `validacion.descartado` lista lo que el validador quitó por citar números que no están en las estadísticas. Si quitó algo, `advertencias` termina con «Se quitaron N frases…».
+- `can_undo` es `true` en `aplicado` y `descartado`.
+
+**GET `/api/v1/resultados/resumen-semanal`:**
+
+```json
+{ "latest": WeeklySummary | null, "previous": [WeeklySummary],
+  "generate": { "week_start": "AAAA-MM-DD", "week_end": "AAAA-MM-DD", "label": "Semana del …", "available": true,
+                "reason": "La semana pasada ya tiene su resumen. | El resumen se está preparando. | Presupuesto del resumen semanal agotado esta semana." | null,
+                "pending": false, "last_error": "…" | null, "automatic": true, "automatic_at": "iso",
+                "estimated_usd": 0.13, "max_usd": 0.34 } }
+```
+
+- `previous`: hasta 12 semanas anteriores, de la más reciente a la más antigua.
+- `generate` se refiere siempre a la semana ISO anterior a la actual. `available` es `true` si esa semana no tiene resumen, no hay otro en preparación y queda presupuesto.
+- `last_error` es el error del último intento fallido de esa semana.
+- `automatic_at` es el lunes de la semana en curso a `WEEKLY_SUMMARY_TIME`.
+- `estimated_usd` es la mediana de los resúmenes anteriores, o una llamada típica si no hay ninguno; `max_usd`, el peor caso de la reserva.
+
+**GET `/api/v1/resultados/resumen-semanal/<id>`** devuelve un `WeeklySummary` más `stats`, las cifras con las que se escribió (ver el documento del backend).
+
+**POST `/api/v1/resultados/resumen-semanal/generar`** recibe `{ "request_id": "uuid" }` (opcional) y devuelve `{ "week_start", "job": Job }`:
+- 202 si encola el trabajo `weekly_summary`, que tiene coste;
+- 200 si el mismo `request_id` ya existía (un reintento es el mismo trabajo);
+- 409 si la semana ya tiene resumen, otro está en preparación o se agotó el presupuesto de la semana.
+
+La oficina pide confirmación antes y muestra `estimated_usd` y `max_usd`.
+
+**Decisiones:** todas responden con `{ "summary": WeeklySummary }`, más `orientation` y `previous_orientation` donde se indica. Las cuatro responden 404 si el id no existe.
+- `POST …/<id>/visto`: pasa de `nuevo` a `visto`; en otro estado no cambia nada. La oficina lo llama al mostrar el resumen.
+- `POST …/<id>/aplicar`: «Usar como orientación». Pone `orientacion_propuesta` como orientación del equipo, por el mismo camino que `PUT /api/v1/orientacion`, y guarda el texto anterior. Añade `orientation` (como en `GET /api/v1/orientacion`) y `previous_orientation`. Responde 409 si el resumen ya está decidido o no propone orientación.
+- `POST …/<id>/descartar`: pasa a `descartado`. Responde 409 si ya está decidido.
+- `POST …/<id>/deshacer`: el «Deshacer» de 5 s. Un resumen aplicado vuelve a poner la orientación anterior y uno descartado queda pendiente otra vez; los dos vuelven a `visto`. Añade `orientation`. Responde 409 si la orientación cambió después de aplicarla («edítala en Ajustes») o si no hay nada que deshacer.
+
+**Tu turno.** Mientras el último resumen propone una orientación sin decidir (`nuevo` o `visto`), `items` y `tasks.resumen` traen una tarjeta, y cuenta en `counts.tareas`. `tasks` siempre trae la clave `resumen`, vacía si no hay tarjeta.
+- **Tarjeta:** `type: "resumen"`, prioridad `cuando_puedas`, `agent: "analista_barrio_resultados"`, `title: "El analista propone una orientación"` y como `body` el texto propuesto. Lleva también `summary: { id, week_start, label, titular }`.
+- **Id:** `weekly_summary:<id>`.
+- **Acciones:**
+
+```json
+[{ "label": "Ver el resumen", "href": "/resultados#resumen", "primary": true },
+ { "label": "Descartar", "endpoint": "/api/v1/resultados/resumen-semanal/<id>/descartar" }]
+```
+
+Un `href` que empieza por `/` y no por `/api/` es una vista de la oficina: la PWA navega dentro de la app en lugar de recargar.
+
+**Notificación.** El tipo `weekly_summary` («Resumen de la semana listo», capa `tuyo`, con push por defecto) llega cuando hay un resumen nuevo. Lleva el titular como `detail`, `link: "/resultados#resumen"` y `ref: "weekly_summary:<AAAA-MM-DD>"`.
+
+**Escena.** El trabajo `weekly_summary` aparece en `analista_barrio_resultados` («Escribiendo el resumen de la semana»). Al terminar, `GET /api/v1/oficina/eventos` trae una `entrega` del analista a `director_editorial`.

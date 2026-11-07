@@ -3,13 +3,17 @@ import {
   addContactNote,
   addHecho,
   answerPregunta,
+  aplicarResumen,
   asList,
   correctHecho,
   createOportunidad,
   declinePregunta,
   deleteOportunidad,
   deleteReferent,
+  descartarResumen,
+  deshacerResumen,
   discardContact,
+  generarResumen,
   getAccounts,
   getActividad,
   getActivity,
@@ -24,12 +28,14 @@ import {
   getPiece,
   getRedSummary,
   getResultados,
+  getResumenSemanal,
   getTuTurno,
   listContacts,
   listHechos,
   listOportunidades,
   listPreguntas,
   listReferents,
+  markResumenVisto,
   planPiece,
   postponePregunta,
   rejectAction,
@@ -366,4 +372,29 @@ export function useSetAccountPaused() {
 export function usePlanPiece() {
   const client = useQueryClient();
   return useMutation({ mutationFn: (requestId?: string) => planPiece(requestId), onSettled: () => invalidate(client, keys.editorialAll, keys.calendarioAll, keys.actividadAll) });
+}
+
+// ================================================================ weekly summary (Resultados › Resumen de la semana)
+
+/** GET /api/v1/resultados/resumen-semanal: the latest summary, the previous weeks and «Generar ahora». */
+export function useResumenSemanal() {
+  return useQuery({ queryKey: keys.resumenSemanal, queryFn: getResumenSemanal, refetchInterval: REFRESH.resultados });
+}
+
+export type ResumenDecision = 'visto' | 'aplicar' | 'descartar' | 'deshacer';
+const DECISIONS = { visto: markResumenVisto, aplicar: aplicarResumen, descartar: descartarResumen, deshacer: deshacerResumen } as const;
+
+/** Gustavo's decision on a summary. Applying or undoing also changes the orientation (Ajustes) and the Tu turno card. */
+export function useResumenDecision() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ summaryId, decision }: { summaryId: string; decision: ResumenDecision }) => DECISIONS[decision](summaryId),
+    onSettled: () => invalidate(client, keys.resumenSemanal, keys.orientacion, keys.ajustes, keys.tuTurno),
+  });
+}
+
+/** Paid: queues the summary of the last week (ask for confirmation first, with the estimated cost). */
+export function useGenerarResumen() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (requestId?: string) => generarResumen(requestId), onSettled: () => invalidate(client, keys.resumenSemanal) });
 }

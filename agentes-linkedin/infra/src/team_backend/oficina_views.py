@@ -126,13 +126,15 @@ JOB_ROLES={'observe':'investigador_referentes','propose_comment':'relaciones_com
            'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta',
            'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
            'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad',
-           'collect_metrics':'analista_barrio_resultados','process_capture':'operador_cuenta'}
+           'collect_metrics':'analista_barrio_resultados','process_capture':'operador_cuenta',
+           'weekly_summary':'analista_barrio_resultados'}
 DESCRIPTIONS={'observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
               'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día',
               'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',
               'plan_network':'Preparando seguimientos e invitaciones','sync_network':'Revisando invitaciones y conexiones',
-              'collect_metrics':'Midiendo los posts y la audiencia','process_capture':'Leyendo lo que enviaste al equipo'}
+              'collect_metrics':'Midiendo los posts y la audiencia','process_capture':'Leyendo lo que enviaste al equipo',
+              'weekly_summary':'Escribiendo el resumen de la semana'}
 STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',
                     'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
                     'verificador':'Verificando afirmaciones, voz y privacidad',

@@ -65,11 +65,13 @@
       "contrato_ejecutable": false,
       "estado": "parcial",
       "runtime": {
-        "implementa": ["team_backend/metricas.py: collect (APRE-01; determinista)", "team_backend/resultados.py (indicadores de la oficina; determinista)"],
-        "modelo": "ninguno",
-        "effort": "no aplica",
-        "activacion": "autopiloto._metrics: collect_metrics cada METRICS_EVERY_MINUTES.",
-        "difiere_del_contrato": "Solo recoge métricas. No propone aprendizaje ni participation_signal. El resumen de resultados que ahora recibe el director (editorial._performance y _history) lo calcula editorial.py, no este rol."
+        "implementa": ["team_backend/metricas.py: collect (APRE-01; determinista)", "team_backend/resultados.py (indicadores de la oficina; determinista)", "team_backend/resumen_semanal.py: stats (determinista) y SYSTEM / run (resumen semanal, trabajo weekly_summary)"],
+        "modelo": "ANTHROPIC_MODEL (claude-opus-5-5) en el resumen semanal; ninguno en las métricas",
+        "effort": "medium",
+        "max_tokens": 12000,
+        "proposito_ledger": "weekly-summary",
+        "activacion": "autopiloto._metrics: collect_metrics cada METRICS_EVERY_MINUTES. autopiloto._weekly_summary: weekly_summary los lunes tras WEEKLY_SUMMARY_TIME para la semana anterior, uno por semana, si WEEKLY_SUMMARY_ENABLED y la máquina funcionó esa semana, dentro de WEEKLY_SUMMARY_LLM_USD por semana; o «Generar ahora» en Resultados.",
+        "difiere_del_contrato": "El resumen semanal (infra/docs/resumen-semanal.md) es su learning_proposal simplificado: cifras deterministas de la semana y la anterior, una llamada que escribe lo que funcionó, lo que no, recomendaciones atadas a una cifra, advertencias y, si los datos lo respaldan, una orientación propuesta; un validador quita las frases con cifras que no están en los datos. Solo Gustavo la adopta, y sus recomendaciones llegan al director como pista (weekly_recommendations). No hay experiment_plan ni participation_signal, y el resumen de 30 días que recibe el director (editorial._performance y _history) sigue en editorial.py."
       }
     },
     {

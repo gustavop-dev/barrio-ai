@@ -24,7 +24,7 @@ Los 16 contratos de `agentes-linkedin/equipos/` son plantillas de diseño de 30�
 | posicionamiento | Parcial (a mano) | `knowledge/agents.py: run` | Opus 5.5 · sin fijar |
 | perfil | Parcial (a mano) | `knowledge/agents.py: run` | Opus 5.5 · sin fijar |
 | investigador_referentes | Parcial | `red.py: CLASSIFY_SYSTEM / classify`, `discover`, `operador.py: observe` | Sonnet 5.5 · medium |
-| analista_barrio_resultados | Parcial | `metricas.py: collect`, `resultados.py` | Ninguno |
+| analista_barrio_resultados | Parcial | `metricas.py: collect`, `resultados.py`, `resumen_semanal.py: run` | Opus 5.5 · medium (resumen semanal) |
 | director_editorial | Activo | `editorial.py: DIRECTOR_SYSTEM / _stage('director')`, `SELECTION_SYSTEM / _stage('seleccion')`, `REPAIR_SYSTEM / _stage('reparacion')` | Opus 5.5 · medium |
 | copywriter_a y copywriter_b | Activo, en una llamada | `editorial.py: WRITER_SYSTEM / _stage('redactor')` | Opus 5.5 · medium |
 | Cinco lectores | Activo, en una llamada | `editorial.py: PANEL_SYSTEM / _stage('lectores')` | Opus 5.5 · low |
@@ -68,12 +68,12 @@ Los 16 contratos de `agentes-linkedin/equipos/` son plantillas de diseño de 30�
 | | |
 | --- | --- |
 | Contrato | `equipos/observatorio/analista_barrio_resultados.json` |
-| Código | `metricas.py: collect` (APRE-01) y `resultados.py` (indicadores de la oficina); los dos son deterministas |
-| Prompt · modelo | Ninguno |
-| Entradas | Lecturas por Unipile de las publicaciones propias a 24 h, 72 h y 7 días, de quién comentó y de la audiencia diaria |
-| Salidas | `PostMetric`, `AudienceSnapshot` y `EditorialPiece.metrics`; los indicadores de `/resultados` |
-| Compuertas | Topes diarios de lectura y `METRICS_EVERY_MINUTES` |
-| Frente al contrato | Le falta su núcleo: no propone aprendizaje, experimentos ni `participation_signal`. El director ya recibe resultados, pero los resume `editorial.py` (`_performance` y `_history`), no este rol. |
+| Código | `metricas.py: collect` (APRE-01) y `resultados.py` (indicadores de la oficina), deterministas; `resumen_semanal.py: stats` (determinista), `run` y `validate` (resumen semanal, trabajo `weekly_summary`) |
+| Prompt · modelo | Métricas: ninguno. Resumen semanal: `resumen_semanal.SYSTEM` con `SCHEMA`; `ANTHROPIC_MODEL` (Opus 5.5) · medium; `max_tokens` 12.000; ledger `weekly-summary` |
+| Entradas | Métricas: lecturas por Unipile de las publicaciones propias a 24 h, 72 h y 7 días, de quién comentó y de la audiencia diaria. Resumen: las cifras de la semana y de la anterior (publicaciones y cortes, comentarios y su destino, red, oportunidades, inbox, capturas, gasto, decisiones del líder, paradas), el posicionamiento, la orientación vigente y los comentarios de Gustavo sobre las piezas de la semana |
+| Salidas | `PostMetric`, `AudienceSnapshot` y `EditorialPiece.metrics`; los indicadores de `/resultados`; un `WeeklySummary` por semana (titular, lo que funcionó, lo que no, recomendaciones, orientación propuesta y advertencias), la Notificación `weekly_summary`, la tarjeta de Tu turno si propone orientación y `weekly_recommendations` en el brief del director |
+| Compuertas | Topes diarios de lectura y `METRICS_EVERY_MINUTES`. El resumen: los lunes tras `WEEKLY_SUMMARY_TIME`, uno por semana (`week_start` único, id de trabajo determinista), solo si `WEEKLY_SUMMARY_ENABLED` y la máquina funcionó esa semana, dentro de `WEEKLY_SUMMARY_LLM_USD` por semana. Un validador quita las frases con cifras que no están en los datos |
+| Frente al contrato | El resumen semanal ([resumen-semanal.md](resumen-semanal.md)) es un `learning_proposal` simplificado. La orientación que propone solo la adopta Gustavo, y el director recibe sus recomendaciones como pista, no como orientación. No hay experimentos ni `participation_signal`, y el resumen de 30 días del director sigue en `editorial.py` (`_performance` y `_history`). |
 
 ### director_editorial
 
@@ -83,7 +83,7 @@ Los 16 contratos de `agentes-linkedin/equipos/` son plantillas de diseño de 30�
 | Código | `editorial.py: _stage('director')`, `_stage('seleccion')` y, en `_repair_round`, `_stage('reparacion')`, dentro de `prepare` / `_run` (trabajo `prepare_piece`) |
 | Prompt | `DIRECTOR_SYSTEM` con `BRIEF_SCHEMA`; `SELECTION_SYSTEM` con `SELECTION_SCHEMA`; `REPAIR_SYSTEM` con `REPAIR_SCHEMA`. Selección y reparación llevan la voz de Gustavo (`voz.with_voice`); las tres incluyen `DIRECTION` |
 | Modelo · effort | `ANTHROPIC_MODEL` (Opus 5.5) o `EDITORIAL_MODEL_<ETAPA>` · medium en las tres (la reparación sigue el modelo de la selección); `max_tokens` 16.000; ledger `editorial-director`, `editorial-seleccion` y `editorial-reparacion` |
-| Entradas del brief | Hechos públicos, orientación privada y orientación de Gustavo; el día; hasta 12 publicaciones de referentes de los últimos 7 días; las 20 últimas piezas listas, con los resultados de las publicadas; el resumen de resultados de 30 días por pilar y modalidad (`performance_30d`); la mezcla de modalidades de 30 días; las preguntas abiertas y cerradas; las ideas y los comentarios de Gustavo de la captura; unidades del curso de pilares, cadencia, los 9 enfoques y formato |
+| Entradas del brief | Hechos públicos, orientación privada y orientación de Gustavo; el día; hasta 12 publicaciones de referentes de los últimos 7 días; las 20 últimas piezas listas, con los resultados de las publicadas; el resumen de resultados de 30 días por pilar y modalidad (`performance_30d`); la mezcla de modalidades de 30 días; las preguntas abiertas y cerradas; las ideas y los comentarios de Gustavo de la captura; las recomendaciones del último resumen semanal (`weekly_recommendations`, una pista, no orientación); unidades del curso de pilares, cadencia, los 9 enfoques y formato |
 | Entradas de la selección | El brief congelado, las dos variantes, el panel de lectores y las fuentes |
 | Entradas de la reparación | El brief congelado, el texto, sus afirmaciones, los hallazgos concretos (de las reglas o del verificador) y las fuentes |
 | Salidas | Brief o «skip»; hasta 2 preguntas a Gustavo (`preguntas.ask`); las ideas usadas (`capturas.mark_used`). La selección devuelve A, B, fusión o descarte, el texto final y sus afirmaciones. La reparación devuelve el texto corregido y un cambio por hallazgo, o un descarte |

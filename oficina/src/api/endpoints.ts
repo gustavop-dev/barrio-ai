@@ -41,6 +41,9 @@ import type {
   TurnoAction,
   Unit,
   User,
+  WeeklySummaries,
+  WeeklySummaryDecision,
+  WeeklySummaryGenerateResponse,
 } from './types';
 
 const OP = '/api/v1/operador';
@@ -248,3 +251,17 @@ export const deleteOportunidad = (opportunityId: string) => api.delete(`${OPP}/$
 
 // ---------------------------------------------------------------- settings
 export const getAjustes = () => api.get<Ajustes>('/api/v1/ajustes');
+
+// ---------------------------------------------------------------- weekly summary (analista_barrio_resultados)
+const RESUMEN = '/api/v1/resultados/resumen-semanal';
+export const getResumenSemanal = () => api.get<WeeklySummaries>(RESUMEN);
+/** nuevo → visto, once the block is on screen. */
+export const markResumenVisto = (summaryId: string) => api.post<WeeklySummaryDecision>(`${RESUMEN}/${id(summaryId)}/visto`, {});
+/** «Usar como orientación»: replaces the team orientation and returns the previous text. */
+export const aplicarResumen = (summaryId: string) => api.post<WeeklySummaryDecision>(`${RESUMEN}/${id(summaryId)}/aplicar`, {});
+export const descartarResumen = (summaryId: string) => api.post<WeeklySummaryDecision>(`${RESUMEN}/${id(summaryId)}/descartar`, {});
+/** The 5 s «Deshacer»: restores the previous orientation (409 if it changed since) or reopens a discarded summary. */
+export const deshacerResumen = (summaryId: string) => api.post<WeeklySummaryDecision>(`${RESUMEN}/${id(summaryId)}/deshacer`, {});
+/** Paid: one Claude call for the last week. `request_id` makes a retry the same job. */
+export const generarResumen = (requestId?: string) =>
+  api.post<WeeklySummaryGenerateResponse>(`${RESUMEN}/generar`, requestId ? { request_id: requestId } : {});

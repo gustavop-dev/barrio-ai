@@ -247,6 +247,8 @@ def tick(user,now=None):
         except Exception as exc:report['inbox_error']=type(exc).__name__  # the inbox never stops the rest of the tick
         report['execute']+=_execute(user,account,now)
     report['reconcile']+=_reconcile(user,now)
+    try:report['weekly_summary']=_weekly_summary(user,now)
+    except Exception as exc:report['weekly_summary_error']=type(exc).__name__  # the weekly summary never stops the rest
     return report
 
 def _editorial(user,now):
@@ -378,6 +380,12 @@ def _inbox(user,account,now):
     bucket=int(now.timestamp()//every.total_seconds())
     _,created=enqueue_operation(user,'read_inbox',{'account':str(account.id)},request_id=_job_id('inbox',account.id,bucket))
     return int(created)
+
+def _weekly_summary(user,now):
+    """analista_barrio_resultados: on Monday after WEEKLY_SUMMARY_TIME, queue the summary of the week that just ended
+    (resumen_semanal.queue: one per week, deterministic job id). Off with WEEKLY_SUMMARY_ENABLED=false."""
+    from . import resumen_semanal
+    return resumen_semanal.queue(user,now)
 
 def _execute(user,account,now):
     if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0

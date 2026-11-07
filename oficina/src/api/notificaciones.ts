@@ -17,6 +17,7 @@ export type NotificationKind =
   | 'capture_processed'
   | 'invite_expected'
   | 'machine_paused_env'
+  | 'weekly_summary'
   | (string & {});
 
 export interface NotificationItem {
