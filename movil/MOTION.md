@@ -102,3 +102,46 @@ Estas vistas reutilizan tokens que ya existían, sin valores nuevos:
 - `fold`: los plegables «Autonomía y límites» y «Por tipo de notificación» de Ajustes.
 - `sheetOpen`, `backdrop` y `sheetClose`: la hoja de la foto y las confirmaciones de Ajustes.
 - `actionSuccess` y `actionError`: guardar o quitar una foto, la parada y la reanudación de la máquina, la pausa de una cuenta, la orientación y «Probar notificación».
+
+## Oficina · escena y hoja de detalle
+
+El motor compartido recibe `officeMotion` desde este módulo. Sus valores iniciales proceden de
+`compartido/src/scene/motion.ts` para conservar la coreografía de la PWA; cualquier ajuste nativo se
+sobrescribe en `officeMotion`, sin editar la pantalla ni el motor. El zoom se ajusta a píxeles físicos
+enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas intermedias borrosas.
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `timings.officeNowIn` / `officeNowOut`, `officeLayout.nowIn/nowOut` | 240 ms enter / 160 ms exit | Entrada y salida de la narración flotante en `scene/OficinaScreen.tsx`. |
+| `officeMotion.walkSpeed` | 40 px lógicos/s | Caminatas del motor compartido (`scene/runtime.ts`). |
+| `officeMotion.startGap` / `summaryHold` | 1800 / 2600 ms | Espaciado de eventos y resúmenes. |
+| `officeMotion.ambientFirst` / `ambientEvery` | 9000 / 20000 ms | Café y charla únicamente para roles en espera. |
+| `officeMotion.fadeMs` | 500 ms | Operación sale y vuelve por la puerta. |
+| `officeMotion.questionMs` / `bookMs` / `readMs` | 1800 / 2200 / 1600 ms | Consulta de biblioteca. |
+| `officeMotion.searchMs` / `librarianBookMs` / `handBookMs` | 1400 / 1200 / 900 ms | Búsqueda y entrega del bibliotecario. |
+| `officeMotion.sheetMs` / `handSheetMs` / `conversationMs` / `deliveryMs` | 2200 / 900 / 1800 / 1500 ms | Entrega entre equipos. |
+| `officeMotion.outsideMs` / `doneMs` / `returnMs` | 1300 / 2000 / 800 ms | Publicación ejecutada. |
+| `officeMotion.coffeeMs` / `chatMs` / `chatReplyMs` | 2600 / 2000 / 2200 ms | Pausas de café y conversación. |
+| `officeMotion.runFrameMs` / `idleFrameMs` | 110 / 220 ms | Fotogramas del atlas en `scene/sprites.ts`. |
+| `officeMotion.lightMs` / `bubbleFrameMs` | 700 / 300 ms | Luces de actividad y bocadillos en `scene/Decorations.tsx`. |
+| `officeFrames.stepMs` / `maxDeltaMs` | 16 / 64 ms | Paso fijo y límite de recuperación tras un frame lento. |
+| `officeFrames.reportFrames` / `slowFrameMs` | 300 / 1000÷60 ms | Diagnóstico de desarrollo: delta medio/máximo, frames sobre presupuesto y coste medio del motor. |
+| `officeGestures.minZoom` / `maxZoom` | 1 / 3 | Límites relativos a la escala inicial. |
+| `officeGestures.panDistance` / `tapDistance` | 8 / 10 dp | Activación del desplazamiento y tolerancia de toque. |
+| `officeGestures.tapDurationMs` / `doubleTapMs` | 250 / 280 ms | Duración máxima de toque e intervalo de doble toque. |
+| `officeGestures.touchTarget` | 48 dp | Área mínima al tocar personajes en el canvas. |
+| `officeGestures.sheetActivation` | 8 dp | Inicio del arrastre del asa de `SnapSheet`. |
+| `officeGestures.sheetHalf` / `sheetFull` | 0.5 / 0.88 | Puntos de ajuste de `SnapSheet`, sobre el espacio disponible. |
+| `haptics.officePick` | selección | Selección de un personaje, zona o equipo. |
+
+`SnapSheet` reutiliza `springs.sheetOpen`, `timings.sheetClose` y `gestures.sheet` para volver a un
+punto de ajuste o cerrar; ofrece ampliar/reducir mediante acciones de accesibilidad y Cerrar.
+Con movimiento reducido se desactiva el callback de frames, todos vuelven a su puesto y los nuevos
+eventos solo se narran. La ausencia de foco, el segundo plano y la pausa de máquina también paran el
+callback; los observers de Oficina dejan de consultar al perder foco o pasar a segundo plano.
+
+Para medir en un teléfono: `cd movil && npm start -- --offline`, abrir Oficina en Expo Go con una
+sesión de desarrollo y observar `[Oficina/UI]` cada 300 frames. `meanSimulationMs` mide solo el motor;
+los deltas incluyen el ritmo de presentación, no aíslan el coste de GPU. Comprobar también pan,
+pinch, regreso del fondo y movimiento reducido. El render local de CanvasKit y las pruebas no
+constituyen una medición de 60 fps en Android.
