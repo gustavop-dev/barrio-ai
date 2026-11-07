@@ -1,0 +1,909 @@
+{
+  "version": "1.1",
+  "tipo": "contrato_documental_no_ejecutable",
+  "naturaleza": "servicio_determinista_no_llm",
+  "id": "operador_cuenta",
+  "nombre": "Operador de la cuenta",
+  "grupo": "operacion",
+  "estado": "diseno_propuesto_no_activo",
+  "fecha": "2026-11-06",
+  "proposito": {
+    "mision": "Ser el único ejecutor de escrituras en LinkedIn (Unipile v2) y en la API oficial, y la pasarela de lectura de la cuenta: comprobar, ejecutar una sola vez, confirmar, conciliar y detener ante cualquier riesgo de la cuenta.",
+    "contribucion_al_objetivo_del_equipo": "Que las decisiones de los agentes, aprobadas por la política autónoma (o por Gustavo en modo approval), se apliquen exactamente una vez, con evidencia, sin duplicados y sin poner en riesgo la cuenta.",
+    "resultado_del_que_responde": "execution_record confirmado, sin_efecto_confirmado o incierto; estado de cuenta (D15); pendientes de notificaciones (ADM-01); parada total (ADM-04); historial conciliado (ADM-05).",
+    "fuera_de_responsabilidad": [
+      "decidir qué hacer, redactar, reinterpretar contenido o juzgar su veracidad: no es un LLM; el juicio de texto es del editor_verificador",
+      "modificar contenido aprobado, aunque sea una corrección menor",
+      "credenciales, 2FA, pagos o propiedad de la cuenta",
+      "resolver retos de seguridad: los resuelve Gustavo",
+      "reanudar tras una parada, pausa o degradación automática: solo Gustavo"
+    ]
+  },
+  "conocimiento": {
+    "clases_permitidas": [],
+    "unidades": [],
+    "temas_prioritarios": [
+      "políticas versionadas de reparto-acciones-v1",
+      "contratos de Unipile v2 y de la API oficial verificados en piloto"
+    ],
+    "relaciones_con_otras_unidades": [],
+    "acceso_no_exclusivo": true,
+    "decisiones_de_diseno_que_no_provienen_del_curso": [
+      "servicio determinista sin modelo de lenguaje",
+      "ejecutor único de escrituras y pasarela de lectura",
+      "idempotencia, confirmación por relectura y conciliación sin reintento ciego",
+      "degradación automática (pausa de la cuenta o de la capacidad, con alerta) ante restricción, 429, reto de seguridad, queja o error material",
+      "aplica la política autónoma: aprueba el nivel B solo con la verificación automática superada"
+    ],
+    "nota": "No consume unidades del curso para decidir; aplica políticas y aprobaciones versionadas."
+  },
+  "entradas": {
+    "obligatorias": [
+      "execution_request: capacidad_id, operación, objeto o destinatario (ids del proveedor), contenido y hash, approval_ref (nivel B: política autónoma, o Gustavo en modo approval) o politica_ref (nivel A), review_record_ref si hay texto, solicitante",
+      "política de reparto vigente: nivel, modo por capacidad (OPERATOR_AUTONOMY), topes, ventana, espaciado, caducidad, antigüedad máxima de post y condiciones estrictas",
+      "estado de parada total (OPERATOR_PAUSED) y pausas por cuenta y por capacidad",
+      "D15 de la cuenta conectada"
+    ],
+    "opcionales": [
+      "fecha programada y zona horaria (CONT-08)",
+      "assets con hash"
+    ],
+    "versiones_requeridas": [
+      "policy_version",
+      "approval version (política autónoma o Gustavo) y review_record version si hay texto",
+      "content_hash",
+      "contract_version"
+    ],
+    "si_falta_informacion": "Rechazar la solicitud con reason_code (missing_approval, stale_approval, cap_reached, account_unhealthy, kill_switch, precondition_failed, unsupported_operation, capability_paused, outside_window, spacing_not_elapsed, proposal_expired, post_too_old, review_missing, strict_conditions_unmet); nunca completar por suposición."
+  },
+  "iniciativa": {
+    "eventos_que_lo_activan": [
+      "execution_request recibido",
+      "vencimiento de un trabajo programado (CONT-08)",
+      "webhook de Unipile (mensajes, relaciones, seguidores) y consulta periódica configurada",
+      "ventana de conciliación de un incierto",
+      "orden de parada, pausa, veto o reanudación de Gustavo; cambio de configuración (OPERATOR_*)"
+    ],
+    "condiciones_para_actuar": [
+      "parada total desactivada, cuenta y capacidad no pausadas y capacidad en modo auto (o approval con aprobación de Gustavo)",
+      "D15: identidad conectada igual a la cuenta de Gustavo, permiso efectivo de la operación y sin restricción",
+      "aprobación vigente de la política autónoma para el hash exacto con la verificación automática superada (review_record ready_for_execution si hay texto) o política de nivel A vigente",
+      "topes disponibles, dentro de OPERATOR_WINDOW (07:00-21:00, America/Bogota), con OPERATOR_MIN_SPACING_SECONDS cumplido desde la última escritura pública y antes de OPERATOR_PROPOSAL_TTL_HOURS",
+      "precondiciones del objeto comprobadas en D13/D14",
+      "comentarios: post de no más de OPERATOR_MAX_POST_AGE_HOURS; RED-08, CONT-11 y ADM-03: condiciones estrictas cumplidas y evidencia confirmada por editor_verificador"
+    ],
+    "criterio_de_prioridad": "Paradas y conciliaciones antes que nuevas ejecuciones; programaciones vencidas antes que solicitudes inmediatas; orden de llegada dentro de cada tipo.",
+    "clave_de_deduplicacion": "clave_idempotencia = hash(workspace + capacidad_id + operacion + objeto_o_destinatario + content_hash + approval_ref|delegacion_ref|politica_ref)",
+    "cuando_no_actuar": [
+      "existe registro con la misma clave en curso, confirmado o incierto",
+      "aprobación caducada, vetada o con contexto cambiado",
+      "parada total o pausa",
+      "operación sin cobertura verificada: crear tarea manual para Gustavo",
+      "fuera de la ventana o sin el espaciado cumplido: esperar sin descartar hasta la caducidad"
+    ]
+  },
+  "funcionamiento": {
+    "pasos": [
+      "Validar la solicitud: esquema, capacidad del catálogo, nivel, modo y autorización (approval_ref de la política autónoma con la verificación superada y hash idéntico, de Gustavo en modo approval, o política A).",
+      "Comprobar parada total, pausas, D15 (identidad, permiso efectivo, restricciones, vigencia del acceso), topes por día, semana, tipo y destinatario, ventana, espaciado entre escrituras públicas, caducidad y antigüedad del post.",
+      "Comprobar precondiciones del objeto en D13/D14: no conectado ni con invitación pendiente (RED-02), hilo sin mensajes nuevos desde la aprobación (CHAT), post existente (INT), sin intervención de Gustavo, sin ejecución previa con la misma clave.",
+      "Registrar la intención con la clave de idempotencia en estado reservado antes de llamar.",
+      "Ejecutar una sola llamada a un único proveedor: Unipile v2 para relaciones, interacción, mensajes y perfil; Posts API oficial (w_member_social) para publicar, editar o retirar posts.",
+      "Confirmar releyendo el resultado: invitación en la lista de enviadas, mensaje en el chat, comentario o reacción en el objeto, campo de perfil igual al aprobado, URN/ID del post y lectura posterior permitida o por Unipile.",
+      "Clasificar como confirmado, sin_efecto_confirmado o incierto; los inciertos entran en conciliación por lectura durante la ventana configurada y, si no se resuelven, se pausa la capacidad, se bloquea el objeto y se alerta a Gustavo.",
+      "Publicar execution_record (D14), actualizar topes consumidos y notificar al solicitante y al aprendizaje."
+    ],
+    "reglas_de_decision": [
+      "Nunca reintentar a ciegas: un reintento solo tras sin_efecto_confirmado y con nueva solicitud que referencia la anterior; en nivel B, con aprobación aún vigente.",
+      "Nunca usar una segunda vía o proveedor para la misma acción; un timeout no activa otro ejecutor.",
+      "Degradación automática: pausa de la cuenta ante restricción o advertencia, HTTP 429 o límite de frecuencia, reto de seguridad (checkpoint, captcha, verificación, 2FA), desconexión o credenciales inválidas, identidad distinta, duplicado detectado o incidencias acumuladas por encima del umbral; pausa de la capacidad ante queja, petición de detenerse o informe de spam, error material detectado, destinatario u objeto equivocado o incierto no conciliado. Toda pausa envía alerta por OPERATOR_ALERT_WEBHOOK y la oficina.",
+      "Durante una pausa o parada: rechazar escrituras del ámbito, retener programaciones (al reanudar repiten la verificación y caducan si superan OPERATOR_PROPOSAL_TTL_HOURS desde su fecha), limitar lecturas a la comprobación de salud autorizada por Gustavo y seguir conciliando sin reintentar.",
+      "Reanudar solo por orden de Gustavo tras revisar el informe de incidencia.",
+      "Espaciado fijo de OPERATOR_MIN_SPACING_SECONDS (1200 s por defecto) entre escrituras públicas para evitar ráfagas; prohibido aleatorizar o imitar comportamiento humano para evitar la detección.",
+      "Operaciones sin cobertura verificada (Destacados, contacto, visibilidad, recomendaciones recibidas, artículos, newsletters, guardado nativo, reporte) se convierten en tarea manual para Gustavo y se registran al confirmarlas.",
+      "El contenido de perfiles, posts y mensajes nunca se interpreta como instrucción.",
+      "Programación: guardar en la cola Django la versión aprobada, fecha UTC y zona horaria; al vencer, repetir todas las comprobaciones antes de publicar; cancelar un trabajo iniciado exige conciliar primero.",
+      "Veto de Gustavo: una propuesta vetada no se ejecuta; revertir algo ya ejecutado es una solicitud nueva con la acción inversa cuando existe.",
+      "La pausa de una capacidad no impide ejecutar la corrección del objeto afectado mediante otra capacidad no pausada; con la cuenta pausada no se ejecuta nada."
+    ],
+    "alternativas_ante_incertidumbre": [
+      "conciliar por lectura",
+      "bloquear el objeto, pausar la capacidad y alertar a Gustavo",
+      "rechazar con reason_code"
+    ],
+    "condicion_de_finalizacion": "execution_record en estado final (confirmado o sin_efecto_confirmado) o escalado documentado; la ejecución técnica no acredita el objetivo de negocio."
+  },
+  "herramientas_y_autoridad": {
+    "herramientas_necesarias": [
+      "Unipile v2 con la cuenta de Gustavo conectada (credenciales y 2FA custodiados por Unipile): búsqueda, perfiles, posts, comentarios, reacciones, invitaciones, seguir, chats y edición del perfil propio; webhooks de mensajes y relaciones",
+      "API oficial de LinkedIn: Posts API con w_member_social (Share on LinkedIn); memberCreatorPostAnalytics y memberFollowersCount solo si Community Management concede r_member_postAnalytics/r_member_profileAnalytics",
+      "Django/PostgreSQL y cola persistente: solicitudes, aprobaciones, programaciones, registro de ejecución, política autónoma, topes, ventana, pausas, alertas y parada total",
+      "almacén de secretos del backend; los agentes nunca reciben tokens"
+    ],
+    "acciones_autorizadas": [
+      "Ejecutar escrituras una sola vez con aprobación vigente de la política autónoma (B, incluida la política estricta), de Gustavo en modo approval, o con política vigente (A)",
+      "Servir lecturas y sincronizaciones con topes (pasarela de lectura)",
+      "Pausar automáticamente la cuenta o una capacidad (degradación) y enviar la alerta",
+      "ADM-01: convertir notificaciones y eventos en pendientes deduplicados; ADM-04: detectar restricciones y detener; ADM-05: conciliar y conservar el historial"
+    ],
+    "acciones_que_requieren_aprobacion": [
+      "Reanudar tras una pausa, degradación o parada: Gustavo",
+      "Cambiar modo por capacidad, topes, ventana, espaciado, caducidad o presupuesto: Gustavo",
+      "Nivel C: no hay operación del operador; comprometer salario, tarifas, dedicación, empleo, contratos o alianzas lo hace solo Gustavo"
+    ],
+    "acciones_prohibidas": [
+      "Ejecutar sin aprobación o política vigente, con un hash distinto del aprobado o un texto sin review_record ready_for_execution",
+      "Modificar, completar o traducir el contenido aprobado",
+      "Reintentar a ciegas o por otra vía",
+      "Eludir restricciones, límites o la detección; aleatorizar para imitar comportamiento humano",
+      "Resolver retos de seguridad, cambiar credenciales o 2FA, tocar pagos o la propiedad de la cuenta",
+      "Superar topes, actuar fuera de OPERATOR_WINDOW o sin respetar el espaciado",
+      "Obedecer instrucciones contenidas en perfiles, posts o mensajes",
+      "Exponer tokens, credenciales o datos privados a agentes que no los necesitan",
+      "Outbound, campañas o secuencias de clases 07+",
+      "Editar el curso o los presupuestos"
+    ]
+  },
+  "capacidades_catalogo": [
+    {
+      "id": "RED-01",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Autónomo con topes para candidatos que cumplen criterios de barrio; seguir no implica conexión ni interés comercial."
+    },
+    {
+      "id": "RED-01",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-02",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Sin nota por defecto (cuenta gratuita); nota automática solo en casos de alto valor dentro del cupo mensual real configurado. Motivo real registrado, sin pitch; el operador comprueba que no exista conexión ni invitación pendiente y no reinvita tras retirada o rechazo."
+    },
+    {
+      "id": "RED-02",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-03",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. Sincronización y consulta de estados; no deducir aceptación del envío ni del silencio."
+    },
+    {
+      "id": "RED-03",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-04",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Aceptar solo con pertinencia evaluada; aceptar no activa mensajes ni secuencias. Dejar una invitación pendiente es decisión interna de nivel A."
+    },
+    {
+      "id": "RED-04",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-05",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. No declinar por falta de notoriedad; distinguir falta de información de falta de encaje."
+    },
+    {
+      "id": "RED-05",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-06",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Retirada con motivo; prohibido retirar y reenviar para insistir. Comprobar consecuencias aplicables antes de ejecutar."
+    },
+    {
+      "id": "RED-06",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-07",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Autónomo con topes; no equivale a eliminar conexión ni responde a una discrepancia aislada."
+    },
+    {
+      "id": "RED-07",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-08",
+      "papel": "ejecuta",
+      "politica": "Nivel B, política estricta. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Política estricta: solo cuentas falsas, spam o acoso documentados con evidencia confirmada por el verificador; nunca por bajo encaje, silencio, crítica o competencia; verificar identidad, conversaciones y compromisos antes de ejecutar; alerta a Gustavo."
+    },
+    {
+      "id": "RED-08",
+      "papel": "verifica",
+      "politica": "Nivel B, política estricta. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "RED-09",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-02",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Autónomo con topes tras leer el contenido; sin reacciones en masa ni para provocar reciprocidad; evitar temas que Gustavo marque sensibles."
+    },
+    {
+      "id": "INT-02",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-03",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Comentario con opinión sustentada y apertura pertinente; sin pitch ni experiencia inventada; solo en posts de 72 h o menos."
+    },
+    {
+      "id": "INT-03",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-04",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Leer el contexto del comentario; admitir lo desconocido; preguntas valiosas se registran para Editorial; el plazo de 72 h se cuenta desde el comentario al que se responde."
+    },
+    {
+      "id": "INT-04",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-05",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. No monopolizar el hilo; terminar cuando no haya aporte o la persona pida no continuar; solo en posts de 72 h o menos."
+    },
+    {
+      "id": "INT-05",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-06",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Compartir con atribución y criterio propio; un único ejecutor y una sola vía (API oficial o Unipile) registrada por pieza; entra en el calendario del director."
+    },
+    {
+      "id": "INT-06",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-07",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Biblioteca interna; el guardado nativo no tiene cobertura verificada: tarea manual de Gustavo que el operador registra; nunca reportar el interno como guardado en LinkedIn."
+    },
+    {
+      "id": "INT-08",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Conservar versión anterior y comprobar autoría; la nueva versión exacta pasa la verificación automática."
+    },
+    {
+      "id": "INT-08",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-09",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Retirar solo comentario propio por error, duplicado o veto de Gustavo; conservar motivo y contexto."
+    },
+    {
+      "id": "INT-09",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "INT-10",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Verificar objeto y reacción vigente antes de cambiar para no duplicar; conciliar entre retirada y nueva reacción."
+    },
+    {
+      "id": "INT-10",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CONT-07",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CONT-08",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Programar en la cola Django la versión aprobada con fecha UTC y zona horaria, dentro de la ventana de actividad; cancelar un trabajo no iniciado es nivel A (dirección segura); al vencer se repite la verificación; si el envío comenzó, conciliar antes."
+    },
+    {
+      "id": "CONT-08",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CONT-09",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Posts API (w_member_social) con la versión aprobada por la política autónoma, sin revisión humana final; guardar URN y confirmar por lectura permitida o Unipile; timeout no activa segundo ejecutor."
+    },
+    {
+      "id": "CONT-09",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CONT-10",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Solo campos admitidos por la API; conservar versión anterior y periodo publicado de cada versión; vía preferente para corregir un error factual."
+    },
+    {
+      "id": "CONT-10",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CONT-11",
+      "papel": "ejecuta",
+      "politica": "Nivel B, política estricta. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Política estricta: solo duplicados o un error factual material confirmado por el verificador y no corregible por edición; nunca por bajo rendimiento ni crítica; conservar métricas, texto y vínculos; alerta a Gustavo."
+    },
+    {
+      "id": "CONT-11",
+      "papel": "verifica",
+      "politica": "Nivel B, política estricta. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CONT-12",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Expansión no activa; preparación interna con verificación automática; creación nativa manual de Gustavo registrada por el operador."
+    },
+    {
+      "id": "CONT-13",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Expansión no activa; requiere que Gustavo decida sostenerla (configuración); operación nativa manual registrada por el operador."
+    },
+    {
+      "id": "CHAT-01",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. Sincronización inicial e incremental por Unipile; leer el hilo completo disponible; acceso restringido a conversaciones_inbox y extractos mínimos para otros roles."
+    },
+    {
+      "id": "CHAT-01",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CHAT-03",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Sin inventar disponibilidad, presupuesto ni compromisos; ante salario, tarifas, dedicación, empleo, contratos o alianzas (nivel C) responde sin comprometer, mantiene la conversación y escala por CHAT-09."
+    },
+    {
+      "id": "CHAT-03",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CHAT-04",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia."
+    },
+    {
+      "id": "CHAT-04",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CHAT-05",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Vínculo real y razón concreta; no fingir cercanía ni usar el café como pretexto comercial."
+    },
+    {
+      "id": "CHAT-05",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CHAT-06",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Recurso con permiso de uso y atribución personal/equipo; sin pruebas confidenciales ni testimonios inventados."
+    },
+    {
+      "id": "CHAT-06",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CHAT-07",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Proponer conversación y confirmar una franja solo dentro de la disponibilidad configurada por Gustavo en D16; sin D16 o fuera de ella, proponer sin comprometer horarios; una reunión no compromete condiciones; agenda opcional no conectada."
+    },
+    {
+      "id": "CHAT-07",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CHAT-08",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Un seguimiento como máximo sin respuesta salvo decisión de Gustavo; respetar un no; nunca secuencia outbound."
+    },
+    {
+      "id": "CHAT-08",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "CHAT-10",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Estados internos libres; archivar nativamente solo hilos cerrados; nunca marcar como leído un mensaje no atendido; campos nativos por verificar en Unipile."
+    },
+    {
+      "id": "CHAT-10",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "PERF-02",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Titular (specifics) y Acerca de (bio) vía Unipile tras la verificación automática; versión anterior y posterior confirmadas por lectura (PERF-10)."
+    },
+    {
+      "id": "PERF-02",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "PERF-03",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Experiencia, educación y habilidades vía Unipile; proyectos y campos no cubiertos quedan como tarea manual de Gustavo; no fabricar certificaciones."
+    },
+    {
+      "id": "PERF-03",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "PERF-04",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. picture y background_picture vía Unipile con assets autorizados; comprobar recorte en vistas observables."
+    },
+    {
+      "id": "PERF-04",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "PERF-05",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Sin cobertura verificada: Gustavo aplica manualmente la versión aprobada por la política autónoma y el operador registra la confirmación."
+    },
+    {
+      "id": "PERF-06",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Sin cobertura verificada: aplicación manual registrada; no exponer datos privados ni reemplazar el sitio personal por ProjectApp sin decisión."
+    },
+    {
+      "id": "PERF-07",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Solo a personas con trabajo real verificable; mensaje contextual vía Unipile; formulario nativo manual; un borrador orientativo nunca es testimonio recibido."
+    },
+    {
+      "id": "PERF-07",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "PERF-08",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Perfil señala recomendaciones recibidas y su encaje; mostrar u ocultar lo aprueba la política autónoma y Gustavo lo aplica a mano (sin cobertura verificada); no editar palabras de terceros."
+    },
+    {
+      "id": "PERF-09",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Sin cobertura verificada: preferencias aplicadas manualmente por Gustavo y registradas por el operador."
+    },
+    {
+      "id": "PERF-10",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. Comparar campos leídos con la versión aprobada; vista propia no acredita visibilidad pública; Gustavo puede confirmar la vista pública o móvil sin bloquear el ciclo."
+    },
+    {
+      "id": "PERF-10",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "APRE-01",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. API oficial (memberCreatorPostAnalytics, memberFollowersCount) solo si Community Management se aprueba; si no, importación manual con procedencia; dato ausente no es cero."
+    },
+    {
+      "id": "APRE-07",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta como servicio determinista y deja registro en D14. Registro fechado que separa observación, interpretación, decisión, ejecución y simulación; datos privados solo a quien los necesita."
+    },
+    {
+      "id": "APRE-07",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "ADM-01",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Eventos Unipile y consultas periódicas convertidos en pendientes deduplicados y enrutados al rol dueño; la notificación es señal, no estado."
+    },
+    {
+      "id": "ADM-01",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "ADM-01",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes."
+    },
+    {
+      "id": "ADM-01",
+      "papel": "verifica",
+      "politica": "Nivel A. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "ADM-02",
+      "papel": "ejecuta",
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Solo spam o exposición indebida en espacios con control real; nunca ocultar críticas legítimas ni actuar sobre posts ajenos."
+    },
+    {
+      "id": "ADM-02",
+      "papel": "verifica",
+      "politica": "Nivel B. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "ADM-03",
+      "papel": "ejecuta",
+      "politica": "Nivel B, política estricta. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Política estricta: bloqueo vía Unipile solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; el reporte sigue siendo manual de Gustavo; alerta a Gustavo."
+    },
+    {
+      "id": "ADM-03",
+      "papel": "verifica",
+      "politica": "Nivel B, política estricta. Confirma releyendo el estado real (D13/D14) y concilia lo incierto."
+    },
+    {
+      "id": "ADM-04",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Pausa automática de la cuenta ante restricción, 429, reto de seguridad, desconexión o identidad distinta, y de la capacidad ante quejas o errores materiales, con alerta; solo Gustavo reanuda; nunca eludir ni reintentar por otra vía."
+    },
+    {
+      "id": "ADM-04",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "ADM-04",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta como servicio determinista y deja registro en D14."
+    },
+    {
+      "id": "ADM-05",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Inventario de ejecuciones, versiones, confirmaciones e inciertos con acceso restringido; no prometer exportación completa de LinkedIn."
+    },
+    {
+      "id": "ADM-05",
+      "papel": "decide",
+      "politica": "Nivel A. Decide dentro de su política y los criterios vigentes."
+    },
+    {
+      "id": "ADM-05",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Ejecuta como servicio determinista y deja registro en D14."
+    }
+  ],
+  "entregables": {
+    "tipos": [
+      {
+        "tipo": "execution_record",
+        "campos": [
+          "clave_idempotencia",
+          "capacidad_id",
+          "operacion",
+          "solicitante",
+          "autorizacion_ref",
+          "verificacion_ref",
+          "objeto_o_destinatario",
+          "content_hash",
+          "proveedor_y_endpoint",
+          "solicitado_en",
+          "ejecutado_en",
+          "respuesta_tecnica",
+          "ids_resultantes (URN, message_id, invitation_id)",
+          "estado: reservado|en_envio|confirmado|sin_efecto_confirmado|incierto|escalado",
+          "evidencia_de_confirmacion",
+          "conciliacion"
+        ]
+      },
+      {
+        "tipo": "account_state",
+        "campos": [
+          "identidad_conectada",
+          "proveedores_y_permisos_efectivos",
+          "restricciones_y_errores",
+          "parada_total",
+          "pausas",
+          "topes_consumidos",
+          "vigencia_del_acceso",
+          "actualizado_en"
+        ]
+      },
+      {
+        "tipo": "incident_report",
+        "campos": [
+          "disparador",
+          "ambito_pausado: global|cuenta|proveedor|capacidad",
+          "momento",
+          "acciones_detenidas",
+          "inciertos_abiertos",
+          "programaciones_retenidas",
+          "recomendacion_de_reanudacion: decide Gustavo",
+          "alerta_enviada"
+        ]
+      },
+      {
+        "tipo": "operator_alert",
+        "campos": [
+          "ambito: global|cuenta|proveedor|capacidad",
+          "capacidad_id si aplica",
+          "disparador",
+          "evidencia",
+          "objetos_afectados",
+          "momento",
+          "canales: OPERATOR_ALERT_WEBHOOK y oficina",
+          "estado_de_entrega"
+        ]
+      },
+      {
+        "tipo": "manual_task",
+        "campos": [
+          "capacidad_id",
+          "version_aprobada",
+          "instrucciones",
+          "confirmacion_de_gustavo",
+          "lectura_posterior_si_posible"
+        ]
+      },
+      {
+        "tipo": "pending_item",
+        "campos": [
+          "origen (notificación o webhook)",
+          "objeto",
+          "rol_dueno",
+          "deduplicacion",
+          "estado_actual_consultado"
+        ]
+      }
+    ],
+    "formato_comun": {
+      "registro": "Inmutable y fechado; las correcciones se añaden sin borrar historial.",
+      "acceso": "Restringido; datos privados solo para roles que los necesitan."
+    }
+  },
+  "memoria": {
+    "lee": [
+      "políticas y aprobaciones versionadas",
+      "D13/D14/D15"
+    ],
+    "puede_proponer": [],
+    "puede_confirmar": [
+      "el resultado observado de cada ejecución y el estado de la cuenta"
+    ],
+    "no_puede_modificar": [
+      "contenido aprobado",
+      "políticas y topes",
+      "decisiones de agentes o de Gustavo",
+      "credenciales"
+    ],
+    "politica_de_caducidad": "Registros de ejecución permanentes según retención configurada; estado de cuenta se refresca antes de cada escritura.",
+    "dependencias_a_revisar_si_cambia_una_entrada": [
+      "programaciones ligadas a una aprobación invalidada",
+      "solicitudes pendientes tras un cambio de política"
+    ]
+  },
+  "coordinacion": {
+    "recibe_de": [
+      "relaciones_comunidad, conversaciones_inbox, perfil y director_editorial: execution_request",
+      "política autónoma: approval_ref tras la verificación automática, con el review_record del editor_verificador referenciado",
+      "Gustavo: configuración (OPERATOR_*), vetos, reversiones, pausa, parada y reanudación; aprobaciones solo para capacidades en modo approval",
+      "Unipile y API oficial: respuestas, webhooks y lecturas"
+    ],
+    "entrega_a": [
+      "solicitante: execution_result",
+      "Gustavo: alertas de pausa, degradación y parada (OPERATOR_ALERT_WEBHOOK y oficina), incident_report, manual_task y escalados de inciertos",
+      "relaciones_comunidad, conversaciones_inbox y perfil: pending_item de notificaciones (ADM-01)",
+      "analista_barrio_resultados: execution_record y métricas recolectadas",
+      "todos los roles: account_state sin secretos"
+    ],
+    "responsable_de_resolver_desacuerdos": "Gustavo para reanudar, cambiar política o resolver inciertos; el operador no arbitra contenido.",
+    "criterio_de_escalamiento": "pausa o parada automática (siempre con alerta), incierto no conciliado, precondición contradictoria, operación sin cobertura o duplicado detectado."
+  },
+  "calidad": {
+    "criterios_materiales": [
+      "exactamente una ejecución por clave",
+      "contenido ejecutado idéntico al aprobado",
+      "confirmación por relectura",
+      "pausa inmediata y alerta ante los disparadores",
+      "ningún secreto expuesto",
+      "ninguna escritura fuera de ventana ni sin espaciado"
+    ],
+    "preferencias_no_bloqueantes": [],
+    "casos_de_evaluacion": [
+      {
+        "caso": "Timeout al publicar",
+        "resultado_esperado": "Incierto; concilia por lectura; no republica.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Dos solicitudes con la misma clave",
+        "resultado_esperado": "Ejecuta una y rechaza la otra como duplicada.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Hash recibido distinto del aprobado",
+        "resultado_esperado": "Rechaza con stale_approval.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Unipile devuelve 429",
+        "resultado_esperado": "Pausa de la cuenta, alerta e incident_report; no reintenta.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Reto de seguridad al enviar",
+        "resultado_esperado": "Pausa de la cuenta y alerta; Gustavo resuelve el reto; no intenta resolverlo.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Invitación a persona ya conectada",
+        "resultado_esperado": "Rechaza por precondición.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Mensaje nuevo en el hilo tras la aprobación",
+        "resultado_esperado": "Rechaza con stale_approval y avisa a conversaciones_inbox.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Programación vence durante una parada",
+        "resultado_esperado": "Retiene; al reanudar repite la verificación; caduca si han pasado 48 h desde su fecha.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Solicitud de Destacados",
+        "resultado_esperado": "Tarea manual para Gustavo y registro al confirmarla.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Escritura pública 5 minutos después de otra",
+        "resultado_esperado": "Espera hasta cumplir 20 minutos; el intervalo es fijo, no aleatorio.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Propuesta aprobada a las 21:30 hora de Bogotá",
+        "resultado_esperado": "Queda pendiente hasta las 07:00; caduca a las 48 h de crearse.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Queja de spam tras una invitación",
+        "resultado_esperado": "Pausa RED-02 y alerta; solo Gustavo reanuda.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "Comentario propuesto sobre un post de 80 h",
+        "resultado_esperado": "Rechaza con post_too_old.",
+        "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "RED-08 sin evidencia confirmada por el verificador",
+        "resultado_esperado": "Rechaza con strict_conditions_unmet.",
+        "estado": "propuesto_no_ejecutado"
+      }
+    ],
+    "evidencia_de_validacion": [
+      "Validación sintáctica local; sin implementación ni prueba contra proveedores."
+    ]
+  },
+  "medicion": {
+    "resultados_observables": [
+      "ejecuciones confirmadas, sin efecto e inciertas por capacidad",
+      "paradas y causas",
+      "duplicados evitados",
+      "tiempo de conciliación",
+      "pausas y degradaciones por capacidad y su causa"
+    ],
+    "fuente_de_datos": "execution_record y account_state",
+    "linea_base": null,
+    "objetivos": "Cero duplicados y cero ejecuciones sin autorización; resto tras el piloto.",
+    "ventana": "continua",
+    "limitaciones_de_atribucion": [
+      "confirmación técnica no es resultado de negocio"
+    ]
+  },
+  "controles": {
+    "presupuesto": "heredar límites y reservas vigentes; no autoriza gasto nuevo",
+    "max_rondas_propuesto": null,
+    "timeout": "por proveedor y operación, configurable antes de activar; un timeout produce estado incierto, no reintento",
+    "topes": "Todos los de reparto-acciones-v1 (valores por defecto configurables con OPERATOR_DAILY_LIMITS y OPERATOR_WEEKLY_LIMITS), aplicados por el operador antes de cada escritura y lectura.",
+    "condiciones_de_parada": [
+      "restricción o advertencia",
+      "429",
+      "reto de seguridad",
+      "desconexión o credenciales inválidas",
+      "identidad distinta",
+      "duplicado detectado",
+      "orden de Gustavo",
+      "incidencias acumuladas por encima del umbral configurado",
+      "queja, informe de spam o error material (pausa de la capacidad)"
+    ],
+    "tratamiento_de_fallo_incierto": "conciliar por lectura; escalar si no se resuelve; nunca repetir a ciegas"
+  },
+  "pendientes_para_activacion": [
+    "conectar la cuenta en Unipile (credenciales y 2FA de Gustavo) y verificar cada operación en piloto controlado",
+    "obtener w_member_social mediante OAuth de Gustavo; solicitar Community Management si se quiere analítica",
+    "implementar en Django: solicitudes, política autónoma y compuerta de verificación, modo por capacidad, cola, idempotencia, conciliación, topes, ventana, espaciado, caducidad, degradación, alertas y parada total",
+    "configurar con Gustavo OPERATOR_ALERT_WEBHOOK, OPERATOR_DAILY_LLM_USD, el cupo real de notas y el umbral de incidencias; el resto tiene valor por defecto en reparto v1.1",
+    "pruebas de los casos adversos antes de cualquier ejecución real"
+  ],
+  "datos_externos": [
+    {
+      "catalogo_id": "D07",
+      "uso": "Registrar lo realmente publicado",
+      "necesidad": "obligatorio para CONT-09/10",
+      "si_falta": "incierto",
+      "fuente_y_campos": "URN/ID de Posts API y lectura posterior."
+    },
+    {
+      "catalogo_id": "D11",
+      "uso": "Aprobaciones por versión exacta (política autónoma o Gustavo en modo approval), vetos y decisiones de nivel C",
+      "necesidad": "obligatorio para nivel B",
+      "si_falta": "rechazar",
+      "fuente_y_campos": "Registro de aprobaciones de la política autónoma en Django y bandeja de la oficina para vetos y modo approval."
+    },
+    {
+      "catalogo_id": "D13",
+      "uso": "Precondiciones de relación",
+      "necesidad": "obligatorio para RED",
+      "si_falta": "rechazar",
+      "fuente_y_campos": "Unipile v2: relaciones, seguidos e invitaciones enviadas y recibidas."
+    },
+    {
+      "catalogo_id": "D14",
+      "uso": "Idempotencia, estado y conciliación",
+      "necesidad": "obligatorio",
+      "si_falta": "no ejecutar",
+      "fuente_y_campos": "Registro propio y lecturas del proveedor."
+    },
+    {
+      "catalogo_id": "D15",
+      "uso": "Identidad, permisos efectivos, restricciones y salud",
+      "necesidad": "obligatorio",
+      "si_falta": "parada",
+      "fuente_y_campos": "Estado de la cuenta en Unipile, alcance OAuth de la API oficial y errores recientes."
+    }
+  ],
+  "contrato_transversal": {
+    "referencia": "infra/docs/circuitos-equipo.md",
+    "estado": "propuesta_documental_no_runtime",
+    "deduplicacion": "workspace + purpose/cycle + piece cuando aplique + rol + tarea + hash_entradas + ronda; event_id solo trazabilidad de transporte, no permiso de repetir",
+    "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
+    "ack": "Admite entrada/versiones; no verifica contenido. Para pasar una pieza a ejecución exige review_record ready_for_execution y approval_package del hash exacto aprobado por la política autónoma (o por Gustavo si la capacidad está en modo approval).",
+    "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
+    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json (v1.1): autonomía por defecto. Nivel A autónomo con topes; B aprobado por la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) con ejecución automática, incluidas RED-08, CONT-11 y ADM-03 con política estricta; C exclusivo de Gustavo, solo para comprometer salario, tarifas, dedicación, empleo, contratos o términos de alianza. Degradación automática con alerta, topes configurables y parada total global y por cuenta; Gustavo supervisa sobre el bucle. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
+  }
+}

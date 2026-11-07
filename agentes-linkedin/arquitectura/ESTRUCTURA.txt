@@ -1,5 +1,5 @@
-LINKEDIN TEAM — ESTRUCTURA DE DISEÑO v0.1
-Estado: propuesta de arquitectura. No activa agentes, llamadas pagadas ni publicación.
+LINKEDIN TEAM — ESTRUCTURA DE DISEÑO v0.2
+Estado: propuesta de arquitectura. No activa agentes, llamadas pagadas ni publicación. v0.2 (2026-11-06) añade el grupo de relaciones y el servicio operador según infra/docs/reparto-acciones-v1.md.
 
 PROPÓSITO
 Construir posicionamiento y autoridad reconocible, y una audiencia grande y pertinente para Gustavo. La audiencia incluye compradores, pares, recomendadores, líderes y divulgadores. El tamaño importa junto con la composición y las relaciones que se construyen. Metas numéricas, línea base, oferta y nicho siguen pendientes de trabajar con Gustavo.
@@ -7,12 +7,14 @@ Construir posicionamiento y autoridad reconocible, y una audiencia grande y pert
 UNIDAD DE DISEÑO
 Primero se diseña el equipo: resultado que persigue, ciclo, decisiones, entradas y entregables. Después se diseña cada agente usando plantilla-agente.json. Un agente tiene responsabilidades continuas y condiciones para actuar; una tarea es una ejecución concreta dentro de esa responsabilidad.
 
-MAPA PROPUESTO — 13 AGENTES + ORQUESTACIÓN
+MAPA PROPUESTO — 13 AGENTES + 2 DE RELACIONES + SERVICIO OPERADOR + ORQUESTACIÓN
 1. Estrategia y perfil: posicionamiento; perfil. Mantienen coherencia entre negocio, audiencia, promesa, pruebas y presentación. Sus diseños previos son insumos que deben adaptarse al contrato común; no equivalen a autonomía ya implementada.
 2. Observatorio: investigador de referentes; analista de barrio y resultados. El primero descubre referentes del nicho, temas y conversaciones relevantes, sin limitarse a insignias Top Voice o cuentas enormes. El segundo observa audiencia real, preguntas, objeciones y composición del barrio; propone participación orgánica y analiza resultados. Investigación de mercado y medición real son distintas de la simulación de lectores.
 3. Dirección editorial y escritura: director editorial; copywriter A; copywriter B. El director convierte estrategia y evidencia en pilares, oportunidades y briefs. Los dos escritores desarrollan alternativas independientes con el mismo brief y evidencia. Sus especialidades se definirán al leer sus unidades; no deben competir inventando hechos o cambiando el objetivo.
 4. Mesa de lectores: cinco perspectivas simuladas — par, recomendador, líder, comprador, divulgador. Son papeles funcionales, no identidades reales ni categorías excluyentes. Examinan claridad, relevancia, credibilidad y valor para su perspectiva. No producen predicciones fiables de engagement ni sustituyen investigación real.
-5. Revisión: un editor/verificador comprueba afirmaciones, fuentes, voz, coherencia y promesa del gancho. Devuelve problemas materiales y correcciones concretas; no bloquea por preferencias cosméticas.
+5. Revisión: un editor/verificador comprueba afirmaciones, fuentes, voz, coherencia y promesa del gancho. Devuelve problemas materiales y correcciones concretas; no bloquea por preferencias cosméticas. También revisa notas de invitación, respuestas y mensajes según su nivel de riesgo.
+6. Relaciones: relaciones y comunidad (seguir, invitar, gestionar invitaciones, reaccionar, comentar y memoria de relación, RED-01..09 e INT-01..10); conversaciones e inbox (CHAT-01..10, con datos privados D10 y disponibilidad D16). Proponen y deciden dentro de la política de reparto.
+7. Operación: operador de la cuenta, servicio determinista sin modelo de lenguaje. Único ejecutor de escrituras en LinkedIn (Unipile v2) y en la API oficial: comprueba estado y permisos, ejecuta una vez con clave de idempotencia, confirma releyendo, concilia sin reintentar a ciegas y detiene todo ante restricción, 429 o reto de seguridad.
 Orquestación: coordina estos grupos, dependencias, prioridades, memoria y presupuesto. En esta etapa yo conduzco el diseño y la lectura transversal. La orquestación autónoma del backend es un componente por implementar, distinto de mi presencia en esta conversación.
 
 CICLO AUTÓNOMO PROPUESTO
@@ -21,7 +23,7 @@ CICLO AUTÓNOMO PROPUESTO
 - Dirección editorial prioriza oportunidades y prepara briefs: destinatario principal, aporte al barrio, pilar, problema, ángulo, evidencia, formato y criterio de éxito.
 - Copywriters producen alternativas independientes. Lectores evalúan primero por separado y después contrastan objeciones específicas.
 - Director elige, combina o descarta con una justificación. No hay obligación de elegir un texto insuficiente ni de satisfacer a los cinco lectores con cada post. La intención de cada pieza determina qué perspectivas pesan más.
-- Revisión verifica la propuesta; una objeción material sin resolver impide pasar a lista para aprobación. La revisión humana final corresponde a Gustavo.
+- Revisión verifica la propuesta como compuerta automática; una objeción material sin resolver impide la aprobación. Por decisión de Gustavo (2026-11-06) no hay revisión humana final: aprueba la política autónoma y Gustavo supervisa sobre el bucle (pausar, vetar, revertir, configurar).
 - La publicación confirmada y sus datos reales alimentan el aprendizaje y el siguiente ciclo. Sin datos accesibles se informa evidencia insuficiente; no se inventan métricas ni se supone que un borrador fue publicado.
 
 El orden, reparto de agentes y mecanismo de debate son decisiones de diseño nuestras. El curso aporta métodos y límites, no prescribe esta arquitectura multiagente.
@@ -31,7 +33,7 @@ Eventos previstos: nuevo contexto confirmado; evidencia relevante nueva; llegada
 El campo de tarea manual será una intervención opcional: el sistema debe mostrar objetivo, siguiente acción justificada, trabajo de cada grupo, bloqueos, aprobaciones y resultados.
 Propuesta inicial de control: dos rondas como máximo de deliberación/revisión por pieza; si sigue habiendo desacuerdo material, registrar alternativas y escalar. Esta cifra es un límite operativo propuesto, no una regla del curso.
 No se activan frecuencia ni gasto nuevos con este documento. Se conservarán límites y reservas vigentes del backend; las reservas inciertas no se liberan ni se reintentan automáticamente. Alcanzar un límite o faltar una dependencia detiene la ejecución afectada sin borrar el trabajo.
-Los agentes podrán investigar con herramientas habilitadas, proponer, redactar, comparar y revisar dentro de la autorización vigente. Publicar, modificar el perfil, comentar o contactar personas requiere autorización explícita aplicable. Los borradores y la validación técnica no son aprobación humana.
+Los agentes podrán investigar con herramientas habilitadas, proponer, redactar, comparar y revisar dentro de la autorización vigente. Publicar, modificar el perfil, comentar o contactar personas requiere autorización explícita aplicable, autónoma por defecto: nivel A autónomo con topes (lecturas, seguir, reaccionar, organización interna); nivel B aprobado por la política autónoma tras una verificación automática (reglas deterministas y editor_verificador) y ejecutado por el operador, incluidas tres acciones destructivas con política estricta; nivel C, exclusivo de Gustavo, solo para comprometer salario, tarifas, dedicación, empleo, contratos o términos de alianza. Degradación automática con alerta y parada total disponibles. Ver infra/docs/reparto-acciones-v1.md. Los borradores y la validación técnica no son aprobación.
 
 MEMORIA COMPARTIDA
 - Conocimiento del curso: unidades originales inmutables, clases 01–06, con identificador, hash y fuentes. Etiquetas, relaciones y afinidades ayudan a recuperar; no son propiedad exclusiva de un agente.

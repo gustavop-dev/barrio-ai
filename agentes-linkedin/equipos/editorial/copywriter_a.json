@@ -1,5 +1,5 @@
 {
-  "version": "1.0",
+  "version": "1.2",
   "tipo": "plantilla_de_diseno_no_ejecutable",
   "id": "copywriter_a",
   "nombre": "Copywriter A",
@@ -11,7 +11,7 @@
     "resultado_del_que_responde": "Borrador trazable con una idea y promesa cumplida, más límites explícitos.",
     "fuera_de_responsabilidad": [
       "Investigación externa autónoma: corresponde a Observatorio",
-      "Aprobar posicionamiento o publicación por el humano",
+      "Aprobar posicionamiento (lo configura Gustavo) o publicación (la aprueba la política autónoma tras la compuerta del editor_verificador)",
       "Publicar, programar, responder o contactar leads",
       "Diseñar/producir assets finales sin productor autorizado",
       "Outbound y clase07"
@@ -364,26 +364,44 @@
       "Recuperación de unidades completas del corpus01–06 con ID/hash",
       "Lectura de artefactos y evidencia autorizada compartida",
       "Almacén de borradores versionados y comparación de cambios",
-      "Cola de handoffs con ACK y contador global; capacidades propuestas no activadas"
+      "Cola de handoffs con ACK y contador global; capacidades propuestas no activadas",
+      "Sin acceso directo a Unipile, API oficial ni búsqueda web: reciben la evidencia por el brief del director"
     ],
     "acciones_autorizadas": [
       "En este incremento: diseñar contratos documentales",
       "En futura operación autorizada: proponer contenido, omitir claims sin prueba, documentar decisiones y emitir handoff interno"
     ],
     "acciones_que_requieren_aprobacion": [
-      "Gustavo aprueba dirección pública, postura atribuida y texto exacto final",
+      "Gustavo aprueba dirección pública y postura atribuida como configuración; el texto exacto final lo aprueba la política autónoma tras la compuerta del editor_verificador, sin revisión humana final (decisión de Gustavo, 2026-11-06)",
       "Cambio central de audiencia/oferta vuelve a Posicionamiento y aprobación humana",
       "Reutilización de material/caso según permiso del titular; si falta queda pendiente"
     ],
     "acciones_prohibidas": [
       "Llamadas pagadas por este diseño",
       "Acceso externo independiente de los copywriters",
-      "Publicar, programar, comentar, enviar mensajes o activar scheduler",
+      "Publicar, programar, comentar, enviar mensajes, activar scheduler o solicitar ejecuciones a operador_cuenta",
       "Modificar corpus, hechos confirmados, permisos o límites",
       "Aceptar mayoría de lectores como verificación factual",
       "Convertir dato privado en copy público sin permiso"
     ]
   },
+  "capacidades_catalogo": [
+    {
+      "id": "CONT-03",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Dos borradores independientes con el mismo brief; sin copiar referentes ni inventar vivencias."
+    },
+    {
+      "id": "CONT-03",
+      "papel": "ejecuta",
+      "politica": "Nivel A. Produce el artefacto interno; sin efecto externo."
+    },
+    {
+      "id": "CONT-04",
+      "papel": "propone",
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. asset_brief y producción mediante OpenAI Images o fotos reales con procedencia; el asset se verifica y aprueba junto con la pieza (mismo hash); audiovisual completo sin cobertura."
+    }
+  ],
   "entregables": {
     "tipos": [
       "editorial_draft",
@@ -497,7 +515,7 @@
     "dependencias_a_revisar_si_cambia_una_entrada": [
       "brief y borradores ante cambio de estrategia/evidencia",
       "reviews y verificación ante cambio de texto",
-      "aprobación humana ante cualquier cambio de versión final"
+      "nueva verificación y aprobación ante cualquier cambio de versión final"
     ]
   },
   "coordinacion": {
@@ -714,8 +732,9 @@
     "estado": "propuesta_documental_no_runtime",
     "deduplicacion": "workspace + purpose/cycle + piece cuando aplique + rol + tarea + hash_entradas + ronda; event_id solo trazabilidad de transporte, no permiso de repetir",
     "rondas": "Ronda0 inicial; máximo ronda1 y ronda2 correctivas globales por pieza. La revisión del candidato ronda2 sí ocurre; si falla no editar/omitir de nuevo. Esperar evidencia o descartar. Nuevo propósito/evidencia material requiere decisión explícita de orquestación con parentesco, no reset automático.",
-    "ack": "Admite entrada/versiones; no verifica contenido. Para remitir pieza al humano exige review_record ready_for_human y approval_package del hash exacto.",
+    "ack": "Admite entrada/versiones; no verifica contenido. Para pasar una pieza a ejecución exige review_record ready_for_execution y approval_package del hash exacto aprobado por la política autónoma (o por Gustavo si la capacidad está en modo approval).",
     "seleccion_lectores": "selected_reader_ids y prioridad fijados por Director en brief antes de evaluar; cinco disponibles, no obligatorios en toda pieza.",
-    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true."
+    "aplicacion_externa": "Aprobado no implica publicado; sin evidencia el estado es desconocido, no false ni true.",
+    "reparto_y_autoridad": "infra/docs/reparto-acciones-v1.md y arquitectura/reparto-acciones-v1.json (v1.1): autonomía por defecto. Nivel A autónomo con topes; B aprobado por la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) con ejecución automática, incluidas RED-08, CONT-11 y ADM-03 con política estricta; C exclusivo de Gustavo, solo para comprometer salario, tarifas, dedicación, empleo, contratos o términos de alianza. Degradación automática con alerta, topes configurables y parada total global y por cuenta; Gustavo supervisa sobre el bucle. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   }
 }

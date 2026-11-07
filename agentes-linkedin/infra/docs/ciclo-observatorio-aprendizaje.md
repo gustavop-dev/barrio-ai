@@ -59,7 +59,7 @@ Frescura se define por la decisión: antes de proponer participación se verific
 | Leer dónde conversa el público pertinente | Investigador, modelo | `candidate_map` y `signal_card`; comunidades pequeñas/medianas y pares también cuentan |
 | Contrastar asuntos y afirmaciones | Investigador, modelo + fuentes | Origen, fechas, contradicciones y dependencia; señal aislada no es tendencia general |
 | Entregar evidencia y pregunta siguiente | Investigador → analista/editorial | `research_packet` con límites o respuesta parcial; ninguna interacción externa |
-| Proponer aporte orgánico, si el material lo permite | Analista, modelo | `organic_participation_proposal` como borrador para verificador y después Gustavo; ejecución separada, sin enviar |
+| Señalar una oportunidad de aporte orgánico, si el material lo permite | Analista, modelo | `participation_signal` para relaciones_comunidad, que redacta `organic_participation_proposal`; verificador, aprobación de Gustavo y ejecución por operador_cuenta según [reparto](reparto-acciones-v1.md) |
 
 La selección valora relación con problema/cliente, conversación que reúne, actividad y aporte posible. Tamaño es contexto, no filtro decisivo. Una etiqueta oficial Top Voice solo se conserva si se verificó a fecha; «referente de nicho» es juicio del equipo con razones. La fama no prueba que el público buscado lea sus publicaciones.
 
@@ -118,14 +118,14 @@ No hay tamaño de muestra mágico. Una observación puede justificar explorar un
 | Necesidad de verificar referente o tendencia | Investigador con pregunta concreta y límite | Investigador devuelve evidencia, no campaña |
 | Confusión entre ejecución personal y equipo | Perfil y Posicionamiento con evidencia | Gustavo decide dirección y texto exactos |
 | Oportunidad relevante incompatible en horas | Contexto/cualificación, no automáticamente alcance | Gustavo evalúa disponibilidad/condiciones |
-| Comentario orgánico pertinente | Borrador contextual al verificador y después Gustavo | Autorizar/aplicar es paso separado; aquí no se ejecuta |
+| Comentario orgánico pertinente | `participation_signal` a relaciones_comunidad | Redacción, aprobación y ejecución fuera del Observatorio (nivel B) |
 | Mucha exposición y poco registro comercial | Examinar cobertura, misión y pertinencia | No se deduce fracaso ni cambio automático |
 
 ## Artefactos, eventos y versiones
 
 Todos los artefactos incluyen ID, versión, hash, workspace, ciclo/correlación, autor/versión de contrato, fecha, tipo/estado, entradas ID/versión/hash, fuentes/localizador/fechas/permisos, hechos, hipótesis, faltantes, límites, decisión/motivo, destinatario, referencia de aprobación y de aplicación separadas, y versión sustituida. Los JSON detallan campos por tipo. Una aprobación no convierte una afirmación falsa en verdadera ni demuestra que una acción se ejecutó.
 
-Eventos internos propuestos a normalizar con el circuito transversal: `research_requested`, `research_completed`, `observation_batch_validated`, `publication_confirmed`, `observation_window_ready`, `learning_proposed`, `editorial_opportunity_proposed` y `organic_participation_proposed` (artefacto `organic_participation_proposal` al verificador, con contexto del hilo versionado). `context_confirmed` notifica cambio de contexto pertinente. Son especificación documental, no eventos emitidos por el backend actual.
+Eventos internos propuestos a normalizar con el circuito transversal: `research_requested`, `research_completed`, `observation_batch_validated`, `publication_confirmed`, `observation_window_ready`, `learning_proposed`, `editorial_opportunity_proposed` y `participation_signal_ready` (artefacto `participation_signal` a relaciones_comunidad, con contexto del hilo versionado; desde 2026-11-06 `organic_participation_proposed` lo emite relaciones_comunidad). `context_confirmed` notifica cambio de contexto pertinente. Son especificación documental, no eventos emitidos por el backend actual.
 
 Envelope propuesto: `event_id`, `event_type`, `schema_version`, `workspace_id`, `cycle_id`, `correlation_id`, `causation_id`, `occurred_at`, `actor`, `input_refs`, `payload_hash`, `deduplication_key`. Dedupe se aplica antes de invocar modelos. Revisión candidata de observación exige validación; solo entonces se notifica nuevo lote y se revisan dependientes. Cambiar una entrada marca artefactos afectados como desactualizados, conservando historia y permitiendo ratificar lo que siga válido.
 

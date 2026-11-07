@@ -1,5 +1,5 @@
 {
-  "version": "0.2",
+  "version": "0.4",
   "estado": "diseno_no_activado",
   "objetivo": "Oportunidades personales en startups (60%) y contratos ProjectApp (40%), apoyados por autoridad y comunidad pertinente.",
   "conocimiento": {
@@ -59,6 +59,22 @@
         "editor_verificador"
       ],
       "estado": "contratos_disenados_no_activos"
+    },
+    {
+      "id": "relaciones",
+      "agentes": [
+        "relaciones_comunidad",
+        "conversaciones_inbox"
+      ],
+      "estado": "contratos_disenados_no_activos"
+    },
+    {
+      "id": "operacion",
+      "agentes": [
+        "operador_cuenta"
+      ],
+      "estado": "contrato_disenado_no_activo",
+      "naturaleza": "servicio_determinista_no_llm; único ejecutor de escrituras en LinkedIn y en la API oficial"
     }
   ],
   "orquestacion": {
@@ -96,23 +112,48 @@
     "pieza_para_aprobacion",
     "registro_publicacion",
     "resultados",
-    "aprendizaje"
+    "aprendizaje",
+    "neighborhood_criteria",
+    "editorial_calendar",
+    "participation_signal",
+    "relationship_action_proposal",
+    "organic_participation_proposal",
+    "message_proposal",
+    "opportunity_record",
+    "approval_package",
+    "execution_request",
+    "execution_record"
   ],
   "control_editorial": {
     "borradores_independientes": 2,
     "max_rondas_propuesto": 2,
     "decisor": "director_editorial",
     "bloqueo_por_evidencia_material": "editor_verificador",
-    "aprobacion_final": "usuario",
+    "aprobacion_final": "politica_autonoma tras la compuerta del editor_verificador; sin revisión humana final (decisión de Gustavo, 2026-11-06)",
     "consenso_unanime_obligatorio": false,
     "publicacion_automatica_activada": false,
-    "lectores": "cinco perspectivas disponibles; subset justificado en brief"
+    "lectores": "cinco perspectivas disponibles; subset justificado en brief",
+    "publicacion_tras_aprobacion": "diseñada (nivel B): la política autónoma aprueba la versión exacta y la fecha dentro de la ventana; operador_cuenta publica una sola vez; no activada"
+  },
+  "autoridad": {
+    "referencia": "../infra/docs/reparto-acciones-v1.md",
+    "niveles": {
+      "A": "autónomo con topes",
+      "B": "autónomo: lo aprueba la política autónoma tras la verificación automática (reglas deterministas y editor_verificador) y lo ejecuta el operador; incluye RED-08, CONT-11 y ADM-03 con política estricta",
+      "C": "exclusivo de Gustavo: comprometer salario, tarifas o dedicación, aceptar un empleo o contrato, firmar acuerdos o términos de alianza"
+    },
+    "modo_por_capacidad": "OPERATOR_AUTONOMY: auto | approval | off; por defecto auto",
+    "ejecutor_unico_de_escrituras": "operador_cuenta",
+    "degradacion": "pausa automática de la capacidad o de la cuenta ante incidencias, con alerta; solo Gustavo reanuda (sustituye a la graduación B→A)",
+    "topes": "por día, semana, tipo y destinatario; valores por defecto configurables; ventana 07:00-21:00 en America/Bogota; espaciado fijo de 20 minutos entre escrituras públicas; caducidad de 48 h",
+    "parada_total": "global y por cuenta; la activa Gustavo o el operador por degradación, con alerta por webhook y en la oficina; solo Gustavo reanuda",
+    "activada": false
   },
   "metas": {
     "linea_base": null,
     "objetivos_numericos": null,
-    "cadencia": null,
-    "pendiente": "Línea base, objetivos cuantitativos y cadencia operativa; contexto personal inicial ya recibido."
+    "cadencia": "intención diaria declarada por Gustavo; la planifica director_editorial en CONT-07 sin rellenar días; no activada",
+    "pendiente": "Línea base y objetivos cuantitativos; cupo real de notas, presupuesto diario de modelos y webhook de alertas por configurar con Gustavo."
   },
   "outbound": {
     "estado": "inactivo_pendiente_curso",
@@ -129,7 +170,8 @@
       "resultados de conversaciones"
     ],
     "procedimientos": null,
-    "permiso_contactar": false
+    "permiso_contactar": false,
+    "nota": "El contacto orgánico de clase 03 (invitar, comentar, conversar con motivo) se rige por reparto-acciones-v1; outbound, campañas y secuencias de clases 07+ siguen inactivos."
   },
   "nota": "Reparto, eventos y controles son decisiones de arquitectura; no instrucciones atribuidas al curso. No modifica el runtime ni límites de gasto.",
   "indice_contratos": "indice-agentes-v1.json"
