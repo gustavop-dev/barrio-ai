@@ -120,6 +120,7 @@ describe('piece', () => {
   it('marks the preparation steps', () => {
     expect(preparationStages('seleccion').map((s) => s.state)).toEqual(['done', 'done', 'done', 'current', 'pending']);
     expect(preparationStages('').map((s) => s.state)).toEqual(['current', 'pending', 'pending', 'pending', 'pending']);
+    expect(preparationStages('reparacion').map((s) => s.state)).toEqual(['done', 'done', 'done', 'done', 'current']);
   });
 
   it('takes the first three lines of the final text', () => {

@@ -22,18 +22,36 @@ Sustituye la aprobación humana de cada acción. Se activa con `LEAD_ENABLED=tru
    | --- | --- |
    | Comentario (INT-03) | `aporta` ≥ 0,7, `pitch` ≤ 0,2, `inventa` ≤ 0,2, `respeto` ≥ 0,8, `idioma` ≥ 0,7 |
    | Publicación (CONT-09), además del verificador con Opus | `clara` ≥ 0,6, `pitch` ≤ 0,2, `inventa` ≤ 0,2 |
-   | Seguir (RED-01) | `encaja` ≥ 0,6, `riesgo` ≤ 0,3 |
-   | Invitar (RED-02) | `encaja` ≥ 0,7, `riesgo` ≤ 0,2 |
-   | Aceptar (RED-04) | `encaja` ≥ 0,5, `riesgo` ≤ 0,3 |
+   | Seguir (RED-01) | `riesgo` ≤ 0,3 |
+   | Invitar (RED-02) | `riesgo` ≤ 0,2 |
+   | Aceptar (RED-04) | `riesgo` ≤ 0,3 |
 
    Si hay orientación, se añade `orientacion` ≥ 0,4 (que no la contradiga).
+
+   En la red, Jev no vuelve a juzgar si la persona encaja: lo decide una sola vez el clasificador de la red, y `red.network_issues` descarta antes cualquier RED-* sin ese veredicto (auditoría, R2). Ver [red-barrio.md](red-barrio.md).
 3. **Decide el código.** Si todo pasa con claridad, aprueba. Si no, descarta y registra qué falló. **No escala nada a Gustavo.** Lo dudoso no se hace y el equipo prepara otra cosa.
 
 Cada juicio queda en `ActionProposal.review` con las probabilidades, los umbrales, el modelo, el coste y la fecha. La nota de la decisión dice «Aprobada por el líder (jev-1.14.0)» o «Descartada por el líder». Actividad muestra lo descartado con `?descartadas=1`.
 
 **Si Jev no responde**, la acción queda pendiente y se reintenta cada `LEAD_RETRY_MINUTES` (10). Caduca con su TTL; nunca se aprueba sin juicio.
 
-**Coste.** Cada llamada pasa por `knowledge.providers.typesafe`: proveedor `typesafe`, propósito `lead-review`, con reserva y liquidación en el ledger y techo `TYPESAFE_LIMIT_USD`. A 0,042 USD por millón de tokens de entrada (la salida es gratis), un juicio de unas 600 tokens cuesta 0,00003 USD.
+**Tope por ciclo.** El líder revisa como máximo `LEAD_MAX_REVIEWS_PER_TICK` (5) propuestas en cada ciclo del autopiloto, de la más antigua a la más reciente. El resto espera a los ciclos siguientes, así que un `plan_network` con unas 25 propuestas ya no bloquea el ciclo varios minutos. No esperan a ese tope:
+- los descartes por reglas fijas;
+- las capacidades en modo `approval`;
+- la caducidad.
+
+Si Jev no responde a una revisión, el ciclo deja de llamarlo hasta el siguiente en lugar de esperar 60 s por cada propuesta.
+
+**Alerta si no aprueba nada.** El líder solo puede descartar, así que su forma de fallar es no hacer nada sin avisar. Cada `LEAD_SILENCE_CHECK_MINUTES` (60), el autopiloto revisa cada capacidad que el líder juzga en modo `auto`. Si en los últimos 7 días revisó al menos `LEAD_SILENCE_MIN_REVIEWS` (5) propuestas y no aprobó ninguna, llega la Notificación `lead_silent` (capa sistema, con push). Dice cuántas revisó y qué preguntas fallan más, y enlaza a lo que no salió en la Lista del calendario. Llega una sola vez por capacidad y semana.
+
+**Prefiltro de comentarios.** Antes de pagar a Opus por un borrador, Jev mira el post del referente (`lider.comment_worthy`, llamado desde `autopiloto._propose`). Con el umbral `COMMENT_PREFILTER_THRESHOLD` (u = 0,5) pasa si:
+- `sustancia` ≥ u: desarrolla una idea, una experiencia o una opinión a la que se puede aportar;
+- `tema` ≥ u: trata un tema del barrio (o lo que pide la orientación, si la hay);
+- `vacante`, `promocion` e `hito` ≤ 1 − u: no es un anuncio de vacantes, una promoción pura ni un hito personal, donde comentar sería ruido.
+
+Si no pasa, el equipo prueba con el siguiente post candidato. Cada veredicto queda en un `AuditEvent` (`operator.comment_prefilter`) con las probabilidades, y el mismo post no se vuelve a preguntar. Se hacen como máximo 3 preguntas por ciclo. Si Jev no responde, se redacta como antes del prefiltro y queda un aviso `comment_prefilter_unavailable` en el log del autopiloto. Funciona cuando `LEAD_ENABLED=true` y se apaga con `COMMENT_PREFILTER=false`. Nunca usa un modelo de lenguaje.
+
+**Coste.** Cada llamada pasa por `knowledge.providers.typesafe`: proveedor `typesafe`, propósito `lead-review` (`comment-prefilter` en el prefiltro), con reserva y liquidación en el ledger y techo `TYPESAFE_LIMIT_USD`. A 0,042 USD por millón de tokens de entrada (la salida es gratis), un juicio de unas 600 tokens cuesta 0,00003 USD.
 
 **Contrato de TypeSafe** (consultado el 2026-11-07): `POST https://api.typesafe.ai/v1/systemone` con `{model, state, questions}` y la clave en `Authorization: Bearer`. Devuelve `answers[id] = {type:'noul', noul:p}` y `usage.input_tokens`. Se probó con un caso inventado en español: un comentario genérico con venta dio `aporta`=0,04, `pitch`=0,99 e `idioma`=0,99.
 
@@ -118,7 +136,7 @@ Además, la respuesta trae:
 - lo resuelto en los últimos 7 días;
 - el resumen del día para el estado vacío.
 
-Las tareas de perfil y de conversaciones llegan con las fases del ciclo de Perfil y del inbox.
+Las conversaciones que le tocan a Gustavo llegan como tareas (`tasks.conversaciones`, tipo `conversacion`, Importante) cuando el inbox está encendido; ver [conversaciones e inbox](conversaciones-inbox.md). Las tareas de perfil llegan con la fase del ciclo de Perfil.
 
 **Calendario** (`GET /api/v1/calendario`) devuelve, por día local, los conteos menudos y los eventos importantes, en cinco capas:
 
@@ -151,7 +169,7 @@ La **vista Lista** (`GET /api/v1/actividad`) trae «Próximo» y todo lo hecho, 
 - el número de datos confirmados;
 - la orientación.
 
-**Notificaciones push.** Las piezas llevan a `/calendario/pieza/<id>`. Las acciones inciertas, la cuenta en pausa, la caducidad de LinkedIn y las preguntas llevan a `/tu-turno`.
+**Notificaciones push.** Las piezas llevan a `/calendario/pieza/<id>`. La alerta del líder (`lead_silent`) lleva a la Lista del calendario con lo que no salió. Las acciones inciertas, la cuenta en pausa, la caducidad de LinkedIn y las preguntas llevan a `/tu-turno`.
 
 ## Configuración
 
@@ -160,6 +178,11 @@ OPERATOR_AUTONOMY=INT-03=auto,INT-02=auto,CONT-09=auto,RED-01=auto,RED-02=auto,R
 LEAD_ENABLED=true
 LEAD_CAPABILITIES=INT-03,CONT-09,RED-01,RED-02,RED-04
 LEAD_RETRY_MINUTES=10
+LEAD_MAX_REVIEWS_PER_TICK=5
+LEAD_SILENCE_MIN_REVIEWS=5
+LEAD_SILENCE_CHECK_MINUTES=60
+COMMENT_PREFILTER=true
+COMMENT_PREFILTER_THRESHOLD=0.5
 TYPESAFE_API_KEY=…            # privada; nunca en el repositorio
 TYPESAFE_MODEL=jev-1.14.0
 TYPESAFE_LIMIT_USD=2

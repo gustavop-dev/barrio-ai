@@ -6,7 +6,7 @@ import type { MemoryFact, TuTurno } from '../api/types';
 import { CaptureProvider } from '../capture/CaptureContext';
 import { turnoAnchor } from '../components/Layout';
 import { fakeServer, SESSION_OK, type Handler, type Reply } from '../test/fakeServer';
-import { cardFixture, dayAt, EXPIRING_CARD, factFixture, hoursFromNow, questionCard, questionFixture, turnoFixture as tuTurnoFixture, UNCERTAIN_CARD } from '../test/fixtures/turno';
+import { cardFixture, CONVERSATION_CARD, dayAt, EXPIRING_CARD, factFixture, hoursFromNow, questionCard, questionFixture, turnoFixture as tuTurnoFixture, UNCERTAIN_CARD } from '../test/fixtures/turno';
 import { renderAt } from '../test/render';
 import { TuTurno as TuTurnoPage } from './TuTurno';
 
@@ -123,6 +123,65 @@ describe('Tu turno · Pendiente', () => {
     expect(api.find('POST', '/api/v1/operador/actions/a1/resolve')[0]!.body).toEqual({ outcome: 'confirmed', note: 'Aparece en el post' });
     expect(await screen.findByText('Anotado: se aplicó')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows a conversation that is his turn, opens the opportunity form prefilled and closes it with an optional reason', async () => {
+    const api = server(busyTurno({ items: [CONVERSATION_CARD], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [CONVERSATION_CARD] } }), {
+      'GET /api/v1/red/contacts': { body: { count: 0, next: null, previous: null, results: [] } },
+      'POST /api/v1/oportunidades': ({ body }) => ({ status: 201, body: { id: 'o-9', ...(body as object) } }),
+      'POST /api/v1/conversaciones/conv-1/cerrar': { body: { id: 'conv-1', needs_you: false } },
+    });
+    renderApp('/tu-turno');
+    const card = await cardTitled('Lucía Ficticia te escribió');
+    const view = within(card);
+
+    expect(view.getByText('Conversación')).toBeInTheDocument();
+    expect(view.getByText('Importante')).toBeInTheDocument();
+    expect(view.getByText('Conversaciones e inbox')).toBeInTheDocument();
+    expect(view.getByRole('link', { name: 'Lucía Ficticia' })).toHaveAttribute('href', '/personas/c-1');
+    expect(view.getByText('Cofundadora @ Huerta Labs (pre-seed)')).toBeInTheDocument();
+    expect(view.getByText('Comprador')).toBeInTheDocument();
+    expect(view.getByText('Por qué importa')).toBeInTheDocument();
+    expect(view.getByText('Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)')).toBeInTheDocument();
+    expect(view.getByText(/^Último mensaje · hoy, /)).toBeInTheDocument();
+    expect(view.getByText(/¿tienes disponibilidad para un proyecto corto de IA en enero\?/)).toBeInTheDocument();
+    expect(view.queryByText(/Happy to share/)).not.toBeInTheDocument();  // only his last message
+    expect(view.getByText('La app nunca envía mensajes: respondes tú en LinkedIn.')).toBeInTheDocument();
+    const open = view.getByRole('link', { name: 'Abrir en LinkedIn' });
+    expect(open).toHaveAttribute('href', 'https://www.linkedin.com/messaging/thread/2-SHVlcnRhTGFicw==/');
+    expect(open).toHaveAttribute('target', '_blank');
+
+    await userEvent.click(view.getByRole('button', { name: 'Marcar como oportunidad' }));
+    const form = within(screen.getByRole('dialog', { name: 'Nueva oportunidad' }));
+    expect(form.getByText('Lucía Ficticia')).toBeInTheDocument();
+    expect(form.getByLabelText('Modalidad')).toHaveValue('projectapp');
+    expect(form.getByLabelText('Canal')).toHaveValue('linkedin');
+    expect(form.getByLabelText(/Notas/)).toHaveValue('Detectada por el equipo en una conversación de LinkedIn.');
+    expect(api.find('POST', '/api/v1/oportunidades')).toHaveLength(0);  // nothing is created until he saves it
+    await userEvent.selectOptions(form.getByLabelText('Cómo llegó'), 'lo_dijo');
+    await userEvent.click(form.getByRole('button', { name: 'Registrar oportunidad' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/oportunidades')).toHaveLength(1));
+    expect(api.find('POST', '/api/v1/oportunidades')[0]!.body).toMatchObject({
+      contact: 'c-1',
+      modality: 'projectapp',
+      channel: 'linkedin',
+      attribution: 'lo_dijo',
+      notes: 'Detectada por el equipo en una conversación de LinkedIn.',
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+
+    await userEvent.click(view.getByRole('button', { name: 'No responder' }));
+    const ask = within(screen.getByRole('dialog', { name: 'No responder' }));
+    expect(ask.getByText(/Nadie le responde por ti/)).toBeInTheDocument();
+    await userEvent.type(ask.getByLabelText(/Motivo/), 'Lo hablamos por teléfono');
+    await userEvent.click(ask.getByRole('button', { name: 'No responder' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/conversaciones/conv-1/cerrar')).toHaveLength(1));
+    expect(api.find('POST', '/api/v1/conversaciones/conv-1/cerrar')[0]!.body).toEqual({ how: 'no_responder', note: 'Lo hablamos por teléfono' });
+    expect(await screen.findByText('Anotado: no responderás')).toBeInTheDocument();
+
+    await userEvent.click(view.getByRole('button', { name: 'Hecho, respondí' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/conversaciones/conv-1/cerrar')).toHaveLength(2));
+    expect(api.find('POST', '/api/v1/conversaciones/conv-1/cerrar')[1]!.body).toEqual({ how: 'respondi' });
   });
 
   it('reconnects LinkedIn with a full navigation and resumes the machine with an optional reason', async () => {

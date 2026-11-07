@@ -257,6 +257,50 @@ export interface Contact extends ContactBrief {
   /** True when the person has an item in Tu turno («Te toca»). */
   your_turn?: boolean;
   last_event?: ContactHistoryEntry | null;
+  /** Their latest LinkedIn conversation, read by conversaciones_inbox (null when there is none or the inbox is off). */
+  conversation?: Conversation | null;
+}
+
+/** A message of a conversation, as read from LinkedIn (third-party text, shown as is, never as markup). */
+export interface ConversationMessage {
+  id: string;
+  at: string | null;
+  /** True when Gustavo wrote it. */
+  from_me: boolean;
+  text: string;
+  attachments?: number;
+}
+
+/** What the team read in the latest message of the other person (Jev's probabilities and the thresholds' verdict). */
+export interface ConversationAssessment {
+  message_id: string;
+  opportunity: boolean;
+  awaiting_reply: boolean;
+  pitch: boolean;
+  /** Suggested Opportunity modality, to prefill «Marcar como oportunidad». */
+  modality: OpportunityModality | null;
+  /** Probabilities 0–1: oportunidad, espera, venta, startups, projectapp. */
+  answers: Record<string, number>;
+  model: string | null;
+  at: string | null;
+}
+
+/** A LinkedIn conversation (CONTRATO-API «Conversaciones»): read-only; Gustavo answers on LinkedIn. */
+export interface Conversation {
+  id: string;
+  chat_url: string;
+  attendee_name: string;
+  contact_id: string | null;
+  last_message_at: string | null;
+  last_from_me: boolean;
+  last_message_preview: string;
+  /** The latest messages, oldest first (3 at most). */
+  messages: ConversationMessage[];
+  assessment: ConversationAssessment | null;
+  /** The team's read as one sentence: «Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)». */
+  why: string;
+  /** It is a Tu turno card right now. */
+  needs_you: boolean;
 }
 
 /** Contact stage plus `opportunity` (an open opportunity), the stages Personas shows. */
@@ -457,6 +501,35 @@ export interface Verification {
   summary?: string;
   citations?: string[];
   text_sha256?: string;
+  /** R3: deterministic CONT-09 rules on this text; when not empty the verifier did not run (no model_verdict). */
+  rules?: string[];
+  /** R4: the one repair round, when the rules or the verifier found concrete problems. */
+  repair?: Repair;
+}
+
+export interface RepairFinding {
+  source: 'reglas' | 'verificador';
+  issue: string;
+  quote?: string;
+  detail?: string;
+}
+
+export interface Repair {
+  trigger: 'reglas' | 'verificador';
+  findings: RepairFinding[];
+  original_text: string;
+  original_sha256?: string;
+  /** The verifier's first verdict, when it was the verifier that found the problems. */
+  first_review?: Pick<Verification, 'verdict' | 'findings' | 'checked_claims' | 'summary' | 'blocking_reasons'> | null;
+  decision?: 'repaired' | 'discard';
+  changes?: { finding: string; change: string }[];
+  rationale?: string;
+  model?: string;
+  /** reparada: verified again and approved; bloqueada: still blocked; descartada, sin_cambios, sin_presupuesto: not re-verified. */
+  outcome: 'reparada' | 'bloqueada' | 'descartada' | 'sin_cambios' | 'sin_presupuesto';
+  note?: string;
+  repaired_sha256?: string;
+  repaired_text?: string;
 }
 
 export interface Signal {
@@ -643,8 +716,32 @@ export interface TurnoAction {
   endpoint?: string;
   body?: Record<string, unknown>;
   note_required?: boolean;
+  /** Asks for an optional note first («No responder»). */
+  note_optional?: boolean;
   href?: string;
   primary?: boolean;
+  /** «Marcar como oportunidad»: opens the opportunity form prefilled; nothing is created until Gustavo saves it. */
+  opportunity?: TurnoOpportunity;
+}
+
+/** The prefill of «Marcar como oportunidad» on a conversation card. */
+export interface TurnoOpportunity {
+  contact: string;
+  display_name: string;
+  headline: string;
+  modality: OpportunityModality | null;
+  channel: OpportunityChannel;
+  notes: string;
+}
+
+/** The person behind a conversation card, when they are in Personas. */
+export interface TurnoPerson {
+  id: string;
+  display_name: string;
+  headline: string;
+  profile_url: string;
+  role: string | null;
+  modality: string | null;
 }
 
 /** What an `uncertain` action tried to do. */
@@ -676,6 +773,8 @@ export interface TurnoCard {
   attempt?: TurnoAttempt | null;
   /** Only on questions. */
   question?: Question | null;
+  /** Only on conversation cards. */
+  conversation?: (Conversation & { person: TurnoPerson | null }) | null;
   /** rev 18 priority group (being added to the backend). */
   priority?: TurnoPriority;
   /** rev 18 state: nueva and vista count, pospuesta and caducada go in `later` (being added to the backend). */

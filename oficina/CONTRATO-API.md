@@ -102,6 +102,11 @@ GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendar
 - `panel`: `{ readers: [{ reader, variant_a: { strengths: [], objections: [{ text, severity: "material|preference|missing_data" }] }, variant_b: {…} }], summary, citations }`.
 - `selection`: `{ decision: "A|B|merge|discard", final_text, rationale, claims, resolved_objections: [], kept_objections: [], citations }`.
 - `verification`: `{ verdict: "ready_for_execution|blocked", model_verdict, blocking_reasons: [], findings: [{ issue, severity: "material|minor", quote, detail }], checked_claims: [{ text, status, ref }], summary, citations, text_sha256 }`. `verdict` es el final (modelo más guardas deterministas) sobre el hash del texto exacto.
+- Auditoría, fase 2 (campos aditivos; `docs/publicacion-diaria.md`):
+  - `verification.rules: [texto]` son los motivos de las reglas deterministas de CONT-09, que ahora corren antes del verificador (R3). Si no está vacío, el verificador no corrió y `model_verdict`, `findings` y `checked_claims` faltan.
+  - `verification.repair` (solo si hubo ronda de reparación, R4): `{ trigger: "reglas|verificador", findings: [{ source: "reglas|verificador", issue, quote, detail }], original_text, original_sha256, first_review: { verdict, findings, checked_claims, summary, blocking_reasons } | null, decision: "repaired|discard", changes: [{ finding, change }], rationale, model, outcome: "reparada|bloqueada|descartada|sin_cambios|sin_presupuesto", note?, repaired_sha256?, repaired_text? }`. `final_text` es entonces el texto reparado (si llegó a verificarse) y `selection.final_text` conserva el de la selección.
+  - `stage` puede valer también `reparacion`, y `usage` trae una fila `reparacion` y una segunda `verificador` cuando hubo ronda.
+  - `brief.positioning_version` (por ejemplo `posicionamiento-v1`) dice con qué versión de `team_backend/posicionamiento.py` se escribió la pieza.
 - `final_text`, `citations: [unitId]`, `signals: [{ id, author, why_followed, posted_at, reactions, comments, text }]` (datos de terceros), `usage: [{ stage, model, estimated_usd, request_id, units, missing_units }]` y `action_detail`: la acción CONT-09 completa o `null`.
 
 Los bloques de una etapa que aún no ha corrido llegan como `{}`. `metrics` lleva los últimos valores leídos del post (ver la sección «Resultados»), y `snapshots` y `commenters` traen los cortes a 24 h, 72 h y 7 días y quién comentó. Un dato ausente no es cero.
@@ -214,7 +219,7 @@ GET `/api/v1/red/summary` (permiso `operate_linkedin`):
   "stages": { "candidate": 3, "fit": 5, "discarded": 9, "followed": 2, "invited": 1, "connected": 0, "closed": 0, "incoming": 1 },
   "capacity": { "RED-01": { "daily": 10, "daily_used": 2, "weekly": 40, "weekly_used": 6, "left": 8, "mode": "approval" },
                 "RED-02": { "…": "…" }, "RED-04": { "…": "…" } },
-  "reads_today": { "comments": 4, "search": 1, "profile": 7, "sync": 1 },
+  "reads_today": { "comments": 4, "search": 1, "profile": 7, "sync": 1, "execution": 6 },
   "read_caps": { "comments": 60, "search": 20, "profile": 30, "sync": 4 },
   "llm": { "spent_today": 0.04, "daily": 0.3, "model": "…" },
   "invites_blocked": { "blocked": false, "reason": "" },
@@ -225,6 +230,7 @@ GET `/api/v1/red/summary` (permiso `operate_linkedin`):
 - `llm` llega en números JSON, no en cadenas decimales como el gasto del overview.
 - `invites_blocked.blocked=true` significa que LinkedIn rechazó invitaciones por límite en los últimos 7 días y que las invitaciones están en pausa. La PWA lo avisa siempre, con `reason`.
 - `enabled=false` significa que el bloque está apagado (`NETWORK_ENABLED=false`). La PWA lo avisa y sigue mostrando lo guardado.
+- `reads_today.execution` cuenta las lecturas de las ejecuciones de red: la comprobación previa, la relectura y la conciliación. No tiene tope (no aparece en `read_caps`), porque ninguna escritura sale sin su comprobación previa.
 
 La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente a su presupuesto y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
 
@@ -705,6 +711,7 @@ Reglas de prioridad:
 
 - Los elementos de `upcoming` se calculan en cada consulta y nunca cuentan como no leídos.
 - `capture_processed` enlaza a `/?enviado=1`, que abre «Lo que enviaste».
+- `lead_silent` (capa `sistema`, push activada por defecto) avisa de que el agente líder lleva 7 días sin aprobar nada en una capacidad. Llega una vez por capacidad y semana, y enlaza a `/calendario?vista=lista&tipo=<tipo>&no_salio=1`.
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
 
@@ -734,3 +741,53 @@ Cada evento lo emite el backend en un momento concreto:
 | `publicacion` | Cuando LinkedIn confirma un post propio o un comentario |
 
 Un `desde` inválido devuelve 400.
+
+## Conversaciones e inbox (solo lectura)
+
+El agente `conversaciones_inbox` lee el inbox de LinkedIn con Unipile y propone a Gustavo las conversaciones que le tocan. Nunca envía mensajes ni crea oportunidades. Detalle en `agentes-linkedin/infra/docs/conversaciones-inbox.md`. Está apagado por defecto (`INBOX_ENABLED=false`): mientras lo esté, no hay tarjetas y `conversation` es `null` en las personas sin conversación leída.
+
+**`Conversation`**, tal como lo devuelven la ficha y la tarjeta:
+
+```json
+{ "id": "uuid", "chat_url": "https://www.linkedin.com/messaging/thread/2-…/ | https://www.linkedin.com/messaging/",
+  "attendee_name": "Lucía Ficticia", "contact_id": "uuid" | null,
+  "last_message_at": "iso" | null, "last_from_me": false, "last_message_preview": "…",
+  "messages": [{ "id": "…", "at": "iso" | null, "from_me": false, "text": "…", "attachments": 1 }],
+  "assessment": { "message_id": "…", "opportunity": true, "awaiting_reply": true, "pitch": false,
+                  "modality": "personal_startups | projectapp | por_clasificar",
+                  "answers": { "oportunidad": 0.86, "espera": 0.81, "venta": 0.04, "startups": 0.2, "projectapp": 0.9 },
+                  "model": "jev-1.14.0", "at": "iso" } | null,
+  "why": "Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)", "needs_you": true }
+```
+
+- `messages`: los últimos 3 mensajes visibles, del más antiguo al más reciente. Son texto de terceros: se muestran tal cual y nunca como HTML. `attachments` solo aparece si el mensaje trae adjuntos.
+- `assessment`: la lectura de Jev del último mensaje de la otra persona, o `null` si aún no se juzgó. `modality` es un valor de `Opportunity.modality`.
+- `needs_you`: la conversación es ahora una tarjeta de Tu turno.
+
+**Personas.** `ContactOutput` suma `conversation: Conversation | null`, la conversación más reciente de la persona. `your_turn` es `true` mientras esa conversación sea tarjeta, y entonces `next_step` es `{ "owner": "gustavo", "text": "Te toca: responder su mensaje", "at": null }`.
+
+**Tu turno.** Las conversaciones que le tocan van en `tasks.conversaciones` y en `items`, y cuentan en `counts.tareas`.
+
+- **Tarjeta:** `type: "conversacion"`, prioridad `importante`, `agent: "conversaciones_inbox"`, `title: "{persona} te escribió"`, `body` con la lectura del equipo, y `created_at` igual a la hora de su último mensaje.
+- **Id:** `conversation:<id>:<huella del mensaje>`. Cambia con cada mensaje nuevo de la persona, que vuelve a salir como Nueva.
+- **Campo `conversation`:** un `Conversation` más `person: { id, display_name, headline, profile_url, role, modality } | null`.
+- **Acciones:**
+
+```json
+[{ "label": "Abrir en LinkedIn", "href": "<chat_url>", "primary": true },
+ { "label": "Hecho, respondí", "endpoint": "/api/v1/conversaciones/<id>/cerrar", "body": { "how": "respondi" } },
+ { "label": "Marcar como oportunidad", "opportunity": { "contact": "uuid", "display_name": "…", "headline": "…",
+   "modality": "projectapp", "channel": "linkedin", "notes": "Detectada por el equipo en una conversación de LinkedIn." } },
+ { "label": "No responder", "endpoint": "/api/v1/conversaciones/<id>/cerrar", "body": { "how": "no_responder" }, "note_optional": true }]
+```
+
+- **Dos claves nuevas en las acciones.** Con `note_optional`, la oficina pide antes una nota opcional y la envía como `note`. Con `opportunity`, abre el formulario de oportunidad relleno; nada se guarda hasta que Gustavo pulsa «Registrar oportunidad» (`POST /api/v1/oportunidades`).
+- **«Marcar como oportunidad»** solo aparece si la persona está en Personas y no tiene una oportunidad abierta.
+- **Hecho recientemente.** `recent` suma `{ "kind": "conversation", "id": "conversation:<id>", "title": "{persona} te escribió", "how": "Respondiste | Sin responder | Respondiste en LinkedIn" }`.
+
+**`POST /api/v1/conversaciones/<id>/cerrar`** recibe `{ "how": "respondi | no_responder", "note": "…" }` (la nota es opcional, de hasta 1000 caracteres). Exige sesión humana: un token de servicio recibe 403.
+- Quita la tarjeta hasta que llegue otro mensaje de la persona y devuelve el `Conversation`.
+- Responde 400 si `how` no es válido y 409 si la conversación no tiene un mensaje de la persona.
+- Si Gustavo responde en LinkedIn, la tarjeta desaparece sola en la lectura siguiente.
+
+**Push.** El tipo `conversation` («Conversación que te toca», Tu turno) envía una sola push por cada mensaje nuevo que le toca. Lleva el nombre y la lectura del equipo, nunca el texto del mensaje.

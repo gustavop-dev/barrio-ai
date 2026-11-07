@@ -50,6 +50,7 @@ import {
   relativeDay,
   shortDate,
 } from './personas/labels';
+import { ConversationBlock } from './personas/ConversationBlock';
 import { OportunidadForm } from './personas/OportunidadForm';
 import './personas/personas.css';
 
@@ -61,6 +62,12 @@ function displayName(contact: Contact): string {
 function when(iso: string): string {
   const day = relativeDay(iso);
   return day === 'hoy' || day === 'ayer' ? `${day} ${formatTime(iso)}` : day;
+}
+
+/** The modality the team read in their conversation when it looks like business; otherwise their classification's. */
+function suggestedModality(contact: Contact): string | null | undefined {
+  const read = contact.conversation?.assessment;
+  return read?.opportunity && read.modality && read.modality !== 'por_clasificar' ? read.modality : contact.classification?.modality;
 }
 
 function NextStep({ contact }: { contact: Contact }) {
@@ -395,11 +402,7 @@ export function Persona() {
       </Section>
 
       <Section label="Conversación">
-        <Card tone="dashed" className="persona-block tight">
-          <p className="persona-text">Aún no disponible</p>
-          <p className="persona-meta">Cuando conectemos el inbox de LinkedIn verás aquí el resumen del analista y los últimos mensajes.</p>
-          {isHttps(person.profile_url) ? <ExternalLink href={person.profile_url}>Abrir en LinkedIn</ExternalLink> : null}
-        </Card>
+        <ConversationBlock conversation={person.conversation} name={name} profileUrl={person.profile_url} />
       </Section>
 
       <OpportunityBlock contact={person} onEdit={(opportunity) => setForm({ opportunity })} />
@@ -413,7 +416,7 @@ export function Persona() {
       {form ? (
         <OportunidadForm
           opportunity={form.opportunity}
-          person={{ id: person.id, display_name: name, headline: person.headline, modality: person.classification?.modality }}
+          person={{ id: person.id, display_name: name, headline: person.headline, modality: suggestedModality(person) }}
           onClose={() => setForm(null)}
         />
       ) : null}

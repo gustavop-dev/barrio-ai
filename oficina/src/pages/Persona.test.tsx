@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import type { Contact } from '../api/types';
 import { overviewFixture, renderApp, tuTurnoFixture } from '../test/app';
 import { fakeServer, SESSION_OK, type Handler, type Reply } from '../test/fakeServer';
-import { contactFixture, opportunityFixture, page, redSummaryFixture } from '../test/fixtures/personas';
+import { contactFixture, conversationFixture, opportunityFixture, page, redSummaryFixture } from '../test/fixtures/personas';
 import { journey } from './personas/journey';
 
 function server(contact: Contact | null, routes: Record<string, Handler | Reply> = {}) {
@@ -81,7 +81,7 @@ describe('Persona', () => {
     expect(view.getByText(/We keep adding AI to the roadmap/)).toBeInTheDocument();
     expect(view.getByRole('link', { name: /Ver el post/ })).toHaveAttribute('href', 'https://www.linkedin.com/feed/update/urn:li:activity:9');
 
-    expect(view.getByText('Aún no disponible')).toBeInTheDocument();
+    expect(view.getByText('Aún no hay una conversación leída con esta persona')).toBeInTheDocument();
     expect(view.getByText('Prefiere hablar en español.')).toBeInTheDocument();
     expect(view.getByText('Tu nota · 6 nov')).toBeInTheDocument();
 
@@ -91,6 +91,50 @@ describe('Persona', () => {
     // Connected people cannot be discarded (the API answers 409); an opportunity can still be marked.
     expect(view.queryByRole('button', { name: 'Descartar' })).not.toBeInTheDocument();
     expect(view.getByRole('button', { name: 'Marcar como oportunidad' })).toBeInTheDocument();
+  });
+
+  it('shows the conversation read by the team: its read, the last messages and the thread on LinkedIn', async () => {
+    const api = server(
+      contactFixture('c-1', {
+        stage: 'connected',
+        display_stage: 'connected',
+        connected_at: '2026-10-26T15:00:00Z',
+        your_turn: true,
+        next_step: { owner: 'gustavo', text: 'Te toca: responder su mensaje', at: null },
+        // A network modality the opportunity form cannot take: the prefill must come from the conversation.
+        classification: { ...contactFixture().classification, modality: 'alianzas' },
+        conversation: conversationFixture(),
+      }),
+      { 'POST /api/v1/oportunidades': ({ body }) => ({ status: 201, body: opportunityFixture('o-9', body as object) }) },
+    );
+    renderApp('/personas/c-1');
+    const view = await card();
+    const block = within(view.getByRole('heading', { level: 2, name: 'Conversación' }).closest('section') as HTMLElement);
+
+    expect(block.getByText('Posible oportunidad · ProjectApp')).toBeInTheDocument();
+    expect(block.getByText('Espera tu respuesta')).toBeInTheDocument();
+    expect(block.getByText('Oportunidad 86 % · Espera respuesta 81 % · Venta o spam 4 %')).toBeInTheDocument();
+    const messages = within(block.getByRole('list', { name: 'Últimos mensajes' })).getAllByRole('listitem');
+    expect(messages).toHaveLength(3);
+    expect(messages[0]).toHaveTextContent(/^Tú · 5 oct/);
+    expect(messages[0]).toHaveClass('mine');
+    expect(messages[2]).toHaveTextContent('Lucía Ficticia · 6 oct');
+    expect(messages[2]).toHaveTextContent('¿tienes disponibilidad para un proyecto corto de IA en enero?');
+    expect(block.getByText('La app nunca envía mensajes: respondes tú en LinkedIn.')).toBeInTheDocument();
+    const thread = block.getByRole('link', { name: /Abrir en LinkedIn/ });
+    expect(thread).toHaveAttribute('href', 'https://www.linkedin.com/messaging/thread/2-SHVlcnRhTGFicw==/');
+    expect(thread).toHaveAttribute('target', '_blank');
+    expect(block.queryByRole('button')).not.toBeInTheDocument();  // read-only: nothing here answers
+
+    expect(view.getByRole('region', { name: 'Siguiente paso' })).toHaveTextContent('Te toca: responder su mensaje');
+    const track = within(view.getByRole('list', { name: 'Recorrido de Lucía Ficticia' })).getAllByRole('listitem');
+    expect(track[4]).toHaveAttribute('aria-current', 'step');  // En conversación
+
+    // «Marcar como oportunidad» takes the modality the team read in the conversation.
+    await userEvent.click(view.getByRole('button', { name: 'Marcar como oportunidad' }));
+    const dialog = within(screen.getByRole('dialog', { name: 'Nueva oportunidad' }));
+    expect(dialog.getByLabelText('Modalidad')).toHaveValue('projectapp');
+    expect(api.find('POST', '/api/v1/oportunidades')).toHaveLength(0);
   });
 
   it('shows the next step and who it depends on', async () => {
