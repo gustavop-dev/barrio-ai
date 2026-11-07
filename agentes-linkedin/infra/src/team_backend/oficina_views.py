@@ -70,7 +70,7 @@ def _control_payload():
 def _capacity(account,now):
     day,week=operador.period_starts(now);result={}
     for capability,(daily,weekly) in operador.limits().items():
-        done=ActionExecution.objects.filter(proposal__account=account,proposal__capability=capability)
+        done=operador.writes(account,capability)
         daily_used=done.filter(started_at__gte=day).count();weekly_used=done.filter(started_at__gte=week).count()
         result[capability]={'daily':daily,'weekly':weekly,'daily_used':daily_used,'weekly_used':weekly_used,
                             'left':max(0,min(daily-daily_used,weekly-weekly_used))}

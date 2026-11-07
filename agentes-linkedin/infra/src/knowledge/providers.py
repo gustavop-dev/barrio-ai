@@ -12,11 +12,16 @@ from .ingest import ENC, digest
 
 EMBEDDING_PRICES={'text-embedding-3-small':Decimal('0.02'),'text-embedding-3-large':Decimal('0.13')}
 # USD per million input/output tokens (Anthropic first-party API, verified 2026-11-06).
-# Cache writes cost 1.25x input and cache reads 0.1x input.
+# Cache writes cost 1.25x input. Cache reads cost 0.1x input, except where the model lists its own price
+# (Opus 5.5 reads at $0.20/M, 0.05x its $4 input; verified 2026-11-07).
 MODEL_PRICES={'claude-opus-5-5':(Decimal('4'),Decimal('20')),'claude-sonnet-5-5':(Decimal('2'),Decimal('10')),
               'claude-haiku-5-5':(Decimal('0.10'),Decimal('0.50')),'claude-sonnet-4-6':(Decimal('3'),Decimal('15'))}
 DEFAULT_CLAUDE_MODEL='claude-opus-5-5'
 CACHE_WRITE=Decimal('1.25');CACHE_READ=Decimal('0.1')
+CACHE_READ_BY_MODEL={'claude-opus-5-5':Decimal('0.05')}
+
+def cache_read_multiplier(model):
+    return CACHE_READ_BY_MODEL.get(model,CACHE_READ)
 DIMENSIONS=1536
 REQUEST_SIZE=128
 
@@ -194,7 +199,7 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
                 'cache_creation_input_tokens':validate_token_count(getattr(usage,'cache_creation_input_tokens',None) or 0),
                 'cache_read_input_tokens':validate_token_count(getattr(usage,'cache_read_input_tokens',None) or 0)}
         cost=(Decimal(tokens['input_tokens'])*ip+Decimal(tokens['cache_creation_input_tokens'])*ip*CACHE_WRITE
-              +Decimal(tokens['cache_read_input_tokens'])*ip*CACHE_READ+Decimal(tokens['output_tokens'])*op)/1000000
+              +Decimal(tokens['cache_read_input_tokens'])*ip*cache_read_multiplier(model)+Decimal(tokens['output_tokens'])*op)/1000000
         answer='\n'.join(b.text for b in message.content if b.type=='text')
         stop_reason=message.stop_reason
     except (AttributeError,TypeError,ValueError):
@@ -202,6 +207,10 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
     record=dict(tokens,request_id=request_id,stop_reason=stop_reason)
     settle(rid,'complete',record,cost)
     if stop_reason=='refusal':raise ValueError('Claude declinó la solicitud; no se generó contenido.')
+    # Thinking counts against max_tokens: a structured answer cut there is incomplete JSON. Say so instead of
+    # letting the caller report «invalid JSON» (the spend is already settled above).
+    if stop_reason=='max_tokens' and output_schema:
+        raise ValueError(f'Claude agotó max_tokens ({max_tokens}) antes de terminar la respuesta; subir el tope de {purpose}.')
     if not answer:raise ValueError('Respuesta Claude vacía.')
     return {'text':answer,'usage':record,'estimated_usd':float(cost),'model':model,'stop_reason':stop_reason,'request_id':request_id}
 

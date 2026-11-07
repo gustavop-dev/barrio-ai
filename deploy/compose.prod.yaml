@@ -1,4 +1,4 @@
-# Barrio AI en un servidor 24/7: PWA + Django + worker + piloto automático + PostgreSQL.
+# Barrio AI en un servidor 24/7: PWA + Django + dos workers (general y acciones) + piloto automático + PostgreSQL.
 # Uso (en el servidor, desde esta carpeta):
 #   docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d
 name: barrio-ai
@@ -44,7 +44,7 @@ services:
     restart: "no"
   api:
     <<: *app
-    command: ["sh", "-c", "python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 2 --timeout 120 --forwarded-allow-ips='*'"]
+    command: ["sh", "-c", "python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 2 --timeout 300 --forwarded-allow-ips='*'"]
     # Lists are not merged with the anchor: repeat the knowledge mount next to the media volume.
     volumes: ["./conocimiento:/workspace:ro", "media:/app/media"]
     depends_on: {migrate: {condition: service_completed_successfully}}
@@ -55,16 +55,28 @@ services:
       retries: 10
   worker:
     <<: *app
-    command: ["python", "manage.py", "runworker"]
+    # General lane: LLM work, network reads, metrics and transcriptions. LinkedIn writes go to worker-acciones.
+    command: ["python", "manage.py", "runworker", "--lane", "general"]
     # The worker reads the audio it transcribes: same media volume as the api.
     volumes: ["./conocimiento:/workspace:ro", "media:/app/media"]
     depends_on: {api: {condition: service_healthy}}
     healthcheck:
-      test: ["CMD", "python", "manage.py", "worker_health"]
+      test: ["CMD", "python", "manage.py", "worker_health", "--lane", "general"]
       interval: 30s
       timeout: 10s
       retries: 3
     stop_grace_period: 330s  # a transcription may take up to ASSEMBLYAI_TIMEOUT_S (300 s)
+  worker-acciones:
+    <<: *app
+    # Actions lane: execute_action and reconcile_action only, so a write never waits behind slow jobs.
+    command: ["python", "manage.py", "runworker", "--lane", "acciones"]
+    depends_on: {api: {condition: service_healthy}}
+    healthcheck:
+      test: ["CMD", "python", "manage.py", "worker_health", "--lane", "acciones"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    stop_grace_period: 90s  # one LinkedIn write with its pre-check and read-back
   autopilot:
     <<: *app
     command: ["python", "manage.py", "autopiloto"]

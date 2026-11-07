@@ -79,14 +79,19 @@ def min_spacing():
     return timedelta(seconds=int(os.environ.get('OPERATOR_MIN_SPACING_SECONDS','1200')))
 
 def spacing_ok(account,now=None):
-    # Every connector acts as the same LinkedIn member, so public writes share one spacing.
-    last=ActionExecution.objects.order_by('-started_at').values_list('started_at',flat=True).first()
+    # Every connector acts as the same LinkedIn member, so public writes share one spacing. An execution whose
+    # pre-check found nothing to write does not count (an execution in flight does: it may be writing).
+    last=ActionExecution.objects.filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
     return last is None or last<=(now or timezone.now())-min_spacing()
+
+def writes(account,capability):
+    """Executions of a capability that wrote (or may have written) on LinkedIn: what the caps count."""
+    return ActionExecution.objects.filter(proposal__account=account,proposal__capability=capability,wrote=True)
 
 def capacity_left(account,capability,now=None):
     daily,weekly=limits().get(capability,(0,0))
     day,week=period_starts(now)
-    done=ActionExecution.objects.filter(proposal__account=account,proposal__capability=capability)
+    done=writes(account,capability)
     return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
 
 def env_paused():
@@ -300,6 +305,9 @@ def reject(user,proposal_id,note=''):
         if proposal.contact_id:
             from . import red
             red.on_rejected(proposal,note)
+        if proposal.piece_id:
+            from . import capturas
+            capturas.release_ideas(proposal.piece,'la vetaste')
     return proposal
 
 # --------------------------------------------------------------------------- execution
@@ -313,6 +321,10 @@ def _finish(execution,state,actor,**fields):
     if state=='confirmed' and proposal.contact_id:
         from . import red
         red.on_confirmed(proposal,execution)
+    if state=='failed' and proposal.piece_id:
+        # A publication LinkedIn refused (or never sent): the ideas behind it are not spent.
+        from . import capturas
+        capturas.release_ideas(proposal.piece,'LinkedIn no la publicó')
     if state=='confirmed' and proposal.capability in (ActionProposal.Capability.PUBLISH,ActionProposal.Capability.COMMENT):
         from . import oficina_eventos
         oficina_eventos.emit('publicacion','operador_cuenta','linkedin',
@@ -354,7 +366,7 @@ def _publish(execution,proposal,connector,user):
     text=proposal.payload['text'];now=timezone.now
     already,_=_find_own_post(text)
     if already:
-        return _finish(execution,'confirmed',user,external_id=already['id'],external_url=already['share_url'],reconciled_at=now(),
+        return _finish(execution,'confirmed',user,external_id=already['id'],external_url=already['share_url'],reconciled_at=now(),wrote=False,
                        note='Ya existía una publicación propia idéntica; no se publicó otra.')
     created=connector.create_post(text)
     execution.external_id=created['id'];execution.external_url=created['url']
@@ -400,7 +412,7 @@ def execute(user,proposal_id):
         status=connector.account_status()
         if status['status']!='running' or status['is_locked']:
             set_account_pause(account,f'Estado del conector: {status["status"]}',user)
-            return _finish(execution,'failed',user,error_kind='account_not_running',note='No se envió: la cuenta no está operativa.')
+            return _finish(execution,'failed',user,error_kind='account_not_running',note='No se envió: la cuenta no está operativa.',wrote=False)
         if proposal.capability==ActionProposal.Capability.PUBLISH:
             return _publish(execution,proposal,connector,user)
         if proposal.capability in NETWORK:
@@ -412,7 +424,7 @@ def execute(user,proposal_id):
             already=_find_own_comment(connector,post_id,text)
             if already:
                 return _finish(execution,'confirmed',user,external_id=already['id'],external_url=proposal.post.share_url,
-                               note='Ya existía un comentario propio idéntico; no se escribió otro.',reconciled_at=timezone.now())
+                               note='Ya existía un comentario propio idéntico; no se escribió otro.',reconciled_at=timezone.now(),wrote=False)
             created=connector.create_comment(post_id,text)
             execution.external_id=created['id']
             found=_find_own_comment(connector,post_id,text,created['id'])
@@ -422,7 +434,7 @@ def execute(user,proposal_id):
         reaction=proposal.payload['reaction']
         # LinkedIn only tells whether we reacted: never stack a second reaction on the same post.
         if connector.get_post(post_id).get('user_reacted'):
-            return _finish(execution,'confirmed',user,note='Ya había una reacción propia; no se añadió otra.',reconciled_at=timezone.now())
+            return _finish(execution,'confirmed',user,note='Ya había una reacción propia; no se añadió otra.',reconciled_at=timezone.now(),wrote=False)
         connector.add_reaction(post_id,reaction)
         confirmed=bool(connector.get_post(post_id).get('user_reacted'))
         return _finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=timezone.now() if confirmed else None)

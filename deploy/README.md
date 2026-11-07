@@ -1,6 +1,6 @@
 # Despliegue de Barrio AI en un servidor 24/7
 
-Este stack levanta en un solo servidor la oficina PWA, Django, el worker, el piloto automático y PostgreSQL con pgvector. Caddy es el único servicio expuesto: obtiene el certificado HTTPS automáticamente, sirve la PWA y hace de proxy de `/api`, `/admin`, `/static` y `/health` hacia Django. Así PWA y API comparten origen, y la sesión de Django funciona con CSRF sin configurar CORS.
+Este stack levanta en un solo servidor la oficina PWA, Django, dos workers (`worker` para el trabajo general y `worker-acciones` solo para escribir y conciliar en LinkedIn), el piloto automático y PostgreSQL con pgvector. Caddy es el único servicio expuesto: obtiene el certificado HTTPS automáticamente, sirve la PWA y hace de proxy de `/api`, `/admin`, `/static` y `/health` hacia Django. Así PWA y API comparten origen, y la sesión de Django funciona con CSRF sin configurar CORS.
 
 ## 1. Servidor y dominio
 
@@ -53,7 +53,7 @@ Los originales del curso no viajan al servidor. Por eso `/api/v1/integrity` info
 ## 4. Comprobar
 
 ```bash
-docker compose -f compose.prod.yaml ps            # api, worker, autopilot y web deben estar "healthy"
+docker compose -f compose.prod.yaml ps            # api, worker, worker-acciones, autopilot y web deben estar "healthy"
 curl -fsS https://barrio.tudominio.com/health
 ```
 
@@ -98,7 +98,7 @@ Detalle completo en [publicación diaria](../agentes-linkedin/infra/docs/publica
 | Copias de seguridad | `crontab -e` → `0 4 * * * /ruta/barrio-ai/deploy/backup.sh` (conserva 14 días). Guarda la base (`knowledge-*.dump`) y los audios y fotos del volumen `media` (`media-*.tar.gz`). Copia periódicamente `deploy/backups/` fuera del servidor. Restaurar los archivos: [capturas-galeria.md](../agentes-linkedin/infra/docs/capturas-galeria.md#servidor). |
 | Actualizar | Tras el merge a `main` y el workflow en verde: `rsync` de `deploy/` si cambió, y `docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d`. Las migraciones se aplican solas. |
 | Volver atrás | `BARRIO_TAG=<sha de un commit anterior>` en `.env`, luego `pull` y `up -d`. Las migraciones no se deshacen solas. |
-| Logs | `docker compose -f compose.prod.yaml logs -f autopilot worker`. |
+| Logs | `docker compose -f compose.prod.yaml logs -f autopilot worker worker-acciones`. |
 | Admin | `https://barrio.tudominio.com/admin/`. |
 
 ## Seguridad

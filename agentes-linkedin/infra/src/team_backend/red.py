@@ -230,8 +230,9 @@ def classify(user,account,now=None,batch=10):
             for c in contacts]
     from . import orientacion
     message=json.dumps({'private_guidance':private,'orientation':orientacion.text(),'people':people},ensure_ascii=False,default=str)
-    answer=providers.claude(CLASSIFY_SYSTEM,message,max_tokens=4000,output_schema=CLASSIFY_SCHEMA,purpose='network-classify',
-                            model=classifier_model())
+    # Sonnet 5.5 thinks at effort high by default; medium keeps the judgment and the cap leaves room for thinking.
+    answer=providers.claude(CLASSIFY_SYSTEM,message,max_tokens=16000,output_schema=CLASSIFY_SCHEMA,effort='medium',
+                            purpose='network-classify',model=classifier_model())
     try:results={r['id']:r for r in json.loads(answer['text'])['contacts']}
     except (json.JSONDecodeError,KeyError,TypeError):raise ValueError('El clasificador no devolvió JSON válido.') from None
     when=timezone.now().isoformat();fits=0
@@ -380,20 +381,20 @@ def execute_action(execution,proposal,connector,user):
     if proposal.capability==RED.FOLLOW:
         before=connector.get_profile(uid)
         if before.get('is_following'):
-            return operador._finish(execution,'confirmed',user,note='Ya lo seguías; no se volvió a seguir.',reconciled_at=now())
+            return operador._finish(execution,'confirmed',user,note='Ya lo seguías; no se volvió a seguir.',reconciled_at=now(),wrote=False)
         connector.follow_user(uid)
         confirmed=bool(connector.get_profile(uid).get('is_following'))
     elif proposal.capability==RED.INVITE:
         before=connector.get_profile(uid);status=before.get('relation_request_status') or ''
         if before.get('network_distance')=='FIRST_DEGREE':
             contact.connected_at=now();_stage(contact,'connected','connected','Ya era conexión; no se invitó.');contact.save()
-            return operador._finish(execution,'failed',user,error_kind='already_connected',note='Ya era conexión de primer grado; no se envió.')
+            return operador._finish(execution,'failed',user,error_kind='already_connected',note='Ya era conexión de primer grado; no se envió.',wrote=False)
         if status=='PENDING':
             return operador._finish(execution,'confirmed',user,external_id=before.get('invitation_id',''),
-                                    note='Ya había una invitación pendiente; no se envió otra.',reconciled_at=now())
+                                    note='Ya había una invitación pendiente; no se envió otra.',reconciled_at=now(),wrote=False)
         if status in ('IGNORED','WITHDRAWN'):
             _stage(contact,'closed','closed',f'Invitación previa {status.lower()}.');contact.save()
-            return operador._finish(execution,'failed',user,error_kind='previous_invitation',note='Hubo una invitación previa; no se reinvita sin Gustavo.')
+            return operador._finish(execution,'failed',user,error_kind='previous_invitation',note='Hubo una invitación previa; no se reinvita sin Gustavo.',wrote=False)
         created=connector.send_invitation(uid)
         execution.external_id=created.get('id','')
         after=connector.get_profile(uid)
@@ -402,9 +403,9 @@ def execute_action(execution,proposal,connector,user):
         request_id=proposal.payload['request_id']
         if request_id not in {i['id'] for i in connector.list_invitations('received')}:
             if connector.get_profile(uid).get('network_distance')=='FIRST_DEGREE':
-                return operador._finish(execution,'confirmed',user,note='Ya era conexión; no había nada que aceptar.',reconciled_at=now())
+                return operador._finish(execution,'confirmed',user,note='Ya era conexión; no había nada que aceptar.',reconciled_at=now(),wrote=False)
             _stage(contact,'closed','closed','La invitación recibida ya no estaba pendiente.');contact.save()
-            return operador._finish(execution,'failed',user,error_kind='invitation_gone',note='La invitación ya no estaba pendiente; no se envió nada.')
+            return operador._finish(execution,'failed',user,error_kind='invitation_gone',note='La invitación ya no estaba pendiente; no se envió nada.',wrote=False)
         connector.accept_invitation(request_id)
         confirmed=connector.get_profile(uid).get('network_distance')=='FIRST_DEGREE'
     else:
@@ -492,7 +493,7 @@ def summary(account=None,now=None):
     day,week=operador.period_starts(now);capacity={}
     for capability in NETWORK_CAPABILITIES:
         daily,weekly=operador.limits()[capability]
-        done=ActionExecution.objects.filter(proposal__capability=capability)
+        done=ActionExecution.objects.filter(proposal__capability=capability,wrote=True)  # what the caps count
         if account:done=done.filter(proposal__account=account)
         du,wu=done.filter(started_at__gte=day).count(),done.filter(started_at__gte=week).count()
         capacity[capability]={'daily':daily,'daily_used':du,'weekly':weekly,'weekly_used':wu,

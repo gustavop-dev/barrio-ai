@@ -112,13 +112,19 @@ def policy_review(proposal):
         proposal.save(update_fields=['state','risks','decided_at','decision_note','review'])
         operador._audit(None,'operator.policy_discarded',proposal.id,issues=issues)
         if proposal.piece_id:
+            from . import capturas
+            capturas.release_ideas(proposal.piece,'la política no la aprobó')
             from .notificaciones import avisar
             avisar('piece_discarded',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}','; '.join(issues)[:300],
                    link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_discarded:{proposal.id}')
         return proposal
     if proposal.payload_hash!=operador.current_hash(proposal):
         proposal.state=ActionProposal.State.DISCARDED;proposal.decision_note='Hash inconsistente; descartada'
-        proposal.save(update_fields=['state','decided_at','decision_note']);return proposal
+        proposal.save(update_fields=['state','decided_at','decision_note'])
+        if proposal.piece_id:
+            from . import capturas
+            capturas.release_ideas(proposal.piece,'se descartó por un cambio en el texto')
+        return proposal
     proposal.state=ActionProposal.State.APPROVED;proposal.approved_hash=proposal.payload_hash
     proposal.decision_note=(f'Aprobada por el líder ({verdict["model"]}) · política {POLICY_VERSION}' if verdict
                             else f'Aprobada por política {POLICY_VERSION}')
@@ -209,8 +215,14 @@ def _observe(user,account,now):
     _,created=enqueue_operation(user,'observe',{'account':str(account.id),'limit':5,'referents':[]},request_id=_job_id('observe',account.id,bucket))
     return int(created)
 
+def open_comments(account):
+    """Comments already drafted and waiting for their turn (proposed or approved, not executed yet)."""
+    return ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,
+                                         state__in=[ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED]).count()
+
 def _propose(user,account,now):
-    if autonomy('INT-03')=='off' or operador.capacity_left(account,'INT-03',now)<=0:return 0
+    # A paid draft only when a write slot is left after the comments already waiting for one.
+    if autonomy('INT-03')=='off' or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
     if llm_spent_today(now)>=Decimal(setting('OPERATOR_DAILY_LLM_USD','1')):return 0
     day,_=operador.period_starts(now)
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
