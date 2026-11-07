@@ -2,24 +2,23 @@
 // Gustavo reads it, adopts its proposed orientation (undoable for 5 s) or discards it, and can generate a missing one.
 import { useEffect, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import {
+  automaticSentence,
+  decidedSentence,
+  decisionToast,
+  RESUMEN_ROLE as ROLE,
+  RESUMEN_ROLE_NAME as ROLE_NAME,
+  RESUMEN_SPRITE as ANALYST_SPRITE,
+  SUMMARY_STATE_BADGE as STATE_BADGE,
+  summaryFooter as footer,
+  summaryPending,
+  weekPhrase,
+} from '../../../../compartido/src/logic/resultados';
 import { useGenerarResumen, useResumenDecision, useResumenSemanal } from '../../api/hooks';
-import type { WeeklySummary, WeeklySummaryGenerate, WeeklySummaryItem, WeeklySummaryState } from '../../api/types';
+import type { WeeklySummary, WeeklySummaryGenerate, WeeklySummaryItem } from '../../api/types';
 import { IconChevronDown } from '../../components/icons';
-import { AgentPortrait, Badge, Button, Card, ConfirmModal, EmptyState, ErrorNote, errorMessage, Note, Section, Skeleton, useToast, type Tone } from '../../components/ui';
-import { formatDateTime, formatTime, formatUsd } from '../../lib/format';
-
-const ROLE = 'analista_barrio_resultados';
-const ROLE_NAME = 'Analista del barrio';
-/** Character sheet of the analyst in the scene (scene/roles.ts). */
-const ANALYST_SPRITE = 3;
-const OPERATOR_TZ = 'America/Bogota';
-
-const STATE_BADGE: Record<WeeklySummaryState, { tone: Tone; label: string } | null> = {
-  nuevo: { tone: 'ok', label: 'Nuevo' },
-  visto: null,
-  aplicado: { tone: 'info', label: 'Usado como orientación' },
-  descartado: { tone: 'muted', label: 'Descartado' },
-};
+import { AgentPortrait, Badge, Button, Card, ConfirmModal, EmptyState, ErrorNote, errorMessage, Note, Section, Skeleton, useToast } from '../../components/ui';
+import { formatUsd } from '../../lib/format';
 
 function newRequestId(): string | undefined {
   try {
@@ -27,11 +26,6 @@ function newRequestId(): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-/** «la semana del 2 al 8 de noviembre» from the backend's «Semana del …». */
-function weekPhrase(label: string): string {
-  return `la ${label.charAt(0).toLowerCase()}${label.slice(1)}`;
 }
 
 function Items({ title, items, empty }: { title: string; items: WeeklySummaryItem[]; empty: string }) {
@@ -83,7 +77,7 @@ type Decide = (summary: WeeklySummary, decision: 'aplicar' | 'descartar') => voi
 function Proposal({ summary, onDecide, busy, error }: { summary: WeeklySummary; onDecide: Decide; busy: boolean; error: unknown }) {
   const text = summary.analysis.orientacion_propuesta;
   if (!text) return null;
-  const pending = summary.state === 'nuevo' || summary.state === 'visto';
+  const pending = summaryPending(summary);
   return (
     <div className="res-resumen-propuesta">
       <h4 className="res-resumen-heading">Orientación propuesta</h4>
@@ -102,18 +96,10 @@ function Proposal({ summary, onDecide, busy, error }: { summary: WeeklySummary; 
           <ErrorNote error={error} />
         </>
       ) : (
-        <p className="res-muted">
-          {summary.state === 'aplicado' ? 'La usaste como orientación del equipo' : 'La descartaste'}
-          {summary.decided_at ? ` el ${formatDateTime(summary.decided_at)}` : ''}.
-        </p>
+        <p className="res-muted">{decidedSentence(summary)}</p>
       )}
     </div>
   );
-}
-
-function footer(summary: WeeklySummary): string {
-  const cost = summary.cost_usd !== null ? ` · ${formatUsd(summary.cost_usd)}` : '';
-  return `Escrito el ${formatDateTime(summary.created_at)}${cost}`;
 }
 
 function SummaryCard({ summary, onDecide, busy, error }: { summary: WeeklySummary; onDecide: Decide; busy: boolean; error: unknown }) {
@@ -260,7 +246,7 @@ export function ResumenSemanal() {
     decide
       .mutateAsync({ summaryId: summary.id, decision })
       .then(() =>
-        toast.show(decision === 'aplicar' ? 'Orientación actualizada. El equipo la usa desde su próxima tarea.' : 'Resumen descartado', {
+        toast.show(decisionToast(decision), {
           undo: () => undo(summary),
         }),
       )
@@ -279,7 +265,7 @@ export function ResumenSemanal() {
   } else {
     const offer = data.generate;
     const missingWeek = offer.available || offer.pending ? offer : null;
-    const automatic = offer.automatic && offer.automatic_at ? ` El analista lo escribe cada lunes a las ${formatTime(offer.automatic_at, OPERATOR_TZ)}.` : '';
+    const automatic = automaticSentence(offer);
     content = (
       <>
         {latest ? (

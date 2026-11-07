@@ -45,6 +45,12 @@ export function routeForUrl(url: unknown): AppRoute | null {
     pathname = '/tu-turno';
     params.tab = 'sabe';
   }
+  // The old network views, as the PWA redirects them (App.tsx KeepSearch): the query stays.
+  if (pathname === '/red') pathname = '/personas';
+  if (pathname === '/referentes') {
+    pathname = '/personas';
+    params.pestana = 'referentes';
+  }
   // Legacy paths of the machine and the memory, redirected as the PWA does.
   const legacy = LEGACY_AJUSTES[pathname];
   if (legacy) {

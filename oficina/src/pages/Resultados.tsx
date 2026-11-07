@@ -1,59 +1,25 @@
 import { useId, useState, type MouseEvent, type ReactNode } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import {
+  dataUntil,
+  NOT_SPLIT_BY_MODALITY,
+  periodNote,
+  readDias,
+  readModalidad,
+  RESULTADOS_MODALITIES as MODALITIES,
+  RESULTADOS_PERIODS as PERIODS,
+  RESULTADOS_SECTIONS as SECTIONS,
+} from '../../../compartido/src/logic/resultados';
 import { useResultados } from '../api/hooks';
-import type { Resultados as ResultadosData, ResultadosDias, ResultadosModalidad } from '../api/types';
+import type { Resultados as ResultadosData } from '../api/types';
 import { ErrorRetry, Page, Section, Skeleton } from '../components/ui';
-import { formatTime } from '../lib/format';
-import { shortDate } from './personas/labels';
 import { OportunidadForm } from './personas/OportunidadForm';
 import { ResumenSemanal } from './resultados/ResumenSemanal';
 import { Contenido, Equipo, Gente, Negocio, SectionBoundary } from './resultados/sections';
 import './resultados/resultados.css';
 
-const PERIODS: { value: ResultadosDias; label: string }[] = [
-  { value: 7, label: '7 días' },
-  { value: 28, label: '28 días' },
-  { value: 90, label: '90 días' },
-];
-
-const MODALITIES: { value: ResultadosModalidad; label: string }[] = [
-  { value: 'todo', label: 'Todo' },
-  { value: 'personal_startups', label: 'Startups' },
-  { value: 'projectapp', label: 'ProjectApp' },
-];
-
-const SECTIONS = [
-  { id: 'res-negocio', chip: '1 · Negocio', label: '1 · ¿Genera negocio?' },
-  { id: 'res-gente', chip: '2 · Gente', label: '2 · ¿Llegamos a la gente correcta?' },
-  { id: 'res-contenido', chip: '3 · Contenido', label: '3 · ¿El contenido aporta?' },
-  { id: 'res-equipo', chip: '4 · Equipo', label: '4 · ¿El equipo trabaja bien?' },
-] as const;
-
-function readDias(value: string | null): ResultadosDias {
-  return value === '7' ? 7 : value === '90' ? 90 : 28;
-}
-
-function readModalidad(value: string | null): ResultadosModalidad {
-  return value === 'personal_startups' || value === 'projectapp' ? value : 'todo';
-}
-
-/** The calendar day of an instant in a time zone, as AAAA-MM-DD. */
-function dayIn(date: Date, timeZone: string | undefined): string {
-  try {
-    return new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(date);
-  } catch {
-    return date.toISOString().slice(0, 10);
-  }
-}
-
-/** «hoy 14:20», or «6 nov 14:20» when the data stopped on another day. */
-export function dataUntil(iso: string, timeZone?: string, now: Date = new Date()): string {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) return '—';
-  const time = formatTime(iso, timeZone);
-  const day = dayIn(date, timeZone);
-  return day === dayIn(now, timeZone) ? `hoy ${time}` : `${shortDate(day)} ${time}`;
-}
+// Shared with the native app (compartido/src/logic/resultados.ts).
+export { dataUntil };
 
 function jump(id: string) {
   return (event: MouseEvent<HTMLAnchorElement>) => {
@@ -68,7 +34,7 @@ function jump(id: string) {
   };
 }
 
-function Compact<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: { value: T; label: string }[]; onChange: (value: string) => void }) {
+function Compact<T extends string | number>({ label, value, options, onChange }: { label: string; value: T; options: readonly { value: T; label: string }[]; onChange: (value: string) => void }) {
   const id = useId();
   return (
     <div className="res-select">
@@ -112,7 +78,7 @@ export function Resultados() {
     return <p className="res-muted">No se pudo cargar esta sección.</p>;
   };
 
-  const notSplit = modalidad !== 'todo' ? 'No se separa por modalidad: muestra toda la cuenta.' : undefined;
+  const notSplit = modalidad !== 'todo' ? NOT_SPLIT_BY_MODALITY : undefined;
 
   return (
     <Page title="Resultados">
@@ -124,11 +90,7 @@ export function Resultados() {
           <Compact label="Modalidad" value={modalidad} options={MODALITIES} onChange={(value) => set('modalidad', value, 'todo')} />
         </div>
         <p className="res-muted" aria-live="polite">
-          {data
-            ? `Periodo en curso: datos hasta ${dataUntil(data.periodo.datos_hasta, data.zona_horaria)}. Todo se compara con los ${data.periodo.dias} días anteriores.`
-            : query.isPending
-              ? 'Cargando el periodo…'
-              : `Todo se compara con los ${dias} días anteriores.`}
+          {periodNote(data, query.isPending, dias)}
         </p>
         <nav aria-label="Secciones de Resultados" className="res-jump">
           {SECTIONS.map((section) => (

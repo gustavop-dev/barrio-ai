@@ -44,6 +44,8 @@ export const springs = {
   press: { damping: 18, stiffness: 420, mass: 0.6 },
   /** The toast rising from the bottom. */
   toast: { damping: 20, stiffness: 260, mass: 0.9 },
+  /** An opportunity card lifting under the finger when its drag starts (and settling when dropped). */
+  dragLift: { damping: 18, stiffness: 300, mass: 0.8 },
   /** The photo viewer: double-tap zoom, the photo settling back inside its bounds, a drag-to-close that did not close. */
   zoomSettle: { damping: 22, stiffness: 240, mass: 1 },
 } as const satisfies Record<string, SpringToken>;
@@ -149,6 +151,16 @@ export const gestures = {
     /** Or flick it down this fast. */
     dismissVelocity: 1000,
   },
+  drag: {
+    /** Hold an opportunity card this long before it lifts and follows the finger (ms). */
+    longPressMs: 400,
+    /** Scale of the lifted card. */
+    liftScale: 1.03,
+    /** Distance from the top or bottom edge of the list where a dragged card scrolls it (points). */
+    autoScrollEdge: 80,
+    /** Speed of that scroll (points per second). */
+    autoScrollSpeed: 700,
+  },
   zoom: {
     /** Pinch-zoom limit of the photo viewer (1 = fitted to the screen). */
     maxScale: 4,
@@ -200,6 +212,12 @@ export const haptics = {
   tabChange: { type: 'selection' },
   /** Toggling a chip or option. */
   toggle: null,
+  /** An opportunity card lifts after the long press. */
+  dragStart: { type: 'impact', style: 'medium' },
+  /** The dragged card moves over another stage. */
+  dragOver: { type: 'selection' },
+  /** The card is dropped on a new stage. */
+  dragDrop: { type: 'impact', style: 'light' },
   /** Flipping a switch row (Ajustes, the photo sheet). */
   switchToggle: null,
   /** The photos reached the gallery. */

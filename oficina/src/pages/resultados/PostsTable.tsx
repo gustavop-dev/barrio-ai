@@ -1,14 +1,21 @@
 import { useId, useState } from 'react';
 import { Link } from 'react-router-dom';
+import {
+  commentersView,
+  pillarLabel,
+  POST_MOBILE_SORTS as MOBILE_SORTS,
+  sortPosts,
+  type PostSortKey as SortKey,
+  type SortDirection as Direction,
+} from '../../../../compartido/src/logic/resultados';
 import type { ResultadosPost } from '../../api/types';
 import { LabelChip } from '../../components/ui';
-import { PILLAR_LABEL } from '../../lib/editorial';
-import { CONTACT_ROLE_LABEL, formatNumber, formatPct } from '../../lib/format';
+import { formatNumber, formatPct } from '../../lib/format';
 import { shortDate } from '../personas/labels';
 import { DESKTOP, useMediaQuery } from '../personas/useMediaQuery';
 
-type SortKey = 'date' | 'first_line' | 'pillar' | 'impressions_24h' | 'impressions_7d' | 'reactions' | 'comments' | 'reposts' | 'engagement_pct' | 'commenters';
-type Direction = 'asc' | 'desc';
+// Shared with the native app (compartido/src/logic/resultados.ts).
+export { pillarLabel, sortPosts };
 
 const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: 'date', label: 'Fecha' },
@@ -22,51 +29,6 @@ const COLUMNS: { key: SortKey; label: string; numeric?: boolean }[] = [
   { key: 'engagement_pct', label: 'Interacción', numeric: true },
   { key: 'commenters', label: 'Quién comentó', numeric: true },
 ];
-
-/** The options of «Ordenar por» on mobile. */
-const MOBILE_SORTS: { value: SortKey; label: string }[] = [
-  { value: 'date', label: 'Fecha' },
-  { value: 'impressions_7d', label: 'Impresiones a 7 días' },
-  { value: 'impressions_24h', label: 'Impresiones a 24 h' },
-  { value: 'engagement_pct', label: 'Interacción' },
-  { value: 'reactions', label: 'Reacciones' },
-  { value: 'comments', label: 'Comentarios' },
-  { value: 'commenters', label: 'Quién comentó' },
-];
-
-export function pillarLabel(pillar: string | null | undefined): string {
-  if (!pillar || pillar === 'sin_pilar') return 'Sin pilar';
-  return PILLAR_LABEL[pillar] ?? pillar;
-}
-
-function roleLabel(role: string): string {
-  if (role === 'sin_clasificar' || role === 'sin_rol') return 'Sin clasificar';
-  return CONTACT_ROLE_LABEL[role] ?? role;
-}
-
-function commenterTotal(post: ResultadosPost): number | null {
-  if (!post.commenters_by_role) return null;
-  return Object.values(post.commenters_by_role).reduce((sum, value) => sum + value, 0);
-}
-
-function sortValue(post: ResultadosPost, key: SortKey): number | string | null {
-  if (key === 'commenters') return commenterTotal(post);
-  if (key === 'pillar') return post.pillar ? pillarLabel(post.pillar) : null;
-  return post[key];
-}
-
-/** Sorted copy; missing values always go last. */
-export function sortPosts(posts: ResultadosPost[], key: SortKey, direction: Direction): ResultadosPost[] {
-  const factor = direction === 'asc' ? 1 : -1;
-  return [...posts].sort((a, b) => {
-    const left = sortValue(a, key);
-    const right = sortValue(b, key);
-    if (left === null || left === undefined) return right === null || right === undefined ? 0 : 1;
-    if (right === null || right === undefined) return -1;
-    if (typeof left === 'number' && typeof right === 'number') return (left - right) * factor;
-    return String(left).localeCompare(String(right), 'es') * factor;
-  });
-}
 
 function num(value: number | null | undefined) {
   if (value === null || value === undefined) {
@@ -86,15 +48,15 @@ function pct(value: number | null | undefined) {
 }
 
 function Commenters({ post }: { post: ResultadosPost }) {
-  if (!post.cut) return <LabelChip tone="info">Aún sin corte</LabelChip>;
-  if (!post.commenters_by_role) return <span className="res-muted">Sin leer</span>;
-  const entries = Object.entries(post.commenters_by_role).filter(([, count]) => count > 0);
-  if (!entries.length) return <span className="res-muted">Nadie</span>;
+  const view = commentersView(post);
+  if (view.kind === 'nocut') return <LabelChip tone="info">Aún sin corte</LabelChip>;
+  if (view.kind === 'unread') return <span className="res-muted">Sin leer</span>;
+  if (view.kind === 'nobody') return <span className="res-muted">Nadie</span>;
   return (
     <>
-      {entries.map(([role, count]) => (
-        <LabelChip key={role} tone="info">
-          {roleLabel(role)} · {count}
+      {view.chips.map((chip) => (
+        <LabelChip key={chip} tone="info">
+          {chip}
         </LabelChip>
       ))}
     </>

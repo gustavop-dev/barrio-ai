@@ -2,17 +2,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useState, type DragEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useUpdateOportunidad } from '../../api/hooks';
-import { keys } from '../../api/queryClient';
 import type { Opportunity, OpportunityStage } from '../../api/types';
 import { OPPORTUNITY_STAGES } from '../../api/types';
 import { IconChevronDown, IconPlus } from '../../components/icons';
 import { Avatar, Badge, Button, EmptyState, ErrorRetry, Skeleton, useToast } from '../../components/ui';
-import { useOpportunityBoard } from './api';
-import { BOARD_STAGES, daysInStage, longDate, MODALITY_SHORT, OPPORTUNITY_STAGE_LABEL, relativeDay } from './labels';
+import { nextActionText } from '../../../../compartido/src/logic/barrio';
+import { OPPORTUNITY_BOARD_KEY, useOpportunityBoard } from './api';
+import { BOARD_STAGES, daysInStage, longDate, MODALITY_SHORT, OPPORTUNITY_STAGE_LABEL } from './labels';
 import { OportunidadForm } from './OportunidadForm';
 import { useMediaQuery, WIDE } from './useMediaQuery';
 
-const BOARD_KEY = [...keys.oportunidadesAll, 'board'];
+const BOARD_KEY = OPPORTUNITY_BOARD_KEY;
 
 function PersonName({ opportunity }: { opportunity: Opportunity }) {
   const name = opportunity.person || opportunity.person_name || 'Sin nombre';
@@ -24,11 +24,6 @@ function PersonName({ opportunity }: { opportunity: Opportunity }) {
     );
   }
   return <span className="opp-name plain">{name}</span>;
-}
-
-function nextActionText(opportunity: Opportunity): string {
-  const when = relativeDay(opportunity.next_action_at);
-  return [opportunity.next_action, when].filter(Boolean).join(' · ');
 }
 
 interface CardProps {

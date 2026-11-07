@@ -1,5 +1,3 @@
-import { Placeholder } from '@/components/shell/Placeholder';
+import { PersonasScreen } from '@/personas/PersonasScreen';
 
-export default function PersonasScreen() {
-  return <Placeholder testID="screen-personas" title="Personas" subtitle="Tu barrio en LinkedIn, las conversaciones y las oportunidades." />;
-}
+export default PersonasScreen;
