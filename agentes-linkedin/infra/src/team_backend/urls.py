@@ -7,6 +7,7 @@ from . import editorial_views as ed
 from . import red_views as rd
 from . import resultados_views as rs
 from . import rediseno_views as rv
+from . import capturas_views as cv
 urlpatterns=[
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
  path('units',views.Units.as_view()),path('units/<str:uid>',views.UnitDetail.as_view()),
@@ -20,7 +21,7 @@ urlpatterns=[
  # Self-hosted office PWA (oficina/CONTRATO-API.md).
  path('auth/session',of.session_view),path('auth/login',of.login_view),path('auth/logout',of.logout_view),
  path('operador/overview',of.Overview.as_view()),path('operador/control',of.Control.as_view()),
- path('operador/feed',of.Feed.as_view()),path('oficina/actividad',of.Actividad.as_view()),
+ path('operador/feed',of.Feed.as_view()),path('oficina/actividad',of.Actividad.as_view()),path('oficina/eventos',of.Eventos.as_view()),
  path('push/key',of.PushKey.as_view()),path('push/subscriptions',of.PushSubscriptions.as_view()),
  path('push/unsubscribe',of.PushUnsubscribe.as_view()),path('push/test',of.PushTest.as_view()),
  # Official LinkedIn API: member OAuth and token status (docs/publicacion-diaria.md).
@@ -30,7 +31,8 @@ urlpatterns=[
  path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/summary',rd.Summary.as_view()),
  # Resultados: own-post and audience metrics against the previous period (docs/metricas-resultados.md).
  path('resultados',rs.Resultados.as_view()),
- path('tu-turno',rv.TuTurno.as_view()),path('preguntas',rv.Questions.as_view()),
+ path('tu-turno',rv.TuTurno.as_view()),path('tu-turno/vistos',rv.TuTurnoSeen.as_view()),
+ path('notificaciones',rv.Notifications.as_view()),path('notificaciones/leer',rv.NotificationsRead.as_view()),path('preguntas',rv.Questions.as_view()),
  path('preguntas/<uuid:qid>/responder',rv.QuestionAnswer.as_view()),path('preguntas/<uuid:qid>/no-compartir',rv.QuestionDecline.as_view()),
  path('preguntas/<uuid:qid>/deshacer',rv.QuestionUndo.as_view()),path('preguntas/<uuid:qid>/mas-tarde',rv.QuestionPostpone.as_view()),
  path('memoria/hechos',rv.Facts.as_view()),path('memoria/hechos/<str:key>/corregir',rv.FactCorrect.as_view()),
@@ -42,6 +44,11 @@ urlpatterns=[
  # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).
  path('editorial/calendar',ed.Calendar.as_view()),path('editorial/pieces/<uuid:pid>',ed.PieceDetail.as_view()),
  path('editorial/plan',ed.Plan.as_view()),
+ # Capture button and Galería (docs/capturas-galeria.md): private files, authenticated streaming only.
+ path('capturas',cv.Captures.as_view()),path('capturas/<uuid:cid>',cv.CaptureDetail.as_view()),
+ path('capturas/<uuid:cid>/audio',cv.CaptureAudio.as_view()),
+ path('galeria',cv.Gallery.as_view()),path('galeria/<uuid:pid>',cv.PhotoDetail.as_view()),
+ path('galeria/<uuid:pid>/imagen',cv.PhotoImage.as_view()),path('ajustes/preferencias',cv.Preferences.as_view()),
  path('operador/accounts',op.Accounts.as_view()),
  path('operador/accounts/<uuid:aid>/check',op.AccountCheck.as_view()),
  path('operador/accounts/<uuid:aid>/pause',op.AccountPause.as_view()),

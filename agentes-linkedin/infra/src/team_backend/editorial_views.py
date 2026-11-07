@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import editorial, operador, resultados
+from . import capturas, editorial, operador, resultados
 from .models import EditorialPiece
 from .operador_views import valid
 from .permissions import require
@@ -48,7 +48,9 @@ class PieceDetail(APIView):
             selection=piece.selection,verification=piece.verification,final_text=piece.final_text,citations=piece.citations,
             signals=piece.signals,usage=piece.usage,metrics=piece.metrics,action_detail=ActionOutput(action).data if action is not None else None,
             # APRE-01 (docs/metricas-resultados.md): snapshots at 24 h/72 h/7 d and who commented.
-            snapshots=resultados.piece_snapshots(piece),commenters=resultados.piece_commenters(piece)))
+            snapshots=resultados.piece_snapshots(piece),commenters=resultados.piece_commenters(piece),
+            # «Comentario para el equipo» sent with the capture button (docs/capturas-galeria.md).
+            team_comments=capturas.piece_comments(piece)))
 
 class Plan(APIView):
     """Queue the preparation of the next free slot (paid: the editorial circuit calls Claude)."""

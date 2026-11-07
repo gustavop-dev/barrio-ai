@@ -14,6 +14,8 @@ x-app: &app
     DJANGO_HTTPS: "true"
     DJANGO_ALLOWED_HOSTS: ${BARRIO_DOMAIN},api,127.0.0.1,localhost
     DJANGO_CSRF_TRUSTED_ORIGINS: https://${BARRIO_DOMAIN}
+    # Private files of the capture button and the Galería; the image creates it owned by app (uid 10001).
+    MEDIA_ROOT: /app/media
   volumes:
     - ./conocimiento:/workspace:ro
   restart: unless-stopped
@@ -43,6 +45,8 @@ services:
   api:
     <<: *app
     command: ["sh", "-c", "python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 2 --timeout 120 --forwarded-allow-ips='*'"]
+    # Lists are not merged with the anchor: repeat the knowledge mount next to the media volume.
+    volumes: ["./conocimiento:/workspace:ro", "media:/app/media"]
     depends_on: {migrate: {condition: service_completed_successfully}}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
@@ -52,13 +56,15 @@ services:
   worker:
     <<: *app
     command: ["python", "manage.py", "runworker"]
+    # The worker reads the audio it transcribes: same media volume as the api.
+    volumes: ["./conocimiento:/workspace:ro", "media:/app/media"]
     depends_on: {api: {condition: service_healthy}}
     healthcheck:
       test: ["CMD", "python", "manage.py", "worker_health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    stop_grace_period: 180s
+    stop_grace_period: 330s  # a transcription may take up to ASSEMBLYAI_TIMEOUT_S (300 s)
   autopilot:
     <<: *app
     command: ["python", "manage.py", "autopiloto"]
@@ -85,5 +91,6 @@ services:
     logging: *logging
 volumes:
   knowledge-db:
+  media:
   caddy-data:
   caddy-config:

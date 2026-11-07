@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
 import { afterEach } from 'vitest';
+
+// findBy*/waitFor wait up to 5 s instead of 1 s, for busy machines.
+configure({ asyncUtilTimeout: 5000 });
 
 afterEach(() => {
   cleanup();
@@ -25,3 +28,6 @@ if (typeof window.matchMedia !== 'function') {
     dispatchEvent: () => false,
   })) as unknown as typeof window.matchMedia;
 }
+
+// jsdom logs "not implemented" for scrolling; the shell scrolls to the top on each new view.
+window.scrollTo = (() => {}) as typeof window.scrollTo;

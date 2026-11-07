@@ -308,7 +308,7 @@ class EditorialCircuitTests(EditorialBase):
         report=autopiloto.tick(self.autobot)
         proposal.refresh_from_db()
         self.assertEqual((report['reviewed'],report['execute'],proposal.state),(1,0,'approved'))  # waits for its hour
-        self.assertIn('pieza lista',self.notify.call_args.args[0])
+        self.assertIn('está lista',self.notify.call_args.args[0])
         self.arrive(piece)
         self.assertEqual(autopiloto.tick(self.autobot)['execute'],1);self.drain()
         proposal.refresh_from_db();execution=proposal.execution
@@ -345,7 +345,7 @@ class EditorialCircuitTests(EditorialBase):
         piece=self.plan(answers(final=INVENTED,verdict='blocked',findings=[finding]))
         self.assertEqual(piece.state,'blocked');self.assertIn('invented_experience',piece.note)
         self.assertFalse(ActionProposal.objects.filter(piece=piece).exists())
-        self.assertIn('bloqueada',self.notify.call_args.args[0])
+        self.assertIn('bloqueó',self.notify.call_args.args[0])
         # Even if the model reviewer missed it, the deterministic guard blocks first-person experience without public facts.
         again=self.plan(answers(final=INVENTED))
         self.assertEqual(again.state,'blocked');self.assertIn('sin hechos públicos confirmados',again.note)
@@ -407,7 +407,7 @@ class EditorialCircuitTests(EditorialBase):
         self.linkedin.state['fail_next']='uncertain_applied'
         autopiloto.tick(self.autobot);self.drain()
         proposal.refresh_from_db();self.assertEqual(proposal.state,'uncertain')
-        self.assertIn('incierta',self.notify.call_args.args[0])
+        self.assertIn('¿Salió o no?',self.notify.call_args.args[0])
         with patch('team_backend.operador._own_posts_reader',return_value=None):
             execution=operador.reconcile(self.gustavo,proposal.id)
         self.assertEqual(execution.state,'uncertain');self.assertIn('w_member_social',execution.note)

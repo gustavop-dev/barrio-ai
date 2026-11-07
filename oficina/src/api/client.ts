@@ -92,10 +92,15 @@ async function parseBody(response: Response): Promise<unknown> {
   return text;
 }
 
+/** A multipart body: the browser writes its Content-Type with the boundary, so the client must not set one. */
+function isFormData(body: unknown): body is FormData {
+  return typeof FormData !== 'undefined' && body instanceof FormData;
+}
+
 function send(path: string, { method = 'GET', body, signal }: RequestOptions): Promise<Response> {
   const upper = method.toUpperCase();
   const headers: Record<string, string> = { Accept: 'application/json' };
-  if (body !== undefined) headers['Content-Type'] = 'application/json';
+  if (body !== undefined && !isFormData(body)) headers['Content-Type'] = 'application/json';
   if (!SAFE_METHODS.has(upper)) {
     const token = readCookie('csrftoken');
     if (token) headers['X-CSRFToken'] = token;
@@ -103,7 +108,7 @@ function send(path: string, { method = 'GET', body, signal }: RequestOptions): P
   return fetch(path, {
     method: upper,
     headers,
-    body: body === undefined ? undefined : JSON.stringify(body),
+    body: body === undefined ? undefined : isFormData(body) ? body : JSON.stringify(body),
     credentials: 'same-origin',
     signal,
   });
@@ -151,4 +156,9 @@ export async function request<T>(path: string, options: RequestOptions = {}, ret
 export const api = {
   get: <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }),
   post: <T>(path: string, body?: unknown) => request<T>(path, { method: 'POST', body: body ?? {} }),
+  put: <T>(path: string, body: unknown) => request<T>(path, { method: 'PUT', body }),
+  patch: <T>(path: string, body: unknown) => request<T>(path, { method: 'PATCH', body }),
+  delete: <T = null>(path: string) => request<T>(path, { method: 'DELETE' }),
+  /** multipart/form-data upload (captures, gallery photos): CSRF header, no JSON Content-Type. */
+  postForm: <T>(path: string, form: FormData) => request<T>(path, { method: 'POST', body: form }),
 };

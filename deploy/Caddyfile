@@ -7,8 +7,15 @@
 		Strict-Transport-Security "max-age=31536000"
 		X-Content-Type-Options "nosniff"
 		Referrer-Policy "same-origin"
-		Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# The capture button records voice notes and takes photos from the PWA itself (same origin only).
+		Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
 		-Server
+	}
+
+	# Uploads of the capture button and the Galería: 25 MB of audio + 10 photos of 10 MB, with margin.
+	@uploads path /api/v1/capturas /api/v1/galeria
+	request_body @uploads {
+		max_size 130MB
 	}
 
 	@backend path /api/* /admin/* /static/* /health

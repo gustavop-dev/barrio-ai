@@ -539,3 +539,198 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
 | Pieza lista, publicada, bloqueada o descartada | `/calendario/pieza/<id>` |
 | Acción incierta, cuenta en pausa, LinkedIn caduca pronto | `/tu-turno` |
 | Pregunta nueva («{Rol} te pregunta: …») | `/tu-turno` |
+
+## Captura y Galería
+
+Backend: `agentes-linkedin/infra/docs/capturas-galeria.md`.
+- **Escrituras:** exigen sesión humana con CSRF (`X-CSRFToken`) y el permiso `approve_actions`. Un token de servicio recibe 403.
+- **Lecturas:** exigen `operate_linkedin`.
+- **Archivos:** nunca son públicos. Se piden con la misma cookie de sesión (`<audio src>` e `<img src>` del mismo origen) y responden con `Cache-Control: private`.
+
+### Enviar una captura
+
+**`POST /api/v1/capturas`** (`multipart/form-data`). Todos los campos son opcionales, pero no puede ir vacía:
+
+| Campo | Valor |
+| --- | --- |
+| `audio` | Un archivo de hasta 25 MB: webm/opus, mp4/m4a, ogg, mp3, aac, wav o flac. Se sube al guardar, no mientras se graba |
+| `audio_duration_s` | La duración que midió la PWA, en segundos (≤ 1800). Sirve para reservar el coste de la transcripción |
+| `fotos` | Varias partes con el mismo nombre, hasta 10 por envío y 10 MB cada una: JPEG, PNG, WebP o HEIC |
+| `nota` | Texto, hasta 4.000 caracteres |
+| `para` | `post` (Idea para un post), `dato` (Dato sobre mí), `respuesta` (Responde una pregunta) o `galeria` (Foto para la galería; exige fotos). Vacío: el equipo decide |
+| `contexto_tipo` y `contexto_id` | `pregunta` (una `TeamQuestion` abierta), `persona` (un contacto) o `pieza` (una pieza editorial), con su `id` |
+| `public_use` | `true` o `false`: la visibilidad elegida al responder una pregunta. Si no va, se usa la que sugiere la pregunta |
+
+**Respuestas:**
+- `201` con `CaptureOutput` en estado `recibida`; el trabajo `process_capture` queda encolado;
+- `400` si va vacía o tiene un tipo, tamaño o contexto inválido;
+- `409` si la pregunta ya no está abierta;
+- `413` si el cuerpo es demasiado grande.
+
+Tras el `201`, la PWA consulta `GET /api/v1/capturas/<id>` cada 2–3 s mientras el estado sea `recibida`, `transcribiendo` o `procesando`.
+
+**`CaptureOutput`:**
+
+```json
+{ "id": "uuid", "created_at": "iso", "note": "Esto es para el post del jueves",
+  "purpose": "post | dato | respuesta | galeria | null", "purpose_label": "Idea para un post | null",
+  "team_decided": { "purpose": "post | dato | galeria", "label": "Dato sobre mí", "reason": "Cuenta una preferencia suya." } | null,
+  "context": { "tipo": "pregunta | persona | pieza", "id": "uuid", "label": "¿Cuál fue tu primer agente en producción?" } | null,
+  "has_audio": true, "audio_duration_s": 42.0, "audio_mime": "audio/webm", "audio_url": "/api/v1/capturas/<id>/audio" | null,
+  "transcript": "Hoy en una llamada salió algo bueno…", "transcript_language": "es" | null,
+  "state": "recibida | transcribiendo | procesando | dato_guardado | anotado | idea | usado | sin_usar | error | deshecha",
+  "state_label": "Procesando",
+  "outcome": { "kind": "procesando", "text": "Mesa editorial lo está leyendo", "link": null },
+  "photos": [{ "id": "uuid", "url": "/api/v1/galeria/<id>/imagen" }],
+  "error": null, "undo_until": "iso", "can_undo": true }
+```
+
+- `team_decided` aparece cuando Gustavo no eligió «Para qué es» y el equipo lo clasificó. `outcome.reason` repite el motivo.
+- `audio_duration_s` pasa a ser la duración real cuando AssemblyAI termina.
+
+**Estados y lo que muestra la tarjeta (`outcome.text`):**
+
+| `state` | `state_label` | `outcome.text` | `outcome.link` |
+| --- | --- | --- | --- |
+| `recibida` | Recibida | El equipo lo recibió | — |
+| `transcribiendo` | Transcribiendo | Transcribiendo el audio | — |
+| `procesando` | Procesando | Mesa editorial lo está leyendo | — |
+| `dato_guardado` | Dato guardado | Está en Lo que el equipo sabe de ti · Público/Privado | `/tu-turno/sabe` |
+| `dato_guardado` (galería) | Dato guardado | Está en tu Galería | `/galeria` |
+| `anotado` (persona) | Anotado | Quedó en las notas de Ana Founder | `/personas/<id>` |
+| `anotado` (pieza) | Anotado | Quedó como comentario para el equipo en la pieza del jueves 12 | `/calendario/pieza/<id>` |
+| `idea` | En la mesa editorial | Mesa editorial lo tendrá en cuenta | — |
+| `usado` | Usado | El Director editorial lo usó en el brief del jueves 12 | `/calendario/pieza/<id>` |
+| `sin_usar` | Sin usar | Pasaron 14 días sin que encajara en un brief | — |
+| `error` | No se pudo procesar | No se pudo procesar (el detalle va en `error`) | — |
+| `deshecha` | Deshecha | Deshiciste este envío | — |
+
+### Historial, Deshacer y audio
+
+- **`GET /api/v1/capturas?estado=`** es «Lo que enviaste». Devuelve una lista paginada (`{count, next, previous, results}`) de `CaptureOutput`, la más reciente primero, sin las deshechas.
+- **`GET /api/v1/capturas/<id>`** devuelve una captura.
+- **`DELETE /api/v1/capturas/<id>`** es «Deshacer». Solo funciona durante 2 minutos (`undo_until`); después devuelve `409`. Hace cuatro cosas:
+  - cancela el trabajo si no había empezado;
+  - revierte lo creado: reabre la pregunta, retira el dato o quita la nota de la persona;
+  - borra el audio y las fotos;
+  - devuelve `200` con la captura en `deshecha`.
+- **`GET /api/v1/capturas/<id>/audio`** sirve el audio con su tipo y admite `Range` (206), así que funciona con `<audio>` en Safari.
+
+### Galería
+
+- **`GET /api/v1/galeria?filtro=todas|sin_usar|elegidas|publicadas`** devuelve una lista paginada de `PhotoOutput`, la más reciente primero. Un filtro desconocido da 400.
+  - `sin_usar` incluye las nuevas.
+  - `elegidas` incluye las editadas.
+- **`POST /api/v1/galeria`** (`multipart`, varias partes `fotos`) devuelve `201` con la lista de fotos creadas.
+- **`GET /api/v1/galeria/<id>`** devuelve una foto.
+- **`PATCH /api/v1/galeria/<id>`** recibe `{ "note": "…", "allow_ai_edit": false }` (cualquiera de los dos) y devuelve la foto.
+- **`DELETE /api/v1/galeria/<id>`** borra la foto y su archivo, y devuelve 204.
+- **`GET /api/v1/galeria/<id>/imagen`** sirve la imagen.
+
+**`PhotoOutput`:**
+
+```json
+{ "id": "uuid", "url": "/api/v1/galeria/<id>/imagen", "created_at": "iso",
+  "state": "sin_usar | elegida | editada | publicada", "display_state": "nueva | sin_usar | elegida | editada | publicada",
+  "label": "Elegida · dom 8", "tone": "info | muted | ok", "note": "Úsala en el post del domingo, la de la pizarra.",
+  "allow_ai_edit": true, "used_in": { "piece_id": "uuid", "date": "2026-11-08", "text": "Elegida para el post del domingo 8" } | null,
+  "capture_id": "uuid" | null, "mime": "image/jpeg", "size_bytes": 482113, "width": null, "height": null }
+```
+
+| `display_state` | `label` | `tone` |
+| --- | --- | --- |
+| `nueva` (sin usar y subida hace menos de 24 h) | Nueva | info |
+| `sin_usar` | Sin usar | muted |
+| `elegida` | Elegida · {día} | info |
+| `editada` | Editada con IA | ok |
+| `publicada` | Publicada · {fecha} | ok |
+
+Si `used_in` es `null`, la hoja muestra «Todavía sin usar». Por ahora las piezas publican solo texto: los estados `elegida`, `editada` y `publicada` llegarán con la fase de imagen.
+
+### Preferencias
+
+- **`GET /api/v1/ajustes/preferencias`** devuelve `{ "gallery_ai_edit_default": true, "updated_at": "iso" | null }`.
+- **`PATCH /api/v1/ajustes/preferencias`** recibe `{ "gallery_ai_edit_default": false }`. Es «El equipo puede editar mis fotos con IA», y cada foto nueva toma este valor por defecto.
+
+### Cambios en rutas existentes
+
+- **`GET /api/v1/editorial/pieces/<id>`** añade `team_comments`:
+
+  ```json
+  [{ "id": "uuid", "text": "…", "note": "…", "transcript": "…", "has_audio": true, "audio_url": "/api/v1/capturas/<id>/audio", "created_at": "iso", "by": "gustavo" }]
+  ```
+
+- **Notas de una persona.** Las que llegan por la captura llevan `"source": "captura"` y `"capture": "<id>"`.
+- **`GET /api/v1/ajustes`.** `ai_spend` añade `transcription_month_usd` (AssemblyAI).
+- **Escena.** El trabajo `process_capture` cuenta como `operador_cuenta` en `/api/v1/oficina/actividad`. Al rutear, `/api/v1/oficina/eventos` recibe una `entrega` desde `operador_cuenta` hacia quien recibe:
+  - `director_editorial` para ideas, fotos y comentarios de pieza;
+  - `posicionamiento` para los datos;
+  - el agente que hizo la pregunta, para una respuesta;
+  - `relaciones_comunidad` para las personas.
+
+## Notificaciones y prioridades de Tu turno (rev 18)
+
+Si solo Gustavo puede resolverlo, va a Tu turno; si no, va a Notificaciones, donde se guarda 7 días. La lógica está en `agentes-linkedin/infra/src/team_backend/notificaciones.py`.
+
+**`GET /api/v1/tu-turno`** suma estos campos:
+
+| Campo | Contenido |
+| --- | --- |
+| `priority` (en cada tarjeta) | `urgente` \| `importante` \| `cuando_puedas` |
+| `state` (en cada tarjeta) | `nueva` \| `vista` \| `pospuesta` \| `caducada` |
+| `items` | Todas las tarjetas activas, ordenadas por prioridad, luego por el plazo más cercano y luego por la más reciente |
+| `later` | Las pospuestas y las caducadas |
+| `count` | Las tarjetas en estado `nueva` o `vista` |
+| `critical` | Si alguna tarjeta es urgente |
+| `urgent_count` | Número de tarjetas urgentes |
+| `notifications_unread` | Notificaciones sin leer |
+
+Reglas de prioridad:
+- **Urgente:** acción incierta, LinkedIn caducado y máquina detenida desde la app.
+- **Importante:** LinkedIn caduca en 3 días o menos (antes de eso es Cuando puedas), cuenta en pausa y preguntas con plazo en menos de 48 h.
+- **Cuando puedas:** el resto de las preguntas.
+- **Parada desde el servidor:** ya no es una tarjeta, sino un elemento de `upcoming` en Notificaciones.
+
+**`POST /api/v1/tu-turno/vistos`** recibe `{ "ids": ["<id de tarjeta>"] }` y devuelve `{ "seen": n }`. Pasa las tarjetas de Nueva a Vista.
+
+**`GET /api/v1/notificaciones?filtro=todas|sin_leer`**
+
+```json
+{ "upcoming": [ { "id": "piece_scheduled:<piece>", "kind": "piece_scheduled | invites_expected | machine_paused_env", "layer": "publicaciones",
+                  "title": "Sale la pieza «…»", "detail": "Puedes vetarla en el detalle hasta las 08:30.", "link": "/calendario/pieza/<id>", "at": "iso" } ],
+  "items": [ { "id": "uuid", "kind": "piece_scheduled | piece_published | piece_blocked | piece_discarded | connection_fit | opportunity | observatory | capture_processed",
+               "layer": "tuyo | publicaciones | red | conversaciones | sistema", "title": "…", "detail": "…", "link": "/…", "at": "iso", "read": false } ],
+  "unread": 3 }
+```
+
+- Los elementos de `upcoming` se calculan en cada consulta y nunca cuentan como no leídos.
+- `capture_processed` enlaza a `/?enviado=1`, que abre «Lo que enviaste».
+
+**`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
+
+**Push.** `GET /api/v1/ajustes` suma `push_types: [{ kind, label, goes_to: "tu_turno" | "notificaciones", default, enabled }]`. `PATCH /api/v1/ajustes/preferencias` recibe `{ "push_disabled": ["kind", …] }`, opcionalmente junto con `gallery_ai_edit_default`, y responde 400 si hay un tipo desconocido o el cuerpo llega vacío. Las push de Tu turno llevan a `/tu-turno`; las de Notificaciones, a su `link`. Push activadas por defecto:
+
+| Va a | Tipos con push |
+| --- | --- |
+| Tu turno | Todos |
+| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked` y `machine_paused_env` |
+
+## Escena de la Oficina: feed de eventos
+
+**`GET /api/v1/oficina/eventos?desde=<iso>`** (permiso `operate_linkedin`) devuelve los eventos de trabajo real que mueven a los personajes, del más antiguo al más reciente. Sin `desde`, trae los de los últimos 10 minutos; como máximo trae 50.
+
+```json
+{ "events": [ { "id": 812, "ts": "iso", "tipo": "consulta_biblioteca | entrega | publicacion",
+                "rol": "copywriter_a", "destino": "biblioteca | <rol que recibe> | linkedin", "detalle": "Unidades del curso para la etapa redactor" } ],
+  "now": "iso" }
+```
+
+Cada evento lo emite el backend en un momento concreto:
+
+| Evento | Cuándo se emite |
+| --- | --- |
+| `consulta_biblioteca` | Antes de que una etapa editorial o el redactor de comentarios lea unidades del curso |
+| `entrega` | Al terminar una etapa (director → copywriter_a → lector_comprador → director → verificador → operador), al redactar un comentario (relaciones → operador) y al enrutar una captura (operador → quien la recibe) |
+| `publicacion` | Cuando LinkedIn confirma un post propio o un comentario |
+
+Un `desde` inválido devuelve 400.

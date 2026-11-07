@@ -117,8 +117,8 @@ describe('push payload (service worker)', () => {
       url: '/maquina',
       tag: 'pause',
     });
-    expect(parsePushPayload('texto plano')).toMatchObject({ title: 'Barrio AI', body: 'texto plano', url: '/' });
-    expect(parsePushPayload(null)).toMatchObject({ title: 'Barrio AI', url: '/' });
+    expect(parsePushPayload('texto plano')).toMatchObject({ title: '0ff1ce', body: 'texto plano', url: '/' });
+    expect(parsePushPayload(null)).toMatchObject({ title: '0ff1ce', url: '/' });
   });
 
   it('opens only same-origin URLs', () => {

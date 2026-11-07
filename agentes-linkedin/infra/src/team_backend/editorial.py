@@ -60,7 +60,7 @@ BRIEF_SCHEMA=_obj(decision=_enum(['write','skip']),skip_reason=_s(),primary_read
     pillar=_enum(PILLARS),thesis=_s(),approach=_enum(APPROACH_UNITS),format=_enum(['text_only']),reader_value=_s(),
     evidence=_arr(_obj(kind=_enum(['observed_post','public_fact','course_unit','general_knowledge']),ref=_s(),note=_s())),
     success_criterion=_s(),avoid=_arr(_s()),signals_used=_arr(_s()),citations=_arr(_s()),rationale=_s(),
-    questions_for_gustavo=_arr(_obj(question=_s(),purpose=_s(),memory_key=_s(),public=_b())))
+    questions_for_gustavo=_arr(_obj(question=_s(),purpose=_s(),memory_key=_s(),public=_b())),ideas_used=_arr(_s()))
 VARIANT=_obj(angle=_s(),text=_s(),claims=_arr(CLAIM),uncertainties=_arr(_s()))
 WRITER_SCHEMA=_obj(variant_a=VARIANT,variant_b=VARIANT,citations=_arr(_s()))
 ASSESSMENT=_obj(strengths=_arr(_s()),objections=_arr(_obj(text=_s(),severity=_enum(['material','preference','missing_data']))))
@@ -119,6 +119,10 @@ Cómo decidir:
   una experiencia real en el post del jueves»), memory_key es una clave corta en minúsculas (por ejemplo
   «experiencia.primer_agente_en_produccion») y public indica si esperas poder contarlo en público. No repitas
   claves de team_questions.open ni de team_questions.closed_keys. Si no hace falta, deja la lista vacía.
+- ideas_from_gustavo son ideas que Gustavo mandó con el botón de captura: tienen prioridad cuando encajan con la
+  dirección y el lector; pon en ideas_used el id de las que uses (vacía si ninguna). Son su punto de partida, no
+  hechos: nunca las cites como hechos salvo que sean hechos sobre él (y en público solo si están en public_facts).
+  feedback_from_gustavo son sus comentarios sobre piezas recientes: tenlos en cuenta.
 Cita en citations solo IDs de unidades del contexto.'''
 
 WRITER_SYSTEM=f'''Eres el equipo de redacción de Barrio AI, copywriter_a y copywriter_b (CONT-03). Con el mismo
@@ -291,7 +295,11 @@ def _stage(piece,name,payload,unit_ids=None):
     if not units:raise ValueError(f'Sin unidades del curso para la etapa {name}.')
     piece.stage=name;piece.save(update_fields=['stage','updated_at'])
     message=json.dumps(dict(payload,course_units=units),ensure_ascii=False,default=str)
+    from . import oficina_eventos
+    role=STAGE_ROLES.get(name,['director_editorial'])[0]
+    oficina_eventos.emit('consulta_biblioteca',role,'biblioteca',f'Unidades del curso para la etapa {name}')
     answer=providers.claude(system,message,max_tokens=max_tokens,output_schema=schema,effort=effort,purpose='editorial-'+name)
+    oficina_eventos.emit('entrega',role,oficina_eventos.NEXT_ROLE.get(name,''),f'Etapa {name} terminada')
     try:data=json.loads(answer['text'])
     except (json.JSONDecodeError,TypeError):raise ValueError(f'La etapa {name} no devolvió JSON válido.') from None
     if not isinstance(data,dict):raise ValueError(f'La etapa {name} no devolvió un objeto.')
@@ -336,7 +344,6 @@ def prepare(user,slot,origin_job=''):
         _close(piece,EditorialPiece.State.FAILED,'Error interno en la preparación; no se repite el gasto.');raise
 
 def _run(piece,user,now,origin_job):
-    from .alerts import notify
     public,private=guardas.blocks()
     signals=_signals(now);history,mix=_history(now)
     memory={'public_facts':public,'private_guidance':private,'orientation':orientacion.text()}
@@ -344,8 +351,14 @@ def _run(piece,user,now,origin_job):
     from . import preguntas
     asked={'open':[{'question':q.question,'memory_key':q.memory_key} for q in TeamQuestion.objects.filter(state='open')[:20]],
            'closed_keys':sorted(preguntas.closed_keys()|{q for q in TeamQuestion.objects.filter(state='answered').values_list('memory_key',flat=True)})}
+    from . import capturas
+    ideas=capturas.ideas_for_director(now)
     brief,_=_stage(piece,'director',dict(memory,slot={'date':piece.slot_date,'weekday':piece.slot_date.strftime('%A')},
-                   signals={'observed_posts':signals},history=history,modality_mix_30d=mix,team_questions=asked))
+                   signals={'observed_posts':signals},history=history,modality_mix_30d=mix,team_questions=asked,
+                   ideas_from_gustavo=ideas,feedback_from_gustavo=capturas.feedback_for_director(now)))
+    offered={i['id'] for i in ideas}
+    used=[i for i in (brief.get('ideas_used') or []) if isinstance(i,str) and i in offered]
+    if used:capturas.mark_used(used,piece)
     for item in (brief.get('questions_for_gustavo') or [])[:2]:
         if isinstance(item,dict):
             preguntas.ask('director_editorial',item.get('question'),item.get('purpose'),item.get('memory_key'),
@@ -377,8 +390,9 @@ def _run(piece,user,now,origin_job):
                             blocking_reasons=reasons,text_sha256=hashlib.sha256(final.encode()).hexdigest())
     piece.save(update_fields=['verification','updated_at'])
     if reasons:
-        notify('Barrio AI: pieza bloqueada',f'El verificador bloqueó la pieza del {piece.slot_date:%d/%m}: {reasons[0][:160]}',
-               url=f'/calendario/pieza/{piece.id}',tag='barrio-pieza')
+        from .notificaciones import avisar
+        avisar('piece_blocked',f'El verificador bloqueó la pieza del {piece.slot_date:%d/%m}',reasons[0][:300],
+               link=f'/calendario/pieza/{piece.id}',ref=f'piece_blocked:{piece.id}')
         return _close(piece,EditorialPiece.State.BLOCKED,'; '.join(reasons))
     risks=[f'Observación menor: {f.get("detail") or f.get("issue")}' for f in review.get('findings',[]) if f.get('severity')=='minor']
     risks+=[f'Objeción conservada: {o}' for o in selection.get('kept_objections',[])]

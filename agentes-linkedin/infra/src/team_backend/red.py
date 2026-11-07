@@ -363,7 +363,8 @@ def sync(user,account,now=None):
     try:
         for contact in settle:
             profile=_refresh(account,connector,contact)
-            if contact.stage=='connected':summary['connected']+=1
+            if contact.stage=='connected':
+                summary['connected']+=1;notify_connection(contact,f'{contact.display_name} aceptó tu invitación')
             elif contact.stage in ('invited','incoming') and profile.get('relation_request_status')!='PENDING':
                 _stage(contact,'closed','closed','La invitación ya no está pendiente y no hay conexión.');contact.save();summary['closed']+=1
     except ReadCapReached as exc:summary['stopped']=str(exc)
@@ -432,6 +433,7 @@ def on_confirmed(proposal,execution):
         _stage(contact,'invited','invited','Invitación sin nota enviada.')
     elif proposal.capability==RED.ACCEPT:
         contact.connected_at=now;contact.network_distance='FIRST_DEGREE';_stage(contact,'connected','connected','Aceptaste su invitación.')
+        notify_connection(contact,f'Aceptaste la invitación de {contact.display_name}')
     contact.save()
 
 @transaction.atomic
@@ -457,6 +459,15 @@ def discard(user,contact_id,note_text):
         _stage(contact,'discarded','discarded',note_text.strip());contact.save()
         operador._audit(user,'network.contact_discarded',contact.id)
     return contact
+
+ROLE_LABELS={'par':'Par','recomendador':'Recomendador','lider':'Líder','comprador':'Comprador','divulgador':'Divulgador','aliado':'Aliado'}
+
+def notify_connection(contact,title):
+    """Notificaciones: a new connection that fits (no push by default)."""
+    if not (contact.classification or {}).get('fit'):return
+    from .notificaciones import avisar
+    role=ROLE_LABELS.get(contact.classification.get('role'),'')
+    avisar('connection_fit',title,' · '.join(x for x in (contact.headline[:120],role) if x),link=f'/personas/{contact.id}',ref=f'connection:{contact.id}')
 
 def network_issues(proposal):
     """Autonomous gate for RED-*: the person still fits, nothing extra is sent, LinkedIn has not pushed back."""

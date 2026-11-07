@@ -1,0 +1,25 @@
+// Shared components of the 0ff1ce office. Styles in src/styles/ui.css.
+export { AgentPortrait, portraitStyle, roleName, type AgentPortraitProps, type PortraitSize } from './AgentPortrait';
+export { Avatar, initials } from './Avatar';
+export { Badge, type BadgeProps, type Tone } from './Badge';
+export { BeforeAfter, type BeforeAfterProps } from './BeforeAfter';
+export { Button, ButtonLink, buttonClass, type ButtonProps, type ButtonVariant } from './Button';
+export { Card, type CardProps } from './Card';
+export { ChipStrip, FilterChip, LabelChip, type ChipStripProps, type FilterChipProps, type LabelChipProps } from './Chips';
+export { ConfirmModal, type ConfirmModalProps } from './ConfirmModal';
+export { charCount, copyText } from './copy';
+export { CopyButton, type CopyButtonProps } from './CopyButton';
+export { EmptyState, type EmptyStateProps } from './EmptyState';
+export { ErrorNote, ErrorRetry, errorMessage, isConflict, type ErrorRetryProps } from './ErrorRetry';
+export { EXTERNAL_HINT_ID, ExternalLink, isHttps, type ExternalLinkProps } from './ExternalLink';
+export { Funnel, type FunnelProps, type FunnelStep } from './Funnel';
+export { KpiCard, kpiDelta, sparklinePoints, type KpiCardProps, type KpiUnit } from './KpiCard';
+export { Loading } from './legacy';
+export { Meter, meterTone, type MeterProps, type MeterTone } from './Meter';
+export { Modal, type ModalProps } from './Modal';
+export { Note, type NoteProps, type NoteTone } from './Note';
+export { APP_NAME, Page, Section, Segmented, TabBar, usePageTitle, type PageProps, type SectionProps, type SegmentedProps, type TabBarProps } from './Page';
+export { Skeleton, type SkeletonProps } from './Skeleton';
+export { StageTrack, type Stage, type StageState, type StageTrackProps } from './StageTrack';
+export { LAYER_COLOR, LAYER_LABEL, Timeline, TimelineItem, type TimelineItemProps } from './Timeline';
+export { ToastProvider, useToast, type ToastApi, type ToastOptions } from './Toast';

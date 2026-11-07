@@ -1,0 +1,612 @@
+/* Capture button, hold-to-record overlay and capture sheet (Captura.dc.html), plus the generic
+   sheet the Galería reuses. Tokens only. */
+
+/* ------------------------------------------------------------ generic sheet */
+
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 45; /* over the bars (30), under modals (50) and the toast (60) */
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  background: rgb(30 30 43 / 0.45);
+}
+.sheet {
+  max-height: 94vh;
+  max-height: 94dvh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px 16px calc(16px + var(--safe-bottom));
+  background: var(--color-superficie);
+  border-radius: 16px 16px 0 0;
+}
+.sheet:focus {
+  outline: none;
+}
+@media (min-width: 640px) {
+  .sheet-backdrop {
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+  }
+  .sheet {
+    width: min(560px, 100%);
+    max-height: 90vh;
+    max-height: 90dvh;
+    padding: 16px 24px 24px;
+    border-radius: 16px;
+  }
+}
+
+/* ------------------------------------------------------------ capture button (mobile bar) */
+
+.capture-slot {
+  position: relative;
+}
+/* .capture-slot raises the specificity over ui.css (loaded later). */
+.capture-slot .capture-button {
+  position: relative;
+  z-index: 2;
+  touch-action: none;
+  transition:
+    width 0.15s ease,
+    height 0.15s ease,
+    margin-top 0.15s ease;
+}
+.capture-slot .capture-button.holding {
+  width: 72px;
+  height: 72px;
+  margin-top: -34px;
+}
+
+/* First use: «Mantén oprimido para grabar. Toca para foto o nota.» */
+.cap-hint {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--nav-h) + var(--safe-bottom) + 32px);
+  z-index: 1;
+  transform: translateX(-50%);
+  width: 260px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-tinta);
+  color: var(--color-papel);
+  font-size: 14px;
+  line-height: 20px;
+  text-align: center;
+  pointer-events: none;
+}
+
+/* While holding: lock above, the recording strip over the bar. */
+.cap-hold {
+  position: relative;
+  z-index: 1;
+}
+.cap-lock {
+  position: fixed;
+  left: 50%;
+  bottom: calc(150px + var(--safe-bottom));
+  width: 64px;
+  padding: 12px 0;
+  border: 1px solid var(--color-linea);
+  border-radius: var(--radius-pill);
+  background: var(--color-superficie);
+  color: var(--color-tinta);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+.cap-lock-hint {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(126px + var(--safe-bottom));
+  margin: 0;
+  text-align: center;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta);
+  pointer-events: none;
+}
+/* Readable over the office scene too. */
+.cap-lock-hint span {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--color-superficie);
+}
+.cap-holdbar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: calc(var(--nav-h) + var(--safe-bottom));
+  height: 56px;
+  padding: 0 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--color-superficie);
+  border-top: 1px solid var(--color-linea);
+}
+.cap-dot {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  border-radius: var(--radius-pill);
+  background: var(--color-alerta);
+  animation: cap-punto 1s ease-in-out infinite;
+}
+.cap-holdtime {
+  width: 44px;
+  flex: none;
+  font-size: 16px;
+  line-height: 24px;
+  font-variant-numeric: tabular-nums;
+}
+.cap-cancel-hint {
+  flex: none;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+
+/* ------------------------------------------------------------ wave */
+
+.cap-wave {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  overflow: hidden;
+}
+.cap-wave span {
+  flex: 1;
+  min-width: 2px;
+  border-radius: 2px;
+  background: var(--color-0ff1ce-hondo);
+}
+.cap-wave.suave span {
+  background: var(--color-tinta-suave);
+}
+
+/* ------------------------------------------------------------ sheet: header */
+
+.cap-sheet-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cap-handle {
+  width: 40px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--color-linea);
+  align-self: center;
+}
+@media (min-width: 640px) {
+  .cap-handle {
+    display: none;
+  }
+}
+.cap-headrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.cap-histlink {
+  margin-left: auto;
+  min-height: 44px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--color-0ff1ce-hondo);
+  font-size: 14px;
+  line-height: 20px;
+}
+.cap-histlink:hover {
+  text-decoration: underline;
+}
+.cap-close,
+.cap-context-remove,
+.cap-remove {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-tinta-suave);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cap-close {
+  margin-right: -8px;
+}
+.cap-close:hover {
+  background: var(--color-papel);
+  color: var(--color-tinta);
+}
+
+/* ------------------------------------------------------------ sheet: form */
+
+.cap-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.cap-context {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 4px 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-0ff1ce-claro);
+}
+.cap-context-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.cap-context-eyebrow {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-0ff1ce-hondo);
+}
+.cap-context-remove {
+  color: var(--color-0ff1ce-hondo);
+}
+
+/* Recording, locked: the pulsing 0ff1ce ball. */
+.cap-recording {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0 8px;
+}
+.cap-ball {
+  width: 112px;
+  height: 112px;
+  border-radius: var(--radius-pill);
+  background: var(--color-0ff1ce);
+  color: var(--color-on-0ff1ce);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cap-pulse {
+  animation: cap-latido 1.4s ease-out infinite;
+}
+.cap-bigtime {
+  font-size: 32px;
+  line-height: 40px;
+  font-variant-numeric: tabular-nums;
+}
+.cap-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+.cap-rec-actions {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+.cap-rec-btn {
+  min-height: 56px;
+  border: 1px solid var(--color-tinta-suave);
+  border-radius: var(--radius-md);
+  background: var(--color-superficie);
+  color: var(--color-tinta);
+  font-size: 14px;
+  line-height: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+}
+.cap-rec-btn.discard {
+  border-color: var(--color-alerta);
+  color: var(--color-alerta);
+}
+.cap-rec-btn.finish {
+  border-color: var(--color-tinta);
+  background: var(--color-tinta);
+  color: var(--color-papel);
+}
+.cap-rec-btn:disabled {
+  border-color: var(--color-linea);
+  background: var(--color-linea);
+  color: var(--color-tinta-suave);
+  cursor: not-allowed;
+}
+
+/* Finished audio: Escuchar, wave, duration, Quitar. */
+.cap-audio-done {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--color-linea);
+  border-radius: var(--radius-md);
+}
+.cap-play {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-0ff1ce);
+  color: var(--color-on-0ff1ce);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cap-duration {
+  flex: none;
+  font-size: 14px;
+  line-height: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.cap-remove {
+  color: var(--color-alerta);
+}
+
+/* No audio yet. */
+.cap-record {
+  min-height: 56px;
+  border: 1px dashed var(--color-tinta-suave);
+  border-radius: var(--radius-md);
+  background: var(--color-superficie);
+  color: var(--color-tinta);
+  font-size: 16px;
+  line-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+.cap-record-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-pill);
+  background: var(--color-0ff1ce);
+  color: var(--color-on-0ff1ce);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Photos. */
+.cap-photos {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: var(--radius-md);
+}
+.cap-photos.dragging {
+  outline: 2px dashed var(--color-0ff1ce-hondo);
+  outline-offset: 4px;
+}
+.cap-photo-buttons {
+  display: flex;
+  gap: 8px;
+}
+.cap-photo-pick {
+  position: relative;
+  flex: 1;
+  min-height: 56px;
+  border: 1px solid var(--color-tinta-suave);
+  border-radius: var(--radius-md);
+  background: var(--color-superficie);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 24px;
+}
+.cap-photo-pick:hover {
+  background: var(--color-papel);
+}
+.cap-photo-pick:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.cap-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+.cap-thumbs {
+  list-style: none;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  padding: 2px 0;
+}
+.cap-thumb {
+  position: relative;
+  width: 72px;
+  height: 72px;
+  flex: none;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-linea);
+}
+.cap-thumb img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cap-thumb button {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--color-tinta);
+  color: var(--color-papel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cap-note {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Visibility of an answer (a question in context). */
+.cap-visibility {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cap-visibility legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+.cap-radio {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  min-height: 44px;
+  cursor: pointer;
+}
+.cap-radio input {
+  margin-top: 2px;
+  flex: none;
+}
+.cap-radio > span {
+  display: flex;
+  flex-direction: column;
+}
+
+.cap-purpose {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.cap-foot {
+  text-align: center;
+}
+
+/* ------------------------------------------------------------ «Lo que enviaste» */
+
+.cap-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.cap-back {
+  align-self: flex-start;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-tinta);
+  font-size: 16px;
+  line-height: 24px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cap-sent-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.card.cap-sent {
+  padding: 12px;
+  gap: 8px;
+}
+.cap-sent-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.cap-sent-text {
+  font-size: 16px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+.cap-sent-state {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.cap-sent-state p {
+  flex: 1;
+  min-width: 0;
+}
+.cap-sent-error {
+  color: var(--color-alerta);
+}
+.cap-sent-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ------------------------------------------------------------ motion */
+
+@keyframes cap-latido {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--color-0ff1ce) 60%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 26px color-mix(in srgb, var(--color-0ff1ce) 0%, transparent);
+  }
+}
+@keyframes cap-punto {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cap-pulse,
+  .cap-dot {
+    animation: none;
+  }
+  .capture-slot .capture-button {
+    transition: none;
+  }
+}

@@ -90,7 +90,6 @@ def content_issues(proposal):
 
 def policy_review(proposal):
     """Approve or discard a pending proposal according to the autonomy policy."""
-    from .alerts import notify
     mode=autonomy(proposal.capability)
     if mode=='approval':return proposal
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)
@@ -110,8 +109,9 @@ def policy_review(proposal):
         proposal.save(update_fields=['state','risks','decided_at','decision_note','review'])
         operador._audit(None,'operator.policy_discarded',proposal.id,issues=issues)
         if proposal.piece_id:
-            notify('Barrio AI: pieza descartada',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}: {"; ".join(issues)[:200]}',
-                   url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
+            from .notificaciones import avisar
+            avisar('piece_discarded',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}','; '.join(issues)[:300],
+                   link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_discarded:{proposal.id}')
         return proposal
     if proposal.payload_hash!=operador.current_hash(proposal):
         proposal.state=ActionProposal.State.DISCARDED;proposal.decision_note='Hash inconsistente; descartada'
@@ -123,8 +123,9 @@ def policy_review(proposal):
     operador._audit(None,'operator.policy_approved',proposal.id,payload_hash=proposal.payload_hash)
     if proposal.piece_id:
         when=proposal.piece.scheduled_for.astimezone(operador.local_tz())
-        notify('Barrio AI: pieza lista',f'Se publicará el {when:%d/%m a las %H:%M}. Puedes vetarla en la oficina antes de esa hora.',
-               url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
+        from .notificaciones import avisar
+        avisar('piece_scheduled',f'La pieza del {when:%d/%m} está lista',f'Sale a las {when:%H:%M}. Puedes vetarla en el detalle hasta esa hora.',
+               link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_scheduled:{proposal.id}')
     return proposal
 
 def llm_spent_today(now=None,purpose='propose-comment'):

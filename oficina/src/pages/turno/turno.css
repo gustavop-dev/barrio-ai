@@ -1,0 +1,313 @@
+/* Tu turno (TuTurno.dc.html): cards by priority, the question form and «Lo que el equipo sabe de ti». */
+
+.turno-view {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.turno-groups,
+.turno-sabe {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.turno-sabe {
+  gap: 12px;
+}
+
+/* ------------------------------------------------------------ card */
+
+.turno-card {
+  /* Anchored from the pause banner, the Oficina and push: clear the sticky top bar. */
+  scroll-margin-top: calc(var(--topbar-h) + var(--safe-top) + 16px);
+}
+.turno-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+.turno-type {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-tinta-suave);
+}
+.turno-type svg {
+  flex: none;
+}
+.turno-type[data-tone='alerta'] {
+  color: var(--color-alerta);
+}
+.turno-type[data-tone='info'] {
+  color: var(--color-info);
+}
+.turno-type[data-tone='hondo'] {
+  color: var(--color-0ff1ce-hondo);
+}
+.turno-badges {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.turno-deadline {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta);
+}
+.turno-deadline.soon {
+  color: var(--color-alerta);
+}
+.turno-title {
+  font-size: 22px;
+  line-height: 30px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+.turno-body {
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--color-tinta);
+  overflow-wrap: anywhere;
+}
+.turno-body.suave,
+.turno-meta,
+.turno-intro {
+  color: var(--color-tinta-suave);
+}
+.turno-meta {
+  font-size: 14px;
+  line-height: 20px;
+}
+.turno-intro {
+  font-size: 16px;
+  line-height: 24px;
+}
+.turno-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.turno-block.wide {
+  gap: 8px;
+}
+.turno-block .extlink {
+  align-self: flex-start;
+}
+.turno-label {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--color-tinta-suave);
+}
+.turno-proposed {
+  padding: 12px;
+  background: var(--color-0ff1ce-claro);
+  border-radius: var(--radius-sm);
+  font-size: 16px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+
+/* Main buttons full width on mobile; side by side, auto width, on desktop. */
+.turno-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.turno-ghosts {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.turno-ghosts .btn.ghost {
+  padding: 0 8px;
+}
+@media (min-width: 900px) {
+  .turno-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .turno-actions > .btn.block {
+    width: auto;
+  }
+  .turno-actions > .note {
+    flex-basis: 100%;
+  }
+}
+
+/* ------------------------------------------------------------ question form */
+
+.turno-question {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.turno-question fieldset,
+.turno-options {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.turno-legend {
+  padding: 0 0 8px;
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-tinta-suave);
+}
+.turno-yesno-options {
+  display: flex;
+  gap: 8px;
+}
+.turno-pill {
+  flex: 1;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid var(--color-tinta-suave);
+  border-radius: var(--radius-sm);
+  background: var(--color-superficie);
+  font-size: 16px;
+  cursor: pointer;
+}
+.turno-pill:has(input:checked) {
+  background: var(--color-0ff1ce-claro);
+  border-color: var(--color-0ff1ce-hondo);
+}
+.turno-pill:has(input:focus-visible),
+.turno-option:has(input:focus-visible) {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.turno-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.turno-option {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 10px 12px;
+  border: 1px solid var(--color-linea);
+  border-radius: var(--radius-sm);
+  background: var(--color-superficie);
+  cursor: pointer;
+}
+.turno-option input {
+  flex: none;
+  margin-top: 2px;
+}
+.turno-option:has(input:checked) {
+  border-color: var(--color-tinta-suave);
+}
+.turno-option-text {
+  display: flex;
+  flex-direction: column;
+  font-size: 16px;
+  line-height: 24px;
+}
+.turno-option-hint {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+fieldset:disabled .turno-option,
+fieldset:disabled .turno-pill {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+/* ------------------------------------------------------------ folds */
+
+.turno-folds {
+  border-bottom: 1px solid var(--color-linea);
+}
+.turno-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.turno-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-linea);
+}
+.turno-row-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 16px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+.turno-row .badge {
+  white-space: normal;
+  text-align: right;
+}
+.turno-explain {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta);
+}
+
+/* ------------------------------------------------------------ Lo que el equipo sabe de ti */
+
+.turno-facts {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.card.turno-fact {
+  gap: 8px;
+}
+.turno-fact .turno-head {
+  align-items: flex-start;
+  flex-wrap: nowrap;
+}
+.turno-fact .turno-label {
+  overflow-wrap: anywhere;
+}
+.turno-fact-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.turno-search {
+  position: relative;
+}
+.turno-search input {
+  padding-left: 40px;
+}
+.turno-search-icon {
+  position: absolute;
+  left: 12px;
+  top: 14px;
+  display: flex;
+  color: var(--color-tinta-suave);
+  pointer-events: none;
+}

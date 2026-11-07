@@ -4,7 +4,9 @@ import { BrowserRouter } from 'react-router-dom';
 import { registerSW } from 'virtual:pwa-register';
 import { createQueryClient } from './api/queryClient';
 import { App } from './App';
+import './styles/tokens.css';
 import './styles/global.css';
+import './styles/ui.css';
 
 registerSW({ immediate: true });
 

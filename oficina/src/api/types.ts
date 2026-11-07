@@ -248,6 +248,41 @@ export interface Contact extends ContactBrief {
   discovered_at: string;
   updated_at: string;
   open_action: ContactOpenAction | null;
+  // Redesign fields (absent on older backends).
+  /** Stage as shown in Personas: the contact stage, or `opportunity` while it has an open opportunity. */
+  display_stage?: DisplayStage;
+  notes?: ContactNote[];
+  opportunity?: ContactOpportunity | null;
+  next_step?: ContactNextStep | null;
+  /** True when the person has an item in Tu turno («Te toca»). */
+  your_turn?: boolean;
+  last_event?: ContactHistoryEntry | null;
+}
+
+/** Contact stage plus `opportunity` (an open opportunity), the stages Personas shows. */
+export type DisplayStage = ContactStage | 'opportunity';
+
+export interface ContactNote {
+  id: string;
+  at: string;
+  text: string;
+  by: string;
+}
+
+export interface ContactOpportunity {
+  id: string;
+  stage: OpportunityStage;
+  stage_label: string;
+  modality: string;
+  next_action: string;
+  next_action_at: string | null;
+}
+
+export interface ContactNextStep {
+  owner: 'equipo' | 'gustavo' | null;
+  text: string;
+  at: string | null;
+  action?: { id: string; capability: Capability; state: ActionState } | null;
 }
 
 export type AutonomyMode = 'auto' | 'approval' | 'off';
@@ -262,7 +297,8 @@ export type NetworkRead = 'comments' | 'search' | 'profile' | 'sync';
 export interface RedSummary {
   /** False when the block is off (`NETWORK_ENABLED=false`). */
   enabled: boolean;
-  stages: Partial<Record<ContactStage, number>>;
+  /** `opportunity` counts open opportunities; `conversation` is null until the inbox arrives. */
+  stages: Partial<Record<ContactStage, number>> & { opportunity?: number; conversation?: number | null };
   capacity: Partial<Record<NetworkCapability, NetworkCapacity>>;
   reads_today: Partial<Record<NetworkRead, number>>;
   read_caps: Partial<Record<NetworkRead, number>>;
@@ -445,7 +481,33 @@ export interface StageUsage {
 /** APRE-01: impressions read through Unipile when the publication is reconciled. Missing is not zero. */
 export interface PieceMetrics {
   impressions?: number | null;
+  reactions?: number | null;
+  comments?: number | null;
+  reposts?: number | null;
+  observed_at?: string | null;
   source?: string;
+  unipile_post_id?: string | null;
+  share_url?: string | null;
+}
+
+/** Cut of a published piece at the same age as the others (24 h, 72 h, 7 days). Missing is not zero. */
+export interface PieceSnapshot {
+  kind: '24h' | '72h' | '7d';
+  impressions: number | null;
+  reactions: number | null;
+  comments: number | null;
+  reposts: number | null;
+  engagement_pct: number | null;
+  captured_at: string;
+  age_hours: number;
+}
+
+export interface PieceCommenter {
+  provider_user_id: string;
+  name: string;
+  substantive: boolean;
+  role: string | null;
+  fit: boolean | null;
 }
 
 export interface PieceDetail extends PieceSummary {
@@ -459,8 +521,12 @@ export interface PieceDetail extends PieceSummary {
   signals: Signal[];
   usage: StageUsage[];
   action_detail: Action | null;
-  /** Not serialized by the current backend; shown only if it ever arrives. */
+  /** Last values read from the post. */
   metrics?: PieceMetrics | null;
+  /** Cuts at 24 h, 72 h and 7 days. */
+  snapshots?: PieceSnapshot[];
+  /** Who commented; null when the comments were never read. */
+  commenters?: PieceCommenter[] | null;
 }
 
 export interface PlanResponse {
@@ -499,6 +565,8 @@ export interface Referent {
   active?: boolean;
   created_at?: string;
   last_observed_at?: string | null;
+  /** People of the barrio discovered in this referent's posts. */
+  contacts_count?: number;
 }
 
 export interface Job {
@@ -560,4 +628,520 @@ export interface RoleActivity {
 export interface Activity {
   updated_at: string;
   roles: Record<string, RoleActivity>;
+}
+
+// ================================================================ redesign (CONTRATO-API «Rediseño»)
+
+// ---------------------------------------------------------------- Tu turno
+
+export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion';
+export type TurnoTone = 'bad' | 'warn' | 'info' | 'ok' | 'muted';
+
+/** A card action: either a POST (`endpoint` + `body`, plus `note` when `note_required`) or a full navigation (`href`). */
+export interface TurnoAction {
+  label: string;
+  endpoint?: string;
+  body?: Record<string, unknown>;
+  note_required?: boolean;
+  href?: string;
+  primary?: boolean;
+}
+
+/** What an `uncertain` action tried to do. */
+export interface TurnoAttempt {
+  capability: Capability | string;
+  label: string;
+  text: string | null;
+  reaction: string | null;
+  target: { kind: 'post' | 'person' | 'own'; name: string; url: string | null } | null;
+  at: string | null;
+  url: string | null;
+}
+
+export interface TurnoCard {
+  /** `linkedin_expired`, `linkedin_expiring`, `uncertain:<id>`, `machine_paused`, `machine_paused_env`, `account_paused:<id>`, `question:<id>`. */
+  id: string;
+  type: TurnoCardType;
+  critical: boolean;
+  tone: TurnoTone;
+  /** Role id of the agent asking (scene/roles.ts); system notices use `operador_cuenta`. */
+  agent: string;
+  agent_label: string;
+  title: string;
+  body: string;
+  deadline: string | null;
+  created_at: string | null;
+  actions: TurnoAction[];
+  /** Only on `uncertain` notices. */
+  attempt?: TurnoAttempt | null;
+  /** Only on questions. */
+  question?: Question | null;
+  /** rev 18 priority group (being added to the backend). */
+  priority?: TurnoPriority;
+  /** rev 18 state: nueva and vista count, pospuesta and caducada go in `later` (being added to the backend). */
+  state?: TurnoState;
+}
+
+export type TurnoPriority = 'urgente' | 'importante' | 'cuando_puedas';
+export type TurnoState = 'nueva' | 'vista' | 'pospuesta' | 'caducada';
+
+export interface TurnoRecent {
+  kind: 'question' | 'alert' | string;
+  id: string;
+  title: string;
+  at: string;
+  /** «Respondida», «No quisiste compartirla», «Confirmaste que se aplicó», «Reconectado», «Reanudada». */
+  how: string;
+}
+
+export interface DoneToday {
+  posts: number;
+  comments: number;
+  reactions: number;
+  follows: number;
+  invites: number;
+  accepts: number;
+}
+
+/** GET /api/v1/tu-turno. */
+export interface TuTurno {
+  /** Notices + open questions + tasks (not postponed or expired questions). */
+  count: number;
+  /** Any critical notice: the counter turns alerta. */
+  critical: boolean;
+  counts: { avisos: number; preguntas: number; tareas: number };
+  /** The most urgent item, for the Oficina card. */
+  top: TurnoCard | null;
+  alerts: TurnoCard[];
+  questions: TurnoCard[];
+  /** Postponed or expired questions (muted tone). */
+  later: TurnoCard[];
+  tasks: { perfil: TurnoCard[]; conversaciones: TurnoCard[] };
+  recent: TurnoRecent[];
+  summary: { done_today: DoneToday; next_piece: { id: string; scheduled_for: string } | null };
+  /** Unread items in Notificaciones, for the bell dot (being added to the backend). */
+  notifications_unread?: number;
+  /** Every active card, ordered by priority, nearest deadline, most recent (being added to the backend). */
+  items?: TurnoCard[];
+  /** Cards with priority urgente (being added to the backend). */
+  urgent_count?: number;
+}
+
+// ---------------------------------------------------------------- team questions
+
+export type QuestionAnswerType = 'text' | 'yes_no' | 'choice' | 'number' | 'date';
+export type QuestionState = 'open' | 'answered' | 'declined';
+
+export interface Question {
+  id: string;
+  /** ask: open question; confirm: confirm or correct a proposed value. */
+  kind: 'ask' | 'confirm';
+  agent: string;
+  agent_label: string;
+  question: string;
+  purpose: string;
+  answer_type: QuestionAnswerType;
+  options: string[];
+  memory_key: string;
+  proposed_value: { texto?: string; uso_publico?: boolean } | Record<string, unknown> | null;
+  suggested_public: boolean;
+  deadline: string | null;
+  postponed_until: string | null;
+  pending: boolean;
+  expired: boolean;
+  /** `piece:<id>` or `memoria`. */
+  origin: string;
+  state: QuestionState;
+  answer: string;
+  public_use: boolean | null;
+  answered_at: string | null;
+  created_at: string;
+}
+
+/**
+ * POST /api/v1/preguntas/<id>/responder. text: `text`; yes_no: `value` si|no and optional `text`;
+ * choice: `value` (one of `options`) and optional `text`; number and date: `value` (AAAA-MM-DD).
+ * kind=confirm: `accept: true` confirms the proposed value, `text` corrects it.
+ */
+export interface QuestionAnswer {
+  text?: string;
+  value?: string;
+  public_use?: boolean | null;
+  accept?: boolean;
+}
+
+// ---------------------------------------------------------------- what the team knows
+
+export interface MemoryFact {
+  key: string;
+  topic: string;
+  text: string;
+  public_use: boolean;
+  version: number;
+  /** Shown as «v{edits}»: v2 means it was edited once. */
+  edits: number;
+  origin: { kind: 'question' | 'manual' | 'memoria'; agent?: string | null; agent_label?: string | null; question?: string | null };
+  updated_at: string;
+}
+
+export interface NewMemoryFact {
+  text: string;
+  public_use: boolean;
+  topic?: string;
+}
+
+export interface Orientation {
+  text: string;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
+// ---------------------------------------------------------------- calendar
+
+export type CalendarLayer = 'tuyo' | 'publicaciones' | 'red' | 'conversaciones' | 'sistema';
+export const CALENDAR_LAYERS: readonly CalendarLayer[] = ['tuyo', 'publicaciones', 'red', 'conversaciones', 'sistema'];
+
+export type CalendarEventKind =
+  | 'piece_published'
+  | 'piece_scheduled'
+  | 'piece_preparing'
+  | 'piece_skipped'
+  | 'piece_blocked'
+  | 'piece_failed'
+  | 'piece_uncertain'
+  | 'piece_vetoed'
+  | 'piece_discarded'
+  | 'piece_publishing'
+  | 'connection_fit'
+  | 'invitation_received'
+  | 'invitation_accepted'
+  | 'invite_expected'
+  | 'deadline'
+  | 'meeting'
+  | 'opportunity_next'
+  | 'linkedin_expiry'
+  | 'resolved'
+  | 'opportunity'
+  | 'machine_paused'
+  | 'machine_resumed'
+  | 'account_paused'
+  | 'action_uncertain'
+  | 'action_failed'
+  | 'linkedin_expired';
+
+export interface CalendarPerson {
+  id: string;
+  name: string;
+  role: string | null;
+}
+
+export interface CalendarEvent {
+  id: string;
+  layer: CalendarLayer;
+  kind: CalendarEventKind | string;
+  at: string | null;
+  title: string;
+  state: string | null;
+  important: boolean;
+  /** /calendario/pieza/<id>, /personas/<id>, /tu-turno… */
+  link: string | null;
+  people?: CalendarPerson[];
+  impressions?: number | null;
+  skip_reason?: string | null;
+  /** invite_expected: an estimate subject to the caps. */
+  estimate?: boolean;
+}
+
+export interface CalendarDayCounts {
+  comments: number;
+  reactions: number;
+  follows: number;
+  invites: number;
+  accepts: number;
+  connections_fit: number;
+}
+
+export interface CalendarioDay {
+  date: string;
+  counts: CalendarDayCounts;
+  /** Ordered by layer priority (Tuyo > Sistema > Publicaciones > Conversaciones > Red), then by time. */
+  events: CalendarEvent[];
+}
+
+/** GET /api/v1/calendario?desde=&hasta= (93 days at most; days in America/Bogota). */
+export interface Calendario {
+  timezone: string;
+  today: string;
+  lead_hours: number;
+  /** true, false or 'parcial' (conversaciones until the inbox arrives). */
+  layers: Record<CalendarLayer, boolean | 'parcial'>;
+  days: CalendarioDay[];
+}
+
+// ---------------------------------------------------------------- activity (Lista, Próximo, Ver todo lo del día)
+
+export type ActividadTipo = 'todo' | 'publicaciones' | 'comentarios' | 'reacciones' | 'red';
+
+export interface ActividadFilters {
+  tipo?: ActividadTipo;
+  desde?: string;
+  hasta?: string;
+  /** Also what did not go out (vetoed, discarded, expired, superseded). */
+  noSalio?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ActivityTarget {
+  kind: 'post' | 'person' | 'own';
+  name: string;
+  headline?: string | null;
+  url?: string | null;
+  post_excerpt?: string | null;
+  contact_id?: string | null;
+  role?: string | null;
+}
+
+export interface ActivityItem {
+  id: string;
+  capability: Capability | string;
+  label: string;
+  agent: string | null;
+  state: ActionState | string;
+  /** null for a normal success; otherwise «En curso», «Incierta», «Fallida», «Vetada por ti»… */
+  state_label: string | null;
+  important: boolean;
+  at: string;
+  date: string;
+  text: string | null;
+  reaction: string | null;
+  target: ActivityTarget | null;
+  url: string | null;
+  rationale: string;
+  decided_by: 'gustavo' | 'lider' | 'politica' | null;
+  decision_note: string;
+  execution_note: string;
+  review: { decision: 'approve' | 'discard'; answers: Record<string, number>; reasons: string[]; model: string } | null;
+  piece_id: string | null;
+}
+
+export interface UpcomingPiece {
+  piece_id: string;
+  slot_date: string;
+  scheduled_for: string;
+  status: 'scheduled' | 'preparing' | 'publishing' | 'awaiting_approval' | PieceStatus;
+  stage: EditorialStage;
+  thesis: string | null;
+  excerpt: string | null;
+  pillar: string | null;
+  modality: string | null;
+  primary_reader: string | null;
+  action: { id: string; state: ActionState } | null;
+  vetoable: boolean;
+  impressions: number | null;
+  skip_reason: string | null;
+  note: string;
+}
+
+/** GET /api/v1/actividad. */
+export interface Actividad {
+  upcoming: { pieces: UpcomingPiece[]; queued: (ActivityItem & { expected_at: string | null })[] };
+  items: ActivityItem[];
+  next_offset: number | null;
+}
+
+// ---------------------------------------------------------------- people: filters and opportunities
+
+export interface ContactSearch {
+  stage?: DisplayStage | '';
+  source?: string;
+  account?: string;
+  /** Name or headline. */
+  q?: string;
+  role?: string;
+  modality?: string;
+  page?: number;
+}
+
+export type OpportunityStage = 'conversacion' | 'necesidad' | 'cualificada' | 'reunion' | 'propuesta' | 'acuerdo' | 'sin_acuerdo';
+export const OPPORTUNITY_STAGES: readonly OpportunityStage[] = ['conversacion', 'necesidad', 'cualificada', 'reunion', 'propuesta', 'acuerdo', 'sin_acuerdo'];
+
+export type OpportunityModality = 'personal_startups' | 'projectapp' | 'por_clasificar';
+export type OpportunityChannel = 'linkedin' | 'email' | 'llamada' | 'evento' | 'otro';
+export type OpportunityAttribution = 'cito_contenido' | 'lo_dijo' | 'inferido' | 'desconocido';
+
+export interface Opportunity {
+  id: string;
+  person: string;
+  contact: { id: string; display_name: string; headline: string; profile_url: string; stage: ContactStage; role: string | null } | null;
+  person_name: string;
+  company: string;
+  modality: OpportunityModality;
+  channel: OpportunityChannel;
+  stage: OpportunityStage;
+  attribution: OpportunityAttribution;
+  need: string;
+  budget: string;
+  dedication: string;
+  next_action: string;
+  next_action_at: string | null;
+  notes: string;
+  history: { at: string; event: 'created' | 'stage' | string; detail: string }[];
+  days_in_stage: number;
+  created_at: string;
+  updated_at: string;
+  stage_changed_at: string;
+  closed_at: string | null;
+}
+
+/** POST needs `modality` and `contact` or `person_name`; PATCH accepts any field. */
+export interface OpportunityInput {
+  contact?: string | null;
+  person_name?: string;
+  company?: string;
+  modality?: OpportunityModality;
+  channel?: OpportunityChannel;
+  stage?: OpportunityStage;
+  attribution?: OpportunityAttribution;
+  need?: string;
+  budget?: string;
+  dedication?: string;
+  next_action?: string;
+  next_action_at?: string | null;
+  notes?: string;
+}
+
+export interface OpportunityFilters {
+  stage?: OpportunityStage | '';
+  modality?: OpportunityModality | '';
+  contact?: string;
+  page?: number;
+}
+
+export interface ReferentPatch {
+  active?: boolean;
+  reason?: string;
+}
+
+// ---------------------------------------------------------------- settings
+
+export interface AjustesSpend {
+  budget: 'general' | 'editorial' | 'red' | string;
+  label: string;
+  spent_usd: number;
+  limit_usd: number;
+}
+
+/** GET /api/v1/ajustes. */
+export interface Ajustes {
+  autonomy: Partial<Record<Capability, AutonomyMode>>;
+  lead: { enabled: boolean; capabilities: Capability[]; model: string };
+  limits: Partial<Record<Capability, { daily: number; weekly: number }>>;
+  window: WindowInfo;
+  ai_spend: { today: AjustesSpend[]; month_usd: number | null; total_usd: number | null; limit_usd: number | null; lead_month_usd: number | null; transcription_month_usd?: number | null };
+  facts_count: number;
+  orientation: Orientation | null;
+}
+
+// ================================================================ Resultados
+
+export type ResultadosDias = 7 | 28 | 90;
+export type ResultadosModalidad = 'todo' | 'personal_startups' | 'projectapp';
+
+export interface KpiPoint {
+  date: string;
+  value: number | null;
+}
+
+/**
+ * One indicator. `value: null` is «sin dato» (show a dash and `unavailable_reason`, never 0).
+ * `delta`/`delta_pct` only arrive with `comparable: true`; in percent KPIs `delta` is in points.
+ */
+export interface Kpi {
+  value: number | null;
+  previous: number | null;
+  delta: number | null;
+  delta_pct: number | null;
+  comparable: boolean;
+  series: KpiPoint[] | null;
+  definition: string;
+  formula: string | null;
+  unavailable_reason: string | null;
+  numerator?: number | null;
+  denominator?: number | null;
+  cut?: '7d' | '24h' | null;
+  posts_measured?: number | null;
+  posts_total?: number | null;
+  measured?: { from: string; to: string } | null;
+  window_days?: number | null;
+  top?: { id?: string; contact_id?: string; name: string; count?: number; interactions?: number }[] | null;
+}
+
+export interface ResultadosPost {
+  piece_id: string;
+  date: string;
+  published_at: string | null;
+  first_line: string;
+  pillar: string | null;
+  url: string | null;
+  impressions_24h: number | null;
+  impressions_7d: number | null;
+  reactions: number | null;
+  comments: number | null;
+  reposts: number | null;
+  engagement_pct: number | null;
+  cut: '7d' | '24h' | null;
+  commenters_by_role: Record<string, number> | null;
+}
+
+export interface SpendLine {
+  spent: number;
+  budget: number | null;
+}
+
+/** GET /api/v1/resultados?dias=&modalidad=. */
+export interface Resultados {
+  periodo: { desde: string; hasta: string; dias: ResultadosDias; datos_hasta: string; anterior: { desde: string; hasta: string } };
+  modalidad: ResultadosModalidad;
+  zona_horaria: string;
+  negocio: { disponible: boolean; motivo: string | null; inbound: Kpi } & Partial<Record<string, unknown>>;
+  audiencia: {
+    followers: Kpi;
+    connections: Kpi;
+    profile_views: Kpi;
+    new_fit_connections: Kpi;
+    roles: { items: { role: string; value: number }[] | null; definition: string; unavailable_reason: string | null };
+    acceptance_rate: Kpi;
+    funnel: { stages: Record<string, number>; order: string[]; aside: string[]; definition: string };
+    recurrent_people: Kpi;
+  };
+  contenido: {
+    kpis: { median_impressions: Kpi; engagement_pct: Kpi; substantive_comments: Kpi; consistency: Kpi };
+    chart: {
+      bars: { piece_id: string; date: string; impressions: number | null; cut: '7d' | '24h' | null; fallback: boolean }[];
+      median_previous_4_weeks: { '7d': number | null; '24h': number | null };
+      definition: string;
+    };
+    best_post: { piece_id: string; first_line: string; date: string; pillar: string | null; impressions: number | null; engagement_pct: number | null; cut: '7d' | '24h' | null } | null;
+    by_pillar: { cut: '7d' | '24h' | null; formula: string; items: { pillar: string; value: number | null; posts: number }[] };
+    posts: ResultadosPost[];
+  };
+  equipo: {
+    comments_published: Kpi;
+    comments_replied: Kpi;
+    follows: Kpi;
+    invites: Kpi;
+    accepts: Kpi;
+    pieces_published: Kpi;
+    pieces_blocked: Kpi;
+    pieces_vetoed: Kpi;
+    spend: {
+      today: Record<string, SpendLine>;
+      month: Record<string, SpendLine>;
+      accumulated: SpendLine;
+      other_providers: Record<string, { today: number; month: number; accumulated: number; budget: number | null }>;
+      month_start: string;
+      definition: string;
+    };
+  };
 }

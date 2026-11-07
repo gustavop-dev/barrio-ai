@@ -100,8 +100,19 @@ export function formatTime(iso: string | null | undefined, timeZone?: string): s
   }
 }
 
-export function formatNumber(value: number): string {
-  return value.toLocaleString(LOCALE);
+/** «1.284», «3,5». At most one decimal unless `digits` says otherwise. */
+export function formatNumber(value: number, digits = 1): string {
+  return value.toLocaleString(LOCALE, { maximumFractionDigits: digits });
+}
+
+/** A value already in percent units (the backend's `engagement_pct`, `delta_pct`): «3,5 %». */
+export function formatPct(value: number, digits = 1): string {
+  return `${value.toLocaleString(LOCALE, { maximumFractionDigits: digits })} %`;
+}
+
+/** «1,20 USD». */
+export function formatUsd(value: number): string {
+  return `${value.toLocaleString(LOCALE, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} USD`;
 }
 
 export function capabilityLabel(code: string): string {

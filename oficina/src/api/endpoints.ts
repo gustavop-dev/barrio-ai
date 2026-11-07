@@ -3,23 +3,42 @@ import type {
   Account,
   Action,
   Activity,
+  Actividad,
+  ActividadFilters,
+  Ajustes,
+  Calendario,
   Capability,
   Contact,
-  ContactStage,
+  ContactSearch,
   Control,
   EditorialCalendar,
   FeedEvent,
   Job,
   LinkedInStatus,
+  MemoryFact,
   MemoryItem,
+  NewMemoryFact,
+  Opportunity,
+  OpportunityFilters,
+  OpportunityInput,
+  Orientation,
   Overview,
   Paginated,
   PieceDetail,
   PlanResponse,
+  Question,
+  QuestionAnswer,
+  QuestionState,
   RedSummary,
   Referent,
+  ReferentPatch,
+  Resultados,
+  ResultadosDias,
+  ResultadosModalidad,
   SearchResponse,
   Session,
+  TuTurno,
+  TurnoAction,
   Unit,
   User,
 } from './types';
@@ -97,27 +116,36 @@ export const listReferents = (account: string) =>
 export const addReferent = (account: string, identifier: string, reason: string) =>
   api.post<Referent>(`${OP}/referents`, { account, identifier, reason });
 export const observeNow = (account: string) => api.post<Job>(`${OP}/observe`, { account });
+/** Deactivate, reactivate or change the reason of a referent. */
+export const updateReferent = (referentId: string, patch: ReferentPatch) => api.patch<Referent>(`${OP}/referents/${id(referentId)}`, patch);
+export const deleteReferent = (referentId: string) => api.delete(`${OP}/referents/${id(referentId)}`);
 
 // ---------------------------------------------------------------- network (Red)
 const RED = '/api/v1/red';
 
-export interface ContactFilters {
-  stage?: ContactStage | '';
-  source?: string;
-  account?: string;
-  page?: number;
+export type ContactFilters = ContactSearch;
+
+/** URL query from an object, leaving out empty values. */
+function queryString(values: Record<string, string | number | boolean | null | undefined>): string {
+  const params = new URLSearchParams();
+  for (const [key, value] of Object.entries(values)) {
+    if (value === undefined || value === null || value === '' || value === false) continue;
+    params.set(key, value === true ? '1' : String(value));
+  }
+  const query = params.toString();
+  return query ? `?${query}` : '';
 }
 
-/** Paginated, newest `updated_at` first. Empty filters are not sent. */
-export function listContacts({ stage = '', source = '', account = '', page = 1 }: ContactFilters = {}) {
-  const params = new URLSearchParams();
-  if (stage) params.set('stage', stage);
-  if (source) params.set('source', source);
-  if (account) params.set('account', account);
-  if (page > 1) params.set('page', String(page));
-  const query = params.toString();
-  return api.get<Paginated<Contact> | Contact[]>(`${RED}/contacts${query ? `?${query}` : ''}`);
+/**
+ * Paginated, newest `updated_at` first. Empty filters are not sent. `stage=opportunity` lists the people
+ * with an open opportunity; `q` searches name and headline.
+ */
+export function listContacts({ stage = '', source = '', account = '', q = '', role = '', modality = '', page = 1 }: ContactSearch = {}) {
+  const query = queryString({ stage, source, account, q: q.trim(), role, modality, page: page > 1 ? page : null });
+  return api.get<Paginated<Contact> | Contact[]>(`${RED}/contacts${query}`);
 }
+/** Adds a free note to the person (201, returns the contact). */
+export const addContactNote = (contactId: string, text: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/notas`, { text });
 export const getContact = (contactId: string) => api.get<Contact>(`${RED}/contacts/${id(contactId)}`);
 /** Human session and `approve_actions`; the note is mandatory. Also rejects the contact's open action. 409 once invited or later. */
 export const discardContact = (contactId: string, note: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/discard`, { note });
@@ -153,3 +181,70 @@ export const savePushSubscription = (subscription: PushSubscriptionJSON) =>
 export const deletePushSubscription = (endpoint: string) =>
   api.post<null>('/api/v1/push/unsubscribe', { endpoint });
 export const sendTestPush = () => api.post<unknown>('/api/v1/push/test');
+
+// ================================================================ redesign
+
+// ---------------------------------------------------------------- Tu turno
+export const getTuTurno = () => api.get<TuTurno>('/api/v1/tu-turno');
+
+/**
+ * Runs a card action: POST its `endpoint` with its `body`, plus `note` when `note_required`.
+ * Actions with `href` are full navigations (LinkedIn OAuth): render them as links, never call this.
+ */
+export function runTurnoAction(action: TurnoAction, note?: string) {
+  if (!action.endpoint) throw new Error('Esta acción es un enlace, no una petición');
+  const body: Record<string, unknown> = { ...(action.body ?? {}) };
+  if (note !== undefined && note !== '') body.note = note;
+  return api.post<unknown>(action.endpoint, body);
+}
+
+// ---------------------------------------------------------------- team questions
+const PREG = '/api/v1/preguntas';
+export const listPreguntas = (state: QuestionState | '' = 'open') =>
+  api.get<Paginated<Question> | Question[]>(`${PREG}${queryString({ state })}`);
+/** 400 when the value is invalid, 409 when the question is no longer open. */
+export const answerPregunta = (questionId: string, answer: QuestionAnswer) => api.post<Question>(`${PREG}/${id(questionId)}/responder`, answer);
+/** Within 15 minutes of answering: restores the memory and reopens the question (409 afterwards). */
+export const undoPregunta = (questionId: string) => api.post<Question>(`${PREG}/${id(questionId)}/deshacer`);
+/** Postpones 3 days and takes it out of the counter. */
+export const postponePregunta = (questionId: string) => api.post<Question>(`${PREG}/${id(questionId)}/mas-tarde`);
+/** Closes the key for good. */
+export const declinePregunta = (questionId: string) => api.post<Question>(`${PREG}/${id(questionId)}/no-compartir`);
+
+// ---------------------------------------------------------------- what the team knows
+const HECHOS = '/api/v1/memoria/hechos';
+export const listHechos = () => api.get<MemoryFact[]>(HECHOS);
+/** «Añadir algo que quieras que sepan»: confirmed directly; 201 with the whole list. */
+export const addHecho = (fact: NewMemoryFact) => api.post<MemoryFact[]>(HECHOS, fact);
+export const correctHecho = (key: string, text: string, publicUse: boolean) =>
+  api.post<MemoryFact>(`${HECHOS}/${id(key)}/corregir`, { text, public_use: publicUse });
+export const retireHecho = (key: string, reason: string) => api.post<unknown>(`${HECHOS}/${id(key)}/retirar`, { reason });
+
+export const getOrientacion = () => api.get<Orientation>('/api/v1/orientacion');
+/** 4000 characters at most. */
+export const saveOrientacion = (text: string) => api.put<Orientation>('/api/v1/orientacion', { text });
+
+// ---------------------------------------------------------------- calendar and activity
+/** AAAA-MM-DD; 93 days at most. Without dates the backend returns the current month. */
+export const getCalendario = (desde = '', hasta = '') => api.get<Calendario>(`/api/v1/calendario${queryString({ desde, hasta })}`);
+
+export function getActividad({ tipo = 'todo', desde = '', hasta = '', noSalio = false, limit, offset }: ActividadFilters = {}) {
+  return api.get<Actividad>(`/api/v1/actividad${queryString({ tipo, desde, hasta, no_salio: noSalio, limit, offset: offset || null })}`);
+}
+
+// ---------------------------------------------------------------- results
+export const getResultados = (dias: ResultadosDias = 28, modalidad: ResultadosModalidad = 'todo') =>
+  api.get<Resultados>(`/api/v1/resultados${queryString({ dias, modalidad })}`);
+
+// ---------------------------------------------------------------- opportunities
+const OPP = '/api/v1/oportunidades';
+export function listOportunidades({ stage = '', modality = '', contact = '', page = 1 }: OpportunityFilters = {}) {
+  return api.get<Paginated<Opportunity> | Opportunity[]>(`${OPP}${queryString({ stage, modality, contact, page: page > 1 ? page : null })}`);
+}
+/** Needs `modality` and `contact` or `person_name` (400 otherwise). */
+export const createOportunidad = (input: OpportunityInput) => api.post<Opportunity>(OPP, input);
+export const updateOportunidad = (opportunityId: string, patch: OpportunityInput) => api.patch<Opportunity>(`${OPP}/${id(opportunityId)}`, patch);
+export const deleteOportunidad = (opportunityId: string) => api.delete(`${OPP}/${id(opportunityId)}`);
+
+// ---------------------------------------------------------------- settings
+export const getAjustes = () => api.get<Ajustes>('/api/v1/ajustes');

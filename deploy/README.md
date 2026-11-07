@@ -95,7 +95,7 @@ Detalle completo en [publicación diaria](../agentes-linkedin/infra/docs/publica
 | Tarea | Cómo |
 | --- | --- |
 | Parada total | Botón en la PWA (Máquina). Como emergencia sin PWA: `OPERATOR_PAUSED=true` en `.env` y `up -d`. |
-| Copias de seguridad | `crontab -e` → `0 4 * * * /ruta/barrio-ai/deploy/backup.sh` (conserva 14 días). Copia periódicamente `deploy/backups/` fuera del servidor. |
+| Copias de seguridad | `crontab -e` → `0 4 * * * /ruta/barrio-ai/deploy/backup.sh` (conserva 14 días). Guarda la base (`knowledge-*.dump`) y los audios y fotos del volumen `media` (`media-*.tar.gz`). Copia periódicamente `deploy/backups/` fuera del servidor. Restaurar los archivos: [capturas-galeria.md](../agentes-linkedin/infra/docs/capturas-galeria.md#servidor). |
 | Actualizar | Tras el merge a `main` y el workflow en verde: `rsync` de `deploy/` si cambió, y `docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d`. Las migraciones se aplican solas. |
 | Volver atrás | `BARRIO_TAG=<sha de un commit anterior>` en `.env`, luego `pull` y `up -d`. Las migraciones no se deshacen solas. |
 | Logs | `docker compose -f compose.prod.yaml logs -f autopilot worker`. |

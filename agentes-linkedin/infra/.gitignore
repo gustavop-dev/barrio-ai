@@ -7,6 +7,8 @@ artifacts/
 backups/
 
 staticfiles/
+# Private files of the capture button and the Galería (MEDIA_ROOT).
+media/
 .coverage
 .coverage.*
 htmlcov/

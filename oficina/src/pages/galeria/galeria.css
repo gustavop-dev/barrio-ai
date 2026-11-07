@@ -1,0 +1,155 @@
+/* Galería (Galeria.dc.html). Three columns on the phone, more on wider screens. Tokens only. */
+
+.gal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border-radius: var(--radius-md);
+}
+.gal-body.dragging {
+  outline: 2px dashed var(--color-0ff1ce-hondo);
+  outline-offset: 8px;
+}
+
+.gal-upload {
+  position: relative;
+  min-height: 64px;
+  border: 1px dashed var(--color-tinta-suave);
+  border-radius: var(--radius-md);
+  background: var(--color-superficie);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 24px;
+}
+.gal-upload:hover {
+  background: var(--color-papel);
+}
+.gal-upload:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+.gal-upload.busy {
+  cursor: progress;
+  color: var(--color-tinta-suave);
+}
+.gal-upload-desktop {
+  margin-left: -6px;
+  color: var(--color-tinta-suave);
+}
+
+.gal-grid {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+@media (min-width: 640px) {
+  .gal-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 8px;
+  }
+}
+@media (min-width: 1100px) {
+  .gal-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+.gal-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--color-linea);
+  cursor: pointer;
+}
+.gal-tile img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gal-tile:hover img {
+  opacity: 0.92;
+}
+.badge.gal-tile-label {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  display: block;
+  padding: 2px 6px;
+  font-size: 11px;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gal-nomatch {
+  padding: 8px 0;
+}
+
+/* Photo sheet. */
+.gal-sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.gal-close {
+  width: 44px;
+  height: 44px;
+  margin: -8px -8px 0 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: transparent;
+  color: var(--color-tinta-suave);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.gal-close:hover {
+  background: var(--color-papel);
+  color: var(--color-tinta);
+}
+.gal-big {
+  position: relative;
+  height: 220px;
+  flex: none;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-linea);
+}
+@media (min-width: 640px) {
+  .gal-big {
+    height: 340px;
+  }
+}
+.gal-big img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.gal-state {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.gal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.btn.ghost.gal-remove {
+  color: var(--color-alerta);
+}
