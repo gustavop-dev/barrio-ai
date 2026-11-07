@@ -31,6 +31,15 @@ def embedding_model():
     if model not in EMBEDDING_PRICES:raise ValueError('Modelo de embeddings sin tarifa verificada')
     return model
 
+def limit_window_start(provider,now=None):
+    """B5: a provider limit (<PROVIDER>_LIMIT_USD) is monthly: the calendar month in OPERATOR_TIMEZONE, the same month
+    the office shows. <PROVIDER>_LIMIT_WINDOW=total keeps the old lifetime sum (returns None)."""
+    if os.environ.get(provider.upper()+'_LIMIT_WINDOW','month').strip().lower()=='total':return None
+    from datetime import datetime, timezone
+    from zoneinfo import ZoneInfo
+    local=(now or datetime.now(timezone.utc)).astimezone(ZoneInfo(os.environ.get('OPERATOR_TIMEZONE','America/Bogota')))
+    return local.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
+
 def reserve(provider,purpose,amount,request_hash=None):
     amount=Decimal(str(amount));limit=Decimal(os.environ.get(provider.upper()+'_LIMIT_USD','1'))
     if not amount.is_finite() or amount<0 or not limit.is_finite() or limit<0:raise ValueError('Presupuesto inválido')
@@ -39,8 +48,10 @@ def reserve(provider,purpose,amount,request_hash=None):
         c.execute('SELECT pg_advisory_xact_lock(103502)')
         if request_hash and c.execute("SELECT id FROM usage_ledger WHERE provider=%s AND request_hash=%s AND (status='reserved' OR (status='uncertain' AND coalesce(usage->>'retry_authorized','false')!='true')) LIMIT 1",(provider,request_hash)).fetchone():
             raise ValueError('Existe una solicitud idéntica pendiente o incierta; conciliarla antes de repetir.')
-        spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s",(provider,)).fetchone()['spent']
-        if spent+amount>limit:raise ValueError(f'Límite local de {provider} alcanzado; incluye reservas pendientes.')
+        since=limit_window_start(provider)
+        spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s AND (%s::timestamptz IS NULL OR created_at>=%s)",(provider,since,since)).fetchone()['spent']
+        if spent+amount>limit:
+            raise ValueError(f'Límite local de {provider} alcanzado'+(' este mes' if since else '')+'; incluye reservas pendientes.')
         c.execute('INSERT INTO usage_ledger(id,provider,purpose,reserved_usd,status,request_hash) VALUES(%s,%s,%s,%s,%s,%s)',(rid,provider,purpose,amount,'reserved',request_hash))
     return rid
 
