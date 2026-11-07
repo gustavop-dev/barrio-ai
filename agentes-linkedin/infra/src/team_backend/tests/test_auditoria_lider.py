@@ -252,7 +252,7 @@ class LeadReviewCapTests(LeadBase):
         return out
 
     def lead_calls(self):
-        return len([r for r in self.jev.requests if 'encaja' in r['questions']])
+        return len([r for r in self.jev.requests if 'riesgo' in r['questions']])  # RED reviews ask riesgo (R2: one fit judge)
 
     def states(self,proposals):
         return [ActionProposal.objects.get(pk=p.pk).state for p in proposals]
