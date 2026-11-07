@@ -448,3 +448,36 @@ class EditorialCircuitTests(EditorialBase):
             self.assertEqual(autopiloto.tick(self.autobot)['plan'],0)
             self.assertEqual(self.human.post('/api/v1/editorial/plan',{},format='json').status_code,409)
         claude.assert_not_called()
+
+
+class VoiceTests(EditorialBase):
+    """Gustavo's own tone document reaches the agents that write public text, and only them."""
+    def test_writers_and_selection_write_in_gustavos_voice(self):
+        from team_backend import voz
+        self.observed()
+        self.plan(answers(signals_used=['first']))
+        systems={purpose.split('-',1)[1]:system for purpose,_,system in self.calls}
+        for stage in ('redactor','seleccion'):
+            self.assertIn(voz.VOICE_GUIDE,systems[stage]);self.assertIn('# Tono de voz',systems[stage])
+            self.assertIn('Una versión cuidada de esta voz',systems[stage])  # the whole document, not an excerpt
+        for stage in ('director','lectores','verificador'):self.assertNotIn('<tono_de_voz',systems[stage])
+        self.assertIn('voz informal de Gustavo',systems['verificador'])
+
+
+class CommentVoiceTests(PublicationBase):
+    def test_comment_writer_gets_the_voice_and_an_invented_spanish_anecdote_is_discarded(self):
+        from team_backend import jobs, voz
+        from team_backend.models import ActionProposal
+        post=self.observed()[0];bot=self.bot()
+        story='Uy qué pro. Yo pensé que eso salía en un rato, pero construí algo parecido y no jsjs. Cómo lo mantienen?'
+        answer={'decision':'comment','language':'es','comment':story,'rationale':'r','citations':['LI-03-M006-K02'],
+                'claims_needing_evidence':[],'risks':[]}
+        with patch('knowledge.providers.claude',return_value={'text':json.dumps(answer),'model':'claude-opus-5-5'}) as claude:
+            jobs.enqueue_operation(bot,'propose_comment',{'post':str(post.id)});jobs.process_one(self.worker)
+        system=claude.call_args.args[0]
+        self.assertTrue(system.startswith('Eres el agente de Relaciones'));self.assertTrue(system.endswith(voz.block()))
+        autopiloto.tick(bot)
+        proposal=ActionProposal.objects.get(post=post)
+        self.assertEqual(proposal.state,'discarded')
+        self.assertTrue(any('sin hechos públicos confirmados' in r for r in proposal.risks),proposal.risks)
+        self.assertEqual(self.fake.state['writes'],0)

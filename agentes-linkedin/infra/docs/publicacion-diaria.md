@@ -103,6 +103,19 @@ Los hechos confirmados de Gustavo (`namespace='user'`) se reparten en dos bloque
 
 Director, redactores, selección y verificador reciben ambos bloques; el panel de lectores no recibe ninguno. Los comentarios (`propose_comment`) usan la misma separación sin la orientación del brief. Con la memoria vacía, como hoy, las piezas aportan criterio, preguntas y aprendizajes generales, sin vivencias de Gustavo. `guardas.private_leaks()` detecta 60/40, segmentos como «Spanish-speaking founders», bandas salariales, LLC y Beloz, además de fragmentos literales de la orientación privada. La usan el verificador de piezas y la compuerta de comentarios.
 
+### Voz de Gustavo (`voz.py`)
+
+El documento «Tono de voz» que escribió Gustavo se guarda tal cual en `src/team_backend/recursos/tono-de-voz.md`. `voz.with_voice()` lo añade, precedido de `voz.VOICE_GUIDE`, al final del system de los agentes que escriben texto público: redactores A/B, selección (`editorial.VOICED_STAGES`) y redactor de comentarios. El director, el panel de lectores y el verificador no lo reciben.
+
+`VOICE_GUIDE` adapta el documento a LinkedIn:
+- Aplica la «versión cuidada» que el propio documento describe. En publicaciones propias se conservan la cadencia, los matices y el remate cotidiano, pero no hay risas escritas, vocales alargadas, groserías ni deformaciones afectivas. Los comentarios admiten algo más de reacción.
+- En inglés, la cadencia se traslada con equivalentes naturales, sin traducir modismos.
+- La voz decide cómo se dice algo, nunca qué le pasó a Gustavo. Una anécdota en primera persona («yo pensé que…») solo puede contar un hecho de `public_facts`.
+
+El verificador sabe que el registro informal no es un defecto y que una anécdota sin respaldo sí es `invented_experience`. `guardas.EXPERIENCE` reconoce también las formas en español («construí», «lanzamos», «mi equipo», «nuestros clientes»). Desde ahora se aplica igualmente a la compuerta de comentarios.
+
+Para cambiar la voz, Gustavo edita ese archivo y se despliega una imagen nueva. El bloque ocupa unas 5 000 tokens, va en el system cacheado y añade como mucho unos 0,03 USD por llamada con opus.
+
 ## Compuerta autónoma (`autopiloto.policy_review`, `autonomia-v1`)
 
 CONT-09 se aprueba solo si se cumplen todas estas condiciones:

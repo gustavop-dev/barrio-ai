@@ -79,7 +79,8 @@ def content_issues(proposal):
         if pattern.search(text):issues.append(reason)
     if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
-    issues+=guardas.private_leaks(text,memory.confirmed_blocks()[1])
+    public,private=memory.confirmed_blocks()
+    issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
     return issues
 
 def policy_review(proposal):
