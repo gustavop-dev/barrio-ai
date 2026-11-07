@@ -54,6 +54,11 @@ def max_age():
     """Only messages younger than this are read, judged, proposed or pushed."""
     return timedelta(days=int(setting('INBOX_MAX_AGE_DAYS','14')))
 
+def inboxes():
+    """LinkedIn inboxes to read (Unipile «List inbox Chats»). CLASSIC_PRIMARY is Gustavo's main inbox; a company page
+    adds COMPANY_<id>_PRIMARY. Spam, archived, jobs and InMail stay out unless listed."""
+    return [i.strip() for i in setting('INBOX_IDS','CLASSIC_PRIMARY').split(',') if i.strip()] or ['CLASSIC_PRIMARY']
+
 def chats_limit():
     return max(1,min(50,int(setting('INBOX_CHATS_LIMIT','20'))))
 
@@ -220,8 +225,10 @@ def read_inbox(user,account,now=None):
     if account.paused or account.status!='running':
         summary['stopped']='La cuenta no está operativa o está en pausa; no se leyó el inbox.';return summary
     connector=get_connector(account)
+    chats=[]
     try:
-        _read(account,'chats',now);chats=connector.list_chats(chats_limit())
+        for inbox in inboxes():  # one read per inbox; each counts against the chats cap
+            _read(account,'chats',now);chats+=connector.list_chats(chats_limit(),inbox=inbox)
     except ReadCapReached as exc:summary['stopped']=str(exc);return summary
     except ConnectorError as exc:_pause_on(account,exc);summary['stopped']=str(exc);return summary
     due=[]
