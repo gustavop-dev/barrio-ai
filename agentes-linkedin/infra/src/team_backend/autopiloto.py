@@ -111,7 +111,7 @@ def policy_review(proposal):
         operador._audit(None,'operator.policy_discarded',proposal.id,issues=issues)
         if proposal.piece_id:
             notify('Barrio AI: pieza descartada',f'La política no aprobó la pieza del {proposal.piece.slot_date:%d/%m}: {"; ".join(issues)[:200]}',
-                   url=f'/editorial/{proposal.piece_id}',tag='barrio-pieza')
+                   url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
         return proposal
     if proposal.payload_hash!=operador.current_hash(proposal):
         proposal.state=ActionProposal.State.DISCARDED;proposal.decision_note='Hash inconsistente; descartada'
@@ -124,7 +124,7 @@ def policy_review(proposal):
     if proposal.piece_id:
         when=proposal.piece.scheduled_for.astimezone(operador.local_tz())
         notify('Barrio AI: pieza lista',f'Se publicará el {when:%d/%m a las %H:%M}. Puedes vetarla en la oficina antes de esa hora.',
-               url=f'/editorial/{proposal.piece_id}',tag='barrio-pieza')
+               url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
     return proposal
 
 def llm_spent_today(now=None,purpose='propose-comment'):

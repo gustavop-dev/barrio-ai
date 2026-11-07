@@ -279,91 +279,207 @@ El payload de cada push es JSON `{ title, body, url, tag }`. El service worker m
 - `POST /api/v1/runs` con `{ agent: "posicionamiento|perfil", task, execute: false, mode: "lexical" }` responde 202 con un trabajo. `GET /api/v1/runs/<id>` devuelve el trabajo con `result.payload`, que es una vista previa con contexto. Ejecutar con IA (`execute: true`) cuesta dinero y solo se ofrece con una confirmación explícita.
 
 
-## Rediseño: Tu turno, preguntas, memoria, orientación, oportunidades, actividad y ajustes
+## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes
 
-Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las escrituras requieren sesión humana con CSRF; un token de servicio recibe 403.
+Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las escrituras requieren sesión humana con CSRF; un token de servicio recibe 403. Las horas son ISO en UTC; los días del calendario se calculan en `America/Bogota`.
+
+### Tu turno
 
 **`GET /api/v1/tu-turno`**
 
 ```json
-{ "count": 3,
-  "questions": [QuestionOutput],
+{ "count": 4, "critical": true, "counts": { "avisos": 2, "preguntas": 2, "tareas": 0 },
+  "top": Card | null,
+  "alerts": [Card], "questions": [Card], "later": [Card],
   "tasks": { "perfil": [], "conversaciones": [] },
-  "alerts": [ { "id": "linkedin_token | uncertain:<proposal_id> | machine_paused | account_paused:<id> | invites_blocked | ai_budget",
-                "severity": "alta | media", "title": "¿Salió o no?", "detail": "…",
-                "action": { "label": "Resolver", "endpoint": "/api/v1/operador/actions/<id>/resolve", "proposal_id": "uuid" } | { "label": "Reconectar", "href": "/api/v1/linkedin/oauth/start" } | null } ],
-  "summary": { "done_today": { "INT-03": 2, "RED-01": 4 }, "next_piece": { "id": "uuid", "scheduled_for": "iso" } | null } }
+  "recent": [{ "kind": "question | alert", "id": "…", "title": "…", "at": "iso", "how": "Respondida | No quisiste compartirla | Confirmaste que se aplicó | Reconectado | Reanudada" }],
+  "summary": { "done_today": { "posts": 1, "comments": 6, "reactions": 3, "follows": 4, "invites": 2, "accepts": 0 }, "next_piece": { "id": "uuid", "scheduled_for": "iso" } | null } }
 ```
 
-- `count` es la suma de preguntas abiertas y avisos.
-- Un aviso `uncertain` se cierra con el `resolve` existente (`{outcome:"confirmed"|"failed", note}`).
+- **Contador.** `count` suma avisos, preguntas pendientes y tareas.
+  - No cuenta las preguntas pospuestas ni las vencidas: esas van en `later`, con tono `muted`.
+  - `critical` indica si hay algún aviso crítico, para pintar el contador en rojo.
+- **`top`.** Es el elemento más urgente, para la tarjeta de la Oficina. Va en este orden: avisos críticos, luego los demás avisos, luego preguntas por plazo.
+- **`Card`:**
+
+```json
+{ "id": "linkedin_expired | linkedin_expiring | uncertain:<proposal_id> | machine_paused | machine_paused_env | account_paused:<id> | question:<id>",
+  "type": "aviso | pregunta | perfil | conversacion", "critical": true, "tone": "bad | warn | info | ok | muted",
+  "agent": "operador_cuenta | director_editorial | …", "agent_label": "Operador de cuenta", "title": "¿Salió o no?",
+  "body": "…", "deadline": "iso" | null, "created_at": "iso" | null,
+  "actions": [{ "label": "Sí, se aplicó", "endpoint": "/api/v1/operador/actions/<id>/resolve", "body": { "outcome": "confirmed" }, "note_required": true, "primary": true }
+              | { "label": "Reconectar LinkedIn", "href": "/api/v1/linkedin/oauth/start", "primary": true }],
+  "attempt": { "capability": "INT-03", "label": "Comentario", "text": "…", "reaction": null,
+               "target": { "kind": "post | person | own", "name": "…", "url": "…" }, "at": "iso", "url": "…" },
+  "question": QuestionOutput }
+```
+
+- `attempt` solo viene en avisos `uncertain`; `question`, solo en las preguntas.
+- **Al ejecutar una acción,** se envía su `body` más `note` cuando `note_required`. «Reanudar» la máquina es `POST /api/v1/operador/control {"paused": false}`, con `reason` opcional.
+- **Los avisos informativos no entran aquí:** invitaciones limitadas por LinkedIn, piezas bloqueadas o presupuesto. Están en Personas (`red/summary.invites_blocked`), en el Calendario y en Ajustes.
 
 **Preguntas del equipo**
-- `GET /api/v1/preguntas?state=open|answered|declined` devuelve una lista paginada.
-- `QuestionOutput`:
+- `GET /api/v1/preguntas?state=open|answered|declined` devuelve una lista paginada de `QuestionOutput`:
 
 ```json
-{ "id": "uuid", "kind": "ask | confirm", "agent": "director_editorial", "question": "¿Qué aprendiste al integrar IA en un ERP real?",
-  "purpose": "Para escribir un post con una experiencia propia", "memory_key": "experiencia.ia_erp",
-  "proposed_value": { "texto": "…", "uso_publico": true }, "suggested_public": true, "origin": "piece:<id> | memoria",
-  "state": "open", "answer": "", "public_use": null, "answered_at": null, "created_at": "iso" }
+{ "id": "uuid", "kind": "ask | confirm", "agent": "director_editorial", "agent_label": "Director editorial",
+  "question": "¿Has liderado la migración de un monolito a microservicios?", "purpose": "Para el post del jueves…",
+  "answer_type": "text | yes_no | choice | number | date", "options": ["Tiempo completo", "Parcial"],
+  "memory_key": "experiencia.migracion", "proposed_value": { "texto": "…", "uso_publico": true }, "suggested_public": true,
+  "deadline": "iso" | null, "postponed_until": "iso" | null, "pending": true, "expired": false,
+  "origin": "piece:<id> | memoria", "state": "open", "answer": "", "public_use": null, "answered_at": null, "created_at": "iso" }
 ```
 
-- `POST /api/v1/preguntas/<id>/responder` recibe `{ "text": "…", "public_use": true|false|null, "accept": false }`.
-  - Con `kind=confirm`, `{ "accept": true }` confirma el dato propuesto; `public_use` cambia si puede usarse en público.
-  - Responde 409 si la pregunta ya no está abierta.
-- `POST /api/v1/preguntas/<id>/no-compartir` cierra la clave para siempre.
+- `POST /api/v1/preguntas/<id>/responder` recibe `{ "text": "…", "value": "si | no | <opción> | <número> | AAAA-MM-DD", "public_use": true|false|null, "accept": false }`.
+
+  | `answer_type` | Campos |
+  | --- | --- |
+  | `text` | `text` |
+  | `yes_no` | `value` (si o no) y `text` opcional como detalle |
+  | `choice` | `value` (una de `options`) y `text` opcional |
+  | `number` y `date` | `value` |
+
+  En `kind=confirm`, `{ "accept": true }` confirma el dato propuesto y `text` lo corrige. Responde 400 si el valor no es válido y 409 si la pregunta ya no está abierta.
+- `POST /api/v1/preguntas/<id>/deshacer`: dentro de los 15 minutos siguientes a responder, devuelve la memoria a su estado anterior y reabre la pregunta (409 después).
+- `POST /api/v1/preguntas/<id>/mas-tarde`: la pospone 3 días y la saca del contador.
+- `POST /api/v1/preguntas/<id>/no-compartir`: cierra la clave para siempre.
 
 **Lo que el equipo sabe de ti**
-- `GET /api/v1/memoria/hechos` devuelve `[{ "key": "identidad.rol", "text": "…", "public_use": true, "version": 3, "updated_at": "iso" }]`.
+- `GET /api/v1/memoria/hechos`:
+
+```json
+[{ "key": "experiencia.primer_cliente_ia", "topic": "¿Cuál fue tu primer cliente con IA?", "text": "…", "public_use": true,
+   "version": 4, "edits": 2, "origin": { "kind": "question | manual | memoria", "agent": "director_editorial", "agent_label": "Director editorial", "question": "…" },
+   "updated_at": "iso" }]
+```
+
+- `edits` es el número de versión que se muestra: v2 significa que se editó una vez.
+- `POST /api/v1/memoria/hechos` recibe `{ "text": "…", "public_use": false, "topic": "Límites" }`: «Añadir algo que quieras que sepan». Se confirma directamente y responde 201 con la lista.
 - `POST /api/v1/memoria/hechos/<key>/corregir` recibe `{ "text": "…", "public_use": true }`.
 - `POST /api/v1/memoria/hechos/<key>/retirar` recibe `{ "reason": "…" }`.
-- Las dos devuelven la lista actualizada.
 
 **Orientación**
-- `GET /api/v1/orientacion` devuelve `{ "text": "…", "updated_at": "iso" | null, "updated_by": "gustavo" | null }`.
-- `PUT /api/v1/orientacion` recibe `{ "text": "…" }`, de 4000 caracteres como máximo; vacío borra la orientación.
+- `GET /api/v1/orientacion` devuelve `{ "text", "updated_at", "updated_by" }`.
+- `PUT /api/v1/orientacion` recibe `{ "text" }`, de 4000 caracteres como máximo.
 
-**Oportunidades**
-- `GET /api/v1/oportunidades?stage=&modality=&contact=` devuelve una lista paginada. `OpportunityOutput`:
+### Calendario
 
-```json
-{ "id": "uuid", "title": "ERP para retail", "modality": "personal_startups | projectapp",
-  "stage": "conversacion | necesidad | cualificada | reunion | propuesta | acuerdo | perdida",
-  "origin": "inbound | outbound | referido | otro", "notes": "…",
-  "contact": { "id": "uuid", "display_name": "…", "headline": "…", "profile_url": "…", "stage": "connected" } | null,
-  "history": [{ "at": "iso", "event": "created | stage", "detail": "Conversación → Reunión" }],
-  "created_at": "iso", "updated_at": "iso", "closed_at": "iso" | null }
-```
-
-- `POST /api/v1/oportunidades` recibe `{ title, modality, origin?, stage?, contact?, notes? }` y devuelve 201.
-- `PATCH /api/v1/oportunidades/<id>` recibe cualquiera de `{ title, modality, origin, stage, notes }`.
-
-**`GET /api/v1/actividad?tipo=comentarios|reacciones|publicaciones|seguimientos|invitaciones|aceptaciones&limit=50&descartadas=1`**
+**`GET /api/v1/calendario?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`**. Por defecto cubre el mes en curso; el máximo es de 93 días. Un rango inválido devuelve 400.
 
 ```json
-{ "upcoming": { "pieces": [{ "piece_id": "uuid", "scheduled_for": "iso", "text": "…", "action": { "id": "uuid", "state": "approved" } | null, "vetoable": true }],
-                "queued": [ActivityItem] },
-  "done": [ActivityItem], "discarded": [ActivityItem] }
+{ "timezone": "America/Bogota", "today": "2026-11-07", "lead_hours": 12,
+  "layers": { "tuyo": true, "publicaciones": true, "red": true, "conversaciones": "parcial", "sistema": true },
+  "days": [{ "date": "2026-11-07",
+             "counts": { "comments": 6, "reactions": 3, "follows": 4, "invites": 2, "accepts": 0, "connections_fit": 1 },
+             "events": [{ "id": "…", "layer": "tuyo | publicaciones | red | conversaciones | sistema", "kind": "…", "at": "iso" | null,
+                          "title": "…", "state": "…" | null, "important": true, "link": "/calendario/pieza/<id> | /personas/<id> | /tu-turno | …" | null,
+                          "people": [{ "id": "uuid", "name": "…", "role": "par" }], "impressions": 1200, "skip_reason": "…", "estimate": true }] }] }
 ```
 
-`ActivityItem`:
+- `kind` por capa:
+
+  | Capa | Valores de `kind` |
+  | --- | --- |
+  | `publicaciones` | `piece_published`, `piece_scheduled`, `piece_preparing`, `piece_skipped`, `piece_blocked`, `piece_failed`, `piece_uncertain`, `piece_vetoed`, `piece_discarded` y `piece_publishing` |
+  | `red` | `connection_fit` (agrupado, con `people`), `invitation_received`, `invitation_accepted` e `invite_expected` (estimación, `important:false`, con `people`) |
+  | `tuyo` | `deadline` (plazo de una pregunta), `meeting` y `opportunity_next` (siguiente acción de una oportunidad), `linkedin_expiry` y `resolved` (`important:false`) |
+  | `conversaciones` | `opportunity` (creada o que cambia de etapa; el inbox llega después) |
+  | `sistema` | `machine_paused`, `machine_resumed`, `account_paused`, `action_uncertain`, `action_failed` y `linkedin_expired` |
+
+- Los eventos llegan ordenados por prioridad de capa (Tuyo > Sistema > Publicaciones > Conversaciones > Red) y luego por hora.
+
+**Vista Lista, «Próximo» y «Ver todo lo del día»**
+- La ruta es `GET /api/v1/actividad`. Parámetros:
+
+  | Parámetro | Valores |
+  | --- | --- |
+  | `tipo` | `todo`, `publicaciones`, `comentarios`, `reacciones` o `red` |
+  | `desde` y `hasta` | AAAA-MM-DD |
+  | `no_salio` | `1` muestra también lo vetado, descartado, caducado o sustituido |
+  | `limit` y `offset` | paginación |
+
+- Respuesta:
 
 ```json
-{ "id": "uuid", "capability": "INT-03", "label": "Comentario", "state": "confirmed", "at": "iso", "text": "…" | null,
-  "target": { "kind": "post | person | own", "name": "…", "headline": "…", "url": "…" }, "url": "enlace en LinkedIn",
-  "rationale": "…", "decided_by": "gustavo | lider | politica | null", "decision_note": "Aprobada por el líder (jev-1.14.0) · …",
-  "review": { "decision": "approve | discard", "answers": { "aporta": 0.92 }, "reasons": [], "model": "jev-1.14.0" }, "piece_id": "uuid" | null }
+{ "upcoming": { "pieces": [{ "piece_id": "uuid", "slot_date": "2026-11-08", "scheduled_for": "iso", "status": "scheduled | preparing | publishing | awaiting_approval",
+                             "stage": "director | redactor | lectores | seleccion | verificador", "thesis": "…", "excerpt": "3 primeras líneas",
+                             "pillar": "applied_ai", "modality": "projectapp", "primary_reader": "lector_comprador",
+                             "action": { "id": "uuid", "state": "approved" } | null, "vetoable": true, "impressions": null, "skip_reason": null, "note": "" }],
+                "queued": [Item + { "expected_at": "iso" }] },
+  "items": [Item], "next_offset": 50 | null }
 ```
 
-`discarded` solo aparece con `descartadas=1`. Un `tipo` desconocido devuelve 404.
+- `Item`:
+
+```json
+{ "id": "uuid", "capability": "INT-03", "label": "Comentario", "agent": "relaciones_comunidad", "state": "confirmed",
+  "state_label": null | "En curso" | "Incierta" | "Fallida" | "Vetada por ti" | "Descartada por la política" | "Caducada" | "Sustituida",
+  "important": false, "at": "iso", "date": "2026-11-07", "text": "…" | null, "reaction": "linkedin_like" | null,
+  "target": { "kind": "post | person | own", "name": "…", "headline": "…", "url": "…", "post_excerpt": "…", "contact_id": "uuid", "role": "par" },
+  "url": "enlace en LinkedIn", "rationale": "…", "decided_by": "gustavo | lider | politica | null", "decision_note": "…",
+  "execution_note": "…", "review": { "decision": "approve | discard", "answers": { "aporta": 0.92 }, "reasons": [], "model": "jev-1.14.0" }, "piece_id": "uuid" | null }
+```
+
+- Un `tipo` desconocido devuelve 404.
+- Vetar una pieza o una acción en cola es `POST /api/v1/operador/actions/<id>/reject {"note"}`. En una acción de red, descarta a la persona.
+
+### Personas
+
+- **`GET /api/v1/red/contacts`.** Además de `stage` y `source`, admite:
+  - `stage=opportunity`, que filtra por las personas con una oportunidad abierta;
+  - `q` (nombre o titular), `role` y `modality`.
+- **Campos nuevos de `ContactOutput`:**
+
+```json
+{ "display_stage": "candidate | fit | followed | invited | connected | incoming | closed | discarded | opportunity",
+  "notes": [{ "id": "…", "at": "iso", "text": "…", "by": "gustavo" }],
+  "opportunity": { "id": "uuid", "stage": "reunion", "stage_label": "Reunión", "modality": "projectapp", "next_action": "…", "next_action_at": "iso" } | null,
+  "next_step": { "owner": "equipo | gustavo | null", "text": "El equipo la invitará cuando termine la espera", "at": "iso" | null,
+                 "action": { "id": "uuid", "capability": "RED-02", "state": "approved" } },
+  "your_turn": false, "last_event": { "at": "iso", "event": "followed", "detail": "…" } | null }
+```
+
+- **`POST /api/v1/red/contacts/<id>/notas`** recibe `{ "text" }`, añade una nota y devuelve el contacto (201).
+- **`GET /api/v1/red/summary`.** `stages` añade `opportunity` (número) y `conversation` (`null` hasta que llegue el inbox).
+- **Oportunidades.** `GET /api/v1/oportunidades?stage=&modality=&contact=` devuelve una lista paginada de `OpportunityOutput`:
+
+```json
+{ "id": "uuid", "person": "Laura Gómez", "contact": { "id": "uuid", "display_name": "…", "headline": "…", "profile_url": "…", "stage": "connected", "role": "comprador" } | null,
+  "person_name": "", "company": "Retail SAS", "modality": "personal_startups | projectapp | por_clasificar",
+  "channel": "linkedin | email | llamada | evento | otro",
+  "stage": "conversacion | necesidad | cualificada | reunion | propuesta | acuerdo | sin_acuerdo",
+  "attribution": "cito_contenido | lo_dijo | inferido | desconocido", "need": "…", "budget": "…", "dedication": "…",
+  "next_action": "…", "next_action_at": "iso" | null, "notes": "…", "history": [{ "at": "iso", "event": "created | stage", "detail": "Conversación → Reunión" }],
+  "days_in_stage": 3, "created_at": "iso", "updated_at": "iso", "stage_changed_at": "iso", "closed_at": "iso" | null }
+```
+
+- **Escrituras de oportunidades:**
+  - `POST /api/v1/oportunidades` exige `modality` y además `contact` o `person_name` (400 si falta la persona).
+  - `PATCH /api/v1/oportunidades/<id>` acepta cualquier campo del formulario.
+  - `DELETE /api/v1/oportunidades/<id>` devuelve 204.
+- **Referentes:**
+  - `ReferentOutput` añade `contacts_count`: las personas del barrio que salieron de sus posts.
+  - `PATCH /api/v1/operador/referents/<id>` recibe `{ "active": false, "reason": "…" }` para desactivar, reactivar o cambiar el motivo.
+  - `DELETE /api/v1/operador/referents/<id>` lo quita y devuelve 204.
+
+### Ajustes
 
 **`GET /api/v1/ajustes`**
 
 ```json
-{ "autonomy": { "INT-03": "auto", "RED-02": "auto" },
+{ "autonomy": { "INT-03": "auto", "INT-02": "auto", "CONT-09": "auto", "RED-01": "auto", "RED-02": "auto", "RED-04": "auto" },
   "lead": { "enabled": true, "capabilities": ["INT-03","CONT-09","RED-01","RED-02","RED-04"], "model": "jev-1.14.0" },
-  "limits": { "INT-03": { "daily": 3, "weekly": 12 } }, "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota" },
-  "ai_spend": { "anthropic_month_usd": 4.2, "anthropic_total_usd": 9.8, "anthropic_limit_usd": 50 },
-  "orientation": { "text": "…", "updated_at": "iso", "updated_by": "gustavo" } }
+  "limits": { "INT-03": { "daily": 3, "weekly": 12 } },
+  "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota", "open_now": true, "min_spacing_seconds": 1200 },
+  "ai_spend": { "today": [{ "budget": "general | editorial | red", "label": "General (comentarios)", "spent_usd": 0.13, "limit_usd": 0.6 }],
+                "month_usd": 4.2, "total_usd": 9.8, "limit_usd": 50, "lead_month_usd": 0.01 },
+  "facts_count": 12, "orientation": { "text": "…", "updated_at": "iso", "updated_by": "gustavo" } }
 ```
+
+### Notificaciones push
+
+| Notificación | Destino |
+| --- | --- |
+| Pieza lista, publicada, bloqueada o descartada | `/calendario/pieza/<id>` |
+| Acción incierta, cuenta en pausa, LinkedIn caduca pronto | `/tu-turno` |
+| Pregunta nueva («{Rol} te pregunta: …») | `/tu-turno` |

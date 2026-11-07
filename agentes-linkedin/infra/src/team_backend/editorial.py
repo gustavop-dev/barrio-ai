@@ -349,7 +349,7 @@ def _run(piece,user,now,origin_job):
     for item in (brief.get('questions_for_gustavo') or [])[:2]:
         if isinstance(item,dict):
             preguntas.ask('director_editorial',item.get('question'),item.get('purpose'),item.get('memory_key'),
-                          bool(item.get('public')),origin=f'piece:{piece.id}')
+                          bool(item.get('public')),origin=f'piece:{piece.id}',deadline=piece.scheduled_for)
     piece.brief=brief;piece.signals=[s for s in signals if s['id'] in set(brief.get('signals_used',[]))]
     piece.save(update_fields=['brief','signals','updated_at'])
     if brief.get('decision')!='write':
@@ -378,7 +378,7 @@ def _run(piece,user,now,origin_job):
     piece.save(update_fields=['verification','updated_at'])
     if reasons:
         notify('Barrio AI: pieza bloqueada',f'El verificador bloqueó la pieza del {piece.slot_date:%d/%m}: {reasons[0][:160]}',
-               url=f'/editorial/{piece.id}',tag='barrio-pieza')
+               url=f'/calendario/pieza/{piece.id}',tag='barrio-pieza')
         return _close(piece,EditorialPiece.State.BLOCKED,'; '.join(reasons))
     risks=[f'Observación menor: {f.get("detail") or f.get("issue")}' for f in review.get('findings',[]) if f.get('severity')=='minor']
     risks+=[f'Objeción conservada: {o}' for o in selection.get('kept_objections',[])]

@@ -49,6 +49,12 @@ def current_version(namespace,key):
     with connect() as c:
         return c.execute('SELECT coalesce(max(version),0) AS v FROM memory WHERE namespace=%s AND key=%s',(namespace,key)).fetchone()['v']
 
+def confirmed_history(namespace,key):
+    """Confirmed versions of one key, newest first."""
+    with connect() as c:
+        return c.execute("SELECT version,value,created_at FROM memory WHERE namespace=%s AND key=%s AND status='confirmed' ORDER BY version DESC",
+                         (namespace,key)).fetchall()
+
 def set_fact(key,value,author,evidence,on_write=None):
     """Human-only: propose and confirm a user fact in one step (an answer, a correction or a withdrawal)."""
     proposed=propose('user',key,value,author,evidence,expected_version=current_version('user',key))

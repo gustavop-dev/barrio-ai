@@ -220,7 +220,7 @@ def set_account_pause(account,reason,actor=None):
     account.paused=True;account.paused_reason=reason
     _audit(actor,'operator.account_paused',account.id,reason=reason)
     from .alerts import notify
-    notify('Barrio AI: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.')
+    notify('Barrio AI: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.',url='/tu-turno',tag='barrio-cuenta')
 
 # --------------------------------------------------------------------------- proposals
 
@@ -356,7 +356,7 @@ def _publish(execution,proposal,connector,user):
     elif readable:result=_finish(execution,'sent',user,note='Publicada (201 con URN); aún no visible al releer. Se conciliará sin repetir.')
     else:result=_finish(execution,'confirmed',user,note='Confirmada por la respuesta 201 de la Posts API (x-restli-id); '
                         'w_member_social no permite releer y no hay cuenta Unipile.')
-    notify('Barrio AI: pieza publicada',text[:140],url=f'/editorial/{proposal.piece_id}',tag='barrio-pieza')
+    notify('Barrio AI: pieza publicada',text[:140],url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
     return result
 
 def execute(user,proposal_id):
@@ -417,7 +417,7 @@ def execute(user,proposal_id):
     except ConnectorUncertain as exc:
         from .alerts import notify
         notify('Barrio AI: acción incierta',f'{proposal.get_capability_display()}: el proveedor no confirmó. Se conciliará sin repetir.',
-               url='/acciones?state=uncertain',tag='barrio-incierta')
+               url='/tu-turno',tag='barrio-incierta')
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
         if exc.pause:set_account_pause(account,f'Detenida por el proveedor: {exc}',user)

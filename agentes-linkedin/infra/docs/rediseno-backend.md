@@ -42,85 +42,116 @@ Los umbrales empiezan conservadores. Se ajustarán con los resultados reales: lo
 ## Preguntas del equipo (`preguntas.py`)
 
 `TeamQuestion` guarda:
-- quién pregunta (el agente);
-- qué necesita saber y para qué (`purpose`);
-- la clave de memoria;
-- si sugiere uso público;
-- el estado (abierta, respondida, no quiere compartirlo o retirada);
-- la respuesta.
+- quién pregunta y qué necesita saber;
+- para qué lo necesita (`purpose`);
+- el tipo de respuesta: texto, sí o no con detalle, una opción, número o fecha;
+- las opciones, la visibilidad sugerida y el plazo (`deadline`, por ejemplo la hora de la pieza para la que se pregunta);
+- el aplazamiento, el estado y la respuesta.
 
 De dónde salen las preguntas:
-- **Agentes.**
-  - El director editorial puede pedir hasta 2 hechos por pieza, cuando una experiencia real de Gustavo haría la pieza claramente mejor. Van en el campo `questions_for_gustavo` del brief.
-  - `preguntas.ask()` no repite una clave abierta, rechazada, retirada ni ya conocida.
-  - Cada pregunta nueva llega por push.
-- **Memoria pendiente.** Cada hecho propuesto y aún no confirmado se convierte en una pregunta de confirmación, que se sincroniza al abrir Tu turno.
+- **El director editorial** puede pedir hasta 2 hechos por pieza (`questions_for_gustavo` en el brief), con la hora de la pieza como plazo.
+- **La memoria propuesta pendiente** llega como preguntas de confirmación.
+- `preguntas.ask()` no repite una clave abierta, rechazada, retirada ni ya conocida. Cada pregunta nueva llega por push: «{Rol} te pregunta: …».
 
-Cómo se responden:
-- **Responder** (`POST /api/v1/preguntas/<id>/responder`, con `{text?, public_use?, accept?}`) guarda la respuesta como memoria confirmada `{texto, uso_publico}` con `memory.set_fact`. `accept=true` confirma tal cual el dato propuesto de una pregunta de confirmación. Solo los hechos con `uso_publico=true` pueden contarse con la voz de Gustavo en público.
-- **«No quiero compartir esto»** (`POST /api/v1/preguntas/<id>/no-compartir`) cierra esa clave para siempre.
-- Las dos acciones requieren sesión humana y el permiso `confirm_memory`.
+Cómo se resuelven:
+- **Responder.** La respuesta se guarda como memoria confirmada `{texto, uso_publico}`. En las respuestas cortas (sí o no, opción, número, fecha), `texto` incluye la pregunta para que el dato se entienda solo.
+- **Deshacer.** Dentro de los 15 minutos siguientes, devuelve la memoria a su versión anterior (o la retira si no había) y reabre la pregunta.
+- **Más tarde.** La pospone 3 días.
+- **No quiero compartir esto.** Cierra la clave para siempre.
+- **Vencidas.** Una pregunta cuyo plazo ya pasó sigue visible, pero no cuenta como pendiente.
 
-**«Lo que el equipo sabe de ti»** está en `GET /api/v1/memoria/hechos`, que devuelve `[{key, text, public_use, version, updated_at}]`.
-- `POST …/<key>/corregir` (`{text, public_use}`) confirma una versión nueva.
-- `POST …/<key>/retirar` (`{reason?}`) confirma una lápida `{retirado: true}`. Los agentes dejan de usar ese dato y su historial se conserva.
+**«Lo que el equipo sabe de ti».** Cada dato confirmado muestra:
+- su tema (la pregunta o el tema escrito por Gustavo);
+- de dónde vino: respondió a un agente, lo añadió él o venía de la memoria;
+- la visibilidad;
+- cuántas veces se editó.
+
+Gustavo puede añadir un dato a mano, que se confirma directamente; corregirlo, con una versión nueva; o retirarlo, con una lápida confirmada que conserva el historial.
 
 ## Orientación (`orientacion.py`)
 
-`GET` y `PUT /api/v1/orientacion` (`{text}`, máximo 4000 caracteres, con sesión humana). Es la dirección de alto nivel que Gustavo le da al equipo, por ejemplo:
-- «más founders técnicos de EE. UU., menos marketers»;
-- «empujar IA aplicada a operaciones»;
-- «esta semana nada de invitaciones».
-
-La leen:
+`GET` y `PUT /api/v1/orientacion` (máximo 4000 caracteres, con sesión humana). Es la dirección de alto nivel de Gustavo. La leen:
 - el redactor de comentarios;
-- el director, los redactores, la selección y el verificador del circuito editorial;
+- el circuito editorial;
 - el clasificador de la red;
 - el agente líder.
 
-Es orientación privada: entra en `guardas.blocks()`, así que las comprobaciones de filtración también la protegen.
+Las comprobaciones de filtración la protegen como orientación privada (`guardas.blocks()`).
 
 ## Oportunidades (`oportunidades.py`)
 
-`Opportunity` guarda:
-- persona opcional;
-- título;
-- modalidad: `personal_startups` o `projectapp`;
-- etapa: conversación → necesidad → cualificada → reunión → propuesta → acuerdo, o perdida;
-- origen: `inbound`, `outbound`, `referido` u `otro`;
-- notas e historial.
+Siguen el formulario de Personas:
+- persona del barrio, o nombre y empresa de alguien fuera de la red;
+- modalidad: Startups (personal), ProjectApp o Por clasificar;
+- canal: LinkedIn, email, llamada, evento u otro;
+- etapa: conversación → necesidad identificada → cualificada → reunión → propuesta → acuerdo, o cerrada sin acuerdo;
+- cómo llegó: citó un post o el perfil, lo dijo la persona, se infiere o se desconoce;
+- necesidad, presupuesto o compensación, y dedicación;
+- siguiente acción con su fecha, que aparece en el calendario;
+- notas, historial y días en la etapa.
 
-Endpoints:
-- `GET /api/v1/oportunidades?stage=&modality=&contact=`;
-- `POST /api/v1/oportunidades`;
-- `GET` y `PATCH /api/v1/oportunidades/<id>`.
+Las escrituras requieren sesión humana y `approve_actions`.
 
-Las escrituras requieren sesión humana y `approve_actions`. Por ahora Gustavo las registra a mano desde Personas; el analista las propondrá cuando exista la lectura del inbox.
+## Tu turno, Calendario, Personas y Ajustes
 
-## Tu turno, Actividad y Ajustes
+**Tu turno** (`GET /api/v1/tu-turno`) entrega tarjetas completas, cada una con:
+- tipo y tono;
+- el agente que la pide;
+- título en imperativo;
+- cuerpo y plazo;
+- sus acciones con el endpoint y el cuerpo que hay que enviar.
 
-- **`GET /api/v1/tu-turno`** devuelve `{count, questions, tasks:{perfil:[], conversaciones:[]}, alerts, summary}`.
-  - Avisos, cada uno con su acción:
-    - LinkedIn caduca o caducó (Reconectar);
-    - acciones inciertas («¿Salió o no?», con el endpoint para resolverlas);
-    - máquina detenida;
-    - cuenta en pausa;
-    - invitaciones limitadas por LinkedIn;
-    - presupuesto de IA al 80 % o más.
-  - `summary` trae lo hecho hoy y la próxima pieza, para el estado vacío.
-  - Las tareas de perfil y de conversaciones llegan en fases posteriores del plan.
-- **`GET /api/v1/actividad?tipo=&limit=&descartadas=1`** es una sola línea de tiempo:
-  - `upcoming.pieces`: piezas programadas, con `vetoable`;
-  - `upcoming.queued`: acciones aprobadas esperando su turno;
-  - `done`: lo confirmado, con texto, objetivo, enlace, justificación y quién decidió (`gustavo`, `lider` o `politica`);
-  - `discarded`: opcional.
-  - `tipo` admite comentarios, reacciones, publicaciones, seguimientos, invitaciones y aceptaciones.
-- **`GET /api/v1/ajustes`** devuelve:
-  - el modo de cada capacidad;
-  - el estado del líder;
-  - topes y ventana;
-  - el gasto de Anthropic del mes, el acumulado y el techo;
-  - la orientación.
+Avisos, según el spec:
+- LinkedIn caducado (crítico);
+- LinkedIn caduca pronto;
+- acción incierta (crítica), con lo que se intentó y los botones «Sí, se aplicó» y «No se aplicó», que piden nota;
+- máquina detenida desde la app (crítica, con Reanudar);
+- máquina detenida desde el servidor (crítica, sin acción);
+- cuenta en pausa.
+
+Lo informativo no entra: las invitaciones limitadas, las piezas bloqueadas y el presupuesto se ven en Personas, Calendario y Ajustes.
+
+Además, la respuesta trae:
+- el contador y si hay algo crítico;
+- el elemento más urgente (`top`), para la Oficina;
+- las preguntas pospuestas o vencidas aparte (`later`);
+- lo resuelto en los últimos 7 días;
+- el resumen del día para el estado vacío.
+
+Las tareas de perfil y de conversaciones llegan con las fases del ciclo de Perfil y del inbox.
+
+**Calendario** (`GET /api/v1/calendario`) devuelve, por día local, los conteos menudos y los eventos importantes, en cinco capas:
+
+| Capa | Eventos |
+| --- | --- |
+| Tuyo | Plazos de preguntas, siguientes acciones y reuniones de oportunidades, caducidad de LinkedIn y lo que Gustavo resolvió |
+| Publicaciones | Cada pieza con su estado |
+| Red | Conexiones nuevas que encajan (agrupadas), invitaciones recibidas y aceptadas, e invitaciones previstas al terminar la espera de 48 h (como estimación) |
+| Conversaciones | Oportunidades nuevas o que cambian de etapa |
+| Sistema | Paradas, reanudaciones, cuentas en pausa y acciones inciertas o fallidas |
+
+La **vista Lista** (`GET /api/v1/actividad`) trae «Próximo» y todo lo hecho, con filtros y paginación:
+- **Próximo:** la pieza con su estado, etapa, tesis, primeras líneas, pilar, modalidad y lector; y las acciones en cola, con la hora estimada de salida según la ventana y el espaciado.
+- **Cada elemento:** texto, extracto del post original, reacción, persona con su rol, enlace, justificación, quién decidió y su estado traducido.
+
+**Personas:**
+- **Cada persona trae:**
+  - su etapa visible, que es «Oportunidad» si tiene una abierta;
+  - el siguiente paso y de quién depende;
+  - sus notas;
+  - su oportunidad abierta.
+- **La lista** busca por nombre o titular y filtra por rol y modalidad.
+- **Los referentes** se desactivan, se reactivan o se quitan, y muestran cuántas personas salieron de sus posts.
+
+**Ajustes** reúne:
+- el modo de cada capacidad y el estado del líder;
+- la ventana (abierta o cerrada ahora) y el espaciado;
+- topes;
+- el gasto de IA de hoy por presupuesto (general, editorial y red) frente a su tope, más el mes, el total y lo gastado en Jev;
+- el número de datos confirmados;
+- la orientación.
+
+**Notificaciones push.** Las piezas llevan a `/calendario/pieza/<id>`. Las acciones inciertas, la cuenta en pausa, la caducidad de LinkedIn y las preguntas llevan a `/tu-turno`.
 
 ## Configuración
 

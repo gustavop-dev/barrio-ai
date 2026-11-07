@@ -107,7 +107,7 @@ class QuestionTests(OperatorBase):
         self.propose_fact('identidad.rol','Fundador de ProjectApp.',True)
         turn=self.human.get('/api/v1/tu-turno').json()
         self.assertEqual(turn['count'],1)
-        question=turn['questions'][0]
+        question=turn['questions'][0]['question']
         self.assertEqual((question['kind'],question['memory_key'],question['suggested_public']),('confirm','identidad.rol',True))
         self.assertEqual(self.api.post(f'/api/v1/preguntas/{question["id"]}/responder',{'accept':True},format='json').status_code,403)
         answered=self.human.post(f'/api/v1/preguntas/{question["id"]}/responder',{'accept':True},format='json').json()
@@ -152,43 +152,140 @@ class DirectorQuestionTests(EditorialBase):
 
 
 class OpportunityAndTurnTests(OperatorBase):
-    def test_opportunities_are_tracked_by_hand_with_history(self):
-        self.assertEqual(self.api.post('/api/v1/oportunidades',{'title':'x','modality':'projectapp'},format='json').status_code,403)
-        created=self.human.post('/api/v1/oportunidades',{'title':'ERP para retail','modality':'projectapp','origin':'inbound'},format='json')
+    def test_opportunities_follow_the_form_with_history(self):
+        self.assertEqual(self.api.post('/api/v1/oportunidades',{'person_name':'x','modality':'projectapp'},format='json').status_code,403)
+        self.assertEqual(self.human.post('/api/v1/oportunidades',{'modality':'projectapp'},format='json').status_code,400)  # who is it?
+        created=self.human.post('/api/v1/oportunidades',{'person_name':'Laura Gómez','company':'Retail SAS','modality':'projectapp',
+            'channel':'email','attribution':'lo_dijo','need':'ERP de inventario','next_action':'Llamada de alcance',
+            'next_action_at':'2026-11-10T15:00:00Z'},format='json')
         self.assertEqual(created.status_code,201,created.content)
-        oid=created.json()['id']
+        body=created.json();oid=body['id']
+        self.assertEqual((body['person'],body['stage'],body['days_in_stage'],body['contact']),('Laura Gómez','conversacion',0,None))
         moved=self.human.patch(f'/api/v1/oportunidades/{oid}',{'stage':'acuerdo','notes':'Firmado'},format='json').json()
         self.assertEqual((moved['stage'],moved['notes']),('acuerdo','Firmado'));self.assertIsNotNone(moved['closed_at'])
         self.assertIn('Conversación → Acuerdo',moved['history'][-1]['detail'])
         self.assertEqual(len(self.human.get('/api/v1/oportunidades?modality=projectapp').json()['results']),1)
+        self.assertEqual(self.human.delete(f'/api/v1/oportunidades/{oid}').status_code,204)
 
-    def test_tu_turno_alerts_bring_their_action(self):
+    def test_tu_turno_alerts_follow_the_spec(self):
         post=self.observed()[0]
         proposal=operador.create_proposal(self.gustavo,post,'INT-03',{'text':GOOD})
         ActionProposal.objects.filter(pk=proposal.pk).update(state='uncertain')
         operador.set_global_pause(self.gustavo,True,'Revisar el tono')
-        with patch('team_backend.connectors_linkedin.status_payload',return_value={'connected':True,'expiring_soon':True,'expired':False,'days_left':4}):
+        with patch('team_backend.connectors_linkedin.status_payload',return_value={'connected':True,'expiring_soon':True,'expired':False,
+                                                                                   'days_left':4,'expires_at':'2026-11-11T10:00:00+00:00'}):
             turn=self.human.get('/api/v1/tu-turno').json()
         ids={a['id'].split(':')[0] for a in turn['alerts']}
-        self.assertEqual(ids,{'linkedin_token','uncertain','machine_paused'})
+        self.assertEqual(ids,{'linkedin_expiring','uncertain','machine_paused'})
         uncertain=next(a for a in turn['alerts'] if a['id'].startswith('uncertain'))
-        self.assertEqual(uncertain['action']['endpoint'],f'/api/v1/operador/actions/{proposal.id}/resolve')
-        self.assertEqual(turn['count'],3);self.assertEqual(turn['tasks'],{'perfil':[],'conversaciones':[]})
+        self.assertTrue(uncertain['critical']);self.assertEqual(uncertain['attempt']['text'],GOOD)
+        self.assertEqual([a['body'] for a in uncertain['actions']],[{'outcome':'confirmed'},{'outcome':'failed'}])
+        self.assertEqual((turn['count'],turn['critical'],turn['counts']),(3,True,{'avisos':3,'preguntas':0,'tareas':0}))
+        self.assertTrue(turn['top']['critical']);self.assertEqual(turn['tasks'],{'perfil':[],'conversaciones':[]})
+        expiring=next(a for a in turn['alerts'] if a['id']=='linkedin_expiring')
+        self.assertFalse(expiring['critical'])
 
-    def test_activity_timeline_and_settings(self):
+    def test_list_view_upcoming_and_settings(self):
         post=self.observed()[0]
         done=self.approve(self.proposal(post))
         self.assertEqual(done.state,'confirmed')
         discarded=operador.create_proposal(self.gustavo,post,'INT-02',{'reaction':'linkedin_like'})
         ActionProposal.objects.filter(pk=discarded.pk).update(state='discarded',decision_note='Descartada por el líder (jev-1.14.0)',
                                                               review={'decision':'discard','reasons':['Líder: no aporta']})
-        activity=self.human.get('/api/v1/actividad?descartadas=1').json()
-        item=activity['done'][0]
-        self.assertEqual((item['label'],item['target']['kind'],item['decided_by'],item['text']),('Comentario','post','gustavo',
-            'Evals are where most of the work hides. Which failure modes do you test first?'))
-        self.assertEqual(activity['discarded'][0]['decided_by'],'lider')
-        self.assertEqual(self.human.get('/api/v1/actividad?tipo=invitaciones').json()['done'],[])
+        listed=self.human.get('/api/v1/actividad').json()
+        self.assertEqual([i['capability'] for i in listed['items']],['INT-03'])  # what did not go out stays hidden
+        item=listed['items'][0]
+        self.assertEqual((item['label'],item['target']['kind'],item['decided_by'],item['agent'],item['state_label']),
+                         ('Comentario','post','gustavo','relaciones_comunidad',None))
+        self.assertIn('Shipping AI agents',item['target']['post_excerpt'])
+        with_hidden=self.human.get('/api/v1/actividad?no_salio=1').json()['items']
+        self.assertEqual(next(i for i in with_hidden if i['capability']=='INT-02')['decided_by'],'lider')
+        self.assertEqual(self.human.get('/api/v1/actividad?tipo=red').json()['items'],[])
         self.assertEqual(self.human.get('/api/v1/actividad?tipo=otra').status_code,404)
         settings=self.human.get('/api/v1/ajustes').json()
         self.assertEqual((settings['autonomy']['INT-03'],settings['autonomy']['RED-02']),('auto','approval'))
-        self.assertIn('RED-01',settings['limits']);self.assertFalse(settings['lead']['enabled'])
+        self.assertEqual([b['budget'] for b in settings['ai_spend']['today']],['general','editorial','red'])
+        self.assertIn('open_now',settings['window']);self.assertFalse(settings['lead']['enabled'])
+
+
+class QuestionFlowTests(OperatorBase):
+    def setUp(self):
+        super().setUp();self.grant(self.gustavo,'confirm_memory','propose_memory')
+
+    def test_typed_answers_postpone_undo_and_expiry(self):
+        yes=preguntas.ask('director_editorial','¿Aceptas proyectos de 3 meses?','Para saber qué oportunidades priorizar','oferta.proyectos_cortos',
+                          answer_type='yes_no')
+        self.assertEqual(self.human.post(f'/api/v1/preguntas/{yes.id}/responder',{'value':'quizas'},format='json').status_code,400)
+        self.human.post(f'/api/v1/preguntas/{yes.id}/responder',{'value':'si','text':'Solo remotos','public_use':False},format='json')
+        _,private=memory.confirmed_blocks()
+        self.assertIn('¿Aceptas proyectos de 3 meses? Sí. Solo remotos',[g['guidance']['texto'] for g in private])
+        undone=self.human.post(f'/api/v1/preguntas/{yes.id}/deshacer',{},format='json').json()
+        self.assertEqual(undone['state'],'open');self.assertEqual(memory.confirmed_blocks(),([],[]))
+        choice=preguntas.ask('perfil','¿Qué modalidad prefieres?','Para el titular','oferta.modalidad',answer_type='choice',options=['Tiempo completo','Parcial'])
+        self.human.post(f'/api/v1/preguntas/{choice.id}/mas-tarde',{},format='json')
+        late=preguntas.ask('perfil','¿En qué ciudad vives?','Para el perfil','identidad.ciudad',deadline=timezone.now()-timedelta(hours=1))
+        turn=self.human.get('/api/v1/tu-turno').json()
+        self.assertEqual(turn['counts']['preguntas'],1)  # the undone one; postponed and expired do not count
+        self.assertEqual({c['question']['id'] for c in turn['later']},{str(choice.id),str(late.id)})
+        self.assertTrue(next(c for c in turn['later'] if c['question']['id']==str(late.id))['question']['expired'])
+
+    def test_facts_show_their_origin_and_gustavo_can_add_one(self):
+        q=preguntas.ask('director_editorial','¿Cuál fue tu primer cliente con IA?','Para un post','experiencia.primer_cliente_ia')
+        self.human.post(f'/api/v1/preguntas/{q.id}/responder',{'text':'Una firma jurídica.','public_use':True},format='json')
+        added=self.human.post('/api/v1/memoria/hechos',{'text':'No trabajo con apuestas.','public_use':False,'topic':'Límites'},format='json')
+        self.assertEqual(added.status_code,201)
+        facts={f['topic']:f for f in added.json()}
+        self.assertEqual(facts['¿Cuál fue tu primer cliente con IA?']['origin']['agent_label'],'Director editorial')
+        self.assertEqual((facts['Límites']['origin']['kind'],facts['Límites']['public_use']),('manual',False))
+        key=facts['Límites']['key']
+        self.human.post(f'/api/v1/memoria/hechos/{key}/corregir',{'text':'Nada de apuestas ni cripto.','public_use':False},format='json')
+        edited=next(f for f in self.human.get('/api/v1/memoria/hechos').json() if f['key']==key)
+        self.assertEqual((edited['edits'],edited['topic']),(2,'Límites'))
+
+
+class PersonasAndCalendarTests(OperatorBase):
+    def setUp(self):
+        super().setUp();from django.contrib.auth.models import User
+        self.fit=Contact.objects.create(account=self.account,provider_user_id='ACoana',display_name='Ana Founder',headline='Founder @ Tiny',
+            source='commenter',stage='followed',followed_at=timezone.now()-timedelta(hours=10),
+            classification={'fit':True,'role':'comprador','modality':'projectapp','reason':'r','confidence':0.9})
+
+    def test_person_card_next_step_notes_opportunity_and_filters(self):
+        card=self.human.get(f'/api/v1/red/contacts/{self.fit.id}').json()
+        self.assertEqual((card['display_stage'],card['next_step']['owner']),('followed','equipo'))
+        self.human.post(f'/api/v1/red/contacts/{self.fit.id}/notas',{'text':'La conocí en un evento'},format='json')
+        self.human.post('/api/v1/oportunidades',{'contact':str(self.fit.id),'modality':'projectapp','stage':'reunion',
+                                                  'next_action':'Reunión de alcance','next_action_at':timezone.now().isoformat()},format='json')
+        card=self.human.get(f'/api/v1/red/contacts/{self.fit.id}').json()
+        self.assertEqual((card['display_stage'],card['opportunity']['stage'],card['notes'][0]['text']),('opportunity','reunion','La conocí en un evento'))
+        self.assertEqual(card['next_step']['owner'],'gustavo')
+        self.assertEqual(len(self.human.get('/api/v1/red/contacts?stage=opportunity').json()['results']),1)
+        self.assertEqual(len(self.human.get('/api/v1/red/contacts?q=tiny&role=comprador').json()['results']),1)
+        self.assertEqual(self.human.get('/api/v1/red/summary').json()['stages']['opportunity'],1)
+
+    def test_referents_can_be_deactivated_and_removed(self):
+        self.observed()
+        referent=self.human.get('/api/v1/operador/referents').json()['results'][0]
+        self.assertEqual(referent['contacts_count'],0)
+        off=self.human.patch(f'/api/v1/operador/referents/{referent["id"]}',{'active':False},format='json').json()
+        self.assertFalse(off['active'])
+        self.assertEqual(self.human.delete(f'/api/v1/operador/referents/{referent["id"]}').status_code,204)
+
+    def test_calendar_days_bring_counts_and_layered_events(self):
+        post=self.observed()[0]
+        self.approve(self.proposal(post))
+        Contact.objects.create(account=self.account,provider_user_id='ACoeva',display_name='Eva',source='commenter',stage='connected',
+                               connected_at=timezone.now(),classification={'fit':True,'role':'par'})
+        q=preguntas.ask('director_editorial','¿Lideraste una migración?','Para el post del jueves','experiencia.migracion',deadline=timezone.now()+timedelta(hours=2))
+        operador.set_global_pause(self.gustavo,True,'Prueba');operador.set_global_pause(self.gustavo,False)
+        today=timezone.now().astimezone(operador.local_tz()).date()
+        body=self.human.get(f'/api/v1/calendario?desde={today}&hasta={today+timedelta(days=3)}').json()
+        day=next(d for d in body['days'] if d['date']==str(today))
+        self.assertEqual((day['counts']['comments'],day['counts']['connections_fit']),(1,1))
+        kinds={(e['layer'],e['kind']) for e in day['events']}
+        self.assertTrue({('red','connection_fit'),('sistema','machine_paused'),('sistema','machine_resumed')}<=kinds,kinds)
+        deadline_day=next(d for d in body['days'] if any(e['kind']=='deadline' for e in d['events']))
+        self.assertEqual(next(e for e in deadline_day['events'] if e['kind']=='deadline')['link'],'/tu-turno')
+        expected=[e for d in body['days'] for e in d['events'] if e['kind']=='invite_expected']
+        self.assertEqual(expected[0]['people'][0]['name'],'Ana Founder');self.assertFalse(expected[0]['important'])
+        self.assertEqual(self.human.get('/api/v1/calendario?desde=2026-01-01&hasta=2026-12-31').status_code,400)
