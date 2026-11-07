@@ -67,6 +67,17 @@ class ReadTests(InboxBase):
         self.assertEqual(self.fake.state['writes'],0)
         self.read_inbox()  # nothing new: the list is read again, the thread is not
         self.assertEqual((conversaciones.reads_today(self.account,'chats'),conversaciones.reads_today(self.account,'messages')),(2,1))
+
+    def test_each_configured_inbox_is_one_read(self):
+        self.chat()
+        asked=[]
+        original=FakeConnector.list_chats
+        def spy(connector,limit=20,inbox='CLASSIC_PRIMARY'):
+            asked.append(inbox);return original(connector,limit,inbox=inbox)
+        with patch.dict(os.environ,{'INBOX_IDS':'CLASSIC_PRIMARY, COMPANY_1_PRIMARY'}),patch.object(FakeConnector,'list_chats',spy):
+            self.read_inbox()
+        self.assertEqual(asked,['CLASSIC_PRIMARY','COMPANY_1_PRIMARY'])
+        self.assertEqual(conversaciones.reads_today(self.account,'chats'),2)
         self.assertEqual(len(self.jev.requests),1)
 
     def test_old_chats_are_kept_from_the_list_only_and_groups_are_skipped(self):
@@ -120,7 +131,8 @@ class ReadTests(InboxBase):
         with patch.dict(os.environ,{'LIVE_LINKEDIN':'true','UNIPILE_API_KEY':'test-only'}):
             connector=UnipileConnector('acc_test1',transport=httpx.MockTransport(unipile))
             chats=connector.list_chats(20);messages=connector.list_chat_messages('2-abc==',10)
-        self.assertEqual(seen,[('GET','/v2/acc_test1/chats',{'limit':'20'}),('GET','/v2/acc_test1/chats/2-abc==/messages',{'limit':'10'})])
+        self.assertEqual(seen,[('GET','/v2/acc_test1/inboxes/CLASSIC_PRIMARY/chats',{'limit':'20'}),
+                               ('GET','/v2/acc_test1/chats/2-abc==/messages',{'limit':'10'})])
         self.assertEqual((chats[0]['type'],chats[0]['user_id'],chats[0]['last_message']['id'],chats[0]['last_message_at'].hour),('1to1','ACoLucia','m2',15))
         self.assertEqual([(m['id'],m['is_sender'],m['hidden']) for m in messages],[('m2',False,False),('m1',True,True)])
         self.assertEqual(messages[0]['sender']['public_identifier'],'lucia-ficticia')

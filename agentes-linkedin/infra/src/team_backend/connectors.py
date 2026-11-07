@@ -215,8 +215,10 @@ class UnipileConnector:
     # -- inbox (conversaciones.py): reads only. There is deliberately no method that sends, marks as read or edits a
     # message: answering or committing terms stays with Gustavo. Unipile v2 reference «List all Chats» and «List all
     # Chat Messages» (consulted 2026-11-07): GET chats?limit and GET chats/{chat_id}/messages?limit, both newest first.
-    def list_chats(self,limit=20):
-        return [_chat(c) for c in self._read(self._path('chats'),{'limit':limit}).get('data',[]) if c.get('id')]
+    def list_chats(self,limit=20,inbox='CLASSIC_PRIMARY'):
+        # LinkedIn has no «List all Chats» in v2 (it answers 501 api/not_implemented): chats are listed per inbox
+        # («List inbox Chats»), e.g. CLASSIC_PRIMARY or a company page's COMPANY_<id>_PRIMARY (GET /v2/{acc}/inboxes).
+        return [_chat(c) for c in self._read(self._path('inboxes',inbox,'chats'),{'limit':limit}).get('data',[]) if c.get('id')]
 
     def list_chat_messages(self,chat_id,limit=10):
         return [_message(m) for m in self._read(self._path('chats',chat_id,'messages'),{'limit':limit}).get('data',[]) if m.get('id')]
@@ -396,7 +398,7 @@ class FakeConnector:
         if mode=='rate_limit':raise ConnectorError('Simulado: HTTP 429.',status=429,kind='provider/too_many_requests',pause=True)
         if mode=='reject':raise ConnectorError('Simulado: HTTP 404.',status=404,kind='provider/resource_not_found')
 
-    def list_chats(self,limit=20):
+    def list_chats(self,limit=20,inbox='CLASSIC_PRIMARY'):
         self._read_fail();rows=[]
         for cid,chat in self.state['chats'].items():
             last=chat['messages'][-1] if chat['messages'] else None
