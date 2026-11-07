@@ -14,9 +14,9 @@ Detalle de cada pantalla de la oficina rediseñada: bloques, campos de cada elem
 1. [Marco común](#marco-común)
 2. [Oficina (inicio)](#1-oficina-inicio)
 3. [Tu turno](#2-tu-turno)
-4. [Resultados](#3-resultados)
-5. [Personas](#4-personas)
-6. [Calendario](#5-calendario)
+4. [Calendario](#3-calendario)
+5. [Resultados](#4-resultados)
+6. [Personas](#5-personas)
 7. [Ajustes](#6-ajustes)
 8. [Login](#7-login)
 9. [Notificaciones push](#notificaciones-push)
@@ -33,9 +33,9 @@ Detalle de cada pantalla de la oficina rediseñada: bloques, campos de cada elem
 |---|---|---|---|
 | 1 | Oficina | `/` | Oficina |
 | 2 | Tu turno | `/tu-turno` | Tu turno |
-| 3 | Resultados | `/resultados` | Resultados |
-| 4 | Personas | `/personas` | Personas |
-| 5 | Calendario | `/calendario` | Calendario |
+| 3 | Calendario | `/calendario` | Calendario |
+| 4 | Resultados | `/resultados` | Resultados |
+| 5 | Personas | `/personas` | Personas |
 | 6 | Ajustes | `/ajustes` | — (icono en la barra superior) |
 
 - **Escritorio (≥ 900 px):**
@@ -43,7 +43,7 @@ Detalle de cada pantalla de la oficina rediseñada: bloques, campos de cada elem
   - La vista activa se resalta.
 - **Móvil (< 900 px):**
   - Barra superior con el logo a la izquierda y el icono de Ajustes a la derecha.
-  - Barra inferior fija con 5 entradas (Oficina, Tu turno, Resultados, Personas y Calendario), cada una con icono y etiqueta corta.
+  - Barra inferior fija con 5 entradas (Oficina, Tu turno, Calendario, Resultados y Personas), cada una con icono y etiqueta corta.
   - Respetar el área segura inferior del iPhone (PWA instalada).
 - **Contador de Tu turno:** número de pendientes en la entrada de navegación (escritorio y móvil).
   - Rojo si hay algún aviso crítico; neutro si solo hay preguntas o tareas.
@@ -282,211 +282,7 @@ Aquí Gustavo responde lo que los agentes necesitan saber de él. Las respuestas
 
 ---
 
-## 3. Resultados
-
-**Objetivo:** saber si vamos bien, en el orden negocio → audiencia → contenido → equipo.
-
-**Se llega desde:** la navegación.
-
-### Estructura
-
-- **Cabecera:** «Resultados» y dos controles.
-  - **Periodo:** 7 días, 28 días (por defecto) o 90 días. Todo se compara con el periodo anterior de igual duración.
-  - **Modalidad:** Todo, Startups (personal) o ProjectApp. Afecta a las secciones 1 y 2; el contenido y el equipo no se separan por modalidad.
-  - Indicador «Periodo en curso: datos hasta hoy {hora}».
-- **4 secciones** con su título y su pregunta, por ejemplo «1 · ¿Genera negocio?».
-- **Escritorio:** las fichas de KPI en una rejilla de 4 columnas; los gráficos a 2 columnas o a ancho completo.
-- **Móvil:** fichas en 2 columnas y gráficos a ancho completo. Las tablas pasan a lista de tarjetas.
-
-### Ficha de KPI (componente)
-
-| Parte | Contenido |
-|---|---|
-| Nombre | «Conversaciones pertinentes». |
-| Valor | Número grande. |
-| Variación | ▲ o ▼, con el valor absoluto o el %, frente al periodo anterior. Verde o rojo según convenga; gris si no hay comparación válida. |
-| Minigráfico | Serie del periodo (opcional por ficha). |
-| Definición | Icono ⓘ con la definición y la fórmula exacta. |
-| Sin dato | Guion largo y el motivo: «Disponible cuando conectemos el inbox». **No mostrar 0.** |
-
-### Sección 1 · ¿Genera negocio? (nuevo en su totalidad)
-
-- **Fichas:**
-  - Conversaciones pertinentes (abiertas en el periodo).
-  - Oportunidades abiertas.
-  - Reuniones.
-  - Propuestas enviadas.
-  - Acuerdos.
-- **Embudo de oportunidades:** barras horizontales por etapa (conversación → necesidad → cualificada → reunión → propuesta → acuerdo), con el número de cada etapa y la conversión entre etapas. «Cerrada sin acuerdo» aparece aparte.
-- **Reparto por modalidad:** barra apilada Startups / ProjectApp frente al objetivo 60/40, marcado con una línea.
-- **Inbound:** ficha con las personas que encajan y escribieron o invitaron sin que las buscáramos.
-- **Lista «Oportunidades activas»:** las 5 más recientes, cada una con persona, empresa, modalidad, etapa y siguiente paso. Lleva a la ficha en Personas.
-
-### Sección 2 · ¿Llegamos a la gente correcta?
-
-| Elemento | Definición | Datos |
-|---|---|---|
-| Seguidores | Total y crecimiento neto del periodo | Nuevo |
-| Conexiones | Total y crecimiento neto | Nuevo |
-| Visitas al perfil | Visitas en el periodo | Nuevo, por comprobar si se puede obtener |
-| Conexiones nuevas que encajan | Contactos que pasaron a `connected` en el periodo y tienen `fit = true` | Existe: `red/contacts` |
-| Composición por rol | Barras: comprador, par, recomendador, divulgador, líder y aliado entre las conexiones nuevas que encajan | Existe: `classification.role` |
-| Tasa de aceptación | Conectados / (conectados + cerrados), sobre las invitaciones resueltas en el periodo | Existe: etapas e historial |
-| Embudo de la red | Por clasificar → encaja → seguido → invitado → conectado, con descartados aparte | Existe: `red/summary.stages` |
-| Personas recurrentes | Quienes interactuaron 2 o más veces en el periodo, con un top 5 enlazado a Personas | Nuevo |
-
-### Sección 3 · ¿El contenido aporta?
-
-- **Fichas:**
-  - Impresiones (mediana por post, a los 7 días).
-  - Interacción % = (reacciones + comentarios + republicaciones) / impresiones.
-  - Comentarios con sustancia.
-  - Constancia: días publicados frente a días previstos.
-- **Gráfico:** barras de impresiones por post a lo largo del periodo, con una línea para la mediana de las 4 semanas anteriores. Cada barra lleva al detalle de la pieza.
-- **Destacado «Mejor post del periodo»:** primera línea del texto, fecha, pilar, impresiones e interacción. Lleva al detalle.
-- **Comparación por pilar:** barras pequeñas con la interacción media de Del negocio al producto, IA aplicada y Arquitectura y entrega.
-- **Tabla «Posts del periodo»:**
-  - Columnas: fecha, primera línea, pilar, impresiones a 24 h, impresiones a 7 días, reacciones, comentarios, republicaciones, interacción % y quién comentó (chips por rol del barrio).
-  - Se puede ordenar por cualquier columna.
-  - En móvil pasa a tarjetas.
-- **Datos:**
-  - Lista de posts publicados: existe (`editorial/calendar` y `pieces`).
-  - Cortes a 24 h, 72 h y 7 días, reacciones, comentarios y republicaciones: nuevo. Hoy solo hay un corte de impresiones tomado al publicar, así que no es fiable.
-
-### Sección 4 · ¿El equipo trabaja bien? (compacta)
-
-- Una fila de fichas pequeñas:
-  - Comentarios publicados y cuántos recibieron respuesta.
-  - Seguidos, invitados y aceptados.
-  - Piezas publicadas, bloqueadas y vetadas.
-  - **Gasto de IA:** «X USD de Y USD», del día en la fase 1 y del mes cuando exista.
-- **Datos:** los conteos existen en `operador/actions` (hace falta un endpoint que agregue); el gasto diario existe en el overview y en `red/summary`; el gasto mensual es nuevo.
-
-### Reglas
-
-- Nunca sumar alcance de posts distintos como personas únicas.
-- Comparar posts con la misma edad: 24 h con 24 h y 7 días con 7 días.
-- Si falta el denominador o es cero, la ficha muestra «sin dato», no 0 %.
-- Las variaciones solo se calculan entre periodos completos y comparables. Si el periodo anterior no tiene datos, la variación va en gris: «sin comparación».
-
-### Estados
-
-- **Fase 1:** las fichas sin datos usan el estado «aún no disponible», que debe verse intencional y no roto. La sección 1 completa puede mostrar un único bloque: «Mediremos oportunidades cuando registres la primera o conectemos el inbox», con el botón «Registrar una oportunidad».
-- **Cargando:** esqueleto de las fichas.
-- **Error:** por sección.
-
----
-
-## 4. Personas
-
-**Objetivo:** con quién estamos hablando y cuál es el siguiente paso con cada persona.
-
-**Se llega desde:** la navegación, las tarjetas de conversación de Tu turno, el Calendario (al tocar a una persona) y Resultados (oportunidades y recurrentes).
-
-### Estructura
-
-- **Pestañas:** **Barrio** (contactos, por defecto) · **Oportunidades** · **Referentes**.
-- **Escritorio:** la lista a la izquierda (unos 420 px) y la ficha a la derecha. La URL cambia a `/personas/:id`.
-- **Móvil:** la lista a pantalla completa; la ficha abre en otra pantalla, con «← Personas».
-
-### Pestaña Barrio
-
-**Datos:** existen `GET /api/v1/red/contacts?stage=&source=`, `GET /api/v1/red/contacts/<id>` y `GET /api/v1/red/summary`. **Nuevo:** las etapas «En conversación» y «Oportunidad», las notas y la búsqueda por nombre.
-
-**Avisos arriba** (si aplican):
-- «La red está apagada en el servidor» (`enabled = false`).
-- «Invitaciones en pausa hasta {fecha}: LinkedIn las limitó» (`invites_blocked`), con el motivo.
-
-**Embudo como filtro:** chips con recuento, en este orden:
-- Por clasificar, Encaja, Seguido, Invitado, Conectado, En conversación, Oportunidad.
-- Después, separados: Te invitó, Cerrado, Descartado.
-- Tocar un chip filtra la lista; «Todas» lo quita.
-
-**Más filtros:** búsqueda por nombre; rol del barrio; modalidad; origen (comentó en un post, búsqueda, te invitó o añadido a mano).
-
-**Orden:** actividad más reciente primero.
-
-**Fila de la lista:**
-
-| Parte | Contenido |
-|---|---|
-| Avatar | Iniciales (hoy no hay foto en los datos). |
-| Nombre | `display_name`. |
-| Titular | Una línea, truncada. |
-| Etapa | Badge. |
-| Clasificación | Chip del rol y chip de la modalidad. «Sin clasificar todavía» si no hay. |
-| Origen | Breve: «Comentó en un post de {referente}», «Búsqueda: {query}» o «Te invitó». |
-| Última actividad | «Hace X» y el último evento: «Seguido hace 2 días». |
-| Te toca | Punto o badge «Te toca» si tiene un elemento en Tu turno. |
-
-**Ficha de la persona:**
-
-1. **Cabecera:**
-   - Nombre (enlace ↗ al perfil de LinkedIn), titular, ubicación, grado (1.er, 2.º, 3.er o fuera de tu red) y «Lo sigues» si aplica.
-   - Botón **Abrir en LinkedIn**.
-2. **Recorrido:** línea de etapas horizontal (vertical en móvil): Descubierto → Seguido → Invitado → Conectado → En conversación → Oportunidad.
-   - Cada paso alcanzado lleva su fecha (`discovered_at`, `followed_at`, `invited_at` y `connected_at`).
-   - Las ramas Cerrado y Descartado se muestran como final alternativo.
-3. **Siguiente paso:** una frase, y de quién depende.
-   - Del equipo: «El equipo la invitará a partir del {followed_at + 48 h}», «Esperando que acepte la invitación (enviada hace 3 días)» o «Se aceptará su invitación».
-   - De Gustavo: «Te toca: responder su mensaje», con enlace a Tu turno.
-   - Si hay una acción abierta: el tipo, el estado y el enlace al Calendario.
-4. **Por qué encaja:** rol, modalidad, afinidad, el motivo (texto del modelo) y la confianza en %. Debajo, «Clasificada el {fecha}».
-5. **De dónde salió:**
-   - Comentó en un post: el referente, un extracto del comentario y el enlace al post.
-   - Búsqueda: la consulta usada.
-   - Te invitó: el mensaje de la invitación, si lo hay.
-6. **Conversación** (nuevo): el resumen del analista, los últimos 3 mensajes con fecha y autor, y «Abrir en LinkedIn».
-7. **Oportunidad** (nuevo; solo si la persona la tiene): ver la pestaña Oportunidades.
-8. **Notas** (nuevo): notas libres de Gustavo con fecha, y «Añadir nota».
-9. **Historial completo:** todos los eventos, del más reciente al más antiguo, cada uno con la etiqueta del evento, la fecha y el detalle.
-
-**Acciones de la ficha:**
-- **Marcar como oportunidad** (nuevo): abre el formulario de oportunidad.
-- **Descartar:** con nota obligatoria. Solo en Por clasificar, Encaja, Seguido y Te invitó. Avisa de que la persona no volverá a proponerse. Existe: `POST /red/contacts/<id>/discard`.
-- **Añadir nota** (nuevo).
-
-**Estados:**
-- **Vacío:** «Aún no hay personas. El equipo empieza a descubrir cuando lee los comentarios de los referentes».
-- **Filtro sin resultados:** «Nadie en «{etapa}» ahora mismo».
-- **Cargando:** esqueleto de filas.
-- **Error:** con «Reintentar».
-
-### Pestaña Oportunidades (nuevo)
-
-- **Escritorio:** tablero por etapas en columnas (Conversación, Necesidad identificada, Cualificada, Reunión, Propuesta, Acuerdo), con «Cerradas sin acuerdo» plegada.
-- **Móvil:** lista agrupada por etapa.
-- **Tarjeta:** persona, empresa, badge de modalidad, siguiente acción con su fecha y los días que lleva en esa etapa.
-- **Mover de etapa:** arrastrar en escritorio, o el selector «Etapa» dentro de la tarjeta (obligatorio en móvil).
-- **Formulario «Nueva oportunidad / Editar»:**
-
-| Campo | Tipo | Obligatorio |
-|---|---|---|
-| Persona | Buscador de Personas, o «Alguien fuera de la red» con nombre y empresa | Sí |
-| Modalidad | Startups (personal), ProjectApp o Por clasificar | Sí |
-| Canal | LinkedIn, email, llamada, evento u otro | Sí |
-| Etapa | Las 7 etapas | Sí |
-| Necesidad | Texto corto | No |
-| Presupuesto / compensación | Texto o rango | No |
-| Dedicación | Texto | No |
-| Cómo llegó | Citó un post o el perfil, lo dijo la persona, se infiere o se desconoce | Sí |
-| Siguiente acción y fecha | Texto y fecha | No |
-| Notas | Texto | No |
-
-### Pestaña Referentes
-
-**Datos:** existen `GET /api/v1/operador/referents?account=`, `POST /api/v1/operador/referents` y `POST /api/v1/operador/observe`. **Nuevo:** desactivar y quitar referentes.
-
-- **Lista:** nombre (con enlace ↗ al perfil), motivo, badge Activo o Inactivo, «Observado hace X» o «Aún sin observar».
-- **Nuevo en la lista:** cuántas personas del barrio salieron de sus posts.
-- **Botón «Añadir referente»:** abre un modal con la URL del perfil (validada como `linkedin.com/in/…`, con error en el propio campo) y el motivo, obligatorio.
-- **Botón «Observar ahora»:** pone en cola una lectura y lo confirma con «Observación encolada. Los posts nuevos aparecerán en unos minutos».
-- **Por referente (nuevo):** Desactivar o reactivar, y Quitar con confirmación.
-- **Selector de cuenta:** solo si hay más de una.
-
----
-
-## 5. Calendario
+## 3. Calendario
 
 **Objetivo:** ver día a día las tareas y las acciones importantes: lo que hizo el equipo, lo que tiene programado y lo que te toca a ti. Desde aquí se puede vetar lo que aún no salió.
 
@@ -708,6 +504,210 @@ Mientras no exista, el frontend puede montar las capas Publicaciones (calendario
 - **Futuro lejano** (más de 15 días): «Todavía no hay nada programado tan lejos».
 - **Capa sin datos todavía** (fase 1): su chip aparece desactivado, con «Aún no disponible».
 - **Error:** con «Reintentar», sin perder la cuadrícula.
+
+---
+
+## 4. Resultados
+
+**Objetivo:** saber si vamos bien, en el orden negocio → audiencia → contenido → equipo.
+
+**Se llega desde:** la navegación.
+
+### Estructura
+
+- **Cabecera:** «Resultados» y dos controles.
+  - **Periodo:** 7 días, 28 días (por defecto) o 90 días. Todo se compara con el periodo anterior de igual duración.
+  - **Modalidad:** Todo, Startups (personal) o ProjectApp. Afecta a las secciones 1 y 2; el contenido y el equipo no se separan por modalidad.
+  - Indicador «Periodo en curso: datos hasta hoy {hora}».
+- **4 secciones** con su título y su pregunta, por ejemplo «1 · ¿Genera negocio?».
+- **Escritorio:** las fichas de KPI en una rejilla de 4 columnas; los gráficos a 2 columnas o a ancho completo.
+- **Móvil:** fichas en 2 columnas y gráficos a ancho completo. Las tablas pasan a lista de tarjetas.
+
+### Ficha de KPI (componente)
+
+| Parte | Contenido |
+|---|---|
+| Nombre | «Conversaciones pertinentes». |
+| Valor | Número grande. |
+| Variación | ▲ o ▼, con el valor absoluto o el %, frente al periodo anterior. Verde o rojo según convenga; gris si no hay comparación válida. |
+| Minigráfico | Serie del periodo (opcional por ficha). |
+| Definición | Icono ⓘ con la definición y la fórmula exacta. |
+| Sin dato | Guion largo y el motivo: «Disponible cuando conectemos el inbox». **No mostrar 0.** |
+
+### Sección 1 · ¿Genera negocio? (nuevo en su totalidad)
+
+- **Fichas:**
+  - Conversaciones pertinentes (abiertas en el periodo).
+  - Oportunidades abiertas.
+  - Reuniones.
+  - Propuestas enviadas.
+  - Acuerdos.
+- **Embudo de oportunidades:** barras horizontales por etapa (conversación → necesidad → cualificada → reunión → propuesta → acuerdo), con el número de cada etapa y la conversión entre etapas. «Cerrada sin acuerdo» aparece aparte.
+- **Reparto por modalidad:** barra apilada Startups / ProjectApp frente al objetivo 60/40, marcado con una línea.
+- **Inbound:** ficha con las personas que encajan y escribieron o invitaron sin que las buscáramos.
+- **Lista «Oportunidades activas»:** las 5 más recientes, cada una con persona, empresa, modalidad, etapa y siguiente paso. Lleva a la ficha en Personas.
+
+### Sección 2 · ¿Llegamos a la gente correcta?
+
+| Elemento | Definición | Datos |
+|---|---|---|
+| Seguidores | Total y crecimiento neto del periodo | Nuevo |
+| Conexiones | Total y crecimiento neto | Nuevo |
+| Visitas al perfil | Visitas en el periodo | Nuevo, por comprobar si se puede obtener |
+| Conexiones nuevas que encajan | Contactos que pasaron a `connected` en el periodo y tienen `fit = true` | Existe: `red/contacts` |
+| Composición por rol | Barras: comprador, par, recomendador, divulgador, líder y aliado entre las conexiones nuevas que encajan | Existe: `classification.role` |
+| Tasa de aceptación | Conectados / (conectados + cerrados), sobre las invitaciones resueltas en el periodo | Existe: etapas e historial |
+| Embudo de la red | Por clasificar → encaja → seguido → invitado → conectado, con descartados aparte | Existe: `red/summary.stages` |
+| Personas recurrentes | Quienes interactuaron 2 o más veces en el periodo, con un top 5 enlazado a Personas | Nuevo |
+
+### Sección 3 · ¿El contenido aporta?
+
+- **Fichas:**
+  - Impresiones (mediana por post, a los 7 días).
+  - Interacción % = (reacciones + comentarios + republicaciones) / impresiones.
+  - Comentarios con sustancia.
+  - Constancia: días publicados frente a días previstos.
+- **Gráfico:** barras de impresiones por post a lo largo del periodo, con una línea para la mediana de las 4 semanas anteriores. Cada barra lleva al detalle de la pieza.
+- **Destacado «Mejor post del periodo»:** primera línea del texto, fecha, pilar, impresiones e interacción. Lleva al detalle.
+- **Comparación por pilar:** barras pequeñas con la interacción media de Del negocio al producto, IA aplicada y Arquitectura y entrega.
+- **Tabla «Posts del periodo»:**
+  - Columnas: fecha, primera línea, pilar, impresiones a 24 h, impresiones a 7 días, reacciones, comentarios, republicaciones, interacción % y quién comentó (chips por rol del barrio).
+  - Se puede ordenar por cualquier columna.
+  - En móvil pasa a tarjetas.
+- **Datos:**
+  - Lista de posts publicados: existe (`editorial/calendar` y `pieces`).
+  - Cortes a 24 h, 72 h y 7 días, reacciones, comentarios y republicaciones: nuevo. Hoy solo hay un corte de impresiones tomado al publicar, así que no es fiable.
+
+### Sección 4 · ¿El equipo trabaja bien? (compacta)
+
+- Una fila de fichas pequeñas:
+  - Comentarios publicados y cuántos recibieron respuesta.
+  - Seguidos, invitados y aceptados.
+  - Piezas publicadas, bloqueadas y vetadas.
+  - **Gasto de IA:** «X USD de Y USD», del día en la fase 1 y del mes cuando exista.
+- **Datos:** los conteos existen en `operador/actions` (hace falta un endpoint que agregue); el gasto diario existe en el overview y en `red/summary`; el gasto mensual es nuevo.
+
+### Reglas
+
+- Nunca sumar alcance de posts distintos como personas únicas.
+- Comparar posts con la misma edad: 24 h con 24 h y 7 días con 7 días.
+- Si falta el denominador o es cero, la ficha muestra «sin dato», no 0 %.
+- Las variaciones solo se calculan entre periodos completos y comparables. Si el periodo anterior no tiene datos, la variación va en gris: «sin comparación».
+
+### Estados
+
+- **Fase 1:** las fichas sin datos usan el estado «aún no disponible», que debe verse intencional y no roto. La sección 1 completa puede mostrar un único bloque: «Mediremos oportunidades cuando registres la primera o conectemos el inbox», con el botón «Registrar una oportunidad».
+- **Cargando:** esqueleto de las fichas.
+- **Error:** por sección.
+
+---
+
+## 5. Personas
+
+**Objetivo:** con quién estamos hablando y cuál es el siguiente paso con cada persona.
+
+**Se llega desde:** la navegación, las tarjetas de conversación de Tu turno, el Calendario (al tocar a una persona) y Resultados (oportunidades y recurrentes).
+
+### Estructura
+
+- **Pestañas:** **Barrio** (contactos, por defecto) · **Oportunidades** · **Referentes**.
+- **Escritorio:** la lista a la izquierda (unos 420 px) y la ficha a la derecha. La URL cambia a `/personas/:id`.
+- **Móvil:** la lista a pantalla completa; la ficha abre en otra pantalla, con «← Personas».
+
+### Pestaña Barrio
+
+**Datos:** existen `GET /api/v1/red/contacts?stage=&source=`, `GET /api/v1/red/contacts/<id>` y `GET /api/v1/red/summary`. **Nuevo:** las etapas «En conversación» y «Oportunidad», las notas y la búsqueda por nombre.
+
+**Avisos arriba** (si aplican):
+- «La red está apagada en el servidor» (`enabled = false`).
+- «Invitaciones en pausa hasta {fecha}: LinkedIn las limitó» (`invites_blocked`), con el motivo.
+
+**Embudo como filtro:** chips con recuento, en este orden:
+- Por clasificar, Encaja, Seguido, Invitado, Conectado, En conversación, Oportunidad.
+- Después, separados: Te invitó, Cerrado, Descartado.
+- Tocar un chip filtra la lista; «Todas» lo quita.
+
+**Más filtros:** búsqueda por nombre; rol del barrio; modalidad; origen (comentó en un post, búsqueda, te invitó o añadido a mano).
+
+**Orden:** actividad más reciente primero.
+
+**Fila de la lista:**
+
+| Parte | Contenido |
+|---|---|
+| Avatar | Iniciales (hoy no hay foto en los datos). |
+| Nombre | `display_name`. |
+| Titular | Una línea, truncada. |
+| Etapa | Badge. |
+| Clasificación | Chip del rol y chip de la modalidad. «Sin clasificar todavía» si no hay. |
+| Origen | Breve: «Comentó en un post de {referente}», «Búsqueda: {query}» o «Te invitó». |
+| Última actividad | «Hace X» y el último evento: «Seguido hace 2 días». |
+| Te toca | Punto o badge «Te toca» si tiene un elemento en Tu turno. |
+
+**Ficha de la persona:**
+
+1. **Cabecera:**
+   - Nombre (enlace ↗ al perfil de LinkedIn), titular, ubicación, grado (1.er, 2.º, 3.er o fuera de tu red) y «Lo sigues» si aplica.
+   - Botón **Abrir en LinkedIn**.
+2. **Recorrido:** línea de etapas horizontal (vertical en móvil): Descubierto → Seguido → Invitado → Conectado → En conversación → Oportunidad.
+   - Cada paso alcanzado lleva su fecha (`discovered_at`, `followed_at`, `invited_at` y `connected_at`).
+   - Las ramas Cerrado y Descartado se muestran como final alternativo.
+3. **Siguiente paso:** una frase, y de quién depende.
+   - Del equipo: «El equipo la invitará a partir del {followed_at + 48 h}», «Esperando que acepte la invitación (enviada hace 3 días)» o «Se aceptará su invitación».
+   - De Gustavo: «Te toca: responder su mensaje», con enlace a Tu turno.
+   - Si hay una acción abierta: el tipo, el estado y el enlace al Calendario.
+4. **Por qué encaja:** rol, modalidad, afinidad, el motivo (texto del modelo) y la confianza en %. Debajo, «Clasificada el {fecha}».
+5. **De dónde salió:**
+   - Comentó en un post: el referente, un extracto del comentario y el enlace al post.
+   - Búsqueda: la consulta usada.
+   - Te invitó: el mensaje de la invitación, si lo hay.
+6. **Conversación** (nuevo): el resumen del analista, los últimos 3 mensajes con fecha y autor, y «Abrir en LinkedIn».
+7. **Oportunidad** (nuevo; solo si la persona la tiene): ver la pestaña Oportunidades.
+8. **Notas** (nuevo): notas libres de Gustavo con fecha, y «Añadir nota».
+9. **Historial completo:** todos los eventos, del más reciente al más antiguo, cada uno con la etiqueta del evento, la fecha y el detalle.
+
+**Acciones de la ficha:**
+- **Marcar como oportunidad** (nuevo): abre el formulario de oportunidad.
+- **Descartar:** con nota obligatoria. Solo en Por clasificar, Encaja, Seguido y Te invitó. Avisa de que la persona no volverá a proponerse. Existe: `POST /red/contacts/<id>/discard`.
+- **Añadir nota** (nuevo).
+
+**Estados:**
+- **Vacío:** «Aún no hay personas. El equipo empieza a descubrir cuando lee los comentarios de los referentes».
+- **Filtro sin resultados:** «Nadie en «{etapa}» ahora mismo».
+- **Cargando:** esqueleto de filas.
+- **Error:** con «Reintentar».
+
+### Pestaña Oportunidades (nuevo)
+
+- **Escritorio:** tablero por etapas en columnas (Conversación, Necesidad identificada, Cualificada, Reunión, Propuesta, Acuerdo), con «Cerradas sin acuerdo» plegada.
+- **Móvil:** lista agrupada por etapa.
+- **Tarjeta:** persona, empresa, badge de modalidad, siguiente acción con su fecha y los días que lleva en esa etapa.
+- **Mover de etapa:** arrastrar en escritorio, o el selector «Etapa» dentro de la tarjeta (obligatorio en móvil).
+- **Formulario «Nueva oportunidad / Editar»:**
+
+| Campo | Tipo | Obligatorio |
+|---|---|---|
+| Persona | Buscador de Personas, o «Alguien fuera de la red» con nombre y empresa | Sí |
+| Modalidad | Startups (personal), ProjectApp o Por clasificar | Sí |
+| Canal | LinkedIn, email, llamada, evento u otro | Sí |
+| Etapa | Las 7 etapas | Sí |
+| Necesidad | Texto corto | No |
+| Presupuesto / compensación | Texto o rango | No |
+| Dedicación | Texto | No |
+| Cómo llegó | Citó un post o el perfil, lo dijo la persona, se infiere o se desconoce | Sí |
+| Siguiente acción y fecha | Texto y fecha | No |
+| Notas | Texto | No |
+
+### Pestaña Referentes
+
+**Datos:** existen `GET /api/v1/operador/referents?account=`, `POST /api/v1/operador/referents` y `POST /api/v1/operador/observe`. **Nuevo:** desactivar y quitar referentes.
+
+- **Lista:** nombre (con enlace ↗ al perfil), motivo, badge Activo o Inactivo, «Observado hace X» o «Aún sin observar».
+- **Nuevo en la lista:** cuántas personas del barrio salieron de sus posts.
+- **Botón «Añadir referente»:** abre un modal con la URL del perfil (validada como `linkedin.com/in/…`, con error en el propio campo) y el motivo, obligatorio.
+- **Botón «Observar ahora»:** pone en cola una lectura y lo confirma con «Observación encolada. Los posts nuevos aparecerán en unos minutos».
+- **Por referente (nuevo):** Desactivar o reactivar, y Quitar con confirmación.
+- **Selector de cuenta:** solo si hay más de una.
 
 ---
 

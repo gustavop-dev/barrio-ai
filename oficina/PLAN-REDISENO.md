@@ -18,13 +18,13 @@ Lo que hizo el equipo, por qué lo hizo y cuánto costó queda como consulta sec
 |---|---|---|
 | **Oficina** (inicio) | `/` | La escena del equipo trabajando. Se queda como inicio. |
 | **Tu turno** | `/tu-turno` | Lo que depende de ti: preguntas del equipo, tareas y avisos. Lleva un contador en la navegación. |
+| **Calendario** | `/calendario` | Día a día: lo que hizo el equipo, lo que tiene programado y lo que te toca. Con veto opcional en lo programado. |
 | **Resultados** | `/resultados` | Dashboard para saber si vamos bien. |
 | **Personas** | `/personas` | Prospectos, red y conversaciones, cada uno con su siguiente paso. |
-| **Calendario** | `/calendario` | Día a día: lo que hizo el equipo, lo que tiene programado y lo que te toca. Con veto opcional en lo programado. |
 | **Ajustes** | `/ajustes` | Conexiones, notificaciones, parada total, autonomía, gasto de IA y referentes. |
 
 - **Escritorio:** las 6 vistas en la barra lateral.
-- **Móvil:** barra inferior con 5 (Oficina, Tu turno, Resultados, Personas y Calendario); Ajustes va en un icono de la barra superior.
+- **Móvil:** barra inferior con 5 (Oficina, Tu turno, Calendario, Resultados y Personas); Ajustes va en un icono de la barra superior.
 - El banner de pausa sigue visible en todas las vistas.
 
 ## 1. Oficina (inicio)
@@ -74,7 +74,29 @@ Lo que se rompe sin ti:
 
 La pieza del día **no** entra: sale sola. Aparece en el Calendario con «Vetar» hasta su hora y llega por push.
 
-## 3. Resultados
+## 3. Calendario
+
+Junta Acciones, el calendario de Contenido y el feed de Máquina. Sustituye a la vista Actividad que se había planteado.
+
+- **Vistas Mes, Semana y Lista.** En móvil, por defecto, una semana compacta con el detalle del día debajo.
+- **Capas de color que se pueden ocultar:**
+  - Tuyo: plazos de Tu turno, reuniones y caducidad de LinkedIn.
+  - Publicaciones.
+  - Red.
+  - Conversaciones y oportunidades.
+  - Sistema: pausas y acciones inciertas o fallidas.
+- **En la cuadrícula solo va lo importante.** Comentarios, reacciones, seguimientos e invitaciones salen como conteo en el resumen del día.
+- **Panel del día:**
+  - el resumen («1 post · 6 comentarios · 4 seguidos»);
+  - tu parte;
+  - la publicación del día, con «Vetar» si aún no salió;
+  - lo programado y lo importante;
+  - «Ver todo lo del día».
+- **Vista Lista:** la línea de tiempo completa, con el bloque «Próximo» (pieza programada y acciones en cola) arriba.
+- **Detalle de una pieza** (`/calendario/pieza/:id`): la página actual de Pieza, aligerada. Arriba quedan el texto final y el resultado; el brief, las variantes, el panel de lectores y el verificador pasan a secciones plegadas, bajo «Cómo se escribió».
+- **Inciertas:** se ven aquí, pero se resuelven desde Tu turno.
+
+## 4. Resultados
 
 El orden sigue `agentes-linkedin/infra/docs/datos-y-resultados-del-equipo.md`: lo principal son las oportunidades y lo demás es apoyo. Todo se compara con el periodo anterior (semana contra semana, o las últimas 4 semanas), y «sin dato» nunca se muestra como 0.
 
@@ -114,7 +136,7 @@ El orden sigue `agentes-linkedin/infra/docs/datos-y-resultados-del-equipo.md`: l
 | Inbox y conversaciones | No está implementado. Unipile documenta los chats y sus webhooks. |
 | Oportunidades y sus etapas | No existen todavía. |
 
-## 4. Personas
+## 5. Personas
 
 Nace de la vista Red y absorbe Referentes.
 
@@ -128,28 +150,6 @@ Nace de la vista Red y absorbe Referentes.
   - **siguiente paso**, y de quién depende: del equipo o tuyo.
 - **Oportunidades:** Gustavo marca a una persona como oportunidad y mueve su etapa a mano. Cuando exista la lectura del inbox, el analista podrá proponerlo.
 - **Acciones:** *Descartar*, que ya existe. Para referentes: añadir, desactivar y quitar.
-
-## 5. Calendario
-
-Junta Acciones, el calendario de Contenido y el feed de Máquina. Sustituye a la vista Actividad que se había planteado.
-
-- **Vistas Mes, Semana y Lista.** En móvil, por defecto, una semana compacta con el detalle del día debajo.
-- **Capas de color que se pueden ocultar:**
-  - Tuyo: plazos de Tu turno, reuniones y caducidad de LinkedIn.
-  - Publicaciones.
-  - Red.
-  - Conversaciones y oportunidades.
-  - Sistema: pausas y acciones inciertas o fallidas.
-- **En la cuadrícula solo va lo importante.** Comentarios, reacciones, seguimientos e invitaciones salen como conteo en el resumen del día.
-- **Panel del día:**
-  - el resumen («1 post · 6 comentarios · 4 seguidos»);
-  - tu parte;
-  - la publicación del día, con «Vetar» si aún no salió;
-  - lo programado y lo importante;
-  - «Ver todo lo del día».
-- **Vista Lista:** la línea de tiempo completa, con el bloque «Próximo» (pieza programada y acciones en cola) arriba.
-- **Detalle de una pieza** (`/calendario/pieza/:id`): la página actual de Pieza, aligerada. Arriba quedan el texto final y el resultado; el brief, las variantes, el panel de lectores y el verificador pasan a secciones plegadas, bajo «Cómo se escribió».
-- **Inciertas:** se ven aquí, pero se resuelven desde Tu turno.
 
 ## 6. Ajustes
 
