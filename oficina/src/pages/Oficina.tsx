@@ -3,26 +3,25 @@
 // bar with the zone labels and the floating «now» line; below it the legend and the team strip.
 // Tapping a character or a zone opens its panel in a half-height sheet (phone) or the side panel (desktop).
 
+import { nowLine } from '../../../compartido/src/scene/presentation';
+export { nowLine, type NowLine } from '../../../compartido/src/scene/presentation';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useOficinaEventos } from '../api/oficina';
 import { useActivity, useOverview } from '../api/hooks';
-import type { Activity } from '../api/types';
 import { AgentPortrait, Button, ChipStrip, FilterChip, Note, Page } from '../components/ui';
 import { timeAgo } from '../lib/format';
-import { roleActivity, statusesFrom, type SceneStatus } from '../scene/activity';
+import { statusesFrom, type SceneStatus } from '../scene/activity';
 import { BottomSheet } from '../scene/BottomSheet';
-import { OfficeEngine, type NowEntry } from '../scene/engine';
+import { OfficeEngine } from '../scene/engine';
 import { OfficeCanvas, type ScenePick } from '../scene/OfficeCanvas';
 import { RolePanel, TeamPanel, type PanelData } from '../scene/OfficePanels';
 import { PLAN_HEIGHT, PLAN_WIDTH, ZONE_LABELS, sceneScale } from '../scene/plan';
-import { CHARACTER_BY_ID, LIBRARIAN_ID, ROLES, TEAMS, type CharacterId, type RoleId, type TeamId, type ZoneId } from '../scene/roles';
+import { CHARACTER_BY_ID, LIBRARIAN_ID, ROLES, TEAMS, type CharacterId, type TeamId, type ZoneId } from '../scene/roles';
 import { OFICINA_WIDE, REDUCED_MOTION, useMediaQuery, useViewport } from '../scene/useMediaQuery';
 import '../scene/oficina.css';
 
 type Selection = { kind: 'team'; id: TeamId } | { kind: 'role'; id: CharacterId };
 
-/** A narration stays on the «now» line this long; then the line goes back to the roles' real state. */
-const NOW_FRESH_MS = 3 * 60_000;
 /** Room above the scene and below it (top bar, bottom bar) when choosing the scale. */
 const CHROME_HEIGHT = 120;
 
@@ -54,40 +53,6 @@ function revealY(selection: Selection, engine: OfficeEngine): number {
   if (selection.kind === 'role') return engine.byId[selection.id].y - 14;
   const box = TEAMS.find((t) => t.id === selection.id)?.box;
   return box ? box[1] + box[3] / 2 : 0;
-}
-
-export interface NowLine {
-  text: string;
-  role: CharacterId;
-}
-
-/**
- * The floating line on top of the scene: the last real event while it is fresh; otherwise who is working
- * right now, from the activity. Hidden while the activity is unavailable.
- */
-export function nowLine(input: {
-  loading: boolean;
-  unavailable: boolean;
-  paused: boolean;
-  entry: NowEntry | null;
-  statuses: Record<RoleId, SceneStatus>;
-  activity: Activity | undefined;
-  now: number;
-}): NowLine | null {
-  if (input.unavailable) return null;
-  if (input.loading) return { text: 'Abriendo la oficina…', role: LIBRARIAN_ID };
-  if (input.paused) return { text: 'La máquina está en pausa. Nadie toca tu LinkedIn.', role: 'operador_cuenta' };
-  const entry = input.entry;
-  if (entry && input.now - entry.at < NOW_FRESH_MS) return { text: entry.text, role: entry.role ?? LIBRARIAN_ID };
-  const working = ROLES.filter((r) => input.statuses[r.id] === 'trabajando')
-    .map((r) => ({ role: r, info: roleActivity(input.activity, r.id) }))
-    .sort((a, b) => (Date.parse(b.info?.since ?? '') || 0) - (Date.parse(a.info?.since ?? '') || 0));
-  const first = working[0];
-  if (first) {
-    const detail = first.info?.detail?.trim();
-    return { text: detail ? `${first.role.short}: ${detail}` : `${first.role.short} trabaja en su puesto`, role: first.role.id };
-  }
-  return { text: 'Nadie camina: el equipo está en espera.', role: LIBRARIAN_ID };
 }
 
 export function Oficina() {

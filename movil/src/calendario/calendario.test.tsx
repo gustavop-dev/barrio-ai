@@ -1,14 +1,8 @@
 // The calendar's pieces apart from the screen: deep links (and the PWA's legacy paths), the route
-// params, the paging and sheet thresholds, and the Lista grouping.
+// params, the paging threshold and the Lista grouping.
 import { item } from '@compartido/fixtures/calendario';
-import { act, fireEvent, screen } from '@testing-library/react-native';
-import { Text } from 'react-native';
-import { State } from 'react-native-gesture-handler';
-import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
-import { SnapSheet, snapOffsets, snapTarget } from '@/components/ui';
 import { openLink } from '@/navigation';
 import { routeForUrl } from '@/push/routes';
-import { renderApp } from '@/test/render';
 import { gestures } from '@/theme/motion';
 import { groupRows } from './ListView';
 import { pageDirection } from './Pager';
@@ -64,51 +58,6 @@ describe('thresholds', () => {
     expect(pageDirection(-20, -gestures.pager.commitVelocity, width)).toBe(1);
     expect(pageDirection(20, -gestures.pager.commitVelocity, width)).toBe(0);
     expect(pageDirection(-300, 0, 0)).toBe(0);
-  });
-
-  it('snaps the sheet to the nearest point, moves one point with a flick and closes well below half', () => {
-    const offsets = snapOffsets(800);
-    expect(offsets.full).toBe(0);
-    expect(offsets.half).toBe(Math.round(800 * gestures.snapSheet.full) - Math.round(800 * gestures.snapSheet.half));
-    expect(snapTarget(10, 0, offsets)).toBe('full');
-    expect(snapTarget(offsets.half - 10, 0, offsets)).toBe('half');
-    expect(snapTarget(offsets.half + gestures.snapSheet.dismissDistance + 1, 0, offsets)).toBe('closed');
-    expect(snapTarget(offsets.half, -gestures.snapSheet.flickVelocity, offsets)).toBe('full');
-    expect(snapTarget(20, gestures.snapSheet.flickVelocity, offsets)).toBe('half');
-    expect(snapTarget(offsets.half + 5, gestures.snapSheet.flickVelocity, offsets)).toBe('closed');
-  });
-
-  it('closes the snap sheet when its handle is dragged well below half', async () => {
-    const onClose = jest.fn();
-    await renderApp(
-      <SnapSheet label="Hoja" onClose={onClose} testID="hoja">
-        <Text>Contenido</Text>
-      </SnapSheet>,
-    );
-    expect(screen.getByText('Contenido')).toBeOnTheScreen();
-    await act(async () => {
-      fireGestureHandler(getByGestureTestId('hoja-drag'), [
-        { state: State.BEGAN, translationY: 0 },
-        { state: State.ACTIVE, translationY: 200, velocityY: 0 },
-        { state: State.ACTIVE, translationY: 600, velocityY: 0 },
-        { state: State.END, translationY: 600, velocityY: 0 },
-      ]);
-    });
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 400));
-    });
-    expect(onClose).toHaveBeenCalled();
-  });
-
-  it('switches between half and full from the handle', async () => {
-    await renderApp(
-      <SnapSheet label="Hoja" onClose={() => {}} testID="hoja">
-        <Text>Contenido</Text>
-      </SnapSheet>,
-    );
-    await fireEvent.press(screen.getByLabelText('Expandir el panel'));
-    await fireEvent.press(screen.getByLabelText('Reducir el panel'));
-    expect(screen.getByLabelText('Expandir el panel')).toBeOnTheScreen();
   });
 });
 

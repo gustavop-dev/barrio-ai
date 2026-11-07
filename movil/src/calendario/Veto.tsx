@@ -6,7 +6,7 @@ import { vetoConsequence, type VetoTarget } from '@compartido/logic/events';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, ConfirmSheet, Note, T, errorMessage, useSnapSheet, useToast } from '@/components/ui';
+import { Button, ConfirmSheet, Note, T, errorMessage, useToast } from '@/components/ui';
 import { haptic } from '@/theme/motion';
 import { space } from '@/theme/tokens';
 import { scheduleVeto, usePendingVeto } from './pendingVeto';
@@ -17,7 +17,6 @@ export function VetoButton({ target, block = false, size, accessibilityHint }: {
   const [open, setOpen] = useState(false);
   const toast = useToast();
   const client = useQueryClient();
-  const sheet = useSnapSheet();
   const waiting = usePendingVeto(target.actionId);
 
   const confirm = (note: string) => {
@@ -33,8 +32,6 @@ export function VetoButton({ target, block = false, size, accessibilityHint }: {
         toast.show(`No se pudo vetar. ${errorMessage(error)}`, { tone: 'error' });
       },
     });
-    // The toast lives under the day sheet's Modal: close it so «Deshacer» can be seen.
-    sheet?.dismiss();
     toast.show('Vetada', {
       undo: () => {
         toast.show(undo() ? 'Veto deshecho' : 'El veto ya se había enviado');

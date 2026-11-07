@@ -23,7 +23,6 @@ Si una pieza nueva necesita un movimiento que no existe, se añade aquí primero
 | `press` | 18 · 420 · 0.6 | Botón al soltarlo y píldora de la pestaña activa en la barra inferior (`components/ui/Button.tsx`, `components/shell/BottomBar.tsx`). |
 | `toast` | 20 · 260 · 0.9 | El aviso inferior entra subiendo (`layout.toastIn`, en `components/ui/Toast.tsx`). |
 | `pageSnap` | 26 · 240 · 1 | Calendario: la tira de la semana o el mes se asientan en la página siguiente o anterior tras deslizar, o vuelven a su sitio (`calendario/Pager.tsx`). |
-| `sheetSnap` | 26 · 280 · 1 | Una hoja con puntos de anclaje (el panel del día) pasa de media a completa o vuelve (`components/ui/SnapSheet.tsx`). |
 
 ## Duraciones y curvas (`timings`, `easings`)
 
@@ -71,10 +70,6 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `pager.failOffsetY` | 14 pt | Recorrido vertical que deja el toque al scroll de la página. |
 | `pager.commitFraction` | 0.25 | Fracción del ancho que pasa de página al soltar. |
 | `pager.commitVelocity` | 700 pt/s | O un gesto rápido a esta velocidad. |
-| `snapSheet.half` | 0.55 | Altura del anclaje medio del panel del día, como fracción de la pantalla (`components/ui/SnapSheet.tsx`). |
-| `snapSheet.full` | 0.92 | Altura del anclaje completo. |
-| `snapSheet.dismissDistance` | 90 pt | Por debajo del anclaje medio, arrastrar esta distancia más la cierra. |
-| `snapSheet.flickVelocity` | 900 pt/s | Un gesto rápido a esta velocidad salta un anclaje (o la cierra desde el medio). |
 
 ## Vibraciones (`haptics`)
 
@@ -93,5 +88,49 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `tabChange` | selección | Cambiar de pestaña en la barra inferior o en las pestañas de una vista. |
 | `toggle` | sin vibración | Marcar un chip o una opción (`components/ui/Chip.tsx`, `components/ui/Options.tsx`). |
 | `pageChange` | selección | Calendario: deslizar pasa la semana o el mes (`calendario/Pager.tsx`). |
-| `sheetSnap` | sin vibración | Una hoja con anclajes se asienta en otro punto (`components/ui/SnapSheet.tsx`). |
 | `copied` | éxito | El texto final quedó en el portapapeles (`pieza/FinalText.tsx`). |
+
+## Oficina · escena y hoja de detalle
+
+El motor compartido recibe `officeMotion` desde este módulo. Sus valores iniciales proceden de
+`compartido/src/scene/motion.ts` para conservar la coreografía de la PWA; cualquier ajuste nativo se
+sobrescribe en `officeMotion`, sin editar la pantalla ni el motor. El zoom se ajusta a píxeles físicos
+enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas intermedias borrosas.
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `timings.officeNowIn` / `officeNowOut`, `officeLayout.nowIn/nowOut` | 240 ms enter / 160 ms exit | Entrada y salida de la narración flotante en `scene/OficinaScreen.tsx`. |
+| `officeMotion.walkSpeed` | 40 px lógicos/s | Caminatas del motor compartido (`scene/runtime.ts`). |
+| `officeMotion.startGap` / `summaryHold` | 1800 / 2600 ms | Espaciado de eventos y resúmenes. |
+| `officeMotion.ambientFirst` / `ambientEvery` | 9000 / 20000 ms | Café y charla únicamente para roles en espera. |
+| `officeMotion.fadeMs` | 500 ms | Operación sale y vuelve por la puerta. |
+| `officeMotion.questionMs` / `bookMs` / `readMs` | 1800 / 2200 / 1600 ms | Consulta de biblioteca. |
+| `officeMotion.searchMs` / `librarianBookMs` / `handBookMs` | 1400 / 1200 / 900 ms | Búsqueda y entrega del bibliotecario. |
+| `officeMotion.sheetMs` / `handSheetMs` / `conversationMs` / `deliveryMs` | 2200 / 900 / 1800 / 1500 ms | Entrega entre equipos. |
+| `officeMotion.outsideMs` / `doneMs` / `returnMs` | 1300 / 2000 / 800 ms | Publicación ejecutada. |
+| `officeMotion.coffeeMs` / `chatMs` / `chatReplyMs` | 2600 / 2000 / 2200 ms | Pausas de café y conversación. |
+| `officeMotion.runFrameMs` / `idleFrameMs` | 110 / 220 ms | Fotogramas del atlas en `scene/sprites.ts`. |
+| `officeMotion.lightMs` / `bubbleFrameMs` | 700 / 300 ms | Luces de actividad y bocadillos en `scene/Decorations.tsx`. |
+| `officeFrames.stepMs` / `maxDeltaMs` | 16 / 64 ms | Paso fijo y límite de recuperación tras un frame lento. |
+| `officeFrames.reportFrames` / `slowFrameMs` | 300 / 1000÷60 ms | Diagnóstico de desarrollo: delta medio/máximo, frames sobre presupuesto y coste medio del motor. |
+| `officeGestures.minZoom` / `maxZoom` | 1 / 3 | Límites relativos a la escala inicial. |
+| `officeGestures.panDistance` / `tapDistance` | 8 / 10 dp | Activación del desplazamiento y tolerancia de toque. |
+| `officeGestures.tapDurationMs` / `doubleTapMs` | 250 / 280 ms | Duración máxima de toque e intervalo de doble toque. |
+| `officeGestures.touchTarget` | 48 dp | Área mínima al tocar personajes en el canvas. |
+| `officeGestures.sheetActivation` | 8 dp | Inicio del arrastre del asa de `SnapSheet`. |
+| `officeGestures.sheetHalf` / `sheetFull` | 0.5 / 0.88 | Puntos de ajuste de `SnapSheet`, sobre el espacio disponible. |
+| `haptics.officePick` | selección | Selección de un personaje, zona o equipo. |
+
+El panel del día del Calendario también es un `SnapSheet` (`calendario/CalendarioScreen.tsx`), con los mismos tokens.
+
+`SnapSheet` reutiliza `springs.sheetOpen`, `timings.sheetClose` y `gestures.sheet` para volver a un
+punto de ajuste o cerrar; ofrece ampliar/reducir mediante acciones de accesibilidad y Cerrar.
+Con movimiento reducido se desactiva el callback de frames, todos vuelven a su puesto y los nuevos
+eventos solo se narran. La ausencia de foco, el segundo plano y la pausa de máquina también paran el
+callback; los observers de Oficina dejan de consultar al perder foco o pasar a segundo plano.
+
+Para medir en un teléfono: `cd movil && npm start -- --offline`, abrir Oficina en Expo Go con una
+sesión de desarrollo y observar `[Oficina/UI]` cada 300 frames. `meanSimulationMs` mide solo el motor;
+los deltas incluyen el ritmo de presentación, no aíslan el coste de GPU. Comprobar también pan,
+pinch, regreso del fondo y movimiento reducido. El render local de CanvasKit y las pruebas no
+constituyen una medición de 60 fps en Android.

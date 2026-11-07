@@ -28,9 +28,10 @@ import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated'
 import { Icon } from '@/components/icons';
 import { Badge, Button, Card, EmptyState, EmptyText, Skeleton, T } from '@/components/ui';
 import { layout, timing } from '@/theme/motion';
+import { openLink } from '@/navigation';
 import { colors, layers as LAYER_COLOR, radius, shell, space } from '@/theme/tokens';
 import { DayActivity, QueuedRow } from './ActivityList';
-import { piecePath, useGo } from './go';
+import { piecePath } from './go';
 import { TimelineItem } from './TimelineItem';
 import { PlanNextButton, VetoButton } from './Veto';
 
@@ -97,7 +98,6 @@ function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
 function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today: string; timeZone: string; now: number }) {
   const pieceId = pieceIdFromLink(event.link) ?? '';
   const query = usePiece(pieceId);
-  const go = useGo();
   const piece = query.data;
   const status = piece?.status ?? event.state ?? event.kind.replace(/^piece_/, '');
   const to = pieceId ? piecePath(pieceId) : null;
@@ -107,7 +107,7 @@ function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today
     return (
       <Gap>
         <T soft>{`Sin publicación.${reason ? ` El director decidió no publicar: ${reason}` : ''}`}</T>
-        {to ? <TextLink label="Ver cómo se decidió" onPress={() => go(to)} /> : null}
+        {to ? <TextLink label="Ver cómo se decidió" onPress={() => openLink(to)} /> : null}
       </Gap>
     );
   }
@@ -140,7 +140,7 @@ function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today
       {piece?.action && vetoable(piece.action) ? (
         <VetoButton block accessibilityHint={thesis ?? undefined} target={{ actionId: piece.action.id, kind: 'pieza', when: `a las ${formatTime(piece.scheduled_for, timeZone)}` }} />
       ) : null}
-      {to ? <TextLink label="Ver cómo se escribió" onPress={() => go(to)} /> : null}
+      {to ? <TextLink label="Ver cómo se escribió" onPress={() => openLink(to)} /> : null}
     </Card>
   );
 }
@@ -193,7 +193,6 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
   const [allOpen, setAllOpen] = useState(false);
   const [tipo, setTipo] = useState<ActividadTipo>('todo');
   const [noSalio, setNoSalio] = useState(false);
-  const go = useGo();
   const kind = dayKind(date, today);
   const heading = showHeading ? <DayHeading date={date} today={today} /> : null;
 
@@ -262,7 +261,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
             ))}
           </View>
           {tuyo.some((event) => event.kind !== 'resolved') ? (
-            <Button block onPress={() => go('/tu-turno')}>
+            <Button block onPress={() => openLink('/tu-turno')}>
               Ir a Tu turno
             </Button>
           ) : null}

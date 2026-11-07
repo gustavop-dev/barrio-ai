@@ -1,7 +1,8 @@
 // Calendario (DISENO-VISTAS «3. Calendario», Calendario.dc.html): day by day, what the team did, what it
 // has scheduled and what is Gustavo's. Mes, Semana and Lista, with the view and the date in the route
 // params. Swipe the week or the month to turn it; tap a day to open its panel in a sheet (half and
-// full); the selected day's panel also sits under the calendar. Days are Bogotá's.
+// full, not modal: the calendar above stays usable); the selected day's panel also sits under the
+// calendar. Days are Bogotá's.
 import { getCalendario } from '@compartido/api/endpoints';
 import { REFRESH, useActividad, useCalendario, useOverview } from '@compartido/api/hooks';
 import { keys } from '@compartido/api/queryClient';
@@ -11,7 +12,7 @@ import { DEFAULT_VISTA, monthIsEmpty, toggledLayers, VISTAS, visibleLayers, type
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { Icon } from '@/components/icons';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { ErrorRetry, Note, PageHeader, Segmented, SnapSheet, T, pageContent } from '@/components/ui';
@@ -65,9 +66,10 @@ export function CalendarioScreen() {
   const pager = useRef<PagerHandle>(null);
   const [sheetDay, setSheetDay] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // The tab stays mounted under other screens (a push, a link): its sheet must not stay over them.
+  const [screenHeight, setScreenHeight] = useState<number | undefined>(undefined);
+  // The tab stays mounted under other screens: its sheet (and the Android back it listens to) waits
+  // until the calendar is back, and comes back open on the same day.
   const here = usePathname() === '/calendario';
-  if (!here && sheetDay) setSheetDay(null);
   const openSheetDay = here ? sheetDay : null;
 
   const data = calendar.data;
@@ -180,7 +182,7 @@ export function CalendarioScreen() {
   };
 
   return (
-    <>
+    <View style={styles.screen} onLayout={(event: LayoutChangeEvent) => setScreenHeight(event.nativeEvent.layout.height)}>
       <ScrollView
         testID="calendario"
         style={styles.screen}
@@ -196,7 +198,14 @@ export function CalendarioScreen() {
         <DayPanel key={fecha} date={fecha} day={selectedDay} loading={dayLoading} {...dayPanelProps} />
       </ScrollView>
       {openSheetDay ? (
-        <SnapSheet label={`Detalle del día, ${longDayTitle(openSheetDay)}`} header={<DayHeading date={openSheetDay} today={today} />} onClose={() => setSheetDay(null)} testID="hoja-dia">
+        <SnapSheet
+          label={`Detalle del día, ${longDayTitle(openSheetDay)}`}
+          bottom={bottom - space[10]}
+          availableHeight={screenHeight}
+          onClose={() => setSheetDay(null)}
+          testID="hoja-dia"
+        >
+          <DayHeading date={openSheetDay} today={today} />
           <DayPanel
             date={openSheetDay}
             day={byDate.get(openSheetDay)}
@@ -207,7 +216,7 @@ export function CalendarioScreen() {
           />
         </SnapSheet>
       ) : null}
-    </>
+    </View>
   );
 }
 

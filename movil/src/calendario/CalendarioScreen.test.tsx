@@ -126,7 +126,7 @@ describe('Calendario · semana', () => {
     ]);
   });
 
-  it('a tap on a day keeps it in the params and opens its panel in a sheet that snaps to full', async () => {
+  it('a tap on a day keeps it in the params and opens its panel in a sheet (half and full)', async () => {
     server();
     await renderCalendario();
     await fireEvent.press(await screen.findByTestId('dia-2026-11-04'));
@@ -139,23 +139,28 @@ describe('Calendario · semana', () => {
     // The inline panel follows the selected day too.
     expect(within(panel()).getByText('Miércoles 4 de noviembre')).toBeOnTheScreen();
 
-    await fireEvent.press(within(day).getByLabelText('Expandir el panel'));
-    expect(within(day).getByLabelText('Reducir el panel')).toBeOnTheScreen();
-    await fireEvent.press(within(day).getAllByLabelText('Cerrar').at(-1)!);
+    const grip = within(day).getByLabelText('Altura del panel');
+    expect(grip.props.accessibilityActions).toEqual([
+      { name: 'increment', label: 'Ampliar' },
+      { name: 'decrement', label: 'Media pantalla' },
+    ]);
+    // Not modal: another day can be picked with the sheet up.
+    await fireEvent.press(screen.getByTestId('dia-2026-11-06'));
+    expect(within(sheet()).getByText('Viernes 6 de noviembre')).toBeOnTheScreen();
+    await fireEvent.press(within(sheet()).getByLabelText('Cerrar'));
     await waitFor(() => expect(screen.queryByTestId('hoja-dia')).toBeNull());
   });
 
-  it('closes the sheet before opening the piece', async () => {
+  it('opens the piece from the day sheet', async () => {
     server();
     await renderCalendario();
     await fireEvent.press(await screen.findByTestId('dia-2026-11-07'));
     const link = await within(sheet()).findByText('Ver cómo se escribió');
     await fireEvent.press(link);
     expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/calendario/pieza/p7', params: {} });
-    expect(screen.queryByTestId('hoja-dia')).toBeNull();
   });
 
-  it('drops the sheet when another screen takes over (a push opened while it was up)', async () => {
+  it('hides the sheet while another screen is on top, and brings it back on the same day', async () => {
     server();
     const view = await renderCalendario();
     await fireEvent.press(await screen.findByTestId('dia-2026-11-05'));
@@ -165,7 +170,7 @@ describe('Calendario · semana', () => {
     expect(screen.queryByTestId('hoja-dia')).toBeNull();
     expoRouter.__state.pathname = '/calendario';
     await view.rerender(<CalendarioScreen />);
-    expect(screen.queryByTestId('hoja-dia')).toBeNull();
+    expect(within(sheet()).getByText('Jueves 5 de noviembre')).toBeOnTheScreen();
   });
 
   it('swipes to the next and the previous week with a tick; a short swipe stays', async () => {
@@ -315,7 +320,7 @@ describe('Calendario · veto con «Deshacer»', () => {
     await waitFor(() => expect(api.find('GET', '/api/v1/editorial/pieces/p8').length).toBeGreaterThan(1));
   });
 
-  it('closes the day sheet so «Deshacer» can be seen, and says when the veto failed', async () => {
+  it('vetoes from the day sheet and says when the veto failed', async () => {
     jest.replaceProperty(motion.toastDurations as { withUndo: number }, 'withUndo', 30);
     server({ 'POST /api/v1/operador/actions/act-8/reject': { status: 409, body: { detail: 'La acción ya se está ejecutando.' } } });
     await renderCalendario();
@@ -324,7 +329,7 @@ describe('Calendario · veto con «Deshacer»', () => {
     const confirm = await screen.findByTestId('confirm-sheet');
     await fireEvent.changeText(within(confirm).getByTestId('confirm-note'), 'No');
     await fireEvent.press(within(confirm).getAllByText('Vetar').at(-1)!);
-    await waitFor(() => expect(screen.queryByTestId('hoja-dia')).toBeNull());
+    expect(within(await screen.findByTestId('toast')).getByText('Vetada')).toBeOnTheScreen();
     expect(await screen.findByText('No se pudo vetar. La acción ya se está ejecutando.')).toBeOnTheScreen();
     expect(Haptics.notificationAsync).toHaveBeenCalledWith('error');
   });

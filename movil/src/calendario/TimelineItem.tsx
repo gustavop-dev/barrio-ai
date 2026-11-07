@@ -5,9 +5,8 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/icons';
 import { AgentPortrait, Badge, T } from '@/components/ui';
-import { isHttps } from '@/navigation';
+import { isHttps, openLink } from '@/navigation';
 import { colors, radius, shell, space } from '@/theme/tokens';
-import { useGo } from './go';
 
 export interface TimelineItemProps {
   /** Dot colour: the layer's, or tinta-suave for the small items. */
@@ -31,7 +30,6 @@ export interface TimelineItemProps {
 
 export function TimelineItem({ color, time, title, sub, badge, agent, to, linkLabel = 'Abrir', externalUrl, children, expandLabel = 'Ver más', testID }: TimelineItemProps) {
   const [open, setOpen] = useState(false);
-  const go = useGo();
   const external = isHttps(externalUrl) ? externalUrl : null;
   return (
     <View style={styles.item} testID={testID}>
@@ -67,14 +65,14 @@ export function TimelineItem({ color, time, title, sub, badge, agent, to, linkLa
         {to || external ? (
           <View style={styles.links}>
             {to ? (
-              <Pressable accessibilityRole="link" onPress={() => go(to)} style={styles.link}>
+              <Pressable accessibilityRole="link" onPress={() => openLink(to)} style={styles.link}>
                 <T variant="detalle" color={colors.brandDeep}>
                   {linkLabel}
                 </T>
               </Pressable>
             ) : null}
             {external ? (
-              <Pressable accessibilityRole="link" accessibilityHint="Se abre fuera de la app" onPress={() => go(external)} style={[styles.link, styles.externalLink]}>
+              <Pressable accessibilityRole="link" accessibilityHint="Se abre fuera de la app" onPress={() => openLink(external)} style={[styles.link, styles.externalLink]}>
                 <T variant="detalle" color={colors.brandDeep}>
                   Ver en LinkedIn
                 </T>

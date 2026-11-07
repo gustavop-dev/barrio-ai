@@ -12,9 +12,10 @@ import { useMemo } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Badge, Button, Card, EmptyState, ErrorRetry, Section, Skeleton, T, pageContent } from '@/components/ui';
+import { openLink } from '@/navigation';
 import { colors, shell, space } from '@/theme/tokens';
 import { ActivityRow, NoSalioSwitch, QueuedRow, TypeChips, visibleItems } from './ActivityList';
-import { piecePath, useGo } from './go';
+import { piecePath } from './go';
 import { PlanNextButton, VetoButton } from './Veto';
 
 function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
@@ -26,7 +27,6 @@ function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
 }
 
 function UpcomingPieceCard({ piece, today, timeZone, now }: { piece: UpcomingPiece; today: string; timeZone: string; now: number }) {
-  const go = useGo();
   const badge = pieceStatus(piece.status);
   const when = pieceWhen(piece.status, piece.scheduled_for, { today, timeZone, now });
   const meta = pieceMeta(piece);
@@ -53,7 +53,7 @@ function UpcomingPieceCard({ piece, today, timeZone, now }: { piece: UpcomingPie
       {piece.vetoable && piece.action ? (
         <VetoButton block accessibilityHint={piece.thesis ?? undefined} target={{ actionId: piece.action.id, kind: 'pieza', when: `a las ${formatTime(piece.scheduled_for, timeZone)}` }} />
       ) : null}
-      <TextLink label="Ver cómo se escribió" onPress={() => go(piecePath(piece.piece_id))} />
+      <TextLink label="Ver cómo se escribió" onPress={() => openLink(piecePath(piece.piece_id))} />
     </Card>
   );
 }
@@ -78,7 +78,6 @@ export function Proximo({
   windowOpen: boolean | undefined;
   now: number;
 }) {
-  const go = useGo();
   const [first, ...later] = upcoming?.pieces ?? [];
   const queued = upcoming?.queued ?? [];
   return (
@@ -98,7 +97,7 @@ export function Proximo({
       {later.length ? (
         <View accessibilityLabel="Después">
           {later.map((piece) => (
-            <Pressable key={piece.piece_id} accessibilityRole="link" onPress={() => go(piecePath(piece.piece_id))} style={styles.row}>
+            <Pressable key={piece.piece_id} accessibilityRole="link" onPress={() => openLink(piecePath(piece.piece_id))} style={styles.row}>
               <T color={colors.brandDeep}>{piece.thesis || 'Pieza en preparación'}</T>
               <T variant="detalle" soft>
                 {`${relativeDay(dayOf(piece.scheduled_for, timeZone) ?? piece.slot_date, today)} a las ${formatTime(piece.scheduled_for, timeZone)} · ${pieceStatus(piece.status).label}`}
