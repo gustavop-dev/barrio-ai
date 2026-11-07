@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<title>0ff1ce · Entrar</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Ubuntu:wght@400;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#00715e}a:hover{color:#1e1e2b}
+.pix{image-rendering:pixelated}
+input:focus-visible,button:focus-visible,a:focus-visible{outline:2px solid #00715e;outline-offset:2px}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; box-sizing: border-box; display: flex; flex-direction: column; background: #f7f6f0; color: #1e1e2b; font-family: Ubuntu, 'Segoe UI', system-ui, sans-serif; overflow: hidden">
+
+<sc-if value="{{checking}}" hint-placeholder-val="{{ false }}">
+<div style="flex: 1; background: #1e1e2b; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 24px; padding: 40px">
+<img src="/_blob/c3a34d0e228437f78c76b0c551d9b14f" alt="0ff1ce" style="width: 72px; height: 72px; display: block">
+<p style="margin: 0; font-size: 16px; line-height: 24px; color: #f7f6f0">Comprobando sesión…</p>
+<div aria-hidden="true" style="display: flex; gap: 8px">
+<span style="width: 8px; height: 8px; background: #0ff1ce; display: block"></span>
+<span style="width: 8px; height: 8px; background: #00715e; display: block"></span>
+<span style="width: 8px; height: 8px; background: #565972; display: block"></span>
+</div>
+</div>
+</sc-if>
+
+<sc-if value="{{form}}" hint-placeholder-val="{{ true }}">
+<div style="background: #1e1e2b; padding: 32px 3px 0; display: flex; flex-direction: column">
+<img class="pix" src="/_blob/65dfd866a8754b9feca0c6873e6ad260" alt="La oficina de 0ff1ce de tarde: la biblioteca con su bibliotecario, la entrada con Operación y la cocina" style="width: 384px; height: 224px; display: block; border-radius: 12px">
+<div style="padding: 20px 21px 24px; display: flex; flex-direction: column; gap: 8px">
+<img src="/_blob/fdcebffddeff29a87f5018d7ec575dd5" alt="0ff1ce" style="height: 34px; width: auto; align-self: flex-start; display: block">
+<p style="margin: 0; font-size: 16px; line-height: 24px; color: #f7f6f0">La oficina de agentes de IA que trabaja tu LinkedIn.</p>
+</div>
+</div>
+
+<div style="flex: 1; padding: 24px 24px 0; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<h1 style="margin: 0; font-size: 32px; line-height: 40px; font-weight: 400; letter-spacing: -0.01em">Entrar</h1>
+<p style="margin: 0; font-size: 16px; line-height: 24px; color: #565972">Usa tu usuario y contraseña de Django.</p>
+</div>
+
+<sc-if value="{{showError}}" hint-placeholder-val="{{ false }}">
+<p role="alert" style="margin: 0; padding: 12px 16px; background: #fffef8; border: 1px solid #a54e35; border-radius: 6px; color: #a54e35; font-size: 14px; line-height: 20px">Usuario o contraseña incorrectos.</p>
+</sc-if>
+<sc-if value="{{showTooMany}}" hint-placeholder-val="{{ false }}">
+<p role="alert" style="margin: 0; padding: 12px 16px; background: #f8d47d; border-radius: 6px; color: #1e1e2b; font-size: 14px; line-height: 20px">Demasiados intentos. Espera unos minutos.</p>
+</sc-if>
+<sc-if value="{{showOffline}}" hint-placeholder-val="{{ false }}">
+<p role="alert" style="margin: 0; padding: 12px 16px; background: #fffef8; border: 1px solid #a54e35; border-radius: 6px; color: #a54e35; font-size: 14px; line-height: 20px">No pudimos conectar con la oficina. Revisa tu conexión e intenta de nuevo.</p>
+</sc-if>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="usuario" style="font-size: 14px; line-height: 20px; color: #565972">Usuario</label>
+<input id="usuario" name="usuario" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" style="height: 48px; box-sizing: border-box; padding: 0 12px; border: 1px solid #565972; border-radius: 6px; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 16px">
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 6px">
+<label for="clave" style="font-size: 14px; line-height: 20px; color: #565972">Contraseña</label>
+<div style="position: relative; display: flex">
+<input id="clave" name="clave" type="{{passType}}" autocomplete="current-password" style="flex: 1; height: 48px; box-sizing: border-box; padding: 0 52px 0 12px; border: 1px solid #565972; border-radius: 6px; background: #fffef8; color: #1e1e2b; font-family: inherit; font-size: 16px">
+<button type="button" onClick="{{togglePass}}" aria-label="{{passLabel}}" aria-pressed="{{showPass}}" style="position: absolute; right: 2px; top: 2px; width: 44px; height: 44px; border: 0; background: transparent; color: #565972; display: flex; align-items: center; justify-content: center; cursor: pointer; border-radius: 6px">
+<sc-if value="{{showPass}}" hint-placeholder-val="{{ false }}">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l18 18"></path><path d="M10.6 5.1A10 10 0 0 1 12 5c6 0 10 7 10 7a17 17 0 0 1-3.2 3.9"></path><path d="M6.6 6.6C3.9 8.4 2 12 2 12s4 7 10 7a9.7 9.7 0 0 0 5.4-1.6"></path><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"></path></svg>
+</sc-if>
+<sc-if value="{{hidePass}}" hint-placeholder-val="{{ true }}">
+<svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+</sc-if>
+</button>
+</div>
+</div>
+
+<sc-if value="{{canSubmit}}" hint-placeholder-val="{{ true }}">
+<a href="Oficina.dc.html" style="height: 52px; border-radius: 12px; background: #0ff1ce; color: #1e1e2b; font-size: 16px; line-height: 24px; text-decoration: none; display: flex; align-items: center; justify-content: center; margin-top: 8px">Entrar</a>
+</sc-if>
+<sc-if value="{{locked}}" hint-placeholder-val="{{ false }}">
+<button type="button" disabled="" style="height: 52px; border-radius: 12px; border: 0; font-family: inherit; font-size: 16px; line-height: 24px; margin-top: 8px; {{lockedStyle}}">{{lockedLabel}}</button>
+</sc-if>
+
+</div>
+
+
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"estado":{"editor":"enum","options":["formulario","enviando","error","sin_conexion","demasiados_intentos","comprobando_sesion"],"default":"formulario","section":"Estado"},"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { showPass: false };
+  }
+  renderVals() {
+    var estado = this.props.estado || 'formulario';
+    var show = !!this.state.showPass;
+    var self = this;
+    return {
+      checking: estado === 'comprobando_sesion',
+      form: estado !== 'comprobando_sesion',
+      showError: estado === 'error',
+      showOffline: estado === 'sin_conexion',
+      showTooMany: estado === 'demasiados_intentos',
+      canSubmit: estado !== 'demasiados_intentos' && estado !== 'enviando',
+      locked: estado === 'demasiados_intentos' || estado === 'enviando',
+      lockedLabel: estado === 'enviando' ? 'Entrando…' : 'Entrar',
+      lockedStyle: estado === 'enviando' ? 'background: #0ff1ce; color: #1e1e2b' : 'background: #dedfd4; color: #565972',
+      showPass: show,
+      hidePass: !show,
+      passType: show ? 'text' : 'password',
+      passLabel: show ? 'Ocultar contraseña' : 'Mostrar contraseña',
+      togglePass: function () { self.setState({ showPass: !self.state.showPass }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

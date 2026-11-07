@@ -1,0 +1,354 @@
+{
+ "v": 3,
+ "attachments": {},
+ "boards": {
+  "Main.dc.html": {
+   "h": 844,
+   "is_interactive": true,
+   "title": "Login",
+   "w": 390,
+   "x": 0,
+   "y": 0
+  },
+  "Oficina.dc.html": {
+   "h": 844,
+   "is_interactive": true,
+   "title": "Oficina · inicio",
+   "w": 390,
+   "x": 470,
+   "y": 0
+  },
+  "TuTurno.dc.html": {
+   "h": 844,
+   "w": 390,
+   "x": 2820,
+   "y": 0,
+   "title": "Tu turno · bandeja (acciones)",
+   "is_interactive": true
+  },
+  "Calendario.dc.html": {
+   "x": 3760,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Calendario · barra superior",
+   "is_interactive": true
+  },
+  "Resultados.dc.html": {
+   "x": 940,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Resultados",
+   "is_interactive": true
+  },
+  "Personas.dc.html": {
+   "x": 1880,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Personas",
+   "is_interactive": true
+  },
+  "Ajustes.dc.html": {
+   "x": 4230,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Ajustes · barra superior",
+   "is_interactive": true
+  },
+  "Pieza.dc.html": {
+   "x": 3760,
+   "y": 1264,
+   "w": 390,
+   "h": 844,
+   "title": "Calendario · detalle de pieza",
+   "is_interactive": true
+  },
+  "Persona.dc.html": {
+   "x": 1880,
+   "y": 1264,
+   "w": 390,
+   "h": 844,
+   "title": "Personas · ficha",
+   "is_interactive": true
+  },
+  "Captura.dc.html": {
+   "x": 1410,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Capturar · botón central",
+   "is_interactive": true
+  },
+  "Galeria.dc.html": {
+   "x": 2350,
+   "y": 0,
+   "w": 390,
+   "h": 844,
+   "title": "Galería",
+   "is_interactive": true
+  },
+  "Notificaciones.dc.html": {
+   "w": 390,
+   "h": 844,
+   "is_interactive": true,
+   "x": 3290,
+   "y": 0,
+   "title": "Notificaciones · sin acción"
+  },
+  "MovCaptura.dc.html": {
+   "x": 0,
+   "y": 2508,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · captura",
+   "is_interactive": true
+  },
+  "MovNavegacion.dc.html": {
+   "x": 470,
+   "y": 2508,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · navegación",
+   "is_interactive": true
+  },
+  "MovHojas.dc.html": {
+   "x": 940,
+   "y": 2508,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · hojas",
+   "is_interactive": true
+  },
+  "MovTuTurno.dc.html": {
+   "x": 0,
+   "y": 3752,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · Tu turno",
+   "is_interactive": true
+  },
+  "MovNotificaciones.dc.html": {
+   "x": 470,
+   "y": 3752,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · Notificaciones",
+   "is_interactive": true
+  },
+  "MovOficina.dc.html": {
+   "x": 940,
+   "y": 3752,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · Oficina",
+   "is_interactive": true
+  },
+  "MovEntrada.dc.html": {
+   "x": 0,
+   "y": 4996,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · del login a la Oficina",
+   "is_interactive": true
+  },
+  "MovCalendario.dc.html": {
+   "x": 470,
+   "y": 4996,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · Calendario",
+   "is_interactive": true
+  },
+  "MovResultados.dc.html": {
+   "x": 940,
+   "y": 4996,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · Resultados",
+   "is_interactive": true
+  },
+  "MovDetalle.dc.html": {
+   "x": 1410,
+   "y": 4996,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · detalle",
+   "is_interactive": true
+  },
+  "MovMicro.dc.html": {
+   "x": 1880,
+   "y": 4996,
+   "w": 390,
+   "h": 844,
+   "title": "Movimiento · microinteracciones",
+   "is_interactive": true
+  }
+ },
+ "createdOnFiles": {
+  "at": "2026-11-07T05:00:00Z",
+  "v": 1
+ },
+ "designSystems": [
+  {
+   "artifact": "https://claude.ai/artifact/EAW5B8oUbwieGB7jtdpxFK",
+   "copiedAt": "2026-11-07T05:00:00Z",
+   "namespace": "0ff1ce",
+   "title": "0ff1ce — Manual de marca",
+   "version": null
+  }
+ ],
+ "launch": {
+  "view": "canvas"
+ },
+ "noteOrder": [
+  "titulo",
+  "comportamiento",
+  "backend"
+ ],
+ "notes": {
+  "backend": {
+   "fill": "orange",
+   "text": "Lo que necesita el backend\n\nHoy /oficina/actividad solo da el estado de cada rol. Para animar visitas y entregas hace falta un feed de eventos, por ejemplo GET /api/v1/oficina/eventos?desde=…\n\n{ tipo: consulta_biblioteca | entrega | publicacion, rol, destino, detalle, ts }\n\nLa escena reproduce los eventos en orden y en cola: si llegan muchos, los resume.",
+   "w": 380,
+   "x": 470,
+   "y": 1264
+  },
+  "comportamiento": {
+   "fill": "teal",
+   "text": "Qué mueve a cada personaje\n\nEn la app real, cada movimiento lo dispara un evento del backend; nada se simula. Aquí corre un guion de demostración con el ciclo editorial.\n\n• Consulta de conocimiento (embeddings) → camina a la biblioteca, el bibliotecario busca en los estantes y le entrega un libro.\n• Entrega entre equipos (handoff) → lleva una hoja al equipo que recibe, conversan y vuelve.\n• Trabajando → en su puesto, monitor y luz en 0ff1ce.\n• En espera → quieto; a veces va por café o conversa.\n• En diseño → atenuado e inmóvil.\n• Sin dato → quieto, sin luz.\n• Publicación ejecutada → Operación sale por la puerta y vuelve.\n• Máquina detenida → todo se congela y la escena se oscurece.",
+   "w": 380,
+   "x": 0,
+   "y": 1264
+  },
+  "titulo": {
+   "kind": "title1",
+   "maxW": 4620,
+   "text": "Móvil · navegación con botón de captura",
+   "w": 240,
+   "x": 0,
+   "y": -300
+  },
+  "titulo2": {
+   "x": 0,
+   "y": 964,
+   "text": "Detalles y notas",
+   "kind": "title1",
+   "maxW": 4620
+  },
+  "datos": {
+   "x": 940,
+   "y": 1264,
+   "w": 380,
+   "fill": "gray",
+   "size": "s",
+   "text": "Datos de ejemplo\n\nNombres ficticios de los tests del repo (Lucía Ficticia, Pablo Ficticio, Marta Inventada) y otros con el mismo estilo. El titular propuesto sale de propuesta-posicionamiento-gustavo-v1.md. Las cifras de Resultados y Ajustes son de ejemplo: con el control Fase ves la fase 1, donde lo nuevo dice «aún no disponible».\n\nColores de las capas del Calendario: Tuyo = post-it, Publicaciones = 0ff1ce hondo, Red = azul de los sprites, Conversaciones = 0ff1ce, Sistema = óxido. Hay que sumarlos al manual, junto con el tono info."
+  },
+  "captura": {
+   "x": 1410,
+   "y": 1264,
+   "w": 380,
+   "fill": "teal",
+   "size": "s",
+   "text": "Botón de captura (centro de la barra)\n\n• Toque corto: hoja para foto o nota, sin grabar.\n• Mantener oprimido: graba; aparece el candado.\n• Deslizar hacia arriba: queda bloqueada y se abre la bolita aguamarina.\n• Deslizar a la izquierda: descarta.\n• Soltar sin bloquear: termina y abre la hoja con el audio.\n\nCon contexto: «Responder con audio» (Tu turno), «Nota de voz» (ficha de persona) y «Comentario para el equipo» (pieza) abren la hoja ligada a ese elemento. En el lienzo los enlaces no llevan el contexto: míralo con el control Contexto.\n\nEl audio es simulado; las fotos se pueden elegir de verdad en Play."
+  },
+  "galeria": {
+   "x": 2350,
+   "y": 1264,
+   "w": 380,
+   "fill": "gray",
+   "size": "s",
+   "text": "Galería\n\nSolo fotos para los posts: un botón «Subir fotos», filtros y la rejilla con el estado de cada foto. Al tocar una foto: nota para el equipo e interruptor para prohibir la edición con IA.\n\nLa cámara se usa desde el botón aguamarina («Foto para la galería»). El historial de capturas vive en la hoja de captura («Lo que enviaste»)."
+  },
+  "prioridades": {
+   "x": 2820,
+   "y": 1264,
+   "w": 380,
+   "fill": "orange",
+   "size": "s",
+   "text": "Tu turno: prioridades y estados\n\nPrioridad\n• Urgente: algo se rompe o se bloquea sin ti (acción incierta, LinkedIn caducado, máquina detenida). Contador en rojo.\n• Importante: plazo en menos de 48 h, alguien espera respuesta o algo caduca en días.\n• Cuando puedas: preguntas y tareas sin prisa. Suben solas a Importante cuando se acerca su plazo.\n\nEstado\nNueva → Vista → (Pospuesta) → Resuelta · Descartada · Caducada. Las tareas de perfil siguen: Aplicada, pendiente de comprobar → Comprobada.\n\nEl contador suma Nuevas y Vistas; lo pospuesto no cuenta hasta su fecha."
+  },
+  "notificaciones": {
+   "x": 3290,
+   "y": 1264,
+   "w": 380,
+   "fill": "blue",
+   "size": "s",
+   "text": "Notificaciones\n\nLo que viene o lo que pasó y no necesita que hagas nada: la próxima pieza, piezas publicadas o bloqueadas, conexiones nuevas, oportunidades que cambian de etapa.\n\nLa campana solo muestra un punto, sin número: hay novedades, no tareas. Tu turno sí lleva número porque pide una acción.\n\nSe guardan 7 días; lo anterior queda en el Calendario. Las push siguen la misma regla: las que piden acción abren Tu turno y el resto abre su destino."
+  },
+  "titulo3": {
+   "x": 0,
+   "y": 2208,
+   "text": "Movimiento · fase 1",
+   "kind": "title1",
+   "maxW": 1330
+  },
+  "movimiento": {
+   "x": 1410,
+   "y": 2508,
+   "w": 380,
+   "fill": "teal",
+   "size": "s",
+   "text": "Cómo revisar el movimiento\n\nEntra en Play en cada mesa.\n\n• Captura: mantén el botón aguamarina, desliza arriba para bloquear o a la izquierda para descartar; toca para abrir sin grabar. Guardar hace volar la bolita de vuelta al botón.\n• Navegación: toca las pestañas, los iconos de arriba y a Lucía en Personas. Vuelve con «‹» o arrastrando desde el borde izquierdo.\n• Hojas: toca la escena; arrastra la manija hacia arriba o abajo y suéltala con impulso.\n\nControles: «velocidad» (1x, 0,5x, 0,25x) para ver el detalle y «menos movimiento» para la versión accesible. La etiqueta «HÁPTICO» muestra dónde vibraría el teléfono.\n\nSon aproximaciones web: los tiempos y resortes son los mismos del código de React Native, pero la sensación final está en el teléfono."
+  },
+  "titulo4": {
+   "x": 0,
+   "y": 3452,
+   "text": "Movimiento · fase 2",
+   "kind": "title1",
+   "maxW": 1330
+  },
+  "movimiento2": {
+   "x": 1410,
+   "y": 3752,
+   "w": 380,
+   "fill": "teal",
+   "size": "s",
+   "text": "Cómo revisar la fase 2\n\n• Tu turno: toca el botón principal de una tarjeta para resolverla, o «Más tarde» para posponerla. Mira el contador de la bandeja arriba y el de cada grupo. «Reiniciar demo» vuelve al principio.\n• Notificaciones: «Simular una que llega» la inserta arriba y balancea la campana; «Marcar todo como leído» apaga las etiquetas en cascada.\n• Oficina: toca a un personaje (salta 2 px) o un equipo de la tira (los corchetes se dibujan desde las esquinas). «Simular un envío» deja caer tu captura frente a Operación, que la lleva a Mesa editorial. La línea de arriba se retira sola a los 3,5 s.\n\nControles: «velocidad» y «menos movimiento», como en la fase 1."
+  },
+  "titulo5": {
+   "x": 0,
+   "y": 4696,
+   "text": "Movimiento · fase 3",
+   "kind": "title1",
+   "maxW": 2270
+  },
+  "movimiento3": {
+   "x": 2350,
+   "y": 4996,
+   "w": 380,
+   "fill": "teal",
+   "size": "s",
+   "text": "Cómo revisar la fase 3\n\n• Entrada: toca «Entrar». Tras «Entrando…», la puerta pixel se abre, la imagen se acerca en saltos enteros (2× y 3×) y se funde con la Oficina. «Repetir la entrada» vuelve al login.\n• Calendario: toca días de la semana (la selección se desliza y el panel entra desde el lado hacia el que avanzas). Cambia a Mes: la semana se va, el mes entra fila por fila y la selección viaja a su celda. Elige otro día y vuelve a Semana.\n• Resultados: las cifras cuentan desde 0 la primera vez; al cambiar de periodo cuentan del valor viejo al nuevo y las barras crecen en cascada.\n• Detalle: toca a cualquiera; el retrato y el nombre viajan de la lista a la ficha y el resto entra escalonado. «‹ Personas» los devuelve.\n• Microinteracciones: botones, interruptor, chips, copiar, campo de texto y carga.\n\nControles: «velocidad» y «menos movimiento»."
+  }
+ },
+ "order": [
+  "Main.dc.html",
+  "Oficina.dc.html",
+  "Resultados.dc.html",
+  "Captura.dc.html",
+  "Personas.dc.html",
+  "Galeria.dc.html",
+  "TuTurno.dc.html",
+  "Notificaciones.dc.html",
+  "Calendario.dc.html",
+  "Ajustes.dc.html",
+  "Pieza.dc.html",
+  "Persona.dc.html",
+  "MovCaptura.dc.html",
+  "MovNavegacion.dc.html",
+  "MovHojas.dc.html",
+  "MovTuTurno.dc.html",
+  "MovNotificaciones.dc.html",
+  "MovOficina.dc.html",
+  "MovEntrada.dc.html",
+  "MovCalendario.dc.html",
+  "MovResultados.dc.html",
+  "MovDetalle.dc.html",
+  "MovMicro.dc.html"
+ ],
+ "pages": [],
+ "title": "0ff1ce — Vistas móviles"
+}
