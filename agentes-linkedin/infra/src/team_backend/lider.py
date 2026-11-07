@@ -36,9 +36,10 @@ CHECKS={
             ('idioma','min',0.7,'no está en el idioma de la publicación')],
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
-    CAP.FOLLOW:[('encaja','min',0.6,'no encaja con el barrio'),('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
-    CAP.INVITE:[('encaja','min',0.7,'no encaja con el barrio'),('riesgo','max',0.2,'parece vendedor, reclutador o cuenta ajena al nicho')],
-    CAP.ACCEPT:[('encaja','min',0.5,'no encaja con el barrio'),('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
+    # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues; the lead weighs risk.
+    CAP.FOLLOW:[('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
+    CAP.INVITE:[('riesgo','max',0.2,'parece vendedor, reclutador o cuenta ajena al nicho')],
+    CAP.ACCEPT:[('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
 }
 ORIENTATION_CHECK=('orientacion','min',0.4,'contradice la orientación de Gustavo')
 
@@ -87,14 +88,15 @@ def _questions(proposal,orientation):
         }
         kind='post'
     else:
+        # Whether the person fits is judged once, by the classifier, and checked by red.network_issues (audit R2).
+        # The lead only weighs the risk of the person and, when there is one, Gustavo's orientation; the niche in
+        # `criterios_del_barrio` is the context for «ajena al nicho» and for the orientation.
         contact=proposal.contact;evidence=contact.evidence or {}
         state={'persona':{'nombre':contact.display_name,'titular':contact.headline[:400],'ubicacion':contact.location,
                           'grado':contact.network_distance,'origen':contact.source,
                           'evidencia':evidence.get('comment') or evidence.get('invitation_message') or evidence.get('query') or ''},
                'criterios_del_barrio':CRITERIA_DEL_BARRIO}
         questions={
-            'encaja':_noul('Según `persona.titular`, `persona.ubicacion` y `persona.evidencia`, ¿esta persona encaja en el barrio de '
-                           'Gustavo descrito en `criterios_del_barrio`?'),
             'riesgo':_noul('¿`persona` parece un reclutador masivo, un vendedor que busca venderle a Gustavo, una cuenta de empresa, una '
                            'cuenta falsa o alguien sin relación con producto, software, startups o negocio?'),
         }
