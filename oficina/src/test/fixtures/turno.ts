@@ -206,3 +206,66 @@ export function notificacionesFixture(overrides: Partial<Notificaciones> = {}): 
     ...overrides,
   };
 }
+
+/** C2 «Conversación que te toca», as rediseno_views builds it. */
+export const CONVERSATION_CARD: TurnoCard = cardFixture({
+  id: 'conversation:conv-1:3f2a9c1b7e',
+  type: 'conversacion',
+  tone: 'warn',
+  priority: 'importante',
+  state: 'nueva',
+  agent: 'conversaciones_inbox',
+  agent_label: 'Conversaciones e inbox',
+  title: 'Lucía Ficticia te escribió',
+  body: 'Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)',
+  created_at: hoursFromNow(-2),
+  actions: [
+    { label: 'Abrir en LinkedIn', href: 'https://www.linkedin.com/messaging/thread/2-SHVlcnRhTGFicw==/', primary: true },
+    { label: 'Hecho, respondí', endpoint: '/api/v1/conversaciones/conv-1/cerrar', body: { how: 'respondi' } },
+    {
+      label: 'Marcar como oportunidad',
+      opportunity: {
+        contact: 'c-1',
+        display_name: 'Lucía Ficticia',
+        headline: 'Cofundadora @ Huerta Labs (pre-seed)',
+        modality: 'projectapp',
+        channel: 'linkedin',
+        notes: 'Detectada por el equipo en una conversación de LinkedIn.',
+      },
+    },
+    { label: 'No responder', endpoint: '/api/v1/conversaciones/conv-1/cerrar', body: { how: 'no_responder' }, note_optional: true },
+  ],
+  conversation: {
+    id: 'conv-1',
+    chat_url: 'https://www.linkedin.com/messaging/thread/2-SHVlcnRhTGFicw==/',
+    attendee_name: 'Lucía Ficticia',
+    contact_id: 'c-1',
+    last_message_at: hoursFromNow(-2),
+    last_from_me: false,
+    last_message_preview: 'Hola Gustavo, ¿tienes disponibilidad para un proyecto corto de IA en enero?',
+    messages: [
+      { id: 'm-1', at: hoursFromNow(-50), from_me: true, text: 'Thanks Lucía! Happy to share how we scoped it if useful.' },
+      { id: 'm-2', at: hoursFromNow(-2), from_me: false, text: 'Hola Gustavo, ¿tienes disponibilidad para un proyecto corto de IA en enero?' },
+    ],
+    assessment: {
+      message_id: 'm-2',
+      opportunity: true,
+      awaiting_reply: true,
+      pitch: false,
+      modality: 'projectapp',
+      answers: { oportunidad: 0.86, espera: 0.81, venta: 0.04 },
+      model: 'jev-1.14.0',
+      at: hoursFromNow(-1),
+    },
+    why: 'Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)',
+    needs_you: true,
+    person: {
+      id: 'c-1',
+      display_name: 'Lucía Ficticia',
+      headline: 'Cofundadora @ Huerta Labs (pre-seed)',
+      profile_url: 'https://www.linkedin.com/in/lucia-ficticia',
+      role: 'comprador',
+      modality: 'projectapp',
+    },
+  },
+});

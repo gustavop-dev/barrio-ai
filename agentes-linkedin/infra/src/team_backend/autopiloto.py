@@ -243,6 +243,8 @@ def tick(user,now=None):
         report['network']=report.get('network',0)+_network(user,account,now)
         try:report['metrics']=report.get('metrics',0)+_metrics(user,account,now)
         except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
+        try:report['inbox']=report.get('inbox',0)+_inbox(user,account,now)
+        except Exception as exc:report['inbox_error']=type(exc).__name__  # the inbox never stops the rest of the tick
         report['execute']+=_execute(user,account,now)
     report['reconcile']+=_reconcile(user,now)
     return report
@@ -364,6 +366,17 @@ def _metrics(user,account,now):
     if not metricas.due(now):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     _,created=enqueue_operation(user,'collect_metrics',{'account':str(account.id)},request_id=_job_id('metrics',account.id,bucket))
+    return int(created)
+
+def _inbox(user,account,now):
+    """conversaciones_inbox: queue read_inbox about every INBOX_EVERY_MINUTES, one at a time, for a Unipile account that
+    is not paused (the job itself refreshes the status and only reads a running account). Off unless INBOX_ENABLED."""
+    from . import conversaciones
+    every=conversaciones.every()
+    if not conversaciones.enabled() or account.provider not in conversaciones.PROVIDERS or every<=timedelta(0):return 0
+    if _pending('read_inbox',account=str(account.id)):return 0
+    bucket=int(now.timestamp()//every.total_seconds())
+    _,created=enqueue_operation(user,'read_inbox',{'account':str(account.id)},request_id=_job_id('inbox',account.id,bucket))
     return int(created)
 
 def _execute(user,account,now):

@@ -311,3 +311,25 @@ fieldset:disabled .turno-pill {
   color: var(--color-tinta-suave);
   pointer-events: none;
 }
+
+/* Conversation card (C2): the person who wrote. */
+.turno-person {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.turno-person-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.turno-person-text a {
+  font-size: 16px;
+  line-height: 24px;
+}
+.turno-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}

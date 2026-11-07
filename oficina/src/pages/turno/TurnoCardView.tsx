@@ -1,9 +1,13 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import { useTurnoAction } from '../../api/hooks';
-import type { TurnoAction, TurnoCard, TurnoCardType, TurnoPriority } from '../../api/types';
+import type { TurnoAction, TurnoCard, TurnoCardType, TurnoOpportunity, TurnoPriority } from '../../api/types';
 import { turnoAnchor } from '../../components/Layout';
 import { IconAviso, IconConversacion, IconPerfil, IconPregunta } from '../../components/icons';
-import { AgentPortrait, Badge, Button, ButtonLink, ConfirmModal, ErrorRetry, ExternalLink, isHttps, useToast } from '../../components/ui';
+import { AgentPortrait, Avatar, Badge, Button, ButtonLink, ConfirmModal, ErrorRetry, ExternalLink, isHttps, LabelChip, useToast } from '../../components/ui';
+import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '../../lib/format';
+import { messageText } from '../personas/ConversationBlock';
+import { OportunidadForm } from '../personas/OportunidadForm';
 import { createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL } from './model';
 import { QuestionForm } from './QuestionForm';
 import type { ObserveCard } from './useSeenCards';
@@ -50,9 +54,11 @@ function cardTitle(card: TurnoCard): string {
 
 const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;
 const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsWith('/resolve'));
+const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
 
 function successMessage(action: TurnoAction): string {
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
+  if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
   if (isMachineResume(action)) return 'Máquina reanudada';
   if (action.endpoint?.endsWith('/pause') && action.body?.paused === false) return 'Cuenta reanudada';
   return 'Hecho';
@@ -79,6 +85,14 @@ function modalFor(action: TurnoAction): ModalSpec | null {
     };
   }
   if (action.note_required) return { title: action.label, text: null, note: 'required', noteLabel: 'Nota' };
+  if (action.note_optional) {
+    return {
+      title: action.label,
+      text: isConversationClose(action) ? 'La tarjeta sale de Tu turno hasta que te vuelva a escribir. Nadie le responde por ti.' : null,
+      note: 'optional',
+      noteLabel: 'Motivo',
+    };
+  }
   if (isMachineResume(action)) {
     return { title: 'Reanudar la máquina', text: 'El equipo vuelve a trabajar dentro de la ventana horaria y los topes.', note: 'optional', noteLabel: 'Motivo' };
   }
@@ -91,6 +105,7 @@ function CardActions({ card }: { card: TurnoCard }) {
   const run = useTurnoAction();
   const [asking, setAsking] = useState<TurnoAction | null>(null);
   const [running, setRunning] = useState<TurnoAction | null>(null);
+  const [opportunity, setOpportunity] = useState<TurnoOpportunity | null>(null);
   const actions = card.actions ?? [];
   if (!actions.length) return null;
 
@@ -117,6 +132,14 @@ function CardActions({ card }: { card: TurnoCard }) {
   const [first, second, ...rest] = ordered;
 
   const render = (action: TurnoAction, variant: 'primary' | 'secondary' | 'ghost') => {
+    if (action.opportunity) {
+      const prefill = action.opportunity;
+      return (
+        <Button key={action.label} variant={variant} block={variant !== 'ghost'} onClick={() => setOpportunity(prefill)}>
+          {action.label}
+        </Button>
+      );
+    }
     if (action.href) {
       const external = isHttps(action.href);
       return (
@@ -175,6 +198,13 @@ function CardActions({ card }: { card: TurnoCard }) {
           {spec.text ? <p>{spec.text}</p> : null}
         </ConfirmModal>
       ) : null}
+      {opportunity ? (
+        <OportunidadForm
+          person={{ id: opportunity.contact, display_name: opportunity.display_name, headline: opportunity.headline, modality: opportunity.modality }}
+          defaults={{ channel: opportunity.channel, notes: opportunity.notes }}
+          onClose={() => setOpportunity(null)}
+        />
+      ) : null}
     </div>
   );
 }
@@ -229,6 +259,46 @@ function NoticeBody({ card }: { card: TurnoCard }) {
           {card.created_at ? ` · ${dayAndTime(card.created_at)}` : ''}
         </p>
       ) : null}
+    </>
+  );
+}
+
+/** C2 «Conversación que te toca»: who wrote, why it matters (the team's read), the latest message, and a reminder that
+ * Gustavo answers on LinkedIn himself. */
+function ConversationBody({ card }: { card: TurnoCard }) {
+  const conversation = card.conversation!;
+  const person = conversation.person;
+  const name = person?.display_name || conversation.attendee_name || 'Esta persona';
+  const last = [...conversation.messages].reverse().find((message) => !message.from_me);
+  const when = dayAndTime(last?.at);
+  return (
+    <>
+      <div className="turno-person">
+        <Avatar name={name} size={40} />
+        <div className="turno-person-text">
+          {person ? <Link to={`/personas/${person.id}`}>{name}</Link> : <p className="turno-body">{name}</p>}
+          {person?.headline ? <p className="turno-meta">{person.headline}</p> : null}
+          {person?.role || person?.modality ? (
+            <span className="turno-chips">
+              {person.role ? <LabelChip tone="info">{labelOf(CONTACT_ROLE_LABEL, person.role)}</LabelChip> : null}
+              {person.modality ? <LabelChip tone="muted">{labelOf(CONTACT_MODALITY_LABEL, person.modality)}</LabelChip> : null}
+            </span>
+          ) : null}
+        </div>
+      </div>
+      {card.body ? (
+        <div className="turno-block">
+          <p className="turno-label">Por qué importa</p>
+          <p className="turno-body">{card.body}</p>
+        </div>
+      ) : null}
+      {last ? (
+        <div className="turno-block">
+          <p className="turno-label">Último mensaje{when ? ` · ${when}` : ''}</p>
+          <blockquote className="quote">“{messageText(last)}”</blockquote>
+        </div>
+      ) : null}
+      <p className="turno-meta">La app nunca envía mensajes: respondes tú en LinkedIn.</p>
     </>
   );
 }
@@ -301,7 +371,15 @@ export function TurnoCardView({ card, priority, isNew = false, observe }: TurnoC
       <h3 className="turno-title" id={titleId}>
         {cardTitle(card)}
       </h3>
-      {card.question ? <QuestionBody card={card} /> : card.attempt ? <Attempt card={card} /> : <NoticeBody card={card} />}
+      {card.question ? (
+        <QuestionBody card={card} />
+      ) : card.attempt ? (
+        <Attempt card={card} />
+      ) : card.conversation ? (
+        <ConversationBody card={card} />
+      ) : (
+        <NoticeBody card={card} />
+      )}
       {card.question ? null : <CardActions card={card} />}
       {created ? <p className="card-footer">{created}</p> : null}
     </article>

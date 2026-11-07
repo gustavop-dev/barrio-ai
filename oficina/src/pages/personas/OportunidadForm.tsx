@@ -23,6 +23,8 @@ export interface OportunidadFormProps {
   /** Edit mode when given. */
   opportunity?: Opportunity | null;
   person?: OpportunityPerson | null;
+  /** Prefill of a new opportunity (a conversation card sends its channel and a note on where it came from). */
+  defaults?: { channel?: OpportunityChannel; notes?: string };
   onClose: () => void;
   onSaved?: (opportunity: Opportunity) => void;
 }
@@ -91,7 +93,7 @@ function PersonSearch({ onPick }: { onPick: (person: OpportunityPerson) => void 
 }
 
 /** «Nueva oportunidad» / «Editar oportunidad» (DISENO-VISTAS, Personas → Oportunidades). */
-export function OportunidadForm({ opportunity, person, onClose, onSaved }: OportunidadFormProps) {
+export function OportunidadForm({ opportunity, person, defaults, onClose, onSaved }: OportunidadFormProps) {
   const editing = Boolean(opportunity);
   const toast = useToast();
   const create = useCreateOportunidad();
@@ -107,7 +109,7 @@ export function OportunidadForm({ opportunity, person, onClose, onSaved }: Oport
   const [personName, setPersonName] = useState(opportunity?.person_name ?? '');
   const [company, setCompany] = useState(opportunity?.company ?? '');
   const [modality, setModality] = useState<OpportunityModality | ''>(initialModality(opportunity, person));
-  const [channel, setChannel] = useState<OpportunityChannel>(opportunity?.channel ?? 'linkedin');
+  const [channel, setChannel] = useState<OpportunityChannel>(opportunity?.channel ?? defaults?.channel ?? 'linkedin');
   const [stage, setStage] = useState<OpportunityStage>(opportunity?.stage ?? 'conversacion');
   const [attribution, setAttribution] = useState<OpportunityAttribution | ''>(opportunity?.attribution ?? '');
   const [need, setNeed] = useState(opportunity?.need ?? '');
@@ -115,7 +117,7 @@ export function OportunidadForm({ opportunity, person, onClose, onSaved }: Oport
   const [dedication, setDedication] = useState(opportunity?.dedication ?? '');
   const [nextAction, setNextAction] = useState(opportunity?.next_action ?? '');
   const [nextAt, setNextAt] = useState(toDateInput(opportunity?.next_action_at));
-  const [notes, setNotes] = useState(opportunity?.notes ?? '');
+  const [notes, setNotes] = useState(opportunity?.notes ?? defaults?.notes ?? '');
   const [touched, setTouched] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
 

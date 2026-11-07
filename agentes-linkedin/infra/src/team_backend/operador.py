@@ -639,6 +639,10 @@ def run_job(job):
             from . import metricas
             r=metricas.collect(user,ConnectorAccount.objects.get(id=params['account']))
             return 'complete',f"cortes:{r['captured']} audiencia:{r['audience']}"[:30],r['stopped']
+        if job.kind=='read_inbox':
+            from . import conversaciones
+            r=conversaciones.read_inbox(user,ConnectorAccount.objects.get(id=params['account']))
+            return 'complete',f"chats:{r['chats']} leidos:{r['read']} te tocan:{r['flagged']}"[:30],r['stopped']
         return 'failed','failed','Tipo de trabajo desconocido.'
     except OperatorBlocked as exc:return 'failed','blocked',str(exc)
     except (Conflict,ValueError,ConnectorError) as exc:return 'failed','failed',str(getattr(exc,'detail',exc))

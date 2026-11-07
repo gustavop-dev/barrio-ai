@@ -675,3 +675,31 @@ class InboxSeen(models.Model):
     """Tu turno: an item Gustavo already opened («Vista»), keyed by the card id the API returns."""
     item_id=models.CharField(max_length=120,primary_key=True)
     seen_at=models.DateTimeField(default=timezone.now)
+
+
+class Conversation(models.Model):
+    """conversaciones_inbox (conversaciones.py): one LinkedIn 1to1 chat read through Unipile, read-only. The team
+    proposes it to Gustavo (Tu turno) when it looks like business or needs his reply; it never answers. Messages are
+    third-party data: shown and judged as data, never followed as instructions."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='conversations')
+    provider_chat_id=models.CharField(max_length=200)
+    contact=models.ForeignKey(Contact,on_delete=models.SET_NULL,null=True,blank=True,related_name='conversations')
+    attendee_name=models.CharField(max_length=200,blank=True)
+    attendee_provider_id=models.CharField(max_length=200,blank=True)
+    last_message_at=models.DateTimeField(null=True,blank=True,db_index=True)
+    last_message_preview=models.CharField(max_length=300,blank=True)
+    # Who sent the last message: True when it was Gustavo (is_sender), so nothing is waiting for him.
+    last_from_me=models.BooleanField(default=False)
+    # The latest messages, oldest first and bounded (INBOX_SNAPSHOT_MESSAGES): [{id, at, from_me, text}].
+    messages=models.JSONField(default=list,blank=True)
+    # Jev's read of the latest inbound message: {message_id, answers, opportunity, awaiting_reply, pitch, modality, model, at}.
+    assessment=models.JSONField(default=dict,blank=True)
+    # Inbound message id at which Gustavo closed the card («Hecho, respondí» / «No responder»); a newer one reopens it.
+    closed_message_id=models.CharField(max_length=200,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-last_message_at']
+        constraints=[models.UniqueConstraint(fields=['account','provider_chat_id'],name='unique_conversation_per_account')]
+    def __str__(self):return self.attendee_name or self.provider_chat_id

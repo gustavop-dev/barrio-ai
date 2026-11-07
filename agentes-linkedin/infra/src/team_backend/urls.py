@@ -64,4 +64,6 @@ urlpatterns=[
  path('operador/actions/<uuid:pid>/execute',op.ActionExecute.as_view()),
  path('operador/actions/<uuid:pid>/reconcile',op.ActionReconcile.as_view()),
  path('operador/actions/<uuid:pid>/resolve',op.ActionResolve.as_view()),
+ # Inbox (docs/conversaciones-inbox.md): read-only; Gustavo closes the Tu turno card of a conversation.
+ path('conversaciones/<uuid:cid>/cerrar',rv.ConversationClose.as_view()),
 ]

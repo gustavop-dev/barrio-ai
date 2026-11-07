@@ -87,6 +87,22 @@ def _comment(data):
     return {'id':str(data['id']),'text':data.get('text') or '','created_at':_when(data.get('created_at')),
             'is_sender':bool(data.get('is_sender')),'thread_id':data.get('thread_id'),'author':_user(data.get('author'))}
 
+def _chat(data):
+    """List all Chats (v2): a 1to1 chat names the other member in user_id; last_message is a MessagePreview or a Message."""
+    last=data.get('last_message') or {}
+    kind=data.get('type') or ('group' if data.get('is_group') else 'channel' if data.get('is_channel') else '1to1' if data.get('is_1to1') else '')
+    return {'id':str(data['id']),'name':data.get('name') or '','type':kind,'user_id':str(data.get('user_id') or ''),
+            'unread_count':_count(data.get('unread_count')) or 0,'is_readonly':bool(data.get('is_readonly')),
+            'last_message_at':_when(data.get('last_message_timestamp') or data.get('updated_at')),
+            'last_message':{'id':str(last.get('id') or ''),'text':last.get('text') or '','is_sender':bool(last.get('is_sender'))} if last else None}
+
+def _message(data):
+    """List all Chat Messages (v2). hidden: deleted, hidden or an event (reaction, announcement…), never shown as text."""
+    return {'id':str(data['id']),'text':data.get('text') or '','at':_when(data.get('timestamp')),'is_sender':bool(data.get('is_sender')),
+            'sender_id':str(data.get('sender_id') or ''),'sender':_user(data.get('sender')),
+            'hidden':bool(data.get('is_hidden') or data.get('is_deleted') or data.get('is_event')),
+            'attachments':len(data.get('attachments') or [])}
+
 def same_text(a,b):
     return ' '.join((a or '').split()).casefold()==' '.join((b or '').split()).casefold()
 
@@ -196,6 +212,15 @@ class UnipileConnector:
         # date_range accepts 14, 28, 90 or 365; a free account gets analytics.views_count (checked 2026-11-06).
         return _profile_views(self._read(self._path('linkedin','analytics','profile-views'),{'date_range':days,'limit':1}))
 
+    # -- inbox (conversaciones.py): reads only. There is deliberately no method that sends, marks as read or edits a
+    # message: answering or committing terms stays with Gustavo. Unipile v2 reference «List all Chats» and «List all
+    # Chat Messages» (consulted 2026-11-07): GET chats?limit and GET chats/{chat_id}/messages?limit, both newest first.
+    def list_chats(self,limit=20):
+        return [_chat(c) for c in self._read(self._path('chats'),{'limit':limit}).get('data',[]) if c.get('id')]
+
+    def list_chat_messages(self,chat_id,limit=10):
+        return [_message(m) for m in self._read(self._path('chats',chat_id,'messages'),{'limit':limit}).get('data',[]) if m.get('id')]
+
 
 class FakeConnector:
     """In-memory LinkedIn for tests and local rehearsals. Never touches the network.
@@ -209,7 +234,7 @@ class FakeConnector:
             raise ConnectorError('Conector simulado desactivado (OPERATOR_ALLOW_FAKE).',kind='disabled')
         self.account_id=account_id
         self.state=self.store.setdefault(account_id,{'status':'running','is_locked':False,'users':{},'posts':{},'comments':{},'reactions':{},'fail_next':None,'writes':0,
-                                                     'network':{},'invitations':{'sent':{},'received':{}},'search':{}})
+                                                     'network':{},'invitations':{'sent':{},'received':{}},'search':{},'chats':{}})
 
     @classmethod
     def reset(cls):cls.store.clear()
@@ -348,6 +373,43 @@ class FakeConnector:
             self.state['network'][invitation['user']['id']]['network_distance']='FIRST_DEGREE';self.state['writes']+=1
         if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
         return {'request_id':request_id}
+
+    # -- inbox (reads only, like the real connector: nothing here sends a message)
+    def seed_chat(self,user_id,messages,chat_id=None):
+        """A 1to1 chat with a seeded member. messages: [(text, is_sender, datetime)], oldest first."""
+        user=self.state['users'][user_id];cid=chat_id or 'chat-'+user['public_identifier']
+        self.state['chats'][cid]={'user':user,'messages':[]}
+        for text,is_sender,at in messages:self.add_message(cid,text,is_sender,at)
+        return cid
+
+    def add_message(self,chat_id,text,is_sender=False,at=None):
+        chat=self.state['chats'][chat_id];user=chat['user']
+        me={'object':'User','id':'me','type':'individual','display_name':'Cuenta conectada'}
+        message={'object':'Message','id':'msg-'+uuid.uuid4().hex[:12],'chat_id':chat_id,'sender_id':'me' if is_sender else user['id'],
+                 'sender':me if is_sender else dict(user,object='User'),'text':text,'is_sender':is_sender,'is_hidden':False,
+                 'is_deleted':False,'is_event':False,'attachments':[],'timestamp':(at or datetime.now(timezone.utc)).isoformat()}
+        chat['messages'].append(message)
+        return message['id']
+
+    def _read_fail(self):
+        mode=self.state.pop('read_fail',None)
+        if mode=='rate_limit':raise ConnectorError('Simulado: HTTP 429.',status=429,kind='provider/too_many_requests',pause=True)
+        if mode=='reject':raise ConnectorError('Simulado: HTTP 404.',status=404,kind='provider/resource_not_found')
+
+    def list_chats(self,limit=20):
+        self._read_fail();rows=[]
+        for cid,chat in self.state['chats'].items():
+            last=chat['messages'][-1] if chat['messages'] else None
+            rows.append({'object':'Chat','id':cid,'name':chat['user']['display_name'],'type':'1to1','is_1to1':True,'user_id':chat['user']['id'],
+                         'unread_count':0 if not last or last['is_sender'] else 1,'last_message_timestamp':last['timestamp'] if last else None,
+                         'last_message':{'object':'MessagePreview','id':last['id'],'text':last['text'],'is_sender':last['is_sender']} if last else None})
+        rows.sort(key=lambda c:c['last_message_timestamp'] or '',reverse=True)
+        return [_chat(c) for c in rows[:limit]]
+
+    def list_chat_messages(self,chat_id,limit=10):
+        self._read_fail()
+        if chat_id not in self.state['chats']:raise ConnectorError('Simulado: chat no encontrado.',status=404,kind='provider/resource_not_found')
+        return [_message(m) for m in reversed(self.state['chats'][chat_id]['messages'])][:limit]
 
     def accept_sent(self,user_id):
         """Simulate the other person accepting our invitation."""
