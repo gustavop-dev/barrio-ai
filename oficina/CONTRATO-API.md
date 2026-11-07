@@ -705,6 +705,7 @@ Reglas de prioridad:
 
 - Los elementos de `upcoming` se calculan en cada consulta y nunca cuentan como no leídos.
 - `capture_processed` enlaza a `/?enviado=1`, que abre «Lo que enviaste».
+- `lead_silent` (capa `sistema`, push activada por defecto) avisa de que el agente líder lleva 7 días sin aprobar nada en una capacidad. Llega una vez por capacidad y semana, y enlaza a `/calendario?vista=lista&tipo=<tipo>&no_salio=1`.
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
 

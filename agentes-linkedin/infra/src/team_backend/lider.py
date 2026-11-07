@@ -126,3 +126,45 @@ def review(proposal):
     return {'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
             'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
             'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat()}
+
+# --------------------------------------------------------------------------- R5: comment prefilter
+# Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.
+# Positive checks need «yes» >= COMMENT_PREFILTER_THRESHOLD; the noise checks need «yes» <= 1 - threshold.
+PREFILTER_CHECKS=[('sustancia','min','no plantea una idea con sustancia a la que aportar'),('tema','min','no es de los temas del barrio'),
+                  ('vacante','max','es un anuncio de vacantes o de contratación'),('promocion','max','es una promoción pura'),
+                  ('hito','max','es un hito personal donde un comentario sería ruido')]
+
+def prefilter_threshold():
+    try:value=float(os.environ.get('COMMENT_PREFILTER_THRESHOLD','0.5'))
+    except ValueError:value=0.5
+    return min(max(value,0.0),1.0) if value==value else 0.5  # NaN falls back to the default
+
+def comment_worthy(post):
+    """{'decision': 'comment' | 'skip' | 'unavailable', 'reasons': [...], 'answers': {...}, 'model': ..., 'at': ...}"""
+    now=timezone.now();orientation=_orientation()
+    state={'publicacion':{'autor':post.author_name,'texto':post.text[:3000]},'criterios_del_barrio':CRITERIA_DEL_BARRIO}
+    topic=('¿El tema de la `publicacion` interesa al barrio de Gustavo descrito en `criterios_del_barrio`: producto, software, '
+           'IA aplicada, startups o negocio')
+    if orientation:
+        state['orientacion_de_gustavo']=orientation;topic+=', o lo que pide `orientacion_de_gustavo`'
+    questions={
+        'sustancia':_noul('¿La `publicacion` desarrolla una idea, una experiencia o una opinión concreta a la que alguien podría aportar '
+                          'un matiz, un dato o una pregunta específica?','Plantea algo concreto que admite una aportación',
+                          'Es una frase suelta, un enlace sin contexto, un meme o un texto sin nada que discutir'),
+        'tema':_noul(topic+'?'),
+        'vacante':_noul('¿La `publicacion` es sobre todo un anuncio de vacantes, de contratación o de búsqueda de empleo?'),
+        'promocion':_noul('¿La `publicacion` es sobre todo la promoción de un producto, un servicio, un evento, un curso o un lanzamiento, '
+                          'sin una idea que discutir?'),
+        'hito':_noul('¿La `publicacion` es sobre todo un hito personal o un saludo: nuevo empleo, ascenso, aniversario, cumpleaños, '
+                     'premio o agradecimiento?'),
+    }
+    try:result=providers.typesafe(state,questions,purpose='comment-prefilter')
+    except ValueError as exc:return {'decision':'unavailable','reasons':[str(exc)],'at':now.isoformat()}
+    answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
+    threshold=prefilter_threshold();failed=[]
+    for qid,bound,label in PREFILTER_CHECKS:
+        value=answers.get(qid);limit=threshold if bound=='min' else round(1-threshold,3)
+        if value is None or (bound=='min' and value<limit) or (bound=='max' and value>limit):
+            failed.append(f'Prefiltro: {label} ({qid}={value if value is not None else "sin respuesta"})')
+    return {'decision':'skip' if failed else 'comment','reasons':failed,'answers':answers,'threshold':threshold,
+            'model':result['model'],'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat()}

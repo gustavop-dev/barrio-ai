@@ -115,17 +115,20 @@ Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo P
 - [ ] R1: quitar el refresh de perfil del plan y contar las lecturas de ejecución
 - [ ] R2: un solo juez de encaje para la red
 - [ ] R3 y R4: reglas deterministas antes del verificador y una ronda de reparación
-- [ ] R5: prefiltro con Jev antes de redactar un comentario
-- [ ] B3: tope de revisiones del líder por tick
+  - [x] R4 en comentarios: si un borrador solo incumple reglas fijas (`autopiloto.comment_text_issues`: hashtag, enlace, longitud, pitch, afirmación sin evidencia…), se pide una sola reescritura que nombra cada regla, dentro de `OPERATOR_DAILY_LLM_USD` y solo en modo `auto`. Si vuelve a fallar, la política la descarta como antes. El enfriamiento por autor no se repara: ningún texto lo arregla.
+- [x] R5: prefiltro con Jev antes de redactar un comentario. Cinco preguntas `noul` (sustancia, tema del barrio, vacante, promoción, hito personal) con un umbral `COMMENT_PREFILTER_THRESHOLD` (0,5). El veredicto queda en un `AuditEvent` (`operator.comment_prefilter`), así que un post no se vuelve a preguntar en cada ciclo. Como máximo 3 preguntas por ciclo. Si Jev no responde, se redacta como antes y queda un aviso en el log. Activo con `LEAD_ENABLED`; se apaga con `COMMENT_PREFILTER=false`.
+- [x] B3: tope de revisiones del líder por tick. `LEAD_MAX_REVIEWS_PER_TICK` (5), de la más antigua a la más reciente; el resto espera al ciclo siguiente. Las decisiones deterministas y la caducidad no esperan al tope. Además, si Jev no responde, el ciclo deja de llamarlo hasta el siguiente, en lugar de esperar 60 s por propuesta.
 
 **Fase 3: diseño y costo**
 
 - [ ] 20–30 casos de evaluación por agente, sacados del historial
 - [ ] Un solo artefacto de posicionamiento para director, clasificador y líder
 - [ ] Resultados de las piezas en el historial del director
-- [ ] Alerta si la aprobación del líder cae a cero en una capacidad
+- [x] Alerta si la aprobación del líder cae a cero en una capacidad. Si en 7 días revisó al menos `LEAD_SILENCE_MIN_REVIEWS` (5) propuestas de una capacidad en `auto` y no aprobó ninguna, llega la Notificación `lead_silent` (capa sistema, con push) con las preguntas que más fallan. Una por capacidad y semana; el tick lo comprueba cada `LEAD_SILENCE_CHECK_MINUTES` (60).
 - [ ] Agente de inbox de solo lectura que proponga oportunidades
 - [ ] C1 a C3, validados con las evaluaciones
+  - [x] C1: las instrucciones y las 6 unidades del curso del redactor de comentarios van en bloques de `system` con `cache_control` (`providers.claude(..., context=...)`); el post y su contexto van en el mensaje. Se hizo sin esperar a las evaluaciones porque las unidades no cambian, solo pasan del final del mensaje al `system`. La reescritura de R4 lee ese prefijo de la caché.
+  - [x] C5: un cliente Anthropic por clave, reutilizado (`providers.anthropic_client`). `count_tokens` se queda: la reserva lo necesita.
 
 ## Cómo confirmarlo en producción
 
