@@ -17,7 +17,7 @@ from django.utils import timezone
 from knowledge import db, memory
 from . import guardas, lider, operador, red
 from .jobs import enqueue_operation
-from .models import ActionExecution, ActionProposal, ConnectorAccount, Contact, Job, ObservedPost
+from .models import ActionExecution, ActionProposal, ConnectorAccount, Contact, EditorialPiece, Job, ObservedPost
 
 POLICY_VERSION='autonomia-v1'
 TICK_NAMESPACE=uuid.UUID('0b7f2c3e-1d7a-4c55-8f0e-2a6b9d4e8c31')
@@ -84,6 +84,9 @@ def content_issues(proposal):
         if pattern.search(text):issues.append(reason)
     if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
+    if proposal.post and proposal.post.referent_id and proposal.post.referent_id in recent_comment_authors(
+            proposal.account,timezone.now(),states=['approved','executing','sent','confirmed','uncertain'],exclude=proposal.pk):
+        issues.append(f'Ya hay un comentario para {proposal.post.author_name} en las últimas {int(author_cooldown().total_seconds()//3600)} h')
     public,private=guardas.blocks()
     issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
     return issues
@@ -180,8 +183,22 @@ def _editorial(user,now):
     if editorial.spent_today(now)>=editorial.daily_budget():return 0
     slot=editorial.next_slot(now)
     if slot is None or operador.capacity_left(account,'CONT-09',editorial.scheduled_for(slot))<=0:return 0
-    _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},request_id=_job_id('piece',slot))
+    attempt=EditorialPiece.objects.filter(slot_date=slot).count()  # a renewed-budget retry gets its own job id
+    _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},
+                                request_id=_job_id('piece',slot) if not attempt else _job_id('piece',slot,attempt))
     return int(created)
+
+def author_cooldown():
+    return timedelta(hours=int(setting('OPERATOR_AUTHOR_COOLDOWN_HOURS','48')))
+
+LIVE_COMMENT_STATES=['proposed','approved','executing','sent','confirmed','uncertain']
+
+def recent_comment_authors(account,now,states=LIVE_COMMENT_STATES,exclude=None):
+    """Referents who already got (or are about to get) a comment within the cooldown: one person, one comment at a time."""
+    qs=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,state__in=states,
+                                     created_at__gte=now-author_cooldown(),post__referent__isnull=False)
+    if exclude:qs=qs.exclude(pk=exclude)
+    return set(qs.values_list('post__referent_id',flat=True))
 
 def _observe(user,account,now):
     every=timedelta(minutes=int(setting('OPERATOR_OBSERVE_EVERY_MINUTES','180')))
@@ -201,7 +218,8 @@ def _propose(user,account,now):
     if room<=0 or pending:return 0  # one paid draft at a time keeps spend within the daily cap
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
     candidates=(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
-                .exclude(text='').exclude(proposals__capability='INT-03').order_by('-posted_at'))
+                .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
+                .order_by('-posted_at'))
     for post in candidates[:1]:
         _,created=enqueue_operation(user,'propose_comment',{'post':str(post.id)},request_id=_job_id('propose',post.id))
         return int(created)

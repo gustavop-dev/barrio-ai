@@ -133,6 +133,7 @@ Si cualquier edición cambia el texto, invalida el veredicto y la política desc
 ## Programación (`autopiloto.tick`)
 
 - **Hueco diario.** La hora es `EDITORIAL_POST_TIME` (08:30 por defecto), en `OPERATOR_TIMEZONE`, y debe caer dentro de `OPERATOR_WINDOW`. La preparación empieza `EDITORIAL_LEAD_HOURS` antes (12 h por defecto). Así hay margen para vetar y llega una push «pieza lista» con la hora de salida.
+- **Un tope de presupuesto no gasta el día.** Si una preparación se detiene solo porque se agotó `EDITORIAL_DAILY_LLM_USD`, el hueco se vuelve a intentar al día siguiente, cuando el presupuesto se renueva, con un trabajo nuevo. Cualquier otro fallo no se reintenta solo.
 - **Una preparación cada vez.** El trabajo `prepare_piece` tiene un id determinista por hueco, así que el autopiloto lo intenta una sola vez por día. Una preparación interrumpida pasa a `failed` sin repetir el gasto.
 - **No se prepara una pieza que no podría salir.** Hace falta una cuenta oficial conectada, sin pausa y con `LIVE_LINKEDIN_OFFICIAL=true`, CONT-09 distinto de `off` y cupo semanal.
 - **Topes.** CONT-09 admite 1 al día y 7 a la semana (`publicaciones` del reparto), configurables en `OPERATOR_DAILY_LIMITS` y `OPERATOR_WEEKLY_LIMITS`. Además, la base de datos impide más de una pieza abierta por día y más de una acción abierta por pieza.
