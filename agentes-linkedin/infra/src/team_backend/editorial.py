@@ -224,15 +224,27 @@ def can_publish(account):
     from .connectors_linkedin import live
     return account is not None and not account.paused and (account.provider=='linkedin_fake' or live())
 
+BUDGET_STOP='Presupuesto editorial diario agotado'
+
+def budget_retry(pieces,now):
+    """A slot whose every attempt stopped only for the daily budget is tried again once the budget renewed
+    (a later local day): running out of budget says nothing about the slot itself."""
+    pieces=list(pieces)
+    if not pieces or any(p.state!=EditorialPiece.State.FAILED or not p.note.startswith(BUDGET_STOP) for p in pieces):return False
+    tz=operador.local_tz()
+    return max(p.created_at for p in pieces).astimezone(tz).date()<now.astimezone(tz).date()
+
 def next_slot(now=None,manual=False):
     """Autopilot: today or tomorrow once the lead time opened and the day has no piece at all (a skip or a
-    failure is not retried automatically). Manual: the first of the next 7 days without an open piece."""
+    failure is not retried automatically, except a stop for the daily budget once it renewed). Manual: the
+    first of the next 7 days without an open piece."""
     now=now or timezone.now();today=now.astimezone(operador.local_tz()).date()
     for offset in range(8 if manual else 2):
         day=today+timedelta(days=offset);when=scheduled_for(day)
         if when<=now or (not manual and now<when-lead_time()):continue
         pieces=EditorialPiece.objects.filter(slot_date=day)
-        if (pieces.filter(state__in=OPEN_PIECE_STATES) if manual else pieces).exists():continue
+        if manual and pieces.filter(state__in=OPEN_PIECE_STATES).exists():continue
+        if not manual and pieces.exists() and not budget_retry(pieces,now):continue
         if Job.objects.filter(kind='prepare_piece',state__in=[Job.State.QUEUED,Job.State.RUNNING],params__slot=day.isoformat()).exists():continue
         return day
     return None
@@ -280,7 +292,7 @@ def _close(piece,state,note):
 
 def _guard():
     if spent_today()>=daily_budget():
-        raise ValueError('Presupuesto editorial diario agotado (EDITORIAL_DAILY_LLM_USD); no se gasta más hoy.')
+        raise ValueError(BUDGET_STOP+' (EDITORIAL_DAILY_LLM_USD); no se gasta más hoy.')
 
 def _stage(piece,name,payload,unit_ids=None):
     system,schema,default_units,budget,max_tokens,effort=STAGES[name]

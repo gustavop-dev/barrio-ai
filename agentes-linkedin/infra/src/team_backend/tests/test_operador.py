@@ -324,6 +324,7 @@ class AutopilotTests(OperatorBase):
         self.assertEqual(ActionProposal.objects.get().state,'discarded')
         self.assertEqual(self.fake.state['writes'],0)
 
+    @patch.dict(os.environ,{'OPERATOR_AUTHOR_COOLDOWN_HOURS':'0'})  # two posts by one referent; the cooldown has its own test
     def test_window_spacing_and_caps_hold_back_writes(self):
         from datetime import datetime
         from zoneinfo import ZoneInfo
