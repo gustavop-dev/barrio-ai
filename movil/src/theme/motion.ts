@@ -7,6 +7,7 @@
 // that for the whole app; `useMotion()` gives components the same decision for what Reanimated does
 // not animate by itself (pulses, the hold overlay, the toast slide).
 import * as Haptics from 'expo-haptics';
+import { SCENE_MOTION } from '@compartido/scene/motion';
 import { Easing, FadeIn, FadeInDown, FadeOut, LinearTransition, ReduceMotion, useReducedMotion, type WithSpringConfig, type WithTimingConfig } from 'react-native-reanimated';
 
 // ---------------------------------------------------------------- reduced motion
@@ -95,6 +96,8 @@ export const timings = {
   skeleton: { duration: 1100, easing: 'pulse' },
   /** Screen transitions of the stack (detail views). */
   screen: { duration: 260, easing: 'standard' },
+  officeNowIn: { duration: 240, easing: 'enter' },
+  officeNowOut: { duration: 160, easing: 'exit' },
 } as const satisfies Record<string, TimingToken>;
 
 export type TimingName = keyof typeof timings;
@@ -171,6 +174,7 @@ export const haptics = {
   tabChange: { type: 'selection' },
   /** Toggling a chip or option. */
   toggle: null,
+  officePick: { type: 'selection' },
 } as const satisfies Record<string, HapticKind | null>;
 
 export type HapticEvent = keyof typeof haptics;
@@ -251,4 +255,16 @@ export const layout = {
   /** The hold overlay of the capture button. */
   overlayIn: () => FadeIn.duration(timings.holdOverlay.duration).reduceMotion(reduce()),
   overlayOut: () => FadeOut.duration(timings.holdOverlay.duration).reduceMotion(reduce()),
+};
+
+// Oficina: choreography is shared with the PWA; all native overrides belong here.
+export const officeMotion = { ...SCENE_MOTION };
+export const officeFrames = { stepMs: 16, maxDeltaMs: 64, reportFrames: 300, slowFrameMs: 1000 / 60 } as const;
+export const officeGestures = {
+  minZoom: 1, maxZoom: 3, panDistance: 8, tapDistance: 10, tapDurationMs: 250, doubleTapMs: 280,
+  touchTarget: 48, sheetActivation: 8, sheetHalf: 0.5, sheetFull: 0.88,
+} as const;
+export const officeLayout = {
+  nowIn: () => FadeIn.duration(timings.officeNowIn.duration).reduceMotion(reduce()),
+  nowOut: () => FadeOut.duration(timings.officeNowOut.duration).reduceMotion(reduce()),
 };

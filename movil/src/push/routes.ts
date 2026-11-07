@@ -34,6 +34,7 @@ export function routeForUrl(url: unknown): AppRoute | null {
   }
   if (hash) params.ancla = decodeURIComponent(hash);
   let pathname = rawPath.replace(/\/+$/, '') || '/';
+  if (pathname === '/conocimiento') pathname = '/';
   if (pathname === '/tu-turno/sabe') {
     pathname = '/tu-turno';
     params.tab = 'sabe';
