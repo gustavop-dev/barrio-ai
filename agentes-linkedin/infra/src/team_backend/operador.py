@@ -213,14 +213,20 @@ def observe(user,account,referent_ids=None,limit=5):
             summary['new_posts' if created else 'seen_posts']+=1
         referent.last_observed_at=timezone.now();referent.save(update_fields=['last_observed_at'])
     _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k!='errors'},errors=len(summary['errors']))
+    if summary['new_posts']:
+        from .notificaciones import avisar
+        n=summary['new_posts']
+        avisar('observatory',f'Observatorio encontró {n} {"post nuevo" if n==1 else "posts nuevos"} de tus referentes',
+               'El equipo comentará en los que encajen, dentro de la ventana horaria.',
+               link=f'/calendario?fecha={timezone.now().astimezone(local_tz()).date().isoformat()}')
     return summary
 
 def set_account_pause(account,reason,actor=None):
     ConnectorAccount.objects.filter(pk=account.pk).update(paused=True,paused_reason=reason)
     account.paused=True;account.paused_reason=reason
     _audit(actor,'operator.account_paused',account.id,reason=reason)
-    from .alerts import notify
-    notify('Barrio AI: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.',url='/tu-turno',tag='barrio-cuenta')
+    from .notificaciones import avisar
+    avisar('account_paused','LinkedIn: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.')
 
 # --------------------------------------------------------------------------- proposals
 
@@ -307,6 +313,10 @@ def _finish(execution,state,actor,**fields):
     if state=='confirmed' and proposal.contact_id:
         from . import red
         red.on_confirmed(proposal,execution)
+    if state=='confirmed' and proposal.capability in (ActionProposal.Capability.PUBLISH,ActionProposal.Capability.COMMENT):
+        from . import oficina_eventos
+        oficina_eventos.emit('publicacion','operador_cuenta','linkedin',
+                             'Publicación propia' if proposal.capability==ActionProposal.Capability.PUBLISH else 'Comentario publicado')
     _audit(actor,'operator.execution_'+state,execution.proposal_id,external_id=execution.external_id,
            error_kind=execution.error_kind,http_status=execution.http_status)
     return execution
@@ -341,7 +351,6 @@ def _record_metrics(proposal,post):
 
 def _publish(execution,proposal,connector,user):
     """CONT-09 through the Posts API: one request, never repeated; confirmed by reading back when possible."""
-    from .alerts import notify
     text=proposal.payload['text'];now=timezone.now
     already,_=_find_own_post(text)
     if already:
@@ -356,7 +365,10 @@ def _publish(execution,proposal,connector,user):
     elif readable:result=_finish(execution,'sent',user,note='Publicada (201 con URN); aún no visible al releer. Se conciliará sin repetir.')
     else:result=_finish(execution,'confirmed',user,note='Confirmada por la respuesta 201 de la Posts API (x-restli-id); '
                         'w_member_social no permite releer y no hay cuenta Unipile.')
-    notify('Barrio AI: pieza publicada',text[:140],url=f'/calendario/pieza/{proposal.piece_id}',tag='barrio-pieza')
+    from .notificaciones import avisar
+    thesis=(proposal.piece.brief or {}).get('thesis') if proposal.piece_id else ''
+    avisar('piece_published',f'Publicaste «{thesis or text[:80]}»','Las impresiones a las 24 h llegan mañana.',
+           link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_published:{proposal.id}')
     return result
 
 def execute(user,proposal_id):
@@ -415,9 +427,8 @@ def execute(user,proposal_id):
         confirmed=bool(connector.get_post(post_id).get('user_reacted'))
         return _finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=timezone.now() if confirmed else None)
     except ConnectorUncertain as exc:
-        from .alerts import notify
-        notify('Barrio AI: acción incierta',f'{proposal.get_capability_display()}: el proveedor no confirmó. Se conciliará sin repetir.',
-               url='/tu-turno',tag='barrio-incierta')
+        from .notificaciones import avisar
+        avisar('uncertain','¿Salió o no?',f'{proposal.get_capability_display()}: el proveedor no confirmó. Resuélvela en Tu turno.')
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
         if exc.pause:set_account_pause(account,f'Detenida por el proveedor: {exc}',user)
@@ -520,7 +531,10 @@ def propose_comment(user,post_id,origin_job=''):
     message=json.dumps({'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':others,
         'public_facts':public_facts,'private_guidance':private_guidance,'orientation':orientacion.text(),'course_units':units},
         ensure_ascii=False,default=str)
+    from . import oficina_eventos
+    oficina_eventos.emit('consulta_biblioteca','relaciones_comunidad','biblioteca','Fundamentos del curso para un comentario')
     answer=providers.claude(voz.with_voice(COMMENT_SYSTEM),message,output_schema=COMMENT_SCHEMA,effort='medium',purpose='propose-comment')
+    oficina_eventos.emit('entrega','relaciones_comunidad','operador_cuenta','Comentario redactado')
     try:data=json.loads(answer['text'])
     except json.JSONDecodeError:raise ValueError('La respuesta del agente no es JSON válido.') from None
     known={u['unit_id'] for u in units}
@@ -568,6 +582,11 @@ def run_job(job):
             from .editorial import prepare
             piece=prepare(user,date.fromisoformat(params['slot']),origin_job=str(job.id))
             return ('failed' if piece.state=='failed' else 'complete'),piece.state,piece.note if piece.state=='failed' else ''
+        if job.kind=='process_capture':
+            from . import capturas
+            capture=capturas.process(params['capture'])
+            if capture is None:return 'failed','failed','La captura ya no existe (se deshizo).'
+            return ('failed' if capture.state=='error' else 'complete'),capture.state,capture.error if capture.state=='error' else ''
         if job.kind=='collect_metrics':
             from . import metricas
             r=metricas.collect(user,ConnectorAccount.objects.get(id=params['account']))

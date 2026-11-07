@@ -126,13 +126,13 @@ JOB_ROLES={'observe':'investigador_referentes','propose_comment':'relaciones_com
            'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta',
            'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
            'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad',
-           'collect_metrics':'analista_barrio_resultados'}
+           'collect_metrics':'analista_barrio_resultados','process_capture':'operador_cuenta'}
 DESCRIPTIONS={'observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
               'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día',
               'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',
               'plan_network':'Preparando seguimientos e invitaciones','sync_network':'Revisando invitaciones y conexiones',
-              'collect_metrics':'Midiendo los posts y la audiencia'}
+              'collect_metrics':'Midiendo los posts y la audiencia','process_capture':'Leyendo lo que enviaste al equipo'}
 STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',
                     'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
                     'verificador':'Verificando afirmaciones, voz y privacidad'}
@@ -210,3 +210,15 @@ class PushTest(APIView):
         if not push.configured():raise PermissionDenied('Notificaciones no configuradas en el servidor (VAPID).')
         sent=push.broadcast('Barrio AI','Notificación de prueba: las alertas llegarán aquí.',url='/ajustes',tag='barrio-prueba',users=[request.user])
         return Response({'sent':sent},status=202)
+
+
+class Eventos(APIView):
+    """GET /api/v1/oficina/eventos?desde=<iso>: real events that move the scene's characters, oldest first."""
+    def get(self,request):
+        require(request.user,'operate_linkedin')
+        from datetime import datetime
+        from . import oficina_eventos
+        raw=request.query_params.get('desde')
+        try:moment=datetime.fromisoformat(raw.replace('Z','+00:00')) if raw else None
+        except ValueError:return Response({'detail':'desde debe ser una fecha ISO'},status=400)
+        return Response({'events':oficina_eventos.since(moment),'now':timezone.now()})

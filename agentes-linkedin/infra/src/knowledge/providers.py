@@ -243,3 +243,109 @@ def typesafe(state,questions,purpose='lead-review'):
     cost=Decimal(tokens['input_tokens'])*price/1000000
     settle(rid,'complete',dict(tokens,model=data.get('model')),cost)
     return {'answers':answers,'model':data.get('model') or model,'usage':tokens,'estimated_usd':float(cost)}
+
+# --------------------------------------------------------------------------- AssemblyAI (voice notes of the capture button)
+# Contract (consulted 2026-11-07): https://www.assemblyai.com/docs/llms.txt, «Upload a media file»
+# (POST /v2/upload, raw bytes as application/octet-stream -> {upload_url}), «Create transcript» (POST /v2/transcript
+# with {audio_url, speech_models, language_detection}), «Get transcript» (GET /v2/transcript/{id}: status
+# queued|processing|completed|error, text, language_code, audio_duration in seconds, speech_model_used, error),
+# «Model selection» (the first model of speech_models that supports the language is used) and «Billing and pricing»
+# (pro-rated to the second of audio processed; errored transcripts are not charged). Universal-3.5 Pro costs
+# $0.21/h and Universal-2 $0.15/h. Header `authorization: <key>`.
+ASSEMBLYAI_URL='https://api.assemblyai.com/v2'
+ASSEMBLYAI_MODELS=['universal-3-5-pro','universal-2']
+ASSEMBLYAI_MAX_SECONDS=1800  # worst case reserved when the client does not say how long the audio is
+ASSEMBLYAI_POLL_SECONDS=3
+ASSEMBLYAI_TRANSPORT=None  # tests inject an httpx.MockTransport
+
+def assemblyai_prices():
+    """USD per hour by model; ASSEMBLYAI_USD_PER_HOUR prices the preferred model (and the reservation)."""
+    return {'universal-3-5-pro':Decimal(os.environ.get('ASSEMBLYAI_USD_PER_HOUR','0.21')),'universal-2':Decimal('0.15')}
+
+def _assemblyai_seconds(value):
+    try:seconds=float(value)
+    except (TypeError,ValueError):return ASSEMBLYAI_MAX_SECONDS
+    if not math.isfinite(seconds) or seconds<=0:return ASSEMBLYAI_MAX_SECONDS
+    return min(seconds,ASSEMBLYAI_MAX_SECONDS)
+
+def assemblyai_transcribe(path,duration_s=None,purpose='capture-transcribe'):
+    """Transcribe one local audio file: upload, create, poll. One paid request, never retried automatically.
+    Reserves the worst case from the client's duration (capped at 30 min) and settles with the real audio_duration;
+    an errored transcript is not charged (rejected). A timeout keeps the reservation (uncertain): AssemblyAI may
+    still finish and bill it."""
+    key=live('assemblyai')
+    prices=assemblyai_prices();rate=prices[ASSEMBLYAI_MODELS[0]]
+    if not rate.is_finite() or rate<0:raise ValueError('ASSEMBLYAI_USD_PER_HOUR inválido')
+    try:timeout_s=float(os.environ.get('ASSEMBLYAI_TIMEOUT_S','300'))
+    except ValueError:raise ValueError('ASSEMBLYAI_TIMEOUT_S inválido') from None
+    with open(path,'rb') as handle:audio=handle.read()
+    if not audio:raise ValueError('El audio está vacío; no se envió a transcribir.')
+    reserved=Decimal(str(_assemblyai_seconds(duration_s)))*rate/3600
+    # The same bytes cannot be sent again while an earlier attempt is pending or uncertain.
+    rid=reserve('assemblyai',purpose,reserved,digest(audio))
+    headers={'authorization':key}
+    with httpx.Client(transport=ASSEMBLYAI_TRANSPORT,timeout=httpx.Timeout(120.0,connect=10.0)) as http:
+        # 1. Upload: not billed by itself; nothing can be transcribed (or charged) if it fails.
+        try:response=http.post(ASSEMBLYAI_URL+'/upload',content=audio,headers=dict(headers,**{'content-type':'application/octet-stream'}))
+        except httpx.HTTPError as exc:
+            settle(rid,'rejected',{'step':'upload','error_type':type(exc).__name__})
+            raise ValueError('AssemblyAI: no se pudo subir el audio; no se transcribió nada.') from None
+        if response.status_code>=400:
+            settle(rid,'rejected',{'step':'upload','http_status':response.status_code})
+            raise ValueError(f'AssemblyAI: HTTP {response.status_code} al subir el audio. Sin reintento automático.')
+        try:upload_url=response.json()['upload_url']
+        except (ValueError,KeyError,TypeError):
+            settle(rid,'rejected',{'step':'upload'});raise ValueError('AssemblyAI: respuesta de subida ilegible; no se transcribió.') from None
+        # 2. Create the transcript: the paid request.
+        body={'audio_url':upload_url,'speech_models':ASSEMBLYAI_MODELS,'language_detection':True}
+        try:response=http.post(ASSEMBLYAI_URL+'/transcript',json=body,headers=headers)
+        except (httpx.ConnectError,httpx.ConnectTimeout):
+            settle(rid,'rejected',{'step':'create','error_type':'connect','request_not_sent':True})
+            raise ValueError('AssemblyAI: no fue posible conectar; no se envió la transcripción.') from None
+        except httpx.HTTPError as exc:
+            settle(rid,'uncertain',{'step':'create','error_type':type(exc).__name__})
+            raise ValueError('AssemblyAI: respuesta incierta al crear la transcripción. Reserva retenida; no se repite.') from None
+        if response.status_code>=400:
+            settle(rid,'uncertain' if response.status_code>=500 else 'rejected',{'step':'create','http_status':response.status_code})
+            raise ValueError(f'AssemblyAI: HTTP {response.status_code} al crear la transcripción. Sin reintento automático.')
+        try:transcript_id=str(response.json()['id'])
+        except (ValueError,KeyError,TypeError):
+            settle(rid,'uncertain',{'step':'create'})
+            raise ValueError('AssemblyAI: respuesta ilegible al crear la transcripción; reserva retenida.') from None
+        # 3. Poll until completed or error. Reads are free: a transient read failure only waits for the next poll.
+        deadline=time.monotonic()+timeout_s
+        while True:
+            data,status=_assemblyai_read(http,transcript_id,headers)
+            if data is not None and data.get('status') in ('completed','error'):break
+            if status is not None:
+                settle(rid,'uncertain',{'step':'poll','transcript_id':transcript_id,'http_status':status})
+                raise ValueError(f'AssemblyAI: HTTP {status} al leer la transcripción; reserva retenida, no se repite.')
+            if time.monotonic()>=deadline:
+                settle(rid,'uncertain',{'step':'poll','transcript_id':transcript_id,'timeout_s':timeout_s})
+                raise ValueError(f'AssemblyAI: la transcripción no terminó en {int(timeout_s)} s. No se reintenta; '
+                                 'si AssemblyAI la termina, se cobra igual (reserva retenida).')
+            time.sleep(ASSEMBLYAI_POLL_SECONDS)
+    if data['status']=='error':
+        # «If a request errors, you aren't charged for it.»
+        settle(rid,'rejected',{'transcript_id':transcript_id,'status':'error'})
+        raise ValueError('AssemblyAI no pudo transcribir el audio: '+str(data.get('error') or 'sin detalle')[:200])
+    model=data.get('speech_model_used') or ASSEMBLYAI_MODELS[0]
+    seconds=data.get('audio_duration')
+    usage={'transcript_id':transcript_id,'speech_model_used':model,'audio_duration':seconds,'language_code':data.get('language_code')}
+    if isinstance(seconds,(int,float)) and not isinstance(seconds,bool) and math.isfinite(seconds) and seconds>=0:
+        cost=Decimal(str(seconds))*prices.get(model,rate)/3600
+    else:
+        cost=reserved;usage['duration_missing']=True
+    settle(rid,'complete',usage,cost)
+    return {'text':(data.get('text') or '').strip(),'language':data.get('language_code') or '','id':transcript_id,
+            'audio_duration':seconds if 'duration_missing' not in usage else None,'model':model,'estimated_usd':float(cost)}
+
+def _assemblyai_read(http,transcript_id,headers):
+    """(transcript, None) on a readable answer; (None, None) on a transient failure; (None, status) on a definite one."""
+    try:response=http.get(f'{ASSEMBLYAI_URL}/transcript/{transcript_id}',headers=headers)
+    except httpx.HTTPError:return None,None
+    if response.status_code in (429,500,502,503,504):return None,None
+    if response.status_code>=400:return None,response.status_code
+    try:data=response.json()
+    except ValueError:return None,None
+    return (data,None) if isinstance(data,dict) else (None,None)

@@ -1,0 +1,4 @@
+0ff1ce brand: logo-inverso.svg, firma-horizontal.svg and isotipo.svg (0ff1ce manual, v1).
+login-oficina-tarde.png and sprites-atlas.png are built from LimeZu — Modern Interiors
+(https://limezu.itch.io/moderninteriors), licensed for use within this project.
+The original asset library is not distributed.

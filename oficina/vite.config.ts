@@ -25,16 +25,16 @@ export default defineConfig({
       includeManifestIcons: false,
       manifest: {
         id: '/',
-        name: 'Barrio AI',
-        short_name: 'Barrio',
-        description: 'La oficina de Barrio AI: supervisa la máquina autónoma y recibe sus alertas.',
+        name: '0ff1ce',
+        short_name: '0ff1ce',
+        description: 'La oficina de 0ff1ce: el equipo de agentes de IA que trabaja tu LinkedIn, y sus avisos.',
         lang: 'es',
         dir: 'ltr',
         start_url: '/',
         scope: '/',
         display: 'standalone',
         orientation: 'any',
-        theme_color: '#263c33',
+        theme_color: '#fffef8',
         background_color: '#f7f6f0',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
@@ -43,15 +43,15 @@ export default defineConfig({
         ],
       },
       injectManifest: {
-        // App shell and the office artwork. Nothing under /api/ is ever precached.
-        globPatterns: ['**/*.{js,css,html,png,json,txt}'],
+        // App shell, fonts, brand and the office artwork. Nothing under /api/ is ever precached.
+        globPatterns: ['**/*.{js,css,html,png,svg,woff2,json,txt}'],
         globIgnores: ['**/node_modules/**'],
       },
       devOptions: { enabled: false },
     }),
   ],
   build: {
-    // `/assets/` holds the LimeZu sprites and `/static/` belongs to Django.
+    // `/static/` belongs to Django; the app's bundles go to `/_app/`.
     assetsDir: '_app',
     sourcemap: false,
   },
@@ -63,5 +63,7 @@ export default defineConfig({
     css: false,
     restoreMocks: true,
     unstubGlobals: true,
+    // Generous limits: the suite renders the whole app and runs on shared, sometimes busy machines.
+    testTimeout: 20_000,
   },
 });

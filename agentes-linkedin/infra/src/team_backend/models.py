@@ -547,3 +547,126 @@ class Opportunity(models.Model):
         ordering=['-updated_at']
         constraints=[models.CheckConstraint(condition=models.Q(contact__isnull=False)|~models.Q(person_name=''),name='opportunity_has_person')]
     def __str__(self):return self.person_name or str(self.contact or self.id)
+
+
+# ---------------------------------------------------------------------------
+# Captura y Galería (0ff1ce, FUNCIONES-NUEVAS.md): what Gustavo sends the team with one gesture, and his photos.
+# Files live under MEDIA_ROOT and are only served through authenticated views (capturas_views.py), never as static.
+
+def _media_name(folder,filename):
+    """A random name under a dated folder; the client's filename is never trusted."""
+    import os.path
+    ext=os.path.splitext(filename or '')[1].lower()[:8]
+    now=timezone.now()
+    return f'{folder}/{now:%Y/%m}/{uuid.uuid4().hex}{ext}'
+
+def capture_audio_path(instance,filename):return _media_name('capturas/audio',filename)
+def gallery_image_path(instance,filename):return _media_name('galeria',filename)
+
+class Capture(models.Model):
+    """«Botón de captura»: a voice note, photos and a note that the team transcribes and routes (capturas.py).
+    `routed_to` records what processing created so «Deshacer» can revert it."""
+    class Purpose(models.TextChoices):
+        POST='post','Idea para un post'
+        FACT='dato','Dato sobre mí'
+        ANSWER='respuesta','Responde una pregunta'
+        GALLERY='galeria','Foto para la galería'
+    class Context(models.TextChoices):
+        QUESTION='pregunta','Pregunta de Tu turno'
+        PERSON='persona','Persona'
+        PIECE='pieza','Pieza'
+    class State(models.TextChoices):
+        RECEIVED='recibida','Recibida'
+        TRANSCRIBING='transcribiendo','Transcribiendo'
+        PROCESSING='procesando','Procesando'
+        SAVED='dato_guardado','Dato guardado'
+        NOTED='anotado','Anotado'
+        IDEA='idea','En la mesa editorial'
+        USED='usado','Usado'
+        UNUSED='sin_usar','Sin usar'
+        ERROR='error','No se pudo procesar'
+        UNDONE='deshecha','Deshecha'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now,db_index=True)
+    note=models.TextField(blank=True)
+    purpose=models.CharField(max_length=12,choices=Purpose.choices,blank=True)
+    context_type=models.CharField(max_length=10,choices=Context.choices,blank=True)
+    context_id=models.CharField(max_length=64,blank=True)
+    # Visibility chosen when the capture answers a question (null: the question's suggestion).
+    public_use=models.BooleanField(null=True,blank=True)
+    audio=models.FileField(upload_to=capture_audio_path,max_length=200,null=True,blank=True)
+    audio_mime=models.CharField(max_length=60,blank=True)
+    # Duration reported by the client at upload; replaced by AssemblyAI's audio_duration once transcribed.
+    audio_duration_s=models.FloatField(null=True,blank=True)
+    transcript=models.TextField(blank=True)
+    transcript_language=models.CharField(max_length=20,blank=True)
+    transcript_provider_id=models.CharField(max_length=80,blank=True)
+    state=models.CharField(max_length=16,choices=State.choices,default=State.RECEIVED,db_index=True)
+    # What the UI shows: {kind, text, link}.
+    outcome=models.JSONField(default=dict,blank=True)
+    routed_to=models.JSONField(default=dict,blank=True)
+    error=models.TextField(blank=True)
+    class Meta:ordering=['-created_at']
+    def __str__(self):return f'{self.created_at:%Y-%m-%d %H:%M} · {self.get_state_display()}'
+    @property
+    def text(self):
+        """The note plus the transcript: what the team routes."""
+        return '\n\n'.join(part.strip() for part in (self.note,self.transcript) if part and part.strip())
+
+class GalleryPhoto(models.Model):
+    """«Galería»: photos for Gustavo's posts. The team decides when to use them and whether to edit them with AI."""
+    class State(models.TextChoices):
+        UNUSED='sin_usar','Sin usar'
+        CHOSEN='elegida','Elegida'
+        EDITED='editada','Editada con IA'
+        PUBLISHED='publicada','Publicada'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    image=models.FileField(upload_to=gallery_image_path,max_length=200)
+    mime=models.CharField(max_length=40)
+    size_bytes=models.PositiveIntegerField()
+    width=models.PositiveIntegerField(null=True,blank=True)
+    height=models.PositiveIntegerField(null=True,blank=True)
+    note=models.TextField(blank=True)
+    allow_ai_edit=models.BooleanField(default=True)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.UNUSED,db_index=True)
+    chosen_piece=models.ForeignKey(EditorialPiece,on_delete=models.SET_NULL,null=True,blank=True,related_name='gallery_photos')
+    chosen_for=models.DateField(null=True,blank=True)
+    published_at=models.DateTimeField(null=True,blank=True)
+    capture=models.ForeignKey(Capture,on_delete=models.SET_NULL,null=True,blank=True,related_name='photos')
+    created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
+    created_at=models.DateTimeField(default=timezone.now,db_index=True)
+    class Meta:ordering=['-created_at']
+    def __str__(self):return f'{self.id} · {self.get_state_display()}'
+
+class OfficePreference(models.Model):
+    """Singleton of Gustavo's office preferences (Ajustes)."""
+    id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
+    gallery_ai_edit_default=models.BooleanField(default=True)
+    # Ajustes › Notificaciones: event kinds whose push Gustavo turned off (notificaciones.PUSH_DEFAULTS).
+    push_disabled=models.JSONField(default=list,blank=True)
+    updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    updated_at=models.DateTimeField(null=True,blank=True)
+    @classmethod
+    def current(cls):
+        return cls.objects.get_or_create(pk=1)[0]
+
+
+class Notification(models.Model):
+    """Notificaciones: what is coming or already happened and asks nothing of Gustavo (kept 7 days).
+    Anything only he can solve lives in Tu turno instead (notificaciones.INBOX_KINDS)."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    kind=models.CharField(max_length=40)
+    layer=models.CharField(max_length=20)
+    title=models.CharField(max_length=300)
+    detail=models.TextField(blank=True)
+    link=models.CharField(max_length=300,blank=True)
+    ref=models.CharField(max_length=160,null=True,blank=True,unique=True,help_text='Deduplica el mismo evento.')
+    created_at=models.DateTimeField(default=timezone.now,db_index=True)
+    read_at=models.DateTimeField(null=True,blank=True)
+    class Meta:ordering=['-created_at']
+
+class InboxSeen(models.Model):
+    """Tu turno: an item Gustavo already opened («Vista»), keyed by the card id the API returns."""
+    item_id=models.CharField(max_length=120,primary_key=True)
+    seen_at=models.DateTimeField(default=timezone.now)

@@ -239,7 +239,6 @@ def status_payload(now=None):
 
 def check_tokens(now=None):
     """Autopilot: push an alert 7 days before expiry and pause publishing once the token expired."""
-    from .alerts import notify
     from .models import LinkedInCredential
     from .operador import local_tz, set_account_pause
     now=now or timezone.now();events=0
@@ -250,7 +249,8 @@ def check_tokens(now=None):
                 set_account_pause(account,TOKEN_PAUSE+': reconecta LinkedIn en Ajustes para reanudar la publicación diaria.');events+=1
         elif left<=EXPIRY_ALERT and credential.expiry_alerted_at is None:
             when=credential.expires_at.astimezone(local_tz()).strftime('%d/%m %H:%M')
-            notify('Barrio AI: LinkedIn caduca pronto',f'El permiso de publicación caduca el {when}. Reconéctalo desde Tu turno '
-                   'para que la publicación diaria no se pause.',url='/tu-turno',tag='barrio-linkedin-token')
+            from .notificaciones import avisar
+            avisar('linkedin_expiring','LinkedIn caduca pronto',f'El permiso de publicación caduca el {when}. Reconéctalo desde Tu turno '
+                   'para que la publicación diaria no se pause.')
             type(credential).objects.filter(pk=credential.pk).update(expiry_alerted_at=now);events+=1
     return events

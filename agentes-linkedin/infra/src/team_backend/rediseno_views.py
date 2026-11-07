@@ -11,7 +11,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from knowledge import db
-from . import autopiloto, editorial, lider, operador, oportunidades, orientacion, preguntas, red
+from . import autopiloto, editorial, lider, notificaciones, operador, oportunidades, orientacion, preguntas, red
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, EditorialPiece, Opportunity,
                      OperatorControl, TeamQuestion)
 from .operador_views import get_or_404, human_session, valid
@@ -116,9 +116,15 @@ class OpportunityPatch(OpportunityInput):
 
 # --------------------------------------------------------------------------- Tu turno
 
-def _card(id,kind,title,body,actions,critical=False,tone='warn',agent='operador_cuenta',deadline=None,created_at=None,**extra):
-    return dict({'id':id,'type':kind,'critical':critical,'tone':tone,'agent':agent,'agent_label':'Operador de cuenta' if agent=='operador_cuenta' else preguntas.agent_label(agent),
-                 'title':title,'body':body,'deadline':deadline,'actions':actions,'created_at':created_at},**extra)
+PRIORITY_ORDER={'urgente':0,'importante':1,'cuando_puedas':2}
+PRIORITY_TONE={'urgente':'bad','importante':'warn','cuando_puedas':'info'}
+
+def _card(id,kind,title,body,actions,critical=False,tone=None,agent='operador_cuenta',deadline=None,created_at=None,priority=None,**extra):
+    """A Tu turno card. priority: urgente (something breaks without Gustavo) | importante | cuando_puedas (rev 18)."""
+    priority=priority or ('urgente' if critical else 'importante')
+    return dict({'id':id,'type':kind,'priority':priority,'critical':priority=='urgente','tone':tone or PRIORITY_TONE[priority],'agent':agent,
+                 'agent_label':'Operador de cuenta' if agent=='operador_cuenta' else preguntas.agent_label(agent),
+                 'title':title,'body':body,'deadline':deadline,'actions':actions,'created_at':created_at,'state':'nueva'},**extra)
 
 def alerts(now=None):
     """Tu turno → Avisos: only what breaks without Gustavo, each with its action (DISENO-VISTAS, sección 2.A).
@@ -131,10 +137,12 @@ def alerts(now=None):
                          [{'label':'Reconectar LinkedIn','href':'/api/v1/linkedin/oauth/start','primary':True}],critical=True,tone='bad',
                          expires_at=status.get('expires_at')))
     elif status.get('connected') and status.get('expiring_soon'):
+        days=status.get('days_left')
         out.append(_card('linkedin_expiring','aviso','Reconecta LinkedIn',
                          f'El permiso para publicar caduca el {status.get("expires_at")} (quedan {status.get("days_left")} días). LinkedIn no deja renovarlo solo.',
                          [{'label':'Reconectar LinkedIn','href':'/api/v1/linkedin/oauth/start','primary':True}],deadline=status.get('expires_at'),
-                         expires_at=status.get('expires_at'),days_left=status.get('days_left')))
+                         priority='importante' if days is not None and days<=3 else 'cuando_puedas',
+                         expires_at=status.get('expires_at'),days_left=days))
     for p in ActionProposal.objects.select_related('post','contact','execution').filter(state='uncertain').order_by('created_at'):
         execution=getattr(p,'execution',None) if hasattr(p,'execution') else None
         target=_target(p)
@@ -145,10 +153,8 @@ def alerts(now=None):
             attempt={'capability':p.capability,'label':LABELS.get(p.capability,p.capability),'text':p.payload.get('text'),
                      'reaction':p.payload.get('reaction'),'target':target,'at':execution.started_at if execution else None,
                      'url':(execution.external_url if execution and execution.external_url else target['url'])}))
-    if operador.env_paused():
-        out.append(_card('machine_paused_env','aviso','La máquina está detenida desde el servidor',
-                         'La parada viene del servidor (OPERATOR_PAUSED=true). No se puede levantar desde la app.',[],critical=True,tone='bad'))
-    else:
+    # A stop set on the server cannot be solved from the app: it is a Notificación (notificaciones.upcoming), not a card.
+    if not operador.env_paused():
         control=OperatorControl.objects.filter(pk=1,paused=True).first()
         if control:
             out.append(_card('machine_paused','aviso','Reanuda la máquina',control.reason or 'Sin motivo registrado.',
@@ -156,16 +162,24 @@ def alerts(now=None):
                 critical=True,tone='bad',created_at=control.updated_at,stopped_by=control.updated_by.get_username() if control.updated_by else None))
     for account in ConnectorAccount.objects.filter(paused=True):
         out.append(_card(f'account_paused:{account.id}','aviso','Reanuda la cuenta de LinkedIn',f'{account.label}: {account.paused_reason or "sin motivo registrado"}',
-            [{'label':'Reanudar la cuenta','endpoint':f'/api/v1/operador/accounts/{account.id}/pause','body':{'paused':False},'primary':True}]))
+            [{'label':'Reanudar la cuenta','endpoint':f'/api/v1/operador/accounts/{account.id}/pause','body':{'paused':False},'primary':True}],
+            priority='importante'))
     return out
 
-def _question_card(q):
+def _question_priority(q,now):
+    """Rises to Importante when less than 48 h remain before its deadline (rev 18 «Escalada»)."""
+    return 'importante' if q.deadline and now<=q.deadline<=now+timedelta(hours=48) else 'cuando_puedas'
+
+def _question_card(q,now=None):
+    now=now or timezone.now()
     data=QuestionOutput(q).data
+    state=('caducada' if data['expired'] else 'pospuesta' if q.postponed_until and q.postponed_until>now else 'nueva')
     return _card(f'question:{q.id}','pregunta',q.question,q.purpose,[
         {'label':'Responder','endpoint':f'/api/v1/preguntas/{q.id}/responder','primary':True},
         {'label':'Más tarde','endpoint':f'/api/v1/preguntas/{q.id}/mas-tarde'},
         {'label':'No quiero compartir esto','endpoint':f'/api/v1/preguntas/{q.id}/no-compartir'}],
-        tone='info' if data['pending'] else 'muted',agent=q.agent,deadline=q.deadline,created_at=q.created_at,question=data)
+        tone=None if data['pending'] else 'muted',priority=_question_priority(q,now),agent=q.agent,deadline=q.deadline,created_at=q.created_at,
+        question=data,state_override=state)
 
 def _today_summary(now):
     day,_=operador.period_starts(now);done={}
@@ -175,23 +189,86 @@ def _today_summary(now):
     upcoming=EditorialPiece.objects.filter(state='ready',scheduled_for__gt=now).order_by('scheduled_for').first()
     return {'done_today':done,'next_piece':{'id':str(upcoming.id),'scheduled_for':upcoming.scheduled_for} if upcoming else None}
 
+def _with_state(cards,seen):
+    for card in cards:
+        override=card.pop('state_override',None)
+        card['state']=override if override in ('pospuesta','caducada') else ('vista' if card['id'] in seen else 'nueva')
+    return cards
+
+def _ordered(cards):
+    """Priority first; inside each group, what has a deadline (nearest first), then the most recent."""
+    far=datetime.max.replace(tzinfo=dt_timezone.utc)
+    def deadline(c):
+        d=c.get('deadline')
+        if isinstance(d,str):
+            try:d=datetime.fromisoformat(d.replace('Z','+00:00'))
+            except ValueError:d=None
+        return d or far
+    def recent(c):
+        d=c.get('created_at')
+        return -(d.timestamp() if hasattr(d,'timestamp') else 0)
+    return sorted(cards,key=lambda c:(PRIORITY_ORDER[c['priority']],deadline(c),recent(c)))
+
 class TuTurno(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
+        from . import notificaciones
+        from .models import InboxSeen
         preguntas.sync_memory_proposals()
         now=timezone.now();warnings=alerts(now)
         open_questions=list(TeamQuestion.objects.filter(state='open').order_by('deadline','created_at'))
         pending=[q for q in open_questions if preguntas.is_pending(q,now)]
-        later=[q for q in open_questions if not preguntas.is_pending(q,now)]
+        later_q=[q for q in open_questions if not preguntas.is_pending(q,now)]
         tasks={'perfil':[],'conversaciones':[]}  # profile cycle (PERF) and inbox (CHAT): later phases of the plan
-        cards=[c for c in warnings if c['critical']]+[c for c in warnings if not c['critical']]+[_question_card(q) for q in pending]
-        return Response({'count':len(warnings)+len(pending)+sum(len(v) for v in tasks.values()),
-                         'critical':any(c['critical'] for c in warnings),
+        question_cards=[_question_card(q,now) for q in pending];later=[_question_card(q,now) for q in later_q]
+        seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in warnings+question_cards]).values_list('item_id',flat=True))
+        items=_ordered(_with_state(warnings+question_cards,seen));_with_state(later,seen)
+        active=[c for c in items if c['state'] in ('nueva','vista')]
+        return Response({'count':len(active),'critical':any(c['priority']=='urgente' for c in active),
+                         'urgent_count':sum(1 for c in active if c['priority']=='urgente'),
                          'counts':{'avisos':len(warnings),'preguntas':len(pending),'tareas':sum(len(v) for v in tasks.values())},
-                         'top':cards[0] if cards else None,
-                         'alerts':warnings,'questions':[_question_card(q) for q in pending],'later':[_question_card(q) for q in later],
+                         'top':items[0] if items else None,'items':items,
+                         'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
                          'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts(),
-                         'summary':_today_summary(now)})
+                         'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
+
+class TuTurnoSeen(APIView):
+    """POST /api/v1/tu-turno/vistos {ids}: cards Gustavo opened go from Nueva to Vista."""
+    def post(self,request):
+        human_session(request);require(request.user,'operate_linkedin')
+        from .models import InboxSeen
+        ids=request.data.get('ids') if isinstance(request.data,dict) else None
+        if not isinstance(ids,list) or not all(isinstance(i,str) and 0<len(i)<=120 for i in ids) or len(ids)>200:
+            raise ValidationError('ids debe ser una lista de identificadores de tarjetas')
+        for item in set(ids):InboxSeen.objects.get_or_create(item_id=item)
+        return Response({'seen':len(set(ids))})
+
+class Notifications(APIView):
+    """GET /api/v1/notificaciones?filtro=todas|sin_leer: what is coming or happened, 7 days, with its read state."""
+    def get(self,request):
+        require(request.user,'operate_linkedin')
+        from . import notificaciones
+        from .models import Notification
+        notificaciones.purge()
+        qs=Notification.objects.filter(created_at__gte=timezone.now()-notificaciones.RETENTION)
+        if request.query_params.get('filtro')=='sin_leer':qs=qs.filter(read_at__isnull=True)
+        items=[{'id':str(n.id),'kind':n.kind,'layer':n.layer,'title':n.title,'detail':n.detail,'link':n.link,'at':n.created_at,
+                'read':n.read_at is not None} for n in qs.order_by('-created_at')[:200]]
+        return Response({'upcoming':notificaciones.upcoming(),'items':items,'unread':notificaciones.unread()})
+
+class NotificationsRead(APIView):
+    """POST /api/v1/notificaciones/leer {ids} or {todas: true}."""
+    def post(self,request):
+        human_session(request);require(request.user,'operate_linkedin')
+        from . import notificaciones
+        from .models import Notification
+        data=request.data if isinstance(request.data,dict) else {}
+        qs=Notification.objects.filter(read_at__isnull=True)
+        if data.get('todas') is True:pass
+        elif isinstance(data.get('ids'),list) and data['ids']:qs=qs.filter(id__in=[i for i in data['ids'] if isinstance(i,str)][:200])
+        else:raise ValidationError('Envía ids o todas: true')
+        qs.update(read_at=timezone.now())
+        return Response({'unread':notificaciones.unread()})
 
 def _resolved_alerts(days=7):
     since=timezone.now()-timedelta(days=days);out=[]
@@ -488,6 +565,7 @@ class Settings(APIView):
                              {'budget':'editorial','label':'Editorial','spent_usd':_spend('editorial-%',day),'limit_usd':float(os.environ.get('EDITORIAL_DAILY_LLM_USD','1'))},
                              {'budget':'red','label':'Red','spent_usd':_spend('network-%',day),'limit_usd':float(red.daily_budget())}],
                              'month_usd':_spend('%',month),'total_usd':_spend('%'),'limit_usd':float(os.environ.get('ANTHROPIC_LIMIT_USD','1')),
-                             'lead_month_usd':_spend('%',month,provider='typesafe')},
-                         'facts_count':len(preguntas.facts()),
+                             'lead_month_usd':_spend('%',month,provider='typesafe'),
+                             'transcription_month_usd':_spend('%',month,provider='assemblyai')},
+                         'facts_count':len(preguntas.facts()),'push_types':notificaciones.push_types(),
                          'orientation':_orientation_payload()})

@@ -1,0 +1,714 @@
+/* Personas (Personas.dc.html, Persona.dc.html): Barrio list, person card, Oportunidades, Referentes and the
+   opportunity form. Tokens only; control borders tinta-suave, card borders linea. */
+
+/* ------------------------------------------------------------ layout */
+
+.personas-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.personas-split {
+  grid-template-columns: minmax(0, 1fr);
+}
+.personas-list,
+.personas-detail {
+  min-width: 0;
+}
+.personas-placeholder {
+  display: none;
+}
+.persona-back {
+  display: none;
+}
+
+/* Below 1100px the card is its own screen: no list, no tabs, the h1 kept for screen readers. */
+@media (max-width: 1099.98px) {
+  .personas.has-detail .personas-list,
+  .personas.has-detail .personas-tabs {
+    display: none;
+  }
+  .personas.has-detail .page-head {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}
+/* Desktop shell without the side-by-side list: the top bar «←» is hidden, so the card brings its own. */
+@media (min-width: 900px) and (max-width: 1099.98px) {
+  .persona-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 44px;
+    align-self: flex-start;
+    color: var(--color-0ff1ce-hondo);
+    font-size: 16px;
+    line-height: 24px;
+  }
+}
+@media (min-width: 1100px) {
+  .personas-detail {
+    position: sticky;
+    top: 24px;
+    max-height: calc(100vh - 48px);
+    overflow-y: auto;
+    padding: 24px;
+    background: var(--color-superficie);
+    border: 1px solid var(--color-linea);
+    border-radius: var(--radius-md);
+  }
+  .personas-placeholder {
+    display: block;
+  }
+}
+
+/* ------------------------------------------------------------ Barrio */
+
+.barrio {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.chip-gap {
+  flex: none;
+  width: 4px;
+}
+.barrio-search {
+  display: flex;
+  gap: 8px;
+}
+.barrio-searchbox,
+.opp-search {
+  flex: 1;
+  min-width: 0;
+  min-height: 48px;
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--color-tinta-suave);
+  border-radius: var(--radius-sm);
+  background: var(--color-superficie);
+  color: var(--color-tinta-suave);
+}
+.barrio-searchbox:focus-within,
+.opp-search:focus-within {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+/* Beats the global field style (input:not(…)), so the box draws the only border. */
+:is(.barrio-searchbox, .opp-search) input:not([type='checkbox']):not([type='radio']):not([type='range']) {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  outline: none;
+}
+.barrio-filterbutton {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-tinta-suave);
+  border-radius: var(--radius-sm);
+  background: var(--color-superficie);
+  color: var(--color-tinta);
+}
+.barrio-filterbutton[aria-expanded='true'] {
+  background: var(--color-0ff1ce-claro);
+}
+.barrio-filtercount {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 5px;
+  border-radius: var(--radius-pill);
+  background: var(--color-tinta);
+  color: var(--color-papel);
+  font-size: 12px;
+  line-height: 20px;
+  text-align: center;
+}
+.barrio-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 12px;
+}
+
+.person-list {
+  list-style: none;
+  border-bottom: 1px solid var(--color-linea);
+}
+.person-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px 0;
+  border-top: 1px solid var(--color-linea);
+  color: var(--color-tinta);
+  text-decoration: none;
+}
+.person-row:hover .person-row-name {
+  text-decoration: underline;
+}
+.person-row[aria-current='page'] {
+  margin: 0 -12px;
+  padding: 14px 12px;
+  background: var(--color-0ff1ce-claro);
+}
+.person-row-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.person-row-top {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.person-row-name {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+.person-row-headline {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.person-row-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.person-row-meta {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+.person-row-turn {
+  display: flex;
+}
+
+/* ------------------------------------------------------------ person card */
+
+.persona {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-width: 0;
+  container: persona / inline-size;
+}
+/* The journey goes horizontal from 900px, but the card next to the list is narrower: keep it vertical there. */
+@container persona (max-width: 699px) {
+  .persona .stages.path {
+    display: block;
+  }
+  .persona .stages.path .stage {
+    flex: none;
+    flex-direction: row;
+    gap: 12px;
+    padding: 0 0 12px;
+  }
+  .persona .stages.path .stage:not(:last-child)::after {
+    left: 11px;
+    right: auto;
+    top: 28px;
+    bottom: -6px;
+    width: 2px;
+    height: auto;
+  }
+}
+.persona-head {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.persona-top {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+}
+.persona-name {
+  font-size: 32px;
+  line-height: 40px;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  overflow-wrap: anywhere;
+}
+.persona-name a {
+  color: var(--color-tinta);
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.persona-name a:hover {
+  text-decoration: underline;
+}
+.persona-name a svg {
+  flex: none;
+  color: var(--color-0ff1ce-hondo);
+}
+.persona-headline {
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--color-tinta-suave);
+}
+.persona-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 4px;
+}
+@media (min-width: 900px) {
+  .persona-buttons {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+  .persona-buttons .btn.block {
+    width: auto;
+  }
+}
+.persona-label,
+.opp-label {
+  font-size: 12px;
+  line-height: 16px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  font-weight: 400;
+  color: var(--color-tinta-suave);
+}
+.persona-text {
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--color-tinta);
+  overflow-wrap: anywhere;
+}
+.persona-meta {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+.persona-small {
+  font-size: 14px;
+  line-height: 20px;
+}
+/* .card. prefixes: page styles load before ui.css in the bundle, so they need the extra weight. */
+.card.persona-next {
+  gap: 8px;
+}
+.card.persona-block {
+  gap: 10px;
+}
+.card.persona-block.tight {
+  gap: 8px;
+}
+.persona-chips {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.persona-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.persona-row.wrap {
+  flex-wrap: wrap;
+}
+.persona-bar {
+  height: 8px;
+  border-radius: var(--radius-pill);
+  background: var(--color-linea);
+  overflow: hidden;
+}
+.persona-bar span {
+  display: block;
+  height: 8px;
+  background: var(--color-0ff1ce-hondo);
+}
+.persona-quote {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--color-papel);
+  font-size: 16px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+.persona-field {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.persona-notes {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.persona-notes li {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.persona-noteform {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.persona-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.persona-actions .btn {
+  flex: 1;
+}
+@media (min-width: 900px) {
+  .persona-actions .btn {
+    flex: none;
+  }
+}
+.persona-history {
+  list-style: none;
+  border-bottom: 1px solid var(--color-linea);
+}
+.persona-history li {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid var(--color-linea);
+}
+.persona-history-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.persona-history time {
+  white-space: nowrap;
+}
+
+/* ------------------------------------------------------------ Oportunidades */
+
+.oportunidades {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+@media (min-width: 900px) {
+  .opp-new.btn.block {
+    width: auto;
+    align-self: flex-start;
+  }
+}
+.opp-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opp-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-linea);
+  border-radius: var(--radius-md);
+  min-width: 0;
+}
+.opp-card[draggable='true'] {
+  cursor: grab;
+}
+.opp-card-head {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.opp-card-who {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.opp-name {
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--color-0ff1ce-hondo);
+  overflow-wrap: break-word;
+}
+.opp-name.plain {
+  color: var(--color-tinta);
+}
+.opp-sub {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+.opp-next {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 16px;
+  line-height: 24px;
+}
+.opp-stage {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+.opp-stage select {
+  color: var(--color-tinta);
+}
+.opp-edit {
+  align-self: flex-start;
+}
+.opp-board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(148px, 1fr));
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+.opp-column {
+  min-width: 0;
+  min-height: 160px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  border-radius: var(--radius-md);
+  background: var(--color-linea);
+}
+.opp-column > .opp-label {
+  min-height: 36px;
+  padding: 4px 4px 0;
+}
+.opp-column.droptarget {
+  background: var(--color-0ff1ce-claro);
+  outline: 2px dashed var(--color-0ff1ce-hondo);
+  outline-offset: -2px;
+}
+.opp-column .opp-card {
+  padding: 12px;
+}
+/* Narrow columns: no avatar, the modality under the name. */
+.opp-column .opp-card-head {
+  flex-direction: column;
+  gap: 6px;
+}
+.opp-column .opp-card-head .avatar {
+  display: none;
+}
+.opp-closed {
+  border-top: 1px solid var(--color-linea);
+}
+.opp-closed summary {
+  min-height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 24px;
+  list-style: none;
+}
+.opp-closed summary::-webkit-details-marker {
+  display: none;
+}
+.opp-closed[open] summary svg {
+  transform: rotate(180deg);
+}
+.opp-closed-list {
+  list-style: none;
+  padding: 0 0 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.opp-closed-row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+/* ------------------------------------------------------------ opportunity form */
+
+.opp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.opp-person {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.opp-person legend {
+  padding: 0;
+  margin-bottom: 8px;
+}
+.opp-grid {
+  display: grid;
+  gap: 16px;
+}
+@media (min-width: 640px) {
+  .opp-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .opp-form .confirm-actions .opp-delete {
+    margin-right: auto;
+  }
+}
+.opp-results {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.opp-result-list {
+  list-style: none;
+  border: 1px solid var(--color-linea);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+.opp-result-list li + li {
+  border-top: 1px solid var(--color-linea);
+}
+.opp-result {
+  width: 100%;
+  min-height: 48px;
+  padding: 8px 12px;
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  border: 0;
+  background: var(--color-superficie);
+  color: var(--color-tinta);
+  text-align: left;
+  font-size: 16px;
+  line-height: 24px;
+}
+.opp-result:hover {
+  background: var(--color-0ff1ce-claro);
+}
+.opp-result-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.opp-result-sub {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.opp-picked {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 4px 8px 12px;
+  border-radius: var(--radius-md);
+  background: var(--color-0ff1ce-claro);
+}
+
+/* ------------------------------------------------------------ Referentes */
+
+.referentes {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-width: 760px;
+}
+.ref-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+@media (min-width: 900px) {
+  .ref-buttons {
+    flex-direction: row;
+  }
+  .ref-buttons .btn.block {
+    width: auto;
+  }
+}
+.ref-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ref-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--color-superficie);
+  border: 1px solid var(--color-linea);
+  border-radius: var(--radius-md);
+}
+.ref-head {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.ref-name {
+  min-width: 0;
+  font-size: 16px;
+  line-height: 24px;
+  overflow-wrap: anywhere;
+}
+.ref-reason {
+  font-size: 16px;
+  line-height: 24px;
+  color: var(--color-tinta-suave);
+}
+.ref-meta {
+  font-size: 14px;
+  line-height: 20px;
+  color: var(--color-tinta-suave);
+}
+.ref-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}

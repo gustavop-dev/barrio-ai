@@ -79,13 +79,13 @@ export async function currentSubscription(): Promise<PushSubscription | null> {
  */
 export async function enablePush(): Promise<PushSubscription> {
   const support = detectPush();
-  if (support.needsInstall) throw new PushError('En iPhone, primero añade Barrio a la pantalla de inicio y ábrela desde allí.');
+  if (support.needsInstall) throw new PushError('En iPhone, primero añade 0ff1ce a la pantalla de inicio y ábrela desde allí.');
   if (!support.supported) throw new PushError('Este navegador no admite notificaciones push.');
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') {
     throw new PushError(
       permission === 'denied'
-        ? 'Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador o del sistema para Barrio.'
+        ? 'Las notificaciones están bloqueadas. Actívalas en los ajustes del navegador o del sistema para 0ff1ce.'
         : 'No se concedió el permiso de notificaciones.',
     );
   }

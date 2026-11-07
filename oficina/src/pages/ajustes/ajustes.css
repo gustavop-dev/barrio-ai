@@ -1,0 +1,225 @@
+/* Ajustes (Ajustes.dc.html). Mobile: stacked sections; desktop: sub-index on the left. Tokens only. */
+
+.aj-layout {
+  display: grid;
+  gap: 24px;
+}
+@media (min-width: 900px) {
+  .aj-layout {
+    grid-template-columns: 220px minmax(0, 720px);
+    align-items: start;
+    gap: 40px;
+  }
+}
+
+.aj-index {
+  position: sticky;
+  top: 24px;
+}
+.aj-index ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--color-linea);
+}
+.aj-index a {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  margin-left: -1px;
+  border-left: 2px solid transparent;
+  color: var(--color-tinta);
+  text-decoration: none;
+  font-size: 14px;
+  line-height: 20px;
+}
+.aj-index a:hover {
+  border-left-color: var(--color-tinta-suave);
+  background: var(--color-superficie);
+}
+
+.aj-sections {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.aj-sections > section {
+  scroll-margin-top: 16px;
+}
+
+.card.aj-card {
+  gap: 10px;
+}
+.card.aj-card-tight {
+  gap: 8px;
+}
+.aj-cardhead {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: space-between;
+}
+.aj-cardhead > p {
+  min-width: 0;
+}
+.aj-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.aj-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.aj-rows .kv > :last-child {
+  color: var(--color-tinta);
+}
+.aj-urn {
+  color: var(--color-tinta-suave);
+  overflow-wrap: anywhere;
+}
+.aj-divider {
+  border-top: 1px solid var(--color-linea);
+}
+.aj-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.aj-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.aj-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+/* Folded «Autonomía y límites», as in the design: a ruled row, not a card. */
+.aj-fold-section {
+  border-bottom: 1px solid var(--color-linea);
+}
+.aj-fold-title {
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 400;
+}
+.aj-fold-body {
+  gap: 16px;
+}
+.aj-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.aj-modes {
+  display: flex;
+  flex-direction: column;
+}
+.aj-mode {
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-top: 1px solid var(--color-linea);
+  font-size: 16px;
+  line-height: 24px;
+}
+.aj-modes .aj-mode:last-child {
+  border-bottom: 1px solid var(--color-linea);
+}
+.aj-block > .aj-mode {
+  border-top: 0;
+}
+.aj-meters {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Switches (checkbox role="switch"). */
+.aj-switch {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 16px;
+  line-height: 24px;
+  cursor: pointer;
+}
+.aj-switch-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.aj-switch input[type='checkbox'] {
+  width: 44px;
+  height: 24px;
+  flex: none;
+  accent-color: var(--color-0ff1ce-hondo);
+}
+.aj-switches .aj-switch {
+  border-top: 1px solid var(--color-linea);
+  padding: 4px 0;
+}
+.aj-fold-inner {
+  margin-top: 2px;
+}
+
+.aj-steps {
+  margin: 6px 0 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* «Lo que el equipo sabe de ti». */
+.card.aj-linkcard {
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  color: var(--color-tinta);
+  text-decoration: none;
+}
+.card.aj-linkcard:hover {
+  background: var(--color-papel);
+  color: var(--color-tinta);
+}
+.aj-linkcard-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.aj-credit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.aj-credit-link {
+  margin-left: auto;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.aj-unavailable {
+  padding: 12px 16px;
+  border: 1px dashed var(--color-tinta-suave);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}

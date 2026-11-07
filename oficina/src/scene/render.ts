@@ -1,322 +1,340 @@
-// Draws the apartment with the licensed LimeZu sprites. Ported from the previous
-// office (apartamento-agentes/public/scene.js), keeping layout, art and order.
+// Draws the vertical office plan with the LimeZu atlas, ported from the design (Oficina.dc.html).
+// Always daylight. The paused darkening is a DOM layer over the canvas, not part of the drawing.
 
-import { ROLES, ROLE_BY_ID, TEAMS, type RoleId, type TeamId } from './roles';
-import type { Actor, StatusMap } from './simulation';
+import { lookFor } from './activity';
+import { ATLAS, type AtlasImage } from './atlas';
+import type { Actor, BubbleIcon, OfficeEngine } from './engine';
+import { PLAN_HEIGHT, PLAN_WIDTH } from './plan';
+import { LIBRARIAN_ID, LIBRARY, SPRITES_WITHOUT_READING, TEAMS, type CharacterId, type ZoneId } from './roles';
 
-export const SCENE_WIDTH = 480;
-export const SCENE_HEIGHT = 330;
-export const SCENE_SCALE = 2;
-
-type ImageLike = CanvasImageSource & { width: number; height: number };
-
-export interface DrawState {
-  actors: readonly Actor[];
-  statuses: StatusMap;
-  selectedTeam: TeamId | null;
-  selectedRole: RoleId | null;
-  evening: boolean;
-  /** Ambient clock in ms; advances only while motion is enabled. */
-  elapsed: number;
-  moving: boolean;
+/** Brand colours used on the canvas; read from the tokens (see `readPalette`). */
+export interface Palette {
+  tinta: string;
+  tintaSuave: string;
+  papel: string;
+  ofc: string;
+  hondo: string;
+  claro: string;
+  postit: string;
 }
 
-const WINDOWS_X = [65, 195, 282];
-const NIGHT_LAMPS: readonly (readonly [number, number])[] = [
-  [89, 103], [150, 103], [245, 103], [306, 103], [404, 230], [332, 250], [402, 124],
-];
+export const DEFAULT_PALETTE: Palette = {
+  tinta: '#1e1e2b',
+  tintaSuave: '#565972',
+  papel: '#f7f6f0',
+  ofc: '#0ff1ce',
+  hondo: '#00715e',
+  claro: '#d2fbf3',
+  postit: '#f8d47d',
+};
 
-export function drawScene(ctx: CanvasRenderingContext2D, images: Record<string, ImageLike> | null, state: DrawState): void {
-  const { actors, statuses, selectedTeam, selectedRole, evening, elapsed, moving } = state;
-  const ready = images !== null;
+/** The palette from the CSS tokens, falling back to the manual's values. */
+export function readPalette(element: Element | null = typeof document !== 'undefined' ? document.documentElement : null): Palette {
+  if (!element || typeof getComputedStyle !== 'function') return DEFAULT_PALETTE;
+  const style = getComputedStyle(element);
+  const token = (name: string, fallback: string) => style.getPropertyValue(name).trim() || fallback;
+  return {
+    tinta: token('--color-tinta', DEFAULT_PALETTE.tinta),
+    tintaSuave: token('--color-tinta-suave', DEFAULT_PALETTE.tintaSuave),
+    papel: token('--color-papel', DEFAULT_PALETTE.papel),
+    ofc: token('--color-0ff1ce', DEFAULT_PALETTE.ofc),
+    hondo: token('--color-0ff1ce-hondo', DEFAULT_PALETTE.hondo),
+    claro: token('--color-0ff1ce-claro', DEFAULT_PALETTE.claro),
+    postit: token('--color-post-it', DEFAULT_PALETTE.postit),
+  };
+}
 
-  ctx.save();
-  ctx.setTransform(SCENE_SCALE, 0, 0, SCENE_SCALE, 0, 0);
+export interface DrawOptions {
+  /** Device pixels per logical pixel (integer). */
+  scale: number;
+  selectedRole: CharacterId | null;
+  selectedZone: ZoneId | null;
+  palette?: Palette;
+}
+
+// Pixel-art colours of the room itself (walls, floor edges, the monitor off, bubble icons).
+const ROOM = {
+  outside: '#4b5655',
+  plaster: '#eee5cc',
+  plasterLight: '#fff5dd',
+  wainscot: '#9ba998',
+  skirting: '#667b70',
+  wall: '#536b61',
+  wallLight: '#b9c5ae',
+  base: '#526c61',
+  kitchenEdge: '#aa987f',
+  screenOff: '#33403f',
+  screenOffLine: '#3f4e4c',
+  screenLine: '#7fd9c9',
+  white: '#ffffff',
+  book: '#a54e35',
+  bookSpine: '#7a3624',
+  coffee: '#8a6552',
+  steam: '#b9b5ad',
+};
+
+export function drawScene(ctx: CanvasRenderingContext2D, atlas: AtlasImage | null, engine: OfficeEngine, options: DrawOptions): void {
+  const C = options.palette ?? DEFAULT_PALETTE;
+  const clock = engine.clock;
+  const still = engine.isStill;
+  const paused = engine.isPaused;
+
+  ctx.setTransform(options.scale, 0, 0, options.scale, 0, 0);
   ctx.imageSmoothingEnabled = false;
+  ctx.globalAlpha = 1;
 
-  const fill = (x: number, y: number, w: number, h: number, color: string) => {
+  const R = (x: number, y: number, w: number, h: number, color: string) => {
     ctx.fillStyle = color;
     ctx.fillRect(x, y, w, h);
   };
-  const sprite = (name: string, x: number, y: number, w?: number, h?: number) => {
-    const image = images?.[name];
-    if (image) ctx.drawImage(image, Math.round(x), Math.round(y), w ?? image.width, h ?? image.height);
+
+  R(0, 0, PLAN_WIDTH, PLAN_HEIGHT, ROOM.outside);
+  if (!atlas) return;
+  const image = atlas;
+
+  const S = (name: string, x: number, y: number) => {
+    const r = ATLAS[name];
+    if (r) ctx.drawImage(image, r[0], r[1], r[2], r[3], Math.round(x), Math.round(y), r[2], r[3]);
   };
-  const tile = (name: string, x: number, y: number, w: number, h: number) => {
-    const image = images?.[name];
-    if (!image) return;
+  const clip = (x: number, y: number, w: number, h: number, paint: () => void) => {
     ctx.save();
     ctx.beginPath();
     ctx.rect(x, y, w, h);
     ctx.clip();
-    for (let yy = y; yy < y + h; yy += image.height) for (let xx = x; xx < x + w; xx += image.width) sprite(name, xx, yy);
+    paint();
     ctx.restore();
   };
-  // A monitor shows work only while its owner is really working.
-  const monitor = (x: number, y: number, w: number, h: number, kind: number, lit: boolean) => {
-    sprite('monitorFront', x, y, w, h);
+  const tile = (name: string, x: number, y: number, w: number, h: number) => {
+    const r = ATLAS[name];
+    if (!r) return;
+    clip(x, y, w, h, () => {
+      for (let yy = y; yy < y + h; yy += r[3]) for (let xx = x; xx < x + w; xx += r[2]) S(name, xx, yy);
+    });
+  };
+  // Rug in nine parts: fixed corners, repeated edges and centre, never scaled.
+  const rug = (name: string, x: number, y: number, w: number, h: number, k: number) => {
+    const r = ATLAS[name];
+    if (!r) return;
+    const [sx, sy, rw, rh] = r;
+    const part = (px: number, py: number, pw: number, ph: number, dx: number, dy: number, dw: number, dh: number) =>
+      clip(dx, dy, dw, dh, () => {
+        for (let yy = dy; yy < dy + dh; yy += ph) for (let xx = dx; xx < dx + dw; xx += pw) ctx.drawImage(image, sx + px, sy + py, pw, ph, xx, yy, pw, ph);
+      });
+    const mw = rw - 2 * k;
+    const mh = rh - 2 * k;
+    part(0, 0, k, k, x, y, k, k);
+    part(rw - k, 0, k, k, x + w - k, y, k, k);
+    part(0, rh - k, k, k, x, y + h - k, k, k);
+    part(rw - k, rh - k, k, k, x + w - k, y + h - k, k, k);
+    part(k, 0, 1, k, x + k, y, w - 2 * k, k);
+    part(k, rh - k, 1, k, x + k, y + h - k, w - 2 * k, k);
+    part(0, k, k, 1, x, y + k, k, h - 2 * k);
+    part(rw - k, k, k, 1, x + w - k, y + k, k, h - 2 * k);
+    part(k + Math.floor(mw / 2), k + Math.floor(mh / 2), 1, 1, x + k, y + k, w - 2 * k, h - 2 * k);
+  };
+  // Monitors light up in 0ff1ce only while their owner is really working at the desk.
+  const monitor = (x: number, y: number, lit: boolean) => {
+    S('monitorFront', x, y);
     if (!lit) {
-      fill(x + 2, y + 2, w - 4, h - 7, '#33403f');
-      fill(x + 3, y + 3, w - 6, 1, '#3f4e4c');
-      fill(x + w - 4, y + h - 4, 1, 1, '#d9a35c');
+      R(x + 2, y + 2, 25, 12, ROOM.screenOff);
+      R(x + 3, y + 3, 23, 1, ROOM.screenOffLine);
       return;
     }
-    fill(x + 2, y + 2, w - 4, h - 7, '#d8edf0');
-    fill(x + 2, y + 2, w - 4, 2, '#427b97');
-    fill(x + 3, y + 5, 4, h - 11, '#8bb9c6');
-    if (kind === 1) {
-      fill(x + 9, y + 10, 2, 3, '#719e87');
-      fill(x + 12, y + 8, 2, 5, '#57968b');
-      fill(x + 15, y + 6, 3, 7, '#427b97');
-    } else {
-      fill(x + 9, y + 5, 9, 2, '#78a9b7');
-      fill(x + 9, y + 9, 7, 1, '#638b9d');
-      fill(x + 9, y + 12, 9, 1, '#83b6ba');
-      if (kind === 2) fill(x + 18, y + 9, 2, 3, '#79aa74');
-    }
-    fill(x + w - 4, y + h - 4, 1, 1, '#a9ebae');
+    R(x + 2, y + 2, 25, 12, C.claro);
+    R(x + 2, y + 2, 25, 2, C.ofc);
+    R(x + 4, y + 6, 13, 1, C.hondo);
+    R(x + 4, y + 9, 17, 1, ROOM.screenLine);
+    R(x + 4, y + 12, 9, 1, ROOM.screenLine);
   };
 
-  fill(0, 0, SCENE_WIDTH, SCENE_HEIGHT, '#c4d1c4');
-  // Soft exterior shadow and raised foundation.
-  fill(24, 36, 438, 269, '#758d7c');
-  fill(21, 32, 438, 269, '#92a591');
-  fill(18, 25, 438, 270, '#4b5655');
-  if (!ready) {
-    fill(24, 52, 426, 235, '#d4c0a2');
-    ctx.restore();
-    return;
-  }
-  tile('floor', 24, 53, 426, 236);
-  // Cream plaster wall, sage wainscot and oak skirting.
-  fill(24, 28, 426, 27, '#eee5cc');
-  fill(24, 46, 426, 10, '#9ba998');
-  fill(24, 53, 426, 3, '#667b70');
-  fill(24, 27, 426, 3, '#fff5dd');
-  fill(18, 25, 6, 270, '#536b61');
-  fill(21, 28, 3, 263, '#b9c5ae');
-  fill(450, 25, 6, 270, '#536b61');
-  fill(450, 29, 3, 261, '#b9c5ae');
-  // Windows overlook a quiet canopy.
-  for (const x of WINDOWS_X) {
-    fill(x + 3, 30, 40, 18, evening ? '#5f7f95' : '#a0c9ca');
-    fill(x + 3, 40, 40, 8, evening ? '#3f5a4c' : '#728f79');
-    sprite('window', x, 26);
-  }
-  sprite('board', 133, 31, 30, 18);
-  sprite('books', 248, 30);
-  sprite('plantSmall', 37, 32);
-  // Compact kitchen, separated only by its tiled floor.
-  tile('tile', 352, 55, 98, 102);
-  fill(350, 55, 2, 102, '#aa987f');
-  for (let x = 357; x < 419; x += 31) sprite('cabinet', x, 64, 31, 25);
-  sprite('sink', 357, 62, 29, 17);
-  sprite('stove', 389, 59, 18, 29);
-  sprite('fridge', 423, 52, 20, 40);
-  sprite('wallCabinet', 361, 29, 27, 19);
-  sprite('wallCabinet', 392, 29, 27, 19);
-  sprite('coffee', 409, 68, 14, 16);
-  sprite('desk', 370, 112, 60, 26);
-  sprite('fruit', 390, 108, 13, 13);
-  sprite('cup', 414, 114, 8, 8);
-  // The two gold kitchen chairs are now Relations' seats; they are drawn with the other chairs below.
-  // Rugs define the teams without dividing the room.
-  sprite('rugGreen', 52, 87, 130, 68);
-  sprite('rugBlue', 207, 87, 135, 68);
-  sprite('rugRust', 48, 194, 130, 98);
-  sprite('rugBlue', 211, 194, 132, 98);
-  sprite('rugGreen', 370, 209, 72, 73);
+  // ---------------------------------------------------------------- room
+  const W = PLAN_WIDTH;
+  const H = PLAN_HEIGHT;
+  tile('floor', 4, 30, 184, 302);
+  tile('tile', 112, 30, 76, 76);
+  R(110, 30, 2, 76, ROOM.kitchenEdge);
+  R(0, 0, W, 22, ROOM.plaster);
+  R(0, 0, W, 2, ROOM.plasterLight);
+  R(0, 22, W, 6, ROOM.wainscot);
+  R(0, 28, W, 2, ROOM.skirting);
+  R(0, 0, 4, H, ROOM.wall);
+  R(3, 2, 1, H - 4, ROOM.wallLight);
+  R(188, 0, 4, H, ROOM.wall);
+  R(188, 2, 1, H - 4, ROOM.wallLight);
+  R(0, H - 4, W, 4, ROOM.base);
+  rug('rugBlue', 6, 114, 72, 60, 8);
+  rug('rugGreen', 114, 114, 72, 60, 6);
+  rug('rugRust', 6, 184, 72, 68, 8);
+  rug('rugGreen', 114, 184, 72, 64, 6);
+  rug('rugBlue', 30, 260, 132, 72, 8);
+  S('door', 88, 2);
+  S('windowSmall', 52, 4);
+  S('board', 160, 6);
+  S('wallCabinet', 116, 8);
+  S('wallCabinet', 134, 8);
 
-  // Selected team's warm brass corner brackets.
-  const team = TEAMS.find((t) => t.id === selectedTeam);
-  if (team) {
-    const [x, y, w, h] = team.box;
-    ctx.strokeStyle = '#f8d47d';
-    ctx.lineWidth = 1.5;
-    const corners: [number, number, number, number][] = [
-      [x - 3, y - 3, 1, 1], [x + w + 3, y - 3, -1, 1], [x - 3, y + h + 3, 1, -1], [x + w + 3, y + h + 3, -1, -1],
-    ];
-    for (const [xx, yy, dx, dy] of corners) {
-      ctx.beginPath();
-      ctx.moveTo(xx, yy + dy * 8);
-      ctx.lineTo(xx, yy);
-      ctx.lineTo(xx + dx * 8, yy);
-      ctx.stroke();
-    }
+  // ---------------------------------------------------------------- furniture behind the people
+  S('library', 6, 22);
+  S('books', 40, 28);
+  S('plantSmall', 78, 30);
+  S('cabinet', 113, 42);
+  S('coffee', 120, 32);
+  S('sink', 144, 40);
+  S('stove', 152, 30);
+  S('fridge', 171, 22);
+  S('deskLight', 142, 58);
+  S('fruit', 150, 62);
+  S('cup', 168, 66);
+  for (const [x, y] of [[8, 114], [44, 114], [116, 114], [152, 114]] as const) S('deskLight', x, y);
+  S('chair', 18, 186);
+  S('chair', 50, 186);
+  S('desk', 10, 196);
+  S('desk', 42, 196);
+  S('laptop', 18, 210);
+  S('laptop', 50, 210);
+  S('cup', 66, 220);
+  S('deskLight', 140, 188);
+  S('plant', 114, 190);
+  S('printer', 172, 226);
+  S('sofa', 72, 262);
+  S('lamp', 158, 266);
+  S('palm', 8, 292);
+  S('plant', 164, 298);
+  S('roundChair', 45, 314);
+  S('roundChair', 133, 314);
+  S('coffeeTable', 81, 300);
+  for (const a of engine.actors) {
+    if (a.role.monitor) monitor(a.role.monitor[0], a.role.monitor[1], !paused && engine.statusOf(a.id) === 'trabajando' && !a.away);
   }
 
-  // Strategy and listening benches.
-  for (const [x, y] of [[67, 93], [127, 93], [222, 93], [282, 93]] as const) {
-    sprite('deskLight', x, y, 48, 29);
-    sprite('cup', x + 36, y + 9, 6, 7);
-  }
-  for (const role of ROLES) {
-    if (role.monitor) {
-      const m = role.monitor;
-      monitor(m.x, m.y, m.w, m.h, m.kind, statuses[role.id] === 'trabajando');
-    }
-  }
-  // Low bookcases, pinboard and plants line the shared central passage.
-  sprite('library', 198, 146, 64, 28);
-  sprite('books', 269, 148, 32, 26);
-  sprite('plantSmall', 319, 148);
-  sprite('plant', 32, 137, 20, 32);
-  // Editorial table: three people, room for notes.
-  sprite('chair', 70, 223, 16, 24);
-  sprite('chair', 135, 223, 16, 24);
-  sprite('desk', 65, 231, 96, 32);
-  sprite('laptop', 72, 232, 16, 16);
-  sprite('laptop', 137, 232, 16, 16);
-  sprite('book', 105, 237, 18, 14);
-  sprite('cup', 122, 247, 7, 7);
-  // The barrio is a living room: a long sofa and two easy chairs.
-  sprite('sofa', 222, 205, 104, 35);
-  sprite('roundChair', 229, 261, 24, 28);
-  sprite('roundChair', 296, 261, 24, 28);
-  sprite('coffeeTable', 251, 245, 45, 23);
-  sprite('book', 262, 242, 14, 12);
-  sprite('cup', 283, 246, 6, 7);
-  sprite('lamp', 329, 237, 12, 32);
-  // Quiet review desk; no enclosed office.
-  sprite('deskLight', 380, 217, 52, 30);
-  sprite('printer', 430, 270, 15, 15);
-  sprite('plant', 350, 242, 20, 35);
-  sprite('plant', 429, 176, 20, 35);
-  sprite('plantSmall', 173, 267);
-  sprite('palm', 30, 253, 21, 35);
-  // Entry, communal project wall and coat-free circulation.
-  sprite('door', 183, 29, 16, 28);
-  sprite('map', 363, 172, 38, 25);
-  sprite('board', 405, 170, 26, 20);
-  // Operations: a low cabinet with the printer beside the entry.
-  sprite('cabinet', 203, 72, 29, 14);
-  sprite('printer', 210, 63, 15, 16);
+  // ---------------------------------------------------------------- people
+  const chairFor = (a: Actor) => {
+    const [x, y] = a.role.home;
+    if (a.role.chair === 'north') S('chairNorth', x - 11, y - 6);
+    if (a.role.chair === 'gold') S('chairNorthGold', x - 11, y - 6);
+  };
+  const frontChair = (a: Actor) => a.role.chair === 'north' || a.role.chair === 'gold';
 
-  // Characters use the pack's frame animations.
-  const person = (actor: Actor) => {
-    const image = images?.[`person${actor.sprite}-${actor.action}`] ?? images?.[`person${actor.sprite}-idle_anim`];
-    if (!image) return;
-    const frameWidth = 16;
-    const perDirection = 6;
-    const reading = actor.action === 'reading' && Boolean(images?.[`person${actor.sprite}-reading`]);
-    const direction = reading ? 2 : actor.direction % 4;
-    const frame = moving && actor.animated ? Math.floor(elapsed / 210 + actor.index) % perDirection : 0;
+  const person = (a: Actor) => {
+    const status = engine.statusOf(a.id);
+    const look = lookFor(status);
+    const moving = a.path !== null;
+    const sprite = a.role.sprite;
+    const canRead = !SPRITES_WITHOUT_READING.has(sprite) && Boolean(ATLAS[`p${sprite}-reading`]);
+    // Working at a table without a monitor (writers, readers, Relaciones) reads; desk workers face the screen.
+    const readsAtSeat = status === 'trabajando' && !a.away && !a.role.monitor && !a.role.service;
+    const anim = moving ? 'run' : canRead && (a.reading || readsAtSeat) ? 'reading' : 'idle_anim';
+    const r = ATLAS[`p${sprite}-${anim}`] ?? ATLAS[`p${sprite}-idle_anim`];
+    if (!r) return;
+    const animate = !still && (moving || look.animated || a.reading);
+    const frame = animate ? Math.floor(clock / (moving ? 110 : 220) + a.index) % 6 : 0;
+    let dir: number = anim === 'reading' ? 2 : a.dir;
+    if ((dir * 6 + frame) * 16 + 16 > r[2]) dir = 0;
     ctx.save();
-    if (actor.dimmed) ctx.globalAlpha = 0.42;
-    ctx.drawImage(
-      image,
-      (direction * perDirection + frame) * frameWidth, 0, frameWidth, 32,
-      Math.round(actor.x - frameWidth / 2), Math.round(actor.y - 29), frameWidth, 32,
-    );
+    ctx.globalAlpha = a.alpha * (look.dimmed ? 0.45 : 1);
+    ctx.drawImage(image, r[0] + (dir * 6 + frame) * 16, r[1], 16, 32, Math.round(a.x - 8), Math.round(a.y - 29), 16, 32);
     ctx.restore();
   };
-  const chair = (id: RoleId) => {
-    const role = ROLE_BY_ID[id];
-    const [x, y] = role.home;
-    if (role.chair === 'north') sprite('chairNorth', x - 11, y - 6, 22, 20);
-    if (role.chair === 'gold') sprite('chairNorthGold', x - 10, y - 6, 20, 18);
+
+  const sorted = [...engine.actors].sort((a, b) => a.y - b.y);
+  for (const a of sorted) if (a.away && frontChair(a)) chairFor(a);
+  for (const a of sorted) {
+    person(a);
+    if (!a.away && frontChair(a)) chairFor(a);
+    // The librarian stands behind the counter.
+    if (a.id === LIBRARIAN_ID) S('book', 28, 70);
+  }
+
+  // ---------------------------------------------------------------- lights, bubbles, selection
+  const light = (a: Actor) => {
+    if (engine.statusOf(a.id) !== 'trabajando' || a.away || paused) return;
+    const on = still || Math.floor(clock / 700 + a.index) % 3 !== 0;
+    const x = Math.round(a.x + 6);
+    const y = Math.round(a.y - 30);
+    R(x - 1, y - 1, 4, 4, C.tinta);
+    R(x, y, 2, 2, on ? C.ofc : C.hondo);
   };
 
-  // Empty chairs remain at the desks while their owners take a break.
-  for (const actor of actors) if (actor.away) chair(actor.role);
-  [...actors].sort((a, b) => a.y - b.y).forEach(person);
-  for (const actor of actors) if (!actor.away) chair(actor.role);
-
-  // A small green light above whoever is really working.
-  for (const actor of actors) {
-    if (actor.status !== 'trabajando' || actor.away) continue;
-    const blink = moving && Math.floor(elapsed / 600 + actor.index) % 2 === 0;
-    const x = Math.round(actor.x + 8);
-    const y = Math.round(actor.y - 17);
-    fill(x - 1, y - 1, 4, 4, '#2c4a3a');
-    fill(x, y, 2, 2, blink ? '#c9f2a8' : '#79c46a');
-  }
-
-  for (const actor of actors.filter((a) => a.talking)) {
-    const x = Math.round(actor.x);
-    const y = Math.round(actor.y - 40);
-    fill(x - 9, y, 19, 10, '#354c48');
-    fill(x - 8, y + 1, 17, 8, '#fff4d6');
-    fill(x - 2, y + 10, 3, 3, '#fff4d6');
-    for (let d = 0; d < 3; d++) fill(x - 5 + d * 4, y + 4 - (moving && Math.floor(elapsed / 300) % 3 === d ? 1 : 0), 2, 2, '#64796c');
-  }
-
-  // Sunlight and subtle room depth, composited above the sprites.
-  if (!evening) {
-    ctx.fillStyle = 'rgba(255,240,184,.10)';
-    for (const x of WINDOWS_X) {
-      ctx.beginPath();
-      ctx.moveTo(x, 56);
-      ctx.lineTo(x + 45, 56);
-      ctx.lineTo(x + 17, 148);
-      ctx.lineTo(x - 27, 148);
-      ctx.fill();
+  const icon = (kind: BubbleIcon, x: number, y: number) => {
+    const t = C.tinta;
+    if (kind === 'libro') {
+      R(x, y + 1, 7, 5, ROOM.book);
+      R(x + 1, y + 2, 5, 3, C.papel);
+      R(x + 3, y + 1, 1, 5, ROOM.bookSpine);
+    } else if (kind === 'hoja') {
+      R(x + 1, y, 5, 6, ROOM.white);
+      R(x + 2, y + 2, 3, 1, C.tintaSuave);
+      R(x + 2, y + 4, 3, 1, C.tintaSuave);
+    } else if (kind === 'cafe') {
+      R(x + 1, y + 2, 4, 4, ROOM.white);
+      R(x + 5, y + 3, 1, 2, ROOM.white);
+      R(x + 2, y + 3, 2, 1, ROOM.coffee);
+      R(x + 2, y, 1, 1, ROOM.steam);
+      R(x + 3, y + 1, 1, 1, ROOM.steam);
+    } else if (kind === 'listo') {
+      for (const [dx, dy] of [[5, 1], [4, 2], [3, 3], [2, 4], [1, 3], [0, 2], [2, 5]] as const) R(x + dx, y + dy, 1, 1, C.hondo);
+    } else if (kind === 'pregunta') {
+      R(x + 2, y, 3, 1, t);
+      R(x + 5, y + 1, 1, 1, t);
+      R(x + 4, y + 2, 1, 1, t);
+      R(x + 3, y + 3, 1, 1, t);
+      R(x + 3, y + 5, 1, 1, t);
+    } else if (kind === 'busca') {
+      R(x + 1, y, 3, 1, t);
+      R(x, y + 1, 1, 2, t);
+      R(x + 4, y + 1, 1, 2, t);
+      R(x + 1, y + 3, 3, 1, t);
+      R(x + 4, y + 4, 1, 1, t);
+      R(x + 5, y + 5, 1, 1, t);
+    } else {
+      const f = Math.floor(clock / 300) % 3;
+      for (let d = 0; d < 3; d++) R(x + d * 3, y + 3 - (f === d && !still ? 1 : 0), 1, 1, C.tintaSuave);
     }
-  }
-  fill(24, 56, 426, 4, '#3a41421b');
-  fill(24, 56, 4, 233, '#3a414217');
-  // Balcony garden.
-  fill(171, 290, 167, 25, '#889b8c');
-  tile('floor', 175, 292, 159, 19);
-  fill(171, 312, 167, 3, '#475d56');
-  for (let x = 175; x < 338; x += 12) fill(x, 306, 2, 8, '#536b61');
-  sprite('plantSmall', 178, 284, 12, 22);
-  sprite('plantSmall', 319, 284, 12, 22);
-  fill(18, 289, 153, 6, '#526c61');
-  fill(338, 289, 118, 6, '#526c61');
-  fill(22, 289, 149, 2, '#c6ceae');
-  fill(338, 289, 114, 2, '#c6ceae');
-
-  if (evening) {
-    fill(18, 25, 438, 270, '#17224446');
-    ctx.globalCompositeOperation = 'screen';
-    for (const [x, y] of NIGHT_LAMPS) {
-      const glow = ctx.createRadialGradient(x, y, 0, x, y, 32);
-      glow.addColorStop(0, '#ffc87540');
-      glow.addColorStop(1, '#ffc87500');
-      ctx.fillStyle = glow;
-      ctx.fillRect(x - 32, y - 32, 64, 64);
+  };
+  const bubble = (a: Actor) => {
+    const b = a.bubble;
+    if (!b || clock > b.until) return;
+    const x = Math.round(a.x);
+    const y = Math.round(a.y - 42);
+    R(x - 7, y, 13, 10, C.tinta);
+    R(x - 6, y + 1, 11, 8, ROOM.white);
+    R(x - 1, y + 10, 3, 2, C.tinta);
+    R(x, y + 9, 1, 2, ROOM.white);
+    icon(b.icon, x - 3, y + 2);
+  };
+  const pointer = (a: Actor) => {
+    const x = Math.round(a.x);
+    const y = Math.round(a.y - 46 - (a.bubble ? 12 : 0));
+    R(x - 4, y, 9, 1, C.tinta);
+    R(x - 3, y + 1, 7, 1, C.tinta);
+    R(x - 2, y + 2, 5, 1, C.tinta);
+    R(x - 1, y + 3, 3, 1, C.tinta);
+    R(x, y + 4, 1, 1, C.tinta);
+    R(x - 3, y, 7, 1, C.postit);
+    R(x - 2, y + 1, 5, 1, C.postit);
+    R(x - 1, y + 2, 3, 1, C.postit);
+    R(x, y + 3, 1, 1, C.postit);
+  };
+  const brackets = (box: readonly number[]) => {
+    const x = box[0]! + 1;
+    const y = box[1]! + 1;
+    const w = box[2]! - 2;
+    const h = box[3]! - 2;
+    const L = 7;
+    for (const [cx, cy, dx, dy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]] as const) {
+      R(Math.min(cx, cx + dx * L), dy > 0 ? cy : cy - 2, L, 3, C.tinta);
+      R(dx > 0 ? cx : cx - 2, Math.min(cy, cy + dy * L), 3, L, C.tinta);
+      R(Math.min(cx, cx + dx * L) + (dx > 0 ? 1 : 0), dy > 0 ? cy + 1 : cy - 1, L - 1, 1, C.postit);
+      R(dx > 0 ? cx + 1 : cx - 1, Math.min(cy, cy + dy * L) + (dy > 0 ? 1 : 0), 1, L - 1, C.postit);
     }
-    ctx.globalCompositeOperation = 'source-over';
-  }
+  };
 
-  // «en diseño» tags under the faded characters, above the lighting so they stay legible.
-  ctx.font = '600 5px system-ui, -apple-system, "Segoe UI", sans-serif';
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'middle';
-  const placed: [number, number, number][] = [];
-  for (const actor of [...actors].sort((a, b) => a.x - b.x)) {
-    if (!actor.tag) continue;
-    const width = Math.ceil(ctx.measureText(actor.tag).width) + 4;
-    const x = Math.round(actor.x - width / 2);
-    let y = Math.round(actor.y + 3);
-    // Neighbours on the sofa sit closer than a tag is wide: stagger instead of overlapping.
-    while (placed.some(([px, py, pw]) => x < px + pw + 2 && px < x + width + 2 && Math.abs(py - y) < 10)) y += 10;
-    placed.push([x, y, width]);
-    fill(x - 1, y - 1, width + 2, 9, '#354c48');
-    fill(x, y, width, 7, '#efe7d2');
-    ctx.fillStyle = '#4c5b55';
-    ctx.fillText(actor.tag, actor.x, y + 3.8);
+  for (const a of engine.actors) light(a);
+  for (const a of engine.actors) bubble(a);
+  const zone = options.selectedZone;
+  if (zone) {
+    const box = zone === 'biblioteca' ? LIBRARY.box : TEAMS.find((t) => t.id === zone)?.box;
+    if (box) brackets(box);
   }
-
-  // Brass pointer over the selected character.
-  const chosen = actors.find((a) => a.role === selectedRole);
-  if (chosen) {
-    const x = Math.round(chosen.x);
-    const y = Math.round(chosen.y - 40 - (chosen.talking ? 12 : 0));
-    ctx.fillStyle = '#354c48';
-    ctx.beginPath();
-    ctx.moveTo(x - 5, y - 1);
-    ctx.lineTo(x + 5, y - 1);
-    ctx.lineTo(x, y + 6);
-    ctx.fill();
-    ctx.fillStyle = '#f8d47d';
-    ctx.beginPath();
-    ctx.moveTo(x - 3, y);
-    ctx.lineTo(x + 3, y);
-    ctx.lineTo(x, y + 4);
-    ctx.fill();
-  }
-
-  ctx.restore();
+  if (options.selectedRole) pointer(engine.byId[options.selectedRole]);
 }

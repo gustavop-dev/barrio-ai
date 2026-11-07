@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Oficina de Barrio AI: PWA React que supervisa la máquina autónoma y recibe alertas push.",
+  "description": "Oficina de 0ff1ce: PWA React que supervisa al equipo de agentes y recibe alertas push.",
   "engines": {
     "node": ">=24"
   },

@@ -7,7 +7,7 @@ export interface PushPayload {
   tag: string | undefined;
 }
 
-const DEFAULT_TITLE = 'Barrio AI';
+const DEFAULT_TITLE = '0ff1ce';
 
 /** Push data is JSON `{title, body, url, tag}`; tolerate plain text or junk. */
 export function parsePushPayload(raw: string | null | undefined): PushPayload {

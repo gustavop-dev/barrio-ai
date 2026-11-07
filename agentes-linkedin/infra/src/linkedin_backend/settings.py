@@ -34,6 +34,14 @@ STATIC_ROOT=BASE_DIR/'staticfiles'
 STORAGES={'default':{'BACKEND':'django.core.files.storage.FileSystemStorage'},
  'staticfiles':{'BACKEND':'whitenoise.storage.CompressedManifestStaticFilesStorage'}}
 DEFAULT_AUTO_FIELD='django.db.models.BigAutoField'
+# Captures and the Galería (docs/capturas-galeria.md): private files, served only by authenticated views.
+# There is deliberately no MEDIA_URL route: nothing under MEDIA_ROOT is ever public.
+MEDIA_ROOT=Path(os.environ.get('MEDIA_ROOT') or BASE_DIR/'media')
+FILE_UPLOAD_PERMISSIONS=0o640
+FILE_UPLOAD_DIRECTORY_PERMISSIONS=0o750
+CAPTURE_AUDIO_MAX_BYTES=25*1024*1024
+GALLERY_PHOTO_MAX_BYTES=10*1024*1024
+GALLERY_MAX_PHOTOS_PER_REQUEST=10
 SESSION_COOKIE_HTTPONLY=True
 SESSION_COOKIE_SAMESITE='Strict'
 CSRF_COOKIE_SAMESITE='Strict'

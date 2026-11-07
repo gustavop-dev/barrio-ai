@@ -1,46 +1,49 @@
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from 'react';
-import { drawScene, SCENE_HEIGHT, SCENE_SCALE, SCENE_WIDTH } from './render';
-import { TEAMS, type RoleId, type TeamId } from './roles';
-import { actorAt, actorsAt, type Actor, type StatusMap } from './simulation';
-import { loadSprites, type SpriteMap } from './sprites';
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react';
+import { loadAtlas, type AtlasImage } from './atlas';
+import type { OfficeEngine } from './engine';
+import { PLAN_HEIGHT, PLAN_WIDTH, zoneAt } from './plan';
+import { drawScene, readPalette, type Palette } from './render';
+import type { CharacterId, ZoneId } from './roles';
+import { useDevicePixels } from './useMediaQuery';
+
+export type ScenePick = { kind: 'role'; id: CharacterId } | { kind: 'zone'; id: ZoneId };
 
 export interface OfficeCanvasProps {
-  statuses: StatusMap;
-  selectedTeam: TeamId | null;
-  selectedRole: RoleId | null;
-  moving: boolean;
-  evening: boolean;
-  onSelectTeam: (team: TeamId) => void;
-  onSelectRole: (role: RoleId) => void;
+  engine: OfficeEngine;
+  /** CSS pixels per logical pixel (integer). */
+  scale: number;
+  selectedRole: CharacterId | null;
+  selectedZone: ZoneId | null;
+  /** A tap on a character or a zone. */
+  onPick: (pick: ScenePick) => void;
 }
 
-function teamAt(x: number, y: number): TeamId | null {
-  for (const team of TEAMS) {
-    const [bx, by, bw, bh] = team.box;
-    if (x >= bx && x <= bx + bw && y >= by && y <= by + bh) return team.id;
-  }
-  return null;
-}
-
-export function OfficeCanvas(props: OfficeCanvasProps) {
-  const { moving, selectedTeam, onSelectTeam, onSelectRole } = props;
+/**
+ * The office canvas: integer scale, `image-rendering: pixelated`, a backing store in whole device pixels.
+ * It steps the engine every animation frame unless the scene is still (reduced motion) or halted
+ * (machine paused, activity unknown); then it only repaints when something changes.
+ */
+export function OfficeCanvas({ engine, scale, selectedRole, selectedZone, onPick }: OfficeCanvasProps) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const [sprites, setSprites] = useState<SpriteMap | null>(null);
-  const [failed, setFailed] = useState<string | null>(null);
-  const latest = useRef(props);
-  const elapsed = useRef(0);
-  const lastFrame = useRef<number | null>(null);
-  const actors = useRef<Actor[]>([]);
-
+  const [atlas, setAtlas] = useState<AtlasImage | null>(null);
+  const [failed, setFailed] = useState(false);
+  const devicePixels = useDevicePixels();
+  const snapshot = useSyncExternalStore(engine.subscribe, engine.getSnapshot, engine.getSnapshot);
+  const palette = useRef<Palette | null>(null);
+  const view = useRef({ scale, devicePixels, selectedRole, selectedZone, atlas });
   useEffect(() => {
-    latest.current = props;
+    view.current = { scale, devicePixels, selectedRole, selectedZone, atlas };
   });
 
   useEffect(() => {
     let alive = true;
-    loadSprites()
-      .then((loaded) => alive && setSprites(loaded))
-      .catch((error: unknown) => alive && setFailed(error instanceof Error ? error.message : 'No se pudo cargar la oficina'));
+    loadAtlas()
+      .then((image) => {
+        if (alive) setAtlas(image);
+      })
+      .catch(() => {
+        if (alive) setFailed(true);
+      });
     return () => {
       alive = false;
     };
@@ -49,104 +52,72 @@ export function OfficeCanvas(props: OfficeCanvasProps) {
   const draw = useCallback(() => {
     const context = canvas.current?.getContext('2d');
     if (!context) return;
-    const current = latest.current;
-    actors.current = actorsAt(elapsed.current, current.statuses);
-    drawScene(context, sprites, {
-      actors: actors.current,
-      statuses: current.statuses,
-      selectedTeam: current.selectedTeam,
+    const current = view.current;
+    palette.current ??= readPalette();
+    drawScene(context, current.atlas, engine, {
+      scale: current.scale * current.devicePixels,
       selectedRole: current.selectedRole,
-      evening: current.evening,
-      elapsed: elapsed.current,
-      moving: current.moving,
+      selectedZone: current.selectedZone,
+      palette: palette.current,
     });
-  }, [sprites]);
+  }, [engine]);
 
-  // The ambient clock only advances while motion is on; pausing freezes strolls too.
+  const animated = !snapshot.still && !snapshot.halted;
+
+  // Running: step and paint every frame (the clock only advances while the tab is visible).
   useEffect(() => {
-    if (!moving) {
-      lastFrame.current = null;
-      return;
-    }
+    if (!animated || typeof requestAnimationFrame !== 'function') return;
     let frame = 0;
+    let last: number | null = null;
     const loop = (time: number) => {
-      if (lastFrame.current !== null) elapsed.current += Math.min(100, Math.max(0, time - lastFrame.current));
-      lastFrame.current = time;
+      if (last !== null) engine.step(Math.min(60, Math.max(0, time - last)));
+      last = time;
       draw();
       frame = requestAnimationFrame(loop);
     };
     frame = requestAnimationFrame(loop);
-    return () => {
-      cancelAnimationFrame(frame);
-      lastFrame.current = null;
-    };
-  }, [moving, draw]);
+    return () => cancelAnimationFrame(frame);
+  }, [animated, engine, draw]);
 
-  // Without motion, repaint whenever something visible changes.
+  // Still or halted: repaint when something visible changes.
   useEffect(() => {
-    if (!moving) draw();
-  }, [moving, draw, props.statuses, props.selectedTeam, props.selectedRole, props.evening]);
+    if (!animated) draw();
+  }, [animated, draw, snapshot, atlas, scale, devicePixels, selectedRole, selectedZone]);
 
-  const toLogical = (event: MouseEvent<HTMLCanvasElement>) => {
+  const pickAt = (event: MouseEvent<HTMLCanvasElement>): ScenePick | null => {
     const rect = event.currentTarget.getBoundingClientRect();
     if (!rect.width || !rect.height) return null;
-    return {
-      x: ((event.clientX - rect.left) / rect.width) * SCENE_WIDTH,
-      y: ((event.clientY - rect.top) / rect.height) * SCENE_HEIGHT,
-    };
-  };
-
-  const onClick = (event: MouseEvent<HTMLCanvasElement>) => {
-    const point = toLogical(event);
-    if (!point) return;
-    const actor = actorAt(actors.current, point.x, point.y);
-    if (actor) return onSelectRole(actor.role);
-    const team = teamAt(point.x, point.y);
-    if (team) onSelectTeam(team);
-  };
-
-  const onMove = (event: MouseEvent<HTMLCanvasElement>) => {
-    const point = toLogical(event);
-    const hit = point && (actorAt(actors.current, point.x, point.y) || teamAt(point.x, point.y));
-    event.currentTarget.style.cursor = hit ? 'pointer' : 'default';
+    const x = ((event.clientX - rect.left) / rect.width) * PLAN_WIDTH;
+    const y = ((event.clientY - rect.top) / rect.height) * PLAN_HEIGHT;
+    const role = engine.hit(x, y);
+    if (role) return { kind: 'role', id: role };
+    const zone = zoneAt(x, y);
+    return zone ? { kind: 'zone', id: zone } : null;
   };
 
   return (
-    <div className="mapwrap">
-      {!sprites && !failed ? (
-        <div className="maploading" role="status">
-          Abriendo el apartamento…
-        </div>
-      ) : null}
-      {failed ? (
-        <div className="maploading" role="alert">
-          {failed}. Recarga la página.
-        </div>
-      ) : null}
+    <>
       <canvas
         ref={canvas}
-        width={SCENE_WIDTH * SCENE_SCALE}
-        height={SCENE_HEIGHT * SCENE_SCALE}
+        className="of-canvas"
+        width={PLAN_WIDTH * scale * devicePixels}
+        height={PLAN_HEIGHT * scale * devicePixels}
+        style={{ width: PLAN_WIDTH * scale, height: PLAN_HEIGHT * scale }}
         role="img"
-        aria-label="Apartamento pixel art con los equipos de Barrio AI. Usa los botones de equipo o la lista del panel para ver a cada integrante."
-        onClick={onClick}
-        onMouseMove={onMove}
+        aria-label="La oficina en pixel art. Toca a un personaje para ver su rol o una zona para ver su equipo. Lo mismo está en la tira de equipos, debajo."
+        onClick={(event) => {
+          const pick = pickAt(event);
+          if (pick) onPick(pick);
+        }}
+        onMouseMove={(event) => {
+          event.currentTarget.style.cursor = pickAt(event) ? 'pointer' : 'default';
+        }}
       />
-      <div className="hotspots">
-        {TEAMS.map((team) => (
-          <button
-            key={team.id}
-            type="button"
-            className={team.id === selectedTeam ? 'hotspot selected' : 'hotspot'}
-            style={{ left: `${(team.label[0] / SCENE_WIDTH) * 100}%`, top: `${(team.label[1] / SCENE_HEIGHT) * 100}%` }}
-            onClick={() => onSelectTeam(team.id)}
-            aria-pressed={team.id === selectedTeam}
-            tabIndex={-1}
-          >
-            <span aria-hidden="true">{team.icon}</span> {team.name.toUpperCase()}
-          </button>
-        ))}
-      </div>
-    </div>
+      {failed ? (
+        <p className="of-canvas-error" role="alert">
+          No se pudo cargar el dibujo de la oficina. Recarga la página.
+        </p>
+      ) : null}
+    </>
   );
 }

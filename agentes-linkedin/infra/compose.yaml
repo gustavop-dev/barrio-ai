@@ -5,10 +5,13 @@ x-app: &app
   environment:
     DATABASE_URL: postgresql://knowledge:${POSTGRES_PASSWORD}@db:5432/knowledge
     SOURCE_ROOT: /workspace
+    MEDIA_ROOT: /app/media
   volumes:
     - "${SOURCE_ROOT:?Configure SOURCE_ROOT}/LinkedIn Sales - Entrega clase 01:/workspace/LinkedIn Sales - Entrega clase 01:ro"
     - "${SOURCE_ROOT}/LinkedIn Sales - Procesamiento completo:/workspace/LinkedIn Sales - Procesamiento completo:ro"
     - "${SOURCE_ROOT}/agentes-linkedin/equipos:/workspace/agentes-linkedin/equipos:ro"
+    # Private files of the capture button and the Galería, shared by api and worker (docs/capturas-galeria.md).
+    - "media:/app/media"
 services:
   db:
     image: pgvector/pgvector:0.8.2-pg17
@@ -89,3 +92,4 @@ services:
     restart: unless-stopped
 volumes:
   knowledge-db:
+  media:

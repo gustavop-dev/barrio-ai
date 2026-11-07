@@ -46,7 +46,6 @@ def is_pending(item,now=None):
 
 def ask(agent,question,purpose,memory_key,suggested_public=False,origin='',answer_type='text',options=None,deadline=None):
     """An agent asks Gustavo for a fact. Idempotent per key; never re-asks a declined, open, withdrawn or known key."""
-    from .alerts import notify
     try:key=_normal_key(memory_key)
     except ValueError:return None
     question=(question or '').strip();purpose=(purpose or '').strip()
@@ -62,7 +61,8 @@ def ask(agent,question,purpose,memory_key,suggested_public=False,origin='',answe
                                              answer_type=answer_type,options=options,deadline=deadline)
     except IntegrityError:return None
     audit(None,'team.question_asked',item.id,agent=agent,key=key)
-    notify('Barrio AI: una pregunta para ti',f'{agent_label(agent)} te pregunta: {question}'[:180],url='/tu-turno',tag='barrio-pregunta')
+    from .notificaciones import avisar
+    avisar('question',f'{agent_label(agent)} te pregunta',question[:200])
     return item
 
 def agent_label(agent):
@@ -85,12 +85,13 @@ def sync_memory_proposals():
         except IntegrityError:continue
     return created
 
-def _typed_text(item,text,value):
-    """The memory text for each answer type. Short answers carry the question so the fact reads on its own."""
+def _typed_text(item,text,value,free=False):
+    """The memory text for each answer type. Short answers carry the question so the fact reads on its own.
+    `free`: a spoken or written answer to a typed question (the capture button) is stored as free text."""
     kind=item.answer_type
-    if kind=='text':
+    if kind=='text' or free:
         if not text:raise ValueError('Escribe la respuesta')
-        return text
+        return text if kind=='text' else f'{item.question} {text}'
     if kind=='yes_no':
         if value not in YES_NO:raise ValueError('Responde sí o no')
         answer=YES_NO[value]+(f'. {text}' if text else '')
@@ -107,7 +108,7 @@ def _typed_text(item,text,value):
         answer+=f' ({text})' if text else ''
     return f'{item.question} {answer}'
 
-def answer(user,question_id,text='',public_use=None,accept=False,value=None):
+def answer(user,question_id,text='',public_use=None,accept=False,value=None,free=False):
     """Save Gustavo's answer as confirmed memory. A confirmation question may be accepted as proposed."""
     require(user,'confirm_memory')
     text=(text or '').strip()
@@ -122,7 +123,7 @@ def answer(user,question_id,text='',public_use=None,accept=False,value=None):
             if not text:raise ValueError('Escribe el dato corregido o confírmalo tal como está')
             stored={'texto':text,'uso_publico':public};shown=text
         else:
-            stored={'texto':_typed_text(item,text,value),'uso_publico':public};shown=stored['texto']
+            stored={'texto':_typed_text(item,text,value,free),'uso_publico':public};shown=stored['texto']
         result=memory.set_fact(item.memory_key,stored,f'user:{user.pk}',f'Respuesta de Gustavo en Tu turno a «{item.question[:200]}» ({item.id})')
         item.state=TeamQuestion.State.ANSWERED;item.answer=shown;item.public_use=public;item.memory_version=result['version']
         item.answered_by=user;item.answered_at=timezone.now();item.save()

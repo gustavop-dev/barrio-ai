@@ -21,6 +21,22 @@ export const keys = {
   redSummary: ['red', 'summary'] as const,
   contacts: (stage: string, page: number) => ['red', 'contacts', stage, page] as const,
   contact: (id: string) => ['red', 'contact', id] as const,
+  // Redesign.
+  tuTurno: ['tu-turno'] as const,
+  preguntasAll: ['preguntas'] as const,
+  preguntas: (state: string) => ['preguntas', state] as const,
+  hechos: ['memoria', 'hechos'] as const,
+  orientacion: ['orientacion'] as const,
+  calendarioAll: ['calendario'] as const,
+  calendario: (desde: string, hasta: string) => ['calendario', desde, hasta] as const,
+  actividadAll: ['actividad'] as const,
+  actividad: (tipo: string, desde: string, hasta: string, noSalio: boolean) => ['actividad', tipo, desde, hasta, noSalio] as const,
+  resultadosAll: ['resultados'] as const,
+  resultados: (dias: number, modalidad: string) => ['resultados', dias, modalidad] as const,
+  contactSearch: (filters: Record<string, unknown>) => ['red', 'search', filters] as const,
+  oportunidadesAll: ['oportunidades'] as const,
+  oportunidades: (filters: Record<string, unknown>) => ['oportunidades', filters] as const,
+  ajustes: ['ajustes'] as const,
 };
 
 /** Client errors (4xx) are answers, not glitches: never retry them. */

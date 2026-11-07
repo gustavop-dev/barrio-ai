@@ -45,7 +45,15 @@ def create(user,data):
     item=Opportunity(created_by=user,modality=data['modality'])
     _apply(item,data);_set_stage(item,data.get('stage') or 'conversacion')
     item.save();audit(user,'opportunity.created',item.id,modality=item.modality,stage=item.stage)
+    _notify(item)
     return item
+
+def _notify(item):
+    from .notificaciones import avisar
+    name=item.contact.display_name if item.contact else item.person_name
+    detail=f'Siguiente paso: {item.next_action}' if item.next_action else item.get_modality_display()
+    avisar('opportunity',f'Oportunidad con {name}: {item.get_stage_display().lower()}',detail,
+           link=f'/personas/{item.contact_id}' if item.contact_id else '/personas?pestana=oportunidades',ref=f'opportunity:{item.id}:{item.stage}')
 
 def update(user,opportunity_id,data):
     require(user,'approve_actions')
@@ -53,8 +61,10 @@ def update(user,opportunity_id,data):
         item=Opportunity.objects.select_for_update().get(id=opportunity_id)
         _apply(item,data)
         if data.get('stage'):_set_stage(item,data['stage'])
+        moved=bool(data.get('stage'))
         item.updated_at=timezone.now();item.save()
     audit(user,'opportunity.updated',item.id,stage=item.stage)
+    if moved:_notify(item)
     return item
 
 def delete(user,opportunity_id):
