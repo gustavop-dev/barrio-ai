@@ -1,6 +1,6 @@
 # Plan de rediseño de la oficina
 
-Acordado con Gustavo el 2026-11-06. Base para el diseño visual. El inventario de lo que existe hoy está en [`VISTAS.md`](VISTAS.md).
+Acordado con Gustavo el 2026-11-06. Base para el diseño visual. El inventario de lo que existe hoy está en [`VISTAS.md`](VISTAS.md). El detalle pantalla por pantalla para el diseño UI está en [`DISENO-VISTAS.md`](DISENO-VISTAS.md).
 
 ## Principio
 
