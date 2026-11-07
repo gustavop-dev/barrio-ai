@@ -75,7 +75,6 @@ services:
     build: ../oficina
     environment:
       BARRIO_DOMAIN: ${BARRIO_DOMAIN:?Configurar .env}
-      ACME_EMAIL: ${ACME_EMAIL:?Configurar .env}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro

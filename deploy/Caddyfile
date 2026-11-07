@@ -1,7 +1,5 @@
-{
-	email {$ACME_EMAIL}
-}
-
+# Caddy obtains and renews the certificate on its own. No ACME email is configured: Let's Encrypt
+# stopped sending expiry emails in 2025. To add one, put a global options block with `email` at the top.
 {$BARRIO_DOMAIN} {
 	encode zstd gzip
 
