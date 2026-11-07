@@ -144,7 +144,7 @@ SELECT state, error_kind, count(*) FROM team_backend_actionexecution GROUP BY 1,
 -- E6: ideas usadas en piezas que no salieron
 SELECT p.state, count(*) FROM team_backend_capture c
 JOIN team_backend_editorialpiece p ON p.id::text = c.routed_to->>'used_in'
-WHERE c.state = 'used' GROUP BY 1;
+WHERE c.state = 'usado' GROUP BY 1;
 
 -- Líder: decisiones por capacidad
 SELECT capability, review->>'decision' AS decision, count(*)
