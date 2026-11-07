@@ -34,6 +34,7 @@ export const STAGE_LABEL: Record<string, string> = {
   lectores: 'Panel de lectores',
   seleccion: 'Selección del texto final',
   verificador: 'Verificador',
+  reparacion: 'Ronda de reparación',
 };
 
 export const MODALITY_LABEL: Record<string, string> = {

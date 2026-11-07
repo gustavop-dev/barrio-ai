@@ -18,11 +18,8 @@ from .models import ActionProposal, Orientation
 CAP=ActionProposal.Capability
 DEFAULT_CAPABILITIES='INT-03,CONT-09,RED-01,RED-02,RED-04'
 
-CRITERIA_DEL_BARRIO=('Gustavo es ingeniero de producto con criterio de negocio y fundador de ProjectApp (software a la medida); '
-    'trabaja IA aplicada cuando resuelve un problema concreto. Su barrio en LinkedIn: founders técnicos o de negocio de startups '
-    'tempranas, líderes técnicos y quienes recomiendan talento; founders u operadores que necesitan una entrega externa o un '
-    'equipo continuo; estudios, agencias complementarias, aceleradoras, inversores y comunidades que recomiendan talento; '
-    'pares, divulgadores y líderes de producto, software, IA aplicada y startups. No buscan vendedores ni reclutadores masivos.')
+from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one positioning source)
+CRITERIA_DEL_BARRIO=_lead_criteria()
 
 def _noul(instructions,true=None,false=None):
     question={'type':'noul','instructions':instructions}

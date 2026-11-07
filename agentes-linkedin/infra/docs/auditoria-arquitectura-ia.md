@@ -94,6 +94,7 @@ Tres problemas transversales:
 
 1. **Diseño y realidad divergen.** Quien lea los contratos no sabe qué hace la máquina, y aparecen roles sin contrato (el líder, el ruteador de capturas). Marcar en el índice el estado real de cada rol y enlazar cada contrato con la función y el prompt que lo implementan.
 2. **La regla contra experiencias inventadas se apaga con un solo hecho público.** `guardas.invented_experience` devuelve vacío en cuanto existe cualquier hecho público (`guardas.py:63`); desde ese momento un «I built…» solo lo frenan los dos modelos. La regla debería comparar la afirmación con los hechos.
+   - **Arreglado en la fase 2.** Ahora compara cada afirmación en primera persona (la frase de «I built», «my clients», «construí», «en mi empresa»…) con los hechos públicos confirmados. La marca si trae una cifra que ningún hecho contiene, o si no comparte ninguna palabra de contenido ni ninguna cifra con ellos. Es conservadora: basta una palabra en común, y tener equipo, empresa o clientes cuenta como una sola familia en inglés y en español. El verificador sigue siendo el juez principal.
 3. **No hay evaluaciones de calidad.** Las pruebas usan proveedores simulados y solo comprueban la mecánica. Sin evaluación no se puede cambiar de modelo, mover umbrales ni quitar el panel con seguridad. Para empezar bastan 20–30 casos por agente sacados del historial: piezas, descartes y vetos.
 
 Conviene conservar: salidas estructuradas con esquema, texto de terceros tratado como datos, vigilancia de filtraciones de la orientación privada, ejecución exactamente una vez y preguntas a Gustavo solo por hechos que nadie más conoce.
@@ -114,18 +115,19 @@ Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo P
 
 - [ ] R1: quitar el refresh de perfil del plan y contar las lecturas de ejecución
 - [ ] R2: un solo juez de encaje para la red
-- [ ] R3 y R4: reglas deterministas antes del verificador y una ronda de reparación
+- [x] R3 y R4: reglas deterministas antes del verificador y una ronda de reparación (pieza editorial; `EDITORIAL_REPAIR=false` la apaga). La reparación del comentario descartado por un hashtag queda fuera de este corte
 - [ ] R5: prefiltro con Jev antes de redactar un comentario
 - [ ] B3: tope de revisiones del líder por tick
 
 **Fase 3: diseño y costo**
 
 - [ ] 20–30 casos de evaluación por agente, sacados del historial
-- [ ] Un solo artefacto de posicionamiento para director, clasificador y líder
-- [ ] Resultados de las piezas en el historial del director
+- [x] Un solo artefacto de posicionamiento para director, clasificador y líder (`team_backend/posicionamiento.py`, `posicionamiento-v1`; sigue siendo una propuesta interna, Gustavo no la ha confirmado)
+- [x] Resultados de las piezas en el historial del director (cortes de 72 h y 7 d y resumen de 30 días por pilar y modalidad; el resumen semanal que propone orientación sigue pendiente)
 - [ ] Alerta si la aprobación del líder cae a cero en una capacidad
 - [ ] Agente de inbox de solo lectura que proponga oportunidades
 - [ ] C1 a C3, validados con las evaluaciones
+  - [x] C3 configurable, sin cambiar: `EDITORIAL_MODEL_<ETAPA>` por etapa editorial; por defecto sigue el modelo actual hasta que la evaluación respalde el cambio
 
 ## Cómo confirmarlo en producción
 
