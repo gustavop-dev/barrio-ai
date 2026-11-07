@@ -1,4 +1,4 @@
-// «Cómo se escribió»: brief, variants, readers, selection, verifier and sources, all folded by default.
+// «Cómo se escribió»: brief, variants, readers, selection, verifier, repair round and sources, all folded by default.
 import { useState, type ReactNode } from 'react';
 import type { Assessment, PieceDetail, StageUsage, Variant } from '../../api/types';
 import { IconChevronDown } from '../../components/icons';
@@ -211,13 +211,20 @@ function VerifierFold({ piece, finished }: { piece: PieceDetail; finished: boole
   }
   const verdict = v.verdict ? (VERDICT[v.verdict] ?? { label: v.verdict, tone: 'muted' as Tone }) : null;
   const corrected = Boolean(v.model_verdict && v.verdict && v.model_verdict !== v.verdict);
+  const stoppedByRules = !v.model_verdict && list(v.rules).length > 0;
   const claims = list(v.checked_claims);
   const supported = claims.filter((claim) => (claim.status ?? claim.kind) !== 'unsupported').length;
   return (
     <Fold title="Verificador">
       <div className="pz-verdict">
         {verdict ? <Badge tone={verdict.tone}>{v.verdict === 'ready_for_execution' ? 'Aprobada' : verdict.label}</Badge> : null}
-        <p className="t-detalle text-suave">{corrected ? 'Las guardas corrigieron al modelo' : 'Sin correcciones de las guardas'}</p>
+        <p className="t-detalle text-suave">
+          {stoppedByRules
+            ? 'El verificador no llegó a leerla: las reglas de publicación la frenaron antes'
+            : corrected
+              ? 'Las guardas corrigieron al modelo'
+              : 'Sin correcciones de las guardas'}
+        </p>
       </div>
       {v.summary ? <p>{v.summary}</p> : null}
       <Field name="Motivos del bloqueo">
@@ -255,12 +262,71 @@ function VerifierFold({ piece, finished }: { piece: PieceDetail; finished: boole
   );
 }
 
+const REPAIR_OUTCOME: Record<string, { label: string; tone: Tone }> = {
+  reparada: { label: 'Reparada y verificada', tone: 'ok' },
+  bloqueada: { label: 'Siguió bloqueada', tone: 'bad' },
+  descartada: { label: 'No se pudo reparar', tone: 'bad' },
+  sin_cambios: { label: 'Sin cambios', tone: 'muted' },
+  sin_presupuesto: { label: 'Sin presupuesto', tone: 'warn' },
+};
+
+/** R4: shown only when the rules or the verifier found concrete problems and the round ran. */
+function RepairFold({ piece }: { piece: PieceDetail }) {
+  const repair = piece.verification?.repair;
+  if (!repair) return null;
+  const outcome = REPAIR_OUTCOME[repair.outcome] ?? { label: repair.outcome, tone: 'muted' as Tone };
+  return (
+    <Fold title="Ronda de reparación">
+      <div className="pz-verdict">
+        <Badge tone={outcome.tone}>{outcome.label}</Badge>
+        <p className="t-detalle text-suave">{repair.trigger === 'reglas' ? 'La pidieron las reglas de publicación' : 'La pidió el verificador'}</p>
+      </div>
+      <Field name="Qué había que corregir">
+        {list(repair.findings).length ? (
+          <ul className="pz-list">
+            {list(repair.findings).map((finding, index) => (
+              <li key={index}>
+                {finding.source === 'reglas' ? finding.detail : label(ISSUE_LABEL, finding.issue)}
+                {finding.quote ? (
+                  <>
+                    {' '}
+                    <q lang="en">{finding.quote}</q>
+                  </>
+                ) : null}
+                {finding.source !== 'reglas' && finding.detail ? <span className="text-suave"> · {finding.detail}</span> : null}
+              </li>
+            ))}
+          </ul>
+        ) : null}
+      </Field>
+      <Field name="Qué cambió">
+        {list(repair.changes).length ? (
+          <ul className="pz-list">
+            {list(repair.changes).map((item, index) => (
+              <li key={index}>{item.change}</li>
+            ))}
+          </ul>
+        ) : null}
+      </Field>
+      <Field name="Nota">{repair.note || repair.rationale || null}</Field>
+      <Field name="Texto antes de reparar">
+        {repair.original_text ? (
+          <p lang="en" className="pz-text">
+            {repair.original_text}
+          </p>
+        ) : null}
+      </Field>
+    </Fold>
+  );
+}
+
 const COST_STAGES: { key: string; label: string }[] = [
   { key: 'director', label: 'Director' },
   { key: 'redactor', label: 'Redactores' },
   { key: 'lectores', label: 'Lectores' },
   { key: 'seleccion', label: 'Selección' },
   { key: 'verificador', label: 'Verificador' },
+  { key: 'reparacion', label: 'Reparación' },
 ];
 
 function costRows(usage: StageUsage[]): { label: string; usd: number }[] {
@@ -336,6 +402,7 @@ export function ComoSeEscribio({ piece, desktop }: { piece: PieceDetail; desktop
         <PanelFold piece={piece} finished={finished} />
         <SelectionFold piece={piece} finished={finished} />
         <VerifierFold piece={piece} finished={finished} />
+        <RepairFold piece={piece} />
         <SourcesFold piece={piece} />
       </div>
     </Section>

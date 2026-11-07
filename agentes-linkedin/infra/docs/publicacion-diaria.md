@@ -13,9 +13,15 @@ flowchart LR
     D --> R[b) Redactores A y B: dos variantes en inglés]
     R --> L[c) Panel de 5 lectores]
     L --> E[d) Director: elige o fusiona; texto final]
-    E --> V[e) Verificador sobre el hash del texto]
-    V -->|blocked| B[Pieza bloqueada + push]
-    V -->|ready_for_execution| P[Propuesta CONT-09]
+    E --> G[Reglas deterministas de CONT-09]
+    G -->|sin problemas| V[e) Verificador sobre el hash del texto]
+    G -->|problemas concretos| F[f) Una ronda de reparación]
+    V -->|hallazgos concretos| F
+    F -->|reglas y verificador otra vez| V2[Veredicto final]
+    V2 -->|blocked| B[Pieza bloqueada + push]
+    V -->|blocked sin hallazgos concretos| B
+    V2 -->|ready_for_execution| P[Propuesta CONT-09]
+    V -->|ready_for_execution| P
     P -->|política autonomia-v1| A[Aprobada + push: se puede vetar]
     A -->|EDITORIAL_POST_TIME| X[Operador: Posts API, una sola vez]
     X -->|201 + URN| C[Confirmada / conciliada por Unipile]
@@ -75,24 +81,33 @@ Cada etapa es una llamada a `knowledge.providers.claude()` con estas caracterís
 
 | Etapa (`purpose`) | Rol del diseño | Unidades (prioridad) | Presupuesto de contexto / salida máx. / effort |
 | --- | --- | --- | --- |
-| a) `editorial-director` | director_editorial (CONT-01/02/07) | B12 `LI-04-M005-K01`; B13 `LI-05-V022-K01/K03`; 9 enfoques `LI-05-M001-K01..K06`, `LI-05-M002-K01..K03`; formato texto `LI-05-M002-K04` | 22 000 / 4 000 / medium |
-| b) `editorial-redactor` | copywriter_a y copywriter_b (CONT-03) | enfoque elegido; `LI-05-M002-K04`; B15 `LI-06-M002-K09/K10`, `LI-06-M003-K06`; guía `LI-06-M001-K01..K16` | 26 000 / 6 000 / medium |
-| c) `editorial-lectores` | cinco lectores (CONT-05) | B14 `LI-05-V005-K05`, `LI-06-V020-K01` | 5 000 / 4 000 / low |
-| d) `editorial-seleccion` | director_editorial | B15 y B14 | 9 000 / 4 000 / medium |
-| e) `editorial-verificador` | editor_verificador (CONT-06) | B15; `LI-06-M001-K04` (promesa del gancho) y `LI-06-M001-K07` (concreción sin inventar) | 8 000 / 4 000 / high |
+| a) `editorial-director` | director_editorial (CONT-01/02/07) | B12 `LI-04-M005-K01`; B13 `LI-05-V022-K01/K03`; 9 enfoques `LI-05-M001-K01..K06`, `LI-05-M002-K01..K03`; formato texto `LI-05-M002-K04` | 22 000 / 16 000 / medium |
+| b) `editorial-redactor` | copywriter_a y copywriter_b (CONT-03) | enfoque elegido; `LI-05-M002-K04`; B15 `LI-06-M002-K09/K10`, `LI-06-M003-K06`; guía `LI-06-M001-K01..K16` | 26 000 / 16 000 / medium |
+| c) `editorial-lectores` | cinco lectores (CONT-05) | B14 `LI-05-V005-K05`, `LI-06-V020-K01` | 5 000 / 12 000 / low |
+| d) `editorial-seleccion` | director_editorial | B15 y B14 | 9 000 / 16 000 / medium |
+| e) `editorial-verificador` | editor_verificador (CONT-06) | B15; `LI-06-M001-K04` (promesa del gancho) y `LI-06-M001-K07` (concreción sin inventar) | 8 000 / 16 000 / high |
+| f) `editorial-reparacion` | director_editorial (solo si hay hallazgos concretos) | B15; `LI-06-M001-K04` y `LI-06-M001-K07` | 9 000 / 16 000 / medium |
+
+La salida máxima deja sitio al pensamiento de Opus 5.5, que cuenta contra `max_tokens` (fase 1 de la auditoría). Cada etapa usa el modelo por defecto (`ANTHROPIC_MODEL`, `claude-opus-5-5`) salvo que se fije `EDITORIAL_MODEL_<ETAPA>` (C3, ver abajo).
 
 Los otros cinco formatos del curso (foto, infografías, carrusel, vídeo y cita: `LI-05-M002-K05..K08` y `LI-05-M003-K01..K03`) quedan registrados para la fase de imágenes. En esta fase el esquema solo admite `text_only`.
 
-- **Director.** Recibe tres tipos de señales: hasta 12 posts de referentes de los últimos 7 días, marcados como datos de terceros; la memoria; y el historial de las últimas 20 piezas con la mezcla de modalidades publicadas en 30 días, para no repetirse. Devuelve un brief con estos campos: lector principal, modalidad (`personal_startups`, `projectapp`, `alianzas` o `comunidad`), pilar provisional (`business_to_product`, `applied_ai` o `architecture_delivery`), tesis, enfoque, formato, valor para el lector, evidencia, criterio de éxito, qué evitar y señales usadas. El 60/40 orienta la mezcla y no es una cuota. Si no hay material genuino, responde `skip`; saltar un día es válido y ese día no se reintenta solo.
+- **Director.** Recibe tres tipos de señales: hasta 12 posts de referentes de los últimos 7 días, marcados como datos de terceros; la memoria; y el historial de las últimas 20 piezas con la mezcla de modalidades publicadas en 30 días, para no repetirse. Cada pieza publicada del historial trae sus resultados (ver «Resultados en el historial del director»). Devuelve un brief con estos campos: lector principal, modalidad (`personal_startups`, `projectapp`, `alianzas` o `comunidad`), pilar provisional (`business_to_product`, `applied_ai` o `architecture_delivery`), tesis, enfoque, formato, valor para el lector, evidencia, criterio de éxito, qué evitar y señales usadas. El 60/40 orienta la mezcla y no es una cuota. Si no hay material genuino, responde `skip`; saltar un día es válido y ese día no se reintenta solo.
 - **Redactores.** Hacen una sola llamada que devuelve dos variantes independientes. La A explora primero una decisión, un procedimiento o un caso; la B, una pregunta u objeción del founder y su mecanismo. Ambas parten del mismo brief y de las mismas fuentes, y cada una enumera sus afirmaciones con su tipo.
 - **Lectores.** Comprador, recomendador, divulgador, líder y par dan fortalezas y objeciones por variante, clasificadas como `material`, `preference` o `missing_data`. Son hipótesis, no métricas. No reciben memoria ni la autoría de las variantes.
 - **Selección.** El director elige A o B, las fusiona o descarta la pieza. Decide por objetivo, verdad, utilidad y voz, no por mayoría.
+- **Reglas antes del verificador (R3).** Justo después de la selección, `editorial.text_rules()` aplica al texto exacto las reglas deterministas de la política (`autopiloto.post_issues`, con sus mismos patrones y límites): longitud de 200 a 2 200 caracteres, sin correos, teléfonos ni enlaces, sin pitch agresivo, como mucho 3 hashtags, sin filtración privada (`guardas.private_leaks`) y sin experiencia que los hechos públicos no respalden (`guardas.invented_experience`). Si algo falla, el verificador no se paga para ese texto. Cada guarda corre una vez por versión del texto dentro del circuito; la política las vuelve a aplicar como compuerta final.
 - **Verificador.** Contrasta cada afirmación con `public_facts` y las fuentes observadas. Marca experiencias inventadas, cifras sin fuente, pitch agresivo, datos privados, filtraciones de `private_guidance`, ganchos incumplidos y piezas fuera del brief. El veredicto final se calcula sobre el SHA-256 del texto exacto y es `blocked` en cualquiera de estos casos:
+  - las reglas deterministas encontraron un problema (el verificador no corre);
   - el modelo emite `blocked`;
   - hay un hallazgo `material`;
-  - hay una afirmación `unsupported`;
-  - la guarda determinista detecta experiencia en primera persona sin hechos públicos confirmados;
-  - se filtra orientación privada.
+  - hay una afirmación `unsupported`.
+- **Ronda de reparación (R4).** Si las reglas o el verificador encuentran problemas concretos (motivos de las reglas, hallazgos `material` o afirmaciones `unsupported`), la etapa `reparacion` recibe el texto final, el brief, la memoria, las fuentes y los hallazgos exactos, y devuelve un texto corregido con el cambio mínimo, en la voz de Gustavo. Después se repiten una vez las reglas y el verificador. Hay una sola ronda por pieza:
+  - si el texto reparado pasa, la pieza sigue como siempre y su propuesta lleva el riesgo «Reparada en una ronda…»;
+  - si sigue bloqueado, la pieza termina `blocked`, como antes;
+  - si la reparación descarta la pieza o no cambia el texto, termina `blocked` con los motivos originales, sin volver a verificar;
+  - un `blocked` del verificador sin hallazgos concretos no tiene nada que reparar y bloquea directamente.
+  La ronda pasa por `_guard()` como cualquier etapa. Si el presupuesto diario se agota durante la ronda, la pieza termina `blocked` con los motivos originales (no `failed`): un defecto de contenido no se reintenta al día siguiente. El registro queda en `verification.repair` (disparador, hallazgos, texto original, primer veredicto, cambios y resultado) y el detalle de la pieza en la PWA lo muestra en «Ronda de reparación». `EDITORIAL_REPAIR=false` apaga la ronda.
 
 ### Memoria: hechos públicos y orientación privada
 
@@ -101,11 +116,13 @@ Los hechos confirmados de Gustavo (`namespace='user'`) se reparten en dos bloque
 - `public_facts`: valores `{"texto": …, "uso_publico": true}`. Son lo único que puede atribuirse a Gustavo en un texto público.
 - `private_guidance`: el resto, incluido cualquier valor que no sea un dict con `uso_publico` (por seguridad), más la orientación privada del brief interno (`guardas.BASELINE_GUIDANCE`: prioridad 60/40, segmento de founders y condiciones). Orienta decisiones, pero nunca aparece ni se parafrasea en público.
 
-Director, redactores, selección y verificador reciben ambos bloques; el panel de lectores no recibe ninguno. Los comentarios (`propose_comment`) usan la misma separación sin la orientación del brief. Con la memoria vacía, como hoy, las piezas aportan criterio, preguntas y aprendizajes generales, sin vivencias de Gustavo. `guardas.private_leaks()` detecta 60/40, segmentos como «Spanish-speaking founders», bandas salariales, LLC y Beloz, además de fragmentos literales de la orientación privada. La usan el verificador de piezas y la compuerta de comentarios.
+Director, redactores, selección y verificador reciben ambos bloques; el panel de lectores no recibe ninguno. Los comentarios (`propose_comment`) usan la misma separación sin la orientación del brief. Con la memoria vacía, como hoy, las piezas aportan criterio, preguntas y aprendizajes generales, sin vivencias de Gustavo. `guardas.private_leaks()` detecta 60/40, segmentos como «Spanish-speaking founders», bandas salariales, LLC y Beloz, además de fragmentos literales de la orientación privada. No cita lo que encontró, porque el motivo viaja en avisos y push. La usan las reglas previas al verificador y la compuerta de comentarios.
+
+`guardas.invented_experience()` compara cada afirmación en primera persona («I built», «my clients», «construí», «en mi empresa»…, la frase entera) con los hechos públicos confirmados. Sin hechos públicos, cualquier experiencia en primera persona es inventada. Con hechos, marca la afirmación si trae una cifra que ningún hecho contiene, o si no comparte ninguna palabra de contenido ni ninguna cifra con ellos. Es estrecha a propósito: basta una palabra en común, y equipo, empresa, estudio, agencia, startup y clientes cuentan como una sola familia en inglés y en español. El verificador sigue siendo el juez principal. Antes, un solo hecho público apagaba la regla.
 
 ### Voz de Gustavo (`voz.py`)
 
-El documento «Tono de voz» que escribió Gustavo se guarda tal cual en `src/team_backend/recursos/tono-de-voz.md`. `voz.with_voice()` lo añade, precedido de `voz.VOICE_GUIDE`, al final del system de los agentes que escriben texto público: redactores A/B, selección (`editorial.VOICED_STAGES`) y redactor de comentarios. El director, el panel de lectores y el verificador no lo reciben.
+El documento «Tono de voz» que escribió Gustavo se guarda tal cual en `src/team_backend/recursos/tono-de-voz.md`. `voz.with_voice()` lo añade, precedido de `voz.VOICE_GUIDE`, al final del system de los agentes que escriben texto público: redactores A/B, selección y reparación (`editorial.VOICED_STAGES`) y redactor de comentarios. El director, el panel de lectores y el verificador no lo reciben.
 
 `VOICE_GUIDE` adapta el documento a LinkedIn:
 - Aplica la «versión cuidada» que el propio documento describe. En publicaciones propias se conservan la cadencia, los matices y el remate cotidiano, pero no hay risas escritas, vocales alargadas, groserías ni deformaciones afectivas. Los comentarios admiten algo más de reacción.
@@ -116,9 +133,34 @@ El verificador sabe que el registro informal no es un defecto y que una anécdot
 
 Para cambiar la voz, Gustavo edita ese archivo y se despliega una imagen nueva. El bloque ocupa unas 5 000 tokens, va en el system cacheado y añade como mucho unos 0,03 USD por llamada con opus.
 
+## Posicionamiento (`posicionamiento.py`)
+
+La dirección de Gustavo vive en una sola fuente versionada (`posicionamiento.VERSION`, hoy `posicionamiento-v1`): quién es, pilares, modalidades con su propósito y su barrio, y límites. De ella salen `editorial.DIRECTION` (director, redactores, selección y reparación), `red.CLASSIFY_SYSTEM` (clasificador de la red) y `lider.CRITERIA_DEL_BARRIO` (líder). Cada brief guarda `positioning_version`. Sigue siendo una propuesta interna que Gustavo supervisa; las prioridades privadas (60/40, segmento) están en `guardas.BASELINE_GUIDANCE`, no aquí.
+
+Los valores guardados no cambian de nombre. `posicionamiento.VOCABULARIES` es la correspondencia explícita:
+
+| Modalidad canónica | Pieza (`brief.modality`) | Persona (`classification.modality`) | Oportunidad (`Opportunity.modality`) |
+| --- | --- | --- | --- |
+| `personal_startups` | `personal_startups` | `personal_startups` | `personal_startups` |
+| `projectapp` | `projectapp` | `projectapp` | `projectapp` |
+| `alianzas` | `alianzas` | `alianzas` | — (`por_clasificar`) |
+| `comunidad` | `comunidad` | `comunidad_autoridad` | — (`por_clasificar`) |
+
+Una alianza o una persona de la comunidad no es por sí misma una oportunidad de negocio, así que Oportunidades solo tiene las dos modalidades de negocio y `por_clasificar`. `to_canonical()` y `to_stored()` traducen entre dominios. Las etiquetas de la PWA (`lib/editorial.ts`, `lib/format.ts`, `personas/labels.ts`) siguen igual, y una prueba comprueba que cada valor guardado tiene etiqueta.
+
+## Resultados en el historial del director
+
+Cada pieza publicada del historial lleva `results` con sus cortes de `PostMetric` (`metricas.py`) a 72 h y 7 d: impresiones, reacciones, comentarios, compartidos, comentarios con sustancia y `engagement_pct`. Un corte es `"pendiente"` si aún no cumplió su edad y `"sin_dato"` si la cumplió pero no se pudo leer; un contador `null` es un dato que falta, nunca un cero.
+
+`performance_30d` resume de forma determinista lo publicado en 30 días, en total (`all`), por pilar y por modalidad: cuántas piezas, cuántas tienen cada corte y las medianas de impresiones, reacciones y comentarios sobre las que tienen dato. El system del director explica cómo usarlo: insistir en lo que funciona sin repetir tesis ni apertura, volver a probar lo que no tiene datos, tratar menos de tres piezas medidas como una pista y no perseguir impresiones por encima de la dirección, la mezcla de modalidades ni la orientación de Gustavo.
+
+## Modelo por etapa (C3)
+
+`EDITORIAL_MODEL_DIRECTOR`, `EDITORIAL_MODEL_REDACTOR`, `EDITORIAL_MODEL_LECTORES`, `EDITORIAL_MODEL_SELECCION`, `EDITORIAL_MODEL_VERIFICADOR` y `EDITORIAL_MODEL_REPARACION` cambian el modelo de una sola etapa. La reparación usa el de la selección si no tiene el suyo. Sin ninguna, todas usan el modelo por defecto, como hasta ahora. Un modelo sin tarifa verificada en `providers.MODEL_PRICES` hace fallar la pieza antes de pagar nada. El cambio real espera la evaluación (fase 3 de la auditoría).
+
 ## Compuerta autónoma (`autopiloto.policy_review`, `autonomia-v1`)
 
-CONT-09 se aprueba solo si se cumplen todas estas condiciones:
+CONT-09 se aprueba solo si se cumplen todas estas condiciones (las mismas reglas deterministas ya corrieron en el circuito antes del verificador; la política las repite como compuerta final):
 - la longitud está entre 200 y 2 200 caracteres;
 - no hay correos, teléfonos ni enlaces;
 - no hay pitch agresivo ni petición de contacto (mencionar ProjectApp está permitido);
@@ -151,7 +193,7 @@ Tokens aproximados: unas 62 000 de unidades del curso entre las cinco etapas, un
 | `claude-sonnet-5-5` (2 / 10) | ≈ 0,22–0,26 USD | ≈ 0,06 USD |
 | `claude-haiku-5-5` (0,10 / 0,50) | ≈ 0,01 USD | < 0,01 USD |
 
-Con opus salen unos 13–15 USD al mes con una pieza diaria. Cada etapa reserva primero su peor caso: con opus, unos 0,26 USD como máximo en la del redactor. Las etapas son secuenciales y se liquidan antes de pasar a la siguiente, así que el tope diario de 1 USD cubre una pieza.
+Una pieza que necesita la ronda de reparación suma una llamada de reparación y, si cambió el texto, un segundo verificador: unos 0,2–0,3 USD más con opus. Una pieza que las reglas frenan antes del verificador se ahorra ese verificador. Con opus salen unos 13–15 USD al mes con una pieza diaria. Cada etapa reserva primero su peor caso: con opus, unos 0,26 USD como máximo en la del redactor. Las etapas son secuenciales y se liquidan antes de pasar a la siguiente, así que el tope diario de 1 USD cubre una pieza.
 
 ## API para la PWA
 
@@ -161,7 +203,7 @@ Con opus salen unos 13–15 USD al mes con una pieza diaria. Cada etapa reserva 
 | `GET /api/v1/linkedin/oauth/callback` | Retorno de LinkedIn: 302 a `/ajustes?linkedin=ok` o a `…=error&motivo=…`. |
 | `GET /api/v1/linkedin/status` | `configured`, `live`, `api_version`, `connected`, `member_urn`, `member_name`, `scopes`, `expires_at`, `days_left`, `expired`, `expiring_soon`, `account{id,paused,paused_reason}`. Nunca incluye el token. |
 | `GET /api/v1/editorial/calendar?desde=AAAA-MM-DD&dias=15` | `timezone`, `post_time`, `lead_hours`, `today` y `days[{date, pieces[…]}]`; un día vacío es un hueco visible. Cada pieza trae `id`, `slot_date`, `scheduled_for`, `state`, `status`, `stage`, `modality`, `pillar`, `primary_reader`, `thesis`, `approach`, `note`, `action{id,state,payload_hash}` y `external_url`. |
-| `GET /api/v1/editorial/pieces/<id>` | Lo mismo, más `brief`, `variants`, `panel`, `selection`, `verification`, `final_text`, `citations`, `signals`, `usage` (modelo, coste estimado y `request_id` por etapa) y `action_detail` (la acción completa). |
+| `GET /api/v1/editorial/pieces/<id>` | Lo mismo, más `brief`, `variants`, `panel`, `selection`, `verification`, `final_text`, `citations`, `signals`, `usage` (modelo, coste estimado y `request_id` por etapa) y `action_detail` (la acción completa). `verification.rules` y `verification.repair` describen las reglas previas y la ronda de reparación (`oficina/CONTRATO-API.md`). |
 | `POST /api/v1/editorial/plan` | `{request_id?}`: encola la preparación del próximo hueco sin pieza abierta (202 `{slot_date, job}`). Responde 409 si LinkedIn no está conectado, si la publicación está pausada o desactivada, o si no hay hueco en 7 días. Requiere `use_paid_providers`. |
 | `POST /api/v1/operador/actions/<id>/reject` | **Vetar** una pieza antes de su hora (sesión humana). El día queda sin publicación. |
 | `POST /api/v1/operador/control` | Parada total (sin cambios). |
@@ -194,6 +236,8 @@ Notificaciones push (y `OPERATOR_ALERT_WEBHOOK`):
    EDITORIAL_POST_TIME=08:30
    EDITORIAL_LEAD_HOURS=12
    EDITORIAL_DAILY_LLM_USD=1
+   EDITORIAL_REPAIR=true            # ronda de reparación (R4); false la apaga
+   # EDITORIAL_MODEL_LECTORES=…     # C3: modelo de una etapa; sin fijar, el de siempre
    OPERATOR_AUTONOMY=INT-03=auto,INT-02=auto,CONT-09=auto
    ```
    Para la primera pieza conviene `CONT-09=approval`: Gustavo la aprueba con su hash y luego pasa a `auto`. Si se pierde `FIELD_ENCRYPTION_KEY`, basta con reconectar LinkedIn.

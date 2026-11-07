@@ -94,6 +94,7 @@ Tres problemas transversales:
 
 1. **Diseño y realidad divergen.** Quien lea los contratos no sabe qué hace la máquina, y aparecen roles sin contrato (el líder, el ruteador de capturas). Marcar en el índice el estado real de cada rol y enlazar cada contrato con la función y el prompt que lo implementan.
 2. **La regla contra experiencias inventadas se apaga con un solo hecho público.** `guardas.invented_experience` devuelve vacío en cuanto existe cualquier hecho público (`guardas.py:63`); desde ese momento un «I built…» solo lo frenan los dos modelos. La regla debería comparar la afirmación con los hechos.
+   - **Arreglado en la fase 2.** Ahora compara cada afirmación en primera persona (la frase de «I built», «my clients», «construí», «en mi empresa»…) con los hechos públicos confirmados. La marca si trae una cifra que ningún hecho contiene, o si no comparte ninguna palabra de contenido ni ninguna cifra con ellos. Es conservadora: basta una palabra en común, y tener equipo, empresa o clientes cuenta como una sola familia en inglés y en español. El verificador sigue siendo el juez principal.
 3. **No hay evaluaciones de calidad.** Las pruebas usan proveedores simulados y solo comprueban la mecánica. Sin evaluación no se puede cambiar de modelo, mover umbrales ni quitar el panel con seguridad. Para empezar bastan 20–30 casos por agente sacados del historial: piezas, descartes y vetos.
 
 Conviene conservar: salidas estructuradas con esquema, texto de terceros tratado como datos, vigilancia de filtraciones de la orientación privada, ejecución exactamente una vez y preguntas a Gustavo solo por hechos que nadie más conoce.
@@ -115,7 +116,7 @@ Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo P
 - [x] R1: quitar el refresh de perfil del plan y contar las lecturas de ejecución. La comprobación previa de la ejecución hace ahora todos los cambios de etapa que hacía el plan, incluidos el perfil restringido y, al invitar, quien está fuera del 2.º y 3.er grado. Quien queda en la misma etapa sin que se escribiera nada descansa `NETWORK_RETRY_AFTER_HOURS` (48) antes de proponerse otra vez. Las lecturas de ejecución se cuentan aparte (`reads_today.execution`), no en el cupo `profile`, y ningún tope las frena. Si contaran en los cupos, en un día de topes llenos las ~40 lecturas de perfil de las ejecuciones le quitarían el cupo a la clasificación, y las comprobaciones de las aceptaciones agotarían las 4 sincronizaciones del día.
 - [x] R2: un solo juez de encaje para la red. Se queda el clasificador (Sonnet), no Jev como proponía la tabla, porque su razón es la que muestra la ficha de la persona. El líder solo pregunta `riesgo` (y la orientación) en RED-01, RED-02 y RED-04, con los mismos umbrales. Las invitaciones recibidas ya pasaban por el clasificador, y `red.network_issues` descarta cualquier RED-* sin su veredicto.
 - [x] B4: frenar `discover` mientras haya `NETWORK_DISCOVER_MAX_BACKLOG` candidatos sin clasificar (por defecto 40, poco más de un día de lecturas de perfil); cada turno añade como mucho lo que falta hasta esa cifra
-- [ ] R3 y R4: reglas deterministas antes del verificador y una ronda de reparación
+- [x] R3 y R4: reglas deterministas antes del verificador y una ronda de reparación (pieza editorial; `EDITORIAL_REPAIR=false` la apaga)
   - [x] R4 en comentarios: si un borrador solo incumple reglas fijas (`autopiloto.comment_text_issues`: hashtag, enlace, longitud, pitch, afirmación sin evidencia…), se pide una sola reescritura que nombra cada regla, dentro de `OPERATOR_DAILY_LLM_USD` y solo en modo `auto`. Si vuelve a fallar, la política la descarta como antes. El enfriamiento por autor no se repara: ningún texto lo arregla.
 - [x] R5: prefiltro con Jev antes de redactar un comentario. Cinco preguntas `noul` (sustancia, tema del barrio, vacante, promoción, hito personal) con un umbral `COMMENT_PREFILTER_THRESHOLD` (0,5). El veredicto queda en un `AuditEvent` (`operator.comment_prefilter`), así que un post no se vuelve a preguntar en cada ciclo. Como máximo 3 preguntas por ciclo. Si Jev no responde, se redacta como antes y queda un aviso en el log. Activo con `LEAD_ENABLED`; se apaga con `COMMENT_PREFILTER=false`.
 - [x] B3: tope de revisiones del líder por tick. `LEAD_MAX_REVIEWS_PER_TICK` (5), de la más antigua a la más reciente; el resto espera al ciclo siguiente. Las decisiones deterministas y la caducidad no esperan al tope. Además, si Jev no responde, el ciclo deja de llamarlo hasta el siguiente, en lugar de esperar 60 s por propuesta.
@@ -123,13 +124,14 @@ Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo P
 **Fase 3: diseño y costo**
 
 - [ ] 20–30 casos de evaluación por agente, sacados del historial
-- [ ] Un solo artefacto de posicionamiento para director, clasificador y líder
-- [ ] Resultados de las piezas en el historial del director
+- [x] Un solo artefacto de posicionamiento para director, clasificador y líder (`team_backend/posicionamiento.py`, `posicionamiento-v1`; sigue siendo una propuesta interna, Gustavo no la ha confirmado)
+- [x] Resultados de las piezas en el historial del director (cortes de 72 h y 7 d y resumen de 30 días por pilar y modalidad; el resumen semanal que propone orientación sigue pendiente)
 - [x] Alerta si la aprobación del líder cae a cero en una capacidad. Si en 7 días revisó al menos `LEAD_SILENCE_MIN_REVIEWS` (5) propuestas de una capacidad en `auto` y no aprobó ninguna, llega la Notificación `lead_silent` (capa sistema, con push) con las preguntas que más fallan. Una por capacidad y semana; el tick lo comprueba cada `LEAD_SILENCE_CHECK_MINUTES` (60).
 - [ ] Agente de inbox de solo lectura que proponga oportunidades
 - [ ] C1 a C3, validados con las evaluaciones
   - [x] C1: las instrucciones y las 6 unidades del curso del redactor de comentarios van en bloques de `system` con `cache_control` (`providers.claude(..., context=...)`); el post y su contexto van en el mensaje. Se hizo sin esperar a las evaluaciones porque las unidades no cambian, solo pasan del final del mensaje al `system`. La reescritura de R4 lee ese prefijo de la caché.
   - [x] C5: un cliente Anthropic por clave, reutilizado (`providers.anthropic_client`). `count_tokens` se queda: la reserva lo necesita.
+  - [x] C3 configurable, sin cambiar: `EDITORIAL_MODEL_<ETAPA>` por etapa editorial; por defecto sigue el modelo actual hasta que la evaluación respalde el cambio
 
 ## Cómo confirmarlo en producción
 

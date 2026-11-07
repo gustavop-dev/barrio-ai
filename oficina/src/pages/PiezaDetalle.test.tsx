@@ -194,6 +194,48 @@ describe('Detalle de una pieza', () => {
     expect(screen.getByText('Las guardas corrigieron al modelo')).toBeInTheDocument();
   });
 
+  it('shows the repair round when the rules or the verifier asked for one', async () => {
+    const repaired = piece({
+      verification: {
+        verdict: 'ready_for_execution',
+        model_verdict: 'ready_for_execution',
+        blocking_reasons: [],
+        rules: [],
+        repair: {
+          trigger: 'reglas',
+          findings: [{ source: 'reglas', issue: 'regla', quote: '', detail: 'Contiene enlaces' }],
+          original_text: 'Most feature requests arrive as a solution. More at https://example.com',
+          changes: [{ finding: 'Contiene enlaces', change: 'Quité el enlace del cierre.' }],
+          outcome: 'reparada',
+        },
+      },
+      usage: [
+        { stage: 'seleccion', model: 'claude', estimated_usd: 0.05 },
+        { stage: 'reparacion', model: 'claude', estimated_usd: 0.03 },
+      ],
+    });
+    server(repaired);
+    renderCalendario('/calendario/pieza/p7');
+    const how = await screen.findByRole('region', { name: 'Cómo se escribió' });
+    const folds = [...how.querySelectorAll('details')];
+    const repair = folds.find((fold) => fold.querySelector('summary')?.textContent === 'Ronda de reparación')!;
+    expect(repair).toBeTruthy();
+    expect(within(repair).getByText('Reparada y verificada')).toBeInTheDocument();
+    expect(within(repair).getByText('La pidieron las reglas de publicación')).toBeInTheDocument();
+    expect(within(repair).getByText('Contiene enlaces')).toBeInTheDocument();
+    expect(within(repair).getByText('Quité el enlace del cierre.')).toBeInTheDocument();
+    expect(within(repair).getByText('Most feature requests arrive as a solution. More at https://example.com')).toBeInTheDocument();
+    expect(within(folds.at(-1)!).getByText('Reparación')).toBeInTheDocument();
+  });
+
+  it('says when the rules stopped a piece before the verifier read it', async () => {
+    server(piece({ status: 'blocked', state: 'blocked', action: null, verification: { verdict: 'blocked', blocking_reasons: ['Contiene enlaces'], rules: ['Contiene enlaces'] } }));
+    renderCalendario('/calendario/pieza/p7');
+    expect(await screen.findByText('El verificador no llegó a leerla: las reglas de publicación la frenaron antes')).toBeInTheDocument();
+    const how = screen.getByRole('region', { name: 'Cómo se escribió' });
+    expect(how.querySelectorAll('details')).toHaveLength(6); // no repair round, no repair fold
+  });
+
   it('shows the error with a retry and keeps the way back', async () => {
     server({ status: 404, body: { detail: 'No encontrado.' } });
     renderCalendario('/calendario/pieza/p7');

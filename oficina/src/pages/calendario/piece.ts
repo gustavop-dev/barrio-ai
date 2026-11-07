@@ -14,15 +14,17 @@ const STAGE_SHORT: Record<string, string> = {
   lectores: 'panel de lectores',
   seleccion: 'selección del texto final',
   verificador: 'verificador',
+  reparacion: 'ronda de reparación',
 };
 
 export function stageShort(stage: string | null | undefined): string {
   return STAGE_SHORT[stage || 'director'] ?? stage ?? '';
 }
 
-/** The 5 preparation steps for the numbered StageTrack. */
+/** The 5 preparation steps for the numbered StageTrack. The repair round belongs to the verification step. */
 export function preparationStages(stage: string | null | undefined): Stage[] {
-  const current = Math.max(0, STAGE_ORDER.indexOf((stage || 'director') as (typeof STAGE_ORDER)[number]));
+  const step = stage === 'reparacion' ? 'verificador' : stage || 'director';
+  const current = Math.max(0, STAGE_ORDER.indexOf(step as (typeof STAGE_ORDER)[number]));
   return STAGE_ORDER.map((key, index) => ({
     key,
     label: STAGE_LABEL[key] ?? key,

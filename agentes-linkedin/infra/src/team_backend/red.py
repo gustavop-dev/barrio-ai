@@ -189,20 +189,11 @@ CLASSIFY_SCHEMA={'type':'object','additionalProperties':False,'required':['conta
                   'modality':{'type':'string','enum':MODALITIES},'affinity':{'type':'string','enum':AFFINITIES},
                   'reason':{'type':'string'},'confidence':{'type':'number'}}}}}}
 
-CLASSIFY_SYSTEM='''Eres investigador_referentes de Barrio AI (DESC-07). Clasificas personas descubiertas en LinkedIn para
+from .posicionamiento import network_criteria as _network_criteria  # noqa: E402 (one positioning source)
+CLASSIFY_SYSTEM=f'''Eres investigador_referentes de Barrio AI (DESC-07). Clasificas personas descubiertas en LinkedIn para
 decidir si conviene que entren al barrio de Gustavo: seguirlas y, más adelante, invitarlas a conectar sin nota.
 
-Gustavo es ingeniero de producto con criterio de negocio: convierte necesidades de negocio en software que funciona,
-lo evoluciona e integra IA cuando resuelve un problema concreto. Dirige ProjectApp, un equipo de desarrollo a la medida.
-
-Criterios de barrio por modalidad:
-- personal_startups: founders técnicos o de negocio de startups tempranas (preferentemente presemilla con inversión),
-  líderes técnicos y personas que recomiendan talento en startups.
-- projectapp: founders u operadores que necesitan una entrega externa, un proyecto definido o un equipo continuo.
-- alianzas: estudios o agencias complementarios, freelancers senior, aceleradoras, inversores o comunidades que
-  recomiendan talento o proveedores.
-- comunidad_autoridad: pares, divulgadores y líderes temáticos (producto, software, IA aplicada, startups) que
-  sostienen la conversación del nicho.
+{_network_criteria()}
 
 Papeles: par, recomendador, lider, comprador, divulgador, aliado. «comprador» es una hipótesis, nunca un hecho.
 
