@@ -8,23 +8,11 @@ import { IconChevronLeft, IconChevronRight } from '../components/icons';
 import { Button, ChipStrip, ErrorRetry, FilterChip, LAYER_COLOR, LAYER_LABEL, Note, Page, Segmented } from '../components/ui';
 import { CALENDAR_TZ, addDays, addMonths, deviceDiffers, isIsoDay, monthGrid, monthOf, monthTitle, todayIn, weekDays, weekRangeLabel } from './calendario/dates';
 import { DayPanel } from './calendario/DayPanel';
-import { isLayer, isTipo } from './calendario/events';
+import { DEFAULT_VISTA, isLayer, isTipo, isVista, monthIsEmpty, toggledLayers, VISTAS, visibleLayers, type Vista } from './calendario/events';
 import { MonthDots, MonthGrid, WeekGrid, WeekStrip } from './calendario/Grids';
 import { ListView } from './calendario/ListView';
-import type { Vista } from './calendario/types';
 import { useIsDesktop, useNow } from './calendario/useMedia';
 import './calendario/calendario.css';
-
-const VISTAS: readonly { value: Vista; label: string }[] = [
-  { value: 'mes', label: 'Mes' },
-  { value: 'semana', label: 'Semana' },
-  { value: 'lista', label: 'Lista' },
-];
-const DEFAULT_VISTA: Vista = 'semana';
-
-function isVista(value: string | null): value is Vista {
-  return VISTAS.some((option) => option.value === value);
-}
 
 /** URL state: `?vista=mes|semana|lista&fecha=AAAA-MM-DD&capas=tuyo,publicaciones` (plus `tipo` and `no_salio` in Lista). */
 function useCalendarParams() {
@@ -70,8 +58,7 @@ export function Calendario() {
   const timeZone = data?.timezone || CALENDAR_TZ;
   const today = data?.today ?? clientToday;
   const layers = data?.layers;
-  const available = CALENDAR_LAYERS.filter((layer) => layers?.[layer] !== false);
-  const visible: ReadonlySet<CalendarLayer> = new Set(available.filter((layer) => (capas ? capas.has(layer) : true)));
+  const { available, visible } = visibleLayers(layers, capas);
   const byDate = useMemo(() => new Map<string, CalendarioDay>((data?.days ?? []).map((day) => [day.date, day])), [data]);
   const selectedDay = byDate.get(fecha);
   const gridLoading = calendar.isPending || calendar.isPlaceholderData;
@@ -80,23 +67,11 @@ export function Calendario() {
 
   const select = (day: string) => update({ fecha: day === today ? null : day });
   const move = (direction: 1 | -1) => select(vista === 'mes' ? addMonths(fecha, direction) : addDays(fecha, 7 * direction));
-  const toggleLayer = (layer: CalendarLayer) => {
-    const next = new Set(visible);
-    if (next.has(layer)) next.delete(layer);
-    else next.add(layer);
-    const all = available.every((l) => next.has(l));
-    update({ capas: all ? null : CALENDAR_LAYERS.filter((l) => next.has(l)).join(',') });
-  };
+  const toggleLayer = (layer: CalendarLayer) => update({ capas: toggledLayers(visible, available, layer) });
 
   const rango = vista === 'mes' ? monthTitle(fecha) : vista === 'semana' ? weekRangeLabel(fecha) : 'Línea de tiempo';
   const otherZone = deviceDiffers(timeZone, new Date(now));
-  const monthEmpty =
-    vista === 'mes' &&
-    calendar.isSuccess &&
-    !calendar.isPlaceholderData &&
-    (data?.days ?? [])
-      .filter((day) => monthOf(day.date) === monthOf(fecha))
-      .every((day) => !day.events.length && !Object.values(day.counts).some(Boolean));
+  const monthEmpty = vista === 'mes' && calendar.isSuccess && !calendar.isPlaceholderData && monthIsEmpty(data?.days ?? [], monthOf(fecha));
 
   const nav =
     vista === 'lista' ? undefined : (

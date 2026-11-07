@@ -22,6 +22,8 @@ Si una pieza nueva necesita un movimiento que no existe, se añade aquí primero
 | `sheetOpen` | 24 · 260 · 1 | Las hojas inferiores suben y vuelven a su sitio tras arrastrarlas sin cerrar: captura, confirmaciones, oportunidad y datos (`components/ui/Sheet.tsx`). |
 | `press` | 18 · 420 · 0.6 | Botón al soltarlo y píldora de la pestaña activa en la barra inferior (`components/ui/Button.tsx`, `components/shell/BottomBar.tsx`). |
 | `toast` | 20 · 260 · 0.9 | El aviso inferior entra subiendo (`layout.toastIn`, en `components/ui/Toast.tsx`). |
+| `pageSnap` | 26 · 240 · 1 | Calendario: la tira de la semana o el mes se asientan en la página siguiente o anterior tras deslizar, o vuelven a su sitio (`calendario/Pager.tsx`). |
+| `sheetSnap` | 26 · 280 · 1 | Una hoja con puntos de anclaje (el panel del día) pasa de media a completa o vuelve (`components/ui/SnapSheet.tsx`). |
 
 ## Duraciones y curvas (`timings`, `easings`)
 
@@ -45,6 +47,8 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `spriteFrameMs` | 200 | Un fotograma del bibliotecario en reposo de los estados vacíos: 6 fotogramas en 1,2 s (`components/ui/Sprite.tsx`). |
 | `toastDurations.withUndo` | 5000 | Lo que dura un aviso con «Deshacer» o «Recuperar», la ventana de acción reversible (`components/ui/Toast.tsx`). |
 | `toastDurations.plain` | 4000 | Lo que dura un aviso sin acción. |
+| `toastDurations.withUndo` (veto) | 5000 | El veto de una pieza o de una acción en cola espera esta ventana antes de enviarse, para que «Deshacer» lo anule (`calendario/pendingVeto.ts`). |
+| `copiedLabelMs` | 2000 | Lo que dura «Copiado» en el botón Copiar del texto final (`pieza/FinalText.tsx`). |
 
 ## Umbrales de gestos (`gestures`)
 
@@ -63,6 +67,14 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `capture.maxLift` | 60 pt | Altura máxima que el botón y el candado siguen al dedo. |
 | `sheet.dismissDistance` | 120 pt | Arrastrar la hoja hacia abajo esta distancia la cierra (`components/ui/Sheet.tsx`). |
 | `sheet.dismissVelocity` | 1000 pt/s | O lanzarla hacia abajo a esta velocidad. |
+| `pager.activeOffsetX` | 16 pt | Calendario: recorrido horizontal antes de que la semana o el mes sigan al dedo (`calendario/Pager.tsx`). |
+| `pager.failOffsetY` | 14 pt | Recorrido vertical que deja el toque al scroll de la página. |
+| `pager.commitFraction` | 0.25 | Fracción del ancho que pasa de página al soltar. |
+| `pager.commitVelocity` | 700 pt/s | O un gesto rápido a esta velocidad. |
+| `snapSheet.half` | 0.55 | Altura del anclaje medio del panel del día, como fracción de la pantalla (`components/ui/SnapSheet.tsx`). |
+| `snapSheet.full` | 0.92 | Altura del anclaje completo. |
+| `snapSheet.dismissDistance` | 90 pt | Por debajo del anclaje medio, arrastrar esta distancia más la cierra. |
+| `snapSheet.flickVelocity` | 900 pt/s | Un gesto rápido a esta velocidad salta un anclaje (o la cierra desde el medio). |
 
 ## Vibraciones (`haptics`)
 
@@ -80,3 +92,6 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `actionError` | error | Una acción o un envío fallaron. |
 | `tabChange` | selección | Cambiar de pestaña en la barra inferior o en las pestañas de una vista. |
 | `toggle` | sin vibración | Marcar un chip o una opción (`components/ui/Chip.tsx`, `components/ui/Options.tsx`). |
+| `pageChange` | selección | Calendario: deslizar pasa la semana o el mes (`calendario/Pager.tsx`). |
+| `sheetSnap` | sin vibración | Una hoja con anclajes se asienta en otro punto (`components/ui/SnapSheet.tsx`). |
+| `copied` | éxito | El texto final quedó en el portapapeles (`pieza/FinalText.tsx`). |

@@ -38,5 +38,20 @@ export function routeForUrl(url: unknown): AppRoute | null {
     pathname = '/tu-turno';
     params.tab = 'sabe';
   }
+  const legacy = legacyCalendarRoute(pathname, params);
+  if (legacy) return legacy;
   return { pathname, params };
+}
+
+/**
+ * Old PWA paths that oficina/src/App.tsx redirects (without their query): /editorial/<id> and
+ * /contenido/<id> (old piece pushes) open the piece; /contenido, /editorial and /maquina the calendar;
+ * /acciones the calendar, or Tu turno for ?state=uncertain (the old target of an uncertain action).
+ */
+export function legacyCalendarRoute(pathname: string, params: Record<string, string>): AppRoute | null {
+  const piece = /^\/(?:editorial|contenido)\/([^/]+)$/.exec(pathname);
+  if (piece) return { pathname: `/calendario/pieza/${piece[1]}`, params: {} };
+  if (pathname === '/editorial' || pathname === '/contenido' || pathname === '/maquina') return { pathname: '/calendario', params: {} };
+  if (pathname === '/acciones') return { pathname: params.state === 'uncertain' ? '/tu-turno' : '/calendario', params: {} };
+  return null;
 }

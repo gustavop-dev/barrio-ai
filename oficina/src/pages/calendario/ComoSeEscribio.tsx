@@ -1,13 +1,31 @@
 // «Cómo se escribió»: brief, variants, readers, selection, verifier, repair round and sources, all folded by default.
 import { useState, type ReactNode } from 'react';
-import type { Assessment, PieceDetail, StageUsage, Variant } from '../../api/types';
+import type { PieceDetail, Variant } from '../../api/types';
 import { IconChevronDown } from '../../components/icons';
 import { Badge, Section, TabBar, type Tone } from '../../components/ui';
-import { CLAIM_LABEL, FORMAT_LABEL, ISSUE_LABEL, label, MODALITY_LABEL, PILLAR_LABEL, readerLabel, SELECTION_LABEL, SEVERITY, VERDICT } from '../../lib/editorial';
+import {
+  asArray as list,
+  assessmentLine,
+  CLAIM_LABEL,
+  costRows,
+  filled,
+  FINISHED_STATUSES as FINISHED,
+  FORMAT_LABEL,
+  ISSUE_LABEL,
+  label,
+  MODALITY_LABEL,
+  notYetText,
+  PILLAR_LABEL,
+  readerBadge,
+  readerLabel,
+  repairOutcome,
+  repairTrigger,
+  SELECTION_LABEL,
+  SEVERITY,
+  variantChosen,
+  verifierSummary,
+} from '../../lib/editorial';
 import { excerpt, formatUsd } from '../../lib/format';
-
-const filled = (value: object | null | undefined) => Boolean(value && Object.keys(value).length);
-const list = <T,>(value: T[] | null | undefined): T[] => (Array.isArray(value) ? value : []);
 
 function Fold({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -32,7 +50,7 @@ function Field({ name, children }: { name: string; children: ReactNode }) {
 }
 
 function NotYet({ finished }: { finished: boolean }) {
-  return <p className="t-detalle text-suave">{finished ? 'Esta etapa no llegó a correr.' : 'Esta etapa aún no ha corrido.'}</p>;
+  return <p className="t-detalle text-suave">{notYetText(finished)}</p>;
 }
 
 function BriefFold({ piece, finished }: { piece: PieceDetail; finished: boolean }) {
@@ -97,7 +115,7 @@ function VariantCard({ name, variant, chosen }: { name: 'A' | 'B'; variant: Vari
 function VariantsFold({ piece, desktop, finished }: { piece: PieceDetail; desktop: boolean; finished: boolean }) {
   const [tab, setTab] = useState<'A' | 'B'>(piece.selection?.decision === 'B' ? 'B' : 'A');
   const decision = piece.selection?.decision;
-  const chosen = (name: 'A' | 'B') => (decision === name ? 'Elegida' : decision === 'merge' ? 'En la fusión' : null);
+  const chosen = (name: 'A' | 'B') => variantChosen(decision, name);
   const variants = piece.variants;
   return (
     <Fold title="Variantes A y B">
@@ -129,20 +147,6 @@ function VariantsFold({ piece, desktop, finished }: { piece: PieceDetail; deskto
   );
 }
 
-const SEVERITY_RANK: Record<string, number> = { material: 3, missing_data: 2, preference: 1 };
-const SEVERITY_BADGE: Record<string, { label: string; tone: Tone }> = {
-  material: { label: 'Objeción material', tone: 'bad' },
-  missing_data: { label: 'Faltan datos', tone: 'warn' },
-  preference: { label: 'Objeción menor', tone: 'muted' },
-};
-
-function assessmentLine(name: string, assessment: Assessment | undefined): string | null {
-  const strengths = list(assessment?.strengths);
-  const objections = list(assessment?.objections).map((o) => o.text);
-  const parts = [strengths.length ? strengths.join('; ') : '', objections.length ? `Objeciones: ${objections.join('; ')}` : ''].filter(Boolean);
-  return parts.length ? `${name}: ${parts.join('. ')}` : null;
-}
-
 function PanelFold({ piece, finished }: { piece: PieceDetail; finished: boolean }) {
   const panel = piece.panel;
   const readers = list(panel?.readers);
@@ -156,11 +160,7 @@ function PanelFold({ piece, finished }: { piece: PieceDetail; finished: boolean 
           {panel.summary ? <p>{panel.summary}</p> : null}
           <ul className="pz-readers">
             {readers.map((reader, index) => {
-              const worst = [...list(reader.variant_a?.objections), ...list(reader.variant_b?.objections)].reduce<string | null>(
-                (acc, objection) => ((SEVERITY_RANK[objection.severity] ?? 0) > (SEVERITY_RANK[acc ?? ''] ?? 0) ? objection.severity : acc),
-                null,
-              );
-              const badge = worst ? SEVERITY_BADGE[worst] : { label: 'Sin objeciones', tone: 'ok' as Tone };
+              const badge = readerBadge(reader);
               return (
                 <li key={`${reader.reader}-${index}`} className="pz-reader">
                   <div className="pz-reader-text">
@@ -209,22 +209,12 @@ function VerifierFold({ piece, finished }: { piece: PieceDetail; finished: boole
       </Fold>
     );
   }
-  const verdict = v.verdict ? (VERDICT[v.verdict] ?? { label: v.verdict, tone: 'muted' as Tone }) : null;
-  const corrected = Boolean(v.model_verdict && v.verdict && v.model_verdict !== v.verdict);
-  const stoppedByRules = !v.model_verdict && list(v.rules).length > 0;
-  const claims = list(v.checked_claims);
-  const supported = claims.filter((claim) => (claim.status ?? claim.kind) !== 'unsupported').length;
+  const { verdict, guards, supported, claims } = verifierSummary(v);
   return (
     <Fold title="Verificador">
       <div className="pz-verdict">
-        {verdict ? <Badge tone={verdict.tone}>{v.verdict === 'ready_for_execution' ? 'Aprobada' : verdict.label}</Badge> : null}
-        <p className="t-detalle text-suave">
-          {stoppedByRules
-            ? 'El verificador no llegó a leerla: las reglas de publicación la frenaron antes'
-            : corrected
-              ? 'Las guardas corrigieron al modelo'
-              : 'Sin correcciones de las guardas'}
-        </p>
+        {verdict ? <Badge tone={verdict.tone}>{verdict.label}</Badge> : null}
+        <p className="t-detalle text-suave">{guards}</p>
       </div>
       {v.summary ? <p>{v.summary}</p> : null}
       <Field name="Motivos del bloqueo">
@@ -257,29 +247,21 @@ function VerifierFold({ piece, finished }: { piece: PieceDetail; finished: boole
           </ul>
         ) : null}
       </Field>
-      <Field name="Afirmaciones comprobadas">{claims.length ? `${supported} de ${claims.length}` : null}</Field>
+      <Field name="Afirmaciones comprobadas">{claims ? `${supported} de ${claims}` : null}</Field>
     </Fold>
   );
 }
-
-const REPAIR_OUTCOME: Record<string, { label: string; tone: Tone }> = {
-  reparada: { label: 'Reparada y verificada', tone: 'ok' },
-  bloqueada: { label: 'Siguió bloqueada', tone: 'bad' },
-  descartada: { label: 'No se pudo reparar', tone: 'bad' },
-  sin_cambios: { label: 'Sin cambios', tone: 'muted' },
-  sin_presupuesto: { label: 'Sin presupuesto', tone: 'warn' },
-};
 
 /** R4: shown only when the rules or the verifier found concrete problems and the round ran. */
 function RepairFold({ piece }: { piece: PieceDetail }) {
   const repair = piece.verification?.repair;
   if (!repair) return null;
-  const outcome = REPAIR_OUTCOME[repair.outcome] ?? { label: repair.outcome, tone: 'muted' as Tone };
+  const outcome = repairOutcome(repair);
   return (
     <Fold title="Ronda de reparación">
       <div className="pz-verdict">
         <Badge tone={outcome.tone}>{outcome.label}</Badge>
-        <p className="t-detalle text-suave">{repair.trigger === 'reglas' ? 'La pidieron las reglas de publicación' : 'La pidió el verificador'}</p>
+        <p className="t-detalle text-suave">{repairTrigger(repair)}</p>
       </div>
       <Field name="Qué había que corregir">
         {list(repair.findings).length ? (
@@ -318,27 +300,6 @@ function RepairFold({ piece }: { piece: PieceDetail }) {
       </Field>
     </Fold>
   );
-}
-
-const COST_STAGES: { key: string; label: string }[] = [
-  { key: 'director', label: 'Director' },
-  { key: 'redactor', label: 'Redactores' },
-  { key: 'lectores', label: 'Lectores' },
-  { key: 'seleccion', label: 'Selección' },
-  { key: 'verificador', label: 'Verificador' },
-  { key: 'reparacion', label: 'Reparación' },
-];
-
-function costRows(usage: StageUsage[]): { label: string; usd: number }[] {
-  const totals = new Map<string, number>();
-  for (const row of usage) {
-    const usd = Number(row.estimated_usd);
-    if (row.estimated_usd === null || row.estimated_usd === undefined || !Number.isFinite(usd)) continue;
-    totals.set(row.stage, (totals.get(row.stage) ?? 0) + usd);
-  }
-  const known = COST_STAGES.filter((stage) => totals.has(stage.key)).map((stage) => ({ label: stage.label, usd: totals.get(stage.key)! }));
-  const other = [...totals.entries()].filter(([stage]) => !COST_STAGES.some((s) => s.key === stage)).map(([stage, usd]) => ({ label: stage, usd }));
-  return [...known, ...other];
 }
 
 function SourcesFold({ piece }: { piece: PieceDetail }) {
@@ -388,9 +349,6 @@ function SourcesFold({ piece }: { piece: PieceDetail }) {
     </Fold>
   );
 }
-
-/** States where the circuit will not run any further stage. */
-const FINISHED = new Set(['skipped', 'blocked', 'failed', 'discarded', 'vetoed', 'expired', 'superseded', 'published', 'uncertain']);
 
 export function ComoSeEscribio({ piece, desktop }: { piece: PieceDetail; desktop: boolean }) {
   const finished = FINISHED.has(piece.status);

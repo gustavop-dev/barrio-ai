@@ -43,6 +43,10 @@ export const springs = {
   press: { damping: 18, stiffness: 420, mass: 0.6 },
   /** The toast rising from the bottom. */
   toast: { damping: 20, stiffness: 260, mass: 0.9 },
+  /** Calendario: the week strip or the month settling on the next page after a swipe (or back to its place). */
+  pageSnap: { damping: 26, stiffness: 240, mass: 1 },
+  /** A snap sheet (the day panel) moving between its half and full heights. */
+  sheetSnap: { damping: 26, stiffness: 280, mass: 1 },
 } as const satisfies Record<string, SpringToken>;
 
 export type SpringName = keyof typeof springs;
@@ -105,6 +109,9 @@ export const spriteFrameMs = 200;
 /** How long a toast stays: 5 s with «Deshacer»/«Recuperar» (the reversible-action window), 4 s otherwise. */
 export const toastDurations = { withUndo: 5000, plain: 4000 } as const;
 
+/** How long «Copiado» stays on a copy button before it says «Copiar» again. */
+export const copiedLabelMs = 2000;
+
 // ---------------------------------------------------------------- gestures
 
 export const gestures = {
@@ -140,6 +147,26 @@ export const gestures = {
     /** Or flick it down this fast. */
     dismissVelocity: 1000,
   },
+  pager: {
+    /** Horizontal travel before the week strip or the month follows the finger (points). */
+    activeOffsetX: 16,
+    /** Vertical travel that leaves the touch to the page scroll instead (points). */
+    failOffsetY: 14,
+    /** Travel that turns the page when the finger lifts (fraction of the width). */
+    commitFraction: 0.25,
+    /** Or a flick this fast (points per second). */
+    commitVelocity: 700,
+  },
+  snapSheet: {
+    /** The half snap point: visible height as a fraction of the screen. */
+    half: 0.55,
+    /** The full snap point. */
+    full: 0.92,
+    /** Below the half point, drag this far more to close it. */
+    dismissDistance: 90,
+    /** A flick this fast moves one snap point (or closes it from half). */
+    flickVelocity: 900,
+  },
 } as const;
 
 // ---------------------------------------------------------------- haptics
@@ -171,6 +198,12 @@ export const haptics = {
   tabChange: { type: 'selection' },
   /** Toggling a chip or option. */
   toggle: null,
+  /** Calendario: a swipe turns the week or the month. */
+  pageChange: { type: 'selection' },
+  /** A snap sheet settles on another snap point. */
+  sheetSnap: null,
+  /** The text went to the clipboard. */
+  copied: { type: 'notification', style: 'success' },
 } as const satisfies Record<string, HapticKind | null>;
 
 export type HapticEvent = keyof typeof haptics;

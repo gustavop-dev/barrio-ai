@@ -9,12 +9,11 @@ import { pieceStatus, vetoable } from '../../lib/editorial';
 import { formatTime } from '../../lib/format';
 import { ActivityList, QueuedRow } from './ActivityList';
 import { dayOf, daysBetween, longDayTitle } from './dates';
-import { chronological, eventBadge, eventLink, eventSentence, eventSub, eventTime, importantEvents, pieceIdFromLink, pieceOfDay, summaryParts } from './events';
+import { chronological, eventBadge, eventLink, eventSentence, eventSub, eventTime, FAR_FUTURE_DAYS, importantEvents, leadText, pieceIdFromLink, pieceOfDay, summaryParts } from './events';
 import { firstLines, isOnItsWay, pieceMeta, pieceWhen, publishedAt, resultLine } from './piece';
 import { PlanNextButton, VetoButton } from './Veto';
 
-/** Beyond this, the panel says «Todavía no hay nada programado tan lejos». */
-export const FAR_FUTURE_DAYS = 15;
+export { FAR_FUTURE_DAYS };
 
 export interface DayPanelProps {
   date: string;
@@ -156,7 +155,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
       <section className="cal-panel" aria-label="Detalle del día">
         {heading}
         <EmptyState title="Todavía no hay nada programado tan lejos." align="start">
-          El equipo prepara cada pieza {leadHours ? `${formatHours(leadHours)} h` : 'unas horas'} antes de su hora.
+          El equipo prepara cada pieza {leadText(leadHours)} antes de su hora.
         </EmptyState>
       </section>
     );
@@ -228,7 +227,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
             <p>
               {kind === 'pasado'
                 ? 'Sin publicación.'
-                : `Hueco libre. El equipo prepara cada pieza ${leadHours ? `${formatHours(leadHours)} h` : 'unas horas'} antes de su hora.`}
+                : `Hueco libre. El equipo prepara cada pieza ${leadText(leadHours)} antes de su hora.`}
             </p>
             {kind !== 'pasado' && noUpcoming ? (
               <>
@@ -285,8 +284,4 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
       ) : null}
     </section>
   );
-}
-
-function formatHours(value: number): string {
-  return Number.isInteger(value) ? String(value) : value.toLocaleString('es-CO', { maximumFractionDigits: 1 });
 }

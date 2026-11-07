@@ -1,28 +1,18 @@
 // «Resultado» of a published piece: the 24 h / 72 h / 7 d cuts and who commented. A missing value is never 0.
 import type { PieceCommenter, PieceDetail, PieceSnapshot } from '../../api/types';
 import { Badge, ExternalLink, LabelChip, Section } from '../../components/ui';
-import { CONTACT_ROLE_LABEL, formatNumber, formatPct, formatTime, timeAgo } from '../../lib/format';
-import { dayOf, longDay } from './dates';
-import { CUT_HOURS, CUT_LABEL, publishedAt } from './piece';
-
-const CUTS: PieceSnapshot['kind'][] = ['24h', '72h', '7d'];
-const METRICS: { key: 'impressions' | 'reactions' | 'comments' | 'reposts'; label: string }[] = [
-  { key: 'impressions', label: 'Impresiones' },
-  { key: 'reactions', label: 'Reacciones' },
-  { key: 'comments', label: 'Comentarios' },
-  { key: 'reposts', label: 'Republicaciones' },
-];
-const ROLE_ORDER = ['comprador', 'par', 'recomendador', 'divulgador', 'lider', 'aliado'];
-
-const value = (n: number | null | undefined) => (typeof n === 'number' ? formatNumber(n, 0) : '—');
-const engagement = (n: number | null | undefined) => (typeof n === 'number' ? formatPct(n) : '—');
-
-/** A cut not read yet: «Aún no · Llega el lunes 9 de noviembre a las 09:00.», or «Sin dato» once its hour passed. */
-function pending(kind: PieceSnapshot['kind'], published: string, timeZone: string, now: number): { badge: string; text: string } {
-  const due = new Date(new Date(published).getTime() + CUT_HOURS[kind] * 3_600_000);
-  if (due.getTime() <= now) return { badge: 'Sin dato', text: 'El corte no se pudo leer a tiempo.' };
-  return { badge: 'Aún no', text: `Llega el ${longDay(dayOf(due, timeZone) ?? '')} a las ${formatTime(due.toISOString(), timeZone)}.` };
-}
+import { timeAgo } from '../../lib/format';
+import {
+  commenterRoles,
+  CUT_LABEL,
+  cutPending as pending,
+  engagementValue as engagement,
+  metricValue as value,
+  pieceUrl,
+  publishedAt,
+  RESULT_CUTS as CUTS,
+  RESULT_METRICS as METRICS,
+} from './piece';
 
 function CutCard({ kind, snapshot, published, timeZone, now }: { kind: PieceSnapshot['kind']; snapshot?: PieceSnapshot; published: string; timeZone: string; now: number }) {
   const title = `A ${CUT_LABEL[kind]}`;
@@ -102,25 +92,19 @@ function CutTable({ byKind, published, timeZone, now }: { byKind: Map<string, Pi
 function Commenters({ commenters }: { commenters: PieceCommenter[] | null | undefined }) {
   if (commenters === null || commenters === undefined) return <p className="t-detalle text-suave">Los comentarios aún no se han leído.</p>;
   if (!commenters.length) return <p className="t-detalle text-suave">Nadie ha comentado todavía.</p>;
-  const counts = new Map<string, number>();
-  for (const person of commenters) counts.set(person.role ?? '', (counts.get(person.role ?? '') ?? 0) + 1);
-  const roles = [...counts.keys()].filter(Boolean).sort((a, b) => {
-    const ia = ROLE_ORDER.indexOf(a);
-    const ib = ROLE_ORDER.indexOf(b);
-    return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-  });
+  const { roles, unclassified } = commenterRoles(commenters);
   return (
     <ul className="pz-chips" aria-label="Quién comentó, por rol">
-      {roles.map((role) => (
+      {roles.map(({ role, label, count }) => (
         <li key={role}>
           <LabelChip tone="info">
-            {CONTACT_ROLE_LABEL[role] ?? role} · {counts.get(role)}
+            {label} · {count}
           </LabelChip>
         </li>
       ))}
-      {counts.get('') ? (
+      {unclassified ? (
         <li>
-          <LabelChip tone="muted">Sin clasificar · {counts.get('')}</LabelChip>
+          <LabelChip tone="muted">Sin clasificar · {unclassified}</LabelChip>
         </li>
       ) : null}
     </ul>
@@ -130,7 +114,7 @@ function Commenters({ commenters }: { commenters: PieceCommenter[] | null | unde
 export function Resultado({ piece, timeZone, now, desktop }: { piece: PieceDetail; timeZone: string; now: number; desktop: boolean }) {
   const byKind = new Map((piece.snapshots ?? []).map((snapshot) => [snapshot.kind, snapshot]));
   const published = publishedAt(piece);
-  const url = piece.external_url || piece.metrics?.share_url || piece.action_detail?.execution?.external_url;
+  const url = pieceUrl(piece);
   const lastRead = typeof piece.metrics?.impressions === 'number' && !byKind.size ? piece.metrics : null;
   return (
     <Section label="Resultado" id="resultado" intro="Interacción = (reacciones + comentarios + republicaciones) / impresiones.">

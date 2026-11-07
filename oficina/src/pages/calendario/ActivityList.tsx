@@ -4,8 +4,8 @@ import { useActividad } from '../../api/hooks';
 import type { ActividadTipo, ActivityItem, CalendarLayer } from '../../api/types';
 import { Button, ChipStrip, EmptyState, ErrorRetry, FilterChip, Skeleton, Timeline, TimelineItem } from '../../components/ui';
 import { formatTime } from '../../lib/format';
-import { dayOf, longDayTitle, relativeDay, relativeDayInSentence } from './dates';
-import { itemLayer, itemLink, itemSentence, itemSub, reactionLabel, stateBadge, TIPOS } from './events';
+import { dayOf, longDayTitle, relativeDay } from './dates';
+import { isNetworkCapability, itemLayer, itemLink, itemSentence, itemSub, queuedSentence, queuedWhen, stateBadge, TIPOS } from './events';
 import { VetoButton } from './Veto';
 
 /** One activity item as a timeline row, with the post excerpt, the full comment and «Por qué» folded. */
@@ -44,35 +44,6 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
   );
 }
 
-/** «Comentario en el post de Elena Prueba»: an approved action waiting for the window or the spacing. */
-export function queuedSentence(item: ActivityItem): string {
-  const name = item.target?.name || '';
-  switch (item.capability) {
-    case 'INT-03':
-      return name ? `Comentario en el post de ${name}` : 'Comentario en un post';
-    case 'INT-02': {
-      const reaction = reactionLabel(item.reaction);
-      return `Reacción${reaction ? ` ${reaction}` : ''} al post${name ? ` de ${name}` : ''}`;
-    }
-    case 'RED-01':
-      return `Seguir a ${name || 'una persona'}`;
-    case 'RED-02':
-      return `Invitar a ${name || 'una persona'} (sin nota)`;
-    case 'RED-04':
-      return `Aceptar la invitación de ${name || 'una persona'}`;
-    default:
-      return name ? `${item.label}: ${name}` : item.label;
-  }
-}
-
-/** «Saldrá cuando abra la ventana, mañana a las 08:00». */
-export function queuedWhen(expectedAt: string | null, { today, timeZone, windowOpen }: { today: string; timeZone: string; windowOpen: boolean | undefined }): string {
-  if (!expectedAt) return 'Saldrá en cuanto lo permitan la ventana y el espaciado';
-  const day = dayOf(expectedAt, timeZone) ?? today;
-  const when = `${relativeDayInSentence(day, today)} a las ${formatTime(expectedAt, timeZone)}`;
-  return windowOpen === false ? `Saldrá cuando abra la ventana, ${when}` : `Saldrá ${when}, según el espaciado`;
-}
-
 /** A queued action with its Vetar (a network action discards the person). */
 export function QueuedRow({
   item,
@@ -95,7 +66,7 @@ export function QueuedRow({
       <VetoButton
         size="small"
         describedBy={titleId}
-        target={{ actionId: item.id, kind: 'accion', network: String(item.capability).startsWith('RED-'), person: item.target?.name }}
+        target={{ actionId: item.id, kind: 'accion', network: isNetworkCapability(item.capability), person: item.target?.name }}
       />
     </li>
   );
