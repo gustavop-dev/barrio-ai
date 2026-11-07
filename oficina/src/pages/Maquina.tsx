@@ -8,7 +8,7 @@ import type { Account, Control, Overview } from '../api/types';
 import { Badge, Empty, ErrorNote, Loading, Meter, Modal, PageHeader } from '../components/ui';
 import { actionStateLabel, capabilityLabel, formatDateTime, money, timeAgo } from '../lib/format';
 
-const ACCOUNT_STATUS: Record<string, string> = { running: 'Conectada', unknown: 'Sin comprobar' };
+const ACCOUNT_STATUS: Record<string, string> = { running: 'Conectada', unknown: 'Sin comprobar', token_expired: 'Token caducado' };
 
 const SOURCE_LABEL: Record<string, string> = {
   db: 'desde la app',
@@ -241,6 +241,11 @@ export function Maquina() {
   const spent = Number(data.today.llm_spent_usd);
   const cap = Number(data.today.llm_daily_cap_usd);
   const proposals = Object.entries(data.today.proposals).filter(([, n]) => n > 0);
+  // Only when the backend reports it: never a made-up budget.
+  const editorial =
+    data.today.editorial_llm_spent_usd !== undefined && data.today.editorial_llm_daily_cap_usd !== undefined
+      ? { spent: Number(data.today.editorial_llm_spent_usd), cap: Number(data.today.editorial_llm_daily_cap_usd) }
+      : null;
   return (
     <div className="stack">
       <PageHeader eyebrow="MÁQUINA AUTÓNOMA" title="Máquina">
@@ -271,6 +276,19 @@ export function Maquina() {
       <section className="card" aria-labelledby="today-title">
         <h2 id="today-title">Hoy</h2>
         <Meter label="Gasto LLM del día" value={spent} max={cap} display={`${money(spent)} de ${money(cap)}`} />
+        {editorial ? (
+          <>
+            <Meter
+              label="Gasto editorial del día"
+              value={editorial.spent}
+              max={editorial.cap}
+              display={`${money(editorial.spent)} de ${money(editorial.cap)}`}
+            />
+            <p className="muted small">
+              Presupuesto propio de la publicación diaria, separado del de comentarios. <Link to="/contenido">Ver el calendario de contenido</Link>
+            </p>
+          </>
+        ) : null}
         <Meter label="Borradores del día" value={data.today.drafts} max={data.today.drafts_daily_cap} />
         <p className="sectionlabel">PROPUESTAS DE HOY</p>
         {proposals.length ? (

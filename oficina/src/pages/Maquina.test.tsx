@@ -97,6 +97,38 @@ describe('Máquina · parada total', () => {
     expect(await within(screen.getByRole('dialog')).findByRole('alert')).toHaveTextContent('no se puede reanudar desde la app');
   });
 
+  it('shows the editorial budget and the own-publication cap only when the backend reports them', async () => {
+    const base = overview();
+    const withEditorial: Overview = {
+      ...base,
+      accounts: [
+        {
+          ...base.accounts[0]!,
+          id: 'acc-li',
+          label: 'LinkedIn oficial',
+          provider: 'linkedin',
+          paused: false,
+          paused_reason: '',
+          capacity: { 'CONT-09': { daily: 1, weekly: 7, daily_used: 0, weekly_used: 3, left: 1 } },
+        },
+      ],
+      today: { ...base.today, editorial_llm_spent_usd: '0.43', editorial_llm_daily_cap_usd: '1' },
+    };
+    fakeServer({ 'GET /api/v1/operador/overview': { body: withEditorial }, 'GET /api/v1/operador/feed': { body: [] } });
+    renderAt('/maquina', routes);
+    expect(await screen.findByRole('meter', { name: 'Gasto editorial del día' })).toHaveAttribute('aria-valuetext', expect.stringContaining('0,43'));
+    expect(screen.getByRole('link', { name: 'Ver el calendario de contenido' })).toHaveAttribute('href', '/contenido');
+    expect(screen.getByRole('meter', { name: 'Publicación propia esta semana' })).toHaveAttribute('aria-valuenow', '3');
+  });
+
+  it('invents no editorial data when the overview has none', async () => {
+    fakeServer({ 'GET /api/v1/operador/overview': { body: overview() }, 'GET /api/v1/operador/feed': { body: [] } });
+    renderAt('/maquina', routes);
+    expect(await screen.findByRole('meter', { name: 'Gasto LLM del día' })).toBeInTheDocument();
+    expect(screen.queryByRole('meter', { name: 'Gasto editorial del día' })).not.toBeInTheDocument();
+    expect(screen.queryByText(/calendario de contenido/)).not.toBeInTheDocument();
+  });
+
   it('shows capacity, LLM spend against its cap and resumes a paused account', async () => {
     const server = fakeServer({
       'GET /api/v1/operador/overview': { body: overview() },

@@ -69,6 +69,9 @@ export interface Overview {
     llm_daily_cap_usd: string;
     drafts: number;
     drafts_daily_cap: number;
+    // Daily own publication: separate editorial budget (absent on older backends).
+    editorial_llm_spent_usd?: string;
+    editorial_llm_daily_cap_usd?: string;
   };
   counts: { referents: number; posts: number; uncertain: number };
 }
