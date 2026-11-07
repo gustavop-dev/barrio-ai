@@ -3,18 +3,8 @@ import { useAccounts, useDeleteReferent, useReferents, useUpdateReferent } from 
 import type { Referent } from '../../api/types';
 import { IconPlus } from '../../components/icons';
 import { Badge, Button, ConfirmModal, EmptyState, ErrorRetry, ExternalLink, Modal, Note, Skeleton, useToast } from '../../components/ui';
-import { timeAgo } from '../../lib/format';
+import { observedAgo, referentName } from '../../../../compartido/src/logic/barrio';
 import { normalizeProfileUrl, useAddReferent, useObserveNow } from './api';
-
-/** «hace 3 h», «hace 12 días» (timeAgo switches to a full date after a week). */
-function observedAgo(iso: string): string {
-  const days = Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000);
-  return days >= 7 ? `hace ${days} días` : timeAgo(iso);
-}
-
-function referentName(referent: Referent): string {
-  return referent.display_name || referent.public_identifier || referent.profile_url || 'Referente';
-}
 
 function AddReferentModal({ account, onClose }: { account: string; onClose: () => void }) {
   const add = useAddReferent();

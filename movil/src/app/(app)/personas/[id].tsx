@@ -1,13 +1,13 @@
 import { useLocalSearchParams } from 'expo-router';
 import { DetailScreen } from '@/components/shell/DetailScreen';
-import { Placeholder } from '@/components/shell/Placeholder';
+import { PersonaScreen } from '@/personas/PersonaScreen';
 
 /** Ficha de una persona (the PWA's /personas/:id). */
-export default function PersonaScreen() {
+export default function PersonaRoute() {
   const { id } = useLocalSearchParams<{ id: string }>();
   return (
     <DetailScreen back="Personas" fallback="/personas">
-      <Placeholder testID="screen-persona" title="Ficha de la persona" subtitle={id ? `Persona ${id}` : undefined} />
+      <PersonaScreen contactId={id ?? ''} />
     </DetailScreen>
   );
 }

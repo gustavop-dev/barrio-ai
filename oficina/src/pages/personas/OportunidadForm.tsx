@@ -7,17 +7,12 @@ import type { Opportunity, OpportunityAttribution, OpportunityChannel, Opportuni
 import { OPPORTUNITY_STAGES } from '../../api/types';
 import { IconSearch } from '../../components/icons';
 import { Avatar, Button, ErrorRetry, Modal, Segmented, useToast } from '../../components/ui';
+import { initialModality, type OpportunityPerson, type PersonMode } from '../../../../compartido/src/logic/barrio';
 import { ATTRIBUTION_LABEL, CHANNEL_LABEL, fromDateInput, OPPORTUNITY_MODALITY_LABEL, OPPORTUNITY_STAGE_LABEL, toDateInput } from './labels';
 import './personas.css';
 
-/** The person the form starts with (Marcar como oportunidad, from the person card). */
-export interface OpportunityPerson {
-  id: string;
-  display_name: string;
-  headline?: string;
-  /** classification.modality: prefills the modality when it is one of the two business ones. */
-  modality?: string | null;
-}
+// The person the form starts with (Marcar como oportunidad, from the person card): shared with the native app.
+export type { OpportunityPerson };
 
 export interface OportunidadFormProps {
   /** Edit mode when given. */
@@ -29,17 +24,9 @@ export interface OportunidadFormProps {
   onSaved?: (opportunity: Opportunity) => void;
 }
 
-type PersonMode = 'red' | 'fuera';
-
 const MODALITIES = Object.keys(OPPORTUNITY_MODALITY_LABEL) as OpportunityModality[];
 const CHANNELS = Object.keys(CHANNEL_LABEL) as OpportunityChannel[];
 const ATTRIBUTIONS = Object.keys(ATTRIBUTION_LABEL) as OpportunityAttribution[];
-
-function initialModality(opportunity: Opportunity | null | undefined, person: OpportunityPerson | null | undefined): OpportunityModality | '' {
-  if (opportunity) return opportunity.modality;
-  const modality = person?.modality;
-  return modality === 'personal_startups' || modality === 'projectapp' ? modality : '';
-}
 
 /** Buscador de Personas: name or headline, two letters at least. */
 function PersonSearch({ onPick }: { onPick: (person: OpportunityPerson) => void }) {
