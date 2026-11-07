@@ -6,6 +6,7 @@
   "nombre": "Operador de la cuenta",
   "grupo": "operacion",
   "estado": "diseno_propuesto_no_activo",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "fecha": "2026-11-06",
   "proposito": {
     "mision": "Ser el único ejecutor de escrituras en LinkedIn (Unipile v2) y en la API oficial, y la pasarela de lectura de la cuenta: comprobar, ejecutar una sola vez, confirmar, conciliar y detener ante cualquier riesgo de la cuenta.",

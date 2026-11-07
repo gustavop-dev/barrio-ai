@@ -5,6 +5,7 @@
   "nombre": "Analista de barrio y resultados",
   "grupo": "observatorio",
   "estado": "propuesta_no_activa",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "proposito": {
     "mision": "Transformar escucha, respuestas y resultados reales en oportunidades editoriales, señales de participación para relaciones_comunidad y aprendizaje verificable.",
     "contribucion_al_objetivo_del_equipo": "Distinguir crecimiento, audiencia pertinente y resultados personales/ProjectApp para orientar el siguiente ciclo sin cambiar identidad por fluctuaciones.",

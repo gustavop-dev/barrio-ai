@@ -5,6 +5,7 @@
   "nombre": "Lector: Divulgador",
   "grupo": "lectores",
   "estado": "diseno_propuesto_no_activo",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "proposito": {
     "mision": "Evaluar claridad y valor transferible para quien comparte aprendizajes.",
     "contribucion_al_objetivo_del_equipo": "Oportunidades personales pertinentes en startups (60%) y contratos ProjectApp (40%), mediante autoridad y barrio relevante; no maximizar likes de forma aislada.",

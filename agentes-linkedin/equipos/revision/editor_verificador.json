@@ -5,6 +5,7 @@
   "nombre": "Editor y verificador",
   "grupo": "revision",
   "estado": "diseno_propuesto_no_activo",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "proposito": {
     "mision": "Determinar si una versión concreta (pieza, perfil, comentario, nota de invitación o mensaje) es suficientemente clara, fiel al brief o al hilo, demostrable y apta para ejecutarse: es la compuerta automática que la política autónoma exige antes de ejecutar cualquier texto.",
     "contribucion_al_objetivo_del_equipo": "Oportunidades personales pertinentes en startups (60%) y contratos ProjectApp (40%), mediante autoridad y barrio relevante; no maximizar likes de forma aislada.",

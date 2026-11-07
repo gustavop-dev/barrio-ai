@@ -5,6 +5,7 @@
   "nombre": "Copywriter A",
   "grupo": "editorial",
   "estado": "propuesta_no_activa",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "proposito": {
     "mision": "Proponer un borrador independiente, útil para el lector y fiel a la evidencia y a la voz del autor.",
     "contribucion_al_objetivo_del_equipo": "Construir autoridad de Gustavo como ingeniero de producto con criterio de negocio e IA pertinente; contribuir a oportunidades personales y ProjectApp diferenciadas.",

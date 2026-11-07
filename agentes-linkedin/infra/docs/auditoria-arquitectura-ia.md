@@ -93,8 +93,12 @@ Los 16 contratos de `agentes-linkedin/equipos/` son plantillas de 30–80 KB mar
 Tres problemas transversales:
 
 1. **Diseño y realidad divergen.** Quien lea los contratos no sabe qué hace la máquina, y aparecen roles sin contrato (el líder, el ruteador de capturas). Marcar en el índice el estado real de cada rol y enlazar cada contrato con la función y el prompt que lo implementan.
+   - *Hecho el 7 de noviembre.* `indice-agentes-v1.json` marca cada rol como activo, parcial o no implementado y enlaza su código, prompt, modelo y effort. Incluye el agente líder y el ruteador de capturas, que no tienen contrato.
+   - [mapa-agentes-runtime.md](mapa-agentes-runtime.md) lo explica por rol (contrato, código, prompt, modelo, effort, entradas, salidas, compuertas y diferencias) y dice dónde vive la etiqueta «operador de cuenta» del ruteador, que no se renombró porque la escena la guarda.
+   - Cada contrato lleva una línea `runtime` que apunta al mapa.
 2. **La regla contra experiencias inventadas se apaga con un solo hecho público.** `guardas.invented_experience` devuelve vacío en cuanto existe cualquier hecho público (`guardas.py:63`); desde ese momento un «I built…» solo lo frenan los dos modelos. La regla debería comparar la afirmación con los hechos.
 3. **No hay evaluaciones de calidad.** Las pruebas usan proveedores simulados y solo comprueban la mecánica. Sin evaluación no se puede cambiar de modelo, mover umbrales ni quitar el panel con seguridad. Para empezar bastan 20–30 casos por agente sacados del historial: piezas, descartes y vetos.
+   - *El arnés existe desde el 7 de noviembre:* `manage.py evaluar` ([evaluaciones-agentes.md](evaluaciones-agentes.md)).
 
 Conviene conservar: salidas estructuradas con esquema, texto de terceros tratado como datos, vigilancia de filtraciones de la orientación privada, ejecución exactamente una vez y preguntas a Gustavo solo por hechos que nadie más conoce.
 
@@ -120,7 +124,10 @@ Hecha en el PR #15. E4 (precio de lectura de caché por modelo) va en el mismo P
 
 **Fase 3: diseño y costo**
 
-- [ ] 20–30 casos de evaluación por agente, sacados del historial
+- [x] 20–30 casos de evaluación por agente, sacados del historial
+  - `manage.py evaluar` (`team_backend/evaluaciones.py`) arma los casos en el servidor a partir del historial, sin exportar datos. Califica de forma determinista al verificador, los comentarios, el clasificador y la ablación del panel; el director es solo descriptivo.
+  - Los conteos reales salen al correrlo en el servidor. La máquina produce desde el 6 de noviembre, así que al principio no habrá 20 casos por agente; el informe muestra cuántos faltan.
+  - Por defecto es un ensayo gratis que estima el coste. `--ejecutar` paga dentro de `--max-usd` y `EVAL_LIMIT_USD`. Una corrida completa de 30 casos por agente ronda los $20 con los modelos de producción.
 - [ ] Un solo artefacto de posicionamiento para director, clasificador y líder
 - [ ] Resultados de las piezas en el historial del director
 - [ ] Alerta si la aprobación del líder cae a cero en una capacidad

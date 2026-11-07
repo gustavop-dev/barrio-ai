@@ -5,6 +5,7 @@
   "nombre": "Investigador de referentes",
   "grupo": "observatorio",
   "estado": "propuesta_no_activa",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "proposito": {
     "mision": "Descubrir y contrastar referentes, comunidades, preguntas y señales pertinentes a la industria/nicho de Gustavo y sus dos vías.",
     "contribucion_al_objetivo_del_equipo": "Entregar lugares y asuntos concretos para aprender y aportar, incluyendo top voices verificables, líderes de nicho, pares y recomendadores, no solo cuentas grandes.",

@@ -5,6 +5,7 @@
   "nombre": "Director editorial",
   "grupo": "editorial",
   "estado": "propuesta_no_activa",
+  "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "proposito": {
     "mision": "Transformar dirección aprobada y evidencia del barrio en briefs, decisiones editoriales y un calendario defendibles.",
     "contribucion_al_objetivo_del_equipo": "Construir autoridad de Gustavo como ingeniero de producto con criterio de negocio e IA pertinente; contribuir a oportunidades personales y ProjectApp diferenciadas.",
