@@ -104,7 +104,8 @@ function Caps({ ajustes, overview, red, period }: { ajustes: Ajustes | undefined
 
 function Reads({ red }: { red: RedSummary }) {
   const rows = READS.filter(({ key }) => typeof red.read_caps?.[key] === 'number' && red.read_caps[key]! > 0);
-  if (!rows.length) return null;
+  const execution = red.reads_today?.execution;
+  if (!rows.length && typeof execution !== 'number') return null;
   return (
     <div className="aj-block" role="group" aria-label="Lecturas de la red">
       <p className="section-label">Lecturas de la red</p>
@@ -119,6 +120,9 @@ function Reads({ red }: { red: RedSummary }) {
             </Row>
           );
         })}
+        {typeof execution === 'number' ? (
+          <Row label="Comprobaciones antes y después de escribir">{execution} hoy · sin tope: ninguna escritura sale sin ellas</Row>
+        ) : null}
       </div>
     </div>
   );

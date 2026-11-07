@@ -135,7 +135,8 @@ DESCRIPTIONS={'observe':'Leyendo publicaciones de referentes','propose_comment':
               'collect_metrics':'Midiendo los posts y la audiencia','process_capture':'Leyendo lo que enviaste al equipo'}
 STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',
                     'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
-                    'verificador':'Verificando afirmaciones, voz y privacidad'}
+                    'verificador':'Verificando afirmaciones, voz y privacidad',
+                    'reparacion':'Corrigiendo la versión final con los hallazgos'}
 
 def _roles(job):
     """Roles doing the job. A running editorial job shows only the stage's roles (no query for finished jobs)."""

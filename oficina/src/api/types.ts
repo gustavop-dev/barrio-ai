@@ -335,7 +335,7 @@ export interface NetworkCapacity extends CapacityInfo {
   mode: AutonomyMode;
 }
 
-export type NetworkRead = 'comments' | 'search' | 'profile' | 'sync';
+export type NetworkRead = 'comments' | 'search' | 'profile' | 'sync' | 'execution';
 
 /** `GET /api/v1/red/summary`. */
 export interface RedSummary {
