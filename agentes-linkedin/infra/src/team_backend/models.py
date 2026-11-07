@@ -703,3 +703,31 @@ class Conversation(models.Model):
         ordering=['-last_message_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_chat_id'],name='unique_conversation_per_account')]
     def __str__(self):return self.attendee_name or self.provider_chat_id
+
+
+class WeeklySummary(models.Model):
+    """analista_barrio_resultados (resumen_semanal.py): the results of one local ISO week (Monday to Sunday) and the
+    analysis written from them. One per week. Only Gustavo's decision turns its proposed orientation into the team's."""
+    class State(models.TextChoices):
+        NEW='nuevo','Nuevo'
+        SEEN='visto','Visto'
+        APPLIED='aplicado','Usado como orientación'
+        DISCARDED='descartado','Descartado'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    week_start=models.DateField(unique=True)
+    # Deterministic figures of the week and the one before; null means no data, never zero.
+    stats=models.JSONField(default=dict,blank=True)
+    # {titular, lo_que_funciono, lo_que_no, recomendaciones, orientacion_propuesta, advertencias, validacion}.
+    analysis=models.JSONField(default=dict,blank=True)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.NEW,db_index=True)
+    usage=models.JSONField(default=dict,blank=True)
+    cost_usd=models.DecimalField(max_digits=12,decimal_places=6,null=True,blank=True)
+    # «Usar como orientación»: the orientation it replaced, so «Deshacer» can put it back.
+    previous_orientation=models.TextField(blank=True)
+    decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    decided_at=models.DateTimeField(null=True,blank=True)
+    origin_job=models.CharField(max_length=40,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:ordering=['-week_start']
+    def __str__(self):return f'{self.week_start} · {self.get_state_display()}'

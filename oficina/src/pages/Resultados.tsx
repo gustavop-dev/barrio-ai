@@ -6,6 +6,7 @@ import { ErrorRetry, Page, Section, Skeleton } from '../components/ui';
 import { formatTime } from '../lib/format';
 import { shortDate } from './personas/labels';
 import { OportunidadForm } from './personas/OportunidadForm';
+import { ResumenSemanal } from './resultados/ResumenSemanal';
 import { Contenido, Equipo, Gente, Negocio, SectionBoundary } from './resultados/sections';
 import './resultados/resultados.css';
 
@@ -83,7 +84,7 @@ function Compact<T extends string | number>({ label, value, options, onChange }:
   );
 }
 
-/** /resultados: «¿vamos bien?» in the order business → audience → content → team. */
+/** /resultados: the weekly summary, then «¿vamos bien?» in the order business → audience → content → team. */
 export function Resultados() {
   const [params, setParams] = useSearchParams();
   const dias = readDias(params.get('dias'));
@@ -115,6 +116,8 @@ export function Resultados() {
 
   return (
     <Page title="Resultados">
+      <ResumenSemanal />
+
       <div className="res-controls">
         <div className="res-selects">
           <Compact label="Periodo" value={dias} options={PERIODS} onChange={(value) => set('dias', value, '28')} />

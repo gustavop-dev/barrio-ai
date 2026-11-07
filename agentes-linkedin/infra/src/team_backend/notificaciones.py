@@ -33,6 +33,7 @@ FEED_KINDS={
     'capture_processed':('tuyo',False,'Captura procesada'),
     'machine_paused_env':('sistema',True,'Máquina detenida desde el servidor'),
     'lead_silent':('sistema',True,'El líder no aprueba nada en una capacidad'),
+    'weekly_summary':('tuyo',True,'Resumen de la semana listo'),
 }
 
 def push_enabled(kind):

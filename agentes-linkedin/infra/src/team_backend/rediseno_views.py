@@ -186,6 +186,18 @@ def _conversation_card(conversation,now):
                  agent='conversaciones_inbox',priority='importante',created_at=conversaciones._at(inbound.get('at')) if inbound else conversation.last_message_at,
                  conversation=dict(conversaciones.payload(conversation,now),person=person))
 
+def _summary_card(summary):
+    """«El analista propone una orientación» (cuando puedas): only while the latest weekly summary's proposal waits for
+    Gustavo. He decides in Resultados, where «Usar como orientación» can be undone; here he can only open it or discard it."""
+    from . import resumen_semanal
+    analysis=summary.analysis or {}
+    return _card(f'weekly_summary:{summary.id}','resumen','El analista propone una orientación',analysis.get('orientacion_propuesta') or '',
+                 [{'label':'Ver el resumen','href':'/resultados#resumen','primary':True},
+                  {'label':'Descartar','endpoint':f'/api/v1/resultados/resumen-semanal/{summary.id}/descartar'}],
+                 agent=resumen_semanal.ROLE,priority='cuando_puedas',created_at=summary.created_at,
+                 summary={'id':str(summary.id),'week_start':summary.week_start,'label':resumen_semanal.payload(summary)['label'],
+                          'titular':analysis.get('titular')})
+
 def _question_priority(q,now):
     """Rises to Importante when less than 48 h remain before its deadline (rev 18 «Escalada»)."""
     return 'importante' if q.deadline and now<=q.deadline<=now+timedelta(hours=48) else 'cuando_puedas'
@@ -241,10 +253,13 @@ class TuTurno(APIView):
         later_q=[q for q in open_questions if not preguntas.is_pending(q,now)]
         from . import conversaciones
         conversation_cards=[_conversation_card(c,now) for c in conversaciones.needing_gustavo(now)]
-        tasks={'perfil':[],'conversaciones':conversation_cards}  # profile cycle (PERF): a later phase of the plan
+        from . import resumen_semanal
+        summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal()] if s]
+        tasks={'perfil':[],'conversaciones':conversation_cards,'resumen':summary_cards}  # profile cycle (PERF): a later phase of the plan
         question_cards=[_question_card(q,now) for q in pending];later=[_question_card(q,now) for q in later_q]
-        seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in warnings+question_cards+conversation_cards]).values_list('item_id',flat=True))
-        items=_ordered(_with_state(warnings+question_cards+conversation_cards,seen));_with_state(later,seen)
+        cards=warnings+question_cards+conversation_cards+summary_cards
+        seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
+        items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]
         return Response({'count':len(active),'critical':any(c['priority']=='urgente' for c in active),
                          'urgent_count':sum(1 for c in active if c['priority']=='urgente'),

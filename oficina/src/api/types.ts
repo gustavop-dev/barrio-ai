@@ -707,7 +707,8 @@ export interface Activity {
 
 // ---------------------------------------------------------------- Tu turno
 
-export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion';
+/** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados). */
+export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion' | 'resumen';
 export type TurnoTone = 'bad' | 'warn' | 'info' | 'ok' | 'muted';
 
 /** A card action: either a POST (`endpoint` + `body`, plus `note` when `note_required`) or a full navigation (`href`). */
@@ -815,7 +816,7 @@ export interface TuTurno {
   questions: TurnoCard[];
   /** Postponed or expired questions (muted tone). */
   later: TurnoCard[];
-  tasks: { perfil: TurnoCard[]; conversaciones: TurnoCard[] };
+  tasks: { perfil: TurnoCard[]; conversaciones: TurnoCard[]; resumen?: TurnoCard[] };
   recent: TurnoRecent[];
   summary: { done_today: DoneToday; next_piece: { id: string; scheduled_for: string } | null };
   /** Unread items in Notificaciones, for the bell dot (being added to the backend). */
@@ -1243,4 +1244,76 @@ export interface Resultados {
       definition: string;
     };
   };
+}
+
+// ---------------------------------------------------------------- weekly summary (Resultados › Resumen de la semana)
+
+/** A claim of the analysis, tied to the figure of the stats it rests on (`cifra`). */
+export interface WeeklySummaryItem {
+  texto: string;
+  cifra: string;
+}
+
+export interface WeeklySummaryAnalysis {
+  titular: string;
+  lo_que_funciono: WeeklySummaryItem[];
+  lo_que_no: WeeklySummaryItem[];
+  recomendaciones: WeeklySummaryItem[];
+  /** Only when the data supports a change; Gustavo decides. */
+  orientacion_propuesta: string | null;
+  advertencias: string[];
+  /** What the number validator dropped (claims quoting figures that are not in the stats). */
+  validacion?: { ok: boolean; descartado: { campo: string; texto: string; cifras_no_encontradas: string[]; sin_cifra: boolean }[] };
+}
+
+export type WeeklySummaryState = 'nuevo' | 'visto' | 'aplicado' | 'descartado';
+
+export interface WeeklySummary {
+  id: string;
+  week_start: string;
+  week_end: string;
+  /** «Semana del 2 al 8 de noviembre». */
+  label: string;
+  state: WeeklySummaryState;
+  state_label: string;
+  analysis: WeeklySummaryAnalysis;
+  model: string | null;
+  cost_usd: number | null;
+  created_at: string;
+  decided_at: string | null;
+  decided_by: string | null;
+  /** Applied or discarded: «Deshacer» can still put it back. */
+  can_undo: boolean;
+}
+
+/** «Generar ahora»: offered while the last week has no summary and none is being prepared. */
+export interface WeeklySummaryGenerate {
+  week_start: string;
+  week_end: string;
+  label: string;
+  available: boolean;
+  reason: string | null;
+  pending: boolean;
+  last_error: string | null;
+  automatic: boolean;
+  automatic_at: string | null;
+  estimated_usd: number;
+  max_usd: number;
+}
+
+export interface WeeklySummaries {
+  latest: WeeklySummary | null;
+  previous: WeeklySummary[];
+  generate: WeeklySummaryGenerate;
+}
+
+export interface WeeklySummaryDecision {
+  summary: WeeklySummary;
+  orientation?: Orientation;
+  previous_orientation?: string | null;
+}
+
+export interface WeeklySummaryGenerateResponse {
+  week_start: string;
+  job: Job;
 }

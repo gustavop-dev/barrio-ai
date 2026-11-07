@@ -66,7 +66,13 @@ export function compareCards(a: TurnoCard, b: TurnoCard, now: number = Date.now(
 /** Active cards: `items` when the backend sends it (already ordered); otherwise every section, ordered here. */
 export function activeCards(data: TuTurno, now: number = Date.now()): TurnoCard[] {
   if (Array.isArray(data.items)) return data.items;
-  const all = [...(data.alerts ?? []), ...(data.questions ?? []), ...(data.tasks?.perfil ?? []), ...(data.tasks?.conversaciones ?? [])];
+  const all = [
+    ...(data.alerts ?? []),
+    ...(data.questions ?? []),
+    ...(data.tasks?.perfil ?? []),
+    ...(data.tasks?.conversaciones ?? []),
+    ...(data.tasks?.resumen ?? []),
+  ];
   return all.sort((a, b) => compareCards(a, b, now));
 }
 
