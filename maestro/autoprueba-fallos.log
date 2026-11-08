@@ -1,0 +1,6 @@
+Running on test
+ > Flow Autoprueba del interruptor de fallos
+Run ../../movil/.maestro/comun/qa-fallo.js... COMPLETED
+Run autoprueba-fallos.js... COMPLETED
+Run ../../movil/.maestro/comun/qa-fallos-limpiar.js... COMPLETED
+Run autoprueba-fallos.js... COMPLETED

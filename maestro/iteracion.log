@@ -1,0 +1,9 @@
+Starting: Intent { act=android.intent.action.VIEW dat=oficina0ff1ce://expo-development-client/... pkg=co.projectapp.office }
+Status: ok
+LaunchState: COLD
+Activity: co.projectapp.office/.MainActivity
+TotalTime: 1605
+WaitTime: 1617
+Complete
+/home/runner/work/barrio-ai/barrio-ai/agentes-linkedin/infra/media/galeria/2026/11/8ee66630ba594e63b25b187a01bd2ceb.png: 1 file pushed, 0 skipped. 8.9 MB/s (661 bytes in 0.000s)
+[qa-sesion] 11-ajustes: código 0

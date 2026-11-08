@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<testsuites>
+  <testsuite name="Test Suite" device="test" tests="1" failures="0" time="194.046" timestamp="2026-11-08T19:35:32">
+    <testcase id="Ajustes" name="Ajustes" classname="Ajustes" file="/home/runner/work/_temp/qa-sesion/iteracion.OKR3J5/flujos/11-ajustes.yaml" time="193.975" timestamp="2026-11-08T19:35:32" status="SUCCESS">
+      <properties>
+        <property name="tags" value="ajustes"/>
+      </properties>
+    </testcase>
+  </testsuite>
+</testsuites>

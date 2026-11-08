@@ -1,0 +1,24 @@
+Starting project at /home/runner/work/barrio-ai/barrio-ai/movil
+Using src/app as the root directory for Expo Router.
+Starting Metro Bundler
+
+Waiting on http://localhost:8081
+
+Logs for your project will appear below.
+TypeScript: The tsconfig.json#include property has been updated
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Android Bundled 59872ms node_modules/expo-router/entry.js (2407 modules)
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Android Bundled 29669ms node_modules/expo-router/entry.js (2407 modules)
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Android Bundled 748ms node_modules/expo-router/entry.js (1 module)
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Android Bundled 594ms node_modules/expo-router/entry.js (1 module)
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Android Bundled 1150ms node_modules/expo-router/entry.js (1 module)
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Warning: Unable to resolve manifest assets. Icons and fonts might not work. This operation was aborted.
+Android Bundled 735ms node_modules/expo-router/entry.js (1 module)

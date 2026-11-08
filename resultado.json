@@ -1,0 +1,16 @@
+{
+  "sha": "895b19b3d1035409381542bb092a2245d9906c7e",
+  "rama": "prueba/sesion-en-vivo",
+  "estado": "error",
+  "mensaje": "No se pudo leer la rama en tres intentos; revisa si fue eliminada o falló GitHub.",
+  "inicio": 1794166499,
+  "fin": 1794166814,
+  "flujos": [
+    {
+      "flujo": "11-ajustes",
+      "codigo": 0,
+      "segundos": 207,
+      "fallo": ""
+    }
+  ]
+}
