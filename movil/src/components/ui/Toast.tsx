@@ -170,9 +170,12 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
     return () => clearTimeout(timer);
   }, [toast, leave]);
 
-  // After the commit that took a toast off the screen, what waited for it goes (a veto, calendario/pendingVeto.ts).
+  // Once a toast that left without its undo has faded out (ToastCard keeps it `durations.fast`), what waited for it
+  // goes (a veto, calendario/pendingVeto.ts): «Deshacer» is never on screen when the action is sent.
   useEffect(() => {
-    for (const gone of expired.current.splice(0)) gone.onExpire?.();
+    const due = expired.current.splice(0);
+    if (!due.length) return;
+    setTimeout(() => due.forEach((gone) => gone.onExpire?.()), durations.fast + 20);
   }, [toast]);
 
   const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
