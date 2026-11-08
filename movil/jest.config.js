@@ -1,7 +1,10 @@
 // Jest for the native app and for compartido/ (shared with the PWA), with Expo's preset.
 // The aliases mirror tsconfig.json and metro.config.js; `modulePaths` lets compartido/ (no
 // node_modules of its own) resolve TanStack Query from this app.
-module.exports = {
+const path = require('node:path');
+
+const app = {
+  rootDir: __dirname,
   preset: 'jest-expo',
   // Reanimated (and worklets) run their web implementation under Jest.
   resolver: 'react-native-reanimated/jest/resolver',
@@ -16,5 +19,29 @@ module.exports = {
   setupFilesAfterEnv: ['<rootDir>/jest.setup.tsx'],
   clearMocks: true,
   restoreMocks: true,
+};
+
+// Coverage (`npm test -- --coverage`, always on in CI) is report-only: no thresholds.
+// Jest only measures files under the root config's `rootDir`, and compartido/ sits next to movil/,
+// so the root is the repository and this app is its only project (same tests, same settings).
+// V8 coverage, because the Babel instrumenter skips every file outside the project's own rootDir.
+module.exports = {
+  rootDir: path.resolve(__dirname, '..'),
+  projects: [app],
   testTimeout: 20_000,
+  coverageProvider: 'v8',
+  // Relative to the repository: movil/src and compartido/src, without tests, fixtures or helpers.
+  collectCoverageFrom: [
+    'movil/src/**/*.{ts,tsx}',
+    'compartido/src/**/*.{ts,tsx}',
+    '!**/*.test.{ts,tsx}',
+    '!**/*.suite.ts',
+    '!**/*.d.ts',
+    '!movil/src/test/**',
+    '!compartido/src/fixtures/**',
+    '!compartido/src/scene/testAPI.ts',
+    '!**/diseno-movimiento/**',
+  ],
+  coverageDirectory: path.join(__dirname, 'coverage'),
+  coverageReporters: ['text-summary', 'json-summary', 'lcov'],
 };

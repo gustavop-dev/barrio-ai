@@ -77,7 +77,118 @@ El build tarda unos 10 a 15 minutos. Al terminar, EAS da un enlace y un QR para 
 
 Los dos perfiles compilan solo para `arm64-v8a`, la arquitectura de casi todos los Android actuales (`ORG_GRADLE_PROJECT_reactNativeArchitectures` en `eas.json`). Con las cuatro arquitecturas por defecto, el compilador de C++ de Skia se quedaba sin memoria en la máquina gratuita de EAS («Killed» en la fase Run gradlew).
 
-Cada versión nueva de la app es un `build` nuevo y se reinstala encima, sin perder la sesión. Más adelante se puede añadir `expo-updates` para mandar cambios sin reinstalar. Las notificaciones push en el APK necesitan además las credenciales de FCM (Firebase), que se cargan en EAS con `npx eas-cli@latest credentials`.
+Un APK nuevo se instala encima del anterior, sin perder la sesión. Solo hace falta cuando cambia algo nativo: los cambios de JavaScript llegan solos como actualización OTA (sección siguiente). Las notificaciones push en el APK necesitan además las credenciales de FCM (Firebase), que se cargan en EAS con `npx eas-cli@latest credentials`.
+
+## Actualizaciones OTA (sin reinstalar el APK)
+
+Desde el próximo APK, la app trae `expo-updates`. Los cambios de JavaScript llegan solos al teléfono, sin compilar ni reinstalar: es una actualización OTA («over the air») de EAS Update.
+
+### Cómo funciona
+
+- Cada APK lleva dentro su canal (`channel` en `eas.json`): `preview` si sale del perfil `preview`, `production` si sale del perfil `production`.
+- Al abrirse, la app pregunta a `https://u.expo.dev/<projectId>` (`updates.url` en `app.json`) si hay una actualización más nueva para su canal y su `runtimeVersion`.
+- Si la hay, la descarga en segundo plano y la usa **en el siguiente arranque**. La app nunca espera a la red para arrancar: son los valores por defecto, `checkAutomatically: ON_LOAD` y `fallbackToCacheTimeout: 0`.
+- Para verla ya, cierra la app del todo y vuelve a abrirla. A veces hace falta dos veces: una la descarga y la otra la aplica.
+- Cada canal lee la rama de EAS Update con su mismo nombre: el canal `preview` lee la rama `preview`.
+
+### Quién publica: GitHub Actions
+
+`.github/workflows/eas-update.yml` publica en la rama `preview`:
+
+- en cada push a `main` que cambie `movil/` o `compartido/` (salvo los `.md` y `diseno-movimiento/`);
+- a mano, desde Actions › «Actualización OTA (preview)» › Run workflow.
+
+Antes de publicar repite las comprobaciones del job `movil` de CI (tipos, lint y pruebas) sobre ese commit. Si fallan, no publica nada. Después corre:
+
+```bash
+npx eas-cli@latest update --branch preview --environment preview --platform android \
+  --non-interactive --message "<asunto del commit>"
+```
+
+- `--environment` es obligatorio desde el SDK 55: elige qué variables de entorno de EAS se usan. Hoy no hay ninguna.
+- `eas update` no lee el `env` de los perfiles de `eas.json`. `EXPO_PUBLIC_API_URL` se queda en su valor por defecto, `https://office.projectapp.co` (`src/api/config.ts`), el mismo que usa el APK. Para cambiarlo en las OTA, crea la variable en expo.dev para el entorno `preview`.
+- Solo Android: todavía no hay build de iOS.
+- Sin el secreto `EXPO_TOKEN`, el workflow termina en verde con un aviso y no publica nada.
+
+Producción no publica sola. Cuando haya builds de `production`, se publica a mano desde `movil/`:
+
+```bash
+npx eas-cli@latest update --channel production --environment production --platform android --message "…"
+```
+
+### `runtimeVersion`: política `fingerprint`
+
+`app.json` lleva `"runtimeVersion": { "policy": "fingerprint" }`. Expo calcula un hash de todo lo que afecta al código nativo: las dependencias con código nativo y sus versiones, los plugins y campos nativos de `app.json`, y el SDK.
+
+- Ese hash es la `runtimeVersion` del APK y de cada actualización.
+- Una actualización solo llega a los APK que tienen el mismo hash.
+- Si un cambio toca lo nativo, el hash cambia. La actualización se publica igual, pero ningún APK instalado la recibe hasta que se compila uno nuevo. Así, una OTA nunca llama a código nativo que el APK no tiene.
+
+La otra opción era `appVersion`, donde la `runtimeVersion` es el campo `version` de `app.json`. Con ella hay que acordarse de subir `version` cada vez que cambia algo nativo. Si se olvida, la OTA llega a un APK incompatible y la app falla al usar ese código. Con `fingerprint` no hay nada que recordar, y el `versionCode` que sube EAS en cada build de producción no cambia el hash. El precio es compilar un APK cada vez que cambia algo nativo, que es justo cuando hace falta.
+
+### ¿APK nuevo o actualización OTA?
+
+| Cambio | Cómo llega |
+|---|---|
+| Código de `movil/src` o `compartido/src`: pantallas, textos, estilos, lógica, hooks | OTA |
+| Imágenes y fuentes que se importan desde el código | OTA |
+| Una dependencia solo de JavaScript, sin código nativo | OTA |
+| Instalar, quitar o actualizar un módulo nativo: un `expo-*` con código nativo, un `react-native-*`, Skia… | APK nuevo |
+| Subir el SDK de Expo o la versión de React Native | APK nuevo |
+| Campos nativos de `app.json`: `plugins`, permisos, `android.*`, icono, splash, nombre, `scheme`, `updates`, `runtimeVersion` | APK nuevo |
+| La compilación en `eas.json` (perfiles, `env`, arquitecturas) y las credenciales, como FCM | APK nuevo |
+
+Si dudas, compara el hash del proyecto con el de un build:
+
+```bash
+npx eas-cli@latest fingerprint:compare --build-id <id del build>
+```
+
+El log de `eas update` muestra la `runtimeVersion` publicada, y expo.dev › Updates indica si algún build la comparte.
+
+### El primer APK con OTA
+
+Los APK compilados antes de este cambio no tienen `expo-updates` y no reciben nada. El primero con OTA será el próximo `npx eas-cli@latest build -p android --profile preview` desde `main`. Se instala una vez encima del anterior y, desde ahí, recibe las actualizaciones.
+
+### Preparar el token (una vez)
+
+1. En expo.dev, con la cuenta `gustavoperez`, abre https://expo.dev/settings/access-tokens y pulsa **Create token**. Ponle un nombre como `github-barrio-ai` y copia el token: solo se muestra una vez.
+2. En GitHub, abre `gustavop-dev/barrio-ai` › Settings › Secrets and variables › Actions › **New repository secret**. Nombre: `EXPO_TOKEN`. Valor: el token.
+   - Desde la terminal también vale: `gh secret set EXPO_TOKEN --repo gustavop-dev/barrio-ai`, y pega el token cuando lo pida.
+3. Si el token se filtra, revócalo en la misma página de expo.dev y crea otro.
+
+El token nunca va en el repositorio ni en `eas.json`.
+
+### Ver y deshacer
+
+Desde `movil/`:
+
+```bash
+npx eas-cli@latest update:list --branch preview       # lo publicado
+npx eas-cli@latest channel:view preview               # qué rama sirve el canal
+npx eas-cli@latest update:rollback                    # interactivo: la actualización anterior o el código del APK
+npx eas-cli@latest update:roll-back-to-embedded --branch preview --platform android --message "Vuelta al APK"
+npx eas-cli@latest update:republish --group <id>      # vuelve a publicar una actualización concreta
+npx eas-cli@latest channel:pause preview              # deja de servir actualizaciones (channel:resume las reanuda)
+```
+
+- `update:rollback` vuelve a publicar la actualización anterior. Si no hay ninguna, vuelve al código del APK.
+- `update:roll-back-to-embedded` hace que los teléfonos vuelvan a usar el código que trae el APK.
+- Los teléfonos reciben la vuelta atrás como cualquier actualización: al abrir la app, y se ve en el siguiente arranque.
+- La siguiente publicación, por ejemplo el próximo push a `main`, vuelve a llegar a todos.
+- Si una actualización hace fallar la app al arrancar, `expo-updates` intenta volver solo a la última que funcionaba.
+
+### Criterios de aceptación: actualizaciones OTA
+
+- [ ] El APK del perfil `preview` lleva el canal `preview` y `runtimeVersion` con la política `fingerprint`. El del perfil `production` lleva el canal `production`.
+- [ ] Un push a `main` que cambia `movil/src` o `compartido/src` publica una actualización en la rama `preview`, con el asunto del commit como mensaje.
+- [ ] Si los tipos, el lint o las pruebas fallan en ese commit, no se publica nada.
+- [ ] Sin el secreto `EXPO_TOKEN`, el workflow termina en verde, con un aviso, sin publicar.
+- [ ] Un cambio solo de JavaScript llega a un APK `preview` ya instalado sin reinstalarlo: se ve después de cerrar y abrir la app, como mucho dos veces.
+- [ ] Un cambio nativo (un módulo nativo nuevo o un campo nativo de `app.json`) cambia el fingerprint. Su actualización no llega a los APK anteriores, que siguen funcionando con su propio código.
+- [ ] La app arranca sin esperar a la red, también sin conexión.
+- [ ] `update:rollback` o `update:roll-back-to-embedded` devuelve los teléfonos a la versión anterior en el siguiente arranque.
+- [ ] No hay tokens ni secretos en el repositorio.
 
 ## Qué funciona en Expo Go y qué necesitará una build de desarrollo
 
@@ -107,9 +218,10 @@ No hay cuentas de Expo ni builds de EAS hechas: eso le toca a Gustavo con su cue
 
 ```
 movil/
-  app.json              nombre, esquema, icono, splash, permisos, plugins
+  app.json              nombre, esquema, icono, splash, permisos, plugins, OTA (updates, runtimeVersion)
+  eas.json              perfiles de EAS Build (preview: APK, production: AAB) y sus canales OTA
   metro.config.js       vigila ../compartido y define los alias @/ y @compartido/
-  jest.config.js        jest-expo, con los mismos alias
+  jest.config.js        jest-expo, con los mismos alias y la cobertura de movil y compartido
   MOTION.md             todos los tokens de movimiento y dónde se usan
   src/
     app/                rutas de Expo Router (login, (app)/(tabs)/…, detalles)
@@ -153,6 +265,7 @@ Desde aquí se le pasan el lint, el chequeo de tipos y las pruebas, y la PWA vue
 npm run typecheck    # tsc (movil + compartido)
 npm run lint         # eslint (movil + compartido)
 npm test             # jest: movil y compartido, con red y módulos nativos simulados
+npm test -- --coverage  # lo mismo con cobertura (V8) en coverage/: lcov-report/index.html
 npm run export       # npx expo export --platform android: prueba que el paquete se construye
 npm run doctor       # npx expo-doctor (versión fija)
 npm run icons        # regenera iconos, splash y retratos desde oficina/public/brand

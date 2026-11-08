@@ -35,3 +35,14 @@ team_backend = ["migrations/*.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# CI: `coverage run manage.py test team_backend.tests`, then `coverage report` and `coverage xml`.
+# Report-only (no fail_under). Every module under src/ counts, imported by the tests or not.
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = ["*/tests/*", "*/migrations/*"]
+relative_files = true
+
+[tool.coverage.report]
+skip_empty = true
