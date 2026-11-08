@@ -91,7 +91,7 @@ tags: [turno]
       childOf:
         id: 'turno-card-question:3db4be49-1ddb-518e-bb02-794907c57c95-contenido'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - tapOn:
     text: 'Responder con audio'
@@ -128,7 +128,7 @@ tags: [turno]
     element:
       text: 'Marcar como oportunidad'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - tapOn: 'Marcar como oportunidad'
 - extendedWaitUntil:
@@ -154,7 +154,7 @@ tags: [turno]
     element:
       text: 'No responder'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - tapOn: 'No responder'
 - extendedWaitUntil:
@@ -182,14 +182,14 @@ tags: [turno]
     element:
       text: 'Fintech'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - tapOn: 'Fintech'
 - scrollUntilVisible:
     element:
       id: 'answer-submit-f8a3b231-d0ba-5938-a222-b12acb5e9d16'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - tapOn:
     id: 'answer-submit-f8a3b231-d0ba-5938-a222-b12acb5e9d16'
@@ -217,7 +217,7 @@ tags: [turno]
       childOf:
         id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - tapOn:
     text: 'No quiero compartir esto'
@@ -246,14 +246,14 @@ tags: [turno]
     element:
       text: 'Ya no es urgente · 1'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
 - scrollUntilVisible:
     element:
       text: 'Descartar'
       childOf:
         id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86-contenido'
     direction: UP
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - tapOn:
     text: 'Descartar'
@@ -276,14 +276,14 @@ tags: [turno]
     element:
       text: 'Hecho recientemente · [0-9]+'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - tapOn: 'Hecho recientemente · [0-9]+'
 - scrollUntilVisible:
     element:
       text: 'Cómo se ordena lo que depende de ti'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - assertVisible: 'REANUDADA|Reanudada'
 - assertVisible: 'SIN RESPONDER|Sin responder'

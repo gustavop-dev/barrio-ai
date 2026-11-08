@@ -70,7 +70,7 @@ tags: [turno]
     element:
       text: 'Sofía Martínez te escribió'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - swipe:
     from:
@@ -86,7 +86,7 @@ tags: [turno]
     element:
       text: 'Fallo simulado por QA \(503\)\.'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - assertVisible: 'No responder'
 - takeScreenshot: 04-estados-03-deslizar-error

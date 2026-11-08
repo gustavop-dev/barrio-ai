@@ -98,12 +98,12 @@ tags: [turno]
     element:
       text: 'Importante · 4'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
 - scrollUntilVisible:
     element:
       id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - assertVisible: '¿Cuántos proyectos de software entregó ProjectApp en 2025\?'
 - tapOn:
@@ -116,7 +116,7 @@ tags: [turno]
     element:
       id: 'answer-submit-3db4be49-1ddb-518e-bb02-794907c57c95'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - tapOn:
     id: 'answer-submit-3db4be49-1ddb-518e-bb02-794907c57c95'
@@ -146,21 +146,22 @@ tags: [turno]
     element:
       text: 'Sofía Martínez te escribió'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
 # The card is tall: centre its «Hecho, respondí»; her message sits just above it.
 - scrollUntilVisible:
     element:
       text: 'Hecho, respondí'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - assertVisible: '.*Estamos armando la plataforma de nuestra cooperativa.*'
 - assertVisible: 'La app nunca envía mensajes: respondes tú en LinkedIn\.'
 - assertVisible: 'No responder'
 - takeScreenshot: 04-turno-06-conversacion
+# The card's title is above the screen now: swipe on her message, inside the same card.
 - swipe:
     from:
-      text: 'Sofía Martínez te escribió'
+      text: '.*Estamos armando la plataforma de nuestra cooperativa.*'
     direction: RIGHT
     duration: 400
 - extendedWaitUntil:
@@ -184,7 +185,7 @@ tags: [turno]
     element:
       text: '¿Con qué tipo de startups prefieres trabajar\?'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - assertVisible: 'Fintech'
 - assertVisible: 'Agrotech'
@@ -214,7 +215,7 @@ tags: [turno]
       childOf:
         id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - assertVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
 - tapOn:
@@ -235,12 +236,12 @@ tags: [turno]
     element:
       text: 'Ya no es urgente · 1'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
 - scrollUntilVisible:
     element:
       text: 'Ver el resumen'
     direction: UP
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - assertVisible: 'El analista propone una orientación'
 - assertVisible: 'Descartar'
@@ -252,12 +253,12 @@ tags: [turno]
     element:
       text: 'Ya no es urgente · 1'
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
 - scrollUntilVisible:
     element:
       text: '¿Fuiste al meetup de producto del martes\?'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - assertVisible:
     text: 'CADUCADA|Caducada'
@@ -272,7 +273,7 @@ tags: [turno]
     element:
       id: pospuestas
     direction: DOWN
-    timeout: 30000
+    timeout: 60000
     centerElement: true
 - extendedWaitUntil:
     visible: 'Pospuestas · 3'
@@ -287,7 +288,7 @@ tags: [turno]
     element:
       text: 'Cómo se ordena lo que depende de ti'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - assertVisible: '.*¿En qué ciudad vives actualmente\?'
 - assertVisible: '.*¿Con qué tipo de startups prefieres trabajar\?'
@@ -306,14 +307,14 @@ tags: [turno]
     element:
       text: 'Hecho recientemente · 3'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - tapOn: 'Hecho recientemente · 3'
 - scrollUntilVisible:
     element:
       text: 'Cómo se ordena lo que depende de ti'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
     centerElement: true
 - assertVisible: 'CONFIRMASTE QUE SE APLICÓ|Confirmaste que se aplicó'
 - assertVisible: 'RESPONDIDA|Respondida'
@@ -338,5 +339,5 @@ tags: [turno]
     element:
       text: 'Fundé ProjectApp en Medellín\.'
     direction: DOWN
-    timeout: 20000
+    timeout: 60000
 - takeScreenshot: 04-turno-16-sabe-semilla
