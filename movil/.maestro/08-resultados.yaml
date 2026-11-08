@@ -408,11 +408,16 @@ tags: [resultados]
 # cubre: RES-02, RES-04
 - scrollUntilVisible:
     element:
+      text: "Seguidores"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
       text: "Aún no medimos las interacciones repetidas por persona."
     direction: DOWN
     centerElement: true
     timeout: 30000
-- assertVisible: "Seguidores"
 - assertVisible: "Tasa de aceptación"
 - assertVisible:
     text: "Sin dato"
@@ -450,7 +455,8 @@ tags: [resultados]
     direction: DOWN
     centerElement: true
     timeout: 15000
-- assertVisible: "Un MVP no es una versión barata del producto"
+# The best post is the one of eight days ago (the only one with a 7-day cut): its first line is the English text.
+- assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue\\."
 - assertVisible: "INTERACCIÓN MEDIA POR PILAR"
 - tapOn: "Ver la pieza"
 - extendedWaitUntil:
