@@ -208,7 +208,7 @@ export function NotificacionesScreen() {
             </FilterChip>
           ))}
         </View>
-        <Button variant="ghost" size="small" disabled={!query.data || unread <= 0 || mark.isPending} onPress={readAll}>
+        <Button variant="ghost" size="small" disabled={!query.data || unread <= 0 || mark.isPending} onPress={readAll} testID="notif-marcar-todo">
           Marcar todo como leído
         </Button>
       </View>

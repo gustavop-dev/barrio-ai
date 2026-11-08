@@ -460,7 +460,7 @@ function RecordingPanel({
           <Wave levels={live.levels} />
         </View>
         <View style={styles.recActions}>
-          <Pressable accessibilityRole="button" disabled={trashing} onPress={discard} style={[styles.recButton, styles.recDiscard]}>
+          <Pressable accessibilityRole="button" disabled={trashing} onPress={discard} style={[styles.recButton, styles.recDiscard]} testID="capture-descartar">
             <Icon name="papelera" size={22} color={colors.alert} />
             <T variant="detalle" color={colors.alert}>
               Descartar
@@ -471,6 +471,7 @@ function RecordingPanel({
             disabled={starting || trashing}
             onPress={() => (paused ? recorder.resume() : recorder.pause())}
             style={[styles.recButton, starting ? styles.recDisabled : null]}
+            testID="capture-pausar"
           >
             <Icon name={paused ? 'play' : 'pausa'} size={22} />
             <T variant="detalle">{paused ? 'Seguir' : 'Pausar'}</T>
@@ -483,6 +484,7 @@ function RecordingPanel({
               void recorder.stop().then(onFinish);
             }}
             style={[styles.recButton, styles.recFinish]}
+            testID="capture-terminar"
           >
             <Icon name="detener" size={22} color={colors.onBrand} />
             <T variant="detalle" color={colors.onBrand}>
@@ -530,7 +532,7 @@ function AudioDone({ audio, stage, onRemove }: { audio: RecordedAudio; stage: St
 function RecordButton({ stage, onPress }: { stage: Stage; onPress: () => void }) {
   const docked = useDocked(stage);
   return (
-    <Pressable accessibilityRole="button" onPress={onPress} style={styles.record} onLayout={wrapperLayout(stage)}>
+    <Pressable accessibilityRole="button" onPress={onPress} style={styles.record} onLayout={wrapperLayout(stage)} testID="capture-grabar">
       <Animated.View style={[styles.recordIcon, docked]} onLayout={elementLayout(stage)}>
         <Icon name="microfono" size={ELEMENT.none.icon} color={colors.onBrand} />
       </Animated.View>
@@ -846,12 +848,12 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
       <T variant="subtitulo" accessibilityRole="header" style={styles.headTitle}>
         Para el equipo
       </T>
-      <Pressable accessibilityRole="button" onPress={() => setView('history')} style={styles.histLink}>
+      <Pressable accessibilityRole="button" onPress={() => setView('history')} style={styles.histLink} testID="capture-historial">
         <T variant="detalle" color={colors.brandDeep}>
           Lo que enviaste{history.count !== null ? ` · ${history.count}` : ''}
         </T>
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sin guardar" onPress={close} style={styles.iconButton}>
+      <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sin guardar" onPress={close} style={styles.iconButton} testID="capture-cerrar">
         <Icon name="cerrar" size={22} color={colors.inkSoft} />
       </Pressable>
     </View>
@@ -936,11 +938,11 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
                 Añadir una imagen
               </T>
               <View style={styles.photoButtons}>
-                <Pressable accessibilityRole="button" onPress={() => void addPhotos('camera')} style={styles.photoPick}>
+                <Pressable accessibilityRole="button" onPress={() => void addPhotos('camera')} style={styles.photoPick} testID="capture-camara">
                   <Icon name="camara" size={22} />
                   <T>Tomar foto</T>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={() => void addPhotos('gallery')} style={styles.photoPick}>
+                <Pressable accessibilityRole="button" onPress={() => void addPhotos('gallery')} style={styles.photoPick} testID="capture-galeria">
                   <Icon name="galeria" size={22} />
                   <T>Galería</T>
                 </Pressable>
@@ -948,6 +950,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
               {fotos.length ? (
                 <View
                   style={styles.thumbs}
+                  testID="capture-fotos"
                   accessibilityLabel="Fotos adjuntas"
                   onLayout={(event) => thumbRow.set({ x: event.nativeEvent.layout.x, y: event.nativeEvent.layout.y })}
                 >
@@ -1008,7 +1011,12 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
               </T>
               <View style={styles.chips} accessibilityLabel="Para qué es">
                 {PURPOSES.map((option) => (
-                  <FilterChip key={option.value} pressed={para === option.value} onPress={() => setPara(para === option.value ? null : option.value)}>
+                  <FilterChip
+                    key={option.value}
+                    pressed={para === option.value}
+                    onPress={() => setPara(para === option.value ? null : option.value)}
+                    testID={`capture-para-${option.value}`}
+                  >
                     {option.label}
                   </FilterChip>
                 ))}

@@ -1,0 +1,409 @@
+# cubre: PRS-01, PRS-02, PRS-03, PRS-05, PRS-07, PRS-08, PRS-12
+# Personas. Barrio: the stage chips filter the list (Por clasificar → Pedro Salazar, Encaja → Laura Gómez, Te invitó →
+# Natalia Rojas, at the end of the strip) and the search box too («Pedro», then «Laura»); Laura's card shows her name,
+# stage, next step, journey and history, and takes a written note. Oportunidades: Valentina Castro moves from
+# «Necesidad identificada» to «Cualificada» with the «Etapa» selector (the drag needs a long press held still, which
+# Maestro cannot do), «Deshacer» brings her back, and a second move survives leaving the tab. Referentes: «Añadir
+# referente» refuses an empty form, a URL that is not a LinkedIn profile and a missing reason, and nothing is added.
+# Text in the «etiqueta» style (badges, section labels) is uppercased on screen, so it is written in capitals here.
+appId: co.projectapp.office
+name: Personas
+tags: [personas]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-personas
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      text: "Todas · \\d+"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "person-.*"
+    timeout: 30000
+- takeScreenshot: 09-personas-01-barrio
+
+# ---------------------------------------------------------------- Barrio: the stage chips
+# cubre: PRS-01, PRS-02
+- tapOn:
+    text: "Por clasificar( · \\d+)?"
+- extendedWaitUntil:
+    visible: "Pedro Salazar"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Laura Gómez"
+    timeout: 10000
+- takeScreenshot: 09-personas-02-por-clasificar
+- tapOn:
+    text: "Encaja( · \\d+)?"
+- extendedWaitUntil:
+    visible: "Laura Gómez"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Pedro Salazar"
+    timeout: 10000
+- takeScreenshot: 09-personas-03-encaja
+# «Te invitó» sits at the end of the strip: swipe it until the chip shows.
+- repeat:
+    times: 6
+    while:
+      notVisible:
+        text: "Te invitó( · \\d+)?"
+    commands:
+      - swipe:
+          from:
+            id: stage-chips
+          direction: LEFT
+- tapOn:
+    text: "Te invitó( · \\d+)?"
+- extendedWaitUntil:
+    visible: "Natalia Rojas"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Laura Gómez"
+    timeout: 10000
+- takeScreenshot: 09-personas-04-te-invito
+# Back to «Todas», at the start of the strip.
+- repeat:
+    times: 6
+    while:
+      notVisible:
+        text: "Todas( · \\d+)?"
+    commands:
+      - swipe:
+          from:
+            id: stage-chips
+          direction: RIGHT
+- tapOn:
+    text: "Todas( · \\d+)?"
+
+# ---------------------------------------------------------------- Barrio: the search box (no stage filter now)
+# cubre: PRS-02
+- tapOn:
+    id: barrio-search
+- inputText: "Pedro"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Pedro Salazar"
+    timeout: 15000
+- takeScreenshot: 09-personas-05-buscar-pedro
+- tapOn: "Borrar la búsqueda"
+- tapOn:
+    id: barrio-search
+- inputText: "Laura"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Laura Gómez"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Pedro Salazar"
+    timeout: 10000
+- takeScreenshot: 09-personas-06-buscar-laura
+
+# ---------------------------------------------------------------- Laura's card
+# cubre: PRS-03, PRS-05
+- tapOn: "Laura Gómez"
+- extendedWaitUntil:
+    visible:
+      id: persona
+    timeout: 20000
+# React Native flattens the header: the name is its own node (persona-name), not a child of persona-head.
+- extendedWaitUntil:
+    visible:
+      id: persona-name
+    timeout: 15000
+- assertVisible: "Laura Gómez"
+- assertVisible:
+    text: "ENCAJA"
+- assertVisible:
+    id: next-step
+- assertVisible:
+    text: ".*El equipo (va a seguirla|la seguirá).*"
+- takeScreenshot: 09-personas-07-ficha
+- scrollUntilVisible:
+    element:
+      text: "Head of Product en un marketplace B2B"
+      childOf:
+        id: persona
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: journey
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 09-personas-08-recorrido
+- scrollUntilVisible:
+    element:
+      text: "HISTORIAL COMPLETO"
+      childOf:
+        id: persona
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: "history|history-empty"
+- takeScreenshot: 09-personas-09-historial
+# A written note: it shows in «Notas» once saved.
+- scrollUntilVisible:
+    element:
+      text: "Añadir nota"
+      childOf:
+        id: persona
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Añadir nota"
+    childOf:
+      id: persona
+- extendedWaitUntil:
+    visible:
+      id: note-text
+    timeout: 10000
+- tapOn:
+    id: note-text
+- inputText: "Nota de QA sobre su marketplace B2B"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Guardar nota"
+      childOf:
+        id: persona
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Guardar nota"
+    childOf:
+      id: persona
+- extendedWaitUntil:
+    visible:
+      text: "Nota guardada"
+      childOf:
+        id: toast
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Nota de QA sobre su marketplace B2B"
+      childOf:
+        id: persona
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- assertNotVisible:
+    id: note-text
+- takeScreenshot: 09-personas-10-nota-guardada
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: persona
+    timeout: 15000
+- assertVisible:
+    id: barrio-list
+
+# ---------------------------------------------------------------- Oportunidades: change a stage with the selector
+# cubre: PRS-07, PRS-08
+- tapOn: "Oportunidades"
+- extendedWaitUntil:
+    visible:
+      id: oportunidades-list
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: opp-zone-acuerdo
+    timeout: 20000
+- takeScreenshot: 09-personas-11-oportunidades
+- scrollUntilVisible:
+    element:
+      text: "Etapa de Valentina Castro"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Valentina Castro, Necesidad identificada"
+- tapOn: "Etapa de Valentina Castro"
+- scrollUntilVisible:
+    element:
+      text: "Cualificada"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 09-personas-12-selector-etapa
+- tapOn: "Cualificada"
+- extendedWaitUntil:
+    visible:
+      text: "Movida a «Cualificada»"
+      childOf:
+        id: toast
+    timeout: 15000
+- assertVisible: "Valentina Castro, Cualificada"
+# «Deshacer» puts her back in «Necesidad identificada».
+- tapOn:
+    text: "Deshacer"
+    childOf:
+      id: toast
+- extendedWaitUntil:
+    visible: "Valentina Castro, Necesidad identificada"
+    timeout: 15000
+- takeScreenshot: 09-personas-13-movida-deshecha
+# Move her again and leave it: after going to Barrio and back, she is still «Cualificada».
+- scrollUntilVisible:
+    element:
+      text: "Etapa de Valentina Castro"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Etapa de Valentina Castro"
+- scrollUntilVisible:
+    element:
+      text: "Cualificada"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: "Cualificada"
+- extendedWaitUntil:
+    visible:
+      text: "Movida a «Cualificada»"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Barrio"
+    direction: UP
+    timeout: 20000
+- tapOn: "Barrio"
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 20000
+- tapOn: "Oportunidades"
+- extendedWaitUntil:
+    visible:
+      id: oportunidades-list
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Valentina Castro, Cualificada"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: opp-zone-cualificada
+- assertNotVisible:
+    id: opp-zone-necesidad
+- takeScreenshot: 09-personas-14-movida-guardada
+
+# ---------------------------------------------------------------- Referentes: the add form validates before sending
+# cubre: PRS-12
+- scrollUntilVisible:
+    element:
+      text: "Referentes"
+    direction: UP
+    timeout: 20000
+- tapOn: "Referentes"
+- extendedWaitUntil:
+    visible:
+      id: referentes-list
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: referent-add
+    timeout: 20000
+# With two accounts (the seed has the simulated LinkedIn one and the official API one) the screen shows «Cuenta»:
+# make sure the referents are read from Gustavo's simulated LinkedIn account, whatever order the accounts come in.
+# If it is already chosen, the first match is the field's own value and the tap just closes the list.
+- runFlow:
+    when:
+      visible:
+        id: referent-account
+    commands:
+      - tapOn:
+          id: referent-account
+      - tapOn: "LinkedIn de Gustavo.*"
+- extendedWaitUntil:
+    visible: "María Fernanda Ruiz"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Ana Lucía Torres"
+    direction: DOWN
+    timeout: 20000
+- assertVisible: "Carlos Andrés Mejía"
+- takeScreenshot: 09-personas-15-referentes
+- scrollUntilVisible:
+    element:
+      id: referent-add
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: referent-add
+- extendedWaitUntil:
+    visible:
+      id: add-referent
+    timeout: 10000
+# Empty: both fields complain.
+- tapOn:
+    id: referent-submit
+- extendedWaitUntil:
+    visible:
+      text: "Pega la URL de un perfil.*"
+      childOf:
+        id: add-referent
+    timeout: 10000
+- assertVisible:
+    text: "El motivo es obligatorio.*"
+    childOf:
+      id: add-referent
+- takeScreenshot: 09-personas-16-referente-vacio
+# A URL that is not a LinkedIn profile keeps the URL error.
+- tapOn:
+    id: referent-url
+- inputText: "twitter.com/alguien"
+- pressKey: Enter
+- assertVisible:
+    text: "Pega la URL de un perfil.*"
+    childOf:
+      id: add-referent
+- takeScreenshot: 09-personas-17-referente-url-invalida
+# A profile URL clears it; the reason is still missing, so «Añadir referente» does not send.
+- tapOn:
+    id: referent-url
+- eraseText: 40
+- inputText: "linkedin.com/in/qa-referente"
+- pressKey: Enter
+- extendedWaitUntil:
+    notVisible:
+      text: "Pega la URL de un perfil.*"
+      childOf:
+        id: add-referent
+    timeout: 10000
+- tapOn:
+    id: referent-submit
+- assertVisible:
+    id: add-referent
+- assertVisible:
+    text: "El motivo es obligatorio.*"
+    childOf:
+      id: add-referent
+- takeScreenshot: 09-personas-18-referente-sin-motivo
+- tapOn:
+    id: referent-cancel
+- extendedWaitUntil:
+    notVisible:
+      id: add-referent
+    timeout: 10000
+- assertNotVisible: ".*qa-referente.*"
+- assertVisible: "María Fernanda Ruiz"
+- takeScreenshot: 09-personas-19-referentes-sin-cambios

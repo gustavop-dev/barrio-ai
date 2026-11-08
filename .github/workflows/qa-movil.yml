@@ -1,0 +1,318 @@
+name: QA móvil
+# UI QA of the 0ff1ce app on Android emulators, against a seeded demo backend on each runner.
+# Nothing here reaches production, LinkedIn or a paid provider: the API runs with FakeConnector
+# (LIVE_LINKEDIN=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
+# EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 (the runner, as the emulator sees it). See movil/.maestro/README.md.
+#
+# Jobs: plan (which flows, split in up to 4 emulators) → apk (built once, cached by what affects the app) →
+# flujos (one emulator + backend per shard, in parallel) → qa (one report, the PR comment and the verdict).
+# Run only some flows: `[qa: 05-captura 09]` in the PR's head commit message, or the `flujos` input of a manual run.
+on:
+  workflow_dispatch:
+    inputs:
+      flujos:
+        description: 'Flujos a correr (nombres o números separados por espacios, p. ej. «05 09-personas»); vacío = todos'
+        required: false
+        default: ''
+  pull_request:
+    paths: ['movil/**', 'compartido/**', 'agentes-linkedin/**', 'scripts/qa/**', '.github/workflows/qa-movil.yml']
+permissions:
+  contents: read
+concurrency:
+  group: qa-movil-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  # Bump to rebuild the APK when the build steps change without touching movil/ or compartido/.
+  APK_CACHE_VERSION: v1
+  API_LEVEL: 35
+  MAESTRO_VERSION: 2.12.0
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      matriz: ${{ steps.plan.outputs.matriz }}
+      resumen: ${{ steps.plan.outputs.resumen }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_SELECCION: ${{ inputs.flujos }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$HEAD_SHA" ]; then
+            export QA_MENSAJE="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" --jq .commit.message || true)"
+          fi
+          python3 scripts/qa/plan.py
+
+  apk:
+    runs-on: ubuntu-24.04
+    # A warm cache finishes in seconds; a cold build of the whole app takes about 17 minutes.
+    timeout-minutes: 40
+    outputs:
+      key: ${{ steps.apk.outputs.cache-primary-key }}
+    steps:
+      - uses: actions/checkout@v4
+      # What goes into the APK: the app (not its flows or docs), compartido/, the lockfile and app.config.js (QA switch).
+      - name: APK cache
+        id: apk
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: apk-${{ env.APK_CACHE_VERSION }}-${{ hashFiles('movil/**', '!movil/.maestro/**', '!movil/**/*.md', 'compartido/**') }}
+          lookup-only: true
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: movil/package-lock.json
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Write the Gradle cache from PRs too, so the next build of the same branch starts warm.
+          cache-read-only: false
+      - name: APK · npm ci and expo prebuild (QA switch on)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil
+        env:
+          OFFICE_QA_BUILD: '1'
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+        run: |
+          npm ci
+          npx expo prebuild --platform android --no-install --clean
+          grep -n 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml
+      - name: APK · gradle assembleRelease (x86_64)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil/android
+        env:
+          OFFICE_QA_BUILD: '1'
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+          NODE_ENV: production
+        run: |
+          ./gradlew assembleRelease -PreactNativeArchitectures=x86_64
+          mkdir -p "$RUNNER_TEMP/apk"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/apk/qa.apk"
+          ls -la "$RUNNER_TEMP/apk"
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: ${{ steps.apk.outputs.cache-primary-key }}
+
+  flujos:
+    needs: [plan, apk]
+    runs-on: ubuntu-24.04
+    # Setup takes about 5 minutes and each flow is cut at QA_FLOW_TIMEOUT (8 minutes): a hang can't hold the run.
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matriz) }}
+    name: flujos (${{ matrix.shard }})
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg17
+        env:
+          POSTGRES_USER: knowledge
+          POSTGRES_DB: knowledge
+          POSTGRES_PASSWORD: qa-only-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U knowledge -d knowledge"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://knowledge:qa-only-ci-password@127.0.0.1:5432/knowledge
+      DJANGO_SECRET_KEY: qa-only-non-production-secret-0123456789
+      DJANGO_ALLOWED_HOSTS: 10.0.2.2,127.0.0.1,localhost
+      LIVE_PROVIDERS: 'false'
+      LIVE_LINKEDIN: 'false'
+      LIVE_LINKEDIN_OFFICIAL: 'false'
+      OPERATOR_ALLOW_FAKE: 'true'
+      # The seeded inbox conversation shows as a Tu turno card only with the inbox on (nothing reads LinkedIn: no worker runs).
+      INBOX_ENABLED: 'true'
+      # The window is open all day so nothing in the QA world waits for 07:00.
+      OPERATOR_WINDOW: '00:00-23:59'
+      TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/agentes-linkedin/infra/assets/tiktoken
+      # CI-only account created by seed_qa; it never exists outside this job.
+      QA_SEED: permitido
+      QA_PASSWORD: qa-0ff1ce-solo-ci
+      QA_OUT: ${{ github.workspace }}/qa-artefactos
+      INFRA_DIR: ${{ github.workspace }}/agentes-linkedin/infra
+      QA_SHARD: ${{ matrix.shard }}
+      QA_FLOWS: ${{ matrix.flujos }}
+      QA_FLOW_TIMEOUT: '480'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # ---------------------------------------------------------------- the APK of this run (built by the apk job)
+      - name: APK
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: ${{ needs.apk.outputs.key }}
+          fail-on-cache-miss: true
+
+      # ---------------------------------------------------------------- demo backend of this emulator
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: agentes-linkedin/infra/uv.lock
+      - name: Backend · migrate, bootstrap_local, seed_qa
+        working-directory: agentes-linkedin/infra
+        run: |
+          mkdir -p "$QA_OUT"
+          uv sync --frozen
+          uv run python manage.py migrate --noinput
+          uv run python manage.py bootstrap_local
+          uv run python manage.py seed_qa
+          uv run python manage.py collectstatic --noinput --verbosity 0
+      - name: Backend · serve the API on 0.0.0.0:8787
+        working-directory: agentes-linkedin/infra
+        run: |
+          nohup uv run gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 3 --timeout 120 \
+            --access-logfile - --error-logfile - --capture-output > "$QA_OUT/api-$QA_SHARD.log" 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8787/health && exit 0
+            sleep 1
+          done
+          echo "The API did not start"; cat "$QA_OUT/api-$QA_SHARD.log"; exit 1
+      - name: Backend · the QA user can log in
+        run: |
+          curl -fsS -X POST http://127.0.0.1:8787/api/v1/auth/token -H 'Content-Type: application/json' \
+            -d "{\"username\":\"qa\",\"password\":\"$QA_PASSWORD\",\"device_name\":\"curl de CI\"}" -o /dev/null -w '%{http_code}\n'
+
+      # ---------------------------------------------------------------- emulator and Maestro
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      # Restore and save apart: actions/cache only saves when the whole job succeeds, and this job fails on purpose
+      # when a flow fails, so the AVD snapshot would never be kept.
+      - name: AVD cache
+        id: avd
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ env.API_LEVEL }}-x86_64-390x844dp-320dpi-v3
+      # The phone is defined at the design boards' size, 390x844 dp (780x1688 px at 320 dpi), instead of resizing a
+      # pixel_6 after boot: a resize makes the launcher hang, and 2x instead of 3x halves the software rendering work.
+      - name: AVD · define a 390x844 dp phone
+        if: steps.avd.outputs.cache-hit != 'true'
+        run: |
+          image="system-images;android-$API_LEVEL;google_apis;x86_64"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          yes | "$sdk/sdkmanager" --install "$image" emulator platform-tools > /dev/null
+          echo no | "$sdk/avdmanager" create avd --force -n test -k "$image" -d pixel_6
+          cfg="$HOME/.android/avd/test.avd/config.ini"
+          sed -i -E '/^(hw\.lcd\.(width|height|density)|skin\.(name|path)|hw\.cpu\.ncore|hw\.ramSize)=/d' "$cfg"
+          printf '%s\n' hw.lcd.width=780 hw.lcd.height=1688 hw.lcd.density=320 skin.name=780x1688 skin.path=_no_skin \
+            hw.cpu.ncore=3 hw.ramSize=4096 >> "$cfg"
+          grep -E '^(hw\.lcd|skin\.|hw\.cpu|hw\.ramSize)' "$cfg"
+      - name: AVD · boot it once and save a snapshot
+        if: steps.avd.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.API_LEVEL }}
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "AVD snapshot generated."
+      - if: steps.avd.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true  # another emulator job may have saved the same key first
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: ${{ steps.avd.outputs.cache-primary-key }}
+      - name: Maestro flows on the emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          QA_APK: ${{ runner.temp }}/apk/qa.apk
+        with:
+          api-level: ${{ env.API_LEVEL }}
+          target: google_apis
+          arch: x86_64
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: bash scripts/qa/correr-maestro.sh
+      - name: Upload this emulator's artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-flujos-${{ matrix.shard }}
+          path: qa-artefactos
+          retention-days: 3
+          if-no-files-found: warn
+
+  qa:
+    needs: [plan, flujos]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      QA_OUT: ${{ github.workspace }}/qa-artefactos
+      QA_PLAN: ${{ needs.plan.outputs.resumen }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gather the emulators' artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: qa-flujos-*
+          merge-multiple: true
+          path: qa-artefactos
+      - name: Report
+        run: |
+          mkdir -p "$QA_OUT"
+          python3 scripts/qa/informe.py "$QA_OUT" > "$QA_OUT/resumen.md" || echo "No se pudo escribir el resumen." > "$QA_OUT/resumen.md"
+          cat "$QA_OUT/resumen.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload the report
+        id: upload
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-movil-${{ github.run_number }}
+          path: qa-artefactos
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Comment on the PR
+        if: github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          body="$(cat "$QA_OUT/resumen.md")"
+          body="$body"$'\n\n'"Artefactos: ${ARTIFACT_URL:-no se subieron} · [ejecución](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"$'\n'"<!-- qa-movil -->"
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq '.[] | select(.body | contains("<!-- qa-movil -->")) | .id' | tail -n1)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+      - name: Fail when a flow failed or the app crashed
+        run: test -f "$QA_OUT/resultado.txt" && grep -qx 'ok' "$QA_OUT/resultado.txt"

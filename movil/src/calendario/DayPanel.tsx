@@ -35,6 +35,10 @@ import { piecePath } from './go';
 import { TimelineItem } from './TimelineItem';
 import { PlanNextButton, VetoButton } from './Veto';
 
+// Built on the JS thread: timing() is not a worklet, and calling it inside a style worklet crashes the app on the UI
+// runtime («Tried to synchronously call a Remote Function»).
+const FOLD = timing('fold');
+
 export interface DayPanelProps {
   date: string;
   day: CalendarioDay | undefined;
@@ -171,7 +175,7 @@ function Summary({ day, onPick }: { day: CalendarioDay | undefined; onPick: (tip
 
 /** «Ver todo lo del día», folded: opened by its summary row or by a part of the day's summary. */
 function AllOfDay({ open, onToggle, children }: { open: boolean; onToggle: () => void; children: ReactNode }) {
-  const chevron = useAnimatedStyle(() => ({ transform: [{ rotate: withTiming(open ? '180deg' : '0deg', timing('fold')) }] }), [open]);
+  const chevron = useAnimatedStyle(() => ({ transform: [{ rotate: withTiming(open ? '180deg' : '0deg', FOLD) }] }), [open]);
   return (
     <View style={styles.all}>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={onToggle} style={styles.allSummary}>

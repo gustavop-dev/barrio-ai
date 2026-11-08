@@ -1,0 +1,180 @@
+# cubre: OFI-02, OFI-04, OFI-06
+# Oficina: a tap on a character of the Skia scene opens its sheet (SnapSheet), the sheet is dragged to full and
+# down to close; the team strip opens a team, a member of it and, scrolled sideways, the library; Android back
+# closes the sheet without leaving the Oficina.
+appId: co.projectapp.office
+name: Oficina
+tags: [oficina]
+---
+- runFlow: comun/entrar.yaml
+- extendedWaitUntil:
+    notVisible:
+      id: login
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: office-scene
+    timeout: 30000
+- assertVisible:
+    id: tab-index
+    selected: true
+- assertVisible: "La oficina en pixel art\\..*"
+- assertVisible:
+    id: team-chip-estrategia
+    selected: false
+- takeScreenshot: 03-oficina-01-escena
+
+# ---------------------------------------------------------------- a character in the scene
+# cubre: OFI-02, OFI-06
+# The canvas has no views per character, so the tap goes to a point of `office-scene` (absolute px inside the
+# element, Maestro's element-relative point). On the 390 dp screen at 3x the plan (192x336 logical px) is drawn
+# at 2x, centred: 3 dp of margin, no vertical offset while nothing is selected or panned. The target is
+# «Conversaciones e inbox», seated at logical (170, 100): hitScene takes x 158..182, y 72..102 (a 24 dp touch
+# target at 2x). It never walks (no backend event moves it and it is not one of the roles that go for coffee),
+# and the tap at logical (175, 80) stays out of the boxes of Relaciones (146, 100) and of a visitor standing at
+# the Relaciones spot (158, 110). Logical (175, 80) -> dp (3 + 350, 160) -> px (1059, 480).
+- tapOn:
+    id: office-scene
+    point: "1059,480"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: office-panel
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "MISIÓN"
+    timeout: 10000
+- assertVisible: "AGENTE · RELACIONES"
+- assertVisible: "Conversaciones e inbox"
+- assertVisible: "Mensajes directos y conversaciones privadas\\."
+- assertVisible: "ESTADO REAL"
+- assertVisible: Altura del panel
+- takeScreenshot: 03-oficina-02-ficha-personaje
+
+# Drag the handle up: the sheet goes from the half snap to the full one. At half, «Ver en el Calendario» sits
+# below the top of the bottom bar (or off screen); at full it is well above it.
+- swipe:
+    from:
+      text: Altura del panel
+    direction: UP
+    duration: 600
+- extendedWaitUntil:
+    visible:
+      text: Ver en el Calendario
+      above:
+        id: tab-index
+    timeout: 10000
+- assertVisible: "LO ÚLTIMO QUE HIZO"
+- assertVisible: "Ver su equipo · Relaciones"
+- takeScreenshot: 03-oficina-03-ficha-ampliada
+
+# Drag the handle down to the bottom of the screen: the sheet closes.
+- swipe:
+    from:
+      text: Altura del panel
+    direction: DOWN
+    duration: 500
+- extendedWaitUntil:
+    notVisible:
+      id: office-panel
+    timeout: 10000
+- assertNotVisible: "MISIÓN"
+- takeScreenshot: 03-oficina-04-ficha-cerrada
+
+# ---------------------------------------------------------------- the team strip
+# cubre: OFI-04
+- tapOn:
+    id: team-chip-estrategia
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: office-panel
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "ESPACIO DEL EQUIPO"
+    timeout: 10000
+- assertVisible: "Estrategia y perfil"
+- assertVisible: "Encontrar tu posición y hacer que tu perfil la comunique\\."
+- assertVisible: "2 INTEGRANTES · LOS ESCRITORIOS COMPARTIDOS"
+- assertVisible:
+    id: team-chip-estrategia
+    selected: true
+- takeScreenshot: 03-oficina-05-equipo
+
+# The members sit low in the panel: at full height both rows are clear of the bottom bar.
+- swipe:
+    from:
+      text: Altura del panel
+    direction: UP
+    duration: 600
+- extendedWaitUntil:
+    visible:
+      text: "Perfil, .*"
+      above:
+        id: tab-index
+    timeout: 10000
+- assertVisible: "Posicionamiento, .*"
+- tapOn: "Perfil, .*"
+- extendedWaitUntil:
+    visible: "Titular, presentación y claridad del perfil, coherentes con el posicionamiento\\."
+    timeout: 10000
+- assertVisible: "AGENTE · ESTRATEGIA Y PERFIL"
+- assertNotVisible: "ESPACIO DEL EQUIPO"
+- takeScreenshot: 03-oficina-06-integrante
+
+# «Cerrar» closes it and the chip is no longer selected.
+- tapOn: Cerrar
+- extendedWaitUntil:
+    notVisible:
+      id: office-panel
+    timeout: 10000
+- assertVisible:
+    id: team-chip-estrategia
+    selected: false
+
+# The library is the last chip: swipe the strip sideways (from its right part, away from the raised capture
+# button in the middle of the bottom bar) until it shows, then open it.
+- repeat:
+    while:
+      notVisible:
+        id: team-chip-biblioteca
+    times: 4
+    commands:
+      - swipe:
+          from:
+            id: team-strip
+            point: "85%,50%"
+          direction: LEFT
+          duration: 400
+- tapOn:
+    id: team-chip-biblioteca
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: office-panel
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "SERVICIO · BIBLIOTECA"
+    timeout: 10000
+- assertVisible: "Bibliotecario"
+- assertVisible: "Es un servicio de software, no un agente de IA: la búsqueda en la base de conocimiento\\..*"
+- assertVisible:
+    id: team-chip-biblioteca
+    selected: true
+- takeScreenshot: 03-oficina-07-biblioteca
+
+# Android back closes the sheet and stays in the Oficina.
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: office-panel
+    timeout: 10000
+- assertVisible:
+    id: screen-oficina
+- assertVisible:
+    id: tab-index
+    selected: true
+- assertVisible:
+    id: team-chip-biblioteca
+    selected: false
+- takeScreenshot: 03-oficina-08-atras-cierra

@@ -83,13 +83,18 @@ export function Monitors({ scene, atlas }: { scene: SharedValue<SceneState>; atl
 export function Decorations({ scene, selected, zone }: { scene: SharedValue<SceneState>; selected: CharacterId | null; zone: ZoneId | null }) {
   const pictures = useDecorations();
   const box = zone === 'biblioteca' ? LIBRARY.box : TEAMS.find((t) => t.id === zone)?.box;
-  const brackets = useMemo(() => box ? Array.from({ length: officeMotion.bracketPx }, (_, i) => zonePicture(box, i + 1)) : [], [box]);
-  const selectedZone = useDerivedValue(() => brackets[sceneBracketLength(scene.value) - 1]!);
   return <>
     {CHARACTERS.map((a, index) => <ActorMarks key={a.id} index={index} scene={scene} selected={selected} {...pictures} />)}
     <CaptureMail scene={scene} />
-    {box ? <Picture picture={selectedZone} /> : null}
+    {box ? <ZoneBrackets key={zone} scene={scene} box={box} /> : null}
   </>;
+}
+// Its own component, mounted with the zone: a derived value created in the parent still held the previous
+// (empty) brackets when the zone appeared, and <Picture> received undefined and crashed the scene.
+function ZoneBrackets({ scene, box }: { scene: SharedValue<SceneState>; box: readonly number[] }) {
+  const brackets = useMemo(() => Array.from({ length: officeMotion.bracketPx }, (_, i) => zonePicture(box, i + 1)), [box]);
+  const picture = useDerivedValue(() => brackets[Math.min(brackets.length, sceneBracketLength(scene.value)) - 1]!);
+  return <Picture picture={picture} />;
 }
 
 function CaptureMail({ scene }: { scene: SharedValue<SceneState> }) {

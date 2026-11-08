@@ -13,6 +13,11 @@ import { gestures, haptic, spring, timing } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 import { commitSide, dragOffset, pastCommit, revealProgress, type SwipeSide } from './swipe';
 
+// Built on the JS thread: spring()/timing() are not worklets, and calling them inside a gesture worklet crashes the
+// app on the UI runtime («Tried to synchronously call a Remote Function»).
+const SNAP_BACK = spring('snapBack');
+const SWIPE_EXIT = timing('swipeExit');
+
 export interface SwipeableCardProps {
   children: ReactNode;
   /** Label of the right swipe (the primary action), or null when there is none. */
@@ -35,7 +40,7 @@ export function SwipeableCard({ children, rightLabel, leftLabel, onSwipe, testID
   const enabled = sides.right || sides.left;
 
   const settle = (gone: boolean) => {
-    if (!gone) x.set(withSpring(0, spring('snapBack')));
+    if (!gone) x.set(withSpring(0, SNAP_BACK));
   };
 
   const commit = (side: SwipeSide) => {
@@ -64,10 +69,10 @@ export function SwipeableCard({ children, rightLabel, leftLabel, onSwipe, testID
       armed.set(false);
       const side = commitSide(event.translationX, event.velocityX, width, sides);
       if (!side) {
-        x.set(withSpring(0, spring('snapBack')));
+        x.set(withSpring(0, SNAP_BACK));
         return;
       }
-      x.set(withTiming(side === 'right' ? width * 1.1 : -width * 1.1, timing('swipeExit')));
+      x.set(withTiming(side === 'right' ? width * 1.1 : -width * 1.1, SWIPE_EXIT));
       runOnJS(commit)(side);
     },
   });

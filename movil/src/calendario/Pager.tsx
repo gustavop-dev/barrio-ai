@@ -14,6 +14,10 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 import { calendarTiming, gestures, haptic, spring, useMotion } from '@/theme/motion';
 
+// Built on the JS thread: spring()/timing() are not worklets, and calling them inside a gesture worklet crashes the
+// app on the UI runtime («Tried to synchronously call a Remote Function»).
+const PAGE_SNAP = spring('pageSnap');
+
 export type PageOffset = -1 | 0 | 1;
 
 export interface PagerHandle {
@@ -79,7 +83,7 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
     (direction: 1 | -1) => {
       const target = base.get() + direction * width;
       base.set(target);
-      offset.set(withSpring(target, spring('pageSnap')));
+      offset.set(withSpring(target, PAGE_SNAP));
       commit(direction);
     },
     [base, offset, width, commit],
@@ -100,7 +104,7 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
       const direction = pageDirection(event.translationX, event.velocityX, width);
       const target = base.value + direction * width;
       base.set(target);
-      offset.set(withSpring(target, spring('pageSnap')));
+      offset.set(withSpring(target, PAGE_SNAP));
       if (direction !== 0) runOnJS(swiped)(direction);
     },
   });

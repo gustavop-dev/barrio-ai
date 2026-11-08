@@ -13,6 +13,10 @@ import { ApiImage, T } from '@/components/ui';
 import { gestures, layout, spring } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 
+// Built on the JS thread: spring()/timing() are not worklets, and calling them inside a gesture worklet crashes the
+// app on the UI runtime («Tried to synchronously call a Remote Function»).
+const ZOOM_SETTLE = spring('zoomSettle');
+
 function clamp(value: number, min: number, max: number): number {
   'worklet';
   return Math.min(max, Math.max(min, value));
@@ -56,8 +60,8 @@ function ZoomablePhoto({
     const maxY = (height * (nextScale - 1)) / 2;
     const toX = clamp(x.value, -maxX, maxX);
     const toY = clamp(y.value, -maxY, maxY);
-    x.set(withSpring(toX, spring('zoomSettle')));
-    y.set(withSpring(toY, spring('zoomSettle')));
+    x.set(withSpring(toX, ZOOM_SETTLE));
+    y.set(withSpring(toY, ZOOM_SETTLE));
     savedX.set(toX);
     savedY.set(toY);
   };
@@ -72,8 +76,8 @@ function ZoomablePhoto({
       const next = scale.value;
       savedScale.set(next);
       if (next <= 1) {
-        x.set(withSpring(0, spring('zoomSettle')));
-        y.set(withSpring(0, spring('zoomSettle')));
+        x.set(withSpring(0, ZOOM_SETTLE));
+        y.set(withSpring(0, ZOOM_SETTLE));
         savedX.set(0);
         savedY.set(0);
       } else {
@@ -111,7 +115,7 @@ function ZoomablePhoto({
       if (Math.abs(event.translationY) > gestures.viewer.dismissDistance || Math.abs(event.velocityY) > gestures.viewer.dismissVelocity) {
         runOnJS(onClose)();
       } else {
-        drag.set(withSpring(0, spring('zoomSettle')));
+        drag.set(withSpring(0, ZOOM_SETTLE));
       }
     },
   });
@@ -122,9 +126,9 @@ function ZoomablePhoto({
     onActivate: (event) => {
       'worklet';
       if (scale.value > 1) {
-        scale.set(withSpring(1, spring('zoomSettle')));
-        x.set(withSpring(0, spring('zoomSettle')));
-        y.set(withSpring(0, spring('zoomSettle')));
+        scale.set(withSpring(1, ZOOM_SETTLE));
+        x.set(withSpring(0, ZOOM_SETTLE));
+        y.set(withSpring(0, ZOOM_SETTLE));
         savedScale.set(1);
         savedX.set(0);
         savedY.set(0);
@@ -136,9 +140,9 @@ function ZoomablePhoto({
       const maxY = (height * (next - 1)) / 2;
       const toX = clamp((width / 2 - event.x) * (next - 1), -maxX, maxX);
       const toY = clamp((height / 2 - event.y) * (next - 1), -maxY, maxY);
-      scale.set(withSpring(next, spring('zoomSettle')));
-      x.set(withSpring(toX, spring('zoomSettle')));
-      y.set(withSpring(toY, spring('zoomSettle')));
+      scale.set(withSpring(next, ZOOM_SETTLE));
+      x.set(withSpring(toX, ZOOM_SETTLE));
+      y.set(withSpring(toY, ZOOM_SETTLE));
       savedScale.set(next);
       savedX.set(toX);
       savedY.set(toY);
@@ -235,7 +239,7 @@ export function PhotoViewer({
             <T variant="detalle" color={colors.paper} testID="photo-viewer-count">
               {photos.length > 1 ? `${current + 1} de ${photos.length}` : ''}
             </T>
-            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar" onPress={onClose} style={styles.close} hitSlop={4}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar" onPress={onClose} style={styles.close} hitSlop={4} testID="photo-viewer-close">
               <Icon name="cerrar" size={24} color={colors.paper} />
             </Pressable>
           </View>

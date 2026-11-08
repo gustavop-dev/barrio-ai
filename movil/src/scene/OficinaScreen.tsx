@@ -97,10 +97,10 @@ export function OficinaScreen() {
         <ErrorRetry error={overview.error} title="No se pudo leer el estado de la máquina." onRetry={() => void overview.refetch()} />
         {feedUnavailable(events.error) ? <Note title="Aún no disponible">El registro de eventos no está disponible. Se muestra la actividad real de cada rol.</Note> : <ErrorRetry error={events.error} title="No se pudieron leer los eventos." onRetry={() => void events.refetch()} />}
       </View>
-      <FlatList horizontal data={TEAMS_AND_LIBRARY} keyExtractor={(item) => item.id} accessibilityLabel="Equipos" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teams}
+      <FlatList horizontal data={TEAMS_AND_LIBRARY} keyExtractor={(item) => item.id} accessibilityLabel="Equipos" testID="team-strip" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teams}
         renderItem={({ item }) => {
           const selected = item.id === 'biblioteca' ? selectedRole === LIBRARIAN_ID : selection?.kind === 'team' && selection.id === item.id;
-          return <Pressable accessibilityRole="button" accessibilityLabel={item.name} accessibilityState={{ selected }} style={[styles.chip, selected && styles.chipOn]}
+          return <Pressable accessibilityRole="button" accessibilityLabel={item.name} accessibilityState={{ selected }} testID={`team-chip-${item.id}`} style={[styles.chip, selected && styles.chipOn]}
             onPress={() => select(item.id === 'biblioteca' ? { kind: 'role', id: LIBRARIAN_ID } : { kind: 'team', id: item.id })}>
             <T variant="detalle" color={selected ? colors.paper : colors.ink}>{item.name}</T>
           </Pressable>;

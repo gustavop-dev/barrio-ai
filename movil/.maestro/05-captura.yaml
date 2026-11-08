@@ -1,0 +1,406 @@
+# cubre: CAP-01, CAP-02, CAP-03, CAP-04, CAP-05, CAP-08, CAP-10, CAP-11, CAP-13, CAP-14
+# Captura: the raised aguamarina button in the centre of the bottom bar. A tap opens the sheet (note,
+# «Para qué es», recording from the sheet); closing it with something written asks «¿Cerrar sin enviar?»;
+# holding the button records; and a capture sent to the team shows in «Lo que enviaste» with its state and
+# «Deshacer», next to the two seeded ones («Dato guardado» and «Usado»).
+#
+# The microphone: the CI emulator runs with -noaudio. Depending on the image the microphone either opens and
+# records silence or fails to start. The flow tries both ways of recording (the sheet's «Grabar un audio» and
+# the hold) and branches on what the app shows, with `runFlow: when:`; no branch fakes a recording.
+appId: co.projectapp.office
+name: Captura
+tags: [captura]
+---
+- runFlow: comun/entrar.yaml
+- extendedWaitUntil:
+    visible:
+      id: capture-button
+    timeout: 20000
+# First use only: the hint over the button shows until the capture is used once (the flag lives in
+# SecureStore and survives between flows, so it depends on what ran before).
+- runFlow:
+    when:
+      visible: 'Mantén oprimido para grabar\. Toca para foto o nota\.'
+    commands:
+      - takeScreenshot: 05-captura-01-pista-primer-uso
+
+# ---------------------------------------------------------------- a tap opens the sheet
+# cubre: CAP-01, CAP-08
+- tapOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- assertVisible: 'Para el equipo'
+- assertVisible:
+    id: capture-grabar
+- assertVisible: 'Tomar foto'
+- assertVisible:
+    id: capture-note
+- assertVisible:
+    id: capture-para-post
+- assertNotVisible: 'Mantén oprimido para grabar\. Toca para foto o nota\.'
+- takeScreenshot: 05-captura-02-hoja
+
+# A note: the text stays in the field. A tap on the «Añadir una imagen» label (above the field, inside the
+# sheet's scroll) dismisses the keyboard without touching anything else.
+- tapOn:
+    id: capture-note
+    waitToSettleTimeoutMs: 500
+- inputText: Nota de QA que se va a descartar
+- tapOn: 'A[ñÑ]adir una imagen'
+- assertVisible: 'Nota de QA que se va a descartar'
+
+# «Para qué es»: the chip turns on, and a second chip replaces it.
+- tapOn:
+    id: capture-para-dato
+    waitToSettleTimeoutMs: 500
+- assertVisible:
+    id: capture-para-dato
+    selected: true
+- tapOn:
+    id: capture-para-post
+    waitToSettleTimeoutMs: 500
+- assertVisible:
+    id: capture-para-post
+    selected: true
+- assertVisible:
+    id: capture-para-dato
+    selected: false
+- takeScreenshot: 05-captura-03-nota-y-para-que
+
+# Recording from the sheet. Whatever the microphone does, the sheet must say it: the recording panel
+# («Grabando», with Descartar · Pausar · Terminar) or the note that the microphone could not be used.
+- tapOn:
+    id: capture-grabar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Grabando|No se pudo usar el micrófono|Para grabar, 0ff1ce necesita el micrófono|El micrófono está bloqueado'
+    timeout: 20000
+- runFlow:
+    when:
+      visible: 'Grabando'
+    commands:
+      - assertVisible:
+          id: capture-recording
+      - assertVisible:
+          id: capture-terminar
+      - takeScreenshot: 05-captura-04-grabando-en-la-hoja
+      # «Descartar» throws the recording in the bin and the sheet offers «Grabar un audio» again.
+      - tapOn:
+          id: capture-descartar
+          waitToSettleTimeoutMs: 500
+      - extendedWaitUntil:
+          visible:
+            id: capture-grabar
+          timeout: 15000
+      - assertNotVisible:
+          id: capture-recording
+# The emulator's microphone did not start (no audio device): the app explains it and keeps the note.
+- runFlow:
+    when:
+      visible: 'No se pudo usar el micrófono'
+    commands:
+      - assertVisible: 'Volver a intentarlo'
+      - takeScreenshot: 05-captura-04-microfono-no-disponible
+# Not expected (launchApp grants every permission), recorded if it happens.
+- runFlow:
+    when:
+      visible: 'Para grabar, 0ff1ce necesita el micrófono|El micrófono está bloqueado'
+    commands:
+      - takeScreenshot: 05-captura-04-microfono-sin-permiso
+
+# ---------------------------------------------------------------- closing with something unsent asks first
+# cubre: CAP-14
+- tapOn:
+    id: capture-cerrar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: '¿Cerrar sin enviar\?'
+    timeout: 15000
+- assertVisible: 'Se pierden el audio, las fotos y la nota de esta captura\.'
+- assertVisible: 'Seguir aquí'
+- takeScreenshot: 05-captura-05-cerrar-sin-enviar
+- tapOn: 'Cerrar sin enviar'
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 15000
+- assertVisible:
+    id: capture-button
+
+# ---------------------------------------------------------------- holding the button records
+# cubre: CAP-02, CAP-13
+# The recording starts after 220 ms of hold; longPressOn holds about 3 s and releases, which ends it and opens
+# the sheet with the audio ready (never sent alone). If the microphone could not start, the sheet opens with
+# «No se pudo usar el micrófono» instead. The hold overlay (time strip, lock, trash) only shows while the
+# finger is down, which Maestro cannot capture: the video of the run shows it.
+- longPressOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Escuchar el audio|No se pudo usar el micrófono|Para grabar, 0ff1ce necesita el micrófono|El micrófono está bloqueado|Grabar un audio'
+    timeout: 20000
+- takeScreenshot: 05-captura-06-tras-mantener
+# No audio came out of the hold (the microphone failed, or the recording was empty): nothing to lose, the sheet
+# closes at once. This branch runs first so that the audio branch below never sees a closed sheet.
+- runFlow:
+    when:
+      notVisible:
+        id: capture-audio
+    commands:
+      - tapOn:
+          id: capture-cerrar
+          waitToSettleTimeoutMs: 500
+# The hold recorded (silence, on this emulator): the audio is ready to listen to, and closing asks first.
+- runFlow:
+    when:
+      visible:
+        id: capture-audio
+    commands:
+      - assertVisible: 'Escuchar el audio'
+      - assertVisible: 'Quitar el audio'
+      # Its length, a few seconds (the status bar clock cannot match: it is scoped to the audio row).
+      # (React Native flattens the row: the length is not a child node of capture-audio in the hierarchy.)
+      - assertVisible: '0:0[0-9]'
+      - takeScreenshot: 05-captura-07-audio-de-la-pulsacion
+      - tapOn:
+          id: capture-cerrar
+          waitToSettleTimeoutMs: 500
+      - extendedWaitUntil:
+          visible: '¿Cerrar sin enviar\?'
+          timeout: 15000
+      - tapOn: 'Cerrar sin enviar'
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 15000
+
+# ---------------------------------------------------------------- send a note to the team
+# cubre: CAP-03, CAP-08
+- tapOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- tapOn:
+    id: capture-note
+    waitToSettleTimeoutMs: 500
+- inputText: Nota de QA idea para un post sobre validar un MVP con clientes
+- tapOn: 'A[ñÑ]adir una imagen'
+- tapOn:
+    id: capture-para-post
+    waitToSettleTimeoutMs: 500
+- assertVisible:
+    id: capture-para-post
+    selected: true
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- takeScreenshot: 05-captura-08-lista-para-enviar
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+# Once the team has it the envelope flies off, the sheet closes and the toast offers «Deshacer» (5 s).
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 30000
+- assertVisible:
+    text: 'Deshacer'
+    childOf:
+      id: toast
+- assertNotVisible:
+    id: capture-sheet
+- takeScreenshot: 05-captura-09-enviado
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- «Lo que enviaste»
+# cubre: CAP-11, CAP-10
+- tapOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-historial
+    timeout: 20000
+# Two seeded captures and the new one (the count refreshes once the sheet asks again).
+- extendedWaitUntil:
+    visible: 'Lo que enviaste · 3'
+    timeout: 20000
+- tapOn:
+    id: capture-historial
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Volver a la captura'
+    timeout: 15000
+# The new capture comes first: what it carries, when and what for, its state (no worker runs in CI, so it
+# stays received) and «Deshacer» for its first 2 minutes.
+- extendedWaitUntil:
+    visible: 'Nota de QA idea para un post sobre validar un MVP con clientes'
+    timeout: 20000
+- assertVisible: 'Hoy, .* · Idea para un post'
+- assertVisible: 'Recibida|Transcribiendo|Procesando|En la mesa editorial'
+- assertVisible: 'El equipo lo recibió'
+- assertVisible:
+    text: 'Deshacer'
+    below:
+      text: 'Nota de QA idea para un post sobre validar un MVP con clientes'
+- takeScreenshot: 05-captura-10-historial-nueva
+
+# «Deshacer» from the history: the row stays, emptied, as «Deshecha». (The app also shows the toast «Envío
+# deshecho.», but the toast lives in the main window, under the sheet's modal, so Gustavo cannot see it: it is
+# not asserted here, the row's new state is.)
+- tapOn:
+    text: 'Deshacer'
+    below:
+      text: 'Nota de QA idea para un post sobre validar un MVP con clientes'
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Deshecha'
+    timeout: 20000
+- assertVisible: 'Deshiciste este envío'
+- assertNotVisible: 'Nota de QA idea para un post sobre validar un MVP con clientes'
+- takeScreenshot: 05-captura-11-historial-deshecha
+
+# The seeded ones, newest first: the transcribed voice note that became a fact, and the idea used in a piece.
+# Each search stops at the state badge, which sits under the capture's text.
+- scrollUntilVisible:
+    element:
+      text: 'Dato guardado'
+    direction: DOWN
+    timeout: 20000
+- assertVisible: '.*Fundé ProjectApp en 2019 en Medellín.*'
+- assertVisible: 'Está en Lo que el equipo sabe de ti · ProjectApp'
+- scrollUntilVisible:
+    element:
+      text: 'Usado'
+    direction: DOWN
+    timeout: 20000
+- assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
+- assertVisible: 'Usada en la pieza del .*'
+- takeScreenshot: 05-captura-12-historial-semilla
+
+# ---------------------------------------------------------------- a capture with a photo from the phone
+# cubre: CAP-05
+# correr-maestro.sh puts a picture in the emulator's Pictures (one of the seeded gallery PNGs). «Galería» opens
+# Android's photo picker; the picture comes back as a thumbnail and travels with the capture (multipart upload).
+- tapOn: 'Volver a la captura'
+- extendedWaitUntil:
+    visible:
+      id: capture-galeria
+    timeout: 15000
+- tapOn:
+    id: capture-galeria
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: '(Photo|Foto).*'
+    timeout: 25000
+- takeScreenshot: 05-captura-13-selector-de-fotos
+# The newest picture is the first cell of the grid. Its description is «Photo taken on …» on current pickers.
+- runFlow:
+    when:
+      visible: 'Photo taken on.*'
+    commands:
+      - tapOn:
+          text: 'Photo taken on.*'
+          index: 0
+          waitToSettleTimeoutMs: 500
+- runFlow:
+    when:
+      notVisible: 'Photo taken on.*'
+    commands:
+      - tapOn:
+          point: '17%,25%'
+          waitToSettleTimeoutMs: 500
+# With several photos allowed the picker asks to confirm the selection.
+- runFlow:
+    when:
+      visible: '(Add|Agregar|Añadir)( \(1\))?'
+    commands:
+      - tapOn: '(Add|Agregar|Añadir)( \(1\))?'
+- extendedWaitUntil:
+    visible:
+      id: capture-fotos
+    timeout: 25000
+- takeScreenshot: 05-captura-14-foto-adjunta
+- tapOn:
+    id: capture-note
+    waitToSettleTimeoutMs: 500
+- inputText: Foto de QA de la pizarra
+- tapOn: 'A[ñÑ]adir una imagen'
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 45000
+- assertNotVisible:
+    id: capture-send-error
+- takeScreenshot: 05-captura-15-foto-enviada
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- a voice note sent to the team
+# cubre: CAP-04
+# Hold the button again and send what it recorded. On this emulator (-noaudio) the microphone either records
+# silence or does not start: if the audio comes back it is sent and must reach the team (multipart upload with
+# the audio file); if not, the screenshot shows why. Nothing is faked.
+- longPressOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Escuchar el audio|No se pudo usar el micrófono|Para grabar, 0ff1ce necesita el micrófono|El micrófono está bloqueado|Grabar un audio'
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: capture-audio
+    commands:
+      - takeScreenshot: 05-captura-16-audio-listo
+      - scrollUntilVisible:
+          element:
+            id: capture-send
+          direction: DOWN
+          timeout: 15000
+      - tapOn:
+          id: capture-send
+          waitToSettleTimeoutMs: 500
+      - extendedWaitUntil:
+          visible: 'Enviado al equipo\.'
+          timeout: 45000
+      - assertNotVisible:
+          id: capture-send-error
+      - takeScreenshot: 05-captura-17-audio-enviado
+- runFlow:
+    when:
+      notVisible:
+        id: capture-audio
+    commands:
+      - takeScreenshot: 05-captura-16-sin-audio
+      - tapOn:
+          id: capture-cerrar
+          waitToSettleTimeoutMs: 500

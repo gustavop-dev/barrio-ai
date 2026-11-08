@@ -1,0 +1,45 @@
+# Opens the app signed in: launches it and, if the login shows, enters with the QA user.
+# Every area flow starts here, so it can run alone and after any other flow.
+appId: co.projectapp.office
+---
+- launchApp:
+    permissions:
+      all: allow
+# A cold emulator may show a system «… isn't responding» dialog over the app: wait for it to go.
+- runFlow:
+    when:
+      visible: ".*(isn't responding|no responde).*"
+    commands:
+      - tapOn: "Wait|Esperar"
+- extendedWaitUntil:
+    visible:
+      id: "login|screen-oficina"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: login
+    commands:
+      - tapOn:
+          id: login-usuario
+      - inputText: ${QA_USER}
+      # The keyboard covers the password field at 390x844: close it and scroll to the field.
+      - hideKeyboard
+      - scrollUntilVisible:
+          element:
+            id: login-clave
+          direction: DOWN
+      - tapOn:
+          id: login-clave
+      - inputText: ${QA_PASSWORD}
+      - hideKeyboard
+      - scrollUntilVisible:
+          element:
+            id: login-entrar
+          direction: DOWN
+      - tapOn:
+          id: login-entrar
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 45000
