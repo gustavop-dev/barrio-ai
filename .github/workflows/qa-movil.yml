@@ -197,6 +197,9 @@ jobs:
           python-version: '3.12'
           enable-cache: true
           cache-dependency-glob: agentes-linkedin/infra/uv.lock
+          # The demo backend keeps a uv process alive until the job ends; pruning
+          # would wait 300 s for its lock and fail the job (run 42459989978).
+          prune-cache: false
       - name: Backend · migrate, bootstrap_local, seed_qa
         working-directory: agentes-linkedin/infra
         run: |
