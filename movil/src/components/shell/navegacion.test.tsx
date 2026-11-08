@@ -4,6 +4,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
 import { Dimensions, Text } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
@@ -69,19 +70,18 @@ describe('push (MovNavegacion)', () => {
 });
 
 describe('DetailScreen', () => {
-  const listeners: Record<string, (event: unknown) => void> = {};
-  const navigation = {
-    getState: () => ({ index: 1, routes: [{ key: 'tabs' }, { key: 'detail' }] }),
-    addListener: jest.fn((name: string, listener: (event: unknown) => void) => {
-      listeners[name] = listener;
-      return () => undefined;
-    }),
-    dispatch: jest.fn(),
-  };
+  type Blocked = (options: { data: { action: { type: string } }; repeat: () => void }) => void;
+  const blocked: { current: Blocked | null; guarded: boolean | null } = { current: null, guarded: null };
+  const navigation = { getState: () => ({ index: 1, routes: [{ key: 'tabs' }, { key: 'detail' }] }) };
 
   beforeEach(() => {
     expoRouter.useNavigation = () => navigation;
     expoRouter.useRoute = () => ({ key: 'detail', name: 'personas/[id]' });
+    expoRouter.usePreventRemove = (guarded: boolean, callback: Blocked) => {
+      blocked.guarded = guarded;
+      blocked.current = callback;
+      return () => undefined;
+    };
     fakeServer({});
   });
 
@@ -96,18 +96,19 @@ describe('DetailScreen', () => {
 
   it('waits for the push back before Android back (or «‹») removes it', async () => {
     await renderDetail();
-    const action = { type: 'GO_BACK' };
-    const preventDefault = jest.fn();
-    await act(async () => listeners.beforeRemove?.({ data: { action }, preventDefault }));
-    expect(preventDefault).toHaveBeenCalled();
-    await waitFor(() => expect(navigation.dispatch).toHaveBeenCalledWith(action), { timeout: 3000 });
+    expect(blocked.guarded).toBe(true);
+    const repeat = jest.fn();
+    await act(async () => blocked.current?.({ data: { action: { type: 'GO_BACK' } }, repeat }));
+    expect(repeat).not.toHaveBeenCalled();
+    await waitFor(() => expect(repeat).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    expect(blocked.guarded).toBe(false);
   });
 
   it('lets a replace go at once (nothing underneath to reveal)', async () => {
     await renderDetail();
-    const preventDefault = jest.fn();
-    await act(async () => listeners.beforeRemove?.({ data: { action: { type: 'REPLACE' } }, preventDefault }));
-    expect(preventDefault).not.toHaveBeenCalled();
+    const repeat = jest.fn();
+    await act(async () => blocked.current?.({ data: { action: { type: 'REPLACE' } }, repeat }));
+    expect(repeat).toHaveBeenCalledTimes(1);
   });
 
   it('«‹» goes back through the router', async () => {
@@ -194,7 +195,7 @@ describe('BottomBar (MovNavegacion)', () => {
     fakeServer({ 'GET /api/v1/capturas': { body: { count: 0, next: null, previous: null, results: [] } }, 'GET /api/v1/preguntas': { body: [] } });
     const navigateToTab = jest.fn();
     const props = { state: { index, routes }, descriptors: {}, emitter: {}, navigateToTab, insets: { top: 0, right: 0, bottom: 0, left: 0 } };
-    const view = await renderApp(<BottomBar {...(props as never)} />, { recorder: true });
+    const view = await renderApp(<BottomBar {...(props as unknown as BottomTabBarProps)} />, { recorder: true });
     await act(async () => {});
     return { navigateToTab, ...view };
   }

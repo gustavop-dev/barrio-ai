@@ -46,12 +46,13 @@ describe('the flight (MovDetalle)', () => {
 });
 
 describe('from a row to the card', () => {
-  const navigation = { getState: () => ({ index: 1, routes: [{ key: 'tabs' }, { key: 'detail' }] }), addListener: jest.fn(() => () => undefined), dispatch: jest.fn() };
+  const navigation = { getState: () => ({ index: 1, routes: [{ key: 'tabs' }, { key: 'detail' }] }) };
   const source = { key: 'c-1', name: 'Lucía Ficticia', initials: 'LF', avatar: row.avatar, label: { x: 68, y: 302, width: 200, height: 24 } };
 
   beforeEach(() => {
     expoRouter.useNavigation = () => navigation;
     expoRouter.useRoute = () => ({ key: 'detail', name: 'personas/[id]' });
+    expoRouter.usePreventRemove = () => () => undefined;
   });
 
   function NameProbe({ id }: { id: string }) {

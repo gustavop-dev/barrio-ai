@@ -3,8 +3,8 @@
 // darken (push.ts); «‹», Android back and any navigation away run the same spring back before the
 // route goes. A drag from the left edge follows the finger and, on release, settles with the board's
 // projection (navGestures). With reduced motion it appears and goes at once (board: «menos movimiento»).
-import { router, useNavigation, useRoute } from 'expo-router';
-import { useCallback, useEffect, useLayoutEffect, useRef, type ReactNode } from 'react';
+import { router, useNavigation, usePreventRemove, useRoute } from 'expo-router';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { cancelAnimation, runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -31,13 +31,14 @@ export function DetailScreen({ back, fallback, children }: { back: string; fallb
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const headerBottom = insets.top + shell.topBarHeight;
-  const panel = useRef<View>(null);
+  const panel = useRef<ComponentRef<typeof View>>(null);
   const flight = useFlightHost({ level, panel, reduced, headerBottom });
   const { flyBack } = flight;
   const exiting = useSharedValue(false);
   const dragging = useSharedValue(false);
   const grabbedAt = useSharedValue(0);
   const released = useRef(false);
+  const [guarded, setGuarded] = useState(true);
   const offscreen = width + EDGE_LINE;
 
   // In from the right; whatever happens, the screen underneath is left in place.
@@ -68,21 +69,20 @@ export function DetailScreen({ back, fallback, children }: { back: string; fallb
     [exiting, flyBack, progress],
   );
 
-  // Every way out («‹», Android back, a link to a tab) waits for the push back.
-  useEffect(
-    () =>
-      navigation.addListener('beforeRemove', (event) => {
-        if (released.current || WITHOUT_PUSH.has(event.data.action.type)) return;
-        event.preventDefault();
-        if (exiting.get()) return;
-        const action = event.data.action;
-        leave(() => {
-          released.current = true;
-          navigation.dispatch(action);
-        });
-      }),
-    [navigation, leave, exiting],
-  );
+  // Every way out («‹», Android back, a link to a tab) waits for the push back, then goes on.
+  usePreventRemove(guarded, ({ data, repeat }) => {
+    const go = () => {
+      released.current = true;
+      setGuarded(false);
+      repeat();
+    };
+    if (released.current || WITHOUT_PUSH.has(data.action.type)) {
+      go();
+      return;
+    }
+    if (exiting.get()) return;
+    leave(go);
+  });
 
   /** After a drag that let go: the spring already runs; the copies fly from where the card is. */
   const dragBack = useCallback(

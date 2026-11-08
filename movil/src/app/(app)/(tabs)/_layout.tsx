@@ -7,7 +7,7 @@
 // moves left and darkens with it (push.ts).
 import { useNavigation, useRoute } from 'expo-router';
 import { Tabs, type TabsScreenOptions } from 'expo-router/js-tabs';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ComponentRef } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { BottomBar } from '@/components/shell/BottomBar';
@@ -31,7 +31,7 @@ export default function TabsLayout() {
   const covered = pushProgress(level + 1);
   const { reduced } = useMotion();
   const { width } = useWindowDimensions();
-  const root = useRef<View>(null);
+  const root = useRef<ComponentRef<typeof View>>(null);
   const focus = useRef<FocusMemory>({ previous: null, current: null });
 
   useEffect(() => registerLayer(level, root.current), [level]);

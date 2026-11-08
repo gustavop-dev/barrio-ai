@@ -6,7 +6,7 @@
 // off in Expo Go), so the flight is an overlay: the row measures its pieces when tapped, the card
 // header registers where they land, and DetailScreen draws copies above both while the real pieces
 // hide. Everything moves on the UI thread with the `flight` spring; with reduced motion nothing flies.
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Animated, { interpolateColor, makeMutable, runOnJS, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { navSpring } from '@/theme/motion';
@@ -94,7 +94,8 @@ export function ghostFrame(from: FlightEnd, to: FlightEnd, h: number) {
 // ---------------------------------------------------------------- the rows (sources)
 
 let pending: FlightSource | null = null;
-const rows = new Map<string, { avatar: RefObject<View | null>; label: RefObject<View | null> }>();
+type ViewNode = ComponentRef<typeof View>;
+const rows = new Map<string, { avatar: RefObject<ViewNode | null>; label: RefObject<ViewNode | null> }>();
 /** The row whose portrait and name are hidden while their copies fly ('' none). */
 const hiddenRow = makeMutable('');
 
@@ -112,8 +113,8 @@ export function beginFlight(source: FlightSource): void {
 
 /** A list row that can fly into a card: refs for its portrait and name, the style that hides them while their copies fly, and `begin` for the tap. */
 export function useFlightSource(key: string) {
-  const avatar = useRef<View>(null);
-  const label = useRef<View>(null);
+  const avatar = useRef<ViewNode>(null);
+  const label = useRef<ViewNode>(null);
   useEffect(() => {
     const entry = { avatar, label };
     rows.set(key, entry);
@@ -160,7 +161,7 @@ export function useFlightName(key: string): string | null {
  */
 export function useFlightTarget(key: string, piece: 'avatar' | 'label', type?: { fontSize: number; lineHeight: number }, color?: string) {
   const flight = useContext(FlightContext);
-  const ref = useRef<View>(null);
+  const ref = useRef<ViewNode>(null);
   const hiddenValue = flight?.cardHidden ?? NEVER_HIDDEN;
   const style = useAnimatedStyle(() => ({ opacity: hiddenValue.value ? 0 : 1 }), [hiddenValue]);
   const onLayout = useCallback(
@@ -180,7 +181,7 @@ interface HostOptions {
   /** Level of the detail screen in the (app) stack (the row is in the screen below). */
   level: number;
   /** A view filling the pushed panel, to measure the header against it. */
-  panel: RefObject<View | null>;
+  panel: RefObject<ViewNode | null>;
   reduced: boolean;
   /** Bottom of the top bar: a header scrolled above it does not fly back. */
   headerBottom: number;
