@@ -94,14 +94,17 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `04-tu-turno-aprobar` | aprobar una acción de red desde su tarjeta de Tu turno y otra desde «En cola» del calendario |
 | `04-tu-turno-mas` | máquina detenida desde Ajustes y reanudada desde Tu turno, «Responder con audio», «Marcar como oportunidad», «No responder», descartar la orientación, responder con una opción y «Deshacer», «No quiero compartir esto» |
 | `04-tu-turno-sabe` | «Lo que el equipo sabe de ti»: añadir, editar (v2) y retirar un dato |
-| `05-captura` | abrir la hoja, escribir, «Para qué es», grabar (o lo que muestre el emulador sin micrófono), cerrar sin enviar, mantener pulsado el botón, enviar, «Lo que enviaste» y «Deshacer» |
+| `05-captura` | desde Galería: abrir la hoja, «Para qué es», grabar desde la hoja, cerrar vacía y con algo («¿Cerrar sin enviar?»), mantener el botón, enviar, «Deshacer» en el aviso (vuelve el borrador), «Lo que enviaste» y «Deshacer» ahí |
+| `05-captura-envios` | una foto del selector de Android y una nota de voz llegan al backend (aviso, Galería, «Lo que enviaste»); sin red (modo avión) y 413: el motivo, el borrador y «Reintentar» |
+| `05-captura-contexto` | «Responder con audio» en Tu turno, «Nota de voz» en una persona y «Comentario para el equipo» con foto en una pieza, con su contexto en «Lo que enviaste» |
 | `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
 | `06-notificaciones-avisos` | Ajustes › Notificaciones: «Este dispositivo», «Probar notificación» y encender un tipo de push apagado por defecto, que sigue encendido tras reabrir la app |
 | `06-notificaciones-destinos` | el resumen semanal, la captura procesada y la oportunidad sin contacto abren su destino |
 | `07-calendario` | Semana, Mes y Lista; tocar días y su hoja; deslizar semanas y meses; la pieza de mañana, los pliegues de «Cómo se escribió», vetar y «Deshacer»; la pieza bloqueada y su ronda de reparación |
 | `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo»; la definición de un gráfico; tocar una barra |
 | `09-personas` | filtros por etapa y búsqueda; la ficha de una persona con una nota nueva; mover una oportunidad de etapa (y deshacerlo); la validación al añadir un referente |
-| `10-galeria` | abrir una foto, editar su nota, el interruptor de edición con IA, el visor y deslizar entre fotos |
+| `10-galeria` | la rejilla, los filtros (y uno vacío), la nota y el interruptor de edición con IA (y la foto abierta otra vez enseguida), el visor (zoom, deslizar, cerrar), «Quitar de la galería» y que las fotos son privadas |
+| `10-galeria-subir` | «Subir fotos» con el selector de Android, un 413 con «Reintentar» y la Galería vacía |
 | `11-ajustes` | todas las secciones, Autonomía, apagar un tipo de aviso, la lista de dispositivos y cerrar sesión (va al final) |
 
 ## Escribir o cambiar un flujo
@@ -117,9 +120,10 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 
 ## Lo que no se automatiza
 
-- **El micrófono.** El emulador del runner arranca con `-noaudio`: no hay entrada de audio real. El flujo de Captura mantiene pulsado el botón y comprueba lo que muestra la app, sin grabar voz de verdad.
+- **La voz.** El emulador del runner arranca con `-noaudio`: el micrófono abre y graba silencio. Las capturas con audio viajan como un m4a real y llegan al backend, pero la transcripción (que en CI no corre) y la voz de verdad se prueban en el teléfono.
 - **Los avisos push reales.** Necesitan las credenciales de FCM y el servicio de Expo, y la QA no usa secretos ni servicios externos. Se prueba la pantalla de Ajustes › Notificaciones, no la entrega.
-- **La cámara y el selector de fotos** (`-camera-back none`), y **abrir LinkedIn**: los enlaces del mundo de QA apuntan a `linkedin.example`, nunca a linkedin.com.
+- **La cámara** (`-camera-back none`). El selector de fotos sí: `correr-maestro.sh` deja una de las fotos sembradas en `Pictures` y `comun/elegir-foto.yaml` la elige.
+- **Abrir LinkedIn**: los enlaces del mundo de QA apuntan a `linkedin.example`, nunca a linkedin.com.
 
 ## Cobertura del catálogo
 

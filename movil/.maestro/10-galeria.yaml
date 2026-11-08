@@ -1,8 +1,11 @@
-# cubre: GAL-01, GAL-03, GAL-04, GAL-06
-# Galería: the grid of the seeded photos and a filter; the photo sheet of «Nueva» (note typed and saved, the
-# AI-edit switch turned off, both still there when it opens again); the full-screen viewer closed by dragging
-# the photo down, and by «Cerrar» after swiping to the next photo (the sheet then follows that photo).
-# Photos, newest first: Nueva (today), Sin usar (3 days, note «Pizarra de la sesión de producto»), Elegida, Publicada.
+# cubre: GAL-01, GAL-03, GAL-04, GAL-05, GAL-06, GAL-07
+# Galería: the grid of the seeded photos, newest first, with its texts; the filters (and an empty one); the photo sheet
+# of «Nueva» (note typed and saved, the AI-edit switch turned off, both there when it opens again right away); the
+# full-screen viewer (on ink, closed by dragging the photo down, double-tap zoom that holds the pager, a swipe to the
+# next photo and «Cerrar», after which the sheet follows that photo); and «Quitar de la galería» with its confirmation.
+# Photos, newest first: Nueva (today), Sin usar (3 days, note «Pizarra de la sesión de producto»), Elegida (for
+# tomorrow's piece), Publicada. «Subir fotos» is in 10-galeria-subir.
+# Steps marked «interruptor de fallos» use the QA failure switch (team_backend.qa_fallos, comun/qa-fallo.js).
 appId: co.projectapp.office
 name: Galería
 tags: [galeria]
@@ -15,8 +18,16 @@ tags: [galeria]
     visible:
       id: screen-galeria
     timeout: 20000
+
+# ---------------------------------------------------------------- the grid
+# cubre: GAL-01, GAL-07
 - assertVisible: "Fotos para tus posts\\."
-# Tiles are labelled «Foto del <día>, <estado>».
+- assertVisible:
+    id: gallery-upload
+    text: Subir fotos
+- assertVisible: "Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería»\\."
+- assertVisible: "El equipo decide cuándo usarlas y si las edita con IA\\. Tú puedes dejar una nota o prohibir la edición en cada foto\\."
+# Tiles are labelled «Foto del <día>, <estado>»; the newest first.
 - extendedWaitUntil:
     visible: "Foto.*, nueva"
     timeout: 20000
@@ -24,11 +35,18 @@ tags: [galeria]
 - assertVisible: "Foto.*, elegida.*"
 - assertVisible: "Foto.*, publicada.*"
 - assertVisible:
+    text: "Foto.*, sin usar"
+    rightOf:
+      text: "Foto.*, nueva"
+- assertVisible:
     id: filtro-todas
     selected: true
 - takeScreenshot: 10-galeria-01-rejilla
+# The photos are private: the image the grid shows, asked for without the session or the device token, is refused.
+- evalScript: ${output.sinSesion = http.get('http://127.0.0.1:8787/api/v1/galeria/67f77ca8-0963-50a7-8308-53d677c07999/imagen').status}
+- assertTrue: ${output.sinSesion == 401 || output.sinSesion == 403}
 
-# ---------------------------------------------------------------- a filter
+# ---------------------------------------------------------------- the filters
 # cubre: GAL-01
 - tapOn:
     id: filtro-publicadas
@@ -41,8 +59,38 @@ tags: [galeria]
     id: filtro-publicadas
     selected: true
 - takeScreenshot: 10-galeria-02-filtro-publicadas
+# «Sin usar» includes the new one.
+- tapOn:
+    id: filtro-sin_usar
+- extendedWaitUntil:
+    visible: "Foto.*, nueva"
+    timeout: 15000
+- assertVisible: "Foto.*, sin usar"
+- assertNotVisible: "Foto.*, elegida.*"
+- assertNotVisible: "Foto.*, publicada.*"
+# A filter without photos (interruptor de fallos: its list, asked for the first time, comes back empty). Lists are
+# fresh for 10 s (compartido queryClient), so it has to be a filter not opened yet: «Elegidas».
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/galeria$'
+      EFECTO: 'vacio'
+      METODO: GET
+      VECES: '1'
+- tapOn:
+    id: filtro-elegidas
+- extendedWaitUntil:
+    visible: "No hay fotos con este filtro\\."
+    timeout: 15000
+- assertVisible:
+    id: filtro-elegidas
+    selected: true
+- takeScreenshot: 10-galeria-03-filtro-vacio
 - tapOn:
     id: filtro-todas
+- extendedWaitUntil:
+    visible: "Foto.*, publicada.*"
+    timeout: 15000
 - extendedWaitUntil:
     visible: "Foto.*, nueva"
     timeout: 15000
@@ -55,22 +103,24 @@ tags: [galeria]
       id: photo-sheet
     timeout: 15000
 - assertVisible: "Todavía sin usar"
+- assertVisible: "Nota para el equipo \\(opcional\\)"
+- assertVisible: "El equipo puede editarla con IA"
+- assertVisible: "Quitar de la galería"
 - assertVisible:
     id: photo-ai
     checked: true
 - assertVisible:
     id: photo-save
     enabled: false
-- takeScreenshot: 10-galeria-03-foto-abierta
+- takeScreenshot: 10-galeria-04-foto-abierta
 
 # The note is ASCII on purpose (Maestro types non-ASCII text through a slower path on Android).
 - tapOn:
     id: photo-note
 - inputText: Recortala para que no se lean nombres de clientes
-# A tap on plain text of the sheet dismisses the keyboard (keyboardShouldPersistTaps="handled"); unlike
-# hideKeyboard (Android back) it cannot close the sheet when the emulator shows no soft keyboard.
+# A tap on plain text of the sheet dismisses the keyboard (keyboardShouldPersistTaps="handled"); unlike hideKeyboard
+# (Android back) it cannot close the sheet when the emulator shows no soft keyboard.
 - tapOn: "Todavía sin usar"
-# Conditional on purpose: only if Gboard is still up, hide it (back with the keyboard down would close the sheet).
 - runFlow:
     when:
       visible:
@@ -88,7 +138,17 @@ tags: [galeria]
 - assertVisible:
     id: photo-save
     enabled: true
-- takeScreenshot: 10-galeria-04-nota-y-switch
+- takeScreenshot: 10-galeria-05-nota-y-switch
+# The gallery reloads slowly after the save (interruptor de fallos), so the photo opens again before the new list
+# arrives: the sheet must show what was just saved, not the list it had.
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/galeria$'
+      EFECTO: 'lento'
+      METODO: GET
+      VECES: '1'
+      SEGUNDOS: '15'
 - tapOn:
     id: photo-save
 - extendedWaitUntil:
@@ -98,31 +158,32 @@ tags: [galeria]
     notVisible:
       id: photo-sheet
     timeout: 15000
-- takeScreenshot: 10-galeria-05-guardada
+- takeScreenshot: 10-galeria-06-guardada
 
-# Open it again: the saved note and the switch come from the server.
+# Open it again at once: the saved note and the switch.
 - tapOn: "Foto.*, nueva"
 - extendedWaitUntil:
     visible:
       id: photo-sheet
     timeout: 15000
-- extendedWaitUntil:
-    visible:
-      id: photo-note
-      text: Recortala para que no se lean nombres de clientes
-    timeout: 10000
+- assertVisible:
+    id: photo-note
+    text: Recortala para que no se lean nombres de clientes
 - assertVisible:
     id: photo-ai
     checked: false
+- assertVisible:
+    id: photo-save
+    enabled: false
 # The big image is labelled with the saved note.
 - assertVisible:
     id: photo-sheet-image
     text: "Foto: Recortala para que no se lean nombres de clientes"
-- takeScreenshot: 10-galeria-06-nota-guardada
+- takeScreenshot: 10-galeria-07-nota-guardada
 
 # ---------------------------------------------------------------- the viewer
 # cubre: GAL-06
-# Drag the photo down to close it: back to the same sheet.
+# The photo on ink (colors.ink), with «1 de 4», «Cerrar» and its caption in paper white over it.
 - tapOn:
     id: photo-sheet-image
 - extendedWaitUntil:
@@ -132,7 +193,11 @@ tags: [galeria]
 - assertVisible:
     id: photo-viewer-count
     text: 1 de 4
-- takeScreenshot: 10-galeria-07-visor
+- assertVisible:
+    id: photo-viewer-close
+- assertVisible: "Nueva"
+- takeScreenshot: 10-galeria-08-visor
+# Drag the photo down to close it: back to the same sheet.
 - swipe:
     start: "50%, 40%"
     end: "50%, 80%"
@@ -145,40 +210,51 @@ tags: [galeria]
     id: photo-sheet-image
     text: "Foto: Recortala para que no se lean nombres de clientes"
 
-# Again, swipe to the next photo and close with «Cerrar»: the sheet now shows that photo (no unsaved changes).
+# Again: a double tap zooms in, and while zoomed a sideways drag moves the photo instead of turning the page.
 - tapOn:
     id: photo-sheet-image
 - extendedWaitUntil:
     visible:
       id: photo-viewer
     timeout: 15000
+- doubleTapOn:
+    point: "50%, 50%"
 - swipe:
-    start: "85%, 50%"
-    end: "15%, 50%"
-    duration: 400
-# The viewer may still be opening when the first swipe lands: one more swipe if it did not turn.
-- runFlow:
-    when:
+    start: "70%, 50%"
+    end: "40%, 50%"
+    duration: 600
+- assertVisible:
+    id: photo-viewer-count
+    text: 1 de 4
+- takeScreenshot: 10-galeria-09-visor-zoom
+# A second double tap zooms out; then a swipe turns to the next photo.
+- doubleTapOn:
+    point: "50%, 50%"
+- repeat:
+    times: 3
+    while:
       visible:
         id: photo-viewer-count
         text: 1 de 4
     commands:
       - swipe:
-          start: "85%, 50%"
-          end: "15%, 50%"
-          duration: 400
+          start: "85%, 60%"
+          end: "10%, 60%"
+          duration: 700
 - extendedWaitUntil:
     visible:
       id: photo-viewer-count
       text: 2 de 4
     timeout: 10000
-- takeScreenshot: 10-galeria-08-visor-siguiente
+- assertVisible: "Sin usar"
+- takeScreenshot: 10-galeria-10-visor-siguiente
 - tapOn:
     id: photo-viewer-close
 - extendedWaitUntil:
     notVisible:
       id: photo-viewer
     timeout: 10000
+# The sheet now shows that photo (the open one had no unsaved changes).
 - extendedWaitUntil:
     visible:
       id: photo-note
@@ -187,9 +263,70 @@ tags: [galeria]
 - assertVisible:
     id: photo-ai
     checked: true
-- takeScreenshot: 10-galeria-09-sigue-la-foto
+- takeScreenshot: 10-galeria-11-sigue-la-foto
 
-# Close the sheet with its «×».
+# ---------------------------------------------------------------- «Quitar de la galería»
+# cubre: GAL-05
+- scrollUntilVisible:
+    element:
+      text: "Quitar de la galería"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Quitar de la galería"
+- extendedWaitUntil:
+    visible: "¿Quitar esta foto de la galería\\?"
+    timeout: 15000
+- assertVisible: "Se borran la foto y su archivo; el equipo ya no podrá usarla\\."
+- assertVisible: "Cancelar"
+- takeScreenshot: 10-galeria-12-quitar-confirmacion
+# «Cancelar» keeps it.
+- tapOn: "Cancelar"
+- extendedWaitUntil:
+    notVisible: "¿Quitar esta foto de la galería\\?"
+    timeout: 15000
+- assertVisible:
+    id: photo-sheet
+- tapOn: "Quitar de la galería"
+- extendedWaitUntil:
+    visible: "¿Quitar esta foto de la galería\\?"
+    timeout: 15000
+- tapOn: "Quitar la foto"
+- takeScreenshot: 10-galeria-tras-quitar
+- extendedWaitUntil:
+    visible: "Foto quitada de la galería\\."
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: photo-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Foto.*, sin usar"
+    timeout: 20000
+- assertVisible: "Foto.*, nueva"
+- assertVisible: "Foto.*, elegida.*"
+- takeScreenshot: 10-galeria-13-quitada
+
+# A photo chosen for a post warns before it goes; close the confirmation and the sheet with «×».
+- tapOn: "Foto.*, elegida.*"
+- extendedWaitUntil:
+    visible:
+      id: photo-sheet
+    timeout: 15000
+- assertVisible: "Elegida para .*"
+- scrollUntilVisible:
+    element:
+      text: "Quitar de la galería"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "Quitar de la galería"
+- extendedWaitUntil:
+    visible: "Ojo: elegida para el post del .*"
+    timeout: 15000
+- takeScreenshot: 10-galeria-14-quitar-elegida
+- tapOn: "Cancelar"
+- extendedWaitUntil:
+    notVisible: "¿Quitar esta foto de la galería\\?"
+    timeout: 15000
 - tapOn:
     id: photo-sheet-close
 - extendedWaitUntil:
@@ -198,4 +335,3 @@ tags: [galeria]
     timeout: 10000
 - assertVisible:
     id: screen-galeria
-- takeScreenshot: 10-galeria-10-cerrada

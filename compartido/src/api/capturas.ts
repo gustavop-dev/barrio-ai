@@ -2,7 +2,7 @@
 // shapes, calls and hooks. Uploads are multipart (api.postForm: the web transport keeps the CSRF
 // header, the native one sends the bearer token). Files are browser Blobs/Files on the web and
 // `{uri, name, type}` parts in React Native (NativeFile).
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
 import { api } from './client';
 import { asList } from './endpoints';
 import { keys } from './queryClient';
@@ -317,11 +317,50 @@ export function useCapturaLive(initial: CaptureOutput) {
   });
 }
 
+type Pages<T> = InfiniteData<Paginated<T> | T[], number>;
+
+/**
+ * Takes an undone capture out of «Lo que enviaste» at once, and lowers its counter: the list hides undone captures,
+ * and on a slow network the row would otherwise stay, with its «Deshacer», until the list comes back.
+ */
+export function removeCapturaFromHistory(client: QueryClient, captureId: string) {
+  client.setQueryData<Pages<CaptureOutput>>(captureKeys.list, (data) => {
+    if (!data || !data.pages.some((page) => asList(page).some((capture) => capture.id === captureId))) return data;
+    const pages = data.pages.map((page) => {
+      if (Array.isArray(page)) return page.filter((capture) => capture.id !== captureId);
+      return { ...page, count: Math.max(0, page.count - 1), results: page.results.filter((capture) => capture.id !== captureId) };
+    });
+    return { ...data, pages };
+  });
+}
+
+/** Puts a photo the API just returned (after a PATCH) into every cached page of the Galería. */
+function replacePhotoInGaleria(client: QueryClient, photo: PhotoOutput) {
+  client.setQueriesData<Pages<PhotoOutput>>({ queryKey: captureKeys.galeriaAll }, (data) => {
+    if (!data?.pages) return data;
+    const swap = (item: PhotoOutput) => (item.id === photo.id ? photo : item);
+    const pages = data.pages.map((page) => (Array.isArray(page) ? page.map(swap) : { ...page, results: page.results.map(swap) }));
+    return { ...data, pages };
+  });
+}
+
+/**
+ * The lists reload in the background after a write. Returning the promise would make TanStack Query wait for the
+ * reload before the caller's onSuccess runs: on a slow network «Enviado al equipo.» or «Foto guardada.» would come
+ * seconds late, with the sheet still «Enviando…».
+ */
+function reloadInBackground(client: QueryClient, ...queryKeys: (readonly unknown[])[]) {
+  for (const queryKey of queryKeys) void client.invalidateQueries({ queryKey });
+}
+
 export function useCreateCaptura() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: createCaptura,
-    onSettled: () => Promise.all([client.invalidateQueries({ queryKey: captureKeys.all }), client.invalidateQueries({ queryKey: captureKeys.galeriaAll })]),
+    // Offline, TanStack would pause the mutation with no error: the sheet stayed «Enviando…» with nothing to tell
+    // Gustavo. It is tried, fails with «No hay conexión…», and the draft waits for «Reintentar».
+    networkMode: 'always',
+    onSettled: () => reloadInBackground(client, captureKeys.all, captureKeys.galeriaAll),
   });
 }
 
@@ -373,7 +412,9 @@ export function useUploadFotos({ onProgress }: { onProgress?: (progress: UploadP
       onProgress?.({ done: files.length, sending: 0, total: files.length });
       return created;
     },
-    onSettled: () => client.invalidateQueries({ queryKey: captureKeys.galeriaAll }),
+    // As a capture: offline it fails and offers «Reintentar» instead of pausing silently.
+    networkMode: 'always',
+    onSettled: () => reloadInBackground(client, captureKeys.galeriaAll),
   });
 }
 
@@ -381,7 +422,11 @@ export function useUpdateFoto() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ photoId, patch }: { photoId: string; patch: PhotoPatch }) => updateFoto(photoId, patch),
-    onSettled: () => client.invalidateQueries({ queryKey: captureKeys.galeriaAll }),
+    // The saved photo goes into the cached Galería at once: opened again before the list reloads, it shows what was saved.
+    onSuccess: (photo) => {
+      if (photo && typeof photo === 'object' && typeof photo.id === 'string') replacePhotoInGaleria(client, photo);
+    },
+    onSettled: () => reloadInBackground(client, captureKeys.galeriaAll),
   });
 }
 

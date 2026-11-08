@@ -2,7 +2,7 @@
 // the phone could not read a file, the server's 400 message, 409, 413, a server error), and the
 // technical detail in small print so a screenshot is enough to diagnose it.
 import { ApiError } from '@compartido/api/client';
-import { isFilePartFailure } from '@/api/multipart';
+import { isFilePartFailure, OFFLINE_REASON, UploadNetworkError } from '@/api/multipart';
 
 export interface SendProblem {
   title: string;
@@ -43,10 +43,12 @@ export function describeSendError(error: unknown): SendProblem {
     };
   }
   if (error instanceof TypeError) {
+    // The phone knew it had no network: nothing technical to add (and no English, CAP-06).
+    const offline = error instanceof UploadNetworkError && error.reason === OFFLINE_REASON;
     return {
       title: 'No hay conexión con el servidor',
       message: 'El envío no salió del teléfono. Comprueba tu red y vuelve a intentarlo.',
-      technical: `${error.name}: ${error.message}`,
+      technical: offline ? null : `${error.name}: ${error.message}`,
       tone: 'error',
     };
   }

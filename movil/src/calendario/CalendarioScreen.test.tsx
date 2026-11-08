@@ -343,7 +343,8 @@ describe('Calendario · veto con «Deshacer»', () => {
   });
 
   it('vetoes from the day sheet and says when the veto failed', async () => {
-    jest.replaceProperty(motion.toastDurations as { withUndo: number }, 'withUndo', 30);
+    // Long enough to see «Vetada» before the failed veto replaces it (the toast can move into the day sheet's window).
+    jest.replaceProperty(motion.toastDurations as { withUndo: number }, 'withUndo', 300);
     server({ 'POST /api/v1/operador/actions/act-8/reject': { status: 409, body: { detail: 'La acción ya se está ejecutando.' } } });
     await renderCalendario();
     await fireEvent.press(await screen.findByTestId('dia-2026-11-08'));

@@ -5,13 +5,13 @@
 import { useGaleria, type GaleriaFiltro, type PhotoOutput } from '@compartido/api/capturas';
 import { FILTERS, isFiltro, photoName, photoTone } from '@compartido/logic/galeria';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Icon } from '@/components/icons';
 import { ApiImage, Button, EmptyState, EmptyText, ErrorRetry, FilterChip, Note, PageHeader, Skeleton, T, pageContent } from '@/components/ui';
-import { layout } from '@/theme/motion';
+import { timing, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { PhotoSheet } from './PhotoSheet';
 import { PhotoViewer } from './PhotoViewer';
@@ -38,6 +38,21 @@ function PhotoTile({ photo, size, onOpen }: { photo: PhotoOutput; size: number; 
       </View>
     </Pressable>
   );
+}
+
+/**
+ * A tile fading in as it joins the grid (`timings.listEnter`). A shared value, not Reanimated `entering`: in the QA, the
+ * grid that reloaded right after the capture sheet's Modal closed stayed blank, every tile stuck at opacity 0 (run
+ * 42481844121, 05-captura-envios). With reduced motion it is visible at once.
+ */
+function TileIn({ children }: { children: ReactNode }) {
+  const { reduced } = useMotion();
+  const shown = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    shown.set(withTiming(1, timing('listEnter')));
+  }, [shown]);
+  const style = useAnimatedStyle(() => ({ opacity: shown.value }));
+  return <Animated.View style={style}>{children}</Animated.View>;
 }
 
 /** The state label over a tile: the Badge colours (info, muted, ok), solid so it reads over the photo. */
@@ -193,9 +208,9 @@ export function GaleriaScreen() {
         initialNumToRender={18}
         windowSize={7}
         renderItem={({ item }) => (
-          <Animated.View entering={layout.listEnter()}>
+          <TileIn>
             <PhotoTile photo={item} size={size} onOpen={() => open(item)} />
-          </Animated.View>
+          </TileIn>
         )}
       />
       {current ? (
