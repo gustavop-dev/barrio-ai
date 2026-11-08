@@ -124,6 +124,23 @@ describe('Personas · Barrio', () => {
     expect(screen.getByTestId('barrio-search').props.value).toBe('S');
   });
 
+  it('keeps a letter typed in the instant the box applies its search (PRS-02)', async () => {
+    // The other race of 09 and 14 on the emulator: «zzzqa» became «zzz». The pause ended with «zzz», the box wrote
+    // ?q=zzz and a letter arrived in that same instant; the box took its own ?q=zzz for a new link and put it back.
+    await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
+    await screen.findByTestId('person-c-1');
+    const box = () => screen.getByTestId('barrio-search');
+    // The letter lands while ?q=zzz is being written, before the screen redraws.
+    jest.mocked(router.setParams).mockImplementationOnce(() => {
+      (box().props as { onChangeText: (text: string) => void }).onChangeText('zzzq');
+    });
+    await fireEvent.changeText(box(), 'zzz');
+    await waitFor(() => expect(router.setParams).toHaveBeenCalledWith(expect.objectContaining({ q: 'zzz' })));
+    expect(box().props.value).toBe('zzzq');
+    await waitFor(() => expect(router.setParams).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'zzzq' })));
+    expect(box().props.value).toBe('zzzq');
+  });
+
   it('searches by name and filters by role, modality and origin in a sheet', async () => {
     const server = await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
     await screen.findByTestId('person-c-1');
