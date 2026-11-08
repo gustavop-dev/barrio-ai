@@ -1,0 +1,29 @@
+# Opens the app signed in: launches it and, if the login shows, enters with the QA user.
+# Every area flow starts here, so it can run alone and after any other flow.
+appId: co.projectapp.office
+---
+- launchApp:
+    permissions:
+      all: allow
+- extendedWaitUntil:
+    visible:
+      id: "login|screen-oficina"
+    timeout: 45000
+- runFlow:
+    when:
+      visible:
+        id: login
+    commands:
+      - tapOn:
+          id: login-usuario
+      - inputText: ${QA_USER}
+      - tapOn:
+          id: login-clave
+      - inputText: ${QA_PASSWORD}
+      - hideKeyboard
+      - tapOn:
+          id: login-entrar
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 45000

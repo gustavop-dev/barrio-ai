@@ -1,0 +1,216 @@
+name: QA móvil
+# UI QA of the 0ff1ce app on an Android emulator, against a seeded demo backend on the runner.
+# Nothing here reaches production, LinkedIn or a paid provider: the API runs with FakeConnector
+# (LIVE_LINKEDIN=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
+# EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 (the runner, as the emulator sees it). See movil/.maestro/README.md.
+on:
+  workflow_dispatch:
+  pull_request:
+    paths: ['movil/**', 'compartido/**', 'agentes-linkedin/**', 'scripts/qa/**', '.github/workflows/qa-movil.yml']
+permissions:
+  contents: read
+  pull-requests: write
+concurrency:
+  group: qa-movil-${{ github.ref }}
+  cancel-in-progress: true
+env:
+  # Bump to rebuild the APK when the build steps change without touching movil/ or compartido/.
+  APK_CACHE_VERSION: v1
+  API_LEVEL: 35
+  MAESTRO_VERSION: 2.12.0
+jobs:
+  qa:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.2-pg17
+        env:
+          POSTGRES_USER: knowledge
+          POSTGRES_DB: knowledge
+          POSTGRES_PASSWORD: qa-only-ci-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U knowledge -d knowledge"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://knowledge:qa-only-ci-password@127.0.0.1:5432/knowledge
+      DJANGO_SECRET_KEY: qa-only-non-production-secret-0123456789
+      DJANGO_ALLOWED_HOSTS: 10.0.2.2,127.0.0.1,localhost
+      LIVE_PROVIDERS: 'false'
+      LIVE_LINKEDIN: 'false'
+      LIVE_LINKEDIN_OFFICIAL: 'false'
+      OPERATOR_ALLOW_FAKE: 'true'
+      # The window is open all day so nothing in the QA world waits for 07:00.
+      OPERATOR_WINDOW: '00:00-23:59'
+      TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/agentes-linkedin/infra/assets/tiktoken
+      # CI-only account created by seed_qa; it never exists outside this job.
+      QA_SEED: permitido
+      QA_PASSWORD: qa-0ff1ce-solo-ci
+      QA_OUT: ${{ github.workspace }}/qa-artefactos
+      INFRA_DIR: ${{ github.workspace }}/agentes-linkedin/infra
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # ---------------------------------------------------------------- demo backend
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: '3.12'
+          enable-cache: true
+          cache-dependency-glob: agentes-linkedin/infra/uv.lock
+      - name: Backend · migrate, bootstrap_local, seed_qa
+        working-directory: agentes-linkedin/infra
+        run: |
+          mkdir -p "$QA_OUT"
+          uv sync --frozen
+          uv run python manage.py migrate --noinput
+          uv run python manage.py bootstrap_local
+          uv run python manage.py seed_qa
+          uv run python manage.py collectstatic --noinput --verbosity 0
+      - name: Backend · serve the API on 0.0.0.0:8787
+        working-directory: agentes-linkedin/infra
+        run: |
+          nohup uv run gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 3 --timeout 120 \
+            --access-logfile - --error-logfile - --capture-output > "$QA_OUT/api.log" 2>&1 &
+          for i in $(seq 1 60); do
+            curl -fsS http://127.0.0.1:8787/health && exit 0
+            sleep 1
+          done
+          echo "The API did not start"; cat "$QA_OUT/api.log"; exit 1
+      - name: Backend · the QA user can log in
+        run: |
+          curl -fsS -X POST http://127.0.0.1:8787/api/v1/auth/token -H 'Content-Type: application/json' \
+            -d "{\"username\":\"qa\",\"password\":\"$QA_PASSWORD\",\"device_name\":\"curl de CI\"}" -o /dev/null -w '%{http_code}\n'
+
+      # ---------------------------------------------------------------- QA APK (x86_64, release, bundled JS)
+      - name: APK cache
+        id: apk
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: apk-${{ env.APK_CACHE_VERSION }}-${{ hashFiles('movil/**', '!movil/.maestro/**', '!movil/**/*.md', 'compartido/**') }}
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: movil/package-lock.json
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: gradle/actions/setup-gradle@v4
+      - name: APK · npm ci and expo prebuild (QA switch on)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil
+        env:
+          OFFICE_QA_BUILD: '1'
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+        run: |
+          npm ci
+          npx expo prebuild --platform android --no-install --clean
+          grep -n 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml
+      - name: APK · gradle assembleRelease (x86_64)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil/android
+        env:
+          OFFICE_QA_BUILD: '1'
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+          NODE_ENV: production
+        run: |
+          ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
+          mkdir -p "$RUNNER_TEMP/apk"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/apk/qa.apk"
+          ls -la "$RUNNER_TEMP/apk"
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: ${{ steps.apk.outputs.cache-primary-key }}
+
+      # ---------------------------------------------------------------- emulator and Maestro
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Maestro
+        run: |
+          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      - name: AVD cache
+        id: avd
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-${{ env.API_LEVEL }}-x86_64-pixel_6-v1
+      - name: AVD · create it and save a snapshot
+        if: steps.avd.outputs.cache-hit != 'true'
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ env.API_LEVEL }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "AVD snapshot generated."
+      - name: Maestro flows on the emulator
+        id: flows
+        uses: reactivecircus/android-emulator-runner@v2
+        env:
+          QA_APK: ${{ runner.temp }}/apk/qa.apk
+        with:
+          api-level: ${{ env.API_LEVEL }}
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: bash scripts/qa/correr-maestro.sh
+
+      # ---------------------------------------------------------------- artifacts and summary
+      - name: Collect logs
+        if: always()
+        run: |
+          mkdir -p "$QA_OUT"
+          python3 scripts/qa/informe.py "$QA_OUT" > "$QA_OUT/resumen.md" || echo "No se pudo escribir el resumen." > "$QA_OUT/resumen.md"
+          cat "$QA_OUT/resumen.md" >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload artifacts
+        id: upload
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-movil-${{ github.run_number }}
+          path: qa-artefactos
+          retention-days: 14
+          if-no-files-found: warn
+      - name: Comment on the PR
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          body="$(cat "$QA_OUT/resumen.md")"
+          body="$body"$'\n\n'"Artefactos: ${ARTIFACT_URL:-no se subieron} · [ejecución](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID})"$'\n'"<!-- qa-movil -->"
+          existing=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PR/comments" --paginate --jq '.[] | select(.body | contains("<!-- qa-movil -->")) | .id' | tail -n1)
+          if [ -n "$existing" ]; then
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$existing" -f body="$body" > /dev/null
+          else
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
+          fi
+      - name: Fail when a flow failed
+        if: always()
+        run: test -f "$QA_OUT/resultado.txt" && grep -qx 'ok' "$QA_OUT/resultado.txt"
