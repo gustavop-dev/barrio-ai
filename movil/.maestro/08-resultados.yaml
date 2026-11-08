@@ -361,11 +361,11 @@ tags: [resultados]
     timeout: 10000
 # Check each chart's heading before scrolling to its contents or the next chart. Centering the funnel's last row
 # can put its heading above the viewport; the following chart headings must be reached independently too.
+# The Negocio chip and its KPIs above locate this section. Match its unique chart text directly: Android can flatten
+# the res-negocio View, so requiring it as a childOf parent can miss visible text and scroll past the whole section.
 - scrollUntilVisible:
     element:
       text: "EMBUDO DE OPORTUNIDADES"
-      childOf:
-        id: res-negocio
     direction: DOWN
     centerElement: true
     timeout: 20000
@@ -373,15 +373,11 @@ tags: [resultados]
 - scrollUntilVisible:
     element:
       text: "Cerrada sin acuerdo: \\d+"
-      childOf:
-        id: res-negocio
     direction: DOWN
     timeout: 20000
 - scrollUntilVisible:
     element:
       text: "REPARTO POR MODALIDAD"
-      childOf:
-        id: res-negocio
     direction: DOWN
     centerElement: true
     timeout: 20000
@@ -389,8 +385,6 @@ tags: [resultados]
 - scrollUntilVisible:
     element:
       text: "OPORTUNIDADES ACTIVAS"
-      childOf:
-        id: res-negocio
     direction: DOWN
     centerElement: true
     timeout: 20000
