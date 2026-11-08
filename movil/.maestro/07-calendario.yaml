@@ -182,14 +182,17 @@ tags: [calendario]
     childOf:
       id: hoja-dia
 - takeScreenshot: 07-calendario-07-hoja-hoy
-# Tomorrow, with the sheet still open (on Sunday tomorrow is in the next week: that case turns the week first).
+# Tomorrow, with the sheet still open (on Sunday tomorrow is in the next week: that case swipes the strip first; the
+# open sheet keeps the strip on top, so the header's arrows are scrolled away).
 - runFlow:
     when:
       notVisible:
         id: "dia-${output.manana}"
     commands:
-      - tapOn:
-          id: calendario-siguiente
+      - swipe:
+          from:
+            id: pager-semana
+          direction: LEFT
       - extendedWaitUntil:
           visible:
             id: "dia-${output.manana}"

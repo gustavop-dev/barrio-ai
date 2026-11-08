@@ -9,7 +9,7 @@ import '@/api/transport';
 import { flushVetoes } from '@/calendario/pendingVeto';
 import { useCaptureSheet } from '@/capture/store';
 import { renderApp } from '@/test/render';
-import { fakeServer, type FakeReply } from '@/test/server';
+import { fakeServer, type FakeHandler, type FakeReply } from '@/test/server';
 import * as motion from '@/theme/motion';
 import { PiezaScreen } from './PiezaScreen';
 
@@ -37,7 +37,7 @@ const SCHEDULED = piece({
   external_url: null,
 });
 
-function server(detail: PieceDetailFull | FakeReply, extra: Record<string, FakeReply> = {}) {
+function server(detail: PieceDetailFull | FakeReply, extra: Record<string, FakeHandler> = {}) {
   const id = 'id' in detail ? detail.id : 'p7';
   return fakeServer({
     'GET /api/v1/operador/overview': { body: shellOverview() },
