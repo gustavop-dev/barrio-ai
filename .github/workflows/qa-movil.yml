@@ -172,6 +172,8 @@ jobs:
       # The QA failure switch (team_backend.qa_fallos): only these settings load it. See movil/.maestro/README.md.
       QA_MODE: 'true'
       QA_FAULTS_FILE: /tmp/qa-fallos.json
+      # One place for the AVD: avdmanager, the emulator, the runner action and the cache all use it.
+      ANDROID_AVD_HOME: /home/runner/.android/avd
     steps:
       - uses: actions/checkout@v4
 
@@ -251,9 +253,11 @@ jobs:
         run: |
           image="system-images;android-$API_LEVEL;google_apis;x86_64"
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
-          yes | "$sdk/sdkmanager" --install "$image" emulator platform-tools > /dev/null
-          echo no | "$sdk/avdmanager" create avd --force -n test -k "$image" -d pixel_6
-          cfg="$HOME/.android/avd/test.avd/config.ini"
+          mkdir -p "$ANDROID_AVD_HOME"
+          yes 2> /dev/null | "$sdk/sdkmanager" --install "$image" emulator platform-tools > /dev/null
+          echo no | "$sdk/avdmanager" create avd --force -n test -k "$image" -d pixel_6 -p "$ANDROID_AVD_HOME/test.avd"
+          "$sdk/avdmanager" list avd
+          cfg="$ANDROID_AVD_HOME/test.avd/config.ini"
           sed -i -E '/^(hw\.lcd\.(width|height|density)|skin\.(name|path)|hw\.cpu\.ncore|hw\.ramSize)=/d' "$cfg"
           printf '%s\n' hw.lcd.width=780 hw.lcd.height=1688 hw.lcd.density=320 skin.name=780x1688 skin.path=_no_skin \
             hw.cpu.ncore=3 hw.ramSize=4096 >> "$cfg"
