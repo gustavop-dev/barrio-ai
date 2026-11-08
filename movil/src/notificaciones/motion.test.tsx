@@ -8,7 +8,6 @@ import { notificacionesFixture, notificationFixture, turnoFixture } from '@compa
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import * as Notifications from 'expo-notifications';
-import { getAnimatedStyle } from 'react-native-reanimated';
 import '@/api/transport';
 import { TopBar } from '@/components/shell/TopBar';
 import { renderApp } from '@/test/render';
@@ -17,6 +16,11 @@ import { notifMotion, notifTimings } from '@/theme/motion';
 import { NotificacionesScreen } from './NotificacionesScreen';
 
 const OVERVIEW = { body: { control: { paused: false }, accounts: [] } };
+
+type AnimatedStyle = { transform?: Record<string, number | string>[]; backgroundColor?: string };
+/** The style Reanimated last applied to a view (what its jest props carry). */
+const animatedStyle = (node: { props: Record<string, unknown> }): AnimatedStyle =>
+  (node.props.jestAnimatedStyle as { value?: AnimatedStyle } | undefined)?.value ?? {};
 
 const advance = async (ms: number) => {
   await act(async () => {
@@ -107,14 +111,8 @@ describe('Notificaciones · the list (MovNotificaciones)', () => {
 });
 
 describe('Notificaciones · the bell (MovNotificaciones)', () => {
-  const rotation = (index: number) => {
-    const style = getAnimatedStyle(screen.getAllByTestId('bell')[index]!) as { transform?: { rotate?: string }[] };
-    return Number.parseFloat(style.transform?.[0]?.rotate ?? '0');
-  };
-  const dotScale = (testID: string) => {
-    const style = getAnimatedStyle(screen.getAllByTestId(testID)[0]!) as { transform?: { scale?: number }[] };
-    return style.transform?.[0]?.scale ?? 1;
-  };
+  const rotation = (index: number) => Number.parseFloat(String(animatedStyle(screen.getAllByTestId('bell')[index]!).transform?.[0]?.rotate ?? '0'));
+  const dotScale = (testID: string) => Number(animatedStyle(screen.getAllByTestId(testID)[0]!).transform?.[0]?.scale ?? 1);
 
   it('sways every bell and pops the dot in from 0 on an arrival, with one LEVE; the dot closes when all is read', async () => {
     jest.useFakeTimers();

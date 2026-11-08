@@ -5,7 +5,6 @@ import { CONVERSATION_CARD, questionCard, turnoFixture } from '@compartido/fixtu
 import type { TuTurno } from '@compartido/api/types';
 import { act, fireEvent, screen } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
-import { getAnimatedStyle } from 'react-native-reanimated';
 import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
@@ -13,6 +12,11 @@ import { turnoMotion } from '@/theme/motion';
 import { TuTurnoScreen } from './TuTurnoScreen';
 
 jest.mock('@/theme/motion', () => ({ ...jest.requireActual('@/theme/motion'), useMotion: () => ({ reduced: true }) }));
+
+type AnimatedStyle = { transform?: Record<string, number | string>[]; backgroundColor?: string };
+/** The style Reanimated last applied to a view (what its jest props carry). */
+const animatedStyle = (node: { props: Record<string, unknown> }): AnimatedStyle =>
+  (node.props.jestAnimatedStyle as { value?: AnimatedStyle } | undefined)?.value ?? {};
 
 const before = (): TuTurno => turnoFixture({ count: 2, items: [CONVERSATION_CARD, questionCard()] });
 
@@ -53,7 +57,7 @@ describe('Tu turno · reduced motion (MovTuTurno «menos movimiento»)', () => {
     expect(Haptics.impactAsync).toHaveBeenCalledWith('light');
     expect(screen.queryByTestId('turno-card-question:q1')).toBeNull();
     expect(screen.getByTestId('pospuestas')).toHaveAccessibleName('Pospuestas · 1');
-    const glow = () => (getAnimatedStyle(screen.getByTestId('pospuestas-row')) as { backgroundColor?: string }).backgroundColor;
+    const glow = () => animatedStyle(screen.getByTestId('pospuestas-row')).backgroundColor;
     const start = glow();
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, turnoMotion.postponedFlashMs / 2));

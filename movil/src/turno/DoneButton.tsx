@@ -9,7 +9,7 @@ import { turnoMotion, turnoTiming } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 
 export function DoneButton({ label, block, testID }: { label: string; block?: boolean; testID?: string }) {
-  const scale = useSharedValue(turnoMotion.checkFrom);
+  const scale = useSharedValue<number>(turnoMotion.checkFrom);
   useEffect(() => {
     scale.set(withTiming(1, turnoTiming('check')));
   }, [scale]);

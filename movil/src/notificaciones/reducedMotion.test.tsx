@@ -5,7 +5,6 @@ import { keys } from '@compartido/api/queryClient';
 import { notificacionesFixture, notificationFixture, turnoFixture } from '@compartido/fixtures/turno';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
-import { getAnimatedStyle } from 'react-native-reanimated';
 import '@/api/transport';
 import { TopBar } from '@/components/shell/TopBar';
 import { renderApp } from '@/test/render';
@@ -14,6 +13,11 @@ import { notifTimings } from '@/theme/motion';
 import { NotificacionesScreen } from './NotificacionesScreen';
 
 jest.mock('@/theme/motion', () => ({ ...jest.requireActual('@/theme/motion'), useMotion: () => ({ reduced: true }) }));
+
+type AnimatedStyle = { transform?: Record<string, number | string>[]; backgroundColor?: string };
+/** The style Reanimated last applied to a view (what its jest props carry). */
+const animatedStyle = (node: { props: Record<string, unknown> }): AnimatedStyle =>
+  (node.props.jestAnimatedStyle as { value?: AnimatedStyle } | undefined)?.value ?? {};
 
 const wait = (ms: number) =>
   act(async () => {
@@ -38,8 +42,7 @@ describe('Notificaciones · reduced motion (MovNotificaciones «menos movimiento
     });
     await waitFor(() => expect(Haptics.impactAsync).toHaveBeenCalledWith('light'));
     await wait(notifTimings.bellStep.duration / 2);
-    const style = getAnimatedStyle(screen.getByTestId('bell')) as { transform?: { rotate?: string }[] };
-    expect(style.transform?.[0]?.rotate ?? '0deg').toBe('0deg');
+    expect(animatedStyle(screen.getByTestId('bell')).transform?.[0]?.rotate ?? '0deg').toBe('0deg');
 
     unread = 0;
     await act(async () => {

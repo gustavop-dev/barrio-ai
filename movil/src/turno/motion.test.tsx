@@ -8,7 +8,6 @@ import { act, fireEvent, screen, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
-import { getAnimatedStyle } from 'react-native-reanimated';
 import '@/api/transport';
 import { TopBar } from '@/components/shell/TopBar';
 import { renderApp } from '@/test/render';
@@ -19,6 +18,11 @@ import { TuTurnoScreen } from './TuTurnoScreen';
 
 const CARD = `turno-card-${CONVERSATION_CARD.id}`;
 const QUESTION = 'turno-card-question:q1';
+
+type AnimatedStyle = { transform?: Record<string, number | string>[]; backgroundColor?: string };
+/** The style Reanimated last applied to a view (what its jest props carry). */
+const animatedStyle = (node: { props: Record<string, unknown> }): AnimatedStyle =>
+  (node.props.jestAnimatedStyle as { value?: AnimatedStyle } | undefined)?.value ?? {};
 
 const before = (): TuTurno => turnoFixture({ count: 2, items: [CONVERSATION_CARD, questionCard()] });
 
@@ -95,7 +99,7 @@ describe('Tu turno · a card resolved with its button (MovTuTurno)', () => {
     const counter = screen.getByTestId('turn-counter');
     expect(counter).toHaveTextContent('1');
     expect(screen.getByLabelText('Tu turno, 1 pendiente')).toBeOnTheScreen();
-    const scale = () => (getAnimatedStyle(screen.getByTestId('turn-counter')) as { transform?: { scale: number }[] }).transform?.[0]?.scale ?? 1;
+    const scale = () => Number(animatedStyle(screen.getByTestId('turn-counter')).transform?.[0]?.scale ?? 1);
     await advance(16);
     expect(scale()).toBeGreaterThan(1);
     expect(scale()).toBeLessThanOrEqual(turnoMotion.badgePop);
@@ -144,7 +148,7 @@ describe('Tu turno · «Más tarde» (MovTuTurno)', () => {
     await advance(turnoTimings.collapse.duration);
     expect(screen.getByTestId('pospuestas')).toHaveAccessibleName('Pospuestas · 1');
     expect(header('Cuando puedas · 0')).toBeOnTheScreen();
-    const glow = () => (getAnimatedStyle(screen.getByTestId('pospuestas-row')) as { backgroundColor?: string }).backgroundColor;
+    const glow = () => animatedStyle(screen.getByTestId('pospuestas-row')).backgroundColor;
     const start = glow();
     await advance(turnoMotion.postponedFlashMs / 2);
     expect(glow()).not.toEqual(start);
