@@ -68,7 +68,8 @@ def avisar(kind,title,detail='',link='',ref=None):
     from .alerts import notify
     try:
         created=None
-        if kind in FEED_KINDS and kind not in COMPUTED_KINDS:
+        if kind in COMPUTED_KINDS:pass  # pushed only: «Próximo» computes it while it lasts
+        elif kind in FEED_KINDS:
             try:
                 with transaction.atomic():
                     created=Notification.objects.create(kind=kind,layer=FEED_KINDS[kind][0],title=title[:300],detail=detail or '',

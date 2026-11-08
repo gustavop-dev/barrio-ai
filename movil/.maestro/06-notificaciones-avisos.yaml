@@ -1,12 +1,44 @@
-# cubre: PUS-04
-# Notificaciones · avisos push: Ajustes › Notificaciones › «Por tipo de notificación». A type whose push is off by
-# default («Conexión nueva que encaja») is turned on, and it stays on after the app starts again from scratch
-# (the switch reads what the server kept, not the screen's memory).
+# cubre: PUS-02, PUS-04, PUS-07
+# Notificaciones · avisos push, in Ajustes › Notificaciones. «Este dispositivo» says what this phone can receive (the
+# emulator has no Firebase: no Expo token) and «Probar notificación» answers (on the runner there is neither VAPID nor
+# a registered phone, so the server refuses it and the reason shows). Then «Por tipo de notificación»: a type whose
+# push is off by default («Conexión nueva que encaja») is turned on, and it stays on after the app starts again from
+# scratch (the switch reads what the server kept, not the screen's memory).
 appId: co.projectapp.office
 name: Notificaciones · avisos push
 tags: [notificaciones]
 ---
 - runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- this phone and «Probar notificación»
+# cubre: PUS-07, PUS-02
+- tapOn:
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Este dispositivo"
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Probar notificación"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: 'Te avisan aquí de lo que pide tu acción \(Tu turno\) y de lo importante que pasa \(Notificaciones\)\.'
+- assertVisible: 'Teléfonos que reciben avisos.*'
+- takeScreenshot: 06-avisos-01-este-dispositivo
+- tapOn: "Probar notificación"
+- extendedWaitUntil:
+    visible: '.*VAPID.*|Notificación de prueba enviada\. Debería llegar en unos segundos\.'
+    timeout: 20000
+- takeScreenshot: 06-avisos-02-probar
+
 - runFlow: comun/ajustes-por-tipo.yaml
 
 # ---------------------------------------------------------------- a push that is off by default, turned on
@@ -21,7 +53,7 @@ tags: [notificaciones]
     id: push-connection_fit
     text: 'Conexión nueva que encaja'
     checked: false
-- takeScreenshot: 06-avisos-01-conexion-apagada
+- takeScreenshot: 06-avisos-03-conexion-apagada
 - tapOn:
     id: push-connection_fit
 - extendedWaitUntil:
@@ -51,4 +83,4 @@ tags: [notificaciones]
 - assertVisible:
     id: push-connection_fit
     checked: true
-- takeScreenshot: 06-avisos-02-conexion-encendida
+- takeScreenshot: 06-avisos-04-conexion-encendida

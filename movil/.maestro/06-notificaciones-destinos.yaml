@@ -1,0 +1,86 @@
+# cubre: NOT-02, NOT-04
+# Notificaciones · destinos: each row opens what it talks about, inside the app, and is marked read on the way.
+# The weekly summary opens Resultados on its «Resumen de la semana» block; the processed capture opens the capture
+# sheet on «Lo que enviaste»; the opportunity without a contact opens Personas on its opportunities.
+# (The blocked piece and the new connection are in 06-notificaciones.)
+appId: co.projectapp.office
+name: Notificaciones · destinos
+tags: [notificaciones]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: top-notificaciones
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-notificaciones
+    timeout: 30000
+
+# ---------------------------------------------------------------- weekly_summary → Resultados, «Resumen de la semana»
+# cubre: NOT-04, NOT-02
+- scrollUntilVisible:
+    element:
+      text: 'El resumen de la semana está listo'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: '.*El resumen de la semana está listo.*Nueva'
+- tapOn: 'El resumen de la semana está listo'
+- extendedWaitUntil:
+    visible:
+      id: resumen-semanal
+    timeout: 30000
+- takeScreenshot: 06-destinos-01-resumen
+- back
+- extendedWaitUntil:
+    visible:
+      id: screen-notificaciones
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: '.*El resumen de la semana está listo.*Nueva'
+    timeout: 15000
+
+# ---------------------------------------------------------------- capture_processed → «Lo que enviaste»
+# cubre: NOT-04
+- runFlow: comun/notificaciones-arriba.yaml
+- scrollUntilVisible:
+    element:
+      text: 'Tu nota quedó en Lo que el equipo sabe de ti'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Tu nota quedó en Lo que el equipo sabe de ti'
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Lo que enviaste.*'
+    timeout: 15000
+- takeScreenshot: 06-destinos-02-lo-que-enviaste
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: screen-notificaciones
+    timeout: 20000
+
+# ---------------------------------------------------------------- opportunity without a contact → Personas › Oportunidades
+# cubre: NOT-04
+- runFlow: comun/notificaciones-arriba.yaml
+- scrollUntilVisible:
+    element:
+      text: 'Oportunidad con Mauricio Peña: Propuesta'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Oportunidad con Mauricio Peña: Propuesta'
+- extendedWaitUntil:
+    visible: 'Mauricio Peña.*'
+    timeout: 30000
+- assertNotVisible:
+    id: screen-notificaciones
+- takeScreenshot: 06-destinos-03-oportunidades

@@ -1,0 +1,119 @@
+# cubre: TUR-15, TUR-16, TUR-17
+# Tu turno › «Lo que el equipo sabe de ti»: the seed's three confirmed facts with their topic, visibility and origin;
+# a new one added by hand (Privado by default, «Lo añadiste tú»); «ProjectApp» edited into a new version («v2»); and
+# «preferencia.equipos» retired, which takes it off the list.
+appId: co.projectapp.office
+name: Tu turno · lo que sabe el equipo
+tags: [turno]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: top-tu-turno
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: turno-list
+    timeout: 30000
+- tapOn: 'Lo que el equipo sabe de ti'
+- extendedWaitUntil:
+    visible:
+      id: turno-sabe
+    timeout: 20000
+
+# ---------------------------------------------------------------- the facts
+# cubre: TUR-15
+- assertVisible: 'Esto es lo único que el equipo puede contar de ti\. Nadie inventará tus experiencias, clientes ni servicios\.'
+- extendedWaitUntil:
+    visible: 'Fundé ProjectApp en Medellín\.'
+    timeout: 20000
+- assertVisible: 'PROJECTAPP|ProjectApp'
+- assertVisible: 'PÚBLICO|Público'
+- assertVisible: 'Lo confirmaste en la memoria.*'
+- takeScreenshot: 04-sabe-01-datos
+
+# ---------------------------------------------------------------- add one by hand
+# cubre: TUR-16
+- tapOn: 'Añadir algo que quieras que sepan'
+- extendedWaitUntil:
+    visible:
+      id: hecho-texto
+    timeout: 15000
+- tapOn:
+    id: hecho-texto
+- inputText: Prefiero las reuniones por la mañana.
+- tapOn:
+    id: hecho-tema
+- inputText: Horarios
+- hideKeyboard
+- takeScreenshot: 04-sabe-02-anadir
+- tapOn: 'Guardar'
+- extendedWaitUntil:
+    visible: 'Guardado\. El equipo ya puede usarlo'
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Prefiero las reuniones por la mañana\.'
+    timeout: 20000
+- assertVisible: 'Lo añadiste tú.*'
+- assertVisible: 'PRIVADO|Privado'
+- takeScreenshot: 04-sabe-03-anadido
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- edit «ProjectApp»: a new version
+# cubre: TUR-17
+- scrollUntilVisible:
+    element:
+      text: 'Editar: ProjectApp'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn: 'Editar: ProjectApp'
+- extendedWaitUntil:
+    visible: 'Editar lo que sabe el equipo'
+    timeout: 15000
+- tapOn:
+    id: hecho-texto
+- eraseText: 60
+- inputText: Fundé ProjectApp en Medellín en 2016.
+- hideKeyboard
+- tapOn: 'Guardar'
+- extendedWaitUntil:
+    visible: 'Guardado como v2'
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Fundé ProjectApp en Medellín en 2016\.'
+    timeout: 20000
+- assertVisible: '.* · v2'
+- takeScreenshot: 04-sabe-04-editado
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- retire «preferencia.equipos»
+- scrollUntilVisible:
+    element:
+      text: 'Retirar: preferencia.equipos'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn: 'Retirar: preferencia.equipos'
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible: 'El equipo deja de usar «preferencia\.equipos» desde ahora\..*'
+- takeScreenshot: 04-sabe-05-retirar
+- tapOn:
+    text: 'Retirar'
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: 'Retirado\. El equipo ya no lo usará'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: 'Prefiero trabajar con equipos pequeños que deciden rápido\.'
+    timeout: 20000
+- takeScreenshot: 04-sabe-06-retirado

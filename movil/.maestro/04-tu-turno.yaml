@@ -1,11 +1,15 @@
-# cubre: TUR-01, TUR-02, TUR-04, TUR-07, TUR-08, TUR-09, TUR-11, TUR-15, TUR-19, INB-03, INB-04, SEM-08
-# Tu turno: what only Gustavo can resolve. The urgent «¿Salió o no?» card (shown as «Comprueba si salió tu
-# comentario»), Sofía's conversation and the team's questions; then resolving them the four ways the screen
-# offers: a swipe right that asks for a note in a sheet, a written answer, a swipe right that runs at once,
-# a swipe left and the «Más tarde» button. «Pospuestas» lists what was postponed, the top bar counter follows,
-# and the answer shows up in «Lo que el equipo sabe de ti» next to the seeded facts.
-# The seed (seed_qa) gives 6 cards: 1 urgente, 2 importantes (the dated question and the conversation) and
-# 3 cuando puedas (two questions and the analyst's orientation), plus «¿En qué ciudad vives actualmente?» postponed.
+# cubre: TUR-01, TUR-02, TUR-03, TUR-04, TUR-07, TUR-08, TUR-09, TUR-11, TUR-13, TUR-14, TUR-15, TUR-19, INB-03, INB-04, SEM-08
+# Tu turno: what only Gustavo can resolve, walked top to bottom once, resolving as it goes. The urgent «¿Salió o no?»
+# card (shown as «Comprueba si salió tu comentario») swiped right asks for its note; the dated question is answered in
+# writing; Sofía's conversation swiped right is done; the choice question swiped left and the yes/no question's «Más
+# tarde» are postponed; the expired question sits under «Ya no es urgente»; «Pospuestas» and «Hecho recientemente»
+# list what happened; the top bar counter follows; and the answer shows up in «Lo que el equipo sabe de ti».
+# The seed (seed_qa) gives 8 cards: 1 urgente; 4 importantes (the dated question, the two network approvals of
+# 04-tu-turno-aprobar and the conversation); 3 cuando puedas (the analyst's orientation, then the choice and yes/no
+# questions, newest first). Plus «¿En qué ciudad vives actualmente?» postponed and «¿Fuiste al meetup…?» expired.
+# Each search goes down from where the last one ended (the order inside each group is fixed by the seed's dates);
+# the list goes back to its header only once, for the «Lo que el equipo sabe de ti» tab (comun/turno-arriba.yaml).
+# Card testIDs carry the seed's deterministic ids (seed_qa.uid): question:ingles is 370dbfe2-….
 appId: co.projectapp.office
 name: Tu turno
 tags: [turno]
@@ -21,7 +25,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 6 pendientes, 1 urgente'
+      text: 'Tu turno, 8 pendientes, 1 urgente'
     timeout: 30000
 - tapOn:
     id: top-tu-turno
@@ -30,90 +34,23 @@ tags: [turno]
     visible:
       id: turno-list
     timeout: 30000
+- assertVisible: '1 urgente · 4 importantes · 3 cuando puedas'
 
-# URGENTE: the uncertain INT-03 comment with its two answers (both ask what Gustavo checked).
-# cubre: TUR-04
+# ---------------------------------------------------------------- URGENTE: «¿Salió o no?», swiped right
+# cubre: TUR-03, TUR-04, TUR-19
+# The INT-03 comment the provider did not confirm, with its two answers (both ask what Gustavo checked). It is new.
 - extendedWaitUntil:
     visible: 'Comprueba si salió tu comentario|¿Salió o no\?'
     timeout: 30000
 - assertVisible: 'Urgente · 1'
 - assertVisible: '.*Volver al monolito con un equipo de cuatro personas.*'
+- assertVisible:
+    text: 'NUEVA|Nueva'
+    childOf:
+      id: 'turno-card-uncertain:b92961cc-9a71-5080-8e7f-65139a659c57'
 - assertVisible: 'Sí, se aplicó'
-- scrollUntilVisible:
-    element:
-      text: 'No se aplicó'
-    direction: DOWN
-    timeout: 20000
 - takeScreenshot: 04-turno-01-urgente
-
-# IMPORTANTE: the dated question first (it has a deadline), then Sofía's conversation with her latest message.
-# cubre: TUR-07, INB-03
-- scrollUntilVisible:
-    element:
-      text: 'Importante · 2'
-    direction: DOWN
-    timeout: 20000
-- scrollUntilVisible:
-    element:
-      text: '¿Cuántos proyectos de software entregó ProjectApp en 2025\?'
-    direction: DOWN
-    timeout: 20000
-- scrollUntilVisible:
-    element:
-      text: 'Sofía Martínez te escribió'
-    direction: DOWN
-    timeout: 20000
-# The card is tall: centre its «Hecho, respondí»; her message sits just above it.
-- scrollUntilVisible:
-    element:
-      text: 'Hecho, respondí'
-    direction: DOWN
-    timeout: 20000
-    centerElement: true
-- assertVisible: '.*Estamos armando la plataforma de nuestra cooperativa.*'
-- assertVisible: 'La app nunca envía mensajes: respondes tú en LinkedIn\.'
-- takeScreenshot: 04-turno-02-conversacion
-
-# CUANDO PUEDAS: the choice and yes/no questions with their answer forms, and the weekly orientation.
-# cubre: TUR-08, SEM-08
-# Their order depends on creation times, so each search starts again from the top.
-- runFlow: comun/turno-arriba.yaml
-- scrollUntilVisible:
-    element:
-      text: '¿Con qué tipo de startups prefieres trabajar\?'
-    direction: DOWN
-    timeout: 30000
-    centerElement: true
-- assertVisible: 'Fintech'
-- assertVisible: 'Agrotech'
-- takeScreenshot: 04-turno-03-pregunta-opciones
-- runFlow: comun/turno-arriba.yaml
-- scrollUntilVisible:
-    element:
-      text: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
-    direction: DOWN
-    timeout: 30000
-    centerElement: true
-- assertVisible: 'Sí'
-- assertVisible: 'No'
-- runFlow: comun/turno-arriba.yaml
-- scrollUntilVisible:
-    element:
-      text: 'El analista propone una orientación'
-    direction: DOWN
-    timeout: 30000
-- scrollUntilVisible:
-    element:
-      id: pospuestas
-    direction: DOWN
-    timeout: 30000
-- assertVisible: 'Pospuestas · 1'
-- takeScreenshot: 04-turno-04-cuando-puedas
-
-# ---------------------------------------------------------------- swipe right on the urgent card
-# cubre: TUR-04, TUR-19
 # Its primary action «Sí, se aplicó» needs a note: the swipe opens the confirmation sheet and the card springs back.
-- runFlow: comun/turno-arriba.yaml
 - swipe:
     from:
       text: 'Comprueba si salió tu comentario|¿Salió o no\?'
@@ -130,7 +67,7 @@ tags: [turno]
 # A tap on the sheet's text dismisses the keyboard (keyboardShouldPersistTaps="handled"), without closing the sheet.
 - tapOn: 'La acción queda como hecha en LinkedIn\.'
 - assertVisible: 'El comentario aparece en el post'
-- takeScreenshot: 04-turno-05-incierta-nota
+- takeScreenshot: 04-turno-02-incierta-nota
 - tapOn:
     text: 'Sí, se aplicó'
     childOf:
@@ -138,49 +75,51 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Anotado: se aplicó'
     timeout: 20000
-- takeScreenshot: 04-turno-06-incierta-anotada
+- takeScreenshot: 04-turno-03-incierta-anotada
 - extendedWaitUntil:
     notVisible: 'Comprueba si salió tu comentario|¿Salió o no\?'
     timeout: 20000
 - assertNotVisible:
     id: confirm-sheet
 - extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 7 pendientes'
+    timeout: 20000
+- extendedWaitUntil:
     notVisible:
       id: toast
     timeout: 15000
 
-# ---------------------------------------------------------------- answer the text question
+# ---------------------------------------------------------------- IMPORTANTE: the dated question, answered in writing
 # cubre: TUR-09
 # The free-text field is the only answer field whose testID is «answer-<uuid>» (no «submit»/«fix» in it).
-- runFlow: comun/turno-arriba.yaml
+- scrollUntilVisible:
+    element:
+      text: 'Importante · 4'
+    direction: DOWN
+    timeout: 20000
 - scrollUntilVisible:
     element:
       id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
     direction: DOWN
     timeout: 20000
     centerElement: true
+- assertVisible: '¿Cuántos proyectos de software entregó ProjectApp en 2025\?'
 - tapOn:
     id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 - inputText: Entregamos 14 proyectos de software en 2025.
 - tapOn: '¿Cuántos proyectos de software entregó ProjectApp en 2025\?'
 - assertVisible: 'Entregamos 14 proyectos de software en 2025\.'
-- takeScreenshot: 04-turno-07-respuesta-escrita
+- takeScreenshot: 04-turno-04-respuesta-escrita
 - scrollUntilVisible:
     element:
-      id: 'answer-submit-.*'
-      childOf:
-        id: 'turno-card-question:.*'
-        containsDescendants:
-          - id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+      id: 'answer-submit-3db4be49-1ddb-518e-bb02-794907c57c95'
     direction: DOWN
     timeout: 20000
     centerElement: true
 - tapOn:
-    id: 'answer-submit-.*'
-    childOf:
-      id: 'turno-card-question:.*'
-      containsDescendants:
-        - id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
+    id: 'answer-submit-3db4be49-1ddb-518e-bb02-794907c57c95'
 - extendedWaitUntil:
     visible: 'Guardado\. El equipo ya puede usarlo'
     timeout: 20000
@@ -188,8 +127,8 @@ tags: [turno]
     text: 'Deshacer'
     childOf:
       id: toast
-- takeScreenshot: 04-turno-08-pregunta-respondida
-# The card leaves the list once the backend confirmed (its field was on screen when «Responder» was tapped).
+- takeScreenshot: 04-turno-05-pregunta-respondida
+# The card leaves the list once the backend confirmed.
 - extendedWaitUntil:
     notVisible:
       id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
@@ -199,16 +138,26 @@ tags: [turno]
       id: toast
     timeout: 15000
 
-# ---------------------------------------------------------------- swipe right on the conversation
-# cubre: TUR-19, INB-04
-# Right runs its first request action, «Hecho, respondí» (no note): the card flies off and does not come back.
-- runFlow: comun/turno-arriba.yaml
+# ---------------------------------------------------------------- IMPORTANTE: Sofía's conversation, swiped right
+# cubre: TUR-07, TUR-19, INB-03, INB-04
+# It has no deadline, so it is the last Importante card. Right runs its first request action, «Hecho, respondí»
+# (no note): the card flies off and does not come back.
 - scrollUntilVisible:
     element:
       text: 'Sofía Martínez te escribió'
     direction: DOWN
+    timeout: 30000
+# The card is tall: centre its «Hecho, respondí»; her message sits just above it.
+- scrollUntilVisible:
+    element:
+      text: 'Hecho, respondí'
+    direction: DOWN
     timeout: 20000
     centerElement: true
+- assertVisible: '.*Estamos armando la plataforma de nuestra cooperativa.*'
+- assertVisible: 'La app nunca envía mensajes: respondes tú en LinkedIn\.'
+- assertVisible: 'No responder'
+- takeScreenshot: 04-turno-06-conversacion
 - swipe:
     from:
       text: 'Sofía Martínez te escribió'
@@ -217,7 +166,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Anotado: respondiste'
     timeout: 20000
-- takeScreenshot: 04-turno-09-conversacion-hecha
+- takeScreenshot: 04-turno-07-conversacion-hecha
 - extendedWaitUntil:
     notVisible: 'Sofía Martínez te escribió'
     timeout: 20000
@@ -226,15 +175,29 @@ tags: [turno]
       id: toast
     timeout: 15000
 
-# ---------------------------------------------------------------- swipe left on the choice question: «Más tarde»
+# ---------------------------------------------------------------- CUANDO PUEDAS: the orientation and the two questions
+# cubre: TUR-08, SEM-08
+- scrollUntilVisible:
+    element:
+      text: 'El analista propone una orientación'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: 'Ver el resumen'
+- assertVisible: 'Descartar'
+- takeScreenshot: 04-turno-08-orientacion
+
+# The choice question, swiped left: «Más tarde».
 # cubre: TUR-11, TUR-19
-- runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
     element:
       text: '¿Con qué tipo de startups prefieres trabajar\?'
     direction: DOWN
     timeout: 30000
     centerElement: true
+- assertVisible: 'Fintech'
+- assertVisible: 'Agrotech'
+- takeScreenshot: 04-turno-09-pregunta-opciones
 - swipe:
     from:
       text: '¿Con qué tipo de startups prefieres trabajar\?'
@@ -252,29 +215,48 @@ tags: [turno]
       id: toast
     timeout: 15000
 
-# ---------------------------------------------------------------- «Más tarde» with the button on the yes/no question
+# The yes/no question, «Más tarde» with its button (the expired question below has one too: look inside this card).
 # cubre: TUR-11
-# It is the last open question, so its «Más tarde» is the only one on the list.
-- runFlow: comun/turno-arriba.yaml
-- scrollUntilVisible:
-    element:
-      text: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
-    direction: DOWN
-    timeout: 30000
 - scrollUntilVisible:
     element:
       text: 'Más tarde'
+      childOf:
+        id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
     direction: DOWN
-    timeout: 20000
+    timeout: 30000
     centerElement: true
-- tapOn: 'Más tarde'
+- assertVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
+- tapOn:
+    text: 'Más tarde'
+    childOf:
+      id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
 - extendedWaitUntil:
     visible: 'Pospuesta\. Vuelve el .*|Pospuesta 3 días'
     timeout: 20000
 - takeScreenshot: 04-turno-11-pospuesta-boton
 - extendedWaitUntil:
-    notVisible: 'Más tarde'
+    notVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
     timeout: 20000
+
+# ---------------------------------------------------------------- «Ya no es urgente»: the question whose deadline passed
+# cubre: TUR-13
+- scrollUntilVisible:
+    element:
+      text: 'Ya no es urgente · 1'
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: '¿Fuiste al meetup de producto del martes\?'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- assertVisible:
+    text: 'CADUCADA|Caducada'
+    childOf:
+      id: 'turno-card-question:2917ba0c-b05b-5be2-b9fb-daf7e1a84885'
+- assertVisible: 'Ya no es urgente, pero sigue siendo útil\.'
+- takeScreenshot: 04-turno-12-caducada
 
 # ---------------------------------------------------------------- «Pospuestas»: the seeded one and the two sent there
 # cubre: TUR-11
@@ -302,14 +284,33 @@ tags: [turno]
 - assertVisible: '.*¿En qué ciudad vives actualmente\?'
 - assertVisible: '.*¿Con qué tipo de startups prefieres trabajar\?'
 - assertVisible: '.*¿Te parece bien que el equipo comente en publicaciones en inglés\?'
-- assertVisible: 'Pospuesta'
-- takeScreenshot: 04-turno-12-pospuestas
-# Only the analyst's orientation is left: the top bar counter says so (no longer urgent).
+- takeScreenshot: 04-turno-13-pospuestas
+# Left: the two approvals and the analyst's orientation (no longer urgent).
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 1 pendiente'
+      text: 'Tu turno, 3 pendientes'
     timeout: 20000
+
+# ---------------------------------------------------------------- «Hecho recientemente»
+# cubre: TUR-14
+- scrollUntilVisible:
+    element:
+      text: 'Hecho recientemente · 3'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn: 'Hecho recientemente · 3'
+- scrollUntilVisible:
+    element:
+      text: 'Cómo se ordena lo que depende de ti'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- assertVisible: 'CONFIRMASTE QUE SE APLICÓ|Confirmaste que se aplicó'
+- assertVisible: 'RESPONDIDA|Respondida'
+- assertVisible: 'RESPONDISTE|Respondiste'
+- takeScreenshot: 04-turno-14-hecho-recientemente
 
 # ---------------------------------------------------------------- «Lo que el equipo sabe de ti»
 # cubre: TUR-15
@@ -324,10 +325,10 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Entregamos 14 proyectos de software en 2025\.'
     timeout: 20000
-- takeScreenshot: 04-turno-13-sabe-respuesta
+- takeScreenshot: 04-turno-15-sabe-respuesta
 - scrollUntilVisible:
     element:
       text: 'Fundé ProjectApp en Medellín\.'
     direction: DOWN
     timeout: 20000
-- takeScreenshot: 04-turno-14-sabe-semilla
+- takeScreenshot: 04-turno-16-sabe-semilla

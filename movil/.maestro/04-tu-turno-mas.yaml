@@ -1,0 +1,289 @@
+# cubre: TUR-06, TUR-07, TUR-08, TUR-09, TUR-10, TUR-12, TUR-14
+# Tu turno · más acciones: the other ways out of a card, top to bottom. The machine stopped from Ajustes becomes the
+# urgent «Reanuda la máquina» card, resumed from Tu turno with its optional reason; «Responder con audio» opens the
+# capture sheet answering that question; Sofía's «Marcar como oportunidad» opens the form prefilled and «No
+# responder» asks for an optional reason; the orientation is discarded; the choice question is answered with an
+# option and the answer undone from the toast; the yes/no question is closed with «No quiero compartir esto»; and
+# «Hecho recientemente» says how each one ended.
+# Card testIDs carry the seed's deterministic ids (seed_qa.uid).
+appId: co.projectapp.office
+name: Tu turno · más acciones
+tags: [turno]
+---
+- runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- the machine stopped from the app, resumed here
+# cubre: TUR-06
+- tapOn:
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Parada total'
+    timeout: 20000
+- tapOn: 'Parada total'
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- tapOn:
+    id: confirm-note
+- inputText: Reviso el tono antes de seguir
+- hideKeyboard
+- tapOn:
+    text: 'Detener la máquina'
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: 'Máquina detenida\.'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- tapOn:
+    id: top-tu-turno
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Reanuda la máquina'
+    timeout: 30000
+- assertVisible: 'Reviso el tono antes de seguir'
+- assertVisible: 'Detenida por qa · .*'
+- assertVisible: 'Urgente · 2'
+- assertVisible:
+    id: top-tu-turno
+    text: 'Tu turno, 9 pendientes, 2 urgentes'
+- takeScreenshot: 04-mas-01-maquina-detenida
+- tapOn:
+    text: 'Reanudar'
+    childOf:
+      id: turno-card-machine_paused
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible: 'El equipo vuelve a trabajar dentro de la ventana horaria y los topes\.'
+- tapOn:
+    id: confirm-note
+- inputText: Tono revisado
+- hideKeyboard
+- tapOn:
+    text: 'Reanudar'
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: 'Máquina reanudada'
+    timeout: 20000
+- takeScreenshot: 04-mas-02-maquina-reanudada
+- extendedWaitUntil:
+    notVisible: 'Reanuda la máquina'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- «Responder con audio»: the capture sheet answers it
+# cubre: TUR-10
+- scrollUntilVisible:
+    element:
+      text: 'Responder con audio'
+      childOf:
+        id: 'turno-card-question:3db4be49-1ddb-518e-bb02-794907c57c95'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    text: 'Responder con audio'
+    childOf:
+      id: 'turno-card-question:3db4be49-1ddb-518e-bb02-794907c57c95'
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Responde a .*'
+    timeout: 15000
+- assertVisible: '.*¿Cuántos proyectos de software entregó ProjectApp en 2025\?.*'
+- takeScreenshot: 04-mas-03-responder-con-audio
+- tapOn:
+    id: capture-cerrar
+- runFlow:
+    when:
+      visible:
+        id: confirm-sheet
+    commands:
+      - tapOn:
+          text: 'Cerrar sin enviar|Cerrar sin guardar|Cerrar'
+          childOf:
+            id: confirm-sheet
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 20000
+
+# ---------------------------------------------------------------- Sofía: «Marcar como oportunidad», then «No responder»
+# cubre: TUR-07
+- scrollUntilVisible:
+    element:
+      text: 'Marcar como oportunidad'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Marcar como oportunidad'
+- extendedWaitUntil:
+    visible:
+      id: opportunity-sheet
+    timeout: 15000
+- assertVisible:
+    text: 'Sofía Martínez'
+    childOf:
+      id: opportunity-sheet
+- takeScreenshot: 04-mas-04-marcar-oportunidad
+- tapOn:
+    text: 'Cancelar'
+    childOf:
+      id: opportunity-sheet
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-sheet
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: 'No responder'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn: 'No responder'
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible: 'La tarjeta sale de Tu turno hasta que te vuelva a escribir\. Nadie le responde por ti\.'
+- takeScreenshot: 04-mas-05-no-responder
+- tapOn:
+    text: 'No responder'
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: 'Anotado: no responderás'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: 'Sofía Martínez te escribió'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- the analyst's orientation, discarded
+# cubre: TUR-08
+- scrollUntilVisible:
+    element:
+      text: 'Descartar'
+      childOf:
+        id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    text: 'Descartar'
+    childOf:
+      id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
+- extendedWaitUntil:
+    visible: 'Resumen descartado'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: 'El analista propone una orientación'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- the choice question: an option, then «Deshacer»
+# cubre: TUR-09
+- scrollUntilVisible:
+    element:
+      text: 'Fintech'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Fintech'
+- scrollUntilVisible:
+    element:
+      id: 'answer-submit-f8a3b231-d0ba-5938-a222-b12acb5e9d16'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn:
+    id: 'answer-submit-f8a3b231-d0ba-5938-a222-b12acb5e9d16'
+- extendedWaitUntil:
+    visible: 'Guardado\. El equipo ya puede usarlo'
+    timeout: 20000
+- tapOn:
+    text: 'Deshacer'
+    childOf:
+      id: toast
+- extendedWaitUntil:
+    visible: 'Respuesta deshecha\. La pregunta vuelve a estar abierta'
+    timeout: 20000
+- takeScreenshot: 04-mas-06-respuesta-deshecha
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- the yes/no question: «No quiero compartir esto»
+# cubre: TUR-12
+- scrollUntilVisible:
+    element:
+      text: 'No quiero compartir esto'
+      childOf:
+        id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    text: 'No quiero compartir esto'
+    childOf:
+      id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible: 'La pregunta se cierra y el equipo no volverá a hacerla\. Tampoco podrá contar esto en público\.'
+- takeScreenshot: 04-mas-07-no-compartir
+- tapOn:
+    text: 'No quiero compartirlo'
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: 'Hecho\. El equipo no volverá a preguntarlo'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
+    timeout: 20000
+
+# ---------------------------------------------------------------- «Hecho recientemente» says how each one ended
+# cubre: TUR-14
+- scrollUntilVisible:
+    element:
+      text: 'Hecho recientemente · [0-9]+'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Hecho recientemente · [0-9]+'
+- scrollUntilVisible:
+    element:
+      text: 'Cómo se ordena lo que depende de ti'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- assertVisible: 'REANUDADA|Reanudada'
+- assertVisible: 'SIN RESPONDER|Sin responder'
+- assertVisible: 'NO QUISISTE COMPARTIRLA|No quisiste compartirla'
+- takeScreenshot: 04-mas-08-hecho-recientemente
