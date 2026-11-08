@@ -17,10 +17,20 @@ appId: co.projectapp.office
       - tapOn:
           id: login-usuario
       - inputText: ${QA_USER}
+      # The keyboard covers the password field at 390x844: close it and scroll to the field.
+      - hideKeyboard
+      - scrollUntilVisible:
+          element:
+            id: login-clave
+          direction: DOWN
       - tapOn:
           id: login-clave
       - inputText: ${QA_PASSWORD}
       - hideKeyboard
+      - scrollUntilVisible:
+          element:
+            id: login-entrar
+          direction: DOWN
       - tapOn:
           id: login-entrar
 - extendedWaitUntil:

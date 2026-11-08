@@ -41,6 +41,8 @@ jobs:
       LIVE_LINKEDIN: 'false'
       LIVE_LINKEDIN_OFFICIAL: 'false'
       OPERATOR_ALLOW_FAKE: 'true'
+      # The seeded inbox conversation shows as a Tu turno card only with the inbox on (nothing reads LinkedIn: no worker runs).
+      INBOX_ENABLED: 'true'
       # The window is open all day so nothing in the QA world waits for 07:00.
       OPERATOR_WINDOW: '00:00-23:59'
       TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/agentes-linkedin/infra/assets/tiktoken

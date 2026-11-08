@@ -16,28 +16,47 @@ tags: [entrada]
 - tapOn:
     id: login-usuario
 - inputText: ${QA_USER}
+- takeScreenshot: 01-entrada-02-teclado
+# The keyboard covers the password field at 390x844: close it and scroll to the field.
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: login-clave
+    direction: DOWN
 - tapOn:
     id: login-clave
 - inputText: clave-equivocada
 - hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: login-entrar
+    direction: DOWN
 - tapOn:
     id: login-entrar
 - extendedWaitUntil:
     visible: Usuario o contraseña incorrectos.
     timeout: 20000
-- takeScreenshot: 01-entrada-02-clave-equivocada
+- takeScreenshot: 01-entrada-03-clave-equivocada
 # Show the password, then type the right one.
+- scrollUntilVisible:
+    element: Mostrar la contraseña
+    direction: DOWN
 - tapOn: Mostrar la contraseña
+- assertVisible: Ocultar la contraseña
 - tapOn:
     id: login-clave
 - eraseText: 40
 - inputText: ${QA_PASSWORD}
 - hideKeyboard
-- takeScreenshot: 01-entrada-03-clave-visible
+- takeScreenshot: 01-entrada-04-clave-visible
+- scrollUntilVisible:
+    element:
+      id: login-entrar
+    direction: DOWN
 - tapOn:
     id: login-entrar
 # The entrance: the door opens and the picture zooms into the live Oficina.
-- takeScreenshot: 01-entrada-04-puerta
+- takeScreenshot: 01-entrada-05-puerta
 - extendedWaitUntil:
     visible:
       id: screen-oficina
@@ -48,4 +67,4 @@ tags: [entrada]
     timeout: 20000
 - assertVisible:
     id: tab-index
-- takeScreenshot: 01-entrada-05-oficina
+- takeScreenshot: 01-entrada-06-oficina
