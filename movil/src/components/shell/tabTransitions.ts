@@ -6,6 +6,13 @@
 // These are options of the JS tabs navigator, whose scenes animate with React Native's Animated on
 // the native driver (UI thread). Each scene animates with its own spec, so the screen that leaves
 // and the one that enters get different ones. With reduced motion nothing animates.
+//
+// A scene's part in the change (entering, leaving, not involved) depends on the tab focused before
+// and the one focused now, and js-tabs reads each scene's options in the very render that changes the
+// focus. So the focus must come from that render's state: the tabs layout reads it from the root
+// navigation state (`focusedChild`), never from `navigation.getState()`, which during render still
+// returns the state of the previous render (it is a callback refreshed after the commit).
+import { useState } from 'react';
 import { Animated, Easing } from 'react-native';
 import type { TabsScreenOptions } from 'expo-router/js-tabs';
 import { BEZIER, navSprings, navTimings, navValues } from '@/theme/motion';
@@ -90,19 +97,50 @@ export function tabSceneOptions(move: TabMove, role: TabRole, side: 1 | -1, widt
   };
 }
 
-/** Remembers the last two focused tabs across renders of the navigator (the options need both). */
+/** The last two focused tabs (the options need both). */
 export interface FocusMemory {
   previous: string | null;
   current: string | null;
 }
 
-/** Updates `memory` when the focus changed; the same state always gives the same answer. */
-export function noteFocus(memory: FocusMemory, focused: string): FocusMemory {
-  if (memory.current !== focused) {
-    memory.previous = memory.current;
-    memory.current = focused;
+/** The memory once `focused` is the focused tab: the same object when nothing changed (null: not known). */
+export function nextFocus(memory: FocusMemory, focused: string | null): FocusMemory {
+  if (focused === null || memory.current === focused) return memory;
+  return { previous: memory.current, current: focused };
+}
+
+/**
+ * Keeps the last two focused tabs across renders. It updates during render (React's «storing
+ * information from previous renders»), so the options computed in the same render already know the
+ * change in course.
+ */
+export function useFocusMemory(focused: string | null): FocusMemory {
+  const [memory, setMemory] = useState<FocusMemory>(() => ({ previous: null, current: focused }));
+  const next = nextFocus(memory, focused);
+  if (next !== memory) setMemory(next);
+  return next;
+}
+
+interface NavNode {
+  index?: number;
+  routes?: readonly { key?: string; name?: string; state?: NavNode }[];
+}
+
+/**
+ * The name of the route focused inside the navigator of the route `routeKey`, searched from the root
+ * navigation state (null when that route or its navigator state is not there yet).
+ */
+export function focusedChild(root: unknown, routeKey: string): string | null {
+  for (const route of (root as NavNode | null | undefined)?.routes ?? []) {
+    if (route.key === routeKey) {
+      const child = route.state;
+      if (!child) return null;
+      return child.routes?.[child.index ?? 0]?.name ?? null;
+    }
+    const found = focusedChild(route.state, routeKey);
+    if (found !== null) return found;
   }
-  return memory;
+  return null;
 }
 
 /** The role and side of `route` in the change from `memory.previous` to `memory.current`, given the tab order. */

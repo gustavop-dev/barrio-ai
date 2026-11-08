@@ -15,9 +15,15 @@ import { durations, FIRM, navGestures, navSprings, navTimings, navValues } from 
 import { BottomBar, pillLeft } from './BottomBar';
 import { DetailScreen } from './DetailScreen';
 import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, stackLevel } from './push';
-import { noteFocus, sceneRole, tabMove, tabSceneOptions, type FocusMemory } from './tabTransitions';
+import { focusedChild, nextFocus, sceneRole, tabMove, tabSceneOptions, useFocusMemory, type FocusMemory } from './tabTransitions';
 
 const expoRouter = jest.requireMock('expo-router') as Record<string, unknown>;
+
+/** Hands over what useFocusMemory returns in every render. */
+function FocusProbe({ focused, onMemory }: { focused: string | null; onMemory: (memory: FocusMemory) => void }) {
+  onMemory(useFocusMemory(focused));
+  return null;
+}
 
 describe('push (MovNavegacion)', () => {
   it('follows the finger from where the detail was grabbed, between 0 and 1', () => {
@@ -156,14 +162,56 @@ describe('tab content and the top-bar push (MovNavegacion)', () => {
 
   it('remembers the last two focused tabs and gives each scene its part', () => {
     const order = ['index', 'resultados', 'personas', 'galeria', 'tu-turno'];
-    const memory: FocusMemory = { previous: null, current: null };
-    noteFocus(memory, 'index');
-    noteFocus(memory, 'tu-turno');
-    noteFocus(memory, 'tu-turno');
+    const start: FocusMemory = { previous: null, current: null };
+    const first = nextFocus(start, 'index');
+    const memory = nextFocus(first, 'tu-turno');
+    expect(nextFocus(memory, 'tu-turno')).toBe(memory);
+    expect(nextFocus(memory, null)).toBe(memory);
     expect(memory).toEqual({ previous: 'index', current: 'tu-turno' });
+    expect(start).toEqual({ previous: null, current: null });
     expect(sceneRole(memory, 'tu-turno', order)).toEqual({ role: 'enter', side: 1 });
     expect(sceneRole(memory, 'index', order)).toEqual({ role: 'leave', side: -1 });
     expect(sceneRole(memory, 'galeria', order).role).toBe('idle');
+  });
+
+  it('knows the new focus in the same render that changes it', async () => {
+    const seen: FocusMemory[] = [];
+    const onMemory = (memory: FocusMemory) => seen.push(memory);
+    const view = await renderApp(<FocusProbe focused="index" onMemory={onMemory} />);
+    expect(seen.at(-1)).toEqual({ previous: null, current: 'index' });
+    const before = seen.length;
+    await view.rerender(<FocusProbe focused="tu-turno" onMemory={onMemory} />);
+    // Every render with the new focus already has the change in course: none is a render behind.
+    const after = seen.slice(before);
+    expect(after.length).toBeGreaterThan(0);
+    for (const memory of after) expect(memory).toEqual({ previous: 'index', current: 'tu-turno' });
+    const settled = seen.at(-1);
+    await view.rerender(<FocusProbe focused="tu-turno" onMemory={onMemory} />);
+    expect(seen.at(-1)).toBe(settled);
+  });
+
+  it('reads the focused tab from the root navigation state, not from a stale getState()', () => {
+    const root = {
+      index: 0,
+      routes: [
+        {
+          key: 'app-1',
+          name: '(app)',
+          state: {
+            index: 1,
+            routes: [
+              { key: 'tabs-1', name: '(tabs)', state: { index: 4, routes: ['index', 'resultados', 'personas', 'galeria', 'tu-turno'].map((name) => ({ key: `${name}-1`, name })) } },
+              { key: 'persona-1', name: 'personas/[id]' },
+            ],
+          },
+        },
+      ],
+    };
+    expect(focusedChild(root, 'tabs-1')).toBe('tu-turno');
+    expect(focusedChild(root, 'app-1')).toBe('personas/[id]');
+    expect(focusedChild(root, 'persona-1')).toBeNull();
+    expect(focusedChild(root, 'nope')).toBeNull();
+    expect(focusedChild(undefined, 'tabs-1')).toBeNull();
   });
 
   it('fades the new content in (TOK.fast, EASE_OUT) and the old one out in 60 % of it (EASE_IN)', () => {

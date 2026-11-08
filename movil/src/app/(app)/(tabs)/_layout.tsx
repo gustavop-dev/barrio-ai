@@ -2,10 +2,15 @@
 // Tu turno, Notificaciones, Calendario and Ajustes are tabs without a button of their own (the top
 // bar opens them); Android back goes through the tab history.
 //
+// Those four are NOT declared with `href: null`. In Expo Router 58, `href: null` on a js-tabs screen
+// becomes `hidden: true`, and a focused hidden tab makes the navigator render nothing and replace the
+// route with the first visible tab: the top bar could never open them (the APK of #38). They need no
+// hiding anyway: the tab bar is BottomBar, which only draws the four bottom tabs.
+//
 // Motion (MovNavegacion): the top bar stays while the content changes (tabTransitions.ts); the
 // top-bar screens open with the push. When a detail screen is pushed over the tabs, the whole shell
 // moves left and darkens with it (push.ts).
-import { useNavigation, useRoute } from 'expo-router';
+import { useNavigation, useRootNavigationState, useRoute } from 'expo-router';
 import { Tabs, type TabsScreenOptions } from 'expo-router/js-tabs';
 import { useEffect, useRef, type ComponentRef } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
@@ -13,16 +18,12 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { BottomBar } from '@/components/shell/BottomBar';
 import { TopBar } from '@/components/shell/TopBar';
 import { baseFrame, pushProgress, registerLayer, stackLevel } from '@/components/shell/push';
-import { noteFocus, sceneRole, tabMove, tabSceneOptions, type FocusMemory } from '@/components/shell/tabTransitions';
+import { focusedChild, sceneRole, tabMove, tabSceneOptions, useFocusMemory } from '@/components/shell/tabTransitions';
 import { useMotion } from '@/theme/motion';
 import { colors } from '@/theme/tokens';
 
 /** The tabs in the navigator's order (the side a scene slides from depends on it). */
 const ORDER = ['index', 'resultados', 'personas', 'galeria', 'tu-turno', 'notificaciones', 'calendario', 'ajustes'] as const;
-
-interface TabsNavigation {
-  getState: () => { index: number; routes: { name: string }[] };
-}
 
 export default function TabsLayout() {
   const navigation = useNavigation();
@@ -32,26 +33,26 @@ export default function TabsLayout() {
   const { reduced } = useMotion();
   const { width } = useWindowDimensions();
   const root = useRef<ComponentRef<typeof View>>(null);
-  const focus = useRef<FocusMemory>({ previous: null, current: null });
+  // The focused tab, from the root state of this very render: the navigator below receives the same
+  // state in the same pass, so each scene's part in the change is right before its animation starts.
+  const focus = useFocusMemory(focusedChild(useRootNavigationState(), route.key));
 
   useEffect(() => registerLayer(level, root.current), [level]);
 
   const shift = useAnimatedStyle(() => ({ transform: [{ translateX: baseFrame(covered.value, width, reduced).translateX }] }), [covered, width, reduced]);
   const dim = useAnimatedStyle(() => ({ opacity: baseFrame(covered.value, width, reduced).dim }), [covered, width, reduced]);
 
-  const screenOptions = ({ route: tab, navigation: tabs }: { route: { name: string }; navigation: TabsNavigation }): TabsScreenOptions => {
-    const state = tabs.getState();
-    const memory = noteFocus(focus.current, state.routes[state.index]?.name ?? tab.name);
-    const { role, side } = sceneRole(memory, tab.name, ORDER);
+  const screenOptions = ({ route: tab }: { route: { name: string } }): TabsScreenOptions => {
+    const { role, side } = sceneRole(focus, tab.name, ORDER);
     return {
       headerShown: false,
       sceneStyle: { backgroundColor: colors.paper },
-      ...tabSceneOptions(tabMove(memory.previous, memory.current ?? tab.name), role, side, width, reduced),
+      ...tabSceneOptions(tabMove(focus.previous, focus.current ?? tab.name), role, side, width, reduced),
     };
   };
 
   return (
-    <Animated.View style={[styles.root, shift]}>
+    <Animated.View testID="shell-tabs" style={[styles.root, shift]}>
       <View ref={root} collapsable={false} pointerEvents="none" style={styles.fill} />
       <TopBar />
       <View style={styles.scenes}>
@@ -60,10 +61,11 @@ export default function TabsLayout() {
           <Tabs.Screen name="resultados" options={{ title: 'Resultados' }} />
           <Tabs.Screen name="personas" options={{ title: 'Personas' }} />
           <Tabs.Screen name="galeria" options={{ title: 'Galería' }} />
-          <Tabs.Screen name="tu-turno" options={{ title: 'Tu turno', href: null }} />
-          <Tabs.Screen name="notificaciones" options={{ title: 'Notificaciones', href: null }} />
-          <Tabs.Screen name="calendario" options={{ title: 'Calendario', href: null }} />
-          <Tabs.Screen name="ajustes" options={{ title: 'Ajustes', href: null }} />
+          {/* The top bar's four: real tabs, without `href: null` (see the note at the top). */}
+          <Tabs.Screen name="tu-turno" options={{ title: 'Tu turno' }} />
+          <Tabs.Screen name="notificaciones" options={{ title: 'Notificaciones' }} />
+          <Tabs.Screen name="calendario" options={{ title: 'Calendario' }} />
+          <Tabs.Screen name="ajustes" options={{ title: 'Ajustes' }} />
         </Tabs>
       </View>
       <Animated.View pointerEvents="none" style={[styles.fill, styles.dim, dim]} />

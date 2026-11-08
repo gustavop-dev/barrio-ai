@@ -16,7 +16,7 @@ import { ExpoRoot, type ExpoRootProps } from 'expo-router/build/ExpoRoot';
 import { getRouteInfoFromState } from 'expo-router/build/global-state/getRouteInfoFromState';
 import { navigationRef } from 'expo-router/build/global-state/navigationRef';
 import { inMemoryContext } from 'expo-router/build/testing-library/context-stubs';
-import { NativeModules, StyleSheet, Text } from 'react-native';
+import { Dimensions, NativeModules, StyleSheet, Text } from 'react-native';
 import type { TestInstance } from 'test-renderer';
 import TabsLayout from '@/app/(app)/(tabs)/_layout';
 import AppLayout from '@/app/(app)/_layout';
@@ -26,6 +26,7 @@ import { clearToken } from '@/api/token';
 import { DetailScreen } from '@/components/shell/DetailScreen';
 import { openLink } from '@/navigation';
 import { fakeServer } from '@/test/server';
+import { navValues } from '@/theme/motion';
 
 jest.unmock('expo-router');
 
@@ -60,7 +61,9 @@ const store = (SecureStore as unknown as { __store: Map<string, string> }).__sto
 const USER = { username: 'gustavo', is_superuser: true, permissions: [] };
 const TOP = ['tu-turno', 'notificaciones', 'calendario', 'ajustes'] as const;
 const BOTTOM = ['index', 'resultados', 'personas', 'galeria'] as const;
-/** Long enough for every spring and timing of the shell to come to rest. */
+/** A tab change at rest: js-tabs' native-driven animations (ended by the mock below) and its 32 ms tail. */
+const TAB_MS = 250;
+/** Long enough for every Reanimated spring of the shell (the detail push, the entrance) to come to rest. */
 const SETTLE_MS = 1500;
 
 function screenOf(name: string) {
@@ -131,6 +134,14 @@ function pathname(): string {
   return getRouteInfoFromState(rootState()).pathname;
 }
 
+/** The routes of the root stack (Expo Router 58 wraps it in a `__root` route). */
+function rootStackNames(): string[] {
+  type Node = { routes?: { name: string; state?: Node }[] };
+  let state = navigationRef.getRootState() as unknown as Node;
+  while (state.routes?.length === 1 && state.routes[0]?.name === '__root' && state.routes[0].state) state = state.routes[0].state;
+  return state.routes?.map((route) => route.name) ?? [];
+}
+
 const pathOf = (name: string) => (name === 'index' ? '/' : `/${name}`);
 
 /** The opacity and horizontal offset an element ends up with, through its own style and every ancestor's. */
@@ -159,16 +170,16 @@ function expectShown(name: string, path = pathOf(name)) {
   expect(Math.abs(frame.translateX)).toBeLessThan(1);
 }
 
-async function press(testID: string) {
+async function press(testID: string, settle = TAB_MS) {
   await fireEvent.press(screen.getByTestId(testID));
-  await advance(SETTLE_MS);
+  await advance(settle);
 }
 
-async function back() {
+async function back(settle = TAB_MS) {
   await act(async () => {
     router.back();
   });
-  await advance(SETTLE_MS);
+  await advance(settle);
 }
 
 beforeAll(() => {
@@ -209,7 +220,7 @@ describe('the top bar on the real shell', () => {
         expectShown(tab);
       }
     }
-  });
+  }, 60_000);
 
   it('goes from one top-bar screen to another and back through them; a second press stays', async () => {
     await renderSignedIn();
@@ -233,13 +244,48 @@ describe('the top bar on the real shell', () => {
     expectShown('index');
   });
 
+  it('pushes a top-bar screen in from the right over the screen underneath, and pops it back (MovNavegacion)', async () => {
+    await renderSignedIn();
+    const { width } = Dimensions.get('window');
+    const parallax = navValues.pushParallax * width;
+    // First frame of the push: Tu turno starts beyond the right edge, opaque (not a fade).
+    await fireEvent.press(screen.getByTestId('top-tu-turno'));
+    const entering = appliedFrame(screen.getByTestId('pantalla-tu-turno'));
+    expect(entering.translateX).toBeCloseTo(width, 0);
+    expect(entering.opacity).toBeCloseTo(1, 2);
+    await advance(TAB_MS);
+    expectShown('tu-turno');
+    // The Oficina underneath ended 30 % to the left.
+    expect(appliedFrame(screen.getByTestId('pantalla-index', { includeHiddenElements: true })).translateX).toBeCloseTo(-parallax, 0);
+
+    // First frame of the way back: the Oficina comes from 30 % to the left, from transparent.
+    await act(async () => {
+      router.back();
+    });
+    const returning = appliedFrame(screen.getByTestId('pantalla-index'));
+    expect(returning.translateX).toBeCloseTo(-parallax, 0);
+    expect(returning.opacity).toBeCloseTo(0, 2);
+    await advance(TAB_MS);
+    expectShown('index');
+    // Tu turno left through the right edge.
+    expect(appliedFrame(screen.getByTestId('pantalla-tu-turno', { includeHiddenElements: true })).translateX).toBeCloseTo(width, 0);
+
+    // A bottom tab still crossfades: Resultados starts transparent, in place horizontally.
+    await fireEvent.press(screen.getByTestId('tab-resultados'));
+    const fading = appliedFrame(screen.getByTestId('pantalla-resultados'));
+    expect(fading.opacity).toBeCloseTo(0, 2);
+    expect(fading.translateX).toBeCloseTo(0, 0);
+    await advance(TAB_MS);
+    expectShown('resultados');
+  });
+
   it('opens a top-bar screen from an in-app link (a push, a card) too', async () => {
     await renderSignedIn();
     await act(async () => openLink('/ajustes'));
-    await advance(SETTLE_MS);
+    await advance(TAB_MS);
     expectShown('ajustes');
     await act(async () => openLink('/tu-turno'));
-    await advance(SETTLE_MS);
+    await advance(TAB_MS);
     expectShown('tu-turno');
   });
 
@@ -276,8 +322,13 @@ describe('the top bar on the real shell', () => {
     await advance(SETTLE_MS);
     expect(pathname()).toBe('/personas/7');
     expect(screen.getByTestId('pantalla-persona')).toBeVisible();
-    await back();
+    expect(Math.abs(appliedFrame(screen.getByTestId('pantalla-persona')).translateX)).toBeLessThan(1);
+    // Under the detail, the whole shell (top bar and tabs) moved 30 % to the left.
+    const { width } = Dimensions.get('window');
+    expect(appliedFrame(screen.getByTestId('shell-tabs', { includeHiddenElements: true })).translateX).toBeCloseTo(-navValues.pushParallax * width, 0);
+    await back(SETTLE_MS);
     expectShown('personas');
+    expect(appliedFrame(screen.getByTestId('shell-tabs')).translateX).toBeCloseTo(0, 0);
 
     await act(async () => {
       router.push('/personas/7');
@@ -308,7 +359,7 @@ describe('login → app', () => {
 
     // Nothing of the login is left: not in the tree, not in the root stack.
     expect(screen.queryByTestId('login-entrar', { includeHiddenElements: true })).toBeNull();
-    expect(navigationRef.getRootState().routes.map((route) => route.name)).toEqual(['(app)']);
+    expect(rootStackNames()).toEqual(['(app)']);
     expectShown('index');
 
     // The top bar is not under anything: none of its ancestors turns touches off.
