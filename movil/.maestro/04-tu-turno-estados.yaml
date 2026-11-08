@@ -1,0 +1,118 @@
+# cubre: TUR-01, TUR-15, TUR-19
+# Tu turno · estados vacíos y de error, with the QA failure switch (comun/qa-fallo.js, team_backend.qa_fallos):
+# an empty Tu turno says «Nada depende de ti hoy»; a refresh that fails keeps the cards and says «No se pudo
+# actualizar» with «Reintentar»; a swipe the API refuses brings the card back with the server's reason; and «Lo que
+# el equipo sabe de ti» shows its load error with «Reintentar», then its empty state.
+appId: co.projectapp.office
+name: Tu turno · estados
+tags: [turno]
+---
+- runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- empty: «Nada depende de ti hoy»
+# cubre: TUR-01
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/tu-turno$'
+      EFECTO: vacio
+      METODO: GET
+      VECES: '-1'
+- tapOn:
+    id: top-tu-turno
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: turno-empty
+    timeout: 30000
+- assertVisible: 'Nada depende de ti hoy'
+- assertVisible: 'Ver el Calendario'
+- takeScreenshot: 04-estados-01-vacio
+
+# ---------------------------------------------------------------- a refresh that fails keeps what was there
+# cubre: TUR-01
+- runScript: comun/qa-fallos-limpiar.js
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/tu-turno$'
+      EFECTO: '503'
+      METODO: GET
+      VECES: '-1'
+- swipe:
+    start: 50%, 30%
+    end: 50%, 75%
+    duration: 600
+- extendedWaitUntil:
+    visible: 'No se pudo actualizar'
+    timeout: 30000
+- assertVisible: 'Fallo simulado por QA \(503\)\.'
+- assertVisible: 'Nada depende de ti hoy'
+- takeScreenshot: 04-estados-02-no-se-pudo-actualizar
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn: 'Reintentar'
+- extendedWaitUntil:
+    notVisible: 'No se pudo actualizar'
+    timeout: 30000
+- extendedWaitUntil:
+    visible: 'Comprueba si salió tu comentario|¿Salió o no\?'
+    timeout: 30000
+
+# ---------------------------------------------------------------- a swipe the API refuses: the card comes back
+# cubre: TUR-19
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/conversaciones/.*/cerrar$'
+      EFECTO: '503'
+      METODO: POST
+- scrollUntilVisible:
+    element:
+      text: 'Sofía Martínez te escribió'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- swipe:
+    from:
+      text: 'Sofía Martínez te escribió'
+    direction: RIGHT
+    duration: 400
+- extendedWaitUntil:
+    visible: 'Fallo simulado por QA \(503\)\.'
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Sofía Martínez te escribió'
+    timeout: 20000
+- assertNotVisible: 'Anotado: respondiste'
+- takeScreenshot: 04-estados-03-deslizar-error
+
+# ---------------------------------------------------------------- «Lo que el equipo sabe de ti»: error, then empty
+# cubre: TUR-15
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/memoria/hechos$'
+      EFECTO: '503'
+      METODO: GET
+      VECES: '-1'
+- runFlow: comun/turno-arriba.yaml
+- tapOn: 'Lo que el equipo sabe de ti'
+- extendedWaitUntil:
+    visible: 'Fallo simulado por QA \(503\)\.'
+    timeout: 30000
+- assertVisible: 'Reintentar'
+- takeScreenshot: 04-estados-04-sabe-error
+- runScript: comun/qa-fallos-limpiar.js
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/memoria/hechos$'
+      EFECTO: vacio
+      METODO: GET
+      VECES: '-1'
+- tapOn: 'Reintentar'
+- extendedWaitUntil:
+    visible: 'Aún no hay nada confirmado'
+    timeout: 30000
+- assertVisible: 'Nadie inventará tus experiencias, clientes ni servicios: responde las preguntas del equipo para que puedan usarlas\.'
+- takeScreenshot: 04-estados-05-sabe-vacio

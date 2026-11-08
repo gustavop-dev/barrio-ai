@@ -1,4 +1,4 @@
-# cubre: TUR-06, TUR-07, TUR-08, TUR-09, TUR-10, TUR-12, TUR-14
+# cubre: TUR-06, TUR-07, TUR-08, TUR-09, TUR-10, TUR-12, TUR-14, INB-05
 # Tu turno · más acciones: the other ways out of a card, top to bottom. The machine stopped from Ajustes becomes the
 # urgent «Reanuda la máquina» card, resumed from Tu turno with its optional reason; «Responder con audio» opens the
 # capture sheet answering that question; Sofía's «Marcar como oportunidad» opens the form prefilled and «No
@@ -138,10 +138,12 @@ tags: [turno]
     visible:
       id: opportunity-sheet
     timeout: 15000
+# cubre: TUR-07, INB-05
 - assertVisible:
     text: 'Sofía Martínez'
     childOf:
       id: opportunity-sheet
+- assertVisible: 'Detectada por el equipo en una conversación de LinkedIn\.'
 - takeScreenshot: 04-mas-04-marcar-oportunidad
 # Closed without saving: nothing is created until «Guardar oportunidad».
 - back
@@ -149,6 +151,8 @@ tags: [turno]
     notVisible:
       id: opportunity-sheet
     timeout: 15000
+# Nothing was created: the card still offers it.
+- assertVisible: 'Marcar como oportunidad'
 - scrollUntilVisible:
     element:
       text: 'No responder'

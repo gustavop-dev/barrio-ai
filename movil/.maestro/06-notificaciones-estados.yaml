@@ -1,0 +1,80 @@
+# cubre: NOT-01, NOT-02
+# Notificaciones · estados vacíos y de error, with the QA failure switch (comun/qa-fallo.js): with nothing in the last
+# 7 days the screen says so; «Marcar todo como leído» that the server refuses puts «Nueva» back and says why; and a
+# refresh that fails keeps the rows with «No se pudo actualizar» and «Reintentar».
+appId: co.projectapp.office
+name: Notificaciones · estados
+tags: [notificaciones]
+---
+- runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- nothing in 7 days
+# cubre: NOT-01
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/notificaciones$'
+      EFECTO: vacio
+      METODO: GET
+      VECES: '-1'
+- tapOn:
+    id: top-notificaciones
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'No hay nada nuevo\. Lo de días anteriores sigue en el Calendario\.'
+    timeout: 30000
+- takeScreenshot: 06-estados-01-vacio
+
+# ---------------------------------------------------------------- «Marcar todo como leído» refused: «Nueva» comes back
+# cubre: NOT-02
+- runScript: comun/qa-fallos-limpiar.js
+- swipe:
+    start: 50%, 30%
+    end: 50%, 75%
+    duration: 600
+- extendedWaitUntil:
+    visible: '.*Nueva'
+    timeout: 30000
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/notificaciones/leer$'
+      EFECTO: '503'
+      METODO: POST
+- runFlow: comun/notificaciones-arriba.yaml
+- tapOn:
+    id: notif-marcar-todo
+- extendedWaitUntil:
+    visible: 'No se pudo marcar como leído'
+    timeout: 20000
+- assertVisible: 'Fallo simulado por QA \(503\)\.'
+- extendedWaitUntil:
+    visible: '.*Nueva'
+    timeout: 20000
+- assertVisible:
+    id: unread-dot
+- takeScreenshot: 06-estados-02-marcar-error
+
+# ---------------------------------------------------------------- a refresh that fails keeps the rows
+# cubre: NOT-01
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/notificaciones$'
+      EFECTO: '503'
+      METODO: GET
+      VECES: '-1'
+- swipe:
+    start: 50%, 30%
+    end: 50%, 75%
+    duration: 600
+- extendedWaitUntil:
+    visible: 'No se pudo actualizar'
+    timeout: 30000
+- assertVisible: '.*Nueva'
+- takeScreenshot: 06-estados-03-no-se-pudo-actualizar
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn: 'Reintentar'
+- extendedWaitUntil:
+    notVisible: 'No se pudo actualizar'
+    timeout: 30000
