@@ -64,7 +64,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   6. **Dado** un usuario sin `use_paid_providers`, **cuando** lo pide, **entonces** recibe 403.
   7. **Dado** que Gustavo pulsa «Preparar la siguiente pieza» en la interfaz, **cuando** aparece la confirmación, **entonces** dice «Tiene coste: cada etapa llama a Claude y gasta del presupuesto editorial…» antes de encolar nada; si cancela, no se envía la petición.
 - **Brechas código/docs:** la confirmación no muestra una cifra de coste, a diferencia de «Generar ahora» del resumen semanal. La interfaz se describe en [CAL-14](calendario-piezas.md#cal-14).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** desde la app en `movil/.maestro/07-pieza-veto.yaml` («Preparar la siguiente pieza»: la confirmación con su coste y la preparación en cola, 202) · 2026-11-08 · pasa
 
 ### EDI-03 · El director escribe el brief o salta el día <a id="edi-03"></a>
 
