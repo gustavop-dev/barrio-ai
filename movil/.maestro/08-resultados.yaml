@@ -249,6 +249,11 @@ tags: [resultados]
     text: "Salió a las .*"
     childOf:
       id: pieza
+# «‹» says where it goes back to: Resultados, not Calendario.
+- assertVisible:
+    text: "Resultados"
+    childOf:
+      id: top-volver
 - scrollUntilVisible:
     element:
       id: corte-24h
