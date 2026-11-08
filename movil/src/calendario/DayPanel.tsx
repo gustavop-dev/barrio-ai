@@ -26,8 +26,8 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
-import { Badge, Button, Card, EmptyState, EmptyText, ErrorRetry, Skeleton, T } from '@/components/ui';
-import { layout, timing } from '@/theme/motion';
+import { Badge, Button, Card, EmptyState, EmptyText, ErrorRetry, FoldIn, Skeleton, T } from '@/components/ui';
+import { timing } from '@/theme/motion';
 import { openLink } from '@/navigation';
 import { colors, layers as LAYER_COLOR, radius, shell, space } from '@/theme/tokens';
 import { DayActivity, QueuedRow } from './ActivityList';
@@ -198,9 +198,7 @@ function AllOfDay({ open, onToggle, children }: { open: boolean; onToggle: () =>
         </Animated.View>
       </Pressable>
       {open ? (
-        <Animated.View entering={layout.foldIn()} exiting={layout.foldOut()}>
-          {children}
-        </Animated.View>
+        <FoldIn>{children}</FoldIn>
       ) : null}
     </View>
   );

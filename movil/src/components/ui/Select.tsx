@@ -1,35 +1,13 @@
 // A labelled choice, the app's version of the PWA's <select>: the field shows the current option and,
 // tapped, lists every option right under it as a radio group (no dialog on top, so it also works inside a
 // sheet). Choosing closes the list.
-import { useEffect, useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
-import { haptic, timing, useMotion } from '@/theme/motion';
+import { haptic } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
+import { FoldIn } from './Fold';
 import { T } from './Text';
-
-// Built on the JS thread: timing() is not a worklet.
-const FOLD = timing('fold');
-
-/**
- * The options fade in (`fold`) with their own opacity, not a layout `entering` animation: in the QA emulator the
- * entering fade of this list stayed at opacity 0, so the options took their room but could not be seen or tapped
- * (08-resultados, «Modalidad»). With reduced motion they are there at once.
- */
-function OptionList({ label, children }: { label: string; children: ReactNode }) {
-  const { reduced } = useMotion();
-  const shown = useSharedValue(reduced ? 1 : 0);
-  useEffect(() => {
-    shown.set(reduced ? 1 : withTiming(1, FOLD));
-  }, [reduced, shown]);
-  const fade = useAnimatedStyle(() => ({ opacity: shown.value }));
-  return (
-    <Animated.View accessibilityRole="radiogroup" accessibilityLabel={label} style={[styles.list, fade]}>
-      {children}
-    </Animated.View>
-  );
-}
 
 export interface SelectOption<V extends string> {
   value: V;
@@ -95,7 +73,8 @@ export function Select<V extends string>({
         <Icon name={open ? 'chevronUp' : 'chevronDown'} size={20} color={colors.inkSoft} />
       </Pressable>
       {open ? (
-        <OptionList label={name}>
+        // FoldIn, not a layout `entering`: that fade sometimes stayed at opacity 0 (08-resultados, «Modalidad»).
+        <FoldIn accessibilityRole="radiogroup" accessibilityLabel={name} style={styles.list}>
           {options.map((option) => {
             const selected = option.value === value;
             return (
@@ -116,7 +95,7 @@ export function Select<V extends string>({
               </Pressable>
             );
           })}
-        </OptionList>
+        </FoldIn>
       ) : null}
       {error ? (
         <T variant="detalle" color={colors.alert}>

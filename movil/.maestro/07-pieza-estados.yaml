@@ -1,11 +1,12 @@
-# cubre: CAL-02, CAL-03, CAL-06, CAL-07, CAL-08, CAL-09
+# cubre: CAL-02, CAL-03, CAL-06, CAL-07, CAL-08, CAL-09, CAL-16
 # The past pieces of the QA world, each from its day in the calendar. Two days ago, blocked: in «Lo importante del
 # día» with its layer (turning «Red» off hides that day's new connection and keeps the block), and in the detail «El
 # verificador bloqueó la pieza» with its reasons, no «Vetar» and «Ronda de reparación». Three days ago, published:
 # «Salió a las …», the result by cut (impressions and the rest, a reading without reposts as «—», the 7-day cut «Aún
 # no» with the day it arrives), who commented by role and the post on LinkedIn. Yesterday, skipped: «Ese día no hubo
 # publicación» with the director's reason. Five days ago, failed: «La publicación falló» with the reason, no final
-# text yet and the stages that did not run. Last, the day sheet at full height leaves the week strip usable.
+# text yet and the stages that did not run. Then the day sheet at full height leaves the week strip usable, and a link
+# to a view that does not exist says so, with «Ir a la Oficina».
 # Dates come from comun/calendario-fechas.js. Text in the «etiqueta» style is uppercased on screen.
 appId: co.projectapp.office
 name: Piezas pasadas
@@ -550,3 +551,16 @@ tags: [calendario]
     notVisible:
       id: hoja-dia
     timeout: 10000
+
+# ---------------------------------------------------------------- a link to a view that does not exist
+# cubre: CAL-16
+- openLink: oficina0ff1ce://vista-que-no-existe
+- extendedWaitUntil:
+    visible: "Esta vista no existe"
+    timeout: 20000
+- takeScreenshot: 07-pieza-estados-15-vista-inexistente
+- tapOn: "Ir a la Oficina"
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 30000

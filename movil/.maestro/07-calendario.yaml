@@ -463,6 +463,8 @@ tags: [calendario]
 # and leaves the queue.
 - tapOn:
     text: "Vetar"
+    below:
+      text: "EN COLA"
     rightOf:
       text: "Invitar a Camila Ortiz \\(sin nota\\)"
 - extendedWaitUntil:
@@ -501,6 +503,8 @@ tags: [calendario]
 # Vetar the reaction, and «Deshacer» at once: nothing is sent and it stays in the queue.
 - tapOn:
     text: "Vetar"
+    below:
+      text: "EN COLA"
     rightOf:
       text: "Reacción Celebro al post de Ana Lucía Torres"
 - extendedWaitUntil:
@@ -593,6 +597,8 @@ tags: [calendario]
     timeout: 20000
 - tapOn:
     text: "Vetar"
+    below:
+      text: "EN COLA"
     rightOf:
       text: "Reacción Celebro al post de Ana Lucía Torres"
 - extendedWaitUntil:
