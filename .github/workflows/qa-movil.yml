@@ -235,10 +235,39 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # Maestro, pinned and cached. get.maestro.mobile.dev answered 504 and handed back a corrupt zip
+      # while the step still passed, so every flow died with exit 127 (runs 42463814844, 42466035998).
+      - name: Maestro cache
+        id: maestro
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.maestro
+          key: maestro-${{ env.MAESTRO_VERSION }}
       - name: Maestro
         run: |
-          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          if ! "$HOME/.maestro/bin/maestro" --version > /dev/null 2>&1; then
+            rm -rf "$HOME/.maestro" /tmp/maestro-zip && mkdir -p /tmp/maestro-zip
+            url="https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+            for i in 1 2 3 4 5; do
+              if curl -fsSL --retry 3 --retry-all-errors -o /tmp/maestro-zip/maestro.zip "$url" \
+                 && unzip -tq /tmp/maestro-zip/maestro.zip > /dev/null; then
+                break
+              fi
+              echo "::warning::Maestro download attempt $i failed; retrying"
+              sleep $((i * 10))
+            done
+            unzip -q /tmp/maestro-zip/maestro.zip -d /tmp/maestro-zip
+            mv /tmp/maestro-zip/maestro "$HOME/.maestro"
+          fi
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
+      - name: Save Maestro cache
+        if: steps.maestro.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: ~/.maestro
+          key: maestro-${{ env.MAESTRO_VERSION }}
       # Restore and save apart: actions/cache only saves when the whole job succeeds, and this job fails on purpose
       # when a flow fails, so the AVD snapshot would never be kept.
       - name: AVD cache
