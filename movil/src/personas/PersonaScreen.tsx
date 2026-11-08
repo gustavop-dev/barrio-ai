@@ -40,10 +40,10 @@ import { OportunidadForm } from './OportunidadForm';
 
 /** MovDetalle: the header portrait, where the row's portrait lands (components/shell/flight.tsx). */
 function FlightAvatar({ contactId, name }: { contactId: string; name: string }) {
-  const target = useFlightTarget(contactId, 'avatar');
+  const { ref, onLayout, style } = useFlightTarget(contactId, 'avatar');
   return (
-    <View ref={target.ref} onLayout={target.onLayout} collapsable={false}>
-      <Animated.View style={target.style}>
+    <View ref={ref} onLayout={onLayout} collapsable={false}>
+      <Animated.View style={style}>
         <Avatar name={name} size={48} />
       </Animated.View>
     </View>
@@ -52,10 +52,10 @@ function FlightAvatar({ contactId, name }: { contactId: string; name: string }) 
 
 /** MovDetalle: the header name, where the row's name lands. */
 function FlightName({ contactId, color, style, children }: { contactId: string; color: string; style?: StyleProp<ViewStyle>; children: ReactNode }) {
-  const target = useFlightTarget(contactId, 'label', typeScale.titulo, color);
+  const { ref, onLayout, style: hidden } = useFlightTarget(contactId, 'label', typeScale.titulo, color);
   return (
-    <View ref={target.ref} onLayout={target.onLayout} collapsable={false} style={style}>
-      <Animated.View style={target.style}>{children}</Animated.View>
+    <View ref={ref} onLayout={onLayout} collapsable={false} style={style}>
+      <Animated.View style={hidden}>{children}</Animated.View>
     </View>
   );
 }

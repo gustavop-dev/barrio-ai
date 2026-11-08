@@ -51,26 +51,26 @@ function PersonRow({ contact }: { contact: Contact }) {
   const classification = contact.classification ?? {};
   const classified = Object.keys(classification).length > 0;
   // MovDetalle: the portrait and the name fly into the person card (components/shell/flight.tsx).
-  const flight = useFlightSource(contact.id);
+  const { avatar, label, hidden, begin } = useFlightSource(contact.id);
   return (
     <Pressable
       accessibilityRole="link"
       testID={`person-${contact.id}`}
       onPress={() => {
-        flight.begin(displayName(contact), initials(contact.display_name));
+        begin(displayName(contact), initials(contact.display_name));
         router.push({ pathname: '/personas/[id]', params: { id: contact.id } });
       }}
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
-      <View ref={flight.avatar} collapsable={false}>
-        <Animated.View style={flight.hidden}>
+      <View ref={avatar} collapsable={false}>
+        <Animated.View style={hidden}>
           <Avatar name={contact.display_name} />
         </Animated.View>
       </View>
       <View style={styles.rowBody}>
         <View style={styles.rowTop}>
-          <View ref={flight.label} collapsable={false} style={styles.grow}>
-            <Animated.View style={flight.hidden}>
+          <View ref={label} collapsable={false} style={styles.grow}>
+            <Animated.View style={hidden}>
               <T numberOfLines={2}>{displayName(contact)}</T>
             </Animated.View>
           </View>
