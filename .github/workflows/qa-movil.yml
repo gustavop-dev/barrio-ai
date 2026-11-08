@@ -4,8 +4,11 @@ name: QA móvil
 # (LIVE_LINKEDIN=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
 # EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 (the runner, as the emulator sees it). See movil/.maestro/README.md.
 #
-# Jobs: plan (which flows, split in up to 4 emulators) → apk (built once, cached by what affects the app) →
-# flujos (one emulator + backend per shard, in parallel) → qa (one report, the PR comment and the verdict).
+# Jobs: plan (whether anything to test changed, which flows, split in up to 4 emulators) → apk (built once, cached by
+# what affects the app) → flujos (one emulator + backend per shard, in parallel) → qa (one report, catalog coverage,
+# visual regression against main, the PR comment and the verdict).
+# `qa` runs on every PR, so it can be a required check: a PR that touches nothing of the app gets a green `qa` in
+# seconds. Main runs on every push that touches the app and every night, and keeps the visual reference.
 # Run only some flows: `[qa: 05-captura 09]` in the PR's head commit message, or the `flujos` input of a manual run.
 on:
   workflow_dispatch:
@@ -15,12 +18,17 @@ on:
         required: false
         default: ''
   pull_request:
+  push:
+    branches: [main]
     paths: ['movil/**', 'compartido/**', 'agentes-linkedin/**', 'scripts/qa/**', '.github/workflows/qa-movil.yml']
+  schedule:
+    - cron: '0 8 * * *'  # 03:00 in Bogotá: the full run on main, every night
 permissions:
   contents: read
 concurrency:
   group: qa-movil-${{ github.ref }}
-  cancel-in-progress: true
+  # A newer push supersedes a PR run; main keeps every run (each one refreshes the visual reference).
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
   # Bump to rebuild the APK when the build steps change without touching movil/ or compartido/.
   APK_CACHE_VERSION: v1
@@ -31,6 +39,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     outputs:
+      ejecutar: ${{ steps.plan.outputs.ejecutar }}
       matriz: ${{ steps.plan.outputs.matriz }}
       resumen: ${{ steps.plan.outputs.resumen }}
     steps:
@@ -40,13 +49,25 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           QA_SELECCION: ${{ inputs.flujos }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR: ${{ github.event.pull_request.number }}
         run: |
-          if [ -n "$HEAD_SHA" ]; then
+          # A PR is tested when it touches the app, the shared code, the API, the QA scripts or this workflow.
+          if [ -n "$PR" ]; then
+            if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename' \
+                | grep -qE '^(movil|compartido|agentes-linkedin|scripts/qa)/|^\.github/workflows/qa-movil\.yml$'; then
+              # A placeholder matrix: the skipped jobs still parse it.
+              { echo "ejecutar=false"; echo 'matriz={"include":[{"shard":1,"flujos":""}]}'
+                echo "resumen=El PR no toca la app, la API ni la QA: no hay flujos que correr."; } >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
             export QA_MENSAJE="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" --jq .commit.message || true)"
           fi
+          echo "ejecutar=true" >> "$GITHUB_OUTPUT"
           python3 scripts/qa/plan.py
 
   apk:
+    needs: plan
+    if: needs.plan.outputs.ejecutar == 'true'
     runs-on: ubuntu-24.04
     # A warm cache finishes in seconds; a cold build of the whole app takes about 17 minutes.
     timeout-minutes: 40
@@ -108,6 +129,7 @@ jobs:
 
   flujos:
     needs: [plan, apk]
+    if: needs.plan.outputs.ejecutar == 'true'
     runs-on: ubuntu-24.04
     # Setup takes about 5 minutes and each flow is cut at QA_FLOW_TIMEOUT (8 minutes): a hang can't hold the run.
     timeout-minutes: 35
@@ -147,6 +169,11 @@ jobs:
       QA_SHARD: ${{ matrix.shard }}
       QA_FLOWS: ${{ matrix.flujos }}
       QA_FLOW_TIMEOUT: '480'
+      # The QA failure switch (team_backend.qa_fallos): only these settings load it. See movil/.maestro/README.md.
+      QA_MODE: 'true'
+      QA_FAULTS_FILE: /tmp/qa-fallos.json
+      # One place for the AVD: avdmanager, the emulator, the runner action and the cache all use it.
+      ANDROID_AVD_HOME: /home/runner/.android/avd
     steps:
       - uses: actions/checkout@v4
 
@@ -170,6 +197,9 @@ jobs:
           python-version: '3.12'
           enable-cache: true
           cache-dependency-glob: agentes-linkedin/infra/uv.lock
+          # The demo backend keeps a uv process alive until the job ends; pruning
+          # would wait 300 s for its lock and fail the job (run 42459989978).
+          prune-cache: false
       - name: Backend · migrate, bootstrap_local, seed_qa
         working-directory: agentes-linkedin/infra
         run: |
@@ -182,17 +212,23 @@ jobs:
       - name: Backend · serve the API on 0.0.0.0:8787
         working-directory: agentes-linkedin/infra
         run: |
-          nohup uv run gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 3 --timeout 120 \
+          DJANGO_SETTINGS_MODULE=linkedin_backend.settings_qa \
+            nohup uv run gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 3 --timeout 120 \
             --access-logfile - --error-logfile - --capture-output > "$QA_OUT/api-$QA_SHARD.log" 2>&1 &
           for i in $(seq 1 60); do
             curl -fsS http://127.0.0.1:8787/health && exit 0
             sleep 1
           done
           echo "The API did not start"; cat "$QA_OUT/api-$QA_SHARD.log"; exit 1
-      - name: Backend · the QA user can log in
+      - name: Backend · the QA user can log in, and the failure switch answers
         run: |
           curl -fsS -X POST http://127.0.0.1:8787/api/v1/auth/token -H 'Content-Type: application/json' \
             -d "{\"username\":\"qa\",\"password\":\"$QA_PASSWORD\",\"device_name\":\"curl de CI\"}" -o /dev/null -w '%{http_code}\n'
+          curl -fsS -X POST http://127.0.0.1:8787/api/v1/qa/fallos -H 'Content-Type: application/json' \
+            -d '{"ruta":"^/health$","efecto":"503"}' > /dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/health)" = 503
+          curl -fsS -X DELETE http://127.0.0.1:8787/api/v1/qa/fallos > /dev/null
+          test "$(curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:8787/health)" = 200
 
       # ---------------------------------------------------------------- emulator and Maestro
       - uses: actions/setup-java@v4
@@ -220,9 +256,11 @@ jobs:
         run: |
           image="system-images;android-$API_LEVEL;google_apis;x86_64"
           sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
-          yes | "$sdk/sdkmanager" --install "$image" emulator platform-tools > /dev/null
-          echo no | "$sdk/avdmanager" create avd --force -n test -k "$image" -d pixel_6
-          cfg="$HOME/.android/avd/test.avd/config.ini"
+          mkdir -p "$ANDROID_AVD_HOME"
+          yes 2> /dev/null | "$sdk/sdkmanager" --install "$image" emulator platform-tools > /dev/null
+          echo no | "$sdk/avdmanager" create avd --force -n test -k "$image" -d pixel_6 -p "$ANDROID_AVD_HOME/test.avd"
+          "$sdk/avdmanager" list avd
+          cfg="$ANDROID_AVD_HOME/test.avd/config.ini"
           sed -i -E '/^(hw\.lcd\.(width|height|density)|skin\.(name|path)|hw\.cpu\.ncore|hw\.ramSize)=/d' "$cfg"
           printf '%s\n' hw.lcd.width=780 hw.lcd.height=1688 hw.lcd.density=320 skin.name=780x1688 skin.path=_no_skin \
             hw.cpu.ncore=3 hw.ramSize=4096 >> "$cfg"
@@ -271,38 +309,80 @@ jobs:
     needs: [plan, flujos]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: write
+      actions: read         # the visual reference: an artifact of an earlier run on main
+      checks: write         # the «QA visual» check
+      pull-requests: write  # the PR comment
     env:
       QA_OUT: ${{ github.workspace }}/qa-artefactos
       QA_PLAN: ${{ needs.plan.outputs.resumen }}
+      GH_TOKEN: ${{ github.token }}
+      EJECUTAR: ${{ needs.plan.outputs.ejecutar }}
     steps:
       - uses: actions/checkout@v4
+      - name: Nothing to test
+        if: needs.plan.outputs.ejecutar != 'true'
+        run: |
+          echo "## QA móvil" >> "$GITHUB_STEP_SUMMARY"
+          echo "$QA_PLAN" >> "$GITHUB_STEP_SUMMARY"
       - name: Gather the emulators' artifacts
+        if: needs.plan.outputs.ejecutar == 'true'
         uses: actions/download-artifact@v4
         with:
           pattern: qa-flujos-*
           merge-multiple: true
           path: qa-artefactos
+      # The visual reference is the screenshots of the latest run on main that kept one (artifact qa-movil-referencias).
+      - name: Visual reference from main
+        if: needs.plan.outputs.ejecutar == 'true'
+        run: |
+          mkdir -p referencias
+          for id in $(gh run list -R "$GITHUB_REPOSITORY" --workflow qa-movil.yml --branch main --limit 30 \
+                        --json databaseId,status --jq '.[] | select(.status == "completed") | .databaseId'); do
+            [ "$id" = "$GITHUB_RUN_ID" ] && continue
+            if gh api "repos/$GITHUB_REPOSITORY/actions/runs/$id/artifacts" \
+                 --jq '.artifacts[] | select(.name == "qa-movil-referencias" and (.expired | not)) | .name' | grep -q .; then
+              gh run download "$id" -R "$GITHUB_REPOSITORY" -n qa-movil-referencias -D referencias && break
+            fi
+          done
+          echo "referencia: $(cat referencias/origen.txt 2> /dev/null || echo ninguna) · $(ls referencias/*.png 2> /dev/null | wc -l) capturas"
+      - uses: astral-sh/setup-uv@v6
+        if: needs.plan.outputs.ejecutar == 'true'
+      - name: Visual regression
+        if: needs.plan.outputs.ejecutar == 'true'
+        run: uv run --no-project --with pillow==11.3.0 python scripts/qa/visual.py comparar "$QA_OUT" referencias || echo "La comparación visual no pudo correr."
       - name: Report
+        if: needs.plan.outputs.ejecutar == 'true'
         run: |
           mkdir -p "$QA_OUT"
           python3 scripts/qa/informe.py "$QA_OUT" > "$QA_OUT/resumen.md" || echo "No se pudo escribir el resumen." > "$QA_OUT/resumen.md"
           cat "$QA_OUT/resumen.md" >> "$GITHUB_STEP_SUMMARY"
       - name: Upload the report
         id: upload
+        if: needs.plan.outputs.ejecutar == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: qa-movil-${{ github.run_number }}
           path: qa-artefactos
           retention-days: 14
           if-no-files-found: warn
+      # On main, this run's screenshots (over the previous reference, for flows that did not run) become the reference.
+      - name: New visual reference (main)
+        if: needs.plan.outputs.ejecutar == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          uv run --no-project --with pillow==11.3.0 python scripts/qa/visual.py referencias "$QA_OUT/capturas" referencias nuevas-referencias \
+            "main $(git rev-parse --short HEAD), ejecución $GITHUB_RUN_ID"
+      - if: needs.plan.outputs.ejecutar == 'true' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-movil-referencias
+          path: nuevas-referencias
+          retention-days: 90
       - name: Comment on the PR
-        if: github.event_name == 'pull_request'
+        if: needs.plan.outputs.ejecutar == 'true' && github.event_name == 'pull_request'
         env:
-          GH_TOKEN: ${{ github.token }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
           PR: ${{ github.event.pull_request.number }}
         run: |
@@ -314,5 +394,24 @@ jobs:
           else
             gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
           fi
+      # Visual changes never fail the run (they may be intended); they mark it: a warning and a neutral «QA visual» check.
+      - name: Mark visual changes
+        if: needs.plan.outputs.ejecutar == 'true'
+        env:
+          SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          result="$QA_OUT/visual/resultado.json"
+          [ -f "$result" ] || exit 0
+          changed=$(python3 -c "import json,sys; print(len(json.load(open(sys.argv[1]))['cambian']))" "$result")
+          if [ "$changed" -gt 0 ]; then
+            echo "::warning title=Regresión visual::$changed capturas cambian más de su tolerancia frente a main (artefacto, carpeta visual/)."
+            conclusion=neutral; title="$changed capturas cambian frente a main"
+          else
+            conclusion=success; title="Sin cambios visuales frente a main"
+          fi
+          gh api -X POST "repos/$GITHUB_REPOSITORY/check-runs" -f name="QA visual" -f head_sha="$SHA" -f status=completed \
+            -f conclusion="$conclusion" -f "output[title]=$title" -f "output[summary]=Detalle en el resumen de la ejecución $GITHUB_RUN_ID (carpeta visual/ del artefacto)." > /dev/null \
+            || echo "No se pudo crear el check «QA visual»."
       - name: Fail when a flow failed or the app crashed
+        if: needs.plan.outputs.ejecutar == 'true'
         run: test -f "$QA_OUT/resultado.txt" && grep -qx 'ok' "$QA_OUT/resultado.txt"
