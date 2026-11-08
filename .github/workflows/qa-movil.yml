@@ -4,11 +4,11 @@ name: QA móvil
 # (LIVE_LINKEDIN=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
 # EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 (the runner, as the emulator sees it). See movil/.maestro/README.md.
 #
-# Jobs: plan (whether anything to test changed, which flows, split in up to 4 emulators) → apk (built once, cached by
-# what affects the app) → flujos (one emulator + backend per shard, in parallel) → qa (one report, catalog coverage,
+# Jobs: plan (paths or explicit selection, split in up to 8 emulators) → apk (native shell by fingerprint + current JS)
+# → flujos (one emulator + backend per shard, in parallel) → qa (one report, catalog coverage,
 # visual regression against main, the PR comment and the verdict).
-# `qa` runs on every PR, so it can be a required check: a PR that touches nothing of the app gets a green `qa` in
-# seconds. Main runs on every push that touches the app and every night, and keeps the visual reference.
+# `qa` runs on every PR, so it can be a required check: known documentation-only PRs get a green `qa` in seconds.
+# Unknown paths run the full suite. Main runs on every relevant push and every night, keeping the visual reference.
 # Run only some flows: `[qa: 05-captura 09]` in the PR's head commit message, or the `flujos` input of a manual run.
 on:
   workflow_dispatch:
@@ -20,7 +20,7 @@ on:
   pull_request:
   push:
     branches: [main]
-    paths: ['movil/**', 'compartido/**', 'agentes-linkedin/**', 'scripts/qa/**', '.github/workflows/qa-movil.yml']
+    paths: ['movil/**', 'compartido/**', 'agentes-linkedin/**', 'api/**', 'scripts/qa/**', '.github/workflows/qa-movil.yml']
   schedule:
     - cron: '0 8 * * *'  # 03:00 in Bogotá: the full run on main, every night
 permissions:
@@ -30,8 +30,8 @@ concurrency:
   # A newer push supersedes a PR run; main keeps every run (each one refreshes the visual reference).
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 env:
-  # Bump to rebuild the APK when the build steps change without touching movil/ or compartido/.
-  APK_CACHE_VERSION: v1
+  # Bump to force a full native build, invalidating BOTH shell and final APK caches.
+  APK_CACHE_VERSION: v2
   API_LEVEL: 35
   MAESTRO_VERSION: 2.12.0
   UV_VERSION: 0.13.7
@@ -39,6 +39,9 @@ jobs:
   plan:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
     outputs:
       ejecutar: ${{ steps.plan.outputs.ejecutar }}
       matriz: ${{ steps.plan.outputs.matriz }}
@@ -51,38 +54,44 @@ jobs:
           QA_SELECCION: ${{ inputs.flujos }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR: ${{ github.event.pull_request.number }}
+          QA_MAX_SHARDS: '8'
         run: |
-          # A PR is tested when it touches the app, the shared code, the API, the QA scripts or this workflow.
           if [ -n "$PR" ]; then
-            if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files" --paginate --jq '.[].filename' \
-                | grep -qE '^(movil|compartido|agentes-linkedin|scripts/qa)/|^\.github/workflows/qa-movil\.yml$'; then
-              # A placeholder matrix: the skipped jobs still parse it.
-              { echo "ejecutar=false"; echo 'matriz={"include":[{"shard":1,"flujos":""}]}'
-                echo "resumen=El PR no toca la app, la API ni la QA: no hay flujos que correr."; } >> "$GITHUB_OUTPUT"
-              exit 0
+            # Keep JSON (including previous_filename on renames), and consume every page.
+            # A failed/truncated request must select all flows, never silently skip QA.
+            export QA_CHANGED_FILES="$RUNNER_TEMP/qa-changed-files.json"
+            if ! gh api "repos/$GITHUB_REPOSITORY/pulls/$PR/files?per_page=100" --paginate --slurp > "$QA_CHANGED_FILES"; then
+              echo '::warning::No se pudieron leer los cambios del PR; se ejecutarán todos los flujos.'
+              echo '[]' > "$QA_CHANGED_FILES"
             fi
             export QA_MENSAJE="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" --jq .commit.message || true)"
           fi
-          echo "ejecutar=true" >> "$GITHUB_OUTPUT"
           python3 scripts/qa/plan.py
 
   apk:
     needs: plan
     if: needs.plan.outputs.ejecutar == 'true'
     runs-on: ubuntu-24.04
-    # A warm cache finishes in seconds; a cold build of the whole app takes about 17 minutes.
+    # Exact APK: seconds. Native hit + new JS: target 2–4 min. Native miss: ~17 min.
     timeout-minutes: 40
+    # One environment for fingerprint, prebuild, Gradle AND standalone Metro/Hermes.
+    env:
+      OFFICE_QA_BUILD: '1'
+      EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+      NODE_ENV: production
+      EXPO_NO_DOTENV: '1'
     outputs:
       key: ${{ steps.apk.outputs.cache-primary-key }}
     steps:
       - uses: actions/checkout@v4
-      # What goes into the APK: the app (not its flows or docs), compartido/, the lockfile and app.config.js (QA switch).
-      - name: APK cache
+      # Fastest path for flow/backend-only changes. Never share this key with the native shell:
+      # caches are immutable and a shell hit must not hand the emulators an old JS bundle.
+      - name: Final APK cache
         id: apk
         uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/apk
-          key: apk-${{ env.APK_CACHE_VERSION }}-${{ hashFiles('movil/**', '!movil/.maestro/**', '!movil/**/*.md', 'compartido/**') }}
+          key: apk-qa-${{ env.APK_CACHE_VERSION }}-${{ runner.os }}-x86_64-${{ hashFiles('movil/**', '!movil/.maestro/**', '!movil/**/*.md', 'compartido/**', 'scripts/qa/apk-*', '.github/workflows/qa-movil.yml') }}
           lookup-only: true
       - if: steps.apk.outputs.cache-hit != 'true'
         uses: actions/setup-node@v4
@@ -95,38 +104,90 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - if: steps.apk.outputs.cache-hit != 'true'
+      - name: APK · dependencies
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil
+        run: npm ci --include=dev
+      - name: APK · current QA bundle and assets (Metro + Hermes)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil
+        run: bash ../scripts/qa/apk-exportar.sh "$RUNNER_TEMP/qa-bundle"
+      - name: APK · Android native fingerprint (before prebuild)
+        id: fingerprint
+        if: steps.apk.outputs.cache-hit != 'true'
+        run: node scripts/qa/apk-fingerprint.cjs "$RUNNER_TEMP/qa-bundle/res" "$RUNNER_TEMP/qa-fingerprint.json"
+      - name: Native shell cache
+        id: native
+        if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/apk-native
+          key: apk-native-${{ env.APK_CACHE_VERSION }}-${{ runner.os }}-x86_64-${{ steps.fingerprint.outputs.hash }}
+      - if: steps.apk.outputs.cache-hit != 'true' && steps.native.outputs.cache-hit != 'true'
         uses: gradle/actions/setup-gradle@v4
         with:
           # Write the Gradle cache from PRs too, so the next build of the same branch starts warm.
           cache-read-only: false
-      - name: APK · npm ci and expo prebuild (QA switch on)
-        if: steps.apk.outputs.cache-hit != 'true'
+      - name: APK · expo prebuild (native cache miss)
+        if: steps.apk.outputs.cache-hit != 'true' && steps.native.outputs.cache-hit != 'true'
         working-directory: movil
-        env:
-          OFFICE_QA_BUILD: '1'
-          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
         run: |
-          npm ci
-          npx expo prebuild --platform android --no-install --clean
+          npx --no-install expo prebuild --platform android --no-install --clean
           grep -n 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml
       - name: APK · gradle assembleRelease (x86_64)
-        if: steps.apk.outputs.cache-hit != 'true'
+        if: steps.apk.outputs.cache-hit != 'true' && steps.native.outputs.cache-hit != 'true'
         working-directory: movil/android
-        env:
-          OFFICE_QA_BUILD: '1'
-          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
-          NODE_ENV: production
         run: |
           ./gradlew assembleRelease -PreactNativeArchitectures=x86_64
+          python3 ../../scripts/qa/apk-empaquetar.py guardar "$PWD" "$RUNNER_TEMP/apk-native" "$RUNNER_TEMP/qa-fingerprint.json"
+      # Exercise the same overlay/signing on misses and hits, so the first CI run validates it.
+      - name: APK · replace JS, zipalign and sign with the shell's debug key
+        if: steps.apk.outputs.cache-hit != 'true'
+        run: |
+          python3 scripts/qa/apk-empaquetar.py reemplazar "$RUNNER_TEMP/apk-native" "$RUNNER_TEMP/qa-bundle" \
+            "$RUNNER_TEMP/qa-fingerprint.json" "$RUNNER_TEMP/qa-unsigned.apk"
+          build_tools=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n1)
+          test -x "$build_tools/zipalign" && test -x "$build_tools/apksigner"
           mkdir -p "$RUNNER_TEMP/apk"
-          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/apk/qa.apk"
-          ls -la "$RUNNER_TEMP/apk"
-      - if: steps.apk.outputs.cache-hit != 'true'
+          "$build_tools/zipalign" -P 16 -f 4 "$RUNNER_TEMP/qa-unsigned.apk" "$RUNNER_TEMP/qa-aligned.apk"
+          "$build_tools/apksigner" sign --ks "$RUNNER_TEMP/apk-native/debug.keystore" \
+            --ks-key-alias androiddebugkey --ks-pass pass:android --key-pass pass:android \
+            --out "$RUNNER_TEMP/apk/qa.apk" "$RUNNER_TEMP/qa-aligned.apk"
+          "$build_tools/zipalign" -c -P 16 4 "$RUNNER_TEMP/apk/qa.apk"
+          "$build_tools/apksigner" verify --verbose --print-certs "$RUNNER_TEMP/apk/qa.apk"
+      - name: Save native shell
+        if: steps.apk.outputs.cache-hit != 'true' && steps.native.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/apk-native
+          key: ${{ steps.native.outputs.cache-primary-key }}
+      - name: Save final APK for the emulators
+        if: steps.apk.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
           path: ${{ runner.temp }}/apk
           key: ${{ steps.apk.outputs.cache-primary-key }}
+      - name: APK · cache summary
+        env:
+          FINAL_HIT: ${{ steps.apk.outputs.cache-hit }}
+          NATIVE_HIT: ${{ steps.native.outputs.cache-hit }}
+          FINAL_KEY: ${{ steps.apk.outputs.cache-primary-key }}
+          NATIVE_KEY: ${{ steps.native.outputs.cache-primary-key }}
+        run: |
+          {
+            echo '### APK de QA'
+            echo "APK final: ${FINAL_HIT:-false} · shell nativo: ${NATIVE_HIT:-no consultado}"
+            echo "APK: $FINAL_KEY"
+            echo "Nativo: ${NATIVE_KEY:-no consultado}"
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: APK · fingerprint diagnostics
+        if: always() && steps.apk.outputs.cache-hit != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-apk-fingerprint
+          path: ${{ runner.temp }}/qa-fingerprint.json
+          retention-days: 3
+          if-no-files-found: ignore
 
   flujos:
     needs: [plan, apk]
@@ -377,6 +438,9 @@ jobs:
       EJECUTAR: ${{ needs.plan.outputs.ejecutar }}
     steps:
       - uses: actions/checkout@v4
+      - name: Planning must succeed
+        if: needs.plan.result != 'success'
+        run: exit 1
       - name: Nothing to test
         if: needs.plan.outputs.ejecutar != 'true'
         run: |
@@ -479,4 +543,9 @@ jobs:
             || echo "No se pudo crear el check «QA visual»."
       - name: Fail when a flow failed or the app crashed
         if: needs.plan.outputs.ejecutar == 'true'
-        run: test -f "$QA_OUT/resultado.txt" && grep -qx 'ok' "$QA_OUT/resultado.txt"
+        env:
+          FLUJOS_RESULT: ${{ needs.flujos.result }}
+        run: |
+          # A missing/failed emulator must not turn a partial report into a green required check.
+          test "$FLUJOS_RESULT" = success
+          test -f "$QA_OUT/resultado.txt" && grep -qx 'ok' "$QA_OUT/resultado.txt"
