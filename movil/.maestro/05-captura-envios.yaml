@@ -177,6 +177,8 @@ onFlowComplete:
 # ---------------------------------------------------------------- without network
 # cubre: CAP-06
 # Airplane mode cuts the emulator off the runner's API (10.0.2.2); Maestro drives the device over adb, unaffected.
+# It goes on first, so the phone knows it is offline (NetInfo) by the time the note is written.
+- setAirplaneMode: enabled
 - tapOn:
     id: capture-note
     waitToSettleTimeoutMs: 500
@@ -185,7 +187,6 @@ onFlowComplete:
 - tapOn:
     id: capture-para-dato
     waitToSettleTimeoutMs: 500
-- setAirplaneMode: enabled
 - scrollUntilVisible:
     element:
       id: capture-send

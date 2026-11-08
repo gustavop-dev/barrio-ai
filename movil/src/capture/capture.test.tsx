@@ -2,6 +2,7 @@
 // «Para qué es», the context chip, the multipart upload with its 5 s «Deshacer», and the microphone
 // explained before the system asks).
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import { onlineManager } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { State } from 'react-native-gesture-handler';
@@ -538,6 +539,29 @@ describe('capture sheet', () => {
     const problem = await within(sheet).findByTestId('capture-send-error');
     expect(within(problem).getByText('No hay conexión con el servidor')).toBeOnTheScreen();
     expect(within(sheet).getByTestId('capture-audio')).toBeOnTheScreen();
+  });
+
+  it('offline, it says so at once instead of waiting with «Enviando…», keeps the draft and sends it again once online', async () => {
+    const server = capturaServer();
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { audio: AUDIO }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Sin red');
+    act(() => onlineManager.setOnline(false));
+    try {
+      await fireEvent.press(within(sheet).getByTestId('capture-send'));
+      const problem = await within(sheet).findByTestId('capture-send-error');
+      expect(within(problem).getByText('No hay conexión con el servidor')).toBeOnTheScreen();
+      expect(within(problem).queryByText(/Detalle:/)).toBeNull();
+      expect(server.find('POST', '/api/v1/capturas')).toHaveLength(0);
+      expect(within(sheet).getByTestId('capture-audio')).toBeOnTheScreen();
+      expect(within(sheet).getByDisplayValue('Sin red')).toBeOnTheScreen();
+    } finally {
+      act(() => onlineManager.setOnline(true));
+    }
+    await fireEvent.press(within(screen.getByTestId('capture-send-error')).getByText('Reintentar'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/capturas')).toHaveLength(1));
+    expect(await screen.findByText('Enviado al equipo.', {}, { timeout: 4000 })).toBeOnTheScreen();
   });
 
   it('a 400 shows the server message', async () => {

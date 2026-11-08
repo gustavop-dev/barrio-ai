@@ -14,6 +14,11 @@
 // failure it leaves the native reason in `responseText` («Could not retrieve file for uri …», «Unable
 // to resolve host …»): UploadNetworkError carries it so the sheet can show it and the app can report it.
 
+import { onlineManager } from '@tanstack/react-query';
+
+/** The reason of an upload refused because the phone has no network (NetInfo, through TanStack's onlineManager). */
+export const OFFLINE_REASON = 'offline';
+
 /** The request the shared client hands the transport, with a multipart body. */
 export interface MultipartRequest {
   method: string;
@@ -82,6 +87,11 @@ export function sendMultipart(url: string, { method, headers, body, signal }: Mu
   return new Promise<Response>((resolve, reject) => {
     if (signal?.aborted) {
       reject(abortError());
+      return;
+    }
+    // Without network the native request can wait for one indefinitely: say so at once instead.
+    if (!onlineManager.isOnline()) {
+      reject(new UploadNetworkError(OFFLINE_REASON));
       return;
     }
     const xhr = new XMLHttpRequest();

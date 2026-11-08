@@ -354,6 +354,9 @@ export function useCreateCaptura() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: createCaptura,
+    // Offline, TanStack would pause the mutation with no error: the sheet stayed «Enviando…» with nothing to tell
+    // Gustavo. It is tried, fails with «No hay conexión…», and the draft waits for «Reintentar».
+    networkMode: 'always',
     onSettled: () => reloadInBackground(client, captureKeys.all, captureKeys.galeriaAll),
   });
 }
@@ -406,6 +409,8 @@ export function useUploadFotos({ onProgress }: { onProgress?: (progress: UploadP
       onProgress?.({ done: files.length, sending: 0, total: files.length });
       return created;
     },
+    // As a capture: offline it fails and offers «Reintentar» instead of pausing silently.
+    networkMode: 'always',
     onSettled: () => reloadInBackground(client, captureKeys.galeriaAll),
   });
 }
