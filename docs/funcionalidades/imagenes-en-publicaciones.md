@@ -33,10 +33,11 @@ Lo que sí existe y este flujo reutilizará: la captura con fotos ([CAP-05](capt
 | [IMG-02](#img-02) | Opción «Propuesta de post» en «Para qué es» | PWA · app · backend | no implementado |
 | [IMG-03](#img-03) | Las fotos siempre llegan a la Galería con su nota | backend | no implementado |
 | [IMG-15](#img-15) | El equipo elige por contexto: foto, infografía o carrusel | backend | no implementado |
+| [IMG-16](#img-16) | Opción «Edición con IA» en la captura, la Galería y Ajustes | PWA · app · backend | no implementado |
 | [IMG-04](#img-04) | El equipo ve la Galería y elige las fotos de un post | backend | no implementado |
 | [IMG-05](#img-05) | Todo post se publica con al menos una imagen | backend | no implementado |
 | [IMG-06](#img-06) | La nota de una propuesta de post alimenta el brief | backend | no implementado |
-| [IMG-07](#img-07) | Decidir si se edita una foto: primero la instrucción de Gustavo, luego `allow_ai_edit` | backend | no implementado |
+| [IMG-07](#img-07) | Decidir si se edita una foto: manda la opción de edición; la nota dice cómo | backend | no implementado |
 | [IMG-08](#img-08) | Ediciones que el equipo decide por su cuenta | backend | no implementado |
 | [IMG-09](#img-09) | Editar con la API de imágenes de OpenAI sin perder el original | backend | no implementado |
 | [IMG-10](#img-10) | Comprobación de la edición con un modelo con visión | backend | no implementado |
@@ -57,7 +58,7 @@ Lo que sí existe y este flujo reutilizará: la captura con fotos ([CAP-05](capt
 
 ## Pendiente de confirmar
 
-- **Ediciones que el equipo decide por su cuenta** ([IMG-08](#img-08)). Por defecto, el equipo aplica una edición que juzga importante y la muestra para veto, sin preguntar antes. Los criterios con «(pendiente de confirmar)» siguen ese valor por defecto hasta que Gustavo responda.
+- Nada. Las ediciones que decide el equipo quedan resueltas con la opción de edición de [IMG-16](#img-16) (decisión de Gustavo, 2026-11-08): con «Que decida el equipo» o «Editar», el equipo aplica la edición y la muestra para veto, sin preguntar antes.
 
 ---
 
@@ -124,6 +125,23 @@ Lo que sí existe y este flujo reutilizará: la captura con fotos ([CAP-05](capt
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
+### IMG-16 · Opción «Edición con IA» en la captura, la Galería y Ajustes <a id="img-16"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** al adjuntar fotos elige si el equipo puede editarlas con IA, sin tener que decirlo en el audio: «No editar», «Que decida el equipo» o «Editar».
+- **Código hoy:** solo existe el interruptor booleano «Permitir edición con IA» en la hoja de cada foto de la Galería (`allow_ai_edit`) y su valor por defecto en Ajustes › Captura y galería (`gallery_ai_edit_default`). La hoja de captura no lo muestra.
+- **Criterios de aceptación:**
+  1. **Dado** la hoja de captura con al menos una foto adjunta, **cuando** se abre, **entonces** muestra el control «Edición con IA» con tres opciones («No editar», «Que decida el equipo», «Editar»), preseleccionado con el valor por defecto de Ajustes.
+  2. **Dado** que elige una opción y envía, **cuando** las fotos llegan a la Galería, **entonces** cada foto guarda esa opción.
+  3. **Dado** la hoja de una foto en la Galería, **cuando** se abre, **entonces** el interruptor actual pasa a ser el mismo control de tres opciones y guardar envía solo el campo cambiado.
+  4. **Dado** Ajustes › Captura y galería, **cuando** se cambia el valor por defecto, **entonces** las fotos nuevas lo toman y las existentes no cambian.
+  5. **Dado** fotos guardadas antes del cambio, **cuando** se migra, **entonces** `allow_ai_edit=false` pasa a «No editar» y `true` a «Que decida el equipo», sin perder ninguna.
+  6. **Dado** una foto ya usada en una pieza, **cuando** se cambia su opción, **entonces** solo afecta a usos futuros.
+  7. **Dado** lectores de pantalla, **cuando** recorren el control, **entonces** es un grupo de opciones con nombre y la opción elegida anunciada.
+- **Brechas código/docs:** el backend pasa de un booleano a un valor de tres estados (`ai_edit`: `no` · `auto` · `si`), con migración y contrato actualizados.
+- **Cobertura QA:** pendiente
+
 ### IMG-04 · El equipo ve la Galería y elige las fotos de un post <a id="img-04"></a>
 
 - **Dónde:** backend
@@ -131,7 +149,7 @@ Lo que sí existe y este flujo reutilizará: la captura con fotos ([CAP-05](capt
 - **Qué hace para Gustavo:** cuando un post va con foto, el equipo mira sus fotos, con sus notas y transcripciones, la fecha, si ya se usaron y si permite editarlas, y elige una o varias.
 - **Código hoy:** `editorial._run` no recibe fotos. Los campos para registrar la elección ya existen sin usar: `GalleryPhoto.state` (`sin_usar`, `elegida`, `editada`, `publicada`), `chosen_piece`, `chosen_for`, `published_at`.
 - **Criterios de aceptación:**
-  1. **Dado** fotos en la Galería, **cuando** corre la etapa del director, **entonces** recibe por cada foto candidata su `id`, su nota, la nota y la transcripción de su captura de origen, la fecha de subida, si ya se usó (y en qué pieza) y `allow_ai_edit`.
+  1. **Dado** fotos en la Galería, **cuando** corre la etapa del director, **entonces** recibe por cada foto candidata su `id`, su nota, la nota y la transcripción de su captura de origen, la fecha de subida, si ya se usó (y en qué pieza) y su opción de edición ([IMG-16](#img-16)).
   2. **Dado** un brief con tipo `foto`, **cuando** se guarda, **entonces** incluye las fotos elegidas (al menos una) con el motivo de cada elección.
   3. **Dado** una foto elegida, **cuando** se liga a la pieza, **entonces** su estado pasa a `elegida`, `chosen_piece` apunta a la pieza y `chosen_for` es el día de la pieza.
   4. **Dado** que la pieza no sale (saltada, bloqueada, fallida, descartada, vetada o caducada), **cuando** se cierra, **entonces** sus fotos vuelven a `sin_usar`.
@@ -168,24 +186,25 @@ Lo que sí existe y este flujo reutilizará: la captura con fotos ([CAP-05](capt
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
-### IMG-07 · Decidir si se edita una foto: primero la instrucción de Gustavo, luego `allow_ai_edit` <a id="img-07"></a>
+### IMG-07 · Decidir si se edita una foto: manda la opción de edición; la nota dice cómo <a id="img-07"></a>
 
 - **Dónde:** backend
 - **Estado:** no implementado
-- **Qué hace para Gustavo:** si su nota dice qué hacer con la foto, se hace eso; si la foto está marcada como «no editar», no se edita; solo sin instrucción el equipo decide, y deja escrito por qué.
-- **Código hoy:** ninguno decide nada. `allow_ai_edit` se guarda y no se lee.
-- **Orden de prioridad (de Gustavo):**
-  1. Su instrucción en la nota de voz o escrita («úsala tal cual», «recórtala», «quita el fondo», «más luz») siempre gana.
-  2. `allow_ai_edit=false` significa no editar nunca.
-  3. Sin instrucción, el equipo edita solo cuando lo juzga importante ([IMG-08](#img-08)).
+- **Qué hace para Gustavo:** cada foto lleva una opción de edición que él elige ([IMG-16](#img-16)). Esa opción decide **si** se edita; su nota de voz o escrita dice **cómo**. Así una foto que necesita retoque se puede editar aunque él no lo diga en el audio.
+- **Código hoy:** ninguno decide nada. `GalleryPhoto.allow_ai_edit` (booleano) se guarda y no se lee; pasará a la opción de tres valores de [IMG-16](#img-16) (`false` → «No editar», `true` → «Que decida el equipo»).
+- **Las tres opciones (decisión de Gustavo, 2026-11-08):**
+  1. **«No editar»:** nunca se envía a la API de imágenes, diga lo que diga la nota.
+  2. **«Que decida el equipo»** (por defecto): se edita si la nota lo pide **o** si el equipo lo juzga necesario ([IMG-08](#img-08)).
+  3. **«Editar»:** siempre se edita; sigue la instrucción de la nota si la hay y, si no, el equipo decide cómo ([IMG-08](#img-08)).
 - **Criterios de aceptación:**
-  1. **Dado** una foto con la instrucción «úsala tal cual», **cuando** se elige, **entonces** no se edita y se publica el original.
-  2. **Dado** una foto con la instrucción «recórtala», «quita el fondo» o «más luz», **cuando** se elige, **entonces** la edición hace exactamente eso y nada más.
-  3. **Dado** una foto sin instrucción y con `allow_ai_edit=false`, **cuando** se elige, **entonces** nunca se envía a la API de imágenes y se publica el original, aunque el equipo considere útil editarla.
-  4. **Dado** una foto con `allow_ai_edit=false` y la instrucción «recórtala», **cuando** se elige, **entonces** gana la instrucción (prioridad 1) y se recorta. Este caso sigue el orden de prioridad tal como lo dio Gustavo; si prefiere que la marca «no editar» gane siempre, este criterio cambia.
-  5. **Dado** una foto sin instrucción y con `allow_ai_edit=true`, **cuando** se elige, **entonces** decide el equipo según [IMG-08](#img-08).
-  6. **Dado** cualquier foto elegida, **cuando** se decide, **entonces** queda registrado qué se decidió y por qué: «Instrucción de Gustavo: …», «Edición prohibida en la foto» o «Decisión del equipo: …».
-  7. **Dado** que la instrucción pide algo que la API no puede hacer bien («cambia la persona de la izquierda»), **cuando** se decide, **entonces** no se edita, se publica el original y el motivo queda registrado.
+  1. **Dado** una foto con «No editar» y la nota «recórtala», **cuando** se elige, **entonces** no se edita, se publica el original y queda registrado «Edición prohibida en la foto».
+  2. **Dado** una foto con «Que decida el equipo» y la nota «úsala tal cual», **cuando** se elige, **entonces** no se edita.
+  3. **Dado** una foto con «Que decida el equipo» y la nota «recórtala», «quita el fondo» o «más luz», **cuando** se elige, **entonces** la edición hace exactamente eso y nada más.
+  4. **Dado** una foto con «Que decida el equipo» y sin instrucción, **cuando** se elige, **entonces** decide el equipo según [IMG-08](#img-08).
+  5. **Dado** una foto con «Editar» y una instrucción, **cuando** se elige, **entonces** se edita siguiendo la instrucción.
+  6. **Dado** una foto con «Editar» y sin instrucción, **cuando** se elige, **entonces** se edita igualmente: el equipo elige el retoque que más mejora la foto para LinkedIn (luz, enderezar, encuadre 4:5 o 1:1, quitar distracciones) y registra cuál.
+  7. **Dado** cualquier foto elegida, **cuando** se decide, **entonces** queda registrado qué se decidió y por qué: «Edición prohibida en la foto», «Instrucción de Gustavo: …», «Decisión del equipo: …» o «Edición pedida en la foto: …».
+  8. **Dado** que la instrucción pide algo que la API no puede hacer bien («cambia la persona de la izquierda»), **cuando** se decide, **entonces** no se hace esa edición, se publica el original o el retoque seguro, y el motivo queda registrado.
 - **Brechas código/docs:** la Galería ya promete «El equipo decide cuándo usarlas y si las edita con IA. Tú puedes dejar una nota o prohibir la edición en cada foto.» (PWA y app); nada lo cumple todavía.
 - **Cobertura QA:** pendiente
 
@@ -193,13 +212,13 @@ Lo que sí existe y este flujo reutilizará: la captura con fotos ([CAP-05](capt
 
 - **Dónde:** backend
 - **Estado:** no implementado
-- **Qué hace para Gustavo:** si la foto no trae instrucción y permite edición, el equipo solo la edita cuando importa (oscura o torcida, encuadre para LinkedIn, objetos que distraen), y él la ve antes de que salga.
+- **Qué hace para Gustavo:** con «Que decida el equipo» y sin instrucción, el equipo solo edita cuando importa (oscura o torcida, encuadre para LinkedIn, objetos que distraen); con «Editar» y sin instrucción, elige el retoque que más mejora la foto. En los dos casos él la ve, con veto, antes de que salga.
 - **Código hoy:** no existe.
 - **Criterios de aceptación:**
-  1. **Dado** una foto sin instrucción, con `allow_ai_edit=true` y bien expuesta, recta y sin distracciones, **cuando** se elige, **entonces** no se edita.
+  1. **Dado** una foto con «Que decida el equipo», sin instrucción y bien expuesta, recta y sin distracciones, **cuando** se elige, **entonces** no se edita.
   2. **Dado** una foto oscura, torcida, mal encuadrada para LinkedIn o con objetos que distraen, **cuando** se elige, **entonces** el equipo la edita para corregir solo eso y registra el motivo («Estaba oscura: se aclaró»).
-  3. **Dado** una edición decidida por el equipo, **cuando** se prepara la pieza, **entonces** se aplica y se muestra en el detalle de la pieza para que Gustavo pueda vetarla, sin preguntarle antes (pendiente de confirmar).
-  4. **Dado** que el equipo duda si editar, **cuando** decide, **entonces** no edita.
+  3. **Dado** una edición decidida por el equipo, **cuando** se prepara la pieza, **entonces** se aplica y se muestra en el detalle de la pieza para que Gustavo pueda vetarla, sin preguntarle antes: elegir «Que decida el equipo» o «Editar» es su permiso.
+  4. **Dado** que el equipo duda si editar una foto con «Que decida el equipo», **cuando** decide, **entonces** no edita. (Con «Editar» no hay duda: se edita.)
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -302,7 +321,7 @@ Lo que sí existe y este flujo reutilizará: la captura con fotos ([CAP-05](capt
   2. **Dado** una pieza con carrusel, **cuando** llega su hora, **entonces** se sube como documento de hasta 8 láminas de 1080×1350 y se crea el post que lo referencia.
   3. **Dado** la imagen que se publica, **cuando** se prepara, **entonces** tiene formato vertical 1080×1350 o cuadrado 1080×1080; nunca horizontal.
   4. **Dado** una foto que no tiene ese formato y que se puede editar, **cuando** se prepara, **entonces** adaptar el encuadre cuenta como una edición y sigue [IMG-07](#img-07) a [IMG-10](#img-10).
-  5. **Dado** una foto con `allow_ai_edit=false` en otro formato, **cuando** se prepara, **entonces** se publica tal cual, sin recortarla.
+  5. **Dado** una foto con «No editar» en otro formato, **cuando** se prepara, **entonces** se publica tal cual, sin recortarla.
   6. **Dado** que falla la subida de la imagen o del documento antes de crear el post, **cuando** termina, **entonces** la acción queda `failed` sin publicar nada (resultado definitivo) y llega el aviso correspondiente.
   7. **Dado** un 401, 403 o 429 al subir, **cuando** termina, **entonces** la cuenta pasa a pausa con aviso, como al publicar texto.
   8. **Dado** que la creación del post da un resultado incierto, **cuando** termina, **entonces** queda `uncertain` y nunca se repite ([EDI-12](motor-editorial.md#edi-12)).

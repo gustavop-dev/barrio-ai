@@ -152,9 +152,9 @@ describe('Persona', () => {
     const next = await screen.findByTestId('next-step');
     expect(next).toHaveAccessibleName(/^Siguiente paso · Te toca\. El equipo la invitará cuando termine la espera\. Para el 7 nov\. Invitación sin nota · Aprobada$/);
     await fireEvent.press(screen.getByText('Ver en el Calendario'));
-    expect(router.navigate).toHaveBeenLastCalledWith('/calendario');
+    expect(router.dismissTo).toHaveBeenLastCalledWith('/calendario');
     await fireEvent.press(screen.getByText('Ir a Tu turno'));
-    expect(router.navigate).toHaveBeenLastCalledWith('/tu-turno');
+    expect(router.dismissTo).toHaveBeenLastCalledWith('/tu-turno');
   });
 
   it('adds a note and opens a voice note about the person in the capture sheet', async () => {
