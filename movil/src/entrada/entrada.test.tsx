@@ -3,6 +3,7 @@
 // crossfades; a failed login stays put.
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect } from 'react';
+import { StyleSheet } from 'react-native';
 import Login from '@/app/login';
 import '@/api/transport';
 import { clearToken } from '@/api/token';
@@ -115,5 +116,21 @@ describe('login → Oficina', () => {
     await waitFor(() => expect(screen.getByRole('button', { name: 'Entrar' })).toBeEnabled());
     expect(navigation.dispatch).not.toHaveBeenCalled();
     expect(navigation.goBack).not.toHaveBeenCalled();
+  });
+
+  // The keyboard covers the lower half of the screen: while a field is focused the content is shifted up (a transform,
+  // part of the render) until the form's heading sits under the status bar, whatever height the keyboard reports.
+  it('lifts the form above the keyboard while a field is focused', async () => {
+    fakeServer({});
+    await renderApp(<Login />, { session: true });
+    const shift = () => {
+      const style = StyleSheet.flatten(screen.getByTestId('login-scroll').props.contentContainerStyle) as { transform?: { translateY?: number }[] };
+      return style.transform?.[0]?.translateY ?? 0;
+    };
+    await fireEvent(screen.getByTestId('login-form'), 'layout', { nativeEvent: { layout: { x: 0, y: 400, width: 390, height: 420 } } });
+    expect(shift()).toBeCloseTo(0);
+    await fireEvent(screen.getByTestId('login-clave'), 'focus');
+    expect(shift()).toBeLessThan(-300);
+    expect(shift()).toBeGreaterThanOrEqual(-400);
   });
 });
