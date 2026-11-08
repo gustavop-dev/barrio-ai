@@ -4,14 +4,12 @@
 # an upload the API refuses (413): the card says what happened, in Spanish, and «Reintentar» sends only what is
 # missing. And the empty Galería.
 # scripts/qa/correr-maestro.sh puts one of the seeded PNGs in the emulator's Pictures for Android's photo picker.
-# Steps marked «interruptor de fallos» use the QA failure switch (team_backend.qa_fallos) and are skipped, with a
-# «pendiente-del-interruptor-de-fallos» screenshot, while that switch is not on main.
+# Steps marked «interruptor de fallos» use the QA failure switch (team_backend.qa_fallos, comun/qa-fallo.js).
 appId: co.projectapp.office
 name: Galería · subir fotos
 tags: [galeria]
 ---
 - runFlow: comun/entrar.yaml
-- evalScript: ${output.interruptor = http.get('http://127.0.0.1:8787/api/v1/qa/fallos').status == 200}
 - tapOn:
     id: tab-galeria
     waitToSettleTimeoutMs: 500
@@ -58,70 +56,64 @@ tags: [galeria]
 
 # ---------------------------------------------------------------- an upload the API refuses, and «Reintentar»
 # cubre: GAL-02
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/galeria$'
+      EFECTO: '413'
+      METODO: POST
+      VECES: '1'
+- tapOn:
+    id: gallery-upload
+    waitToSettleTimeoutMs: 500
 - runFlow:
-    when:
-      true: ${output.interruptor}
-    commands:
-      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'POST', efecto: '413', veces: 1})}).status}"
-      - tapOn:
-          id: gallery-upload
-          waitToSettleTimeoutMs: 500
-      - runFlow:
-          file: comun/elegir-foto.yaml
-          env:
-            CAPTURA: 10-subir-04-selector-otra-vez
-      - extendedWaitUntil:
-          visible: "No se pudieron subir todas las fotos"
-          timeout: 30000
-      - assertVisible: "0 de 1 foto subida"
-      - assertVisible: "Descartar las que faltan"
-      - assertNotVisible: ".*(fetch failed|Network request failed|Unsupported FormDataPart|Request failed).*"
-      - takeScreenshot: 10-subir-05-rechazada
-      - tapOn:
-          text: "Reintentar"
-          below:
-            text: "No se pudieron subir todas las fotos"
-      - extendedWaitUntil:
-          visible: "Foto subida\\. El equipo la verá en su próxima ronda\\."
-          timeout: 45000
-      - extendedWaitUntil:
-          visible:
-            text: "Foto.*, nueva"
-            index: 2
-          timeout: 20000
-      - takeScreenshot: 10-subir-06-reintentada
-- runFlow:
-    when:
-      true: ${!output.interruptor}
-    commands:
-      - takeScreenshot: 10-subir-05-rechazada-pendiente-del-interruptor-de-fallos
+    file: comun/elegir-foto.yaml
+    env:
+      CAPTURA: 10-subir-04-selector-otra-vez
+- extendedWaitUntil:
+    visible: "No se pudieron subir todas las fotos"
+    timeout: 30000
+- assertVisible: "0 de 1 foto subida"
+- assertVisible: "Descartar las que faltan"
+- assertNotVisible: ".*(fetch failed|Network request failed|Unsupported FormDataPart|Request failed).*"
+- takeScreenshot: 10-subir-05-rechazada
+- tapOn:
+    text: "Reintentar"
+    below:
+      text: "No se pudieron subir todas las fotos"
+- extendedWaitUntil:
+    visible: "Foto subida\\. El equipo la verá en su próxima ronda\\."
+    timeout: 45000
+- extendedWaitUntil:
+    visible:
+      text: "Foto.*, nueva"
+      index: 2
+    timeout: 20000
+- takeScreenshot: 10-subir-06-reintentada
 
 # ---------------------------------------------------------------- an empty Galería
 # cubre: GAL-01
 # Pull to refresh with the next list coming back empty (interruptor de fallos), then again with the real one.
-- runFlow:
-    when:
-      true: ${output.interruptor}
-    commands:
-      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'vacio', veces: 1})}).status}"
-      - swipe:
-          start: "50%, 35%"
-          end: "50%, 85%"
-          duration: 800
-      - extendedWaitUntil:
-          visible: "Todavía no hay fotos"
-          timeout: 20000
-      - assertVisible: "Sube fotos tuyas, de eventos o de tu trabajo\\. El equipo las usará en tus posts cuando encajen\\."
-      - takeScreenshot: 10-subir-07-galeria-vacia
-      - swipe:
-          start: "50%, 35%"
-          end: "50%, 85%"
-          duration: 800
-      - extendedWaitUntil:
-          visible: "Foto.*, publicada.*"
-          timeout: 20000
-- runFlow:
-    when:
-      true: ${!output.interruptor}
-    commands:
-      - takeScreenshot: 10-subir-07-galeria-vacia-pendiente-del-interruptor-de-fallos
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/galeria$'
+      EFECTO: 'vacio'
+      METODO: GET
+      VECES: '1'
+- swipe:
+    start: "50%, 35%"
+    end: "50%, 85%"
+    duration: 800
+- extendedWaitUntil:
+    visible: "Todavía no hay fotos"
+    timeout: 20000
+- assertVisible: "Sube fotos tuyas, de eventos o de tu trabajo\\. El equipo las usará en tus posts cuando encajen\\."
+- takeScreenshot: 10-subir-07-galeria-vacia
+- swipe:
+    start: "50%, 35%"
+    end: "50%, 85%"
+    duration: 800
+- extendedWaitUntil:
+    visible: "Foto.*, publicada.*"
+    timeout: 20000

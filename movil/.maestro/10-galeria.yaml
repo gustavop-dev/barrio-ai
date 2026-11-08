@@ -5,14 +5,12 @@
 # next photo and «Cerrar», after which the sheet follows that photo); and «Quitar de la galería» with its confirmation.
 # Photos, newest first: Nueva (today), Sin usar (3 days, note «Pizarra de la sesión de producto»), Elegida (for
 # tomorrow's piece), Publicada. «Subir fotos» is in 10-galeria-subir.
-# Steps marked «interruptor de fallos» use the QA failure switch (team_backend.qa_fallos) and are skipped, with a
-# «pendiente-del-interruptor-de-fallos» screenshot, while that switch is not on main.
+# Steps marked «interruptor de fallos» use the QA failure switch (team_backend.qa_fallos, comun/qa-fallo.js).
 appId: co.projectapp.office
 name: Galería
 tags: [galeria]
 ---
 - runFlow: comun/entrar.yaml
-- evalScript: ${output.interruptor = http.get('http://127.0.0.1:8787/api/v1/qa/fallos').status == 200}
 - tapOn:
     id: tab-galeria
     waitToSettleTimeoutMs: 500
@@ -61,14 +59,6 @@ tags: [galeria]
     id: filtro-publicadas
     selected: true
 - takeScreenshot: 10-galeria-02-filtro-publicadas
-# «Elegidas»: the photo chosen for tomorrow's piece.
-- tapOn:
-    id: filtro-elegidas
-- extendedWaitUntil:
-    notVisible: "Foto.*, publicada.*"
-    timeout: 15000
-- assertVisible: "Foto.*, elegida.*"
-- assertNotVisible: "Foto.*, nueva"
 # «Sin usar» includes the new one.
 - tapOn:
     id: filtro-sin_usar
@@ -77,23 +67,25 @@ tags: [galeria]
     timeout: 15000
 - assertVisible: "Foto.*, sin usar"
 - assertNotVisible: "Foto.*, elegida.*"
-# A filter without photos (interruptor de fallos: the next list comes back empty).
-- runFlow:
-    when:
-      true: ${output.interruptor}
-    commands:
-      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'vacio', veces: 1})}).status}"
-      - tapOn:
-          id: filtro-publicadas
-      - extendedWaitUntil:
-          visible: "No hay fotos con este filtro\\."
-          timeout: 15000
-      - takeScreenshot: 10-galeria-03-filtro-vacio
-- runFlow:
-    when:
-      true: ${!output.interruptor}
-    commands:
-      - takeScreenshot: 10-galeria-03-filtro-vacio-pendiente-del-interruptor-de-fallos
+- assertNotVisible: "Foto.*, publicada.*"
+# A filter without photos (interruptor de fallos: its list, asked for the first time, comes back empty). Lists are
+# fresh for 10 s (compartido queryClient), so it has to be a filter not opened yet: «Elegidas».
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/galeria$'
+      EFECTO: 'vacio'
+      METODO: GET
+      VECES: '1'
+- tapOn:
+    id: filtro-elegidas
+- extendedWaitUntil:
+    visible: "No hay fotos con este filtro\\."
+    timeout: 15000
+- assertVisible:
+    id: filtro-elegidas
+    selected: true
+- takeScreenshot: 10-galeria-03-filtro-vacio
 - tapOn:
     id: filtro-todas
 - extendedWaitUntil:
@@ -149,11 +141,14 @@ tags: [galeria]
 - takeScreenshot: 10-galeria-05-nota-y-switch
 # The gallery reloads slowly after the save (interruptor de fallos), so the photo opens again before the new list
 # arrives: the sheet must show what was just saved, not the list it had.
-- runFlow:
-    when:
-      true: ${output.interruptor}
-    commands:
-      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'lento', segundos: 15, veces: 2})}).status}"
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/galeria$'
+      EFECTO: 'lento'
+      METODO: GET
+      VECES: '1'
+      SEGUNDOS: '15'
 - tapOn:
     id: photo-save
 - extendedWaitUntil:

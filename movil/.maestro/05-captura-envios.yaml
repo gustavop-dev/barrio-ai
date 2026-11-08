@@ -7,8 +7,7 @@
 #
 # Used from Galería (a still screen, see 05-captura), which also shows the photo arrive.
 # The microphone: the CI emulator runs with -noaudio and records silence; the audio still travels as a real m4a file.
-# The 413 comes from the QA failure switch (team_backend.qa_fallos). Until that switch is on main the step is skipped
-# with a «pendiente-del-interruptor-de-fallos» screenshot.
+# The 413 comes from the QA failure switch (team_backend.qa_fallos, comun/qa-fallo.js).
 appId: co.projectapp.office
 name: Captura con fotos y audio
 tags: [captura]
@@ -236,52 +235,48 @@ onFlowComplete:
 
 # ---------------------------------------------------------------- a 413 from the API (QA failure switch)
 # cubre: CAP-06
-- evalScript: ${output.interruptor = http.get('http://127.0.0.1:8787/api/v1/qa/fallos').status == 200}
-- runFlow:
-    when:
-      true: ${!output.interruptor}
-    commands:
-      - takeScreenshot: 05-envios-11-413-pendiente-del-interruptor-de-fallos
-- runFlow:
-    when:
-      true: ${output.interruptor}
-    commands:
-      - tapOn:
-          id: capture-button
-          waitToSettleTimeoutMs: 500
-      - extendedWaitUntil:
-          visible:
-            id: capture-sheet
-          timeout: 20000
-      - tapOn:
-          id: capture-note
-          waitToSettleTimeoutMs: 500
-      - inputText: Nota de QA demasiado grande
-      - tapOn: 'A[ñÑ]adir una imagen'
-      # The next capture POST answers 413 (once).
-      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/capturas$', metodo: 'POST', efecto: '413', veces: 1})}).status}"
-      - scrollUntilVisible:
-          element:
-            id: capture-send
-          direction: DOWN
-          timeout: 15000
-      - tapOn:
-          id: capture-send
-          waitToSettleTimeoutMs: 500
-      - extendedWaitUntil:
-          visible:
-            id: capture-send-error
-          timeout: 30000
-      - assertVisible: 'El envío es demasiado grande'
-      - assertVisible: 'El audio puede pesar hasta 25 MB y cada foto hasta 10 MB\. Quita alguna foto o graba un audio más corto\.'
-      - assertVisible: 'Tu audio, tus fotos y tu nota siguen aquí\. Puedes reintentar\.'
-      - assertVisible: 'Nota de QA demasiado grande'
-      - takeScreenshot: 05-envios-11-413
-      - tapOn:
-          text: 'Reintentar'
-          below:
-            text: 'El envío es demasiado grande'
-      - extendedWaitUntil:
-          visible: 'Enviado al equipo\.'
-          timeout: 30000
-      - takeScreenshot: 05-envios-12-413-reintentado
+- tapOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- tapOn:
+    id: capture-note
+    waitToSettleTimeoutMs: 500
+- inputText: Nota de QA demasiado grande
+- tapOn: 'A[ñÑ]adir una imagen'
+# The next capture POST answers 413 (once).
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/capturas$'
+      EFECTO: '413'
+      METODO: POST
+      VECES: '1'
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-send-error
+    timeout: 30000
+- assertVisible: 'El envío es demasiado grande'
+- assertVisible: 'El audio puede pesar hasta 25 MB y cada foto hasta 10 MB\. Quita alguna foto o graba un audio más corto\.'
+- assertVisible: 'Tu audio, tus fotos y tu nota siguen aquí\. Puedes reintentar\.'
+- assertVisible: 'Nota de QA demasiado grande'
+- takeScreenshot: 05-envios-11-413
+- tapOn:
+    text: 'Reintentar'
+    below:
+      text: 'El envío es demasiado grande'
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 30000
+- takeScreenshot: 05-envios-12-413-reintentado
