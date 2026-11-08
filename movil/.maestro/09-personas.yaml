@@ -500,6 +500,8 @@ tags: [personas]
     text: "Registrar oportunidad"
     childOf:
       id: opportunity-form
+    waitToSettleTimeoutMs: 500
+- takeScreenshot: 09-personas-19b-tras-registrar
 - extendedWaitUntil:
     visible:
       text: "Oportunidad registrada"

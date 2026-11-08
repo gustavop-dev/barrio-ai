@@ -227,11 +227,10 @@ tags: [ajustes]
     text: "Guardar orientación"
     enabled: false
 - takeScreenshot: 11-ajustes-07-orientacion
-# A change can be discarded…
+# A change can be discarded… (a tap puts the cursor where it lands, so the flow adds words instead of replacing them)
 - tapOn:
     id: orientacion-field
-- eraseText: 200
-- inputText: "Prioriza casos de ProjectApp esta semana"
+- inputText: " Prioriza casos de ProjectApp esta semana "
 - hideKeyboard
 - scrollUntilVisible:
     element:
@@ -243,14 +242,13 @@ tags: [ajustes]
 - extendedWaitUntil:
     visible:
       id: orientacion-field
-      text: "Habla a fundadores de startups latinoamericanas.*"
+      text: "Habla a fundadores de startups latinoamericanas en etapa temprana\\. Evita el tono de vendedor\\."
     timeout: 10000
 - assertNotVisible: "Descartar cambios"
 # …or saved.
 - tapOn:
     id: orientacion-field
-- eraseText: 200
-- inputText: "Prioriza casos de ProjectApp esta semana"
+- inputText: " Prioriza casos de ProjectApp esta semana "
 - hideKeyboard
 - scrollUntilVisible:
     element:
@@ -267,7 +265,7 @@ tags: [ajustes]
     timeout: 15000
 - assertVisible:
     id: orientacion-field
-    text: "Prioriza casos de ProjectApp esta semana"
+    text: ".*Prioriza casos de ProjectApp esta semana.*"
 - extendedWaitUntil:
     visible: "Actualizada hace .* por qa\\."
     timeout: 15000

@@ -68,23 +68,17 @@ tags: [personas, fichas]
     text: "La app nunca envía mensajes: respondes tú en LinkedIn\\."
 - assertVisible:
     id: conversation-link
-- assertVisible:
-    text: "Hola Gustavo, vi tu post sobre MVPs\\..*"
-    childOf:
-      id: messages
-- assertVisible:
-    text: "Sofía Martínez · .*"
-    childOf:
-      id: messages
-- assertVisible:
-    text: "Tú · .*"
-    childOf:
-      id: messages
-- assertVisible:
-    text: "¡Con gusto, Sofía! Un placer\\."
-    childOf:
-      id: messages
+- assertVisible: "Hola Gustavo, vi tu post sobre MVPs\\..*"
 - takeScreenshot: 14-fichas-02-mensajes
+# The earlier messages, with who wrote them and when (a message row is not a child of the list for Maestro).
+- scrollUntilVisible:
+    element:
+      text: "¡Con gusto, Sofía! Un placer\\."
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Tú · .*"
+- assertVisible: "Sofía Martínez · .*"
 # The team's read sits above the messages.
 - scrollUntilVisible:
     element:
@@ -248,6 +242,7 @@ tags: [personas, fichas]
     childOf:
       id: confirm-sheet
     enabled: true
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       text: "Descartada: no volverá a proponerse"

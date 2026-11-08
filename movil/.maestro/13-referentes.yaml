@@ -213,14 +213,30 @@ tags: [personas, referentes]
 - assertVisible:
     id: add-referent
 - takeScreenshot: 13-referentes-09-perfil-desconocido
-# A profile the API resolves: the sheet closes with «Referente añadido».
+# A profile the API resolves: the sheet closes with «Referente añadido». (A fresh sheet: a tap puts the cursor where it
+# lands, so erasing the long URL is not reliable.)
+- tapOn:
+    id: referent-cancel
+- extendedWaitUntil:
+    notVisible:
+      id: add-referent
+    timeout: 10000
+- tapOn:
+    id: referent-add
+- extendedWaitUntil:
+    visible:
+      id: add-referent
+    timeout: 10000
 - tapOn:
     id: referent-url
-- eraseText: 60
 - inputText: "linkedin.com/in/mafe-ruiz-producto"
+- tapOn:
+    id: referent-reason
+- inputText: "Prueba de QA: habla de producto"
 - hideKeyboard
 - tapOn:
     id: referent-submit
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       text: "Referente añadido"
@@ -264,6 +280,7 @@ tags: [personas, referentes]
     text: "Quitar"
     childOf:
       id: confirm-sheet
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       text: "Referente quitado"

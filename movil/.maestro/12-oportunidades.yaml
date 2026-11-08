@@ -412,6 +412,8 @@ tags: [personas, oportunidades]
     text: "Registrar oportunidad"
     childOf:
       id: opportunity-form
+    waitToSettleTimeoutMs: 500
+- takeScreenshot: 12-oportunidades-12b-tras-registrar
 - extendedWaitUntil:
     visible:
       text: "Oportunidad registrada"
@@ -469,6 +471,8 @@ tags: [personas, oportunidades]
     text: "Guardar cambios"
     childOf:
       id: opportunity-form
+    waitToSettleTimeoutMs: 500
+- takeScreenshot: 12-oportunidades-13b-tras-guardar
 - extendedWaitUntil:
     visible:
       text: "Cambios guardados"
@@ -518,6 +522,7 @@ tags: [personas, oportunidades]
     text: "Eliminar"
     childOf:
       id: opportunity-form
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       text: "Oportunidad eliminada"
