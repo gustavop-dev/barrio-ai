@@ -3,9 +3,11 @@
 # «Programada», «Sale mañana a las …» and the veto card; the final text with «Copiar» → «Copiado»; «Comentario para el
 # equipo» opens the capture tied to the piece; vetar and «Deshacer» at once («Veto deshecho», nothing sent); every
 # fold of «Cómo se escribió» opens with its content (the variants also swipe); then vetar for real and let the 5 s
-# pass: the piece says «La vetaste» with the note and has no «Vetar» any more. With nothing on its way, the panel of a
-# free day offers «Preparar la siguiente pieza», whose confirmation says what it costs and shows the API's answer (the
-# QA backend has no official LinkedIn, so it is a 409 with its reason, or the job queued).
+# pass: the piece says «La vetaste» with the note and has no «Vetar» any more. Then veto the piece in three days that
+# waits for approval (seed_qa piece:aprobacion, used by 04-tu-turno-aprobar): it also counts as «en camino», even for
+# another day. Each flow reseeds, so this one must veto both pieces itself. With nothing on its way, the panel of a
+# free day offers «Preparar la siguiente pieza», whose confirmation says what it costs and shows the API's answer
+# (the QA backend has no official LinkedIn, so it is a 409 with its reason, or the job queued).
 # Text in the «etiqueta» style (badges, section labels) is uppercased on screen, so it is written in capitals here.
 appId: co.projectapp.office
 name: Pieza de mañana y su veto
@@ -452,7 +454,85 @@ tags: [calendario]
       id: pieza
     timeout: 15000
 
-# ---------------------------------------------------------------- «Preparar la siguiente pieza» from a free day
+# ---------------------------------------------------------------- veto the other piece still on its way: pending approval in three days
+# cubre: CAL-12
+# Back in Lista, open the approval seed's piece from «Después». Tomorrow's veto alone does not enable preparation:
+# DayPanel checks all upcoming pieces, and `awaiting_approval` counts regardless of the selected free day's date.
+# The row's accessible label can include the date and status after its thesis.
+- scrollUntilVisible:
+    element:
+      text: "Un piloto de seis semanas dice más que una propuesta de cuarenta páginas.*"
+      childOf:
+        id: calendario-lista
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Un piloto de seis semanas dice más que una propuesta de cuarenta páginas.*"
+    childOf:
+      id: calendario-lista
+- extendedWaitUntil:
+    visible:
+      text: "PENDIENTE DE APROBACIÓN"
+      childOf:
+        id: pieza
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Vetar"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "Aprobar"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-pieza-veto-14a-pendiente
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- tapOn:
+    id: confirm-note
+- inputText: "Esta pieza pendiente tampoco debe salir"
+- hideKeyboard
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: confirm-sheet
+# «La vetaste» comes from the persisted rejection, after the undo window and the detail's refetch (not the toast).
+- extendedWaitUntil:
+    visible:
+      text: "La vetaste"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "Tu nota: Esta pieza pendiente tampoco debe salir"
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Aprobar"
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-pieza-veto-14b-pendiente-vetada
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# ---------------------------------------------------------------- «Preparar la siguiente pieza» from a free day, after both vetoes
 # cubre: CAL-04, CAL-14
 - scrollUntilVisible:
     element:
