@@ -32,7 +32,7 @@ export function TimelineItem({ color, time, title, sub, badge, agent, to, linkLa
   const [open, setOpen] = useState(false);
   const external = isHttps(externalUrl) ? externalUrl : null;
   return (
-    <View style={styles.item} testID={testID}>
+    <View style={styles.item} testID={testID} collapsable={false}>
       <View style={[styles.dot, { backgroundColor: color }]} />
       <T variant="detalle" soft style={styles.time}>
         {time || ''}
