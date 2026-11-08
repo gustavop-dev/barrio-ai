@@ -10,9 +10,11 @@ import { FUNNEL_ASIDE, FUNNEL_MAIN, MODALITY_SHORT, personStage, SOURCE_FILTER, 
 import { router } from 'expo-router';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
+import { useFlightSource } from '@/components/shell/flight';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { Avatar, Badge, Button, EmptyState, EmptyText, ErrorRetry, FilterChip, LabelChip, Note, Sheet, Skeleton, T, pageContent } from '@/components/ui';
+import { Avatar, Badge, Button, EmptyState, EmptyText, ErrorRetry, FilterChip, LabelChip, Note, Sheet, Skeleton, T, initials, pageContent } from '@/components/ui';
 import { Select } from '@/components/ui/Select';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
@@ -48,19 +50,30 @@ function PersonRow({ contact }: { contact: Contact }) {
   const stage = personStage(contact.display_stage ?? contact.stage);
   const classification = contact.classification ?? {};
   const classified = Object.keys(classification).length > 0;
+  // MovDetalle: the portrait and the name fly into the person card (components/shell/flight.tsx).
+  const { avatar, label, hidden, begin } = useFlightSource(contact.id);
   return (
     <Pressable
       accessibilityRole="link"
       testID={`person-${contact.id}`}
-      onPress={() => router.push({ pathname: '/personas/[id]', params: { id: contact.id } })}
+      onPress={() => {
+        begin(displayName(contact), initials(contact.display_name));
+        router.push({ pathname: '/personas/[id]', params: { id: contact.id } });
+      }}
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
     >
-      <Avatar name={contact.display_name} />
+      <View ref={avatar} collapsable={false}>
+        <Animated.View style={hidden}>
+          <Avatar name={contact.display_name} />
+        </Animated.View>
+      </View>
       <View style={styles.rowBody}>
         <View style={styles.rowTop}>
-          <T style={styles.grow} numberOfLines={2}>
-            {displayName(contact)}
-          </T>
+          <View ref={label} collapsable={false} style={styles.grow}>
+            <Animated.View style={hidden}>
+              <T numberOfLines={2}>{displayName(contact)}</T>
+            </Animated.View>
+          </View>
           <Badge tone={stage.tone}>{stage.label}</Badge>
         </View>
         {contact.headline ? (

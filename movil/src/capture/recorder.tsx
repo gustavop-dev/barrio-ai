@@ -14,10 +14,11 @@ import {
   useAudioRecorderState,
 } from 'expo-audio';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { captureMotion } from '@/theme/motion';
 import type { RecordedAudio } from './types';
 
-/** How often the meter and the timer refresh while recording (ms). */
-export const LEVEL_INTERVAL_MS = 100;
+/** How often the meter and the timer refresh while recording: a new wave bar each time (MovCaptura). */
+export const LEVEL_INTERVAL_MS = captureMotion.levelEveryMs;
 const IDLE_INTERVAL_MS = 1000;
 /** Metering arrives in dBFS (-160…0): this floor maps to an empty bar. */
 const SILENCE_DB = -60;

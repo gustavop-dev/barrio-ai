@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
-import { spring, timing } from '@/theme/motion';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { microMotion, springWith } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { T } from './Text';
 
@@ -34,7 +34,10 @@ const FILL: Record<ButtonVariant, { bg: string; fg: string; border: string }> = 
   ghost: { bg: 'transparent', fg: colors.brandDeep, border: 'transparent' },
 };
 
-/** The design's buttons (48 px, radius 12): primary 0ff1ce, secondary outlined, danger alerta, ghost link. */
+/**
+ * The design's buttons (48 px, radius 12): primary 0ff1ce, secondary outlined, danger alerta, ghost link.
+ * MovMicro: pressed, they give way to 0.97 on a stiff spring and come back on FIRM when released.
+ */
 export function Button({
   children,
   onPress,
@@ -70,10 +73,10 @@ export function Button({
         disabled={inactive}
         onPress={onPress}
         onPressIn={() => {
-          scale.set(withTiming(0.97, timing('press')));
+          scale.set(withSpring(microMotion.pressedScale, springWith(microMotion.pressDown)));
         }}
         onPressOut={() => {
-          scale.set(withSpring(1, spring('press')));
+          scale.set(withSpring(1, springWith(microMotion.pressUp)));
         }}
         style={({ pressed }) => [
           styles.base,

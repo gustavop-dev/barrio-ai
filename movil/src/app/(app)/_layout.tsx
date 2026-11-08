@@ -27,6 +27,13 @@ function usePushRouting() {
   }, []);
 }
 
+/**
+ * Detail screens draw their own push (components/shell/DetailScreen.tsx, MovNavegacion): the stack
+ * shows them as transparent modals without a native animation, so the tabs stay drawn underneath
+ * and can move left and darken while the detail slides in.
+ */
+const PUSHED = { presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } } as const;
+
 function SignedIn() {
   usePushRouting();
   useEffect(() => {
@@ -41,7 +48,11 @@ function SignedIn() {
           animation: 'slide_from_right',
           animationDuration: timings.screen.duration,
         }}
-      />
+      >
+        <Stack.Screen name="(tabs)" />
+        <Stack.Screen name="personas/[id]" options={PUSHED} />
+        <Stack.Screen name="calendario/pieza/[id]" options={PUSHED} />
+      </Stack>
       <CaptureSheetHost />
     </RecorderProvider>
   );

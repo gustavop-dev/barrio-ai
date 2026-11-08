@@ -38,13 +38,20 @@ export interface CaptureDraft {
 
 export type MicNoteKind = 'explain' | 'denied' | 'error';
 
+/** MovCaptura: the capture button as it turned into the sheet (its lift and scale at that moment). */
+export interface CaptureOrigin {
+  lift: number;
+  scale: number;
+}
+
 /**
  * How the sheet opens, beyond the context:
  * - `recording`: a live recording locked by sliding up (the sheet shows the pulsing ball);
  * - `audio`: the finished audio of a hold released without locking (never sent alone);
  * - `mic`: the microphone could not be used: `explain` asks first;
  * - `view: 'history'`: «Lo que enviaste» (the capture_processed notification, /?enviado=1);
- * - `draft`: content to put back in the sheet.
+ * - `draft`: content to put back in the sheet;
+ * - `from`: opened by the capture button, which turns into the sheet's audio ball (MovCaptura).
  */
 export interface CaptureSeed {
   recording?: boolean;
@@ -52,4 +59,5 @@ export interface CaptureSeed {
   mic?: MicNoteKind;
   view?: 'history';
   draft?: CaptureDraft;
+  from?: CaptureOrigin;
 }

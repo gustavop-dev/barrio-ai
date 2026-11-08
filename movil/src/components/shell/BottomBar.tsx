@@ -1,13 +1,19 @@
 // Mobile bottom bar: Oficina and Resultados, the raised capture button in the centre, Personas and
 // Galería. It floats over the screens (they pad their content with useContentInsets) so the raised
 // button stays touchable above the bar.
+//
+// Motion (MovNavegacion `tab`): one pill slides to the active tab with the `pill` spring, the tapped
+// tab's icon pops from 0.92 with the `tabIcon` spring and the phone ticks (`tabChange`). On the four
+// top-bar screens no bottom tab is active and the pill hides; it slides from where it was when a
+// bottom tab is chosen again. With reduced motion the springs jump.
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { Pressable, StyleSheet, View } from 'react-native';
-import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View, type LayoutChangeEvent, type LayoutRectangle } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { CaptureButton } from '@/capture/CaptureButton';
 import { Icon, type IconName } from '@/components/icons';
 import { T } from '@/components/ui';
-import { haptic, spring } from '@/theme/motion';
+import { haptic, navSpring, navValues } from '@/theme/motion';
 import { colors, radius, shell } from '@/theme/tokens';
 
 interface Item {
@@ -28,8 +34,37 @@ export const BOTTOM_RIGHT: readonly Item[] = [
 /** Room the raised capture button needs above the bar (it grows to 72 px while holding). */
 const RAISE = shell.captureButtonHolding - shell.captureButton + shell.captureLift;
 
-function Tab({ item, focused, onPress }: { item: Item; focused: boolean; onPress: () => void }) {
-  const pill = useAnimatedStyle(() => ({ transform: [{ scale: withSpring(focused ? 1 : 0.92, spring('press')) }] }), [focused]);
+const PILL = { width: 56, height: 28 } as const;
+
+/** Where the pill sits for a tab centred at `center` (MovNavegacion: `CX[i] − 28`). */
+export function pillLeft(center: number): number {
+  return center - PILL.width / 2;
+}
+
+function Tab({
+  item,
+  focused,
+  onPress,
+  onPlace,
+  onIcon,
+}: {
+  item: Item;
+  focused: boolean;
+  onPress: () => void;
+  onPlace: (route: Item['route'], layout: LayoutRectangle) => void;
+  onIcon: (layout: LayoutRectangle) => void;
+}) {
+  const scale = useSharedValue(1);
+  const wasFocused = useRef(focused);
+  // Only a change of tab pops the icon (MovNavegacion: `IC[i].sc.set(0.92).to(1, TOK.soft)`).
+  useEffect(() => {
+    if (focused && !wasFocused.current) {
+      scale.set(navValues.tabIconFrom);
+      scale.set(withSpring(1, navSpring('tabIcon')));
+    }
+    wasFocused.current = focused;
+  }, [focused, scale]);
+  const icon = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
     <Pressable
       testID={`tab-${item.route}`}
@@ -37,9 +72,10 @@ function Tab({ item, focused, onPress }: { item: Item; focused: boolean; onPress
       accessibilityLabel={item.label}
       accessibilityState={{ selected: focused }}
       onPress={onPress}
+      onLayout={(event: LayoutChangeEvent) => onPlace(item.route, event.nativeEvent.layout)}
       style={styles.tab}
     >
-      <Animated.View style={[styles.pill, focused ? styles.pillOn : null, pill]}>
+      <Animated.View testID={`tab-icon-${item.route}`} onLayout={(event: LayoutChangeEvent) => onIcon(event.nativeEvent.layout)} style={[styles.icon, icon]}>
         <Icon name={item.icon} color={focused ? colors.ink : colors.inkSoft} />
       </Animated.View>
       <T variant="etiqueta" color={focused ? colors.ink : colors.inkSoft} numberOfLines={1} style={styles.label}>
@@ -51,16 +87,55 @@ function Tab({ item, focused, onPress }: { item: Item; focused: boolean; onPress
 
 export function BottomBar({ state, navigateToTab, insets }: BottomTabBarProps) {
   const focusedName = state.routes[state.index]?.name;
+  const centers = useRef<Partial<Record<string, number>>>({});
+  const placed = useRef(false);
+  const pillX = useSharedValue(0);
+  const pillOn = useSharedValue(0);
+  const [pillTop, setPillTop] = useState(0);
+
+  /** Puts the pill under the active tab: at once the first time, then sliding from where it was. */
+  const placePill = useCallback(
+    (name: string | undefined) => {
+      const center = name ? centers.current[name] : undefined;
+      if (center === undefined) {
+        pillOn.set(0);
+        return;
+      }
+      if (placed.current) pillX.set(withSpring(pillLeft(center), navSpring('pill')));
+      else pillX.set(pillLeft(center));
+      placed.current = true;
+      pillOn.set(1);
+    },
+    [pillOn, pillX],
+  );
+
+  useEffect(() => placePill(focusedName), [focusedName, placePill]);
+
+  const onPlace = useCallback(
+    (route: Item['route'], layout: LayoutRectangle) => {
+      const first = centers.current[route] === undefined;
+      centers.current[route] = layout.x + layout.width / 2;
+      if (first && route === focusedName) placePill(route);
+    },
+    [focusedName, placePill],
+  );
+  const onIcon = useCallback((layout: LayoutRectangle) => setPillTop(layout.y), []);
+
+  const pill = useAnimatedStyle(() => ({ opacity: pillOn.value, transform: [{ translateX: pillX.value }] }));
+
   const go = (item: Item) => {
     const route = state.routes.find((r) => r.name === item.route);
     if (!route) return;
     if (route.name !== focusedName) haptic('tabChange');
     navigateToTab(route.key);
   };
-  const render = (item: Item) => <Tab key={item.route} item={item} focused={focusedName === item.route} onPress={() => go(item)} />;
+  const render = (item: Item) => (
+    <Tab key={item.route} item={item} focused={focusedName === item.route} onPress={() => go(item)} onPlace={onPlace} onIcon={onIcon} />
+  );
   return (
     <View pointerEvents="box-none" style={[styles.root, { height: shell.tabBarHeight + insets.bottom + RAISE }]} accessibilityRole="tablist" accessibilityLabel="Secciones">
       <View style={[styles.bar, { height: shell.tabBarHeight + insets.bottom, paddingBottom: insets.bottom }]}>
+        <Animated.View testID="tab-pill" pointerEvents="none" accessible={false} importantForAccessibility="no" style={[styles.pill, { top: pillTop }, pill]} />
         {BOTTOM_LEFT.map(render)}
         <CaptureButton />
         {BOTTOM_RIGHT.map(render)}
@@ -73,7 +148,7 @@ const styles = StyleSheet.create({
   root: { position: 'absolute', left: 0, right: 0, bottom: 0, justifyContent: 'flex-end' },
   bar: { flexDirection: 'row', alignItems: 'flex-start', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.line },
   tab: { flex: 1, height: shell.tabBarHeight, alignItems: 'center', justifyContent: 'center', gap: 2 },
-  pill: { width: 56, height: 28, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center' },
-  pillOn: { backgroundColor: colors.brandLight },
+  icon: { width: PILL.width, height: PILL.height, alignItems: 'center', justifyContent: 'center' },
+  pill: { position: 'absolute', left: 0, width: PILL.width, height: PILL.height, borderRadius: radius.pill, backgroundColor: colors.brandLight },
   label: { letterSpacing: 0, textTransform: 'none', fontSize: 12, lineHeight: 16 },
 });

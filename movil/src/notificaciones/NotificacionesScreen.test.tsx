@@ -40,13 +40,15 @@ describe('Notificaciones', () => {
     expect(within(today).getByText('Nueva')).toBeOnTheScreen();
     expect(within(today).getByText('00:30')).toBeOnTheScreen();
     expect(within(today).getByText('Las impresiones a las 24 h llegan mañana.')).toBeOnTheScreen();
-    expect(today).toHaveStyle({ backgroundColor: colors.surface });
+    // Unread: the row is highlighted (superficie, a layer that fades when it is read).
+    expect(within(today).getByTestId('notif-lit')).toHaveStyle({ backgroundColor: colors.surface });
 
     const yesterday = screen.getByTestId('notif-n-ayer');
     expect(within(yesterday).queryByText('Nueva')).toBeNull();
+    expect(within(yesterday).queryByTestId('notif-lit')).toBeNull();
     expect(row('El verificador bloqueó la pieza del viernes')).toBeTruthy();
     // The dot takes the colour of the item's calendar layer.
-    const dots = (id: string) => screen.getByTestId(id).children[0] as unknown as { props: { style: unknown } };
+    const dots = (id: string) => within(screen.getByTestId(id)).getByTestId('notif-dot');
     expect(dots('notif-n-ayer')).toHaveStyle({ backgroundColor: layers.sistema });
     expect(dots('notif-n-hoy')).toHaveStyle({ backgroundColor: layers.publicaciones });
     expect(screen.getByText(/Se guardan 7 días\. Lo anterior está en el/)).toBeOnTheScreen();

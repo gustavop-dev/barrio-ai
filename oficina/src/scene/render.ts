@@ -1,6 +1,7 @@
 // Draws the vertical office plan with the LimeZu atlas, ported from the design (Oficina.dc.html).
 // Always daylight. The paused darkening is a DOM layer over the canvas, not part of the drawing.
 
+import { sceneBracketLength, sceneHop, selectScene } from '../../../compartido/src/scene/runtime';
 import { lookFor } from './activity';
 import { ATLAS, type AtlasImage } from './atlas';
 import type { Actor, BubbleIcon, OfficeEngine } from './engine';
@@ -74,6 +75,8 @@ const ROOM = {
 };
 
 export function drawScene(ctx: CanvasRenderingContext2D, atlas: AtlasImage | null, engine: OfficeEngine, options: DrawOptions): void {
+  selectScene(engine.state, options.selectedRole, options.selectedZone);
+  const motion = engine.state.motion;
   const C = options.palette ?? DEFAULT_PALETTE;
   const clock = engine.clock;
   const still = engine.isStill;
@@ -226,13 +229,13 @@ export function drawScene(ctx: CanvasRenderingContext2D, atlas: AtlasImage | nul
     const anim = moving ? 'run' : canRead && (a.reading || readsAtSeat) ? 'reading' : 'idle_anim';
     const r = ATLAS[`p${sprite}-${anim}`] ?? ATLAS[`p${sprite}-idle_anim`];
     if (!r) return;
-    const animate = !still && (moving || look.animated || a.reading);
-    const frame = animate ? Math.floor(clock / (moving ? 110 : 220) + a.index) % 6 : 0;
+    const animate = !still && !engine.halted && (moving || look.animated || a.reading);
+    const frame = animate ? Math.floor(clock / (moving ? motion.runFrameMs : motion.idleFrameMs) + a.index) % 6 : 0;
     let dir: number = anim === 'reading' ? 2 : a.dir;
     if ((dir * 6 + frame) * 16 + 16 > r[2]) dir = 0;
     ctx.save();
     ctx.globalAlpha = a.alpha * (look.dimmed ? 0.45 : 1);
-    ctx.drawImage(image, r[0] + (dir * 6 + frame) * 16, r[1], 16, 32, Math.round(a.x - 8), Math.round(a.y - 29), 16, 32);
+    ctx.drawImage(image, r[0] + (dir * 6 + frame) * 16, r[1], 16, 32, Math.round(a.x - 8), Math.round(a.y - 29) - sceneHop(engine.state, a.id), 16, 32);
     ctx.restore();
   };
 
@@ -248,7 +251,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, atlas: AtlasImage | nul
   // ---------------------------------------------------------------- lights, bubbles, selection
   const light = (a: Actor) => {
     if (engine.statusOf(a.id) !== 'trabajando' || a.away || paused) return;
-    const on = still || Math.floor(clock / 700 + a.index) % 3 !== 0;
+    const on = still || Math.floor(clock / motion.lightMs + a.index) % 3 !== 0;
     const x = Math.round(a.x + 6);
     const y = Math.round(a.y - 30);
     R(x - 1, y - 1, 4, 4, C.tinta);
@@ -287,7 +290,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, atlas: AtlasImage | nul
       R(x + 4, y + 4, 1, 1, t);
       R(x + 5, y + 5, 1, 1, t);
     } else {
-      const f = Math.floor(clock / 300) % 3;
+      const f = Math.floor(clock / motion.bubbleFrameMs) % 3;
       for (let d = 0; d < 3; d++) R(x + d * 3, y + 3 - (f === d && !still ? 1 : 0), 1, 1, C.tintaSuave);
     }
   };
@@ -320,7 +323,7 @@ export function drawScene(ctx: CanvasRenderingContext2D, atlas: AtlasImage | nul
     const y = box[1]! + 1;
     const w = box[2]! - 2;
     const h = box[3]! - 2;
-    const L = 7;
+    const L = sceneBracketLength(engine.state);
     for (const [cx, cy, dx, dy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]] as const) {
       R(Math.min(cx, cx + dx * L), dy > 0 ? cy : cy - 2, L, 3, C.tinta);
       R(dx > 0 ? cx : cx - 2, Math.min(cy, cy + dy * L), 3, L, C.tinta);
@@ -331,6 +334,15 @@ export function drawScene(ctx: CanvasRenderingContext2D, atlas: AtlasImage | nul
 
   for (const a of engine.actors) light(a);
   for (const a of engine.actors) bubble(a);
+  const mail = engine.state.mail;
+  if (mail && !still) {
+    const x = Math.round(mail.x - 5), y = Math.round(mail.y - 4);
+    R(x, y, 11, 8, C.tinta); R(x + 1, y + 1, 9, 6, ROOM.white);
+    R(x + 1, y + 1, 1, 1, C.tinta); R(x + 2, y + 2, 1, 1, C.tinta);
+    R(x + 3, y + 3, 1, 1, C.tinta); R(x + 4, y + 4, 3, 1, C.tinta);
+    R(x + 7, y + 3, 1, 1, C.tinta); R(x + 8, y + 2, 1, 1, C.tinta);
+    R(x + 9, y + 1, 1, 1, C.tinta); R(x + 4, y + 5, 3, 1, C.ofc);
+  }
   const zone = options.selectedZone;
   if (zone) {
     const box = zone === 'biblioteca' ? LIBRARY.box : TEAMS.find((t) => t.id === zone)?.box;

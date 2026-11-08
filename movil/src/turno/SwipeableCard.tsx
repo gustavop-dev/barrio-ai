@@ -1,7 +1,8 @@
 // A Tu turno card that can be swiped: right for its primary action (done), left for «Más tarde».
 // The card follows the finger on the UI thread; past the commit point a selection tick plays, and
 // on release it either flies off (the action runs) or springs back. Screen readers get the same two
-// actions as accessibility actions.
+// actions as accessibility actions. MovTuTurno: once the action is confirmed, the list closes the gap
+// behind the card that flew off, exactly as for a card resolved with its button (exits.ts).
 import { useState, type ReactNode } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -18,8 +19,11 @@ export interface SwipeableCardProps {
   rightLabel: string | null;
   /** Label of the left swipe («Más tarde»), or null. */
   leftLabel: string | null;
-  /** Runs the swipe. Resolves true when the card leaves the list (it stays off screen), false to bring it back. */
-  onSwipe: (side: SwipeSide) => Promise<boolean>;
+  /**
+   * Runs the swipe. Resolves true when the card leaves the list (it stays off screen), false to bring it
+   * back. `flown`: the finger took the card off screen (false for the screen reader's actions).
+   */
+  onSwipe: (side: SwipeSide, flown: boolean) => Promise<boolean>;
   testID?: string;
 }
 
@@ -36,7 +40,7 @@ export function SwipeableCard({ children, rightLabel, leftLabel, onSwipe, testID
 
   const commit = (side: SwipeSide) => {
     haptic('swipeCommit');
-    void onSwipe(side).then(settle, () => settle(false));
+    void onSwipe(side, true).then(settle, () => settle(false));
   };
 
   const tick = () => haptic('swipeThreshold');
@@ -89,8 +93,8 @@ export function SwipeableCard({ children, rightLabel, leftLabel, onSwipe, testID
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
       accessibilityActions={actions}
       onAccessibilityAction={(event) => {
-        if (event.nativeEvent.actionName === 'swipeRight' && rightLabel) void onSwipe('right');
-        if (event.nativeEvent.actionName === 'swipeLeft' && leftLabel) void onSwipe('left');
+        if (event.nativeEvent.actionName === 'swipeRight' && rightLabel) void onSwipe('right', false);
+        if (event.nativeEvent.actionName === 'swipeLeft' && leftLabel) void onSwipe('left', false);
       }}
     >
       {enabled ? (

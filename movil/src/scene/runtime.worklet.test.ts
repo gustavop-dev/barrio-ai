@@ -50,3 +50,21 @@ it('runs the compiled shared choreography on an isolated UI runtime with no JS c
   expect(snapshot(s)).toEqual(js.getSnapshot());
   expect(s.tasks).toHaveLength(0);
 });
+
+it('compiles receipt, selection and reduced-motion choreography without JS runtime dependencies', () => {
+  const runtime = loadCompiledRuntime();
+  const create = uiClone(runtime.createScene), receive = uiClone(runtime.receiveSceneCapture);
+  const select = uiClone(runtime.selectScene), step = uiClone(runtime.stepScene), still = uiClone(runtime.setSceneStill);
+  const hop = uiClone(runtime.sceneHop), brackets = uiClone(runtime.sceneBracketLength);
+  const s = create(); select(s, 'operador_cuenta', 'operacion'); receive(s);
+  expect(hop(s, 'operador_cuenta')).toBe(2);
+  expect(brackets(s)).toBe(1);
+  for (let i = 0; i < 2000; i++) step(s, 16);
+  expect(s.captures).toBe(0);
+  expect(s.now?.text).toBe('Director editorial recibe tu captura.');
+  receive(s); still(s, true);
+  expect(s.mail).toBeNull();
+  expect(s.tasks).toHaveLength(0);
+  expect(hop(s, 'operador_cuenta')).toBe(0);
+  expect(brackets(s)).toBe(7);
+});
