@@ -48,5 +48,5 @@ jobs:
           print(f"Perfil `${{ inputs.perfil }}` · commit `${{ github.sha }}`\n")
           print(f"- Estado: {b.get('status')}")
           print(f"- Runtime: `{b.get('runtimeVersion')}`")
-          print(f"- Enlace: https://expo.dev/accounts/gustavoperez/projects/office/builds/{b.get('id')}")
+          print(f"- Enlace: https://expo.dev/accounts/gustavoperez/projects/oficina-0ff1ce/builds/{b.get('id')}")
           PY
