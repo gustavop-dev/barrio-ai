@@ -1,5 +1,6 @@
-# cubre: PRS-01, PRS-02, PRS-03, PRS-04, PRS-05, PRS-09, PRS-10
-# Personas › Barrio and Laura's card. The tabs; the network-off warning of the QA server; each row (stage, headline,
+# cubre: PRS-01, PRS-02, PRS-03, PRS-04, PRS-05, PRS-09, PRS-10, BAR-11
+# Personas › Barrio and Laura's card. With the failure switch, the empty Barrio («Aún no hay personas») and a failed
+# load with «Reintentar». The tabs; the network-off warning of the QA server; each row (stage, headline,
 # role and modality chips, «Sin clasificar todavía»); the stage chips (Por clasificar → Pedro Salazar, Encaja → Laura
 # Gómez, Oportunidad → Andrés Restrepo and Valentina Castro, «En conversación · aún no disponible», Te invitó →
 # Natalia Rojas at the end of the strip); the search box («Pedro», a search nobody matches with «Quitar filtros»,
@@ -14,9 +15,51 @@ name: Personas
 tags: [personas]
 ---
 - runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- Barrio empty, then a failed load and «Reintentar»
+# cubre: PRS-01
+# The failure switch (comun/qa-fallo.js) empties the list first, then makes it fail.
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/red/contacts$'
+      METODO: GET
+      EFECTO: vacio
+      VECES: '-1'
 - tapOn:
     id: tab-personas
     waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "Aún no hay personas"
+    timeout: 30000
+- assertVisible: "El equipo empieza a descubrir cuando lee los comentarios de los referentes\\."
+- takeScreenshot: 09-personas-01-vacio
+# A failing load shows the error with «Reintentar», which brings the people back.
+- runScript: comun/qa-fallos-limpiar.js
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/red/contacts$'
+      METODO: GET
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    text: "Seguido( · \\d+)?"
+    childOf:
+      id: stage-chips
+- extendedWaitUntil:
+    visible: "Reintentar"
+    timeout: 30000
+- takeScreenshot: 09-personas-02-error
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn: "Reintentar"
+- extendedWaitUntil:
+    visible: "Julián Herrera"
+    timeout: 20000
+- tapOn:
+    text: "Seguido( · \\d+)?"
+    childOf:
+      id: stage-chips
 - extendedWaitUntil:
     visible:
       id: barrio-list
@@ -40,7 +83,7 @@ tags: [personas]
 # The QA server runs with the network off (NETWORK_ENABLED unset), and red/summary says so.
 - assertVisible: "La red está apagada en el servidor"
 - assertVisible: "El equipo no descubre ni propone a nadie nuevo\\. Lo guardado sigue aquí\\."
-- takeScreenshot: 09-personas-01-barrio
+- takeScreenshot: 09-personas-03-barrio
 # Laura's row (person-<uuid5 of contact:laura-gomez>): stage, headline, role and modality chips, origin and activity.
 - scrollUntilVisible:
     element:
@@ -83,7 +126,7 @@ tags: [personas]
     text: Sin clasificar todavía
     childOf:
       id: person-5ede725c-3221-5088-8e6d-334ca462e9b0
-- takeScreenshot: 09-personas-02-filas
+- takeScreenshot: 09-personas-04-filas
 - scrollUntilVisible:
     element:
       id: stage-chips
@@ -102,7 +145,7 @@ tags: [personas]
 - extendedWaitUntil:
     notVisible: "Laura Gómez"
     timeout: 10000
-- takeScreenshot: 09-personas-03-por-clasificar
+- takeScreenshot: 09-personas-05-por-clasificar
 - tapOn:
     text: "Encaja( · \\d+)?"
     childOf:
@@ -113,7 +156,7 @@ tags: [personas]
 - extendedWaitUntil:
     notVisible: "Pedro Salazar"
     timeout: 10000
-- takeScreenshot: 09-personas-04-encaja
+- takeScreenshot: 09-personas-06-encaja
 # «Oportunidad» lists the people with an open opportunity; «En conversación» has no count yet and is disabled.
 - repeat:
     times: 6
@@ -139,7 +182,7 @@ tags: [personas]
     timeout: 15000
 - assertVisible: "Valentina Castro"
 - assertNotVisible: "Laura Gómez"
-- takeScreenshot: 09-personas-05-oportunidad
+- takeScreenshot: 09-personas-07-oportunidad
 # «Te invitó» sits at the end of the strip: swipe it until the chip shows.
 - repeat:
     times: 6
@@ -163,7 +206,7 @@ tags: [personas]
 - extendedWaitUntil:
     notVisible: "Laura Gómez"
     timeout: 10000
-- takeScreenshot: 09-personas-06-te-invito
+- takeScreenshot: 09-personas-08-te-invito
 # Back to «Todas», at the start of the strip.
 - repeat:
     times: 6
@@ -194,7 +237,7 @@ tags: [personas]
 - extendedWaitUntil:
     notVisible: "Laura Gómez"
     timeout: 10000
-- takeScreenshot: 09-personas-07-buscar-pedro
+- takeScreenshot: 09-personas-09-buscar-pedro
 - tapOn: "Borrar la búsqueda"
 # Nobody matches: the empty state offers «Quitar filtros», which brings everybody back.
 - tapOn:
@@ -205,7 +248,7 @@ tags: [personas]
     visible: "Nadie coincide con estos filtros"
     timeout: 15000
 - hideKeyboard
-- takeScreenshot: 09-personas-08-sin-resultados
+- takeScreenshot: 09-personas-10-sin-resultados
 - tapOn: "Quitar filtros"
 - extendedWaitUntil:
     visible:
@@ -226,7 +269,7 @@ tags: [personas]
     text: Comprador
     childOf:
       id: barrio-filters
-- takeScreenshot: 09-personas-09-mas-filtros
+- takeScreenshot: 09-personas-11-mas-filtros
 - tapOn:
     text: Ver resultados
     childOf:
@@ -244,7 +287,7 @@ tags: [personas]
     timeout: 15000
 - assertNotVisible: "Julián Herrera"
 - assertNotVisible: "Pedro Salazar"
-- takeScreenshot: 09-personas-10-compradores
+- takeScreenshot: 09-personas-12-compradores
 - tapOn: "Más filtros: rol, modalidad y origen \\(1 activo\\)"
 - extendedWaitUntil:
     visible:
@@ -297,7 +340,7 @@ tags: [personas]
     id: next-step
 - assertVisible:
     text: "Siguiente paso · Equipo.*El equipo (va a seguirla|la seguirá).*"
-- takeScreenshot: 09-personas-11-ficha
+- takeScreenshot: 09-personas-13-ficha
 - scrollUntilVisible:
     element:
       id: journey
@@ -308,7 +351,7 @@ tags: [personas]
     id: journey-discovered
 - assertVisible:
     id: journey-followed
-- takeScreenshot: 09-personas-12-recorrido
+- takeScreenshot: 09-personas-14-recorrido
 # «Por qué encaja»: the reason and the confidence.
 - scrollUntilVisible:
     element:
@@ -325,7 +368,7 @@ tags: [personas]
     centerElement: true
     timeout: 20000
 - assertVisible: "Comentó en un post de un referente"
-- takeScreenshot: 09-personas-13-por-que-encaja
+- takeScreenshot: 09-personas-15-por-que-encaja
 # cubre: PRS-04
 - scrollUntilVisible:
     element:
@@ -334,7 +377,7 @@ tags: [personas]
     centerElement: true
     timeout: 20000
 - assertVisible: "Cuando el equipo lea tu inbox de LinkedIn verás aquí sus últimos mensajes y su lectura\\. La app nunca envía mensajes\\."
-- takeScreenshot: 09-personas-14-sin-conversacion
+- takeScreenshot: 09-personas-16-sin-conversacion
 - scrollUntilVisible:
     element:
       text: "HISTORIAL COMPLETO"
@@ -345,7 +388,7 @@ tags: [personas]
     timeout: 30000
 - assertVisible:
     id: "history|history-empty"
-- takeScreenshot: 09-personas-15-historial
+- takeScreenshot: 09-personas-17-historial
 
 # ---------------------------------------------------------------- Laura's card: a written note
 # cubre: PRS-05
@@ -404,7 +447,7 @@ tags: [personas]
 - assertNotVisible:
     id: note-text
 - assertNotVisible: "Aún no hay notas sobre esta persona\\."
-- takeScreenshot: 09-personas-16-nota-guardada
+- takeScreenshot: 09-personas-18-nota-guardada
 
 # ---------------------------------------------------------------- «Marcar como oportunidad» from her card
 # cubre: PRS-09, PRS-10
@@ -428,7 +471,7 @@ tags: [personas]
     text: "Laura Gómez"
     childOf:
       id: opp-picked
-- takeScreenshot: 09-personas-17-marcar-oportunidad
+- takeScreenshot: 09-personas-19-marcar-oportunidad
 - scrollUntilVisible:
     element:
       id: opp-attribution
@@ -474,7 +517,7 @@ tags: [personas]
     centerElement: true
     timeout: 30000
 - assertVisible: "Desde hoy en esta etapa"
-- takeScreenshot: 09-personas-18-con-oportunidad
+- takeScreenshot: 09-personas-20-con-oportunidad
 - scrollUntilVisible:
     element:
       id: persona-name

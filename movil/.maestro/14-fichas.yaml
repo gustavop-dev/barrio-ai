@@ -1,8 +1,9 @@
-# cubre: PRS-03, PRS-04, PRS-05, PRS-06, PRS-10
-# Person cards beyond Laura's (09-personas). Sofía Martínez: the conversation read from the inbox (the team's read and
+# cubre: PRS-03, PRS-04, PRS-05, PRS-06, PRS-10, INB-06, BAR-10
+# Person cards beyond Laura's (09-personas). Sofía Martínez: her next step is Gustavo's («Ir a Tu turno»), and the
+# conversation read from the inbox (the team's read and
 # its numbers, the last messages, «La app nunca envía mensajes…» and «Abrir en LinkedIn»). Andrés Restrepo: his open
 # opportunity in «Reunión» with «Editar oportunidad», a note already written by qa («Tu nota · …») and no «Descartar»
-# (he is connected). Pedro Salazar: «Descartar» asks for a reason and the card ends in «Descartado». A link to a
+# (he is connected), after a first load that fails and «Reintentar» (failure switch). Pedro Salazar: «Descartar» asks for a reason and the card ends in «Descartado». A link to a
 # person that does not exist shows «No encontramos a esta persona» with «Volver a Personas».
 # The search box takes ASCII only (Maestro types through adb), so names are searched by their first letters.
 appId: co.projectapp.office
@@ -38,6 +39,12 @@ tags: [personas, fichas]
       id: persona-name
     timeout: 20000
 - assertVisible: "Sofía Martínez"
+# Her message waits for Gustavo: the next step is his, with «Ir a Tu turno» (INB-06).
+- assertVisible:
+    id: next-step
+- assertVisible:
+    text: "Siguiente paso · Te toca.*Te toca: responder su mensaje.*"
+- assertVisible: "Ir a Tu turno"
 - takeScreenshot: 14-fichas-01-sofia
 # She invited Gustavo: that is where she came from.
 - scrollUntilVisible:
@@ -123,7 +130,23 @@ tags: [personas, fichas]
     visible: "Andrés Restrepo"
     timeout: 15000
 - hideKeyboard
+# The card fails to load first (failure switch, comun/qa-fallo.js): the error comes with «Reintentar».
+# cubre: PRS-03
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/red/contacts/[0-9a-f-]+$'
+      METODO: GET
+      EFECTO: '500'
+      VECES: '-1'
 - tapOn: "Andrés Restrepo"
+- extendedWaitUntil:
+    visible: "Reintentar"
+    timeout: 30000
+- assertVisible: "Fallo simulado por QA \\(500\\)\\."
+- takeScreenshot: 14-fichas-04-error
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn: "Reintentar"
 - extendedWaitUntil:
     visible:
       id: persona-name
@@ -133,7 +156,7 @@ tags: [personas, fichas]
 # Connected and with an opportunity: neither «Marcar como oportunidad» nor «Descartar».
 - assertNotVisible: "Marcar como oportunidad"
 - assertNotVisible: "Descartar"
-- takeScreenshot: 14-fichas-04-andres
+- takeScreenshot: 14-fichas-05-andres
 - scrollUntilVisible:
     element:
       text: "Editar oportunidad"
@@ -150,7 +173,7 @@ tags: [personas, fichas]
     text: "Reunión"
     childOf:
       id: persona
-- takeScreenshot: 14-fichas-05-oportunidad
+- takeScreenshot: 14-fichas-06-oportunidad
 - tapOn: "Editar oportunidad"
 - extendedWaitUntil:
     visible:
@@ -188,7 +211,7 @@ tags: [personas, fichas]
     centerElement: true
     timeout: 30000
 - assertVisible: "Tu nota · .*"
-- takeScreenshot: 14-fichas-06-nota
+- takeScreenshot: 14-fichas-07-nota
 - back
 - extendedWaitUntil:
     notVisible:
@@ -229,7 +252,7 @@ tags: [personas, fichas]
     childOf:
       id: confirm-sheet
     enabled: false
-- takeScreenshot: 14-fichas-07-confirmar-descarte
+- takeScreenshot: 14-fichas-08-confirmar-descarte
 - tapOn:
     id: confirm-note
 - inputText: "No trabaja en producto"
@@ -253,7 +276,7 @@ tags: [personas, fichas]
     visible: "DESCARTADO"
     timeout: 15000
 - assertNotVisible: "Descartar"
-- takeScreenshot: 14-fichas-08-descartado
+- takeScreenshot: 14-fichas-09-descartado
 - back
 - extendedWaitUntil:
     notVisible:
@@ -267,7 +290,7 @@ tags: [personas, fichas]
     visible: "No encontramos a esta persona"
     timeout: 30000
 - assertVisible: "Puede que el enlace sea viejo\\."
-- takeScreenshot: 14-fichas-09-no-existe
+- takeScreenshot: 14-fichas-10-no-existe
 - tapOn: "Volver a Personas"
 - extendedWaitUntil:
     visible:

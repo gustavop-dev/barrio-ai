@@ -1,4 +1,4 @@
-# cubre: PRS-12
+# cubre: PRS-12, COM-10
 # Personas › Referentes. Each referent with its link, «Activo», its reason, when it was observed and how many people
 # came from its posts; «Observar ahora» queues an observation; «Desactivar» Ana Lucía Torres with «Deshacer», then
 # deactivate and «Reactivar» her; «Añadir referente» refuses an empty form, a URL that is not a LinkedIn profile and a

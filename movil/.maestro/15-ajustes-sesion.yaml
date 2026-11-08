@@ -1,5 +1,5 @@
 # cubre: AJU-10, AJU-11, PUS-04, ACC-08, ACC-09
-# Ajustes, from Notificaciones to the end: one push type switched off and on again; «Dispositivos con la app» with
+# Ajustes, from Notificaciones to the end: one push type switched off and on again, and back on when saving fails; «Dispositivos con la app» with
 # this phone («Este») and the seeded «Pixel 7 de Gustavo (QA)», signed out from here; «Lo que el equipo sabe de ti»,
 # which opens that tab of Tu turno; a link with ?ancla=autonomia, which scrolls to the section and unfolds it; and
 # «Cerrar sesión», which lands on the login. The flow signs in again at the end, so the flows after it in the same
@@ -55,7 +55,7 @@ tags: [ajustes]
     id: push-question
     text: Pregunta nueva del equipo
     checked: true
-- takeScreenshot: 11-ajustes-13-tipos-de-push
+- takeScreenshot: 15-ajustes-01-tipos-de-push
 - tapOn:
     id: push-question
 - extendedWaitUntil:
@@ -64,7 +64,7 @@ tags: [ajustes]
 - assertVisible:
     id: push-question
     checked: false
-- takeScreenshot: 11-ajustes-14-push-apagada
+- takeScreenshot: 15-ajustes-02-push-apagada
 - extendedWaitUntil:
     notVisible:
       id: toast
@@ -77,6 +77,31 @@ tags: [ajustes]
 - assertVisible:
     id: push-question
     checked: true
+# A failed save puts the switch back and says why (failure switch, comun/qa-fallo.js).
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/ajustes/preferencias$'
+      METODO: PATCH
+      EFECTO: '500'
+- tapOn:
+    id: push-question
+- extendedWaitUntil:
+    visible:
+      text: "Fallo simulado por QA \\(500\\)\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: push-question
+      checked: true
+    timeout: 10000
+- takeScreenshot: 15-ajustes-03-push-error
 
 # ---------------------------------------------------------------- Dispositivos con la app: sign the Pixel 7 out
 # cubre: ACC-09
@@ -95,7 +120,7 @@ tags: [ajustes]
 # This phone: its row has the «Este» badge and its own revoke label.
 - assertVisible: "Cerrar la sesión de este teléfono"
 - assertVisible: "ESTE"
-- takeScreenshot: 11-ajustes-15-dispositivos
+- takeScreenshot: 15-ajustes-04-dispositivos
 - tapOn: "Cerrar la sesión de Pixel 7 de Gustavo \\(QA\\)"
 - extendedWaitUntil:
     visible:
@@ -120,7 +145,7 @@ tags: [ajustes]
     notVisible: "Pixel 7 de Gustavo \\(QA\\)"
     timeout: 15000
 - assertVisible: "Cerrar la sesión de este teléfono"
-- takeScreenshot: 11-ajustes-16-pixel-cerrado
+- takeScreenshot: 15-ajustes-05-pixel-cerrado
 
 # ---------------------------------------------------------------- Lo que el equipo sabe de ti
 # cubre: AJU-10
@@ -131,7 +156,7 @@ tags: [ajustes]
     centerElement: true
     timeout: 30000
 - assertVisible: "Lo que el equipo sabe de ti\\. 3 datos confirmados"
-- takeScreenshot: 11-ajustes-17-sabe
+- takeScreenshot: 15-ajustes-06-sabe
 - tapOn:
     id: sabe-link
 - extendedWaitUntil:
@@ -140,7 +165,7 @@ tags: [ajustes]
     timeout: 20000
 - assertNotVisible:
     id: screen-ajustes
-- takeScreenshot: 11-ajustes-18-sabe-abierto
+- takeScreenshot: 15-ajustes-07-sabe-abierto
 
 # ---------------------------------------------------------------- a link to a section (?ancla=autonomia)
 # cubre: AJU-11
@@ -157,7 +182,7 @@ tags: [ajustes]
     visible: "MODO POR CAPACIDAD · SOLO LECTURA"
     timeout: 20000
 - assertNotVisible: "MÁQUINA"
-- takeScreenshot: 11-ajustes-19-ancla-autonomia
+- takeScreenshot: 15-ajustes-08-ancla-autonomia
 
 # ---------------------------------------------------------------- Sesión y Acerca de: sign out, and back in
 # cubre: ACC-08
@@ -174,7 +199,7 @@ tags: [ajustes]
     timeout: 30000
 - assertVisible: "Has entrado como qa\\."
 - assertVisible: "Versión: app .*"
-- takeScreenshot: 11-ajustes-20-sesion
+- takeScreenshot: 15-ajustes-09-sesion
 - tapOn:
     id: logout
 - extendedWaitUntil:
@@ -182,7 +207,7 @@ tags: [ajustes]
       id: confirm-sheet
     timeout: 15000
 - assertVisible: "Este teléfono deja de recibir avisos y olvida su acceso\\..*"
-- takeScreenshot: 11-ajustes-21-confirmar-salida
+- takeScreenshot: 15-ajustes-10-confirmar-salida
 # Inside the sheet «Cerrar sesión» is both the title and the action; sorted top to bottom, the action is second.
 - tapOn:
     text: Cerrar sesión
@@ -198,6 +223,6 @@ tags: [ajustes]
 - assertVisible: Entrar
 - assertNotVisible:
     id: screen-ajustes
-- takeScreenshot: 11-ajustes-22-login
+- takeScreenshot: 15-ajustes-11-login
 # Back in: the next flow on this emulator finds the session open.
 - runFlow: comun/entrar.yaml

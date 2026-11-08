@@ -1,10 +1,10 @@
-# cubre: AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-09, AJU-11
+# cubre: AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-09, AJU-11, OFI-07
 # Ajustes, opened from the top bar, from Máquina to Captura y galería (Notificaciones, devices, «Lo que el equipo sabe
-# de ti», the section links and the session are in 15-ajustes-sesion): «Parada total» with its required reason, the
-# banner and «Reanudar»; pausing and resuming the simulated Unipile account; the orientation («Descartar cambios»,
+# de ti», the section links and the session are in 15-ajustes-sesion): «Parada total» with its required reason, a
+# first try that fails (failure switch) and a second that stops the machine, the banner and «Reanudar»; pausing and resuming the simulated Unipile account; the orientation («Descartar cambios»,
 # then «Guardar orientación»); Autonomía y límites unfolded; Gasto de IA; LinkedIn oficial and «Conectar LinkedIn»,
 # which opens the office web in the phone's browser and refreshes on return; the microphone and the AI edit default,
-# off and on. Everything it changes is undone or re-seeded before the next flow (scripts/qa/correr-maestro.sh runs
+# off and on, and back on when saving fails. Everything it changes is undone or re-seeded before the next flow (scripts/qa/correr-maestro.sh runs
 # seed_qa). Maestro matches text case-insensitively: section labels and badges are drawn UPPERCASE.
 appId: co.projectapp.office
 name: Ajustes
@@ -54,6 +54,26 @@ tags: [ajustes]
 - inputText: "Pausa de QA para revisar los topes"
 - hideKeyboard
 - takeScreenshot: 11-ajustes-02-parada-motivo
+# The first try fails (failure switch, comun/qa-fallo.js): the sheet stays open with the reason; the second goes through.
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/operador/control$'
+      METODO: POST
+      EFECTO: '500'
+- tapOn:
+    text: "Detener la máquina"
+    childOf:
+      id: confirm-sheet
+    enabled: true
+- extendedWaitUntil:
+    visible:
+      text: "Fallo simulado por QA \\(500\\)\\."
+      childOf:
+        id: confirm-sheet
+    timeout: 15000
+- assertVisible: "En marcha"
+- takeScreenshot: 11-ajustes-03-parada-fallida
 - tapOn:
     text: "Detener la máquina"
     childOf:
@@ -75,11 +95,11 @@ tags: [ajustes]
 - assertVisible: "Motivo: Pausa de QA para revisar los topes\\."
 - assertVisible: "Origen: Desde la app"
 - assertVisible: "Quién: qa"
-# Every view shows the pause under the top bar (OFI-07).
+# Every view shows the pause under the top bar (OFI-07); it goes away once the machine runs again.
 - extendedWaitUntil:
     visible: "Máquina en pausa · Pausa de QA para revisar los topes"
     timeout: 20000
-- takeScreenshot: 11-ajustes-03-detenida
+- takeScreenshot: 11-ajustes-04-detenida
 - tapOn: "Reanudar"
 - extendedWaitUntil:
     visible:
@@ -109,7 +129,7 @@ tags: [ajustes]
 - extendedWaitUntil:
     notVisible: "Máquina en pausa.*"
     timeout: 20000
-- takeScreenshot: 11-ajustes-04-en-marcha
+- takeScreenshot: 11-ajustes-05-en-marcha
 
 # ---------------------------------------------------------------- Máquina: pause only the Unipile account
 # cubre: AJU-02
@@ -155,7 +175,11 @@ tags: [ajustes]
     visible: "En pausa"
     timeout: 15000
 - assertVisible: "Reviso la cuenta de QA"
-- takeScreenshot: 11-ajustes-05-cuenta-en-pausa
+# The banner under the top bar names the account's pause too (OFI-07).
+- extendedWaitUntil:
+    visible: "La cuenta de LinkedIn está en pausa · Reviso la cuenta de QA"
+    timeout: 20000
+- takeScreenshot: 11-ajustes-06-cuenta-en-pausa
 - scrollUntilVisible:
     element:
       text: "Reanudar la cuenta"
@@ -173,6 +197,9 @@ tags: [ajustes]
     visible: "Pausar solo esta cuenta: LinkedIn de Gustavo \\(simulado\\)"
     timeout: 15000
 - assertNotVisible: "En pausa"
+- extendedWaitUntil:
+    notVisible: "La cuenta de LinkedIn está en pausa.*"
+    timeout: 20000
 
 # ---------------------------------------------------------------- Orientación para el equipo
 # cubre: AJU-03
@@ -195,7 +222,7 @@ tags: [ajustes]
 - assertVisible:
     text: "Guardar orientación"
     enabled: false
-- takeScreenshot: 11-ajustes-06-orientacion
+- takeScreenshot: 11-ajustes-07-orientacion
 # A change can be discarded…
 - tapOn:
     id: orientacion-field
@@ -241,7 +268,7 @@ tags: [ajustes]
     visible: "Actualizada (hace .*|ahora.*) por qa\\."
     timeout: 15000
 - assertNotVisible: "Descartar cambios"
-- takeScreenshot: 11-ajustes-07-orientacion-guardada
+- takeScreenshot: 11-ajustes-08-orientacion-guardada
 
 # ---------------------------------------------------------------- Autonomía y límites (folded)
 # cubre: AJU-04
@@ -280,7 +307,7 @@ tags: [ajustes]
       text: "TOPES DE HOY"
     direction: DOWN
     timeout: 30000
-- takeScreenshot: 11-ajustes-08-autonomia
+- takeScreenshot: 11-ajustes-09-autonomia
 - scrollUntilVisible:
     element:
       text: "LECTURAS DE LA RED"
@@ -308,7 +335,7 @@ tags: [ajustes]
 - assertVisible: "Desde el inicio: .* USD"
 - assertVisible: "Agente líder, este mes: .* USD"
 - assertVisible: "Transcripción de audios, este mes: .* USD"
-- takeScreenshot: 11-ajustes-09-gasto
+- takeScreenshot: 11-ajustes-10-gasto
 
 # ---------------------------------------------------------------- LinkedIn oficial: «Conectar LinkedIn» opens the office web
 # cubre: AJU-06, AJU-07
@@ -337,13 +364,13 @@ tags: [ajustes]
     centerElement: true
     timeout: 30000
 - assertVisible: "Se abre la oficina web dentro de la app.*"
-- takeScreenshot: 11-ajustes-10-linkedin
+- takeScreenshot: 11-ajustes-11-linkedin
 - tapOn: "Conectar LinkedIn"
 - extendedWaitUntil:
     notVisible:
       id: screen-ajustes
     timeout: 30000
-- takeScreenshot: 11-ajustes-11-oficina-web
+- takeScreenshot: 11-ajustes-12-oficina-web
 # Back from the browser (twice if Chrome shows its first-run screen first), the app refreshes the status.
 - repeat:
     times: 3
@@ -386,7 +413,7 @@ tags: [ajustes]
 - assertVisible:
     text: "El equipo puede editar mis fotos con IA"
     checked: true
-- takeScreenshot: 11-ajustes-12-captura
+- takeScreenshot: 11-ajustes-13-captura
 - tapOn: "El equipo puede editar mis fotos con IA"
 - extendedWaitUntil:
     visible:
@@ -411,3 +438,27 @@ tags: [ajustes]
 - assertVisible:
     text: "El equipo puede editar mis fotos con IA"
     checked: true
+# A failed save puts the switch back and says why (failure switch).
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/ajustes/preferencias$'
+      METODO: PATCH
+      EFECTO: '500'
+- tapOn: "El equipo puede editar mis fotos con IA"
+- extendedWaitUntil:
+    visible:
+      text: "Fallo simulado por QA \\(500\\)\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "El equipo puede editar mis fotos con IA"
+      checked: true
+    timeout: 10000
+- takeScreenshot: 11-ajustes-14-captura-error
