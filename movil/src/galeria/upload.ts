@@ -5,6 +5,7 @@ import { CAPTURE_LIMITS, isAcceptedPhoto, useUploadFotos, type NativeFile, type 
 import { rejectedMessage, uploadedMessage } from '@compartido/logic/galeria';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
+import { localPart, reportError } from '@/api/errorReport';
 import { toPickedPhoto } from '@/capture/photos';
 import type { PickedPhoto } from '@/capture/types';
 import { useToast } from '@/components/ui';
@@ -61,7 +62,10 @@ export function useGalleryUpload(): GalleryUpload {
           setPhotos([]);
           setProgress(null);
         },
-        onError: () => haptic('actionError'),
+        onError: (error) => {
+          haptic('actionError');
+          reportError('galeria_subida', error, ok.map((photo) => localPart('fotos', photo)));
+        },
       });
     },
     [upload, toast],

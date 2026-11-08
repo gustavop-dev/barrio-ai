@@ -765,3 +765,26 @@ class ExpoPushToken(models.Model):
     # Push tickets waiting for their receipt: [[ticket_id, iso]], newest last, at most expo.MAX_TICKETS.
     tickets=models.JSONField(default=list,blank=True)
     def __str__(self):return self.device_name or str(self.id)
+
+
+class AppClientError(models.Model):
+    """A failure the mobile app reported (POST /api/v1/app/errores, movil_views.ClientErrors): what failed and on which
+    build, so the team can diagnose it without the phone. Never what was being sent: no audio, photos, note text, file
+    names or tokens. Only the newest movil_views.CLIENT_ERRORS_KEPT are kept."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    created_at=models.DateTimeField(default=timezone.now,editable=False,db_index=True)
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name='app_client_errors')
+    device=models.ForeignKey(DeviceToken,on_delete=models.SET_NULL,null=True,blank=True,related_name='client_errors')
+    # What failed (captura_envio, galeria_subida…), the error class and message, and the HTTP answer if there was one.
+    kind=models.CharField(max_length=40)
+    name=models.CharField(max_length=80,blank=True)
+    message=models.CharField(max_length=500,blank=True)
+    status=models.PositiveSmallIntegerField(null=True,blank=True)
+    detail=models.CharField(max_length=500,blank=True)
+    # [{field, type, scheme, size}] of the upload's file parts.
+    parts=models.JSONField(default=list,blank=True)
+    platform=models.CharField(max_length=20,blank=True)
+    os_version=models.CharField(max_length=40,blank=True)
+    app_version=models.CharField(max_length=40,blank=True)
+    class Meta:ordering=['-created_at']
+    def __str__(self):return f'{self.kind} · {self.name}'

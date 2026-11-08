@@ -185,6 +185,14 @@
    "h": 844,
    "title": "Movimiento · microinteracciones",
    "is_interactive": true
+  },
+  "Infografias.dc.html": {
+   "x": 0,
+   "y": 6440,
+   "w": 1280,
+   "h": 8800,
+   "title": "Infografías hechas con IA · reglas",
+   "expand": "fill"
   }
  },
  "createdOnFiles": {
@@ -322,6 +330,13 @@
    "fill": "teal",
    "size": "s",
    "text": "Cómo revisar la fase 3\n\n• Entrada: toca «Entrar». Tras «Entrando…», la puerta pixel se abre, la imagen se acerca en saltos enteros (2× y 3×) y se funde con la Oficina. «Repetir la entrada» vuelve al login.\n• Calendario: toca días de la semana (la selección se desliza y el panel entra desde el lado hacia el que avanzas). Cambia a Mes: la semana se va, el mes entra fila por fila y la selección viaja a su celda. Elige otro día y vuelve a Semana.\n• Resultados: las cifras cuentan desde 0 la primera vez; al cambiar de periodo cuentan del valor viejo al nuevo y las barras crecen en cascada.\n• Detalle: toca a cualquiera; el retrato y el nombre viajan de la lista a la ficha y el resto entra escalonado. «‹ Personas» los devuelve.\n• Microinteracciones: botones, interruptor, chips, copiar, campo de texto y carga.\n\nControles: «velocidad» y «menos movimiento»."
+  },
+  "titulo6": {
+   "x": 0,
+   "y": 6140,
+   "text": "Infografías hechas con IA",
+   "kind": "title1",
+   "maxW": 1280
   }
  },
  "order": [
@@ -347,7 +362,8 @@
   "MovCalendario.dc.html",
   "MovResultados.dc.html",
   "MovDetalle.dc.html",
-  "MovMicro.dc.html"
+  "MovMicro.dc.html",
+  "Infografias.dc.html"
  ],
  "pages": [],
  "title": "0ff1ce — Vistas móviles"
