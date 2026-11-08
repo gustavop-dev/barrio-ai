@@ -1,0 +1,287 @@
+# cubre: CAP-04, CAP-05, CAP-06
+# Captura with files, the regression of PR #43 (with expo/fetch as the global fetch, a capture with a photo or an audio
+# never left the phone): a photo picked from the phone's gallery and a voice note recorded by holding the button reach
+# the backend. Each one shows the toast «Enviado al equipo.» and its row in «Lo que enviaste» («1 foto», «Audio 0:0N»);
+# the photo is in the Galería right away. Then the error states: without network, and a 413 from the API. The sheet
+# says why, keeps the draft and sends it again with «Reintentar».
+#
+# Used from Galería (a still screen, see 05-captura), which also shows the photo arrive.
+# The microphone: the CI emulator runs with -noaudio and records silence; the audio still travels as a real m4a file.
+# The 413 comes from the QA failure switch (team_backend.qa_fallos). Until that switch is on main the step is skipped
+# with a «pendiente-del-interruptor-de-fallos» screenshot.
+appId: co.projectapp.office
+name: Captura con fotos y audio
+tags: [captura]
+onFlowComplete:
+  # Never leave the emulator offline for the next flow.
+  - setAirplaneMode: disabled
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-galeria
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-galeria
+    timeout: 30000
+# Four seeded photos; one of them is «Nueva».
+- extendedWaitUntil:
+    visible: 'Foto.*, nueva'
+    timeout: 20000
+- assertNotVisible:
+    text: 'Foto.*, nueva'
+    index: 1
+
+# ---------------------------------------------------------------- a photo from the phone's gallery
+# cubre: CAP-05
+- tapOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- tapOn:
+    id: capture-galeria
+    waitToSettleTimeoutMs: 500
+- runFlow:
+    file: comun/elegir-foto.yaml
+    env:
+      CAPTURA: 05-envios-01-selector-de-fotos
+- extendedWaitUntil:
+    visible:
+      id: capture-fotos
+    timeout: 25000
+- assertVisible: 'Foto adjunta 1'
+- assertVisible: 'Quitar la foto 1'
+- tapOn:
+    id: capture-note
+    waitToSettleTimeoutMs: 500
+- inputText: Foto de QA de la pizarra
+- tapOn: 'A[ñÑ]adir una imagen'
+- takeScreenshot: 05-envios-02-foto-adjunta
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 45000
+- assertNotVisible:
+    id: capture-send-error
+- takeScreenshot: 05-envios-03-foto-enviada
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+# The photo is in the Galería already, as «Nueva» (now two of them).
+- extendedWaitUntil:
+    visible:
+      text: 'Foto.*, nueva'
+      index: 1
+    timeout: 20000
+- takeScreenshot: 05-envios-04-foto-en-la-galeria
+# «Lo que enviaste»: the capture with its photo and its note.
+- tapOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Lo que enviaste · 3'
+    timeout: 20000
+- tapOn:
+    id: capture-historial
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Foto de QA de la pizarra'
+    timeout: 20000
+- assertVisible: '1 foto'
+- assertVisible: 'Nota'
+- assertVisible: 'El equipo lo recibió'
+- takeScreenshot: 05-envios-05-historial-foto
+- tapOn: 'Volver a la captura'
+- extendedWaitUntil:
+    visible:
+      id: capture-grabar
+    timeout: 15000
+- tapOn:
+    id: capture-cerrar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 15000
+
+# ---------------------------------------------------------------- a voice note, held on the button
+# cubre: CAP-04
+- longPressOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: capture-audio
+    timeout: 20000
+- assertVisible: '0:0[1-9]'
+- takeScreenshot: 05-envios-06-audio-listo
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 45000
+- assertNotVisible:
+    id: capture-send-error
+- takeScreenshot: 05-envios-07-audio-enviado
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+# «Lo que enviaste»: the audio with its length, ready to listen to.
+- tapOn:
+    id: capture-button
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Lo que enviaste · 4'
+    timeout: 20000
+- tapOn:
+    id: capture-historial
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Audio 0:0[1-9]'
+    timeout: 20000
+- assertVisible:
+    text: 'Escuchar'
+    below:
+      text: 'Audio 0:0[1-9]'
+- assertVisible: 'El equipo lo transcribe y decide'
+- takeScreenshot: 05-envios-08-historial-audio
+- tapOn: 'Volver a la captura'
+- extendedWaitUntil:
+    visible:
+      id: capture-grabar
+    timeout: 15000
+
+# ---------------------------------------------------------------- without network
+# cubre: CAP-06
+# Airplane mode cuts the emulator off the runner's API (10.0.2.2); Maestro drives the device over adb, unaffected.
+- tapOn:
+    id: capture-note
+    waitToSettleTimeoutMs: 500
+- inputText: Nota de QA sin conexion
+- tapOn: 'A[ñÑ]adir una imagen'
+- tapOn:
+    id: capture-para-dato
+    waitToSettleTimeoutMs: 500
+- setAirplaneMode: enabled
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+# The reason, in Spanish and without scrolling, right above the button; the draft stays.
+- extendedWaitUntil:
+    visible:
+      id: capture-send-error
+    timeout: 30000
+- assertVisible: 'No hay conexión con el servidor'
+- assertVisible: 'Tu audio, tus fotos y tu nota siguen aquí\. Puedes reintentar\.'
+- assertNotVisible: '.*(fetch failed|Network request failed|Unsupported FormDataPart).*'
+- assertVisible:
+    text: 'Reintentar'
+    below:
+      text: 'No hay conexión con el servidor'
+- assertVisible: 'Nota de QA sin conexion'
+- assertVisible:
+    id: capture-para-dato
+    selected: true
+- assertVisible:
+    id: capture-sheet
+- takeScreenshot: 05-envios-09-sin-conexion
+# Back online, «Reintentar» sends the same draft (the network can take a few seconds to come back).
+- setAirplaneMode: disabled
+- retry:
+    maxRetries: 4
+    commands:
+      - extendedWaitUntil:
+          visible: 'Texto que nunca aparece: espera a que vuelva la red'
+          timeout: 6000
+          optional: true
+      - tapOn:
+          text: 'Reintentar'
+          below:
+            text: 'No hay conexión con el servidor|No se pudo enviar|El servidor falló al recibirlo'
+      - extendedWaitUntil:
+          visible: 'Enviado al equipo\.'
+          timeout: 20000
+- takeScreenshot: 05-envios-10-reintentado
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- a 413 from the API (QA failure switch)
+# cubre: CAP-06
+- evalScript: ${output.interruptor = http.get('http://127.0.0.1:8787/api/v1/qa/fallos').status == 200}
+- runFlow:
+    when:
+      true: ${!output.interruptor}
+    commands:
+      - takeScreenshot: 05-envios-11-413-pendiente-del-interruptor-de-fallos
+- runFlow:
+    when:
+      true: ${output.interruptor}
+    commands:
+      - tapOn:
+          id: capture-button
+          waitToSettleTimeoutMs: 500
+      - extendedWaitUntil:
+          visible:
+            id: capture-sheet
+          timeout: 20000
+      - tapOn:
+          id: capture-note
+          waitToSettleTimeoutMs: 500
+      - inputText: Nota de QA demasiado grande
+      - tapOn: 'A[ñÑ]adir una imagen'
+      # The next capture POST answers 413 (once).
+      - evalScript: ${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/capturas$', metodo: 'POST', efecto: '413', veces: 1})}).status}
+      - scrollUntilVisible:
+          element:
+            id: capture-send
+          direction: DOWN
+          timeout: 15000
+      - tapOn:
+          id: capture-send
+          waitToSettleTimeoutMs: 500
+      - extendedWaitUntil:
+          visible:
+            id: capture-send-error
+          timeout: 30000
+      - assertVisible: 'El envío es demasiado grande'
+      - assertVisible: 'El audio puede pesar hasta 25 MB y cada foto hasta 10 MB\. Quita alguna foto o graba un audio más corto\.'
+      - assertVisible: 'Tu audio, tus fotos y tu nota siguen aquí\. Puedes reintentar\.'
+      - assertVisible: 'Nota de QA demasiado grande'
+      - takeScreenshot: 05-envios-11-413
+      - tapOn:
+          text: 'Reintentar'
+          below:
+            text: 'El envío es demasiado grande'
+      - extendedWaitUntil:
+          visible: 'Enviado al equipo\.'
+          timeout: 30000
+      - takeScreenshot: 05-envios-12-413-reintentado

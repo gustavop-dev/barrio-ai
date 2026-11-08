@@ -1,0 +1,306 @@
+# cubre: CAP-07, CAP-04, CAP-05
+# Captures tied to what Gustavo is looking at: «Responder con audio» on a Tu turno question, «Nota de voz» on a person
+# and «Comentario para el equipo» on a piece. The sheet opens with the context chip (and, for a question, «Visibilidad
+# de tu respuesta»); a voice answer, a voice note and a comment with a photo reach the backend tied to their context
+# and show up in «Lo que enviaste» with it.
+# The seed (seed_qa) gives the yes/no question «¿Te parece bien que el equipo comente en publicaciones en inglés?»,
+# Laura Gómez in the Barrio and the blocked piece behind the notification «El verificador bloqueó la pieza del …».
+# No worker runs in CI: the captures stay «Recibida», so nothing is answered or noted yet (that is CAP-12, backend).
+appId: co.projectapp.office
+name: Captura con contexto
+tags: [captura]
+---
+- runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- answering a question by voice
+# cubre: CAP-07, CAP-04
+- tapOn:
+    id: top-tu-turno
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: turno-list
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      text: 'Responder con audio'
+      below:
+        text: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    text: 'Responder con audio'
+    below:
+      text: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+# The chip says who asks and what; the visibility of the answer comes with it.
+- extendedWaitUntil:
+    visible: 'Responde a .*'
+    timeout: 15000
+- assertVisible:
+    id: capture-context
+- assertVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
+- assertVisible: 'Quitar el contexto'
+- assertVisible: 'Visibilidad de tu respuesta'
+- assertVisible: 'Público'
+- assertVisible: 'Privado'
+- takeScreenshot: 05-contexto-01-responder-con-audio
+# Record from the sheet, a few seconds, and finish.
+- tapOn:
+    id: capture-grabar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-terminar
+    timeout: 20000
+- extendedWaitUntil:
+    visible: '0:0[2-9]'
+    timeout: 15000
+- tapOn:
+    id: capture-terminar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-audio
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: 'Privado'
+    direction: DOWN
+    timeout: 15000
+- tapOn: 'Privado'
+- takeScreenshot: 05-contexto-02-respuesta-grabada
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 45000
+- assertNotVisible:
+    id: capture-send-error
+- takeScreenshot: 05-contexto-03-respuesta-enviada
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- a voice note on a person
+# cubre: CAP-07, CAP-04
+- tapOn:
+    id: tab-personas
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'Laura Gómez'
+    direction: DOWN
+    timeout: 30000
+- tapOn: 'Laura Gómez'
+- extendedWaitUntil:
+    visible:
+      id: persona
+    timeout: 30000
+# A detail view has no bottom bar (CAP-01): its own «Nota de voz» opens the capture tied to her.
+- assertNotVisible:
+    id: capture-button
+- scrollUntilVisible:
+    element:
+      text: 'Nota de voz'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Nota de voz'
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- assertVisible:
+    id: capture-context
+- assertVisible: 'Nota sobre'
+- assertVisible: 'Laura Gómez'
+- assertNotVisible: 'Visibilidad de tu respuesta'
+- tapOn:
+    id: capture-grabar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-terminar
+    timeout: 20000
+- extendedWaitUntil:
+    visible: '0:0[2-9]'
+    timeout: 15000
+- tapOn:
+    id: capture-terminar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: capture-audio
+    timeout: 20000
+- takeScreenshot: 05-contexto-04-nota-de-voz-persona
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 45000
+- assertNotVisible:
+    id: capture-send-error
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+# «Lo que enviaste» from her card: the voice note tied to her, and the voice answer.
+- tapOn: 'Nota de voz'
+- extendedWaitUntil:
+    visible:
+      id: capture-historial
+    timeout: 20000
+- tapOn:
+    id: capture-historial
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Sobre: Laura Gómez'
+    timeout: 20000
+- assertVisible:
+    text: 'Audio 0:0[2-9]'
+    index: 0
+- assertVisible: 'Responde a: ¿Te parece bien que el equipo comente en publicaciones en inglés\?'
+- takeScreenshot: 05-contexto-05-historial-persona-y-pregunta
+- tapOn: 'Volver a la captura'
+- extendedWaitUntil:
+    visible:
+      id: capture-grabar
+    timeout: 15000
+- tapOn:
+    id: capture-cerrar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 15000
+- back
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 20000
+
+# ---------------------------------------------------------------- a comment with a photo on a piece
+# cubre: CAP-07, CAP-05
+- tapOn:
+    id: top-notificaciones
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-notificaciones
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'El verificador bloqueó la pieza del [0-9]{2}/[0-9]{2}'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'El verificador bloqueó la pieza del [0-9]{2}/[0-9]{2}'
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'Comentario para el equipo'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Comentario para el equipo'
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- assertVisible:
+    id: capture-context
+- assertVisible: 'Comentario sobre la pieza'
+- assertVisible: 'Pieza del .*'
+- tapOn:
+    id: capture-galeria
+    waitToSettleTimeoutMs: 500
+- runFlow:
+    file: comun/elegir-foto.yaml
+    env:
+      CAPTURA: 05-contexto-06-selector-de-fotos
+- extendedWaitUntil:
+    visible:
+      id: capture-fotos
+    timeout: 25000
+- tapOn:
+    id: capture-note
+    waitToSettleTimeoutMs: 500
+- inputText: Comentario de QA usa la foto de la pizarra al final
+- tapOn: 'A[ñÑ]adir una imagen'
+- takeScreenshot: 05-contexto-07-comentario-con-foto
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 45000
+- assertNotVisible:
+    id: capture-send-error
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- tapOn: 'Comentario para el equipo'
+- extendedWaitUntil:
+    visible:
+      id: capture-historial
+    timeout: 20000
+- tapOn:
+    id: capture-historial
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: 'Comentario de QA usa la foto de la pizarra al final'
+    timeout: 20000
+- assertVisible: 'Sobre la pieza: .*'
+- assertVisible:
+    text: '1 foto'
+    index: 0
+- takeScreenshot: 05-contexto-08-historial-pieza
+- tapOn: 'Volver a la captura'
+- extendedWaitUntil:
+    visible:
+      id: capture-grabar
+    timeout: 15000
+- tapOn:
+    id: capture-cerrar
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 15000

@@ -4,6 +4,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
+import { Modal } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { createGestureController, fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { resetErrorReportsForTests } from '@/api/errorReport';
@@ -25,6 +26,33 @@ const CAPTURE = { id: 'c1', state: 'recibida', state_label: 'Recibida', undo_unt
 /** A finished voice note as expo-audio leaves it in the cache (here without its file:// scheme). */
 const AUDIO: RecordedAudio = { uri: '/data/user/0/co.projectapp.office/cache/Audio/recording-1.m4a', mime: 'audio/mp4', duration: 4.24, levels: Array.from({ length: 24 }, () => 0.3) };
 const AUDIO_PART = { uri: 'file:///data/user/0/co.projectapp.office/cache/Audio/recording-1.m4a', name: 'captura.m4a', type: 'audio/mp4' };
+
+/** A capture of «Lo que enviaste», sent a moment ago (it can still be undone). */
+function historyCapture(extra: Record<string, unknown> = {}) {
+  return {
+    id: 'c9',
+    created_at: new Date().toISOString(),
+    note: 'Idea para el post del jueves',
+    purpose: 'post',
+    purpose_label: 'Idea para un post',
+    team_decided: null,
+    context: null,
+    has_audio: false,
+    audio_duration_s: null,
+    audio_mime: null,
+    audio_url: null,
+    transcript: '',
+    transcript_language: null,
+    state: 'recibida',
+    state_label: 'Recibida',
+    outcome: { kind: 'recibida', text: 'El equipo lo recibió', link: null },
+    photos: [],
+    error: null,
+    undo_until: new Date(Date.now() + 120_000).toISOString(),
+    can_undo: true,
+    ...extra,
+  };
+}
 
 function capturaServer(extra: Parameters<typeof fakeServer>[0] = {}) {
   return fakeServer({
@@ -269,6 +297,8 @@ describe('capture sheet', () => {
     await waitFor(() => expect(server.find('DELETE', '/api/v1/capturas/c1')).toHaveLength(1));
     expect(await screen.findByText('Envío deshecho. Lo tienes otra vez en la hoja.')).toBeOnTheScreen();
     const again = await screen.findByTestId('capture-sheet');
+    // The sheet opens again on top: the toast is drawn in its window, where Gustavo sees it, not under it.
+    expect(within(screen.UNSAFE_getByType(Modal)).getByText('Envío deshecho. Lo tienes otra vez en la hoja.')).toBeOnTheScreen();
     expect(within(again).getByDisplayValue('Para el post del jueves')).toBeOnTheScreen();
     expect(within(again).getByLabelText('Foto adjunta 1')).toBeOnTheScreen();
   });
@@ -324,8 +354,40 @@ describe('capture sheet', () => {
     await renderCapture();
     await act(async () => openCaptureSheet());
     const sheet = await screen.findByTestId('capture-sheet');
-    await fireEvent.press(within(sheet).getByLabelText('Cerrar sin guardar'));
+    await fireEvent.press(within(sheet).getByLabelText('Cerrar sin enviar'));
     await waitFor(() => expect(screen.queryByTestId('capture-sheet')).toBeNull());
+  });
+
+  it('«Deshacer» in «Lo que enviaste» says so over the sheet and takes the capture out of the list at once, even on a slow network', async () => {
+    const sent = historyCapture();
+    const undone = { ...sent, state: 'deshecha', state_label: 'Deshecha', note: '', can_undo: false, outcome: { kind: 'deshecha', text: 'Deshiciste este envío', link: null } };
+    const server = capturaServer({
+      'GET /api/v1/capturas': { body: { count: 1, next: null, previous: null, results: [sent] } },
+      'GET /api/v1/capturas/c9': { body: sent },
+      'DELETE /api/v1/capturas/c9': { body: undone },
+    });
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { view: 'history' }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    expect(await within(sheet).findByText('Idea para el post del jueves')).toBeOnTheScreen();
+    expect(within(sheet).getByText('Lo que enviaste · 1')).toBeOnTheScreen();
+    // From the undo on, every read of the captures hangs (a phone on a bad network): the list cannot wait for them.
+    const answer = server.fetch.getMockImplementation()!;
+    let afterUndo = false;
+    server.fetch.mockImplementation((...args: Parameters<typeof answer>) => {
+      const [url, init] = args;
+      const method = (init?.method ?? 'GET').toUpperCase();
+      if (afterUndo && method === 'GET' && String(url).includes('/api/v1/capturas')) return new Promise(() => {});
+      if (method === 'DELETE') afterUndo = true;
+      return answer(...args);
+    });
+    await fireEvent.press(within(sheet).getByText('Deshacer'));
+    await waitFor(() => expect(server.find('DELETE', '/api/v1/capturas/c9')).toHaveLength(1));
+    // The toast is drawn in the sheet's window, above it.
+    await waitFor(() => expect(within(screen.UNSAFE_getByType(Modal)).getByText('Envío deshecho.')).toBeOnTheScreen());
+    await waitFor(() => expect(within(screen.getByTestId('capture-sheet')).queryByText('Idea para el post del jueves')).toBeNull());
+    expect(within(screen.getByTestId('capture-sheet')).getByText('Lo que enviaste · 0')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('capture-sheet')).getByText('Todavía no has enviado nada')).toBeOnTheScreen();
   });
 
   it('closing with content asks first', async () => {
@@ -334,7 +396,7 @@ describe('capture sheet', () => {
     await act(async () => openCaptureSheet());
     const sheet = await screen.findByTestId('capture-sheet');
     await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Algo');
-    await fireEvent.press(within(sheet).getByLabelText('Cerrar sin guardar'));
+    await fireEvent.press(within(sheet).getByLabelText('Cerrar sin enviar'));
     expect(await screen.findByText('¿Cerrar sin enviar?')).toBeOnTheScreen();
   });
 

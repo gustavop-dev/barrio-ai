@@ -5,11 +5,13 @@ import type { PhotoOutput } from '@compartido/api/capturas';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import { StyleSheet } from 'react-native';
 import '@/api/transport';
 import { saveToken } from '@/api/token';
 import { apiImageSource } from '@/components/ui';
 import { renderApp } from '@/test/render';
 import { fakeServer, type FakeHandler } from '@/test/server';
+import { colors } from '@/theme/tokens';
 import { GaleriaScreen } from './GaleriaScreen';
 
 const routerState = (jest.requireMock('expo-router') as { __state: { params: Record<string, string> } }).__state;
@@ -187,6 +189,30 @@ describe('Galería', () => {
     await waitFor(() => expect(server.find('PATCH', '/api/v1/galeria/p1')[0]?.body).toEqual({ allow_ai_edit: false }));
   });
 
+  it('a photo opened again before the gallery reloads shows what was just saved', async () => {
+    const server = await renderGaleria({ 'PATCH /api/v1/galeria/p1': (request) => ({ body: { ...PHOTOS[0], ...(request.body as object) } }) });
+    await fireEvent.press(await screen.findByLabelText('Foto del 3 nov, nueva'));
+    let sheet = await screen.findByTestId('photo-sheet');
+    // From here on the gallery reloads slowly (a phone on a bad network): its list stays the old one for a while.
+    const answer = server.fetch.getMockImplementation()!;
+    server.fetch.mockImplementation((...args: Parameters<typeof answer>) => {
+      const [url, init] = args;
+      if ((init?.method ?? 'GET').toUpperCase() === 'GET' && String(url).includes('/api/v1/galeria')) return new Promise(() => {});
+      return answer(...args);
+    });
+    await fireEvent.changeText(within(sheet).getByTestId('photo-note'), 'Sin nombres de clientes');
+    await fireEvent.press(within(sheet).getByRole('switch', { name: 'El equipo puede editarla con IA' }));
+    await fireEvent.press(within(sheet).getByRole('button', { name: 'Guardar' }));
+    expect(await screen.findByText('Foto guardada.')).toBeOnTheScreen();
+    await waitFor(() => expect(screen.queryByTestId('photo-sheet')).toBeNull());
+    await fireEvent.press(screen.getByLabelText('Foto del 3 nov, nueva'));
+    sheet = await screen.findByTestId('photo-sheet');
+    expect(within(sheet).getByTestId('photo-note')).toHaveDisplayValue('Sin nombres de clientes');
+    expect(within(sheet).getByRole('switch', { name: 'El equipo puede editarla con IA' })).not.toBeChecked();
+    expect(within(sheet).getByRole('button', { name: 'Guardar' })).toBeDisabled();
+    expect(within(sheet).getByLabelText('Foto: Sin nombres de clientes')).toBeOnTheScreen();
+  });
+
   it('removes a photo after confirming, warning where it is used', async () => {
     const server = await renderGaleria({ 'DELETE /api/v1/galeria/p2': { status: 204 } });
     await fireEvent.press(await screen.findByLabelText('Foto del 3 nov, elegida · jue 12'));
@@ -198,6 +224,18 @@ describe('Galería', () => {
     await fireEvent.press(within(confirm).getByRole('button', { name: 'Quitar la foto' }));
     await waitFor(() => expect(server.find('DELETE', '/api/v1/galeria/p2')).toHaveLength(1));
     expect(await screen.findByText('Foto quitada de la galería.')).toBeOnTheScreen();
+  });
+
+  it('shows the photo on ink in the viewer: nothing light around it, so «N de M» and the caption read in white', async () => {
+    await renderGaleria();
+    await fireEvent.press(await screen.findByLabelText('Foto del 3 nov, nueva'));
+    await fireEvent.press(within(await screen.findByTestId('photo-sheet')).getByTestId('photo-sheet-image'));
+    const viewer = await screen.findByTestId('photo-viewer');
+    expect(StyleSheet.flatten(viewer.props.style).backgroundColor).toBe(colors.ink);
+    expect(StyleSheet.flatten(within(viewer).getByTestId('photo-viewer-count').props.style).color).toBe(colors.paper);
+    // The fitted photo fills the whole page: a placeholder colour on it would cover the ink around the picture.
+    const image = within(viewer).getByLabelText('Foto del 3 nov, nueva');
+    expect(StyleSheet.flatten(image.props.style).backgroundColor ?? 'transparent').toBe('transparent');
   });
 
   it('opens the full-screen viewer from the sheet and moves between photos', async () => {
