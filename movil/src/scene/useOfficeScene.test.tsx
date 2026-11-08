@@ -15,8 +15,8 @@ jest.mock('react-native-reanimated', () => {
 const statuses = { copywriter_a: 'trabajando' as const };
 const page = { now: '2026-11-07T15:00:00Z', events: [{ id: 1, ts: '2026-11-07T15:00:00Z', tipo: 'consulta_biblioteca' as const, rol: 'copywriter_a', destino: 'biblioteca', detalle: 'clase 03' }] };
 const renders = jest.fn();
-function Probe({ active = true, reduced = false }: { active?: boolean; reduced?: boolean }) {
-  const { snapshot } = useOfficeScene({ active, live: true, paused: false, reduced, statuses, page });
+function Probe({ active = true, reduced = false, covered = false }: { active?: boolean; reduced?: boolean; covered?: boolean }) {
+  const { snapshot } = useOfficeScene({ active, live: true, paused: false, reduced, statuses, page, covered });
   renders();
   return <T>{snapshot.now?.text ?? 'Cargando'}</T>;
 }
@@ -32,6 +32,9 @@ it('keeps ordinary frames off React, disables the callback on blur and in reduce
   expect(renders).toHaveBeenCalledTimes(before);
   await view.rerender(<Probe active={false} />); expect(mockFrame.active).toBe(false);
   await view.rerender(<Probe reduced />); expect(mockFrame.active).toBe(false);
+  await view.rerender(<Probe />); expect(mockFrame.active).toBe(true);
+  // A sheet or a modal covering the whole scene stops it (battery, and the emulator's software GPU), and it goes on after.
+  await view.rerender(<Probe covered />); expect(mockFrame.active).toBe(false);
   await view.rerender(<Probe />); expect(mockFrame.active).toBe(true);
   await view.unmount(); expect(mockFrame.active).toBe(false);
 });

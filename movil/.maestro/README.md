@@ -12,7 +12,7 @@ El workflow tiene cuatro jobs:
    - Un push que solo cambia flujos, `seed_qa` o los scripts no vuelve a compilar: el job termina en segundos.
 3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
    - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
-   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
+   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada`, `02-navegacion` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
    - **Flujos:** `scripts/qa/correr-maestro.sh` corre sus flujos uno a uno y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
 4. **`qa`** junta los artefactos de todos los emuladores, compara las capturas con la referencia de `main` y cuenta la cobertura del catálogo. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
 
@@ -87,9 +87,9 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 
 | Flujo | Qué hace |
 |---|---|
-| `01-entrada` | contraseña equivocada y su error; mostrar la contraseña; la correcta, la entrada animada y la Oficina |
-| `02-navegacion` | las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial y el «‹» de una ficha |
-| `03-oficina` | tocar un personaje de la escena y ver su hoja, arrastrarla a altura completa y cerrarla, la tira de equipos y la Biblioteca |
+| `01-entrada` | la pantalla de entrada y «Entrar» desactivado; con el teclado abierto, la contraseña sigue a la vista; sin conexión, el aviso en español; contraseña equivocada; mostrar la contraseña; la correcta, la entrada animada y la Oficina; abrir otra vez sigue dentro; una sesión cerrada desde otro dispositivo vuelve a la entrada |
+| `02-navegacion` | abrir la app sin conexión sigue dentro (la franja, y la red que vuelve); el contador y el punto de arriba; las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial; una ficha cerrada con «‹», con atrás y arrastrando desde el borde; la firma; enlaces `oficina0ff1ce://` a una pestaña y a una pieza |
+| `03-oficina` | tocar un personaje de la escena y ver su hoja con su estado real y lo último que hizo, arrastrarla a altura completa y cerrarla, la tira de equipos, «Ver en el Calendario» y la Biblioteca; arrastre y doble toque en la escena; tirar para recargar; la leyenda; la máquina en pausa (el aviso, la escena oscurecida y Ajustes) |
 | `04-tu-turno` | «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Pospuestas» y «Lo que el equipo sabe de ti» |
 | `05-captura` | abrir la hoja, escribir, «Para qué es», grabar (o lo que muestre el emulador sin micrófono), cerrar sin enviar, mantener pulsado el botón, enviar, «Lo que enviaste» y «Deshacer» |
 | `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
@@ -107,6 +107,8 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 - Cada interacción va seguida de lo que tiene que aparecer (`assertVisible`, `extendedWaitUntil`). Un flujo que solo hace capturas no detecta nada.
 - El emulador usa render por software y es lento. Espera con `extendedWaitUntil` y timeouts de 20 a 30 s. La escena de la Oficina se anima sin parar: no uses `waitForAnimationToEnd` sin `timeout`.
 - Los flujos no se prueban en el portátil: haz push y mira el PR, o lanza `gh workflow run qa-movil.yml --ref tu-rama`.
+- **Sin conexión:** `setAirplaneMode: enabled` corta la red del emulador (el backend del runner deja de verse). Un flujo que lo usa pone `onFlowComplete: [setAirplaneMode: disabled]`, para no dejar al siguiente sin red aunque falle un paso.
+- **Lo que haría otro dispositivo o la máquina:** `comun/qa-api.js` llama a la API del backend del runner como otro teléfono del usuario `qa`. `ACCION: cerrar-este-telefono` cierra la sesión del emulador desde «Dispositivos con la app» (la siguiente petición de la app recibe un 401); `pausar` y `reanudar` paran y reanudan la máquina.
 
 ## Lo que no se automatiza
 
@@ -160,7 +162,7 @@ Para probar los estados de error y los vacíos, el backend de la QA puede hacer 
 
 ## Animaciones
 
-`scripts/qa/correr-maestro.sh` pone las escalas de animación del sistema a 1 solo para los flujos de `QA_FLUJOS_ANIMADOS` (por defecto `01-entrada 03-oficina`) y a 0 para el resto.
+`scripts/qa/correr-maestro.sh` pone las escalas de animación del sistema a 1 solo para los flujos de `QA_FLUJOS_ANIMADOS` (en el workflow, `01-entrada 02-navegacion 03-oficina`; sin la variable, `01-entrada 03-oficina`) y a 0 para el resto. `02-navegacion` la necesita: con movimiento reducido las pestañas cambian sin su push, y la pantalla en blanco al volver con atrás entre dos pantallas de la barra superior (ejecución 42451843664) solo ocurría con él.
 
 - Con 0, la app usa movimiento reducido y la escena de la Oficina queda quieta. Maestro ve cada pantalla asentarse al momento, en vez de esperar 20 a 100 s por paso sobre la escena animada con el render por software del emulador.
 - Un flujo que necesite el movimiento se añade a la lista, en el workflow (`QA_FLUJOS_ANIMADOS`), no en el flujo.

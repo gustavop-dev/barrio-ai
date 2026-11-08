@@ -50,8 +50,31 @@ function away(progress: Progress, side: 1 | -1) {
   return progress.interpolate({ inputRange: [-1, 1], outputRange: [-side, side] });
 }
 
+type Driven = Animated.AnimatedInterpolation<number>;
+
+/** A value that stays put, as an interpolation of the same progress (so it is still a driven prop). */
+function fixed(progress: Progress, value: number): Driven {
+  return progress.interpolate({ inputRange: [-1, 1], outputRange: [value, value] });
+}
+
+/**
+ * Every animated scene sets the same three props, opacity, translateX and translateY, driven by its progress, whatever
+ * its part in the change. A scene's style changes shape as its part changes (idle, entering, leaving), and the native
+ * driver keeps the last value it set for a prop that a new style no longer drives: an idle scene faded to opacity 0 that
+ * came back with the push (a style without opacity) stayed invisible. That was the blank screen of Android back from
+ * Calendario to Notificaciones (QA run 42451843664, 02-navegacion).
+ */
+function scene(progress: Progress, { opacity, x, y }: { opacity?: Driven; x?: Driven; y?: Driven }): SceneStyle {
+  return {
+    sceneStyle: {
+      opacity: opacity ?? fixed(progress, 1),
+      transform: [{ translateX: x ?? fixed(progress, 0) }, { translateY: y ?? fixed(progress, 0) }],
+    },
+  };
+}
+
 function hidden(progress: Progress): SceneStyle {
-  return { sceneStyle: { opacity: progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [0, 1, 0] }) } };
+  return scene(progress, { opacity: progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [0, 1, 0] }) });
 }
 
 /**
@@ -66,19 +89,17 @@ export function tabSceneOptions(move: TabMove, role: TabRole, side: 1 | -1, widt
       transitionSpec: tabInSpec,
       sceneStyleInterpolator: ({ current }) => {
         const a = away(current.progress, side);
-        return {
-          sceneStyle: {
-            opacity: a.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
-            transform: [{ translateY: a.interpolate({ inputRange: [0, 1], outputRange: [0, navValues.tabRise] }) }],
-          },
-        };
+        return scene(current.progress, {
+          opacity: a.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }),
+          y: a.interpolate({ inputRange: [0, 1], outputRange: [0, navValues.tabRise] }),
+        });
       },
     };
   }
   if (move === 'fade') {
     return {
       transitionSpec: tabOutSpec,
-      sceneStyleInterpolator: ({ current }) => ({ sceneStyle: { opacity: away(current.progress, side).interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) } }),
+      sceneStyleInterpolator: ({ current }) => scene(current.progress, { opacity: away(current.progress, side).interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }),
     };
   }
   // The push and its way back: the top-bar screen moves by the whole width, the other by 30 %.
@@ -87,12 +108,12 @@ export function tabSceneOptions(move: TabMove, role: TabRole, side: 1 | -1, widt
     transitionSpec: pushSpec,
     sceneStyleInterpolator: ({ current }) => {
       const a = away(current.progress, side);
-      if (slides) return { sceneStyle: { transform: [{ translateX: a.interpolate({ inputRange: [0, 1], outputRange: [0, width] }) }] } };
-      const shift = { translateX: a.interpolate({ inputRange: [0, 1], outputRange: [0, -navValues.pushParallax * width] }) };
+      if (slides) return scene(current.progress, { x: a.interpolate({ inputRange: [0, 1], outputRange: [0, width] }) });
+      const x = a.interpolate({ inputRange: [0, 1], outputRange: [0, -navValues.pushParallax * width] });
       // The tabs draw the focused scene on top, so a screen coming back from under the top-bar screen
       // cannot be revealed by it: it fades in as it moves back.
-      if (role === 'enter') return { sceneStyle: { opacity: a.interpolate({ inputRange: [0, 1], outputRange: [1, 0], extrapolate: 'clamp' }), transform: [shift] } };
-      return { sceneStyle: { transform: [shift] } };
+      if (role === 'enter') return scene(current.progress, { opacity: a.interpolate({ inputRange: [0, 1], outputRange: [1, 0], extrapolate: 'clamp' }), x });
+      return scene(current.progress, { x });
     },
   };
 }
