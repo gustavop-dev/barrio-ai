@@ -213,6 +213,10 @@ tags: [personas, fichas]
       id: persona-name
     timeout: 20000
 - assertVisible: "POR CLASIFICAR"
+# The rest of the card (headline, buttons, sections) must show too: once, it stayed blank under the name.
+- extendedWaitUntil:
+    visible: "Desarrollador backend en una fintech"
+    timeout: 30000
 - tapOn: "Descartar"
 - extendedWaitUntil:
     visible:

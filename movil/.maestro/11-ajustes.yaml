@@ -329,14 +329,16 @@ tags: [ajustes]
     direction: DOWN
     timeout: 30000
 - assertVisible: "Editorial"
+# The list runs under the floating tab bar: the last row is centred so the ones above it are really on screen.
 - scrollUntilVisible:
     element:
-      text: "Este mes: .* USD de .* USD"
+      text: "Transcripción de audios, este mes: .* USD"
     direction: DOWN
+    centerElement: true
     timeout: 30000
+- assertVisible: "Este mes: .* USD de .* USD"
 - assertVisible: "Desde el inicio: .* USD"
 - assertVisible: "Agente líder, este mes: .* USD"
-- assertVisible: "Transcripción de audios, este mes: .* USD"
 - takeScreenshot: 11-ajustes-10-gasto
 
 # ---------------------------------------------------------------- LinkedIn oficial: «Conectar LinkedIn» opens the office web
@@ -372,10 +374,19 @@ tags: [ajustes]
     notVisible:
       id: screen-ajustes
     timeout: 30000
+# A fresh emulator shows Chrome's first-run screen first: past it, the office web loads from the QA server.
+- runFlow:
+    when:
+      visible: "Use without an account|Usar sin una cuenta"
+    commands:
+      - tapOn: "Use without an account|Usar sin una cuenta"
+- assertVisible:
+    text: ".*10\\.0\\.2\\.2.*"
+    optional: true
 - takeScreenshot: 11-ajustes-12-oficina-web
-# Back from the browser (twice if Chrome shows its first-run screen first), the app refreshes the status.
+# Back from the browser, the app refreshes the status.
 - repeat:
-    times: 3
+    times: 4
     while:
       notVisible:
         id: screen-ajustes
