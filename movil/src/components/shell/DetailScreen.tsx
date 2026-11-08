@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { navGestures, navSpring, useMotion } from '@/theme/motion';
 import { colors, shell } from '@/theme/tokens';
 import { FlightProvider, useFlightHost } from './flight';
-import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, pushProgress, registerLayer, stackLevel, stackOf } from './push';
+import { backLabel, baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, pushProgress, registerLayer, stackLevel, stackOf } from './push';
 import { TopBar } from './TopBar';
 
 /** The hairline on the panel's left edge, seen while it slides. */
@@ -26,7 +26,10 @@ export function DetailScreen({ back, fallback, children }: { back: string; fallb
   const route = useRoute();
   // From the root state of this render: getState() would not have this screen yet on its first render
   // (level 0: the tabs would not move, and this panel would take the tabs' layer).
-  const level = stackLevel(stackOf(useRootNavigationState(), route.key) ?? navigation.getState(), route.key);
+  const stack = stackOf(useRootNavigationState(), route.key) ?? navigation.getState();
+  const level = stackLevel(stack, route.key);
+  // «‹» names where it goes back to (a piece opened from Tu turno: «‹ Tu turno»); `back` without a screen underneath.
+  const backTo = backLabel(stack as Parameters<typeof backLabel>[0], route.key, back);
   const progress = pushProgress(level);
   const covered = pushProgress(level + 1);
   const { reduced } = useMotion();
@@ -145,7 +148,7 @@ export function DetailScreen({ back, fallback, children }: { back: string; fallb
         <View ref={panel} collapsable={false} pointerEvents="none" style={styles.fill} />
         <View style={styles.line} pointerEvents="none" />
         <FlightProvider value={flight.context}>
-          <TopBar back={{ label: back, onPress: goBack }} />
+          <TopBar back={{ label: backTo, onPress: goBack }} />
           {children}
         </FlightProvider>
         <GestureDetector gesture={edge}>

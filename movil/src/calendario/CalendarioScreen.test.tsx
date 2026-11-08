@@ -10,7 +10,7 @@ import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer, type FakeHandler, type SentRequest } from '@/test/server';
 import * as motion from '@/theme/motion';
-import { CalendarioScreen } from './CalendarioScreen';
+import { CalendarioScreen, sheetTop } from './CalendarioScreen';
 import { cancelVeto, flushVetoes } from './pendingVeto';
 
 const expoRouter = jest.requireMock('expo-router') as {
@@ -257,6 +257,22 @@ describe('Calendario · semana', () => {
     expect(within(confirm).getByText(/descarta a Sofía Muestra para siempre/)).toBeOnTheScreen();
   });
 
+  it('approves from «Programado» what waits for Gustavo, with its exact version', async () => {
+    const base = actividadFixture();
+    const waiting = { ...base.upcoming.queued[1]!, id: 'q-3', state: 'proposed', expected_at: null, awaiting_approval: true, payload_hash: 'b'.repeat(64), expires_at: '2026-11-08T20:00:00Z' };
+    const api = server({
+      'GET /api/v1/actividad': { body: { ...base, upcoming: { ...base.upcoming, queued: [waiting, ...base.upcoming.queued] } } },
+      'POST /api/v1/operador/actions/q-3/approve': { status: 202, body: {} },
+    });
+    await renderCalendario();
+    const row = await within(panel()).findByTestId('en-cola-q-3');
+    expect(within(row).getByText(/^Espera tu aprobación · caduca /)).toBeOnTheScreen();
+    expect(within(within(panel()).getByTestId('en-cola-q-2')).queryByText('Aprobar')).toBeNull();  // already approved: only Vetar
+    await fireEvent.press(within(row).getByText('Aprobar'));
+    await waitFor(() => expect(api.find('POST', '/api/v1/operador/actions/q-3/approve')[0]?.body).toEqual({ expected_hash: 'b'.repeat(64), note: '' }));
+    expect(await screen.findByText('Aprobada. Sale cuando lo permitan la ventana y los topes.')).toBeOnTheScreen();
+  });
+
   it('says when a day is too far ahead', async () => {
     server();
     await renderCalendario({ fecha: '2026-11-30' });
@@ -274,9 +290,26 @@ describe('Calendario · semana', () => {
     expect(await screen.findByText('No se pudo cargar el calendario')).toBeOnTheScreen();
     expect(screen.getByText('Error del servidor')).toBeOnTheScreen();
     expect(screen.getAllByTestId(/^dia-/)).toHaveLength(7);
+    // CAL-03: the day under the calendar is not drawn as an empty day.
+    expect(within(panel()).getByText('No se pudo cargar este día.')).toBeOnTheScreen();
+    expect(within(panel()).queryByText('Sin actividad registrada.')).toBeNull();
     fail = false;
     await fireEvent.press(screen.getByText('Reintentar'));
     expect(await within(panel()).findByText('6 comentarios')).toBeOnTheScreen();
+  });
+
+  it('says when the day’s piece could not be loaded, with «Reintentar»', async () => {
+    let fail = true;
+    const api = server({
+      'GET /api/v1/editorial/pieces/p7': () => (fail ? { status: 500, body: { detail: 'Error del servidor' } } : { body: piece() }),
+    });
+    await renderCalendario();
+    const publication = await within(panel()).findByTestId('bloque-publicacion');
+    expect(await within(publication).findByText('No se pudo cargar la pieza')).toBeOnTheScreen();
+    fail = false;
+    await fireEvent.press(within(publication).getByText('Reintentar'));
+    expect(await within(publication).findByText('Salió a las 09:00')).toBeOnTheScreen();
+    expect(api.find('GET', '/api/v1/editorial/pieces/p7').length).toBeGreaterThan(1);
   });
 
   it('says «Horas de Bogotá» when the phone is in another time zone', async () => {
@@ -284,6 +317,15 @@ describe('Calendario · semana', () => {
     server();
     await renderCalendario();
     expect(await screen.findByText('2–8 nov 2026 · Horas de Bogotá')).toBeOnTheScreen();
+  });
+});
+
+describe('Calendario · hoja del día', () => {
+  // E2E wave, E4 bug 2: at full height the day sheet covered the week strip, so no other day could be tapped.
+  it('starts the sheet under the grid, leaving it at least 55 % of the screen', () => {
+    expect(sheetTop(90, 750)).toBe(98);
+    expect(sheetTop(0, 750)).toBe(8);
+    expect(sheetTop(400, 750)).toBe(337.5);
   });
 });
 

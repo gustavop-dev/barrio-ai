@@ -96,7 +96,7 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn de Gustavo (solo lectu
   3. **Dado** que pulsa «Registrar oportunidad», **cuando** se guarda, **entonces** se crea la oportunidad y, en la siguiente carga, la tarjeta ya no ofrece «Marcar como oportunidad».
   4. **Dado** un remitente que no es contacto, **cuando** se muestra la tarjeta, **entonces** no aparece «Marcar como oportunidad».
 - **Brechas código/docs:** en la app, la tarjeta abre una hoja reducida (Modalidad, Canal, Notas) que siempre crea la oportunidad en «Conversación» y avisa «Oportunidad creada»; la PWA abre el formulario completo ([PRS-09](personas-oportunidades.md#prs-09)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-mas` (criterios 1 y 2: la hoja llega con la persona y la nota del equipo; cerrarla no crea nada).
 
 ### INB-06 · La conversación en la ficha de la persona <a id="inb-06"></a>
 

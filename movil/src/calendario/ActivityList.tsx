@@ -1,8 +1,9 @@
 // What the team did (GET /api/v1/actividad): one row per item, the queued actions with Vetar, the
 // type chips and «Mostrar lo que no salió», and «Ver todo lo del día» with «Cargar más».
 import { useActividad } from '@compartido/api/hooks';
-import type { ActividadTipo, ActivityItem, CalendarLayer } from '@compartido/api/types';
+import type { ActividadTipo, ActivityItem, CalendarLayer, QueuedItem } from '@compartido/api/types';
 import {
+  awaitingSentence,
   isNetworkCapability,
   itemLayer,
   itemLink,
@@ -18,7 +19,7 @@ import { ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { Button, ErrorRetry, FilterChip, Fold, Skeleton, T } from '@/components/ui';
 import { colors, layers, shell, space } from '@/theme/tokens';
 import { TimelineItem } from './TimelineItem';
-import { VetoButton } from './Veto';
+import { ApproveButton, VetoButton } from './Veto';
 
 /** One activity item: the post excerpt, the full comment and «Por qué» folded. */
 export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: string }) {
@@ -59,32 +60,28 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
   );
 }
 
-/** An approved action waiting for the window or the spacing, with its Vetar (a network action discards the person). */
-export function QueuedRow({
-  item,
-  today,
-  timeZone,
-  windowOpen,
-}: {
-  item: ActivityItem & { expected_at: string | null };
-  today: string;
-  timeZone: string;
-  windowOpen: boolean | undefined;
-}) {
+/** An approved action waiting for the window or the spacing, with its Vetar (a network action discards the person); one
+ * that waits for Gustavo's approval (`approval` mode) also has «Aprobar». */
+export function QueuedRow({ item, today, timeZone, windowOpen }: { item: QueuedItem; today: string; timeZone: string; windowOpen: boolean | undefined }) {
   const sentence = queuedSentence(item);
+  const awaiting = Boolean(item.awaiting_approval && item.payload_hash);
   return (
-    <View style={styles.row} testID={`en-cola-${item.id}`}>
-      <View style={styles.rowText}>
+    <View style={awaiting ? styles.rowStacked : styles.row} testID={`en-cola-${item.id}`} collapsable={false}>
+      <View style={awaiting ? styles.rowTextStacked : styles.rowText}>
         <T>{sentence}</T>
         <T variant="detalle" soft>
-          {queuedWhen(item.expected_at, { today, timeZone, windowOpen })}
+          {awaiting ? awaitingSentence(item.expires_at, { today, timeZone }) : queuedWhen(item.expected_at, { today, timeZone, windowOpen })}
         </T>
       </View>
-      <VetoButton
-        size="small"
-        accessibilityHint={sentence}
-        target={{ actionId: item.id, kind: 'accion', network: isNetworkCapability(item.capability), person: item.target?.name }}
-      />
+      {/* Waiting for approval, the two buttons go under the text: beside it they squeezed it into a narrow column. */}
+      <View style={styles.rowActions}>
+        {awaiting ? <ApproveButton size="small" actionId={item.id} expectedHash={item.payload_hash!} accessibilityHint={sentence} /> : null}
+        <VetoButton
+          size="small"
+          accessibilityHint={sentence}
+          target={{ actionId: item.id, kind: 'accion', network: isNetworkCapability(item.capability), person: item.target?.name }}
+        />
+      </View>
     </View>
   );
 }
@@ -178,5 +175,8 @@ const styles = StyleSheet.create({
   chips: { gap: space[2] },
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
   rowText: { flex: 1, gap: 2 },
+  rowActions: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  rowStacked: { gap: space[2], paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
+  rowTextStacked: { gap: 2 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: shell.touch },
 });

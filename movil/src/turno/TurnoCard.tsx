@@ -26,7 +26,8 @@ import type { SwipeSide } from './swipe';
 const TYPE_COLOR = { suave: colors.inkSoft, alerta: colors.alert, hondo: colors.brandDeep, info: colors.info } as const;
 
 /** Runs card actions: the POST (with its modal when it needs one) and the toasts. Shared by the buttons and the swipe. */
-function useActionRunner(cardId: string) {
+function useActionRunner(card: TurnoCardData) {
+  const cardId = card.id;
   const toast = useToast();
   const run = useTurnoAction();
   const exits = useTurnoExitsApi();
@@ -56,7 +57,7 @@ function useActionRunner(cardId: string) {
   /** Tap or swipe: ask first when the action needs a note or a confirmation. */
   const start = async (action: TurnoAction, flown = false): Promise<boolean> => {
     run.reset();
-    if (modalFor(action)) {
+    if (modalFor(action, card)) {
       setAsking(action);
       return false;
     }
@@ -107,7 +108,7 @@ function CardActions({ card, runner, onOpportunity, resolvedBy }: CardActionsPro
         </Button>
       );
     }
-    const spec = modalFor(action);
+    const spec = modalFor(action, card);
     return (
       <Button
         key={action.label}
@@ -164,6 +165,35 @@ function Attempt({ card }: { card: TurnoCardData }) {
           <Icon name="external" size={16} color={colors.brandDeep} />
         </Pressable>
       ) : null}
+    </View>
+  );
+}
+
+/** What an approval card asks for: the action and its target, the exact text when there is one, and why the team proposes it. */
+function ApprovalBody({ card }: { card: TurnoCardData }) {
+  const approval = card.approval!;
+  const target = approval.target;
+  const where = !target ? '' : target.kind === 'post' ? ` en el post de ${target.name}` : target.kind === 'own' ? '' : target.name ? ` · ${target.name}` : '';
+  return (
+    <View style={styles.block}>
+      <T variant="detalle" soft>
+        {approval.label}
+        {where}
+      </T>
+      {target?.kind === 'person' && target.headline ? <T soft>{target.headline}</T> : null}
+      {approval.text ? <Quote>{approval.text}</Quote> : null}
+      {approval.reaction ? <T>Reacción: {approval.reaction}</T> : null}
+      {card.body ? (
+        <View style={styles.block}>
+          <T variant="etiqueta" soft>
+            Por qué
+          </T>
+          <T>{card.body}</T>
+        </View>
+      ) : null}
+      <T variant="detalle" soft>
+        Si no la apruebas, no sale.
+      </T>
     </View>
   );
 }
@@ -277,7 +307,7 @@ export interface TurnoCardProps {
 
 export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProps) {
   const toast = useToast();
-  const runner = useActionRunner(card.id);
+  const runner = useActionRunner(card);
   const exits = useTurnoExitsApi();
   const postpone = usePostponePregunta();
   const [opportunity, setOpportunity] = useState<TurnoOpportunity | null>(null);
@@ -308,7 +338,7 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
     }
   };
 
-  const spec = runner.asking ? modalFor(runner.asking) : null;
+  const spec = runner.asking ? modalFor(runner.asking, card) : null;
   // MovTuTurno: after the backend confirms, the resolving button holds a check and the card turns 0ff1ce-claro.
   const resolvedBy = exit && exit.phase !== 'acting' && exit.lead === 'check' ? (exit.by ?? null) : null;
 
@@ -355,6 +385,8 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
             <Attempt card={card} />
           ) : card.conversation ? (
             <ConversationBody card={card} />
+          ) : card.approval ? (
+            <ApprovalBody card={card} />
           ) : (
             <NoticeBody card={card} />
           )}

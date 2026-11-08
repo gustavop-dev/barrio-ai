@@ -249,7 +249,9 @@ class Command(BaseCommand):
                ('publicada8',-8,'published','Un MVP no es una versión barata del producto','business_to_product','personal_startups','lector_lider'),
                ('bloqueada',-2,'blocked','Qué aprendí cobrando por mi primer proyecto','business_to_product','projectapp','lector_comprador'),
                ('saltada',-1,'skipped',None,None,None,None),
-               ('fallida',-5,'failed','Cómo elegimos el stack de un MVP en dos días','architecture_delivery','projectapp','lector_divulgador')]
+               ('fallida',-5,'failed','Cómo elegimos el stack de un MVP en dos días','architecture_delivery','projectapp','lector_divulgador'),
+               # Its CONT-09 waits in `proposed` (the state of the daily post in approval mode): «Aprobar» in its detail (CAL-15).
+               ('aprobacion',3,'ready','Un piloto de seis semanas dice más que una propuesta de cuarenta páginas','business_to_product','projectapp','lector_comprador')]
         self.piece={}
         for key,offset,kind,thesis,pillar,modality,reader in specs:
             day=self.today+timedelta(days=offset)
@@ -298,6 +300,9 @@ class Command(BaseCommand):
             EditorialPiece.objects.filter(pk=piece.pk).update(created_at=when-timedelta(hours=14))
             self.piece[key]=piece
         # CONT-09 of the ready pieces: approved (tomorrow) and published with its metrics.
+        waiting=self.piece['aprobacion']
+        self.action(waiting,'CONT-09',{'text':waiting.final_text},'proposed',created=self.ago(hours=1),
+                    rationale=f'{waiting.brief["thesis"]} — B cuenta un piloto real.',key='cont09:aprobacion')
         tomorrow=self.piece['manana']
         self.action(tomorrow,'CONT-09',{'text':tomorrow.final_text},'approved',created=self.ago(hours=3),decided=self.ago(hours=2),
                     rationale=f'{tomorrow.brief["thesis"]} — B tiene una historia verificable.',review={'decision':'approve','reasons':['Cumple la política'],'model':'jev-1.14.0'},key='cont09:manana')
@@ -308,7 +313,9 @@ class Command(BaseCommand):
             ages=[('24h',timedelta(hours=24),0.45),('72h',timedelta(hours=72),0.8)]+([('7d',timedelta(days=7),1.0)] if key=='publicada8' else [])
             for kind,age,share in ages:
                 PostMetric.objects.create(id=uid(f'metric:{key}:{kind}'),piece=piece,provider_post_id=f'qa-{key}',share_url=f'{FAKE_URL}/feed/update/qa-{key}',kind=kind,
-                    impressions=int(impressions*share),reactions=int(42*share),comments=int(11*share),reposts=int(3*share),published_at=started,captured_at=started+age+timedelta(minutes=20),
+                    impressions=int(impressions*share),reactions=int(42*share),comments=int(11*share),published_at=started,
+                    # A reading that did not return the reposts (CAL-07, RES-06: «—», never 0).
+                    reposts=None if (key,kind)==('publicada3','72h') else int(3*share),captured_at=started+age+timedelta(minutes=20),
                     commenters=[{'provider_user_id':'qa-user-andres-restrepo','name':'Andrés Restrepo','substantive':True,'role':'comprador','fit':True},
                                 {'provider_user_id':'qa-user-pedro-salazar','name':'Pedro Salazar','substantive':False,'role':'par','fit':False}])
 
@@ -365,6 +372,12 @@ class Command(BaseCommand):
                         external_url=people[handle].profile_url,key=f'red:{handle}:{capability}')
         self.action(p[7],'INT-03',{'text':'La demo de los viernes cambia quién se siente dueño del producto.'},'failed',
                     created=self.at(-6,11),decided=self.at(-6,11,10),executed=self.at(-6,11,20),key='comentario:fallido')
+        # «En cola» (Calendario › Lista and the day panel, CAL-04 and CAL-13): approved, waiting for the window or the
+        # spacing, each with its Vetar. Nothing executes them in the QA world (no worker runs).
+        self.action(p[5],'INT-02',{'reaction':'linkedin_celebrate'},'approved',created=self.ago(hours=1,minutes=30),decided=self.ago(hours=1),
+                    rationale='Una práctica de contratación que encaja con el pilar de equipo.',key='cola:reaccion')
+        self.action(people['camila-ortiz'],'RED-02',{},'approved',created=self.ago(hours=2,minutes=30),decided=self.ago(hours=2),
+                    rationale='Terminó la espera tras seguirla: invitación sin nota.',key='cola:red02:camila')
 
     def opportunities(self):
         def opportunity(key,stage,modality,contact=None,person='',company='',created_days=20,steps=(),next_action='',next_at=None,need=''):
@@ -413,7 +426,10 @@ class Command(BaseCommand):
               ('ingles','relaciones_comunidad','¿Te parece bien que el equipo comente en publicaciones en inglés?','Hoy solo comenta en español.',
                'comentarios.ingles','yes_no',[],False,None,None,self.ago(days=2)),
               ('ciudad','perfil','¿En qué ciudad vives actualmente?','Para presentarte bien en el perfil y en los posts.',
-               'ubicacion.ciudad','text',[],True,None,self.at(2,9),self.ago(days=3))]
+               'ubicacion.ciudad','text',[],True,None,self.at(2,9),self.ago(days=3)),
+              # Its deadline passed: «Ya no es urgente», it does not count (TUR-13).
+              ('caducada','director_editorial','¿Fuiste al meetup de producto del martes?','Para contarlo en la pieza de ayer.',
+               'eventos.meetup_producto','yes_no',[],True,self.ago(days=1),None,self.ago(days=4))]
         for key,agent,question,purpose,memory_key,answer_type,options,public,deadline,postponed,created in rows:
             item=TeamQuestion.objects.create(id=uid(f'question:{key}'),kind='ask',agent=agent,question=question,purpose=purpose,memory_key=memory_key,
                 answer_type=answer_type,options=options,suggested_public=public,origin='qa',deadline=deadline,postponed_until=postponed)
@@ -542,7 +558,7 @@ class Command(BaseCommand):
         orientation.text='Habla a fundadores de startups latinoamericanas en etapa temprana. Evita el tono de vendedor.'
         orientation.updated_by=self.user;orientation.updated_at=self.ago(days=12);orientation.save()
         control=OperatorControl.current();control.paused=False;control.reason='';control.updated_by=None;control.updated_at=None;control.save()
-        preference=OfficePreference.current();preference.push_disabled=[];preference.gallery_ai_edit_default=True
+        preference=OfficePreference.current();preference.push_disabled=[];preference.push_enabled=[];preference.gallery_ai_edit_default=True
         preference.updated_by=None;preference.updated_at=None;preference.save()
 
     def office(self):

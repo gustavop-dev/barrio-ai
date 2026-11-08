@@ -1,4 +1,5 @@
-import { CONVERSATION_CARD, EXPIRING_CARD, questionCard, UNCERTAIN_CARD, cardFixture } from '@compartido/fixtures/turno';
+import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, questionCard, UNCERTAIN_CARD, cardFixture } from '@compartido/fixtures/turno';
+import { APPROVED_MESSAGE } from '@compartido/logic/events';
 import { cardTitle, modalFor, orderedActions, successMessage, swipeIntents, withNote } from './actions';
 import { commitSide, dragOffset, pastCommit, revealProgress } from './swipe';
 
@@ -19,6 +20,17 @@ describe('card actions', () => {
     expect(successMessage(done)).toBe('Anotado: respondiste');
     expect(modalFor(noReply)).toMatchObject({ note: 'optional', noteLabel: 'Motivo' });
     expect(successMessage(noReply)).toBe('Anotado: no responderás');
+  });
+
+  it('approves at once with the exact version; «Vetar» asks for a note and warns that the person is discarded', () => {
+    const [approve, reject] = APPROVAL_CARD.actions;
+    expect(modalFor(approve!, APPROVAL_CARD)).toBeNull();
+    expect(successMessage(approve!)).toBe(APPROVED_MESSAGE);
+    expect(modalFor(reject!, APPROVAL_CARD)).toMatchObject({ title: 'Vetar la acción', note: 'required', noteLabel: 'Nota' });
+    expect(modalFor(reject!, APPROVAL_CARD)?.text).toContain('descarta a Laura Prueba para siempre');
+    expect(successMessage(reject!)).toBe('Vetada');
+    expect(swipeIntents(APPROVAL_CARD).right).toMatchObject({ kind: 'run', label: 'Aprobar' });
+    expect(swipeIntents(APPROVAL_CARD).left).toBeNull();
   });
 
   it('sends the machine its reason as `reason`, everything else as `note`', () => {

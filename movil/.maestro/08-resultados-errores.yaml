@@ -1,0 +1,82 @@
+# cubre: RES-03, RES-05, RES-06, RES-08, SEM-05
+# Resultados when the backend fails or comes back empty (QA failure switch, comun/qa-fallo.js; README «Fallos
+# simulados»). Both the figures and the weekly summary fail: «No se pudieron cargar los resultados» with «Reintentar»,
+# and only the summary's block says «No se pudo cargar el resumen de la semana.» (SEM-05: still without «Reintentar»).
+# «Reintentar» brings the figures back. Then a period with nothing: no posts, no active opportunities.
+appId: co.projectapp.office
+name: Resultados · errores y vacíos
+tags: [resultados]
+---
+- runFlow: comun/entrar.yaml
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/resultados$'
+      EFECTO: '500'
+      VECES: '-1'
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/resultados/resumen-semanal$'
+      METODO: GET
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    id: tab-resultados
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: resultados-list
+    timeout: 30000
+
+# ---------------------------------------------------------------- the figures and the summary fail
+# cubre: RES-08, SEM-05
+- extendedWaitUntil:
+    visible: "No se pudieron cargar los resultados"
+    timeout: 45000
+- assertVisible: "No se pudo cargar el resumen de la semana."
+- assertVisible: "Reintentar"
+- takeScreenshot: 08-resultados-errores-01-sin-datos
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn: "Reintentar"
+- extendedWaitUntil:
+    notVisible: "No se pudieron cargar los resultados"
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: res-negocio
+    timeout: 30000
+
+# ---------------------------------------------------------------- an empty period
+# cubre: RES-03, RES-05, RES-06
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/resultados$'
+      EFECTO: 'vacio'
+      VECES: '-1'
+- scrollUntilVisible:
+    element:
+      id: res-periodo
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "90 días"
+- extendedWaitUntil:
+    visible: ".*Todo se compara con los 90 días anteriores.*"
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "No hay oportunidades activas ahora mismo."
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- takeScreenshot: 08-resultados-errores-02-sin-oportunidades
+- scrollUntilVisible:
+    element:
+      text: "Sin posts publicados en el periodo."
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- takeScreenshot: 08-resultados-errores-03-sin-posts
+- runScript: comun/qa-fallos-limpiar.js

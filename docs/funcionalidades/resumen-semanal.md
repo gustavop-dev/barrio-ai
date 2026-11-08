@@ -93,7 +93,7 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
   6. **Dado** que la semana pasada no tiene resumen y no se puede generar, **cuando** abre Resultados, **entonces** ve el motivo (`generate.reason`, por ejemplo «Presupuesto del resumen semanal agotado esta semana.»). **Hoy falla en la PWA:** el botón «Generar ahora» desaparece sin explicar por qué.
   7. **Dado** un error al cargar el bloque, **cuando** falla, **entonces** solo ese bloque muestra el error con «Reintentar»; el resto de Resultados sigue. **Hoy es parcial:** las dos interfaces muestran «No se pudo cargar el resumen de la semana.» sin botón «Reintentar».
 - **Brechas código/docs:** si falla la llamada automática a `…/visto`, no se avisa y la etiqueta «Nuevo» se queda (las dos interfaces).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** SEM-05.1, 4 y 7 en `08-resultados.yaml` y `08-resultados-errores.yaml` (listas, advertencias, semanas anteriores; el error del bloque, aún sin «Reintentar») · 2026-11-08 · pasa
 
 ### SEM-06 · «Usar como orientación», «Descartar» y «Deshacer» <a id="sem-06"></a>
 
@@ -110,7 +110,7 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
   6. **Dado** un resumen sin orientación propuesta, **cuando** se intenta aplicar, **entonces** responde 409 «Este resumen no propone una orientación.».
   7. **Dado** un token de servicio, **cuando** intenta decidir, **entonces** recibe 403.
 - **Brechas código/docs:** el límite de 5 s lo pone la interfaz; la API acepta `deshacer` en cualquier momento mientras el resumen esté `aplicado` o `descartado` (`can_undo`).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** SEM-06.1 y 2, y «Descartar» con «Deshacer», en `08-resultados.yaml` · 2026-11-08 · pasa
 
 ### SEM-07 · «Generar ahora» con el coste a la vista <a id="sem-07"></a>
 

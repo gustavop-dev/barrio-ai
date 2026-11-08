@@ -1,8 +1,8 @@
 // Ajustes › Notificaciones en este dispositivo: Web Push (src/push) with activate, test and disable,
-// the iPhone steps, and one switch per push type (`push_types`, PATCH /preferencias push_disabled).
+// the iPhone steps, and one switch per push type (`push_types`, PATCH /preferencias push_disabled and push_enabled).
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { disabledKinds, pushToggledMessage, pushTypeHint, pushTypesOf } from '../../../../compartido/src/logic/ajustes';
+import { pushPreferencesPatch, pushToggledMessage, pushTypeHint, pushTypesOf } from '../../../../compartido/src/logic/ajustes';
 import { useSavePreferencias, type PushType } from '../../api/capturas';
 import { sendTestPush } from '../../api/endpoints';
 import { useAjustes } from '../../api/hooks';
@@ -133,9 +133,8 @@ function PerType() {
     const previous = overrides;
     const updated = { ...overrides, [type.kind]: next };
     setOverrides(updated);
-    const disabled = disabledKinds(types ?? [], updated);
     save.mutate(
-      { push_disabled: disabled },
+      pushPreferencesPatch(types ?? [], updated),
       {
         onSuccess: () => toast.show(pushToggledMessage(type, next)),
         onError: (error) => {

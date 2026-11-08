@@ -181,7 +181,7 @@ class OpportunityAndTurnTests(OperatorBase):
         uncertain=next(a for a in turn['alerts'] if a['id'].startswith('uncertain'))
         self.assertTrue(uncertain['critical']);self.assertEqual(uncertain['attempt']['text'],GOOD)
         self.assertEqual([a['body'] for a in uncertain['actions']],[{'outcome':'confirmed'},{'outcome':'failed'}])
-        self.assertEqual((turn['count'],turn['critical'],turn['counts']),(3,True,{'avisos':3,'preguntas':0,'tareas':0}))
+        self.assertEqual((turn['count'],turn['critical'],turn['counts']),(3,True,{'avisos':3,'preguntas':0,'tareas':0,'aprobaciones':0}))
         self.assertTrue(turn['top']['critical']);self.assertEqual(turn['tasks'],{'perfil':[],'conversaciones':[],'resumen':[]})
         expiring=next(a for a in turn['alerts'] if a['id']=='linkedin_expiring')
         self.assertFalse(expiring['critical'])

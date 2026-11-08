@@ -222,6 +222,7 @@ def tick(user,now=None):
     now=now or timezone.now();report={'expired':0,'reviewed':0,'observe':0,'propose':0,'execute':0,'reconcile':0}
     from .connectors_linkedin import check_tokens
     report['linkedin_token']=check_tokens(now)  # expiry alerts reach Gustavo even with the machine stopped
+    if operador.check_env_pause():report['env_paused_alert']=1  # the server stop pushes once per stop
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
     ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')))
     # Own pieces are prepared ahead of time: their TTL runs from the scheduled hour, not from creation.
