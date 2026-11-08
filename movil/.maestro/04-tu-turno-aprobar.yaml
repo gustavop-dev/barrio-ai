@@ -38,6 +38,11 @@ tags: [turno]
     speed: 20
     timeout: 60000
     centerElement: true
+# Bring the card's buttons up, clear of the bottom bar: a tap on «Aprobar» right above it once hit the capture button.
+- swipe:
+    start: 50%, 70%
+    end: 50%, 40%
+    duration: 800
 - assertVisible: 'Lidera producto en un marketplace B2B\.'
 - assertVisible:
     text: 'Vetar'
