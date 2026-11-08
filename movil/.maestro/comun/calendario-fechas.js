@@ -64,6 +64,7 @@ output.semanaHoy = weekRange(hoy);
 output.semanaSiguiente = weekRange(day(7));
 output.semanaAnterior = weekRange(day(-7));
 output.diaSemanaSiguiente = iso(day(7));
+output.diaSemanaSiguienteTitulo = capitalize(longDay(day(7)));
 output.diaSemanaAnterior = iso(day(-7));
 output.mesHoy = monthTitle(hoy);
 output.mesSiguiente = monthTitle(midMonth(hoy, 1));

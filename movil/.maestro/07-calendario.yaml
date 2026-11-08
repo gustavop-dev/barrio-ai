@@ -56,6 +56,23 @@ tags: [calendario]
 - assertNotVisible:
     id: "dia-${output.hoy}"
 - takeScreenshot: 07-calendario-02-semana-siguiente
+# A day of the week that slid in opens its sheet (its cells used to stay untouchable and hidden from TalkBack).
+- tapOn:
+    id: "dia-${output.diaSemanaSiguiente}"
+- extendedWaitUntil:
+    visible:
+      text: "${output.diaSemanaSiguienteTitulo}"
+      childOf:
+        id: hoja-dia
+    timeout: 10000
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
 # Right twice: back to this week, then the previous one.
 - swipe:
     from:

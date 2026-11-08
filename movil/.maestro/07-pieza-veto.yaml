@@ -67,11 +67,13 @@ tags: [calendario]
 - assertVisible: "[0-9.]+ caracteres"
 - assertVisible: "Se publica tal cual, en inglés."
 - assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue."
+# «Copiado» lasts 1.5 s: do not wait for the screen to settle after the tap, or it is gone.
 - tapOn:
     id: copiar
+    waitToSettleTimeoutMs: 100
 - extendedWaitUntil:
     visible: "Copiado"
-    timeout: 5000
+    timeout: 3000
 - takeScreenshot: 07-pieza-veto-02-copiado
 
 # ---------------------------------------------------------------- «Comentario para el equipo»: the capture, tied to the piece

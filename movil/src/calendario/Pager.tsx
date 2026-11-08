@@ -150,7 +150,16 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
         <Animated.View style={strip}>
           {pages.map((page) =>
             page.offset === 0 ? (
-              <View key={page.key} style={[styles.current, { left: page.key * width }]} onLayout={measure(page.key)}>
+              // A page keeps its key as it slides in, so the side page's props must be undone explicitly: left out,
+              // Android kept the slid-in week untouchable and hidden from TalkBack (and from the QA flows).
+              <View
+                key={page.key}
+                style={[styles.current, { left: page.key * width }]}
+                onLayout={measure(page.key)}
+                accessibilityElementsHidden={false}
+                importantForAccessibility="auto"
+                pointerEvents="auto"
+              >
                 {renderPage(0)}
               </View>
             ) : (

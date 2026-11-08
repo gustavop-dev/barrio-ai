@@ -229,7 +229,12 @@ tags: [calendario]
     centerElement: true
     timeout: 20000
 - assertVisible: "PUBLICADA"
-- assertVisible: "Impresiones a las 72 h: 768"
+- scrollUntilVisible:
+    element:
+      text: "Impresiones a las 72 h: 768"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - takeScreenshot: 07-pieza-estados-06-dia-publicada
 - scrollUntilVisible:
     element:
