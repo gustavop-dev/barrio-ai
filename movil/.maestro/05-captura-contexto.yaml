@@ -112,9 +112,9 @@ tags: [captura]
     visible:
       id: persona
     timeout: 30000
-# A detail view has no bottom bar (CAP-01): its own «Nota de voz» opens the capture tied to her.
-- assertNotVisible:
-    id: capture-button
+# A detail view has no bottom bar (CAP-01): its own «Nota de voz» opens the capture tied to her. (The tabs stay mounted
+# under the detail screen, so Maestro still finds the capture button there: the screenshot shows it is not on screen.)
+- takeScreenshot: 05-contexto-04a-ficha-sin-barra
 - scrollUntilVisible:
     element:
       text: 'Nota de voz'

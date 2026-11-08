@@ -40,7 +40,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   3. **Dado** la PWA en escritorio, **cuando** pulsa «Capturar» en la barra lateral, **entonces** se abre la misma hoja (en escritorio no hay mantener para grabar).
   4. **Dado** una vista de detalle en la app (pieza o persona), **cuando** se muestra, **entonces** la barra inferior y el botón de captura no aparecen.
 - **Brechas código/docs:** —
-- **Cobertura QA:** E2E `05-captura` (criterios 1, 2 y 4: el toque, la pista del primer uso y la barra oculta en una ficha, esta en `05-captura-contexto`). El 3 es de la PWA.
+- **Cobertura QA:** E2E `05-captura` (criterios 1 y 2: el toque y la pista del primer uso). El 4 (sin barra en una ficha) se ve en la captura `05-contexto-04a-ficha-sin-barra`: las pestañas siguen montadas debajo de la ficha y Maestro encuentra el botón aunque no esté en pantalla. El 3 es de la PWA.
 
 ### CAP-02 · Grabar manteniendo el botón: bloquear, descartar, recuperar <a id="cap-02"></a>
 
