@@ -14,6 +14,11 @@ export interface ToastOptions {
   /** Milliseconds; motion.ts toastDurations by default. */
   duration?: number;
   tone?: 'default' | 'error';
+  /**
+   * Runs once the toast has left the screen without its undo: its time ran out, another toast took its place or it
+   * was dismissed. An action that waits for «Deshacer» goes here, so it never goes while «Deshacer» still shows.
+   */
+  onExpire?: () => void;
 }
 
 interface ToastState extends ToastOptions {
@@ -42,19 +47,46 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
   const [toast, setToast] = useState<ToastState | null>(null);
   const nextId = useRef(1);
   const insets = useSafeAreaInsets();
+  /** The toast whose «Deshacer» still counts: cleared the moment its time runs out, so a late tap does nothing. */
+  const live = useRef<ToastState | null>(null);
+  /** Toasts that left without their undo; their onExpire runs once the screen no longer shows them. */
+  const expired = useRef<ToastState[]>([]);
 
-  const dismiss = useCallback(() => setToast(null), []);
-  const show = useCallback((message: string, options: ToastOptions = {}) => {
-    setToast({ id: nextId.current++, message, ...options });
+  const leave = useCallback(() => {
+    const current = live.current;
+    live.current = null;
+    if (current?.onExpire) expired.current.push(current);
   }, []);
+  const dismiss = useCallback(() => {
+    leave();
+    setToast(null);
+  }, [leave]);
+  const show = useCallback(
+    (message: string, options: ToastOptions = {}) => {
+      leave();
+      const next = { id: nextId.current++, message, ...options };
+      live.current = next;
+      setToast(next);
+    },
+    [leave],
+  );
 
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(
-      () => setToast((current) => (current?.id === toast.id ? null : current)),
+      () => {
+        if (live.current?.id !== toast.id) return;
+        leave();
+        setToast(null);
+      },
       toast.duration ?? (toast.undo ? toastDurations.withUndo : toastDurations.plain),
     );
     return () => clearTimeout(timer);
+  }, [toast, leave]);
+
+  // After the commit that took a toast off the screen, what waited for it goes (a veto, pendingVeto.ts).
+  useEffect(() => {
+    for (const gone of expired.current.splice(0)) gone.onExpire?.();
   }, [toast]);
 
   const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
@@ -81,9 +113,10 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
                 accessibilityRole="button"
                 hitSlop={8}
                 onPress={() => {
-                  const undo = toast.undo;
+                  if (live.current?.id !== toast.id) return;
+                  live.current = null;
                   setToast(null);
-                  undo?.();
+                  toast.undo?.();
                 }}
                 style={styles.undo}
               >

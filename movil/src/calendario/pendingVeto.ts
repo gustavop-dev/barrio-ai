@@ -1,7 +1,10 @@
 // A veto waits the «Deshacer» window (toastDurations.withUndo, 5 s) before it reaches the backend: the
-// API cannot take a reject back, so «Deshacer» cancels it before it is sent. The store lives outside
-// the views, so leaving the screen does not lose a veto, and the app going to the background sends the
-// pending ones at once (a killed app would lose them otherwise).
+// API cannot take a reject back, so «Deshacer» cancels it before it is sent. The window is its toast's:
+// the veto goes when the «Vetada» toast leaves the screen (Veto.tsx passes `send` as the toast's
+// onExpire), never on a clock of its own that could run out while «Deshacer» still shows. A late timer
+// only covers a toast that never reports back. The store lives outside the views, so leaving the screen
+// does not lose a veto, and the app going to the background sends the pending ones at once (a killed
+// app would lose them otherwise).
 import { rejectAction } from '@compartido/api/endpoints';
 import { keys } from '@compartido/api/queryClient';
 import type { QueryClient } from '@tanstack/react-query';
@@ -37,6 +40,9 @@ function refresh(client: QueryClient) {
   }
 }
 
+/** Past the «Deshacer» window, a veto whose toast never reported back goes anyway. */
+const LATE_SEND_MS = 5000;
+
 async function send(actionId: string): Promise<void> {
   const veto = pending.get(actionId);
   if (!veto) return;
@@ -60,11 +66,18 @@ export interface ScheduleVeto {
   onSettled?: (error: unknown) => void;
 }
 
-/** Schedules the reject; returns «Deshacer» (true when it was still in time). */
-export function scheduleVeto({ actionId, note, client, onSettled }: ScheduleVeto): () => boolean {
+export interface PendingVetoHandle {
+  /** «Deshacer»: true when it was still in time (nothing was sent). */
+  undo: () => boolean;
+  /** The «Deshacer» window is over (its toast left the screen): send it now. */
+  send: () => void;
+}
+
+/** Holds the reject until its window ends; returns «Deshacer» and the end of the window. */
+export function scheduleVeto({ actionId, note, client, onSettled }: ScheduleVeto): PendingVetoHandle {
   const previous = pending.get(actionId);
   if (previous) clearTimeout(previous.timer);
-  const timer = setTimeout(() => void send(actionId), toastDurations.withUndo);
+  const timer = setTimeout(() => void send(actionId), toastDurations.withUndo + LATE_SEND_MS);
   pending.set(actionId, { actionId, note, client, timer, onSettled });
   if (!appState) {
     appState = AppState.addEventListener('change', (state) => {
@@ -72,7 +85,7 @@ export function scheduleVeto({ actionId, note, client, onSettled }: ScheduleVeto
     });
   }
   changed();
-  return () => cancelVeto(actionId);
+  return { undo: () => cancelVeto(actionId), send: () => void send(actionId) };
 }
 
 export function cancelVeto(actionId: string): boolean {
