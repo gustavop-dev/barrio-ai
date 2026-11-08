@@ -77,13 +77,18 @@ tags: [turno]
       text: 'Sofía Martínez te escribió'
     direction: RIGHT
     duration: 400
-- extendedWaitUntil:
-    visible: 'Fallo simulado por QA \(503\)\.'
-    timeout: 20000
+# The card springs back; the server's reason shows under its buttons.
 - extendedWaitUntil:
     visible: 'Sofía Martínez te escribió'
     timeout: 20000
 - assertNotVisible: 'Anotado: respondiste'
+- scrollUntilVisible:
+    element:
+      text: 'Fallo simulado por QA \(503\)\.'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- assertVisible: 'No responder'
 - takeScreenshot: 04-estados-03-deslizar-error
 
 # ---------------------------------------------------------------- «Lo que el equipo sabe de ti»: error, then empty

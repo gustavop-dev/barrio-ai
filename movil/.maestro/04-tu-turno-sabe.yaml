@@ -1,7 +1,7 @@
 # cubre: TUR-15, TUR-16, TUR-17
 # Tu turno › «Lo que el equipo sabe de ti»: the seed's three confirmed facts with their topic, visibility and origin;
-# a new one added by hand (Privado by default, «Lo añadiste tú»); «ProjectApp» edited into a new version («v2»); and
-# «preferencia.equipos» retired, which takes it off the list.
+# a new one added by hand (Privado by default, «Lo añadiste tú», first on the list); «preferencia.equipos» retired,
+# which takes it off the list; and «ProjectApp» edited into a new version («v2»), which moves it to the top.
 appId: co.projectapp.office
 name: Tu turno · lo que sabe el equipo
 tags: [turno]
@@ -24,14 +24,13 @@ tags: [turno]
 # cubre: TUR-15
 - assertVisible: 'Esto es lo único que el equipo puede contar de ti\. Nadie inventará tus experiencias, clientes ni servicios\.'
 - extendedWaitUntil:
-    visible: 'Fundé ProjectApp en Medellín\.'
+    visible: 'Prefiero trabajar con equipos pequeños que deciden rápido\.'
     timeout: 20000
-- assertVisible: 'PROJECTAPP|ProjectApp'
 - assertVisible: 'PÚBLICO|Público'
 - assertVisible: 'Lo confirmaste en la memoria.*'
 - takeScreenshot: 04-sabe-01-datos
 
-# ---------------------------------------------------------------- add one by hand
+# ---------------------------------------------------------------- add one by hand: Privado by default, first on the list
 # cubre: TUR-16
 - tapOn: 'Añadir algo que quieras que sepan'
 - extendedWaitUntil:
@@ -53,22 +52,55 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Prefiero las reuniones por la mañana\.'
     timeout: 20000
+- assertVisible: 'HORARIOS|Horarios'
 - assertVisible: 'Lo añadiste tú.*'
-- assertVisible: 'PRIVADO|Privado'
 - takeScreenshot: 04-sabe-03-anadido
 - extendedWaitUntil:
     notVisible:
       id: toast
     timeout: 15000
 
-# ---------------------------------------------------------------- edit «ProjectApp»: a new version
+# ---------------------------------------------------------------- retire «preferencia.equipos»
 # cubre: TUR-17
+- scrollUntilVisible:
+    element:
+      text: 'Retirar: preferencia.equipos'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- tapOn: 'Retirar: preferencia.equipos'
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible: 'El equipo deja de usar «preferencia\.equipos» desde ahora\..*'
+- takeScreenshot: 04-sabe-04-retirar
+- tapOn:
+    text: 'Retirar'
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: 'Retirado\. El equipo ya no lo usará'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: 'Prefiero trabajar con equipos pequeños que deciden rápido\.'
+    timeout: 20000
+- takeScreenshot: 04-sabe-05-retirado
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- edit «ProjectApp»: a new version
+# cubre: TUR-15, TUR-17
 - scrollUntilVisible:
     element:
       text: 'Editar: ProjectApp'
     direction: DOWN
     timeout: 20000
     centerElement: true
+- assertVisible: 'Fundé ProjectApp en Medellín\.'
+- assertVisible: 'PROJECTAPP|ProjectApp'
 - tapOn: 'Editar: ProjectApp'
 - extendedWaitUntil:
     visible: 'Editar lo que sabe el equipo'
@@ -82,38 +114,12 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Guardado como v2'
     timeout: 20000
-- extendedWaitUntil:
-    visible: 'Fundé ProjectApp en Medellín en 2016\.'
-    timeout: 20000
-- assertVisible: '.* · v2'
-- takeScreenshot: 04-sabe-04-editado
-- extendedWaitUntil:
-    notVisible:
-      id: toast
-    timeout: 15000
-
-# ---------------------------------------------------------------- retire «preferencia.equipos»
+# The new version is now the newest fact: up to it.
 - scrollUntilVisible:
     element:
-      text: 'Retirar: preferencia.equipos'
-    direction: DOWN
+      text: 'Fundé ProjectApp en Medellín en 2016\.'
+    direction: UP
     timeout: 20000
     centerElement: true
-- tapOn: 'Retirar: preferencia.equipos'
-- extendedWaitUntil:
-    visible:
-      id: confirm-sheet
-    timeout: 15000
-- assertVisible: 'El equipo deja de usar «preferencia\.equipos» desde ahora\..*'
-- takeScreenshot: 04-sabe-05-retirar
-- tapOn:
-    text: 'Retirar'
-    childOf:
-      id: confirm-sheet
-- extendedWaitUntil:
-    visible: 'Retirado\. El equipo ya no lo usará'
-    timeout: 20000
-- extendedWaitUntil:
-    notVisible: 'Prefiero trabajar con equipos pequeños que deciden rápido\.'
-    timeout: 20000
-- takeScreenshot: 04-sabe-06-retirado
+- assertVisible: '.* · v2'
+- takeScreenshot: 04-sabe-06-editado

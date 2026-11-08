@@ -71,8 +71,14 @@ tags: [notificaciones]
 - extendedWaitUntil:
     visible: 'No se pudo actualizar'
     timeout: 30000
-- assertVisible: '.*Nueva'
 - takeScreenshot: 06-estados-03-no-se-pudo-actualizar
+# The rows stay under the two notices.
+- scrollUntilVisible:
+    element:
+      text: '.*Nueva'
+    direction: DOWN
+    timeout: 20000
+- runFlow: comun/notificaciones-arriba.yaml
 - runScript: comun/qa-fallos-limpiar.js
 - tapOn: 'Reintentar'
 - extendedWaitUntil:

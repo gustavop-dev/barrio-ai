@@ -47,7 +47,7 @@ tags: [turno]
 - assertVisible:
     text: 'NUEVA|Nueva'
     childOf:
-      id: 'turno-card-uncertain:b92961cc-9a71-5080-8e7f-65139a659c57'
+      id: 'turno-card-uncertain:b92961cc-9a71-5080-8e7f-65139a659c57-contenido'
 - assertVisible: 'Sí, se aplicó'
 - takeScreenshot: 04-turno-01-urgente
 # Its primary action «Sí, se aplicó» needs a note: the swipe opens the confirmation sheet and the card springs back.
@@ -212,7 +212,7 @@ tags: [turno]
     element:
       text: 'Más tarde'
       childOf:
-        id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
+        id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
     direction: DOWN
     timeout: 30000
     centerElement: true
@@ -220,7 +220,7 @@ tags: [turno]
 - tapOn:
     text: 'Más tarde'
     childOf:
-      id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
+      id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
 - extendedWaitUntil:
     visible: 'Pospuesta\. Vuelve el .*|Pospuesta 3 días'
     timeout: 20000
@@ -262,7 +262,7 @@ tags: [turno]
 - assertVisible:
     text: 'CADUCADA|Caducada'
     childOf:
-      id: 'turno-card-question:2917ba0c-b05b-5be2-b9fb-daf7e1a84885'
+      id: 'turno-card-question:2917ba0c-b05b-5be2-b9fb-daf7e1a84885-contenido'
 - assertVisible: 'Ya no es urgente, pero sigue siendo útil\.'
 - takeScreenshot: 04-turno-12-caducada
 

@@ -60,7 +60,7 @@ tags: [turno]
 - tapOn:
     text: 'Reanudar'
     childOf:
-      id: turno-card-machine_paused
+      id: turno-card-machine_paused-contenido
 - extendedWaitUntil:
     visible:
       id: confirm-sheet
@@ -92,14 +92,14 @@ tags: [turno]
     element:
       text: 'Responder con audio'
       childOf:
-        id: 'turno-card-question:3db4be49-1ddb-518e-bb02-794907c57c95'
+        id: 'turno-card-question:3db4be49-1ddb-518e-bb02-794907c57c95-contenido'
     direction: DOWN
     timeout: 30000
     centerElement: true
 - tapOn:
     text: 'Responder con audio'
     childOf:
-      id: 'turno-card-question:3db4be49-1ddb-518e-bb02-794907c57c95'
+      id: 'turno-card-question:3db4be49-1ddb-518e-bb02-794907c57c95-contenido'
 - extendedWaitUntil:
     visible:
       id: capture-sheet
@@ -220,14 +220,14 @@ tags: [turno]
     element:
       text: 'No quiero compartir esto'
       childOf:
-        id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
+        id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
     direction: DOWN
     timeout: 30000
     centerElement: true
 - tapOn:
     text: 'No quiero compartir esto'
     childOf:
-      id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056'
+      id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
 - extendedWaitUntil:
     visible:
       id: confirm-sheet
@@ -258,14 +258,14 @@ tags: [turno]
     element:
       text: 'Descartar'
       childOf:
-        id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
+        id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86-contenido'
     direction: UP
     timeout: 30000
     centerElement: true
 - tapOn:
     text: 'Descartar'
     childOf:
-      id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
+      id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86-contenido'
 - extendedWaitUntil:
     visible: 'Resumen descartado'
     timeout: 20000

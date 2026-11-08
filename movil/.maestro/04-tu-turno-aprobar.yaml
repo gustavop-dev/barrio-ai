@@ -39,12 +39,12 @@ tags: [turno]
 - assertVisible:
     text: 'Vetar'
     childOf:
-      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1'
+      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1-contenido'
 - takeScreenshot: 04-aprobar-01-tarjeta
 - tapOn:
     text: 'Aprobar'
     childOf:
-      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1'
+      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1-contenido'
 - extendedWaitUntil:
     visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
     timeout: 20000
