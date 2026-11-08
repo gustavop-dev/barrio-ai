@@ -82,7 +82,7 @@ tags: [galeria]
     when:
       true: ${output.interruptor}
     commands:
-      - evalScript: ${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'vacio', veces: 1})}).status}
+      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'vacio', veces: 1})}).status}"
       - tapOn:
           id: filtro-publicadas
       - extendedWaitUntil:
@@ -153,7 +153,7 @@ tags: [galeria]
     when:
       true: ${output.interruptor}
     commands:
-      - evalScript: ${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'lento', segundos: 15, veces: 2})}).status}
+      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'lento', segundos: 15, veces: 2})}).status}"
 - tapOn:
     id: photo-save
 - extendedWaitUntil:

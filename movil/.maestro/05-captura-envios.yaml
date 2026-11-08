@@ -259,7 +259,7 @@ onFlowComplete:
       - inputText: Nota de QA demasiado grande
       - tapOn: 'A[ñÑ]adir una imagen'
       # The next capture POST answers 413 (once).
-      - evalScript: ${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/capturas$', metodo: 'POST', efecto: '413', veces: 1})}).status}
+      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/capturas$', metodo: 'POST', efecto: '413', veces: 1})}).status}"
       - scrollUntilVisible:
           element:
             id: capture-send

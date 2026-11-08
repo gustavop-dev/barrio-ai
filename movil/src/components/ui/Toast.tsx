@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -38,9 +38,9 @@ export function useToast(): ToastApi {
 interface ToastHost {
   toast: ToastState | null;
   close: () => void;
-  register: (id: number) => () => void;
+  register: (id: string) => () => void;
   /** The outlet that draws the toast: the last one mounted, or none (the provider draws it in the app's window). */
-  top: number | null;
+  top: string | null;
 }
 
 const ToastHostContext = createContext<ToastHost | null>(null);
@@ -92,7 +92,7 @@ function ToastRegion({ toast, close, bottom }: { toast: ToastState | null; close
  */
 export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: { children: ReactNode; bottomOffset?: number }) {
   const [toast, setToast] = useState<ToastState | null>(null);
-  const [outlets, setOutlets] = useState<number[]>([]);
+  const [outlets, setOutlets] = useState<string[]>([]);
   const nextId = useRef(1);
   const insets = useSafeAreaInsets();
 
@@ -100,7 +100,7 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
   const show = useCallback((message: string, options: ToastOptions = {}) => {
     setToast({ id: nextId.current++, message, ...options });
   }, []);
-  const register = useCallback((id: number) => {
+  const register = useCallback((id: string) => {
     setOutlets((current) => [...current, id]);
     return () => setOutlets((current) => current.filter((outlet) => outlet !== id));
   }, []);
@@ -128,8 +128,6 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
   );
 }
 
-let outletIds = 0;
-
 /**
  * Where the toast is drawn while this outlet is the newest one mounted: inside a Modal's window (Sheet mounts one),
  * so a toast shown while a sheet is open («Envío deshecho.» in «Lo que enviaste», or the one that comes with a sheet
@@ -138,7 +136,7 @@ let outletIds = 0;
 export function ToastOutlet({ bottomOffset = 0 }: { bottomOffset?: number }) {
   const host = useContext(ToastHostContext);
   const insets = useSafeAreaInsets();
-  const [id] = useState(() => ++outletIds);
+  const id = useId();
   const register = host?.register;
   useEffect(() => register?.(id), [register, id]);
   if (!host || host.top !== id) return null;

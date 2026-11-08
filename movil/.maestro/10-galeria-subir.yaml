@@ -62,7 +62,7 @@ tags: [galeria]
     when:
       true: ${output.interruptor}
     commands:
-      - evalScript: ${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'POST', efecto: '413', veces: 1})}).status}
+      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'POST', efecto: '413', veces: 1})}).status}"
       - tapOn:
           id: gallery-upload
           waitToSettleTimeoutMs: 500
@@ -103,7 +103,7 @@ tags: [galeria]
     when:
       true: ${output.interruptor}
     commands:
-      - evalScript: ${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'vacio', veces: 1})}).status}
+      - evalScript: "${http.post('http://127.0.0.1:8787/api/v1/qa/fallos', {headers: {'Content-Type': 'application/json'}, body: JSON.stringify({ruta: '^/api/v1/galeria$', metodo: 'GET', efecto: 'vacio', veces: 1})}).status}"
       - swipe:
           start: "50%, 35%"
           end: "50%, 85%"
