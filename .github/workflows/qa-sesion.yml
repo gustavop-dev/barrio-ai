@@ -65,7 +65,7 @@ jobs:
       # CI-only account created by seed_qa; it never exists outside this job.
       QA_SEED: permitido
       QA_PASSWORD: qa-0ff1ce-solo-ci
-      QA_OUT: ${{ runner.temp }}/qa-sesion/backend
+      QA_OUT: /home/runner/work/_temp/qa-sesion/backend
       INFRA_DIR: ${{ github.workspace }}/agentes-linkedin/infra
       QA_SHARD: 'sesion'
       QA_FLOW_TIMEOUT: '480'
@@ -82,7 +82,7 @@ jobs:
       QA_SELECCION: ${{ inputs.flujos }}
       QA_SESION_CI: '1'
       QA_SESION_ROOT: ${{ github.workspace }}
-      QA_APK: ${{ runner.temp }}/qa-devclient/qa.apk
+      QA_APK: /home/runner/work/_temp/qa-devclient/qa.apk
       GH_TOKEN: ${{ github.token }}
       OFFICE_QA_BUILD: '1'
       EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
@@ -133,7 +133,7 @@ jobs:
         id: apk
         uses: actions/cache/restore@v4
         with:
-          path: ${{ runner.temp }}/qa-devclient
+          path: /home/runner/work/_temp/qa-devclient
           key: qa-devclient-${{ steps.native.outputs.fingerprint }}
       - if: steps.apk.outputs.cache-hit != 'true'
         uses: gradle/actions/setup-gradle@v4
@@ -156,7 +156,7 @@ jobs:
       - if: steps.apk.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
         with:
-          path: ${{ runner.temp }}/qa-devclient
+          path: /home/runner/work/_temp/qa-devclient
           key: ${{ steps.apk.outputs.cache-primary-key }}
       - name: Enable KVM
         run: |
