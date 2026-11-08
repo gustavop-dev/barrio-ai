@@ -399,7 +399,7 @@ export const officeLayout = {
 // Boards MovCaptura, MovHojas and MovMicro (diseno-movimiento/tableros): every value here is the
 // board's own, named after what it moves. (This block keeps its own imports so the shared header
 // above stays untouched by each motion area.)
-import { Keyframe, withTiming, type EntryExitAnimationFunction } from 'react-native-reanimated';
+import { Keyframe, type EntryExitAnimationFunction } from 'react-native-reanimated';
 
 /** withSpring config of any spring token (not only the named `springs`), honouring reduced motion. */
 export function springWith(token: SpringToken): WithSpringConfig {
