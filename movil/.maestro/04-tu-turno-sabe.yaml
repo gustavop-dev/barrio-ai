@@ -104,6 +104,11 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Editar lo que sabe el equipo'
     timeout: 15000
+# A tap leaves the cursor under the finger, mid-text: erase what is before it, then tap again (the rest is short, so
+# the cursor lands at its end) and erase that too.
+- tapOn:
+    id: hecho-texto
+- eraseText: 60
 - tapOn:
     id: hecho-texto
 - eraseText: 60
