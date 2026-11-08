@@ -7,11 +7,15 @@ resultado.txt ('ok' or 'fallo'), and prints the Markdown summary (job summary an
 """
 import gzip
 import html
+import json
 import os
 import re
 import sys
 import xml.etree.ElementTree as ET
 from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import cobertura  # noqa: E402  (scripts/qa/cobertura.py)
 
 APP = 'co.projectapp.office'
 # threadtime: "11-07 21:03:04.123  1234  1250 E ReactNativeJS: message"
@@ -134,17 +138,44 @@ def write_html(out, flows, logcat, api):
         links = ' · '.join(f'<a href="videos/{html.escape(v)}">{html.escape(v)}</a>' for v in vids)
         return f'<h2>{html.escape(prefix)}</h2><p>Video: {links or "—"}</p><div class="g">{figs or "<p>Sin capturas.</p>"}</div>'
     body = ''.join(gallery(f['name']) for f in flows)
+    visual = out / 'visual' / 'resultado.json'
+    if visual.exists():
+        changed = json.loads(visual.read_text()).get('cambian', [])
+        figs = ''.join(f'<figure class="w"><a href="visual/{html.escape(c["captura"])}.png"><img loading="lazy" src="visual/{html.escape(c["captura"])}.png"></a>'
+                       f'<figcaption>{html.escape(c["captura"])}: {c["cambio"] * 100:.1f} % (tolerancia {c["tolerancia"] * 100:.1f} %) · antes · después · diferencias</figcaption></figure>' for c in changed)
+        body = f'<h2>Regresión visual</h2>{figs or "<p>Ninguna captura cambia más de su tolerancia.</p>"}' + body
     crash = '<p class="ko">Crash de la app:</p><pre>' + html.escape('\n'.join(logcat['crashes'])) + '</pre>' if logcat['crash'] else '<p>Sin crashes en logcat.</p>'
     page = f"""<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>QA móvil</title><style>
 body{{font:15px/1.45 system-ui,sans-serif;margin:16px;color:#1d1d1b;background:#f7f6f0}}table{{border-collapse:collapse;width:100%}}
 td,th{{border:1px solid #ccc;padding:4px 8px;vertical-align:top;text-align:left}}tr.ok td:nth-child(2){{color:#00715e}}tr.ko td:nth-child(2),.ko{{color:#b3261e;font-weight:700}}
 pre{{white-space:pre-wrap;margin:0;font-size:12px}}.g{{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}}
-figure{{margin:0}}img{{width:100%;border:1px solid #ccc}}figcaption{{font-size:12px;word-break:break-all}}</style>
+figure{{margin:0}}figure.w{{max-width:1200px;margin-bottom:16px}}img{{width:100%;border:1px solid #ccc}}figcaption{{font-size:12px;word-break:break-all}}</style>
 <h1>QA móvil</h1><table><tr><th>Flujo</th><th>Resultado</th><th>Duración</th><th>Cubre</th><th>Fallo</th></tr>{rows}</table>
 {crash}<p>Errores de ReactNativeJS en logcat: {logcat['js_errors']} · API: {api['5xx']} respuestas 5xx, {api['429']} respuestas 429, {api['traceback']} tracebacks.</p>
 {body}</html>"""
     (out / 'informe.html').write_text(page)
+
+
+def visual_section(out):
+    """Markdown of scripts/qa/visual.py's result (visual/resultado.json), when it ran."""
+    path = out / 'visual' / 'resultado.json'
+    if not path.exists():
+        return []
+    data = json.loads(path.read_text())
+    lines = ['', '### Regresión visual', '']
+    if data.get('sin_referencia'):
+        return lines + ['Todavía no hay referencia de main con la que comparar: la próxima ejecución en main la crea.']
+    origin = f" ({data['referencia']})" if data.get('referencia') else ''
+    changed = data.get('cambian', [])
+    lines.append(f"{'⚠️ ' if changed else ''}**{len(changed)} de {data.get('comparadas', 0)} capturas cambian** más de su tolerancia "
+                 f"frente a la referencia de main{origin}; nuevas sin referencia: {len(data.get('nuevas', []))}.")
+    for item in changed[:25]:
+        lines.append(f"- `{item['captura']}`: {item['cambio'] * 100:.1f} % (tolerancia {item['tolerancia'] * 100:.1f} %), "
+                     f"antes · después · diferencias en `visual/{item['captura']}.png`")
+    if len(changed) > 25:
+        lines.append(f'- … y {len(changed) - 25} más en `visual/`.')
+    return lines
 
 
 def main():
@@ -167,12 +198,15 @@ def main():
         lines.append(f"| `{f['name']}` | {'✅ pasa' if f['ok'] else '❌ falla'} | {f['seconds']} s | {', '.join(f['covers'])} | {reason} |")
     if not flows:
         lines.append('| — | no se ejecutó ningún flujo | — | — | — |')
-    good = sorted({i for f in flows if f['ok'] for i in f['covers']})
-    bad = sorted({i for f in flows if not f['ok'] for i in f['covers']})
-    if flows:
-        lines += ['', f"**Funciones del catálogo (`docs/funcionalidades/`) cubiertas: {len(set(good) | set(bad))}**",
-                  f"- en flujos que pasan ({len(good)}): {', '.join(good) or '—'}",
-                  f"- en flujos que fallan ({len(bad)}): {', '.join(bad) or '—'}"]
+    try:
+        lines += ['', '### Cobertura del catálogo', '', cobertura.markdown(cobertura.summary([f['name'] for f in flows if f['ok']]))]
+    except Exception as exc:  # the report never fails for the coverage count
+        lines += ['', f'No se pudo calcular la cobertura del catálogo: {exc}']
+    lines += visual_section(out)
+    selftest = out / 'autoprueba-fallos.txt'
+    if selftest.exists() and selftest.read_text().strip() != 'ok':
+        lines += ['', '⚠️ El interruptor de fallos de QA no respondió desde Maestro (`maestro/autoprueba-fallos.log`): '
+                  'los flujos que simulan errores no son fiables en esta ejecución.']
     if logcat['crash']:
         lines += ['', '<details><summary>Crash en logcat</summary>', '', '```', *logcat['crashes'][:10], '```', '</details>']
     if not logcat['present']:
