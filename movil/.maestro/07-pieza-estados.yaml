@@ -300,8 +300,8 @@ tags: [calendario]
     centerElement: true
     timeout: 15000
 - assertVisible: "QUIÉN COMENTÓ"
-- assertVisible: "Comprador · 1"
-- assertVisible: "Par · 1"
+- assertVisible: "COMPRADOR · 1"
+- assertVisible: "PAR · 1"
 - takeScreenshot: 07-pieza-estados-09-quien-comento
 - scrollUntilVisible:
     element:
