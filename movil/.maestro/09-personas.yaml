@@ -288,8 +288,16 @@ tags: [personas]
 - assertNotVisible: "Pedro Salazar"
 - takeScreenshot: 09-personas-12-compradores
 # A card opened right after a sheet closed: every block must show, not only the header (its blocks used to fade in with
-# Reanimated `entering`, which after a Modal closes can stay at opacity 0; run 42486187324, 14-fichas).
-- tapOn: "Laura Gómez"
+# Reanimated `entering`, which after a Modal closes can stay at opacity 0; run 42486187324, 14-fichas). Her row is
+# centred first: near the bottom, a tap lands on the floating capture button.
+- scrollUntilVisible:
+    element:
+      id: person-547cd492-cd91-542a-976e-3a1f11029285
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: person-547cd492-cd91-542a-976e-3a1f11029285
 - extendedWaitUntil:
     visible:
       id: persona-name
