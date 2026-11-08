@@ -276,7 +276,9 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: Capture
   const hasContent = !empty;
 
   const close = () => {
-    if (view === 'form' && hasContent && !sending) {
+    // While the send is on its way the sheet stays: closed, its result (the toast or the error) would be lost (CAP-14).
+    if (sending) return;
+    if (view === 'form' && hasContent) {
       setConfirmClose(true);
       return;
     }
@@ -396,7 +398,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: Capture
           <button type="button" className="cap-histlink" onClick={() => setView('history')}>
             Lo que enviaste{count !== null ? ` · ${count}` : ''}
           </button>
-          <button type="button" className="cap-close" aria-label="Cerrar sin guardar" onClick={close}>
+          <button type="button" className="cap-close" aria-label="Cerrar sin enviar" onClick={close}>
             <IconCerrar size={22} />
           </button>
         </div>

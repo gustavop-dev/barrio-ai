@@ -130,6 +130,13 @@ export function CaptureButton() {
   const toast = useToast();
   const recorder = useRecorder();
   const used = useCaptureUsed();
+  // The first-use hint covers what is behind it: it goes away by itself (and for good after the first use).
+  const [hintUp, setHintUp] = useState(true);
+  useEffect(() => {
+    if (used) return;
+    const timer = setTimeout(() => setHintUp(false), captureMotion.hintMs);
+    return () => clearTimeout(timer);
+  }, [used]);
   const sheet = useCaptureSheet();
   const sentCount = useCaptureSentCount();
   const insets = useSafeAreaInsets();
@@ -345,7 +352,7 @@ export function CaptureButton() {
 
   return (
     <View style={styles.slot} onLayout={(event) => setSlot({ x: event.nativeEvent.layout.x, width: event.nativeEvent.layout.width })}>
-      {!used && !holding ? (
+      {!used && !holding && hintUp ? (
         <View style={styles.hint} pointerEvents="none">
           <T variant="detalle" color={colors.paper} center>
             Mantén oprimido para grabar. Toca para foto o nota.
