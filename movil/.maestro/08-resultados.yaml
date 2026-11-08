@@ -75,9 +75,10 @@ tags: [resultados]
     timeout: 10000
 
 # «Usar como orientación»: the toast offers «Deshacer» for 5 s and the card already says it was used; undo at once.
-# Keep tap settling short and check the toast's message in the undo selector, avoiding a separate hierarchy read
-# before the deadline. «Deshecho» lasts 4 s and may be missed by Maestro; both enabled buttons returning and the
-# decided sentence disappearing are mandatory, so a missed/expired undo still fails.
+# Let the decision taps settle normally and shorten settling only for «Deshacer». Match the visible decision text
+# directly, as before, without depending on the partly off-screen summary wrapper. Check the toast's message in the
+# undo selector, avoiding a separate hierarchy read before the deadline. «Deshecho» lasts 4 s and may be missed by
+# Maestro; both enabled buttons returning and the decided sentence disappearing are mandatory.
 - scrollUntilVisible:
     element:
       id: resumen-usar
@@ -86,12 +87,10 @@ tags: [resultados]
     timeout: 20000
 - tapOn:
     id: resumen-usar
-    waitToSettleTimeoutMs: 300
+    enabled: true
 - extendedWaitUntil:
     visible:
       text: "La usaste como orientación del equipo.*"
-      childOf:
-        id: resumen-semanal
     timeout: 15000
 - tapOn:
     text: "Deshacer"
@@ -122,12 +121,10 @@ tags: [resultados]
 # «Descartar», then «Deshacer».
 - tapOn:
     id: resumen-descartar
-    waitToSettleTimeoutMs: 300
+    enabled: true
 - extendedWaitUntil:
     visible:
       text: "La descartaste.*"
-      childOf:
-        id: resumen-semanal
     timeout: 15000
 - tapOn:
     text: "Deshacer"
