@@ -34,6 +34,7 @@ env:
   APK_CACHE_VERSION: v1
   API_LEVEL: 35
   MAESTRO_VERSION: 2.12.0
+  UV_VERSION: 0.13.7
 jobs:
   plan:
     runs-on: ubuntu-24.04
@@ -198,13 +199,22 @@ jobs:
 
       # ---------------------------------------------------------------- demo backend of this emulator
       - uses: astral-sh/setup-uv@v6
+        id: uv
+        continue-on-error: true
         with:
+          version: ${{ env.UV_VERSION }}
           python-version: '3.12'
           enable-cache: true
           cache-dependency-glob: agentes-linkedin/infra/uv.lock
           # The demo backend keeps a uv process alive until the job ends; pruning
           # would wait 300 s for its lock and fail the job (run 42459989978).
           prune-cache: false
+      # GitHub release downloads answered 504 (run on PR #54): fall back to uv from PyPI.
+      - name: uv fallback (PyPI)
+        if: steps.uv.outcome == 'failure'
+        run: |
+          python3 -m pip install --user --break-system-packages "uv==${{ env.UV_VERSION }}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Backend · migrate, bootstrap_local, seed_qa
         working-directory: agentes-linkedin/infra
         run: |
@@ -240,10 +250,47 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # Maestro, pinned and cached. get.maestro.mobile.dev answered 504 and handed back a corrupt zip
+      # while the step still passed, so every flow died with exit 127 (runs 42463814844, 42466035998).
+      - name: Maestro cache
+        id: maestro
+        uses: actions/cache/restore@v4
+        with:
+          path: ~/.maestro
+          key: maestro-${{ env.MAESTRO_VERSION }}
       - name: Maestro
         run: |
-          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          if ! "$HOME/.maestro/bin/maestro" --version > /dev/null 2>&1; then
+            rm -rf "$HOME/.maestro" /tmp/maestro-zip && mkdir -p /tmp/maestro-zip
+            url="https://github.com/mobile-dev-inc/maestro/releases/download/cli-${MAESTRO_VERSION}/maestro.zip"
+            for i in 1 2 3 4 5; do
+              if curl -fsSL --retry 3 --retry-all-errors -o /tmp/maestro-zip/maestro.zip "$url" \
+                 && unzip -tq /tmp/maestro-zip/maestro.zip > /dev/null; then
+                break
+              fi
+              echo "::warning::Maestro download attempt $i failed; retrying"
+              sleep $((i * 10))
+            done
+            if unzip -tq /tmp/maestro-zip/maestro.zip > /dev/null 2>&1; then
+              unzip -q /tmp/maestro-zip/maestro.zip -d /tmp/maestro-zip
+              mv /tmp/maestro-zip/maestro "$HOME/.maestro"
+            else
+              echo "::warning::GitHub release download failed; trying get.maestro.mobile.dev"
+              for i in 1 2 3; do
+                curl -fsSL --retry 3 "https://get.maestro.mobile.dev" | bash && "$HOME/.maestro/bin/maestro" --version > /dev/null 2>&1 && break
+                sleep $((i * 15))
+              done
+            fi
+          fi
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+          "$HOME/.maestro/bin/maestro" --version
+      - name: Save Maestro cache
+        if: steps.maestro.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        continue-on-error: true
+        with:
+          path: ~/.maestro
+          key: maestro-${{ env.MAESTRO_VERSION }}
       # Restore and save apart: actions/cache only saves when the whole job succeeds, and this job fails on purpose
       # when a flow fails, so the AVD snapshot would never be kept.
       - name: AVD cache
@@ -354,7 +401,17 @@ jobs:
           done
           echo "referencia: $(cat referencias/origen.txt 2> /dev/null || echo ninguna) · $(ls referencias/*.png 2> /dev/null | wc -l) capturas"
       - uses: astral-sh/setup-uv@v6
+        id: uv
         if: needs.plan.outputs.ejecutar == 'true'
+        continue-on-error: true
+        with:
+          version: ${{ env.UV_VERSION }}
+      # GitHub release downloads answered 504 (run on PR #54): fall back to uv from PyPI.
+      - name: uv fallback (PyPI)
+        if: steps.uv.outcome == 'failure' && needs.plan.outputs.ejecutar == 'true'
+        run: |
+          python3 -m pip install --user --break-system-packages "uv==${{ env.UV_VERSION }}"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
       - name: Visual regression
         if: needs.plan.outputs.ejecutar == 'true'
         run: uv run --no-project --with pillow==11.3.0 python scripts/qa/visual.py comparar "$QA_OUT" referencias || echo "La comparación visual no pudo correr."
