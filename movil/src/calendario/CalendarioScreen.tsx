@@ -157,7 +157,8 @@ export function CalendarioScreen() {
         setGridBottom(Math.max(0, y + height));
         return;
       }
-      const target = Math.max(0, scrollY.current + y);
+      // A small gap above the strip, so its cells' edge is not flush with the top bar.
+      const target = Math.max(0, scrollY.current + y - space[2]);
       const reachable = Math.max(0, contentHeight.current - (screenHeight ?? 0));
       const landed = Math.min(target, reachable);
       setGridBottom(Math.max(0, y + height - (landed - scrollY.current)));

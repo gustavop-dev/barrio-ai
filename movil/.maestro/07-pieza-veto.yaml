@@ -156,7 +156,8 @@ tags: [calendario]
     text: "Vetar"
     childOf:
       id: confirm-sheet
-# «Vetada» with «Deshacer» for 5 s: undo at once (no screenshot in between, the window is short on the emulator).
+# «Vetada» with «Deshacer» for 5 s: undo at once (one quick screenshot of the toast, the window is short).
+- takeScreenshot: 07-pieza-veto-04b-aviso-vetada
 - extendedWaitUntil:
     visible: "Deshacer"
     timeout: 5000
