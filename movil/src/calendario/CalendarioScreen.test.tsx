@@ -102,7 +102,7 @@ describe('Calendario · semana', () => {
     expect(within(tuParte).getByText('Responde: ¿En qué idioma van tus textos públicos?')).toBeOnTheScreen();
     expect(within(tuParte).getByText('Plazo: 17:00')).toBeOnTheScreen();
     await fireEvent.press(within(tuParte).getByText('Ir a Tu turno'));
-    expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/tu-turno', params: {} });
+    expect(expoRouter.router.navigate).toHaveBeenCalledWith({ pathname: '/tu-turno', params: {} });
 
     const publication = within(day).getByTestId('bloque-publicacion');
     expect(within(publication).getByText('Scope features from the decision they support.')).toBeOnTheScreen();
@@ -205,7 +205,7 @@ describe('Calendario · semana', () => {
     expect(within(uncertain).getByText('Comentario: no se sabe si salió')).toBeOnTheScreen();
     expect(within(uncertain).getByText('Incierta')).toBeOnTheScreen();
     await fireEvent.press(within(uncertain).getByText('Resuélvela en Tu turno'));
-    expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-prop-9' } });
+    expect(expoRouter.router.navigate).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-prop-9' } });
 
     await fireEvent.press(screen.getByLabelText('Semana siguiente'));
     expect(lastParams()).toMatchObject({ fecha: '2026-11-13' });
@@ -397,7 +397,7 @@ describe('Calendario · lista', () => {
     const uncertain = within(list).getByTestId('actividad-i-4');
     expect(within(uncertain).getByText('Incierta')).toBeOnTheScreen();
     await fireEvent.press(within(uncertain).getByText('Resuélvela en Tu turno'));
-    expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-i-4' } });
+    expect(expoRouter.router.navigate).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-i-4' } });
     await fireEvent.press(within(list).getByText('Ver la pieza'));
     expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/calendario/pieza/p5', params: {} });
 

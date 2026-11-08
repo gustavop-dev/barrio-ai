@@ -5,13 +5,17 @@
 // so a fake XMLHttpRequest is installed too. It hands each request to the same fetch mock (tests that
 // hold a request with `fetch.mockImplementationOnce` hold an upload as well) and records `via: 'xhr'`.
 // A route can answer `{ networkError: 'reason' }`: fetch rejects with a TypeError and the XHR fires
-// `error` with that reason in `responseText`, as React Native's does.
+// `error` with that reason in `responseText`, as React Native's does. `{ fetchError: 'reason' }` is what
+// the phone really does without a connection since `expo/fetch` became the global fetch: it rejects with
+// expo's FetchError, a plain Error whose message is «fetch failed: <reason>» (not a TypeError).
 
 export interface FakeReply {
   status?: number;
   body?: unknown;
   /** No HTTP answer: the request fails on the phone with this native reason. */
   networkError?: string;
+  /** No HTTP answer, as expo/fetch fails on the phone: a FetchError («fetch failed: <reason>»). */
+  fetchError?: string;
 }
 
 export type FakeHandler = FakeReply | ((request: SentRequest) => FakeReply);
@@ -42,8 +46,16 @@ class FakeNetworkError extends TypeError {
   }
 }
 
-function reply({ status = 200, body = null, networkError }: FakeReply): FakeResponse {
+/** expo/src/winter/fetch/FetchErrors.ts: `class FetchError extends Error`, message «fetch failed: …». */
+class FakeFetchError extends Error {
+  constructor(reason: string) {
+    super(`fetch failed: ${reason}`);
+  }
+}
+
+function reply({ status = 200, body = null, networkError, fetchError }: FakeReply, via: 'fetch' | 'xhr' = 'fetch'): FakeResponse {
   if (networkError !== undefined) throw new FakeNetworkError(networkError);
+  if (fetchError !== undefined) throw via === 'xhr' ? new FakeNetworkError(fetchError) : new FakeFetchError(fetchError);
   const text = body === null || body === undefined || status === 204 ? '' : JSON.stringify(body);
   return {
     ok: status >= 200 && status < 300,
@@ -151,7 +163,7 @@ export function fakeServer(routes: Record<string, FakeHandler> = {}) {
     const pathOnly = path.split('?')[0];
     const handler = table.get(`${method} ${path}`) ?? table.get(`${method} ${pathOnly}`);
     if (!handler) return reply({ status: 404, body: { detail: `Sin ruta de prueba para ${method} ${path}` } });
-    return reply(typeof handler === 'function' ? handler(sent) : handler);
+    return reply(typeof handler === 'function' ? handler(sent) : handler, sent.via);
   });
   (globalThis as unknown as { fetch: unknown }).fetch = fetchMock;
   (globalThis as unknown as { XMLHttpRequest: unknown }).XMLHttpRequest = FakeXMLHttpRequest;

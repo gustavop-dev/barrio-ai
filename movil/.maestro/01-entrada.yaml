@@ -1,9 +1,15 @@
-# cubre: ACC-02, ACC-10, APP-01, APP-02
-# Login: a wrong password shows the error; the right one plays the entrance and lands in Oficina.
+# cubre: ACC-02, ACC-05, ACC-06, ACC-10, APP-01, APP-02, APP-08
+# Login and the session on the phone: the login screen; the keyboard does not cover the password; offline, the message
+# in Spanish; the wrong password and the right one; the entrance into the Oficina; opening the app again stays inside
+# (offline and with the server failing: 02-navegacion); and a session closed from another device goes back to the login.
 appId: co.projectapp.office
 name: Entrada
 tags: [entrada]
+onFlowComplete:
+  # Never leave the emulator offline for the next flow, even when a step failed.
+  - setAirplaneMode: disabled
 ---
+- setAirplaneMode: disabled
 - launchApp:
     clearState: true
     permissions:
@@ -18,23 +24,65 @@ tags: [entrada]
     visible:
       id: login
     timeout: 60000
+
+# ---------------------------------------------------------------- the login screen
+# cubre: ACC-02.1 — the door, the logo, «Entrar», the hint, the fields with «Mostrar la contraseña» and the device note
 - assertVisible: Entrar
+- assertVisible: "La oficina de agentes de IA que trabaja tu LinkedIn\\."
+- assertVisible: "Usa tu usuario y contraseña de Django\\."
+- assertVisible:
+    id: login-usuario
+- assertVisible: Mostrar la contraseña
 - takeScreenshot: 01-entrada-01-pantalla
-# cubre: ACC-02 (login de la app)
+# cubre: ACC-02.5 — with the fields empty, «Entrar» is disabled
+- scrollUntilVisible:
+    element: "Este teléfono queda como un dispositivo de tu cuenta\\. Puedes cerrarlo desde Ajustes\\."
+    direction: DOWN
+- assertVisible:
+    id: login-entrar
+    enabled: false
+
+# ---------------------------------------------------------------- the keyboard must not cover the form (390x844)
+# Regression: the keyboard covered «Usuario» and «Contraseña» and the form did not scroll them into view. With the
+# keyboard still open, a tap on «Contraseña» must land on the field: it used to land on the keyboard and type into
+# «Usuario».
 - tapOn:
     id: login-usuario
 - inputText: ${QA_USER}
 - takeScreenshot: 01-entrada-02-teclado
-# The keyboard covers the password field at 390x844: close it and scroll to the field.
-- hideKeyboard
-- scrollUntilVisible:
-    element:
-      id: login-clave
-    direction: DOWN
 - tapOn:
     id: login-clave
 - inputText: clave-equivocada
+- assertVisible:
+    id: login-usuario
+    text: ${QA_USER}
+- takeScreenshot: 01-entrada-03-teclado-clave
 - hideKeyboard
+
+# ---------------------------------------------------------------- no connection: the message in Spanish
+# cubre: ACC-02.4, APP-08.3 — never «fetch failed: …» (expo/fetch's English error)
+- setAirplaneMode: enabled
+- scrollUntilVisible:
+    element:
+      id: login-entrar
+    direction: DOWN
+- tapOn:
+    id: login-entrar
+- extendedWaitUntil:
+    visible: "No pudimos conectar con la oficina\\. Revisa tu conexión e intenta de nuevo\\."
+    timeout: 30000
+- assertNotVisible: ".*fetch failed.*"
+- assertNotVisible: ".*Network request failed.*"
+- takeScreenshot: 01-entrada-04-sin-conexion
+- setAirplaneMode: disabled
+# Give Android a few seconds to bring the network back (an optional wait for something that never shows).
+- extendedWaitUntil:
+    visible: "__la-red-vuelve__"
+    timeout: 10000
+    optional: true
+
+# ---------------------------------------------------------------- wrong password
+# cubre: ACC-02.3
 - scrollUntilVisible:
     element:
       id: login-entrar
@@ -43,8 +91,10 @@ tags: [entrada]
     id: login-entrar
 - extendedWaitUntil:
     visible: Usuario o contraseña incorrectos.
-    timeout: 20000
-- takeScreenshot: 01-entrada-03-clave-equivocada
+    timeout: 30000
+- takeScreenshot: 01-entrada-05-clave-equivocada
+
+# ---------------------------------------------------------------- the right one, and the entrance
 # Show the password, then type the right one.
 - scrollUntilVisible:
     element: Mostrar la contraseña
@@ -56,16 +106,15 @@ tags: [entrada]
 - eraseText: 40
 - inputText: ${QA_PASSWORD}
 - hideKeyboard
-- takeScreenshot: 01-entrada-04-clave-visible
+- takeScreenshot: 01-entrada-06-clave-visible
 - scrollUntilVisible:
     element:
       id: login-entrar
     direction: DOWN
+# cubre: ACC-02.2, ACC-10.1 — the door opens, the picture zooms in and fades into the live Oficina, mounted underneath
 - tapOn:
     id: login-entrar
-# The entrance: the door opens and the picture zooms into the live Oficina.
-# cubre: ACC-10
-- takeScreenshot: 01-entrada-05-puerta
+- takeScreenshot: 01-entrada-07-puerta
 - extendedWaitUntil:
     visible:
       id: screen-oficina
@@ -76,4 +125,36 @@ tags: [entrada]
     timeout: 20000
 - assertVisible:
     id: tab-index
-- takeScreenshot: 01-entrada-06-oficina
+    selected: true
+- takeScreenshot: 01-entrada-08-oficina
+
+# ---------------------------------------------------------------- opening the app again keeps the session
+# cubre: ACC-06.1, ACC-10.3 — straight into the Oficina: no login and no entrance
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "login|screen-oficina"
+    timeout: 45000
+- assertNotVisible:
+    id: login
+- assertVisible:
+    id: screen-oficina
+
+# ---------------------------------------------------------------- the session closed from another device
+# cubre: ACC-05.4 — another device closes this phone's session (DELETE /auth/dispositivos/<id>); the next request of the
+# app gets a 401, the app forgets its token and shows the login
+- runScript:
+    file: comun/qa-api.js
+    env:
+      ACCION: cerrar-este-telefono
+      QA_USER: ${QA_USER}
+      QA_PASSWORD: ${QA_PASSWORD}
+- tapOn:
+    id: tab-resultados
+- extendedWaitUntil:
+    visible:
+      id: login
+    timeout: 60000
+- assertVisible: Entrar
+- takeScreenshot: 01-entrada-09-sesion-cerrada

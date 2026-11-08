@@ -304,3 +304,15 @@ class PersonasAndCalendarTests(OperatorBase):
         expected=[e for d in body['days'] for e in d['events'] if e['kind']=='invite_expected']
         self.assertEqual(expected[0]['people'][0]['name'],'Ana Founder');self.assertFalse(expected[0]['important'])
         self.assertEqual(self.human.get('/api/v1/calendario?desde=2026-01-01&hasta=2026-12-31').status_code,400)
+
+
+class LeadEventTests(LeadBase):
+    """OFI-03: the lead's review moves the scene: an approved comment goes from Relaciones to Operación."""
+
+    def test_an_approved_comment_is_handed_to_operations(self):
+        from team_backend.models import AuditEvent
+        proposal=autopiloto.policy_review(self.agent_comment());proposal.refresh_from_db()
+        self.assertEqual(proposal.state,'approved')
+        last=AuditEvent.objects.filter(action='office.event').order_by('-created_at','-id').first()
+        self.assertEqual((last.metadata['tipo'],last.metadata['rol'],last.metadata['destino'],last.metadata['detalle']),
+                         ('entrega','relaciones_comunidad','operador_cuenta','Comentario aprobado por el líder'))

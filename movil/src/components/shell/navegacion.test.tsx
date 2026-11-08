@@ -5,7 +5,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
-import { Dimensions, Text } from 'react-native';
+import { Animated, Dimensions, Text } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import '@/api/transport';
@@ -237,6 +237,35 @@ describe('tab content and the top-bar push (MovNavegacion)', () => {
     for (const role of ['enter', 'leave'] as const) {
       expect(tabSceneOptions('push', role, 1, 390, false).transitionSpec).toEqual({ animation: 'spring', config: { ...FIRM } });
       expect(tabSceneOptions('pop', role, 1, 390, false).transitionSpec).toEqual({ animation: 'spring', config: { ...FIRM } });
+    }
+  });
+
+  // Back from Calendario to Notificaciones left a blank screen on the phone (QA run 42451843664, 02-navegacion): a scene
+  // that was idle (faded out by its opacity) came back with the push, whose style had no opacity, and kept the stale 0
+  // the native driver had set. Every animated scene now sets the same props, so a role change rewrites all of them.
+  it('gives every animated scene the same props (opacity, translateX, translateY), all at rest when shown', () => {
+    // Rounded, and -0 counted as 0.
+    const value = (node: unknown) => Math.round((typeof node === 'number' ? node : (node as { __getValue: () => number }).__getValue()) * 1000) / 1000 + 0;
+    for (const move of ['fade', 'push', 'pop'] as const) {
+      for (const role of ['enter', 'leave', 'idle'] as const) {
+        for (const side of [1, -1] as const) {
+          const options = tabSceneOptions(move, role, side, 390, false);
+          for (const at of [0, side]) {
+            const progress = new Animated.Value(at);
+            const { sceneStyle } = options.sceneStyleInterpolator!({ current: { progress } } as never) as unknown as {
+              sceneStyle: { opacity: unknown; transform: Record<string, unknown>[] };
+            };
+            const label = `${move} ${role} ${side} at ${at}`;
+            expect(sceneStyle.transform.map((step) => Object.keys(step)[0])).toEqual(['translateX', 'translateY']);
+            expect(sceneStyle.opacity).toBeDefined();
+            if (at === 0) {
+              // Shown: opaque and in place, whatever its part in the change.
+              expect([label, value(sceneStyle.opacity)]).toEqual([label, 1]);
+              expect([label, value(sceneStyle.transform[0]!.translateX), value(sceneStyle.transform[1]!.translateY)]).toEqual([label, 0, 0]);
+            }
+          }
+        }
+      }
     }
   });
 

@@ -105,7 +105,9 @@ def scan(text, app, errors, crashes):
         m = LINE.match(line)
         pid, level, tag = (m.group(1), m.group(3), m.group(4)) if m else (None, None, '')
         mine = pid in pids or APP in line
-        crash = bool(CRASH.search(line)) and (mine or 'FATAL EXCEPTION' in line or 'Fatal signal' in line)
+        # A native crash («Fatal signal») counts only in the app's process: airplane mode (01 and 02 go offline) makes the
+        # emulator's own Bluetooth stack abort («pid 1070 (droid.bluetooth)»), which is not the app.
+        crash = bool(CRASH.search(line)) and (mine or 'FATAL EXCEPTION' in line)
         if crash:
             crashes.append(line)
         if mine or tag in ('ReactNativeJS', 'ReactNative'):

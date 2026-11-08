@@ -87,6 +87,7 @@ describe('Notificaciones', () => {
     await fireEvent.press(await screen.findByTestId('notif-n-fuera'));
     await waitFor(() => expect(api.find('POST', '/api/v1/notificaciones/leer')).toHaveLength(1));
     expect(router.push).not.toHaveBeenCalled();
+    expect(router.navigate).not.toHaveBeenCalled();
   });
 
   it('marks everything read at once and the bell dot follows', async () => {

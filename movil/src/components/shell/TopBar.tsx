@@ -214,7 +214,7 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
           })}
         </View>
       </View>
-      <PauseBanner open={back ? open : undefined} />
+      <PauseBanner open={open} />
       <OfflineStrip />
     </View>
   );

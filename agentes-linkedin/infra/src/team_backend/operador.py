@@ -612,12 +612,15 @@ def propose_comment(user,post_id,origin_job=''):
 NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','plan_network':'plan','sync_network':'sync'}
 
 def run_job(job):
-    """Returns (job_state, result_status, safe_error). Known failures carry our own messages."""
+    """Returns (job_state, result_status, safe_error). Known failures carry our own messages. Background jobs that produced
+    something tell the office scene (oficina_eventos.job_done)."""
+    from . import oficina_eventos
     params=job.params or {};user=job.owner
     try:
         if job.kind=='observe':
             account=ConnectorAccount.objects.get(id=params['account'])
             summary=observe(user,account,params.get('referents'),int(params.get('limit',5)))
+            oficina_eventos.job_done(job.kind,summary)
             return 'complete',f'observed:{summary["new_posts"]}+{summary["seen_posts"]}','; '.join(e['error'] for e in summary['errors'])
         if job.kind=='propose_comment':
             proposal=propose_comment(user,params['post'],origin_job=str(job.id))
@@ -631,6 +634,7 @@ def run_job(job):
             from . import red
             account=ConnectorAccount.objects.get(id=params['account'])
             r=getattr(red,NETWORK_JOBS[job.kind])(user,account)
+            oficina_eventos.job_done(job.kind,r)
             status={'discover_network':lambda:f"nuevos:{r['new']}",'classify_contacts':lambda:f"encajan:{r['fit']}/{r['classified']}",
                     'plan_network':lambda:f"seg:{r['follow']} inv:{r['invite']} acep:{r['accept']}",
                     'sync_network':lambda:f"recibidas:{r['received']} conexiones:{r['connected']}"}[job.kind]()
@@ -648,10 +652,12 @@ def run_job(job):
         if job.kind=='collect_metrics':
             from . import metricas
             r=metricas.collect(user,ConnectorAccount.objects.get(id=params['account']))
+            oficina_eventos.job_done(job.kind,r)
             return 'complete',f"cortes:{r['captured']} audiencia:{r['audience']}"[:30],r['stopped']
         if job.kind=='read_inbox':
             from . import conversaciones
             r=conversaciones.read_inbox(user,ConnectorAccount.objects.get(id=params['account']))
+            oficina_eventos.job_done(job.kind,r)
             return 'complete',f"chats:{r['chats']} leidos:{r['read']} te tocan:{r['flagged']}"[:30],r['stopped']
         if job.kind=='weekly_summary':
             from datetime import date
