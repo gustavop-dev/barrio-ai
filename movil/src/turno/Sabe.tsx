@@ -81,8 +81,8 @@ function FactSheet({ fact, onClose }: { fact: MemoryFact | null; onClose: () => 
           {fact.topic || fact.key}
         </T>
       ) : null}
-      <Field label={fact ? 'Texto' : 'Qué quieres que sepan'} value={text} onChangeText={setText} multiline maxLength={4000} />
-      {fact ? null : <Field label="Tema" optional placeholder="Por ejemplo: Límites" value={topic} onChangeText={setTopic} maxLength={200} />}
+      <Field label={fact ? 'Texto' : 'Qué quieres que sepan'} value={text} onChangeText={setText} multiline maxLength={4000} testID="hecho-texto" />
+      {fact ? null : <Field label="Tema" optional placeholder="Por ejemplo: Límites" value={topic} onChangeText={setTopic} maxLength={200} testID="hecho-tema" />}
       <VisibilityField value={publicUse} onChange={setPublicUse} disabled={mutation.isPending} />
       <T variant="detalle" soft>
         {fact ? 'Se guarda como una versión nueva; la anterior queda en el historial.' : 'Se confirma al guardar: lo escribes tú.'}

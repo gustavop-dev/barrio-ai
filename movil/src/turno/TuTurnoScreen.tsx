@@ -8,12 +8,12 @@ import { useTuTurno } from '@compartido/api/hooks';
 import type { TuTurno, TurnoCard as TurnoCardData, TurnoRecent } from '@compartido/api/types';
 import { agoText, dayAndTime, doneTodaySentence, longDate, toAgent, turnoAnchor } from '@compartido/logic/turno';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, RefreshControl, ScrollView, StyleSheet, View, type ListViewToken } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Badge, Button, EmptyText, ErrorRetry, Fold, IdleLibrarian, PageHeader, Skeleton, T, TabBar, pageContent } from '@/components/ui';
-import { layout, turnoLayout, useMotion } from '@/theme/motion';
+import { timing, timingWith, turnoLayout, turnoMotion, turnoTimings, useMotion } from '@/theme/motion';
 import { colors, space } from '@/theme/tokens';
 import { ExitRow } from './ExitRow';
 import { buildRows, pendingView, summaryOf, TurnoExitsContext, usePublishHeld, useTurnoExits, type Row } from './exits';
@@ -38,6 +38,22 @@ function useFreshIds(cards: readonly TurnoCardData[]): ReadonlySet<string> {
   const added = cards.filter((card) => card.state === 'nueva' && !fresh.has(card.id)).map((card) => card.id);
   if (added.length) setFresh((current) => new Set([...current, ...added]));
   return fresh;
+}
+
+/**
+ * A row fading in as it joins the list (`timings.listEnter`). A shared value, not Reanimated `entering`: a row mounted
+ * right after a sheet's Modal closed stayed at opacity 0, invisible to Gustavo and to the QA (the folds, run
+ * 42466144199; the same pattern as the Galería tiles in 05-captura-envios). With reduced motion it is visible at once.
+ */
+function RowIn({ children, style, delay = 0, duration }: { children: ReactNode; style?: object; delay?: number; duration?: number }) {
+  const { reduced } = useMotion();
+  const shown = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    const fade = withTiming(1, duration ? timingWith(duration, 'enter') : timing('listEnter'));
+    shown.set(delay ? withDelay(delay, fade) : fade);
+  }, [shown, delay, duration]);
+  const fade = useAnimatedStyle(() => ({ opacity: shown.value }));
+  return <Animated.View style={[style, fade]}>{children}</Animated.View>;
 }
 
 /** A group's label (the Section look): «URGENTE · 1», its number rolling when a card stops counting. */
@@ -124,14 +140,17 @@ function Folds({ postponedCount, postponed, recent, flash }: FoldsProps) {
 }
 
 /** «Nada depende de ti hoy» (the EmptyState look). After the last card it fades in late and its librarian rises (MovTuTurno). */
-function NothingPending({ data, afterExit }: { data: TuTurno; afterExit: boolean }) {
+function NothingPending({ data, afterExit, reduced }: { data: TuTurno; afterExit: boolean; reduced: boolean }) {
   const sentence = doneTodaySentence(data.summary?.done_today);
   const next = data.summary?.next_piece;
   return (
-    <Animated.View entering={afterExit ? turnoLayout.emptyIn() : layout.listEnter()} style={styles.empty} testID="turno-empty">
-      <Animated.View entering={afterExit ? turnoLayout.emptyPortraitIn() : undefined}>
+    <RowIn
+      style={styles.empty}
+      delay={afterExit && !reduced ? turnoMotion.emptyDelayMs : 0}
+      duration={afterExit ? turnoTimings.emptyIn.duration : undefined}
+    >
+      <View testID="turno-empty" style={styles.emptyInner}>
         <IdleLibrarian />
-      </Animated.View>
       <T variant="subtitulo" center accessibilityRole="header">
         Nada depende de ti hoy
       </T>
@@ -146,7 +165,8 @@ function NothingPending({ data, afterExit }: { data: TuTurno; afterExit: boolean
           Ver el Calendario
         </Button>
       </View>
-    </Animated.View>
+      </View>
+    </RowIn>
   );
 }
 
@@ -223,8 +243,10 @@ export function TuTurnoScreen() {
     switch (item.kind) {
       case 'label':
         return (
-          <Animated.View entering={layout.listEnter()} exiting={turnoLayout.collapse()} style={[styles.label, styles.clip]}>
-            <GroupLabel name={item.name} count={item.count} intro={item.intro} />
+          <Animated.View exiting={reduced ? undefined : turnoLayout.collapse()} style={[styles.label, styles.clip]}>
+            <RowIn>
+              <GroupLabel name={item.name} count={item.count} intro={item.intro} />
+            </RowIn>
           </Animated.View>
         );
       case 'card': {
@@ -236,12 +258,12 @@ export function TuTurnoScreen() {
         );
       }
       case 'empty':
-        return turno.data ? <NothingPending data={turno.data} afterExit={exits.state.emptyAfterExit} /> : null;
+        return turno.data ? <NothingPending data={turno.data} afterExit={exits.state.emptyAfterExit} reduced={reduced} /> : null;
       case 'folds':
         return (
-          <Animated.View entering={layout.listEnter()}>
+          <RowIn>
             <Folds postponedCount={item.postponed} postponed={view.postponed} recent={view.recent} flash={exits.state.flash} />
-          </Animated.View>
+          </RowIn>
         );
     }
   };
@@ -256,7 +278,11 @@ export function TuTurnoScreen() {
         data={turno.data ? rows : []}
         keyExtractor={(row: Row) => row.key}
         keyboardShouldPersistTaps="handled"
-        itemLayoutAnimation={turnoLayout.listMove()}
+        // With reduced motion nothing animates in or moves: the rows mounted later (the folds after the first
+        // batch, a group counter that changes) were left invisible on Android with the system animations off.
+        itemLayoutAnimation={reduced ? undefined : turnoLayout.listMove()}
+        // A short list: keep every row attached, so a row scrolled back into view is never left blank.
+        removeClippedSubviews={false}
         ListHeaderComponent={header}
         ListEmptyComponent={
           turno.isPending ? (
@@ -290,6 +316,7 @@ const styles = StyleSheet.create({
   folds: { marginTop: space[6] },
   foldRow: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2], paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
   foldText: { flex: 1, gap: 2 },
-  empty: { paddingVertical: space[6], gap: space[3], alignItems: 'center' },
+  empty: { paddingVertical: space[6] },
+  emptyInner: { gap: space[3], alignItems: 'center' },
   emptyText: { gap: space[2], maxWidth: 340 },
 });

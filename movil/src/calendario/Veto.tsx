@@ -1,8 +1,9 @@
 // «Vetar» (the confirm sheet with its mandatory note, then «Vetada» with «Deshacer» for 5 s: the reject
-// waits that window in pendingVeto.ts) and «Preparar la siguiente pieza» behind the cost confirmation.
-import { usePlanPiece } from '@compartido/api/hooks';
+// waits that window in pendingVeto.ts), «Aprobar» for what waits in `approval` mode, and «Preparar la
+// siguiente pieza» behind the cost confirmation.
+import { useApproveAction, usePlanPiece } from '@compartido/api/hooks';
 import { longDay } from '@compartido/logic/dates';
-import { vetoConsequence, type VetoTarget } from '@compartido/logic/events';
+import { APPROVED_MESSAGE, vetoConsequence, type VetoTarget } from '@compartido/logic/events';
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -69,6 +70,39 @@ export function VetoButton({ target, block = false, size, accessibilityHint }: {
         </ConfirmSheet>
       ) : null}
     </>
+  );
+}
+
+/** «Aprobar»: approves the exact version Gustavo sees (`expectedHash`); a 409 (it changed or is no longer pending) shows as a toast. */
+export function ApproveButton({ actionId, expectedHash, block = false, size, accessibilityHint }: { actionId: string; expectedHash: string; block?: boolean; size?: 'normal' | 'small'; accessibilityHint?: string }) {
+  const approve = useApproveAction();
+  const toast = useToast();
+  return (
+    <Button
+      variant="primary"
+      block={block}
+      size={size}
+      accessibilityHint={accessibilityHint}
+      loading={approve.isPending}
+      loadingLabel="Aprobando…"
+      onPress={() =>
+        approve.mutate(
+          { actionId, expectedHash },
+          {
+            onSuccess: () => {
+              haptic('actionSuccess');
+              toast.show(APPROVED_MESSAGE);
+            },
+            onError: (error) => {
+              haptic('actionError');
+              toast.show(`No se pudo aprobar. ${errorMessage(error)}`, { tone: 'error' });
+            },
+          },
+        )
+      }
+    >
+      Aprobar
+    </Button>
   );
 }
 

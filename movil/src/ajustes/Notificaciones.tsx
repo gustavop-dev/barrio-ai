@@ -1,11 +1,11 @@
 // Ajustes › Notificaciones: the native push of this phone (the Expo token the session registered at
 // launch, push/register.ts), «Probar notificación», one switch per push type (`push_types`, saved as
-// `push_disabled`) and «Dispositivos con la app» with revoke; revoking this phone signs it out.
+// `push_disabled` and `push_enabled`) and «Dispositivos con la app» with revoke; revoking this phone signs it out.
 import { useSavePreferencias, type PushType } from '@compartido/api/capturas';
 import { asList, listDevices, revokeDevice, sendTestPush } from '@compartido/api/endpoints';
 import { useAjustes } from '@compartido/api/hooks';
 import type { Device } from '@compartido/api/types';
-import { disabledKinds, pushToggledMessage, pushTypeHint, pushTypesOf } from '@compartido/logic/ajustes';
+import { pushPreferencesPatch, pushToggledMessage, pushTypeHint, pushTypesOf } from '@compartido/logic/ajustes';
 import { whenLabel } from '@compartido/logic/capturas';
 import { timeAgo } from '@compartido/logic/format';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
@@ -110,7 +110,7 @@ function PerType() {
     const updated = { ...overrides, [type.kind]: next };
     setOverrides(updated);
     save.mutate(
-      { push_disabled: disabledKinds(types ?? [], updated) },
+      pushPreferencesPatch(types ?? [], updated),
       {
         onSuccess: () => toast.show(pushToggledMessage(type, next)),
         onError: (error) => {

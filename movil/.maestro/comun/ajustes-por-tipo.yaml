@@ -1,0 +1,26 @@
+# Ajustes › Notificaciones › «Por tipo de notificación»: opens Ajustes from the top bar, scrolls to the fold and opens
+# it, so the next step can look for a `push-<kind>` switch.
+appId: co.projectapp.office
+---
+- tapOn:
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+# The heading is looked up inside its own section: the top bar's bell is also labelled «Notificaciones».
+- scrollUntilVisible:
+    element:
+      text: "NOTIFICACIONES"
+      childOf:
+        id: ajustes-notificaciones
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Por tipo de notificación"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Por tipo de notificación"

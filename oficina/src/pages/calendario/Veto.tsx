@@ -1,10 +1,31 @@
 import { useState } from 'react';
-import { usePlanPiece, useVeto } from '../../api/hooks';
-import { Button, ConfirmModal, Note, useToast } from '../../components/ui';
+import { useApproveAction, usePlanPiece, useVeto } from '../../api/hooks';
+import { Button, ConfirmModal, ErrorRetry, Note, useToast } from '../../components/ui';
 import { longDay } from './dates';
-import { vetoConsequence, type VetoTarget } from './events';
+import { APPROVED_MESSAGE, vetoConsequence, type VetoTarget } from './events';
 
 export type { VetoTarget };
+
+/** «Aprobar» for what waits in `approval` mode: approves the exact version shown (`expectedHash`). */
+export function ApproveButton({ actionId, expectedHash, size, describedBy }: { actionId: string; expectedHash: string; size?: 'normal' | 'small'; describedBy?: string }) {
+  const approve = useApproveAction();
+  const toast = useToast();
+  return (
+    <>
+      <Button
+        variant="primary"
+        size={size}
+        aria-describedby={describedBy}
+        loading={approve.isPending}
+        loadingLabel="Aprobando…"
+        onClick={() => approve.mutate({ actionId, expectedHash }, { onSuccess: () => toast.show(APPROVED_MESSAGE) })}
+      >
+        Aprobar
+      </Button>
+      <ErrorRetry error={approve.error} />
+    </>
+  );
+}
 
 /** «Vetar» with the mandatory-note modal (POST /operador/actions/<id>/reject). */
 export function VetoButton({

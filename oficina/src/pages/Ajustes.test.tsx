@@ -407,7 +407,7 @@ describe('Ajustes · Notificaciones', () => {
     await user.click(published);
     expect(published).not.toBeChecked();
     await waitFor(() => expect(api.find('PATCH', '/api/v1/ajustes/preferencias')).toHaveLength(1));
-    expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ push_disabled: ['piece_published', 'question_new'] });
+    expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ push_disabled: ['piece_published', 'question_new'], push_enabled: ['piece_scheduled'] });
   });
 });
 

@@ -737,7 +737,7 @@ export interface Activity {
 // ---------------------------------------------------------------- Tu turno
 
 /** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados). */
-export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion' | 'resumen';
+export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion' | 'resumen' | 'aprobacion';
 export type TurnoTone = 'bad' | 'warn' | 'info' | 'ok' | 'muted';
 
 /** A card action: either a POST (`endpoint` + `body`, plus `note` when `note_required`) or a full navigation (`href`). */
@@ -785,8 +785,23 @@ export interface TurnoAttempt {
   url: string | null;
 }
 
+/** What an `approval:<id>` card asks to approve: a proposal of a capability in `approval` mode (BAR-13, CAL-15). */
+export interface TurnoApproval {
+  proposal_id: string;
+  capability: Capability | string;
+  label: string;
+  text: string | null;
+  reaction: string | null;
+  target: ActivityTarget | null;
+  piece_id: string | null;
+  /** A network action: vetoing it discards the person for good. */
+  network: boolean;
+  /** When it stops waiting (the piece's hour, or the proposal's TTL). */
+  expires_at: string | null;
+}
+
 export interface TurnoCard {
-  /** `linkedin_expired`, `linkedin_expiring`, `uncertain:<id>`, `machine_paused`, `machine_paused_env`, `account_paused:<id>`, `question:<id>`. */
+  /** `linkedin_expired`, `linkedin_expiring`, `uncertain:<id>`, `machine_paused`, `machine_paused_env`, `account_paused:<id>`, `question:<id>`, `approval:<id>`. */
   id: string;
   type: TurnoCardType;
   critical: boolean;
@@ -805,6 +820,8 @@ export interface TurnoCard {
   question?: Question | null;
   /** Only on conversation cards. */
   conversation?: (Conversation & { person: TurnoPerson | null }) | null;
+  /** Only on approval cards. */
+  approval?: TurnoApproval | null;
   /** rev 18 priority group (being added to the backend). */
   priority?: TurnoPriority;
   /** rev 18 state: nueva and vista count, pospuesta and caducada go in `later` (being added to the backend). */
@@ -1072,9 +1089,18 @@ export interface UpcomingPiece {
   note: string;
 }
 
+/** «En cola»: an approved action waiting for the window or the spacing, or (first) one that waits for Gustavo's approval. */
+export type QueuedItem = ActivityItem & {
+  expected_at: string | null;
+  /** In `approval` mode and still `proposed`: «Aprobar» sends `payload_hash` as the exact version. */
+  awaiting_approval?: boolean;
+  payload_hash?: string;
+  expires_at?: string | null;
+};
+
 /** GET /api/v1/actividad. */
 export interface Actividad {
-  upcoming: { pieces: UpcomingPiece[]; queued: (ActivityItem & { expected_at: string | null })[] };
+  upcoming: { pieces: UpcomingPiece[]; queued: QueuedItem[] };
   items: ActivityItem[];
   next_offset: number | null;
 }

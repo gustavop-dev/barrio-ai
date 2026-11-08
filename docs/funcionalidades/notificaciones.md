@@ -14,7 +14,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
 | [NOT-03](#not-03) | «Próximo»: lo que va a pasar | PWA · app · backend | funciona |
 | [NOT-04](#not-04) | Abrir el destino de una notificación | PWA · app · backend | funciona |
 | [NOT-05](#not-05) | Punto de novedades en la campana | PWA · app · backend | funciona |
-| [NOT-06](#not-06) | Qué eventos llegan a Notificaciones | backend | parcial |
+| [NOT-06](#not-06) | Qué eventos llegan a Notificaciones | backend | funciona |
 
 ---
 
@@ -33,7 +33,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
   6. **Dado** un error, **cuando** falla, **entonces** ve el error con «Reintentar» (o «No se pudo actualizar» si ya había datos).
   7. **Dado** el pie de la vista, **cuando** se pinta, **entonces** dice «Se guardan 7 días. Lo anterior está en el Calendario.».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones` (criterios 1 y 7) y `06-notificaciones-estados` (4 vacío y 6 «No se pudo actualizar» con el interruptor de fallos). El 2 y el 3, backend.
 
 ### NOT-02 · Filtrar «Sin leer» y marcar como leído <a id="not-02"></a>
 
@@ -48,7 +48,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
   4. **Dado** que marcar como leído falla, **cuando** vuelve el error, **entonces** las etiquetas «Nueva» vuelven y se ve «No se pudo marcar como leído».
   5. **Dado** un cuerpo sin `ids` ni `todas: true`, **cuando** se envía, **entonces** la API responde 400 «Envía ids o todas: true».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones` (criterios 1 a 3), `06-notificaciones-destinos` (3) y `06-notificaciones-estados` (4: «No se pudo marcar como leído» y vuelven las «Nueva»). El 5, backend.
 
 ### NOT-03 · «Próximo»: lo que va a pasar <a id="not-03"></a>
 
@@ -62,7 +62,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
   3. **Dado** `OPERATOR_PAUSED=true`, **cuando** abre Notificaciones, **entonces** ve «La máquina está detenida desde el servidor» con «La parada viene de OPERATOR_PAUSED y no se levanta desde la app.» y enlace a `/ajustes#maquina`.
   4. **Dado** los elementos de «Próximo», **cuando** se calcula `unread`, **entonces** no cuentan.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones` (criterios 1 y 2). El 3 (parada del servidor), backend.
 
 ### NOT-04 · Abrir el destino de una notificación <a id="not-04"></a>
 
@@ -78,7 +78,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
   5. **Dado** `lead_silent`, **cuando** la toca, **entonces** abre la Lista del calendario filtrada con lo que no salió.
   6. **Dado** una notificación sin enlace ya leída, **cuando** la toca, **entonces** no pasa nada.
 - **Brechas código/docs:** la oportunidad sin contacto enlaza a `/personas?pestana=oportunidades` desde la notificación y a `/personas?tab=oportunidades` desde el calendario; la PWA solo entiende `pestana` (ver [PRS-07](personas-oportunidades.md#prs-07)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones` (criterios 1 y 2) y `06-notificaciones-destinos` (3 resumen semanal, 4 «Lo que enviaste» y la oportunidad sin contacto).
 
 ### NOT-05 · Punto de novedades en la campana <a id="not-05"></a>
 
@@ -91,21 +91,21 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
   2. **Dado** 0 sin leer, **cuando** carga, **entonces** no hay punto.
   3. **Dado** que marca todo como leído, **cuando** termina, **entonces** el punto desaparece sin esperar a la siguiente consulta.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones` (criterios 1 a 3).
 
 ### NOT-06 · Qué eventos llegan a Notificaciones <a id="not-06"></a>
 
 - **Dónde:** backend
-- **Estado:** parcial
+- **Estado:** funciona
 - **Qué hace para Gustavo:** cada cosa que pasa y no le pide nada aparece una sola vez en su bandeja.
 - **Código:** llamadas a `notificaciones.avisar` con un tipo de `FEED_KINDS`; `ref` único para no duplicar.
 - **Criterios de aceptación:**
   1. **Dado** cada uno de estos eventos, **cuando** ocurre, **entonces** se guarda su Notificación: pieza lista (`piece_scheduled`), publicada, bloqueada, descartada, conexión que encaja, oportunidad nueva o que cambia de etapa, posts nuevos del Observatorio (`observatory`), captura procesada, líder sin aprobar en 7 días (`lead_silent`) y resumen de la semana.
   2. **Dado** el mismo evento dos veces (mismo `ref`), **cuando** se avisa, **entonces** solo hay una Notificación.
   3. **Dado** `invites_expected` y `machine_paused_env`, **cuando** ocurren, **entonces** aparecen solo en «Próximo» (se calculan, no se guardan).
-  4. **Dado** que la máquina se detiene desde el servidor, **cuando** pasa, **entonces** llega una push. **Hoy falla:** `machine_paused_env` tiene push activada por defecto en Ajustes, pero nada llama a `avisar` con ese tipo, así que la push nunca sale.
-- **Brechas código/docs:** el contrato dice que `machine_paused_env` tiene push por defecto; no tiene emisor (ver [PUS-05](notificaciones-push.md#pus-05)).
-- **Cobertura QA:** pendiente
+  4. **Dado** que la máquina se detiene desde el servidor, **cuando** el autopiloto lo ve, **entonces** llega una push una vez por parada ([PUS-05](notificaciones-push.md#pus-05)), sin guardarla en el feed.
+- **Brechas código/docs:** —
+- **Cobertura QA:** Backend (`test_notificaciones`): eventos, `ref` único, tipos calculados y la push de la parada del servidor.
 
 ## Retiradas
 

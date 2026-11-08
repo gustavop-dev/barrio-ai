@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import { useTurnoAction } from '../../api/hooks';
 import type { TurnoAction, TurnoCard, TurnoCardType, TurnoOpportunity, TurnoPriority } from '../../api/types';
 import { turnoAnchor } from '../../components/Layout';
-import { IconAviso, IconConversacion, IconPerfil, IconPregunta, IconResultados } from '../../components/icons';
+import { APPROVED_MESSAGE } from '../calendario/events';
+import { IconAviso, IconCheck, IconConversacion, IconPerfil, IconPregunta, IconResultados } from '../../components/icons';
 import { AgentPortrait, Avatar, Badge, Button, ButtonLink, ConfirmModal, ErrorRetry, ExternalLink, isHttps, LabelChip, useToast } from '../../components/ui';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '../../lib/format';
 import { messageText } from '../personas/ConversationBlock';
@@ -18,6 +19,7 @@ const TYPE_LABEL: Record<TurnoCardType, string> = {
   perfil: 'Perfil',
   conversacion: 'Conversación',
   resumen: 'Resumen semanal',
+  aprobacion: 'Aprobación',
 };
 
 const TYPE_ICON: Record<TurnoCardType, typeof IconAviso> = {
@@ -26,13 +28,14 @@ const TYPE_ICON: Record<TurnoCardType, typeof IconAviso> = {
   perfil: IconPerfil,
   conversacion: IconConversacion,
   resumen: IconResultados,
+  aprobacion: IconCheck,
 };
 
 /** Colour of the type label: alerta for urgent notices, info for questions and conversations, hondo for profile tasks. */
 function typeTone(card: TurnoCard, priority: TurnoPriority | null): string {
   if (!priority) return 'suave';
   if (card.type === 'aviso') return priority === 'urgente' ? 'alerta' : 'suave';
-  if (card.type === 'perfil') return 'hondo';
+  if (card.type === 'perfil' || card.type === 'aprobacion') return 'hondo';
   return 'info';
 }
 
@@ -59,10 +62,14 @@ const isInApp = (href: string) => href.startsWith('/') && !href.startsWith('//')
 const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;
 const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsWith('/resolve'));
 const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
+const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
+const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
 
 function successMessage(action: TurnoAction): string {
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
+  if (isApprove(action)) return APPROVED_MESSAGE;
+  if (isReject(action)) return 'Vetada';
   if (isMachineResume(action)) return 'Máquina reanudada';
   if (action.endpoint?.endsWith('/pause') && action.body?.paused === false) return 'Cuenta reanudada';
   if (action.endpoint?.startsWith('/api/v1/resultados/resumen-semanal/') && action.endpoint.endsWith('/descartar')) return 'Resumen descartado';
@@ -79,6 +86,15 @@ interface ModalSpec {
 
 /** Which actions ask first: a required note (uncertain actions and any `note_required`) or the optional reason to resume. */
 function modalFor(action: TurnoAction): ModalSpec | null {
+  if (isReject(action)) {
+    return {
+      title: 'Vetar la acción',
+      text: 'No saldrá. Vetar una acción de red descarta a esa persona para siempre: el equipo no la volverá a proponer.',
+      note: 'required',
+      noteLabel: 'Nota',
+      placeholder: 'Por qué no debe salir',
+    };
+  }
   if (isResolve(action) && action.note_required) {
     const applied = action.body?.outcome !== 'failed';
     return {

@@ -75,7 +75,7 @@ Para comparar con el diseño, abre las capturas junto a los tableros `movil/dise
 - una pieza en cada estado: programada para mañana y vetable, publicada con cortes de 72 h y de 7 días, bloqueada con ronda de reparación, saltada y fallida;
 - comentarios y acciones de red pendientes, y acciones ya hechas para la Lista y el calendario;
 - personas en cada etapa, oportunidades en varias etapas y referentes;
-- todas las tarjetas de Tu turno: «¿Salió o no?», una conversación del inbox, preguntas de texto, de opción y de sí o no, una pospuesta y la orientación del analista;
+- todas las tarjetas de Tu turno: «¿Salió o no?», una conversación del inbox, preguntas de texto, de opción y de sí o no, una pospuesta, una caducada, la orientación del analista y dos aprobaciones de red (seguir a Laura, invitar a Julián: la red está en modo `approval` porque `OPERATOR_AUTONOMY` va vacío);
 - notificaciones leídas y sin leer, y «Próximo»;
 - una captura transcrita y una idea usada;
 - cuatro fotos generadas en la Galería;
@@ -90,11 +90,16 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `01-entrada` | la pantalla de entrada y «Entrar» desactivado; con el teclado abierto, la contraseña sigue a la vista; sin conexión, el aviso en español; contraseña equivocada; mostrar la contraseña; la correcta, la entrada animada y la Oficina; abrir otra vez sigue dentro; una sesión cerrada desde otro dispositivo vuelve a la entrada |
 | `02-navegacion` | abrir la app sin conexión sigue dentro (la franja, y la red que vuelve); el contador y el punto de arriba; las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial; una ficha cerrada con «‹», con atrás y arrastrando desde el borde; la firma; enlaces `oficina0ff1ce://` a una pestaña y a una pieza |
 | `03-oficina` | tocar un personaje de la escena y ver su hoja con su estado real y lo último que hizo, arrastrarla a altura completa y cerrarla, la tira de equipos, «Ver en el Calendario» y la Biblioteca; arrastre y doble toque en la escena; tirar para recargar; la leyenda; la máquina en pausa (el aviso, la escena oscurecida y Ajustes) |
-| `04-tu-turno` | «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Pospuestas» y «Lo que el equipo sabe de ti» |
+| `04-tu-turno` | la lista de arriba abajo una sola vez: «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Ya no es urgente», «Pospuestas», «Hecho recientemente» y «Lo que el equipo sabe de ti» |
+| `04-tu-turno-aprobar` | aprobar una acción de red desde su tarjeta de Tu turno y otra desde «En cola» del calendario |
+| `04-tu-turno-mas` | máquina detenida desde Ajustes y reanudada desde Tu turno, «Responder con audio», «Marcar como oportunidad», «No responder», descartar la orientación, responder con una opción y «Deshacer», «No quiero compartir esto» |
+| `04-tu-turno-sabe` | «Lo que el equipo sabe de ti»: añadir, editar (v2) y retirar un dato |
 | `05-captura` | desde Galería: abrir la hoja, «Para qué es», grabar desde la hoja, cerrar vacía y con algo («¿Cerrar sin enviar?»), mantener el botón, enviar, «Deshacer» en el aviso (vuelve el borrador), «Lo que enviaste» y «Deshacer» ahí |
 | `05-captura-envios` | una foto del selector de Android y una nota de voz llegan al backend (aviso, Galería, «Lo que enviaste»); sin red (modo avión) y 413: el motivo, el borrador y «Reintentar» |
 | `05-captura-contexto` | «Responder con audio» en Tu turno, «Nota de voz» en una persona y «Comentario para el equipo» con foto en una pieza, con su contexto en «Lo que enviaste» |
 | `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
+| `06-notificaciones-avisos` | Ajustes › Notificaciones: «Este dispositivo», «Probar notificación» y encender un tipo de push apagado por defecto, que sigue encendido tras reabrir la app |
+| `06-notificaciones-destinos` | el resumen semanal, la captura procesada y la oportunidad sin contacto abren su destino |
 | `07-calendario` | Semana, Mes y Lista; deslizar semanas y meses; un mes sin nada y un día a más de 15 días; la hoja del día y el panel de un día con reunión, uno sin pieza y el de ayer con «Ver todo lo del día» filtrado; «En cola»: vetar una acción de red (se envía a los 5 s) y una reacción con «Deshacer»; «Lo que pasó» por tipo y con «Mostrar lo que no salió» |
 | `07-pieza-veto` | la pieza de mañana: cabecera, «Copiar», «Comentario para el equipo», vetar y «Deshacer», los pliegues de «Cómo se escribió», el veto que se envía a los 5 s («La vetaste») y «Preparar la siguiente pieza» |
 | `07-pieza-estados` | las piezas pasadas desde su día: bloqueada (y la capa «Red» apagada), publicada con sus cortes y «—», saltada y fallida; la hoja a altura completa deja tocar otro día |

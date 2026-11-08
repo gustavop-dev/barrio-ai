@@ -55,11 +55,12 @@ export function buildRows(view: PendingView): Row[] {
     });
     for (const card of group.cards) rows.push({ key: card.id, kind: 'card', group: group.priority, card, priority: group.priority });
   }
+  // Nothing that counts (expired cards do not, TUR-01): «Nada depende de ti hoy» first, as the PWA, then the expired ones.
+  if (!view.groups.length) rows.push({ key: 'empty', kind: 'empty' });
   if (view.expired.length) {
     rows.push({ key: 'label-caducadas', kind: 'label', group: 'caducadas', name: 'Ya no es urgente', count: view.expired.length });
     for (const card of view.expired) rows.push({ key: `caducada-${card.id}`, kind: 'card', group: 'caducadas', card, priority: null });
   }
-  if (!rows.length) rows.push({ key: 'empty', kind: 'empty' });
   const quiet = view.groups.length === 0 && !view.postponed.length && !view.recent.length;
   if (!quiet) rows.push({ key: 'folds', kind: 'folds', postponed: view.postponed.length });
   return rows;
