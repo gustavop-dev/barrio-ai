@@ -245,8 +245,8 @@ tags: [personas, fichas]
     childOf:
       id: confirm-sheet
 - assertVisible: "No volverá a proponerse: el equipo no la seguirá ni la invitará\\. Si tiene una acción abierta, se veta\\."
-- assertVisible: "Por qué la descartas"
-# The reason is required.
+# The reason is required, and its label says so (« · obligatoria», as in the PWA).
+- assertVisible: "Por qué la descartas · obligatoria"
 - assertVisible:
     text: "Descartar"
     childOf:

@@ -50,6 +50,7 @@ export function ConfirmSheet({
         <Field
           label={noteLabel}
           optional={note === 'optional'}
+          required={note === 'required'}
           placeholder={notePlaceholder}
           value={text}
           onChangeText={setText}

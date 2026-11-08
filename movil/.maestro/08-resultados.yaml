@@ -1,8 +1,11 @@
-# cubre: RES-01, RES-05, SEM-05, SEM-06, CAL-07
-# Resultados. The weekly summary: the analyst's lists and proposed orientation, the previous weeks fold, «Usar como
-# orientación» then «Deshacer» and «Descartar» then «Deshacer» (the card says what was decided, and the buttons come
-# back). «Periodo» 7 / 90 / 28 días: the period note and the impressions chart change with it (28 días has the posts
-# of T-8 and T-3, 7 días only T-3). The chart's ⓘ opens its definition, and a bar opens its piece.
+# cubre: RES-01, RES-02, RES-03, RES-04, RES-05, RES-06, RES-07, SEM-05, SEM-06, CAL-07
+# Resultados. The weekly summary: the analyst's lists, warnings and proposed orientation, the previous weeks fold,
+# «Usar como orientación» then «Deshacer» and «Descartar» then «Deshacer» (the card says what was decided, and the
+# buttons come back). «Periodo» 7 / 90 / 28 días: the period note and the impressions chart change with it (28 días has
+# the posts of T-8 and T-3, 7 días only T-3). The chart's ⓘ opens its definition, and a bar opens its piece. Then
+# «Modalidad» (sections 3 and 4 say they are not split), the section chips, each section's figures, a missing figure
+# as «—» with its reason (never 0), an active opportunity opening its person, the posts with a missing cut as «—», the
+# best post opening its piece, and the team's comments with the replies not measured yet.
 # Text in the «etiqueta» style (section labels, badges) is uppercased on screen, so it is written in capitals here.
 appId: co.projectapp.office
 name: Resultados
@@ -29,6 +32,13 @@ tags: [resultados]
     centerElement: true
     timeout: 30000
 - takeScreenshot: 08-resultados-01-resumen
+- scrollUntilVisible:
+    element:
+      text: "• Pocos datos: 2 de 3 posts con corte de 72 h\\."
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Advertencias"
 
 # ---------------------------------------------------------------- the weekly summary
 # cubre: SEM-05, SEM-06
@@ -239,6 +249,11 @@ tags: [resultados]
     text: "Salió a las .*"
     childOf:
       id: pieza
+# «‹» says where it goes back to: Resultados, not Calendario.
+- assertVisible:
+    text: "Resultados"
+    childOf:
+      id: top-volver
 - scrollUntilVisible:
     element:
       id: corte-24h
@@ -253,3 +268,205 @@ tags: [resultados]
     timeout: 15000
 - assertVisible:
     id: resultados-list
+
+# ---------------------------------------------------------------- Modalidad: sections 3 and 4 are not split
+# cubre: RES-01
+- scrollUntilVisible:
+    element:
+      id: res-modalidad
+    direction: UP
+    timeout: 30000
+- tapOn:
+    id: res-modalidad
+- tapOn:
+    text: "Startups"
+    below:
+      id: res-modalidad
+- extendedWaitUntil:
+    visible: ".*Todo se compara con los 28 días anteriores.*"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "No se separa por modalidad: muestra toda la cuenta."
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- takeScreenshot: 08-resultados-13-modalidad-startups
+- scrollUntilVisible:
+    element:
+      id: res-modalidad
+    direction: UP
+    timeout: 30000
+- tapOn:
+    id: res-modalidad
+- tapOn:
+    text: "Todo"
+    below:
+      id: res-modalidad
+- extendedWaitUntil:
+    notVisible: "No se separa por modalidad: muestra toda la cuenta."
+    timeout: 20000
+
+# ---------------------------------------------------------------- 1 · Negocio: a missing figure, the funnel, an opportunity
+# cubre: RES-01, RES-02, RES-03
+# The section chips (just under Modalidad) jump to a section.
+- scrollUntilVisible:
+    element:
+      text: "1 · Negocio"
+    direction: DOWN
+    timeout: 15000
+- tapOn: "1 · Negocio"
+- scrollUntilVisible:
+    element:
+      text: "Disponible cuando conectemos el inbox."
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+# «Conversaciones pertinentes» has no data: a dash (read as «Sin dato») and the reason, never a 0.
+- assertVisible:
+    text: "Sin dato"
+    above:
+      text: "Disponible cuando conectemos el inbox."
+- assertVisible: "Oportunidades abiertas"
+- takeScreenshot: 08-resultados-15-negocio-sin-dato
+# Its ⓘ: the definition.
+- tapOn: "Definición de Conversaciones pertinentes"
+- extendedWaitUntil:
+    visible:
+      id: definition-sheet
+    timeout: 10000
+- assertVisible:
+    text: "Conversaciones con personas que encajan abiertas en el periodo."
+    childOf:
+      id: definition-sheet
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: definition-sheet
+- extendedWaitUntil:
+    notVisible:
+      id: definition-sheet
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Cerrada sin acuerdo: \\d+"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "EMBUDO DE OPORTUNIDADES"
+- scrollUntilVisible:
+    element:
+      text: "OPORTUNIDADES ACTIVAS"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "REPARTO POR MODALIDAD"
+- scrollUntilVisible:
+    element:
+      text: "Andrés Restrepo"
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: 08-resultados-16-oportunidades-activas
+- tapOn: "Andrés Restrepo"
+- extendedWaitUntil:
+    visible:
+      id: persona-head
+    timeout: 20000
+- assertVisible:
+    text: "Andrés Restrepo"
+    childOf:
+      id: persona
+- back
+- extendedWaitUntil:
+    visible:
+      id: resultados-list
+    timeout: 15000
+
+# ---------------------------------------------------------------- 2 · Gente: the audience, recurrent people not measured
+# cubre: RES-02, RES-04
+- scrollUntilVisible:
+    element:
+      text: "Seguidores"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Aún no medimos las interacciones repetidas por persona."
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Tasa de aceptación"
+- assertVisible:
+    text: "Sin dato"
+    above:
+      text: "Aún no medimos las interacciones repetidas por persona."
+- takeScreenshot: 08-resultados-17-gente
+
+# ---------------------------------------------------------------- 3 · Contenido: the posts and the best post
+# cubre: RES-05, RES-06, CAL-07
+# The post of three days ago has no 7-day cut yet and its last reading had no reposts: «—», read as «sin dato».
+- scrollUntilVisible:
+    element:
+      text: "POSTS DEL PERIODO"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "7 días: sin dato"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Republic.: sin dato"
+- assertVisible: "Interacción: sin dato"
+- takeScreenshot: 08-resultados-18-post-sin-corte
+- scrollUntilVisible:
+    element:
+      text: "MEJOR POST DEL PERIODO"
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Ver la pieza"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+# The best post is the one of eight days ago (the only one with a 7-day cut): its first line is the English text.
+- assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue\\."
+- assertVisible: "INTERACCIÓN MEDIA POR PILAR"
+- tapOn: "Ver la pieza"
+- extendedWaitUntil:
+    visible:
+      text: "PUBLICADA"
+      childOf:
+        id: pieza
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: corte-7d
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: "A LOS 7 DÍAS"
+- takeScreenshot: 08-resultados-19-mejor-post
+- back
+- extendedWaitUntil:
+    visible:
+      id: resultados-list
+    timeout: 15000
+
+# ---------------------------------------------------------------- 4 · Equipo, the last section: replies not measured yet
+# cubre: RES-07
+- scrollUntilVisible:
+    element:
+      text: "Gasto de IA"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "\\d+ publicados? · — con respuesta"
+- assertVisible: "\\d+ seguidos? · \\d+ invitados? · \\d+ aceptados?"
+- assertVisible: "\\d+ publicadas? · \\d+ bloqueadas? · \\d+ vetadas?"
+- assertVisible: "[0-9.,]+ de [0-9.,]+ USD hoy"
+- takeScreenshot: 08-resultados-14-equipo

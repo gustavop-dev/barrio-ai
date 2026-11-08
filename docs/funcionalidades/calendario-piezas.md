@@ -11,7 +11,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 | --- | --- | --- | --- |
 | [CAL-01](#cal-01) | Vistas Mes, Semana y Lista | PWA · app · backend | funciona |
 | [CAL-02](#cal-02) | Capas del calendario | PWA · app · backend | funciona |
-| [CAL-03](#cal-03) | Panel del día | PWA · app · backend | con fallo conocido |
+| [CAL-03](#cal-03) | Panel del día | PWA · app · backend | parcial |
 | [CAL-04](#cal-04) | «Próximo» y lo que está en cola | PWA · app · backend | funciona |
 | [CAL-05](#cal-05) | «Lo que pasó» y «Ver todo lo del día» | PWA · app · backend | funciona |
 | [CAL-06](#cal-06) | Detalle de una pieza: cabecera y estado | PWA · app · backend | funciona |
@@ -43,7 +43,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   6. **Dado** un rango de más de 93 días o fechas inválidas, **cuando** se pide a la API, **entonces** responde 400.
   7. **Dado** la app, **cuando** abre el Calendario, **entonces** llega desde el icono de la barra superior (no es una pestaña de la barra inferior).
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-01.1, 3, 4, 5 y 7 en `movil/.maestro/07-calendario.yaml` y `07-calendario-errores.yaml` (Semana, Mes y Lista, deslizar semanas y meses, mes vacío, error con «Reintentar») · CAL-01.2 y 6 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-02 · Capas del calendario <a id="cal-02"></a>
 
@@ -58,15 +58,15 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   4. **Dado** los eventos de un día, **cuando** se ordenan, **entonces** van por capa (Tuyo, Sistema, Publicaciones, Conversaciones, Red) y después por hora.
   5. **Dado** cada capa, **cuando** hay datos, **entonces** muestra: Tuyo (plazos de preguntas, siguientes acciones y reuniones de oportunidades, caducidad de LinkedIn, lo resuelto), Publicaciones (cada pieza con su estado), Red (conexiones que encajan agrupadas, invitaciones recibidas y aceptadas, invitaciones previstas como estimación), Conversaciones (oportunidades nuevas o que cambian de etapa) y Sistema (paradas, reanudaciones, pausas de cuenta, acciones inciertas o fallidas).
 - **Brechas código/docs:** la capa Conversaciones sigue marcada `parcial` y sin conversaciones del inbox, aunque el inbox ya está implementado ([INB-01](inbox.md#inb-01)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-02.1 y 2 en `07-calendario.yaml` y `07-pieza-estados.yaml` («Conversaciones · parcial», apagar «Red» y volver a encenderla) · CAL-02.3–5 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-03 · Panel del día <a id="cal-03"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** parcial
 - **Qué hace para Gustavo:** al elegir un día ve su resumen (qué publicó y cuántas interacciones hubo), lo que le tocaba a él, la publicación del día, lo programado y lo importante.
 - **Código:** PWA `calendario/DayPanel.tsx`; app `DayPanel.tsx` (en línea y en una hoja).
-- **El fallo:** si falla la carga del calendario, el panel del día no queda en estado de carga ni de error: se pinta como un día vacío («Sin actividad registrada.», «Hueco libre…», «Nada importante en las capas visibles.») junto al error (`Calendario.tsx:65` en la PWA; lo mismo en la app).
+- **Lo que falta:** en la PWA, si falla la carga del calendario, el panel del día se pinta como un día vacío («Sin actividad registrada.», «Hueco libre…», «Nada importante en las capas visibles.») junto al error (`Calendario.tsx:65`). La app ya dice «No se pudo cargar este día.» y, si falla la pieza del día, muestra el error con «Reintentar».
 - **Criterios de aceptación:**
   1. **Dado** hoy o un día pasado, **cuando** lo elige, **entonces** ve el encabezado con «Hoy» o «Pasado» y el resumen («1 post · 6 comentarios · …»); cada cifra abre «Ver todo lo del día» filtrado.
   2. **Dado** un día sin actividad, **cuando** lo elige, **entonces** ve «Sin actividad registrada.».
@@ -74,10 +74,10 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   4. **Dado** un día futuro sin pieza, **cuando** lo elige, **entonces** ve «Hueco libre. El equipo prepara cada pieza N h antes de su hora.»; uno pasado sin pieza dice «Sin publicación.».
   5. **Dado** un día a más de 15 días, **cuando** lo elige, **entonces** ve «Todavía no hay nada programado tan lejos.».
   6. **Dado** acciones en cola o invitaciones previstas, **cuando** lo elige, **entonces** «Programado» las muestra, cada acción con «Vetar», y «Invitaciones previstas: N personas».
-  7. **Dado** que falla la carga del calendario, **cuando** se muestra el error, **entonces** el panel del día no dice que el día está vacío: muestra que no se pudo cargar. **Hoy falla en las dos interfaces.**
-  8. **Dado** que falla la carga de la pieza del día, **cuando** se pinta la tarjeta, **entonces** se ve un error. **Hoy falla en la app:** vuelve en silencio al título del evento.
+  7. **Dado** que falla la carga del calendario, **cuando** se muestra el error, **entonces** el panel del día no dice que el día está vacío: muestra que no se pudo cargar. **Hoy falla en la PWA.**
+  8. **Dado** que falla la carga de la pieza del día, **cuando** se pinta la tarjeta, **entonces** se ve un error con «Reintentar».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-03.1–5 y 7–8 en `07-calendario.yaml`, `07-pieza-estados.yaml` y `07-calendario-errores.yaml` (hoja media y completa sin tapar la tira, «Ver todo lo del día» filtrado, «Tu parte», hueco libre, sin publicación, día lejano, panel y pieza del día que fallan) · CAL-03.6 visto en las capturas («Programado» con «Vetar») · 2026-11-08 · pasa
 
 ### CAL-04 · «Próximo» y lo que está en cola <a id="cal-04"></a>
 
@@ -92,7 +92,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   4. **Dado** una pieza ya publicada, fallida o incierta, **cuando** se calcula «Próximo», **entonces** no aparece.
   5. **Dado** la carga en curso o un error, **cuando** abre la Lista, **entonces** ve «Cargando lo próximo…» o el error con «Reintentar».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-04.1–3 y 5 en `07-calendario.yaml`, `07-pieza-veto.yaml` y `07-calendario-errores.yaml` («Próximo», «En cola», sin pieza en camino, error y vacío) · CAL-04.4 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-05 · «Lo que pasó» y «Ver todo lo del día» <a id="cal-05"></a>
 
@@ -109,7 +109,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   6. **Dado** un filtro sin resultados, **cuando** lo aplica, **entonces** ve «No hay nada registrado con este filtro.» (o «Nada registrado ese día con este filtro.» en un día).
   7. **Dado** el enlace de `lead_silent` (`/calendario?vista=lista&tipo=comentarios&no_salio=1`), **cuando** lo abre, **entonces** llega a la Lista con ese filtro.
 - **Brechas código/docs:** en la app, «tirar para recargar» en la Lista solo recarga la actividad sin filtro; con filtro hay que esperar a la consulta de cada 30 s.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-05.1–3 y 6 en `07-calendario.yaml` y `07-calendario-errores.yaml` (filtro «Red», «Mostrar lo que no salió» con «Vetada por ti», día y lista sin resultados) · CAL-05.4, 5 y 7 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-06 · Detalle de una pieza: cabecera y estado <a id="cal-06"></a>
 
@@ -125,7 +125,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   5. **Dado** la carga, **cuando** abre el detalle, **entonces** ve «Cargando la pieza…»; con error y sin datos, «No se pudo cargar la pieza» con «Reintentar»; con datos, «No se pudo actualizar la pieza».
   6. **Dado** un id que no existe, **cuando** abre el detalle, **entonces** ve un mensaje de pieza no encontrada. **Hoy:** la PWA muestra el genérico «No encontrado.».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-06.1–3 y 5 en `07-pieza-veto.yaml`, `07-pieza-estados.yaml` y `07-calendario-errores.yaml` (programada, bloqueada, saltada, fallida, vetada, error con «Reintentar») · CAL-06.4 y 6 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-07 · Resultado de una pieza publicada <a id="cal-07"></a>
 
@@ -141,7 +141,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   5. **Dado** comentaristas leídos, **cuando** se pinta «Quién comentó», **entonces** ve chips por rol («Comprador · 2», «Sin clasificar · N»); si no se leyeron, «Los comentarios aún no se han leído.»; si nadie comentó, «Nadie ha comentado todavía.».
   6. **Dado** la URL del post, **cuando** pulsa «Ver el post en LinkedIn», **entonces** se abre fuera de la app (solo si es https).
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-07.1–3, 5 y 6 en `07-pieza-estados.yaml` y `08-resultados.yaml` (cortes, «—» sin republicaciones, «Aún no», quién comentó; el enlace a LinkedIn se ve, no se abre) · CAL-07.4 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-08 · Texto final y «Copiar» <a id="cal-08"></a>
 
@@ -154,7 +154,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   2. **Dado** «Copiar», **cuando** lo pulsa, **entonces** el texto queda en el portapapeles y el botón dice «Copiado»; si falla, la PWA dice «No se pudo copiar».
   3. **Dado** una pieza sin selección todavía, **cuando** abre el detalle, **entonces** ve «El texto final aparece cuando termine la selección.».
 - **Brechas código/docs:** en la app no se comprobó qué pasa si falla el portapapeles.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-08.1 y 3 en `07-pieza-veto.yaml` y `07-pieza-estados.yaml` · CAL-08.2: se toca «Copiar» sin «No se pudo copiar»; «Copiado» dura menos que un toque de Maestro · 2026-11-08 · pasa
 
 ### CAL-09 · «Cómo se escribió» <a id="cal-09"></a>
 
@@ -169,7 +169,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   4. **Dado** que no hay coste registrado, **cuando** abre Fuentes y coste, **entonces** ve «Sin dato de coste.».
   5. **Dado** las variantes, **cuando** las mira en el teléfono, **entonces** van en pestañas (o deslizables en la app); en escritorio, lado a lado.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-09.1–3 y 5 en `07-pieza-veto.yaml` y `07-pieza-estados.yaml` (cada pliegue, variantes deslizadas, ronda de reparación, etapa que no corrió) · CAL-09.4 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-10 · Pieza en preparación <a id="cal-10"></a>
 
@@ -182,7 +182,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   2. **Dado** la etapa `reparacion`, **cuando** se pinta, **entonces** la etiqueta de etapa lo refleja.
   3. **Dado** que la pieza avanza, **cuando** pasan 30 s, **entonces** el detalle se actualiza solo.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** sin prueba E2E: una pieza en preparación en el mundo de QA dejaría siempre algo «en camino» y CAL-04.3 y CAL-14 no se podrían probar · 2026-11-08 · pasa
 
 ### CAL-11 · Comentario para el equipo sobre una pieza <a id="cal-11"></a>
 
@@ -197,7 +197,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   3. **Dado** un comentario de voz en la app, **cuando** lo envía, **entonces** llega igual que uno escrito. **Hoy falla.**
   4. **Dado** comentarios de los últimos 30 días, **cuando** corre el director, **entonces** los recibe en `feedback_from_gustavo` ([EDI-17](motor-editorial.md#edi-17)).
 - **Brechas código/docs:** un comentario solo aparece cuando el backend lo marca `anotado`; mientras se procesa, el detalle no lo muestra como pendiente.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-11.1 en `07-pieza-veto.yaml` (abre la captura con «Comentario sobre la pieza») · el envío es de `05-captura-*.yaml` · 2026-11-08 · pasa
 
 ### CAL-12 · Vetar una pieza <a id="cal-12"></a>
 
@@ -214,7 +214,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   6. **Dado** una pieza ya publicada, saltada o bloqueada, **cuando** abre el detalle, **entonces** no hay botón «Vetar».
   7. **Dado** un token de servicio, **cuando** intenta vetar, **entonces** recibe 403.
 - **Brechas código/docs:** la API acepta el veto sin nota (`note` opcional en `DecisionInput`); la nota obligatoria la pone la interfaz. En la app, cerrar la app a la fuerza durante los 5 s pierde el veto (lo dice un comentario en `pendingVeto.ts`), y un error del envío en segundo plano probablemente no se ve.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-12.1, 2, 4 y 6 en `07-pieza-veto.yaml` (nota obligatoria, «Deshacer», veto enviado a los 5 s) · CAL-12.5 en `07-calendario-errores.yaml` (veto rechazado: «No se pudo vetar») · CAL-12.3 y 7 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-13 · Vetar una acción en cola <a id="cal-13"></a>
 
@@ -227,7 +227,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   2. **Dado** una acción de red, **cuando** abre el veto, **entonces** el texto avisa «No saldrá, y vetar una acción de red descarta a <persona> para siempre: el equipo no la volverá a proponer.».
   3. **Dado** que confirma el veto de red, **cuando** termina, **entonces** la persona pasa a `discarded`.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-13.1 y 2 en `07-calendario.yaml` (veto de una invitación en cola, que sale a los 5 s, y de una reacción con «Deshacer») · CAL-13.3 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-14 · «Preparar la siguiente pieza» <a id="cal-14"></a>
 
@@ -242,7 +242,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   4. **Dado** un 409 (sin LinkedIn, en pausa o sin hueco), **cuando** vuelve, **entonces** el motivo se ve dentro de la confirmación.
   5. **Dado** dos pulsaciones del mismo intento, **cuando** se envían, **entonces** llevan el mismo `request_id` y solo se encola una preparación.
 - **Brechas código/docs:** la confirmación no da una cifra de coste.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-14.1–3 en `07-pieza-veto.yaml` (con la API del mundo de QA responde 202 y la preparación queda en cola) · CAL-14.4 y 5 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-15 · Aprobar una pieza en modo aprobación <a id="cal-15"></a>
 
@@ -256,7 +256,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   3. **Dado** esa pieza en la PWA o la app, **cuando** abre el detalle, **entonces** ve «Aprobar» junto a «Vetar». **Hoy falla:** solo puede vetarla.
   4. **Dado** un `expected_hash` que no coincide con el texto actual, **cuando** aprueba, **entonces** la API lo rechaza.
 - **Brechas código/docs:** `publicacion-diaria.md` («Para la primera pieza conviene `CONT-09=approval`: Gustavo la aprueba con su hash») presupone una interfaz que ya no existe. Ver también [BAR-13](red.md#bar-13).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** sin prueba E2E: falta «Aprobar» en la app (lo añade el PR de Tu turno) · 2026-11-08 · pasa
 
 ### CAL-16 · Enlaces antiguos llevan al Calendario o a la pieza <a id="cal-16"></a>
 
@@ -270,7 +270,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   3. **Dado** `/acciones?state=uncertain`, **cuando** lo abre, **entonces** llega a `/tu-turno`; cualquier otro `/acciones`, a `/calendario`.
   4. **Dado** una ruta desconocida en la app, **cuando** la abre, **entonces** ve «Esta vista no existe» con «Ir a la Oficina»; en la PWA vuelve a `/`.
 - **Brechas código/docs:** `CONTRATO-API.md` sigue describiendo `/acciones`, `/red` y `/maquina` como pantallas vivas.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** CAL-16.4 en `07-pieza-estados.yaml` (una vista que no existe y «Ir a la Oficina») · CAL-16.1–3 en `push/routes.ts` y sus pruebas · 2026-11-08 · pasa
 
 ---
 

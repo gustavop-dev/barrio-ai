@@ -2,7 +2,9 @@
 // has scheduled and what is Gustavo's. Mes, Semana and Lista, with the view and the date in the route
 // params. Swipe the week or the month to turn it; tap a day to open its panel in a sheet (half and
 // full, not modal: the calendar above stays usable); the selected day's panel also sits under the
-// calendar. Days are Bogotá's.
+// calendar. Days are Bogotá's. While the sheet is open the calendar scrolls so the week strip (or the
+// month) sits at the top, and the sheet's room starts under it: at full height it never covers the days,
+// so another one can still be tapped. Closing the sheet scrolls back to where Gustavo was.
 //
 // Motion (MovCalendario): the selection slides to the tapped day (Selection.tsx); the day panel, inline
 // and in the sheet, enters from the side the date moved to (DaySwap.tsx); Semana ↔ Mes makes the week
@@ -16,7 +18,7 @@ import { addDays, addMonths, CALENDAR_TZ, deviceDiffers, longDayTitle, monthGrid
 import { DEFAULT_VISTA, monthIsEmpty, toggledLayers, VISTAS, visibleLayers, type Vista } from '@compartido/logic/events';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useSharedValue } from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
@@ -39,6 +41,11 @@ import { LeavingView, useViewSwitch, type GridVista } from './ViewSwitch';
 export function rangeOf(vista: Vista, fecha: string): [string, string] {
   const days = vista === 'mes' ? monthGrid(fecha) : weekDays(fecha);
   return [days[0]!, days[days.length - 1]!];
+}
+
+/** The day sheet's top at its highest: just under the grid, but always leaving it at least 55 % of the screen. */
+export function sheetTop(gridBottom: number, screenHeight: number): number {
+  return Math.max(0, Math.min(gridBottom + space[2], screenHeight * 0.45));
 }
 
 function shifted(vista: Vista, fecha: string, direction: number): string {
@@ -81,6 +88,15 @@ export function CalendarioScreen() {
   const [sheetDay, setSheetDay] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [screenHeight, setScreenHeight] = useState<number | undefined>(undefined);
+  // The day sheet's room starts under the grid: the screen, the grid's frame and the scroll that brings it to the top.
+  const screenRef = useRef<ComponentRef<typeof View>>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const gridRef = useRef<ComponentRef<typeof View>>(null);
+  const scrollY = useRef(0);
+  const scrollBeforeSheet = useRef<number | null>(null);
+  const [gridBottom, setGridBottom] = useState(0);
+  /** While the sheet is open: the scroll that puts the grid on top, and the content height that keeps it reachable. */
+  const [sheetScroll, setSheetScroll] = useState<number | null>(null);
   // The tab stays mounted under other screens: its sheet (and the Android back it listens to) waits
   // until the calendar is back, and comes back open on the same day.
   const here = usePathname() === '/calendario';
@@ -131,9 +147,49 @@ export function CalendarioScreen() {
     byDate.get(day) ?? client.getQueryData<Calendario>(keys.calendario(...rangeOf(vista, day)))?.days.find((item) => item.date === day);
 
   const select = useCallback((day: string) => update({ fecha: day === today ? null : day }), [update, today]);
+
+  /**
+   * Scrolls the grid to the top, under a small gap (`scroll`), or only measures where it ends on screen. While the sheet
+   * is open the content keeps at least the height that scroll needs (sheetScroll + the screen), so a short day panel,
+   * or one loading after a swipe, never pulls the calendar back under the header.
+   */
+  const placeGrid = useCallback((scroll: boolean) => {
+    const grid = gridRef.current;
+    const screen = screenRef.current;
+    if (!grid || !screen || typeof grid.measureLayout !== 'function') return;
+    grid.measureLayout(screen, (_x, y, _width, height) => {
+      if (!scroll) {
+        setGridBottom(Math.max(0, y + height));
+        return;
+      }
+      setSheetScroll(Math.max(0, scrollY.current + y - space[2]));
+      setGridBottom(space[2] + height);
+    });
+  }, []);
+
+  // The scroll goes once the content is tall enough for it (the floor below renders with it).
+  useEffect(() => {
+    if (sheetScroll !== null) scrollRef.current?.scrollTo({ y: sheetScroll, animated: !reduced });
+  }, [sheetScroll, reduced]);
+
+  // While the sheet is open, keep the grid on top when the day or the week changes.
+  useEffect(() => {
+    if (openSheetDay) placeGrid(true);
+  }, [openSheetDay, fecha, placeGrid]);
+
   const openDay = (day: string) => {
     select(day);
+    if (!sheetDay) scrollBeforeSheet.current = scrollY.current;
     setSheetDay(day);
+    placeGrid(true);
+  };
+
+  const closeSheet = () => {
+    setSheetDay(null);
+    setSheetScroll(null);
+    const before = scrollBeforeSheet.current;
+    scrollBeforeSheet.current = null;
+    if (before !== null) scrollRef.current?.scrollTo({ y: before, animated: !reduced });
   };
   const shift = useCallback((direction: 1 | -1) => select(shifted(vista, fecha, direction)), [select, vista, fecha]);
 
@@ -218,17 +274,33 @@ export function CalendarioScreen() {
   );
 
   return (
-    <View style={styles.screen} onLayout={(event: LayoutChangeEvent) => setScreenHeight(event.nativeEvent.layout.height)}>
+    <View ref={screenRef} style={styles.screen} onLayout={(event: LayoutChangeEvent) => setScreenHeight(event.nativeEvent.layout.height)}>
       <ScrollView
+        ref={scrollRef}
         testID="calendario"
         style={styles.screen}
-        contentContainerStyle={[pageContent, styles.content, { paddingBottom: bottom }]}
+        scrollEventThrottle={32}
+        onScroll={(event) => {
+          scrollY.current = event.nativeEvent.contentOffset.y;
+        }}
+        onScrollEndDrag={() => {
+          if (openSheetDay) placeGrid(false);
+        }}
+        onMomentumScrollEnd={() => {
+          if (openSheetDay) placeGrid(false);
+        }}
+        contentContainerStyle={[
+          pageContent,
+          styles.content,
+          { paddingBottom: bottom },
+          openSheetDay && sheetScroll !== null && screenHeight ? { minHeight: sheetScroll + screenHeight } : null,
+        ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} colors={[colors.brandDeep]} />}
       >
         {header}
         <View style={styles.calendar}>
           <ErrorRetry error={calendar.isError ? calendar.error : null} onRetry={() => void calendar.refetch()} title="No se pudo cargar el calendario" />
-          <View style={styles.viewport}>
+          <View ref={gridRef} style={styles.viewport} collapsable={false}>
             {viewSwitch.from ? (
               <LeavingView key={viewSwitch.from} onDone={viewSwitch.done}>
                 <Grid vista={viewSwitch.from} fecha={fecha} today={today} byDate={byDate} visible={visible} onSelect={openDay} preview />
@@ -254,7 +326,7 @@ export function CalendarioScreen() {
             leaving ? (
               <DayPanel date={date} day={cachedDay(date)} loading={false} testID="panel-dia-saliente" {...dayPanelProps} />
             ) : (
-              <DayPanel date={date} day={selectedDay} loading={dayLoading} {...dayPanelProps} />
+              <DayPanel date={date} day={selectedDay} loading={dayLoading} failed={calendar.isError} {...dayPanelProps} />
             )
           }
         />
@@ -263,8 +335,8 @@ export function CalendarioScreen() {
         <SnapSheet
           label={`Detalle del día, ${longDayTitle(openSheetDay)}`}
           bottom={bottom - space[10]}
-          availableHeight={screenHeight}
-          onClose={() => setSheetDay(null)}
+          availableHeight={screenHeight === undefined ? undefined : screenHeight - sheetTop(gridBottom, screenHeight)}
+          onClose={closeSheet}
           testID="hoja-dia"
         >
           <DaySwap
@@ -277,6 +349,7 @@ export function CalendarioScreen() {
                   date={date}
                   day={leaving ? cachedDay(date) : byDate.get(date)}
                   loading={!leaving && !calendar.isError && !byDate.get(date) && gridLoading}
+                  failed={!leaving && calendar.isError}
                   showHeading={false}
                   testID={leaving ? 'panel-dia-hoja-saliente' : 'panel-dia-hoja'}
                   {...dayPanelProps}

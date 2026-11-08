@@ -8,7 +8,7 @@ export { ConfirmSheet } from './ConfirmSheet';
 export { EmptyState, EmptyText } from './EmptyState';
 export { errorMessage, ErrorRetry, isConflict } from './ErrorRetry';
 export { Field } from './Field';
-export { Fold } from './Fold';
+export { Fold, FoldIn } from './Fold';
 export { KeyValue } from './KeyValue';
 export { Meter, meterTone, type MeterTone } from './Meter';
 export { Note, type NoteTone } from './Note';

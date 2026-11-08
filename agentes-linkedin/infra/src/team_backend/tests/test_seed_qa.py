@@ -76,6 +76,9 @@ class SeedQaTests(MediaMixin,OperatorBase):
                      '/api/v1/resultados/resumen-semanal','/api/v1/red/contacts','/api/v1/red/summary','/api/v1/oportunidades',
                      '/api/v1/operador/referents','/api/v1/galeria','/api/v1/capturas','/api/v1/oficina/actividad','/api/v1/operador/overview'):
             self.assertEqual(app.get(path).status_code,200,path)
+        # Calendario › Lista «En cola» (CAL-04, CAL-13): a reaction and a network action, approved and waiting.
+        queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
+        self.assertEqual(sorted(q['capability'] for q in queued),['INT-02','RED-02'])
 
         # A flow changes the world (answers, vetoes, reads); the next seed puts it back and keeps the app signed in.
         question=TeamQuestion.objects.get(question__startswith='¿Cuántos proyectos')

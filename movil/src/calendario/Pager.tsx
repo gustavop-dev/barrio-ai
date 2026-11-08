@@ -131,6 +131,12 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
   const strip = useAnimatedStyle(() => ({ transform: [{ translateX: -offset.value }] }));
   const frame = useAnimatedStyle(() => (height && height.value >= 0 ? { height: height.value } : {}));
   const pages: { key: number; offset: PageOffset }[] = width ? [-1, 0, 1].map((step) => ({ key: index + step, offset: step as PageOffset })) : [{ key: index, offset: 0 }];
+  // The strip's own box spans its three pages and always covers the frame: a view laid out outside its parent's box is
+  // drawn (the strip is translated), but Android does not count it as on screen, so after a swipe TalkBack (and the QA
+  // flows) lost the days of the week or month that slid in. Pages sit at key × width from the strip's origin, so a
+  // page's place on screen stays key × width − offset whatever the box is.
+  const origin = Math.min(0, index - 1) * width;
+  const extent = Math.max(1, index + 2) * width - origin;
 
   return (
     <Animated.View
@@ -147,16 +153,16 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
       testID={testID}
     >
       <GestureDetector gesture={pan}>
-        <Animated.View style={strip}>
+        <Animated.View style={[strip, width ? { left: origin, width: extent } : null]}>
           {pages.map((page) =>
             page.offset === 0 ? (
-              <View key={page.key} style={[styles.current, { left: page.key * width }]} onLayout={measure(page.key)}>
+              <View key={page.key} style={[styles.current, { left: page.key * width - origin }, width ? { width } : null]} onLayout={measure(page.key)}>
                 {renderPage(0)}
               </View>
             ) : (
               <View
                 key={page.key}
-                style={[styles.side, { left: page.key * width, width }]}
+                style={[styles.side, { left: page.key * width - origin, width }]}
                 onLayout={measure(page.key)}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
