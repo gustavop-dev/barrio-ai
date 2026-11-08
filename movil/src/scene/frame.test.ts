@@ -1,4 +1,4 @@
-import { createScene, ingestScene, setSceneStill } from '@compartido/scene/runtime';
+import { createScene, ingestScene, selectScene, setSceneStill } from '@compartido/scene/runtime';
 import { officeFrames } from '@/theme/motion';
 import { advanceFrame } from './frame';
 import { createSpriteBuffer, updateSprites } from './sprites';
@@ -11,7 +11,8 @@ it('advances identical fixed steps at different display rates and bounds a long 
   for (let i = 0; i < 60; i++) advanceFrame(b, cb, 16, true);
   expect(a.clock).toBe(b.clock);
   const before = a.clock; advanceFrame(a, ca, 20000, true);
-  expect(a.clock - before).toBe(officeFrames.maxDeltaMs);
+  expect(a.clock - before).toBe(Math.floor(officeFrames.maxDeltaMs / officeFrames.stepMs) * officeFrames.stepMs);
+  expect(ca.remainder).toBe(officeFrames.maxDeltaMs % officeFrames.stepMs);
 });
 it('freezes a walker for blur, background, machine pause and unavailable activity without catching up', () => {
   const s = createScene(), c = { remainder: 0 };
@@ -53,4 +54,19 @@ it('clamps pan, keeps the pinch focal point stable and snaps to whole physical p
 it('opens the home path and legacy knowledge redirect in Oficina', () => {
   expect(routeForUrl('/')).toEqual({ pathname: '/', params: {} });
   expect(routeForUrl('/conocimiento')).toEqual({ pathname: '/', params: {} });
+});
+
+it('moves only the selected sprite in whole logical pixels, without shifting its hit target or furniture', () => {
+  const s = createScene(), b = createSpriteBuffer();
+  updateSprites(s, b);
+  const before = b.slots.map((slot) => ({ ...slot }));
+  selectScene(s, 'perfil', 'estrategia'); updateSprites(s, b);
+  const changes = b.slots.filter((slot, i) => slot.y !== before[i]!.y);
+  expect(changes).toHaveLength(1);
+  expect(changes[0]!.y).toBe(166 - 29 - s.motion.hopPx);
+  expect(s.actors.find((a) => a.id === 'perfil')!.y).toBe(166);
+  s.clock = s.motion.hopStepMs; updateSprites(s, b);
+  expect(changes[0]!.y).toBe(166 - 29 - s.motion.hopSettlePx);
+  setSceneStill(s, true); updateSprites(s, b);
+  expect(changes[0]!.y).toBe(166 - 29);
 });

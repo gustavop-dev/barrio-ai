@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { runOnJS, runOnUI, useAnimatedReaction, useFrameCallback, useSharedValue } from 'react-native-reanimated';
 import type { StatusMap } from '@compartido/scene/activity';
 import type { OficinaEventos } from '@compartido/api/oficina';
-import { createScene, ingestScene, pumpScene, sceneSnapshot, setSceneStill } from '@compartido/scene/runtime';
+import { createScene, ingestScene, pumpScene, receiveSceneCapture, sceneSnapshot, setSceneStill } from '@compartido/scene/runtime';
 import { officeFrames, officeMotion } from '@/theme/motion';
 import { advanceFrame } from './frame';
+import { subscribeCaptureReceipts } from './captureReceipts';
 
 function reportFrames(frames: number, meanDelta: number, maxDelta: number, slow: number, meanWork: number) {
   console.info('[Oficina/UI]', { frames, meanDeltaMs: meanDelta, maxDeltaMs: maxDelta, overBudget: slow, meanSimulationMs: meanWork });
@@ -12,6 +14,7 @@ function reportFrames(frames: number, meanDelta: number, maxDelta: number, slow:
 export function useOfficeScene({ active, live, paused, reduced, statuses, page }: {
   active: boolean; live: boolean; paused: boolean; reduced: boolean; statuses: StatusMap; page?: OficinaEventos;
 }) {
+  const client = useQueryClient();
   const [initial] = useState(() => createScene({ frozen: true, still: reduced }, officeMotion));
   const scene = useSharedValue(initial);
   const enabled = useSharedValue(false);
@@ -38,6 +41,11 @@ export function useOfficeScene({ active, live, paused, reduced, statuses, page }
       scene.modify((s) => { s.wallTime = Date.now(); ingestScene(s, page.events, page.now); return s; });
     })();
   }, [page, scene]);
+  useEffect(() => subscribeCaptureReceipts(client, () => {
+    runOnUI(() => {
+      scene.modify((s) => { s.wallTime = Date.now(); receiveSceneCapture(s); return s; });
+    })();
+  }), [client, scene]);
   const frame = useFrameCallback(({ timeSincePreviousFrame: delta }) => {
     const started = __DEV__ ? performance.now() : 0;
     scene.modify((s) => {

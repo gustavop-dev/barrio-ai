@@ -145,10 +145,10 @@ enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas 
 
 | Token | Valor | Dónde se usa |
 |---|---|---|
-| `timings.officeNowIn` / `officeNowOut`, `officeLayout.nowIn/nowOut` | 260 (base) enter / 180 (fast) exit | Entrada y salida de la narración flotante en `scene/OficinaScreen.tsx`. |
+| `timings.officeNowIn` / `officeNowOut`, `officeLayout.nowIn/nowOut` | 180 (fast) enter / 120 exit | Entrada y salida del texto de la narración flotante (MovOficina) en `scene/OfficeNarration.tsx`. |
 | `officeMotion.walkSpeed` | 40 px lógicos/s | Caminatas del motor compartido (`scene/runtime.ts`). |
 | `officeMotion.startGap` / `summaryHold` | 1800 / 2600 ms | Espaciado de eventos y resúmenes. |
-| `officeMotion.ambientFirst` / `ambientEvery` | 9000 / 20000 ms | Café y charla únicamente para roles en espera. |
+| `officeMotion.ambientFirst` / `ambientEvery` | 9000 / 11000 ms | Café y charla (MovOficina) únicamente para roles en espera. |
 | `officeMotion.fadeMs` | 500 ms | Operación sale y vuelve por la puerta. |
 | `officeMotion.questionMs` / `bookMs` / `readMs` | 1800 / 2200 / 1600 ms | Consulta de biblioteca. |
 | `officeMotion.searchMs` / `librarianBookMs` / `handBookMs` | 1400 / 1200 / 900 ms | Búsqueda y entrega del bibliotecario. |
@@ -157,7 +157,7 @@ enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas 
 | `officeMotion.coffeeMs` / `chatMs` / `chatReplyMs` | 2600 / 2000 / 2200 ms | Pausas de café y conversación. |
 | `officeMotion.runFrameMs` / `idleFrameMs` | 110 / 220 ms | Fotogramas del atlas en `scene/sprites.ts`. |
 | `officeMotion.lightMs` / `bubbleFrameMs` | 700 / 300 ms | Luces de actividad y bocadillos en `scene/Decorations.tsx`. |
-| `officeFrames.stepMs` / `maxDeltaMs` | 16 / 64 ms | Paso fijo y límite de recuperación tras un frame lento. |
+| `officeFrames.stepMs` / `maxDeltaMs` | 16 / 60 ms | Paso fijo y límite de recuperación tras un frame lento. |
 | `officeFrames.reportFrames` / `slowFrameMs` | 300 / 1000÷60 ms | Diagnóstico de desarrollo: delta medio/máximo, frames sobre presupuesto y coste medio del motor. |
 | `officeGestures.minZoom` / `maxZoom` | 1 / 3 | Límites relativos a la escala inicial. |
 | `officeGestures.panDistance` / `tapDistance` | 8 / 10 dp | Activación del desplazamiento y tolerancia de toque. |
@@ -220,3 +220,51 @@ Una notificación nueva puede llegar de dos formas:
 | `notifSprings.dotIn` / `dotOut` | SOFT / FIRM | El punto de la campana salta desde 0 cuando llega una (`dot`) y se cierra cuando todo está leído. |
 | `notifMotion.readStaggerMs` / `readChipTo`, `notifTimings.readOff` | 30 ms por fila, 0.7, 180 (fast) · exit | «Marcar todo como leído» apaga «Nueva» y el resaltado de cada fila en cascada, de arriba abajo. La etiqueta encoge a 0.7 mientras se desvanece. |
 | `haptics.notificationArrive` | impacto ligero | Llega una notificación con la app abierta (LEVE). Vibra una sola vez aunque haya una barra superior por pestaña. |
+
+### MovOficina · selección, captura y narración
+
+Fuente: [`MovOficina.dc.html`](diseno-movimiento/tableros/MovOficina.dc.html), script completo,
+`person`, `brackets`, `receiveCapture`, `ambient` y `caption`. `officeMotion` entrega los valores al
+intérprete compartido; `compartido/src/scene/motion.ts` conserva los mismos valores por defecto para
+la PWA. No se reproduce el ciclo editorial de demostración: las tareas siguen viniendo de eventos
+reales y la captura se confirma mediante el éxito de la mutación existente `createCaptura`.
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `officeMotion.hopPx` / `hopSettlePx` | 2 / 1 px lógicos | `sceneHop` y el atlas de Skia: solo sube el personaje seleccionado, no su silla, su posición ni su área de toque. |
+| `officeMotion.hopStepMs` / `hopEndMs` | 90 / 180 ms | Salto escalonado: 2 px hasta 90 ms, 1 px hasta 180 ms, luego 0. Seleccionar otra vez el mismo personaje no reinicia el salto, como en el tablero. |
+| `officeMotion.bracketPx` / `bracketMs` | 7 px / 120 ms | Los cuatro corchetes crecen linealmente desde 1 px, redondeados a píxeles enteros. Skia selecciona entre siete dibujos precalculados. |
+| `officeMotion.mailX` / `mailStartY` / `mailLandingY` | 98 / −6 / 68 px lógicos | Posición y caída del sobre delante de Operación. |
+| `officeMotion.mailAcceleration` / `mailStepMs` | 0,9 px por paso / 16 ms | Aceleración discreta del tablero, incluido el primer paso inmediato; el sobre permanece en el suelo hasta que Operación esté libre. |
+| `officeMotion.captureFreePollMs` | 300 ms | Espera de Operación ocupada, sin sustituir una publicación u otra ruta en curso. |
+| `officeMotion.captureQuestionMs` | 700 ms | Bocadillo de pregunta y espera al recoger el sobre. |
+| `officeMotion.captureSheetMs` / `capturePickupMs` | 1600 / 500 ms | Bocadillo de hoja al recoger y espera antes de caminar hacia Mesa editorial. |
+| `officeMotion.captureHandoffMs` | 1800 ms | Hoja de Operación y charla del Director al llegar; espera `deliveryMs` (1500 ms) y regreso a casa a `walkSpeed` (40 px/s). |
+| `officeNarration.enterDelayMs` / `enterY` | 60 ms / 6 dp | La nueva línea entra subiendo con `timings.officeNowIn`: 180 ms, `easings.enter`. |
+| `officeNarration.exitY` | −4 dp | La línea anterior sale subiendo con `timings.officeNowOut`: 120 ms, `easings.exit`. |
+| `officeNarration.holdMs` | 3500 ms | Desde cada narración, programa la retirada de la caja; una nueva narración cancela el reloj anterior. |
+| `officeNarration.retireY` / `timings.officeNowRetire` | −6 dp / 180 ms, `easings.exit` | Salida de la caja; al terminar se retira también su nodo de accesibilidad. |
+
+El ambiente del tablero conserva la primera pausa a 9 s y vuelve a intentarlo cada 11 s: café para
+Posicionamiento, Perfil, Investigador, Lector par y Lector divulgador; charla en Relaciones a los
+2000 / 2200 ms existentes. Solo participan roles realmente en espera y libres, sin interferir con
+los eventos reales ni las entregas de capturas.
+
+Adaptaciones nativas: el salto, los corchetes y el sobre son píxeles lógicos del mapa (la pantalla
+los amplía a escala entera); la narración usa dp. El motor conserva pasos fijos de 16 ms y limita
+cada delta a 60 ms, como el frame del tablero, guardando el resto para el frame siguiente. Skia y
+Reanimated realizan el movimiento en UI; React solo recibe cambios de narración/tarea. La tira,
+los paneles, el pan, el pinch y los objetivos de toque de 48 dp conservan su comportamiento.
+
+No hay vibraciones nuevas en el tablero: se conserva `officePick` para seleccionar y el único
+`captureSent` existente en la hoja. Oficina escucha el cache de mutaciones sin tocar la hoja,
+los requests ni «Deshacer»; deduplica por id de captura y serializa varios envíos. Una captura no
+crea eventos ficticios en «Lo último que hizo».
+
+Con `useMotion().reduced`, no hay salto, caída, paseo, bucles ni dibujo progresivo de corchetes;
+los corchetes aparecen completos. Las narraciones se sustituyen al instante y **no se retiran**,
+igual que el retorno temprano de `caption` en el tablero. Activar movimiento reducido durante una
+entrega elimina el sobre y devuelve los personajes a casa; desactivarlo no repite lo ya recibido.
+Se mantiene la adaptación de quietud de la app, evitando dejar a un personaje elevado o un sobre
+suspendido al congelar el reloj. La velocidad de demostración y «Simular un envío» no se añaden a
+la app: el envío real es su disparador.
