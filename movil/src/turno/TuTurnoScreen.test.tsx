@@ -49,6 +49,14 @@ describe('Tu turno', () => {
     expect(screen.getByText('Hoy el equipo publicó 1 post, comentó en 6 y siguió a 4 personas.')).toBeOnTheScreen();
   });
 
+  it('says nothing depends on Gustavo when only expired cards are left, and still shows them under «Ya no es urgente»', async () => {
+    const expired = questionCard({ id: 'q8', question: '¿Fuiste al meetup del martes?', expired: true }, { state: 'caducada', tone: 'muted' });
+    await renderTurno(turno({ items: [], count: 0, critical: false, later: [expired] }));
+    expect(await screen.findByText('Nada depende de ti hoy')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Ya no es urgente · 1' })).toBeOnTheScreen();
+    expect(screen.getByText('¿Fuiste al meetup del martes?')).toBeOnTheScreen();
+  });
+
   it('«Más tarde» postpones a question and says when it comes back', async () => {
     const server = await renderTurno(turno(), { 'POST /api/v1/preguntas/q1/mas-tarde': { body: { id: 'q1', postponed_until: '2026-11-10T09:00:00-05:00' } } });
     await screen.findByText('Más tarde');

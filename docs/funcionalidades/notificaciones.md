@@ -14,7 +14,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
 | [NOT-03](#not-03) | «Próximo»: lo que va a pasar | PWA · app · backend | funciona |
 | [NOT-04](#not-04) | Abrir el destino de una notificación | PWA · app · backend | funciona |
 | [NOT-05](#not-05) | Punto de novedades en la campana | PWA · app · backend | funciona |
-| [NOT-06](#not-06) | Qué eventos llegan a Notificaciones | backend | parcial |
+| [NOT-06](#not-06) | Qué eventos llegan a Notificaciones | backend | funciona |
 
 ---
 
@@ -96,15 +96,15 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
 ### NOT-06 · Qué eventos llegan a Notificaciones <a id="not-06"></a>
 
 - **Dónde:** backend
-- **Estado:** parcial
+- **Estado:** funciona
 - **Qué hace para Gustavo:** cada cosa que pasa y no le pide nada aparece una sola vez en su bandeja.
 - **Código:** llamadas a `notificaciones.avisar` con un tipo de `FEED_KINDS`; `ref` único para no duplicar.
 - **Criterios de aceptación:**
   1. **Dado** cada uno de estos eventos, **cuando** ocurre, **entonces** se guarda su Notificación: pieza lista (`piece_scheduled`), publicada, bloqueada, descartada, conexión que encaja, oportunidad nueva o que cambia de etapa, posts nuevos del Observatorio (`observatory`), captura procesada, líder sin aprobar en 7 días (`lead_silent`) y resumen de la semana.
   2. **Dado** el mismo evento dos veces (mismo `ref`), **cuando** se avisa, **entonces** solo hay una Notificación.
   3. **Dado** `invites_expected` y `machine_paused_env`, **cuando** ocurren, **entonces** aparecen solo en «Próximo» (se calculan, no se guardan).
-  4. **Dado** que la máquina se detiene desde el servidor, **cuando** pasa, **entonces** llega una push. **Hoy falla:** `machine_paused_env` tiene push activada por defecto en Ajustes, pero nada llama a `avisar` con ese tipo, así que la push nunca sale.
-- **Brechas código/docs:** el contrato dice que `machine_paused_env` tiene push por defecto; no tiene emisor (ver [PUS-05](notificaciones-push.md#pus-05)).
+  4. **Dado** que la máquina se detiene desde el servidor, **cuando** el autopiloto lo ve, **entonces** llega una push una vez por parada ([PUS-05](notificaciones-push.md#pus-05)), sin guardarla en el feed.
+- **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
 ## Retiradas

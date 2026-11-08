@@ -72,7 +72,7 @@ Estados de una acción: `proposed`, `approved`, `rejected`, `superseded`, `disca
 
 Decisiones, todas con sesión humana:
 - `POST /api/v1/operador/actions/<id>/reject` con `{ note }`: vetar una acción pendiente o aprobada.
-- `POST /api/v1/operador/actions/<id>/approve` con `{ expected_hash, note }`: solo en capacidades configuradas en modo `approval`.
+- `POST /api/v1/operador/actions/<id>/approve` con `{ expected_hash, note }`: solo en capacidades configuradas en modo `approval`. Responde 202 con `{ action, job }`; 409 si la propuesta ya no está en `proposed` o si `expected_hash` no es el del texto actual. Lo que espera esta aprobación aparece como tarjeta «Aprobación» de Tu turno (`approval:<id>`) y primero en `upcoming.queued` de `/api/v1/actividad`, con `awaiting_approval: true` y su `payload_hash`.
 - `POST /api/v1/operador/actions/<id>/resolve` con `{ outcome: "confirmed|failed", note }`.
 - `POST /api/v1/operador/actions/<id>/revise` con `{ payload }`.
 - `POST /api/v1/operador/actions/<id>/reconcile`.
@@ -148,7 +148,7 @@ La PWA muestra un mensaje en español para cada motivo y quita `linkedin` y `mot
 
 ## Red (crecer la red)
 
-Fuente del bloque: DESC-02/05/07 y RED-01/02/03/04/09. La máquina descubre a quien comenta en los posts de los referentes y a quien sale en búsquedas por palabras clave, clasifica a cada candidato con un modelo y propone seguirlo, invitarlo sin nota o aceptar su invitación. Toda acción pasa por el flujo de siempre (propuesta → aprobación → ejecución). En el modo de ensayo, cada capacidad está en `approval` y espera a Gustavo en `/acciones`.
+Fuente del bloque: DESC-02/05/07 y RED-01/02/03/04/09. La máquina descubre a quien comenta en los posts de los referentes y a quien sale en búsquedas por palabras clave, clasifica a cada candidato con un modelo y propone seguirlo, invitarlo sin nota o aceptar su invitación. Toda acción pasa por el flujo de siempre (propuesta → aprobación → ejecución). En el modo de ensayo, cada capacidad está en `approval` y espera a Gustavo: cada propuesta es una tarjeta «Aprobación» de Tu turno y una fila de «En cola» en Calendario › Lista, las dos con «Aprobar» y «Vetar». La antigua pantalla `/acciones` ya no existe: la PWA la redirige al calendario.
 
 ### Acciones de red
 
@@ -170,7 +170,7 @@ En estas acciones, `post` y `piece_id` son **siempre `null`**. Se aprueban, veta
                                  "reason": "…", "confidence": 0.8, "model": "…", "classified_at": "ISO" } }
 ```
 
-`GET /api/v1/operador/actions?capability=RED-01` filtra por capacidad. La PWA la sigue filtrando también en cliente (`/acciones?capacidad=seguimientos|invitaciones|invitaciones-recibidas`). En `/acciones`, una acción de red muestra la persona (nombre enlazado al perfil en otra pestaña, titular, grado y origen; si comentó, el referente y un extracto del comentario), su clasificación (rol, modalidad y motivo), la acción propuesta y la justificación del agente.
+`GET /api/v1/operador/actions?capability=RED-01` filtra por capacidad. (Histórico: la antigua pantalla `/acciones` la filtraba también en cliente; hoy la PWA redirige `/acciones` al calendario y lo pendiente se aprueba desde Tu turno y «En cola».) En la antigua `/acciones`, una acción de red mostraba la persona (nombre enlazado al perfil en otra pestaña, titular, grado y origen; si comentó, el referente y un extracto del comentario), su clasificación (rol, modalidad y motivo), la acción propuesta y la justificación del agente.
 
 ### Contactos
 
@@ -365,8 +365,8 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
 - **`Card`:**
 
 ```json
-{ "id": "linkedin_expired | linkedin_expiring | uncertain:<proposal_id> | machine_paused | machine_paused_env | account_paused:<id> | question:<id>",
-  "type": "aviso | pregunta | perfil | conversacion", "critical": true, "tone": "bad | warn | info | ok | muted",
+{ "id": "linkedin_expired | linkedin_expiring | uncertain:<proposal_id> | machine_paused | account_paused:<id> | question:<id> | approval:<proposal_id>",
+  "type": "aviso | pregunta | perfil | conversacion | resumen | aprobacion", "critical": true, "tone": "bad | warn | info | ok | muted",
   "agent": "operador_cuenta | director_editorial | …", "agent_label": "Operador de cuenta", "title": "¿Salió o no?",
   "body": "…", "deadline": "iso" | null, "created_at": "iso" | null,
   "actions": [{ "label": "Sí, se aplicó", "endpoint": "/api/v1/operador/actions/<id>/resolve", "body": { "outcome": "confirmed" }, "note_required": true, "primary": true }
@@ -377,6 +377,7 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
 ```
 
 - `attempt` solo viene en avisos `uncertain`; `question`, solo en las preguntas.
+- **Aprobación** (`type: "aprobacion"`, `id: "approval:<proposal_id>"`, Importante): una propuesta en `proposed` de una capacidad en modo `approval` (`OPERATOR_AUTONOMY`; las de red lo están por defecto), que la política no toca y solo Gustavo decide. El título dice qué («¿Apruebas seguir a Laura Gómez?»), `body` es la justificación del agente y `deadline` es cuándo deja de esperar (la hora de la pieza, o `created_at` + `OPERATOR_PROPOSAL_TTL_HOURS`). Acciones: «Aprobar» (`POST …/actions/<id>/approve` con `{ "expected_hash": "<payload_hash>" }`, la principal), «Vetar» (`POST …/actions/<id>/reject`, `note_required`; en red descarta a la persona) y un enlace a la pieza o a la ficha. Trae `approval: { proposal_id, capability, label, text, reaction, target, piece_id, network, expires_at }`. Lo aprobado sale en `recent` con `how: "Aprobada"`. `counts.aprobaciones` las cuenta.
 - **Al ejecutar una acción,** se envía su `body` más `note` cuando `note_required`. «Reanudar» la máquina es `POST /api/v1/operador/control {"paused": false}`, con `reason` opcional.
 - **Los avisos informativos no entran aquí:** invitaciones limitadas por LinkedIn, piezas bloqueadas o presupuesto. Están en Personas (`red/summary.invites_blocked`), en el Calendario y en Ajustes.
 
@@ -467,7 +468,7 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
                              "stage": "director | redactor | lectores | seleccion | verificador", "thesis": "…", "excerpt": "3 primeras líneas",
                              "pillar": "applied_ai", "modality": "projectapp", "primary_reader": "lector_comprador",
                              "action": { "id": "uuid", "state": "approved" } | null, "vetoable": true, "impressions": null, "skip_reason": null, "note": "" }],
-                "queued": [Item + { "expected_at": "iso" }] },
+                "queued": [Item + { "expected_at": "iso" | null, "awaiting_approval": false | true, "payload_hash": "sha256", "expires_at": "iso" }] },
   "items": [Item], "next_offset": 50 | null }
 ```
 
@@ -715,12 +716,14 @@ Reglas de prioridad:
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
 
-**Push.** `GET /api/v1/ajustes` suma `push_types: [{ kind, label, goes_to: "tu_turno" | "notificaciones", default, enabled }]`. `PATCH /api/v1/ajustes/preferencias` recibe `{ "push_disabled": ["kind", …] }`, opcionalmente junto con `gallery_ai_edit_default`, y responde 400 si hay un tipo desconocido o el cuerpo llega vacío. Las push de Tu turno llevan a `/tu-turno`; las de Notificaciones, a su `link`. Push activadas por defecto:
+**Push.** `GET /api/v1/ajustes` suma `push_types: [{ kind, label, goes_to: "tu_turno" | "notificaciones", default, enabled }]` (sin `profile_task`, que aún no tiene evento). `PATCH /api/v1/ajustes/preferencias` recibe `{ "push_disabled": ["kind", …], "push_enabled": ["kind", …] }` (lo apagado, y lo encendido aunque su valor por defecto sea apagado), cualquiera de las dos o las dos, opcionalmente junto con `gallery_ai_edit_default`. Responde 400 si hay un tipo desconocido, si un tipo va en las dos listas o si el cuerpo llega vacío. Si llega una sola lista, la otra se conserva sin los tipos que esa mueve (un cliente antiguo que solo envía `push_disabled` no apaga lo que se encendió). La respuesta trae las dos listas. Las push de Tu turno llevan a `/tu-turno`; las de Notificaciones, a su `link`. Push activadas por defecto:
 
 | Va a | Tipos con push |
 | --- | --- |
 | Tu turno | Todos |
-| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked` y `machine_paused_env` |
+| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent` y `weekly_summary` |
+
+Quién emite cada tipo sin tarjeta propia: `machine_paused` al detener la máquina desde la app; `linkedin_expired` cuando el autopiloto ve el token caducado (en lugar de `account_paused`); `machine_paused_env` una vez por parada, cuando el autopiloto ve `OPERATOR_PAUSED` (un AuditEvent `operator.env_paused` marca que ya salió; nunca se guarda en el feed: «Próximo» la muestra mientras dura). Los urgentes (`uncertain`, `linkedin_expired`, `machine_paused` y `machine_paused_env`) van con prioridad alta.
 
 ## Escena de la Oficina: feed de eventos
 

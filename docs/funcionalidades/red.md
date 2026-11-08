@@ -22,7 +22,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 | [BAR-10](#bar-10) | Descartar a una persona o vetar su acción | PWA · app · backend | funciona |
 | [BAR-11](#bar-11) | Resumen de la red | PWA · app · backend | funciona |
 | [BAR-12](#bar-12) | Aviso de conexión nueva que encaja | backend | funciona |
-| [BAR-13](#bar-13) | Aprobar acciones de red en modo aprobación | backend | parcial |
+| [BAR-13](#bar-13) | Aprobar acciones de red en modo aprobación | PWA · app · backend | funciona |
 
 ---
 
@@ -198,16 +198,17 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 
 ### BAR-13 · Aprobar acciones de red en modo aprobación <a id="bar-13"></a>
 
-- **Dónde:** backend
-- **Estado:** parcial
+- **Dónde:** PWA · app · backend
+- **Estado:** funciona
 - **Qué hace para Gustavo:** si una capacidad de red está en modo aprobación, puede aprobar cada seguimiento, invitación o aceptación antes de que salga.
-- **Código:** `POST /api/v1/operador/actions/<id>/approve` existe (`operador_views.ActionApprove`) y `compartido/src/api/endpoints.ts` define `approveAction`, pero ningún hook ni pantalla lo usa. `autopiloto.autonomy` deja RED-01, RED-02 y RED-04 en `approval` por defecto.
+- **Código:** `POST /api/v1/operador/actions/<id>/approve` (`operador_views.ActionApprove`); tarjetas `approval:<id>` de Tu turno (`rediseno_views.awaiting_approval`, `_approval_card`) y filas con `awaiting_approval` en `upcoming.queued` de `/api/v1/actividad`; `useApproveAction` en `compartido/src/api/hooks.ts`; app `movil/src/turno/TurnoCard.tsx`, `movil/src/calendario/Veto.tsx` (`ApproveButton`), `ActivityList.tsx` (`QueuedRow`); PWA `pages/turno/TurnoCardView.tsx`, `pages/calendario/Veto.tsx`, `ActivityList.tsx`. `autopiloto.autonomy` deja RED-01, RED-02 y RED-04 en `approval` por defecto.
 - **Criterios de aceptación:**
   1. **Dado** `OPERATOR_AUTONOMY` sin RED-01 (modo `approval` por defecto), **cuando** se crea una propuesta RED-01, **entonces** queda en `proposed` y la política no la toca.
   2. **Dado** esa propuesta, **cuando** se envía `POST …/approve` con su `expected_hash` desde una sesión humana con `approve_actions`, **entonces** pasa a `approved` y se ejecuta en su turno.
-  3. **Dado** esa propuesta, **cuando** Gustavo abre la PWA o la app, **entonces** ve la acción pendiente con un botón para aprobarla. **Hoy falla:** no hay pantalla que lo ofrezca.
+  3. **Dado** esa propuesta, **cuando** Gustavo abre Tu turno en la PWA o la app, **entonces** ve la tarjeta «¿Apruebas seguir a <persona>?» (Importante, con el plazo hasta que caduca) con «Aprobar», «Vetar» y «Ver ficha»; «Aprobar» envía su `payload_hash`, aparece «Aprobada. Sale cuando lo permitan la ventana y los topes.», la tarjeta sale y «Hecho recientemente» dice «Aprobada».
   4. **Dado** que nadie la aprueba, **cuando** pasan `OPERATOR_PROPOSAL_TTL_HOURS`, **entonces** caduca.
-- **Brechas código/docs:** `CONTRATO-API.md` dice que en modo de ensayo cada capacidad «espera a Gustavo en `/acciones`», pero la PWA rediseñada redirige `/acciones` a `/calendario` y ya no tiene botón de aprobar. Producción está en modo `auto` para todo, así que hoy no se nota.
+  5. **Dado** esa propuesta, **cuando** abre Calendario › Lista, **entonces** «En cola» la muestra primero con «Espera tu aprobación · caduca <día> a las HH:MM», «Aprobar» y «Vetar»; aprobada, pasa a «Saldrá … según el espaciado».
+- **Brechas código/docs:** — (Producción está en modo `auto` para todo; el mundo de QA deja la red en `approval`.)
 - **Cobertura QA:** pendiente
 
 ## Retiradas

@@ -9,7 +9,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
-| [TUR-01](#tur-01) | Ver lo que depende de él, por prioridad | PWA · app · backend | con fallo conocido |
+| [TUR-01](#tur-01) | Ver lo que depende de él, por prioridad | PWA · app · backend | funciona |
 | [TUR-02](#tur-02) | Contador en la navegación | PWA · app · backend | funciona |
 | [TUR-03](#tur-03) | Una tarjeta pasa de Nueva a Vista | PWA · app · backend | funciona |
 | [TUR-04](#tur-04) | Aviso «¿Salió o no?» de una acción incierta | PWA · app · backend | funciona |
@@ -34,20 +34,19 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 ### TUR-01 · Ver lo que depende de él, por prioridad <a id="tur-01"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** abre Tu turno y ve, ordenado de lo más urgente a lo que puede esperar, todo lo que solo él puede resolver; si no hay nada, ve qué hizo el equipo hoy.
 - **Código:** `GET /api/v1/tu-turno` (`rediseno_views.TuTurno`, `_ordered`); PWA `pages/turno/Pendiente.tsx`; app `movil/src/turno/TuTurnoScreen.tsx`.
 - **Criterios de aceptación:**
   1. **Dado** un aviso urgente, uno importante y dos preguntas sin prisa, **cuando** abre Tu turno, **entonces** ve los grupos «Urgente · 1», «Importante · 1» y «Cuando puedas · 2», en ese orden, y el subtítulo «1 urgente · 1 importante · 2 cuando puedas» (PWA).
   2. **Dado** dos tarjetas de la misma prioridad, una con plazo y otra sin él, **cuando** se ordenan, **entonces** va primero la de plazo más cercano y después la más reciente.
-  3. **Dado** que la máquina detenida desde la app, una acción incierta o LinkedIn caducado existen, **cuando** se calcula la prioridad, **entonces** son Urgente; LinkedIn que caduca en 3 días o menos, una cuenta en pausa, una pregunta con plazo en menos de 48 h y una conversación son Importante; el resto de preguntas y la orientación propuesta son Cuando puedas.
-  4. **Dado** que no hay nada pendiente (aunque haya tarjetas caducadas), **cuando** abre Tu turno, **entonces** ve «Nada depende de ti hoy», el resumen del día («Hoy el equipo publicó 1 post, comentó en 6…» o «Hoy el equipo aún no ha publicado ni interactuado.»), la hora de la próxima pieza si la hay y un enlace al Calendario.
+  3. **Dado** que la máquina detenida desde la app, una acción incierta o LinkedIn caducado existen, **cuando** se calcula la prioridad, **entonces** son Urgente; LinkedIn que caduca en 3 días o menos, una cuenta en pausa, una pregunta con plazo en menos de 48 h, una conversación y una acción que espera su aprobación ([BAR-13](red.md#bar-13)) son Importante; el resto de preguntas y la orientación propuesta son Cuando puedas.
+  4. **Dado** que no hay nada pendiente (aunque haya tarjetas caducadas, que siguen debajo en «Ya no es urgente»), **cuando** abre Tu turno, **entonces** ve «Nada depende de ti hoy», el resumen del día («Hoy el equipo publicó 1 post, comentó en 6…» o «Hoy el equipo aún no ha publicado ni interactuado.»), la hora de la próxima pieza si la hay y un enlace al Calendario.
   5. **Dado** que la carga está en curso, **cuando** abre la vista, **entonces** ve un esqueleto «Cargando lo que depende de ti…».
   6. **Dado** un error en la primera carga, **cuando** falla, **entonces** ve «No se pudo completar» con el detalle y «Reintentar»; si ya había datos, ve «No se pudo actualizar» y las tarjetas siguen visibles.
   7. **Dado** un aviso informativo (invitaciones limitadas, pieza bloqueada, presupuesto agotado), **cuando** abre Tu turno, **entonces** no aparece: está en Personas, Calendario o Ajustes.
   8. **Dado** el enlace `/tu-turno#turno-<id>`, **cuando** carga, **entonces** la vista baja hasta esa tarjeta.
   9. **Dado** que la máquina se detuvo desde el servidor (`OPERATOR_PAUSED`), **cuando** abre Tu turno, **entonces** no hay tarjeta: aparece en Notificaciones › Próximo ([NOT-03](notificaciones.md#not-03)).
-- **El fallo:** en la app, si no hay tarjetas activas pero sí alguna caducada, no aparece «Nada depende de ti hoy» (`movil/src/turno/exits.ts:58-62`); la PWA sí lo muestra.
 - **Brechas código/docs:** el contrato documenta `top` «para la tarjeta de la Oficina»; ninguna interfaz lo usa (el diseño rev 18 quitó lo que había sobre la escena).
 - **Cobertura QA:** pendiente
 
@@ -100,7 +99,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** antes de que caduque el permiso de publicar, y cuando ya caducó, le aparece «Reconecta LinkedIn» con un botón.
-- **Código:** tarjetas `linkedin_expiring` y `linkedin_expired` de `rediseno_views.alerts`; acción `href: /api/v1/linkedin/oauth/start`.
+- **Código:** tarjetas `linkedin_expiring` y `linkedin_expired` de `rediseno_views.alerts`; acción `href: /api/v1/linkedin/oauth/start`. Con el token caducado, la tarjeta de cuenta en pausa por ese motivo no se muestra (reanudar no serviría).
 - **Criterios de aceptación:**
   1. **Dado** un token que caduca en 5 días, **cuando** abre Tu turno, **entonces** ve «Reconecta LinkedIn», Cuando puedas, con «El permiso para publicar caduca el <fecha> (quedan 5 días). LinkedIn no deja renovarlo solo.».
   2. **Dado** un token que caduca en 2 días, **cuando** abre Tu turno, **entonces** la misma tarjeta es Importante.
@@ -286,7 +285,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 - **Dónde:** PWA · app · backend
 - **Estado:** no implementado
 - **Qué hace para Gustavo:** el equipo le propondría cambios en su perfil de LinkedIn (titular, Acerca de…) con el texto actual, el propuesto, el porqué y los pasos para aplicarlo él.
-- **Código:** no existe. `tasks.perfil` llega siempre vacío; el tipo de push `profile_task` aparece en Ajustes pero nada lo emite. Diseño en `DISENO-VISTAS.md` (rama `feat/rediseno-oficina`), sección 2.C1.
+- **Código:** no existe. `tasks.perfil` llega siempre vacío; el tipo de push `profile_task` existe en el backend, pero Ajustes no ofrece su interruptor hasta que haya evento. Diseño en `DISENO-VISTAS.md` (rama `feat/rediseno-oficina`), sección 2.C1.
 - **Criterios de aceptación:**
   1. **Dado** una propuesta de perfil, **cuando** abre Tu turno, **entonces** ve la sección, el texto actual (o «No pudimos leer tu perfil actual»), el propuesto con «Copiar» y el contador frente al límite de LinkedIn (titular 220, Acerca de 2.600), el porqué y los pasos.
   2. **Dado** «Hecho», **cuando** lo pulsa, **entonces** la tarea pasa a «Aplicado, pendiente de comprobar» y después a «Comprobado» cuando el equipo relee el perfil.

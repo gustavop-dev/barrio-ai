@@ -74,7 +74,7 @@ Para comparar con el diseño, abre las capturas junto a los tableros `movil/dise
 - una pieza en cada estado: programada para mañana y vetable, publicada con cortes de 72 h y de 7 días, bloqueada con ronda de reparación, saltada y fallida;
 - comentarios y acciones de red pendientes, y acciones ya hechas para la Lista y el calendario;
 - personas en cada etapa, oportunidades en varias etapas y referentes;
-- todas las tarjetas de Tu turno: «¿Salió o no?», una conversación del inbox, preguntas de texto, de opción y de sí o no, una pospuesta y la orientación del analista;
+- todas las tarjetas de Tu turno: «¿Salió o no?», una conversación del inbox, preguntas de texto, de opción y de sí o no, una pospuesta, una caducada, la orientación del analista y dos aprobaciones de red (seguir a Laura, invitar a Julián: la red está en modo `approval` porque `OPERATOR_AUTONOMY` va vacío);
 - notificaciones leídas y sin leer, y «Próximo»;
 - una captura transcrita y una idea usada;
 - cuatro fotos generadas en la Galería;
@@ -89,9 +89,14 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `01-entrada` | contraseña equivocada y su error; mostrar la contraseña; la correcta, la entrada animada y la Oficina |
 | `02-navegacion` | las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial y el «‹» de una ficha |
 | `03-oficina` | tocar un personaje de la escena y ver su hoja, arrastrarla a altura completa y cerrarla, la tira de equipos y la Biblioteca |
-| `04-tu-turno` | «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Pospuestas» y «Lo que el equipo sabe de ti» |
+| `04-tu-turno` | la lista de arriba abajo una sola vez: «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Ya no es urgente», «Pospuestas», «Hecho recientemente» y «Lo que el equipo sabe de ti» |
+| `04-tu-turno-aprobar` | aprobar una acción de red desde su tarjeta de Tu turno y otra desde «En cola» del calendario |
+| `04-tu-turno-mas` | máquina detenida desde Ajustes y reanudada desde Tu turno, «Responder con audio», «Marcar como oportunidad», «No responder», descartar la orientación, responder con una opción y «Deshacer», «No quiero compartir esto» |
+| `04-tu-turno-sabe` | «Lo que el equipo sabe de ti»: añadir, editar (v2) y retirar un dato |
 | `05-captura` | abrir la hoja, escribir, «Para qué es», grabar (o lo que muestre el emulador sin micrófono), cerrar sin enviar, mantener pulsado el botón, enviar, «Lo que enviaste» y «Deshacer» |
 | `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
+| `06-notificaciones-avisos` | Ajustes › Notificaciones: «Este dispositivo», «Probar notificación» y encender un tipo de push apagado por defecto, que sigue encendido tras reabrir la app |
+| `06-notificaciones-destinos` | el resumen semanal, la captura procesada y la oportunidad sin contacto abren su destino |
 | `07-calendario` | Semana, Mes y Lista; tocar días y su hoja; deslizar semanas y meses; la pieza de mañana, los pliegues de «Cómo se escribió», vetar y «Deshacer»; la pieza bloqueada y su ronda de reparación |
 | `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo»; la definición de un gráfico; tocar una barra |
 | `09-personas` | filtros por etapa y búsqueda; la ficha de una persona con una nota nueva; mover una oportunidad de etapa (y deshacerlo); la validación al añadir un referente |

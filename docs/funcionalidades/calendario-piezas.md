@@ -247,13 +247,13 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 ### CAL-15 · Aprobar una pieza en modo aprobación <a id="cal-15"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** parcial
+- **Estado:** funciona
 - **Qué hace para Gustavo:** si la publicación diaria está en modo aprobación (por ejemplo para la primera pieza, como recomienda `publicacion-diaria.md`), aprueba la pieza antes de que salga.
-- **Código:** `POST /api/v1/operador/actions/<id>/approve {expected_hash, note}` existe y `compartido/src/api/endpoints.ts` define `approveAction`, pero ningún hook ni pantalla lo usa.
+- **Código:** `POST /api/v1/operador/actions/<id>/approve {expected_hash, note}`; `useApproveAction` (`compartido/src/api/hooks.ts`); app `movil/src/pieza/PiezaScreen.tsx` y PWA `pages/PiezaDetalle.tsx` (sección «Aprobación» con `ApproveButton` y `VetoButton`); la tarjeta `approval:<id>` de Tu turno y «En cola» ([BAR-13](red.md#bar-13)).
 - **Criterios de aceptación:**
   1. **Dado** `OPERATOR_AUTONOMY=…,CONT-09=approval`, **cuando** una pieza pasa el verificador, **entonces** su acción queda en `proposed` y el detalle dice «Pendiente de aprobación».
   2. **Dado** esa pieza, **cuando** se envía `approve` con su `payload_hash` desde una sesión humana con `approve_actions`, **entonces** pasa a `approved` y sale a su hora.
-  3. **Dado** esa pieza en la PWA o la app, **cuando** abre el detalle, **entonces** ve «Aprobar» junto a «Vetar». **Hoy falla:** solo puede vetarla.
+  3. **Dado** esa pieza en la PWA o la app, **cuando** abre el detalle, **entonces** ve la sección «Aprobación» con «Aprobar» junto a «Vetar»; en Tu turno, la tarjeta «¿Apruebas la pieza del <d/m>?» con «Ver la pieza».
   4. **Dado** un `expected_hash` que no coincide con el texto actual, **cuando** aprueba, **entonces** la API lo rechaza.
 - **Brechas código/docs:** `publicacion-diaria.md` («Para la primera pieza conviene `CONT-09=approval`: Gustavo la aprueba con su hash») presupone una interfaz que ya no existe. Ver también [BAR-13](red.md#bar-13).
 - **Cobertura QA:** pendiente
