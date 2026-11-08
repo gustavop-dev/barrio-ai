@@ -26,8 +26,8 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
-import { Badge, Button, Card, EmptyState, EmptyText, Skeleton, T } from '@/components/ui';
-import { layout, timing } from '@/theme/motion';
+import { Badge, Button, Card, EmptyState, EmptyText, ErrorRetry, FoldIn, Skeleton, T } from '@/components/ui';
+import { timing } from '@/theme/motion';
 import { openLink } from '@/navigation';
 import { colors, layers as LAYER_COLOR, radius, shell, space } from '@/theme/tokens';
 import { DayActivity, QueuedRow } from './ActivityList';
@@ -48,6 +48,8 @@ export interface DayPanelProps {
   visible: ReadonlySet<CalendarLayer>;
   /** Calendar data still loading for this day. */
   loading: boolean;
+  /** The calendar failed and this day has no data: the panel says so instead of drawing an empty day. */
+  failed?: boolean;
   upcoming: Actividad['upcoming'] | undefined;
   windowOpen: boolean | undefined;
   now: number;
@@ -105,6 +107,17 @@ function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today
   const piece = query.data;
   const status = piece?.status ?? event.state ?? event.kind.replace(/^piece_/, '');
   const to = pieceId ? piecePath(pieceId) : null;
+
+  // The piece could not be loaded: say so (with «Reintentar») rather than fall back to the bare thesis without
+  // its «Vetar».
+  if (query.isError && !piece) {
+    return (
+      <Card>
+        <T variant="subtitulo">{event.title}</T>
+        <ErrorRetry error={query.error} onRetry={() => void query.refetch()} title="No se pudo cargar la pieza" />
+      </Card>
+    );
+  }
 
   if (status === 'skipped') {
     const reason = event.skip_reason || piece?.brief?.skip_reason || piece?.note;
@@ -185,15 +198,13 @@ function AllOfDay({ open, onToggle, children }: { open: boolean; onToggle: () =>
         </Animated.View>
       </Pressable>
       {open ? (
-        <Animated.View entering={layout.foldIn()} exiting={layout.foldOut()}>
-          {children}
-        </Animated.View>
+        <FoldIn>{children}</FoldIn>
       ) : null}
     </View>
   );
 }
 
-export function DayPanel({ date, day, today, timeZone, leadHours, visible, loading, upcoming, windowOpen, now, showHeading = true, testID = 'panel-dia' }: DayPanelProps) {
+export function DayPanel({ date, day, today, timeZone, leadHours, visible, loading, failed = false, upcoming, windowOpen, now, showHeading = true, testID = 'panel-dia' }: DayPanelProps) {
   const [allOpen, setAllOpen] = useState(false);
   const [tipo, setTipo] = useState<ActividadTipo>('todo');
   const [noSalio, setNoSalio] = useState(false);
@@ -207,6 +218,15 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
         <EmptyState title="Todavía no hay nada programado tan lejos.">
           <EmptyText>{`El equipo prepara cada pieza ${leadText(leadHours)} antes de su hora.`}</EmptyText>
         </EmptyState>
+      </View>
+    );
+  }
+
+  if (failed && !day) {
+    return (
+      <View style={styles.panel} testID={testID}>
+        {heading}
+        <T soft>No se pudo cargar este día.</T>
       </View>
     );
   }

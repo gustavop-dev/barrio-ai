@@ -14,6 +14,11 @@ export interface ToastOptions {
   /** Milliseconds; motion.ts toastDurations by default. */
   duration?: number;
   tone?: 'default' | 'error';
+  /**
+   * Runs once the toast has left the screen without its undo: its time ran out, another toast took its place or it
+   * was dismissed. An action that waits for «Deshacer» goes here, so it never goes while «Deshacer» still shows.
+   */
+  onExpire?: () => void;
 }
 
 interface ToastState extends ToastOptions {
@@ -38,6 +43,8 @@ export function useToast(): ToastApi {
 interface ToastHost {
   toast: ToastState | null;
   close: () => void;
+  /** «Deshacer» on toast `id`: true while it still counts (its time has not run out). */
+  take: (id: number) => boolean;
   register: (id: string) => () => void;
   /** The outlet that draws the toast: the last one mounted, or none (the provider draws it in the app's window). */
   top: string | null;
@@ -52,7 +59,7 @@ const ToastHostContext = createContext<ToastHost | null>(null);
  * outlet, and an entering animation that never starts leaves the toast at opacity 0. With reduced motion it starts
  * fully visible.
  */
-function ToastCard({ toast, leaving, close, onGone }: { toast: ToastState; leaving: boolean; close: () => void; onGone: () => void }) {
+function ToastCard({ toast, leaving, take, onGone }: { toast: ToastState; leaving: boolean; take: (id: number) => boolean; onGone: () => void }) {
   const { reduced } = useMotion();
   const shown = useSharedValue(reduced ? 1 : 0);
   useEffect(() => {
@@ -78,9 +85,9 @@ function ToastCard({ toast, leaving, close, onGone }: { toast: ToastState; leavi
           accessibilityRole="button"
           hitSlop={8}
           onPress={() => {
-            const undo = toast.undo;
-            close();
-            undo?.();
+            // A tap after its time ran out (the toast fading out) no longer undoes: the action may have gone.
+            if (!take(toast.id)) return;
+            toast.undo?.();
           }}
           style={styles.undo}
         >
@@ -92,14 +99,14 @@ function ToastCard({ toast, leaving, close, onGone }: { toast: ToastState; leavi
 }
 
 /** The toast region, at `bottom` px from the bottom of its window: the current toast, or the last one fading out. */
-function ToastRegion({ toast, close, bottom }: { toast: ToastState | null; close: () => void; bottom: number }) {
+function ToastRegion({ toast, take, bottom }: { toast: ToastState | null; take: (id: number) => boolean; bottom: number }) {
   const [drawn, setDrawn] = useState<ToastState | null>(toast);
   // A new toast replaces the one on screen at once.
   if (toast && toast !== drawn) setDrawn(toast);
   const gone = useCallback(() => setDrawn(null), []);
   return (
     <View pointerEvents="box-none" style={[styles.region, { bottom }]}>
-      {drawn ? <ToastCard key={drawn.id} toast={drawn} leaving={!toast} close={close} onGone={gone} /> : null}
+      {drawn ? <ToastCard key={drawn.id} toast={drawn} leaving={!toast} take={take} onGone={gone} /> : null}
     </View>
   );
 }
@@ -116,10 +123,34 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
   const [outlets, setOutlets] = useState<string[]>([]);
   const nextId = useRef(1);
   const insets = useSafeAreaInsets();
+  /** The toast whose «Deshacer» still counts: cleared the moment its time runs out, so a late tap does nothing. */
+  const live = useRef<ToastState | null>(null);
+  /** Toasts that left without their undo; their onExpire runs once the screen no longer shows them. */
+  const expired = useRef<ToastState[]>([]);
 
-  const dismiss = useCallback(() => setToast(null), []);
-  const show = useCallback((message: string, options: ToastOptions = {}) => {
-    setToast({ id: nextId.current++, message, ...options });
+  const leave = useCallback(() => {
+    const current = live.current;
+    live.current = null;
+    if (current?.onExpire) expired.current.push(current);
+  }, []);
+  const dismiss = useCallback(() => {
+    leave();
+    setToast(null);
+  }, [leave]);
+  const show = useCallback(
+    (message: string, options: ToastOptions = {}) => {
+      leave();
+      const next = { id: nextId.current++, message, ...options };
+      live.current = next;
+      setToast(next);
+    },
+    [leave],
+  );
+  const take = useCallback((id: number) => {
+    if (live.current?.id !== id) return false;
+    live.current = null;
+    setToast(null);
+    return true;
   }, []);
   const register = useCallback((id: string) => {
     setOutlets((current) => [...current, id]);
@@ -129,21 +160,33 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
   useEffect(() => {
     if (!toast) return;
     const timer = setTimeout(
-      () => setToast((current) => (current?.id === toast.id ? null : current)),
+      () => {
+        if (live.current?.id !== toast.id) return;
+        leave();
+        setToast(null);
+      },
       toast.duration ?? (toast.undo ? toastDurations.withUndo : toastDurations.plain),
     );
     return () => clearTimeout(timer);
+  }, [toast, leave]);
+
+  // Once a toast that left without its undo has faded out (ToastCard keeps it `durations.fast`), what waited for it
+  // goes (a veto, calendario/pendingVeto.ts): «Deshacer» is never on screen when the action is sent.
+  useEffect(() => {
+    const due = expired.current.splice(0);
+    if (!due.length) return;
+    setTimeout(() => due.forEach((gone) => gone.onExpire?.()), durations.fast + 20);
   }, [toast]);
 
   const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
   const top = outlets[outlets.length - 1] ?? null;
-  const host = useMemo(() => ({ toast, close: dismiss, register, top }), [toast, dismiss, register, top]);
+  const host = useMemo(() => ({ toast, close: dismiss, take, register, top }), [toast, dismiss, take, register, top]);
 
   return (
     <ToastContext.Provider value={api}>
       <ToastHostContext.Provider value={host}>
         {children}
-        {top === null ? <ToastRegion toast={toast} close={dismiss} bottom={insets.bottom + bottomOffset + space[3]} /> : null}
+        {top === null ? <ToastRegion toast={toast} take={take} bottom={insets.bottom + bottomOffset + space[3]} /> : null}
       </ToastHostContext.Provider>
     </ToastContext.Provider>
   );
@@ -161,7 +204,7 @@ export function ToastOutlet({ bottomOffset = 0 }: { bottomOffset?: number }) {
   const register = host?.register;
   useEffect(() => register?.(id), [register, id]);
   if (!host || host.top !== id) return null;
-  return <ToastRegion toast={host.toast} close={host.close} bottom={insets.bottom + bottomOffset + space[3]} />;
+  return <ToastRegion toast={host.toast} take={host.take} bottom={insets.bottom + bottomOffset + space[3]} />;
 }
 
 const styles = StyleSheet.create({

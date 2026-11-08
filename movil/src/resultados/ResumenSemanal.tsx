@@ -22,8 +22,8 @@ import { useEffect, useRef, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
-import { AgentPortrait, Badge, Button, Card, ConfirmSheet, EmptyState, EmptyText, ErrorRetry, errorMessage, Fold, Note, Section, Skeleton, T, useToast } from '@/components/ui';
-import { haptic, layout, timing } from '@/theme/motion';
+import { AgentPortrait, Badge, Button, Card, ConfirmSheet, EmptyState, EmptyText, ErrorRetry, errorMessage, Fold, FoldIn, Note, Section, Skeleton, T, useToast } from '@/components/ui';
+import { haptic, timing } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 
 // Built on the JS thread: timing() is not a worklet, and calling it inside a style worklet crashes the app on the UI
@@ -209,7 +209,7 @@ function Week({ summary }: { summary: WeeklySummary }) {
         </Animated.View>
       </Pressable>
       {open ? (
-        <Animated.View entering={layout.foldIn()} exiting={layout.foldOut()} style={styles.weekBody}>
+        <FoldIn style={styles.weekBody}>
           <SummaryBody summary={summary} />
           {summary.analysis.orientacion_propuesta ? (
             <T variant="detalle" soft>
@@ -219,7 +219,7 @@ function Week({ summary }: { summary: WeeklySummary }) {
           <T variant="detalle" soft>
             {summaryFooter(summary)}
           </T>
-        </Animated.View>
+        </FoldIn>
       ) : null}
     </View>
   );

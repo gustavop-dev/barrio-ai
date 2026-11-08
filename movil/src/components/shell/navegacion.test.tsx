@@ -14,7 +14,7 @@ import { fakeServer } from '@/test/server';
 import { durations, FIRM, navGestures, navSprings, navTimings, navValues } from '@/theme/motion';
 import { BottomBar, pillLeft } from './BottomBar';
 import { DetailScreen } from './DetailScreen';
-import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, stackLevel, stackOf } from './push';
+import { backLabel, baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, stackLevel, stackOf } from './push';
 import { focusedChild, nextFocus, sceneRole, tabMove, tabSceneOptions, useFocusMemory, type FocusMemory } from './tabTransitions';
 
 const expoRouter = jest.requireMock('expo-router') as Record<string, unknown>;
@@ -66,6 +66,18 @@ describe('push (MovNavegacion)', () => {
   it('finds the level of a route in its stack', () => {
     expect(stackLevel({ routes: [{ key: 'tabs' }, { key: 'detail' }] }, 'detail')).toBe(1);
     expect(stackLevel(undefined, 'detail')).toBe(0);
+  });
+
+  // E2E wave: a piece opened from Tu turno said «‹ Calendario» and went back to Tu turno.
+  it('names «‹» after the screen it goes back to', () => {
+    const tabs = (focused: string) => ({ key: 'tabs', name: '(tabs)', state: { index: 1, routes: [{ name: 'index' }, { name: focused }] } });
+    expect(backLabel({ routes: [tabs('tu-turno'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Tu turno');
+    expect(backLabel({ routes: [tabs('resultados'), { key: 'detail', name: 'personas/[id]' }] }, 'detail', 'Personas')).toBe('Resultados');
+    expect(backLabel({ routes: [tabs('calendario'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Calendario');
+    expect(backLabel({ routes: [tabs('personas'), { key: 'p', name: 'personas/[id]' }, { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Persona');
+    // Opened straight from a notification: nothing underneath, «‹» goes to the fallback section.
+    expect(backLabel({ routes: [{ key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Calendario');
+    expect(backLabel(undefined, 'detail', 'Personas')).toBe('Personas');
   });
 
   it('finds the stack of a route in the root navigation state (where a just-pushed screen already is)', () => {

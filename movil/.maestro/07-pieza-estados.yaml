@@ -1,0 +1,569 @@
+# cubre: CAL-02, CAL-03, CAL-06, CAL-07, CAL-08, CAL-09, CAL-16, PRS-10
+# The past pieces of the QA world, each from its day in the calendar. Two days ago, blocked: in «Lo importante del
+# día» with its layer (turning «Red» off hides that day's new connection and keeps the block), and in the detail «El
+# verificador bloqueó la pieza» with its reasons, no «Vetar» and «Ronda de reparación». Three days ago, published:
+# «Salió a las …», the result by cut (impressions and the rest, a reading without reposts as «—», the 7-day cut «Aún
+# no» with the day it arrives), who commented by role and the post on LinkedIn. Yesterday, skipped: «Ese día no hubo
+# publicación» with the director's reason. Five days ago, failed: «La publicación falló» with the reason, no final
+# text yet and the stages that did not run. Then the day sheet at full height leaves the week strip usable, and a link
+# to a view that does not exist says so, with «Ir a la Oficina».
+# Dates come from comun/calendario-fechas.js. Text in the «etiqueta» style is uppercased on screen.
+appId: co.projectapp.office
+name: Piezas pasadas
+tags: [calendario]
+---
+- runFlow: comun/entrar.yaml
+- runScript: comun/calendario-fechas.js
+- tapOn:
+    id: top-calendario
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: pager-semana
+    timeout: 30000
+
+# ---------------------------------------------------------------- two days ago: the blocked piece, and the layers
+# cubre: CAL-02, CAL-03
+# On Monday and Tuesday two days ago is in the previous week.
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.anteayer}"
+    commands:
+      - tapOn:
+          id: calendario-anterior
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.anteayer}"
+          timeout: 10000
+- tapOn:
+    id: "dia-${output.anteayer}"
+- extendedWaitUntil:
+    visible:
+      text: "${output.anteayerTitulo}"
+      childOf:
+        id: hoja-dia
+    timeout: 10000
+- assertVisible:
+    text: "PASADO"
+    childOf:
+      id: hoja-dia
+- swipe:
+    from:
+      text: "Altura del panel"
+    direction: UP
+- scrollUntilVisible:
+    element:
+      text: "Qué aprendí cobrando por mi primer proyecto"
+      childOf:
+        id: hoja-dia
+    direction: DOWN
+    timeout: 15000
+- assertVisible:
+    text: "BLOQUEADA POR EL VERIFICADOR"
+    childOf:
+      id: hoja-dia
+- takeScreenshot: 07-pieza-estados-01-hoja-bloqueada
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+# «Lo importante del día» under the calendar: the verifier's block and Andrés Restrepo's accepted invitation (Red).
+- scrollUntilVisible:
+    element:
+      text: "El verificador bloqueó la pieza"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Andrés Restrepo aceptó tu invitación"
+# The opportunity created that day, in the Conversaciones layer (PRS-10).
+# cubre: PRS-10
+- assertVisible: "Oportunidad con Isabel Duarte: .*"
+- takeScreenshot: 07-pieza-estados-02-lo-importante
+# Turn «Red» off: the connection goes, the block stays. Then on again.
+- scrollUntilVisible:
+    element:
+      id: capa-red
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: capa-red
+- scrollUntilVisible:
+    element:
+      text: "El verificador bloqueó la pieza"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible: "Andrés Restrepo aceptó tu invitación"
+- takeScreenshot: 07-pieza-estados-03-sin-capa-red
+- scrollUntilVisible:
+    element:
+      id: capa-red
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: capa-red
+- scrollUntilVisible:
+    element:
+      text: "Andrés Restrepo aceptó tu invitación"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+
+# The block's «Abrir» opens the piece.
+# cubre: CAL-06, CAL-09
+- scrollUntilVisible:
+    element:
+      text: "El verificador bloqueó la pieza"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Abrir"
+    below:
+      text: "El verificador bloqueó la pieza"
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.anteayerLargo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "BLOQUEADA POR EL VERIFICADOR"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "El verificador bloqueó la pieza"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "Hallazgo material \\(invented_experience\\).*"
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-pieza-estados-04-pieza-bloqueada
+- scrollUntilVisible:
+    element:
+      text: "Ronda de reparación"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "Ronda de reparación"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "SIGUIÓ BLOQUEADA"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "La pid(ió el verificador|ieron las reglas de publicación)"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "TEXTO ANTES DE REPARAR"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-estados-05-ronda-reparacion
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# ---------------------------------------------------------------- three days ago: the published piece and its result
+# cubre: CAL-03, CAL-06, CAL-07, CAL-08
+- scrollUntilVisible:
+    element:
+      id: calendario-hoy
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: calendario-hoy
+- extendedWaitUntil:
+    visible:
+      id: "dia-${output.hoy}"
+    timeout: 10000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.hace3}"
+    commands:
+      - tapOn:
+          id: calendario-anterior
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.hace3}"
+          timeout: 10000
+- tapOn:
+    id: "dia-${output.hace3}"
+- extendedWaitUntil:
+    visible:
+      id: hoja-dia
+    timeout: 10000
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+# The day's piece: «Publicada», its thesis and its latest cut.
+- scrollUntilVisible:
+    element:
+      text: "Las startups pierden meses por no hablar con sus primeros clientes"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "PUBLICADA"
+- scrollUntilVisible:
+    element:
+      text: "Impresiones a las 72 h: 768"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-estados-06-dia-publicada
+- scrollUntilVisible:
+    element:
+      text: "Ver cómo se escribió"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: "Ver cómo se escribió"
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.hace3Largo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "PUBLICADA"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "Salió a las .*"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "Interacción = \\(reacciones \\+ comentarios \\+ republicaciones\\) / impresiones\\."
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+# A las 24 h: every figure.
+- scrollUntilVisible:
+    element:
+      id: corte-24h
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: "A LAS 24 H"
+- assertVisible: "Impresiones: 432"
+- assertVisible: "Reacciones: 18"
+- takeScreenshot: 07-pieza-estados-07-corte-24h
+# A las 72 h: the reading did not bring the reposts, so they and the engagement are «—», never 0.
+- scrollUntilVisible:
+    element:
+      id: corte-72h
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: "Impresiones: 768"
+- assertVisible: "Republicaciones: —"
+- assertVisible: "Interacción —"
+- assertNotVisible: "Republicaciones: 0"
+# A los 7 días: not yet, with the day it arrives.
+- scrollUntilVisible:
+    element:
+      text: "Llega el ${output.corte7dHace3} a las .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: "A LOS 7 DÍAS"
+- assertVisible: "AÚN NO"
+- takeScreenshot: 07-pieza-estados-08-cortes-sin-dato
+# Who commented, by role, and the post on LinkedIn (linkedin.example in the QA world: not opened).
+- scrollUntilVisible:
+    element:
+      text: "Ver el post en LinkedIn"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: "QUIÉN COMENTÓ"
+- assertVisible: "COMPRADOR · 1"
+- assertVisible: "PAR · 1"
+- takeScreenshot: 07-pieza-estados-09-quien-comento
+- scrollUntilVisible:
+    element:
+      id: copiar
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: "Se publica tal cual, en inglés."
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# ---------------------------------------------------------------- yesterday: the skipped day
+# cubre: CAL-03, CAL-06
+- scrollUntilVisible:
+    element:
+      id: calendario-hoy
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: calendario-hoy
+- extendedWaitUntil:
+    visible:
+      id: "dia-${output.hoy}"
+    timeout: 10000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.ayer}"
+    commands:
+      - tapOn:
+          id: calendario-anterior
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.ayer}"
+          timeout: 10000
+- tapOn:
+    id: "dia-${output.ayer}"
+- extendedWaitUntil:
+    visible:
+      id: hoja-dia
+    timeout: 10000
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Sin publicación\\. El director decidió no publicar: No había material genuino.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Ver cómo se decidió"
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.ayerLargo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "Ese día no hubo publicación"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "No había material genuino: las señales de la semana repetían el tema del lunes."
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "TEXTO FINAL"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-pieza-estados-10-saltada
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# ---------------------------------------------------------------- five days ago: the failed piece
+# cubre: CAL-06, CAL-08, CAL-09
+- scrollUntilVisible:
+    element:
+      id: calendario-hoy
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: calendario-hoy
+- extendedWaitUntil:
+    visible:
+      id: "dia-${output.hoy}"
+    timeout: 10000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.hace5}"
+    commands:
+      - tapOn:
+          id: calendario-anterior
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.hace5}"
+          timeout: 10000
+- tapOn:
+    id: "dia-${output.hace5}"
+- extendedWaitUntil:
+    visible:
+      id: hoja-dia
+    timeout: 10000
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Cómo elegimos el stack de un MVP en dos días"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Ver cómo se escribió"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: "Ver cómo se escribió"
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.hace5Largo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "FALLIDA"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "La publicación falló"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "Error interno en la preparación; no se repite el gasto."
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "El texto final aparece cuando termine la selección."
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-estados-11-fallida
+# The readers' panel never ran.
+- scrollUntilVisible:
+    element:
+      text: "Panel de lectores"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Panel de lectores"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "Esta etapa no llegó a correr."
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-estados-12-etapa-sin-correr
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# ---------------------------------------------------------------- the day sheet at full height keeps the week usable
+# cubre: CAL-03
+# The sheet is not modal: dragged to full height it stops under the week strip, so another day can still be tapped.
+- scrollUntilVisible:
+    element:
+      id: calendario-hoy
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: calendario-hoy
+- extendedWaitUntil:
+    visible:
+      id: "dia-${output.hoy}"
+    timeout: 10000
+- tapOn:
+    id: "dia-${output.hoy}"
+- extendedWaitUntil:
+    visible:
+      text: "${output.hoyTitulo}"
+      childOf:
+        id: hoja-dia
+    timeout: 10000
+- swipe:
+    from:
+      text: "Altura del panel"
+    direction: UP
+- takeScreenshot: 07-pieza-estados-13-hoja-completa
+- tapOn:
+    id: "dia-${output.otroDia}"
+- extendedWaitUntil:
+    visible:
+      text: "${output.otroDiaTitulo}"
+      childOf:
+        id: hoja-dia
+    timeout: 10000
+- takeScreenshot: 07-pieza-estados-14-hoja-completa-otro-dia
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+
+# ---------------------------------------------------------------- a link to a view that does not exist
+# cubre: CAL-16
+- openLink: oficina0ff1ce://vista-que-no-existe
+- extendedWaitUntil:
+    visible: "Esta vista no existe"
+    timeout: 20000
+- takeScreenshot: 07-pieza-estados-15-vista-inexistente
+- tapOn: "Ir a la Oficina"
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 30000

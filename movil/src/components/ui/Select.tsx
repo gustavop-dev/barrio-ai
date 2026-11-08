@@ -3,10 +3,10 @@
 // sheet). Choosing closes the list.
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
-import { haptic, layout } from '@/theme/motion';
+import { haptic } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
+import { FoldIn } from './Fold';
 import { T } from './Text';
 
 export interface SelectOption<V extends string> {
@@ -73,7 +73,8 @@ export function Select<V extends string>({
         <Icon name={open ? 'chevronUp' : 'chevronDown'} size={20} color={colors.inkSoft} />
       </Pressable>
       {open ? (
-        <Animated.View entering={layout.foldIn()} exiting={layout.foldOut()} accessibilityRole="radiogroup" accessibilityLabel={name} style={styles.list}>
+        // FoldIn, not a layout `entering`: that fade sometimes stayed at opacity 0 (08-resultados, «Modalidad»).
+        <FoldIn accessibilityRole="radiogroup" accessibilityLabel={name} style={styles.list}>
           {options.map((option) => {
             const selected = option.value === value;
             return (
@@ -94,7 +95,7 @@ export function Select<V extends string>({
               </Pressable>
             );
           })}
-        </Animated.View>
+        </FoldIn>
       ) : null}
       {error ? (
         <T variant="detalle" color={colors.alert}>

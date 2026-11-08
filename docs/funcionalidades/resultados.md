@@ -34,7 +34,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   4. **Dado** `dias=10` o una modalidad desconocida, **cuando** se pide a la API, **entonces** responde 400 «dias debe ser 7, 28 o 90.» o «modalidad debe ser todo, personal_startups o projectapp.».
   5. **Dado** los accesos «1 · Negocio» a «4 · Equipo», **cuando** pulsa uno, **entonces** salta a esa sección.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-01.1, 2, 3 y 5 en `movil/.maestro/08-resultados.yaml` (periodo 7/28/90, modalidad «Startups», accesos) · RES-01.4 sin prueba E2E · 2026-11-08 · pasa
 
 ### RES-02 · Fichas de indicadores: sin dato no es cero <a id="res-02"></a>
 
@@ -49,7 +49,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   4. **Dado** el valor anterior igual a 0, **cuando** se calcula, **entonces** `delta_pct` es `null`.
   5. **Dado** «ⓘ», **cuando** lo pulsa, **entonces** ve la definición y la fórmula.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-02.1 y 5 en `08-resultados.yaml` («—» con su motivo en «Conversaciones pertinentes» y «Personas recurrentes», definición) · RES-02.2–4 sin prueba E2E · 2026-11-08 · pasa
 
 ### RES-03 · 1 · ¿Genera negocio? <a id="res-03"></a>
 
@@ -62,7 +62,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   2. **Dado** oportunidades, **cuando** abre Resultados, **entonces** ve Conversaciones pertinentes, Oportunidades abiertas, Reuniones, Propuestas enviadas, Acuerdos e Inbound, el «Embudo de oportunidades» con «Cerrada sin acuerdo: N», el «Reparto por modalidad» y «Oportunidades activas» (las 5 más recientes, enlazadas a la persona).
   3. **Dado** que no hay oportunidades activas, **cuando** se pinta, **entonces** ve «No hay oportunidades activas ahora mismo.».
 - **Brechas código/docs:** los campos de `negocio` con `disponible: true` (conversaciones, abiertas, reuniones, propuestas, acuerdos, embudo, modalidades, activas) existen en `resultados.py` y en las interfaces, pero `CONTRATO-API.md` solo documenta el caso `disponible: false`.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-03.2 y 3 en `08-resultados.yaml` y `08-resultados-errores.yaml` (embudo, reparto, oportunidad activa que abre la ficha; sin oportunidades activas) · RES-03.1 sin prueba E2E · 2026-11-08 · pasa
 
 ### RES-04 · 2 · ¿Llegamos a la gente correcta? <a id="res-04"></a>
 
@@ -76,7 +76,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   3. **Dado** que falta el reparto por rol, **cuando** se pinta, **entonces** dice «— <motivo>» o «— Sin dato en este periodo.».
   4. **Dado** el embudo de la red, **cuando** se pinta, **entonces** sigue el orden de etapas de la red y muestra aparte las que no forman parte del embudo.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-04.1 en `08-resultados.yaml` · RES-04.2–4 sin prueba E2E · 2026-11-08 · pasa
 
 ### RES-05 · 3 · ¿El contenido aporta? <a id="res-05"></a>
 
@@ -91,7 +91,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   4. **Dado** un mejor post, **cuando** se pinta, **entonces** ve su primera línea, fecha, pilar, impresiones e interacción con «Ver la pieza»; si ninguno tiene corte, «Aún ningún post del periodo tiene su corte de impresiones.».
   5. **Dado** posts sin corte, **cuando** se pinta «Interacción media por pilar», **entonces** ve «Sin posts con corte en el periodo.».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-05.2–4 en `08-resultados.yaml` y `08-resultados-errores.yaml` (barra que abre la pieza, mejor post, periodo sin posts) · RES-05.1 y 5 sin prueba E2E · 2026-11-08 · pasa
 
 ### RES-06 · Posts del periodo <a id="res-06"></a>
 
@@ -105,7 +105,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   3. **Dado** «Ordenar por», **cuando** elige una columna, **entonces** se reordena (en la PWA de escritorio en los dos sentidos; en la app solo de mayor a menor).
   4. **Dado** que no hay posts, **cuando** se pinta, **entonces** ve «Sin posts publicados en el periodo.».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-06.1, 2 y 4 en `08-resultados.yaml` y `08-resultados-errores.yaml` («7 días: sin dato», «Republic.: sin dato») · RES-06.3 sin prueba E2E · 2026-11-08 · pasa
 
 ### RES-07 · 4 · ¿El equipo trabaja bien? <a id="res-07"></a>
 
@@ -117,7 +117,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   1. **Dado** actividad del periodo, **cuando** abre la sección, **entonces** ve Comentarios (publicados · con respuesta), Red (seguidos · invitados · aceptados) y Piezas (publicadas · bloqueadas · vetadas).
   2. **Dado** el gasto, **cuando** se pinta «Gasto de IA», **entonces** ve «$X de $Y hoy» (la suma de los presupuestos diarios) y «$Z este mes»; un dato que falta es «—».
 - **Brechas código/docs:** el texto `definition` de `spend` (en `resultados.py`) y `CONTRATO-API.md` dicen que `ANTHROPIC_LIMIT_USD` es un techo acumulado; desde B5 (`knowledge/providers.limit_window_start`) es mensual por defecto (`ANTHROPIC_LIMIT_WINDOW=total` vuelve al acumulado). Ver [AJU-05](ajustes.md#aju-05).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-07.1 y 2 en `08-resultados.yaml` («— con respuesta», gasto de hoy) · 2026-11-08 · pasa
 
 ### RES-08 · Errores por sección <a id="res-08"></a>
 
@@ -131,7 +131,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   3. **Dado** una sección que llega sin datos, **cuando** se pinta, **entonces** dice «No se pudo cargar esta sección.».
   4. **Dado** una sección con una forma inesperada, **cuando** se pinta, **entonces** dice «No se pudo mostrar esta sección» con «Los datos de esta sección llegaron con una forma inesperada.» y «Reintentar», y las demás secciones siguen.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** RES-08.2 en `08-resultados-errores.yaml` («No se pudieron cargar los resultados» con «Reintentar») · RES-08.1, 3 y 4 sin prueba E2E · 2026-11-08 · pasa
 
 ### RES-09 · Medir los posts y la audiencia <a id="res-09"></a>
 
