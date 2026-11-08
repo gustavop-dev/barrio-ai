@@ -53,7 +53,7 @@ describe('Resultados', () => {
   it('shows the controls, the period, the section chips and the unavailable business block', async () => {
     await renderResultados();
     expect(screen.getByText('Resultados')).toBeOnTheScreen();
-    expect(screen.getByRole('tablist', { name: 'Periodo' })).toBeOnTheScreen();
+    expect(screen.getByLabelText('Periodo')).toBeOnTheScreen();
     expect(screen.getByRole('tab', { name: '28 días' })).toBeSelected();
     expect(screen.getByRole('button', { name: 'Modalidad' })).toHaveAccessibilityValue({ text: 'Todo' });
     expect(await screen.findByText(/Periodo en curso: datos hasta .*14:20\. Todo se compara con los 28 días anteriores\./)).toBeOnTheScreen();

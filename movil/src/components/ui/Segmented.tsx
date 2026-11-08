@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { calendarSpring, haptic, useMotion } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 import { T } from './Text';
 
 const PAD = space[1];
 const GAP = space[1];
+
+/** The sliding superficie. It mounts once the track is measured, so its first frame is already in place. */
+function Indicator({ seg, optionWidth, testID }: { seg: SharedValue<number>; optionWidth: number; testID?: string }) {
+  const slide = useAnimatedStyle(() => ({ transform: [{ translateX: seg.value * (optionWidth + GAP) }] }), [optionWidth]);
+  return <Animated.View testID={testID} pointerEvents="none" style={[styles.indicator, { width: optionWidth }, slide]} />;
+}
 
 /**
  * Segmented control (ui.css .segmented, the Calendario's Mes · Semana · Lista, Resultados' Periodo): a linea
@@ -36,7 +42,6 @@ export function Segmented<V extends string>({
   }, [index, reduced, seg]);
 
   const optionWidth = width ? (width - PAD * 2 - GAP * (options.length - 1)) / options.length : 0;
-  const indicator = useAnimatedStyle(() => ({ width: optionWidth, transform: [{ translateX: seg.value * (optionWidth + GAP) }] }), [optionWidth]);
 
   return (
     <View
@@ -46,7 +51,7 @@ export function Segmented<V extends string>({
       testID={testID}
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
     >
-      {width ? <Animated.View testID={testID ? `${testID}-seleccion` : undefined} pointerEvents="none" style={[styles.indicator, indicator]} /> : null}
+      {width ? <Indicator seg={seg} optionWidth={optionWidth} testID={testID ? `${testID}-seleccion` : undefined} /> : null}
       {options.map((option) => {
         const selected = option.value === value;
         return (

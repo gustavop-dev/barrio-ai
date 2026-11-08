@@ -69,6 +69,8 @@ describe('MovCalendario · the selection', () => {
   it('sits on the selected day at once, then slides to the tapped one', async () => {
     const view = await render(<Calendar fecha="2026-11-07" />);
     await layOutWeek();
+    // Under Jest, Reanimated applies a value on the next frame.
+    await advance(16);
     const pill = screen.getByTestId('seleccion-dia');
     expect(animated(pill)).toMatchObject({ width: 48, height: 72, borderRadius: radius.md });
     expect(translate(pill)).toEqual({ x: 5 * STEP, y: 0 });
