@@ -1,0 +1,71 @@
+name: Actualización OTA (preview)
+# Publishes the JavaScript of movil/ (and compartido/) as an Expo Update on the `preview` branch. APKs
+# built with the `preview` profile (channel `preview`) download it on their next launch and run it on
+# the launch after that. Updates only reach APKs whose native layer matches (runtimeVersion policy
+# `fingerprint` in movil/app.json); a native change needs a new APK. See movil/README.md.
+#
+# It never publishes code that fails the checks of the `movil` CI job: it runs the same checks
+# (types, lint, tests) on this commit first, and `eas update` bundles the app like `expo export`.
+# Without the EXPO_TOKEN secret it skips with a notice and succeeds.
+on:
+  push:
+    branches: [main]
+    # Docs and the motion design boards are not in the bundle.
+    paths: ['movil/**', 'compartido/**', '!**/*.md', '!movil/diseno-movimiento/**']
+  workflow_dispatch:
+permissions:
+  contents: read
+# One publish at a time, in order; a newer pending run replaces an older pending one.
+concurrency:
+  group: eas-update-preview
+  cancel-in-progress: false
+jobs:
+  publicar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - id: token
+        name: ¿Hay EXPO_TOKEN?
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -n "$EXPO_TOKEN" ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Actualización OTA omitida::Falta el secreto EXPO_TOKEN del repositorio. Cómo crearlo: movil/README.md, «Actualizaciones OTA»."
+            {
+              echo "### Actualización OTA omitida"
+              echo ""
+              echo "Falta el secreto \`EXPO_TOKEN\`, así que no se publicó nada. Cómo crearlo: \`movil/README.md\`, «Actualizaciones OTA»."
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/checkout@v4
+      - if: steps.token.outputs.present == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: movil/package-lock.json
+      - if: steps.token.outputs.present == 'true'
+        name: Mismas comprobaciones que el job movil de CI
+        working-directory: movil
+        run: npm ci && npm run typecheck && npm run lint && npm test -- --ci
+      - if: steps.token.outputs.present == 'true'
+        name: Publicar en la rama preview
+        working-directory: movil
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        # --environment is required since SDK 55: it picks the EAS environment variables (none today;
+        # EXPO_PUBLIC_API_URL falls back to https://office.projectapp.co in src/api/config.ts). The
+        # `env` of eas.json build profiles does not apply to updates. Android only: there is no iOS build.
+        run: |
+          SUBJECT="$(git log -1 --format=%s)"
+          npx eas-cli@latest update --branch preview --environment preview --platform android \
+            --non-interactive --message "$SUBJECT"
+          {
+            echo "### Actualización OTA publicada"
+            echo ""
+            echo "Rama \`preview\`, Android: «$SUBJECT» (\`${GITHUB_SHA::7}\`). Llega a los APK del perfil \`preview\` con el mismo fingerprint al abrirlos."
+          } >> "$GITHUB_STEP_SUMMARY"

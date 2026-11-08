@@ -362,8 +362,9 @@ describe('Calendario · mes', () => {
     await fireEvent.press(screen.getByText('Mes'));
     expect(lastParams()).toMatchObject({ vista: 'mes' });
     expect(screen.getByRole('tab', { name: 'Mes' })).toBeSelected();
-    // The week leaves under the month (MovCalendario), hidden from screen readers, then goes.
-    expect(screen.getByTestId('vista-saliente', hidden)).toBeTruthy();
+    // The week leaves under the month (MovCalendario), hidden from screen readers, then goes. Its
+    // 120 ms fade runs on real timers here and can be over before the next line on a slow runner
+    // (CI measures coverage): movimiento.test.tsx checks that view and its fade with fake timers.
     expect(await screen.findByText('Noviembre 2026')).toBeOnTheScreen();
     await waitFor(() => expect(screen.queryByTestId('vista-saliente', hidden)).toBeNull());
     expect(screen.getAllByTestId(/^dia-/)).toHaveLength(42);

@@ -26,7 +26,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [inbox.md](inbox.md) | `INB` | Lectura del inbox de LinkedIn y conversaciones que le tocan a Gustavo |
 | [resumen-semanal.md](resumen-semanal.md) | `SEM` | El resumen de la semana del analista y su orientación propuesta |
 | [notificaciones-push.md](notificaciones-push.md) | `PUS` | Web Push de la PWA, push nativa de la app y sus interruptores |
-| [app-movil-instalacion.md](app-movil-instalacion.md) | `APP` | Compilar e instalar la app, a qué servidor apunta y sus permisos |
+| [app-movil-instalacion.md](app-movil-instalacion.md) | `APP` | Compilar e instalar la app, a qué servidor apunta, sus permisos y sus actualizaciones OTA |
 | [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md) | `IMG`, `IMG-INF` | La imagen de cada post: foto de la Galería, infografía o carrusel, hasta LinkedIn (no implementado) |
 
 Los prefijos no coinciden con los códigos del [catálogo de acciones de LinkedIn](../../agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md) (`ADM`, `APRE`, `CHAT`, `CONT`, `DESC`, `INT`, `LI`, `PERF`, `RED`). Por eso la red usa `BAR` (barrio) y Personas usa `PRS`. Cuando una ficha cita `CONT-09` o `RED-02`, habla de una capacidad de LinkedIn, no de otra ficha de este catálogo.

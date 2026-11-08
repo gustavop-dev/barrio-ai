@@ -10,6 +10,12 @@
     "userInterfaceStyle": "light",
     "backgroundColor": "#f7f6f0",
     "primaryColor": "#00715e",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/704ea73a-9382-4918-b361-ea6d83bd582e"
+    },
     "ios": {
       "supportsTablet": false
     },

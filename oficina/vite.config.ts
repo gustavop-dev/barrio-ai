@@ -72,5 +72,13 @@ export default defineConfig({
     unstubGlobals: true,
     // Generous limits: the suite renders the whole app and runs on shared, sometimes busy machines.
     testTimeout: 20_000,
+    // `npx vitest run --coverage` (always on in CI). Report-only: no thresholds. compartido/ is
+    // measured from movil/, where its tests run.
+    coverage: {
+      provider: 'v8',
+      include: ['src/**/*.{ts,tsx}'],
+      exclude: ['src/**/*.test.{ts,tsx}', 'src/test/**', 'src/**/*.d.ts'],
+      reporter: ['text-summary', 'json-summary', 'lcov'],
+    },
   },
 });

@@ -23,6 +23,7 @@ En `npm run dev` no hay service worker. Para probar la instalación y las notifi
 | `npm run build` | `tsc -b` y build de producción en `dist/` (incluye `sw.js` y `manifest.webmanifest`). |
 | `npm run preview` | Sirve `dist/` con el mismo proxy. |
 | `npm test -- --run` | Vitest + Testing Library (jsdom). Las rutas nuevas del backend se simulan con `src/test/fakeServer.ts`. |
+| `npm test -- --run --coverage` | Lo mismo con cobertura (`@vitest/coverage-v8`) en `coverage/`: `lcov-report/index.html`. Solo informe, sin umbrales; CI la publica en el resumen del job. |
 | `npm run lint` | ESLint (TypeScript + reglas de hooks). |
 | `npm run typecheck` | TypeScript estricto para app, service worker y configuración. |
 | `npm run icons` | Regenera los iconos de la PWA (ver abajo). |

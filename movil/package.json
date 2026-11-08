@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . ../compartido",
     "test": "jest",
+    "test:cobertura": "export EXPO_PROJECT_ROOT=\"$PWD\" && cd .. && movil/node_modules/.bin/jest --config movil/jest.config.js --coverage",
     "export": "expo export --platform android",
     "doctor": "npx --yes expo-doctor@1.21.6",
     "icons": "node scripts/generate-icons.mjs"
@@ -40,6 +41,7 @@
     "expo-splash-screen": "58.0.13",
     "expo-status-bar": "58.0.4",
     "expo-system-ui": "58.0.7",
+    "expo-updates": "~58.0.21",
     "expo-web-browser": "58.0.7",
     "react": "19.3.0",
     "react-dom": "19.3.0",

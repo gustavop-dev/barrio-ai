@@ -13,7 +13,8 @@ function loadCompiledRuntime() {
   const load = (path: string): Record<string, unknown> => {
     const previous = modules.get(path); if (previous) return previous.exports;
     const module = { exports: {} }; modules.set(path, module);
-    const { code } = babel.transformSync(readFileSync(path, 'utf8'), { filename: path, configFile: false, babelrc: false,
+    // `cwd`: the plugins resolve from this app even when Jest runs from the repository (test:cobertura).
+    const { code } = babel.transformSync(readFileSync(path, 'utf8'), { filename: path, cwd: __dirname, configFile: false, babelrc: false,
       plugins: ['@babel/plugin-transform-typescript', 'react-native-worklets/plugin', '@babel/plugin-transform-modules-commonjs'] });
     runInNewContext(code, { module, exports: module.exports, global: { Error }, require: (name: string) => load(resolve(dirname(path), `${name}.ts`)) });
     return module.exports;

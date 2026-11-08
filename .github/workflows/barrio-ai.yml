@@ -1,12 +1,14 @@
 name: Barrio AI
 # Tests on every PR; on main, builds the server images (linux/amd64) and publishes them to
 # GHCR so the 1-vCPU production server only pulls them instead of compiling.
+# Each test job also measures coverage (report-only, no thresholds): a short table in the job
+# summary (.github/scripts/cobertura.py) and the full report as a `cobertura-*` artifact.
 on:
   push:
     branches: [main]
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
+    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml', '.github/scripts/**']
   pull_request:
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml']
+    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml', '.github/scripts/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -43,8 +45,27 @@ jobs:
       - run: uv sync --frozen --extra test
       - run: uv run python manage.py check
       - run: uv run python manage.py makemigrations --check --dry-run
-      - run: uv run python manage.py test team_backend.tests --noinput
+      # Under coverage.py (settings in pyproject.toml: branches on, every module in src/).
+      - run: uv run coverage run manage.py test team_backend.tests --noinput
       # Corpus integration tests (pytest) need the private course files: run them locally.
+      - name: Cobertura
+        if: ${{ !cancelled() }}
+        run: |
+          [ -f .coverage ] || exit 0
+          uv run coverage report
+          uv run coverage xml -q
+          uv run coverage html -q
+          uv run coverage json -q
+          python3 ../../.github/scripts/cobertura.py coveragepy coverage.json --title "backend (Django)" --artifact cobertura-backend | tee -a "$GITHUB_STEP_SUMMARY"
+      - if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-backend
+          path: |
+            agentes-linkedin/infra/coverage.xml
+            agentes-linkedin/infra/htmlcov/
+          if-no-files-found: ignore
+          retention-days: 14
 
   oficina:
     runs-on: ubuntu-24.04
@@ -60,7 +81,19 @@ jobs:
           cache-dependency-path: oficina/package-lock.json
       - if: steps.present.outputs.pwa == 'true'
         working-directory: oficina
-        run: npm ci && npm run typecheck && npm run lint && npm test -- --run && npm run build
+        run: npm ci && npm run typecheck && npm run lint && npm test -- --run --coverage && npm run build
+      - name: Cobertura
+        if: ${{ !cancelled() && steps.present.outputs.pwa == 'true' }}
+        run: |
+          [ -f oficina/coverage/coverage-summary.json ] || exit 0
+          python3 .github/scripts/cobertura.py istanbul oficina/coverage/coverage-summary.json --title oficina --artifact cobertura-oficina | tee -a "$GITHUB_STEP_SUMMARY"
+      - if: ${{ !cancelled() && steps.present.outputs.pwa == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-oficina
+          path: oficina/coverage/
+          if-no-files-found: ignore
+          retention-days: 14
 
   # The native app (Expo) and compartido/ (shared with the PWA, linted, typed and tested from movil/).
   movil:
@@ -69,7 +102,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      # Only when movil/, compartido/ or this workflow changed (always on a manual run).
+      # Only when movil/, compartido/, this workflow or its scripts changed (always on a manual run).
       - id: changes
         env:
           EVENT: ${{ github.event_name }}
@@ -77,7 +110,7 @@ jobs:
         run: |
           if [ "$EVENT" = "workflow_dispatch" ] || [ -z "$BASE" ] || ! git cat-file -e "$BASE^{commit}" 2>/dev/null; then
             echo "movil=true" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE" HEAD | grep -qE '^(movil|compartido)/|^\.github/workflows/barrio-ai\.yml$'; then
+          elif git diff --name-only "$BASE" HEAD | grep -qE '^(movil|compartido)/|^\.github/workflows/barrio-ai\.yml$|^\.github/scripts/'; then
             echo "movil=true" >> "$GITHUB_OUTPUT"
           else
             echo "movil=false" >> "$GITHUB_OUTPUT"
@@ -90,7 +123,19 @@ jobs:
           cache-dependency-path: movil/package-lock.json
       - if: steps.changes.outputs.movil == 'true'
         working-directory: movil
-        run: npm ci && npm run typecheck && npm run lint && npm test -- --ci && npx expo export --platform android --output-dir ../movil-export
+        run: npm ci && npm run typecheck && npm run lint && npm run test:cobertura -- --ci && npx expo export --platform android --output-dir ../movil-export
+      - name: Cobertura
+        if: ${{ !cancelled() && steps.changes.outputs.movil == 'true' }}
+        run: |
+          [ -f movil/coverage/coverage-summary.json ] || exit 0
+          python3 .github/scripts/cobertura.py istanbul movil/coverage/coverage-summary.json --title "movil + compartido" --area movil/src/ --area compartido/src/ --artifact cobertura-movil | tee -a "$GITHUB_STEP_SUMMARY"
+      - if: ${{ !cancelled() && steps.changes.outputs.movil == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: cobertura-movil
+          path: movil/coverage/
+          if-no-files-found: ignore
+          retention-days: 14
 
   images:
     if: github.event_name != 'pull_request'
