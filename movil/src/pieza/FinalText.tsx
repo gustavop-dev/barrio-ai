@@ -1,38 +1,11 @@
-// «Texto final» (Pieza.dc.html): the text as it goes out, its length, «Copiar» (expo-clipboard) and
+// «Texto final» (Pieza.dc.html): the text as it goes out, its length, «Copiar» (the shared CopyButton) and
 // «Se publica tal cual, en inglés».
 import type { PieceDetail } from '@compartido/api/types';
 import { formatNumber } from '@compartido/logic/format';
 import { charCount } from '@compartido/logic/piece';
-import * as Clipboard from 'expo-clipboard';
-import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import { Button, Card, Section, T } from '@/components/ui';
-import { copiedLabelMs, haptic } from '@/theme/motion';
+import { Card, CopyButton, Section, T } from '@/components/ui';
 import { space } from '@/theme/tokens';
-
-function CopyButton({ text }: { text: string }) {
-  const [state, setState] = useState<'idle' | 'copied' | 'failed'>('idle');
-  useEffect(() => {
-    if (state === 'idle') return;
-    const timer = setTimeout(() => setState('idle'), copiedLabelMs);
-    return () => clearTimeout(timer);
-  }, [state]);
-  const copy = async () => {
-    try {
-      await Clipboard.setStringAsync(text);
-      haptic('copied');
-      setState('copied');
-    } catch {
-      haptic('actionError');
-      setState('failed');
-    }
-  };
-  return (
-    <Button size="small" onPress={() => void copy()} testID="copiar">
-      {state === 'copied' ? 'Copiado' : state === 'failed' ? 'No se pudo copiar' : 'Copiar'}
-    </Button>
-  );
-}
 
 export function FinalText({ piece }: { piece: PieceDetail }) {
   const text = piece.final_text || piece.selection?.final_text || '';
@@ -57,7 +30,7 @@ export function FinalText({ piece }: { piece: PieceDetail }) {
         </View>
         <View style={styles.foot}>
           <T variant="detalle" soft>{`${formatNumber(charCount(text), 0)} caracteres`}</T>
-          <CopyButton text={text} />
+          <CopyButton text={text} testID="copiar" />
         </View>
         <T variant="detalle" soft>
           Se publica tal cual, en inglés.
