@@ -3,7 +3,7 @@
 // darken (push.ts); «‹», Android back and any navigation away run the same spring back before the
 // route goes. A drag from the left edge follows the finger and, on release, settles with the board's
 // projection (navGestures). With reduced motion it appears and goes at once (board: «menos movimiento»).
-import { router, useNavigation, usePreventRemove, useRoute } from 'expo-router';
+import { router, useNavigation, usePreventRemove, useRootNavigationState, useRoute } from 'expo-router';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
 import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -12,7 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { navGestures, navSpring, useMotion } from '@/theme/motion';
 import { colors, shell } from '@/theme/tokens';
 import { FlightProvider, useFlightHost } from './flight';
-import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, pushProgress, registerLayer, stackLevel } from './push';
+import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, pushProgress, registerLayer, stackLevel, stackOf } from './push';
 import { TopBar } from './TopBar';
 
 /** The hairline on the panel's left edge, seen while it slides. */
@@ -24,7 +24,9 @@ const WITHOUT_PUSH = new Set(['REPLACE', 'RESET']);
 export function DetailScreen({ back, fallback, children }: { back: string; fallback: '/calendario' | '/personas'; children: ReactNode }) {
   const navigation = useNavigation();
   const route = useRoute();
-  const level = stackLevel(navigation.getState(), route.key);
+  // From the root state of this render: getState() would not have this screen yet on its first render
+  // (level 0: the tabs would not move, and this panel would take the tabs' layer).
+  const level = stackLevel(stackOf(useRootNavigationState(), route.key) ?? navigation.getState(), route.key);
   const progress = pushProgress(level);
   const covered = pushProgress(level + 1);
   const { reduced } = useMotion();

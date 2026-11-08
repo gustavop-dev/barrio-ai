@@ -8,7 +8,7 @@
 import { useOverview } from '@compartido/api/hooks';
 import { turnoAnchor } from '@compartido/logic/turno';
 import NetInfo from '@react-native-community/netinfo';
-import { router, usePathname } from 'expo-router';
+import { router, usePathname, type Href } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
@@ -122,7 +122,12 @@ function Bell({ color, unread, loaded }: { color: string; unread: number; loaded
   );
 }
 
-export function PauseBanner() {
+/** Opens a screen of the tabs from the top bar (see `TopBar`). */
+type Open = (href: Href) => void;
+
+const pushHref: Open = (href) => router.push(href);
+
+export function PauseBanner({ open = pushHref }: { open?: Open }) {
   const overview = useOverview();
   const control = overview.data?.control;
   const account = overview.data?.accounts?.find((a) => a.paused);
@@ -133,7 +138,7 @@ export function PauseBanner() {
     <Pressable
       accessibilityRole="link"
       accessibilityLiveRegion="polite"
-      onPress={() => router.push(control?.paused ? { pathname: '/ajustes', params: { ancla: 'maquina' } } : { pathname: '/tu-turno', params: { ancla: turnoAnchor(`account_paused:${account?.id ?? ''}`) } })}
+      onPress={() => open(control?.paused ? { pathname: '/ajustes', params: { ancla: 'maquina' } } : { pathname: '/tu-turno', params: { ancla: turnoAnchor(`account_paused:${account?.id ?? ''}`) } })}
       style={styles.pause}
     >
       <View style={styles.pauseIcon}>
@@ -166,6 +171,11 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
   const pathname = usePathname();
   const turn = useTurnCount();
   useLiveNotifications();
+  // On a detail view (`back`) the tabs are under it in the (app) stack: dismissTo goes back down to
+  // them (the detail runs its push back first) and focuses the tab, keeping the tab history. A
+  // navigate from there would push a second shell over the detail: in Expo Router 58 a stack's
+  // NAVIGATE only reuses the route on top.
+  const open: Open = back ? (href) => router.dismissTo(href) : (href) => router.navigate(href);
   return (
     <View style={styles.wrap}>
       <View style={[styles.bar, { paddingTop: insets.top, height: shell.topBarHeight + insets.top }]}>
@@ -190,7 +200,7 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
                 accessibilityRole="link"
                 accessibilityLabel={label}
                 accessibilityState={{ selected: current }}
-                onPress={() => router.navigate(item.path)}
+                onPress={() => open(item.path)}
                 style={[styles.icon, current ? styles.iconCurrent : null]}
               >
                 {item.path === '/notificaciones' ? (
@@ -204,7 +214,7 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
           })}
         </View>
       </View>
-      <PauseBanner />
+      <PauseBanner open={back ? open : undefined} />
       <OfflineStrip />
     </View>
   );

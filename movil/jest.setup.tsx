@@ -61,14 +61,16 @@ jest.mock('expo-audio', () => require('./src/test/fakeAudio').expoAudioMock);
 
 // expo-router: screens are rendered on their own; navigation calls are recorded.
 jest.mock('expo-router', () => {
-  const router = { push: jest.fn(), navigate: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true), setParams: jest.fn() };
-  const state = { params: {} as Record<string, string>, pathname: '/' };
+  const router = { push: jest.fn(), navigate: jest.fn(), dismissTo: jest.fn(), replace: jest.fn(), back: jest.fn(), canGoBack: jest.fn(() => true), setParams: jest.fn() };
+  const state = { params: {} as Record<string, string>, pathname: '/', root: undefined as unknown };
   return {
     router,
     useRouter: () => router,
     useLocalSearchParams: () => state.params,
     usePathname: () => state.pathname,
     useIsFocused: () => state.pathname === '/',
+    // No root state by default: screens fall back to useNavigation().getState(), which the tests set.
+    useRootNavigationState: () => state.root,
     Redirect: ({ href }: { href: string }) => {
       const { Text } = require('react-native');
       return <Text testID="redirect">{String(href)}</Text>;
