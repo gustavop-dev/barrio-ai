@@ -505,10 +505,10 @@ tags: [calendario]
 # Vetar the reaction, and «Deshacer» at once: nothing is sent and it stays in the queue.
 - tapOn:
     text: "Vetar"
-    below:
-      text: "EN COLA"
-    rightOf:
-      text: "Reacción Celebro al post de Ana Lucía Torres"
+    childOf:
+      id: "en-cola-.*"
+      containsDescendants:
+        - text: "Reacción Celebro al post de Ana Lucía Torres"
 - extendedWaitUntil:
     visible:
       id: confirm-sheet
@@ -604,10 +604,10 @@ tags: [calendario]
     timeout: 20000
 - tapOn:
     text: "Vetar"
-    below:
-      text: "EN COLA"
-    rightOf:
-      text: "Reacción Celebro al post de Ana Lucía Torres"
+    childOf:
+      id: "en-cola-.*"
+      containsDescendants:
+        - text: "Reacción Celebro al post de Ana Lucía Torres"
 - extendedWaitUntil:
     visible:
       id: confirm-sheet
