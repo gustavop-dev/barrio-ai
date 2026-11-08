@@ -51,12 +51,13 @@ tags: [calendario]
     from:
       text: "Altura del panel"
     direction: UP
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       text: "Qué aprendí cobrando por mi primer proyecto"
       childOf:
         id: hoja-dia
-    timeout: 10000
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     text: "BLOQUEADA POR EL VERIFICADOR"
     childOf:

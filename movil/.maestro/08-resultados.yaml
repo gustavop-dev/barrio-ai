@@ -307,32 +307,14 @@ tags: [resultados]
     notVisible: "No se separa por modalidad: muestra toda la cuenta."
     timeout: 20000
 
-# ---------------------------------------------------------------- 4 · Equipo, from its chip: replies not measured yet
-# cubre: RES-01, RES-07
-- tapOn: "4 · Equipo"
-- extendedWaitUntil:
-    visible:
-      id: res-equipo
-    timeout: 15000
-- scrollUntilVisible:
-    element:
-      text: "Gasto de IA"
-    direction: DOWN
-    centerElement: true
-    timeout: 20000
-- assertVisible: "\\d+ publicados? · — con respuesta"
-- assertVisible: "\\d+ seguidos? · \\d+ invitados? · \\d+ aceptados?"
-- assertVisible: "\\d+ publicadas? · \\d+ bloqueadas? · \\d+ vetadas?"
-- assertVisible: "[0-9.,]+ de [0-9.,]+ USD hoy"
-- takeScreenshot: 08-resultados-14-equipo
-
 # ---------------------------------------------------------------- 1 · Negocio: a missing figure, the funnel, an opportunity
-# cubre: RES-02, RES-03
+# cubre: RES-01, RES-02, RES-03
+# The section chips (just under Modalidad) jump to a section.
 - scrollUntilVisible:
     element:
-      id: res-modalidad
-    direction: UP
-    timeout: 30000
+      text: "1 · Negocio"
+    direction: DOWN
+    timeout: 15000
 - tapOn: "1 · Negocio"
 - scrollUntilVisible:
     element:
@@ -480,3 +462,17 @@ tags: [resultados]
     visible:
       id: resultados-list
     timeout: 15000
+
+# ---------------------------------------------------------------- 4 · Equipo, the last section: replies not measured yet
+# cubre: RES-07
+- scrollUntilVisible:
+    element:
+      text: "Gasto de IA"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "\\d+ publicados? · — con respuesta"
+- assertVisible: "\\d+ seguidos? · \\d+ invitados? · \\d+ aceptados?"
+- assertVisible: "\\d+ publicadas? · \\d+ bloqueadas? · \\d+ vetadas?"
+- assertVisible: "[0-9.,]+ de [0-9.,]+ USD hoy"
+- takeScreenshot: 08-resultados-14-equipo

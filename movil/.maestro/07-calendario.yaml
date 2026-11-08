@@ -227,17 +227,18 @@ tags: [calendario]
     childOf:
       id: hoja-dia
 - takeScreenshot: 07-calendario-08-hoja-manana
-# Drag the handle up: the sheet goes to full height and shows the day's piece, «Programada».
+# Drag the handle up: the sheet goes to full height (under the week strip) and shows the day's piece, «Programada».
 - swipe:
     from:
       text: "Altura del panel"
     direction: UP
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       text: "Documentar decisiones vale más que documentar tareas"
       childOf:
         id: hoja-dia
-    timeout: 10000
+    direction: DOWN
+    timeout: 15000
 - assertVisible:
     text: "PROGRAMADA"
     childOf:

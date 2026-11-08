@@ -148,7 +148,7 @@ export function CalendarioScreen() {
   const select = useCallback((day: string) => update({ fecha: day === today ? null : day }), [update, today]);
 
   /** Where the grid ends on screen once it is scrolled to the top (the scroll is clamped to the content). */
-  const placeGrid = (scroll: boolean) => {
+  const placeGrid = useCallback((scroll: boolean) => {
     const grid = gridRef.current;
     const screen = screenRef.current;
     if (!grid || !screen || typeof grid.measureLayout !== 'function') return;
@@ -163,7 +163,14 @@ export function CalendarioScreen() {
       setGridBottom(Math.max(0, y + height - (landed - scrollY.current)));
       scrollRef.current?.scrollTo({ y: target, animated: !reduced });
     });
-  };
+  }, [screenHeight, reduced]);
+
+  // While the sheet is open, keep the grid at the top: changing day or week can shrink the content for a moment (the
+  // panel loading) and leave the calendar scrolled back under the header.
+  const dayLoaded = Boolean(selectedDay);
+  useEffect(() => {
+    if (openSheetDay) placeGrid(true);
+  }, [openSheetDay, fecha, dayLoaded, placeGrid]);
 
   const openDay = (day: string) => {
     select(day);

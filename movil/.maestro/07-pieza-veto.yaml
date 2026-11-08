@@ -59,11 +59,15 @@ tags: [calendario]
 # cubre: CAL-08
 - scrollUntilVisible:
     element:
+      text: "TEXTO FINAL"
+    direction: DOWN
+    timeout: 20000
+- scrollUntilVisible:
+    element:
       id: copiar
     direction: DOWN
     centerElement: true
     timeout: 20000
-- assertVisible: "TEXTO FINAL"
 - assertVisible: "[0-9.]+ caracteres"
 - assertVisible: "Se publica tal cual, en inglés."
 - assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue."
