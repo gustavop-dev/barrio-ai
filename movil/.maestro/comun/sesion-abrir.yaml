@@ -16,3 +16,11 @@ appId: co.projectapp.office
     visible:
       id: "login|screen-oficina"
     timeout: 60000
+# The menu can also slide in a moment after the app shows; close it if it does.
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow:
+    when:
+      visible: "Go home|Reload|Open JS debugger"
+    commands:
+      - back
