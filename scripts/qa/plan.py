@@ -3,7 +3,7 @@
 
 Selection, first match wins:
   1. QA_SELECCION (the `flujos` input of a manual run);
-  2. `[qa: …]` in QA_MENSAJE (the message of the PR's head commit), e.g. `[qa: 05-captura 09]`;
+  2. the last `[qa: …]` in QA_MENSAJE (the message of the PR's head commit), e.g. `[qa: 05-captura 09]`;
   3. every flow.
 Tokens are separated by spaces or commas; a token selects the flows whose name equals it, starts with it or contains it
 (`05`, `05-captura`, `captura`). `todo` or `todos` selects everything.
@@ -29,8 +29,8 @@ def available():
 def tokens():
     raw = os.environ.get('QA_SELECCION', '').strip()
     if not raw:
-        m = TAG.search(os.environ.get('QA_MENSAJE', ''))
-        raw = m.group(1).strip() if m else ''
+        found = TAG.findall(os.environ.get('QA_MENSAJE', ''))
+        raw = found[-1].strip() if found else ''
     return [t for t in re.split(r'[\s,]+', raw) if t]
 
 

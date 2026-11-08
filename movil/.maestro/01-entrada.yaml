@@ -8,6 +8,12 @@ tags: [entrada]
     clearState: true
     permissions:
       all: allow
+# A cold emulator may show a system «… isn't responding» dialog over the app: wait for it to go.
+- runFlow:
+    when:
+      visible: ".*(isn't responding|no responde).*"
+    commands:
+      - tapOn: "Wait|Esperar"
 - extendedWaitUntil:
     visible:
       id: login

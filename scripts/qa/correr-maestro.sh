@@ -33,6 +33,19 @@ adb shell cmd alarm set-timezone America/Bogota > /dev/null 2>&1 || true
 adb shell date
 log "pantalla: $(adb shell wm size | tr -d '\r' | tail -n1) · $(adb shell wm density | tr -d '\r' | tail -n1)"
 
+# A cold emulator under load sometimes shows «Pixel Launcher isn't responding» over everything for the first
+# minute: wait for the system to settle and dismiss any such dialog before the first flow.
+settle_system() {
+  for _ in $(seq 1 12); do
+    if adb shell dumpsys window 2> /dev/null | grep -qiE "mCurrentFocus=.*(Application Not Responding|not responding)"; then
+      log "diálogo de «no responde» del sistema: se cierra con Esperar"
+      adb shell input keyevent KEYCODE_BACK
+    fi
+    sleep 5
+  done
+}
+settle_system
+
 log "instalando ${QA_APK:?QA_APK sin definir}"
 adb install -r -g "$QA_APK"
 
