@@ -209,7 +209,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
   4. **Dado** que nadie la aprueba, **cuando** pasan `OPERATOR_PROPOSAL_TTL_HOURS`, **entonces** caduca.
   5. **Dado** esa propuesta, **cuando** abre Calendario › Lista, **entonces** «En cola» la muestra primero con «Espera tu aprobación · caduca <día> a las HH:MM», «Aprobar» y «Vetar»; aprobada, pasa a «Saldrá … según el espaciado».
 - **Brechas código/docs:** — (Producción está en modo `auto` para todo; el mundo de QA deja la red en `approval`.)
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-aprobar` (criterios 3 y 5: la tarjeta de Tu turno y «En cola»). Backend `ApprovalTests`.
 
 ## Retiradas
 

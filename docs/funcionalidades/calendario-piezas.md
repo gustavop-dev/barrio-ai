@@ -256,7 +256,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   3. **Dado** esa pieza en la PWA o la app, **cuando** abre el detalle, **entonces** ve la sección «Aprobación» con «Aprobar» junto a «Vetar»; en Tu turno, la tarjeta «¿Apruebas la pieza del <d/m>?» con «Ver la pieza».
   4. **Dado** un `expected_hash` que no coincide con el texto actual, **cuando** aprueba, **entonces** la API lo rechaza.
 - **Brechas código/docs:** `publicacion-diaria.md` («Para la primera pieza conviene `CONT-09=approval`: Gustavo la aprueba con su hash») presupone una interfaz que ya no existe. Ver también [BAR-13](red.md#bar-13).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-aprobar` (criterio 3: «Aprobar» en el detalle de una pieza pendiente, que pasa a «Programada»). Backend `ApprovalTests`.
 
 ### CAL-16 · Enlaces antiguos llevan al Calendario o a la pieza <a id="cal-16"></a>
 

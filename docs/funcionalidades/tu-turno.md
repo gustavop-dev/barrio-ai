@@ -48,7 +48,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   8. **Dado** el enlace `/tu-turno#turno-<id>`, **cuando** carga, **entonces** la vista baja hasta esa tarjeta.
   9. **Dado** que la máquina se detuvo desde el servidor (`OPERATOR_PAUSED`), **cuando** abre Tu turno, **entonces** no hay tarjeta: aparece en Notificaciones › Próximo ([NOT-03](notificaciones.md#not-03)).
 - **Brechas código/docs:** el contrato documenta `top` «para la tarjeta de la Oficina»; ninguna interfaz lo usa (el diseño rev 18 quitó lo que había sobre la escena).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterios 1, 3 y 9: grupos, orden y contador con las 8 tarjetas del mundo de QA) y `04-tu-turno-estados` (4 vacío y 6 «No se pudo actualizar» con el interruptor de fallos). El 2 (orden por plazo) y el 7 son del backend; el 5 (esqueleto) y el 8 (ancla), de Jest.
 
 ### TUR-02 · Contador en la navegación <a id="tur-02"></a>
 
@@ -63,7 +63,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   4. **Dado** más de 99 pendientes, **cuando** se pinta, **entonces** muestra «99+».
   5. **Dado** que `GET /api/v1/tu-turno` falla, **cuando** se pinta la barra, **entonces** el contador desaparece sin mensaje (comportamiento actual; la vista Tu turno sí muestra el error).
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno`, `04-tu-turno-aprobar` y `04-tu-turno-mas` (criterios 1 y 2: «Tu turno, 8 pendientes, 1 urgente», baja al resolver, «2 urgentes» con la máquina detenida). El 3 (sin contador) en `04-tu-turno-estados`; el 4 y el 5, Jest.
 
 ### TUR-03 · Una tarjeta pasa de Nueva a Vista <a id="tur-03"></a>
 
@@ -77,7 +77,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   3. **Dado** una lista de ids que no es lista, con ids vacíos o de más de 120 caracteres, o con más de 200 ids, **cuando** se envía, **entonces** la API responde 400.
   4. **Dado** que el envío falla, **cuando** pasa, **entonces** no se avisa y se reintenta la próxima vez que la tarjeta aparece.
 - **Brechas código/docs:** el contrato dice que la respuesta es `{seen}`; el tipo de `compartido/src/api/tuTurno.ts` espera `{count}`. No tiene efecto porque no se usa.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterio 2: la etiqueta «Nueva» de la tarjeta urgente). El envío por lotes y los 400, backend.
 
 ### TUR-04 · Aviso «¿Salió o no?» de una acción incierta <a id="tur-04"></a>
 
@@ -92,7 +92,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   4. **Dado** «No se aplicó», **cuando** confirma con nota, **entonces** se envía `{outcome: "failed", note}` y aparece «Anotado: no se aplicó».
   5. **Dado** que la acción ya no está en `sent` ni `uncertain`, **cuando** envía, **entonces** el error «Solo se resuelven acciones enviadas o inciertas.» se ve dentro del diálogo y la tarjeta sigue.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterios 1 a 3: la tarjeta, deslizar abre «Confirmar que se aplicó» con la nota y la tarjeta se va; «Hecho recientemente» dice «Confirmaste que se aplicó»). El 4 y el 5, backend y Jest.
 
 ### TUR-05 · Aviso de LinkedIn caducado o a punto de caducar <a id="tur-05"></a>
 
@@ -108,7 +108,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   5. **Dado** la tarjeta en la app, **cuando** pulsa «Reconectar LinkedIn», **entonces** se abre `/ajustes#linkedin` de la PWA en el navegador externo para conectar (el OAuth necesita la cookie de la PWA; ver [AJU-07](ajustes.md#aju-07)); al volver, la app no refresca el estado hasta la siguiente consulta.
   6. **Dado** que reconectó, **cuando** vuelve a Tu turno, **entonces** la tarjeta ya no está y «Hecho recientemente» dice «Reconectado».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** Sin E2E: seed_qa no puede sembrar una credencial de LinkedIn (su guarda se niega a correr si existe una, para proteger una oficina real). El criterio 3 lo cubre `LinkedInExpiredTests` en el backend.
 
 ### TUR-06 · Reanudar la máquina o la cuenta desde Tu turno <a id="tur-06"></a>
 
@@ -122,7 +122,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   3. **Dado** una cuenta en pausa, **cuando** abre Tu turno, **entonces** ve «Reanuda la cuenta de LinkedIn», Importante, con «<cuenta>: <motivo>»; «Reanudar la cuenta» la reanuda y aparece «Cuenta reanudada».
   4. **Dado** la parada fijada en el servidor, **cuando** abre Tu turno, **entonces** no hay tarjeta de máquina.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-mas` (criterios 1 y 2: detener la máquina desde Ajustes, la tarjeta urgente «Reanuda la máquina» con «Detenida por qa», reanudar con motivo). El 3 y el 4, backend.
 
 ### TUR-07 · Tarjeta de conversación que le toca <a id="tur-07"></a>
 
@@ -137,7 +137,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   4. **Dado** «Hecho, respondí», **cuando** lo pulsa, **entonces** aparece «Anotado: respondiste» y la tarjeta desaparece.
   5. **Dado** «Marcar como oportunidad», **cuando** lo pulsa, **entonces** se abre el formulario de oportunidad relleno ([INB-05](inbox.md#inb-05)).
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterios 1 y 4: la tarjeta y «Hecho, respondí» deslizando) y `04-tu-turno-mas` (3 «No responder» con su motivo, 5 «Marcar como oportunidad»). El 2 abre LinkedIn: no se automatiza.
 
 ### TUR-08 · Tarjeta de la orientación propuesta por el analista <a id="tur-08"></a>
 
@@ -151,7 +151,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   3. **Dado** «Ver el resumen», **cuando** lo pulsa, **entonces** navega dentro de la app a Resultados, al bloque `#resumen`, sin recargar.
   4. **Dado** «Descartar», **cuando** lo pulsa, **entonces** el resumen queda `descartado`, aparece «Resumen descartado» y la tarjeta desaparece.
 - **Brechas código/docs:** la API envía `summary: {id, week_start, label, titular}` y la PWA no lo pinta.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterio 1) y `04-tu-turno-mas` (4 «Descartar»). El 3 (navegar a Resultados) lo cubre `06-notificaciones-destinos` por la notificación del resumen.
 
 ### TUR-09 · Responder una pregunta del equipo <a id="tur-09"></a>
 
@@ -170,7 +170,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   8. **Dado** que pasaron menos de 15 minutos desde la respuesta, **cuando** Gustavo quiere deshacerla, **entonces** tiene dónde hacerlo. **Hoy falla:** la interfaz solo ofrece «Deshacer» en el aviso de 5 s, aunque la API lo permite 15 minutos.
   9. **Dado** que pasaron más de 15 minutos, **cuando** se pide deshacer, **entonces** la API responde 409 y la PWA muestra «Ya no se puede deshacer: pasaron más de 15 minutos».
 - **Brechas código/docs:** ventana de deshacer de 15 minutos en la API frente a 5 s en la interfaz. El botón de enviar queda desactivado sin explicar por qué mientras el valor no es válido (PWA).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterio 1: respuesta escrita y su dato en «Lo que el equipo sabe de ti») y `04-tu-turno-mas` (2 con una opción y 7 «Deshacer»). El 3, 5, 6, 8 y 9, backend y Jest.
 
 ### TUR-10 · Responder una pregunta con audio <a id="tur-10"></a>
 
@@ -183,7 +183,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   2. **Dado** el envío con texto o audio, **cuando** el equipo lo procesa, **entonces** la pregunta queda respondida con la visibilidad elegida (o la sugerida) y la captura termina en `dato_guardado` con «Está en Lo que el equipo sabe de ti · Público/Privado».
   3. **Dado** que la pregunta se cerró antes de enviar, **cuando** se envía, **entonces** la API responde 409 «Esa pregunta ya no está abierta.».
 - **Brechas código/docs:** en la app, enviar con audio falla hoy ([CAP-04](captura.md#cap-04)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-mas` (criterio 1: la hoja de captura con «Responde a …» y la pregunta) y `05-captura-contexto` (1 y el envío con audio que llega al backend). El 2 necesita el worker; el 3, backend.
 
 ### TUR-11 · «Más tarde» y las pospuestas <a id="tur-11"></a>
 
@@ -197,7 +197,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   3. **Dado** que pasan los 3 días, **cuando** abre Tu turno, **entonces** vuelve a la lista principal y cuenta.
   4. **Dado** una pregunta ya cerrada, **cuando** se pospone, **entonces** la API responde 409.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterios 1 y 2: «Más tarde» deslizando y con su botón, «Pospuestas · 3» con las tres). El 3 y el 4, backend.
 
 ### TUR-12 · «No quiero compartir esto» <a id="tur-12"></a>
 
@@ -210,7 +210,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   2. **Dado** que confirma, **cuando** se envía, **entonces** la pregunta queda `declined`, aparece «Hecho. El equipo no volverá a preguntarlo» y «Hecho recientemente» dice «No quisiste compartirla».
   3. **Dado** una clave rechazada, **cuando** un agente la pregunta otra vez, **entonces** no se crea la pregunta.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-mas` (criterios 1 y 2: la confirmación «No compartir esto» y «No quisiste compartirla» en «Hecho recientemente»). El 3, backend.
 
 ### TUR-13 · Preguntas cuyo plazo pasó <a id="tur-13"></a>
 
@@ -223,7 +223,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   2. **Dado** esa pregunta, **cuando** la responde, **entonces** se guarda igual que una pendiente.
   3. **Dado** una pregunta con plazo en menos de 24 h, **cuando** se pinta, **entonces** la línea del plazo («Útil antes de las HH:MM») va en rojo.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterio 1: «Ya no es urgente · 1», «Caducada» y su texto; no cuenta). El 2 y el 3, Jest y backend.
 
 ### TUR-14 · Hecho recientemente <a id="tur-14"></a>
 
@@ -236,7 +236,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   2. **Dado** una acción incierta resuelta, LinkedIn reconectado, la máquina reanudada o una conversación cerrada, **cuando** abre el pliegue, **entonces** aparecen con «Confirmaste que se aplicó», «Reconectado», «Reanudada», «Respondiste» o «Sin responder».
   3. **Dado** algo resuelto hace 8 días, **cuando** abre el pliegue, **entonces** no aparece.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno`, `04-tu-turno-aprobar` y `04-tu-turno-mas` (criterios 1 y 2: «Respondida», «Confirmaste que se aplicó», «Respondiste», «Aprobada», «Reanudada», «Sin responder», «No quisiste compartirla»). El 3, backend.
 
 ### TUR-15 · Ver lo que el equipo sabe de él <a id="tur-15"></a>
 
@@ -251,7 +251,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   4. **Dado** un error al cargar, **cuando** falla, **entonces** ve el error con «Reintentar».
   5. **Dado** el enlace `/memoria` (antiguo), **cuando** lo abre en la PWA, **entonces** llega a `/tu-turno/sabe`.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` y `04-tu-turno-sabe` (criterio 1: la introducción, tema, visibilidad, origen y `v2`) y `04-tu-turno-estados` (3 vacío y 4 error con «Reintentar»). El 2 (búsqueda desde 20 datos), Jest.
 
 ### TUR-16 · Añadir algo que quiere que sepan <a id="tur-16"></a>
 
@@ -264,7 +264,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   2. **Dado** un texto vacío o de más de 4.000 caracteres, **cuando** guarda, **entonces** la API responde 400 «Escribe el dato (máximo 4000 caracteres)».
   3. **Dado** un dato público, **cuando** corre el circuito editorial, **entonces** aparece en `public_facts`; uno privado, en `private_guidance`.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-sabe` (criterio 1: Privado por defecto, «Lo añadiste tú»). El 2 y el 3, backend.
 
 ### TUR-17 · Editar o retirar un dato <a id="tur-17"></a>
 
@@ -278,7 +278,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   3. **Dado** una clave que no está en la memoria confirmada, **cuando** se corrige o retira, **entonces** la API responde 409 «Ese dato no está en la memoria confirmada.».
   4. **Dado** una edición o una retirada, **cuando** se hace, **entonces** no hay «Deshacer» (comportamiento actual).
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno-sabe` (criterios 1 y 2: versión nueva `v2` y retirar). El 3 y el 4, backend.
 
 ### TUR-18 · Tareas de perfil <a id="tur-18"></a>
 
@@ -308,7 +308,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   5. **Dado** un lector de pantalla, **cuando** recorre la tarjeta, **entonces** las acciones de deslizar están disponibles como acciones accesibles.
   6. **Dado** que la API responde con un error, **cuando** vuelve, **entonces** la tarjeta vuelve y se ve el `detail` del error.
 - **Brechas código/docs:** no se comprobó en un teléfono un caso posible: si tras un deslizamiento correcto la tarjeta sigue en la respuesta de la API, podría quedar fuera de la pantalla e invisible (`SwipeableCard.tsx:218-225`, `exits.ts:305-309`). Los errores de red salen en inglés ([APP-08](app-movil-instalacion.md#app-08)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `04-tu-turno` (criterios 1 a 3: derecha con acción directa, derecha que pide nota y la hoja, izquierda «Más tarde») y `04-tu-turno-estados` (6: la API rechaza y la tarjeta vuelve con el motivo). El 4 y el 5, Jest.
 
 ## Retiradas
 

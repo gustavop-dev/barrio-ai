@@ -54,7 +54,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   3. **Dado** el servidor sin VAPID y sin teléfonos registrados, **cuando** lo pide, **entonces** recibe 403 «Notificaciones no configuradas en el servidor (VAPID).».
   4. **Dado** un token de servicio, **cuando** lo pide, **entonces** recibe 403.
 - **Brechas código/docs:** las dos interfaces ignoran `sent`: con `sent: 0` también dicen que se envió.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones-avisos` (criterio 3: sin VAPID ni teléfonos, «No se pudo completar» con el motivo). El 1 necesita FCM.
 
 ### PUS-03 · Desactivar las notificaciones en este dispositivo <a id="pus-03"></a>
 
@@ -84,7 +84,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   4. **Dado** un tipo desconocido o un cuerpo vacío, **cuando** llega a la API, **entonces** responde 400.
   5. **Dado** que guardar falla, **cuando** vuelve el error, **entonces** el interruptor vuelve a su valor y aparece un aviso de error.
 - **Brechas código/docs:** en la PWA el pliegue no tiene estado de carga: sale vacío mientras carga `/ajustes`.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones-avisos` (criterio 6: encender un tipo apagado por defecto y que siga encendido al reabrir) y `11-ajustes` (3, apagar uno). Backend `PushSwitchTests`.
 
 ### PUS-05 · Qué tipos envían push <a id="pus-05"></a>
 
@@ -100,7 +100,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   5. **Dado** que la máquina se detiene desde el servidor (`OPERATOR_PAUSED`), **cuando** el autopiloto lo ve, **entonces** llega una vez la push urgente «Máquina detenida desde el servidor» con destino `/notificaciones`; no se guarda en el feed («Próximo» la muestra mientras dura) y una parada nueva, tras levantarla, vuelve a avisar.
   6. **Dado** que Gustavo detiene la máquina desde la app, **cuando** pasa, **entonces** llega la push urgente «Máquina detenida» con el motivo. «Tarea de perfil nueva» no tiene evento hasta que exista el ciclo de Perfil ([TUR-18](tu-turno.md#tur-18)): Ajustes no ofrece su interruptor y la API lo sigue aceptando.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** Backend (`PushEmitterTests`, `LinkedInExpiredTests`, `test_publicacion`).
 
 ### PUS-06 · Mostrar y abrir una Web Push <a id="pus-06"></a>
 
@@ -134,7 +134,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   7. **Dado** el servidor, **cuando** abre Ajustes, **entonces** ve «Teléfonos que reciben avisos», «Último aviso entregado» y «Último error de Expo» (`ajustes.expo_push`).
   8. **Dado** el mismo token registrado otra vez, **cuando** llega, **entonces** se actualiza y reactiva con el mismo `id`; un token sin formato `ExponentPushToken[…]` recibe 400 «Token de Expo inválido: se espera ExponentPushToken[…].».
 - **Brechas código/docs:** `movil/README.md` dice que las push «necesitan además las credenciales de FCM (Firebase), que se cargan en EAS con `npx eas-cli@latest credentials`» y que hace falta una build de desarrollo; `eas.json` no tiene perfil `development` ([APP-07](app-movil-instalacion.md#app-07)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones-avisos` (criterios 5 y 7: «Avisos push aún no disponibles · Los avisos push solo llegan a un teléfono real.» y «Teléfonos que reciben avisos»). El 1 a 4 necesitan un teléfono real con FCM.
 
 ### PUS-08 · Tocar un aviso en el teléfono <a id="pus-08"></a>
 
@@ -149,7 +149,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   4. **Dado** una URL absoluta o que empieza por `/api/`, **cuando** toca el aviso, **entonces** no navega.
   5. **Dado** una ruta que la app no tiene, **cuando** toca el aviso, **entonces** ve «Esta vista no existe» con «Ir a la Oficina».
 - **Brechas código/docs:** no se comprobó qué pasa si toca un aviso con la sesión cerrada.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** Sin E2E: necesita una push real (FCM y el servicio de Expo). Los enlaces `oficina0ff1ce://` los recorre `02-navegacion`.
 
 ### PUS-09 · Envío desde el servidor <a id="pus-09"></a>
 
@@ -178,7 +178,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   1. **Dado** la app abierta, **cuando** llega un aviso, **entonces** se muestra como banner, sin sonido ni número en el icono.
   2. **Dado** ese aviso, **cuando** llega, **entonces** Notificaciones y Tu turno se actualizan, la campana se balancea y el teléfono vibra una vez.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** Sin E2E: necesita una push real con la app abierta.
 
 ### PUS-11 · Copia de las alertas a un webhook <a id="pus-11"></a>
 
