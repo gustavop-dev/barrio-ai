@@ -143,7 +143,8 @@ describe('Tu turno · Pendiente', () => {
     expect(view.getByText('Comprador')).toBeInTheDocument();
     expect(view.getByText('Por qué importa')).toBeInTheDocument();
     expect(view.getByText('Posible oportunidad: ProjectApp (86 %) · Espera tu respuesta (81 %)')).toBeInTheDocument();
-    expect(view.getByText(/^Último mensaje · hoy, /)).toBeInTheDocument();
+    // The fixture's message is 2 h old: between 00:00 and 02:00 on the test clock it falls on the day before.
+    expect(view.getByText(/^Último mensaje · (hoy|ayer), /)).toBeInTheDocument();
     expect(view.getByText(/¿tienes disponibilidad para un proyecto corto de IA en enero\?/)).toBeInTheDocument();
     expect(view.queryByText(/Happy to share/)).not.toBeInTheDocument();  // only his last message
     expect(view.getByText('La app nunca envía mensajes: respondes tú en LinkedIn.')).toBeInTheDocument();

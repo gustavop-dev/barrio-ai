@@ -1,5 +1,6 @@
 import { Skia, type SkCanvas } from '@shopify/react-native-skia';
 import type { BubbleIcon } from '@compartido/scene/model';
+import { officeMotion } from '@/theme/motion';
 import { colors, officeRoom as ROOM } from '@/theme/tokens';
 const C = { tinta: colors.ink, tintaSuave: colors.inkSoft, papel: colors.paper, ofc: colors.brand, hondo: colors.brandDeep, claro: colors.brandLight, postit: colors.postIt };
 function pixels(ctx: SkCanvas) {
@@ -74,7 +75,7 @@ export function pointerPicture() {
   return recorder.finishRecordingAsPicture();
 }
 
-export function zonePicture(box: readonly number[]) {
+export function zonePicture(box: readonly number[], length = officeMotion.bracketPx) {
   const recorder = Skia.PictureRecorder();
   const ctx = recorder.beginRecording(Skia.XYWHRect(0, 0, 192, 336));
   const R = pixels(ctx);
@@ -83,7 +84,7 @@ export function zonePicture(box: readonly number[]) {
     const y = box[1]! + 1;
     const w = box[2]! - 2;
     const h = box[3]! - 2;
-    const L = 7;
+    const L = length;
     for (const [cx, cy, dx, dy] of [[x, y, 1, 1], [x + w, y, -1, 1], [x, y + h, 1, -1], [x + w, y + h, -1, -1]] as const) {
       R(Math.min(cx, cx + dx * L), dy > 0 ? cy : cy - 2, L, 3, C.tinta);
       R(dx > 0 ? cx : cx - 2, Math.min(cy, cy + dy * L), 3, L, C.tinta);
@@ -93,5 +94,18 @@ export function zonePicture(box: readonly number[]) {
   };
 
   brackets(box);
+  return recorder.finishRecordingAsPicture();
+}
+
+/** MovOficina's 11×8 envelope, recorded once; only its integer position changes on UI. */
+export function mailPicture() {
+  const recorder = Skia.PictureRecorder();
+  const R = pixels(recorder.beginRecording(Skia.XYWHRect(-5, -4, 11, 8)));
+  const x = -5, y = -4;
+  R(x, y, 11, 8, C.tinta); R(x + 1, y + 1, 9, 6, ROOM.white);
+  R(x + 1, y + 1, 1, 1, C.tinta); R(x + 2, y + 2, 1, 1, C.tinta);
+  R(x + 3, y + 3, 1, 1, C.tinta); R(x + 4, y + 4, 3, 1, C.tinta);
+  R(x + 7, y + 3, 1, 1, C.tinta); R(x + 8, y + 2, 1, 1, C.tinta);
+  R(x + 9, y + 1, 1, 1, C.tinta); R(x + 4, y + 5, 3, 1, C.ofc);
   return recorder.finishRecordingAsPicture();
 }
