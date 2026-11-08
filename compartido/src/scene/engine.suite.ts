@@ -2,6 +2,8 @@ import type { TestAPI } from './testAPI';
 import type { SceneStatus, StatusMap } from './activity';
 import { AMBIENT_EVERY, OfficeEngine } from './engine';
 import type { OfficeEvent } from './events';
+import { SCENE_MOTION as M } from './motion';
+import { sceneBracketLength, sceneHop, selectScene } from './runtime';
 import { ROLES, ROLE_IDS, type CharacterId, type RoleId } from './roles';
 
 const BASE = Date.parse('2026-11-07T15:00:00Z');
@@ -293,6 +295,91 @@ describe('OfficeEngine · reads', () => {
     expect(e.statusOf('bibliotecario')).toBe('desconocido');
     e.setStatuses(all('en_espera'));
     expect(e.statusOf('bibliotecario')).toBe('en_espera');
+  });
+});
+
+describe('MovOficina · selection and capture receipt', () => {
+  it('hops in integer pixels for 90 + 90 ms and draws corners linearly in 120 ms', () => {
+    const e = engine(), s = e.state;
+    selectScene(s, 'perfil', 'estrategia');
+    expect(sceneHop(s, 'perfil')).toBe(M.hopPx);
+    expect(sceneHop(s, 'posicionamiento')).toBe(0);
+    expect(sceneBracketLength(s)).toBe(1);
+    e.step(M.bracketMs / 2);
+    expect(sceneBracketLength(s)).toBe(4);
+    e.step(M.hopStepMs - M.bracketMs / 2);
+    expect(sceneHop(s, 'perfil')).toBe(M.hopSettlePx);
+    selectScene(s, 'perfil', 'estrategia'); // Same selection does not restart the board's feedback.
+    e.step(M.hopEndMs - M.hopStepMs);
+    expect(sceneHop(s, 'perfil')).toBe(0);
+    expect(sceneBracketLength(s)).toBe(M.bracketPx);
+    selectScene(s, null, 'editorial');
+    expect(sceneBracketLength(s)).toBe(1);
+    selectScene(s, 'perfil', 'estrategia');
+    expect(sceneHop(s, 'perfil')).toBe(M.hopPx);
+  });
+
+  it('drops the envelope, picks it up, delivers to Editorial and returns Operación home', () => {
+    const e = engine(), s = e.state, o = e.byId.operador_cuenta;
+    const said = narrations(e);
+    e.receiveCapture();
+    expect(s.mail?.x).toBe(M.mailX);
+    expect(s.mail?.y).toBe(M.mailStartY + M.mailAcceleration);
+    e.step(M.mailStepMs);
+    expect(Math.round(s.mail!.y * 10)).toBe(Math.round((M.mailStartY + M.mailAcceleration * 3) * 10));
+    until(e, () => o.busy);
+    expect(s.mail?.y).toBe(M.mailLandingY);
+    expect(o.bubble?.icon).toBe('pregunta');
+    until(e, () => s.mail === null);
+    expect(o.bubble?.icon).toBe('hoja');
+    expect(o.path).toBeNull();
+    until(e, () => o.x === 82 && o.y === 214 && o.path === null);
+    expect(e.byId.director_editorial.bubble?.icon).toBe('charla');
+    until(e, () => !s.captureActive);
+    expect(atHome(e, 'operador_cuenta')).toBe(true);
+    expect(o.busy).toBe(false);
+    expect(said).toEqual(['Llegó tu captura a la oficina.', 'Operación lleva tu captura a Mesa editorial.', 'Director editorial recibe tu captura.']);
+    expect(e.feed).toEqual([]); // Receipt motion must not invent a backend work event.
+  });
+
+  it('waits for a publication and serializes consecutive captures without overwriting a path', () => {
+    const e = engine(), s = e.state;
+    e.ingest([ev(1, 'publicacion', 'operador_cuenta')]);
+    e.receiveCapture(); e.receiveCapture();
+    e.advance(500);
+    expect(e.byId.operador_cuenta.doing).toBe('Publicando en LinkedIn');
+    expect(s.captures).toBe(2);
+    until(e, () => s.captures === 0, 60_000);
+    expect(atHome(e, 'operador_cuenta')).toBe(true);
+    expect(e.feed).toHaveLength(1);
+    expect(s.mail).toBeNull();
+  });
+
+  it('freezes a receipt while paused or offscreen and resumes without catching up', () => {
+    const e = engine(); e.setPaused(true); e.receiveCapture();
+    const y = e.state.mail?.y;
+    e.advance(5000); expect(e.state.mail?.y).toBe(y);
+    e.setPaused(false); e.setFrozen(true);
+    e.advance(5000); expect(e.state.mail?.y).toBe(y);
+    e.setFrozen(false); e.advance(16);
+    expect(e.state.mail!.y).toBeGreaterThan(y!);
+    until(e, () => !e.state.captureActive);
+  });
+
+  it('reduced motion narrates receipts, cancels deliveries and shows complete static selection', () => {
+    const e = engine(); e.receiveCapture(); e.advance(2000);
+    selectScene(e.state, 'operador_cuenta', 'operacion');
+    e.setStill(true);
+    expect(e.state.mail).toBeNull();
+    expect(e.state.captures).toBe(0);
+    expect(atHome(e, 'operador_cuenta')).toBe(true);
+    e.receiveCapture();
+    expect(e.now?.text).toBe('Llegó tu captura a la oficina.');
+    expect(e.activeTasks).toBe(0);
+    expect(sceneHop(e.state, 'operador_cuenta')).toBe(0);
+    expect(sceneBracketLength(e.state)).toBe(M.bracketPx);
+    e.setStill(false); e.advance(1000);
+    expect(e.activeTasks).toBe(0);
   });
 });
 
