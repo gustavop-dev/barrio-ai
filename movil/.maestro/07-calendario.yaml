@@ -449,13 +449,22 @@ tags: [calendario]
       id: calendario-lista
 - takeScreenshot: 07-calendario-14-lista-proximo
 # «En cola»: a reaction and an invitation, approved and waiting, each with when it goes out.
+# Approval rows precede Camila: check the heading before scrolling past them to the approved actions.
+- scrollUntilVisible:
+    element:
+      text: "EN COLA"
+      childOf:
+        id: calendario-lista
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "EN COLA"
 - scrollUntilVisible:
     element:
       text: "Invitar a Camila Ortiz \\(sin nota\\)"
     direction: DOWN
     centerElement: true
     timeout: 20000
-- assertVisible: "EN COLA"
 - assertVisible: "Reacción Celebro al post de Ana Lucía Torres"
 - assertVisible: "Saldrá .*"
 - takeScreenshot: 07-calendario-15-en-cola

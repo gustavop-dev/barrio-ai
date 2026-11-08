@@ -115,17 +115,24 @@ tags: [calendario]
     timeout: 20000
 
 # The block's «Abrir» opens the piece.
+# Scroll down to the link itself: its title can be visible while «Abrir» is behind the Resultados tab.
 # cubre: CAL-06, CAL-09
 - scrollUntilVisible:
     element:
-      text: "El verificador bloqueó la pieza"
-    direction: UP
+      text: "Abrir"
+      childOf:
+        id: "evento-.*"
+        containsDescendants:
+          - text: "El verificador bloqueó la pieza"
+    direction: DOWN
     centerElement: true
     timeout: 20000
 - tapOn:
     text: "Abrir"
-    below:
-      text: "El verificador bloqueó la pieza"
+    childOf:
+      id: "evento-.*"
+      containsDescendants:
+        - text: "El verificador bloqueó la pieza"
 - extendedWaitUntil:
     visible:
       text: "Pieza del ${output.anteayerLargo}"
