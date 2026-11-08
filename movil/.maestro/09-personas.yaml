@@ -247,7 +247,6 @@ tags: [personas]
 - extendedWaitUntil:
     visible: "Nadie coincide con estos filtros"
     timeout: 15000
-- hideKeyboard
 - takeScreenshot: 09-personas-10-sin-resultados
 - tapOn: "Quitar filtros"
 - extendedWaitUntil:
@@ -314,7 +313,6 @@ tags: [personas]
 - extendedWaitUntil:
     notVisible: "Pedro Salazar"
     timeout: 10000
-- hideKeyboard
 
 # ---------------------------------------------------------------- Laura's card
 # cubre: PRS-03

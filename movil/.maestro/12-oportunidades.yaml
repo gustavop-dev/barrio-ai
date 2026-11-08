@@ -8,7 +8,8 @@
 # moving, which Maestro cannot do: Jest covers it, and a person on a real phone.) «Nueva oportunidad»: the required
 # fields complain, «De Personas» finds Laura from two letters, then «Alguien fuera de la red» with a wrong date and the
 # right one registers «Lucia Prueba QA». Isabel Duarte's opportunity is edited («Cambios guardados») and deleted after
-# its confirmation («Oportunidad eliminada»). Cards are found by their testID (opp-<id>, the seed's fixed uuid5 values).
+# its confirmation («Oportunidad eliminada»). Cards and their «Etapa» selectors are found by their testID (opp-<id>,
+# opp-stage-<id>, the seed's fixed uuid5 values): a selector's accessible name is «Etapa de <name>, <stage>».
 appId: co.projectapp.office
 name: Oportunidades
 tags: [personas, oportunidades]
@@ -66,7 +67,7 @@ tags: [personas, oportunidades]
     text: "\\d+ días? en esta etapa"
     childOf:
       id: opp-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
-- assertVisible: "Etapa de Mauricio Peña"
+- assertVisible: "Etapa de Mauricio Peña, Propuesta"
 - assertVisible: "Editar la oportunidad con Mauricio Peña"
 - takeScreenshot: 12-oportunidades-02-tarjeta
 
@@ -74,12 +75,13 @@ tags: [personas, oportunidades]
 # cubre: PRS-07
 - scrollUntilVisible:
     element:
-      text: "Etapa de Valentina Castro"
+      id: opp-stage-6221123c-1873-52a9-abb5-4718847afe71
     direction: DOWN
     centerElement: true
     timeout: 30000
 - assertVisible: "Valentina Castro, Necesidad identificada"
-- tapOn: "Etapa de Valentina Castro"
+- tapOn:
+    id: opp-stage-6221123c-1873-52a9-abb5-4718847afe71
 - scrollUntilVisible:
     element:
       text: "Cualificada"
@@ -108,11 +110,12 @@ tags: [personas, oportunidades]
 # she stays in «Cualificada» and the toast says so. Then a move that fails puts the card back (criterion 3).
 - scrollUntilVisible:
     element:
-      text: "Etapa de Valentina Castro"
+      id: opp-stage-6221123c-1873-52a9-abb5-4718847afe71
     direction: DOWN
     centerElement: true
     timeout: 20000
-- tapOn: "Etapa de Valentina Castro"
+- tapOn:
+    id: opp-stage-6221123c-1873-52a9-abb5-4718847afe71
 - scrollUntilVisible:
     element:
       text: "Cualificada"
@@ -147,7 +150,7 @@ tags: [personas, oportunidades]
 # The move itself fails: the card goes back and says so.
 - scrollUntilVisible:
     element:
-      text: "Etapa de Mauricio Peña"
+      id: opp-stage-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
     direction: UP
     centerElement: true
     timeout: 20000
@@ -157,7 +160,8 @@ tags: [personas, oportunidades]
       RUTA: '^/api/v1/oportunidades/[^/]+$'
       METODO: PATCH
       EFECTO: '500'
-- tapOn: "Etapa de Mauricio Peña"
+- tapOn:
+    id: opp-stage-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
 - scrollUntilVisible:
     element:
       text: "Reunión"

@@ -32,7 +32,6 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Sofía Martínez"
     timeout: 15000
-- hideKeyboard
 - tapOn: "Sofía Martínez"
 - extendedWaitUntil:
     visible:
@@ -129,7 +128,6 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Andrés Restrepo"
     timeout: 15000
-- hideKeyboard
 # The card fails to load first (failure switch, comun/qa-fallo.js): the error comes with «Reintentar».
 # cubre: PRS-03
 - runScript:
@@ -228,7 +226,6 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Pedro Salazar"
     timeout: 15000
-- hideKeyboard
 - tapOn: "Pedro Salazar"
 - extendedWaitUntil:
     visible:
