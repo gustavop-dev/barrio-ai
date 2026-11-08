@@ -366,3 +366,33 @@ Ya no los usa la captura: `timings.recordDot` (la franja muestra el punto quieto
 El campo de texto no anima: al enfocarlo, el borde pasa a 2 px 0ff1ce hondo (el relleno devuelve el píxel, así el texto no se mueve) y la etiqueta pasa a 0ff1ce hondo.
 
 Ya no los usan los botones ni el aviso: `timings.press` y `springs.press` en `Button.tsx` (la barra inferior sigue usando `springs.press`), `springs.toast`, `layout.toastIn` y `layout.toastOut`.
+
+## Calendario y Resultados (MovCalendario, MovResultados)
+
+Los dos tableros de la fase 3 que mueven datos. Los valores del tablero que no son de `TOK` (las salidas de 120 ms, los retrasos, las cascadas y los desplazamientos en px) tienen nombre propio en `motion.ts`.
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `calendarSprings.daySelect` | FIRM (20 · 260 · 1) | Calendario: la selección oscura (`px`, `py`, `pw`, `ph`) se desliza al día tocado y viaja a su celda al cambiar entre Semana y Mes (`calendario/Selection.tsx`). La primera vez, y con movimiento reducido, salta. |
+| `calendarSprings.segment` | FIRM (20 · 260 · 1) | La superficie del control segmentado (`seg`) se desliza a la opción elegida: Vista en Calendario y Periodo en Resultados (`components/ui/Segmented.tsx`). |
+| `calendarTimings.panelOut` | 120 · exit | Calendario: el panel del día que se va se desvanece y se aparta 12 px hacia el lado contrario (`calendario/DaySwap.tsx`), en línea y en la hoja del día. |
+| `calendarTimings.panelIn` | 180 (fast) · enter | El panel nuevo entra desde el lado hacia el que avanzó la fecha. |
+| `calendarTimings.viewOut` | 120 · exit | La vista que se va, semana o mes, se desvanece debajo de la nueva (`calendario/ViewSwitch.tsx`). |
+| `calendarTimings.viewIn` | 180 (fast) · enter | La semana, o cada fila del mes, aparece (`calendarLayout.weekIn` y `calendarLayout.monthRowIn`, en `calendario/Grids.tsx`). |
+| `calendarTimings.height` | 260 (base) · enter | La altura del calendario (`h`) pasa de la semana al mes, o de un mes de 5 filas a uno de 6 (`calendario/Pager.tsx`). |
+| `calendarChoreography.panelShift` / `panelRise` | 12 / 8 px | Lo que se desliza el panel: 12 px de lado (al salir y al entrar) y 8 px de abajo arriba al entrar. |
+| `calendarChoreography.panelInDelayMs` | 60 ms | Lo que espera el panel nuevo antes de entrar. |
+| `calendarChoreography.monthRowDelayMs` / `monthRowStaggerMs` | 60 / 30 ms | La primera fila del mes espera 60 ms y cada fila siguiente 30 ms más. |
+| `calendarChoreography.monthRowDrop` | 6 px | Cada fila del mes baja desde 6 px más arriba. |
+| `calendarChoreography.weekInDelayMs` | 80 ms | La semana espera 80 ms antes de aparecer al volver del Mes. |
+| `calendarChoreography.pillTallAt` | 56 pt | Por encima de esta altura la selección tiene el radio de un día de la semana (`radius.md`); por debajo, el de una celda del mes (`radius.sm`). |
+| `resultsTimings.countFirst` | 600 · enter | Resultados: la primera vez, cada cifra cuenta desde 0 (`resultados/CountUp.tsx`): las cifras de los KPI y las de los embudos. |
+| `resultsTimings.count` | 400 (slow) · enter | Al cambiar de periodo (o de modalidad, o al refrescar), cuenta del valor que se ve al nuevo. |
+| `resultsTimings.bar` | 260 (base) · enter | Cada barra de los embudos y de «Interacción media por pilar» crece hasta su largo. |
+| `resultsChoreography.barFirstDelayMs` / `barStaggerMs` | 120 / 40 ms | Las barras crecen en cascada: 40 ms más por barra, y 120 ms de espera la primera vez. |
+
+Sin vibraciones nuevas: los tableros no marcan ninguna. Cambiar de vista o de periodo sigue usando `tabChange` (la del control segmentado) y deslizar la semana o el mes, `pageChange`.
+
+Con movimiento reducido (`useMotion()` y `reduceMotion` en cada configuración) la selección salta a su día, el panel y la vista cambian sin transición, la altura cambia de golpe, las cifras aparecen con su valor final y las barras con su largo.
+
+«Sin dato» nunca cuenta: se queda en «—», ni sale de 0 ni llega a 0. La cuenta corre en el hilo de la interfaz (un `TextInput` de solo lectura que Reanimated reescribe), y el último fotograma muestra la cifra tal como la escribe `formatKpiValue`; el lector de pantalla solo oye esa cifra final.

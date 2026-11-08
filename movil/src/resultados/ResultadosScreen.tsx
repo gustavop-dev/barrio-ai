@@ -1,6 +1,8 @@
 // Resultados: the weekly summary on top, then «¿vamos bien?» in the order business → audience → content →
 // team. Periodo and Modalidad live in the route params (?dias=&modalidad=, as in the PWA); the chips jump
 // to each section. A virtualized list: the sections and every post card are its rows. Pull to refresh.
+// Motion (MovResultados): Periodo is a segmented control whose selection slides (`seg`); the figures count
+// and the bars grow (CountUp.tsx).
 import { useResultados, useResumenSemanal } from '@compartido/api/hooks';
 import type { Resultados, ResultadosPost } from '@compartido/api/types';
 import {
@@ -20,7 +22,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useParamState } from '@/components/shell/useParamState';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { ErrorRetry, PageHeader, Section, Skeleton, T, pageContent } from '@/components/ui';
+import { ErrorRetry, PageHeader, Section, Segmented, Skeleton, T, pageContent } from '@/components/ui';
 import { Select } from '@/components/ui/Select';
 import { OportunidadForm } from '@/personas/OportunidadForm';
 import { useMotion } from '@/theme/motion';
@@ -133,10 +135,8 @@ export function ResultadosScreen() {
       <PageHeader title="Resultados" />
       <ResumenSemanal />
       <View style={styles.controls}>
+        <Segmented label="Periodo" testID="res-periodo" value={String(dias)} options={PERIOD_OPTIONS} onChange={(value) => setParams({ dias: value === '28' ? '' : value })} />
         <View style={styles.selects}>
-          <View style={styles.select}>
-            <Select label="Periodo" value={String(dias)} options={PERIOD_OPTIONS} onChange={(value) => setParams({ dias: value === '28' ? '' : value })} testID="res-periodo" />
-          </View>
           <View style={styles.select}>
             <Select label="Modalidad" value={modalidad} options={RESULTADOS_MODALITIES} onChange={(value) => setParams({ modalidad: value === 'todo' ? '' : value })} testID="res-modalidad" />
           </View>

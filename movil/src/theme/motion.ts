@@ -969,3 +969,102 @@ export const notifLayout = {
   /** The rest of the list moves down at the same pace. */
   listMove: () => LinearTransition.duration(notifTimings.arrive.duration).easing(easings.enter).reduceMotion(reduce()),
 };
+
+// ---------------------------------------------------------------- Calendario y Resultados (MovCalendario, MovResultados)
+// The phase 3 boards that move data: the calendar's selection, day panel and views, and the results'
+// counters and bars. TOK values are named by their base token; the values the boards write outside TOK
+// (the 120 ms leaves, the delays, the staggers and the shifts in px) are named here.
+
+/** MovCalendario and MovResultados: what leaves in these boards takes 120 ms (EASE_IN). */
+const BOARD_LEAVE_MS = 120;
+
+export const calendarSprings = {
+  /** MovCalendario: the dark selection (`px`, `py`, `pw`, `ph`) slides to the tapped day, and travels to its cell when the view changes. */
+  daySelect: FIRM,
+  /** MovCalendario and MovResultados: the selection of a segmented control (`seg`) slides to the chosen option (Vista, Periodo). */
+  segment: FIRM,
+} as const satisfies Record<string, SpringToken>;
+
+export const calendarTimings = {
+  /** MovCalendario: the old day panel fades and slides away from the side the date moved to (120 ms, EASE_IN). */
+  panelOut: { duration: BOARD_LEAVE_MS, easing: 'exit' },
+  /** MovCalendario: the new day panel enters from the side the date moved to (TOK.fast, EASE_OUT). */
+  panelIn: { duration: durations.fast, easing: 'enter' },
+  /** MovCalendario: the view that leaves, week or month, fades out (120 ms, EASE_IN). */
+  viewOut: { duration: BOARD_LEAVE_MS, easing: 'exit' },
+  /** MovCalendario: the week, or each row of the month, fades in (TOK.fast, EASE_OUT). */
+  viewIn: { duration: durations.fast, easing: 'enter' },
+  /** MovCalendario: the calendar's height (`h`) follows the view, week or month, and the month's number of rows (TOK.base, EASE_OUT). */
+  height: { duration: durations.base, easing: 'enter' },
+} as const satisfies Record<string, TimingToken>;
+
+export const calendarChoreography = {
+  /** MovCalendario: the day panels slide this far sideways (px): the old one out, the new one in. */
+  panelShift: 12,
+  /** MovCalendario: the new day panel also rises from this far below (px). */
+  panelRise: 8,
+  /** MovCalendario: the new day panel waits this long before it enters (ms). */
+  panelInDelayMs: 60,
+  /** MovCalendario: the first row of the month waits this long (ms)… */
+  monthRowDelayMs: 60,
+  /** …and each next row this much more (ms). */
+  monthRowStaggerMs: 30,
+  /** MovCalendario: each row of the month comes down from this far above (px). */
+  monthRowDrop: 6,
+  /** MovCalendario: the week waits this long before it fades in when coming back from Mes (ms). */
+  weekInDelayMs: 80,
+  /** MovCalendario: the selection is rounded like a week day (radius.md) above this height (pt), like a month cell (radius.sm) below. */
+  pillTallAt: 56,
+} as const;
+
+export const resultsTimings = {
+  /** MovResultados: the first time, each figure counts up from 0 (600 ms, EASE_OUT). */
+  countFirst: { duration: 600, easing: 'enter' },
+  /** MovResultados: on a period change, from the old value to the new one (TOK.slow, EASE_OUT). */
+  count: { duration: durations.slow, easing: 'enter' },
+  /** MovResultados: a bar grows to its new length (TOK.base, EASE_OUT). */
+  bar: { duration: durations.base, easing: 'enter' },
+} as const satisfies Record<string, TimingToken>;
+
+export const resultsChoreography = {
+  /** MovResultados: the first time, the bars wait this long before they grow (ms)… */
+  barFirstDelayMs: 120,
+  /** …and each bar this much more than the one above it, also on a period change (ms). */
+  barStaggerMs: 40,
+} as const;
+
+/** withSpring config of a Calendario spring, honouring reduced motion. */
+export function calendarSpring(name: keyof typeof calendarSprings): WithSpringConfig {
+  return { ...calendarSprings[name], reduceMotion: REDUCE[REDUCE_MOTION] };
+}
+
+function boardTiming(token: TimingToken): WithTimingConfig {
+  return { duration: token.duration, easing: easings[token.easing], reduceMotion: REDUCE[REDUCE_MOTION] };
+}
+
+/** withTiming config of a Calendario timing, honouring reduced motion. */
+export function calendarTiming(name: keyof typeof calendarTimings): WithTimingConfig {
+  return boardTiming(calendarTimings[name]);
+}
+
+/** withTiming config of a Resultados timing, honouring reduced motion. */
+export function resultsTiming(name: keyof typeof resultsTimings): WithTimingConfig {
+  return boardTiming(resultsTimings[name]);
+}
+
+/** MovCalendario's entering animations, when Semana and Mes swap. */
+export const calendarLayout = {
+  /** The week fading in, after the month has started to leave. */
+  weekIn: () =>
+    FadeIn.duration(calendarTimings.viewIn.duration)
+      .easing(easings[calendarTimings.viewIn.easing])
+      .delay(calendarChoreography.weekInDelayMs)
+      .reduceMotion(reduce()),
+  /** Row `row` of the month coming down into place, one row after the other. */
+  monthRowIn: (row: number) =>
+    FadeInDown.duration(calendarTimings.viewIn.duration)
+      .easing(easings[calendarTimings.viewIn.easing])
+      .delay(calendarChoreography.monthRowDelayMs + row * calendarChoreography.monthRowStaggerMs)
+      .withInitialValues({ transform: [{ translateY: -calendarChoreography.monthRowDrop }] })
+      .reduceMotion(reduce()),
+};

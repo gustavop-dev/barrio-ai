@@ -5,11 +5,14 @@
 //
 // Pages are keyed by an absolute index and placed at index × width, so when the parent moves its date
 // the page that slid in keeps its place: nothing jumps between the spring and the new render.
-import { useCallback, useEffect, useImperativeHandle, useState, type ReactNode, type Ref } from 'react';
+//
+// The frame's height is MovCalendario's `h`: the parent keeps it (so it carries from the week to the
+// month) and the frame eases to the current page's height, clipping what is still outside it.
+import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
-import { gestures, haptic, spring } from '@/theme/motion';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
+import { calendarTiming, gestures, haptic, spring, useMotion } from '@/theme/motion';
 
 export type PageOffset = -1 | 0 | 1;
 
@@ -36,9 +39,12 @@ export interface PagerProps {
   nextLabel: string;
   testID?: string;
   ref?: Ref<PagerHandle>;
+  /** The frame's height (−1: not measured yet, so the frame takes its page's height at once). */
+  height?: SharedValue<number>;
 }
 
-export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, ref }: PagerProps) {
+export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, ref, height }: PagerProps) {
+  const { reduced } = useMotion();
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
   /** index × width, also on the UI thread. */
@@ -99,12 +105,32 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
     },
   });
 
+  // Every page's height: a page that slides in may not lay out again, so the frame follows it from here.
+  const heights = useRef(new Map<number, number>());
+  const follow = useCallback(
+    (next: number) => {
+      if (!height) return;
+      height.set(reduced || height.get() < 0 ? next : withTiming(next, calendarTiming('height')));
+    },
+    [height, reduced],
+  );
+  const measure = (key: number) => (event: LayoutChangeEvent) => {
+    const next = event.nativeEvent.layout.height;
+    heights.current.set(key, next);
+    if (key === index) follow(next);
+  };
+  useEffect(() => {
+    const next = heights.current.get(index);
+    if (next !== undefined) follow(next);
+  }, [index, follow]);
+
   const strip = useAnimatedStyle(() => ({ transform: [{ translateX: -offset.value }] }));
+  const frame = useAnimatedStyle(() => (height && height.value >= 0 ? { height: height.value } : {}));
   const pages: { key: number; offset: PageOffset }[] = width ? [-1, 0, 1].map((step) => ({ key: index + step, offset: step as PageOffset })) : [{ key: index, offset: 0 }];
 
   return (
-    <View
-      style={styles.frame}
+    <Animated.View
+      style={[styles.frame, frame]}
       onLayout={(event: LayoutChangeEvent) => setWidth(Math.round(event.nativeEvent.layout.width))}
       accessibilityActions={[
         { name: 'previous', label: previousLabel },
@@ -120,13 +146,14 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
         <Animated.View style={strip}>
           {pages.map((page) =>
             page.offset === 0 ? (
-              <View key={page.key} style={[styles.current, { left: page.key * width }]}>
+              <View key={page.key} style={[styles.current, { left: page.key * width }]} onLayout={measure(page.key)}>
                 {renderPage(0)}
               </View>
             ) : (
               <View
                 key={page.key}
                 style={[styles.side, { left: page.key * width, width }]}
+                onLayout={measure(page.key)}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"
                 pointerEvents="none"
@@ -137,7 +164,7 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
           )}
         </Animated.View>
       </GestureDetector>
-    </View>
+    </Animated.View>
   );
 }
 

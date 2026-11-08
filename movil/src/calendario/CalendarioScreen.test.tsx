@@ -45,6 +45,7 @@ async function renderCalendario(params: Record<string, string> = {}) {
 }
 
 const panel = () => screen.getByTestId('panel-dia');
+const hidden = { includeHiddenElements: true };
 const sheet = () => screen.getByTestId('hoja-dia');
 const lastParams = () => expoRouter.router.setParams!.mock.calls.at(-1)?.[0];
 
@@ -131,6 +132,9 @@ describe('Calendario · semana', () => {
     await renderCalendario();
     await fireEvent.press(await screen.findByTestId('dia-2026-11-04'));
     expect(lastParams()).toMatchObject({ fecha: '2026-11-04' });
+    // The 7th's panel leaves under the 4th's (MovCalendario), out of reach of screen readers, then goes.
+    expect(screen.getByTestId('panel-dia-saliente', hidden)).toBeTruthy();
+    await waitFor(() => expect(screen.queryByTestId('panel-dia-saliente', hidden)).toBeNull());
     const day = sheet();
     expect(within(day).getByText('Miércoles 4 de noviembre')).toBeOnTheScreen();
     expect(within(day).getByText('Pasado')).toBeOnTheScreen();
@@ -147,6 +151,8 @@ describe('Calendario · semana', () => {
     // Not modal: another day can be picked with the sheet up.
     await fireEvent.press(screen.getByTestId('dia-2026-11-06'));
     expect(within(sheet()).getByText('Viernes 6 de noviembre')).toBeOnTheScreen();
+    expect(within(sheet()).queryByText('Miércoles 4 de noviembre')).toBeNull();
+    await waitFor(() => expect(screen.queryByTestId('panel-dia-hoja-saliente', hidden)).toBeNull());
     await fireEvent.press(within(sheet()).getByLabelText('Cerrar'));
     await waitFor(() => expect(screen.queryByTestId('hoja-dia')).toBeNull());
   });
@@ -355,7 +361,12 @@ describe('Calendario · mes', () => {
     await renderCalendario();
     await fireEvent.press(screen.getByText('Mes'));
     expect(lastParams()).toMatchObject({ vista: 'mes' });
+    expect(screen.getByRole('tab', { name: 'Mes' })).toBeSelected();
+    // The week leaves under the month (MovCalendario), hidden from screen readers, then goes.
+    expect(screen.getByTestId('vista-saliente', hidden)).toBeTruthy();
     expect(await screen.findByText('Noviembre 2026')).toBeOnTheScreen();
+    await waitFor(() => expect(screen.queryByTestId('vista-saliente', hidden)).toBeNull());
+    expect(screen.getAllByTestId(/^dia-/)).toHaveLength(42);
     await fireEvent.press(screen.getByText('Lista'));
     expect(lastParams()).toMatchObject({ vista: 'lista' });
     expect(await screen.findByText('Línea de tiempo')).toBeOnTheScreen();

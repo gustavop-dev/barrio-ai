@@ -53,7 +53,8 @@ describe('Resultados', () => {
   it('shows the controls, the period, the section chips and the unavailable business block', async () => {
     await renderResultados();
     expect(screen.getByText('Resultados')).toBeOnTheScreen();
-    expect(screen.getByRole('button', { name: 'Periodo' })).toHaveAccessibilityValue({ text: '28 días' });
+    expect(screen.getByLabelText('Periodo')).toBeOnTheScreen();
+    expect(screen.getByRole('tab', { name: '28 días' })).toBeSelected();
     expect(screen.getByRole('button', { name: 'Modalidad' })).toHaveAccessibilityValue({ text: 'Todo' });
     expect(await screen.findByText(/Periodo en curso: datos hasta .*14:20\. Todo se compara con los 28 días anteriores\./)).toBeOnTheScreen();
     for (const chip of ['1 · Negocio', '2 · Gente', '3 · Contenido', '4 · Equipo']) expect(screen.getByText(chip)).toBeOnTheScreen();
@@ -74,7 +75,7 @@ describe('Resultados', () => {
     expect(followers.queryByText('0')).toBeNull();
 
     const rate = within(screen.getByTestId('kpi-Tasa de aceptación'));
-    expect(rate.getByText('41 %')).toBeOnTheScreen();
+    expect(rate.getByLabelText('41 %')).toBeOnTheScreen();
     expect(rate.getByText('▼ −4 pts')).toBeOnTheScreen();
     await fireEvent.press(rate.getByLabelText('Definición de Tasa de aceptación'));
     const sheet = within(await screen.findByTestId('definition-sheet'));
@@ -91,8 +92,7 @@ describe('Resultados', () => {
     await screen.findByText(/Periodo en curso/);
     expect(query(server.find('GET', '/api/v1/resultados')[0]!).dias).toBe('28');
 
-    await fireEvent.press(screen.getByRole('button', { name: 'Periodo' }));
-    await fireEvent.press(screen.getByRole('radio', { name: '7 días' }));
+    await fireEvent.press(screen.getByRole('tab', { name: '7 días' }));
     expect(router.setParams).toHaveBeenLastCalledWith({ dias: '7', modalidad: undefined });
     expect(await screen.findByText(/Todo se compara con los 7 días anteriores/)).toBeOnTheScreen();
 
@@ -115,7 +115,7 @@ describe('Resultados', () => {
     const conversations = within(await screen.findByTestId('kpi-Conversaciones pertinentes'));
     expect(conversations.getByText('Disponible cuando conectemos el inbox.')).toBeOnTheScreen();
     const open = within(screen.getByTestId('kpi-Oportunidades abiertas'));
-    expect(open.getByText('2')).toBeOnTheScreen();
+    expect(open.getByLabelText('2')).toBeOnTheScreen();
     expect(open.getByText('▲ 1')).toBeOnTheScreen();
     expect(within(screen.getByTestId('kpi-Propuestas enviadas')).getByText('= igual que antes')).toBeOnTheScreen();
 
