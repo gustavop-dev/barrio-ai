@@ -1,19 +1,26 @@
 // Mobile top bar: the 0ff1ce signature (or «‹ Volver» on detail views) and the four accesses:
 // Tu turno (counter, alerta when critical), Notificaciones (dot), Calendario, Ajustes.
 // Under it, the global pause banner and the offline strip.
+//
+// Motion (MovTuTurno, MovNotificaciones): the Tu turno counter rolls to its new number and pops
+// (`badge`, SOFT) when it changes; when a notification arrives the bell sways and its dot pops in
+// from nothing (`dot`, SOFT), and the dot closes (FIRM) once everything is read.
 import { useOverview } from '@compartido/api/hooks';
 import { turnoAnchor } from '@compartido/logic/turno';
 import NetInfo from '@react-native-community/netinfo';
 import { router, usePathname } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/icons';
 import { T } from '@/components/ui';
+import { reportUnread, useLiveNotifications } from '@/notificaciones/arrival';
+import { notifMotion, notifSpring, notifTiming, turnoMotion, turnoSpring, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
+import { RollingNumber } from '@/turno/RollingNumber';
 import FIRMA from '../../../assets/brand/firma-horizontal.png';
 import { notificationsLabel, turnLabel, useTurnCount } from './useTurnCount';
-
 
 interface Access {
   path: '/tu-turno' | '/notificaciones' | '/calendario' | '/ajustes';
@@ -28,14 +35,90 @@ export const TOP_NAV: readonly Access[] = [
   { path: '/ajustes', label: 'Ajustes', icon: 'ajustes' },
 ];
 
-function Counter({ count, critical }: { count: number; critical: boolean }) {
+/**
+ * Calls `onChange` when a value of GET /tu-turno changes. Its first answer is not a change: `onFirst`
+ * gets it instead (and the value a top bar finds when it mounts).
+ */
+function useChange<V>(value: V, loaded: boolean, onChange: (before: V, now: V) => void, onFirst?: (now: V) => void) {
+  const previous = useRef<{ value: V } | null>(null);
+  const handlers = useRef({ onChange, onFirst });
+  useEffect(() => {
+    handlers.current = { onChange, onFirst };
+  });
+  useEffect(() => {
+    if (!loaded) return;
+    const before = previous.current;
+    previous.current = { value };
+    if (!before) handlers.current.onFirst?.(value);
+    else if (before.value !== value) handlers.current.onChange(before.value, value);
+  }, [value, loaded]);
+}
+
+/** Tu turno's counter (MovTuTurno `badge`): a new number rolls in and the badge pops back from badgePop. */
+function Counter({ count, critical, loaded }: { count: number; critical: boolean; loaded: boolean }) {
+  const scale = useSharedValue(1);
+  useChange(count, loaded, () => {
+    scale.set(turnoMotion.badgePop);
+    scale.set(withSpring(1, turnoSpring('badge')));
+  });
+  const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   if (count <= 0) return null;
   return (
-    <View style={[styles.counter, critical ? styles.counterCritical : null]} testID="turn-counter">
-      <T variant="etiqueta" color={critical ? colors.onAlert : colors.paper} style={styles.counterText}>
-        {count > 99 ? '99+' : String(count)}
-      </T>
-    </View>
+    <Animated.View style={[styles.counter, critical ? styles.counterCritical : null, pop]} testID="turn-counter">
+      <RollingNumber value={count > 99 ? '99+' : String(count)} variant="etiqueta" color={critical ? colors.onAlert : colors.paper} style={styles.counterText} />
+    </Animated.View>
+  );
+}
+
+/**
+ * The bell and its dot (MovNotificaciones). An arrival sways the bell through `bellSway` (each step
+ * eased out, from a pivot near its top) and pops the dot in from 0; reading everything closes the dot,
+ * which leaves the tree once it is shut. With reduced motion the bell stays still and the dot just shows.
+ */
+function Bell({ color, unread, loaded }: { color: string; unread: number; loaded: boolean }) {
+  const { reduced } = useMotion();
+  const angle = useSharedValue(0);
+  const dot = useSharedValue(unread > 0 ? 1 : 0);
+  const [closing, setClosing] = useState(false);
+  const [shown, setShown] = useState(unread);
+  if (shown !== unread) {
+    setShown(unread);
+    setClosing(unread === 0 && shown > 0 && !reduced);
+  }
+
+  useEffect(() => {
+    if (loaded) reportUnread(unread);
+  }, [unread, loaded]);
+
+  useChange(
+    unread,
+    loaded,
+    (before, now) => {
+      if (now > before) {
+        dot.set(0);
+        dot.set(withSpring(1, notifSpring('dotIn')));
+        if (!reduced) angle.set(withSequence(...notifMotion.bellSway.map((step) => withTiming(step, notifTiming('bellStep')))));
+      } else if (now === 0) {
+        dot.set(
+          withSpring(0, notifSpring('dotOut'), (finished) => {
+            if (finished) runOnJS(setClosing)(false);
+          }),
+        );
+      }
+    },
+    // What GET /tu-turno said first: the dot is just there.
+    (now) => dot.set(now > 0 ? 1 : 0),
+  );
+
+  const sway = useAnimatedStyle(() => ({ transform: [{ rotate: `${angle.value}deg` }] }));
+  const pulse = useAnimatedStyle(() => ({ transform: [{ scale: Math.max(0, dot.value) }] }));
+  return (
+    <>
+      <Animated.View style={[styles.bell, sway]} testID="bell">
+        <Icon name="notificaciones" color={color} />
+      </Animated.View>
+      {unread > 0 || closing ? <Animated.View style={[styles.dot, pulse]} testID={unread > 0 ? 'unread-dot' : 'unread-dot-closing'} /> : null}
+    </>
   );
 }
 
@@ -82,6 +165,7 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
   const insets = useSafeAreaInsets();
   const pathname = usePathname();
   const turn = useTurnCount();
+  useLiveNotifications();
   return (
     <View style={styles.wrap}>
       <View style={[styles.bar, { paddingTop: insets.top, height: shell.topBarHeight + insets.top }]}>
@@ -109,9 +193,12 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
                 onPress={() => router.navigate(item.path)}
                 style={[styles.icon, current ? styles.iconCurrent : null]}
               >
-                <Icon name={item.icon} color={current ? colors.ink : colors.inkSoft} />
-                {item.path === '/tu-turno' ? <Counter count={turn.count} critical={turn.critical} /> : null}
-                {item.path === '/notificaciones' && turn.unread > 0 ? <View style={styles.dot} testID="unread-dot" /> : null}
+                {item.path === '/notificaciones' ? (
+                  <Bell color={current ? colors.ink : colors.inkSoft} unread={turn.unread} loaded={turn.loaded} />
+                ) : (
+                  <Icon name={item.icon} color={current ? colors.ink : colors.inkSoft} />
+                )}
+                {item.path === '/tu-turno' ? <Counter count={turn.count} critical={turn.critical} loaded={turn.loaded} /> : null}
               </Pressable>
             );
           })}
@@ -136,6 +223,7 @@ const styles = StyleSheet.create({
   counterCritical: { backgroundColor: colors.alert },
   counterText: { letterSpacing: 0, lineHeight: 18 },
   dot: { position: 'absolute', top: 9, right: 10, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.brand, borderWidth: 1.5, borderColor: colors.ink },
+  bell: { transformOrigin: `${notifMotion.bellPivot.x * 100}% ${notifMotion.bellPivot.y * 100}%` },
   pause: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, paddingHorizontal: space[4], backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.alert },
   pauseIcon: { width: 32, height: 32, borderRadius: radius.pill, backgroundColor: colors.alert, alignItems: 'center', justifyContent: 'center' },
   pauseText: { flex: 1 },
