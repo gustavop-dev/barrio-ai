@@ -267,6 +267,10 @@ export const haptics = {
   /** The photos reached the gallery. */
   uploadDone: { type: 'notification', style: 'success' },
   officePick: { type: 'selection' },
+  /** MovTuTurno: «Más tarde» sends a card to «Pospuestas» (LEVE). A card resolved with its button plays `actionSuccess` (ÉXITO). */
+  turnoLater: { type: 'impact', style: 'light' },
+  /** MovNotificaciones: a new notification arrives while the app is open; the bell sways (LEVE). */
+  notificationArrive: { type: 'impact', style: 'light' },
 } as const satisfies Record<string, HapticKind | null>;
 
 export type HapticEvent = keyof typeof haptics;
@@ -389,4 +393,217 @@ export const officeLayout = {
         animations: { opacity: withTiming(0, config), transform: [{ translateY: withTiming(officeNarration.exitY, config) }] } };
     };
   },
+};
+
+// ---------------------------------------------------------------- Tu turno and Notificaciones (MovTuTurno, MovNotificaciones)
+// Gustavo's phase 2 boards. Tu turno: a card resolved with its button shows a check, holds it, then
+// collapses while the list closes the gap; only then do the counters roll (each group's, the top bar
+// badge). «Más tarde» first slides the card toward «Pospuestas». A swiped card has already left under
+// the finger and goes through the same gap and counters. Notificaciones: a new one opens its space at
+// the top, the bell sways and its dot pulses; «Marcar todo como leído» turns «Nueva» off in a cascade.
+import { type EntryAnimationsValues, type ExitAnimationsValues, type LayoutAnimation } from 'react-native-reanimated';  // withDelay/withTiming: top import
+
+/** MovTuTurno: the board's numbers and distances. */
+export const turnoMotion = {
+  /** MovTuTurno: the check of the resolved button grows from this scale. */
+  checkFrom: 0.6,
+  /** MovTuTurno: a resolved card shows its check this long before it collapses (ms). */
+  doneHoldMs: 220,
+  /** MovTuTurno: «Más tarde» moves the card this far right and down while it fades (pt). */
+  laterShift: { x: 40, y: 6 },
+  /** MovTuTurno: a counter that changes rolls: the old number rises this far and the new one comes from as far below (pt). */
+  rollDistance: 8,
+  /** MovTuTurno: the top bar badge pops to this scale and springs back with SOFT. */
+  badgePop: 1.25,
+  /** MovTuTurno: a group label left at 0 collapses this long after its last card is counted out (ms). */
+  labelDelayMs: durations.base,
+  /** MovTuTurno: «Nada depende de ti hoy» fades in this long after the last card is counted out (ms). */
+  emptyDelayMs: durations.base + 80,
+  /** MovTuTurno: the librarian of the empty state rises from this far below as it fades in (pt). */
+  emptyRise: 8,
+  /** MovTuTurno: the «Pospuestas» row flashes 0ff1ce-claro for this long, up and down along a sine (ms, linear). */
+  postponedFlashMs: 420,
+} as const;
+
+/** MovTuTurno: the board's tweens. */
+export const turnoTimings = {
+  /** MovTuTurno: the check grows in the resolved button. */
+  check: { duration: durations.fast, easing: 'enter' },
+  /** MovTuTurno: «Más tarde» slides the card away and fades it. */
+  laterSlide: { duration: durations.base, easing: 'exit' },
+  /** MovTuTurno: a card (or an empty group label) collapses; the rest of the list closes the gap at the same pace. */
+  collapse: { duration: durations.base, easing: 'exit' },
+  /** MovTuTurno: the old number of a counter leaves upward. */
+  rollOut: { duration: 90, easing: 'exit' },
+  /** MovTuTurno: then the new number comes in from below. */
+  rollIn: { duration: 90, easing: 'enter' },
+  /** MovTuTurno: «Nada depende de ti hoy» fades in. */
+  emptyIn: { duration: durations.base, easing: 'enter' },
+} as const satisfies Record<string, TimingToken>;
+
+/** MovTuTurno: the top bar badge springs back from its pop (`badge`, SOFT). */
+export const turnoSprings = { badge: SOFT } as const satisfies Record<string, SpringToken>;
+
+/** MovNotificaciones: the board's numbers, angles and distances. */
+export const notifMotion = {
+  /** MovNotificaciones: a new notification drops into its space from this far above (pt). */
+  arriveDrop: 8,
+  /** MovNotificaciones: the bell sways through these angles (degrees, one equal step each) and rests on the last. */
+  bellSway: [12, -9, 6, -3, 0],
+  /** MovNotificaciones: the whole sway (ms); each step eases out. */
+  bellSwayMs: 600,
+  /** MovNotificaciones: the bell hangs from this point of its 24-unit icon: the centre, 3 units from the top. */
+  bellPivot: { x: 0.5, y: 3 / 24 },
+  /** MovNotificaciones: «Marcar todo como leído» turns each «Nueva» off this long after the one before (ms). */
+  readStaggerMs: 30,
+  /** MovNotificaciones: the «Nueva» label shrinks to this scale as it fades. */
+  readChipTo: 0.7,
+} as const;
+
+/** MovNotificaciones: the board's tweens. */
+export const notifTimings = {
+  /** MovNotificaciones: a new notification opens its space and fades in; the list moves down at the same pace. */
+  arrive: { duration: durations.base, easing: 'enter' },
+  /** MovNotificaciones: one step of the bell's sway. */
+  bellStep: { duration: notifMotion.bellSwayMs / notifMotion.bellSway.length, easing: 'enter' },
+  /** MovNotificaciones: a «Nueva» label and its row highlight turn off. */
+  readOff: { duration: durations.fast, easing: 'exit' },
+} as const satisfies Record<string, TimingToken>;
+
+/** MovNotificaciones: the bell's dot pops in from 0 when one arrives (SOFT) and closes when all are read (FIRM). */
+export const notifSprings = { dotIn: SOFT, dotOut: FIRM } as const satisfies Record<string, SpringToken>;
+
+function timingOf(token: TimingToken): WithTimingConfig {
+  return { duration: token.duration, easing: easings[token.easing], reduceMotion: REDUCE[REDUCE_MOTION] };
+}
+
+function springOf(token: SpringToken): WithSpringConfig {
+  return { ...token, reduceMotion: REDUCE[REDUCE_MOTION] };
+}
+
+/** withTiming config of a Tu turno tween, honouring reduced motion. */
+export function turnoTiming(name: keyof typeof turnoTimings): WithTimingConfig {
+  return timingOf(turnoTimings[name]);
+}
+
+/** withTiming config of the «Pospuestas» flash: linear, the sine is applied to its progress. */
+export function postponedFlashTiming(): WithTimingConfig {
+  return { duration: turnoMotion.postponedFlashMs, easing: Easing.linear, reduceMotion: REDUCE[REDUCE_MOTION] };
+}
+
+/** withSpring config of a Tu turno spring, honouring reduced motion. */
+export function turnoSpring(name: keyof typeof turnoSprings): WithSpringConfig {
+  return springOf(turnoSprings[name]);
+}
+
+/** withTiming config of a Notificaciones tween, honouring reduced motion. */
+export function notifTiming(name: keyof typeof notifTimings): WithTimingConfig {
+  return timingOf(notifTimings[name]);
+}
+
+/** withSpring config of a Notificaciones spring, honouring reduced motion. */
+export function notifSpring(name: keyof typeof notifSprings): WithSpringConfig {
+  return springOf(notifSprings[name]);
+}
+
+/** Layout animations of MovTuTurno: `entering`, `exiting` and the list's `itemLayoutAnimation`. Their configs are
+ * built here on the JS thread and captured by the worklets, which run on the UI thread. */
+export const turnoLayout = {
+  /** A resolved card or an empty group label collapses (its height closes) and fades: the board's `collapse`. Clip the row. */
+  collapse: () => {
+    const config = timingOf(turnoTimings.collapse);
+    return (values: ExitAnimationsValues): LayoutAnimation => {
+      'worklet';
+      return {
+        initialValues: { height: values.currentHeight, opacity: 1 },
+        animations: { height: withTiming(0, config), opacity: withTiming(0, config) },
+      };
+    };
+  },
+  /** A card that already slid away invisible («Más tarde»): only its space closes. */
+  collapseSpace: () => {
+    const config = timingOf(turnoTimings.collapse);
+    return (values: ExitAnimationsValues): LayoutAnimation => {
+      'worklet';
+      return { initialValues: { height: values.currentHeight }, animations: { height: withTiming(0, config) } };
+    };
+  },
+  /** The rest of the list closes the gap at the pace of the collapse. */
+  listMove: () => LinearTransition.duration(turnoTimings.collapse.duration).easing(easings.exit).reduceMotion(reduce()),
+  /** «Nada depende de ti hoy» after the last card: it fades in once the gap has closed. */
+  emptyIn: () => {
+    const config = timingOf(turnoTimings.emptyIn);
+    const delay = turnoMotion.emptyDelayMs;
+    const rm = reduce();
+    return (): LayoutAnimation => {
+      'worklet';
+      return { initialValues: { opacity: 0 }, animations: { opacity: withDelay(delay, withTiming(1, config), rm) } };
+    };
+  },
+  /** …and its librarian rises into place with it. */
+  emptyPortraitIn: () => {
+    const config = timingOf(turnoTimings.emptyIn);
+    const delay = turnoMotion.emptyDelayMs;
+    const rise = turnoMotion.emptyRise;
+    const rm = reduce();
+    return (): LayoutAnimation => {
+      'worklet';
+      return {
+        initialValues: { transform: [{ translateY: rise }] },
+        animations: { transform: [{ translateY: withDelay(delay, withTiming(0, config), rm) }] },
+      };
+    };
+  },
+  /** A counter's old number leaves upward. */
+  rollOut: () => {
+    const config = timingOf(turnoTimings.rollOut);
+    const distance = turnoMotion.rollDistance;
+    return (): LayoutAnimation => {
+      'worklet';
+      return {
+        initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
+        animations: { opacity: withTiming(0, config), transform: [{ translateY: withTiming(-distance, config) }] },
+      };
+    };
+  },
+  /** …then the new one comes in from below, once the old one is gone. */
+  rollIn: () => {
+    const config = timingOf(turnoTimings.rollIn);
+    const delay = turnoTimings.rollOut.duration;
+    const distance = turnoMotion.rollDistance;
+    const rm = reduce();
+    return (): LayoutAnimation => {
+      'worklet';
+      return {
+        initialValues: { opacity: 0, transform: [{ translateY: distance }] },
+        animations: { opacity: withDelay(delay, withTiming(1, config), rm), transform: [{ translateY: withDelay(delay, withTiming(0, config), rm) }] },
+      };
+    };
+  },
+};
+
+/** Layout animations of MovNotificaciones (configs built on the JS thread, as above). */
+export const notifLayout = {
+  /** A new notification opens its space (clip the row) and fades in. */
+  arrive: () => {
+    const config = timingOf(notifTimings.arrive);
+    return (values: EntryAnimationsValues): LayoutAnimation => {
+      'worklet';
+      return {
+        initialValues: { height: 0, opacity: 0 },
+        animations: { height: withTiming(values.targetHeight, config), opacity: withTiming(1, config) },
+      };
+    };
+  },
+  /** …while its content drops into place from above. */
+  arriveContent: () => {
+    const config = timingOf(notifTimings.arrive);
+    const drop = notifMotion.arriveDrop;
+    return (): LayoutAnimation => {
+      'worklet';
+      return { initialValues: { transform: [{ translateY: -drop }] }, animations: { transform: [{ translateY: withTiming(0, config) }] } };
+    };
+  },
+  /** The rest of the list moves down at the same pace. */
+  listMove: () => LinearTransition.duration(notifTimings.arrive.duration).easing(easings.enter).reduceMotion(reduce()),
 };

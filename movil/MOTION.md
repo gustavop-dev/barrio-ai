@@ -181,6 +181,46 @@ los deltas incluyen el ritmo de presentación, no aíslan el coste de GPU. Compr
 pinch, regreso del fondo y movimiento reducido. El render local de CanvasKit y las pruebas no
 constituyen una medición de 60 fps en Android.
 
+## Tu turno y Notificaciones (MovTuTurno, MovNotificaciones)
+
+Los tableros de la fase 2 en `diseno-movimiento/tableros/`. Los valores viven en el bloque «Tu turno and Notificaciones» al final de `motion.ts`.
+
+**Tu turno** (`turno/exits.ts` lleva los pasos). Una tarjeta solo sale cuando el backend confirma. Desde el POST hasta el final, la lista conserva las filas que mostraba y reproduce sobre ellas:
+
+1. la salida de la tarjeta, según cómo se resolvió;
+2. el colapso;
+3. los contadores.
+
+Con movimiento reducido, cada paso es inmediato.
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `turnoTimings.check` / `turnoMotion.checkFrom` | 180 (fast) · enter, desde 0.6 | El botón que resolvió la tarjeta pasa a 0ff1ce-hondo con un ✓ que crece. La tarjeta se vuelve 0ff1ce-claro (`turno/DoneButton.tsx`, `turno/TurnoCard.tsx`, `turno/QuestionForm.tsx`). |
+| `turnoMotion.doneHoldMs` | 220 ms | Lo que la tarjeta resuelta enseña el ✓ antes de colapsar. Si se deslizó a la derecha, el ✓ es el del fondo que dejó al salir. |
+| `turnoTimings.laterSlide` / `turnoMotion.laterShift` | 260 (base) · exit, 40 · 6 pt | «Más tarde» con su botón: la tarjeta se desliza a la derecha y abajo, hacia «Pospuestas», mientras se desvanece (`turno/ExitRow.tsx`). |
+| `turnoTimings.collapse`, `turnoLayout.collapse` / `collapseSpace` / `listMove` | 260 (base) · exit | La tarjeta colapsa: su altura se cierra y se desvanece. La lista cierra el hueco al mismo ritmo (`itemLayoutAnimation` en `turno/TuTurnoScreen.tsx`). Igual si se resolvió con botón o deslizando. |
+| `turnoTimings.rollOut` / `rollIn`, `turnoMotion.rollDistance` | 90 · exit, luego 90 · enter, 8 pt | Un contador cambia girando: el número viejo sube y se va, y el nuevo entra desde abajo (`turno/RollingNumber.tsx`). Los usan el contador de cada grupo, «Pospuestas · N» y el de la barra superior. |
+| `turnoSprings.badge` / `turnoMotion.badgePop` | SOFT, desde 1.25 | El contador de Tu turno en la barra superior salta y vuelve cuando cambia (`components/shell/TopBar.tsx`). Baja cuando la tarjeta ya salió, no cuando el backend la quita (`turno/heldCount.ts`). |
+| `turnoMotion.labelDelayMs` | 260 ms (base) | La etiqueta de un grupo que se queda en 0 colapsa este tiempo después de que su última tarjeta deja de contar. |
+| `turnoMotion.emptyDelayMs` / `emptyRise`, `turnoTimings.emptyIn` | 340 ms, 8 pt, 260 (base) · enter | «Nada depende de ti hoy» aparece tras la última tarjeta, cuando el hueco ya se cerró. El bibliotecario sube 8 pt mientras aparece. |
+| `turnoMotion.postponedFlashMs` (`postponedFlashTiming()`) | 420 ms · lineal | La fila «Pospuestas» se ilumina en 0ff1ce-claro, subiendo y bajando como un seno, cuando recibe una tarjeta (`turno/PostponedFold.tsx`). |
+| `haptics.turnoLater` | impacto ligero | «Más tarde» manda la tarjeta a «Pospuestas», con el botón o deslizando (LEVE). Resolver con el botón sigue usando `actionSuccess` (ÉXITO). |
+
+**Notificaciones**
+
+Una notificación nueva puede llegar de dos formas:
+
+- el refresco de GET /tu-turno trae un `notifications_unread` mayor;
+- llega una push con la app abierta, y entonces la barra superior refresca Notificaciones y Tu turno (`notificaciones/arrival.ts`).
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `notifTimings.arrive`, `notifLayout.arrive` / `arriveContent` / `listMove`, `notifMotion.arriveDrop` | 260 (base) · enter, 8 pt | La notificación nueva abre su espacio arriba y cae 8 pt hasta su sitio. El resto de la lista baja al mismo ritmo: cada celda lleva una animación de layout (`notificaciones/NotificacionesScreen.tsx`). |
+| `notifMotion.bellSway` / `bellSwayMs` / `bellPivot`, `notifTimings.bellStep` | 12°, −9°, 6°, −3°, 0° en 600 ms; cada paso 120 · enter, pivote arriba al centro | La campana se balancea al llegar una notificación (`components/shell/TopBar.tsx`). Con movimiento reducido no se mueve. |
+| `notifSprings.dotIn` / `dotOut` | SOFT / FIRM | El punto de la campana salta desde 0 cuando llega una (`dot`) y se cierra cuando todo está leído. |
+| `notifMotion.readStaggerMs` / `readChipTo`, `notifTimings.readOff` | 30 ms por fila, 0.7, 180 (fast) · exit | «Marcar todo como leído» apaga «Nueva» y el resaltado de cada fila en cascada, de arriba abajo. La etiqueta encoge a 0.7 mientras se desvanece. |
+| `haptics.notificationArrive` | impacto ligero | Llega una notificación con la app abierta (LEVE). Vibra una sola vez aunque haya una barra superior por pestaña. |
+
 ### MovOficina · selección, captura y narración
 
 Fuente: [`MovOficina.dc.html`](diseno-movimiento/tableros/MovOficina.dc.html), script completo,

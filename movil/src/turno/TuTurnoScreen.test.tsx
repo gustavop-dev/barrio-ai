@@ -27,9 +27,9 @@ describe('Tu turno', () => {
     expect(screen.getByLabelText('Cargando lo que depende de ti…')).toBeOnTheScreen();
     expect(await screen.findByText('Comprueba si salió tu comentario')).toBeOnTheScreen();
     expect(screen.getByText('1 urgente · 1 importante · 1 cuando puedas')).toBeOnTheScreen();
-    expect(screen.getByText('Urgente · 1')).toBeOnTheScreen();
-    expect(screen.getByText('Importante · 1')).toBeOnTheScreen();
-    expect(screen.getByText('Cuando puedas · 1')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Urgente · 1' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Importante · 1' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Cuando puedas · 1' })).toBeOnTheScreen();
     // Nueva on the new cards only.
     expect(within(screen.getByTestId(`turno-card-${UNCERTAIN_CARD.id}`)).getByText('Nueva')).toBeOnTheScreen();
     expect(within(screen.getByTestId('turno-card-question:q1')).queryByText('Nueva')).toBeNull();

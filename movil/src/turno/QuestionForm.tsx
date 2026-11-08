@@ -1,5 +1,7 @@
 // A team question: the answer field for its type, Público/Privado with the suggestion preselected,
 // Responder, Responder con audio, Más tarde and No quiero compartir esto (the PWA's QuestionForm).
+// MovTuTurno: once saved, «Responder» turns into a check before the card leaves; «Más tarde» slides
+// the card toward «Pospuestas» (exits.ts plays the steps).
 import { undoPregunta } from '@compartido/api/endpoints';
 import { useAnswerPregunta, useDeclinePregunta, usePostponePregunta } from '@compartido/api/hooks';
 import type { Question, QuestionAnswer } from '@compartido/api/types';
@@ -13,6 +15,8 @@ import { Icon } from '@/components/icons';
 import { Button, ConfirmSheet, ErrorRetry, Field, Options, T, errorMessage, isConflict, useToast } from '@/components/ui';
 import { haptic } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
+import { DoneButton } from './DoneButton';
+import { buttonKey, useTurnoExitsApi } from './exits';
 
 const DETAIL_PLACEHOLDER = 'Cuéntalo como se lo contarías a un colega: qué había, qué hiciste y qué salió.';
 
@@ -111,9 +115,11 @@ function AnswerField({ question, value, text, onValue, onText }: { question: Que
   }
 }
 
-export function QuestionForm({ question }: { question: Question }) {
+/** `cardId`: its Tu turno card, which leaves once answered or postponed. `resolved`: the answer was saved (the button shows the check). */
+export function QuestionForm({ question, cardId, resolved = false }: { question: Question; cardId: string; resolved?: boolean }) {
   const client = useQueryClient();
   const toast = useToast();
+  const exits = useTurnoExitsApi();
   const answer = useAnswerPregunta();
   const postpone = usePostponePregunta();
   const decline = useDeclinePregunta();
@@ -140,32 +146,42 @@ export function QuestionForm({ question }: { question: Question }) {
 
   const submit = async () => {
     if (!body || busy) return;
+    exits.begin(cardId);
     try {
       await answer.mutateAsync({ questionId: question.id, answer: body });
       haptic('actionSuccess');
       toast.show('Guardado. El equipo ya puede usarlo', { undo: () => void undo() });
+      exits.resolve(cardId, { kind: 'done', lead: 'check', by: buttonKey.answer });
     } catch {
       haptic('actionError');
+      exits.cancel(cardId);
     }
   };
 
   const later = async () => {
+    exits.begin(cardId);
     try {
       const result = await postpone.mutateAsync(question.id);
       const back = longDate(result?.postponed_until);
+      haptic('turnoLater');
       toast.show(back ? `Pospuesta. Vuelve el ${back}` : 'Pospuesta 3 días');
+      exits.resolve(cardId, { kind: 'later', lead: 'slide' });
     } catch {
       // Shown under the form through postpone.error.
+      exits.cancel(cardId);
     }
   };
 
   const confirmDecline = async () => {
+    exits.begin(cardId);
     try {
       await decline.mutateAsync(question.id);
       setDeclining(false);
       toast.show('Hecho. El equipo no volverá a preguntarlo');
+      exits.resolve(cardId, { kind: 'done', lead: 'plain' });
     } catch {
       // Shown inside the sheet.
+      exits.cancel(cardId);
     }
   };
 
@@ -177,9 +193,13 @@ export function QuestionForm({ question }: { question: Question }) {
       <VisibilityField value={publicUse} onChange={setPublicUse} disabled={busy} />
       <ErrorRetry error={answer.error ?? postpone.error} />
       <View style={styles.actions}>
-        <Button variant="primary" block disabled={!body || busy} loading={answer.isPending} loadingLabel="Guardando…" onPress={() => void submit()} testID={`answer-submit-${question.id}`}>
-          {submitLabel}
-        </Button>
+        {resolved ? (
+          <DoneButton label={submitLabel} block testID={`answer-done-${question.id}`} />
+        ) : (
+          <Button variant="primary" block disabled={!body || busy} loading={answer.isPending} loadingLabel="Guardando…" onPress={() => void submit()} testID={`answer-submit-${question.id}`}>
+            {submitLabel}
+          </Button>
+        )}
         <Button block icon={<Icon name="microfono" size={20} />} onPress={() => openCaptureSheet({ tipo: 'pregunta', id: question.id, label: question.question })}>
           Responder con audio
         </Button>

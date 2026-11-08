@@ -45,6 +45,8 @@ jest.mock('expo-notifications', () => ({
   getLastNotificationResponse: jest.fn(() => null),
   addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   clearLastNotificationResponse: jest.fn(),
+  // A push received with the app open (MovNotificaciones: the top bar refreshes the bell).
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
   AndroidImportance: { HIGH: 4, MAX: 5 },
 }));
 
