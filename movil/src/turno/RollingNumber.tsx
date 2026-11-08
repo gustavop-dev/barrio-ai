@@ -2,7 +2,7 @@
 // below. The old one leaves with a layout animation on its keyed view; the new one rises with a shared value, not with
 // Reanimated `entering`: a number that changed right after a sheet's Modal closed stayed at opacity 0 (the group label
 // read «URGENTE ·» with no number). Nothing rolls when the counter first shows; with reduced motion the number just changes.
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { StyleSheet, View } from 'react-native';
 import Animated, { LayoutAnimationConfig, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { T, type TProps } from '@/components/ui/Text';
@@ -21,10 +21,13 @@ function RollIn({ roll, children }: { roll: boolean; children: ReactNode }) {
 
 export function RollingNumber({ value, ...text }: { value: string } & Omit<TProps, 'children'>) {
   const { reduced } = useMotion();
-  const mounted = useRef(false);
-  useEffect(() => {
-    mounted.current = true;
-  }, []);
+  // Rolls from the first change on (derived state: the value it showed first never rolls in).
+  const [shownFirst, setShownFirst] = useState(value);
+  const [changed, setChanged] = useState(false);
+  if (value !== shownFirst) {
+    setShownFirst(value);
+    setChanged(true);
+  }
   if (reduced) {
     return (
       <View style={styles.box}>
@@ -36,7 +39,7 @@ export function RollingNumber({ value, ...text }: { value: string } & Omit<TProp
     <LayoutAnimationConfig skipExiting>
       <View style={styles.box}>
         <Animated.View key={value} exiting={turnoLayout.rollOut()}>
-          <RollIn roll={mounted.current}>
+          <RollIn roll={changed}>
             <T {...text}>{value}</T>
           </RollIn>
         </Animated.View>
