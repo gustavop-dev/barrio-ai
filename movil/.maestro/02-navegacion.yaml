@@ -1,11 +1,16 @@
-# cubre: ACC-06, OFI-09
-# Navegación: the shell. Every bottom-bar tab, the four top-bar accesses, Android back through the tab history
-# (backBehavior="history": each visit moves the tab to the end of the history, back pops it), a detail screen
-# (the person card) closed with its «‹ Personas», and the 0ff1ce signature back to the Oficina.
+# cubre: ACC-06, OFI-08, OFI-09, APP-03, APP-08
+# Navegación: the shell. Opening the app again keeps the session, also offline (the offline strip, and back online);
+# every bottom-bar tab, the four top-bar accesses with the Tu turno counter and the Notificaciones dot, Android back
+# through the tab history (backBehavior="history": each visit moves the tab to the end of the history, back pops it), a
+# detail screen (the person card) closed with its «‹ Personas», with Android back and with a drag from the left edge,
+# the 0ff1ce signature back to the Oficina, and oficina0ff1ce:// links (a tab and a piece, closed with «‹»).
 # Each screen is recognised by a testID only it has; inactive tabs are detached, so «notVisible» proves it left.
 appId: co.projectapp.office
 name: Navegación
 tags: [navegacion]
+onFlowComplete:
+  # Never leave the emulator offline for the next flow, even when a step failed.
+  - setAirplaneMode: disabled
 ---
 - runFlow: comun/entrar.yaml
 # cubre: ACC-06 — opening the app again keeps the session: straight to the Oficina, no login.
@@ -20,6 +25,44 @@ tags: [navegacion]
     id: tab-index
     selected: true
 - takeScreenshot: 02-navegacion-01-oficina
+# cubre: OFI-09.2 — the top bar keeps Tu turno's counter and the Notificaciones dot in sight
+- assertVisible:
+    id: turn-counter
+- assertVisible:
+    id: unread-dot
+- assertVisible: "Tu turno, \\d+ pendientes?.*"
+- assertVisible: "Notificaciones, hay novedades"
+
+# cubre: ACC-06.2, OFI-08.1 — opened without a connection it stays inside and says so (it used to log out)
+- setAirplaneMode: enabled
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "login|screen-oficina"
+    timeout: 45000
+- assertNotVisible:
+    id: login
+- assertVisible:
+    id: screen-oficina
+- extendedWaitUntil:
+    visible: "Sin conexión\\. Mostrando lo último que cargó\\."
+    timeout: 30000
+- assertNotVisible: ".*fetch failed.*"
+- takeScreenshot: 02-navegacion-01b-sin-conexion
+# cubre: OFI-08.2, ACC-06.6 — the network comes back: the strip goes and the Oficina reads the real activity again
+- setAirplaneMode: disabled
+- extendedWaitUntil:
+    notVisible: "Sin conexión\\. Mostrando lo último que cargó\\."
+    timeout: 45000
+- scrollUntilVisible:
+    element: "Actividad real · .*"
+    direction: DOWN
+    timeout: 60000
+- takeScreenshot: 02-navegacion-01c-red-de-vuelta
+
+# cubre: ACC-06.3 — opened while the server answers 502 it stays inside. Pendiente del interruptor de fallos (PR #48):
+# comun/qa-fallo.js with RUTA '^/api/v1/auth/session$' and EFECTO '502', then stopApp, launchApp and the same checks.
 
 # ---------------------------------------------------------------- bottom bar: Resultados, Personas, Galería, Oficina
 # cubre: OFI-09
@@ -306,6 +349,39 @@ tags: [navegacion]
     selected: true
 - takeScreenshot: 02-navegacion-15-ficha-cerrada
 
+# cubre: OFI-09.3 — in the app a detail also goes back with Android back, and with a drag from its left edge
+- tapOn: Pedro Salazar
+- extendedWaitUntil:
+    visible:
+      id: persona
+    timeout: 20000
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: persona
+    timeout: 20000
+- assertVisible:
+    id: tab-personas
+    selected: true
+- tapOn: Pedro Salazar
+- extendedWaitUntil:
+    visible:
+      id: persona
+    timeout: 20000
+- swipe:
+    from:
+      id: detail-edge-zone
+    direction: RIGHT
+    duration: 500
+- extendedWaitUntil:
+    notVisible:
+      id: persona
+    timeout: 20000
+- assertVisible:
+    id: tab-personas
+    selected: true
+- takeScreenshot: 02-navegacion-15b-ficha-arrastrada
+
 # ---------------------------------------------------------------- the signature goes to the Oficina
 - tapOn: 0ff1ce, ir a la Oficina
 - extendedWaitUntil:
@@ -316,3 +392,39 @@ tags: [navegacion]
     id: tab-index
     selected: true
 - takeScreenshot: 02-navegacion-16-firma-a-oficina
+
+# ---------------------------------------------------------------- oficina0ff1ce:// links
+# cubre: APP-03.3 — a link oficina0ff1ce://… opens the app on its screen: a tab, then a piece over it
+- openLink: oficina0ff1ce://tu-turno
+- extendedWaitUntil:
+    visible:
+      id: turno-list
+    timeout: 30000
+- assertVisible:
+    id: top-tu-turno
+    selected: true
+# The piece published 3 days ago (seed_qa: uid('piece:publicada3')).
+- openLink: oficina0ff1ce://calendario/pieza/be144c1c-3ea7-5321-8f21-9c3520bace8f
+- extendedWaitUntil:
+    visible:
+      id: detail-panel
+    timeout: 30000
+# cubre: OFI-09.3 — a piece shows «‹ Calendario»
+- assertVisible:
+    text: Calendario
+    childOf:
+      id: top-volver
+- takeScreenshot: 02-navegacion-17-enlace-pieza
+- tapOn:
+    id: top-volver
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    notVisible:
+      id: detail-panel
+    timeout: 20000
+- assertVisible:
+    id: turno-list
+- assertVisible:
+    id: top-tu-turno
+    selected: true
+- takeScreenshot: 02-navegacion-18-enlace-cerrado

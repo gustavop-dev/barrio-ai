@@ -2,6 +2,7 @@
 // revoked token goes back to login, and logout unregisters the push token before revoking.
 import { getTuTurno } from '@compartido/api/endpoints';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { onlineManager } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { Pressable, Text } from 'react-native';
 import { clearToken, currentToken } from '@/api/token';
@@ -59,6 +60,48 @@ describe('session', () => {
     await renderApp(<Probe />, { session: true });
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('fuera'));
     expect(store.has('oficina.token-dispositivo')).toBe(false);
+  });
+
+  // ACC-06: only a 401 or `authenticated:false` logs out at start-up. Offline (expo/fetch's FetchError) or with the
+  // server failing (a 5xx while it restarts) the phone keeps its token and stays inside.
+  it('stays inside when the phone opens the app without a connection (expo/fetch FetchError)', async () => {
+    store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
+    fakeServer({ 'GET /api/v1/auth/session': { fetchError: 'Unable to resolve host "office.projectapp.co"' } });
+    await renderApp(<Probe />, { session: true });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('dentro'));
+    expect(store.get('oficina.token-dispositivo')).toBe('0ff1ce_dt_guardado');
+    expect(currentToken()).toBe('0ff1ce_dt_guardado');
+  });
+
+  it('stays inside when the server answers 502 at start-up', async () => {
+    store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
+    fakeServer({ 'GET /api/v1/auth/session': { status: 502, body: '<html>Bad Gateway</html>' } });
+    await renderApp(<Probe />, { session: true });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('dentro'));
+    expect(store.get('oficina.token-dispositivo')).toBe('0ff1ce_dt_guardado');
+  });
+
+  it('forgets the token when the session answers 401 at start-up', async () => {
+    store.set('oficina.token-dispositivo', '0ff1ce_dt_desconocido');
+    fakeServer({ 'GET /api/v1/auth/session': { status: 401, body: { detail: 'Token inválido.' } } });
+    await renderApp(<Probe />, { session: true });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('fuera'));
+    expect(store.has('oficina.token-dispositivo')).toBe(false);
+  });
+
+  it('recovers the user once the network is back after an offline start (ACC-06.6)', async () => {
+    store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
+    const server = fakeServer({ 'GET /api/v1/auth/session': { fetchError: 'Failed to connect' } });
+    await renderApp(<Probe />, { session: true });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('dentro'));
+    expect(screen.getByTestId('user')).toHaveTextContent('');
+    server.on('GET /api/v1/auth/session', { body: { authenticated: true, user: USER } });
+    await act(async () => {
+      onlineManager.setOnline(false);
+      onlineManager.setOnline(true);
+    });
+    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('gustavo'));
+    expect(screen.getByTestId('status')).toHaveTextContent('dentro');
   });
 
   it('goes back to login when any request gets a 401', async () => {

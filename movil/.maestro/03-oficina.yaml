@@ -1,7 +1,9 @@
-# cubre: OFI-02, OFI-04, OFI-06
-# Oficina: a tap on a character of the Skia scene opens its sheet (SnapSheet), the sheet is dragged to full and
-# down to close; the team strip opens a team, a member of it and, scrolled sideways, the library; Android back
-# closes the sheet without leaving the Oficina.
+# cubre: OFI-01, OFI-02, OFI-03, OFI-04, OFI-06, OFI-07
+# Oficina: a tap on a character of the Skia scene opens its sheet (SnapSheet), with its real state (the inbox agent is
+# not «en diseño») and what it did this session; the sheet is dragged to full and down to close; the team strip opens a
+# team, a member of it, «Ver en el Calendario» and, scrolled sideways, the library; Android back closes the sheet without
+# leaving the Oficina; the scene survives a drag and a double tap; pull to refresh; the legend; and a machine stopped
+# elsewhere darkens the scene and shows the pause banner, which leads to Ajustes.
 appId: co.projectapp.office
 name: Oficina
 tags: [oficina]
@@ -48,6 +50,10 @@ tags: [oficina]
 - assertVisible: "Conversaciones e inbox"
 - assertVisible: "Mensajes directos y conversaciones privadas\\."
 - assertVisible: "ESTADO REAL"
+# cubre: OFI-01.4, OFI-01.5 — the inbox agent reads the inbox (read_inbox): it is not «en diseño», and its real state
+# says what it did last (seed_qa: a read_inbox job an hour ago)
+- assertNotVisible: "Este rol está en diseño\\..*"
+- assertVisible: "En espera · Último: leyendo el inbox de linkedin .*"
 - assertVisible: Altura del panel
 - takeScreenshot: 03-oficina-02-ficha-personaje
 
@@ -65,6 +71,9 @@ tags: [oficina]
         id: tab-index
     timeout: 10000
 - assertVisible: "LO ÚLTIMO QUE HIZO"
+# cubre: OFI-03 — background work hands off in the scene too: the inbox reading of a few minutes ago (seed_qa), summarized
+# because it is older than two minutes, is in «Lo último que hizo»
+- assertVisible: "Conversaciones entrega su trabajo: .1 conversación te toca."
 - assertVisible: "Ver su equipo · Relaciones"
 - takeScreenshot: 03-oficina-03-ficha-ampliada
 
@@ -122,6 +131,30 @@ tags: [oficina]
 - assertNotVisible: "ESPACIO DEL EQUIPO"
 - takeScreenshot: 03-oficina-06-integrante
 
+# cubre: OFI-04.5 — «Ver en el Calendario» opens the Calendario; back returns to the Oficina, the panel still open
+- scrollUntilVisible:
+    element: Ver en el Calendario
+    direction: DOWN
+- tapOn: Ver en el Calendario
+- extendedWaitUntil:
+    visible:
+      id: calendario
+    timeout: 20000
+- assertVisible:
+    id: top-calendario
+    selected: true
+- takeScreenshot: 03-oficina-06b-calendario
+- back
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 20000
+- assertVisible:
+    id: office-panel
+- assertVisible:
+    id: tab-index
+    selected: true
+
 # «Cerrar» closes it and the chip is no longer selected.
 - tapOn: Cerrar
 - extendedWaitUntil:
@@ -178,3 +211,69 @@ tags: [oficina]
     id: team-chip-biblioteca
     selected: false
 - takeScreenshot: 03-oficina-08-atras-cierra
+
+# ---------------------------------------------------------------- gestures on the scene
+# cubre: OFI-06.1, OFI-06.2 — a drag moves the office and a double tap brings it back; neither closes the app (the
+# spring configs once built inside the gesture worklets did)
+- swipe:
+    from:
+      id: office-scene
+    direction: LEFT
+    duration: 600
+- doubleTapOn:
+    id: office-scene
+- assertVisible:
+    id: office-scene
+- assertNotVisible:
+    id: office-panel
+# cubre: OFI-06.3 — pulling the page down asks for the activity and the events again
+- swipe:
+    from:
+      id: team-strip
+    direction: DOWN
+    duration: 600
+- assertVisible:
+    id: screen-oficina
+
+# cubre: OFI-01.8 — the legend and the age of the real activity
+- scrollUntilVisible:
+    element: "Actividad real · .*"
+    direction: DOWN
+    timeout: 30000
+- assertVisible: Trabajando
+- assertVisible: En espera
+- assertVisible: En diseño
+- takeScreenshot: 03-oficina-09-leyenda
+
+# ---------------------------------------------------------------- the machine stopped elsewhere
+# cubre: OFI-07.1, OFI-07.5 — the banner «Máquina en pausa · <motivo>» in the views, the scene darkened; the banner leads
+# to Ajustes › Máquina; once resumed, it goes (OFI-07.3)
+- runScript:
+    file: comun/qa-api.js
+    env:
+      ACCION: pausar
+- extendedWaitUntil:
+    visible: "Máquina en pausa · Pausa de la QA"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: oficina-pausa
+    timeout: 20000
+- takeScreenshot: 03-oficina-10-maquina-en-pausa
+- tapOn: "Máquina en pausa · Pausa de la QA"
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- assertVisible:
+    id: top-ajustes
+    selected: true
+- assertVisible: "Máquina en pausa · Pausa de la QA"
+- takeScreenshot: 03-oficina-11-pausa-en-ajustes
+- runScript:
+    file: comun/qa-api.js
+    env:
+      ACCION: reanudar
+- extendedWaitUntil:
+    notVisible: "Máquina en pausa · Pausa de la QA"
+    timeout: 60000
