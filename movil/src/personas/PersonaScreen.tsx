@@ -81,13 +81,14 @@ function NextStep({ contact }: { contact: Contact }) {
           </T>
         ) : null}
       </View>
+      {/* This screen is a detail over the tabs: dismissTo goes back down to them (TopBar says why not navigate). */}
       {step.action ? (
-        <Button variant="ghost" size="small" style={styles.start} onPress={() => router.navigate('/calendario')}>
+        <Button variant="ghost" size="small" style={styles.start} onPress={() => router.dismissTo('/calendario')}>
           Ver en el Calendario
         </Button>
       ) : null}
       {contact.your_turn ? (
-        <Button block onPress={() => router.navigate('/tu-turno')}>
+        <Button block onPress={() => router.dismissTo('/tu-turno')}>
           Ir a Tu turno
         </Button>
       ) : null}

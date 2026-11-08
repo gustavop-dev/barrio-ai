@@ -29,6 +29,26 @@ export function stackLevel(state: { routes: readonly { key: string }[] } | undef
   return index < 0 ? 0 : index;
 }
 
+interface StackNode {
+  routes?: readonly { key?: string; state?: StackNode }[];
+}
+
+/**
+ * The state of the navigator that holds the route `key`, searched from the root navigation state
+ * (useRootNavigationState). Screens take their level from it: during render, `navigation.getState()`
+ * still returns the previous render's state, where a screen pushed just now is not there yet.
+ */
+export function stackOf(root: unknown, key: string): { routes: readonly { key: string }[] } | undefined {
+  const node = root as StackNode | null | undefined;
+  const routes = node?.routes ?? [];
+  if (routes.some((route) => route.key === key)) return node as { routes: readonly { key: string }[] };
+  for (const route of routes) {
+    const found = stackOf(route.state, key);
+    if (found) return found;
+  }
+  return undefined;
+}
+
 /** The root view of the screen at `level`, so a flight can measure a row against its resting place. */
 export function registerLayer(level: number, node: unknown): () => void {
   layers.set(level, node);
