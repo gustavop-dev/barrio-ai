@@ -17,7 +17,7 @@ import { StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { BottomBar } from '@/components/shell/BottomBar';
 import { TopBar } from '@/components/shell/TopBar';
-import { baseFrame, pushProgress, registerLayer, stackLevel } from '@/components/shell/push';
+import { baseFrame, pushProgress, registerLayer, stackLevel, stackOf } from '@/components/shell/push';
 import { focusedChild, sceneRole, tabMove, tabSceneOptions, useFocusMemory } from '@/components/shell/tabTransitions';
 import { useMotion } from '@/theme/motion';
 import { colors } from '@/theme/tokens';
@@ -28,14 +28,16 @@ const ORDER = ['index', 'resultados', 'personas', 'galeria', 'tu-turno', 'notifi
 export default function TabsLayout() {
   const navigation = useNavigation();
   const route = useRoute();
-  const level = stackLevel(navigation.getState(), route.key);
+  // The root state of this very render (never getState(), which lags a render behind): the navigator
+  // below receives the same state in the same pass, so each scene's part in the change is right
+  // before its animation starts.
+  const rootState = useRootNavigationState();
+  const level = stackLevel(stackOf(rootState, route.key) ?? navigation.getState(), route.key);
   const covered = pushProgress(level + 1);
   const { reduced } = useMotion();
   const { width } = useWindowDimensions();
   const root = useRef<ComponentRef<typeof View>>(null);
-  // The focused tab, from the root state of this very render: the navigator below receives the same
-  // state in the same pass, so each scene's part in the change is right before its animation starts.
-  const focus = useFocusMemory(focusedChild(useRootNavigationState(), route.key));
+  const focus = useFocusMemory(focusedChild(rootState, route.key));
 
   useEffect(() => registerLayer(level, root.current), [level]);
 

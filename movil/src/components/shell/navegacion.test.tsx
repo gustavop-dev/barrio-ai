@@ -14,7 +14,7 @@ import { fakeServer } from '@/test/server';
 import { durations, FIRM, navGestures, navSprings, navTimings, navValues } from '@/theme/motion';
 import { BottomBar, pillLeft } from './BottomBar';
 import { DetailScreen } from './DetailScreen';
-import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, stackLevel } from './push';
+import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, stackLevel, stackOf } from './push';
 import { focusedChild, nextFocus, sceneRole, tabMove, tabSceneOptions, useFocusMemory, type FocusMemory } from './tabTransitions';
 
 const expoRouter = jest.requireMock('expo-router') as Record<string, unknown>;
@@ -66,6 +66,16 @@ describe('push (MovNavegacion)', () => {
   it('finds the level of a route in its stack', () => {
     expect(stackLevel({ routes: [{ key: 'tabs' }, { key: 'detail' }] }, 'detail')).toBe(1);
     expect(stackLevel(undefined, 'detail')).toBe(0);
+  });
+
+  it('finds the stack of a route in the root navigation state (where a just-pushed screen already is)', () => {
+    const app = { index: 1, routes: [{ key: 'tabs', state: { index: 0, routes: [{ key: 'index-1' }] } }, { key: 'detail' }] };
+    const root = { index: 0, routes: [{ key: 'root', name: '__root', state: { index: 0, routes: [{ key: 'app', state: app }] } }] };
+    expect(stackOf(root, 'detail')).toBe(app);
+    expect(stackLevel(stackOf(root, 'detail'), 'detail')).toBe(1);
+    expect(stackLevel(stackOf(root, 'tabs'), 'tabs')).toBe(0);
+    expect(stackOf(root, 'nope')).toBeUndefined();
+    expect(stackOf(undefined, 'detail')).toBeUndefined();
   });
 
   it('uses the design springs', () => {
