@@ -340,9 +340,9 @@ tags: [captura]
     visible:
       id: capture-historial
     timeout: 20000
-# Two seeded captures and the one sent again (the undone one is not listed).
+# Three seeded captures (one is the «lo antes posible» example) and the one sent again (the undone one is not listed).
 - extendedWaitUntil:
-    visible: 'Lo que enviaste · 3'
+    visible: 'Lo que enviaste · 4'
     timeout: 20000
 - tapOn:
     id: capture-historial
@@ -378,7 +378,7 @@ tags: [captura]
 - extendedWaitUntil:
     notVisible: 'Nota de QA idea para un post sobre validar un MVP con clientes'
     timeout: 10000
-- assertVisible: 'Lo que enviaste · 2'
+- assertVisible: 'Lo que enviaste · 3'
 
 # The seeded ones, newest first: the transcribed voice note that became a fact, and the idea used in a piece.
 - scrollUntilVisible:
