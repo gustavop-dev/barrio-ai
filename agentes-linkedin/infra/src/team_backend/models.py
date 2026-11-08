@@ -648,8 +648,10 @@ class OfficePreference(models.Model):
     """Singleton of Gustavo's office preferences (Ajustes)."""
     id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
     gallery_ai_edit_default=models.BooleanField(default=True)
-    # Ajustes › Notificaciones: event kinds whose push Gustavo turned off (notificaciones.PUSH_DEFAULTS).
+    # Ajustes › Notificaciones: event kinds whose push Gustavo turned off, and those he turned on although their default
+    # is off (notificaciones.INBOX_KINDS and FEED_KINDS hold the defaults; off wins if a kind is in both).
     push_disabled=models.JSONField(default=list,blank=True)
+    push_enabled=models.JSONField(default=list,blank=True)
     updated_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     updated_at=models.DateTimeField(null=True,blank=True)
     @classmethod

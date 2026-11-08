@@ -176,11 +176,14 @@ export interface Preferencias {
   updated_at: string | null;
   /** Kinds whose push is off (PATCH accepts it; GET may not return it). */
   push_disabled?: string[];
+  /** Kinds whose push is on although their default is off. */
+  push_enabled?: string[];
 }
 
 export interface PreferenciasPatch {
   gallery_ai_edit_default?: boolean;
   push_disabled?: string[];
+  push_enabled?: string[];
 }
 
 /** One push type of GET /api/v1/ajustes `push_types` (Ajustes › Notificaciones, a switch each). */

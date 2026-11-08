@@ -369,8 +369,21 @@ describe('Ajustes · Notificaciones', () => {
     expect(published).toBeChecked();
     expect(screen.getByRole('switch', { name: 'Pregunta nueva' })).not.toBeChecked();
     await fireEvent.press(published);
-    await waitFor(() => expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ push_disabled: ['piece_published', 'question_new'] }));
+    await waitFor(() =>
+      expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ push_disabled: ['piece_published', 'question_new'], push_enabled: ['piece_scheduled'] }),
+    );
     expect(await screen.findByText('Push apagada: Pieza publicada.')).toBeOnTheScreen();
+  });
+
+  it('turns on the push of a type that is off and saves it as enabled, so the server keeps it', async () => {
+    const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: true, updated_at: null } } });
+    await renderAjustes();
+    await fireEvent.press(screen.getByRole('button', { name: 'Por tipo de notificación' }));
+    await fireEvent.press(await screen.findByRole('switch', { name: 'Pregunta nueva' }));
+    await waitFor(() =>
+      expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ push_disabled: [], push_enabled: ['piece_scheduled', 'piece_published', 'question_new'] }),
+    );
+    expect(await screen.findByText('Push activada: Pregunta nueva.')).toBeOnTheScreen();
   });
 
   it('turns a switch back when saving fails', async () => {

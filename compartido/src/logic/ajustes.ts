@@ -223,6 +223,16 @@ export function disabledKinds(types: readonly PushType[], overrides: Readonly<Re
   return types.filter((type) => !(overrides[type.kind] ?? type.enabled)).map((type) => type.kind);
 }
 
+/** Every kind switched on, for PATCH /ajustes/preferencias `push_enabled` (a kind whose push is off by default can be turned on). */
+export function enabledKinds(types: readonly PushType[], overrides: Readonly<Record<string, boolean>>): string[] {
+  return types.filter((type) => overrides[type.kind] ?? type.enabled).map((type) => type.kind);
+}
+
+/** The body that saves every switch: what is off and what is on, so the server keeps both. */
+export function pushPreferencesPatch(types: readonly PushType[], overrides: Readonly<Record<string, boolean>>): { push_disabled: string[]; push_enabled: string[] } {
+  return { push_disabled: disabledKinds(types, overrides), push_enabled: enabledKinds(types, overrides) };
+}
+
 export function pushToggledMessage(type: Pick<PushType, 'label'>, enabled: boolean): string {
   return enabled ? `Push activada: ${type.label}.` : `Push apagada: ${type.label}.`;
 }

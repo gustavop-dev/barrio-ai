@@ -238,7 +238,7 @@ def status_payload(now=None):
     return data
 
 def check_tokens(now=None):
-    """Autopilot: push an alert 7 days before expiry and pause publishing once the token expired."""
+    """Autopilot: push an alert 7 days before expiry; once the token expired, pause publishing and push «LinkedIn caducado»."""
     from .models import LinkedInCredential
     from .operador import local_tz, set_account_pause
     now=now or timezone.now();events=0
@@ -246,7 +246,10 @@ def check_tokens(now=None):
         left=credential.expires_at-now;account=credential.account
         if left<=timedelta(0):
             if not account.paused:
-                set_account_pause(account,TOKEN_PAUSE+': reconecta LinkedIn en Ajustes para reanudar la publicación diaria.');events+=1
+                set_account_pause(account,TOKEN_PAUSE+': reconecta LinkedIn en Ajustes para reanudar la publicación diaria.',notify=False)
+                from .notificaciones import avisar
+                avisar('linkedin_expired','LinkedIn caducado','El acceso caducó y la publicación diaria está en pausa. Reconéctalo desde Tu turno.')
+                events+=1
         elif left<=EXPIRY_ALERT and credential.expiry_alerted_at is None:
             when=credential.expires_at.astimezone(local_tz()).strftime('%d/%m %H:%M')
             from .notificaciones import avisar

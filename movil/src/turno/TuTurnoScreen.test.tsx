@@ -1,6 +1,6 @@
 // Tu turno: groups by priority, Nueva/Vista, «Más tarde», card actions with and without a note,
 // empty, loading and error states, and the swipe actions.
-import { CONVERSATION_CARD, EXPIRING_CARD, questionCard, turnoFixture, UNCERTAIN_CARD } from '@compartido/fixtures/turno';
+import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, questionCard, turnoFixture, UNCERTAIN_CARD } from '@compartido/fixtures/turno';
 import type { TuTurno } from '@compartido/api/types';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
@@ -63,6 +63,24 @@ describe('Tu turno', () => {
     await waitFor(() => expect(server.find('POST', '/api/v1/conversaciones/conv-1/cerrar')[0]?.body).toEqual({ how: 'respondi' }));
     expect(await screen.findByText('Anotado: respondiste')).toBeOnTheScreen();
     await waitFor(() => expect(server.find('GET', '/api/v1/tu-turno').length).toBeGreaterThan(1));
+  });
+
+  it('approves an action that waits for Gustavo with its exact version, and vetoing asks for a note first', async () => {
+    const server = await renderTurno(turno({ items: [APPROVAL_CARD], count: 1, critical: false }), {
+      'POST /api/v1/operador/actions/a-1/approve': { status: 202, body: {} },
+      'POST /api/v1/operador/actions/a-1/reject': { body: {} },
+    });
+    expect(await screen.findByText('¿Apruebas seguir a Laura Prueba?')).toBeOnTheScreen();
+    expect(screen.getByText('Head of Product en un marketplace B2B')).toBeOnTheScreen();
+    expect(screen.getByText('Lidera producto en un marketplace B2B.')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Vetar'));
+    const sheet = await screen.findByTestId('confirm-sheet');
+    expect(within(sheet).getByText('Vetar la acción')).toBeOnTheScreen();
+    await fireEvent.press(within(sheet).getByText('Cancelar'));
+    await fireEvent.press(screen.getByText('Aprobar'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/operador/actions/a-1/approve')[0]?.body).toEqual({ expected_hash: 'a'.repeat(64) }));
+    expect(await screen.findByText('Aprobada. Sale cuando lo permitan la ventana y los topes.')).toBeOnTheScreen();
+    expect(server.find('POST', '/api/v1/operador/actions/a-1/reject')).toHaveLength(0);
   });
 
   it('asks for a note before resolving an uncertain action and sends it', async () => {

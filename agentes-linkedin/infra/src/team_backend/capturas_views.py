@@ -89,6 +89,7 @@ class PhotoPatch(serializers.Serializer):
 class PreferencesInput(serializers.Serializer):
     gallery_ai_edit_default=serializers.BooleanField(required=False)
     push_disabled=serializers.ListField(child=serializers.CharField(max_length=40),required=False,max_length=40)
+    push_enabled=serializers.ListField(child=serializers.CharField(max_length=40),required=False,max_length=40)
 
 # --------------------------------------------------------------------------- captures
 
@@ -171,23 +172,31 @@ class PhotoImage(FileView):
 
 def _preferences():
     current=OfficePreference.current()
-    return {'gallery_ai_edit_default':current.gallery_ai_edit_default,'push_disabled':current.push_disabled,'updated_at':current.updated_at}
+    return {'gallery_ai_edit_default':current.gallery_ai_edit_default,'push_disabled':current.push_disabled,'push_enabled':current.push_enabled,
+            'updated_at':current.updated_at}
 
 class Preferences(APIView):
-    """Ajustes → «El equipo puede editar mis fotos con IA» (default of each new photo)."""
+    """Ajustes → «El equipo puede editar mis fotos con IA» (default of each new photo) and the push switch of each kind
+    (push_disabled: turned off; push_enabled: turned on although off by default)."""
     def get(self,request):
         require(request.user,'operate_linkedin')
         return Response(_preferences())
     def patch(self,request):
         human_session(request);require(request.user,'approve_actions')
         data=valid(PreferencesInput,request);current=OfficePreference.current()
-        if not data:raise ValidationError('Envía gallery_ai_edit_default o push_disabled')
+        if not data:raise ValidationError('Envía gallery_ai_edit_default, push_disabled o push_enabled')
         if 'gallery_ai_edit_default' in data:current.gallery_ai_edit_default=data['gallery_ai_edit_default']
-        if 'push_disabled' in data:
+        if 'push_disabled' in data or 'push_enabled' in data:
             from .notificaciones import FEED_KINDS, INBOX_KINDS
-            unknown=[k for k in data['push_disabled'] if k not in INBOX_KINDS and k not in FEED_KINDS]
+            off=set(data.get('push_disabled') or []);on=set(data.get('push_enabled') or [])
+            unknown=sorted(k for k in off|on if k not in INBOX_KINDS and k not in FEED_KINDS)
             if unknown:raise ValidationError(f'Tipos de aviso desconocidos: {", ".join(unknown)}')
-            current.push_disabled=sorted(set(data['push_disabled']))
+            if off&on:raise ValidationError(f'Un tipo no puede estar encendido y apagado a la vez: {", ".join(sorted(off&on))}')
+            # A client that sends one list only (older apps send push_disabled) keeps the other, minus what it moved.
+            if 'push_disabled' not in data:off=set(current.push_disabled or [])-on
+            if 'push_enabled' not in data:on=set(current.push_enabled or [])-off
+            current.push_disabled=sorted(off);current.push_enabled=sorted(on)
         current.updated_by=request.user;current.updated_at=timezone.now();current.save()
-        audit(request.user,'office.preferences',1,gallery_ai_edit_default=current.gallery_ai_edit_default,push_disabled=current.push_disabled)
+        audit(request.user,'office.preferences',1,gallery_ai_edit_default=current.gallery_ai_edit_default,push_disabled=current.push_disabled,
+              push_enabled=current.push_enabled)
         return Response(_preferences())

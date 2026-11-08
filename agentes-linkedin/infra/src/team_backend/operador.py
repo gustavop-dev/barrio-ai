@@ -102,6 +102,24 @@ def globally_paused():
     from .models import OperatorControl
     return env_paused() or OperatorControl.objects.filter(pk=1,paused=True).exists()
 
+ENV_STOP_EVENTS=('operator.env_paused','operator.env_resumed')
+
+def check_env_pause():
+    """The stop set on the server (OPERATOR_PAUSED) reaches Gustavo once per stop: the first cycle that sees it pushes
+    «Máquina detenida desde el servidor», and nothing more until it is lifted. Each change leaves an AuditEvent, the
+    durable mark that the push already went out. «Próximo» keeps showing the stop while it lasts (notificaciones.upcoming)."""
+    from .models import AuditEvent
+    last=AuditEvent.objects.filter(action__in=ENV_STOP_EVENTS).order_by('-created_at').values_list('action',flat=True).first()
+    if env_paused():
+        if last=='operator.env_paused':return False
+        _audit(None,'operator.env_paused','machine')
+        from .notificaciones import avisar
+        avisar('machine_paused_env','Máquina detenida desde el servidor','La parada viene de OPERATOR_PAUSED y no se levanta desde la app.',
+               link='/notificaciones')
+        return True
+    if last=='operator.env_paused':_audit(None,'operator.env_resumed','machine')
+    return False
+
 def set_global_pause(user,paused,reason=''):
     from .models import OperatorControl
     require(user,'approve_actions')
@@ -111,6 +129,9 @@ def set_global_pause(user,paused,reason=''):
     control.paused=paused;control.reason=reason.strip() if paused else '';control.updated_by=user;control.updated_at=timezone.now()
     control.save()
     _audit(user,'operator.machine_'+('paused' if paused else 'resumed'),'machine',reason=control.reason)
+    if paused:
+        from .notificaciones import avisar
+        avisar('machine_paused','Máquina detenida',f'{control.reason} Nadie actúa en LinkedIn hasta que la reanudes desde Tu turno.')
     return control
 
 def validate_payload(capability,payload):
@@ -226,12 +247,14 @@ def observe(user,account,referent_ids=None,limit=5):
                link=f'/calendario?fecha={timezone.now().astimezone(local_tz()).date().isoformat()}')
     return summary
 
-def set_account_pause(account,reason,actor=None):
+def set_account_pause(account,reason,actor=None,notify=True):
+    """`notify=False` when the caller sends a more precise push itself (the expired LinkedIn token: linkedin_expired)."""
     ConnectorAccount.objects.filter(pk=account.pk).update(paused=True,paused_reason=reason)
     account.paused=True;account.paused_reason=reason
     _audit(actor,'operator.account_paused',account.id,reason=reason)
-    from .notificaciones import avisar
-    avisar('account_paused','LinkedIn: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.')
+    if notify:
+        from .notificaciones import avisar
+        avisar('account_paused','LinkedIn: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.')
 
 # --------------------------------------------------------------------------- proposals
 

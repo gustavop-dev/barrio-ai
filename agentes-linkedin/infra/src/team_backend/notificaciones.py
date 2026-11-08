@@ -2,7 +2,7 @@
 
 Rule: if only Gustavo can solve it, it is a Tu turno card (computed live by rediseno_views.alerts and the team
 questions); otherwise it is a Notificación kept 7 days. Each kind has a default push, and Gustavo can turn the
-push of any kind off in Ajustes › Notificaciones (OfficePreference.push_disabled)."""
+push of any kind off or on in Ajustes › Notificaciones (OfficePreference.push_disabled and push_enabled)."""
 from datetime import timedelta
 from django.db import IntegrityError, transaction
 from django.utils import timezone
@@ -36,14 +36,31 @@ FEED_KINDS={
     'weekly_summary':('tuyo',True,'Resumen de la semana listo'),
 }
 
+# Computed every time «Próximo» is read: they push when they happen but are never stored in the feed.
+COMPUTED_KINDS=('invites_expected','machine_paused_env')
+# Notificaciones kinds that still push with high priority: the machine stopped from the server stops everything.
+URGENT_FEED_KINDS=('machine_paused_env',)
+# Kinds nothing can emit yet: no switch in Ajustes until their event exists (profile tasks, TUR-18).
+WITHOUT_EMITTER=('profile_task',)
+
+def _switches():
+    """(off, on): what Gustavo turned off, and what he turned on although its default is off."""
+    current=OfficePreference.current()
+    return set(current.push_disabled or []),set(current.push_enabled or [])
+
+def _enabled(kind,default,switches):
+    off,on=switches
+    return kind not in off and (default or kind in on)
+
 def push_enabled(kind):
     default=(INBOX_KINDS.get(kind) or FEED_KINDS.get(kind) or (None,False))[1]
-    return default and kind not in (OfficePreference.current().push_disabled or [])
+    return _enabled(kind,default,_switches())
 
 def push_types():
-    disabled=set(OfficePreference.current().push_disabled or [])
-    rows=[{'kind':k,'label':v[2],'goes_to':'tu_turno','default':v[1],'enabled':v[1] and k not in disabled} for k,v in INBOX_KINDS.items()]
-    rows+=[{'kind':k,'label':v[2],'goes_to':'notificaciones','default':v[1],'enabled':v[1] and k not in disabled} for k,v in FEED_KINDS.items()]
+    switches=_switches()
+    rows=[{'kind':k,'label':v[2],'goes_to':'tu_turno','default':v[1],'enabled':_enabled(k,v[1],switches)} for k,v in INBOX_KINDS.items()
+          if k not in WITHOUT_EMITTER]
+    rows+=[{'kind':k,'label':v[2],'goes_to':'notificaciones','default':v[1],'enabled':_enabled(k,v[1],switches)} for k,v in FEED_KINDS.items()]
     return rows
 
 def avisar(kind,title,detail='',link='',ref=None):
@@ -51,7 +68,7 @@ def avisar(kind,title,detail='',link='',ref=None):
     from .alerts import notify
     try:
         created=None
-        if kind in FEED_KINDS:
+        if kind in FEED_KINDS and kind not in COMPUTED_KINDS:
             try:
                 with transaction.atomic():
                     created=Notification.objects.create(kind=kind,layer=FEED_KINDS[kind][0],title=title[:300],detail=detail or '',
@@ -60,7 +77,7 @@ def avisar(kind,title,detail='',link='',ref=None):
         elif kind not in INBOX_KINDS:return None
         if push_enabled(kind):
             notify(title[:120],detail[:200] or title[:200],url='/tu-turno' if kind in INBOX_KINDS else (link or '/notificaciones'),tag=f'0ff1ce-{kind}',
-                   urgent=INBOX_KINDS.get(kind,('',))[0]=='urgente')
+                   urgent=INBOX_KINDS.get(kind,('',))[0]=='urgente' or kind in URGENT_FEED_KINDS)
         return created
     except Exception:
         return None

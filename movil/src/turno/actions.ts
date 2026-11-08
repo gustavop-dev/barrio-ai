@@ -1,6 +1,7 @@
 // Rules of the Tu turno card actions (the PWA's TurnoCardView), apart from the views so they can be
 // tested: which actions ask first, what the toast says, and what a swipe does on each card.
 import type { TurnoAction, TurnoCard, TurnoCardType, TurnoPriority } from '@compartido/api/types';
+import { APPROVED_MESSAGE, vetoConsequence } from '@compartido/logic/events';
 import type { IconName } from '@/components/icons';
 
 export const TYPE_LABEL: Record<TurnoCardType, string> = {
@@ -9,6 +10,7 @@ export const TYPE_LABEL: Record<TurnoCardType, string> = {
   perfil: 'Perfil',
   conversacion: 'Conversación',
   resumen: 'Resumen semanal',
+  aprobacion: 'Aprobación',
 };
 
 export const TYPE_ICON: Record<TurnoCardType, IconName> = {
@@ -17,13 +19,14 @@ export const TYPE_ICON: Record<TurnoCardType, IconName> = {
   perfil: 'perfil',
   conversacion: 'conversacion',
   resumen: 'resultados',
+  aprobacion: 'check',
 };
 
 /** Colour of the type label: alerta for urgent notices, info for questions and conversations, hondo for profile tasks. */
 export function typeTone(card: TurnoCard, priority: TurnoPriority | null): 'suave' | 'alerta' | 'hondo' | 'info' {
   if (!priority) return 'suave';
   if (card.type === 'aviso') return priority === 'urgente' ? 'alerta' : 'suave';
-  if (card.type === 'perfil') return 'hondo';
+  if (card.type === 'perfil' || card.type === 'aprobacion') return 'hondo';
   return 'info';
 }
 
@@ -46,10 +49,14 @@ export function cardTitle(card: TurnoCard): string {
 export const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;
 export const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsWith('/resolve'));
 export const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
+export const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
+export const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
 
 export function successMessage(action: TurnoAction): string {
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
+  if (isApprove(action)) return APPROVED_MESSAGE;
+  if (isReject(action)) return 'Vetada';
   if (isMachineResume(action)) return 'Máquina reanudada';
   if (action.endpoint?.endsWith('/pause') && action.body?.paused === false) return 'Cuenta reanudada';
   if (action.endpoint?.startsWith('/api/v1/resultados/resumen-semanal/') && action.endpoint.endsWith('/descartar')) return 'Resumen descartado';
@@ -64,8 +71,19 @@ export interface ModalSpec {
   placeholder?: string;
 }
 
-/** Which actions ask first: a required note (uncertain actions and any `note_required`) or the optional reason to resume. */
-export function modalFor(action: TurnoAction): ModalSpec | null {
+/** Which actions ask first: a required note (uncertain actions, «Vetar» and any `note_required`) or the optional reason to resume.
+ * `card` gives «Vetar» its consequence (a network action discards the person for good). */
+export function modalFor(action: TurnoAction, card?: TurnoCard): ModalSpec | null {
+  if (isReject(action)) {
+    const approval = card?.approval;
+    return {
+      title: approval?.piece_id ? 'Vetar la pieza' : 'Vetar la acción',
+      text: vetoConsequence(approval?.piece_id ? { actionId: approval.proposal_id, kind: 'pieza' } : { actionId: approval?.proposal_id ?? '', kind: 'accion', network: approval?.network, person: approval?.target?.name }),
+      note: 'required',
+      noteLabel: 'Nota',
+      placeholder: 'Por qué no debe salir',
+    };
+  }
   if (isResolve(action) && action.note_required) {
     const applied = action.body?.outcome !== 'failed';
     return {
