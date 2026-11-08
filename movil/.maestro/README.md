@@ -6,10 +6,12 @@ Esta carpeta tiene los flujos de [Maestro](https://maestro.dev) que **usan la ap
 
 El workflow tiene cuatro jobs:
 
-1. **`plan`** decide qué flujos corren y los reparte en hasta **4 emuladores en paralelo**, equilibrando su duración. En cada emulador los flujos van en orden numérico. `15-ajustes-sesion` cierra la sesión y vuelve a entrar al final, así que los flujos que vengan después en su emulador encuentran la sesión abierta.
-2. **`apk`** compila la app una sola vez: `expo prebuild` y Gradle `assembleRelease -PreactNativeArchitectures=x86_64`. Es una build release, con el JS empaquetado y R8, igual que la de EAS, pero para el emulador x86_64. Usa `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, que es el runner visto desde el emulador.
-   - El APK queda en caché por el hash de lo que lo compone: `movil/` (sin esta carpeta ni los `.md`), `compartido/`, el `package-lock.json` y `app.config.js`.
-   - Un push que solo cambia flujos, `seed_qa` o los scripts no vuelve a compilar: el job termina en segundos.
+1. **`plan`** decide qué flujos corren y los reparte en hasta **8 emuladores en paralelo**, equilibrando el número de líneas como aproximación de la duración. Usa `min(8, flujos seleccionados)` emuladores; `QA_MAX_SHARDS` permite otro límite al invocar el script. En cada emulador los flujos van en orden numérico. `15-ajustes-sesion` cierra la sesión y vuelve a entrar al final, así que los flujos que vengan después en su emulador encuentran la sesión abierta.
+2. **`apk`** combina un shell nativo release x86_64 con el JS actual. Todos los pasos usan `OFFICE_QA_BUILD=1`, `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, `NODE_ENV=production` y `EXPO_NO_DOTENV=1` (sin cargar `.env` implícitos).
+   - **Caché nativa:** después de `npm ci`, exporta con `expo export:embed` y compila el bundle con el Hermes del lockfile. Calcula `@expo/fingerprint` para Android, antes de generar `android/`, con preset estricto, configuración, plugins, lockfile, entorno de QA y los recursos que Metro referencia. Si falta esa huella, hace `expo prebuild` y Gradle `assembleRelease -PreactNativeArchitectures=x86_64`, y guarda el APK nativo con su keystore debug y el inventario de assets.
+   - **Cambios de JS/TS:** con la misma huella no hay prebuild ni Gradle. Sustituye `assets/index.android.bundle` y los assets acompañantes de Metro; elimina los que ya no existen. Conserva los recursos Android compilados, elimina las firmas anteriores, hace `zipalign -P 16` y firma con `apksigner` y el keystore debug del shell. La ruta fría usa también este reempaquetado, para comprobarlo desde la primera ejecución.
+   - **Imágenes, fuentes y otros recursos:** un cambio en los nombres o contenidos exportados a `res/` cambia la huella, incluso si viene de un nuevo `require()` en JS. Necesita build nativa porque Android registra esos recursos en `resources.arsc`; copiar archivos nuevos al ZIP no los registra. No se sobrescribe XML compilado con XML de texto.
+   - **Caché del APK final:** evita incluso npm/Metro cuando solo cambian flujos, documentación, backend o los scripts de selección/informe. Los emuladores restauran esta caché, que contiene el JS de esta revisión.
 3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
    - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
    - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada`, `02-navegacion` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
@@ -17,6 +19,10 @@ El workflow tiene cuatro jobs:
 4. **`qa`** junta los artefactos de todos los emuladores, compara las capturas con la referencia de `main` y cuenta la cobertura del catálogo. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
 
 En un PR, una ejecución nueva cancela la anterior (`concurrency` con `cancel-in-progress`); en `main` cada ejecución termina, porque renueva la referencia visual.
+
+Las claves son `apk-native-v2-Linux-x86_64-<huella>` y `apk-qa-v2-Linux-x86_64-<hashFiles>`. La segunda usa `hashFiles('movil/**', '!movil/.maestro/**', '!movil/**/*.md', 'compartido/**', 'scripts/qa/apk-*', '.github/workflows/qa-movil.yml')`. El resumen del job muestra las claves y los aciertos; el artefacto `qa-apk-fingerprint` conserva las fuentes de la huella para diagnosticar un miss inesperado. Las cachés de GitHub respetan el ámbito de rama/PR: `main` sirve de base para los PR; un shell creado en un PR no calienta otro PR.
+
+**Forzar una build nativa completa:** sube `APK_CACHE_VERSION` en `.github/workflows/qa-movil.yml` (actualmente `v2`). Invalida ambas cachés. Hazlo también si cambias los pasos de compilación o el empaquetado. `[qa: todos]` fuerza todos los flujos, pero no invalida el APK.
 
 ### Por qué HTTP en claro solo en esta build
 
@@ -28,9 +34,9 @@ Se eligió una release con el JS empaquetado, en vez de una build debug, para pr
 
 ## Lanzar una QA
 
-- **En un PR:** corre en todos los PR, para que `qa` pueda ser un check obligatorio. Si el PR no toca `movil/`, `compartido/`, `agentes-linkedin/`, `scripts/qa/` ni el workflow, `qa` pasa en segundos sin emulador.
+- **En un PR sin etiqueta:** `scripts/qa/seleccion.json` cruza las rutas cambiadas con carpetas de área, prefijos de flujo y las cabeceras `# cubre:`. Une la selección de todos los archivos, incluidos los nombres anteriores de archivos renombrados. Por ejemplo, `capture/**` selecciona `05-*` y `10-*`; `login.tsx`, `01-*`; Calendario, `07-*` y otros flujos que declaran `CAL-*`. Cambiar un flujo selecciona ese flujo. Los helpers comunes, UI, tema, autenticación, API, `compartido/`, `agentes-linkedin/`, `seed_qa`, scripts de QA, workflow o **cualquier ruta sin mapa** seleccionan todos. Si la lista de GitHub falla o puede estar truncada, también van todos. Solo las rutas documentales explícitas de `ignorar` permiten pasar sin emulador.
 - **En `main`:** después de cada push que toca la app y cada noche a las 03:00 de Bogotá, con todos los flujos. Esas ejecuciones guardan la referencia visual.
-- **Solo algunos flujos:** pon `[qa: …]` en el mensaje del último commit del PR, con nombres o números separados por espacios o comas. Por ejemplo, `fix(movil): … [qa: 05-captura 09]` corre solo `05-captura` y `09-personas`. Sirve para arreglar un flujo sin volver a correr los once; antes de terminar, un push sin `[qa: …]` los corre todos.
+- **Solo algunos flujos:** pon `[qa: …]` en el mensaje del último commit del PR, con nombres o números separados por espacios o comas. Conserva la selección por nombre, prefijo o fragmento: `[qa: 05-captura 09]` corre todos los `05-captura*` y `09-personas`. La etiqueta tiene prioridad sobre el mapa automático; `[qa: todos]` corre la suite completa. Quitar la etiqueta vuelve a la selección automática. Los pushes a `main` y las ejecuciones nocturnas siempre corren todos los flujos.
 - **A mano**, una vez que el workflow esté en `main`:
 
   ```bash
@@ -39,7 +45,9 @@ Se eligió una release con el JS empaquetado, en vez de una build debug, para pr
   gh run watch $(gh run list --workflow qa-movil.yml --limit 1 --json databaseId --jq '.[0].databaseId')
   ```
 
-Con el APK en caché, una ejecución completa tarda lo que el emulador más lento, unos 15 minutos. Si hay que compilar el APK, se suman unos 17.
+El objetivo del job `apk` para cambios solo de JS/TS es **2–4 minutos** con el shell nativo en caché; una build nativa sigue costando unos 13–17 minutos. El tiempo total depende además del emulador más lento y de la cola de GitHub; hay que medirlo en CI.
+
+En las primeras ejecuciones, comprobar una ruta fría y después un cambio de JS con la misma huella: prebuild/Gradle deben quedar omitidos en la segunda, la firma y alineación deben pasar, y el emulador debe mostrar el cambio nuevo, las imágenes y las fuentes, iniciar sesión contra `10.0.2.2` y arrancar sin OTA. Verificar también una selección pequeña, `[qa: todos]` con 8 shards y un cambio nativo que invalide la huella. Al actualizar Expo/RN, revisar `assets/index.android.bundle`, las rutas `generated/{assets,res}/react/release`, Hermes y los recursos: el script falla si deja de coincidir el contrato del shell. La implementación se preparó mediante lectura de código; la validación de ejecución se hace únicamente en CI.
 
 ## Revisar una ejecución (personas y agentes revisores)
 
@@ -177,7 +185,7 @@ Para probar los estados de error y los vacíos, el backend de la QA puede hacer 
 
 ## Check obligatorio para los PR (lo aplica Gustavo)
 
-`qa` corre en todos los PR y pasa en segundos cuando el PR no toca la app, así que puede exigirse sin bloquear los PR de documentación. Cambiar la protección de `main` necesita permisos de administrador.
+`qa` corre en todos los PR y pasa en segundos cuando solo cambian las rutas documentales ignoradas por el mapa, así que puede exigirse sin bloquear esos PR. Cambiar la protección de `main` necesita permisos de administrador.
 
 1. Comprueba que `qa` ya pasó en algún PR. El nombre del check es exactamente `qa`, el último job de «QA móvil».
 2. Crea una regla del repositorio que exija `qa` en `main`, dejando que los administradores la salten en una urgencia:
