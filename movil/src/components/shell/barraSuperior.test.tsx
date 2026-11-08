@@ -344,7 +344,13 @@ describe('the top bar on the real shell', () => {
     await fireEvent.press(within(screen.getByTestId('detail-panel')).getByTestId('top-tu-turno'));
     await advance(SETTLE_MS);
     expectShown('tu-turno');
+    // The detail went (after its push back), and no second shell was stacked over it.
     expect(screen.queryByTestId('pantalla-persona', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getAllByTestId('shell-tabs', { includeHiddenElements: true })).toHaveLength(1);
+    expect(appliedFrame(screen.getByTestId('shell-tabs')).translateX).toBeCloseTo(0, 0);
+    // Back returns to the tab the detail was opened from.
+    await back();
+    expectShown('personas');
   });
 });
 
