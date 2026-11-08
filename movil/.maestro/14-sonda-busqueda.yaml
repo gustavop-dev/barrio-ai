@@ -1,0 +1,42 @@
+# SONDA TEMPORAL (se borra antes de fusionar): ¿la caja de búsqueda del Barrio pierde el foco cuando la búsqueda se
+# aplica (?q= tras la pausa de 300 ms)? Escribe una letra, espera a que la lista se filtre y mira si sigue enfocada.
+appId: co.projectapp.office
+name: Sonda búsqueda
+tags: [personas]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-personas
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- extendedWaitUntil:
+    visible: "Laura Gómez"
+    timeout: 30000
+- repeat:
+    times: 4
+    commands:
+      - tapOn:
+          id: barrio-search
+      - inputText: "S"
+      # q=S filters Laura out (no «s» in her name or headline): the search has been applied.
+      - extendedWaitUntil:
+          notVisible: "Laura Gómez"
+          timeout: 15000
+      - takeScreenshot: 14-sonda-01-tras-filtrar
+      - assertVisible:
+          id: barrio-search
+          focused: true
+      - inputText: "of"
+      - extendedWaitUntil:
+          visible:
+            id: barrio-search
+            text: "Sof"
+          timeout: 5000
+      - tapOn: "Borrar la búsqueda"
+      - hideKeyboard
+      - extendedWaitUntil:
+          visible: "Laura Gómez"
+          timeout: 15000
