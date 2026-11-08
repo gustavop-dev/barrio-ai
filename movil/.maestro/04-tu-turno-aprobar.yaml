@@ -45,6 +45,7 @@ tags: [turno]
     text: 'Aprobar'
     childOf:
       id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1-contenido'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
     timeout: 20000
@@ -107,7 +108,9 @@ tags: [turno]
 - takeScreenshot: 04-aprobar-04-en-cola
 # Julián's is the only row that still waits, so its «Aprobar» is the only one in «En cola» (the row's own view is
 # reported apart from its buttons on Android, so `childOf` cannot reach them).
-- tapOn: 'Aprobar'
+- tapOn:
+    text: 'Aprobar'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
     timeout: 20000
@@ -138,7 +141,9 @@ tags: [turno]
 - assertVisible: 'La publicación diaria espera tu aprobación.*'
 - assertVisible: 'Vetar'
 - takeScreenshot: 04-aprobar-06-pieza-pendiente
-- tapOn: 'Aprobar'
+- tapOn:
+    text: 'Aprobar'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
     timeout: 20000

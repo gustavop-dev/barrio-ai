@@ -33,8 +33,8 @@ tags: [turno]
     id: confirm-note
 - inputText: Reviso el tono antes de seguir
 - hideKeyboard
-# The toast after a sheet closes is not asserted: on the emulator it often never reaches the view hierarchy (see the
-# PR); what changed on screen is.
+# The toast after a sheet closes is not asserted: closing the sheet can keep Maestro waiting longer than the toast's
+# 4 s (the screenshot right after the tap shows it). What changed on screen is asserted instead.
 - tapOn:
     text: 'Detener la máquina'
     childOf:
@@ -195,6 +195,7 @@ tags: [turno]
     centerElement: true
 - tapOn:
     id: 'answer-submit-f8a3b231-d0ba-5938-a222-b12acb5e9d16'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Guardado\. El equipo ya puede usarlo'
     timeout: 20000
@@ -202,6 +203,7 @@ tags: [turno]
     text: 'Deshacer'
     childOf:
       id: toast
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Respuesta deshecha\. La pregunta vuelve a estar abierta'
     timeout: 20000
@@ -261,6 +263,7 @@ tags: [turno]
     text: 'Descartar'
     childOf:
       id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86-contenido'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Resumen descartado'
     timeout: 20000

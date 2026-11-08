@@ -66,13 +66,14 @@ export function QueuedRow({ item, today, timeZone, windowOpen }: { item: QueuedI
   const sentence = queuedSentence(item);
   const awaiting = Boolean(item.awaiting_approval && item.payload_hash);
   return (
-    <View style={styles.row} testID={`en-cola-${item.id}`}>
-      <View style={styles.rowText}>
+    <View style={awaiting ? styles.rowStacked : styles.row} testID={`en-cola-${item.id}`}>
+      <View style={awaiting ? styles.rowTextStacked : styles.rowText}>
         <T>{sentence}</T>
         <T variant="detalle" soft>
           {awaiting ? awaitingSentence(item.expires_at, { today, timeZone }) : queuedWhen(item.expected_at, { today, timeZone, windowOpen })}
         </T>
       </View>
+      {/* Waiting for approval, the two buttons go under the text: beside it they squeezed it into a narrow column. */}
       <View style={styles.rowActions}>
         {awaiting ? <ApproveButton size="small" actionId={item.id} expectedHash={item.payload_hash!} accessibilityHint={sentence} /> : null}
         <VetoButton
@@ -175,5 +176,7 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
   rowText: { flex: 1, gap: 2 },
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  rowStacked: { gap: space[2], paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
+  rowTextStacked: { gap: 2 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: shell.touch },
 });

@@ -45,8 +45,8 @@ tags: [turno]
 - inputText: Horarios
 - hideKeyboard
 - takeScreenshot: 04-sabe-02-anadir
-# The toast after a sheet closes is not asserted: on the emulator it often never reaches the view hierarchy (see the
-# PR); what changed on screen is.
+# The toast after a sheet closes is not asserted: closing the sheet can keep Maestro waiting longer than the toast's
+# 4 s (the screenshot right after the tap shows it). What changed on screen is asserted instead.
 - tapOn:
     text: 'Guardar'
     waitToSettleTimeoutMs: 300

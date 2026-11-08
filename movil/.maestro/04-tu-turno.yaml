@@ -68,8 +68,8 @@ tags: [turno]
 - tapOn: 'La acción queda como hecha en LinkedIn\.'
 - assertVisible: 'El comentario aparece en el post'
 - takeScreenshot: 04-turno-02-incierta-nota
-# The toast after a sheet closes is not asserted: on the emulator it often never reaches the view hierarchy (see the
-# PR); what changed on screen is.
+# The toast after a sheet closes is not asserted: closing the sheet can keep Maestro waiting longer than the toast's
+# 4 s (the screenshot right after the tap shows it). What changed on screen is asserted instead.
 - tapOn:
     text: 'Sí, se aplicó'
     childOf:
@@ -120,6 +120,7 @@ tags: [turno]
     centerElement: true
 - tapOn:
     id: 'answer-submit-3db4be49-1ddb-518e-bb02-794907c57c95'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Guardado\. El equipo ya puede usarlo'
     timeout: 20000
@@ -164,6 +165,7 @@ tags: [turno]
       text: '.*Estamos armando la plataforma de nuestra cooperativa.*'
     direction: RIGHT
     duration: 400
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Anotado: respondiste'
     timeout: 20000
@@ -195,6 +197,7 @@ tags: [turno]
       text: '¿Con qué tipo de startups prefieres trabajar\?'
     direction: LEFT
     duration: 400
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Pospuesta\. Vuelve el .*|Pospuesta 3 días'
     timeout: 20000
@@ -221,6 +224,7 @@ tags: [turno]
     text: 'Más tarde'
     childOf:
       id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Pospuesta\. Vuelve el .*|Pospuesta 3 días'
     timeout: 20000

@@ -32,11 +32,17 @@ tags: [notificaciones]
     timeout: 30000
 - assertVisible: 'Te avisan aquí de lo que pide tu acción \(Tu turno\) y de lo importante que pasa \(Notificaciones\)\.'
 - assertVisible: 'Teléfonos que reciben avisos.*'
+# The emulator has no Expo token: the reason, and no phone registered.
+- assertVisible: 'Avisos push aún no disponibles'
+- assertVisible: 'Los avisos push solo llegan a un teléfono real\.'
 - takeScreenshot: 06-avisos-01-este-dispositivo
+# Neither VAPID nor a registered phone on the runner: the server refuses it and the reason shows (PUS-02.3).
 - tapOn: "Probar notificación"
 - extendedWaitUntil:
-    visible: '.*VAPID.*|Notificación de prueba enviada\. Debería llegar en unos segundos\.'
+    visible: 'Notificaciones no configuradas en el servidor \(VAPID\)\.'
     timeout: 20000
+- assertVisible: 'No se pudo completar'
+
 - takeScreenshot: 06-avisos-02-probar
 
 - runFlow: comun/ajustes-por-tipo.yaml
@@ -56,6 +62,7 @@ tags: [notificaciones]
 - takeScreenshot: 06-avisos-03-conexion-apagada
 - tapOn:
     id: push-connection_fit
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Push activada: Conexión nueva que encaja\.'
     timeout: 15000
