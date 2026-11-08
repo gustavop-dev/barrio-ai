@@ -51,7 +51,11 @@ onFlowComplete:
     visible:
       id: capture-fotos
     timeout: 25000
-- assertVisible: 'Foto adjunta 1'
+# The thumbnail pops in (MovCaptura, durations.base): wait for it to be on screen, not only its row. A thumbnail that
+# never shows (QA 42497299487: an `entering` keyframe stuck at opacity 0 after the picker) still fails here.
+- extendedWaitUntil:
+    visible: 'Foto adjunta 1'
+    timeout: 10000
 - assertVisible: 'Quitar la foto 1'
 - tapOn:
     id: capture-note

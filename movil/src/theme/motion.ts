@@ -520,7 +520,6 @@ export const navLayout = {
 // Boards MovCaptura, MovHojas and MovMicro (diseno-movimiento/tableros): every value here is the
 // board's own, named after what it moves. (This block keeps its own imports so the shared header
 // above stays untouched by each motion area.)
-import { Keyframe } from 'react-native-reanimated';
 
 /** withSpring config of any spring token (not only the named `springs`), honouring reduced motion. */
 export function springWith(token: SpringToken): WithSpringConfig {
@@ -723,19 +722,6 @@ export const microMotion = {
 
 /** The design's curves as plain functions, for worklets that place things along a timeline (EASE_OUT, EASE_IN). */
 export const curves = { enter: easings.enter.factory(), exit: easings.exit.factory() } as const;
-
-/** `entering`/`exiting` builders for this block. */
-export const microLayout = {
-  /** A photo added to the capture pops in (MovCaptura `.entra`). */
-  thumbIn: () =>
-    new Keyframe({
-      0: { opacity: 0, transform: [{ scale: captureMotion.thumbFrom }] },
-      [captureMotion.thumbPeakAt]: { opacity: 1, transform: [{ scale: captureMotion.thumbOvershoot }], easing: easings.enter },
-      100: { opacity: 1, transform: [{ scale: 1 }], easing: easings.enter },
-    })
-      .duration(durations.base)
-      .reduceMotion(reduce()),
-};
 
 // ---------------------------------------------------------------- Tu turno and Notificaciones (MovTuTurno, MovNotificaciones)
 // Gustavo's phase 2 boards. Tu turno: a card resolved with its button shows a check, holds it, then
