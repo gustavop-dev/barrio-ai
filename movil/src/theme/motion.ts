@@ -401,7 +401,7 @@ export const officeLayout = {
 // badge). «Más tarde» first slides the card toward «Pospuestas». A swiped card has already left under
 // the finger and goes through the same gap and counters. Notificaciones: a new one opens its space at
 // the top, the bell sways and its dot pulses; «Marcar todo como leído» turns «Nueva» off in a cascade.
-import { withDelay, withTiming, type EntryAnimationsValues, type ExitAnimationsValues, type LayoutAnimation } from 'react-native-reanimated';
+import { type EntryAnimationsValues, type ExitAnimationsValues, type LayoutAnimation } from 'react-native-reanimated';  // withDelay/withTiming: top import
 
 /** MovTuTurno: the board's numbers and distances. */
 export const turnoMotion = {
