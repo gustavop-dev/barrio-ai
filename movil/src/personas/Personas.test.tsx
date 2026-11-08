@@ -96,6 +96,51 @@ describe('Personas · Barrio', () => {
     await waitFor(() => expect(query(server.find('GET', '/api/v1/red/contacts')[0]!).stage).toBe('opportunity'));
   });
 
+  it('keeps every letter typed in the search box while the URL catches up late (PRS-02)', async () => {
+    // Found by 14-fichas on the emulator: «Sof» became «S». The box writes ?q= after its pause; when the router took
+    // longer than the next letters to apply ?q=S, that older value came back and replaced what had been typed since.
+    fakeServer({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
+    const view = await renderApp(<PersonasScreen />);
+    await screen.findByTestId('person-c-1');
+    const lastQ = () => (jest.mocked(router.setParams).mock.calls.at(-1)?.[0] as { q?: string } | undefined)?.q;
+
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'S');
+    await waitFor(() => expect(lastQ()).toBe('S'));
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'So');
+    await waitFor(() => expect(lastQ()).toBe('So'));
+    // Only now does the router apply the first change, ?q=S, while the next letter is typed.
+    routerState.params = { q: 'S' };
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'Sof');
+    expect(screen.getByTestId('barrio-search').props.value).toBe('Sof');
+    await waitFor(() => expect(lastQ()).toBe('Sof'));
+    expect(screen.getByTestId('barrio-search').props.value).toBe('Sof');
+
+    // Once the router reaches «Sof», the earlier changes are spent: a later link back to ?q=S (Atrás, a push) wins.
+    routerState.params = { q: 'Sof' };
+    await act(async () => view.rerender(<PersonasScreen />));
+    expect(screen.getByTestId('barrio-search').props.value).toBe('Sof');
+    routerState.params = { q: 'S' };
+    await act(async () => view.rerender(<PersonasScreen />));
+    expect(screen.getByTestId('barrio-search').props.value).toBe('S');
+  });
+
+  it('keeps a letter typed in the instant the box applies its search (PRS-02)', async () => {
+    // The other race of 09 and 14 on the emulator: «zzzqa» became «zzz». The pause ended with «zzz», the box wrote
+    // ?q=zzz and a letter arrived in that same instant; the box took its own ?q=zzz for a new link and put it back.
+    await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
+    await screen.findByTestId('person-c-1');
+    const box = () => screen.getByTestId('barrio-search');
+    // The letter lands while ?q=zzz is being written, before the screen redraws.
+    jest.mocked(router.setParams).mockImplementationOnce(() => {
+      (box().props as { onChangeText: (text: string) => void }).onChangeText('zzzq');
+    });
+    await fireEvent.changeText(box(), 'zzz');
+    await waitFor(() => expect(router.setParams).toHaveBeenCalledWith(expect.objectContaining({ q: 'zzz' })));
+    expect(box().props.value).toBe('zzzq');
+    await waitFor(() => expect(router.setParams).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'zzzq' })));
+    expect(box().props.value).toBe('zzzq');
+  });
+
   it('searches by name and filters by role, modality and origin in a sheet', async () => {
     const server = await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
     await screen.findByTestId('person-c-1');

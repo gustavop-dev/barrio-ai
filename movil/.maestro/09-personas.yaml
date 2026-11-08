@@ -115,7 +115,13 @@ tags: [personas]
     text: "Comentó en un post de un referente · .*"
     childOf:
       id: person-547cd492-cd91-542a-976e-3a1f11029285
-# Pedro (contact:pedro-salazar) has no classification yet.
+# Pedro (contact:pedro-salazar) has no classification yet. The order of the rows follows their last activity, so the
+# list goes back to the top first and Pedro is looked for from there.
+- scrollUntilVisible:
+    element:
+      id: stage-chips
+    direction: UP
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: person-5ede725c-3221-5088-8e6d-334ca462e9b0
@@ -234,6 +240,12 @@ tags: [personas]
 - extendedWaitUntil:
     visible: "Pedro Salazar"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Pedro"
+    timeout: 5000
 - extendedWaitUntil:
     notVisible: "Laura Gómez"
     timeout: 10000
@@ -247,6 +259,12 @@ tags: [personas]
 - extendedWaitUntil:
     visible: "Nadie coincide con estos filtros"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "zzzqa"
+    timeout: 5000
 - takeScreenshot: 09-personas-10-sin-resultados
 - tapOn: "Quitar filtros"
 - extendedWaitUntil:
@@ -342,6 +360,12 @@ tags: [personas]
 - extendedWaitUntil:
     visible: "Laura Gómez"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Laura"
+    timeout: 5000
 - extendedWaitUntil:
     notVisible: "Pedro Salazar"
     timeout: 10000
