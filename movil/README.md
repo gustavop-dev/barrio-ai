@@ -137,8 +137,9 @@ La otra opción era `appVersion`, donde la `runtimeVersion` es el campo `version
 | Subir el SDK de Expo o la versión de React Native | APK nuevo |
 | Campos nativos de `app.json`: `plugins`, permisos, `android.*`, icono, splash, nombre, `scheme`, `updates`, `runtimeVersion` | APK nuevo |
 | La compilación en `eas.json` (perfiles, `env`, arquitecturas) y las credenciales, como FCM | APK nuevo |
+| Los `scripts` de `package.json` | No cambian el APK, pero sí el fingerprint: las OTA siguientes solo llegan a un APK nuevo |
 
-Si dudas, compara el hash del proyecto con el de un build:
+El hash no cambia con `version` de `app.json`, con el `versionCode` ni con `eas.json` (preset `balanced` de `@expo/fingerprint`). Si dudas, compara el hash del proyecto con el de un build:
 
 ```bash
 npx eas-cli@latest fingerprint:compare --build-id <id del build>
@@ -265,7 +266,7 @@ Desde aquí se le pasan el lint, el chequeo de tipos y las pruebas, y la PWA vue
 npm run typecheck    # tsc (movil + compartido)
 npm run lint         # eslint (movil + compartido)
 npm test             # jest: movil y compartido, con red y módulos nativos simulados
-npm test -- --coverage  # lo mismo con cobertura (V8) en coverage/: lcov-report/index.html
+npm run test:cobertura  # lo mismo con cobertura de movil y compartido en coverage/ (lcov-report/index.html)
 npm run export       # npx expo export --platform android: prueba que el paquete se construye
 npm run doctor       # npx expo-doctor (versión fija)
 npm run icons        # regenera iconos, splash y retratos desde oficina/public/brand

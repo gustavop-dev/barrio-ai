@@ -123,7 +123,7 @@ jobs:
           cache-dependency-path: movil/package-lock.json
       - if: steps.changes.outputs.movil == 'true'
         working-directory: movil
-        run: npm ci && npm run typecheck && npm run lint && npm test -- --ci --coverage && npx expo export --platform android --output-dir ../movil-export
+        run: npm ci && npm run typecheck && npm run lint && npm run test:cobertura -- --ci && npx expo export --platform android --output-dir ../movil-export
       - name: Cobertura
         if: ${{ !cancelled() && steps.changes.outputs.movil == 'true' }}
         run: |

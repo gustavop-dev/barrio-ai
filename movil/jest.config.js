@@ -21,16 +21,18 @@ const app = {
   restoreMocks: true,
 };
 
-// Coverage (`npm test -- --coverage`, always on in CI) is report-only: no thresholds.
+// Coverage (`npm run test:cobertura`, always in CI) is report-only: no thresholds.
 // compartido/ sits next to movil/, and Jest only measures files under the root config's rootDir:
 // the root is the repository and this app is its only project (same tests, same settings).
-// V8 coverage, because Babel's instrumenter (babel-jest) skips every file outside the directory
-// Jest runs from, movil/. It costs time: the suite takes about twice as long with --coverage.
+// Babel's instrumenter (babel-jest) also skips files outside the directory Jest runs from, so
+// `test:cobertura` runs Jest from the repository root, with EXPO_PROJECT_ROOT so Expo's Babel preset
+// still treats movil/ as the project. (V8 coverage avoids that but counts every source line, types
+// and comments included, and made the suite up to twice as slow.)
 module.exports = {
   rootDir: path.resolve(__dirname, '..'),
   projects: [app],
   testTimeout: 20_000,
-  coverageProvider: 'v8',
+  coverageProvider: 'babel',
   // Relative to the repository: movil/src and compartido/src, without tests, fixtures or helpers.
   collectCoverageFrom: [
     'movil/src/**/*.{ts,tsx}',
