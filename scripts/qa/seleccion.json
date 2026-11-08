@@ -1,0 +1,67 @@
+{
+  "todos": [
+    "compartido/**", "agentes-linkedin/**", "api/**", "scripts/qa/**",
+    ".github/workflows/qa-movil.yml", "**/seed_qa*",
+    "movil/src/components/**", "movil/src/theme/**", "movil/src/api/**",
+    "movil/src/auth/**", "movil/src/navigation.ts", "movil/src/app/**/_layout.tsx",
+    "movil/src/app/_layout.tsx", "movil/.maestro/comun/**"
+  ],
+  "ignorar": ["*.md", "**/*.md", "docs/**", "movil/diseno-movimiento/**"],
+  "areas": [
+    {
+      "rutas": ["movil/src/app/login.tsx", "movil/src/entrada/**"],
+      "flujos": ["01-*"],
+      "cubre": ["ACC-02", "ACC-10"]
+    },
+    {
+      "rutas": ["movil/src/capture/**"],
+      "flujos": ["05-*", "10-*"],
+      "cubre": ["CAP-*"]
+    },
+    {
+      "rutas": ["movil/src/calendario/**", "movil/src/app/(app)/(tabs)/calendario.tsx"],
+      "flujos": ["07-*"],
+      "cubre": ["CAL-*"]
+    },
+    {
+      "rutas": ["movil/src/pieza/**", "movil/src/app/(app)/calendario/pieza/**"],
+      "flujos": ["02-*", "05-captura-contexto", "07-*", "08-*"],
+      "cubre": ["CAL-06", "CAL-09", "CAL-12"]
+    },
+    {
+      "rutas": ["movil/src/scene/**", "movil/src/app/(app)/(tabs)/index.tsx"],
+      "flujos": ["01-*", "03-*"],
+      "cubre": ["OFI-*"]
+    },
+    {
+      "rutas": ["movil/src/turno/**", "movil/src/app/(app)/(tabs)/tu-turno.tsx"],
+      "flujos": ["04-*", "15-*"],
+      "cubre": ["TUR-*"]
+    },
+    {
+      "rutas": ["movil/src/notificaciones/**", "movil/src/app/(app)/(tabs)/notificaciones.tsx", "movil/src/push/**"],
+      "flujos": ["02-*", "06-*", "15-*"],
+      "cubre": ["NOT-*", "PUS-*"]
+    },
+    {
+      "rutas": ["movil/src/resultados/**", "movil/src/app/(app)/(tabs)/resultados.tsx"],
+      "flujos": ["08-*"],
+      "cubre": ["RES-*", "SEM-*"]
+    },
+    {
+      "rutas": ["movil/src/personas/**", "movil/src/app/(app)/(tabs)/personas.tsx", "movil/src/app/(app)/personas/**"],
+      "flujos": ["05-captura-contexto", "09-*", "12-*", "13-*", "14-*"],
+      "cubre": ["PRS-*", "BAR-*"]
+    },
+    {
+      "rutas": ["movil/src/galeria/**", "movil/src/app/(app)/(tabs)/galeria.tsx"],
+      "flujos": ["05-*", "10-*"],
+      "cubre": ["GAL-*"]
+    },
+    {
+      "rutas": ["movil/src/ajustes/**", "movil/src/app/(app)/(tabs)/ajustes.tsx"],
+      "flujos": ["11-*", "15-*"],
+      "cubre": ["AJU-*"]
+    }
+  ]
+}
