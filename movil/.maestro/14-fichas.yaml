@@ -256,6 +256,8 @@ tags: [personas, fichas]
 - tapOn:
     id: confirm-note
 - inputText: "No trabaja en producto"
+# What Gustavo sees while typing: the reason and the sheet's buttons above the keyboard.
+- takeScreenshot: 14-fichas-08b-motivo-con-teclado
 - hideKeyboard
 - tapOn:
     text: "Descartar"

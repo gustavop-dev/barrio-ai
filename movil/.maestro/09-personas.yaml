@@ -416,6 +416,10 @@ tags: [personas]
 - tapOn:
     id: note-text
 - inputText: "Nota de QA sobre su marketplace B2B"
+# The note being written stays above the keyboard (the card scrolls it into view).
+- assertVisible:
+    id: note-text
+- takeScreenshot: 09-personas-17b-nota-con-teclado
 - hideKeyboard
 - scrollUntilVisible:
     element:

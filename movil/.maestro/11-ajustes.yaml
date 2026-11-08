@@ -52,6 +52,8 @@ tags: [ajustes]
 - tapOn:
     id: confirm-note
 - inputText: "Pausa de QA para revisar los topes"
+# What Gustavo sees while typing: the reason and the sheet's buttons above the keyboard.
+- takeScreenshot: 11-ajustes-02b-motivo-con-teclado
 - hideKeyboard
 - takeScreenshot: 11-ajustes-02-parada-motivo
 # The first try fails (failure switch, comun/qa-fallo.js): the sheet stays open with the reason; the second goes through.
