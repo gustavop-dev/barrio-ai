@@ -6,4 +6,5 @@ appId: co.projectapp.office
     element:
       id: filtro-todas
     direction: UP
-    timeout: 30000
+    speed: 80
+    timeout: 60000

@@ -10,7 +10,7 @@ tags: [galeria]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: tab-galeria
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: screen-galeria
@@ -156,6 +156,17 @@ tags: [galeria]
     start: "85%, 50%"
     end: "15%, 50%"
     duration: 400
+# The viewer may still be opening when the first swipe lands: one more swipe if it did not turn.
+- runFlow:
+    when:
+      visible:
+        id: photo-viewer-count
+        text: 1 de 4
+    commands:
+      - swipe:
+          start: "85%, 50%"
+          end: "15%, 50%"
+          duration: 400
 - extendedWaitUntil:
     visible:
       id: photo-viewer-count

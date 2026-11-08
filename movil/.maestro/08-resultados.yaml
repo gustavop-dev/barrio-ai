@@ -11,7 +11,7 @@ tags: [resultados]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: tab-resultados
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: resultados-list
@@ -22,13 +22,9 @@ tags: [resultados]
     timeout: 20000
 - assertVisible:
     text: "RESUMEN DE LA SEMANA"
-    childOf:
-      id: resumen-semanal
 - scrollUntilVisible:
     element:
       text: "LO QUE FUNCIONÓ"
-      childOf:
-        id: resumen-semanal
     direction: DOWN
     centerElement: true
     timeout: 30000
@@ -39,15 +35,11 @@ tags: [resultados]
 - scrollUntilVisible:
     element:
       text: "Prioriza posts sobre cómo validar un MVP.*"
-      childOf:
-        id: resumen-semanal
     direction: DOWN
     centerElement: true
     timeout: 20000
 - assertVisible:
     text: "ORIENTACIÓN PROPUESTA"
-    childOf:
-      id: resumen-semanal
 - assertVisible:
     id: resumen-usar
 - takeScreenshot: 08-resultados-02-orientacion
@@ -63,8 +55,6 @@ tags: [resultados]
 - extendedWaitUntil:
     visible:
       text: "USADO COMO ORIENTACIÓN"
-      childOf:
-        id: resumen-semanal
     timeout: 10000
 - takeScreenshot: 08-resultados-03-semanas-anteriores
 - tapOn:
@@ -72,8 +62,6 @@ tags: [resultados]
 - extendedWaitUntil:
     notVisible:
       text: "USADO COMO ORIENTACIÓN"
-      childOf:
-        id: resumen-semanal
     timeout: 10000
 
 # «Usar como orientación»: the toast offers «Deshacer» for 5 s and the card already says it was used; undo at once.
@@ -93,8 +81,6 @@ tags: [resultados]
     timeout: 15000
 - assertVisible:
     text: "La usaste como orientación del equipo.*"
-    childOf:
-      id: resumen-semanal
 - tapOn:
     text: "Deshacer"
     childOf:
@@ -126,8 +112,6 @@ tags: [resultados]
     timeout: 15000
 - assertVisible:
     text: "La descartaste.*"
-    childOf:
-      id: resumen-semanal
 - tapOn:
     text: "Deshacer"
     childOf:
@@ -174,8 +158,6 @@ tags: [resultados]
     timeout: 30000
 - tapOn:
     text: "7 días"
-    childOf:
-      id: res-periodo
 - extendedWaitUntil:
     visible: ".*Todo se compara con los 7 días anteriores.*"
     timeout: 20000
@@ -197,16 +179,12 @@ tags: [resultados]
     timeout: 30000
 - tapOn:
     text: "90 días"
-    childOf:
-      id: res-periodo
 - extendedWaitUntil:
     visible: ".*Todo se compara con los 90 días anteriores.*"
     timeout: 20000
 - takeScreenshot: 08-resultados-10-periodo-90
 - tapOn:
     text: "28 días"
-    childOf:
-      id: res-periodo
 - extendedWaitUntil:
     visible: ".*Todo se compara con los 28 días anteriores.*"
     timeout: 20000

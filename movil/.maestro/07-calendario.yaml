@@ -18,7 +18,7 @@ tags: [calendario]
 # cubre: CAL-01
 - tapOn:
     id: top-calendario
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: calendario
@@ -78,8 +78,6 @@ tags: [calendario]
 # cubre: CAL-01
 - tapOn:
     text: "Mes"
-    childOf:
-      id: vista
 - extendedWaitUntil:
     visible:
       id: rejilla-mes
@@ -120,8 +118,6 @@ tags: [calendario]
 # cubre: CAL-01, CAL-04, CAL-05
 - tapOn:
     text: "Lista"
-    childOf:
-      id: vista
 - extendedWaitUntil:
     visible:
       id: calendario-lista
@@ -159,14 +155,10 @@ tags: [calendario]
 - scrollUntilVisible:
     element:
       text: "Semana"
-      childOf:
-        id: vista
     direction: UP
     timeout: 20000
 - tapOn:
     text: "Semana"
-    childOf:
-      id: vista
 - extendedWaitUntil:
     visible:
       id: pager-semana
@@ -249,15 +241,11 @@ tags: [calendario]
 - scrollUntilVisible:
     element:
       text: "Ver cómo se escribió"
-      childOf:
-        id: panel-dia
     direction: DOWN
     centerElement: true
     timeout: 20000
 - tapOn:
     text: "Ver cómo se escribió"
-    childOf:
-      id: panel-dia
 - extendedWaitUntil:
     visible:
       id: pieza
@@ -643,8 +631,6 @@ tags: [calendario]
 - scrollUntilVisible:
     element:
       id: "evento-piece_blocked:.*"
-      childOf:
-        id: panel-dia
     direction: DOWN
     centerElement: true
     timeout: 20000

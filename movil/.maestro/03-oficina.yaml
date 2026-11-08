@@ -36,7 +36,7 @@ tags: [oficina]
 - tapOn:
     id: office-scene
     point: "1059,480"
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: office-panel
@@ -85,7 +85,7 @@ tags: [oficina]
 # cubre: OFI-04
 - tapOn:
     id: team-chip-estrategia
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: office-panel
@@ -148,7 +148,7 @@ tags: [oficina]
           duration: 400
 - tapOn:
     id: team-chip-biblioteca
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: office-panel

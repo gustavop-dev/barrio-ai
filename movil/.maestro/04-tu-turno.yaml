@@ -25,7 +25,7 @@ tags: [turno]
     timeout: 30000
 - tapOn:
     id: top-tu-turno
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: turno-list

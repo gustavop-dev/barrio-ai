@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Runs inside reactivecircus/android-emulator-runner (.github/workflows/qa-movil.yml): installs the QA APK, sizes the
-# screen to 390x844 dp, and runs the Maestro flows of this emulator job (QA_FLOWS, names separated by spaces; all of
+# Runs inside reactivecircus/android-emulator-runner (.github/workflows/qa-movil.yml): installs the QA APK on the
+# 390x844 dp emulator (the workflow defines it at that size), and runs the Maestro flows of this emulator job (QA_FLOWS, names separated by spaces; all of
 # movil/.maestro when empty) one by one. Before each flow the backend is re-seeded (seed_qa), so a flow never depends
 # on what another one changed. Each flow gets a screen recording, its JUnit report and Maestro's own output; files
 # shared by the job carry its number (QA_SHARD) so several jobs merge into one report. It always exits 0:
@@ -21,9 +21,6 @@ mkdir -p "$OUT"/capturas/fallos "$OUT"/videos "$OUT"/junit "$OUT"/maestro "$OUT"
 log() { echo "[qa] $*"; }
 
 adb wait-for-device
-# The design boards are 390x844 dp: 1170x2532 px at 480 dpi (3x) on the emulator's pixel_6 panel.
-adb shell wm size 1170x2532
-adb shell wm density 480
 adb shell svc power stayon true
 adb shell settings put system screen_off_timeout 1800000
 # Same zone as the backend (America/Bogota), so «hoy» and «mañana» match on both sides.
@@ -33,12 +30,10 @@ adb shell cmd alarm set-timezone America/Bogota > /dev/null 2>&1 || true
 adb shell date
 log "pantalla: $(adb shell wm size | tr -d '\r' | tail -n1) · $(adb shell wm density | tr -d '\r' | tail -n1)"
 
-# Resizing the screen makes the launcher relayout on the software GPU, and it hangs: «Pixel Launcher isn't
-# responding» then covers the app for the whole run. System error dialogs are hidden (crashes of the app are read
-# from logcat, not from a dialog), the launcher restarts fresh, and any dialog left is dismissed before the first flow.
+# A cold, software-rendered emulator can leave «Pixel Launcher isn't responding» over the app. System error dialogs
+# are hidden (crashes of the app are read from logcat, not from a dialog), and any dialog left is dismissed.
 adb shell settings put global hide_error_dialogs 1
 adb shell settings put global anr_show_background 0
-adb shell am force-stop com.google.android.apps.nexuslauncher > /dev/null 2>&1 || true
 settle_system() {
   for _ in $(seq 1 12); do
     if adb shell dumpsys window 2> /dev/null | grep -qiE "mCurrentFocus=.*(Application Not Responding|not responding)"; then
@@ -105,7 +100,8 @@ for flow in $selected; do
   (cd "$INFRA" && uv run python manage.py seed_qa >> "$OUT/seed-$SHARD.log" 2>&1) || log "seed_qa falló antes de $name"
   record_start "$name"
   start=$(date +%s)
-  maestro test "$flow" \
+  # A hard cap per flow: a hung flow fails with its screenshot and the job goes on to the next one.
+  timeout --kill-after=30 "${QA_FLOW_TIMEOUT:-480}" maestro test "$flow" \
     --format junit --output "$OUT/junit/$name.xml" \
     --test-output-dir "$OUT/maestro/$name" \
     --debug-output "$OUT/maestro/$name/debug" --flatten-debug-output \
@@ -113,6 +109,10 @@ for flow in $selected; do
     > "$OUT/maestro/$name.log" 2>&1
   code=$?
   end=$(date +%s)
+  if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then
+    echo "TIMEOUT: el flujo superó ${QA_FLOW_TIMEOUT:-480} s y se cortó" >> "$OUT/maestro/$name.log"
+    adb exec-out screencap -p > "$OUT/capturas/fallos/$name--tiempo-agotado.png" 2> /dev/null || true
+  fi
   record_stop "$name"
   log "flujo $name: código $code en $((end - start)) s"
   echo "$name $code $((end - start))" >> "$OUT/flujos-$SHARD.txt"

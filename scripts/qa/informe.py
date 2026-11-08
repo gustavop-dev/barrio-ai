@@ -46,6 +46,8 @@ def read_flows(out):
                             flow['failure'] = (node.get('message') or node.text or '').strip()
             except ET.ParseError:
                 pass
+        if flow['code'] in (124, 137):
+            flow['failure'] = f"Tiempo agotado: el flujo superó {os.environ.get('QA_FLOW_TIMEOUT', '480')} s y se cortó"
         if flow['code'] != 0 and not flow['failure']:
             log = out / 'maestro' / f"{flow['name']}.log"
             if log.exists():

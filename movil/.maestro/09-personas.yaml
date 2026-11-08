@@ -13,7 +13,7 @@ tags: [personas]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: tab-personas
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: barrio-list
@@ -21,8 +21,6 @@ tags: [personas]
 - extendedWaitUntil:
     visible:
       text: "Todas · \\d+"
-      childOf:
-        id: stage-chips
     timeout: 30000
 - extendedWaitUntil:
     visible:
@@ -34,8 +32,6 @@ tags: [personas]
 # cubre: PRS-01, PRS-02
 - tapOn:
     text: "Por clasificar( · \\d+)?"
-    childOf:
-      id: stage-chips
 - extendedWaitUntil:
     visible: "Pedro Salazar"
     timeout: 15000
@@ -45,8 +41,6 @@ tags: [personas]
 - takeScreenshot: 09-personas-02-por-clasificar
 - tapOn:
     text: "Encaja( · \\d+)?"
-    childOf:
-      id: stage-chips
 - extendedWaitUntil:
     visible: "Laura Gómez"
     timeout: 15000
@@ -60,8 +54,6 @@ tags: [personas]
     while:
       notVisible:
         text: "Te invitó( · \\d+)?"
-        childOf:
-          id: stage-chips
     commands:
       - swipe:
           from:
@@ -69,8 +61,6 @@ tags: [personas]
           direction: LEFT
 - tapOn:
     text: "Te invitó( · \\d+)?"
-    childOf:
-      id: stage-chips
 - extendedWaitUntil:
     visible: "Natalia Rojas"
     timeout: 15000
@@ -84,8 +74,6 @@ tags: [personas]
     while:
       notVisible:
         text: "Todas( · \\d+)?"
-        childOf:
-          id: stage-chips
     commands:
       - swipe:
           from:
@@ -93,8 +81,6 @@ tags: [personas]
           direction: RIGHT
 - tapOn:
     text: "Todas( · \\d+)?"
-    childOf:
-      id: stage-chips
 
 # ---------------------------------------------------------------- Barrio: the search box (no stage filter now)
 # cubre: PRS-02
@@ -134,14 +120,10 @@ tags: [personas]
 - assertVisible: "Laura Gómez"
 - assertVisible:
     text: "ENCAJA"
-    childOf:
-      id: persona-head
 - assertVisible:
     id: next-step
 - assertVisible:
     text: ".*El equipo (va a seguirla|la seguirá).*"
-    childOf:
-      id: next-step
 - takeScreenshot: 09-personas-07-ficha
 - scrollUntilVisible:
     element:

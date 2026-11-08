@@ -10,7 +10,7 @@ tags: [ajustes]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: top-ajustes
-    waitToSettleTimeoutMs: 2000
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: screen-ajustes

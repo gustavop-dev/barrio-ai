@@ -48,7 +48,8 @@ jobs:
 
   apk:
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # A warm cache finishes in seconds; a cold build of the whole app takes about 17 minutes.
+    timeout-minutes: 40
     outputs:
       key: ${{ steps.apk.outputs.cache-primary-key }}
     steps:
@@ -108,7 +109,8 @@ jobs:
   flujos:
     needs: [plan, apk]
     runs-on: ubuntu-24.04
-    timeout-minutes: 60
+    # Setup takes about 5 minutes and each flow is cut at QA_FLOW_TIMEOUT (8 minutes): a hang can't hold the run.
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matriz) }}
@@ -144,6 +146,7 @@ jobs:
       INFRA_DIR: ${{ github.workspace }}/agentes-linkedin/infra
       QA_SHARD: ${{ matrix.shard }}
       QA_FLOWS: ${{ matrix.flujos }}
+      QA_FLOW_TIMEOUT: '480'
     steps:
       - uses: actions/checkout@v4
 
@@ -209,17 +212,28 @@ jobs:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ env.API_LEVEL }}-x86_64-pixel_6-c3-v2
-      - name: AVD · create it and save a snapshot
+          key: avd-${{ env.API_LEVEL }}-x86_64-390x844dp-320dpi-v3
+      # The phone is defined at the design boards' size, 390x844 dp (780x1688 px at 320 dpi), instead of resizing a
+      # pixel_6 after boot: a resize makes the launcher hang, and 2x instead of 3x halves the software rendering work.
+      - name: AVD · define a 390x844 dp phone
+        if: steps.avd.outputs.cache-hit != 'true'
+        run: |
+          image="system-images;android-$API_LEVEL;google_apis;x86_64"
+          sdk="$ANDROID_HOME/cmdline-tools/latest/bin"
+          yes | "$sdk/sdkmanager" --install "$image" emulator platform-tools > /dev/null
+          echo no | "$sdk/avdmanager" create avd --force -n test -k "$image" -d pixel_6
+          cfg="$HOME/.android/avd/test.avd/config.ini"
+          sed -i -E '/^(hw\.lcd\.(width|height|density)|skin\.(name|path)|hw\.cpu\.ncore|hw\.ramSize)=/d' "$cfg"
+          printf '%s\n' hw.lcd.width=780 hw.lcd.height=1688 hw.lcd.density=320 skin.name=780x1688 skin.path=_no_skin \
+            hw.cpu.ncore=3 hw.ramSize=4096 >> "$cfg"
+          grep -E '^(hw\.lcd|skin\.|hw\.cpu|hw\.ramSize)' "$cfg"
+      - name: AVD · boot it once and save a snapshot
         if: steps.avd.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: ${{ env.API_LEVEL }}
           target: google_apis
           arch: x86_64
-          profile: pixel_6
-          cores: 3
-          ram-size: 4096M
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
@@ -240,9 +254,6 @@ jobs:
           api-level: ${{ env.API_LEVEL }}
           target: google_apis
           arch: x86_64
-          profile: pixel_6
-          cores: 3
-          ram-size: 4096M
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
@@ -260,7 +271,7 @@ jobs:
     needs: [plan, flujos]
     if: ${{ !cancelled() }}
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
       pull-requests: write

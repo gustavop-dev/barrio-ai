@@ -12,7 +12,7 @@ El workflow tiene cuatro jobs:
    - Un push que solo cambia flujos, `seed_qa` o los scripts no vuelve a compilar: el job termina en segundos.
 3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
    - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
-   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. La pantalla queda en **390×844 dp** (1170×2532 px a 480 dpi), el tamaño de los tableros de `diseno-movimiento/`, con las animaciones activadas.
+   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`, con las animaciones activadas. Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
    - **Flujos:** `scripts/qa/correr-maestro.sh` corre sus flujos uno a uno y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
 4. **`qa`** junta los artefactos de todos los emuladores. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR (con las funciones del catálogo que cubre cada flujo) e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
 
@@ -54,7 +54,7 @@ Descarga el artefacto `qa-movil-<n>` en `qa-descargas/<run id>/`:
 |---|---|
 | `resumen.md` | flujos que pasan y fallan, si hubo crash, errores de JS, respuestas 5xx o 429 de la API |
 | `informe.html` | el informe navegable: tabla de flujos con el motivo del fallo y, por flujo, sus capturas y su video |
-| `capturas/NN-pantalla-SS-paso.png` | una captura por paso relevante, a 1170×2532 (3× los tableros de 390×844) |
+| `capturas/NN-pantalla-SS-paso.png` | una captura por paso relevante, a 780×1688 (2× los tableros de 390×844) |
 | `capturas/fallos/` | la captura que Maestro toma al fallar un paso, con el nombre del flujo delante |
 | `videos/NN-flujo-parteK.mp4` | la grabación de la pantalla de cada flujo, en partes de menos de 3 minutos |
 | `junit/NN-flujo.xml` | el informe JUnit de Maestro de cada flujo |
