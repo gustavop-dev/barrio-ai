@@ -269,6 +269,30 @@ Se mantiene la adaptación de quietud de la app, evitando dejar a un personaje e
 suspendido al congelar el reloj. La velocidad de demostración y «Simular un envío» no se añaden a
 la app: el envío real es su disparador.
 
+## Navegación, Entrada y Detalle (MovNavegacion, MovEntrada, MovDetalle)
+
+Grupos propios en `motion.ts`: `navSprings`, `navTimings`, `navValues`, `navGestures` y `entrada`, con `navSpring()`, `navTiming()`, `crossfade()` y `navLayout`. `BEZIER` da los puntos de control de `easings.enter` y `easings.exit` al `Animated` de React Native (las escenas de las pestañas). No hay vibraciones nuevas: el cambio de pestaña usa `tabChange`.
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `navSprings.pill` | FIRM | La píldora de la barra inferior se desliza a la pestaña tocada (`components/shell/BottomBar.tsx`). Sin pestaña inferior activa (Tu turno, Notificaciones, Calendario, Ajustes) se oculta. |
+| `navSprings.tabIcon` / `navValues.tabIconFrom` | SOFT · 0.92 | El icono de la pestaña nueva salta a 0.92 y vuelve a 1 (`BottomBar.tsx`). |
+| `navTimings.tabIn` / `navValues.tabRise` | 180 (fast) · enter · 8 pt | El contenido de la pestaña nueva aparece y sube 8 pt; la barra superior queda quieta (`components/shell/tabTransitions.ts`, en `app/(app)/(tabs)/_layout.tsx`). |
+| `navTimings.tabOut` | 108 (60 % de fast) · exit | El contenido de la pestaña anterior se desvanece. |
+| `navSprings.push` | FIRM | El push: una pantalla de detalle (pieza, persona) entra desde la derecha y vuelve con «‹», el botón atrás de Android o cualquier navegación que la quite (`components/shell/DetailScreen.tsx`, `components/shell/push.ts`). También abre las pantallas de los iconos de arriba (`tabTransitions.ts`). |
+| `navValues.pushParallax` / `pushDim` | 0.3 · 0.08 | La pantalla de debajo se mueve a la izquierda el 30 % del ancho y se oscurece con tinta al 8 % (`push.ts`, `(tabs)/_layout.tsx`). Con movimiento reducido solo se oscurece. |
+| `navGestures.edgeWidth` | 24 pt | Franja del borde izquierdo de un detalle (bajo la barra superior) que lo arrastra hacia atrás (`DetailScreen.tsx`). |
+| `navGestures.grabFrom` | 0.5 | La franja solo agarra un detalle que está al menos a medio entrar. |
+| `navGestures.stayOpen` / `velocityProjection` | 0.6 · 0.25 | Al soltar, el progreso se proyecta con la velocidad (`progreso − vx[pt/ms] · 0.25`): por debajo de 0.6 el detalle se va, si no vuelve a su sitio (`push.ts › edgeRelease`). |
+| `navSprings.flight` | FIRM | Personas › Barrio: el retrato y el nombre viajan de la fila a la cabecera de la ficha y de vuelta (`components/shell/flight.tsx`, `personas/Barrio.tsx`, `personas/PersonaScreen.tsx`). |
+| `navTimings.cardBlock` / `navValues.cardBlockRise` | 180 (fast) · enter · 8 pt | El resto de la ficha entra escalonado en cuatro bloques (`navLayout.cardBlock`, en `PersonaScreen.tsx`). |
+| `navValues.cardBlockDelayMs` / `cardBlockStepMs` | 120 · 30 ms | Retraso del primer bloque y de cada siguiente. |
+| `entrada.leafHalf` / `leafOpen` / `leafStepMs` | 0.5 · 0.125 · 80 ms | Entrada: la hoja de la puerta se pliega sobre su bisagra en dos saltos (`entrada/useEntrada.ts`, `entrada/PixelDoor.tsx`). |
+| `entrada.zoom2Ms` / `zoom2` · `zoom3Ms` / `zoom3` | 160 ms · 2× · 310 ms · 3× | La imagen del login salta a 2× y a 3× sobre la puerta, con píxeles nítidos (Skia, vecino más cercano). |
+| `navTimings.entradaCut` | 0 | La puerta y el zoom saltan, nunca se interpolan. |
+| `entrada.formOutMs` / `formDrop` · `navTimings.entradaFormOut` | 160 ms · 16 pt · 180 (fast) · exit | El formulario baja y se va con el lema (`app/login.tsx`). |
+| `entrada.fadeMs` · `navTimings.entradaFade` | 460 ms · 260 (base) · enter | El login se funde con la Oficina viva, que ya está montada debajo. Con movimiento reducido es lo único que pasa (`crossfade()`). |
+
 ## Captura, hojas y microinteracciones (MovCaptura, MovHojas, MovMicro)
 
 Los valores salen del código de los tableros `MovCaptura`, `MovHojas` y `MovMicro`. Los grupos viven al final de `motion.ts`: `sheetMotion`, `captureMotion`, `captureTimeline`, `microMotion`, `microLayout` y `curves`, con los ayudantes `springWith()`, `timingWith()` y `timelineWith()`.

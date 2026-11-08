@@ -1,29 +1,50 @@
 // Login, as Main.dc.html: the office hero on tinta, then the Django username and password. It asks
 // for a device token (POST /api/v1/auth/token) that SecureStore keeps; no cookies.
+//
+// After a successful login comes the entrance of MovEntrada (src/entrada): the app is put under this
+// screen (a transparent modal of the root stack), the pixel door opens, the picture zooms in integer
+// steps, and the login fades into the live Oficina before it leaves the stack.
 import { ApiError } from '@compartido/api/client';
-import { Redirect } from 'expo-router';
-import { useEffect, useRef, useState, type ComponentRef } from 'react';
-import { Image, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Redirect, router, useNavigation } from 'expo-router';
+import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
+import { Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LOCK_MS, PROBLEM_TEXT, problemOf } from '@/auth/loginProblems';
 import { useSession } from '@/auth/session';
 import { Icon } from '@/components/icons';
 import { Button, Field, T, errorMessage } from '@/components/ui';
+import { PixelDoor } from '@/entrada/PixelDoor';
+import { useEntrada } from '@/entrada/useEntrada';
+import { entrada as entradaMotion, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
-import HERO from '../../assets/brand/login-oficina-tarde.png';
 import LOGO from '../../assets/brand/logo-inverso.png';
 
+const HERO_LABEL = 'La oficina de 0ff1ce de tarde: la biblioteca con su bibliotecario, la entrada con Operación y la cocina';
 
 export default function Login() {
   const session = useSession();
+  const navigation = useNavigation();
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const { reduced } = useMotion();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<unknown>(null);
   const [locked, setLocked] = useState(false);
+  const [entering, setEntering] = useState(false);
   const passRef = useRef<ComponentRef<typeof TextInput>>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const opened = useRef(false);
+
+  /** The login has faded into the Oficina: it leaves the stack. */
+  const finish = useCallback(() => {
+    if (navigation.canGoBack()) navigation.goBack();
+    else router.replace('/');
+  }, [navigation]);
+  const { door, leaving, shown, running, start } = useEntrada({ reduced, onDone: finish });
 
   useEffect(() => {
     if (!locked) return;
@@ -31,112 +52,128 @@ export default function Login() {
     return () => clearTimeout(timer);
   }, [locked]);
 
-  if (session.status === 'dentro' && !sending) return <Redirect href="/" />;
+  // Once the session is open, the app goes under the login (the same login route stays on top), and the door opens.
+  useEffect(() => {
+    if (!entering || session.status !== 'dentro' || opened.current) return;
+    opened.current = true;
+    const state = navigation.getState();
+    const me = state?.routes[state.index];
+    if (!me) {
+      router.replace('/');
+      return;
+    }
+    navigation.dispatch({ type: 'RESET', payload: { index: 1, routes: [{ name: '(app)' }, me] } });
+    start();
+  }, [entering, session.status, navigation, start]);
+
+  const screenStyle = useAnimatedStyle(() => ({ opacity: shown.value }));
+  const brandStyle = useAnimatedStyle(() => ({ opacity: 1 - leaving.value }));
+  const formStyle = useAnimatedStyle(() => ({ opacity: 1 - leaving.value, transform: [{ translateY: entradaMotion.formDrop * leaving.value }] }));
+
+  if (session.status === 'dentro' && !sending && !entering) return <Redirect href="/" />;
 
   const problem = problemOf(error);
   const submit = async () => {
-    if (sending || locked || !username.trim() || !password) return;
+    if (sending || locked || entering || !username.trim() || !password) return;
     setSending(true);
     setError(null);
     try {
       await session.login(username, password);
-      setPassword('');
+      Keyboard.dismiss();
+      scrollRef.current?.scrollTo({ y: 0, animated: !reduced });
+      setEntering(true);
     } catch (caught) {
       setError(caught);
       if (caught instanceof ApiError && caught.status === 429) setLocked(true);
-    } finally {
       setSending(false);
     }
   };
 
   return (
-    <KeyboardAvoidingView style={styles.screen} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom + space[6] }]} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero}>
-          <Image
-            source={HERO}
-            style={styles.heroImage}
-            resizeMode="cover"
-            accessibilityLabel="La oficina de 0ff1ce de tarde: la biblioteca con su bibliotecario, la entrada con Operación y la cocina"
-          />
-          <View style={styles.brand}>
-            <Image source={LOGO} style={styles.logo} resizeMode="contain" accessibilityLabel="0ff1ce" />
-            <T color={colors.paper}>La oficina de agentes de IA que trabaja tu LinkedIn.</T>
+    <Animated.View style={[styles.screen, screenStyle]} pointerEvents={running ? 'none' : 'auto'} testID="login">
+      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <ScrollView ref={scrollRef} contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom + space[6] }]} keyboardShouldPersistTaps="handled">
+          <View style={styles.hero}>
+            <PixelDoor width={width} door={door} accessibilityLabel={HERO_LABEL} />
+            <Animated.View style={[styles.brand, brandStyle]}>
+              <Image source={LOGO} style={styles.logo} resizeMode="contain" accessibilityLabel="0ff1ce" />
+              <T color={colors.paper}>La oficina de agentes de IA que trabaja tu LinkedIn.</T>
+            </Animated.View>
           </View>
-        </View>
-        <View style={styles.form}>
-          <View style={styles.head}>
-            <T variant="titulo" accessibilityRole="header">
-              Entrar
-            </T>
-            <T soft>Usa tu usuario y contraseña de Django.</T>
-          </View>
-          {problem ? (
-            <View style={[styles.alert, problem === 'too-many' ? styles.alertWarn : null]} accessibilityRole="alert" accessibilityLiveRegion="assertive">
-              <T color={problem === 'too-many' ? colors.ink : colors.alert}>{problem === 'other' ? errorMessage(error) : PROBLEM_TEXT[problem]}</T>
+          <Animated.View style={[styles.form, formStyle]}>
+            <View style={styles.head}>
+              <T variant="titulo" accessibilityRole="header">
+                Entrar
+              </T>
+              <T soft>Usa tu usuario y contraseña de Django.</T>
             </View>
-          ) : null}
-          <Field
-            label="Usuario"
-            value={username}
-            onChangeText={setUsername}
-            autoCapitalize="none"
-            autoCorrect={false}
-            autoComplete="username"
-            textContentType="username"
-            returnKeyType="next"
-            onSubmitEditing={() => passRef.current?.focus()}
-            testID="login-usuario"
-          />
-          <View>
+            {problem ? (
+              <View style={[styles.alert, problem === 'too-many' ? styles.alertWarn : null]} accessibilityRole="alert" accessibilityLiveRegion="assertive">
+                <T color={problem === 'too-many' ? colors.ink : colors.alert}>{problem === 'other' ? errorMessage(error) : PROBLEM_TEXT[problem]}</T>
+              </View>
+            ) : null}
             <Field
-              ref={passRef}
-              label="Contraseña"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
+              label="Usuario"
+              value={username}
+              onChangeText={setUsername}
               autoCapitalize="none"
               autoCorrect={false}
-              autoComplete="current-password"
-              textContentType="password"
-              returnKeyType="go"
-              onSubmitEditing={() => void submit()}
-              testID="login-clave"
+              autoComplete="username"
+              textContentType="username"
+              returnKeyType="next"
+              onSubmitEditing={() => passRef.current?.focus()}
+              testID="login-usuario"
             />
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={showPassword ? 'Ocultar la contraseña' : 'Mostrar la contraseña'}
-              onPress={() => setShowPassword((value) => !value)}
-              style={styles.eye}
+            <View>
+              <Field
+                ref={passRef}
+                label="Contraseña"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                autoCapitalize="none"
+                autoCorrect={false}
+                autoComplete="current-password"
+                textContentType="password"
+                returnKeyType="go"
+                onSubmitEditing={() => void submit()}
+                testID="login-clave"
+              />
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={showPassword ? 'Ocultar la contraseña' : 'Mostrar la contraseña'}
+                onPress={() => setShowPassword((value) => !value)}
+                style={styles.eye}
+              >
+                <Icon name={showPassword ? 'eyeOff' : 'eye'} color={colors.inkSoft} />
+              </Pressable>
+            </View>
+            <Button
+              variant="primary"
+              block
+              disabled={!username.trim() || !password || locked}
+              loading={sending}
+              loadingLabel="Entrando…"
+              onPress={() => void submit()}
+              testID="login-entrar"
             >
-              <Icon name={showPassword ? 'eyeOff' : 'eye'} color={colors.inkSoft} />
-            </Pressable>
-          </View>
-          <Button
-            variant="primary"
-            block
-            disabled={!username.trim() || !password || locked}
-            loading={sending}
-            loadingLabel="Entrando…"
-            onPress={() => void submit()}
-            testID="login-entrar"
-          >
-            Entrar
-          </Button>
-          <T variant="detalle" soft center>
-            Este teléfono queda como un dispositivo de tu cuenta. Puedes cerrarlo desde Ajustes.
-          </T>
-        </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+              Entrar
+            </Button>
+            <T variant="detalle" soft center>
+              Este teléfono queda como un dispositivo de tu cuenta. Puedes cerrarlo desde Ajustes.
+            </T>
+          </Animated.View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.paper },
+  fill: { flex: 1 },
   content: { flexGrow: 1 },
   hero: { backgroundColor: colors.ink },
-  heroImage: { width: '100%', aspectRatio: 384 / 224 },
   brand: { padding: space[4], gap: space[2] },
   logo: { width: 120, height: 34 },
   form: { padding: shell.gutter, gap: space[4] },
