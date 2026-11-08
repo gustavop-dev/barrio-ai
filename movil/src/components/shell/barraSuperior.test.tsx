@@ -144,12 +144,19 @@ function rootStackNames(): string[] {
 
 const pathOf = (name: string) => (name === 'index' ? '/' : `/${name}`);
 
+/** A view's style as applied now: its props, with what Reanimated applied under Jest on top (`jestAnimatedStyle`). */
+function liveStyle(node: TestInstance): { opacity?: unknown; transform?: unknown } {
+  const style = StyleSheet.flatten(node.props.style) ?? {};
+  const live = (node.props.jestAnimatedStyle as { value?: Record<string, unknown> } | undefined)?.value ?? {};
+  return { ...style, ...live };
+}
+
 /** The opacity and horizontal offset an element ends up with, through its own style and every ancestor's. */
 function appliedFrame(element: TestInstance): { opacity: number; translateX: number } {
   let opacity = 1;
   let translateX = 0;
   for (let node: TestInstance | null = element; node; node = node.parent) {
-    const style = (StyleSheet.flatten(node.props.style) ?? {}) as { opacity?: unknown; transform?: unknown };
+    const style = liveStyle(node);
     if (typeof style.opacity === 'number') opacity *= style.opacity;
     if (Array.isArray(style.transform)) {
       for (const step of style.transform as Record<string, unknown>[]) {
