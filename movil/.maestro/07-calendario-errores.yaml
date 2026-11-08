@@ -1,0 +1,248 @@
+# cubre: CAL-01, CAL-03, CAL-04, CAL-05, CAL-06, CAL-12
+# Calendario when the backend fails or comes back empty (QA failure switch, comun/qa-fallo.js; README «Fallos
+# simulados»). The calendar fails: «No se pudo cargar el calendario» with «Reintentar», and the day panel says the day
+# could not be loaded instead of drawing an empty day (CAL-03, a known failure). The activity fails: «Próximo» shows
+# the error with «Reintentar»; empty, it says there is no piece on its way and «Lo que pasó» that nothing matches. The
+# piece fails: «No se pudo cargar la pieza» with «Reintentar». A veto the backend refuses says «No se pudo vetar» and
+# the piece keeps its «Vetar». The day's piece fails inside the day sheet: an error, not the bare thesis (CAL-03, a
+# known failure). Every rule is cleared before «Reintentar».
+appId: co.projectapp.office
+name: Calendario · errores y vacíos
+tags: [calendario]
+---
+- runFlow: comun/entrar.yaml
+- runScript: comun/calendario-fechas.js
+
+# ---------------------------------------------------------------- the calendar fails
+# cubre: CAL-01, CAL-03
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/calendario$'
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    id: top-calendario
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "No se pudo cargar el calendario"
+    timeout: 45000
+- assertVisible: "Reintentar"
+# The day under the calendar is not an empty day: it could not be loaded.
+- scrollUntilVisible:
+    element:
+      text: "No se pudo cargar este día\\."
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertNotVisible: "Sin actividad registrada."
+- assertNotVisible: "Nada importante en las capas visibles."
+- takeScreenshot: 07-calendario-errores-01-calendario
+- runScript: comun/qa-fallos-limpiar.js
+- scrollUntilVisible:
+    element:
+      text: "Reintentar"
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- tapOn: "Reintentar"
+- extendedWaitUntil:
+    notVisible: "No se pudo cargar el calendario"
+    timeout: 20000
+- assertVisible:
+    id: "dia-${output.hoy}"
+
+# ---------------------------------------------------------------- the activity fails, then comes back empty
+# cubre: CAL-04, CAL-05
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/actividad$'
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    text: "Lista"
+- extendedWaitUntil:
+    visible:
+      id: calendario-lista
+    timeout: 10000
+# The Lista's filtered query fails too; «Próximo» was loaded with the calendar, so pull to refresh to see it fail.
+- extendedWaitUntil:
+    visible: "Reintentar"
+    timeout: 45000
+- takeScreenshot: 07-calendario-errores-02-actividad
+- runScript: comun/qa-fallos-limpiar.js
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/actividad$'
+      EFECTO: 'vacio'
+      VECES: '-1'
+- tapOn: "Reintentar"
+- extendedWaitUntil:
+    visible: "No hay nada registrado con este filtro."
+    timeout: 30000
+# Pull to refresh: «Próximo» comes back empty too.
+- swipe:
+    from:
+      id: calendario-lista
+    direction: DOWN
+- extendedWaitUntil:
+    visible: "No hay pieza programada para los próximos días."
+    timeout: 30000
+- assertVisible: "Preparar la siguiente pieza"
+- takeScreenshot: 07-calendario-errores-03-actividad-vacia
+- runScript: comun/qa-fallos-limpiar.js
+- swipe:
+    from:
+      id: calendario-lista
+    direction: DOWN
+- extendedWaitUntil:
+    visible:
+      text: "Ver cómo se escribió"
+      childOf:
+        id: calendario-lista
+    timeout: 30000
+
+# ---------------------------------------------------------------- the piece fails
+# cubre: CAL-06
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/editorial/pieces/'
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    text: "Ver cómo se escribió"
+    childOf:
+      id: calendario-lista
+- extendedWaitUntil:
+    visible:
+      text: "No se pudo cargar la pieza"
+      childOf:
+        id: pieza
+    timeout: 45000
+- assertVisible:
+    text: "Reintentar"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-errores-04-pieza
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn:
+    text: "Reintentar"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.mananaLargo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+
+# ---------------------------------------------------------------- the veto is refused
+# cubre: CAL-12
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/operador/actions/[^/]+/reject$'
+      METODO: POST
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- tapOn:
+    id: confirm-note
+- inputText: "QA: el servidor lo rechaza"
+- hideKeyboard
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: "Deshacer"
+    timeout: 5000
+- extendedWaitUntil:
+    visible: "No se pudo vetar\\. .*"
+    timeout: 30000
+- takeScreenshot: 07-calendario-errores-05-veto-rechazado
+- runScript: comun/qa-fallos-limpiar.js
+- extendedWaitUntil:
+    visible:
+      text: "Vetar"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "PROGRAMADA"
+    childOf:
+      id: pieza
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# ---------------------------------------------------------------- the day's piece fails in the day sheet
+# cubre: CAL-03
+- scrollUntilVisible:
+    element:
+      text: "Semana"
+    direction: UP
+    timeout: 20000
+- tapOn:
+    text: "Semana"
+- extendedWaitUntil:
+    visible:
+      id: pager-semana
+    timeout: 10000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.hace3}"
+    commands:
+      - tapOn:
+          id: calendario-anterior
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.hace3}"
+          timeout: 10000
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/editorial/pieces/'
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    id: "dia-${output.hace3}"
+- extendedWaitUntil:
+    visible:
+      id: hoja-dia
+    timeout: 10000
+- swipe:
+    from:
+      text: "Altura del panel"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      text: "No se pudo cargar la pieza"
+      childOf:
+        id: hoja-dia
+    timeout: 45000
+- takeScreenshot: 07-calendario-errores-06-pieza-del-dia
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn:
+    text: "Reintentar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    visible:
+      text: "Impresiones a las 72 h: 768"
+      childOf:
+        id: hoja-dia
+    timeout: 20000
