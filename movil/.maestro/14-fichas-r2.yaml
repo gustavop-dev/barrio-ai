@@ -164,6 +164,13 @@ tags: [personas, fichas]
     childOf:
       id: persona
 - takeScreenshot: 14-fichas-r2-06-oportunidad
+# Back down to the button: centring the need above can push it under the bottom edge.
+- scrollUntilVisible:
+    element:
+      text: "Editar oportunidad"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - tapOn: "Editar oportunidad"
 - extendedWaitUntil:
     visible:
