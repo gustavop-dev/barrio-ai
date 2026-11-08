@@ -31,7 +31,9 @@ const USER = { username: 'gustavo', is_superuser: true, permissions: [] };
 
 function Probe({ reduced, onDone, onApi }: { reduced: boolean; onDone: () => void; onApi: (api: Entrada) => void }) {
   const api = useEntrada({ reduced, onDone });
-  useEffect(() => onApi(api));
+  useEffect(() => {
+    onApi(api);
+  });
   return null;
 }
 
