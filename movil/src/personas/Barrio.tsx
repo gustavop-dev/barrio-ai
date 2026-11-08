@@ -118,16 +118,19 @@ export function Barrio({ header, filters, onFilters }: { header: ReactNode; filt
   const { stage, q, role, modality, source } = filters;
   const [text, setText] = useState(q);
   const [lastQ, setLastQ] = useState(q);
+  /** The last search this box wrote to ?q= itself. */
+  const [written, setWritten] = useState(q);
   const [sheet, setSheet] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const summary = useRedSummary();
   const list = useContactPages({ stage: stage as PersonStage & ContactStage, q, role, modality, source });
   const { bottom } = useContentInsets();
 
-  // A new link (or «Quitar filtros») brings its own search text.
+  // A new link (or «Quitar filtros») brings its own search text. The box's own search coming back never does: a letter
+  // typed in the instant it was written would be lost («zzzqa» became «zzz» in 09-personas on the emulator).
   if (q !== lastQ) {
     setLastQ(q);
-    if (q !== text.trim()) setText(q);
+    if (q !== written && q !== text.trim()) setText(q);
   }
 
   // The search box writes ?q= after a short pause.
@@ -137,7 +140,10 @@ export function Barrio({ header, filters, onFilters }: { header: ReactNode; filt
   });
   useEffect(() => {
     if (text.trim() === q) return;
-    const timer = setTimeout(() => latest.current({ q: text.trim() }), SEARCH_PAUSE_MS);
+    const timer = setTimeout(() => {
+      setWritten(text.trim());
+      latest.current({ q: text.trim() });
+    }, SEARCH_PAUSE_MS);
     return () => clearTimeout(timer);
   }, [text, q]);
 

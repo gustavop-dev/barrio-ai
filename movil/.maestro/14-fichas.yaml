@@ -32,6 +32,12 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Sofía Martínez"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Sof"
+    timeout: 5000
 - tapOn: "Sofía Martínez"
 - extendedWaitUntil:
     visible:
@@ -107,6 +113,12 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Andrés Restrepo"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Andr"
+    timeout: 5000
 # The card fails to load first (failure switch, comun/qa-fallo.js): the error comes with «Reintentar».
 # cubre: PRS-03
 - runScript:
@@ -151,6 +163,13 @@ tags: [personas, fichas]
     childOf:
       id: persona
 - takeScreenshot: 14-fichas-06-oportunidad
+# Back down to the button: centring the need above can push it under the bottom edge.
+- scrollUntilVisible:
+    element:
+      text: "Editar oportunidad"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - tapOn: "Editar oportunidad"
 - extendedWaitUntil:
     visible:
@@ -166,18 +185,9 @@ tags: [personas, fichas]
     text: "Andrés Restrepo"
     childOf:
       id: opportunity-form
-- scrollUntilVisible:
-    element:
-      text: "Cancelar"
-      childOf:
-        id: opportunity-form
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-- tapOn:
-    text: "Cancelar"
-    childOf:
-      id: opportunity-form
+# Android «atrás» closes the form without saving (no need to scroll the long form down to «Cancelar»: a swipe that
+# starts on one of its fields does not always scroll it).
+- back
 - extendedWaitUntil:
     notVisible:
       id: opportunity-form
@@ -207,6 +217,12 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Pedro Salazar"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Pedro"
+    timeout: 5000
 - tapOn: "Pedro Salazar"
 - extendedWaitUntil:
     visible:
