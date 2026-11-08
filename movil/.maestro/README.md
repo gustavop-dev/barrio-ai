@@ -6,7 +6,7 @@ Esta carpeta tiene los flujos de [Maestro](https://maestro.dev) que **usan la ap
 
 El workflow tiene cuatro jobs:
 
-1. **`plan`** decide qué flujos corren y los reparte en hasta **4 emuladores en paralelo**, equilibrando su duración. En cada emulador los flujos van en orden numérico, así que `11-ajustes`, que cierra la sesión, siempre va el último del suyo.
+1. **`plan`** decide qué flujos corren y los reparte en hasta **4 emuladores en paralelo**, equilibrando su duración. En cada emulador los flujos van en orden numérico. `15-ajustes-sesion` cierra la sesión y vuelve a entrar al final, así que los flujos que vengan después en su emulador encuentran la sesión abierta.
 2. **`apk`** compila la app una sola vez: `expo prebuild` y Gradle `assembleRelease -PreactNativeArchitectures=x86_64`. Es una build release, con el JS empaquetado y R8, igual que la de EAS, pero para el emulador x86_64. Usa `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, que es el runner visto desde el emulador.
    - El APK queda en caché por el hash de lo que lo compone: `movil/` (sin esta carpeta ni los `.md`), `compartido/`, el `package-lock.json` y `app.config.js`.
    - Un push que solo cambia flujos, `seed_qa` o los scripts no vuelve a compilar: el job termina en segundos.
@@ -101,10 +101,14 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `07-calendario-errores` | con el interruptor de fallos: el calendario, la actividad, la pieza y la pieza del día fallan («Reintentar»); un veto rechazado; «Próximo» y «Lo que pasó» vacíos |
 | `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo» y la «Modalidad»; los accesos a cada sección; un dato que falta como «—» con su motivo; la definición de un gráfico; tocar una barra, una oportunidad activa y el mejor post |
 | `08-resultados-errores` | con el interruptor de fallos: las cifras y el resumen semanal fallan, «Reintentar»; un periodo sin posts ni oportunidades activas |
-| `09-personas` | filtros por etapa y búsqueda; la ficha de una persona con una nota nueva; mover una oportunidad de etapa (y deshacerlo); la validación al añadir un referente |
+| `09-personas` | Barrio: pestañas, aviso de red apagada, filas, chips de etapa (con «En conversación» sin datos), búsqueda sin resultados y «Quitar filtros», «Más filtros» por rol; la ficha de Laura (recorrido, por qué encaja, de dónde salió, sin conversación, una nota nueva) y «Marcar como oportunidad» |
 | `10-galeria` | la rejilla, los filtros (y uno vacío), la nota y el interruptor de edición con IA (y la foto abierta otra vez enseguida), el visor (zoom, deslizar, cerrar), «Quitar de la galería» y que las fotos son privadas |
 | `10-galeria-subir` | «Subir fotos» con el selector de Android, un 413 con «Reintentar» y la Galería vacía |
-| `11-ajustes` | todas las secciones, Autonomía, apagar un tipo de aviso, la lista de dispositivos y cerrar sesión (va al final) |
+| `11-ajustes` | de Máquina a Captura: parada total y reanudar, pausar la cuenta simulada, orientación (descartar y guardar), Autonomía, Gasto, «Conectar LinkedIn» abre la oficina web, micrófono y edición con IA |
+| `12-oportunidades` | el tablero por etapas, mover con el selector y «Deshacer», que el cambio se guarde, «Cerradas sin acuerdo»; nueva oportunidad (obligatorios, «De Personas», fuera de la red, fecha inválida), editar y eliminar |
+| `13-referentes` | la lista, «Observar ahora», desactivar con «Deshacer» y reactivar, la validación al añadir, un perfil que LinkedIn no conoce, «Referente añadido», quitar con confirmación y una cuenta sin referentes |
+| `14-fichas` | la conversación de Sofía, la oportunidad y la nota de Andrés, descartar a Pedro con motivo y el enlace a una persona que no existe |
+| `15-ajustes-sesion` | un tipo de aviso apagado y encendido, cerrar la sesión del Pixel 7, «Lo que el equipo sabe de ti», `?ancla=autonomia` y cerrar sesión (vuelve a entrar al final) |
 
 ## Escribir o cambiar un flujo
 

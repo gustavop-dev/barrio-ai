@@ -364,16 +364,10 @@ tags: [resultados]
 - scrollUntilVisible:
     element:
       text: "Andrés Restrepo"
-      below:
-        text: "OPORTUNIDADES ACTIVAS"
     direction: DOWN
-    centerElement: true
     timeout: 20000
 - takeScreenshot: 08-resultados-16-oportunidades-activas
-- tapOn:
-    text: "Andrés Restrepo"
-    below:
-      text: "OPORTUNIDADES ACTIVAS"
+- tapOn: "Andrés Restrepo"
 - extendedWaitUntil:
     visible:
       id: persona-head

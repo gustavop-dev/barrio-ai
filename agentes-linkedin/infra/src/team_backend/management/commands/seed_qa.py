@@ -164,8 +164,9 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ accounts, referents, posts, people
 
     def accounts(self):
+        # «running» is the status Unipile reports for a working account: Ajustes shows it as «Conectada» (AJU-02).
         self.fake=ConnectorAccount.objects.create(id=uid('account:unipile'),provider='fake',external_account_id='qa-unipile-gustavo',
-                                                  label='LinkedIn de Gustavo (simulado)',status='OK',last_checked_at=self.ago(hours=1))
+                                                  label='LinkedIn de Gustavo (simulado)',status='running',last_checked_at=self.ago(hours=1))
         self.official=ConnectorAccount.objects.create(id=uid('account:official'),provider='linkedin_fake',external_account_id='urn:li:person:qa-gustavo',
                                                       label='API oficial (simulada)',status='OK',last_checked_at=self.ago(hours=1))
 

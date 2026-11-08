@@ -1,4 +1,4 @@
-# cubre: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05, CAL-13
+# cubre: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05, CAL-13, PRS-08, PRS-10
 # Calendario: the views, the day panel and the queue. Semana, Mes and Lista; swiping the week strip and the month turns
 # them and the range under the title follows (a254114: the week swipe used to close the app); a month with nothing and
 # a day more than 15 days away; a tapped day opens its panel in a sheet (half, then full), and the panel under the
@@ -254,7 +254,8 @@ tags: [calendario]
     timeout: 10000
 
 # The day after tomorrow, in the panel under the calendar: Gustavo's meeting («Tu parte», with its hour and «Ir a Tu
-# turno») and a free slot.
+# turno»: the next action of Andrés Restrepo's opportunity, PRS-08 and PRS-10) and a free slot.
+# cubre: CAL-03, PRS-08, PRS-10
 - runFlow:
     when:
       notVisible:
@@ -554,7 +555,12 @@ tags: [calendario]
     direction: UP
     centerElement: true
     timeout: 20000
-# «Red»: only the network («Seguiste a…», «Invitaste a… (sin nota)», «Aceptaste la invitación de…»).
+# «Red»: only the network («Seguiste a…», «Invitaste a… (sin nota)», «Aceptaste la invitación de…»). The chips scroll
+# sideways: «Red» is the last one.
+- swipe:
+    from:
+      text: "Comentarios"
+    direction: LEFT
 - tapOn:
     text: "Red"
     below:

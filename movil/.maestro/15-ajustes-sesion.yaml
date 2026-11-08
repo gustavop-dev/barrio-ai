@@ -1,0 +1,228 @@
+# cubre: AJU-10, AJU-11, PUS-04, ACC-08, ACC-09
+# Ajustes, from Notificaciones to the end: one push type switched off and on again, and back on when saving fails; «Dispositivos con la app» with
+# this phone («Este») and the seeded «Pixel 7 de Gustavo (QA)», signed out from here; «Lo que el equipo sabe de ti»,
+# which opens that tab of Tu turno; a link with ?ancla=autonomia, which scrolls to the section and unfolds it; and
+# «Cerrar sesión», which lands on the login. The flow signs in again at the end, so the flows after it in the same
+# emulator find the session as they expect. Máquina to Captura y galería are in 11-ajustes.
+appId: co.projectapp.office
+name: Ajustes · avisos y sesión
+tags: [ajustes]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "MÁQUINA"
+    timeout: 20000
+
+# ---------------------------------------------------------------- Notificaciones: one push type off and on
+# cubre: PUS-04
+# The heading is looked up inside its own section: the top bar's bell is also labelled «Notificaciones».
+- scrollUntilVisible:
+    element:
+      text: "NOTIFICACIONES"
+      childOf:
+        id: ajustes-notificaciones
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Este dispositivo"
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Por tipo de notificación"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertNotVisible:
+    id: push-question
+- tapOn: "Por tipo de notificación"
+- scrollUntilVisible:
+    element:
+      id: push-question
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+# «Pregunta nueva del equipo» pushes by default (push_disabled is empty in the seed).
+- assertVisible:
+    id: push-question
+    text: Pregunta nueva del equipo
+    checked: true
+- takeScreenshot: 15-ajustes-01-tipos-de-push
+- tapOn:
+    id: push-question
+- extendedWaitUntil:
+    visible: "Push apagada: Pregunta nueva del equipo\\."
+    timeout: 15000
+- assertVisible:
+    id: push-question
+    checked: false
+- takeScreenshot: 15-ajustes-02-push-apagada
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- tapOn:
+    id: push-question
+- extendedWaitUntil:
+    visible: "Push activada: Pregunta nueva del equipo\\."
+    timeout: 15000
+- assertVisible:
+    id: push-question
+    checked: true
+# A failed save puts the switch back and says why (failure switch, comun/qa-fallo.js).
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/ajustes/preferencias$'
+      METODO: PATCH
+      EFECTO: '500'
+- tapOn:
+    id: push-question
+- extendedWaitUntil:
+    visible:
+      text: "Fallo simulado por QA \\(500\\)\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: push-question
+      checked: true
+    timeout: 10000
+- takeScreenshot: 15-ajustes-03-push-error
+
+# ---------------------------------------------------------------- Dispositivos con la app: sign the Pixel 7 out
+# cubre: ACC-09
+- scrollUntilVisible:
+    element:
+      text: "DISPOSITIVOS CON LA APP"
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Pixel 7 de Gustavo \\(QA\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Usado .*"
+# This phone: its row has the «Este» badge and its own revoke label.
+- assertVisible: "Cerrar la sesión de este teléfono"
+- assertVisible: "ESTE"
+- takeScreenshot: 15-ajustes-04-dispositivos
+- tapOn: "Cerrar la sesión de Pixel 7 de Gustavo \\(QA\\)"
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible: "Ese dispositivo tendrá que volver a entrar con usuario y contraseña, y deja de recibir avisos\\."
+- tapOn:
+    text: "Cerrar su sesión"
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "Sesión cerrada en Pixel 7 de Gustavo \\(QA\\)\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Pixel 7 de Gustavo \\(QA\\)"
+    timeout: 15000
+- assertVisible: "Cerrar la sesión de este teléfono"
+- takeScreenshot: 15-ajustes-05-pixel-cerrado
+
+# ---------------------------------------------------------------- Lo que el equipo sabe de ti
+# cubre: AJU-10
+- scrollUntilVisible:
+    element:
+      id: sabe-link
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Lo que el equipo sabe de ti\\. 3 datos confirmados"
+- takeScreenshot: 15-ajustes-06-sabe
+- tapOn:
+    id: sabe-link
+- extendedWaitUntil:
+    visible:
+      id: turno-sabe
+    timeout: 20000
+- assertNotVisible:
+    id: screen-ajustes
+- takeScreenshot: 15-ajustes-07-sabe-abierto
+
+# ---------------------------------------------------------------- a link to a section (?ancla=autonomia)
+# cubre: AJU-11
+- openLink: "oficina0ff1ce://ajustes?ancla=autonomia"
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+# It scrolls to Autonomía y límites and opens the fold.
+- extendedWaitUntil:
+    visible: "Autonomía y límites"
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "MODO POR CAPACIDAD · SOLO LECTURA"
+    timeout: 20000
+- assertNotVisible: "MÁQUINA"
+- takeScreenshot: 15-ajustes-08-ancla-autonomia
+
+# ---------------------------------------------------------------- Sesión y Acerca de: sign out, and back in
+# cubre: ACC-08
+# And ?ancla=sesion goes straight to the last section.
+- openLink: "oficina0ff1ce://ajustes?ancla=sesion"
+- extendedWaitUntil:
+    visible: "SESIÓN Y ACERCA DE"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: logout
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Has entrado como qa\\."
+- assertVisible: "Versión: app .*"
+- takeScreenshot: 15-ajustes-09-sesion
+- tapOn:
+    id: logout
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible: "Este teléfono deja de recibir avisos y olvida su acceso\\..*"
+- takeScreenshot: 15-ajustes-10-confirmar-salida
+# Inside the sheet «Cerrar sesión» is both the title and the action; sorted top to bottom, the action is second.
+- tapOn:
+    text: Cerrar sesión
+    childOf:
+      id: confirm-sheet
+    index: 1
+- extendedWaitUntil:
+    visible:
+      id: login
+    timeout: 30000
+- assertVisible:
+    id: login-usuario
+- assertVisible: Entrar
+- assertNotVisible:
+    id: screen-ajustes
+- takeScreenshot: 15-ajustes-11-login
+# Back in: the next flow on this emulator finds the session open.
+- runFlow: comun/entrar.yaml

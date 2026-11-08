@@ -1,4 +1,4 @@
-# cubre: CAL-02, CAL-03, CAL-06, CAL-07, CAL-08, CAL-09, CAL-16
+# cubre: CAL-02, CAL-03, CAL-06, CAL-07, CAL-08, CAL-09, CAL-16, PRS-10
 # The past pieces of the QA world, each from its day in the calendar. Two days ago, blocked: in «Lo importante del
 # día» with its layer (turning «Red» off hides that day's new connection and keeps the block), and in the detail «El
 # verificador bloqueó la pieza» with its reasons, no «Vetar» and «Ronda de reparación». Three days ago, published:
@@ -80,6 +80,9 @@ tags: [calendario]
     centerElement: true
     timeout: 20000
 - assertVisible: "Andrés Restrepo aceptó tu invitación"
+# The opportunity created that day, in the Conversaciones layer (PRS-10).
+# cubre: PRS-10
+- assertVisible: "Oportunidad con Isabel Duarte: .*"
 - takeScreenshot: 07-pieza-estados-02-lo-importante
 # Turn «Red» off: the connection goes, the block stays. Then on again.
 - scrollUntilVisible:
