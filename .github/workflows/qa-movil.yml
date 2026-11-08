@@ -177,7 +177,7 @@ jobs:
       QA_FLOW_TIMEOUT: '480'
       # System animations on (scripts/qa/correr-maestro.sh): the entrance, the shell's push and pop between tabs (the blank
       # screen of Android back between two top-bar screens only happened with them) and the Oficina scene.
-      QA_FLUJOS_ANIMADOS: '01-entrada 02-navegacion 03-oficina'
+      QA_FLUJOS_ANIMADOS: '01-entrada 01-entrada-r2 01-entrada-r3 01-entrada-r4 02-navegacion 03-oficina'  # TEMPORAL: las copias de 01, animadas como 01
       # The QA failure switch (team_backend.qa_fallos): only these settings load it. See movil/.maestro/README.md.
       QA_MODE: 'true'
       QA_FAULTS_FILE: /tmp/qa-fallos.json
