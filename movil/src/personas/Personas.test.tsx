@@ -96,6 +96,25 @@ describe('Personas · Barrio', () => {
     await waitFor(() => expect(query(server.find('GET', '/api/v1/red/contacts')[0]!).stage).toBe('opportunity'));
   });
 
+  it('keeps every letter typed in the search box while the URL catches up late (PRS-02)', async () => {
+    // Found by 14-fichas on the emulator: «Sof» became «S». The box writes ?q= after its pause; when the router took
+    // longer than the next letters to apply ?q=S, that older value came back and replaced what had been typed since.
+    await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
+    await screen.findByTestId('person-c-1');
+    const lastQ = () => (jest.mocked(router.setParams).mock.calls.at(-1)?.[0] as { q?: string } | undefined)?.q;
+
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'S');
+    await waitFor(() => expect(lastQ()).toBe('S'));
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'So');
+    await waitFor(() => expect(lastQ()).toBe('So'));
+    // Only now does the router apply the first change, ?q=S, while the next letter is typed.
+    routerState.params = { q: 'S' };
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'Sof');
+    expect(screen.getByTestId('barrio-search').props.value).toBe('Sof');
+    await waitFor(() => expect(lastQ()).toBe('Sof'));
+    expect(screen.getByTestId('barrio-search').props.value).toBe('Sof');
+  });
+
   it('searches by name and filters by role, modality and origin in a sheet', async () => {
     const server = await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
     await screen.findByTestId('person-c-1');

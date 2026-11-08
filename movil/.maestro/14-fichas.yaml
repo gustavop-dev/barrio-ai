@@ -32,6 +32,12 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Sofía Martínez"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Sof"
+    timeout: 5000
 - tapOn: "Sofía Martínez"
 - extendedWaitUntil:
     visible:
@@ -107,6 +113,12 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Andrés Restrepo"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Andr"
+    timeout: 5000
 # The card fails to load first (failure switch, comun/qa-fallo.js): the error comes with «Reintentar».
 # cubre: PRS-03
 - runScript:
@@ -207,6 +219,12 @@ tags: [personas, fichas]
 - extendedWaitUntil:
     visible: "Pedro Salazar"
     timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
+- extendedWaitUntil:
+    visible:
+      id: barrio-search
+      text: "Pedro"
+    timeout: 5000
 - tapOn: "Pedro Salazar"
 - extendedWaitUntil:
     visible:
