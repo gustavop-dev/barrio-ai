@@ -148,6 +148,8 @@ onFlowComplete:
     file: comun/qa-api.js
     env:
       ACCION: cerrar-este-telefono
+      QA_USER: ${QA_USER}
+      QA_PASSWORD: ${QA_PASSWORD}
 - tapOn:
     id: tab-resultados
 - extendedWaitUntil:

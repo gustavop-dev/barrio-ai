@@ -4,6 +4,8 @@
 //       file: comun/qa-api.js
 //       env:
 //         ACCION: cerrar-este-telefono   # cerrar-este-telefono | pausar | reanudar
+//         QA_USER: ${QA_USER}            # the QA user and its password (correr-maestro.sh passes them with -e)
+//         QA_PASSWORD: ${QA_PASSWORD}
 // - cerrar-este-telefono (ACC-05, ACC-09): another phone of the QA user logs in and closes every other device login,
 //   this emulator's included, as «Dispositivos con la app» does; then it logs itself out. seed_qa recreates the seeded
 //   second phone before the next flow.

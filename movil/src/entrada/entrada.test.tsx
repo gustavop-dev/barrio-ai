@@ -5,6 +5,7 @@ import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import { useEffect } from 'react';
 import Login from '@/app/login';
 import '@/api/transport';
+import { clearToken } from '@/api/token';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
 import { entrada, navTimings } from '@/theme/motion';
@@ -85,8 +86,10 @@ describe('login → Oficina', () => {
     goBack: jest.fn(),
   };
 
-  beforeEach(() => {
+  beforeEach(async () => {
     expoRouter.useNavigation = () => navigation;
+    // No token left by another test: with one, the start-up keeps the session (only a 401 logs out) and the login redirects.
+    await clearToken();
   });
 
   async function fillAndEnter() {

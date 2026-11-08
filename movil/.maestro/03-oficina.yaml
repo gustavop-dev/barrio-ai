@@ -252,6 +252,8 @@ tags: [oficina]
     file: comun/qa-api.js
     env:
       ACCION: pausar
+      QA_USER: ${QA_USER}
+      QA_PASSWORD: ${QA_PASSWORD}
 - extendedWaitUntil:
     visible: "Máquina en pausa · Pausa de la QA"
     timeout: 60000
@@ -274,6 +276,8 @@ tags: [oficina]
     file: comun/qa-api.js
     env:
       ACCION: reanudar
+      QA_USER: ${QA_USER}
+      QA_PASSWORD: ${QA_PASSWORD}
 - extendedWaitUntil:
     notVisible: "Máquina en pausa · Pausa de la QA"
     timeout: 60000

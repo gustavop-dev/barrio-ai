@@ -2,14 +2,13 @@
 // revoked token goes back to login, and logout unregisters the push token before revoking.
 import { getTuTurno } from '@compartido/api/endpoints';
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { onlineManager } from '@tanstack/react-query';
 import * as SecureStore from 'expo-secure-store';
 import { Pressable, Text } from 'react-native';
 import { clearToken, currentToken } from '@/api/token';
 import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
-import { useSession } from './session';
+import { SESSION_RETRY_MS, useSession } from './session';
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const USER = { username: 'gustavo', is_superuser: true, permissions: [] };
@@ -89,19 +88,32 @@ describe('session', () => {
     expect(store.has('oficina.token-dispositivo')).toBe(false);
   });
 
-  it('recovers the user once the network is back after an offline start (ACC-06.6)', async () => {
-    store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
-    const server = fakeServer({ 'GET /api/v1/auth/session': { fetchError: 'Failed to connect' } });
-    await renderApp(<Probe />, { session: true });
-    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('dentro'));
-    expect(screen.getByTestId('user')).toHaveTextContent('');
-    server.on('GET /api/v1/auth/session', { body: { authenticated: true, user: USER } });
-    await act(async () => {
-      onlineManager.setOnline(false);
-      onlineManager.setOnline(true);
-    });
-    await waitFor(() => expect(screen.getByTestId('user')).toHaveTextContent('gustavo'));
-    expect(screen.getByTestId('status')).toHaveTextContent('dentro');
+  it('asks for the session again until the user is back after an offline start (ACC-06.6)', async () => {
+    jest.useFakeTimers();
+    try {
+      store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
+      const server = fakeServer({ 'GET /api/v1/auth/session': { fetchError: 'Failed to connect' } });
+      await renderApp(<Probe />, { session: true });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(100);
+      });
+      expect(screen.getByTestId('status')).toHaveTextContent('dentro');
+      expect(screen.getByTestId('user')).toHaveTextContent('');
+      server.on('GET /api/v1/auth/session', { body: { authenticated: true, user: USER } });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SESSION_RETRY_MS + 100);
+      });
+      expect(screen.getByTestId('user')).toHaveTextContent('gustavo');
+      expect(screen.getByTestId('status')).toHaveTextContent('dentro');
+      // Known again: no more asking.
+      const asked = server.find('GET', '/api/v1/auth/session').length;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SESSION_RETRY_MS * 2);
+      });
+      expect(server.find('GET', '/api/v1/auth/session')).toHaveLength(asked);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('goes back to login when any request gets a 401', async () => {

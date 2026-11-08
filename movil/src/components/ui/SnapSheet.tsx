@@ -18,8 +18,13 @@ export interface SnapSheetProps {
   bottom: number; availableHeight?: number; testID?: string;
   /** Called with the snap the sheet rests on (sheetMotion.snaps), on opening and after every drag or action. */
   onRest?: (snap: number) => void;
+  /**
+   * Whether Android back closes the sheet (default). BackHandler listeners are global: a screen that is not shown (a tab
+   * left with its sheet open) must turn this off, or back on the screen in front would close the hidden sheet instead.
+   */
+  backCloses?: boolean;
 }
-export function SnapSheet({ label, onClose, children, bottom, availableHeight, testID, onRest }: SnapSheetProps) {
+export function SnapSheet({ label, onClose, children, bottom, availableHeight, testID, onRest, backCloses = true }: SnapSheetProps) {
   const window = useWindowDimensions();
   const room = (availableHeight ?? window.height) - bottom;
   const [half, full] = sheetMotion.snaps;
@@ -87,9 +92,10 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
   }, [half, snap, p]);
 
   useEffect(() => {
+    if (!backCloses) return;
     const listener = BackHandler.addEventListener('hardwareBackPress', () => { dismiss(); return true; });
     return () => listener.remove();
-  }, [dismiss]);
+  }, [dismiss, backCloses]);
 
   const drag = usePanGesture({
     testID: 'snap-sheet-drag', minDistance: officeGestures.sheetActivation,

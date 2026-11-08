@@ -113,7 +113,7 @@ export function OficinaScreen() {
       <T variant="detalle" soft style={styles.credit}>Arte: LimeZu — Modern Interiors</T>
     </ScrollView>
     </GestureDetector>
-    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap}>
+    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active}>
       {selection.kind === 'team' ? <TeamPanel team={selection.id} data={data} onRole={(id) => select({ kind: 'role', id })} /> : <RolePanel id={selection.id} data={data} onTeam={(id) => select({ kind: 'team', id })} />}
     </SnapSheet> : null}
   </View>;
