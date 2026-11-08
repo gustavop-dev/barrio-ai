@@ -54,6 +54,29 @@ También puedes crear `movil/.env.local` (no se sube al repositorio) con una lí
 - El teléfono tiene que poder alcanzar esa URL. `localhost` o `127.0.0.1` apuntan al propio teléfono.
 - Para el Django de este portátil, expón `127.0.0.1:8787` con un túnel HTTPS y pon esa URL.
 
+## Instalarla en tu teléfono como app (APK con EAS Build)
+
+Expo Go sirve para desarrollar. Para tener 0ff1ce en la pantalla de inicio, con su icono y su nombre, se compila un APK en la nube de Expo (EAS Build). Se compila en sus servidores, no en este portátil. `eas.json` ya trae dos perfiles:
+
+- `preview`: un APK para instalar directamente en tu Android.
+- `production`: el `.aab` para Google Play, cuando toque.
+
+La primera vez, en `movil/`:
+
+```
+npx eas-cli@latest login                 # tu cuenta de Expo (la misma de `expo start`)
+npx eas-cli@latest init                  # crea el proyecto en expo.dev y escribe su projectId en app.json
+npx eas-cli@latest build -p android --profile preview
+```
+
+El build tarda unos 10 a 15 minutos. Al terminar, EAS da un enlace y un QR para descargar el APK:
+
+1. Ábrelo en el teléfono e instálalo. Android pedirá permitir «instalar apps desconocidas» desde el navegador.
+2. Queda como **0ff1ce**, con el icono de la marca, conectada a `https://office.projectapp.co`.
+3. El `projectId` que escribe `eas init` en `app.json` se sube al repo.
+
+Cada versión nueva de la app es un `build` nuevo y se reinstala encima, sin perder la sesión. Más adelante se puede añadir `expo-updates` para mandar cambios sin reinstalar. Las notificaciones push en el APK necesitan además las credenciales de FCM (Firebase), que se cargan en EAS con `npx eas-cli@latest credentials`.
+
 ## Qué funciona en Expo Go y qué necesitará una build de desarrollo
 
 Funciona en Expo Go:
