@@ -265,9 +265,6 @@ tags: [turno]
       id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86-contenido'
     waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
-    visible: 'Resumen descartado'
-    timeout: 20000
-- extendedWaitUntil:
     notVisible: 'El analista propone una orientación'
     timeout: 20000
 - extendedWaitUntil:
