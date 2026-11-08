@@ -248,7 +248,9 @@ class Command(BaseCommand):
                ('publicada8',-8,'published','Un MVP no es una versión barata del producto','business_to_product','personal_startups','lector_lider'),
                ('bloqueada',-2,'blocked','Qué aprendí cobrando por mi primer proyecto','business_to_product','projectapp','lector_comprador'),
                ('saltada',-1,'skipped',None,None,None,None),
-               ('fallida',-5,'failed','Cómo elegimos el stack de un MVP en dos días','architecture_delivery','projectapp','lector_divulgador')]
+               ('fallida',-5,'failed','Cómo elegimos el stack de un MVP en dos días','architecture_delivery','projectapp','lector_divulgador'),
+               # Its CONT-09 waits in `proposed` (the state of the daily post in approval mode): «Aprobar» in its detail (CAL-15).
+               ('aprobacion',3,'ready','Un piloto de seis semanas dice más que una propuesta de cuarenta páginas','business_to_product','projectapp','lector_comprador')]
         self.piece={}
         for key,offset,kind,thesis,pillar,modality,reader in specs:
             day=self.today+timedelta(days=offset)
@@ -297,6 +299,9 @@ class Command(BaseCommand):
             EditorialPiece.objects.filter(pk=piece.pk).update(created_at=when-timedelta(hours=14))
             self.piece[key]=piece
         # CONT-09 of the ready pieces: approved (tomorrow) and published with its metrics.
+        waiting=self.piece['aprobacion']
+        self.action(waiting,'CONT-09',{'text':waiting.final_text},'proposed',created=self.ago(hours=1),
+                    rationale=f'{waiting.brief["thesis"]} — B cuenta un piloto real.',key='cont09:aprobacion')
         tomorrow=self.piece['manana']
         self.action(tomorrow,'CONT-09',{'text':tomorrow.final_text},'approved',created=self.ago(hours=3),decided=self.ago(hours=2),
                     rationale=f'{tomorrow.brief["thesis"]} — B tiene una historia verificable.',review={'decision':'approve','reasons':['Cumple la política'],'model':'jev-1.14.0'},key='cont09:manana')

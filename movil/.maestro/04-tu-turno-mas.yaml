@@ -143,10 +143,8 @@ tags: [turno]
     childOf:
       id: opportunity-sheet
 - takeScreenshot: 04-mas-04-marcar-oportunidad
-- tapOn:
-    text: 'Cancelar'
-    childOf:
-      id: opportunity-sheet
+# Closed without saving: nothing is created until «Guardar oportunidad».
+- back
 - extendedWaitUntil:
     notVisible:
       id: opportunity-sheet
@@ -173,31 +171,6 @@ tags: [turno]
     timeout: 20000
 - extendedWaitUntil:
     notVisible: 'Sofía Martínez te escribió'
-    timeout: 20000
-- extendedWaitUntil:
-    notVisible:
-      id: toast
-    timeout: 15000
-
-# ---------------------------------------------------------------- the analyst's orientation, discarded
-# cubre: TUR-08
-- scrollUntilVisible:
-    element:
-      text: 'Descartar'
-      childOf:
-        id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
-    direction: DOWN
-    timeout: 30000
-    centerElement: true
-- tapOn:
-    text: 'Descartar'
-    childOf:
-      id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
-- extendedWaitUntil:
-    visible: 'Resumen descartado'
-    timeout: 20000
-- extendedWaitUntil:
-    notVisible: 'El analista propone una orientación'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
@@ -267,6 +240,38 @@ tags: [turno]
 - extendedWaitUntil:
     notVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
     timeout: 20000
+
+# ---------------------------------------------------------------- the analyst's orientation, discarded
+# cubre: TUR-08
+# Dated on this week's Monday, its place among the questions changes with the weekday: down to the next group's
+# label, then up to it.
+- scrollUntilVisible:
+    element:
+      text: 'Ya no es urgente · 1'
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'Descartar'
+      childOf:
+        id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
+    direction: UP
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    text: 'Descartar'
+    childOf:
+      id: 'turno-card-weekly_summary:6b583ea1-1614-56e3-9888-7b0bbaeb1b86'
+- extendedWaitUntil:
+    visible: 'Resumen descartado'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: 'El analista propone una orientación'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
 
 # ---------------------------------------------------------------- «Hecho recientemente» says how each one ended
 # cubre: TUR-14

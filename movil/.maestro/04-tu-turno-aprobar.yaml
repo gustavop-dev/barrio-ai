@@ -3,7 +3,8 @@
 # waits for Gustavo's approval, and the seed's two proposals are Importante cards: «¿Apruebas seguir a Laura Gómez?»
 # and «¿Apruebas invitar a Julián Herrera?». Laura's follow is approved from its card: it leaves Tu turno, the top
 # bar counter drops, «Hecho recientemente» says «Aprobada» and the calendar's «En cola» lists it as approved.
-# Julián's invitation is approved from «En cola» in Calendario › Lista.
+# Julián's invitation is approved from «En cola» in Calendario › Lista. Last, the piece in three days, whose daily post
+# waits in `proposed` (as it does in approval mode), shows «Aprobar» next to «Vetar» in its detail and is approved.
 # Card and row testIDs carry the seed's deterministic ids (seed_qa.uid): action:red01:laura and action:red02:julian.
 appId: co.projectapp.office
 name: Tu turno · aprobar
@@ -117,3 +118,33 @@ tags: [turno]
 - assertVisible:
     id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
 - takeScreenshot: 04-aprobar-05-en-cola-aprobada
+
+# ---------------------------------------------------------------- a piece awaiting approval: «Aprobar» in its detail
+# cubre: CAL-15
+# Opened by its link, as a notification would (seed_qa piece:aprobacion).
+- openLink: oficina0ff1ce://calendario/pieza/74a9cae0-2507-5628-8dba-f09a48a4115f
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 30000
+- extendedWaitUntil:
+    visible: 'PENDIENTE DE APROBACIÓN|Pendiente de aprobación'
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: 'Aprobar'
+    direction: DOWN
+    timeout: 20000
+    centerElement: true
+- assertVisible: 'La publicación diaria espera tu aprobación.*'
+- assertVisible: 'Vetar'
+- takeScreenshot: 04-aprobar-06-pieza-pendiente
+- tapOn: 'Aprobar'
+- extendedWaitUntil:
+    visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'PROGRAMADA|Programada'
+    timeout: 20000
+- assertNotVisible: 'La publicación diaria espera tu aprobación.*'
+- takeScreenshot: 04-aprobar-07-pieza-aprobada

@@ -52,7 +52,7 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertIn('Mundo de QA listo',self.seed())
         first=self.counts()
         statuses={editorial.status(p,editorial.latest_action(p)) for p in EditorialPiece.objects.all()}
-        self.assertTrue({'scheduled','published','blocked','skipped','failed'}<=statuses,statuses)
+        self.assertTrue({'scheduled','published','blocked','skipped','failed','awaiting_approval'}<=statuses,statuses)
         self.assertTrue(set(Contact.Stage.values)<=set(Contact.objects.values_list('stage',flat=True)))
         self.assertEqual(set(PostMetric.objects.values_list('kind',flat=True)),{'24h','72h','7d'})
         self.assertGreaterEqual(Opportunity.objects.values('stage').distinct().count(),5)

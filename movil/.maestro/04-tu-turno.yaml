@@ -175,18 +175,9 @@ tags: [turno]
       id: toast
     timeout: 15000
 
-# ---------------------------------------------------------------- CUANDO PUEDAS: the orientation and the two questions
-# cubre: TUR-08, SEM-08
-- scrollUntilVisible:
-    element:
-      text: 'El analista propone una orientación'
-    direction: DOWN
-    timeout: 30000
-    centerElement: true
-- assertVisible: 'Ver el resumen'
-- assertVisible: 'Descartar'
-- takeScreenshot: 04-turno-08-orientacion
-
+# ---------------------------------------------------------------- CUANDO PUEDAS: the two questions, then the orientation
+# The choice question (1 day old) always comes before the yes/no one (2 days); the orientation is dated on this week's
+# Monday, so its place among them changes with the weekday: it is looked for last, going up from «Ya no es urgente».
 # The choice question, swiped left: «Más tarde».
 # cubre: TUR-11, TUR-19
 - scrollUntilVisible:
@@ -197,7 +188,7 @@ tags: [turno]
     centerElement: true
 - assertVisible: 'Fintech'
 - assertVisible: 'Agrotech'
-- takeScreenshot: 04-turno-09-pregunta-opciones
+- takeScreenshot: 04-turno-08-pregunta-opciones
 - swipe:
     from:
       text: '¿Con qué tipo de startups prefieres trabajar\?'
@@ -206,7 +197,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Pospuesta\. Vuelve el .*|Pospuesta 3 días'
     timeout: 20000
-- takeScreenshot: 04-turno-10-pospuesta-deslizando
+- takeScreenshot: 04-turno-09-pospuesta-deslizando
 - extendedWaitUntil:
     notVisible: '¿Con qué tipo de startups prefieres trabajar\?'
     timeout: 20000
@@ -233,10 +224,27 @@ tags: [turno]
 - extendedWaitUntil:
     visible: 'Pospuesta\. Vuelve el .*|Pospuesta 3 días'
     timeout: 20000
-- takeScreenshot: 04-turno-11-pospuesta-boton
+- takeScreenshot: 04-turno-10-pospuesta-boton
 - extendedWaitUntil:
     notVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
     timeout: 20000
+
+# The analyst's orientation, alone in its group now: down to the next group's label, then up to it.
+# cubre: TUR-08, SEM-08
+- scrollUntilVisible:
+    element:
+      text: 'Ya no es urgente · 1'
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: 'Ver el resumen'
+    direction: UP
+    timeout: 30000
+    centerElement: true
+- assertVisible: 'El analista propone una orientación'
+- assertVisible: 'Descartar'
+- takeScreenshot: 04-turno-11-orientacion
 
 # ---------------------------------------------------------------- «Ya no es urgente»: the question whose deadline passed
 # cubre: TUR-13
