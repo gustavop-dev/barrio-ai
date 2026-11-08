@@ -224,7 +224,9 @@ class CaptureRoutingTests(CaptureBase):
         self.assertEqual(len(calls),1)  # photos alone go to the gallery without asking anyone
         self.assertEqual((calls[0]['model'],calls[0]['purpose']),('claude-sonnet-5-5','capture-route'))
         self.assertEqual(calls[0]['schema']['properties']['destino']['enum'],['post','propuesta','dato'])
-        self.assertEqual(calls[0]['message'],{'texto':'No quiero hablar de cripto nunca.','fotos':0})
+        # local_date lets the router resolve «mañana», «el lunes» for «publícalo lo antes posible» (CAP-16).
+        self.assertEqual({k:v for k,v in calls[0]['message'].items() if k!='local_date'},{'texto':'No quiero hablar de cripto nunca.','fotos':0})
+        self.assertRegex(calls[0]['message']['local_date'],r'^\d{4}-\d{2}-\d{2}$')
         capture=self.capture(body)
         self.assertEqual((capture.state,capture.routed_to['kind'],capture.routed_to['classified']),('dato_guardado','dato',True))
         detail=self.human.get(f'/api/v1/capturas/{body["id"]}').json()
@@ -468,8 +470,10 @@ class DirectorIdeasTests(MediaMixin,EditorialBase):
         plan=answers();plan['director']=dict(plan['director'],ideas_used=[str(idea.id),'no-es-un-id',str(stale.id)])
         piece=self.plan(plan)
         director=self.calls[0][1]
-        self.assertEqual(director['ideas_from_gustavo'],[{'id':str(idea.id),'text':idea.note,
-                                                           'date':now.astimezone(operador.local_tz()).date().isoformat()}])
+        # Each idea now also carries its purpose, «lo antes posible» and its photos (IMG-06, CAP-16).
+        self.assertEqual([{k:i[k] for k in ('id','text','date')} for i in director['ideas_from_gustavo']],
+                         [{'id':str(idea.id),'text':idea.note,'date':now.astimezone(operador.local_tz()).date().isoformat()}])
+        self.assertEqual({k:director['ideas_from_gustavo'][0][k] for k in ('publish_asap','photos')},{'publish_asap':False,'photos':[]})
         self.assertEqual(director['feedback_from_gustavo'],[{'piece_date':yesterday.isoformat(),'thesis':'Evals before features.',
                                                               'comment':'Muy largo; recorta.','date':now.astimezone(operador.local_tz()).date().isoformat()}])
         self.assertIn('ideas_from_gustavo',self.calls[0][2])
