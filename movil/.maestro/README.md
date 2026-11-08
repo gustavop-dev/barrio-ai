@@ -12,7 +12,7 @@ El workflow tiene cuatro jobs:
    - Un push que solo cambia flujos, `seed_qa` o los scripts no vuelve a compilar: el job termina en segundos.
 3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
    - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
-   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
+   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada`, `02-navegacion` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
    - **Flujos:** `scripts/qa/correr-maestro.sh` corre sus flujos uno a uno y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
 4. **`qa`** junta los artefactos de todos los emuladores, compara las capturas con la referencia de `main` y cuenta la cobertura del catálogo. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
 
@@ -162,7 +162,7 @@ Para probar los estados de error y los vacíos, el backend de la QA puede hacer 
 
 ## Animaciones
 
-`scripts/qa/correr-maestro.sh` pone las escalas de animación del sistema a 1 solo para los flujos de `QA_FLUJOS_ANIMADOS` (por defecto `01-entrada 03-oficina`) y a 0 para el resto.
+`scripts/qa/correr-maestro.sh` pone las escalas de animación del sistema a 1 solo para los flujos de `QA_FLUJOS_ANIMADOS` (en el workflow, `01-entrada 02-navegacion 03-oficina`; sin la variable, `01-entrada 03-oficina`) y a 0 para el resto. `02-navegacion` la necesita: con movimiento reducido las pestañas cambian sin su push, y la pantalla en blanco al volver con atrás entre dos pantallas de la barra superior (ejecución 42451843664) solo ocurría con él.
 
 - Con 0, la app usa movimiento reducido y la escena de la Oficina queda quieta. Maestro ve cada pantalla asentarse al momento, en vez de esperar 20 a 100 s por paso sobre la escena animada con el render por software del emulador.
 - Un flujo que necesite el movimiento se añade a la lista, en el workflow (`QA_FLUJOS_ANIMADOS`), no en el flujo.
