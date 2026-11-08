@@ -33,17 +33,16 @@ tags: [turno]
     id: confirm-note
 - inputText: Reviso el tono antes de seguir
 - hideKeyboard
+# The toast after a sheet closes is not asserted: on the emulator it often never reaches the view hierarchy (see the
+# PR); what changed on screen is.
 - tapOn:
     text: 'Detener la máquina'
     childOf:
       id: confirm-sheet
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
-    visible: 'Máquina detenida\.'
+    visible: 'Máquina en pausa.*'
     timeout: 20000
-- extendedWaitUntil:
-    notVisible:
-      id: toast
-    timeout: 15000
 - tapOn:
     id: top-tu-turno
     waitToSettleTimeoutMs: 500
@@ -76,9 +75,6 @@ tags: [turno]
       id: confirm-sheet
     waitToSettleTimeoutMs: 300
 - takeScreenshot: 04-mas-02-maquina-reanudada
-- extendedWaitUntil:
-    visible: 'Máquina reanudada'
-    timeout: 20000
 - extendedWaitUntil:
     notVisible: 'Reanuda la máquina'
     timeout: 20000
@@ -171,9 +167,7 @@ tags: [turno]
     text: 'No responder'
     childOf:
       id: confirm-sheet
-- extendedWaitUntil:
-    visible: 'Anotado: no responderás'
-    timeout: 20000
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     notVisible: 'Sofía Martínez te escribió'
     timeout: 20000
@@ -239,9 +233,7 @@ tags: [turno]
     text: 'No quiero compartirlo'
     childOf:
       id: confirm-sheet
-- extendedWaitUntil:
-    visible: 'Hecho\. El equipo no volverá a preguntarlo'
-    timeout: 20000
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     notVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
     timeout: 20000

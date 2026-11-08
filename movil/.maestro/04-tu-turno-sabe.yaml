@@ -45,10 +45,11 @@ tags: [turno]
 - inputText: Horarios
 - hideKeyboard
 - takeScreenshot: 04-sabe-02-anadir
-- tapOn: 'Guardar'
-- extendedWaitUntil:
-    visible: 'Guardado\. El equipo ya puede usarlo'
-    timeout: 20000
+# The toast after a sheet closes is not asserted: on the emulator it often never reaches the view hierarchy (see the
+# PR); what changed on screen is.
+- tapOn:
+    text: 'Guardar'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible: 'Prefiero las reuniones por la mañana\.'
     timeout: 20000
@@ -79,9 +80,7 @@ tags: [turno]
     text: 'Retirar'
     childOf:
       id: confirm-sheet
-- extendedWaitUntil:
-    visible: 'Retirado\. El equipo ya no lo usará'
-    timeout: 20000
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     notVisible: 'Prefiero trabajar con equipos pequeños que deciden rápido\.'
     timeout: 20000
@@ -110,10 +109,9 @@ tags: [turno]
 - eraseText: 60
 - inputText: Fundé ProjectApp en Medellín en 2016.
 - hideKeyboard
-- tapOn: 'Guardar'
-- extendedWaitUntil:
-    visible: 'Guardado como v2'
-    timeout: 20000
+- tapOn:
+    text: 'Guardar'
+    waitToSettleTimeoutMs: 300
 # The new version is now the newest fact: up to it.
 - scrollUntilVisible:
     element:

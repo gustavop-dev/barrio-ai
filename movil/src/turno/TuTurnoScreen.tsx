@@ -124,12 +124,12 @@ function Folds({ postponedCount, postponed, recent, flash }: FoldsProps) {
 }
 
 /** «Nada depende de ti hoy» (the EmptyState look). After the last card it fades in late and its librarian rises (MovTuTurno). */
-function NothingPending({ data, afterExit }: { data: TuTurno; afterExit: boolean }) {
+function NothingPending({ data, afterExit, reduced }: { data: TuTurno; afterExit: boolean; reduced: boolean }) {
   const sentence = doneTodaySentence(data.summary?.done_today);
   const next = data.summary?.next_piece;
   return (
-    <Animated.View entering={afterExit ? turnoLayout.emptyIn() : layout.listEnter()} style={styles.empty} testID="turno-empty">
-      <Animated.View entering={afterExit ? turnoLayout.emptyPortraitIn() : undefined}>
+    <Animated.View entering={reduced ? undefined : afterExit ? turnoLayout.emptyIn() : layout.listEnter()} style={styles.empty} testID="turno-empty">
+      <Animated.View entering={afterExit && !reduced ? turnoLayout.emptyPortraitIn() : undefined}>
         <IdleLibrarian />
       </Animated.View>
       <T variant="subtitulo" center accessibilityRole="header">
@@ -223,7 +223,7 @@ export function TuTurnoScreen() {
     switch (item.kind) {
       case 'label':
         return (
-          <Animated.View entering={layout.listEnter()} exiting={turnoLayout.collapse()} style={[styles.label, styles.clip]}>
+          <Animated.View entering={reduced ? undefined : layout.listEnter()} exiting={reduced ? undefined : turnoLayout.collapse()} style={[styles.label, styles.clip]}>
             <GroupLabel name={item.name} count={item.count} intro={item.intro} />
           </Animated.View>
         );
@@ -236,10 +236,10 @@ export function TuTurnoScreen() {
         );
       }
       case 'empty':
-        return turno.data ? <NothingPending data={turno.data} afterExit={exits.state.emptyAfterExit} /> : null;
+        return turno.data ? <NothingPending data={turno.data} afterExit={exits.state.emptyAfterExit} reduced={reduced} /> : null;
       case 'folds':
         return (
-          <Animated.View entering={layout.listEnter()}>
+          <Animated.View entering={reduced ? undefined : layout.listEnter()}>
             <Folds postponedCount={item.postponed} postponed={view.postponed} recent={view.recent} flash={exits.state.flash} />
           </Animated.View>
         );
@@ -256,7 +256,11 @@ export function TuTurnoScreen() {
         data={turno.data ? rows : []}
         keyExtractor={(row: Row) => row.key}
         keyboardShouldPersistTaps="handled"
-        itemLayoutAnimation={turnoLayout.listMove()}
+        // With reduced motion nothing animates in or moves: the rows mounted later (the folds after the first
+        // batch, a group counter that changes) were left invisible on Android with the system animations off.
+        itemLayoutAnimation={reduced ? undefined : turnoLayout.listMove()}
+        // A short list: keep every row attached, so a row scrolled back into view is never left blank.
+        removeClippedSubviews={false}
         ListHeaderComponent={header}
         ListEmptyComponent={
           turno.isPending ? (
