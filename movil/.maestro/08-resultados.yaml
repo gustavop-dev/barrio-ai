@@ -11,6 +11,7 @@ tags: [resultados]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: tab-resultados
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: resultados-list

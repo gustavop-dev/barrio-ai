@@ -25,6 +25,7 @@ tags: [navegacion]
 # cubre: OFI-09
 - tapOn:
     id: tab-resultados
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: resultados-list
@@ -43,6 +44,7 @@ tags: [navegacion]
 
 - tapOn:
     id: tab-personas
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: barrio-list
@@ -58,6 +60,7 @@ tags: [navegacion]
 
 - tapOn:
     id: tab-galeria
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: screen-galeria
@@ -73,6 +76,7 @@ tags: [navegacion]
 
 - tapOn:
     id: tab-index
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: screen-oficina
@@ -91,6 +95,7 @@ tags: [navegacion]
 # They open with the push; the bottom bar stays and no bottom tab is selected.
 - tapOn:
     id: top-tu-turno
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: turno-list
@@ -109,6 +114,7 @@ tags: [navegacion]
 
 - tapOn:
     id: top-notificaciones
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: screen-notificaciones
@@ -127,6 +133,7 @@ tags: [navegacion]
 
 - tapOn:
     id: top-calendario
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: calendario
@@ -142,6 +149,7 @@ tags: [navegacion]
 
 - tapOn:
     id: top-ajustes
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: screen-ajustes
@@ -259,6 +267,7 @@ tags: [navegacion]
 # the card is gone, not that the list is there).
 - tapOn:
     id: tab-personas
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: barrio-list
@@ -285,6 +294,7 @@ tags: [navegacion]
 - takeScreenshot: 02-navegacion-14-ficha-persona
 - tapOn:
     id: top-volver
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     notVisible:
       id: persona

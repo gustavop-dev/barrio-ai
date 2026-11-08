@@ -10,6 +10,7 @@ tags: [galeria]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: tab-galeria
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: screen-galeria

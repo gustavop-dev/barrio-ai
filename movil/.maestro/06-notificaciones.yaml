@@ -22,6 +22,7 @@ tags: [notificaciones]
 - takeScreenshot: 06-notificaciones-01-campana
 - tapOn:
     id: top-notificaciones
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: screen-notificaciones

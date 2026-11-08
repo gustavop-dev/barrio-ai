@@ -13,6 +13,7 @@ tags: [personas]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: tab-personas
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: barrio-list
@@ -125,14 +126,12 @@ tags: [personas]
     visible:
       id: persona
     timeout: 20000
+# React Native flattens the header: the name is its own node (persona-name), not a child of persona-head.
 - extendedWaitUntil:
     visible:
-      text: "Laura Gómez"
-      childOf:
-        id: persona-head
+      id: persona-name
     timeout: 15000
-- assertVisible:
-    id: persona-name
+- assertVisible: "Laura Gómez"
 - assertVisible:
     text: "ENCAJA"
     childOf:

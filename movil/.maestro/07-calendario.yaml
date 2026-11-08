@@ -18,6 +18,7 @@ tags: [calendario]
 # cubre: CAL-01
 - tapOn:
     id: top-calendario
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: calendario

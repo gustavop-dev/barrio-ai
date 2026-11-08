@@ -147,14 +147,16 @@ jobs:
         run: |
           curl -fsSL "https://get.maestro.mobile.dev" | bash
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
+      # Restore and save apart: actions/cache only saves when the whole job succeeds, and this job fails on purpose
+      # when a flow fails, so the AVD snapshot would never be kept.
       - name: AVD cache
         id: avd
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-${{ env.API_LEVEL }}-x86_64-pixel_6-v1
+          key: avd-${{ env.API_LEVEL }}-x86_64-pixel_6-c3-v2
       - name: AVD · create it and save a snapshot
         if: steps.avd.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
@@ -163,10 +165,19 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          cores: 3
+          ram-size: 4096M
           force-avd-creation: false
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: echo "AVD snapshot generated."
+      - if: steps.avd.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: ${{ steps.avd.outputs.cache-primary-key }}
       - name: Maestro flows on the emulator
         id: flows
         uses: reactivecircus/android-emulator-runner@v2
@@ -177,6 +188,8 @@ jobs:
           target: google_apis
           arch: x86_64
           profile: pixel_6
+          cores: 3
+          ram-size: 4096M
           force-avd-creation: false
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false

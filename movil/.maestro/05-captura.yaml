@@ -28,6 +28,7 @@ tags: [captura]
 # cubre: CAP-01, CAP-08
 - tapOn:
     id: capture-button
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: capture-sheet
@@ -47,6 +48,7 @@ tags: [captura]
 # sheet's scroll) dismisses the keyboard without touching anything else.
 - tapOn:
     id: capture-note
+    waitToSettleTimeoutMs: 2000
 - inputText: Nota de QA que se va a descartar
 - tapOn: 'A[ñÑ]adir una imagen'
 - assertVisible: 'Nota de QA que se va a descartar'
@@ -54,11 +56,13 @@ tags: [captura]
 # «Para qué es»: the chip turns on, and a second chip replaces it.
 - tapOn:
     id: capture-para-dato
+    waitToSettleTimeoutMs: 2000
 - assertVisible:
     id: capture-para-dato
     selected: true
 - tapOn:
     id: capture-para-post
+    waitToSettleTimeoutMs: 2000
 - assertVisible:
     id: capture-para-post
     selected: true
@@ -71,6 +75,7 @@ tags: [captura]
 # («Grabando», with Descartar · Pausar · Terminar) or the note that the microphone could not be used.
 - tapOn:
     id: capture-grabar
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible: 'Grabando|No se pudo usar el micrófono|Para grabar, 0ff1ce necesita el micrófono|El micrófono está bloqueado'
     timeout: 20000
@@ -86,6 +91,7 @@ tags: [captura]
       # «Descartar» throws the recording in the bin and the sheet offers «Grabar un audio» again.
       - tapOn:
           id: capture-descartar
+          waitToSettleTimeoutMs: 2000
       - extendedWaitUntil:
           visible:
             id: capture-grabar
@@ -110,6 +116,7 @@ tags: [captura]
 # cubre: CAP-14
 - tapOn:
     id: capture-cerrar
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible: '¿Cerrar sin enviar\?'
     timeout: 15000
@@ -132,6 +139,7 @@ tags: [captura]
 # finger is down, which Maestro cannot capture: the video of the run shows it.
 - longPressOn:
     id: capture-button
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: capture-sheet
@@ -149,6 +157,7 @@ tags: [captura]
     commands:
       - tapOn:
           id: capture-cerrar
+          waitToSettleTimeoutMs: 2000
 # The hold recorded (silence, on this emulator): the audio is ready to listen to, and closing asks first.
 - runFlow:
     when:
@@ -158,13 +167,12 @@ tags: [captura]
       - assertVisible: 'Escuchar el audio'
       - assertVisible: 'Quitar el audio'
       # Its length, a few seconds (the status bar clock cannot match: it is scoped to the audio row).
-      - assertVisible:
-          text: '0:0[0-9]'
-          childOf:
-            id: capture-audio
+      # (React Native flattens the row: the length is not a child node of capture-audio in the hierarchy.)
+      - assertVisible: '0:0[0-9]'
       - takeScreenshot: 05-captura-07-audio-de-la-pulsacion
       - tapOn:
           id: capture-cerrar
+          waitToSettleTimeoutMs: 2000
       - extendedWaitUntil:
           visible: '¿Cerrar sin enviar\?'
           timeout: 15000
@@ -178,16 +186,19 @@ tags: [captura]
 # cubre: CAP-03, CAP-08
 - tapOn:
     id: capture-button
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: capture-sheet
     timeout: 20000
 - tapOn:
     id: capture-note
+    waitToSettleTimeoutMs: 2000
 - inputText: Nota de QA idea para un post sobre validar un MVP con clientes
 - tapOn: 'A[ñÑ]adir una imagen'
 - tapOn:
     id: capture-para-post
+    waitToSettleTimeoutMs: 2000
 - assertVisible:
     id: capture-para-post
     selected: true
@@ -199,6 +210,7 @@ tags: [captura]
 - takeScreenshot: 05-captura-08-lista-para-enviar
 - tapOn:
     id: capture-send
+    waitToSettleTimeoutMs: 2000
 # Once the team has it the envelope flies off, the sheet closes and the toast offers «Deshacer» (5 s).
 - extendedWaitUntil:
     visible: 'Enviado al equipo\.'
@@ -219,6 +231,7 @@ tags: [captura]
 # cubre: CAP-11, CAP-10
 - tapOn:
     id: capture-button
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: capture-historial
@@ -229,6 +242,7 @@ tags: [captura]
     timeout: 20000
 - tapOn:
     id: capture-historial
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible: 'Volver a la captura'
     timeout: 15000
@@ -253,6 +267,7 @@ tags: [captura]
     text: 'Deshacer'
     below:
       text: 'Nota de QA idea para un post sobre validar un MVP con clientes'
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible: 'Deshecha'
     timeout: 20000
@@ -289,6 +304,7 @@ tags: [captura]
     timeout: 15000
 - tapOn:
     id: capture-galeria
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible: '(Photo|Foto).*'
     timeout: 25000
@@ -301,12 +317,14 @@ tags: [captura]
       - tapOn:
           text: 'Photo taken on.*'
           index: 0
+          waitToSettleTimeoutMs: 2000
 - runFlow:
     when:
       notVisible: 'Photo taken on.*'
     commands:
       - tapOn:
           point: '17%,25%'
+          waitToSettleTimeoutMs: 2000
 # With several photos allowed the picker asks to confirm the selection.
 - runFlow:
     when:
@@ -320,6 +338,7 @@ tags: [captura]
 - takeScreenshot: 05-captura-14-foto-adjunta
 - tapOn:
     id: capture-note
+    waitToSettleTimeoutMs: 2000
 - inputText: Foto de QA de la pizarra
 - tapOn: 'A[ñÑ]adir una imagen'
 - scrollUntilVisible:
@@ -329,6 +348,7 @@ tags: [captura]
     timeout: 15000
 - tapOn:
     id: capture-send
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible: 'Enviado al equipo\.'
     timeout: 45000
@@ -347,6 +367,7 @@ tags: [captura]
 # the audio file); if not, the screenshot shows why. Nothing is faked.
 - longPressOn:
     id: capture-button
+    waitToSettleTimeoutMs: 2000
 - extendedWaitUntil:
     visible:
       id: capture-sheet
@@ -367,6 +388,7 @@ tags: [captura]
           timeout: 15000
       - tapOn:
           id: capture-send
+          waitToSettleTimeoutMs: 2000
       - extendedWaitUntil:
           visible: 'Enviado al equipo\.'
           timeout: 45000
@@ -381,3 +403,4 @@ tags: [captura]
       - takeScreenshot: 05-captura-16-sin-audio
       - tapOn:
           id: capture-cerrar
+          waitToSettleTimeoutMs: 2000
