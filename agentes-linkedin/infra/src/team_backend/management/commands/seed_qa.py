@@ -412,7 +412,10 @@ class Command(BaseCommand):
               ('ingles','relaciones_comunidad','¿Te parece bien que el equipo comente en publicaciones en inglés?','Hoy solo comenta en español.',
                'comentarios.ingles','yes_no',[],False,None,None,self.ago(days=2)),
               ('ciudad','perfil','¿En qué ciudad vives actualmente?','Para presentarte bien en el perfil y en los posts.',
-               'ubicacion.ciudad','text',[],True,None,self.at(2,9),self.ago(days=3))]
+               'ubicacion.ciudad','text',[],True,None,self.at(2,9),self.ago(days=3)),
+              # Its deadline passed: «Ya no es urgente», it does not count (TUR-13).
+              ('caducada','director_editorial','¿Fuiste al meetup de producto del martes?','Para contarlo en la pieza de ayer.',
+               'eventos.meetup_producto','yes_no',[],True,self.ago(days=1),None,self.ago(days=4))]
         for key,agent,question,purpose,memory_key,answer_type,options,public,deadline,postponed,created in rows:
             item=TeamQuestion.objects.create(id=uid(f'question:{key}'),kind='ask',agent=agent,question=question,purpose=purpose,memory_key=memory_key,
                 answer_type=answer_type,options=options,suggested_public=public,origin='qa',deadline=deadline,postponed_until=postponed)
@@ -541,7 +544,7 @@ class Command(BaseCommand):
         orientation.text='Habla a fundadores de startups latinoamericanas en etapa temprana. Evita el tono de vendedor.'
         orientation.updated_by=self.user;orientation.updated_at=self.ago(days=12);orientation.save()
         control=OperatorControl.current();control.paused=False;control.reason='';control.updated_by=None;control.updated_at=None;control.save()
-        preference=OfficePreference.current();preference.push_disabled=[];preference.gallery_ai_edit_default=True
+        preference=OfficePreference.current();preference.push_disabled=[];preference.push_enabled=[];preference.gallery_ai_edit_default=True
         preference.updated_by=None;preference.updated_at=None;preference.save()
 
     def devices(self):

@@ -1,0 +1,54 @@
+# cubre: PUS-04
+# Notificaciones · avisos push: Ajustes › Notificaciones › «Por tipo de notificación». A type whose push is off by
+# default («Conexión nueva que encaja») is turned on, and it stays on after the app starts again from scratch
+# (the switch reads what the server kept, not the screen's memory).
+appId: co.projectapp.office
+name: Notificaciones · avisos push
+tags: [notificaciones]
+---
+- runFlow: comun/entrar.yaml
+- runFlow: comun/ajustes-por-tipo.yaml
+
+# ---------------------------------------------------------------- a push that is off by default, turned on
+# cubre: PUS-04
+- scrollUntilVisible:
+    element:
+      id: push-connection_fit
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: push-connection_fit
+    text: 'Conexión nueva que encaja'
+    checked: false
+- takeScreenshot: 06-avisos-01-conexion-apagada
+- tapOn:
+    id: push-connection_fit
+- extendedWaitUntil:
+    visible: 'Push activada: Conexión nueva que encaja\.'
+    timeout: 15000
+- assertVisible:
+    id: push-connection_fit
+    checked: true
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- the server kept it: a cold start shows it on
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 45000
+- runFlow: comun/ajustes-por-tipo.yaml
+- scrollUntilVisible:
+    element:
+      id: push-connection_fit
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: push-connection_fit
+    checked: true
+- takeScreenshot: 06-avisos-02-conexion-encendida

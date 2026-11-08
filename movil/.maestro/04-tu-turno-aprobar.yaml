@@ -1,0 +1,119 @@
+# cubre: BAR-13, CAL-15, TUR-02, TUR-14
+# Tu turno · aprobar. The QA backend runs with OPERATOR_AUTONOMY empty, so the network block (RED-01, RED-02, RED-04)
+# waits for Gustavo's approval, and the seed's two proposals are Importante cards: «¿Apruebas seguir a Laura Gómez?»
+# and «¿Apruebas invitar a Julián Herrera?». Laura's follow is approved from its card: it leaves Tu turno, the top
+# bar counter drops, «Hecho recientemente» says «Aprobada» and the calendar's «En cola» lists it as approved.
+# Julián's invitation is approved from «En cola» in Calendario › Lista.
+# Card and row testIDs carry the seed's deterministic ids (seed_qa.uid): action:red01:laura and action:red02:julian.
+appId: co.projectapp.office
+name: Tu turno · aprobar
+tags: [turno]
+---
+- runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- the counter counts the two approvals
+# cubre: TUR-02
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 8 pendientes, 1 urgente'
+    timeout: 30000
+- tapOn:
+    id: top-tu-turno
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: turno-list
+    timeout: 30000
+
+# ---------------------------------------------------------------- «¿Apruebas seguir a Laura Gómez?»: Aprobar
+# cubre: BAR-13
+- scrollUntilVisible:
+    element:
+      text: '¿Apruebas seguir a Laura Gómez\?'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: 'Lidera producto en un marketplace B2B\.'
+- assertVisible:
+    text: 'Vetar'
+    childOf:
+      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1'
+- takeScreenshot: 04-aprobar-01-tarjeta
+- tapOn:
+    text: 'Aprobar'
+    childOf:
+      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1'
+- extendedWaitUntil:
+    visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
+    timeout: 20000
+- takeScreenshot: 04-aprobar-02-aprobada
+- extendedWaitUntil:
+    notVisible: '¿Apruebas seguir a Laura Gómez\?'
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 7 pendientes, 1 urgente'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- «Hecho recientemente»
+# cubre: TUR-14
+- scrollUntilVisible:
+    element:
+      text: 'Hecho recientemente · 1'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn: 'Hecho recientemente · 1'
+- extendedWaitUntil:
+    visible: 'Seguir a Laura Gómez'
+    timeout: 15000
+- assertVisible: 'APROBADA|Aprobada'
+- takeScreenshot: 04-aprobar-03-hecho-recientemente
+
+# ---------------------------------------------------------------- Calendario › Lista › «En cola»: Julián's invitation
+# cubre: CAL-15, BAR-13
+- tapOn:
+    id: top-calendario
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: calendario
+    timeout: 30000
+- tapOn:
+    text: 'Lista'
+- extendedWaitUntil:
+    visible:
+      id: calendario-lista
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: 'Invitar a Julián Herrera \(sin nota\)'
+- assertVisible: 'Espera tu aprobación.*'
+# Laura's follow, approved a moment ago, waits for the window and the spacing.
+- assertVisible:
+    id: 'en-cola-48be6cb6-07ed-5976-ac8c-0044d7f25be1'
+- assertVisible: 'Seguir a Laura Gómez'
+- takeScreenshot: 04-aprobar-04-en-cola
+- tapOn:
+    text: 'Aprobar'
+    childOf:
+      id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
+- extendedWaitUntil:
+    visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible: 'Espera tu aprobación.*'
+    timeout: 20000
+- assertVisible:
+    id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
+- takeScreenshot: 04-aprobar-05-en-cola-aprobada

@@ -61,8 +61,14 @@ class SeedQaTests(MediaMixin,OperatorBase):
 
         app=self.device()
         turno=app.get('/api/v1/tu-turno').json()
-        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen'})
-        self.assertTrue(turno['critical']);self.assertEqual(len(turno['later']),1)
+        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion'})
+        # The network block waits for approval by default (OPERATOR_AUTONOMY is empty): Laura's follow and Julián's invitation.
+        self.assertEqual(sorted(c['title'] for c in turno['items'] if c['type']=='aprobacion'),
+                         ['¿Apruebas invitar a Julián Herrera?','¿Apruebas seguir a Laura Gómez?'])
+        self.assertEqual((turno['count'],turno['urgent_count']),(8,1))
+        self.assertTrue(turno['critical']);self.assertEqual(sorted(c['state'] for c in turno['later']),['caducada','pospuesta'])
+        queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
+        self.assertEqual(sorted(q['capability'] for q in queued if q['awaiting_approval']),['RED-01','RED-02'])
         notifications=app.get('/api/v1/notificaciones').json()
         self.assertEqual(notifications['unread'],5)
         self.assertEqual({u['kind'] for u in notifications['upcoming']},{'piece_scheduled','invites_expected'})
