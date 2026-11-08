@@ -91,14 +91,14 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
       'worklet';
       if (closing.value) return;
       cancelAnimation(p);
-      start.value = p.value;
-      from.value = event.translationY;
+      start.set(p.value);
+      from.set(event.translationY);
     },
     onUpdate: (event) => {
       'worklet';
       if (closing.value) return;
       const raw = start.value - (event.translationY - from.value) / span.value;
-      p.value = Math.max(0, rubberBand(raw, full));
+      p.set(Math.max(0, rubberBand(raw, full)));
     },
     onDeactivate: (event) => {
       'worklet';
@@ -109,8 +109,8 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
         return;
       }
       if (target !== snap.value) runOnJS(haptic)('sheetSnap');
-      snap.value = target;
-      p.value = withSpring(target, firm);
+      snap.set(target);
+      p.set(withSpring(target, firm));
       runOnJS(setResting)(target);
     },
   });

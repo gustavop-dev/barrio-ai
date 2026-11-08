@@ -172,21 +172,21 @@ export function Sheet({ label, onClose, children, header, suspended, canClose, o
       'worklet';
       if (closing.value) return;
       cancelAnimation(progress);
-      moved.value = true;
-      start.value = progress.value;
-      from.value = event.translationY;
+      moved.set(true);
+      start.set(progress.value);
+      from.set(event.translationY);
     },
     onUpdate: (event) => {
       'worklet';
       if (closing.value) return;
       const raw = start.value - (event.translationY - from.value) / height.value;
-      progress.value = Math.max(0, rubberBand(raw, 1));
+      progress.set(Math.max(0, rubberBand(raw, 1)));
     },
     onDeactivate: (event) => {
       'worklet';
       if (closing.value) return;
       if (settleSnap(progress.value, -event.velocityY / height.value, [1]) === 0) runOnJS(release)();
-      else progress.value = withSpring(1, firm);
+      else progress.set(withSpring(1, firm));
     },
   });
 

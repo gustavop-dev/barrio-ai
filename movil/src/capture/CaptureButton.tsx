@@ -299,7 +299,7 @@ export function CaptureButton() {
     testID: 'capture-hold',
     onBegin: () => {
       'worklet';
-      pressedAt.value = Date.now();
+      pressedAt.set(Date.now());
     },
     onActivate: () => {
       'worklet';
@@ -308,13 +308,13 @@ export function CaptureButton() {
     onUpdate: (event) => {
       'worklet';
       if (phase.value !== RECORDING) return;
-      dy.value = holdFollow(event.translationY);
-      dx.value = holdFollow(event.translationX);
+      dy.set(holdFollow(event.translationY));
+      dx.set(holdFollow(event.translationX));
       const cancelP = discardProgress(dx.value);
-      if (cancelP > captureMotion.trashShowAt) trashOn.value = Math.max(trashOn.value, cancelP);
+      if (cancelP > captureMotion.trashShowAt) trashOn.set(Math.max(trashOn.value, cancelP));
       const decision = holdDecision(event.translationX, event.translationY);
       if (decision === 'none') return;
-      phase.value = HANDLED;
+      phase.set(HANDLED);
       if (decision === 'lock') runOnJS(lockNow)();
       else runOnJS(discardNow)();
     },
@@ -324,7 +324,7 @@ export function CaptureButton() {
     },
     onFinalize: () => {
       'worklet';
-      if (phase.value === HANDLED) phase.value = IDLE;
+      if (phase.value === HANDLED) phase.set(IDLE);
     },
   });
 

@@ -46,7 +46,7 @@ export function useVoiceLevel(target: number, live: boolean, reduced: boolean): 
     const elapsed = info.timeSincePreviousFrame ?? BOARD_FRAME_MS;
     const rate = on.value ? captureMotion.levelFollow : captureMotion.levelRelease;
     const step = 1 - Math.pow(1 - rate, elapsed / BOARD_FRAME_MS);
-    level.value += (goal.value - level.value) * step;
+    level.set(level.value + (goal.value - level.value) * step);
   }, false);
   useEffect(() => {
     frame.setActive(!reduced);

@@ -158,11 +158,11 @@ function MorphBall({ frame, stage, origin, kind }: { frame: SheetFrame; stage: S
     () => stage.element.value.known && frame.panelY.value > 0,
     (ready) => {
       if (!ready || started.value) return;
-      started.value = true;
-      morph.value = withSpring(1, flight);
+      started.set(true);
+      morph.set(withSpring(1, flight));
       if (kind === 'done') {
-        icMic.value = withTiming(0, crossfade);
-        icPlay.value = withTiming(1, crossfade);
+        icMic.set(withTiming(0, crossfade));
+        icPlay.set(withTiming(1, crossfade));
       }
     },
   );
