@@ -42,7 +42,7 @@ while (( SECONDS < deadline )); do
   if commit=$(gh api "repos/$repo/commits/$ref" --jq .sha 2> "$scratch/error.log") \
       && gh api "repos/$repo/contents/resultado.json?ref=$commit" --jq .content \
         | base64 --decode > "$scratch/resultado.json"; then
-    found=$(jq -r .sha "$scratch/resultado.json")
+    found=$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sha",""))' "$scratch/resultado.json")
     if [[ $found == "$sha" ]]; then
       out="$dest/$sha"
       if [[ -e $out ]]; then
@@ -52,11 +52,11 @@ while (( SECONDS < deadline )); do
       gh api "repos/$repo/tarball/$commit" > "$scratch/resultados.tar.gz"
       mkdir -p "$scratch/descarga" "$dest"
       tar -xzf "$scratch/resultados.tar.gz" --strip-components=1 --no-same-owner -C "$scratch/descarga"
-      [[ $(jq -r .sha "$scratch/descarga/resultado.json") == "$sha" ]]
+      [[ $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("sha",""))' "$scratch/descarga/resultado.json") == "$sha" ]]
       mv "$scratch/descarga" "$out"
       cat "$out/resumen.md"
       echo "Resultados descargados en: $out"
-      case $(jq -r .estado "$out/resultado.json") in
+      case $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("estado",""))' "$out/resultado.json") in
         ok|idle) exit 0 ;;
         *) exit 1 ;;
       esac

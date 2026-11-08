@@ -14,7 +14,8 @@ UTIL="$BIN/sesion-util.py"
 APP=co.projectapp.office
 API=http://127.0.0.1:8787
 export MAESTRO_CLI_NO_ANALYTICS=1 MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true
-export QA_DEVCLIENT_URL='oficina0ff1ce://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081'
+# disableOnboarding=1: the dev client otherwise opens its menu over the app on first launch (and after clearState).
+export QA_DEVCLIENT_URL='oficina0ff1ce://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081&disableOnboarding=1'
 export EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 OFFICE_QA_BUILD=1 EXPO_NO_DOTENV=1
 cd "$ROOT"
 
@@ -270,8 +271,8 @@ while true; do
   # gh pr view returns the closed/merged PR too; if there is no PR, branch-only sessions are allowed.
   pr_json=$(timeout 20 gh pr view "$QA_RAMA" --repo "$GITHUB_REPOSITORY" --json number,state 2> "$SESSION/pr-error.log") || pr_json=''
   if [[ -n $pr_json ]]; then
-    PR=$(jq -r .number <<< "$pr_json")
-    state=$(jq -r .state <<< "$pr_json")
+    PR=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("number",""))' <<< "$pr_json")
+    state=$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("state",""))' <<< "$pr_json")
     if [[ $state == MERGED || $state == CLOSED ]]; then
       stop_worker
       [[ -n $OUT ]] || new_output
