@@ -66,7 +66,7 @@ export function QueuedRow({ item, today, timeZone, windowOpen }: { item: QueuedI
   const sentence = queuedSentence(item);
   const awaiting = Boolean(item.awaiting_approval && item.payload_hash);
   return (
-    <View style={awaiting ? styles.rowStacked : styles.row} testID={`en-cola-${item.id}`}>
+    <View style={awaiting ? styles.rowStacked : styles.row} testID={`en-cola-${item.id}`} collapsable={false}>
       <View style={awaiting ? styles.rowTextStacked : styles.rowText}>
         <T>{sentence}</T>
         <T variant="detalle" soft>

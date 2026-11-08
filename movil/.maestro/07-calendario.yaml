@@ -462,12 +462,13 @@ tags: [calendario]
 
 # Vetar the network action: it warns that the person is discarded for good; nobody undoes it, so it goes after 5 s
 # and leaves the queue.
+# Approval rows (BAR-13) are listed first in «En cola», so pick Camila's row by its content, not by position.
 - tapOn:
     text: "Vetar"
-    below:
-      text: "EN COLA"
-    rightOf:
-      text: "Invitar a Camila Ortiz \\(sin nota\\)"
+    childOf:
+      id: "en-cola-.*"
+      containsDescendants:
+        - text: "Invitar a Camila Ortiz \\(sin nota\\)"
 - extendedWaitUntil:
     visible:
       id: confirm-sheet
