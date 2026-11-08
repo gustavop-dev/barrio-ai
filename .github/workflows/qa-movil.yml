@@ -238,9 +238,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+      # The installer downloads a GitHub release, and it exits 0 even when that download fails (a 504 left every flow
+      # «maestro: No such file or directory» while the job passed): retry until the binary answers, or fail here.
       - name: Maestro
+        env:
+          MAESTRO_CLI_NO_ANALYTICS: '1'
+          MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED: 'true'
         run: |
-          curl -fsSL "https://get.maestro.mobile.dev" | bash
+          for attempt in 1 2 3 4 5 6; do
+            rm -rf "$HOME/.maestro"
+            curl -fsSL "https://get.maestro.mobile.dev" | bash && "$HOME/.maestro/bin/maestro" --version && break
+            echo "Maestro no quedó instalado (intento $attempt); se reintenta en $((attempt * 20)) s"
+            sleep $((attempt * 20))
+          done
+          "$HOME/.maestro/bin/maestro" --version
           echo "$HOME/.maestro/bin" >> "$GITHUB_PATH"
       # Restore and save apart: actions/cache only saves when the whole job succeeds, and this job fails on purpose
       # when a flow fails, so the AVD snapshot would never be kept.
