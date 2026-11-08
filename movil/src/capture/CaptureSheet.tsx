@@ -623,7 +623,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
   const morphing = Boolean(seed.from) && opening !== null;
   const stage: Stage = {
     wrapper: useSharedValue<Point>({ x: 0, y: 0 }),
-    element: useSharedValue({ x: 0, y: 0, known: false }),
+    element: useSharedValue<Point & { known: boolean }>({ x: 0, y: 0, known: false }),
     docked: useSharedValue(!morphing),
   };
   const photoBlock = useSharedValue<Point>({ x: 0, y: 0 });
@@ -1034,8 +1034,8 @@ const styles = StyleSheet.create({
   recording: { alignItems: 'center', gap: space[3], paddingTop: space[1], paddingBottom: space[2] },
   recordingControls: { alignSelf: 'stretch', alignItems: 'center', gap: space[3] },
   ballSlot: { width: BALL, height: BALL, zIndex: 2 },
-  ring: { ...StyleSheet.absoluteFillObject, borderRadius: radius.pill, backgroundColor: colors.brand },
-  ball: { ...StyleSheet.absoluteFillObject, borderRadius: radius.pill, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
+  ring: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.pill, backgroundColor: colors.brand },
+  ball: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.pill, backgroundColor: colors.brand, alignItems: 'center', justifyContent: 'center' },
   // Paused (MovCaptura): 0ff1ce-claro with a 3 px 0ff1ce-hondo ring inside.
   ballPaused: { backgroundColor: colors.brandLight, borderWidth: 3, borderColor: colors.brandDeep },
   bin: {

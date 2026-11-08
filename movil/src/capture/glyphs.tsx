@@ -95,6 +95,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
   },
   envelope: { width: ENVELOPE.width, height: ENVELOPE.height },
-  envelopeBox: { ...StyleSheet.absoluteFillObject, borderWidth: 2, borderColor: colors.ink, borderRadius: 6, backgroundColor: colors.surface },
+  envelopeBox: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderWidth: 2, borderColor: colors.ink, borderRadius: 6, backgroundColor: colors.surface },
   flap: { position: 'absolute', left: 0, top: 0, width: 72, height: 30, transformOrigin: '36px 1px' },
 });
