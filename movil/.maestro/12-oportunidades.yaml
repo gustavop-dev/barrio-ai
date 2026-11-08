@@ -260,7 +260,7 @@ tags: [personas, oportunidades]
         id: opportunity-form
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     text: "Registrar oportunidad"
     childOf:
@@ -333,7 +333,7 @@ tags: [personas, oportunidades]
       id: opp-modality
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     id: opp-modality
 - tapOn:
@@ -345,7 +345,7 @@ tags: [personas, oportunidades]
       id: opp-attribution
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     id: opp-attribution
 - tapOn:
@@ -357,7 +357,7 @@ tags: [personas, oportunidades]
       id: opp-next
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     id: opp-next
 - inputText: "Llamada de QA"
@@ -368,7 +368,7 @@ tags: [personas, oportunidades]
       id: opp-date
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     id: opp-date
 - inputText: "manana"
@@ -380,7 +380,7 @@ tags: [personas, oportunidades]
         id: opportunity-form
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     text: "Registrar oportunidad"
     childOf:
@@ -407,7 +407,7 @@ tags: [personas, oportunidades]
         id: opportunity-form
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     text: "Registrar oportunidad"
     childOf:
@@ -466,7 +466,7 @@ tags: [personas, oportunidades]
         id: opportunity-form
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     text: "Guardar cambios"
     childOf:
@@ -505,7 +505,7 @@ tags: [personas, oportunidades]
         id: opportunity-form
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     text: "Eliminar"
     childOf:

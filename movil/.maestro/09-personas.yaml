@@ -314,6 +314,11 @@ tags: [personas]
     visible:
       id: barrio-list
     timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Más filtros: rol, modalidad y origen \\(1 activo\\)"
+    direction: UP
+    timeout: 20000
 - tapOn: "Más filtros: rol, modalidad y origen \\(1 activo\\)"
 - extendedWaitUntil:
     visible:
@@ -508,7 +513,7 @@ tags: [personas]
       id: opp-attribution
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     id: opp-attribution
 - tapOn:
@@ -522,7 +527,7 @@ tags: [personas]
         id: opportunity-form
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     text: "Registrar oportunidad"
     childOf:

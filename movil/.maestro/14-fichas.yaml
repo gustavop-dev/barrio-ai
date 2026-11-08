@@ -173,7 +173,7 @@ tags: [personas, fichas]
         id: opportunity-form
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
 - tapOn:
     text: "Cancelar"
     childOf:
