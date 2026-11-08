@@ -246,11 +246,19 @@ tags: [calendario]
     childOf:
       id: pieza
 - takeScreenshot: 07-pieza-veto-07-variante-b
-# Swipe the card right: variant A.
+# Swipe the card right: variant A. Across most of the card (the swipe from its centre is too short for the pager).
+- scrollUntilVisible:
+    element:
+      text: "VARIANTE B · COPYWRITER B"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 10000
 - swipe:
-    from:
-      id: variantes
-    direction: RIGHT
+    start: "10%, 50%"
+    end: "92%, 50%"
+    duration: 300
 - extendedWaitUntil:
     visible:
       text: "VARIANTE A · COPYWRITER A"

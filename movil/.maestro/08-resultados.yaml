@@ -270,7 +270,6 @@ tags: [resultados]
     element:
       id: res-modalidad
     direction: UP
-    centerElement: true
     timeout: 30000
 - tapOn:
     id: res-modalidad
@@ -292,7 +291,6 @@ tags: [resultados]
     element:
       id: res-modalidad
     direction: UP
-    centerElement: true
     timeout: 30000
 - tapOn:
     id: res-modalidad
@@ -329,7 +327,6 @@ tags: [resultados]
     element:
       id: res-modalidad
     direction: UP
-    centerElement: true
     timeout: 30000
 - tapOn: "1 · Negocio"
 - scrollUntilVisible:
