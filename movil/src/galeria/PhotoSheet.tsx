@@ -83,7 +83,7 @@ export function PhotoSheet({
             <T variant="etiqueta" soft accessibilityRole="header">
               Foto
             </T>
-            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar" onPress={onClose} style={styles.close}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar" onPress={onClose} style={styles.close} testID="photo-sheet-close">
               <Icon name="cerrar" size={22} color={colors.inkSoft} />
             </Pressable>
           </View>
@@ -116,7 +116,7 @@ export function PhotoSheet({
         />
         <SwitchRow label="El equipo puede editarla con IA" value={allowAi} onChange={changeAi} disabled={update.isPending} testID="photo-ai" />
         <ErrorRetry error={update.error} />
-        <Button variant="primary" block disabled={!dirty} loading={update.isPending} loadingLabel="Guardando…" onPress={save}>
+        <Button variant="primary" block disabled={!dirty} loading={update.isPending} loadingLabel="Guardando…" onPress={save} testID="photo-save">
           Guardar
         </Button>
         <Button

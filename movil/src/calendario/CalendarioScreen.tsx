@@ -45,9 +45,9 @@ function shifted(vista: Vista, fecha: string, direction: number): string {
   return vista === 'mes' ? addMonths(fecha, direction) : addDays(fecha, 7 * direction);
 }
 
-function NavButton({ label, icon, text, onPress }: { label: string; icon?: 'chevronLeft' | 'chevronRight'; text?: string; onPress: () => void }) {
+function NavButton({ label, icon, text, onPress, testID }: { label: string; icon?: 'chevronLeft' | 'chevronRight'; text?: string; onPress: () => void; testID?: string }) {
   return (
-    <Pressable accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={2} style={[styles.navButton, text ? styles.navText : null]}>
+    <Pressable testID={testID} accessibilityRole="button" accessibilityLabel={label} onPress={onPress} hitSlop={2} style={[styles.navButton, text ? styles.navText : null]}>
       {icon ? <Icon name={icon} size={20} /> : <T variant="detalle">{text}</T>}
     </Pressable>
   );
@@ -155,9 +155,9 @@ export function CalendarioScreen() {
   const nav =
     vista === 'lista' ? undefined : (
       <View style={styles.nav}>
-        <NavButton label={previousLabel} icon="chevronLeft" onPress={() => pager.current?.go(-1)} />
-        <NavButton label="Hoy" text="Hoy" onPress={() => update({ fecha: null })} />
-        <NavButton label={nextLabel} icon="chevronRight" onPress={() => pager.current?.go(1)} />
+        <NavButton label={previousLabel} icon="chevronLeft" onPress={() => pager.current?.go(-1)} testID="calendario-anterior" />
+        <NavButton label="Hoy" text="Hoy" onPress={() => update({ fecha: null })} testID="calendario-hoy" />
+        <NavButton label={nextLabel} icon="chevronRight" onPress={() => pager.current?.go(1)} testID="calendario-siguiente" />
       </View>
     );
 

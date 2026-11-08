@@ -72,6 +72,22 @@ Para comparar con el diseño, abre las capturas junto a los tableros `movil/dise
 
 Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con los mismos ids y textos. Por eso **se niega a correr** si no está `QA_SEED=permitido`, si hay un interruptor `LIVE_*` activado o si la base tiene una cuenta real de LinkedIn. La prueba `team_backend/tests/test_seed_qa.py` lo cubre en el CI normal.
 
+## Los flujos
+
+| Flujo | Qué hace |
+|---|---|
+| `01-entrada` | contraseña equivocada y su error; mostrar la contraseña; la correcta, la entrada animada y la Oficina |
+| `02-navegacion` | las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial y el «‹» de una ficha |
+| `03-oficina` | tocar un personaje de la escena y ver su hoja, arrastrarla a altura completa y cerrarla, la tira de equipos y la Biblioteca |
+| `04-tu-turno` | «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Pospuestas» y «Lo que el equipo sabe de ti» |
+| `05-captura` | abrir la hoja, escribir, «Para qué es», grabar (o lo que muestre el emulador sin micrófono), cerrar sin enviar, mantener pulsado el botón, enviar, «Lo que enviaste» y «Deshacer» |
+| `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
+| `07-calendario` | Semana, Mes y Lista; tocar días y su hoja; deslizar semanas y meses; la pieza de mañana, los pliegues de «Cómo se escribió», vetar y «Deshacer»; la pieza bloqueada y su ronda de reparación |
+| `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo»; la definición de un gráfico; tocar una barra |
+| `09-personas` | filtros por etapa y búsqueda; la ficha de una persona con una nota nueva; mover una oportunidad de etapa (y deshacerlo); la validación al añadir un referente |
+| `10-galeria` | abrir una foto, editar su nota, el interruptor de edición con IA, el visor y deslizar entre fotos |
+| `11-ajustes` | todas las secciones, Autonomía, apagar un tipo de aviso, la lista de dispositivos y cerrar sesión (va al final) |
+
 ## Escribir o cambiar un flujo
 
 - Un archivo por área (`NN-area.yaml`), que empieza con `- runFlow: comun/entrar.yaml`.

@@ -275,7 +275,7 @@ function History({ contact }: { contact: Contact }) {
   const entries = sortHistory(contact.history ?? []);
   if (!entries.length)
     return (
-      <T variant="detalle" soft>
+      <T variant="detalle" soft testID="history-empty">
         Sin eventos todavía.
       </T>
     );

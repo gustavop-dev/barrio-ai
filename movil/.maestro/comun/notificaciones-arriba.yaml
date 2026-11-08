@@ -1,0 +1,9 @@
+# Notificaciones: scrolls the list back to its header (the filters), so the next search can go down
+# from the top whatever day each notification fell on.
+appId: co.projectapp.office
+---
+- scrollUntilVisible:
+    element:
+      id: filtro-todas
+    direction: UP
+    timeout: 30000

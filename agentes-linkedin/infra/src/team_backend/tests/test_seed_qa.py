@@ -41,9 +41,11 @@ class SeedQaTests(MediaMixin,OperatorBase):
             with self.assertRaises(CommandError):self.seed()
         with patch.dict(os.environ,{'LIVE_LINKEDIN':'true'}):
             with self.assertRaises(CommandError):self.seed()
-        ConnectorAccount.objects.create(provider='unipile',external_account_id='real',label='Cuenta real')
+        before=ConnectorAccount.objects.count()
+        real=ConnectorAccount.objects.create(provider='unipile',external_account_id='real',label='Cuenta real')
         with self.assertRaises(CommandError):self.seed()
-        self.assertEqual(ConnectorAccount.objects.count(),1)
+        self.assertEqual(ConnectorAccount.objects.count(),before+1)
+        self.assertTrue(ConnectorAccount.objects.filter(pk=real.pk).exists())
 
     def test_builds_every_state_and_is_idempotent(self):
         """Catch a flow losing its data: every state the app shows exists, the API serves it, and reseeding repeats it."""

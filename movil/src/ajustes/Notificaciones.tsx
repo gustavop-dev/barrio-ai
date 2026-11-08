@@ -132,7 +132,15 @@ function PerType() {
           </T>
           <View>
             {types.map((type) => (
-              <SwitchRow key={type.kind} label={type.label} hint={pushTypeHint(type)} value={enabled(type)} disabled={save.isPending} onChange={(next) => toggle(type, next)} />
+              <SwitchRow
+                key={type.kind}
+                label={type.label}
+                hint={pushTypeHint(type)}
+                value={enabled(type)}
+                disabled={save.isPending}
+                onChange={(next) => toggle(type, next)}
+                testID={`push-${type.kind}`}
+              />
             ))}
           </View>
         </>

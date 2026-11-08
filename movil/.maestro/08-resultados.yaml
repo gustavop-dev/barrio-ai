@@ -1,0 +1,272 @@
+# Resultados. The weekly summary: the analyst's lists and proposed orientation, the previous weeks fold, «Usar como
+# orientación» then «Deshacer» and «Descartar» then «Deshacer» (the card says what was decided, and the buttons come
+# back). «Periodo» 7 / 90 / 28 días: the period note and the impressions chart change with it (28 días has the posts
+# of T-8 and T-3, 7 días only T-3). The chart's ⓘ opens its definition, and a bar opens its piece.
+# Text in the «etiqueta» style (section labels, badges) is uppercased on screen, so it is written in capitals here.
+appId: co.projectapp.office
+name: Resultados
+tags: [resultados]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-resultados
+- extendedWaitUntil:
+    visible:
+      id: resultados-list
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: resumen-semanal
+    timeout: 20000
+- assertVisible:
+    text: "RESUMEN DE LA SEMANA"
+    childOf:
+      id: resumen-semanal
+- scrollUntilVisible:
+    element:
+      text: "LO QUE FUNCIONÓ"
+      childOf:
+        id: resumen-semanal
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- takeScreenshot: 08-resultados-01-resumen
+
+# ---------------------------------------------------------------- the weekly summary
+- scrollUntilVisible:
+    element:
+      text: "Prioriza posts sobre cómo validar un MVP.*"
+      childOf:
+        id: resumen-semanal
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "ORIENTACIÓN PROPUESTA"
+    childOf:
+      id: resumen-semanal
+- assertVisible:
+    id: resumen-usar
+- takeScreenshot: 08-resultados-02-orientacion
+# The previous week, folded: it was used as the orientation.
+- scrollUntilVisible:
+    element:
+      text: "Ver semanas anteriores · \\d+"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Ver semanas anteriores · \\d+"
+- extendedWaitUntil:
+    visible:
+      text: "USADO COMO ORIENTACIÓN"
+      childOf:
+        id: resumen-semanal
+    timeout: 10000
+- takeScreenshot: 08-resultados-03-semanas-anteriores
+- tapOn:
+    text: "Ver semanas anteriores · \\d+"
+- extendedWaitUntil:
+    notVisible:
+      text: "USADO COMO ORIENTACIÓN"
+      childOf:
+        id: resumen-semanal
+    timeout: 10000
+
+# «Usar como orientación»: the toast offers «Deshacer» for 5 s and the card already says it was used; undo at once.
+- scrollUntilVisible:
+    element:
+      id: resumen-usar
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    id: resumen-usar
+- extendedWaitUntil:
+    visible:
+      text: "Orientación actualizada.*"
+      childOf:
+        id: toast
+    timeout: 15000
+- assertVisible:
+    text: "La usaste como orientación del equipo.*"
+    childOf:
+      id: resumen-semanal
+- tapOn:
+    text: "Deshacer"
+    childOf:
+      id: toast
+- extendedWaitUntil:
+    visible:
+      text: "Deshecho"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: resumen-usar
+    timeout: 10000
+- assertVisible:
+    id: resumen-descartar
+- assertNotVisible:
+    text: "La usaste como orientación del equipo.*"
+- takeScreenshot: 08-resultados-04-orientacion-deshecha
+
+# «Descartar», then «Deshacer».
+- tapOn:
+    id: resumen-descartar
+- extendedWaitUntil:
+    visible:
+      text: "Resumen descartado"
+      childOf:
+        id: toast
+    timeout: 15000
+- assertVisible:
+    text: "La descartaste.*"
+    childOf:
+      id: resumen-semanal
+- tapOn:
+    text: "Deshacer"
+    childOf:
+      id: toast
+- extendedWaitUntil:
+    visible:
+      text: "Deshecho"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: resumen-descartar
+    timeout: 10000
+- assertNotVisible:
+    text: "La descartaste.*"
+- takeScreenshot: 08-resultados-05-descarte-deshecho
+
+# ---------------------------------------------------------------- Periodo: 28 días (default), 7, 90 and back to 28
+- scrollUntilVisible:
+    element:
+      id: res-periodo
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: ".*Todo se compara con los 28 días anteriores.*"
+- takeScreenshot: 08-resultados-06-periodo-28
+# 28 días: two posts in the impressions chart.
+- scrollUntilVisible:
+    element:
+      text: "Post 1, .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Post 2, .*"
+- takeScreenshot: 08-resultados-07-grafico-28
+# 7 días: the note says so, and only the post of three days ago is left.
+- scrollUntilVisible:
+    element:
+      id: res-periodo
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "7 días"
+    childOf:
+      id: res-periodo
+- extendedWaitUntil:
+    visible: ".*Todo se compara con los 7 días anteriores.*"
+    timeout: 20000
+- takeScreenshot: 08-resultados-08-periodo-7
+- scrollUntilVisible:
+    element:
+      text: "Post 1, .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertNotVisible: "Post 2, .*"
+- takeScreenshot: 08-resultados-09-grafico-7
+# 90 días, then 28 días again.
+- scrollUntilVisible:
+    element:
+      id: res-periodo
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "90 días"
+    childOf:
+      id: res-periodo
+- extendedWaitUntil:
+    visible: ".*Todo se compara con los 90 días anteriores.*"
+    timeout: 20000
+- takeScreenshot: 08-resultados-10-periodo-90
+- tapOn:
+    text: "28 días"
+    childOf:
+      id: res-periodo
+- extendedWaitUntil:
+    visible: ".*Todo se compara con los 28 días anteriores.*"
+    timeout: 20000
+
+# ---------------------------------------------------------------- the impressions chart: its ⓘ and a bar
+- scrollUntilVisible:
+    element:
+      text: "Definición de Impresiones por post.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "Definición de Impresiones por post.*"
+- extendedWaitUntil:
+    visible:
+      id: definition-sheet
+    timeout: 10000
+- assertVisible:
+    text: "Impresiones de cada post a los 7 días.*"
+    childOf:
+      id: definition-sheet
+- takeScreenshot: 08-resultados-11-definicion-grafico
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: definition-sheet
+- extendedWaitUntil:
+    notVisible:
+      id: definition-sheet
+    timeout: 10000
+# A bar opens its piece: published, with its result by cut.
+- scrollUntilVisible:
+    element:
+      text: "Post 1, .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Post 1, .*"
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "PUBLICADA"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "Salió a las .*"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      id: corte-24h
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 08-resultados-12-pieza-de-la-barra
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+- assertVisible:
+    id: resultados-list

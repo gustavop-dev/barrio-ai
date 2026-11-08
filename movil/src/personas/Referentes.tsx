@@ -67,10 +67,10 @@ function AddReferentSheet({ account, onClose }: { account: string; onClose: () =
       />
       <ErrorRetry error={add.error} />
       <View style={styles.actions}>
-        <Button variant="primary" block loading={add.isPending} loadingLabel="Guardando…" onPress={submit}>
+        <Button variant="primary" block loading={add.isPending} loadingLabel="Guardando…" onPress={submit} testID="referent-submit">
           Añadir referente
         </Button>
-        <Button block onPress={onClose} disabled={add.isPending}>
+        <Button block onPress={onClose} disabled={add.isPending} testID="referent-cancel">
           Cancelar
         </Button>
       </View>
@@ -174,7 +174,7 @@ export function Referentes({ header }: { header: ReactNode }) {
           <Select label="Cuenta" value={account} options={accounts.data.map((item) => ({ value: item.id, label: item.label }))} onChange={setChosen} testID="referent-account" />
         ) : null}
         <View style={styles.buttons}>
-          <Button variant="primary" block icon={<Icon name="plus" size={20} color={colors.onBrand} />} onPress={() => setAdding(true)}>
+          <Button variant="primary" block icon={<Icon name="plus" size={20} color={colors.onBrand} />} onPress={() => setAdding(true)} testID="referent-add">
             Añadir referente
           </Button>
           <Button

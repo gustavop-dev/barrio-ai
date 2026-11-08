@@ -1,0 +1,9 @@
+# Tu turno: scrolls the list back to its header (the «Pendiente» tab), so the next search can go down
+# from the top whatever order the cards came in.
+appId: co.projectapp.office
+---
+- scrollUntilVisible:
+    element:
+      text: Pendiente
+    direction: UP
+    timeout: 30000

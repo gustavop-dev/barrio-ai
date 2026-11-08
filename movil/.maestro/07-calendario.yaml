@@ -1,0 +1,700 @@
+# Calendario and the piece detail. Semana, Mes and Lista; swiping the week strip and the month turns them and the
+# range under the title follows; a tapped day opens its panel in a sheet (half height, then dragged to full) and
+# the panel under the calendar keeps that day; the T+1 piece opens from it, is vetoed and the veto undone, and every
+# fold of «Cómo se escribió» opens with its content (the variants also swipe); the blocked piece (T-2) opens from
+# its day's event and shows «Ronda de reparación».
+# Dates come from comun/calendario-fechas.js (Bogotá's today, as the app computes it); the range under the title
+# may end in « · Horas de Bogotá» if the device zone differs, hence the «.*». Text in the «etiqueta»
+# style (badges, section labels) is uppercased on screen, so it is written in capitals here.
+appId: co.projectapp.office
+name: Calendario
+tags: [calendario]
+---
+- runFlow: comun/entrar.yaml
+- runScript: comun/calendario-fechas.js
+
+# ---------------------------------------------------------------- Semana: today's week, its range in the header
+- tapOn:
+    id: top-calendario
+- extendedWaitUntil:
+    visible:
+      id: calendario
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: pager-semana
+    timeout: 20000
+- assertVisible:
+    id: "dia-${output.hoy}"
+- assertVisible: "${output.semanaHoy}.*"
+- takeScreenshot: 07-calendario-01-semana
+
+# Swipe the strip left: next week, its days and its range.
+- swipe:
+    from:
+      id: pager-semana
+    direction: LEFT
+- extendedWaitUntil:
+    visible: "${output.semanaSiguiente}.*"
+    timeout: 10000
+- assertVisible:
+    id: "dia-${output.diaSemanaSiguiente}"
+- assertNotVisible:
+    id: "dia-${output.hoy}"
+- takeScreenshot: 07-calendario-02-semana-siguiente
+# Right twice: back to this week, then the previous one.
+- swipe:
+    from:
+      id: pager-semana
+    direction: RIGHT
+- extendedWaitUntil:
+    visible: "${output.semanaHoy}.*"
+    timeout: 10000
+- assertVisible:
+    id: "dia-${output.hoy}"
+- swipe:
+    from:
+      id: pager-semana
+    direction: RIGHT
+- extendedWaitUntil:
+    visible: "${output.semanaAnterior}.*"
+    timeout: 10000
+- assertVisible:
+    id: "dia-${output.diaSemanaAnterior}"
+- takeScreenshot: 07-calendario-03-semana-anterior
+# «Hoy» brings today's week back.
+- tapOn:
+    id: calendario-hoy
+- extendedWaitUntil:
+    visible:
+      id: "dia-${output.hoy}"
+    timeout: 10000
+- assertVisible: "${output.semanaHoy}.*"
+
+# ---------------------------------------------------------------- Mes: the grid, swiped to the next month and back
+- tapOn:
+    text: "Mes"
+    childOf:
+      id: vista
+- extendedWaitUntil:
+    visible:
+      id: rejilla-mes
+    timeout: 10000
+- assertVisible:
+    id: pager-mes
+- assertNotVisible:
+    id: pager-semana
+- assertVisible: "${output.mesHoy}.*"
+- assertVisible:
+    id: "dia-${output.mitadMes}"
+- takeScreenshot: 07-calendario-04-mes
+- swipe:
+    from:
+      id: pager-mes
+    direction: LEFT
+- extendedWaitUntil:
+    visible: "${output.mesSiguiente}.*"
+    timeout: 10000
+- assertVisible:
+    id: "dia-${output.mitadMesSiguiente}"
+- assertNotVisible:
+    id: "dia-${output.mitadMes}"
+- takeScreenshot: 07-calendario-05-mes-siguiente
+- swipe:
+    from:
+      id: pager-mes
+    direction: RIGHT
+- extendedWaitUntil:
+    visible: "${output.mesHoy}.*"
+    timeout: 10000
+- assertVisible:
+    id: "dia-${output.mitadMes}"
+- tapOn:
+    id: calendario-hoy
+
+# ---------------------------------------------------------------- Lista: «Próximo» with tomorrow's piece, then what happened
+- tapOn:
+    text: "Lista"
+    childOf:
+      id: vista
+- extendedWaitUntil:
+    visible:
+      id: calendario-lista
+    timeout: 10000
+- assertNotVisible:
+    id: pager-mes
+- assertVisible: "PRÓXIMO"
+- extendedWaitUntil:
+    visible:
+      text: "Documentar decisiones vale más que documentar tareas"
+      childOf:
+        id: calendario-lista
+    timeout: 20000
+- assertVisible:
+    text: "PROGRAMADA"
+    childOf:
+      id: calendario-lista
+- takeScreenshot: 07-calendario-06-lista
+- scrollUntilVisible:
+    element:
+      text: "LO QUE PASÓ"
+      childOf:
+        id: calendario-lista
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "actividad-.*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- takeScreenshot: 07-calendario-07-lista-actividad
+# Back to Semana (the switch scrolled away with the list).
+- scrollUntilVisible:
+    element:
+      text: "Semana"
+      childOf:
+        id: vista
+    direction: UP
+    timeout: 20000
+- tapOn:
+    text: "Semana"
+    childOf:
+      id: vista
+- extendedWaitUntil:
+    visible:
+      id: pager-semana
+    timeout: 10000
+- assertNotVisible:
+    id: calendario-lista
+
+# ---------------------------------------------------------------- days: the panel opens in a sheet
+# Today: the sheet opens at half height with today's heading and «Hoy»; the week stays visible above it.
+- tapOn:
+    id: "dia-${output.hoy}"
+- extendedWaitUntil:
+    visible:
+      id: panel-dia-hoja
+    timeout: 10000
+- assertVisible:
+    id: hoja-dia
+- assertVisible:
+    text: "${output.hoyTitulo}"
+    childOf:
+      id: hoja-dia
+- assertVisible:
+    text: "HOY"
+    childOf:
+      id: hoja-dia
+- takeScreenshot: 07-calendario-08-hoja-hoy
+# Tomorrow, with the sheet still open (on Sunday tomorrow is in the next week: that case turns the week first).
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.manana}"
+    commands:
+      - tapOn:
+          id: calendario-siguiente
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.manana}"
+          timeout: 10000
+- tapOn:
+    id: "dia-${output.manana}"
+- extendedWaitUntil:
+    visible:
+      text: "${output.mananaTitulo}"
+      childOf:
+        id: hoja-dia
+    timeout: 10000
+- assertVisible:
+    text: "PROGRAMADO"
+    childOf:
+      id: hoja-dia
+- takeScreenshot: 07-calendario-09-hoja-manana
+# Drag the handle up: the sheet goes to full height and shows the day's piece, «Programada».
+- swipe:
+    from:
+      text: "Altura del panel"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      text: "Documentar decisiones vale más que documentar tareas"
+      childOf:
+        id: panel-dia-hoja
+    timeout: 10000
+- assertVisible:
+    text: "PROGRAMADA"
+    childOf:
+      id: panel-dia-hoja
+- takeScreenshot: 07-calendario-10-hoja-completa
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+
+# ---------------------------------------------------------------- the T+1 piece, from the panel under the calendar
+- scrollUntilVisible:
+    element:
+      text: "Ver cómo se escribió"
+      childOf:
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Ver cómo se escribió"
+    childOf:
+      id: panel-dia
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.mananaLargo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "PROGRAMADA"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "Sale mañana a las .*"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "El equipo publica solo.*"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-11-pieza-programada
+
+# Vetar: the confirmation asks for a note; without it «Vetar» does nothing.
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- assertVisible:
+    text: "Vetar la pieza"
+    childOf:
+      id: confirm-sheet
+- assertVisible:
+    text: "La pieza no saldrá.*"
+    childOf:
+      id: confirm-sheet
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: confirm-sheet
+- assertVisible:
+    id: confirm-sheet
+- assertNotVisible:
+    id: toast
+- takeScreenshot: 07-calendario-12-veto-sin-nota
+- tapOn:
+    id: confirm-note
+- inputText: "Prueba de QA, no debe salir"
+- hideKeyboard
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: confirm-sheet
+# «Vetada» with «Deshacer» for 5 s: undo at once (no screenshot in between, the window is short on the emulator).
+- extendedWaitUntil:
+    visible:
+      text: "Vetada"
+      childOf:
+        id: toast
+    timeout: 5000
+- tapOn:
+    text: "Deshacer"
+    childOf:
+      id: toast
+- extendedWaitUntil:
+    visible:
+      text: "Veto deshecho"
+      childOf:
+        id: toast
+    timeout: 5000
+- assertNotVisible:
+    id: confirm-sheet
+- assertVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "PROGRAMADA"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-13-veto-deshecho
+
+# ---------------------------------------------------------------- «Cómo se escribió»: every fold, with content inside
+# Brief: open (thesis), then closed again.
+- scrollUntilVisible:
+    element:
+      text: "Brief"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "Brief"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "Documentar decisiones vale más que documentar tareas"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "TESIS"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-14-brief
+- scrollUntilVisible:
+    element:
+      text: "Brief"
+      childOf:
+        id: pieza
+    direction: UP
+    timeout: 15000
+- tapOn:
+    text: "Brief"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    notVisible:
+      text: "TESIS"
+      childOf:
+        id: pieza
+    timeout: 10000
+
+# Variantes A y B: B was chosen, so the pager starts on B («Elegida») with A off to the left.
+- scrollUntilVisible:
+    element:
+      text: "Variantes A y B"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Variantes A y B"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      id: variantes
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "VARIANTE B · COPYWRITER B"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "ELEGIDA"
+    childOf:
+      id: variantes
+- assertNotVisible:
+    text: "VARIANTE A · COPYWRITER A"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-15-variante-b
+# Swipe the card right: variant A.
+- swipe:
+    from:
+      id: variantes
+    direction: RIGHT
+- extendedWaitUntil:
+    visible:
+      text: "VARIANTE A · COPYWRITER A"
+      childOf:
+        id: pieza
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      text: "VARIANTE B · COPYWRITER B"
+      childOf:
+        id: pieza
+    timeout: 10000
+- takeScreenshot: 07-calendario-16-variante-a
+# Its tab brings B back.
+- tapOn:
+    text: "Variante B · Elegida"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      text: "VARIANTE B · COPYWRITER B"
+      childOf:
+        id: pieza
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      text: "VARIANTE A · COPYWRITER A"
+      childOf:
+        id: pieza
+    timeout: 10000
+
+# Panel de lectores: the five simulated readers.
+- scrollUntilVisible:
+    element:
+      text: "Panel de lectores"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Panel de lectores"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "Cinco perspectivas simuladas.*"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-calendario-17-panel
+
+# Selección: the decision, «Variante B».
+- scrollUntilVisible:
+    element:
+      text: "Selección"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Selección"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "Variante B"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "DECISIÓN"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-18-seleccion
+
+# Verificador: approved, with what the guards did.
+- scrollUntilVisible:
+    element:
+      text: "Verificador"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Verificador"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "(Sin correcciones de las guardas|Las guardas corrigieron al modelo|El verificador no llegó a leerla.*)"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "APROBADA"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-19-verificador
+
+# Fuentes y coste: the cost per stage and its total. No repair round on this piece.
+- scrollUntilVisible:
+    element:
+      text: "Fuentes y coste"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    text: "Ronda de reparación"
+    childOf:
+      id: pieza
+- tapOn:
+    text: "Fuentes y coste"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "COSTE"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Total"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-calendario-20-fuentes-coste
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+- assertVisible:
+    id: calendario
+
+# ---------------------------------------------------------------- the blocked piece (T-2)
+- scrollUntilVisible:
+    element:
+      id: calendario-hoy
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: calendario-hoy
+- extendedWaitUntil:
+    visible:
+      id: "dia-${output.hoy}"
+    timeout: 10000
+# On Monday and Tuesday two days ago is in the previous week.
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.anteayer}"
+    commands:
+      - tapOn:
+          id: calendario-anterior
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.anteayer}"
+          timeout: 10000
+- tapOn:
+    id: "dia-${output.anteayer}"
+- extendedWaitUntil:
+    visible:
+      text: "${output.anteayerTitulo}"
+      childOf:
+        id: hoja-dia
+    timeout: 10000
+- assertVisible:
+    text: "PASADO"
+    childOf:
+      id: hoja-dia
+- swipe:
+    from:
+      text: "Altura del panel"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      text: "Qué aprendí cobrando por mi primer proyecto"
+      childOf:
+        id: panel-dia-hoja
+    timeout: 10000
+- assertVisible:
+    text: "BLOQUEADA POR EL VERIFICADOR"
+    childOf:
+      id: panel-dia-hoja
+- takeScreenshot: 07-calendario-21-hoja-bloqueada
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+# «Lo importante del día» under the calendar: the verifier's block, whose «Abrir» opens the piece.
+- scrollUntilVisible:
+    element:
+      id: "evento-piece_blocked:.*"
+      childOf:
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "El verificador bloqueó la pieza"
+    childOf:
+      id: "evento-piece_blocked:.*"
+- takeScreenshot: 07-calendario-22-evento-bloqueo
+- tapOn:
+    text: "Abrir"
+    childOf:
+      id: "evento-piece_blocked:.*"
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.anteayerLargo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "BLOQUEADA POR EL VERIFICADOR"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "El verificador bloqueó la pieza"
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-23-pieza-bloqueada
+- scrollUntilVisible:
+    element:
+      text: "Ronda de reparación"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "Ronda de reparación"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "SIGUIÓ BLOQUEADA"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "La pid(ió el verificador|ieron las reglas de publicación)"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-calendario-24-ronda-reparacion
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+- assertVisible:
+    id: calendario

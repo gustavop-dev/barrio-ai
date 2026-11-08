@@ -170,7 +170,7 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
     <View style={styles.wrap}>
       <View style={[styles.bar, { paddingTop: insets.top, height: shell.topBarHeight + insets.top }]}>
         {back ? (
-          <Pressable accessibilityRole="button" onPress={back.onPress} style={styles.back}>
+          <Pressable accessibilityRole="button" onPress={back.onPress} style={styles.back} testID="top-volver">
             <Icon name="chevronLeft" size={20} />
             <T>{back.label}</T>
           </Pressable>

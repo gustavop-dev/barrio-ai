@@ -235,7 +235,7 @@ export function PhotoViewer({
             <T variant="detalle" color={colors.paper} testID="photo-viewer-count">
               {photos.length > 1 ? `${current + 1} de ${photos.length}` : ''}
             </T>
-            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar" onPress={onClose} style={styles.close} hitSlop={4}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Cerrar" onPress={onClose} style={styles.close} hitSlop={4} testID="photo-viewer-close">
               <Icon name="cerrar" size={24} color={colors.paper} />
             </Pressable>
           </View>

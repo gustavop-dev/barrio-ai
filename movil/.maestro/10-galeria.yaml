@@ -1,0 +1,185 @@
+# Galería: the grid of the seeded photos and a filter; the photo sheet of «Nueva» (note typed and saved, the
+# AI-edit switch turned off, both still there when it opens again); the full-screen viewer closed by dragging
+# the photo down, and by «Cerrar» after swiping to the next photo (the sheet then follows that photo).
+# Photos, newest first: Nueva (today), Sin usar (3 days, note «Pizarra de la sesión de producto»), Elegida, Publicada.
+appId: co.projectapp.office
+name: Galería
+tags: [galeria]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-galeria
+- extendedWaitUntil:
+    visible:
+      id: screen-galeria
+    timeout: 20000
+- assertVisible: "Fotos para tus posts\\."
+# Tiles are labelled «Foto del <día>, <estado>».
+- extendedWaitUntil:
+    visible: "Foto.*, nueva"
+    timeout: 20000
+- assertVisible: "Foto.*, sin usar"
+- assertVisible: "Foto.*, elegida.*"
+- assertVisible: "Foto.*, publicada.*"
+- assertVisible:
+    id: filtro-todas
+    selected: true
+- takeScreenshot: 10-galeria-01-rejilla
+
+# ---------------------------------------------------------------- a filter
+- tapOn:
+    id: filtro-publicadas
+- extendedWaitUntil:
+    notVisible: "Foto.*, nueva"
+    timeout: 15000
+- assertVisible: "Foto.*, publicada.*"
+- assertNotVisible: "Foto.*, sin usar"
+- assertVisible:
+    id: filtro-publicadas
+    selected: true
+- takeScreenshot: 10-galeria-02-filtro-publicadas
+- tapOn:
+    id: filtro-todas
+- extendedWaitUntil:
+    visible: "Foto.*, nueva"
+    timeout: 15000
+
+# ---------------------------------------------------------------- the photo sheet: note and AI switch
+- tapOn: "Foto.*, nueva"
+- extendedWaitUntil:
+    visible:
+      id: photo-sheet
+    timeout: 15000
+- assertVisible: "Todavía sin usar"
+- assertVisible:
+    id: photo-ai
+    checked: true
+- assertVisible:
+    id: photo-save
+    enabled: false
+- takeScreenshot: 10-galeria-03-foto-abierta
+
+# The note is ASCII on purpose (Maestro types non-ASCII text through a slower path on Android).
+- tapOn:
+    id: photo-note
+- inputText: Recortala para que no se lean nombres de clientes
+# A tap on plain text of the sheet dismisses the keyboard (keyboardShouldPersistTaps="handled"); unlike
+# hideKeyboard (Android back) it cannot close the sheet when the emulator shows no soft keyboard.
+- tapOn: "Todavía sin usar"
+# Conditional on purpose: only if Gboard is still up, hide it (back with the keyboard down would close the sheet).
+- runFlow:
+    when:
+      visible:
+        id: "com\\.google\\.android\\.inputmethod\\.latin:id/.*"
+    commands:
+      - hideKeyboard
+- assertVisible:
+    id: photo-note
+    text: Recortala para que no se lean nombres de clientes
+- tapOn:
+    id: photo-ai
+- assertVisible:
+    id: photo-ai
+    checked: false
+- assertVisible:
+    id: photo-save
+    enabled: true
+- takeScreenshot: 10-galeria-04-nota-y-switch
+- tapOn:
+    id: photo-save
+- extendedWaitUntil:
+    visible: "Foto guardada\\."
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: photo-sheet
+    timeout: 15000
+- takeScreenshot: 10-galeria-05-guardada
+
+# Open it again: the saved note and the switch come from the server.
+- tapOn: "Foto.*, nueva"
+- extendedWaitUntil:
+    visible:
+      id: photo-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      id: photo-note
+      text: Recortala para que no se lean nombres de clientes
+    timeout: 10000
+- assertVisible:
+    id: photo-ai
+    checked: false
+# The big image is labelled with the saved note.
+- assertVisible:
+    id: photo-sheet-image
+    text: "Foto: Recortala para que no se lean nombres de clientes"
+- takeScreenshot: 10-galeria-06-nota-guardada
+
+# ---------------------------------------------------------------- the viewer
+# Drag the photo down to close it: back to the same sheet.
+- tapOn:
+    id: photo-sheet-image
+- extendedWaitUntil:
+    visible:
+      id: photo-viewer
+    timeout: 15000
+- assertVisible:
+    id: photo-viewer-count
+    text: 1 de 4
+- takeScreenshot: 10-galeria-07-visor
+- swipe:
+    start: "50%, 40%"
+    end: "50%, 80%"
+    duration: 500
+- extendedWaitUntil:
+    notVisible:
+      id: photo-viewer
+    timeout: 10000
+- assertVisible:
+    id: photo-sheet-image
+    text: "Foto: Recortala para que no se lean nombres de clientes"
+
+# Again, swipe to the next photo and close with «Cerrar»: the sheet now shows that photo (no unsaved changes).
+- tapOn:
+    id: photo-sheet-image
+- extendedWaitUntil:
+    visible:
+      id: photo-viewer
+    timeout: 15000
+- swipe:
+    start: "85%, 50%"
+    end: "15%, 50%"
+    duration: 400
+- extendedWaitUntil:
+    visible:
+      id: photo-viewer-count
+      text: 2 de 4
+    timeout: 10000
+- takeScreenshot: 10-galeria-08-visor-siguiente
+- tapOn:
+    id: photo-viewer-close
+- extendedWaitUntil:
+    notVisible:
+      id: photo-viewer
+    timeout: 10000
+- extendedWaitUntil:
+    visible:
+      id: photo-note
+      text: Pizarra de la sesión de producto
+    timeout: 10000
+- assertVisible:
+    id: photo-ai
+    checked: true
+- takeScreenshot: 10-galeria-09-sigue-la-foto
+
+# Close the sheet with its «×».
+- tapOn:
+    id: photo-sheet-close
+- extendedWaitUntil:
+    notVisible:
+      id: photo-sheet
+    timeout: 10000
+- assertVisible:
+    id: screen-galeria
+- takeScreenshot: 10-galeria-10-cerrada

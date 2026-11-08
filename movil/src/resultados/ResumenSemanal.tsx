@@ -93,10 +93,10 @@ function Proposal({ summary, onDecide, busy, error }: { summary: WeeklySummary; 
             Si la usas, sustituye la orientación del equipo (Ajustes). Podrás deshacerlo durante 5 segundos.
           </T>
           <View style={styles.actions}>
-            <Button variant="primary" block disabled={busy} onPress={() => onDecide(summary, 'aplicar')}>
+            <Button variant="primary" block disabled={busy} onPress={() => onDecide(summary, 'aplicar')} testID="resumen-usar">
               Usar como orientación
             </Button>
-            <Button variant="danger" block disabled={busy} onPress={() => onDecide(summary, 'descartar')}>
+            <Button variant="danger" block disabled={busy} onPress={() => onDecide(summary, 'descartar')} testID="resumen-descartar">
               Descartar
             </Button>
           </View>

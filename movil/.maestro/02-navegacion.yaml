@@ -1,0 +1,296 @@
+# Navegación: the shell. Every bottom-bar tab, the four top-bar accesses, Android back through the tab history
+# (backBehavior="history": each visit moves the tab to the end of the history, back pops it), a detail screen
+# (the person card) closed with its «‹ Personas», and the 0ff1ce signature back to the Oficina.
+# Each screen is recognised by a testID only it has; inactive tabs are detached, so «notVisible» proves it left.
+appId: co.projectapp.office
+name: Navegación
+tags: [navegacion]
+---
+- runFlow: comun/entrar.yaml
+- assertVisible:
+    id: tab-index
+    selected: true
+- takeScreenshot: 02-navegacion-01-oficina
+
+# ---------------------------------------------------------------- bottom bar: Resultados, Personas, Galería, Oficina
+- tapOn:
+    id: tab-resultados
+- extendedWaitUntil:
+    visible:
+      id: resultados-list
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-oficina
+    timeout: 10000
+- assertVisible:
+    id: tab-resultados
+    selected: true
+- assertVisible:
+    id: tab-index
+    selected: false
+- takeScreenshot: 02-navegacion-02-resultados
+
+- tapOn:
+    id: tab-personas
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: resultados-list
+    timeout: 10000
+- assertVisible:
+    id: tab-personas
+    selected: true
+- takeScreenshot: 02-navegacion-03-personas
+
+- tapOn:
+    id: tab-galeria
+- extendedWaitUntil:
+    visible:
+      id: screen-galeria
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: barrio-list
+    timeout: 10000
+- assertVisible:
+    id: tab-galeria
+    selected: true
+- takeScreenshot: 02-navegacion-04-galeria
+
+- tapOn:
+    id: tab-index
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-galeria
+    timeout: 10000
+- assertVisible:
+    id: tab-index
+    selected: true
+- takeScreenshot: 02-navegacion-05-oficina-otra-vez
+
+# ---------------------------------------------------------------- top bar: Tu turno, Notificaciones, Calendario, Ajustes
+# They open with the push; the bottom bar stays and no bottom tab is selected.
+- tapOn:
+    id: top-tu-turno
+- extendedWaitUntil:
+    visible:
+      id: turno-list
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-oficina
+    timeout: 10000
+- assertVisible:
+    id: top-tu-turno
+    selected: true
+- assertVisible:
+    id: tab-index
+    selected: false
+- takeScreenshot: 02-navegacion-06-tu-turno
+
+- tapOn:
+    id: top-notificaciones
+- extendedWaitUntil:
+    visible:
+      id: screen-notificaciones
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: turno-list
+    timeout: 10000
+- assertVisible:
+    id: top-notificaciones
+    selected: true
+- assertVisible:
+    id: top-tu-turno
+    selected: false
+- takeScreenshot: 02-navegacion-07-notificaciones
+
+- tapOn:
+    id: top-calendario
+- extendedWaitUntil:
+    visible:
+      id: calendario
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-notificaciones
+    timeout: 10000
+- assertVisible:
+    id: top-calendario
+    selected: true
+- takeScreenshot: 02-navegacion-08-calendario
+
+- tapOn:
+    id: top-ajustes
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: calendario
+    timeout: 10000
+- assertVisible:
+    id: top-ajustes
+    selected: true
+- takeScreenshot: 02-navegacion-09-ajustes
+
+# ---------------------------------------------------------------- Android back through the tab history
+# History now: Resultados, Personas, Galería, Oficina, Tu turno, Notificaciones, Calendario, Ajustes.
+- back
+- extendedWaitUntil:
+    visible:
+      id: calendario
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-ajustes
+    timeout: 10000
+- assertVisible:
+    id: top-calendario
+    selected: true
+- takeScreenshot: 02-navegacion-10-atras-calendario
+
+- back
+- extendedWaitUntil:
+    visible:
+      id: screen-notificaciones
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: calendario
+    timeout: 10000
+- assertVisible:
+    id: top-notificaciones
+    selected: true
+
+- back
+- extendedWaitUntil:
+    visible:
+      id: turno-list
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-notificaciones
+    timeout: 10000
+- assertVisible:
+    id: top-tu-turno
+    selected: true
+- takeScreenshot: 02-navegacion-11-atras-tu-turno
+
+- back
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: turno-list
+    timeout: 10000
+- assertVisible:
+    id: tab-index
+    selected: true
+- takeScreenshot: 02-navegacion-12-atras-oficina
+
+- back
+- extendedWaitUntil:
+    visible:
+      id: screen-galeria
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-oficina
+    timeout: 10000
+- assertVisible:
+    id: tab-galeria
+    selected: true
+
+- back
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: screen-galeria
+    timeout: 10000
+- assertVisible:
+    id: tab-personas
+    selected: true
+
+- back
+- extendedWaitUntil:
+    visible:
+      id: resultados-list
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: barrio-list
+    timeout: 10000
+- assertVisible:
+    id: tab-resultados
+    selected: true
+- takeScreenshot: 02-navegacion-13-atras-resultados
+# Resultados is the first entry left in the history: one more back would leave the app, so the flow stops here.
+
+# ---------------------------------------------------------------- a detail screen and its «‹»
+# The person card is pushed over the tabs (the tabs stay drawn underneath, so the proof it closed is that
+# the card is gone, not that the list is there).
+- tapOn:
+    id: tab-personas
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: Pedro Salazar
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: Pedro Salazar
+- extendedWaitUntil:
+    visible:
+      id: persona
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: Pedro Salazar
+      childOf:
+        id: persona
+    timeout: 20000
+- assertVisible:
+    id: top-volver
+- takeScreenshot: 02-navegacion-14-ficha-persona
+- tapOn:
+    id: top-volver
+- extendedWaitUntil:
+    notVisible:
+      id: persona
+    timeout: 20000
+- assertNotVisible:
+    id: top-volver
+- assertVisible:
+    id: tab-personas
+    selected: true
+- takeScreenshot: 02-navegacion-15-ficha-cerrada
+
+# ---------------------------------------------------------------- the signature goes to the Oficina
+- tapOn: 0ff1ce, ir a la Oficina
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 20000
+- assertVisible:
+    id: tab-index
+    selected: true
+- takeScreenshot: 02-navegacion-16-firma-a-oficina
