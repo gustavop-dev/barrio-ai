@@ -54,7 +54,12 @@ export default function RootLayout() {
                     animation: 'slide_from_right',
                     animationDuration: timings.screen.duration,
                   }}
-                />
+                >
+                  <Stack.Screen name="(app)" />
+                  {/* The login sits over the app as a transparent modal: after a successful login the Oficina
+                      mounts underneath and the login opens its door and fades into it (src/entrada). */}
+                  <Stack.Screen name="login" options={{ presentation: 'transparentModal', animation: 'none', contentStyle: { backgroundColor: 'transparent' } }} />
+                </Stack>
               </SplashGate>
             </ToastProvider>
           </SessionProvider>

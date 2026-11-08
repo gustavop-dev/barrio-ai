@@ -1,0 +1,219 @@
+// MovNavegacion: the push of detail screens (thresholds, projection, reduced motion, every way back
+// waiting for the spring), the tab content change and the top-bar push, and the bottom bar's pill and
+// haptic.
+import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
+import { Dimensions, Text } from 'react-native';
+import { State } from 'react-native-gesture-handler';
+import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+import '@/api/transport';
+import { renderApp } from '@/test/render';
+import { fakeServer } from '@/test/server';
+import { durations, FIRM, navGestures, navSprings, navTimings, navValues } from '@/theme/motion';
+import { BottomBar, pillLeft } from './BottomBar';
+import { DetailScreen } from './DetailScreen';
+import { baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, stackLevel } from './push';
+import { noteFocus, sceneRole, tabMove, tabSceneOptions, type FocusMemory } from './tabTransitions';
+
+const expoRouter = jest.requireMock('expo-router') as Record<string, unknown>;
+
+describe('push (MovNavegacion)', () => {
+  it('follows the finger from where the detail was grabbed, between 0 and 1', () => {
+    expect(dragProgress(1, 0, 390)).toBe(1);
+    expect(dragProgress(1, 195, 390)).toBeCloseTo(0.5);
+    expect(dragProgress(1, -40, 390)).toBe(1);
+    expect(dragProgress(0.8, 500, 390)).toBe(0);
+  });
+
+  it('settles a released drag with the board projection: below 0.6 it goes back', () => {
+    expect(navGestures.stayOpen).toBe(0.6);
+    expect(navGestures.velocityProjection).toBe(0.25);
+    // Dragged 39 % of the way, no speed: projected 0.61, it stays.
+    expect(edgeRelease(0.61, 0)).toBe(1);
+    // Dragged 41 %: it goes back.
+    expect(edgeRelease(0.59, 0)).toBe(0);
+    // A short drag flicked right at 1 pt/ms (1000 pt/s) loses 0.25 more: 0.8 → 0.55, it goes back.
+    expect(edgeRelease(0.8, 1000)).toBe(0);
+    // A flick back to the left keeps it.
+    expect(edgeRelease(0.5, -1000)).toBe(1);
+  });
+
+  it('only grabs a detail that is at least half in', () => {
+    expect(canGrab(0.5)).toBe(true);
+    expect(canGrab(0.49)).toBe(false);
+  });
+
+  it('slides the detail in from beyond the edge and moves the screen underneath by 30 % and 8 % tinta', () => {
+    expect(panelFrame(0, 0, 390, 391, false)).toEqual({ translateX: 391, opacity: 1 });
+    expect(panelFrame(1, 0, 390, 391, false)).toEqual({ translateX: 0, opacity: 1 });
+    expect(baseFrame(1, 390, false)).toEqual({ translateX: -navValues.pushParallax * 390, dim: navValues.pushDim });
+    expect(baseFrame(0.5, 390, false).dim).toBeCloseTo(0.04);
+  });
+
+  it('with reduced motion only fades the detail and darkens the screen underneath, without moving', () => {
+    expect(panelFrame(0.4, 0, 390, 391, true)).toEqual({ translateX: 0, opacity: 0.4 });
+    expect(baseFrame(1, 390, true)).toEqual({ translateX: 0, dim: navValues.pushDim });
+  });
+
+  it('finds the level of a route in its stack', () => {
+    expect(stackLevel({ routes: [{ key: 'tabs' }, { key: 'detail' }] }, 'detail')).toBe(1);
+    expect(stackLevel(undefined, 'detail')).toBe(0);
+  });
+
+  it('uses the design springs', () => {
+    expect(navSprings.push).toBe(FIRM);
+    expect(navSprings.pill).toBe(FIRM);
+    expect(navSprings.tabIcon).toEqual({ damping: 14, stiffness: 160, mass: 1 });
+  });
+});
+
+describe('DetailScreen', () => {
+  const listeners: Record<string, (event: unknown) => void> = {};
+  const navigation = {
+    getState: () => ({ index: 1, routes: [{ key: 'tabs' }, { key: 'detail' }] }),
+    addListener: jest.fn((name: string, listener: (event: unknown) => void) => {
+      listeners[name] = listener;
+      return () => undefined;
+    }),
+    dispatch: jest.fn(),
+  };
+
+  beforeEach(() => {
+    expoRouter.useNavigation = () => navigation;
+    expoRouter.useRoute = () => ({ key: 'detail', name: 'personas/[id]' });
+    fakeServer({});
+  });
+
+  async function renderDetail() {
+    await renderApp(
+      <DetailScreen back="Personas" fallback="/personas">
+        <Text>La ficha</Text>
+      </DetailScreen>,
+    );
+    expect(screen.getByText('La ficha')).toBeOnTheScreen();
+  }
+
+  it('waits for the push back before Android back (or «‹») removes it', async () => {
+    await renderDetail();
+    const action = { type: 'GO_BACK' };
+    const preventDefault = jest.fn();
+    await act(async () => listeners.beforeRemove?.({ data: { action }, preventDefault }));
+    expect(preventDefault).toHaveBeenCalled();
+    await waitFor(() => expect(navigation.dispatch).toHaveBeenCalledWith(action), { timeout: 3000 });
+  });
+
+  it('lets a replace go at once (nothing underneath to reveal)', async () => {
+    await renderDetail();
+    const preventDefault = jest.fn();
+    await act(async () => listeners.beforeRemove?.({ data: { action: { type: 'REPLACE' } }, preventDefault }));
+    expect(preventDefault).not.toHaveBeenCalled();
+  });
+
+  it('«‹» goes back through the router', async () => {
+    await renderDetail();
+    await fireEvent.press(screen.getByRole('button', { name: 'Personas' }));
+    expect(router.back).toHaveBeenCalled();
+  });
+
+  it('a drag from the left edge past 40 % goes back; a short one stays', async () => {
+    const { width } = Dimensions.get('window');
+    await renderDetail();
+    // Let the push finish so the strip can grab it.
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1000)));
+    await act(async () => {
+      fireGestureHandler(getByGestureTestId('detail-edge'), [
+        { state: State.BEGAN, translationX: 0, velocityX: 0 },
+        { state: State.ACTIVE, translationX: 0, velocityX: 0 },
+        { state: State.ACTIVE, translationX: width * 0.1, velocityX: 0 },
+        { state: State.END, translationX: width * 0.1, velocityX: 0 },
+      ]);
+    });
+    await act(async () => new Promise((resolve) => setTimeout(resolve, 1000)));
+    expect(router.back).not.toHaveBeenCalled();
+
+    await act(async () => {
+      fireGestureHandler(getByGestureTestId('detail-edge'), [
+        { state: State.BEGAN, translationX: 0, velocityX: 0 },
+        { state: State.ACTIVE, translationX: 0, velocityX: 0 },
+        { state: State.ACTIVE, translationX: width * 0.5, velocityX: 0 },
+        { state: State.END, translationX: width * 0.5, velocityX: 0 },
+      ]);
+    });
+    await waitFor(() => expect(router.back).toHaveBeenCalled(), { timeout: 3000 });
+  });
+});
+
+describe('tab content and the top-bar push (MovNavegacion)', () => {
+  it('tells a tab change from a push into a top-bar screen and the way back', () => {
+    expect(tabMove('index', 'resultados')).toBe('fade');
+    expect(tabMove('index', 'tu-turno')).toBe('push');
+    expect(tabMove('tu-turno', 'calendario')).toBe('push');
+    expect(tabMove('ajustes', 'galeria')).toBe('pop');
+    expect(tabMove(null, 'index')).toBe('fade');
+  });
+
+  it('remembers the last two focused tabs and gives each scene its part', () => {
+    const order = ['index', 'resultados', 'personas', 'galeria', 'tu-turno'];
+    const memory: FocusMemory = { previous: null, current: null };
+    noteFocus(memory, 'index');
+    noteFocus(memory, 'tu-turno');
+    noteFocus(memory, 'tu-turno');
+    expect(memory).toEqual({ previous: 'index', current: 'tu-turno' });
+    expect(sceneRole(memory, 'tu-turno', order)).toEqual({ role: 'enter', side: 1 });
+    expect(sceneRole(memory, 'index', order)).toEqual({ role: 'leave', side: -1 });
+    expect(sceneRole(memory, 'galeria', order).role).toBe('idle');
+  });
+
+  it('fades the new content in (TOK.fast, EASE_OUT) and the old one out in 60 % of it (EASE_IN)', () => {
+    const entering = tabSceneOptions('fade', 'enter', 1, 390, false);
+    const leaving = tabSceneOptions('fade', 'leave', -1, 390, false);
+    expect(entering.transitionSpec).toEqual(expect.objectContaining({ animation: 'timing', config: expect.objectContaining({ duration: durations.fast }) }));
+    expect(leaving.transitionSpec).toEqual(expect.objectContaining({ animation: 'timing', config: expect.objectContaining({ duration: navTimings.tabOut.duration }) }));
+    expect(navTimings.tabOut.duration).toBeCloseTo(durations.fast * 0.6);
+    expect(navValues.tabRise).toBe(8);
+  });
+
+  it('pushes the top-bar screens with the FIRM spring', () => {
+    for (const role of ['enter', 'leave'] as const) {
+      expect(tabSceneOptions('push', role, 1, 390, false).transitionSpec).toEqual({ animation: 'spring', config: { ...FIRM } });
+      expect(tabSceneOptions('pop', role, 1, 390, false).transitionSpec).toEqual({ animation: 'spring', config: { ...FIRM } });
+    }
+  });
+
+  it('does not animate with reduced motion', () => {
+    expect(tabSceneOptions('push', 'enter', 1, 390, true)).toEqual({ animation: 'none' });
+    expect(tabSceneOptions('fade', 'leave', 1, 390, true)).toEqual({ animation: 'none' });
+  });
+});
+
+describe('BottomBar (MovNavegacion)', () => {
+  const routes = ['index', 'resultados', 'personas', 'galeria', 'tu-turno'].map((name) => ({ key: `${name}-k`, name }));
+
+  async function renderBar(index: number) {
+    fakeServer({ 'GET /api/v1/capturas': { body: { count: 0, next: null, previous: null, results: [] } }, 'GET /api/v1/preguntas': { body: [] } });
+    const navigateToTab = jest.fn();
+    const props = { state: { index, routes }, descriptors: {}, emitter: {}, navigateToTab, insets: { top: 0, right: 0, bottom: 0, left: 0 } };
+    const view = await renderApp(<BottomBar {...(props as never)} />, { recorder: true });
+    await act(async () => {});
+    return { navigateToTab, ...view };
+  }
+
+  it('changing tab ticks once (selection) and navigates; the active tab does not tick', async () => {
+    const { navigateToTab } = await renderBar(0);
+    await fireEvent.press(screen.getByTestId('tab-personas'));
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+    expect(navigateToTab).toHaveBeenCalledWith('personas-k');
+    await fireEvent.press(screen.getByTestId('tab-index'));
+    expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('tab', { name: 'Oficina' })).toBeSelected();
+  });
+
+  it('puts the pill under the centre of the active tab', async () => {
+    expect(pillLeft(39)).toBe(11);
+    expect(pillLeft(351)).toBe(323);
+    await renderBar(4);
+    expect(screen.getByTestId('tab-pill')).toBeOnTheScreen();
+    for (const label of ['Oficina', 'Resultados', 'Personas', 'Galería']) expect(screen.getByRole('tab', { name: label })).not.toBeSelected();
+  });
+});

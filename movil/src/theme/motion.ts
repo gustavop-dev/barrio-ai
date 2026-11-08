@@ -361,3 +361,120 @@ export const officeLayout = {
   nowIn: () => FadeIn.duration(timings.officeNowIn.duration).reduceMotion(reduce()),
   nowOut: () => FadeOut.duration(timings.officeNowOut.duration).reduceMotion(reduce()),
 };
+
+// ---------------------------------------------------------------- navigation, entrance and detail (MovNavegacion, MovEntrada, MovDetalle)
+// The bottom bar, the push of detail screens (and of the top-bar screens), the login entrance and the
+// shared element from a list row into a person card. MOTION.md › «Navegación, Entrada y Detalle».
+
+/** Springs of the navigation boards (TOK.firm and TOK.soft). */
+export const navSprings = {
+  /** MovNavegacion: the active pill slides to the tapped tab. */
+  pill: FIRM,
+  /** MovNavegacion: the tapped tab's icon pops from `navValues.tabIconFrom` back to 1. */
+  tabIcon: SOFT,
+  /** MovNavegacion: a detail screen (and a top-bar screen) pushed in and back, also after the edge drag. */
+  push: FIRM,
+  /** MovDetalle: the portrait and the name flying between the list row and the person card. */
+  flight: FIRM,
+} as const satisfies Record<string, SpringToken>;
+
+export type NavSpringName = keyof typeof navSprings;
+
+export const navTimings = {
+  /** MovNavegacion: the new tab's content fades in and rises (TOK.fast, EASE_OUT). */
+  tabIn: { duration: durations.fast, easing: 'enter' },
+  /** MovNavegacion: the old tab's content fades out in 60 % of TOK.fast (EASE_IN). */
+  tabOut: { duration: durations.fast * 0.6, easing: 'exit' },
+  /** MovDetalle: each block of the person card enters (TOK.fast, EASE_OUT). */
+  cardBlock: { duration: durations.fast, easing: 'enter' },
+  /** MovEntrada: the login form and the tagline leave (TOK.fast, EASE_IN). */
+  entradaFormOut: { duration: durations.fast, easing: 'exit' },
+  /** MovEntrada: the login fades into the Oficina (TOK.base, EASE_OUT). With reduced motion it is the whole entrance. */
+  entradaFade: { duration: durations.base, easing: 'enter' },
+  /** MovEntrada: the door leaf and the integer zoom jump instead of tweening (crisp pixels). */
+  entradaCut: { duration: 0, easing: 'standard' },
+} as const satisfies Record<string, TimingToken>;
+
+export type NavTimingName = keyof typeof navTimings;
+
+export const navValues = {
+  /** MovNavegacion: the tapped tab's icon starts at this scale. */
+  tabIconFrom: 0.92,
+  /** MovNavegacion: the new tab's content rises from this many points below. */
+  tabRise: 8,
+  /** MovNavegacion: the screen underneath a push moves left by this fraction of the width, */
+  pushParallax: 0.3,
+  /** and darkens with tinta at this opacity. */
+  pushDim: 0.08,
+  /** MovDetalle: each block of the person card rises from this many points below, */
+  cardBlockRise: 8,
+  /** the first one this long (ms) after the push starts, */
+  cardBlockDelayMs: 120,
+  /** and each next one this much later (ms). */
+  cardBlockStepMs: 30,
+} as const;
+
+export const navGestures = {
+  /** MovNavegacion: width of the strip at the left edge of a detail screen that drags it back (points). */
+  edgeWidth: 24,
+  /** On release the detail stays when its projected progress is at least this (0 gone, 1 in place); below, it goes back. */
+  stayOpen: 0.6,
+  /** The release projection: progress taken off per point/ms of rightward speed (the board's `vx · 0.25`). */
+  velocityProjection: 0.25,
+  /** The strip only grabs a detail that is at least this far in. */
+  grabFrom: 0.5,
+} as const;
+
+/** MovEntrada: after the server says yes, the pixel door opens and the picture zooms in integer steps (ms). */
+export const entrada = {
+  /** The door leaf folds on its hinge to this width at once, */
+  leafHalf: 0.5,
+  /** and to this one `leafStepMs` later. */
+  leafOpen: 0.125,
+  leafStepMs: 80,
+  /** The picture jumps to `zoom2` here, */
+  zoom2Ms: 160,
+  zoom2: 2,
+  /** and to `zoom3` here. */
+  zoom3Ms: 310,
+  zoom3: 3,
+  /** The form and the tagline start leaving here (navTimings.entradaFormOut), */
+  formOutMs: 160,
+  /** the form dropping this many points. */
+  formDrop: 16,
+  /** The login starts fading into the Oficina here (navTimings.entradaFade). */
+  fadeMs: 460,
+} as const;
+
+/** Control points of `easings.enter` and `easings.exit`, for React Native's Animated (the tab scenes). */
+export const BEZIER = { enter: [0.2, 0, 0, 1], exit: [0.3, 0, 1, 1] } as const;
+
+/** withSpring config of a navigation spring, honouring reduced motion. */
+export function navSpring(name: NavSpringName): WithSpringConfig {
+  return { ...navSprings[name], reduceMotion: REDUCE[REDUCE_MOTION] };
+}
+
+/** withTiming config of a navigation timing, honouring reduced motion. */
+export function navTiming(name: NavTimingName): WithTimingConfig {
+  const token = navTimings[name];
+  return { duration: token.duration, easing: easings[token.easing], reduceMotion: REDUCE[REDUCE_MOTION] };
+}
+
+/**
+ * An opacity-only fade that still plays when the phone asks for less motion: the boards' «menos
+ * movimiento» crossfades (MovEntrada). REDUCE_MOTION 'always' still removes it.
+ */
+export function crossfade(name: NavTimingName): WithTimingConfig {
+  const token = navTimings[name];
+  return { duration: token.duration, easing: easings[token.easing], reduceMotion: REDUCE_MOTION === 'always' ? ReduceMotion.Always : ReduceMotion.Never };
+}
+
+export const navLayout = {
+  /** MovDetalle: block `step` of the person card fades in and rises, staggered after the push. */
+  cardBlock: (step: number) =>
+    FadeInDown.duration(navTimings.cardBlock.duration)
+      .easing(easings.enter)
+      .delay(navValues.cardBlockDelayMs + step * navValues.cardBlockStepMs)
+      .withInitialValues({ opacity: 0, transform: [{ translateY: navValues.cardBlockRise }] })
+      .reduceMotion(reduce()),
+};
