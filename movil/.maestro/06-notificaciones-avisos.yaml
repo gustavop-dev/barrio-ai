@@ -45,7 +45,14 @@ tags: [notificaciones]
 
 - takeScreenshot: 06-avisos-02-probar
 
-- runFlow: comun/ajustes-por-tipo.yaml
+# The fold is further down in the same section (the heading is already above the screen).
+- scrollUntilVisible:
+    element:
+      text: "Por tipo de notificación"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Por tipo de notificación"
 
 # ---------------------------------------------------------------- a push that is off by default, turned on
 # cubre: PUS-04
