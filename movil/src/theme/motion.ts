@@ -520,7 +520,7 @@ export const navLayout = {
 // Boards MovCaptura, MovHojas and MovMicro (diseno-movimiento/tableros): every value here is the
 // board's own, named after what it moves. (This block keeps its own imports so the shared header
 // above stays untouched by each motion area.)
-import { Keyframe, type EntryExitAnimationFunction } from 'react-native-reanimated';
+import { Keyframe } from 'react-native-reanimated';
 
 /** withSpring config of any spring token (not only the named `springs`), honouring reduced motion. */
 export function springWith(token: SpringToken): WithSpringConfig {
@@ -559,6 +559,8 @@ export const sheetMotion = {
 
 /** MovCaptura: the capture button, its hold overlay and the capture sheet. */
 export const captureMotion = {
+  /** The first-use hint («Mantén oprimido para grabar…») goes away by itself after this long, on each launch until the first use (ms). */
+  hintMs: 8000,
   /** The button grows to this scale while holding (72 px over 60), on `springs.captureGrow` (SOFT). */
   holdScale: 1.2,
   /** The button follows 60 % of the finger up and left (`dy · 0.6`); it goes back on `springs.captureFollow` (FIRM). */
@@ -724,28 +726,6 @@ export const curves = { enter: easings.enter.factory(), exit: easings.exit.facto
 
 /** `entering`/`exiting` builders for this block. */
 export const microLayout = {
-  /** The toast fading in while it rises 12 px (fast, EASE_OUT). */
-  toastIn: (): EntryExitAnimationFunction => {
-    const config = timingWith(durations.fast, 'enter');
-    return () => {
-      'worklet';
-      return {
-        initialValues: { opacity: 0, transform: [{ translateY: microMotion.toastRise }] },
-        animations: { opacity: withTiming(1, config), transform: [{ translateY: withTiming(0, config) }] },
-      };
-    };
-  },
-  /** The toast fading out while it sinks 12 px (fast, EASE_IN). */
-  toastOut: (): EntryExitAnimationFunction => {
-    const config = timingWith(durations.fast, 'exit');
-    return () => {
-      'worklet';
-      return {
-        initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
-        animations: { opacity: withTiming(0, config), transform: [{ translateY: withTiming(microMotion.toastRise, config) }] },
-      };
-    };
-  },
   /** A photo added to the capture pops in (MovCaptura `.entra`). */
   thumbIn: () =>
     new Keyframe({

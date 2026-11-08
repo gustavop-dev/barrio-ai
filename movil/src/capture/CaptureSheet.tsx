@@ -12,6 +12,7 @@
 import {
   CAPTURE_LIMITS,
   captureKeys,
+  removeCapturaFromHistory,
   undoCaptura,
   useCapturas,
   useCreateCaptura,
@@ -711,9 +712,13 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
     timers.current.push(setTimeout(run, ms));
   };
 
-  /** Closing with something unsent asks first («¿Cerrar sin enviar?»). */
+  /**
+   * Closing with something unsent asks first («¿Cerrar sin enviar?»). While the send is on its way the sheet stays:
+   * closed, its result (the toast or the error) would be lost (CAP-14).
+   */
   const canClose = () => {
-    if (view === 'form' && !empty && !sending) {
+    if (sending) return false;
+    if (view === 'form' && !empty) {
       setConfirmClose(true);
       return false;
     }
@@ -777,6 +782,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
     }
     try {
       await undoCaptura(capture.id);
+      removeCapturaFromHistory(client, capture.id);
       toast.show('Envío deshecho. Lo tienes otra vez en la hoja.');
       openCaptureSheet(sentContext ?? undefined, { draft });
     } catch (error) {
@@ -853,7 +859,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
           Lo que enviaste{history.count !== null ? ` · ${history.count}` : ''}
         </T>
       </Pressable>
-      <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sin guardar" onPress={close} style={styles.iconButton} testID="capture-cerrar">
+      <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sin enviar" onPress={close} style={styles.iconButton} testID="capture-cerrar">
         <Icon name="cerrar" size={22} color={colors.inkSoft} />
       </Pressable>
     </View>
@@ -866,7 +872,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
         label="Captura para el equipo"
         onClose={closeNow}
         canClose={canClose}
-        suspended={confirmClose || leaving}
+        suspended={confirmClose || leaving || sending}
         header={header}
         openHaptic={!morphing}
         contentOpacity={contentOpacity}

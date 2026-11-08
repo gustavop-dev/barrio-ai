@@ -32,6 +32,17 @@ export function PhotoSheet({
   const [note, setNote] = useState(photo.note ?? '');
   const [allowAi, setAllowAi] = useState(photo.allow_ai_edit);
   const [confirming, setConfirming] = useState(false);
+  // The photo the fields started from. When a fresher copy arrives (the Galería reloaded) and Gustavo has not
+  // touched the fields, they follow it instead of keeping the old values.
+  const [base, setBase] = useState(photo);
+  if (base !== photo && (base.note !== photo.note || base.allow_ai_edit !== photo.allow_ai_edit)) {
+    const untouched = Object.keys(photoPatch(base, note, allowAi)).length === 0;
+    setBase(photo);
+    if (untouched) {
+      setNote(photo.note ?? '');
+      setAllowAi(photo.allow_ai_edit);
+    }
+  }
   const patch = photoPatch(photo, note, allowAi);
   const dirty = Object.keys(patch).length > 0;
   const warning = inUseWarning(photo);

@@ -319,6 +319,7 @@ Ya no los usan las hojas: `gestures.sheet.dismissDistance` y `dismissVelocity` (
 |---|---|---|
 | `springs.captureGrow` | SOFT | El botón crece a `captureMotion.holdScale` (1,2) al empezar a grabar, y vuelve desde 0 tras descartar. |
 | `springs.captureFollow` | FIRM | El botón vuelve a su sitio y a escala 1 cuando el gesto termina en la hoja. |
+| `captureMotion.hintMs` | 8000 | La pista del primer uso («Mantén oprimido para grabar. Toca para foto o nota.») se quita sola a los 8 s, en cada arranque hasta el primer uso: no tapa la Oficina ni la Galería todo el rato. |
 | `captureMotion.follow` | 0,6 | El botón sigue el 60 % del dedo, solo hacia arriba y hacia la izquierda. Sigue al dedo directamente, sin resorte. |
 | `captureMotion.lockRise` / `lockFollow` | 12 px / 0,35 | El candado sube 12 px al aparecer y acompaña al botón con el 35 % de su subida. |
 | `captureMotion.lockRestOpacity` / `lockRestScale` | 0,55 / 0,85 | Opacidad y escala del candado antes de mover el dedo; llegan a 1 en el punto de bloqueo. |
@@ -361,7 +362,7 @@ Ya no los usa la captura: `timings.recordDot` (la franja muestra el punto quieto
 | `haptics.chipToggle` | selección | Elegir o soltar un chip de filtro. |
 | `microMotion.copyTurnDeg` / `copyCheckFrom` | 90° / 0,6 | «Copiado»: el icono de copiar gira 90° y se va, y la marca entra girando desde −90° y creciendo desde 0,6 (fast, EASE_OUT). Pasado `copiedLabelMs`, ambos vuelven sin animación. |
 | `microMotion.skeletonPeriodMs` / `skeletonLow` / `skeletonLag` / `skeletonStill` | 1200 ms / 0,55 / 0,4 rad / 0,7 | Cada bloque de carga late en opacidad entre el 55 % y el 100 % cada 1,2 s, 0,4 rad detrás del anterior. Con movimiento reducido queda quieto al 70 %. |
-| `microMotion.toastRise` | 12 px | El aviso entra subiendo 12 px (fast, EASE_OUT) y sale bajando (fast, EASE_IN) (`microLayout.toastIn`/`toastOut`). |
+| `microMotion.toastRise` | 12 px | El aviso entra subiendo 12 px (fast, EASE_OUT) y sale bajando (fast, EASE_IN), con un valor compartido en `ToastCard` (no con `entering`/`exiting`: en Android una animación de entrada que empezaba mientras se cerraba el Modal de una hoja podía quedarse invisible). Dentro de una hoja abierta, el aviso se dibuja en su ventana (`ToastOutlet`). |
 
 El campo de texto no anima: al enfocarlo, el borde pasa a 2 px 0ff1ce hondo (el relleno devuelve el píxel, así el texto no se mueve) y la etiqueta pasa a 0ff1ce hondo.
 

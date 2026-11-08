@@ -160,7 +160,8 @@ function ZoomablePhoto({
   return (
     <GestureDetector gesture={gesture}>
       <Animated.View style={[{ width, height }, styles.page, moved]}>
-        <ApiImage path={photo.url} style={{ width, height }} contentFit="contain" accessibilityLabel={photoName(photo)} recyclingKey={photo.id} />
+        {/* The fitted photo fills the page: without a background of its own, so the ink shows around the picture. */}
+        <ApiImage path={photo.url} style={[{ width, height }, styles.photo]} contentFit="contain" accessibilityLabel={photoName(photo)} recyclingKey={photo.id} />
       </Animated.View>
     </GestureDetector>
   );
@@ -261,6 +262,8 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: colors.ink },
   page: { alignItems: 'center', justifyContent: 'center' },
+  // ApiImage paints colors.line while it loads; over the whole page that hid the ink (QA 10-galeria-07/08).
+  photo: { backgroundColor: 'transparent' },
   top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: space[4], flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   close: { width: shell.touch + 4, height: shell.touch + 4, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backdrop },
   bottom: { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: space[4], paddingTop: space[3], backgroundColor: colors.backdrop },

@@ -54,6 +54,12 @@ if [ -n "$pic" ]; then
   adb push "$pic" /sdcard/Pictures/qa-pizarra.png > /dev/null
   adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/qa-pizarra.png > /dev/null 2>&1 || true
   adb shell content call --uri content://media --method scan_volume --arg external_primary > /dev/null 2>&1 || true
+  # The photo picker only lists what MediaStore indexed (comun/elegir-foto.yaml picks this picture): say whether it is.
+  if adb shell content query --uri content://media/external/images/media --projection _display_name 2> /dev/null | grep -q qa-pizarra; then
+    log "selector de fotos: qa-pizarra.png está en MediaStore"
+  else
+    log "selector de fotos: qa-pizarra.png NO está en MediaStore; los flujos que eligen una foto fallarán"
+  fi
 else
   log "no hay una foto sembrada para el selector de fotos"
 fi
