@@ -1,0 +1,26 @@
+# Only the session's temporary flow copies call this, including after launchApp clearState.
+# The USB reverse keeps Metro reachable even while a flow disables the emulator's API network.
+appId: co.projectapp.office
+---
+- openLink: ${QA_DEVCLIENT_URL}
+# First launch can show the Expo development-client introduction/menu over the application.
+- tapOn:
+    text: "Continue|Continuar"
+    optional: true
+- runFlow:
+    when:
+      visible: "Go home|Reload|Open JS debugger"
+    commands:
+      - back
+- extendedWaitUntil:
+    visible:
+      id: "login|screen-oficina"
+    timeout: 60000
+# The menu can also slide in a moment after the app shows; close it if it does.
+- waitForAnimationToEnd:
+    timeout: 3000
+- runFlow:
+    when:
+      visible: "Go home|Reload|Open JS debugger"
+    commands:
+      - back

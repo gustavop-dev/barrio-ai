@@ -212,3 +212,61 @@ Para probar los estados de error y los vacíos, el backend de la QA puede hacer 
 
 No conviene exigir los jobs de «Barrio AI» (`backend`, `movil`, `oficina`) de la misma forma: ese workflow solo corre cuando cambian ciertas rutas, y un check exigido que nunca aparece deja el PR esperando para siempre.
 
+
+## Sesión viva de QA: iterar sobre un arreglo
+
+`qa-sesion.yml` mantiene un runner, el backend de QA, un emulador y Metro durante el ciclo de arreglar, hacer push y volver a probar. Úsalo para unos pocos flujos afectados por un bug de JS o de UI. Tras el arranque, el objetivo es recibir resultados en 1–5 minutos por push; depende de los flujos elegidos, no es un plazo garantizado. Un flujo puede llegar al límite de 8 minutos. La primera sesión con cachés frías todavía debe compilar el dev client y preparar el AVD.
+
+`qa-movil` sigue siendo la comprobación final del PR, de los cambios nativos y de las fusiones: prueba el APK release y conserva cobertura y regresión visual. La sesión usa un APK debug con `expo-dev-client` y bundles de producción servidos por Metro; no sustituye ese check ni cambia sus triggers. Los pushes pueden seguir disparando también `qa-movil`.
+
+### Abrir la sesión y leer los resultados
+
+La rama vigilada debe pertenecer al mismo repositorio y contener los archivos de la sesión. Cuando el workflow ya esté en la rama por defecto:
+
+```bash
+gh workflow run qa-sesion.yml -f rama=mi-rama
+# Con selección inicial y duración distinta (la preparación cuenta dentro del plazo):
+gh workflow run qa-sesion.yml -f rama=mi-rama -f minutos=120 -f flujos="05-captura 09"
+# Para elegir la versión del workflow, cuando GitHub ya lo tenga registrado:
+gh workflow run qa-sesion.yml --ref mi-rama -f rama=mi-rama -f flujos="01"
+```
+
+`rama` es el código que el runner vigila; `--ref` elige la versión del workflow. `flujos` solo se aplica al primer head observado. Después, el **último** tag `[qa: ...]` del mensaje del commit head decide qué correr, con la misma selección que `plan.py`: nombres, números o fragmentos separados por espacios o comas; `todo`, `todos` y `all` seleccionan todos.
+
+```bash
+git commit -am 'fix(movil): corregir el teclado [qa: 01-entrada]'
+git push
+scripts/qa/sesion-resultado.sh mi-rama
+# SHA explícito y carpeta base de descarga:
+scripts/qa/sesion-resultado.sh mi-rama <sha> --carpeta /tmp/qa-revision --espera 1800
+```
+
+El lector usa `gh` autenticado, Git, Python 3, `jq` y `tar`; no instala dependencias ni ejecuta la app. Por defecto espera el SHA de `HEAD`, consulta cada 15 segundos y termina a los 1800 segundos. Guarda los archivos en `<carpeta>/<sha>/` (por defecto `qa-sesion-resultados/<sha>/`), sin sobrescribir una carpeta existente, e imprime `resumen.md`. Sale con 0 para `ok` o `idle`, con 1 si hay un fallo o la sesión se detuvo, y con 124 si agotó la espera. `QA_REPO=owner/repo` permite elegir el repositorio; sin esa variable se infiere con `gh repo view`.
+
+**Sin tag no se ejecuta ningún flujo:** se publica `idle`. Esto difiere deliberadamente de `qa-movil`, donde un push sin tag pide todos. Para pedir todos en la sesión usa `[qa: todos]`; un tag vacío también selecciona todos, igual que `plan.py`. Si llega otro push mientras corre Maestro, se cancela esa iteración y se pasa al nuevo head; no se garantiza un resultado para los heads intermedios.
+
+### Qué conserva la sesión
+
+- El backend usa PostgreSQL/pgvector, `bootstrap_local`, `seed_qa`, `settings_qa`, `QA_MODE=true` y el interruptor de fallos de `qa-movil`. Antes de cada flujo vuelve a sembrar y limpia los fallos; si alguna operación falla, el flujo falla. Solo `01-entrada`, `02-navegacion` y `03-oficina` mantienen las animaciones del sistema. No se usan secretos del repositorio ni proveedores reales.
+- El APK debug x86_64 se guarda bajo `qa-devclient-<huella>`. La huella usa objetos Git de los manifiestos y lockfiles, app config, plugins, módulos, parches, assets nativos, scripts de generación y receta del workflow. El JS de la app y de `compartido/`, los flujos y sus docs quedan fuera. Es una huella conservadora: cambiar una dependencia JS o la receta también puede pedir APK nuevo. Los plugins locales deben vivir en `movil/plugins/`, `movil/modules/` o las rutas declaradas en `sesion-util.py`; añade a esa lista cualquier otra entrada nativa local. Un acierto de caché omite prebuild y Gradle.
+- El AVD y su snapshot son los mismos de `qa-movil`: Android 35, x86_64, 390×844 dp a 320 dpi. Se instala el APK una vez. `OFFICE_QA_BUILD=1` mantiene HTTP habilitado y `updates.enabled=false`.
+- El comando exacto es `npx expo start --dev-client --no-dev --minify --port 8081`, con `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, `EXPO_NO_DOTENV=1`, `EXPO_OFFLINE=1` y el host anunciado de Metro en `localhost`. La API se alcanza por `10.0.2.2:8787`; solo Metro lleva `adb reverse tcp:8081 tcp:8081`.
+- El enlace es `oficina0ff1ce://expo-development-client/?url=http%3A%2F%2Flocalhost%3A8081&disableOnboarding=1`. Antes de correr flujos se pide con curl la URL del bundle anunciada por Expo y se comprueba que contiene el SHA nuevo. La sonda se añade solo a archivos generados del runner. La app vuelve a abrir el proyecto de Metro al comenzar cada iteración; con `--no-dev` se fuerza esa recarga en vez de depender de Fast Refresh.
+- `sesion-abrir.yaml` abre ese enlace y atiende la introducción/menú del dev client. Se inserta después de `launchApp` en **copias temporales** de los flujos, también después de `clearState` de `01-entrada`. Los flujos originales siguen intactos. El runner conserva Metro, APK y emulador entre pushes. Si cambia el backend, sincroniza sus dependencias y migraciones y reinicia solo gunicorn antes de probar, para evitar ejecutar Python del head anterior.
+
+Después de cada iteración se fuerza la rama `qa-sesion/<rama>` a un **commit sin padre** que contiene únicamente el último resultado: `resultado.json`, `head-sha.txt`, `resumen.md`, un JUnit por flujo y logs de Maestro. Solo se copian capturas de flujos fallidos (hasta tres por flujo y 20 MiB en total); los logs publicados se limitan a 256 KiB cada uno y no se guardan videos. El resumen incluye PASS/FAIL, paso o motivo del fallo, SHA y tiempos. Se crea o actualiza un único comentario del bot marcado `<!-- qa-sesion -->` en el PR; si la rama aún no tiene PR, los resultados siguen disponibles en la rama de resultados. El lector fija el commit de resultados antes de descargar, para evitar mezclar dos publicaciones.
+
+### Límites y primer arranque en GitHub
+
+Una sesión por rama: iniciar otra cancela la anterior. El job tiene un límite de 6 horas; `minutos` acepta de 1 a 345, por defecto 330, contados desde el comienzo de la preparación y dejando margen para publicar/cerrar. La sesión también termina cuando el PR se fusiona o se cierra. No hay historial de resultados en la rama: una nueva iteración reemplaza la anterior. Cambiar el controlador requiere iniciar otra sesión, porque el proceso conserva una copia fuera del checkout.
+
+Si cambia la huella antes de un reset, la sesión publica **«Cambió lo nativo: corre qa-movil (APK nuevo)»** y termina. Corre `qa-movil` y abre una sesión nueva para obtener el nuevo dev client. Esta sesión es para ramas del mismo repositorio; no para PRs de forks.
+
+En la primera ejecución hay que comprobar en GitHub:
+
+1. Que el dev-client launcher y el menú se cierran, incluso después de `clearState`; sus textos pueden cambiar entre versiones.
+2. Que `adb reverse` lleva Metro a `localhost:8081`, mientras `10.0.2.2:8787` sigue siendo la API. Prueba los pasos de modo avión: Metro debe seguir disponible por el transporte de adb y la API debe quedar sin conexión. Estas reaperturas con Metro no prueban el arranque offline de un APK release.
+3. Que Expo 58/dev client acepta el manifiesto y los bundles de `--no-dev --minify`, y que la comprobación del SHA reconoce el bundle nuevo. El APK sigue siendo debug aunque el JS use esas opciones.
+4. Que el token efímero de Actions tiene `contents: write` y `pull-requests: write`, y que las reglas del repositorio permiten crear y hacer force-push a `qa-sesion/**`. El controlador solo empuja ese prefijo. Las reglas de ramas protegidas pueden rechazarlo aunque el workflow declare los permisos.
+
+La implementación se preparó sin ejecutar instalaciones, builds ni pruebas locales. La primera ejecución y su revisión se hacen en GitHub.
