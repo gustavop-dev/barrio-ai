@@ -161,6 +161,14 @@ describe('capture button', () => {
     expect(audio.recorder.record).not.toHaveBeenCalled();
   });
 
+  it('the first-use hint goes away by itself, so it does not cover the screen until the first capture', async () => {
+    jest.replaceProperty(captureMotion as { hintMs: number }, 'hintMs', 200);
+    capturaServer();
+    await renderCapture();
+    expect(screen.getByText('Mantén oprimido para grabar. Toca para foto o nota.')).toBeOnTheScreen();
+    await waitFor(() => expect(screen.queryByText('Mantén oprimido para grabar. Toca para foto o nota.')).toBeNull(), { timeout: 2000 });
+  });
+
   /** Starts a hold and lets the recorder open the microphone, as the finger stays down. */
   async function startHold() {
     const hold = createGestureController('capture-hold');

@@ -319,6 +319,7 @@ Ya no los usan las hojas: `gestures.sheet.dismissDistance` y `dismissVelocity` (
 |---|---|---|
 | `springs.captureGrow` | SOFT | El botón crece a `captureMotion.holdScale` (1,2) al empezar a grabar, y vuelve desde 0 tras descartar. |
 | `springs.captureFollow` | FIRM | El botón vuelve a su sitio y a escala 1 cuando el gesto termina en la hoja. |
+| `captureMotion.hintMs` | 8000 | La pista del primer uso («Mantén oprimido para grabar. Toca para foto o nota.») se quita sola a los 8 s, en cada arranque hasta el primer uso: no tapa la Oficina ni la Galería todo el rato. |
 | `captureMotion.follow` | 0,6 | El botón sigue el 60 % del dedo, solo hacia arriba y hacia la izquierda. Sigue al dedo directamente, sin resorte. |
 | `captureMotion.lockRise` / `lockFollow` | 12 px / 0,35 | El candado sube 12 px al aparecer y acompaña al botón con el 35 % de su subida. |
 | `captureMotion.lockRestOpacity` / `lockRestScale` | 0,55 / 0,85 | Opacidad y escala del candado antes de mover el dedo; llegan a 1 en el punto de bloqueo. |
