@@ -206,6 +206,24 @@ describe('Captura · hoja', () => {
     expect(screen.queryByRole('dialog', { name: 'Captura para el equipo' })).not.toBeInTheDocument();
   });
 
+  it('stays open while the send is on its way, and then says it arrived', async () => {
+    let release: (() => void) | null = null;
+    server({ 'POST /api/v1/capturas': () => new Promise<Reply>((resolve) => (release = () => resolve({ status: 201, body: captureFixture() }))) });
+    const user = userEvent.setup();
+    renderWithCapture();
+    await screen.findByRole('heading', { name: 'Galería', level: 1 });
+    await user.click(screen.getByRole('button', { name: CAPTURE_LABEL }));
+    await user.type(within(dialog()).getByLabelText('Nota para el equipo (opcional)'), 'Algo');
+    await user.click(within(dialog()).getByRole('button', { name: 'Guardar y enviar al equipo' }));
+    await waitFor(() => expect(release).not.toBeNull());
+    await user.click(within(dialog()).getByRole('button', { name: 'Cerrar sin enviar' }));
+    await user.keyboard('{Escape}');
+    expect(dialog()).toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: '¿Cerrar sin enviar?' })).not.toBeInTheDocument();
+    await act(async () => release?.());
+    expect(await screen.findByText('Enviado al equipo.')).toBeInTheDocument();
+  });
+
   it('shows the first-use hint until the first use', async () => {
     server();
     const user = userEvent.setup();
@@ -346,6 +364,17 @@ describe('Captura · Lo que enviaste', () => {
     expect(await screen.findByRole('button', { name: 'Volver a la captura' })).toBeInTheDocument();
     expect(await within(dialog()).findAllByRole('listitem')).toHaveLength(3);
     await waitFor(() => expect(screen.getByTestId('location').textContent).toBe('/galeria'));
+  });
+
+  it('takes «Deshacer» away when its 2 minutes run out, with the list still open', async () => {
+    const sent = captureFixture({ id: 'c9', note: 'Idea para el post del jueves', state: 'idea', state_label: 'En la mesa editorial', undo_until: new Date(Date.now() + 1500).toISOString() });
+    server({ 'GET /api/v1/capturas': { body: { count: 1, next: null, previous: null, results: [sent] } } });
+    renderWithCapture();
+    await screen.findByRole('heading', { name: 'Galería', level: 1 });
+    act(() => openCaptureSheet(undefined, { view: 'history' }));
+    expect(await within(dialog()).findByRole('button', { name: 'Deshacer' })).toBeInTheDocument();
+    await waitFor(() => expect(within(dialog()).queryByRole('button', { name: 'Deshacer' })).not.toBeInTheDocument(), { timeout: 5000 });
+    expect(within(dialog()).getByText('Idea para el post del jueves')).toBeInTheDocument();
   });
 
   it('says so when nothing was sent yet', async () => {

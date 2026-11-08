@@ -34,18 +34,75 @@ export function useToast(): ToastApi {
   return useContext(ToastContext);
 }
 
+/** What a toast outlet needs from the provider: the current toast, and which outlet draws it. */
+interface ToastHost {
+  toast: ToastState | null;
+  close: () => void;
+  register: (id: number) => () => void;
+  /** The outlet that draws the toast: the last one mounted, or none (the provider draws it in the app's window). */
+  top: number | null;
+}
+
+const ToastHostContext = createContext<ToastHost | null>(null);
+
+/** The toast itself, at `bottom` px from the bottom of its window. */
+function ToastRegion({ toast, close, bottom }: { toast: ToastState | null; close: () => void; bottom: number }) {
+  return (
+    <View pointerEvents="box-none" style={[styles.region, { bottom }]}>
+      {toast ? (
+        <Animated.View
+          key={toast.id}
+          entering={microLayout.toastIn()}
+          exiting={microLayout.toastOut()}
+          style={[styles.toast, toast.tone === 'error' ? styles.error : null]}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
+          testID="toast"
+        >
+          <T color={colors.paper} style={styles.message}>
+            {toast.message}
+          </T>
+          {toast.undo ? (
+            <Pressable
+              accessibilityRole="button"
+              hitSlop={8}
+              onPress={() => {
+                const undo = toast.undo;
+                close();
+                undo?.();
+              }}
+              style={styles.undo}
+            >
+              <T color={colors.brand}>{toast.undoLabel ?? 'Deshacer'}</T>
+            </Pressable>
+          ) : null}
+        </Animated.View>
+      ) : null}
+    </View>
+  );
+}
+
 /**
  * Mount once near the root. It floats above the bottom bar; screen readers announce each toast.
  * MovCaptura: it fades in rising 12 px (fast, EASE_OUT) and fades out sinking back (fast, EASE_IN).
+ *
+ * A Modal (a sheet) is a window of its own, drawn over the app's: a toast drawn in the app's window would sit under
+ * it, where Gustavo cannot see it. So each sheet mounts a ToastOutlet, and while one is mounted the newest draws the
+ * toast, above that sheet.
  */
 export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: { children: ReactNode; bottomOffset?: number }) {
   const [toast, setToast] = useState<ToastState | null>(null);
+  const [outlets, setOutlets] = useState<number[]>([]);
   const nextId = useRef(1);
   const insets = useSafeAreaInsets();
 
   const dismiss = useCallback(() => setToast(null), []);
   const show = useCallback((message: string, options: ToastOptions = {}) => {
     setToast({ id: nextId.current++, message, ...options });
+  }, []);
+  const register = useCallback((id: number) => {
+    setOutlets((current) => [...current, id]);
+    return () => setOutlets((current) => current.filter((outlet) => outlet !== id));
   }, []);
 
   useEffect(() => {
@@ -58,43 +115,34 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
   }, [toast]);
 
   const api = useMemo(() => ({ show, dismiss }), [show, dismiss]);
+  const top = outlets[outlets.length - 1] ?? null;
+  const host = useMemo(() => ({ toast, close: dismiss, register, top }), [toast, dismiss, register, top]);
 
   return (
     <ToastContext.Provider value={api}>
-      {children}
-      <View pointerEvents="box-none" style={[styles.region, { bottom: insets.bottom + bottomOffset + space[3] }]}>
-        {toast ? (
-          <Animated.View
-            key={toast.id}
-            entering={microLayout.toastIn()}
-            exiting={microLayout.toastOut()}
-            style={[styles.toast, toast.tone === 'error' ? styles.error : null]}
-            accessibilityRole="alert"
-            accessibilityLiveRegion="polite"
-            testID="toast"
-          >
-            <T color={colors.paper} style={styles.message}>
-              {toast.message}
-            </T>
-            {toast.undo ? (
-              <Pressable
-                accessibilityRole="button"
-                hitSlop={8}
-                onPress={() => {
-                  const undo = toast.undo;
-                  setToast(null);
-                  undo?.();
-                }}
-                style={styles.undo}
-              >
-                <T color={colors.brand}>{toast.undoLabel ?? 'Deshacer'}</T>
-              </Pressable>
-            ) : null}
-          </Animated.View>
-        ) : null}
-      </View>
+      <ToastHostContext.Provider value={host}>
+        {children}
+        {top === null ? <ToastRegion toast={toast} close={dismiss} bottom={insets.bottom + bottomOffset + space[3]} /> : null}
+      </ToastHostContext.Provider>
     </ToastContext.Provider>
   );
+}
+
+let outletIds = 0;
+
+/**
+ * Where the toast is drawn while this outlet is the newest one mounted: inside a Modal's window (Sheet mounts one),
+ * so a toast shown while a sheet is open («Envío deshecho.» in «Lo que enviaste», or the one that comes with a sheet
+ * opening again) shows above the sheet. There is no bottom bar in a modal: it sits `bottomOffset` px above the safe area.
+ */
+export function ToastOutlet({ bottomOffset = 0 }: { bottomOffset?: number }) {
+  const host = useContext(ToastHostContext);
+  const insets = useSafeAreaInsets();
+  const [id] = useState(() => ++outletIds);
+  const register = host?.register;
+  useEffect(() => register?.(id), [register, id]);
+  if (!host || host.top !== id) return null;
+  return <ToastRegion toast={host.toast} close={host.close} bottom={insets.bottom + bottomOffset + space[3]} />;
 }
 
 const styles = StyleSheet.create({

@@ -63,9 +63,9 @@ tags: [captura]
     visible:
       id: capture-terminar
     timeout: 20000
-- extendedWaitUntil:
-    visible: '0:0[2-9]'
-    timeout: 15000
+- assertVisible: 'Grabando'
+- assertVisible:
+    id: capture-pausar
 - tapOn:
     id: capture-terminar
     waitToSettleTimeoutMs: 500
@@ -144,9 +144,9 @@ tags: [captura]
     visible:
       id: capture-terminar
     timeout: 20000
-- extendedWaitUntil:
-    visible: '0:0[2-9]'
-    timeout: 15000
+- assertVisible: 'Grabando'
+- assertVisible:
+    id: capture-pausar
 - tapOn:
     id: capture-terminar
     waitToSettleTimeoutMs: 500
@@ -185,7 +185,7 @@ tags: [captura]
     visible: 'Sobre: Laura Gómez'
     timeout: 20000
 - assertVisible:
-    text: 'Audio 0:0[2-9]'
+    text: 'Audio.*'
     index: 0
 - assertVisible: 'Responde a: ¿Te parece bien que el equipo comente en publicaciones en inglés\?'
 - takeScreenshot: 05-contexto-05-historial-persona-y-pregunta

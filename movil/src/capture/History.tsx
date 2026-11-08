@@ -1,12 +1,12 @@
 // «Lo que enviaste»: the capture history inside the sheet (Captura.dc.html, rev 18), with the same
 // labels as the PWA (compartido/src/logic/capturas.ts).
-import { captureKeys, sameOrigin, undoCaptura, useCapturaLive, useCapturas, type CaptureOutput } from '@compartido/api/capturas';
+import { captureKeys, removeCapturaFromHistory, sameOrigin, undoCaptura, useCapturaLive, useCapturas, type CaptureOutput } from '@compartido/api/capturas';
 import { canUndo, CONTEXT_PREFIX, contentsOf, purposeOf, STATE_TONE, whenLabel } from '@compartido/logic/capturas';
 import { excerpt } from '@compartido/logic/format';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { apiUrl } from '@/api/config';
 import { keys } from '@/api/queryClient';
@@ -26,13 +26,28 @@ function Listen({ path }: { path: string }) {
   );
 }
 
-function CaptureCard({ initial, onNavigate }: { initial: CaptureOutput; onNavigate: () => void }) {
+/** Re-renders when the 2 minutes of «Deshacer» run out, so the button goes away on time (CAP-10). */
+function useUndoClock(capture: CaptureOutput): number {
+  const [now, setNow] = useState(() => Date.now());
+  const until = capture.can_undo && capture.undo_until ? Date.parse(capture.undo_until) : NaN;
+  useEffect(() => {
+    const left = until - Date.now();
+    if (!(left > 0)) return;
+    const timer = setTimeout(() => setNow(Date.now()), left + 50);
+    return () => clearTimeout(timer);
+  }, [until]);
+  return now;
+}
+
+function CaptureCard({ initial, listUpdatedAt, onNavigate }: { initial: CaptureOutput; listUpdatedAt: number; onNavigate: () => void }) {
   const live = useCapturaLive(initial);
-  const capture = live.data ?? initial;
+  // The newer of the two: the row's own polling, or the list when it came back later (the row's cache stops
+  // following a capture once it is no longer being processed).
+  const capture = live.data && live.dataUpdatedAt >= listUpdatedAt ? live.data : initial;
   const client = useQueryClient();
   const toast = useToast();
   const [undoing, setUndoing] = useState(false);
-  const [now] = useState(() => Date.now());
+  const now = useUndoClock(capture);
   const contents = contentsOf(capture);
   const text = capture.transcript?.trim() ? `«${excerpt(capture.transcript, 240)}»` : capture.note?.trim() ? excerpt(capture.note, 240) : '';
   const noteToo = Boolean(capture.transcript?.trim() && capture.note?.trim());
@@ -44,6 +59,8 @@ function CaptureCard({ initial, onNavigate }: { initial: CaptureOutput; onNaviga
     setUndoing(true);
     try {
       await undoCaptura(capture.id);
+      // Out of the list at once (the list hides undone captures): no waiting for it to come back.
+      removeCapturaFromHistory(client, capture.id);
       toast.show('Envío deshecho.');
     } catch (error) {
       toast.show(errorMessage(error), { tone: 'error' });
@@ -136,7 +153,7 @@ export function CaptureHistory({ onBack, onNavigate }: { onBack: () => void; onN
         </EmptyState>
       ) : null}
       {history.items.map((capture) => (
-        <CaptureCard key={capture.id} initial={capture} onNavigate={onNavigate} />
+        <CaptureCard key={capture.id} initial={capture} listUpdatedAt={history.dataUpdatedAt} onNavigate={onNavigate} />
       ))}
       {history.hasNextPage ? (
         <Button block loading={history.isFetchingNextPage} loadingLabel="Cargando…" onPress={() => void history.fetchNextPage()}>

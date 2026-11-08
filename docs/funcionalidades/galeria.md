@@ -10,7 +10,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
 | [GAL-01](#gal-01) | Ver la Galería y filtrar | PWA · app · backend | funciona |
-| [GAL-02](#gal-02) | Subir fotos | PWA · app · backend | con fallo conocido |
+| [GAL-02](#gal-02) | Subir fotos | PWA · app · backend | parcial |
 | [GAL-03](#gal-03) | Dejar una nota para el equipo en una foto | PWA · app · backend | funciona |
 | [GAL-04](#gal-04) | Prohibir o permitir la edición con IA de una foto | PWA · app · backend | parcial |
 | [GAL-05](#gal-05) | Quitar una foto de la Galería | PWA · app · backend | funciona |
@@ -35,15 +35,15 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   7. **Dado** la carga en curso, **cuando** abre la vista, **entonces** ve «Cargando la galería…»; si falla, ve el error con «Reintentar».
   8. **Dado** un filtro desconocido, **cuando** se pide a la API, **entonces** responde 400 «Usa todas, sin_usar, elegidas o publicadas.».
 - **Brechas código/docs:** las etiquetas «Elegida», «Editada con IA» y «Publicada» existen en la API pero nada las alcanza todavía ([IMG-12](imagenes-en-publicaciones.md#img-12)). En la app, una foto que no carga se queda gris, sin aviso.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `10-galeria` (criterios 1, 2, 3: los textos, «Nueva» y «Sin usar», los cuatro filtros; 6, un filtro vacío con el interruptor de fallos) y `10-galeria-subir` (5, la Galería vacía con el interruptor de fallos). 4, 7 y 8: Jest y backend.
 
 ### GAL-02 · Subir fotos <a id="gal-02"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** parcial
 - **Qué hace para Gustavo:** elige fotos de su teléfono o de su ordenador y las sube a la Galería.
 - **Código:** `POST /api/v1/galeria` (multipart, partes `fotos` repetidas, lotes de 10, `capturas.add_photos`); PWA `Galeria.tsx` (botón y arrastrar y soltar); app `upload.ts` (`launchImageLibraryAsync`, partes `{uri, name, type}`), `UploadProgressCard.tsx`.
-- **El fallo:** en la app, «Subir fotos» **no funciona**: cada foto viaja como una parte `{uri, name, type}` y `expo/fetch` lanza `Unsupported FormDataPart implementation` antes de enviar nada, el mismo fallo de [CAP-05](captura.md#cap-05). La tarjeta de progreso muestra «No se pudieron subir todas las fotos» con ese texto en inglés, y «Reintentar» falla igual. En la PWA funciona.
+- **Lo que falta:** en la app funciona desde el PR #43 (las subidas van por `XMLHttpRequest`, `movil/src/api/multipart.ts`). En la PWA falla el criterio 4: tras un segundo lote fallido solo muestra el error, sin decir que el primero sí se guardó.
 - **Criterios de aceptación:**
   1. **Dado** tres fotos JPEG elegidas, **cuando** las sube, **entonces** la API responde 201 con las fotos creadas, aparecen en la rejilla como «Nueva» y se ve «3 fotos subidas. El equipo las verá en su próxima ronda.» (o «Foto subida. …» con una).
   2. **Dado** la app, **cuando** sube fotos, **entonces** la tarjeta muestra «Subiendo X de N fotos…» con una barra y una miniatura por foto (en espera, enviando, subida).
@@ -52,8 +52,8 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   5. **Dado** una foto de más de 10 MB o que no es JPEG, PNG, WebP o HEIC, **cuando** la elige, **entonces** ve «No se subió <nombres>: solo JPEG, PNG, WebP o HEIC de hasta 10 MB.» y las demás se suben.
   6. **Dado** cada foto nueva, **cuando** se crea, **entonces** toma `allow_ai_edit` del valor por defecto de Ajustes › Captura y galería ([AJU-09](ajustes.md#aju-09)).
   7. **Dado** que la subida falla, **cuando** vuelve el error, **entonces** se ve en español; nunca un mensaje técnico en inglés.
-- **Brechas código/docs:** como en [CAP-05](captura.md#cap-05). En la app la línea de fotos rechazadas no se borra tras una subida correcta posterior.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** en la app la línea de fotos rechazadas no se borra tras una subida correcta posterior.
+- **Cobertura QA:** E2E `10-galeria-subir` (criterios 1 y 7: una foto elegida en el selector de Android llega al backend, «Foto subida. El equipo la verá en su próxima ronda.» y la foto en la rejilla como «Nueva»; 4, un 413 con el interruptor de fallos, «0 de 1 foto subida» y «Reintentar»). 2, 3, 5 y 6: Jest y backend.
 
 ### GAL-03 · Dejar una nota para el equipo en una foto <a id="gal-03"></a>
 
@@ -68,7 +68,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   4. **Dado** una nota de más de 2.000 caracteres, **cuando** se envía, **entonces** la API responde 400.
   5. **Dado** un error al guardar, **cuando** vuelve, **entonces** se ve dentro de la hoja y la nota no se pierde.
 - **Brechas código/docs:** la nota se guarda, pero el equipo todavía no la lee ([IMG-04](imagenes-en-publicaciones.md#img-04)). En la PWA, la X de la hoja sigue activa mientras guarda y puede cerrarla antes de ver el resultado.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `10-galeria` (criterios 1 a 3; la foto abierta otra vez enseguida, con la Galería recargando despacio por el interruptor de fallos, muestra lo guardado). 4 y 5: backend y Jest.
 
 ### GAL-04 · Prohibir o permitir la edición con IA de una foto <a id="gal-04"></a>
 
@@ -81,7 +81,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   2. **Dado** una foto nueva, **cuando** se crea, **entonces** el interruptor viene con el valor por defecto de Ajustes ([AJU-09](ajustes.md#aju-09)).
   3. **Dado** una foto con `allow_ai_edit=false`, **cuando** el equipo prepara un post con ella, **entonces** no la edita salvo instrucción expresa de Gustavo en su nota. **Hoy no aplica:** no hay edición de imágenes; ver [IMG-07](imagenes-en-publicaciones.md#img-07).
 - **Brechas código/docs:** el interruptor se guarda y se muestra, pero no tiene efecto hasta que exista el flujo de imagen.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `10-galeria` (criterio 1: el interruptor apagado y guardado sigue apagado al volver). 2, Jest; 3 no aplica todavía.
 
 ### GAL-05 · Quitar una foto de la Galería <a id="gal-05"></a>
 
@@ -96,7 +96,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   4. **Dado** un error, **cuando** vuelve, **entonces** se ve dentro de la confirmación.
   5. **Dado** el borrado, **cuando** termina, **entonces** no hay «Deshacer» (comportamiento actual).
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `10-galeria` (criterios 1 a 3 y 5: la confirmación, «Cancelar», «Quitar la foto» y la foto fuera de la rejilla; 2, el aviso de la foto elegida). 4: Jest.
 
 ### GAL-06 · Ver las fotos a pantalla completa <a id="gal-06"></a>
 
@@ -110,7 +110,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   3. **Dado** el visor, **cuando** pellizca o toca dos veces, **entonces** hace zoom y puede moverse por la foto.
   4. **Dado** el visor, **cuando** arrastra hacia arriba o abajo sin zoom, **entonces** se cierra.
 - **Brechas código/docs:** la PWA no tiene visor.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `10-galeria` (criterios 1, 2 y 4, y el doble toque del 3: con zoom, deslizar no cambia de foto). El pellizco necesita dos dedos, que Maestro no hace en Android. El fondo de tinta del visor: Jest (`GaleriaScreen.test.tsx`) y la captura `10-galeria-08-visor`.
 
 ### GAL-07 · Las fotos son privadas <a id="gal-07"></a>
 
@@ -125,7 +125,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   4. **Dado** la PWA o la app, **cuando** recibe una URL de imagen de otro origen, **entonces** no la carga (la app muestra un recuadro azul con un icono).
   5. **Dado** una rejilla con muchas fotos, **cuando** se cargan, **entonces** estas lecturas no cuentan para el límite de peticiones de la API.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `10-galeria` (criterio 1: la imagen de una foto sin sesión ni token responde 401 o 403; 2, la app muestra las fotos con su token en la rejilla, la hoja y el visor). 3 a 5: backend.
 
 ---
 

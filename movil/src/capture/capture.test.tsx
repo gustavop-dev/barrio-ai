@@ -403,6 +403,24 @@ describe('capture sheet', () => {
     expect(within(screen.getByTestId('capture-sheet')).getByText('Idea para el post del jueves')).toBeOnTheScreen();
   });
 
+  it('stays open while the send is on its way, and then says it arrived', async () => {
+    const server = capturaServer();
+    await renderCapture();
+    await act(async () => openCaptureSheet());
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Algo');
+    const answer = server.fetch.getMockImplementation()!;
+    let release: (() => void) | null = null;
+    server.fetch.mockImplementationOnce((...args: Parameters<typeof answer>) => new Promise((resolve) => (release = () => resolve(answer(...args)))));
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+    await waitFor(() => expect(release).not.toBeNull());
+    await fireEvent.press(within(sheet).getByLabelText('Cerrar sin enviar'));
+    expect(screen.getByTestId('capture-sheet')).toBeOnTheScreen();
+    expect(screen.queryByText('¿Cerrar sin enviar?')).toBeNull();
+    await act(async () => release?.());
+    expect(await screen.findByText('Enviado al equipo.', {}, { timeout: 4000 })).toBeOnTheScreen();
+  });
+
   it('closing with content asks first', async () => {
     capturaServer();
     await renderCapture();

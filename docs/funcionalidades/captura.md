@@ -4,7 +4,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 
 - **Código:** backend `capturas.py` (`create`, `process`, `classify`, `undo`, `capture_payload`), `capturas_views.py`, `knowledge/providers.assemblyai_transcribe`; PWA `oficina/src/capture/*`; app `movil/src/capture/*`, `movil/src/api/transport.ts`; común `compartido/src/api/capturas.ts` (`captureForm`, `appendFile`, `useCreateCaptura`), `compartido/src/logic/capturas.ts`, `compartido/src/logic/audio.ts`.
 - **Documentación:** [`capturas-galeria.md`](../../agentes-linkedin/infra/docs/capturas-galeria.md), sección «Captura y Galería» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
-- **Entorno de prueba:** AssemblyAI y Claude parcheados, como en `tests/test_capturas.py`. En la app, las pruebas de Jest sustituyen `fetch` por un simulacro (`movil/src/test/server.ts`), así que **no pueden detectar** el fallo de [CAP-04](#cap-04) y [CAP-05](#cap-05): hay que probar en un teléfono con la build.
+- **Entorno de prueba:** AssemblyAI y Claude parcheados, como en `tests/test_capturas.py`. En la app, las pruebas de Jest sustituyen `fetch` por un simulacro (`movil/src/test/server.ts`), así que no pueden detectar un fallo del transporte como el de [CAP-04](#cap-04) y [CAP-05](#cap-05): eso lo prueban los flujos de Maestro sobre la build release en el emulador (`movil/.maestro/05-captura*.yaml`), contra el backend de QA.
 
 ## Resumen
 
@@ -13,17 +13,17 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 | [CAP-01](#cap-01) | Abrir la hoja de captura con un toque | PWA · app | funciona |
 | [CAP-02](#cap-02) | Grabar manteniendo el botón: bloquear, descartar, recuperar | PWA · app | funciona |
 | [CAP-03](#cap-03) | Enviar una captura solo con nota | PWA · app · backend | funciona |
-| [CAP-04](#cap-04) | Enviar una captura con nota de voz | PWA · app · backend | con fallo conocido |
-| [CAP-05](#cap-05) | Enviar una captura con fotos | PWA · app · backend | con fallo conocido |
-| [CAP-06](#cap-06) | Mensaje claro cuando un envío falla | PWA · app | con fallo conocido |
+| [CAP-04](#cap-04) | Enviar una captura con nota de voz | PWA · app · backend | funciona |
+| [CAP-05](#cap-05) | Enviar una captura con fotos | PWA · app · backend | funciona |
+| [CAP-06](#cap-06) | Mensaje claro cuando un envío falla | PWA · app | parcial |
 | [CAP-07](#cap-07) | Captura ligada a una pregunta, una persona o una pieza | PWA · app · backend | funciona |
 | [CAP-08](#cap-08) | «Para qué es», o lo decide el equipo | PWA · app · backend | funciona |
 | [CAP-09](#cap-09) | Transcripción del audio | backend | funciona |
-| [CAP-10](#cap-10) | Deshacer un envío en los 2 minutos siguientes | PWA · app · backend | con fallo conocido |
+| [CAP-10](#cap-10) | Deshacer un envío en los 2 minutos siguientes | PWA · app · backend | funciona |
 | [CAP-11](#cap-11) | «Lo que enviaste» | PWA · app · backend | funciona |
 | [CAP-12](#cap-12) | Qué hizo el equipo con cada envío | backend | funciona |
 | [CAP-13](#cap-13) | Permiso del micrófono | PWA · app | funciona |
-| [CAP-14](#cap-14) | Cerrar la hoja sin enviar | PWA · app | con fallo conocido |
+| [CAP-14](#cap-14) | Cerrar la hoja sin enviar | PWA · app | funciona |
 | [CAP-15](#cap-15) | Límites de tamaño, tipo y duración | PWA · app · backend | parcial |
 
 ---
@@ -40,7 +40,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   3. **Dado** la PWA en escritorio, **cuando** pulsa «Capturar» en la barra lateral, **entonces** se abre la misma hoja (en escritorio no hay mantener para grabar).
   4. **Dado** una vista de detalle en la app (pieza o persona), **cuando** se muestra, **entonces** la barra inferior y el botón de captura no aparecen.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (criterios 1, 2 y 4: el toque, la pista del primer uso y la barra oculta en una ficha, esta en `05-captura-contexto`). El 3 es de la PWA.
 
 ### CAP-02 · Grabar manteniendo el botón: bloquear, descartar, recuperar <a id="cap-02"></a>
 
@@ -56,7 +56,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** que suelta antes de 600 ms desde que pulsó, **cuando** termina el gesto, **entonces** cuenta como un toque y no se graba nada.
   6. **Dado** 30 minutos de grabación, **cuando** se alcanzan, **entonces** la grabación se detiene sola y queda en la hoja.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (criterio 4: mantener el botón abre la hoja con el audio listo; grabar, descartar y terminar desde la hoja). Bloquear, deslizar para descartar y «Recuperar» necesitan el dedo quieto en pantalla mientras se mueve, que Maestro no hace: pruebas de Jest (`capture.test.tsx`) y el video del flujo.
 
 ### CAP-03 · Enviar una captura solo con nota <a id="cap-03"></a>
 
@@ -72,15 +72,15 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** el envío desde la app, **cuando** sale la petición, **entonces** lleva `Authorization: Bearer <token>` y ninguna cookie ni `X-CSRFToken`; desde la PWA lleva la cookie y `X-CSRFToken`.
   6. **Dado** un token de servicio, **cuando** intenta enviar, **entonces** recibe 403.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (criterios 1 a 3). El 4 (4.000 caracteres) y el 5 y 6 (cabeceras, token de servicio) son de Jest y del backend.
 
 ### CAP-04 · Enviar una captura con nota de voz <a id="cap-04"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** graba lo que piensa y lo manda; el equipo lo transcribe y decide qué hacer.
-- **Código:** app `CaptureSheet.tsx:771-799` (`create.mutate` con `audio: {blob: {uri, name, type}}`), `recorder.tsx` (`RecordingPresets.HIGH_QUALITY`, `.m4a`, `MIME = 'audio/mp4'`), `transport.ts` (`fetch` global); común `compartido/src/api/capturas.ts` (`appendFile`, `captureForm`); backend `capturas.check_audio`.
-- **El fallo:** en la app nativa, una captura con nota de voz **no llega al equipo**; solo con texto sí llega. En Expo SDK 58, el `fetch` global es `expo/fetch` (`expo/src/winter/runtime.native.ts`; `EXPO_PUBLIC_USE_RN_FETCH` no está definido en el repo). Su conversión de `FormData` (`expo/src/winter/fetch/convertFormData.ts`) solo acepta texto, `Blob` u objetos con `bytes()`, y lanza `Error('Unsupported FormDataPart implementation')` ante la parte `{uri, name, type}` que construye `appendFile`. El error salta en el teléfono, antes de enviar nada: el backend nunca recibe la petición. La PWA usa `Blob` del navegador y no tiene el fallo. Otro agente lo está arreglando.
+- **Código:** app `CaptureSheet.tsx` (`send`: `create.mutate` con `audio: {blob: {uri, name, type}}`), `recorder.tsx` (`RecordingPresets.HIGH_QUALITY`, `.m4a`, `MIME = 'audio/mp4'`), `movil/src/api/multipart.ts` (las subidas `multipart/form-data` van por `XMLHttpRequest`); común `compartido/src/api/capturas.ts` (`appendFile`, `nativePart`, `captureForm`); backend `capturas.check_audio`.
+- **Arreglado:** con `expo/fetch` como `fetch` global, la parte `{uri, name, type}` lanzaba `Unsupported FormDataPart implementation` y la captura con audio no salía del teléfono. El PR #43 manda las subidas por `XMLHttpRequest` (`multipart.ts`); el flujo `05-captura-envios` lo comprueba en el emulador.
 - **Criterios de aceptación:**
   1. **Dado** la app con una grabación de 20 s, **cuando** pulsa «Guardar y enviar al equipo», **entonces** sale `POST /api/v1/capturas` multipart con la parte `audio` (nombre `captura.m4a`, tipo `audio/mp4`) y `audio_duration_s` = 20, la API responde 201 y aparece «Enviado al equipo.» con «Deshacer».
   2. **Dado** esa captura, **cuando** abre «Lo que enviaste», **entonces** ve «Audio 0:20» y el estado pasa por «Transcribiendo» y «Procesando» hasta su destino, con la transcripción visible y «Escuchar».
@@ -89,16 +89,16 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** la PWA en Chrome (webm/opus) o en Safari (mp4), **cuando** envía con audio, **entonces** llega con el tipo correcto y la API la acepta.
   6. **Dado** un audio cuyo tipo declarado no coincide con su contenido, **cuando** llega, **entonces** la API responde 400 «El archivo de audio no corresponde a su tipo.».
   7. **Dado** que un envío con audio falla por cualquier motivo, **cuando** termina, **entonces** se cumple [CAP-06](#cap-06).
-- **Brechas código/docs:** `CONTRATO-API.md` y `app-movil-backend.md` dicen que la app «usa todas las rutas de este contrato sin cambios, incluidas las subidas `multipart/form-data`»; el backend lo cumple (`tests/test_app_movil.py`, `test_multipart_capture_and_gallery_upload_with_bearer`), pero el cliente nativo no. `movil/src/api/transport.test.ts` comprueba las partes contra un `fetch` simulado y por eso pasa.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** —
+- **Cobertura QA:** E2E `05-captura-envios` (criterios 1 y 2: una nota de voz grabada manteniendo el botón llega al backend, «Enviado al equipo.» y «Audio 0:0N» con «Escuchar» en «Lo que enviaste»; sin trabajador en CI se queda «Recibida») y `05-captura-contexto` (criterio 4: respuesta por voz a una pregunta y nota de voz en una persona). El emulador graba silencio (`-noaudio`): la voz real y la transcripción (CAP-09) se prueban en el teléfono. Los criterios 5 y 6 son de la PWA y del backend.
 
 ### CAP-05 · Enviar una captura con fotos <a id="cap-05"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** hace una foto o elige varias y las manda; quedan en su Galería y, si hay texto, el equipo decide qué hacer con él.
 - **Código:** app `movil/src/capture/photos.ts` (`launchCameraAsync`, `launchImageLibraryAsync`, partes `{uri, name, type}`); común `appendFile`; backend `capturas.check_photos`, `_save_photos`.
-- **El fallo:** el mismo de [CAP-04](#cap-04). Cada foto viaja como una parte `{uri, name, type}`, `expo/fetch` lanza `Unsupported FormDataPart implementation` y la captura no sale del teléfono. Afecta también a «Foto para la galería» y a «Subir fotos» de la Galería ([GAL-02](galeria.md#gal-02)).
+- **Arreglado:** el mismo fallo de transporte de [CAP-04](#cap-04), corregido en el PR #43; `05-captura-envios` y `10-galeria-subir` lo comprueban en el emulador.
 - **Criterios de aceptación:**
   1. **Dado** la app, **cuando** pulsa «Tomar foto», hace la foto y envía, **entonces** sale `POST /api/v1/capturas` con una parte `fotos` (JPEG), la API responde 201 y la foto aparece en la Galería con la etiqueta «Nueva».
   2. **Dado** «Galería» en la hoja, **cuando** elige 3 fotos y envía, **entonces** llegan las 3 como partes `fotos` de la misma captura y «Lo que enviaste» muestra «3 fotos».
@@ -107,19 +107,16 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** una foto HEIC del iPhone o una PNG, **cuando** la envía, **entonces** la API la acepta y la sirve con su tipo real.
   6. **Dado** un archivo que dice ser imagen pero no lo es, **cuando** llega, **entonces** la API responde 400 «Uno de los archivos no es una imagen JPEG, PNG, WebP o HEIC.».
   7. **Dado** que el permiso de cámara está denegado, **cuando** pulsa «Tomar foto», **entonces** ve «La cámara está bloqueada para 0ff1ce: permítela en los ajustes del teléfono, o elige una foto de la galería.».
-- **Brechas código/docs:** como en [CAP-04](#cap-04). En la app, a diferencia del micrófono, no hay botón para abrir los ajustes cuando la cámara está bloqueada.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** en la app, a diferencia del micrófono, no hay botón para abrir los ajustes cuando la cámara está bloqueada.
+- **Cobertura QA:** E2E `05-captura-envios` (criterios 2 y 4: una foto elegida en el selector de Android llega al backend, aparece en la Galería como «Nueva» y en «Lo que enviaste» con «1 foto»; «Foto para la galería» sin fotos, en `05-captura`) y `05-captura-contexto` (comentario con foto en una pieza). El criterio 1 (cámara) no: el emulador arranca sin cámara (`-camera-back none`). 3, 5 y 6 son del backend; 7, de Jest.
 
 ### CAP-06 · Mensaje claro cuando un envío falla <a id="cap-06"></a>
 
 - **Dónde:** PWA · app
-- **Estado:** con fallo conocido
+- **Estado:** parcial
 - **Qué hace para Gustavo:** si algo sale mal al enviar, lo ve al momento, en español, sabe qué hacer y no pierde lo que grabó o escribió.
-- **Código:** app `CaptureSheet.tsx:795` (`onError: () => haptic('actionError')`) y `:983-989` (`ErrorRetry` sin `onRetry`); PWA `oficina/src/capture/CaptureSheet.tsx:378-381, 550-555`; común `compartido/src/api/errors.ts` (`errorMessage`).
-- **El fallo:** en la app, cuando un envío falla, la hoja **solo vibra**. El único texto es una nota `ErrorRetry` («No se pudo completar») dentro del contenido desplazable de la hoja, que no se desplaza hasta ella y puede quedar fuera de la vista o debajo del teclado. Además:
-  - para el fallo de [CAP-04](#cap-04) el texto es el mensaje técnico en inglés `Unsupported FormDataPart implementation`;
-  - sin conexión, `expo/fetch` lanza `FetchError` (no `TypeError`), así que `errorMessage` nunca elige «No hay conexión con el servidor. Comprueba tu red.» y muestra `fetch failed: …` en inglés;
-  - no hay botón «Reintentar», ni cola, ni borrador guardado: si cierra la hoja o la app, lo pierde.
+- **Código:** app `CaptureSheet.tsx` (`SendError`: el motivo, «Tu audio, tus fotos y tu nota siguen aquí. Puedes reintentar.» y «Reintentar», justo encima del botón de enviar), `sendError.ts` (`describeSendError`), `movil/src/api/multipart.ts` (`UploadNetworkError`); PWA `oficina/src/capture/CaptureSheet.tsx`; común `compartido/src/api/errors.ts` (`errorMessage`).
+- **Lo que falta:** la app cumple los criterios desde el PR #43 (con sus propios títulos: sin conexión, «No hay conexión con el servidor» y «El envío no salió del teléfono. Comprueba tu red y vuelve a intentarlo.»; el 409, «No se puede enviar así ahora»). En la PWA falta el 7: no hay «Reintentar», se vuelve a pulsar «Guardar y enviar al equipo».
 - **Criterios de aceptación:**
   1. **Dado** un envío que falla por cualquier motivo, **cuando** vuelve el error, **entonces** la hoja sigue abierta con el audio, las fotos, la nota, «Para qué es», la visibilidad y el contexto intactos.
   2. **Dado** el mismo fallo, **cuando** vuelve el error, **entonces** Gustavo ve un mensaje en español sin tener que desplazarse (un aviso fijo junto al botón de enviar o un toast), además de la vibración en la app.
@@ -129,8 +126,8 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   6. **Dado** cualquier otro error de la API, **cuando** vuelve, **entonces** ve su `detail` en español.
   7. **Dado** el mensaje de error, **cuando** se muestra, **entonces** ofrece reintentar el mismo envío con un toque, sin rehacer nada.
   8. **Dado** cualquier fallo, **cuando** se muestra, **entonces** nunca aparece texto técnico en inglés (`Unsupported FormDataPart implementation`, `fetch failed: …`).
-- **Brechas código/docs:** la PWA cumple 1, 3, 4, 5 y 6 con la nota en línea, pero no 7 (no hay «Reintentar»: se vuelve a pulsar «Guardar y enviar al equipo»). El problema de los mensajes sin conexión en inglés afecta a toda la app, no solo a la captura (ver [APP-08](app-movil-instalacion.md#app-08)).
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** el problema de los mensajes sin conexión en inglés fuera de la captura se sigue en [APP-08](app-movil-instalacion.md#app-08).
+- **Cobertura QA:** E2E `05-captura-envios` (criterios 1, 2, 3, 7 y 8: sin red, con el modo avión del emulador; y 4, el 413 con el interruptor de fallos de la QA). 5 y 6, Jest (`capture.test.tsx`).
 
 ### CAP-07 · Captura ligada a una pregunta, una persona o una pieza <a id="cap-07"></a>
 
@@ -146,7 +143,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** el chip de contexto, **cuando** pulsa «Quitar el contexto», **entonces** la captura se envía sin contexto.
   6. **Dado** un contexto que ya no existe, **cuando** se envía, **entonces** la API responde 400 «El elemento ligado a la captura no existe.».
 - **Brechas código/docs:** en la app, el contexto funciona con texto; con audio o fotos falla ([CAP-04](#cap-04)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura-contexto` (criterios 1 y 4 a la vista: el chip de cada contexto, la visibilidad de la respuesta, y las tres capturas en «Lo que enviaste» con su contexto). Lo que hace el equipo con ellas (2, 3, 4) necesita el trabajador, que no corre en CI: pruebas del backend.
 
 ### CAP-08 · «Para qué es», o lo decide el equipo <a id="cap-08"></a>
 
@@ -162,7 +159,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** un audio sin voz y sin nota ni fotos, **cuando** se procesa, **entonces** la captura queda «Sin usar».
   6. **Dado** que la clasificación falla o devuelve algo inválido, **cuando** se procesa, **entonces** la captura queda en error con «No se pudo decidir a dónde va (…). El texto queda aquí: elige «Para qué es» y envíalo de nuevo.».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (los chips de «Para qué es» y «Idea para un post» en «Lo que enviaste»). La clasificación (1 a 6) es del backend.
 
 ### CAP-09 · Transcripción del audio <a id="cap-09"></a>
 
@@ -183,19 +180,19 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 ### CAP-10 · Deshacer un envío en los 2 minutos siguientes <a id="cap-10"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** si mandó algo por error, lo deshace y el equipo revierte lo que hizo con ello.
 - **Código:** `DELETE /api/v1/capturas/<id>` (`capturas.undo`, `UNDO_WINDOW` 2 min); el aviso «Enviado al equipo.» y `History.tsx` en las dos interfaces.
-- **El fallo:** en «Lo que enviaste», el botón «Deshacer» calcula si sigue a tiempo con la hora en que se pintó la tarjeta (`History.tsx`, `now` fijo), así que sigue visible pasados los 2 minutos y al pulsarlo devuelve un error 409.
+- **Arreglado:** «Deshacer» de «Lo que enviaste» calculaba el plazo con la hora en que se pintó la tarjeta y seguía visible pasados los 2 minutos. Ahora la tarjeta vuelve a pintarse cuando vence el plazo (`useUndoClock`, en las dos interfaces), y una captura deshecha sale de la lista al momento (`removeCapturaFromHistory`), sin esperar a que vuelva la lista.
 - **Criterios de aceptación:**
   1. **Dado** una captura recién enviada, **cuando** pulsa «Deshacer» en el aviso (5 s), **entonces** la API la deja en `deshecha`, aparece «Envío deshecho. Lo tienes otra vez en la hoja.» y la hoja se reabre con el mismo borrador.
   2. **Dado** una captura de hace 1 minuto, **cuando** pulsa «Deshacer» en «Lo que enviaste», **entonces** se deshace, aparece «Envío deshecho.» y desaparece de la lista.
   3. **Dado** que se deshace, **cuando** termina, **entonces** se cancela el trabajo si no había empezado, se reabre la pregunta, se retira el dato o se quita la nota de la persona, y se borran el audio y las fotos (también de la Galería).
-  4. **Dado** una captura de hace más de 2 minutos, **cuando** abre «Lo que enviaste», **entonces** no hay botón «Deshacer». **Hoy falla:** el botón sigue si la tarjeta se pintó antes de los 2 minutos.
+  4. **Dado** una captura de hace más de 2 minutos, **cuando** abre «Lo que enviaste», **entonces** no hay botón «Deshacer».
   5. **Dado** que se pide deshacer pasados los 2 minutos, **cuando** responde la API, **entonces** es 409 «Ya no se puede deshacer: pasaron más de 2 minutos. Corrige o quita lo que creó desde su sitio.» y la interfaz muestra «Ya no se puede deshacer: pasaron los 2 minutos.».
   6. **Dado** otra persona, **cuando** intenta deshacer una captura que no envió, **entonces** la API responde 409 «Solo quien la envió puede deshacerla.».
 - **Brechas código/docs:** deshacer desde «Lo que enviaste» no reabre el borrador, a diferencia del aviso.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (criterios 1 y 2: «Deshacer» en el aviso devuelve el borrador; en «Lo que enviaste», «Envío deshecho.» encima de la hoja y la captura sale de la lista). 3, 5 y 6, backend; 4, Jest y Vitest (el plazo de 2 minutos).
 
 ### CAP-11 · «Lo que enviaste» <a id="cap-11"></a>
 
@@ -212,7 +209,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   6. **Dado** un error al cargar, **cuando** falla, **entonces** ve el error con «Reintentar».
   7. **Dado** el enlace `/?enviado=1` (notificación «captura procesada»), **cuando** lo abre, **entonces** se abre la hoja en «Lo que enviaste».
 - **Brechas código/docs:** un envío que falló en el teléfono antes de llegar al servidor no aparece aquí. En la app no se comprobó si el reproductor de audio envía la cabecera `Authorization` en Android.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (criterio 1: la lista con las dos capturas sembradas y la nueva, chips, hora, estado y resultado; 3: «Escuchar» de la nota de voz sembrada) y `05-captura-envios` («1 foto», «Audio 0:0N»). 2, 4 a 7: Jest.
 
 ### CAP-12 · Qué hizo el equipo con cada envío <a id="cap-12"></a>
 
@@ -239,21 +236,21 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   4. **Dado** un navegador sin grabación, **cuando** abre la hoja en la PWA, **entonces** ve «Aquí no se puede grabar audio».
   5. **Dado** que vuelve a la app tras cambiar el permiso en el sistema, **cuando** la app pasa a primer plano, **entonces** relee el permiso.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (lo que muestra la hoja según abra o no el micrófono del emulador; el flujo concede el permiso al instalar, así que «Para grabar, 0ff1ce necesita el micrófono» y «bloqueado» son de Jest).
 
 ### CAP-14 · Cerrar la hoja sin enviar <a id="cap-14"></a>
 
 - **Dónde:** PWA · app
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** si cierra la hoja con algo dentro, se le pregunta antes de perderlo.
 - **Código:** `CaptureSheet.tsx` en las dos interfaces (confirmación «¿Cerrar sin enviar?»).
-- **El fallo:** en la PWA, mientras el envío está en curso, cerrar con Esc, el fondo o la X no pide confirmación (`close()` la salta si `sending`, `CaptureSheet.tsx:278-285, 391`). La hoja se cierra y, como TanStack Query descarta los callbacks de una llamada tras desmontar, ni el aviso de éxito ni el error llegan: un envío fallido en ese momento se pierde sin aviso.
+- **Arreglado:** mientras el envío estaba en curso, cerrar con Esc, el fondo, «atrás» o la X cerraba la hoja sin preguntar (en la PWA y en la app) y el resultado del envío se perdía. Ahora la hoja no se cierra hasta que el envío termina (`close()` en la PWA, `canClose` y `suspended` en la app). La X dice «Cerrar sin enviar», como su diálogo (decía «Cerrar sin guardar»).
 - **Criterios de aceptación:**
   1. **Dado** una hoja con audio, fotos o nota, **cuando** la cierra, **entonces** ve «¿Cerrar sin enviar?» con «Se pierden el audio, las fotos y la nota de esta captura.», «Seguir aquí» y «Cerrar sin enviar».
   2. **Dado** una hoja vacía, **cuando** la cierra, **entonces** se cierra sin preguntar.
-  3. **Dado** un envío en curso, **cuando** intenta cerrar la hoja, **entonces** no se cierra hasta que termine, o el resultado (éxito o error) se le muestra igualmente. **Hoy falla en la PWA.**
+  3. **Dado** un envío en curso, **cuando** intenta cerrar la hoja, **entonces** no se cierra hasta que termine, o el resultado (éxito o error) se le muestra igualmente.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `05-captura` (criterios 1 y 2, con «Seguir aquí»). El 3, Jest y Vitest (`capture.test.tsx`, `CaptureSheet.test.tsx`).
 
 ### CAP-15 · Límites de tamaño, tipo y duración <a id="cap-15"></a>
 
