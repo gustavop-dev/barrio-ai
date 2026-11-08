@@ -75,6 +75,8 @@ El build tarda unos 10 a 15 minutos. Al terminar, EAS da un enlace y un QR para 
 2. Queda como **0ff1ce**, con el icono de la marca, conectada a `https://office.projectapp.co`.
 3. El `projectId` que escribe `eas init` en `app.json` se sube al repo.
 
+Los dos perfiles compilan solo para `arm64-v8a`, la arquitectura de casi todos los Android actuales (`ORG_GRADLE_PROJECT_reactNativeArchitectures` en `eas.json`). Con las cuatro arquitecturas por defecto, el compilador de C++ de Skia se quedaba sin memoria en la máquina gratuita de EAS («Killed» en la fase Run gradlew).
+
 Cada versión nueva de la app es un `build` nuevo y se reinstala encima, sin perder la sesión. Más adelante se puede añadir `expo-updates` para mandar cambios sin reinstalar. Las notificaciones push en el APK necesitan además las credenciales de FCM (Firebase), que se cargan en EAS con `npx eas-cli@latest credentials`.
 
 ## Qué funciona en Expo Go y qué necesitará una build de desarrollo
