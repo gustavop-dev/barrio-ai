@@ -115,7 +115,13 @@ tags: [personas]
     text: "Comentó en un post de un referente · .*"
     childOf:
       id: person-547cd492-cd91-542a-976e-3a1f11029285
-# Pedro (contact:pedro-salazar) has no classification yet.
+# Pedro (contact:pedro-salazar) has no classification yet. The order of the rows follows their last activity, so the
+# list goes back to the top first and Pedro is looked for from there.
+- scrollUntilVisible:
+    element:
+      id: stage-chips
+    direction: UP
+    timeout: 30000
 - scrollUntilVisible:
     element:
       id: person-5ede725c-3221-5088-8e6d-334ca462e9b0
