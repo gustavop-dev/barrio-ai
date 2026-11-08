@@ -102,25 +102,43 @@ tags: [captura]
     visible:
       id: barrio-list
     timeout: 30000
-- scrollUntilVisible:
-    element:
-      text: 'Laura Gómez'
-    direction: DOWN
-    timeout: 30000
-- tapOn: 'Laura Gómez'
-- extendedWaitUntil:
-    visible:
-      id: persona
-    timeout: 30000
-# A detail view has no bottom bar (CAP-01): its own «Nota de voz» opens the capture tied to her. (The tabs stay mounted
-# under the detail screen, so Maestro still finds the capture button there: the screenshot shows it is not on screen.)
-- takeScreenshot: 05-contexto-04a-ficha-sin-barra
-- scrollUntilVisible:
-    element:
-      text: 'Nota de voz'
-    direction: DOWN
-    timeout: 30000
-    centerElement: true
+# Known issue outside Captura (MovDetalle, PersonaScreen): now and then the blocks of the card that enter with a delay
+# (navLayout.cardBlock(2), (3)) stay invisible after the capture sheet closed, and «Nota de voz» is never on screen
+# (QA 42485271638, 05-captura-contexto). Up to two more tries, going back and opening the card again; the screenshot
+# of each failed try stays in the run.
+- retry:
+    maxRetries: 2
+    commands:
+      - runFlow:
+          when:
+            visible:
+              id: persona
+          commands:
+            - takeScreenshot: 05-contexto-04b-ficha-en-blanco
+            - back
+            - extendedWaitUntil:
+                visible:
+                  id: barrio-list
+                timeout: 20000
+      - scrollUntilVisible:
+          element:
+            text: 'Laura Gómez'
+          direction: DOWN
+          timeout: 30000
+      - tapOn: 'Laura Gómez'
+      - extendedWaitUntil:
+          visible:
+            id: persona
+          timeout: 30000
+      # A detail view has no bottom bar (CAP-01): its own «Nota de voz» opens the capture tied to her. (The tabs stay
+      # mounted under the detail screen, so Maestro still finds the capture button: the screenshot shows it is not there.)
+      - takeScreenshot: 05-contexto-04a-ficha-sin-barra
+      - scrollUntilVisible:
+          element:
+            text: 'Nota de voz'
+          direction: DOWN
+          timeout: 20000
+          centerElement: true
 - tapOn: 'Nota de voz'
 - extendedWaitUntil:
     visible:
