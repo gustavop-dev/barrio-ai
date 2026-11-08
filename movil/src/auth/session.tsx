@@ -1,13 +1,14 @@
 // The native session: a device token (POST /api/v1/auth/token) kept in SecureStore, sent as a bearer
 // token by the transport. No cookies, no CSRF. The gate in app/(app)/_layout.tsx reads `status`.
 //
-// - Start-up: no token → signed out. With one, GET /auth/session decides: `authenticated:false`
-//   (revoked or unknown token) clears it; a network failure keeps it (offline launch) and the screens
-//   show their own errors.
+// - Start-up: no token → signed out. With one, GET /auth/session decides: `authenticated:false` or a
+//   401 (revoked or unknown token) clears it. Anything else keeps it and the app opens inside (ACC-06):
+//   no connection (the transport's NetworkError), or the server failing (a 5xx during a deploy). The
+//   screens show their own errors, and the session is asked again until the user is back.
 // - Any 401 from the API (compartido's onUnauthorized) clears the token and goes back to login.
 // - Logout, in this order: DELETE /push/expo (needs the token), POST /auth/token/revocar, clear SecureStore.
 // - The Expo push token is registered on every launch with a session (the backend just updates it).
-import { onUnauthorized } from '@compartido/api/client';
+import { ApiError, onUnauthorized } from '@compartido/api/client';
 import { getSession, loginWithToken, revokeToken } from '@compartido/api/endpoints';
 import type { Session, User } from '@compartido/api/types';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -19,6 +20,9 @@ import { deviceName, registerForPush, unregisterPush, type PushResult } from '@/
 export const SIGNED_OUT: Session = { authenticated: false, user: null };
 
 export type SessionStatus = 'cargando' | 'fuera' | 'dentro';
+
+/** Inside without knowing the user (offline start, server failing): how often the session is asked again. */
+export const SESSION_RETRY_MS = 15_000;
 
 export interface SessionApi {
   status: SessionStatus;
@@ -47,16 +51,32 @@ export async function restoreSession(): Promise<Session> {
     await clearToken();
     return SIGNED_OUT;
   } catch (error) {
-    // Offline launch: keep the token, the screens show their own errors and retry.
-    if (error instanceof TypeError) return { authenticated: true, user: null };
-    await clearToken();
-    return SIGNED_OUT;
+    // Only the server saying the token is not valid logs out. Offline, or with the server failing, the
+    // phone keeps its token: the screens show their own errors and retry.
+    if (error instanceof ApiError && error.status === 401) {
+      await clearToken();
+      return SIGNED_OUT;
+    }
+    return { authenticated: true, user: null };
   }
 }
 
+/** Signed in, but the user is not known yet (the start-up could not reach the server). */
+const userMissing = (data: Session | undefined) => Boolean(data?.authenticated && !data.user);
+
 export function SessionProvider({ children, autoRegisterPush = true }: { children: ReactNode; autoRegisterPush?: boolean }) {
   const queryClient = useQueryClient();
-  const session = useQuery({ queryKey: keys.session, queryFn: restoreSession, staleTime: Infinity, retry: false });
+  // `always`: the start-up must decide even before the network is known (offline it keeps the token).
+  // While the user is missing, the session is stale: it is asked again when the network comes back and
+  // every SESSION_RETRY_MS, so «Tu nota» and the LinkedIn permissions come back (ACC-06.6).
+  const session = useQuery({
+    queryKey: keys.session,
+    queryFn: restoreSession,
+    networkMode: 'always',
+    retry: false,
+    staleTime: (query) => (userMissing(query.state.data) ? 0 : Infinity),
+    refetchInterval: (query) => (userMissing(query.state.data) ? SESSION_RETRY_MS : false),
+  });
   const [push, setPush] = useState<PushResult | null>(null);
   const registered = useRef(false);
 

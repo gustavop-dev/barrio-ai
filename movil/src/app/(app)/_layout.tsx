@@ -1,8 +1,10 @@
 // The session gate and what only signed-in screens need: the shared recorder, the capture sheet,
-// the push-tap routing, and the stack (tabs plus the detail views above them).
+// the push-tap routing, and the stack (tabs plus the detail views above them). Signed out, it opens the
+// login over itself (SignedOut).
 import * as Notifications from 'expo-notifications';
-import { Redirect, Stack } from 'expo-router';
-import { useEffect } from 'react';
+import { Stack, router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect } from 'react';
+import { View } from 'react-native';
 import { useSession } from '@/auth/session';
 import { CaptureSheetHost } from '@/capture/CaptureSheet';
 import { RecorderProvider } from '@/capture/recorder';
@@ -58,9 +60,24 @@ function SignedIn() {
   );
 }
 
+/**
+ * Signed out, the app stays at the bottom of the root stack and opens the login over itself (a transparent
+ * modal). When the session opens, SignedIn mounts here, under the login, and the login fades into the live
+ * Oficina (MovEntrada, app/login.tsx). A Redirect would replace the app with the login, which would then be
+ * the first screen of its stack: drawn as an opaque card, with nothing under it to fade into.
+ */
+function SignedOut() {
+  useFocusEffect(
+    useCallback(() => {
+      router.push('/login');
+    }, []),
+  );
+  return <View testID="app-fuera" style={{ flex: 1, backgroundColor: colors.ink }} />;
+}
+
 export default function AppLayout() {
   const { status } = useSession();
-  if (status === 'fuera') return <Redirect href="/login" />;
+  if (status === 'fuera') return <SignedOut />;
   if (status === 'cargando') return null;
   return <SignedIn />;
 }

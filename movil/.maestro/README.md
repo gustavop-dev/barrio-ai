@@ -86,9 +86,9 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 
 | Flujo | Qué hace |
 |---|---|
-| `01-entrada` | contraseña equivocada y su error; mostrar la contraseña; la correcta, la entrada animada y la Oficina |
-| `02-navegacion` | las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial y el «‹» de una ficha |
-| `03-oficina` | tocar un personaje de la escena y ver su hoja, arrastrarla a altura completa y cerrarla, la tira de equipos y la Biblioteca |
+| `01-entrada` | la pantalla de entrada y «Entrar» desactivado; con el teclado abierto, la contraseña sigue a la vista; sin conexión, el aviso en español; contraseña equivocada; mostrar la contraseña; la correcta, la entrada animada y la Oficina; abrir otra vez sigue dentro; una sesión cerrada desde otro dispositivo vuelve a la entrada |
+| `02-navegacion` | abrir la app sin conexión sigue dentro (la franja, y la red que vuelve); el contador y el punto de arriba; las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial; una ficha cerrada con «‹», con atrás y arrastrando desde el borde; la firma; enlaces `oficina0ff1ce://` a una pestaña y a una pieza |
+| `03-oficina` | tocar un personaje de la escena y ver su hoja con su estado real y lo último que hizo, arrastrarla a altura completa y cerrarla, la tira de equipos, «Ver en el Calendario» y la Biblioteca; arrastre y doble toque en la escena; tirar para recargar; la leyenda; la máquina en pausa (el aviso, la escena oscurecida y Ajustes) |
 | `04-tu-turno` | «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Pospuestas» y «Lo que el equipo sabe de ti» |
 | `05-captura` | abrir la hoja, escribir, «Para qué es», grabar (o lo que muestre el emulador sin micrófono), cerrar sin enviar, mantener pulsado el botón, enviar, «Lo que enviaste» y «Deshacer» |
 | `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
@@ -106,6 +106,8 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 - Cada interacción va seguida de lo que tiene que aparecer (`assertVisible`, `extendedWaitUntil`). Un flujo que solo hace capturas no detecta nada.
 - El emulador usa render por software y es lento. Espera con `extendedWaitUntil` y timeouts de 20 a 30 s. La escena de la Oficina se anima sin parar: no uses `waitForAnimationToEnd` sin `timeout`.
 - Los flujos no se prueban en el portátil: haz push y mira el PR, o lanza `gh workflow run qa-movil.yml --ref tu-rama`.
+- **Sin conexión:** `setAirplaneMode: enabled` corta la red del emulador (el backend del runner deja de verse). Un flujo que lo usa pone `onFlowComplete: [setAirplaneMode: disabled]`, para no dejar al siguiente sin red aunque falle un paso.
+- **Lo que haría otro dispositivo o la máquina:** `comun/qa-api.js` llama a la API del backend del runner como otro teléfono del usuario `qa`. `ACCION: cerrar-este-telefono` cierra la sesión del emulador desde «Dispositivos con la app» (la siguiente petición de la app recibe un 401); `pausar` y `reanudar` paran y reanudan la máquina.
 
 ## Lo que no se automatiza
 

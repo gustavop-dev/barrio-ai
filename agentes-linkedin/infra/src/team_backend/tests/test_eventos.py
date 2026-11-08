@@ -19,7 +19,9 @@ class OfficeEventTests(OperatorBase):
         drafted=ActionProposal.objects.get(post=post,capability='INT-03')
         self.approve({'id':str(drafted.id),'payload_hash':drafted.payload_hash})
         kinds=[(e['tipo'],e['rol'],e['destino']) for e in self.human.get('/api/v1/oficina/eventos').json()['events']]
-        self.assertEqual(kinds,[('consulta_biblioteca','relaciones_comunidad','biblioteca'),('entrega','relaciones_comunidad','operador_cuenta'),
+        # Reading the referents handed their new posts to Relaciones first (background work moves the scene too).
+        self.assertEqual(kinds,[('entrega','investigador_referentes','relaciones_comunidad'),
+                                ('consulta_biblioteca','relaciones_comunidad','biblioteca'),('entrega','relaciones_comunidad','operador_cuenta'),
                                 ('publicacion','operador_cuenta','linkedin')])
         later=(timezone.now()+timedelta(minutes=1)).isoformat()
         self.assertEqual(self.human.get('/api/v1/oficina/eventos',{'desde':later}).json()['events'],[])
@@ -31,7 +33,8 @@ class EditorialEventTests(EditorialBase):
         events=[e.metadata for e in AuditEvent.objects.filter(action='office.event').order_by('created_at')]
         library=[e['rol'] for e in events if e['tipo']=='consulta_biblioteca']
         self.assertEqual(library,['director_editorial','copywriter_a','lector_comprador','director_editorial','editor_verificador'])
-        handoffs=[(e['rol'],e['destino']) for e in events if e['tipo']=='entrega']
+        # The editorial circuit's own handoffs (reading the referents hands their posts to Relaciones before it).
+        handoffs=[(e['rol'],e['destino']) for e in events if e['tipo']=='entrega' and e['rol']!='investigador_referentes']
         self.assertEqual(handoffs[0],('director_editorial','copywriter_a'));self.assertEqual(handoffs[-1],('editor_verificador','operador_cuenta'))
 
 class BackgroundWorkEventTests(OperatorBase):

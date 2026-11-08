@@ -1,4 +1,4 @@
-// MovEntrada: after a successful login the app goes under the login, the door opens, the picture
+// MovEntrada: after a successful login the door opens (the app is already under the login), the picture
 // zooms to 3× in integer steps and the login fades out and leaves; with reduced motion it only
 // crossfades; a failed login stays put.
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
@@ -95,15 +95,14 @@ describe('login → Oficina', () => {
     await fireEvent.press(screen.getByTestId('login-entrar'));
   }
 
-  it('puts the app under the login after a successful login, then the login leaves', async () => {
+  it('opens the door after a successful login and leaves once faded, without resetting the stack', async () => {
     fakeServer({ 'POST /api/v1/auth/token': { status: 201, body: { token: '0ff1ce_dt_nuevo', user: USER, device: { id: 'd1', name: 'Pixel de prueba', created_at: '2026-11-07T10:00:00Z' } } } });
     await renderApp(<Login />, { session: true });
     await fillAndEnter();
-    await waitFor(() =>
-      expect(navigation.dispatch).toHaveBeenCalledWith({ type: 'RESET', payload: { index: 1, routes: [{ name: '(app)' }, { key: 'login-1', name: 'login' }] } }),
-    );
     expect(screen.queryByTestId('redirect')).toBeNull();
     await waitFor(() => expect(navigation.goBack).toHaveBeenCalledTimes(1), { timeout: 3000 });
+    // The app is already under the login (the (app) layout opened it over itself): no RESET, which Expo Router 58 rejects.
+    expect(navigation.dispatch).not.toHaveBeenCalled();
   });
 
   it('stays on the login when the credentials are wrong', async () => {
