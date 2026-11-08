@@ -1,7 +1,7 @@
 # cubre: ACC-02, ACC-05, ACC-06, ACC-10, APP-01, APP-02, APP-08
 # Login and the session on the phone: the login screen; the keyboard does not cover the password; offline, the message
 # in Spanish; the wrong password and the right one; the entrance into the Oficina; opening the app again stays inside
-# (offline: 02-navegacion); and a session closed from another device goes back to the login.
+# (offline and with the server failing: 02-navegacion); and a session closed from another device goes back to the login.
 appId: co.projectapp.office
 name: Entrada
 tags: [entrada]
