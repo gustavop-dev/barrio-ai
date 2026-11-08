@@ -45,7 +45,7 @@ import { Icon } from '@/components/icons';
 import { Button, ConfirmSheet, FilterChip, Note, Options, Sheet, T, errorMessage, useToast } from '@/components/ui';
 import { Field } from '@/components/ui/Field';
 import { useSheetFrame, type SheetFrame, type SheetHandle } from '@/components/ui/Sheet';
-import { captureMotion, captureTimeline, curves, durations, haptic, microLayout, springWith, timelineWith, timingWith, useMotion } from '@/theme/motion';
+import { captureMotion, captureTimeline, curves, durations, haptic, springWith, timelineWith, timingWith, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { lerp, qbez, seg, useVoiceLevel } from './choreo';
 import { BIN, BinGlyph, ENVELOPE, EnvelopeGlyph } from './glyphs';
@@ -564,6 +564,21 @@ function Thumb({
 }) {
   const frame = useSheetFrame();
   const centre = useSharedValue<Point>({ x: 0, y: 0 });
+  // MovCaptura `.entra`: from 0.6 to 1.06 at 60 % of `durations.base`, then 1. A shared value, not Reanimated
+  // `entering`: back from Android's photo picker, the keyframe could stay at its first frame and the photo was never
+  // seen, only its empty slot (QA 42497299487, 05-captura-envios). With reduced motion it is there at once.
+  const pop = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    pop.set(withTiming(1, timelineWith(durations.base)));
+  }, [pop]);
+  const popIn = useAnimatedStyle(() => {
+    const t = pop.value;
+    const peak = captureMotion.thumbPeakAt / 100;
+    const rise = curves.enter(Math.min(1, t / peak));
+    const settle = t <= peak ? 0 : curves.enter((t - peak) / (1 - peak));
+    const scale = t <= peak ? lerp(captureMotion.thumbFrom, captureMotion.thumbOvershoot, rise) : lerp(captureMotion.thumbOvershoot, 1, settle);
+    return { opacity: rise, transform: [{ scale }] };
+  });
   const flight = useAnimatedStyle(() => {
     const t = clock.value;
     if (t <= 0 || !frame) return { opacity: 1, transform: [{ translateX: 0 }, { translateY: 0 }, { scale: 1 }] };
@@ -577,7 +592,7 @@ function Thumb({
   });
   return (
     <Animated.View
-      entering={microLayout.thumbIn()}
+      style={popIn}
       onLayout={(event) => {
         const { x, y, width, height } = event.nativeEvent.layout;
         centre.set({ x: x + width / 2, y: y + height / 2 });
