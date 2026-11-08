@@ -298,10 +298,13 @@ tags: [ajustes]
     direction: DOWN
     timeout: 30000
 # OPERATOR_WINDOW is 00:00-23:59 in America/Bogota (a key/value row is labelled «Horario: …»).
+# Centred: Maestro counts a row under the bottom bar as visible, and how far one swipe scrolls varies with the fling,
+# so «Ahora» (the next row) may still be below the screen (QA 42494671507).
 - scrollUntilVisible:
     element:
       text: "Horario: 00:00.23:59 · America/Bogota"
     direction: DOWN
+    centerElement: true
     timeout: 30000
 - assertVisible: "Ahora: Abierta"
 - scrollUntilVisible:
