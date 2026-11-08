@@ -75,6 +75,9 @@ tags: [resultados]
     timeout: 10000
 
 # «Usar como orientación»: the toast offers «Deshacer» for 5 s and the card already says it was used; undo at once.
+# Keep tap settling short and check the toast's message in the undo selector, avoiding a separate hierarchy read
+# before the deadline. «Deshecho» lasts 4 s and may be missed by Maestro; both enabled buttons returning and the
+# decided sentence disappearing are mandatory, so a missed/expired undo still fails.
 - scrollUntilVisible:
     element:
       id: resumen-usar
@@ -83,30 +86,35 @@ tags: [resultados]
     timeout: 20000
 - tapOn:
     id: resumen-usar
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
-      text: "Orientación actualizada.*"
+      text: "La usaste como orientación del equipo.*"
       childOf:
-        id: toast
+        id: resumen-semanal
     timeout: 15000
-- assertVisible:
-    text: "La usaste como orientación del equipo.*"
 - tapOn:
     text: "Deshacer"
     childOf:
       id: toast
+      containsDescendants:
+        - text: "Orientación actualizada.*"
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       text: "Deshecho"
       childOf:
         id: toast
-    timeout: 15000
+    timeout: 2000
+    optional: true
 - extendedWaitUntil:
     visible:
       id: resumen-usar
+      enabled: true
     timeout: 10000
 - assertVisible:
     id: resumen-descartar
+    enabled: true
 - assertNotVisible:
     text: "La usaste como orientación del equipo.*"
 - takeScreenshot: 08-resultados-04-orientacion-deshecha
@@ -114,28 +122,35 @@ tags: [resultados]
 # «Descartar», then «Deshacer».
 - tapOn:
     id: resumen-descartar
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
-      text: "Resumen descartado"
+      text: "La descartaste.*"
       childOf:
-        id: toast
+        id: resumen-semanal
     timeout: 15000
-- assertVisible:
-    text: "La descartaste.*"
 - tapOn:
     text: "Deshacer"
     childOf:
       id: toast
+      containsDescendants:
+        - text: "Resumen descartado"
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       text: "Deshecho"
       childOf:
         id: toast
-    timeout: 15000
+    timeout: 2000
+    optional: true
 - extendedWaitUntil:
     visible:
       id: resumen-descartar
+      enabled: true
     timeout: 10000
+- assertVisible:
+    id: resumen-usar
+    enabled: true
 - assertNotVisible:
     text: "La descartaste.*"
 - takeScreenshot: 08-resultados-05-descarte-deshecho
