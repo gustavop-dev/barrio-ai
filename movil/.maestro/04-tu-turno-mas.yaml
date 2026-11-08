@@ -74,10 +74,11 @@ tags: [turno]
     text: 'Reanudar'
     childOf:
       id: confirm-sheet
+    waitToSettleTimeoutMs: 300
+- takeScreenshot: 04-mas-02-maquina-reanudada
 - extendedWaitUntil:
     visible: 'Máquina reanudada'
     timeout: 20000
-- takeScreenshot: 04-mas-02-maquina-reanudada
 - extendedWaitUntil:
     notVisible: 'Reanuda la máquina'
     timeout: 20000
