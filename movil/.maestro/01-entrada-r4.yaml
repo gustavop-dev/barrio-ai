@@ -1,0 +1,180 @@
+# cubre: ACC-02, ACC-05, ACC-06, ACC-10, APP-01, APP-02, APP-08
+# TEMPORAL: copia de 01-entrada para correrla varias veces a la vez en CI (se borra antes de fusionar).
+# Login and the session on the phone: the login screen; the keyboard does not cover the password; offline, the message
+# in Spanish; the wrong password and the right one; the entrance into the Oficina; opening the app again stays inside
+# (offline and with the server failing: 02-navegacion); and a session closed from another device goes back to the login.
+appId: co.projectapp.office
+name: Entrada (repetición 4)
+tags: [entrada]
+onFlowComplete:
+  # Never leave the emulator offline for the next flow, even when a step failed.
+  - setAirplaneMode: disabled
+---
+- setAirplaneMode: disabled
+- launchApp:
+    clearState: true
+    permissions:
+      all: allow
+# A cold emulator may show a system «… isn't responding» dialog over the app: wait for it to go.
+- runFlow:
+    when:
+      visible: ".*(isn't responding|no responde).*"
+    commands:
+      - tapOn: "Wait|Esperar"
+- extendedWaitUntil:
+    visible:
+      id: login
+    timeout: 60000
+
+# ---------------------------------------------------------------- the login screen
+# cubre: ACC-02.1 — the door, the logo, «Entrar», the hint, the fields with «Mostrar la contraseña» and the device note
+- assertVisible: Entrar
+- assertVisible: "La oficina de agentes de IA que trabaja tu LinkedIn\\."
+- assertVisible: "Usa tu usuario y contraseña de Django\\."
+- assertVisible:
+    id: login-usuario
+- assertVisible: Mostrar la contraseña
+- takeScreenshot: 01-entrada-01-pantalla
+# cubre: ACC-02.5 — with the fields empty, «Entrar» is disabled
+- scrollUntilVisible:
+    element: "Este teléfono queda como un dispositivo de tu cuenta\\. Puedes cerrarlo desde Ajustes\\."
+    direction: DOWN
+- assertVisible:
+    id: login-entrar
+    enabled: false
+
+# ---------------------------------------------------------------- the keyboard must not cover the form (390x844)
+# Regression: the keyboard covered «Usuario» and «Contraseña» and the form did not scroll them into view. With the
+# keyboard still open, a tap on «Contraseña» must land on the field: it used to land on the keyboard and type into
+# «Usuario».
+- tapOn:
+    id: login-usuario
+- inputText: ${QA_USER}
+- takeScreenshot: 01-entrada-02-teclado
+- tapOn:
+    id: login-clave
+- inputText: clave-equivocada
+- assertVisible:
+    id: login-usuario
+    text: ${QA_USER}
+- takeScreenshot: 01-entrada-03-teclado-clave
+- hideKeyboard
+
+# ---------------------------------------------------------------- no connection: the message in Spanish
+# cubre: ACC-02.4, APP-08.3 — never «fetch failed: …» (expo/fetch's English error)
+- setAirplaneMode: enabled
+- scrollUntilVisible:
+    element:
+      id: login-entrar
+    direction: DOWN
+- tapOn:
+    id: login-entrar
+- extendedWaitUntil:
+    visible: "No pudimos conectar con la oficina\\. Revisa tu conexión e intenta de nuevo\\."
+    timeout: 30000
+- assertNotVisible: ".*fetch failed.*"
+- assertNotVisible: ".*Network request failed.*"
+- takeScreenshot: 01-entrada-04-sin-conexion
+- setAirplaneMode: disabled
+
+# ---------------------------------------------------------------- wrong password
+# cubre: ACC-02.3
+# The answer itself says when the network is back: while Android brings it up, «Entrar» still gets «No pudimos
+# conectar…», so it is pressed again (a few seconds apart) until the server answers «Usuario o contraseña incorrectos.».
+- scrollUntilVisible:
+    element:
+      id: login-entrar
+    direction: DOWN
+- repeat:
+    while:
+      notVisible: "Usuario o contraseña incorrectos\\."
+    times: 8
+    commands:
+      - tapOn:
+          id: login-entrar
+      - extendedWaitUntil:
+          visible: "Usuario o contraseña incorrectos\\.|No pudimos conectar con la oficina\\..*"
+          timeout: 20000
+      - runFlow:
+          when:
+            visible: "No pudimos conectar con la oficina\\..*"
+          commands:
+            - extendedWaitUntil:
+                visible: "__la-red-aun-no-vuelve__"
+                timeout: 4000
+                optional: true
+- assertVisible: "Usuario o contraseña incorrectos\\."
+- takeScreenshot: 01-entrada-05-clave-equivocada
+
+# ---------------------------------------------------------------- the right one, and the entrance
+# Show the password, then type the right one.
+- scrollUntilVisible:
+    element: Mostrar la contraseña
+    direction: DOWN
+- tapOn: Mostrar la contraseña
+- assertVisible: Ocultar la contraseña
+- tapOn:
+    id: login-clave
+- eraseText: 40
+- inputText: ${QA_PASSWORD}
+- hideKeyboard
+- takeScreenshot: 01-entrada-06-clave-visible
+- scrollUntilVisible:
+    element:
+      id: login-entrar
+    direction: DOWN
+# cubre: ACC-02.2, ACC-10.1 — the door opens, the picture zooms in and fades into the live Oficina, mounted underneath
+- tapOn:
+    id: login-entrar
+- takeScreenshot: 01-entrada-07-puerta
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 45000
+- extendedWaitUntil:
+    notVisible:
+      id: login
+    timeout: 20000
+- assertVisible:
+    id: tab-index
+    selected: true
+- takeScreenshot: 01-entrada-08-oficina
+
+# ---------------------------------------------------------------- opening the app again keeps the session
+# cubre: ACC-06.1, ACC-10.3 — straight into the Oficina: no login and no entrance
+- stopApp
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: "login|screen-oficina"
+    timeout: 45000
+- assertNotVisible:
+    id: login
+- assertVisible:
+    id: screen-oficina
+
+# ---------------------------------------------------------------- the session closed from another device
+# cubre: ACC-05.4 — another device closes this phone's session (DELETE /auth/dispositivos/<id>); the next request of the
+# app gets a 401, the app forgets its token and shows the login
+- runScript:
+    file: comun/qa-api.js
+    env:
+      ACCION: cerrar-este-telefono
+      QA_USER: ${QA_USER}
+      QA_PASSWORD: ${QA_PASSWORD}
+# The Oficina polls every 15 s, so its next request may get the 401 before this tap: the tap that makes a request only
+# runs while the shell is still there.
+- runFlow:
+    when:
+      visible:
+        id: tab-resultados
+    commands:
+      - tapOn:
+          id: tab-resultados
+          optional: true
+- extendedWaitUntil:
+    visible:
+      id: login
+    timeout: 60000
+- assertVisible: Entrar
+- takeScreenshot: 01-entrada-09-sesion-cerrada
