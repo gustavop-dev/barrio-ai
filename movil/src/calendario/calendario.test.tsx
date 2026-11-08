@@ -33,7 +33,7 @@ describe('deep links of the calendar and the piece', () => {
     openLink('/editorial/p-9');
     expect(expoRouter.router.push).toHaveBeenLastCalledWith({ pathname: '/calendario/pieza/p-9', params: {} });
     openLink('/calendario?vista=lista');
-    expect(expoRouter.router.push).toHaveBeenLastCalledWith({ pathname: '/calendario', params: { vista: 'lista' } });
+    expect(expoRouter.router.navigate).toHaveBeenLastCalledWith({ pathname: '/calendario', params: { vista: 'lista' } });
   });
 });
 

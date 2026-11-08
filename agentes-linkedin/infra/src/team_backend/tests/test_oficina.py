@@ -4,6 +4,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 from django.core.cache import cache
 from django.test import Client
+from django.utils import timezone
 from pywebpush import WebPushException
 from team_backend import autopiloto, jobs, operador, push
 from team_backend.models import Job, OperatorControl, PushSubscription
@@ -87,7 +88,9 @@ class OfficeTests(OperatorBase):
         self.sign_in()
         roles=self.browser.get('/api/v1/oficina/actividad').json()['roles']
         self.assertEqual(len(roles),16)
-        self.assertEqual(roles['conversaciones_inbox']['status'],'diseno')
+        # Every role with code is implemented: the inbox agent reads the inbox (read_inbox), so it is never «en diseño» (OFI-01.4).
+        self.assertEqual([r for r,v in roles.items() if v['status']=='diseno'],[])
+        self.assertEqual(roles['conversaciones_inbox']['status'],'en_espera')
         self.assertEqual(roles['lector_par']['status'],'en_espera')  # the readers panel runs in the editorial circuit
         self.assertEqual(roles['investigador_referentes']['status'],'en_espera')
         job,_=jobs.enqueue_operation(self.gustavo,'observe',{'account':str(self.account.id),'limit':5})
@@ -95,6 +98,17 @@ class OfficeTests(OperatorBase):
         roles=self.browser.get('/api/v1/oficina/actividad').json()['roles']
         self.assertEqual(roles['investigador_referentes']['status'],'trabajando')
         self.assertEqual(roles['relaciones_comunidad']['status'],'en_espera')
+
+    def test_the_inbox_agent_works_while_the_inbox_is_read(self):
+        # OFI-01.5: a running read_inbox job puts «Conversaciones e inbox» to work; once done, its last job shows.
+        self.sign_in()
+        job=Job.objects.create(owner=self.gustavo,request_hash='inbox',agent='conversaciones_inbox',task='read_inbox',kind='read_inbox',
+                               params={'account':str(self.account.id)},state=Job.State.RUNNING,started_at=timezone.now(),worker=self.worker)
+        role=self.browser.get('/api/v1/oficina/actividad').json()['roles']['conversaciones_inbox']
+        self.assertEqual((role['status'],role['detail']),('trabajando','Leyendo el inbox de LinkedIn'))
+        Job.objects.filter(pk=job.pk).update(state=Job.State.COMPLETE,finished_at=timezone.now(),result_status='chats:3 leidos:3 te tocan:1')
+        role=self.browser.get('/api/v1/oficina/actividad').json()['roles']['conversaciones_inbox']
+        self.assertEqual((role['status'],role['detail']),('en_espera','Último: leyendo el inbox de linkedin (chats:3 leidos:3 te tocan:1)'))
 
     def test_push_subscription_test_and_revocation(self):
         with patch.dict(os.environ,{'VAPID_PUBLIC_KEY':''}):

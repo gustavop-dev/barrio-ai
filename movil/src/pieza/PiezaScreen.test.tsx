@@ -242,8 +242,11 @@ describe('Detalle de una pieza', () => {
     server(piece({ status: 'uncertain', action_detail: { id: 'act-7' } as PieceDetailFull['action_detail'] }));
     await renderPieza();
     expect(await screen.findByText('No se sabe si salió')).toBeOnTheScreen();
+    // From the piece (a detail over the tabs) it goes back down to the tabs instead of stacking another shell.
+    (expoRouter.router.canDismiss as jest.Mock).mockReturnValueOnce(true);
     await fireEvent.press(screen.getByText('Resuélvela en Tu turno'));
-    expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-act-7' } });
+    expect(expoRouter.router.dismissTo).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-act-7' } });
+    expect(expoRouter.router.push).not.toHaveBeenCalled();
   });
 
   it('shows the error with a retry', async () => {

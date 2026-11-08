@@ -8,7 +8,7 @@ import { clearToken, currentToken } from '@/api/token';
 import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
-import { useSession } from './session';
+import { SESSION_RETRY_MS, useSession } from './session';
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const USER = { username: 'gustavo', is_superuser: true, permissions: [] };
@@ -59,6 +59,61 @@ describe('session', () => {
     await renderApp(<Probe />, { session: true });
     await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('fuera'));
     expect(store.has('oficina.token-dispositivo')).toBe(false);
+  });
+
+  // ACC-06: only a 401 or `authenticated:false` logs out at start-up. Offline (expo/fetch's FetchError) or with the
+  // server failing (a 5xx while it restarts) the phone keeps its token and stays inside.
+  it('stays inside when the phone opens the app without a connection (expo/fetch FetchError)', async () => {
+    store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
+    fakeServer({ 'GET /api/v1/auth/session': { fetchError: 'Unable to resolve host "office.projectapp.co"' } });
+    await renderApp(<Probe />, { session: true });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('dentro'));
+    expect(store.get('oficina.token-dispositivo')).toBe('0ff1ce_dt_guardado');
+    expect(currentToken()).toBe('0ff1ce_dt_guardado');
+  });
+
+  it('stays inside when the server answers 502 at start-up', async () => {
+    store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
+    fakeServer({ 'GET /api/v1/auth/session': { status: 502, body: '<html>Bad Gateway</html>' } });
+    await renderApp(<Probe />, { session: true });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('dentro'));
+    expect(store.get('oficina.token-dispositivo')).toBe('0ff1ce_dt_guardado');
+  });
+
+  it('forgets the token when the session answers 401 at start-up', async () => {
+    store.set('oficina.token-dispositivo', '0ff1ce_dt_desconocido');
+    fakeServer({ 'GET /api/v1/auth/session': { status: 401, body: { detail: 'Token inválido.' } } });
+    await renderApp(<Probe />, { session: true });
+    await waitFor(() => expect(screen.getByTestId('status')).toHaveTextContent('fuera'));
+    expect(store.has('oficina.token-dispositivo')).toBe(false);
+  });
+
+  it('asks for the session again until the user is back after an offline start (ACC-06.6)', async () => {
+    jest.useFakeTimers();
+    try {
+      store.set('oficina.token-dispositivo', '0ff1ce_dt_guardado');
+      const server = fakeServer({ 'GET /api/v1/auth/session': { fetchError: 'Failed to connect' } });
+      await renderApp(<Probe />, { session: true });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(100);
+      });
+      expect(screen.getByTestId('status')).toHaveTextContent('dentro');
+      expect(screen.getByTestId('user')).toHaveTextContent('');
+      server.on('GET /api/v1/auth/session', { body: { authenticated: true, user: USER } });
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SESSION_RETRY_MS + 100);
+      });
+      expect(screen.getByTestId('user')).toHaveTextContent('gustavo');
+      expect(screen.getByTestId('status')).toHaveTextContent('dentro');
+      // Known again: no more asking.
+      const asked = server.find('GET', '/api/v1/auth/session').length;
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(SESSION_RETRY_MS * 2);
+      });
+      expect(server.find('GET', '/api/v1/auth/session')).toHaveLength(asked);
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('goes back to login when any request gets a 401', async () => {

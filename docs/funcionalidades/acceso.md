@@ -10,11 +10,11 @@ Cómo entra Gustavo en la PWA (sesión de Django con cookie y CSRF) y en la app 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
 | [ACC-01](#acc-01) | Entrar en la PWA | PWA · backend | funciona |
-| [ACC-02](#acc-02) | Entrar en la app | app · backend | con fallo conocido |
+| [ACC-02](#acc-02) | Entrar en la app | app · backend | funciona |
 | [ACC-03](#acc-03) | Bloqueo tras demasiados intentos | PWA · app · backend | funciona |
 | [ACC-04](#acc-04) | Volver a donde estaba después de entrar | PWA | funciona |
 | [ACC-05](#acc-05) | Sesión caducada o revocada | PWA · app · backend | funciona |
-| [ACC-06](#acc-06) | Seguir dentro al abrir la app | app · backend | con fallo conocido |
+| [ACC-06](#acc-06) | Seguir dentro al abrir la app | app · backend | funciona |
 | [ACC-07](#acc-07) | Cerrar sesión en la PWA | PWA · backend | funciona |
 | [ACC-08](#acc-08) | Cerrar sesión en la app | app · backend | funciona |
 | [ACC-09](#acc-09) | Dispositivos con la app | PWA · app · backend | parcial |
@@ -42,20 +42,19 @@ Cómo entra Gustavo en la PWA (sesión de Django con cookie y CSRF) y en la app 
 ### ACC-02 · Entrar en la app <a id="acc-02"></a>
 
 - **Dónde:** app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** entra en la app con su usuario y su contraseña; el teléfono queda como un dispositivo de su cuenta.
-- **Código:** `POST /api/v1/auth/token {username, password, device_name}` (201 `{token, user, device}`, `Cache-Control: no-store`); `movil/src/app/login.tsx`, `loginProblems.ts`; token en `expo-secure-store` (`oficina.token-dispositivo`).
-- **El fallo:** sin conexión, la app no muestra «No pudimos conectar con la oficina…» sino el mensaje técnico en inglés `fetch failed: …`. `loginProblems.ts` reconoce la falta de red por `TypeError`, y `expo/fetch` lanza `FetchError` (ver [APP-08](app-movil-instalacion.md#app-08)).
+- **Código:** `POST /api/v1/auth/token {username, password, device_name}` (201 `{token, user, device}`, `Cache-Control: no-store`); `movil/src/app/login.tsx` (con el teclado abierto el formulario se rellena y se desplaza para dejar los campos y «Entrar» a la vista), `loginProblems.ts`, `movil/src/api/transport.ts` (un fallo sin respuesta HTTP llega como `NetworkError`); token en `expo-secure-store` (`oficina.token-dispositivo`).
 - **Criterios de aceptación:**
   1. **Dado** la app sin sesión, **cuando** la abre, **entonces** ve la puerta pixel, el logo, «Entrar», «Usa tu usuario y contraseña de Django.», los campos con «Mostrar la contraseña», «Entrar» y «Este teléfono queda como un dispositivo de tu cuenta. Puedes cerrarlo desde Ajustes.».
   2. **Dado** credenciales correctas, **cuando** pulsa «Entrar», **entonces** se envía el nombre del teléfono como `device_name`, la API responde 201 con un token que empieza por `0ff1ce_dt_`, el token queda en el almacén seguro y entra en la Oficina.
   3. **Dado** credenciales incorrectas, **cuando** pulsa «Entrar», **entonces** ve «Usuario o contraseña incorrectos.».
-  4. **Dado** que no hay conexión, **cuando** pulsa «Entrar», **entonces** ve «No pudimos conectar con la oficina. Revisa tu conexión e intenta de nuevo.». **Hoy falla:** muestra `fetch failed: …` en inglés.
+  4. **Dado** que no hay conexión, **cuando** pulsa «Entrar», **entonces** ve «No pudimos conectar con la oficina. Revisa tu conexión e intenta de nuevo.».
   5. **Dado** un campo vacío, **cuando** mira «Entrar», **entonces** está desactivado.
   6. **Dado** `device_name` vacío, **cuando** se crea el dispositivo, **entonces** se llama «App móvil»; se guardan como mucho 120 caracteres.
   7. **Dado** el token, **cuando** se guarda en el servidor, **entonces** solo queda su SHA-256 y se registra `auth.device_token` con el nombre del dispositivo.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** ACC-02.1–5 en `movil/.maestro/01-entrada.yaml` (también sin conexión y con el teclado abierto) · ACC-02.6–7 en las pruebas del backend · 2026-11-08 · pasa
 
 ### ACC-03 · Bloqueo tras demasiados intentos <a id="acc-03"></a>
 
@@ -69,7 +68,7 @@ Cómo entra Gustavo en la PWA (sesión de Django con cookie y CSRF) y en la app 
   3. **Dado** un acierto, **cuando** entra, **entonces** el contador vuelve a cero.
   4. **Dado** que pasan 15 minutos desde el último fallo, **cuando** intenta, **entonces** ya no está bloqueado.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** sin prueba E2E: el contador vive en la caché en memoria de cada worker de gunicorn (3 en la QA), así que 10 fallos no bloquean de forma determinista; lo cubren las pruebas del backend (`test_oficina`) · 2026-11-08
 
 ### ACC-04 · Volver a donde estaba después de entrar <a id="acc-04"></a>
 
@@ -97,24 +96,23 @@ Cómo entra Gustavo en la PWA (sesión de Django con cookie y CSRF) y en la app 
   4. **Dado** un token de dispositivo revocado, **cuando** la app hace cualquier petición, **entonces** la API responde 401, la app borra el token y va a la pantalla de entrada.
   5. **Dado** `GET /api/v1/auth/session` con un token revocado o desconocido, **cuando** se pide, **entonces** responde 200 `{authenticated: false, user: null}`.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** ACC-05.4 en `movil/.maestro/01-entrada.yaml` (sesión cerrada desde otro dispositivo con `comun/qa-api.js`: la siguiente petición recibe 401 y vuelve a la entrada) · ACC-05.1–3 son de la PWA · ACC-05.5 en las pruebas del backend · 2026-11-08 · pasa
 
 ### ACC-06 · Seguir dentro al abrir la app <a id="acc-06"></a>
 
 - **Dónde:** app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** abre la app y sigue dentro, sin volver a escribir la contraseña, aunque esté sin conexión o el servidor esté reiniciando.
-- **Código:** `movil/src/auth/session.tsx` (`restoreSession`), `movil/src/api/token.ts`, `movil/src/app/_layout.tsx`.
-- **El fallo:** `restoreSession` solo conserva el token si el error es un `TypeError` («Offline launch: keep the token»). En el teléfono, `expo/fetch` lanza `FetchError` sin conexión, y un 5xx llega como `ApiError`; en los dos casos la app **borra el token y cierra la sesión**. Abrir la app sin red, o durante un despliegue (por ejemplo un 502), obliga a entrar de nuevo, y el dispositivo queda huérfano en el servidor hasta que se cierre desde la lista de dispositivos. Deducido del código; no se reprodujo en un teléfono.
+- **Código:** `movil/src/auth/session.tsx` (`restoreSession`: solo un 401 o `authenticated:false` olvidan el token; la consulta corre con `networkMode: 'always'` y, mientras falta el usuario, se repite al volver la red y cada 15 s), `movil/src/api/transport.ts` (`NetworkError`), `movil/src/api/token.ts`, `movil/src/app/_layout.tsx`.
 - **Criterios de aceptación:**
   1. **Dado** un token válido, **cuando** abre la app con conexión, **entonces** la pantalla de inicio se mantiene hasta saber la sesión y entra en la Oficina sin pedir la contraseña.
-  2. **Dado** un token válido y el teléfono sin conexión, **cuando** abre la app, **entonces** sigue dentro, las vistas muestran «Sin conexión. Mostrando lo último que cargó.» y sus errores, y al volver la red todo se recupera. **Hoy falla:** vuelve a la pantalla de entrada y el token se borra.
-  3. **Dado** un token válido y el servidor respondiendo 502, **cuando** abre la app, **entonces** sigue dentro y reintenta. **Hoy falla.**
+  2. **Dado** un token válido y el teléfono sin conexión, **cuando** abre la app, **entonces** sigue dentro, las vistas muestran «Sin conexión. Mostrando lo último que cargó.» y sus errores, y al volver la red todo se recupera.
+  3. **Dado** un token válido y el servidor respondiendo 502, **cuando** abre la app, **entonces** sigue dentro y reintenta.
   4. **Dado** un token revocado, **cuando** abre la app, **entonces** la sesión responde `authenticated: false`, se borra el token y ve la pantalla de entrada.
   5. **Dado** que el almacén seguro no se puede leer, **cuando** abre la app, **entonces** ve la pantalla de entrada.
   6. **Dado** que la app conserva la sesión sin conexión, **cuando** vuelve la red, **entonces** recupera el usuario (para «Tu nota» y los permisos de LinkedIn), en vez de quedarse con `user: null` todo el arranque.
-- **Brechas código/docs:** `app-movil-backend.md` pide «Si una petición devuelve 401, volver al login»; el código vuelve al login con cualquier error al arrancar.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** sin red, las consultas de las vistas quedan en pausa (React Query con NetInfo): muestran «Leyendo…» o su esqueleto en vez de un error; la franja «Sin conexión…» lo explica. Antes del arreglo, la propia consulta de la sesión también quedaba en pausa y la app se quedaba en la pantalla de inicio (QA 42467388870).
+- **Cobertura QA:** ACC-06.1 en `movil/.maestro/01-entrada.yaml` y `movil/.maestro/02-navegacion.yaml` · ACC-06.2 y ACC-06.6 en `movil/.maestro/02-navegacion.yaml` (modo avión) · ACC-06.3 en `movil/.maestro/02-navegacion.yaml` (interruptor de fallos: `/auth/session` responde 502) y en `movil/src/auth/session.test.tsx` · ACC-06.4–5 en `session.test.tsx` · 2026-11-08 · pasa
 
 ### ACC-07 · Cerrar sesión en la PWA <a id="acc-07"></a>
 
@@ -165,13 +163,13 @@ Cómo entra Gustavo en la PWA (sesión de Django con cookie y CSRF) y en la app 
 - **Dónde:** app
 - **Estado:** funciona
 - **Qué hace para Gustavo:** al entrar, la puerta pixel se abre y la imagen se funde con la Oficina en vivo.
-- **Código:** `movil/src/entrada/useEntrada.ts`, `PixelDoor.tsx`, `door.ts`; `movil/src/app/login.tsx`.
+- **Código:** `movil/src/entrada/useEntrada.ts`, `PixelDoor.tsx`, `door.ts`; `movil/src/app/login.tsx`; `movil/src/app/(app)/_layout.tsx` (sin sesión, la app abre el login encima de sí misma, como modal transparente, para que la Oficina se monte debajo).
 - **Criterios de aceptación:**
   1. **Dado** un acierto en «Entrar», **cuando** termina, **entonces** la puerta se pliega, la imagen se acerca en saltos (2× y 3×) y se funde con la Oficina, que ya está montada debajo.
   2. **Dado** «reducir movimiento» en el teléfono, **cuando** entra, **entonces** solo hay un fundido.
   3. **Dado** que la app arranca con la sesión ya abierta, **cuando** se abre, **entonces** no hay animación de entrada.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** ACC-10.1 y ACC-10.3 en `movil/.maestro/01-entrada.yaml` (capturas de la puerta y de la Oficina) y en `movil/src/components/shell/barraSuperior.test.tsx` (la Oficina montada bajo el login mientras se abre la puerta) · ACC-10.2 en `movil/src/entrada/entrada.test.tsx` · 2026-11-08 · pasa
 
 ### ACC-11 · Quién puede decidir <a id="acc-11"></a>
 

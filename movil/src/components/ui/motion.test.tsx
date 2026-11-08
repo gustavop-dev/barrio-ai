@@ -3,6 +3,7 @@
 import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
+import { BackHandler } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { renderApp } from '@/test/render';
@@ -168,6 +169,26 @@ describe('SnapSheet', () => {
       ]),
     );
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+  });
+
+  // BackHandler listeners are global: the Oficina's panel left open under another tab used to swallow Android back
+  // there (back from the Calendario opened by «Ver en el Calendario» closed the hidden panel and stayed put).
+  it('takes Android back only while its screen is shown (backCloses), and tells the snap it rests on', async () => {
+    const listen = jest.spyOn(BackHandler, 'addEventListener');
+    const onRest = jest.fn();
+    await renderApp(
+      <SnapSheet label="Mesa editorial" bottom={0} onClose={() => undefined} onRest={onRest} backCloses={false}>
+        <T>Equipo</T>
+      </SnapSheet>,
+    );
+    expect(listen).not.toHaveBeenCalled();
+    expect(onRest).toHaveBeenLastCalledWith(sheetMotion.snaps[0]);
+    await renderApp(
+      <SnapSheet label="Mesa editorial" bottom={0} onClose={() => undefined}>
+        <T>Equipo</T>
+      </SnapSheet>,
+    );
+    expect(listen).toHaveBeenCalledWith('hardwareBackPress', expect.any(Function));
   });
 });
 

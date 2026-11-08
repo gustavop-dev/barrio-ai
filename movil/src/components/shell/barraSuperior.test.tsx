@@ -296,6 +296,42 @@ describe('the top bar on the real shell', () => {
     expectShown('tu-turno');
   });
 
+  // A tapped push (and any in-app link) with a detail open: router.push used to stack a second shell over the detail
+  // (in Expo Router 58 a stack's PUSH always adds a route). It goes down to the tabs like the top bar (#45).
+  it('opens a tab from an in-app link (a push tap) with a detail open, without stacking a second shell', async () => {
+    await renderSignedIn();
+    await press('tab-personas');
+    await act(async () => {
+      router.push('/personas/7');
+    });
+    await advance(SETTLE_MS);
+    expect(pathname()).toBe('/personas/7');
+    await act(async () => openLink('/tu-turno'));
+    await advance(SETTLE_MS);
+    await advance(TAB_MS);
+    expectShown('tu-turno');
+    expect(screen.queryByTestId('pantalla-persona', { includeHiddenElements: true })).toBeNull();
+    expect(screen.getAllByTestId('shell-tabs', { includeHiddenElements: true })).toHaveLength(1);
+    // Back walks the tab history, as from the top bar: the detail is gone.
+    await back();
+    expectShown('personas');
+    expect(screen.getAllByTestId('shell-tabs', { includeHiddenElements: true })).toHaveLength(1);
+  });
+
+  it('opens a detail from an in-app link over the tabs, and over another detail', async () => {
+    await renderSignedIn();
+    await act(async () => openLink('/calendario/pieza/p1'));
+    await advance(SETTLE_MS);
+    expect(pathname()).toBe('/calendario/pieza/p1');
+    expect(screen.getByTestId('pantalla-pieza')).toBeVisible();
+    await act(async () => openLink('/personas/7'));
+    await advance(SETTLE_MS);
+    expect(pathname()).toBe('/personas/7');
+    expect(screen.getAllByTestId('shell-tabs', { includeHiddenElements: true })).toHaveLength(1);
+    await back(SETTLE_MS);
+    expect(pathname()).toBe('/calendario/pieza/p1');
+  });
+
   it('keeps the bottom tabs working, and back walks the tab history', async () => {
     await renderSignedIn();
     for (const [tab, label] of [
@@ -358,6 +394,39 @@ describe('the top bar on the real shell', () => {
 });
 
 describe('login → app', () => {
+  // MovEntrada: the Oficina mounts under the login right after a successful login, and the login fades into it. It used
+  // to dispatch a partial RESET that Expo Router 58 rejects («The RESET action payload must contain a complete
+  // navigation state»), so the login (the first screen of its stack, drawn as an opaque card) faded over nothing and
+  // only then replaced itself with the app.
+  it('mounts the Oficina under the login while the door opens, then the login leaves', async () => {
+    const errors = jest.spyOn(console, 'error');
+    fakeServer({
+      ...SHELL_API,
+      'POST /api/v1/auth/token': { status: 201, body: { token: '0ff1ce_dt_nuevo', user: USER, device: { id: 'd1', name: 'Pixel de prueba', created_at: '2026-11-07T10:00:00Z' } } },
+    });
+    await renderShell();
+    await waitFor(() => expect(screen.getByTestId('login')).toBeOnTheScreen());
+    // Signed out, the login sits over the app (a transparent modal, not the first screen of the root stack).
+    expect(rootStackNames()).toEqual(['(app)', 'login']);
+
+    await fireEvent.changeText(screen.getByTestId('login-usuario'), 'gustavo');
+    await fireEvent.changeText(screen.getByTestId('login-clave'), 'secreto');
+    await fireEvent.press(screen.getByTestId('login-entrar'));
+    await advance(100);
+    // The entrance runs: the login is still there, and the Oficina is already mounted underneath.
+    expect(screen.getByTestId('login')).toBeOnTheScreen();
+    expect(screen.getByTestId('pantalla-index', { includeHiddenElements: true })).toBeTruthy();
+    expect(rootStackNames()).toEqual(['(app)', 'login']);
+
+    await advance(SETTLE_MS);
+    expect(screen.queryByTestId('login', { includeHiddenElements: true })).toBeNull();
+    expect(rootStackNames()).toEqual(['(app)']);
+    expectShown('index');
+    const rejected = errors.mock.calls.filter((call) => call.some((part) => /RESET/.test(String(part))));
+    expect(rejected).toEqual([]);
+    errors.mockRestore();
+  });
+
   it('takes the login out of the tree once inside, with the top bar working right away', async () => {
     fakeServer({
       ...SHELL_API,

@@ -4,8 +4,9 @@
   "umbral_pixel": 40,
   "mascaras": [[0, 0, 390, 24]],
   "capturas": {
-    "01-entrada-05-puerta": {"ignorar": true, "nota": "a mitad de la animación de entrada"},
+    "01-entrada-07-puerta": {"ignorar": true, "nota": "a mitad de la animación de entrada"},
     "01-entrada-*": {"tolerancia": 0.05, "nota": "flujo con animaciones: la escena del héroe se mueve"},
+    "02-navegacion-*": {"tolerancia": 0.25, "nota": "flujo con animaciones (el push de las pestañas): en la Oficina los personajes caminan"},
     "03-oficina-*": {"tolerancia": 0.25, "nota": "flujo con animaciones: los personajes caminan"},
     "07-calendario-*": {"tolerancia": 0.06, "nota": "las fechas del calendario cambian cada día"}
   }
