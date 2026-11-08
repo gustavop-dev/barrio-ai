@@ -233,4 +233,3 @@ const styles = StyleSheet.create({
   alertWarn: { borderColor: colors.postIt, backgroundColor: colors.postIt },
   eye: { position: 'absolute', right: 2, bottom: 2, width: shell.touch, height: shell.touch, alignItems: 'center', justifyContent: 'center' },
 });
-// QA: prueba de reempaquetado solo-JS (se puede borrar)
