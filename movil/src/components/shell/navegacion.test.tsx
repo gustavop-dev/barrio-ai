@@ -101,7 +101,7 @@ describe('DetailScreen', () => {
     await act(async () => blocked.current?.({ data: { action: { type: 'GO_BACK' } }, repeat }));
     expect(repeat).not.toHaveBeenCalled();
     await waitFor(() => expect(repeat).toHaveBeenCalledTimes(1), { timeout: 3000 });
-    expect(blocked.guarded).toBe(false);
+    await waitFor(() => expect(blocked.guarded).toBe(false));
   });
 
   it('lets a replace go at once (nothing underneath to reveal)', async () => {
