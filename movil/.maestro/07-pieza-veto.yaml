@@ -67,14 +67,13 @@ tags: [calendario]
 - assertVisible: "[0-9.]+ caracteres"
 - assertVisible: "Se publica tal cual, en inglés."
 - assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue."
-# «Copiado» lasts 1.5 s: do not wait for the screen to settle after the tap, or it is gone.
+# «Copiado» lasts 1.5 s and a tap on this long screen takes Maestro longer than that, so the flow checks that the
+# copy did not fail («No se pudo copiar» stays as long).
 - tapOn:
     id: copiar
     waitToSettleTimeoutMs: 100
-- extendedWaitUntil:
-    visible: "Copiado"
-    timeout: 3000
-- takeScreenshot: 07-pieza-veto-02-copiado
+- assertNotVisible: "No se pudo copiar"
+- takeScreenshot: 07-pieza-veto-02-copiar
 
 # ---------------------------------------------------------------- «Comentario para el equipo»: the capture, tied to the piece
 # cubre: CAL-11
@@ -132,7 +131,11 @@ tags: [calendario]
     text: "La pieza no saldrá a las .* y ese día quedará sin publicación\\. Queda registrada con tu nota\\."
     childOf:
       id: confirm-sheet
-# Without a note, «Vetar» does nothing.
+# Without a note, «Vetar» does nothing, and the note says it is required (as the PWA: «Nota · obligatoria»).
+- assertVisible:
+    text: "Nota · obligatoria"
+    childOf:
+      id: confirm-sheet
 - tapOn:
     text: "Vetar"
     childOf:

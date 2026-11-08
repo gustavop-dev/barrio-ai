@@ -13,8 +13,78 @@ tags: [calendario]
 - runFlow: comun/entrar.yaml
 - runScript: comun/calendario-fechas.js
 
+# ---------------------------------------------------------------- the day's piece fails in the day sheet
+# cubre: CAL-03
+- tapOn:
+    id: top-calendario
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: pager-semana
+    timeout: 30000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.hace3}"
+    commands:
+      - tapOn:
+          id: calendario-anterior
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.hace3}"
+          timeout: 10000
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/editorial/pieces/'
+      EFECTO: '500'
+      VECES: '-1'
+- tapOn:
+    id: "dia-${output.hace3}"
+- extendedWaitUntil:
+    visible:
+      id: hoja-dia
+    timeout: 10000
+- swipe:
+    from:
+      text: "Altura del panel"
+    direction: UP
+- extendedWaitUntil:
+    visible:
+      text: "No se pudo cargar la pieza"
+      childOf:
+        id: hoja-dia
+    timeout: 45000
+- takeScreenshot: 07-calendario-errores-06-pieza-del-dia
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn:
+    text: "Reintentar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    visible:
+      text: "Impresiones a las 72 h: 768"
+      childOf:
+        id: hoja-dia
+    timeout: 20000
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+
 # ---------------------------------------------------------------- the calendar fails
 # cubre: CAL-01, CAL-03
+# Relaunched, so nothing of the calendar is cached.
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 45000
 - runScript:
     file: comun/qa-fallo.js
     env:
@@ -187,62 +257,3 @@ tags: [calendario]
     notVisible:
       id: pieza
     timeout: 15000
-
-# ---------------------------------------------------------------- the day's piece fails in the day sheet
-# cubre: CAL-03
-- scrollUntilVisible:
-    element:
-      text: "Semana"
-    direction: UP
-    timeout: 20000
-- tapOn:
-    text: "Semana"
-- extendedWaitUntil:
-    visible:
-      id: pager-semana
-    timeout: 10000
-- runFlow:
-    when:
-      notVisible:
-        id: "dia-${output.hace3}"
-    commands:
-      - tapOn:
-          id: calendario-anterior
-      - extendedWaitUntil:
-          visible:
-            id: "dia-${output.hace3}"
-          timeout: 10000
-- runScript:
-    file: comun/qa-fallo.js
-    env:
-      RUTA: '^/api/v1/editorial/pieces/'
-      EFECTO: '500'
-      VECES: '-1'
-- tapOn:
-    id: "dia-${output.hace3}"
-- extendedWaitUntil:
-    visible:
-      id: hoja-dia
-    timeout: 10000
-- swipe:
-    from:
-      text: "Altura del panel"
-    direction: UP
-- extendedWaitUntil:
-    visible:
-      text: "No se pudo cargar la pieza"
-      childOf:
-        id: hoja-dia
-    timeout: 45000
-- takeScreenshot: 07-calendario-errores-06-pieza-del-dia
-- runScript: comun/qa-fallos-limpiar.js
-- tapOn:
-    text: "Reintentar"
-    childOf:
-      id: hoja-dia
-- extendedWaitUntil:
-    visible:
-      text: "Impresiones a las 72 h: 768"
-      childOf:
-        id: hoja-dia
-    timeout: 20000
