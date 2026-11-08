@@ -199,7 +199,8 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
       - name: Comment on the PR
-        if: always() && github.event_name == 'pull_request'
+        # A run cancelled by a newer push says nothing: the newer run will comment.
+        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
