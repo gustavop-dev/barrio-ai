@@ -94,10 +94,25 @@ else
 fi
 log "emulador $SHARD: $(echo $selected | xargs -n1 basename | tr '\n' ' ')"
 
+# System animations: on only for the flows that test motion (the entrance and the Oficina scene); off for the rest, so
+# the app runs with reduced motion, the scene stands still and Maestro sees each screen settle at once.
+ANIMATED=${QA_FLUJOS_ANIMADOS-01-entrada 03-oficina}
+animations() {
+  for key in window_animation_scale transition_animation_scale animator_duration_scale; do
+    adb shell settings put global "$key" "$1" > /dev/null 2>&1
+  done
+}
+
 for flow in $selected; do
   name=$(basename "$flow" .yaml)
   log "flujo $name: sembrando el mundo de QA"
   (cd "$INFRA" && uv run python manage.py seed_qa >> "$OUT/seed-$SHARD.log" 2>&1) || log "seed_qa falló antes de $name"
+  # No simulated failure left over from another flow (QA failure switch, team_backend.qa_fallos).
+  curl -fsS -X DELETE "${QA_API:-http://127.0.0.1:8787}/api/v1/qa/fallos" > /dev/null 2>&1 || true
+  scale=0
+  for animated in $ANIMATED; do [ "$animated" = "$name" ] && scale=1; done
+  animations "$scale"
+  log "flujo $name: animaciones del sistema a $scale"
   record_start "$name"
   start=$(date +%s)
   # A hard cap per flow: a hung flow fails with its screenshot and the job goes on to the next one.

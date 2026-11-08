@@ -12,11 +12,11 @@ El workflow tiene cuatro jobs:
    - Un push que solo cambia flujos, `seed_qa` o los scripts no vuelve a compilar: el job termina en segundos.
 3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
    - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
-   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`, con las animaciones activadas. Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
+   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
    - **Flujos:** `scripts/qa/correr-maestro.sh` corre sus flujos uno a uno y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
-4. **`qa`** junta los artefactos de todos los emuladores. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR (con las funciones del catálogo que cubre cada flujo) e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
+4. **`qa`** junta los artefactos de todos los emuladores, compara las capturas con la referencia de `main` y cuenta la cobertura del catálogo. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
 
-Una nueva ejecución en la misma rama cancela la anterior (`concurrency` con `cancel-in-progress`).
+En un PR, una ejecución nueva cancela la anterior (`concurrency` con `cancel-in-progress`); en `main` cada ejecución termina, porque renueva la referencia visual.
 
 ### Por qué HTTP en claro solo en esta build
 
@@ -28,7 +28,8 @@ Se eligió una release con el JS empaquetado, en vez de una build debug, para pr
 
 ## Lanzar una QA
 
-- **En un PR:** corre sola cuando el PR toca `movil/`, `compartido/`, `agentes-linkedin/`, `scripts/qa/` o el workflow.
+- **En un PR:** corre en todos los PR, para que `qa` pueda ser un check obligatorio. Si el PR no toca `movil/`, `compartido/`, `agentes-linkedin/`, `scripts/qa/` ni el workflow, `qa` pasa en segundos sin emulador.
+- **En `main`:** después de cada push que toca la app y cada noche a las 03:00 de Bogotá, con todos los flujos. Esas ejecuciones guardan la referencia visual.
 - **Solo algunos flujos:** pon `[qa: …]` en el mensaje del último commit del PR, con nombres o números separados por espacios o comas. Por ejemplo, `fix(movil): … [qa: 05-captura 09]` corre solo `05-captura` y `09-personas`. Sirve para arreglar un flujo sin volver a correr los once; antes de terminar, un push sin `[qa: …]` los corre todos.
 - **A mano**, una vez que el workflow esté en `main`:
 
@@ -112,3 +113,88 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 - **El micrófono.** El emulador del runner arranca con `-noaudio`: no hay entrada de audio real. El flujo de Captura mantiene pulsado el botón y comprueba lo que muestra la app, sin grabar voz de verdad.
 - **Los avisos push reales.** Necesitan las credenciales de FCM y el servicio de Expo, y la QA no usa secretos ni servicios externos. Se prueba la pantalla de Ajustes › Notificaciones, no la entrega.
 - **La cámara y el selector de fotos** (`-camera-back none`), y **abrir LinkedIn**: los enlaces del mundo de QA apuntan a `linkedin.example`, nunca a linkedin.com.
+
+## Cobertura del catálogo
+
+El resumen de cada ejecución dice **«X de Y funcionalidades de la app cubiertas por E2E»**, con la lista de las que faltan agrupadas por área (`scripts/qa/cobertura.py`):
+
+- **Y** son las fichas de `docs/funcionalidades/*.md` cuyo «Dónde» incluye `app` y cuyo «Estado» es `funciona` o `parcial`.
+- **X** son las de Y que aparecen en la cabecera `# cubre: ID, ID` de algún flujo, antes de su `---`. Un `# cubre:` en mitad del flujo documenta un paso, pero no suma.
+- También dice cuántas de ellas cubren flujos que pasaron en esa ejecución, y avisa de IDs en `# cubre:` que no existen en el catálogo.
+
+`python3 scripts/qa/cobertura.py` da el mismo recuento sin correr nada (`--json` para máquinas).
+
+## Regresión visual
+
+Cada ejecución compara sus capturas con la **referencia de `main`** (`scripts/qa/visual.py`):
+
+- **La referencia es un artefacto, no está en el repo.** Las ejecuciones en `main` suben `qa-movil-referencias`: sus capturas a 390×844, encima de la referencia anterior para los flujos que no corrieron, guardadas 90 días. Así no se versionan cientos de PNG en git, y la referencia es siempre lo último que se fusionó. Un PR compara contra la última ejecución de `main` que guardó una.
+- **Cómo compara:** lleva las dos imágenes a 390×844, deja fuera la barra de estado y las máscaras configuradas, y cuenta un píxel como cambiado cuando un canal se mueve más de `umbral_pixel`. Una captura cambia cuando la parte cambiada supera su `tolerancia`, por defecto 1,5 %.
+- **Lo que deja:** para cada captura que cambia, `visual/<captura>.png` en el artefacto, con antes, después y los píxeles cambiados en rojo. El resumen y el comentario del PR las listan, la ejecución lleva un aviso y aparece el check **«QA visual»**: neutro si algo cambió, verde si no.
+- **No hace fallar la ejecución:** un cambio visual puede ser buscado. Quien revisa mira `visual/` y decide; al fusionar, la siguiente ejecución en `main` lo convierte en referencia.
+- **Ajustes** en `scripts/qa/visual.json`: tolerancia, máscaras `[x, y, ancho, alto]` en dp e `ignorar`, por patrón de nombre. Por ejemplo, las capturas del calendario toleran más porque sus fechas cambian cada día.
+
+## Fallos simulados (interruptor de QA)
+
+Para probar los estados de error y los vacíos, el backend de la QA puede hacer que un endpoint responda 5xx, 413 o 429, que tarde, que se agote el tiempo o que devuelva sus listas vacías.
+
+- **Solo existe en la QA.** Vive en `linkedin_backend/settings_qa.py`, que el workflow usa para gunicorn y que se niega a cargar sin `QA_MODE=true`. Los settings de producción no tienen el middleware ni la ruta de control. `team_backend/tests/test_qa_fallos.py` prueba que en producción no hace nada, aunque haya reglas o cabeceras.
+- **Desde un flujo** se arma con un script que corre en el runner, junto a la API:
+
+  ```yaml
+  - runScript:
+      file: comun/qa-fallo.js
+      env:
+        RUTA: '^/api/v1/capturas$'   # regex sobre el path (obligatoria)
+        EFECTO: '500'                 # 500 | 502 | 503 | 504 | 413 | 429 | timeout | lento | vacio
+        METODO: POST                  # opcional; por defecto, cualquiera
+        VECES: '1'                    # opcional; cuántas peticiones afecta, -1 hasta limpiar (por defecto 1)
+        SEGUNDOS: '30'                # opcional; para timeout (después responde 504) y lento
+  - tapOn: …                          # la acción que debe fallar
+  - assertVisible: …                  # el mensaje de error que debe ver Gustavo
+  - runScript: comun/qa-fallos-limpiar.js   # opcional: el script de la QA limpia todo antes de cada flujo
+  ```
+
+- **`vacio`** devuelve la respuesta real con sus listas vacías, los contadores (`count`, `unread`, `urgent_count`, `total`) a 0 y `top` en `null`. Sirve para los estados vacíos sin otra siembra.
+- **Por HTTP** (curl o pruebas del backend): `POST /api/v1/qa/fallos` con una regla o una lista, `GET` para verlas, `DELETE` para limpiarlas. También vale la cabecera `X-QA-Fallo: 503` en una petición.
+
+## Animaciones
+
+`scripts/qa/correr-maestro.sh` pone las escalas de animación del sistema a 1 solo para los flujos de `QA_FLUJOS_ANIMADOS` (por defecto `01-entrada 03-oficina`) y a 0 para el resto.
+
+- Con 0, la app usa movimiento reducido y la escena de la Oficina queda quieta. Maestro ve cada pantalla asentarse al momento, en vez de esperar 20 a 100 s por paso sobre la escena animada con el render por software del emulador.
+- Un flujo que necesite el movimiento se añade a la lista, en el workflow (`QA_FLUJOS_ANIMADOS`), no en el flujo.
+
+## Check obligatorio para los PR (lo aplica Gustavo)
+
+`qa` corre en todos los PR y pasa en segundos cuando el PR no toca la app, así que puede exigirse sin bloquear los PR de documentación. Cambiar la protección de `main` necesita permisos de administrador.
+
+1. Comprueba que `qa` ya pasó en algún PR. El nombre del check es exactamente `qa`, el último job de «QA móvil».
+2. Crea una regla del repositorio que exija `qa` en `main`, dejando que los administradores la salten en una urgencia:
+
+   ```bash
+   gh api -X POST repos/gustavop-dev/barrio-ai/rulesets --input - <<'EOF'
+   {
+     "name": "main · QA móvil obligatoria",
+     "target": "branch",
+     "enforcement": "active",
+     "conditions": { "ref_name": { "include": ["~DEFAULT_BRANCH"], "exclude": [] } },
+     "rules": [
+       { "type": "required_status_checks",
+         "parameters": {
+           "strict_required_status_checks_policy": false,
+           "required_status_checks": [ { "context": "qa", "integration_id": 15368 } ] } }
+     ],
+     "bypass_actors": [ { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" } ]
+   }
+   EOF
+   ```
+
+   - `15368` es la app de GitHub Actions.
+   - `actor_id: 5` es el rol de administrador del repositorio.
+   - Lo mismo se hace en la web: Settings › Rules › Rulesets › New branch ruleset › «Require status checks to pass» › `qa`.
+
+3. Verifica con `gh api repos/gustavop-dev/barrio-ai/rulesets`. Para quitarla: `gh api -X DELETE repos/gustavop-dev/barrio-ai/rulesets/<id>`.
+
+No conviene exigir los jobs de «Barrio AI» (`backend`, `movil`, `oficina`) de la misma forma: ese workflow solo corre cuando cambian ciertas rutas, y un check exigido que nunca aparece deja el PR esperando para siempre.
+
