@@ -123,7 +123,7 @@ class Command(BaseCommand):
             self.wipe()
             self.accounts();self.network();self.pieces();self.proposals();self.opportunities();self.conversation()
             self.questions();self.facts();self.notifications();self.captures();self.gallery();self.results();self.summaries()
-            self.spend();self.settings();self.devices()
+            self.spend();self.settings();self.devices();self.office()
         self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
 
     # ------------------------------------------------------------------ safety and reset
@@ -551,6 +551,21 @@ class Command(BaseCommand):
         control=OperatorControl.current();control.paused=False;control.reason='';control.updated_by=None;control.updated_at=None;control.save()
         preference=OfficePreference.current();preference.push_disabled=[];preference.push_enabled=[];preference.gallery_ai_edit_default=True
         preference.updated_by=None;preference.updated_at=None;preference.save()
+
+    def office(self):
+        """The office scene (OFI-01, OFI-03): the inbox agent's last real job, and two handoffs of background work a few
+        minutes ago, so the scene replays them (summarized: they are older than its 2-minute window) and each role's
+        «Lo último que hizo» lists them. GET /oficina/eventos only returns the last 10 minutes: the seed runs right
+        before each flow."""
+        moment=self.ago(hours=1)
+        Job.objects.create(id=uid('job:inbox'),owner=self.robot,request_hash=sha('qa-job-inbox'),agent='conversaciones_inbox',task='read_inbox',
+                           kind='read_inbox',params={'account':str(self.fake.id)},state='complete',created_at=moment,started_at=moment,
+                           finished_at=moment+timedelta(minutes=1),result_status='chats:3 leidos:3 te tocan:1')
+        events=[('conversaciones_inbox','','1 conversación te toca'),
+                ('investigador_referentes','relaciones_comunidad','2 publicaciones nuevas de referentes')]
+        for minutes,(role,target,detail) in zip((4,3),events):
+            AuditEvent.objects.create(actor=self.robot,action='office.event',target=role,created_at=self.ago(minutes=minutes),
+                                      metadata={'tipo':'entrega','rol':role,'destino':target,'detalle':detail,'qa':True})
 
     def devices(self):
         """A second phone in «Dispositivos con la app» (the one running the app appears when it logs in)."""

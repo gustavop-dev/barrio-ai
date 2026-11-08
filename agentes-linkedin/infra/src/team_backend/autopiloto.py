@@ -17,7 +17,7 @@ from decimal import Decimal
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, memory
-from . import guardas, lider, operador, red
+from . import guardas, lider, oficina_eventos, operador, red
 from .jobs import enqueue_operation
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, EditorialPiece, Job, ObservedPost
 
@@ -120,6 +120,7 @@ def policy_review(proposal,lead_budget=None):
         # Jev did not answer: do not wait up to its timeout again for every other proposal of this tick.
         if lead_budget is not None and verdict['decision']=='retry':lead_budget['left']=0
         operador._audit(None,'operator.lead_reviewed',proposal.id,decision=verdict['decision'],answers=verdict.get('answers'))
+        oficina_eventos.lead_reviewed(proposal.capability,verdict['decision'])
         if verdict['decision']=='retry':
             proposal.save(update_fields=['review']);return proposal
         issues=verdict['reasons']

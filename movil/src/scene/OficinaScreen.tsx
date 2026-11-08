@@ -13,7 +13,8 @@ import type { PanelData } from '@compartido/scene/panels';
 import { timeAgo } from '@compartido/logic/format';
 import { Button, ErrorRetry, Note, SnapSheet, T } from '@/components/ui';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { haptic, officeGestures, useMotion } from '@/theme/motion';
+import { useCaptureSheet } from '@/capture/store';
+import { haptic, officeGestures, sheetMotion, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { OfficeCanvas, type ScenePick } from './OfficeCanvas';
 import { RolePanel, TeamPanel } from './OfficePanels';
@@ -33,7 +34,12 @@ export function OficinaScreen() {
   const paused = Boolean(overview.data?.control?.paused);
   // Overview must be known before playing: a missing machine state must not look like a running one.
   const canPlay = live && Boolean(overview.data) && !overview.isError;
-  const { scene, snapshot } = useOfficeScene({ active, live: canPlay, paused, reduced, statuses, page: events.data });
+  // The scene pauses while something covers it: the capture sheet (a modal) or a panel dragged to full height.
+  const captureOpen = useCaptureSheet().open;
+  const [panelSnap, setPanelSnap] = useState(0);
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const covered = captureOpen || (selection !== null && panelSnap >= sheetMotion.snaps[1]);
+  const { scene, snapshot } = useOfficeScene({ active, live: canPlay, paused, reduced, statuses, page: events.data, covered });
   const [now, setNow] = useState(Date.now);
   useEffect(() => {
     if (!active) return;
@@ -46,7 +52,6 @@ export function OficinaScreen() {
   const scale = Math.round(sceneScale(window.width, height - insets.bottom) * window.scale) / window.scale;
   const sceneHeight = Math.min(PLAN_HEIGHT * scale, Math.max(240, height - insets.bottom - 100));
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
-  const [selection, setSelection] = useState<Selection | null>(null);
   const select = useCallback((next: Selection) => {
     haptic('officePick'); scroll.current?.scrollTo({ y: 0, animated: !reduced }); setSelection(next);
     runOnUI(() => {
@@ -108,7 +113,7 @@ export function OficinaScreen() {
       <T variant="detalle" soft style={styles.credit}>Arte: LimeZu — Modern Interiors</T>
     </ScrollView>
     </GestureDetector>
-    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection}>
+    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active}>
       {selection.kind === 'team' ? <TeamPanel team={selection.id} data={data} onRole={(id) => select({ kind: 'role', id })} /> : <RolePanel id={selection.id} data={data} onTeam={(id) => select({ kind: 'team', id })} />}
     </SnapSheet> : null}
   </View>;

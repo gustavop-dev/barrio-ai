@@ -123,11 +123,11 @@ Las brechas de cada función van en su ficha. Estas afectan a varias.
 **Fallos que comparten causa:**
 - **`expo/fetch` en la app.** Expo SDK 58 sustituye el `fetch` global por `expo/fetch` (`EXPO_PUBLIC_USE_RN_FETCH` no está definido en el repositorio). Eso explica tres fallos a la vez:
   - las subidas con audio o fotos no salen del teléfono (`Unsupported FormDataPart implementation`): [CAP-04](captura.md#cap-04), [CAP-05](captura.md#cap-05), [GAL-02](galeria.md#gal-02), [CAL-11](calendario-piezas.md#cal-11), [PRS-05](personas-oportunidades.md#prs-05), [TUR-10](tu-turno.md#tur-10);
-  - los errores de red salen en inglés (`fetch failed: …`): [APP-08](app-movil-instalacion.md#app-08), [ACC-02](acceso.md#acc-02), [CAP-06](captura.md#cap-06);
-  - abrir la app sin conexión, o con el servidor dando un 5xx, cierra la sesión: [ACC-06](acceso.md#acc-06).
+  - los errores de red salían en inglés (`fetch failed: …`): [APP-08](app-movil-instalacion.md#app-08), [ACC-02](acceso.md#acc-02), [CAP-06](captura.md#cap-06). **Arreglado** en el PR #52: el transporte de la app convierte el `FetchError` en un `NetworkError` (un `TypeError`);
+  - abrir la app sin conexión, o con el servidor dando un 5xx, cerraba la sesión: [ACC-06](acceso.md#acc-06). **Arreglado** en el PR #52: solo un 401 o `authenticated:false` cierran la sesión al arrancar.
 
   Las pruebas de Jest de la app sustituyen `fetch` por un simulacro (`movil/src/test/server.ts`), así que ninguna los detecta.
-- **El inbox existe, pero varias partes siguen como si no.** La escena muestra al agente de inbox «en diseño» ([OFI-01](oficina.md#ofi-01)), `red/summary.stages.conversation` es siempre `null` ([BAR-11](red.md#bar-11)) y la capa Conversaciones del calendario sigue «parcial» sin conversaciones ([CAL-02](calendario-piezas.md#cal-02)).
+- **El inbox existe, pero varias partes siguen como si no.** La escena mostraba al agente de inbox «en diseño» ([OFI-01](oficina.md#ofi-01), arreglado en el PR #52), `red/summary.stages.conversation` es siempre `null` ([BAR-11](red.md#bar-11)) y la capa Conversaciones del calendario sigue «parcial» sin conversaciones ([CAL-02](calendario-piezas.md#cal-02)).
 
 **Documentos desfasados:**
 - **Techo de Anthropic.** `CONTRATO-API.md` y el texto `definition` de `resultados.spend` dicen que `ANTHROPIC_LIMIT_USD` es un techo acumulado; desde B5 (`knowledge/providers.limit_window_start`) es mensual por defecto. Las interfaces lo muestran frente al mes, que es lo correcto: [AJU-05](ajustes.md#aju-05), [RES-07](resultados.md#res-07).

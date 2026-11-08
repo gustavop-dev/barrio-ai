@@ -129,7 +129,7 @@ describe('Resultados', () => {
     await fireEvent.press(screen.getByRole('link', { name: /Lucía Ficticia/ }));
     expect(router.push).toHaveBeenLastCalledWith({ pathname: '/personas/c-1', params: {} });
     await fireEvent.press(screen.getByRole('link', { name: /Mario Externo/ }));
-    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/personas', params: { pestana: 'oportunidades' } });
+    expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/personas', params: { pestana: 'oportunidades' } });
   });
 
   it('shows the audience funnel with the discarded aside and the roles without conversion', async () => {
