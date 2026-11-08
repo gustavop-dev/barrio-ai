@@ -219,7 +219,7 @@ def captures(w):
             'comentarios_sobre_piezas':sum(1 for c in rows if c.context_type=='pieza'),
             'ideas_usadas_en_piezas_de_la_semana':Capture.objects.filter(state=Capture.State.USED,routed_to__used_in__in=pieces).count()}
 
-SPEND_BUCKETS=(('propose-comment','general'),('editorial-','editorial'),('network-','red'),(PURPOSE,'resumen_semanal'))
+SPEND_BUCKETS=(('image-','imagenes'),('propose-comment','general'),('editorial-','editorial'),('network-','red'),(PURPOSE,'resumen_semanal'))
 
 def _bucket(purpose):
     for prefix,name in SPEND_BUCKETS:
@@ -236,10 +236,11 @@ def spend(w):
         if r['provider']=='anthropic':budgets[_bucket(r['purpose'])]+=r['spent']
         else:others[r['provider']]=others.get(r['provider'],Decimal(0))+r['spent']
     total=sum(budgets.values())+sum(others.values())
-    return {'disponible':True,'total_usd':_round(total,2),'anthropic_por_presupuesto_usd':{k:_round(v,2) for k,v in budgets.items()},
+    images=sum((r['spent'] for r in rows if (r['purpose'] or '').startswith('image-')),Decimal(0))
+    return {'imagenes_usd':_round(images,2),'disponible':True,'total_usd':_round(total,2),'anthropic_por_presupuesto_usd':{k:_round(v,2) for k,v in budgets.items()},
             'otros_proveedores_usd':{k:_round(v,2) for k,v in sorted(others.items())},
             'topes_diarios_usd':{'general':_round(setting('OPERATOR_DAILY_LLM_USD','1'),2),'editorial':_round(editorial.daily_budget(),2),
-                                 'red':_round(red.daily_budget(),2)}}
+                                 'red':_round(red.daily_budget(),2),'imagenes':_round(setting('IMAGE_DAILY_USD','1'),2)}}
 
 def lead(w):
     from . import autopiloto, lider

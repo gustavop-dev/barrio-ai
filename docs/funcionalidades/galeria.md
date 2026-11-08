@@ -1,6 +1,6 @@
 # Galería (`GAL`)
 
-Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un interruptor para prohibir la edición con IA en cada una. Hoy la Galería guarda y muestra las fotos; el equipo todavía no las usa (ver «Imágenes» al final).
+Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un interruptor para prohibir la edición con IA en cada una. El backend ya selecciona, edita y publica las fotos; los controles de tres estados quedan para fase 2 (ver «Imágenes» al final).
 
 - **Código:** backend `capturas_views.Gallery`, `PhotoDetail`, `PhotoImage`, `capturas.add_photos`, `delete_photo`, `photo_payload`, `photo_status`, `photo_used_in`, modelo `GalleryPhoto`; PWA `oficina/src/pages/Galeria.tsx`, `pages/galeria/PhotoSheet.tsx`; app `movil/src/galeria/*` (`GaleriaScreen.tsx`, `PhotoSheet.tsx`, `PhotoViewer.tsx`, `upload.ts`, `UploadProgressCard.tsx`), `movil/src/components/ui/ApiImage.tsx`; común `compartido/src/api/capturas.ts`, `compartido/src/logic/galeria.ts`.
 - **Documentación:** sección «Galería» de [`capturas-galeria.md`](../../agentes-linkedin/infra/docs/capturas-galeria.md) y de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
@@ -67,7 +67,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
   3. **Dado** que no cambió nada, **cuando** mira «Guardar», **entonces** está desactivado.
   4. **Dado** una nota de más de 2.000 caracteres, **cuando** se envía, **entonces** la API responde 400.
   5. **Dado** un error al guardar, **cuando** vuelve, **entonces** se ve dentro de la hoja y la nota no se pierde.
-- **Brechas código/docs:** la nota se guarda, pero el equipo todavía no la lee ([IMG-04](imagenes-en-publicaciones.md#img-04)). En la PWA, la X de la hoja sigue activa mientras guarda y puede cerrarla antes de ver el resultado.
+- **Brechas código/docs:** el director recibe y usa las notas ([IMG-04](imagenes-en-publicaciones.md#img-04)). En la PWA, la X de la hoja sigue activa mientras guarda y puede cerrarla antes de ver el resultado.
 - **Cobertura QA:** E2E `10-galeria` (criterios 1 a 3; la foto abierta otra vez enseguida, con la Galería recargando despacio por el interruptor de fallos, muestra lo guardado). 4 y 5: backend y Jest.
 
 ### GAL-04 · Prohibir o permitir la edición con IA de una foto <a id="gal-04"></a>
@@ -75,12 +75,12 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
 - **Dónde:** PWA · app · backend
 - **Estado:** parcial
 - **Qué hace para Gustavo:** en cada foto decide si el equipo puede editarla con IA.
-- **Código:** `PATCH /api/v1/galeria/<id> {allow_ai_edit}`; interruptor «El equipo puede editarla con IA» en `PhotoSheet.tsx` de las dos interfaces. Ningún código del backend lee `allow_ai_edit`.
+- **Código:** `PATCH /api/v1/galeria/<id> {allow_ai_edit}`; interruptor «El equipo puede editarla con IA» en `PhotoSheet.tsx` de las dos interfaces. El backend usa `ai_edit`; `allow_ai_edit` permanece como alias de compatibilidad.
 - **Criterios de aceptación:**
   1. **Dado** una foto, **cuando** apaga el interruptor y guarda, **entonces** se envía `{allow_ai_edit: false}`, aparece «Foto guardada.» y la foto vuelve con `allow_ai_edit: false`; queda registrado `gallery.updated` en la auditoría.
   2. **Dado** una foto nueva, **cuando** se crea, **entonces** el interruptor viene con el valor por defecto de Ajustes ([AJU-09](ajustes.md#aju-09)).
-  3. **Dado** una foto con `allow_ai_edit=false`, **cuando** el equipo prepara un post con ella, **entonces** no la edita salvo instrucción expresa de Gustavo en su nota. **Hoy no aplica:** no hay edición de imágenes; ver [IMG-07](imagenes-en-publicaciones.md#img-07).
-- **Brechas código/docs:** el interruptor se guarda y se muestra, pero no tiene efecto hasta que exista el flujo de imagen.
+  3. **Dado** una foto con `allow_ai_edit=false`, **cuando** el equipo prepara un post con ella, **entonces** nunca la edita, aunque la nota pida editar; ver [IMG-07](imagenes-en-publicaciones.md#img-07).
+- **Brechas código/docs:** el backend aplica no/auto/si; la interfaz de tres opciones queda para fase 2.
 - **Cobertura QA:** E2E `10-galeria` (criterio 1: el interruptor apagado y guardado sigue apagado al volver). 2, Jest; 3 no aplica todavía.
 
 ### GAL-05 · Quitar una foto de la Galería <a id="gal-05"></a>
@@ -131,7 +131,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
 
 ## Imágenes
 
-La Galería es la fuente del flujo de imagen, que no existe todavía ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)). Las fichas que la tocan:
+La Galería es la fuente del flujo de imagen, implementado en el backend; interfaz de fase 2 pendiente ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)). Las fichas que la tocan:
 - [IMG-03](imagenes-en-publicaciones.md#img-03): las fotos llegan siempre con la nota de su captura;
 - [IMG-15](imagenes-en-publicaciones.md#img-15) e [IMG-04](imagenes-en-publicaciones.md#img-04): el equipo decide por contexto si un post lleva una foto de la Galería, una infografía o un carrusel; cuando es una foto, ve la Galería (notas, transcripciones, fecha, uso, `allow_ai_edit`) y elige;
 - [IMG-07](imagenes-en-publicaciones.md#img-07) e [IMG-09](imagenes-en-publicaciones.md#img-09): cuándo se edita una foto y cómo se guarda la versión editada sin tocar el original;

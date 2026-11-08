@@ -21,6 +21,8 @@ request never left; ConnectorUncertain = may have been published. A publication 
 """
 import os
 import re
+import hashlib
+import time
 from datetime import timedelta
 from urllib.parse import quote, urlencode
 import httpx
@@ -142,10 +144,17 @@ def connect_member(user,token,profile):
 
 # --------------------------------------------------------------------------- publishing
 
-def post_body(author,text):
-    return {'author':author,'commentary':little_text(text),'visibility':'PUBLIC',
+def post_body(author,text,media=None):
+    body={'author':author,'commentary':little_text(text),'visibility':'PUBLIC',
             'distribution':{'feedDistribution':'MAIN_FEED','targetEntities':[],'thirdPartyDistributionChannels':[]},
             'lifecycleState':'PUBLISHED','isReshareDisabledByAuthor':False}
+    if media:
+        if len(media)==1:
+            item=media[0]
+            body['content']={'media':{'id':item['id'],'title':item.get('title') or 'Gustavo'}}
+            if not item['id'].startswith('urn:li:document:'):body['content']['media']['altText']=item['alt']
+        else:body['content']={'multiImage':{'images':[{'id':item['id'],'altText':item['alt']} for item in media]}}
+    return body
 
 class LinkedInOfficialConnector:
     """Writes only. w_member_social cannot read posts back; confirmation comes from the 201 response
@@ -164,12 +173,47 @@ class LinkedInOfficialConnector:
     def account_status(self):
         return {'status':'token_expired' if self.expired() else 'running','is_locked':False}
 
-    def create_post(self,text):
+    def upload_media(self,raw,mime,alt,title=''):
+        """Initialize, PUT bytes, wait for AVAILABLE. Every failure is before post creation and definite.
+        Official shapes: /rest/images and /rest/documents?action=initializeUpload.
+        Document alt text lives in the tagged PDF; Posts API has no per-page altText field.
+        """
+        if self.expired():raise ConnectorError(TOKEN_PAUSE,kind='token_expired',pause=True)
+        document=mime=='application/pdf';resource='documents' if document else 'images';key='document' if document else 'image'
+        endpoint='https://api.linkedin.com/rest/'+resource
+        headers={'Authorization':'Bearer '+decrypt(self.credential.token_encrypted),'LinkedIn-Version':self.version,
+                 'X-Restli-Protocol-Version':'2.0.0'}
+        def checked(response):
+            if response.status_code>=400:
+                raise ConnectorError(f'LinkedIn: subida HTTP {response.status_code}; no se creó el post.',status=response.status_code,
+                    kind='upload',pause=response.status_code in (401,403,429))
+            return response
+        try:
+            with _http() as http:
+                response=checked(http.post(endpoint+'?action=initializeUpload',headers=headers,
+                    json={'initializeUploadRequest':{'owner':self.credential.member_urn}}))
+                value=response.json()['value'];url=value['uploadUrl'];urn=value[key]
+                # Do not leak the bearer token to a redirected or unrelated upload host.
+                from urllib.parse import urlparse
+                parsed=urlparse(url);host=parsed.hostname or ''
+                if parsed.scheme!='https' or parsed.username or parsed.password or parsed.port not in (None,443) or not (host.endswith('.linkedin.com') or host.endswith('.licdn.com')):raise ValueError('Host de subida inválido')
+                if not urn.startswith('urn:li:'+key+':'):raise ValueError('URN de subida inválido')
+                checked(http.put(url,content=raw,headers={'Authorization':headers['Authorization'],'Content-Type':mime}))
+                for attempt in range(8):
+                    state=checked(http.get(endpoint+'/'+quote(urn,safe=''),headers=headers)).json().get('status')
+                    if state=='AVAILABLE':return {'id':urn,'alt':alt,'title':title}
+                    if state not in ('PROCESSING','WAITING_UPLOAD'):break
+                    if attempt<7:time.sleep(1)
+                raise ValueError('El archivo no quedó disponible')
+        except (httpx.HTTPError,ValueError,KeyError,TypeError):
+            raise ConnectorError('LinkedIn: no terminó la subida; no se creó el post.',kind='upload') from None
+
+    def create_post(self,text,media=None):
         if self.expired():raise ConnectorError(TOKEN_PAUSE+'; reconecta LinkedIn.',kind='token_expired',pause=True)
         headers={'Authorization':'Bearer '+decrypt(self.credential.token_encrypted),'LinkedIn-Version':self.version,
                  'X-Restli-Protocol-Version':'2.0.0','Content-Type':'application/json'}
         try:
-            with _http() as http:response=http.post(POSTS_URL,json=post_body(self.credential.member_urn,text),headers=headers)
+            with _http() as http:response=http.post(POSTS_URL,json=post_body(self.credential.member_urn,text,media),headers=headers)
         except (httpx.ConnectError,httpx.ConnectTimeout):
             raise ConnectorError('LinkedIn: no fue posible conectar; la publicación no se envió.',kind='not_sent') from None
         except httpx.HTTPError as exc:
@@ -193,14 +237,25 @@ class FakeLinkedInOfficial:
         if os.environ.get('OPERATOR_ALLOW_FAKE','false').lower()!='true':
             raise ConnectorError('Conector simulado desactivado (OPERATOR_ALLOW_FAKE).',kind='disabled')
         self.account=account
-        self.state=self.store.setdefault(account.external_account_id,{'posts':[],'fail_next':None,'writes':0,'expired':False})
+        self.state=self.store.setdefault(account.external_account_id,{'posts':[],'uploads':[],'fail_next':None,'writes':0,'expired':False})
 
     @classmethod
     def reset(cls):cls.store.clear()
 
     def account_status(self):return {'status':'token_expired' if self.state['expired'] else 'running','is_locked':False}
 
-    def create_post(self,text):
+    def upload_media(self,raw,mime,alt,title=''):
+        mode=self.state['fail_next']
+        if mode in ('upload_error','upload_rate_limit','upload_auth'):
+            self.state['fail_next']=None
+            status=429 if mode=='upload_rate_limit' else 401 if mode=='upload_auth' else 422
+            raise ConnectorError('Simulado: subida fallida.',status=status,kind='upload',pause=status in (401,429))
+        kind='document' if mime=='application/pdf' else 'image'
+        urn=f'urn:li:{kind}:fake{len(self.state["uploads"])+1}'
+        self.state['uploads'].append({'id':urn,'bytes':raw,'mime':mime,'sha256':hashlib.sha256(raw).hexdigest(),'alt':alt,'title':title})
+        return {'id':urn,'alt':alt,'title':title}
+
+    def create_post(self,text,media=None):
         mode=self.state['fail_next'];self.state['fail_next']=None
         if self.state['expired']:raise ConnectorError(TOKEN_PAUSE+' (simulado).',kind='token_expired',pause=True)
         if mode=='reject':raise ConnectorError('Simulado: HTTP 422.',status=422,kind='http_422')
@@ -208,7 +263,7 @@ class FakeLinkedInOfficial:
         if mode=='not_sent':raise ConnectorError('Simulado: sin conexión.',kind='not_sent')
         urn=f'urn:li:share:{7400000000000000000+len(self.state["posts"])+1}'
         if mode!='uncertain_not_applied':
-            self.state['posts'].append({'id':urn,'text':text,'body':post_body(self.account.external_account_id,text)});self.state['writes']+=1
+            self.state['posts'].append({'id':urn,'text':text,'body':post_body(self.account.external_account_id,text,media)});self.state['writes']+=1
         if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras publicar.')
         return {'id':urn,'url':post_url(urn)}
 

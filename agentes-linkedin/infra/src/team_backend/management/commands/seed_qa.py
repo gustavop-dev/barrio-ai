@@ -30,7 +30,7 @@ from team_backend.authentication import digest
 from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, Capture, ConnectorAccount, Contact,
                                  Conversation, DeviceToken, EditorialPiece, GalleryPhoto, InboxSeen, Job, LinkedInCredential,
                                  Notification, ObservedPost, OfficePreference, OperatorControl, Opportunity, Orientation, PostMetric,
-                                 Referent, TeamQuestion, WeeklySummary, Worker)
+                                 Referent, TeamQuestion, WeeklySummary, Worker, PieceImage)
 
 QA_USERNAME='qa'
 QA_PASSWORD_DEFAULT='qa-0ff1ce-solo-ci'
@@ -123,7 +123,7 @@ class Command(BaseCommand):
             self.wipe()
             self.accounts();self.network();self.pieces();self.proposals();self.opportunities();self.conversation()
             self.questions();self.facts();self.notifications();self.captures();self.gallery();self.results();self.summaries()
-            self.spend();self.settings();self.devices();self.office()
+            self.image_examples();self.spend();self.settings();self.devices();self.office()
         self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
 
     # ------------------------------------------------------------------ safety and reset
@@ -144,9 +144,12 @@ class Command(BaseCommand):
 
     def wipe(self):
         """Empty the QA world. Device logins, users, groups and Expo tokens stay."""
+        for image in PieceImage.objects.filter(source_photo__isnull=True):image.image.delete(save=False)
+        for image in PieceImage.objects.filter(edited=True):image.image.delete(save=False)
+        for piece in EditorialPiece.objects.exclude(image_document=''):piece.image_document.delete(save=False)
         for photo in GalleryPhoto.objects.all():photo.image.delete(save=False)
         for capture in Capture.objects.exclude(audio=''):capture.audio.delete(save=False)
-        models=[ActionExecution,ActionProposal,PostMetric,GalleryPhoto,Capture,EditorialPiece,Conversation,Opportunity,Contact,
+        models=[ActionExecution,ActionProposal,PostMetric,PieceImage,GalleryPhoto,Capture,EditorialPiece,Conversation,Opportunity,Contact,
                 ObservedPost,Referent,ConnectorAccount,TeamQuestion,Notification,InboxSeen,WeeklySummary,AudienceSnapshot,Job,Worker,AuditEvent]
         tables=', '.join(connection.ops.quote_name(m._meta.db_table) for m in models)
         with connection.cursor() as cursor:
@@ -492,6 +495,44 @@ class Command(BaseCommand):
 
     # ------------------------------------------------------------------ results history
 
+    def image_examples(self):
+        """Add image examples to existing pieces; keep the old gallery and inbox fixtures intact."""
+        from team_backend import imagenes, infografias
+        from team_backend.connectors_images import FakeImageConnector
+        for piece in self.piece.values():
+            if piece.state=='ready':imagenes.fallback(piece,'Tarjeta de muestra QA, sin proveedores')
+        piece=self.piece['manana'];photo=GalleryPhoto.objects.get(id=uid('photo:elegida'))
+        for row in piece.images.all():row.image.delete(save=False);row.delete()
+        raw=imagenes.read(photo.image)
+        PieceImage.objects.create(id=uid('image:foto'),piece=piece,source_photo=photo,kind='foto',position=1,
+            image=photo.image.name,mime=photo.mime,width=photo.width,height=photo.height,sha256=imagenes.sha(raw),
+            alt='A workshop scene provided by Gustavo, with people sharing a product demonstration.',
+            reason='Foto de ejemplo para la fase 2',ai_edit='no')
+        piece.image_kind='foto';piece.image_review={'ok':True,'sha256':[imagenes.sha(raw)]};piece.save()
+        capture=Capture.objects.create(id=uid('capture:urgente'),created_by=self.user,purpose='propuesta',ai_edit='auto',
+            note='Esta es la demo del equipo. Publícalo lo antes posible.',state='usado',publish_asap=True,
+            publish_asap_evidence='Publícalo lo antes posible.',publish_asap_expected_slot=piece.scheduled_for,
+            publish_asap_reason='Primer hueco libre; sujeto a verificación, aprobación y veto.',
+            outcome={'kind':'usado','text':'La idea tiene fecha prevista','link':f'/calendario/pieza/{piece.id}'},
+            routed_to={'kind':'idea','used_in':str(piece.id)})
+        photo.capture=capture;photo.save(update_fields=['capture'])
+        piece=self.piece['aprobacion']
+        for row in piece.images.all():row.image.delete(save=False);row.delete()
+        slide=dict(infografias.fallback(),template='pasos',highlight='',label='WORKFLOW',title='The decision comes first',
+            subtitle='',steps=['Name the decision','Compare the options','Record the reason'],
+            alt='Three steps: name the decision, compare the options, and record the reason. Make the decision explicit.')
+        raw=infografias.render(slide);review=FakeImageConnector().check([raw],{'design':slide})
+        row=PieceImage(id=uid('image:infografia'),piece=piece,kind='infografia',width=1080,height=1080,
+            sha256=imagenes.sha(raw),alt=slide['alt'],template='pasos',data=slide,review=review)
+        row.image.save('infografia-qa.png',ContentFile(raw),save=False);row.save()
+        piece.image_kind='infografia';piece.image_spec={'slides':[slide]};piece.image_review=review;piece.save()
+        for piece in self.piece.values():
+            for action in piece.proposals.all():
+                action.payload=dict(action.payload,media=imagenes.manifest(piece))
+                action.payload_hash=operador.current_hash(action)
+                if action.approved_hash:action.approved_hash=action.payload_hash
+                action.save(update_fields=['payload','payload_hash','approved_hash'])
+
     def results(self):
         """~100 days of audience snapshots, machine jobs and network syncs, so 7, 28 and 90 days compare with data."""
         days=100;snapshots=[];jobs=[]
@@ -543,6 +584,7 @@ class Command(BaseCommand):
     def spend(self):
         rows=[('anthropic','propose-comment',Decimal('0.042'),0),('anthropic','editorial-director',Decimal('0.31'),0),('anthropic','network-classify',Decimal('0.05'),0),
               ('anthropic','editorial-redactor',Decimal('0.52'),3),('anthropic','weekly-summary',Decimal('0.084'),6),('typesafe','lead-review',Decimal('0.0021'),1),
+              ('openai','image-edit',Decimal('0.042'),1),('anthropic','image-check',Decimal('0.008'),1),
               ('assemblyai','capture-transcription',Decimal('0.004'),1),('anthropic','propose-comment',Decimal('0.038'),2)]
         with connection.cursor() as cursor:
             for i,(provider,purpose,usd,days) in enumerate(rows):

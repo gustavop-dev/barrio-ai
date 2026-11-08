@@ -18,6 +18,7 @@ dependencies = [
     "anthropic>=1,<2",
     "pywebpush>=2,<3",
     "cryptography>=43",
+    "Pillow>=11,<13",
 ]
 
 [project.optional-dependencies]
@@ -31,7 +32,7 @@ knowledge = "knowledge.cli:main"
 
 [tool.setuptools.package-data]
 knowledge = ["schema.sql", "console.html"]
-team_backend = ["migrations/*.sql"]
+team_backend = ["migrations/*.sql", "recursos/*.md", "recursos/*.html", "recursos/fonts/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

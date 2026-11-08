@@ -223,7 +223,7 @@ class CaptureRoutingTests(CaptureBase):
             only_photos=self.send(fotos=[photo()]);self.drain()
         self.assertEqual(len(calls),1)  # photos alone go to the gallery without asking anyone
         self.assertEqual((calls[0]['model'],calls[0]['purpose']),('claude-sonnet-5-5','capture-route'))
-        self.assertEqual(calls[0]['schema']['properties']['destino']['enum'],['post','dato'])
+        self.assertEqual(calls[0]['schema']['properties']['destino']['enum'],['post','propuesta','dato'])
         self.assertEqual(calls[0]['message'],{'texto':'No quiero hablar de cripto nunca.','fotos':0})
         capture=self.capture(body)
         self.assertEqual((capture.state,capture.routed_to['kind'],capture.routed_to['classified']),('dato_guardado','dato',True))
@@ -322,7 +322,7 @@ class GalleryTests(CaptureBase):
         self.assertEqual((listed[ids[0]]['label'],listed[ids[0]]['tone']),('Nueva','info'))
         self.assertEqual((listed[ids[1]]['display_state'],listed[ids[1]]['label'],listed[ids[1]]['tone']),('sin_usar','Sin usar','muted'))
         self.assertEqual((listed[ids[2]]['label'],listed[ids[2]]['tone']),(f'Elegida · {capturas.short_day(day)}','info'))
-        self.assertEqual(listed[ids[2]]['used_in'],{'piece_id':str(piece.id),'date':str(day),'text':f'Elegida para el post del {capturas.day_label(day)}'})
+        self.assertEqual(listed[ids[2]]['used_in'],{'piece_id':str(piece.id),'date':str(day),'text':f'Usada en la pieza del {capturas.day_label(day)}'})
         local=published.astimezone(operador.local_tz()).date()
         self.assertEqual((listed[ids[3]]['label'],listed[ids[3]]['tone']),(f'Publicada · {capturas.date_label(local)}','ok'))
         def filtered(key):return {p['id'] for p in self.human.get(f'/api/v1/galeria?filtro={key}').json()['results']}

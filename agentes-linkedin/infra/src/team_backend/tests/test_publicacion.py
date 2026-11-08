@@ -242,6 +242,10 @@ def answers(final=GOOD_POST,decision='write',verdict='ready_for_execution',findi
 class EditorialBase(PublicationBase):
     def setUp(self):
         super().setUp()
+        import tempfile, shutil
+        from django.test import override_settings
+        root=tempfile.mkdtemp(prefix='editorial-images-');self.addCleanup(shutil.rmtree,root,ignore_errors=True)
+        media=override_settings(MEDIA_ROOT=root);media.enable();self.addCleanup(media.disable)
         from knowledge import db
         from team_backend import operador
         with db.connect() as c:
@@ -286,6 +290,8 @@ class EditorialBase(PublicationBase):
         piece=EditorialPiece.objects.create(account=self.official,slot_date=(now-timedelta(days=days_ago)).astimezone(operador.local_tz()).date(),
             scheduled_for=now-timedelta(hours=1+days_ago),state='ready',final_text=text,
             verification={'verdict':'ready_for_execution','text_sha256':hashlib.sha256(text.encode()).hexdigest()})
+        from team_backend.imagenes import fallback
+        fallback(piece,'Fixture sin proveedores')
         proposal=operador.create_proposal(self.gustavo,None,'CONT-09',{'text':text},citations=['LI-04-M005-K01'],source='agent',piece=piece)
         return autopiloto.policy_review(proposal)
 

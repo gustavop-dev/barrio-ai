@@ -25,6 +25,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 | [CAL-14](#cal-14) | «Preparar la siguiente pieza» | PWA · app · backend | funciona |
 | [CAL-15](#cal-15) | Aprobar una pieza en modo aprobación | PWA · app · backend | parcial |
 | [CAL-16](#cal-16) | Enlaces antiguos llevan al Calendario o a la pieza | PWA · app | funciona |
+| [CAL-17](#cal-17) | Fecha prevista y aviso de una captura urgente | backend | funciona |
 
 ---
 
@@ -274,9 +275,22 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 
 ---
 
+### CAL-17 · Fecha prevista y aviso de una captura urgente <a id="cal-17"></a>
+
+- **Dónde:** backend (campos y avisos; presentación de fase 2 pendiente)
+- **Estado:** funciona
+- **Código:** `urgente.assign_slots`, `notificaciones.avisar(capture_scheduled)`, eventos de oficina y API de capturas.
+- **Criterios de aceptación:**
+  1. **Dado** que se asigna una fecha a una idea urgente, **cuando** termina la planificación, **entonces** se guarda `publish_asap_expected_slot`, se envía una notificación con fecha, hora y condiciones y se emite un evento de oficina.
+  2. **Dado** una cuenta en pausa o sin hueco, **cuando** se consulta, **entonces** la fecha es null y el motivo explica por qué; no se promete una publicación.
+  3. **Dado** el mismo hueco sin cambios, **cuando** vuelve el planificador, **entonces** no duplica avisos.
+  4. **Dado** una pieza vetada, fallida o caducada, **cuando** se cierra, **entonces** libera la idea y las fotos para reconsiderarlas; jamás reintenta una publicación incierta.
+- **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
+- **Cobertura QA:**
+
 ## Imágenes
 
-El detalle de la pieza todavía no muestra ninguna imagen: la API, los tipos y las pantallas no tienen campo de imagen. Lo que Gustavo quiere ver (la foto original y la editada con el motivo, o la infografía o las láminas del carrusel con su texto alternativo, y el veto hasta la hora de salida) está en [IMG-11](imagenes-en-publicaciones.md#img-11) ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)).
+El detalle de la API devuelve imágenes y revisiones; los tipos y las pantallas se actualizan en fase 2. Lo que Gustavo quiere ver (la foto original y la editada con el motivo, o la infografía o las láminas del carrusel con su texto alternativo, y el veto hasta la hora de salida) está en [IMG-11](imagenes-en-publicaciones.md#img-11) ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)).
 
 ## Retiradas
 

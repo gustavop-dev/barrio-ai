@@ -74,6 +74,8 @@ def post_issues(proposal):
         issues.append('El veredicto del verificador no corresponde a este texto exacto')
     if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
+    from . import imagenes
+    issues+=imagenes.issues(proposal.piece,proposal.payload.get('media'))
     return issues
 
 def content_issues(proposal):
@@ -228,7 +230,11 @@ def tick(user,now=None):
     # Own pieces are prepared ahead of time: their TTL runs from the scheduled hour, not from creation.
     stale=ActionProposal.objects.filter(state__in=['proposed','approved'],execution__isnull=True).filter(
         Q(piece__isnull=True,created_at__lt=now-ttl)|Q(piece__isnull=False,piece__scheduled_for__lt=now-ttl))
-    for proposal in stale:operador._audit(None,'operator.expired',proposal.id)
+    for proposal in stale:
+        operador._audit(None,'operator.expired',proposal.id)
+        if proposal.piece_id:
+            from .capturas import release_ideas
+            release_ideas(proposal.piece,'caducó sin publicar')
     report['expired']=stale.update(state=ActionProposal.State.EXPIRED,decision_note='Caducada sin ejecutar')
     # The lead (Jev, up to 60 s per call) reviews at most LEAD_MAX_REVIEWS_PER_TICK proposals per tick, oldest first; after
     # a plan_network the rest wait for the next ticks instead of blocking this one for minutes.
@@ -262,7 +268,8 @@ def _editorial(user,now):
     account=editorial.publishing_account()
     if not editorial.can_publish(account):return 0
     if editorial.spent_today(now)>=editorial.daily_budget():return 0
-    slot=editorial.next_slot(now)
+    from . import urgente
+    slot=urgente.next_slot(now) or editorial.next_slot(now)
     if slot is None or operador.capacity_left(account,'CONT-09',editorial.scheduled_for(slot))<=0:return 0
     attempt=EditorialPiece.objects.filter(slot_date=slot).count()  # a renewed-budget retry gets its own job id
     _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},
