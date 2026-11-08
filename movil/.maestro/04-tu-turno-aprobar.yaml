@@ -105,10 +105,9 @@ tags: [turno]
     id: 'en-cola-48be6cb6-07ed-5976-ac8c-0044d7f25be1'
 - assertVisible: 'Seguir a Laura Gómez'
 - takeScreenshot: 04-aprobar-04-en-cola
-- tapOn:
-    text: 'Aprobar'
-    childOf:
-      id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
+# Julián's is the only row that still waits, so its «Aprobar» is the only one in «En cola» (the row's own view is
+# reported apart from its buttons on Android, so `childOf` cannot reach them).
+- tapOn: 'Aprobar'
 - extendedWaitUntil:
     visible: 'Aprobada\. Sale cuando lo permitan la ventana y los topes\.'
     timeout: 20000

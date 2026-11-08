@@ -50,6 +50,7 @@ tags: [notificaciones]
       text: '.*Andrés Restrepo aceptó tu invitación.*Nueva'
     direction: DOWN
     timeout: 30000
+    centerElement: true
 - assertVisible: 'Andrés Restrepo aceptó tu invitación'
 - runFlow: comun/notificaciones-arriba.yaml
 - scrollUntilVisible:

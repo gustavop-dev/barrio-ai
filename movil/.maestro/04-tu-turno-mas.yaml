@@ -163,18 +163,20 @@ tags: [turno]
     timeout: 15000
 - assertVisible: 'La tarjeta sale de Tu turno hasta que te vuelva a escribir\. Nadie le responde por ti\.'
 - takeScreenshot: 04-mas-05-no-responder
+# «No responder» is both the sheet's title and its action; top to bottom, the action is second.
 - tapOn:
     text: 'No responder'
     childOf:
       id: confirm-sheet
+    index: 1
     waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
-    notVisible: 'Sofía Martínez te escribió'
+    notVisible:
+      id: confirm-sheet
     timeout: 20000
 - extendedWaitUntil:
-    notVisible:
-      id: toast
-    timeout: 15000
+    notVisible: 'Marcar como oportunidad'
+    timeout: 20000
 
 # ---------------------------------------------------------------- the choice question: an option, then «Deshacer»
 # cubre: TUR-09

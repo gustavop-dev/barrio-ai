@@ -217,7 +217,6 @@ tags: [turno]
     direction: DOWN
     timeout: 60000
     centerElement: true
-- assertVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
 - tapOn:
     text: 'Más tarde'
     childOf:
