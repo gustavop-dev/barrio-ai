@@ -179,18 +179,9 @@ tags: [personas, fichas]
     text: "Andrés Restrepo"
     childOf:
       id: opportunity-form
-- scrollUntilVisible:
-    element:
-      text: "Cancelar"
-      childOf:
-        id: opportunity-form
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-- tapOn:
-    text: "Cancelar"
-    childOf:
-      id: opportunity-form
+# Android «atrás» closes the form without saving (no need to scroll the long form down to «Cancelar»: a swipe that
+# starts on one of its fields does not always scroll it).
+- back
 - extendedWaitUntil:
     notVisible:
       id: opportunity-form
