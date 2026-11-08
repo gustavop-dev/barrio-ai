@@ -1,0 +1,521 @@
+# cubre: CAL-04, CAL-06, CAL-08, CAL-09, CAL-11, CAL-12, CAL-14
+# Tomorrow's piece (seed_qa: ready, its CONT-09 approved). Opened from «Próximo» in Lista: «Pieza del <día>»,
+# «Programada», «Sale mañana a las …» and the veto card; the final text with «Copiar» → «Copiado»; «Comentario para el
+# equipo» opens the capture tied to the piece; vetar and «Deshacer» at once («Veto deshecho», nothing sent); every
+# fold of «Cómo se escribió» opens with its content (the variants also swipe); then vetar for real and let the 5 s
+# pass: the piece says «La vetaste» with the note and has no «Vetar» any more. With nothing on its way, the panel of a
+# free day offers «Preparar la siguiente pieza», whose confirmation says what it costs and shows the API's answer (the
+# QA backend has no official LinkedIn, so it is a 409 with its reason, or the job queued).
+# Text in the «etiqueta» style (badges, section labels) is uppercased on screen, so it is written in capitals here.
+appId: co.projectapp.office
+name: Pieza de mañana y su veto
+tags: [calendario]
+---
+- runFlow: comun/entrar.yaml
+- runScript: comun/calendario-fechas.js
+- tapOn:
+    id: top-calendario
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: pager-semana
+    timeout: 30000
+- tapOn:
+    text: "Lista"
+- extendedWaitUntil:
+    visible:
+      text: "Ver cómo se escribió"
+      childOf:
+        id: calendario-lista
+    timeout: 20000
+- tapOn:
+    text: "Ver cómo se escribió"
+    childOf:
+      id: calendario-lista
+
+# ---------------------------------------------------------------- header and veto card
+# cubre: CAL-06, CAL-12
+- extendedWaitUntil:
+    visible:
+      text: "Pieza del ${output.mananaLargo}"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "PROGRAMADA"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "Sale mañana a las .*"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "El equipo publica solo\\. Si no quieres que salga, vétala antes de las .*: ese día quedará sin publicación\\."
+    childOf:
+      id: pieza
+- takeScreenshot: 07-pieza-veto-01-programada
+
+# ---------------------------------------------------------------- final text and «Copiar»
+# cubre: CAL-08
+- scrollUntilVisible:
+    element:
+      id: copiar
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "TEXTO FINAL"
+- assertVisible: "[0-9.]+ caracteres"
+- assertVisible: "Se publica tal cual, en inglés."
+- assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue."
+- tapOn:
+    id: copiar
+- extendedWaitUntil:
+    visible: "Copiado"
+    timeout: 5000
+- takeScreenshot: 07-pieza-veto-02-copiado
+
+# ---------------------------------------------------------------- «Comentario para el equipo»: the capture, tied to the piece
+# cubre: CAL-11
+- scrollUntilVisible:
+    element:
+      text: "Comentario para el equipo"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Comentario para el equipo"
+- extendedWaitUntil:
+    visible:
+      id: capture-context
+    timeout: 20000
+- assertVisible: "Comentario sobre la pieza.*"
+- takeScreenshot: 07-pieza-veto-03-comentario-captura
+- tapOn:
+    id: capture-cerrar
+# An empty capture closes at once; if it asks first, close without sending.
+- runFlow:
+    when:
+      visible: "¿Cerrar sin (enviar|guardar)\\?"
+    commands:
+      - tapOn: "Cerrar sin (enviar|guardar)"
+- extendedWaitUntil:
+    notVisible:
+      id: capture-sheet
+    timeout: 15000
+- assertVisible:
+    id: pieza
+
+# ---------------------------------------------------------------- vetar, then «Deshacer» at once
+# cubre: CAL-12
+- scrollUntilVisible:
+    element:
+      text: "Vetar"
+      childOf:
+        id: pieza
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- assertVisible:
+    text: "Vetar la pieza"
+    childOf:
+      id: confirm-sheet
+- assertVisible:
+    text: "La pieza no saldrá a las .* y ese día quedará sin publicación\\. Queda registrada con tu nota\\."
+    childOf:
+      id: confirm-sheet
+# Without a note, «Vetar» does nothing.
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: confirm-sheet
+- assertVisible:
+    id: confirm-sheet
+- assertNotVisible: "Deshacer"
+- takeScreenshot: 07-pieza-veto-04-sin-nota
+- tapOn:
+    id: confirm-note
+- inputText: "Prueba de QA, no debe salir"
+- hideKeyboard
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: confirm-sheet
+# «Vetada» with «Deshacer» for 5 s: undo at once (no screenshot in between, the window is short on the emulator).
+- extendedWaitUntil:
+    visible: "Deshacer"
+    timeout: 5000
+- tapOn: "Deshacer"
+- extendedWaitUntil:
+    visible: "Veto deshecho"
+    timeout: 5000
+- assertNotVisible:
+    id: confirm-sheet
+- assertVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "PROGRAMADA"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-pieza-veto-05-veto-deshecho
+
+# ---------------------------------------------------------------- «Cómo se escribió»: every fold, with content inside
+# cubre: CAL-09
+# Brief: open (thesis), then closed again.
+- scrollUntilVisible:
+    element:
+      text: "Brief"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "Brief"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "TESIS"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-veto-06-brief
+- scrollUntilVisible:
+    element:
+      text: "Brief"
+      childOf:
+        id: pieza
+    direction: UP
+    timeout: 15000
+- tapOn:
+    text: "Brief"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    notVisible:
+      text: "TESIS"
+      childOf:
+        id: pieza
+    timeout: 10000
+
+# Variantes A y B: B was chosen, so the pager starts on B («Elegida») with A off to the left.
+- scrollUntilVisible:
+    element:
+      text: "Variantes A y B"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Variantes A y B"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      id: variantes
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "VARIANTE B · COPYWRITER B"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "ELEGIDA"
+    childOf:
+      id: variantes
+- assertNotVisible:
+    text: "VARIANTE A · COPYWRITER A"
+    childOf:
+      id: pieza
+- takeScreenshot: 07-pieza-veto-07-variante-b
+# Swipe the card right: variant A.
+- swipe:
+    from:
+      id: variantes
+    direction: RIGHT
+- extendedWaitUntil:
+    visible:
+      text: "VARIANTE A · COPYWRITER A"
+      childOf:
+        id: pieza
+    timeout: 10000
+- extendedWaitUntil:
+    notVisible:
+      text: "VARIANTE B · COPYWRITER B"
+      childOf:
+        id: pieza
+    timeout: 10000
+- takeScreenshot: 07-pieza-veto-08-variante-a
+# Its tab brings B back.
+- tapOn:
+    text: "Variante B · Elegida"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      text: "VARIANTE B · COPYWRITER B"
+      childOf:
+        id: pieza
+    timeout: 10000
+
+# Panel de lectores: the five simulated readers.
+- scrollUntilVisible:
+    element:
+      text: "Panel de lectores"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Panel de lectores"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "Cinco perspectivas simuladas.*"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-veto-09-panel
+
+# Selección: the decision, «Variante B».
+- scrollUntilVisible:
+    element:
+      text: "Selección"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Selección"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "DECISIÓN"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-veto-10-seleccion
+
+# Verificador: approved, with the checked claims.
+- scrollUntilVisible:
+    element:
+      text: "Verificador"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn:
+    text: "Verificador"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "APROBADA"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "1 de 1"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-veto-11-verificador
+
+# Fuentes y coste: the cost per stage and its total. No repair round on this piece.
+- scrollUntilVisible:
+    element:
+      text: "Fuentes y coste"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertNotVisible:
+    text: "Ronda de reparación"
+    childOf:
+      id: pieza
+- tapOn:
+    text: "Fuentes y coste"
+    childOf:
+      id: pieza
+- scrollUntilVisible:
+    element:
+      text: "Total"
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-pieza-veto-12-fuentes-coste
+
+# ---------------------------------------------------------------- vetar for real: nobody undoes it, it goes after 5 s
+# cubre: CAL-06, CAL-12
+- scrollUntilVisible:
+    element:
+      text: "Vetar"
+      childOf:
+        id: pieza
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- tapOn:
+    id: confirm-note
+- inputText: "Prueba de QA, no debe salir"
+- hideKeyboard
+- tapOn:
+    text: "Vetar"
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    visible: "Deshacer"
+    timeout: 5000
+- takeScreenshot: 07-pieza-veto-13-vetada-esperando
+- extendedWaitUntil:
+    notVisible: "Deshacer"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "La vetaste"
+      childOf:
+        id: pieza
+    timeout: 20000
+- assertVisible:
+    text: "Tu nota: Prueba de QA, no debe salir"
+    childOf:
+      id: pieza
+- assertVisible:
+    text: "VETADA"
+    childOf:
+      id: pieza
+- assertNotVisible:
+    text: "Vetar"
+    childOf:
+      id: pieza
+- assertNotVisible: "El veto ya se había enviado"
+- takeScreenshot: 07-pieza-veto-14-la-vetaste
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# ---------------------------------------------------------------- «Preparar la siguiente pieza» from a free day
+# cubre: CAL-04, CAL-14
+- scrollUntilVisible:
+    element:
+      text: "Semana"
+    direction: UP
+    timeout: 20000
+- tapOn:
+    text: "Semana"
+- extendedWaitUntil:
+    visible:
+      id: pager-semana
+    timeout: 10000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.pasadoManana}"
+    commands:
+      - tapOn:
+          id: calendario-siguiente
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.pasadoManana}"
+          timeout: 10000
+- tapOn:
+    id: "dia-${output.pasadoManana}"
+- extendedWaitUntil:
+    visible:
+      text: "${output.pasadoMananaTitulo}"
+      childOf:
+        id: hoja-dia
+    timeout: 10000
+- tapOn:
+    text: "Cerrar"
+    childOf:
+      id: hoja-dia
+- extendedWaitUntil:
+    notVisible:
+      id: hoja-dia
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Preparar la siguiente pieza"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "No hay pieza programada para los próximos días."
+- takeScreenshot: 07-pieza-veto-15-nada-en-camino
+- tapOn: "Preparar la siguiente pieza"
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- assertVisible:
+    text: "Pone en cola el circuito editorial para el próximo día libre.*"
+    childOf:
+      id: confirm-sheet
+- assertVisible:
+    text: "Tiene coste: cada etapa llama a Claude.*"
+    childOf:
+      id: confirm-sheet
+- takeScreenshot: 07-pieza-veto-16-preparar-confirmacion
+- tapOn:
+    text: "Preparar"
+    childOf:
+      id: confirm-sheet
+# The QA backend has no official LinkedIn account that can publish: the 409's reason shows inside the confirmation.
+# If a later seed adds one, the job is queued instead and the panel says for which day.
+- extendedWaitUntil:
+    visible: "(.*(Conecta LinkedIn|La publicación está en pausa|No hay un hueco libre).*|Preparación en cola para el .*)"
+    timeout: 20000
+- takeScreenshot: 07-pieza-veto-17-preparar-respuesta
+- runFlow:
+    when:
+      visible:
+        id: confirm-sheet
+    commands:
+      - tapOn:
+          text: "Cancelar"
+          childOf:
+            id: confirm-sheet
+      - extendedWaitUntil:
+          notVisible:
+            id: confirm-sheet
+          timeout: 10000

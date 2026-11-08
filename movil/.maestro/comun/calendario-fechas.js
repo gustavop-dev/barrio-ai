@@ -69,3 +69,32 @@ output.mesHoy = monthTitle(hoy);
 output.mesSiguiente = monthTitle(midMonth(hoy, 1));
 output.mitadMes = iso(midMonth(hoy, 0));
 output.mitadMesSiguiente = iso(midMonth(hoy, 1));
+
+// 07-pieza-veto and 07-pieza-estados: the other days of the QA world (seed_qa: pieces at T-1 skipped, T-2 blocked,
+// T-3 and T-8 published, T-5 failed; T+2 has a meeting and no piece; T-4 has no piece).
+var ayer = day(-1);
+var hace3 = day(-3);
+var hace4 = day(-4);
+var hace5 = day(-5);
+var pasadoManana = day(2);
+output.ayer = iso(ayer);
+output.ayerTitulo = capitalize(longDay(ayer));
+output.ayerLargo = longDay(ayer);
+output.hace3 = iso(hace3);
+output.hace3Largo = longDay(hace3);
+output.hace4 = iso(hace4);
+output.hace4Titulo = capitalize(longDay(hace4));
+output.hace5 = iso(hace5);
+output.hace5Largo = longDay(hace5);
+output.pasadoManana = iso(pasadoManana);
+output.pasadoMananaTitulo = capitalize(longDay(pasadoManana));
+// The 7-day cut of the T-3 post arrives at T+4 («Aún no · Llega el …»).
+output.corte7dHace3 = longDay(day(4));
+// Two months away: nothing registered there, and every day is more than 15 days out.
+output.mesMas2 = monthTitle(midMonth(hoy, 2));
+output.mitadMesMas2 = iso(midMonth(hoy, 2));
+output.mitadMesMas2Titulo = capitalize(longDay(midMonth(hoy, 2)));
+// Another day of today's week (Monday first): the day before, or the day after on Mondays.
+var otroDia = day(hoy.getUTCDay() === 1 ? 1 : -1);
+output.otroDia = iso(otroDia);
+output.otroDiaTitulo = capitalize(longDay(otroDia));

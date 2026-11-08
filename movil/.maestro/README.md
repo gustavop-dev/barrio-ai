@@ -92,8 +92,10 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `04-tu-turno` | «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Pospuestas» y «Lo que el equipo sabe de ti» |
 | `05-captura` | abrir la hoja, escribir, «Para qué es», grabar (o lo que muestre el emulador sin micrófono), cerrar sin enviar, mantener pulsado el botón, enviar, «Lo que enviaste» y «Deshacer» |
 | `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
-| `07-calendario` | Semana, Mes y Lista; tocar días y su hoja; deslizar semanas y meses; la pieza de mañana, los pliegues de «Cómo se escribió», vetar y «Deshacer»; la pieza bloqueada y su ronda de reparación |
-| `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo»; la definición de un gráfico; tocar una barra |
+| `07-calendario` | Semana, Mes y Lista; deslizar semanas y meses; un mes sin nada y un día a más de 15 días; la hoja del día y el panel de un día con reunión, uno sin pieza y el de ayer con «Ver todo lo del día» filtrado; «En cola»: vetar una acción de red (se envía a los 5 s) y una reacción con «Deshacer»; «Lo que pasó» por tipo y con «Mostrar lo que no salió» |
+| `07-pieza-veto` | la pieza de mañana: cabecera, «Copiar», «Comentario para el equipo», vetar y «Deshacer», los pliegues de «Cómo se escribió», el veto que se envía a los 5 s («La vetaste») y «Preparar la siguiente pieza» |
+| `07-pieza-estados` | las piezas pasadas desde su día: bloqueada (y la capa «Red» apagada), publicada con sus cortes y «—», saltada y fallida; la hoja a altura completa deja tocar otro día |
+| `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo» y la «Modalidad»; los accesos a cada sección; un dato que falta como «—» con su motivo; la definición de un gráfico; tocar una barra, una oportunidad activa y el mejor post |
 | `09-personas` | filtros por etapa y búsqueda; la ficha de una persona con una nota nueva; mover una oportunidad de etapa (y deshacerlo); la validación al añadir un referente |
 | `10-galeria` | abrir una foto, editar su nota, el interruptor de edición con IA, el visor y deslizar entre fotos |
 | `11-ajustes` | todas las secciones, Autonomía, apagar un tipo de aviso, la lista de dispositivos y cerrar sesión (va al final) |
