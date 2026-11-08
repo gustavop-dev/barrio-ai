@@ -4,8 +4,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
-import { Text } from 'react-native';
-import { getAnimatedStyle } from 'react-native-reanimated';
+import { StyleSheet, Text, type StyleProp, type ViewStyle } from 'react-native';
 import { Segmented } from '@/components/ui';
 import * as motion from '@/theme/motion';
 import { calendarChoreography, calendarLayout, calendarSpring, calendarTiming, durations, easings, FIRM } from '@/theme/motion';
@@ -34,8 +33,15 @@ async function advance(ms: number) {
   });
 }
 
-function translate(element: Parameters<typeof getAnimatedStyle>[0]): { x: number; y: number } {
-  const transform = getAnimatedStyle(element).transform as unknown as { translateX?: number; translateY?: number }[];
+/** What Reanimated has applied to an animated view under Jest (its `jestAnimatedStyle`), over its static style. */
+function animated(element: { props: Record<string, unknown> }): Record<string, unknown> {
+  const style = StyleSheet.flatten(element.props.style as StyleProp<ViewStyle>) ?? {};
+  const live = (element.props.jestAnimatedStyle as { value?: Record<string, unknown> } | undefined)?.value ?? {};
+  return { ...style, ...live };
+}
+
+function translate(element: { props: Record<string, unknown> }): { x: number; y: number } {
+  const transform = animated(element).transform as { translateX?: number; translateY?: number }[];
   return { x: transform[0]!.translateX!, y: transform[1]!.translateY! };
 }
 
@@ -64,7 +70,7 @@ describe('MovCalendario · the selection', () => {
     const view = await render(<Calendar fecha="2026-11-07" />);
     await layOutWeek();
     const pill = screen.getByTestId('seleccion-dia');
-    expect(pill).toHaveAnimatedStyle({ width: 48, height: 72, borderRadius: radius.md });
+    expect(animated(pill)).toMatchObject({ width: 48, height: 72, borderRadius: radius.md });
     expect(translate(pill)).toEqual({ x: 5 * STEP, y: 0 });
 
     await view.rerender(<Calendar fecha="2026-11-03" />);
@@ -92,7 +98,7 @@ describe('MovCalendario · the selection', () => {
     await advance(1200);
     // …and lands on the month cell, with the month cell's radius.
     expect(translate(pill)).toEqual({ x: 250, y: 54 });
-    expect(pill).toHaveAnimatedStyle({ width: 48, height: 52, borderRadius: radius.sm });
+    expect(animated(pill)).toMatchObject({ width: 48, height: 52, borderRadius: radius.sm });
   });
 
   it('jumps with reduced motion', async () => {
@@ -122,7 +128,7 @@ describe('MovCalendario · the day panel', () => {
 
   it('appears without moving, then each new day enters from the side the date moved to', async () => {
     const view = await render(<Panel date="2026-11-07" />);
-    expect(screen.getByTestId('panel-entrante')).toHaveAnimatedStyle({ opacity: 1 });
+    expect(animated(screen.getByTestId('panel-entrante'))).toMatchObject({ opacity: 1 });
     expect(translate(screen.getByTestId('panel-entrante'))).toEqual({ x: 0, y: 0 });
 
     await view.rerender(<Panel date="2026-11-09" />);
@@ -131,16 +137,16 @@ describe('MovCalendario · the day panel', () => {
     // The old panel stays laid over the new one, out of reach of screen readers.
     expect(screen.queryByText('sale 2026-11-07')).toBeNull();
     expect(screen.getByText('sale 2026-11-07', hidden)).toBeTruthy();
-    expect(entering).toHaveAnimatedStyle({ opacity: 0 });
+    expect(animated(entering)).toMatchObject({ opacity: 0 });
     expect(translate(entering)).toEqual({ x: 12, y: 8 });
 
     await advance(40);
     // The new one waits 60 ms; the old one is already leaving to the left.
-    expect(entering).toHaveAnimatedStyle({ opacity: 0 });
+    expect(animated(entering)).toMatchObject({ opacity: 0 });
     expect(translate(leaving).x).toBeLessThan(0);
 
     await advance(400);
-    expect(entering).toHaveAnimatedStyle({ opacity: 1 });
+    expect(animated(entering)).toMatchObject({ opacity: 1 });
     expect(translate(entering)).toEqual({ x: 0, y: 0 });
     expect(screen.queryByTestId('panel-saliente', hidden)).toBeNull();
 
@@ -154,7 +160,7 @@ describe('MovCalendario · the day panel', () => {
     const view = await render(<Panel date="2026-11-07" reduced />);
     await view.rerender(<Panel date="2026-11-09" reduced />);
     expect(screen.queryByTestId('panel-saliente', hidden)).toBeNull();
-    expect(screen.getByTestId('panel-entrante')).toHaveAnimatedStyle({ opacity: 1 });
+    expect(animated(screen.getByTestId('panel-entrante'))).toMatchObject({ opacity: 1 });
     expect(translate(screen.getByTestId('panel-entrante'))).toEqual({ x: 0, y: 0 });
   });
 });
@@ -188,9 +194,9 @@ describe('MovCalendario · Semana ↔ Mes', () => {
     await view.rerender(<Views vista="mes" />);
     const leaving = screen.getByTestId('vista-saliente', hidden);
     expect(screen.getByText('semana', hidden)).toBeTruthy();
-    expect(leaving).toHaveAnimatedStyle({ opacity: 1 });
+    expect(animated(leaving)).toMatchObject({ opacity: 1 });
     await advance(64);
-    const opacity = Number(getAnimatedStyle(leaving).opacity);
+    const opacity = Number(animated(leaving).opacity);
     expect(opacity).toBeGreaterThan(0);
     expect(opacity).toBeLessThan(1);
     await advance(200);
@@ -231,18 +237,18 @@ describe('MovCalendario · the Vista selection (seg)', () => {
     await render(<VistaControl />);
     await layOutTrack();
     const selection = screen.getByTestId('vista-seleccion');
-    expect(selection).toHaveAnimatedStyle({ width: 100 });
-    expect(getAnimatedStyle(selection).transform).toEqual([{ translateX: 104 }]);
+    expect(animated(selection)).toMatchObject({ width: 100 });
+    expect(animated(selection).transform).toEqual([{ translateX: 104 }]);
 
     await fireEvent.press(screen.getByRole('tab', { name: 'Mes' }));
     expect(Haptics.selectionAsync).toHaveBeenCalled();
     expect(screen.getByRole('tab', { name: 'Mes' })).toBeSelected();
     await advance(32);
-    const moving = (getAnimatedStyle(selection).transform as unknown as { translateX: number }[])[0]!.translateX;
+    const moving = (animated(selection).transform as { translateX: number }[])[0]!.translateX;
     expect(moving).toBeGreaterThan(0);
     expect(moving).toBeLessThan(104);
     await advance(1200);
-    expect(getAnimatedStyle(selection).transform).toEqual([{ translateX: 0 }]);
+    expect(animated(selection).transform).toEqual([{ translateX: 0 }]);
   });
 
   it('jumps with reduced motion', async () => {
@@ -251,6 +257,6 @@ describe('MovCalendario · the Vista selection (seg)', () => {
     await layOutTrack();
     await fireEvent.press(screen.getByRole('tab', { name: 'Lista' }));
     await advance(16);
-    expect(getAnimatedStyle(screen.getByTestId('vista-seleccion')).transform).toEqual([{ translateX: 208 }]);
+    expect(animated(screen.getByTestId('vista-seleccion')).transform).toEqual([{ translateX: 208 }]);
   });
 });

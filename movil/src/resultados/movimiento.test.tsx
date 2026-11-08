@@ -4,7 +4,7 @@
 import { kpi } from '@compartido/fixtures/resultados';
 import { formatKpiValue, type KpiUnit } from '@compartido/logic/resultados';
 import { act, render, screen } from '@testing-library/react-native';
-import { getAnimatedStyle } from 'react-native-reanimated';
+import { StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
 import { renderApp } from '@/test/render';
 import * as motion from '@/theme/motion';
 import { durations, easings, resultsChoreography, resultsTiming } from '@/theme/motion';
@@ -12,6 +12,13 @@ import { KpiTile } from './charts';
 import { countDecimals, CountUp, formatCount, GrowBar } from './CountUp';
 
 const hidden = { includeHiddenElements: true };
+
+/** What Reanimated has applied to an animated view under Jest (its `jestAnimatedStyle`), over its static style. */
+function animated(element: { props: Record<string, unknown> }): Record<string, unknown> {
+  const style = StyleSheet.flatten(element.props.style as StyleProp<ViewStyle>) ?? {};
+  const live = (element.props.jestAnimatedStyle as { value?: Record<string, unknown> } | undefined)?.value ?? {};
+  return { ...style, ...live };
+}
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -107,25 +114,25 @@ describe('MovResultados · the bars', () => {
   it('grow in a cascade: 120 ms plus 40 ms per bar the first time, 40 ms per bar afterwards', async () => {
     const view = await render(<GrowBar width={60} color="#647e99" index={2} />);
     const bar = screen.getByTestId('barra');
-    expect(bar).toHaveAnimatedStyle({ width: '0%' });
+    expect(animated(bar)).toMatchObject({ width: '0%' });
     await advance(150);
     // Bar 2 waits 120 + 2 × 40 = 200 ms.
-    expect(bar).toHaveAnimatedStyle({ width: '0%' });
+    expect(animated(bar)).toMatchObject({ width: '0%' });
     await advance(400);
-    expect(bar).toHaveAnimatedStyle({ width: '60%' });
+    expect(animated(bar)).toMatchObject({ width: '60%' });
 
     await view.rerender(<GrowBar width={30} color="#647e99" index={2} />);
     await advance(48);
     // Now it waits only 2 × 40 = 80 ms.
-    expect(bar).toHaveAnimatedStyle({ width: '60%' });
+    expect(animated(bar)).toMatchObject({ width: '60%' });
     await advance(400);
-    expect(bar).toHaveAnimatedStyle({ width: '30%' });
+    expect(animated(bar)).toMatchObject({ width: '30%' });
   });
 
   it('are at their length at once with reduced motion', async () => {
     jest.spyOn(motion, 'useMotion').mockReturnValue({ reduced: true });
     await render(<GrowBar width={45} color="#647e99" index={3} />);
     await advance(16);
-    expect(getAnimatedStyle(screen.getByTestId('barra')).width).toBe('45%');
+    expect(animated(screen.getByTestId('barra')).width).toBe('45%');
   });
 });
