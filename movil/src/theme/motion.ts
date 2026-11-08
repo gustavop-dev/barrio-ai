@@ -638,6 +638,7 @@ export const microLayout = {
     })
       .duration(durations.base)
       .reduceMotion(reduce()),
+};
 
 // ---------------------------------------------------------------- Tu turno and Notificaciones (MovTuTurno, MovNotificaciones)
 // Gustavo's phase 2 boards. Tu turno: a card resolved with its button shows a check, holds it, then
