@@ -45,7 +45,7 @@ GET `/api/v1/operador/feed?limit=50` devuelve los eventos recientes de `operator
 Rutas existentes (ver `agentes-linkedin/infra/docs/operador-linkedin.md`):
 - `GET /api/v1/operador/accounts`
 - `POST /api/v1/operador/accounts/<id>/pause` con `{ paused, reason }`
-- `GET|POST /api/v1/operador/referents` con `{ account, identifier, reason }`
+- `GET|POST /api/v1/operador/referents` con `{ account, identifier, reason }`. El alta busca el perfil en LinkedIn: responde 201 si lo crea, 200 si ya era referente, 400 «No encontramos ese perfil en LinkedIn: revisa la URL.» si LinkedIn no lo conoce y 503 «No se pudo consultar LinkedIn: …» si el proveedor falla.
 - `POST /api/v1/operador/observe` con `{ account, limit? }`
 - `GET /api/v1/operador/posts?account=`
 - `POST /api/v1/operador/posts/<id>/propose-comment`

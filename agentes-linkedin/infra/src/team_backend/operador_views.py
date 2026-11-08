@@ -6,11 +6,14 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from . import operador
+from .connectors import ConnectorError
 from .jobs import enqueue_operation
 from .models import ActionProposal, ConnectorAccount, DeviceToken, ObservedPost, Referent
 from .permissions import require
 from .serializers import (AccountInput, AccountOutput, ActionInput, ActionOutput, DecisionInput, JobOutput, ObserveInput,
                           OptionalRequestInput, PauseInput, PostOutput, ReferentInput, ReferentOutput, ReferentPatch, ResolveInput, ReviseInput)
+
+REFERENT_NOT_FOUND='No encontramos ese perfil en LinkedIn: revisa la URL.'
 
 def human_session(request):
     """A Django session (request.auth is None) or a device token of the mobile app; anything else, such as a service
@@ -60,7 +63,12 @@ class Referents(ListAPIView):
         return qs.filter(account_id=account) if account else qs
     def post(self,request):
         data=valid(ReferentInput,request)
-        referent,created=operador.add_referent(request.user,get_or_404(ConnectorAccount,id=data['account']),data['identifier'],data['reason'])
+        try:
+            referent,created=operador.add_referent(request.user,get_or_404(ConnectorAccount,id=data['account']),data['identifier'],data['reason'])
+        except ConnectorError as exc:
+            # The profile is looked up on LinkedIn first: say why it could not be added instead of a server error.
+            if exc.status==404:return Response({'detail':REFERENT_NOT_FOUND},status=400)
+            return Response({'detail':f'No se pudo consultar LinkedIn: {exc}'},status=503)
         return Response(ReferentOutput(referent).data,status=201 if created else 200)
 
 class ReferentDetail(APIView):
