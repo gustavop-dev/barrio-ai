@@ -9,12 +9,17 @@
 // card with nothing under it to fade into).
 //
 // The keyboard covers the lower half of a 390×844 screen and the app is drawn edge to edge (the window no
-// longer shrinks for it): the form pads itself by the keyboard (KeyboardAvoidingView) and scrolls so the
-// fields and «Entrar» sit above it.
+// longer shrinks for it). While a field is focused or the keyboard is up, the form rises to the top of the
+// screen: the content is shifted up (a transform, so it is part of the render, not a later command) until
+// «Entrar» (the heading) sits under the status bar, and the fields and the button are above any keyboard.
+// Nothing depends on the keyboard's reported height or on a scroll landing in time: on Android the first
+// keyboardDidShow can carry the height of an IME still animating in, and a scrollTo sent before the taller
+// content was mounted was clamped, so now and then the password stayed under the keyboard (QA 42483127088,
+// 42493813776, 42492749737). The only scroll is back to the top, which is always in range.
 import { ApiError } from '@compartido/api/client';
 import { Redirect, router, useFocusEffect, useNavigation } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
-import { BackHandler, Image, Keyboard, KeyboardAvoidingView, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
+import { BackHandler, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LOCK_MS, PROBLEM_TEXT, problemOf } from '@/auth/loginProblems';
@@ -45,7 +50,10 @@ export default function Login() {
   const passRef = useRef<ComponentRef<typeof TextInput>>(null);
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const opened = useRef(false);
-  const keyboardUp = useRef(false);
+  /** Where the form starts in the scroll content (its onLayout). */
+  const [formY, setFormY] = useState(0);
+  /** A field is focused or the keyboard is up: the form sits at the top of the screen. */
+  const [lifted, setLifted] = useState(false);
 
   /** The login has faded into the Oficina: it leaves the stack. */
   const finish = useCallback(() => {
@@ -79,24 +87,22 @@ export default function Login() {
     }, []),
   );
 
-  // With the keyboard up, the end of the form (the fields and «Entrar») scrolls into view above it; again when the
-  // padding of the KeyboardAvoidingView has shrunk the scroll view (onLayout below).
-  const showForm = useCallback(() => {
-    if (keyboardUp.current) scrollRef.current?.scrollToEnd({ animated: !reduced });
-  }, [reduced]);
+  // The form rises while typing (see the note at the top). The keyboard's own events keep it up or let it down;
+  // focusing a field lifts it too, in case the keyboard reports late.
+  const lift = useCallback(() => setLifted(true), []);
   useEffect(() => {
-    const up = Keyboard.addListener('keyboardDidShow', () => {
-      keyboardUp.current = true;
-      requestAnimationFrame(showForm);
-    });
-    const down = Keyboard.addListener('keyboardDidHide', () => {
-      keyboardUp.current = false;
-    });
+    const up = Keyboard.addListener('keyboardDidShow', lift);
+    const down = Keyboard.addListener('keyboardDidHide', () => setLifted(false));
     return () => {
       up.remove();
       down.remove();
     };
-  }, [showForm]);
+  }, [lift]);
+  // Shifted up, the content starts at the top of the scroll view: any scroll left from before goes back to 0.
+  useEffect(() => {
+    if (lifted) scrollRef.current?.scrollTo({ y: 0, animated: false });
+  }, [lifted]);
+  const rise = lifted ? Math.max(0, formY - insets.top) : 0;
 
   const screenStyle = useAnimatedStyle(() => ({ opacity: shown.value }));
   const brandStyle = useAnimatedStyle(() => ({ opacity: 1 - leaving.value }));
@@ -112,6 +118,8 @@ export default function Login() {
     try {
       await session.login(username, password);
       Keyboard.dismiss();
+      // The door is in the picture above the form: it shows again for the entrance.
+      setLifted(false);
       scrollRef.current?.scrollTo({ y: 0, animated: !reduced });
       setEntering(true);
     } catch (caught) {
@@ -123,11 +131,11 @@ export default function Login() {
 
   return (
     <Animated.View style={[styles.screen, screenStyle]} pointerEvents={running ? 'none' : 'auto'} testID="login">
-      <KeyboardAvoidingView style={styles.fill} behavior="padding">
+      <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           ref={scrollRef}
-          onLayout={showForm}
-          contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom + space[6] }]}
+          testID="login-scroll"
+          contentContainerStyle={[styles.content, { paddingTop: insets.top, paddingBottom: insets.bottom + space[6], transform: [{ translateY: -rise }] }]}
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.hero}>
@@ -137,7 +145,11 @@ export default function Login() {
               <T color={colors.paper}>La oficina de agentes de IA que trabaja tu LinkedIn.</T>
             </Animated.View>
           </View>
-          <Animated.View style={[styles.form, formStyle]}>
+          <Animated.View
+            style={[styles.form, formStyle]}
+            testID="login-form"
+            onLayout={(event) => setFormY(event.nativeEvent.layout.y)}
+          >
             <View style={styles.head}>
               <T variant="titulo" accessibilityRole="header">
                 Entrar
@@ -159,6 +171,7 @@ export default function Login() {
               textContentType="username"
               returnKeyType="next"
               onSubmitEditing={() => passRef.current?.focus()}
+              onFocus={lift}
               testID="login-usuario"
             />
             <View>
@@ -173,6 +186,7 @@ export default function Login() {
                 autoComplete="current-password"
                 textContentType="password"
                 returnKeyType="go"
+                onFocus={lift}
                 onSubmitEditing={() => void submit()}
                 testID="login-clave"
               />

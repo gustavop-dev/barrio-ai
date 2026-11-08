@@ -75,23 +75,34 @@ onFlowComplete:
 - assertNotVisible: ".*Network request failed.*"
 - takeScreenshot: 01-entrada-04-sin-conexion
 - setAirplaneMode: disabled
-# Give Android a few seconds to bring the network back (an optional wait for something that never shows).
-- extendedWaitUntil:
-    visible: "__la-red-vuelve__"
-    timeout: 10000
-    optional: true
 
 # ---------------------------------------------------------------- wrong password
 # cubre: ACC-02.3
+# The answer itself says when the network is back: while Android brings it up, «Entrar» still gets «No pudimos
+# conectar…», so it is pressed again (a few seconds apart) until the server answers «Usuario o contraseña incorrectos.».
 - scrollUntilVisible:
     element:
       id: login-entrar
     direction: DOWN
-- tapOn:
-    id: login-entrar
-- extendedWaitUntil:
-    visible: Usuario o contraseña incorrectos.
-    timeout: 30000
+- repeat:
+    while:
+      notVisible: "Usuario o contraseña incorrectos\\."
+    times: 8
+    commands:
+      - tapOn:
+          id: login-entrar
+      - extendedWaitUntil:
+          visible: "Usuario o contraseña incorrectos\\.|No pudimos conectar con la oficina\\..*"
+          timeout: 20000
+      - runFlow:
+          when:
+            visible: "No pudimos conectar con la oficina\\..*"
+          commands:
+            - extendedWaitUntil:
+                visible: "__la-red-aun-no-vuelve__"
+                timeout: 4000
+                optional: true
+- assertVisible: "Usuario o contraseña incorrectos\\."
 - takeScreenshot: 01-entrada-05-clave-equivocada
 
 # ---------------------------------------------------------------- the right one, and the entrance
@@ -150,8 +161,16 @@ onFlowComplete:
       ACCION: cerrar-este-telefono
       QA_USER: ${QA_USER}
       QA_PASSWORD: ${QA_PASSWORD}
-- tapOn:
-    id: tab-resultados
+# The Oficina polls every 15 s, so its next request may get the 401 before this tap: the tap that makes a request only
+# runs while the shell is still there.
+- runFlow:
+    when:
+      visible:
+        id: tab-resultados
+    commands:
+      - tapOn:
+          id: tab-resultados
+          optional: true
 - extendedWaitUntil:
     visible:
       id: login
