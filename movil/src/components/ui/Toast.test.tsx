@@ -71,8 +71,9 @@ describe('toasts and sheets', () => {
     await advance(0);
     expect(screen.queryByTestId('hoja-modal')).toBeNull();
     expect(screen.getByText('Sigue abierta.')).toBeOnTheScreen();
-    // The second it had left, and its fade: gone, not shown for a new full duration.
-    await advance(1000 + durations.fast + 50);
+    // The second it had left (not a new full duration), then its fade.
+    await advance(1000 + 10);
+    await advance(durations.fast + 50);
     expect(screen.queryByText('Sigue abierta.')).toBeNull();
   });
 });
