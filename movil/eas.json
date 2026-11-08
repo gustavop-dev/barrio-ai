@@ -13,7 +13,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://office.projectapp.co",
-        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a"
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\" -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=2 -Dorg.gradle.daemon=false -Dkotlin.daemon.jvm.options=-Xmx2g"
       }
     },
     "preview": {
@@ -24,7 +25,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://office.projectapp.co",
-        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a"
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\" -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=2 -Dorg.gradle.daemon=false -Dkotlin.daemon.jvm.options=-Xmx2g"
       }
     },
     "production": {
@@ -35,7 +37,8 @@
       },
       "env": {
         "EXPO_PUBLIC_API_URL": "https://office.projectapp.co",
-        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a"
+        "ORG_GRADLE_PROJECT_reactNativeArchitectures": "arm64-v8a",
+        "GRADLE_OPTS": "-Dorg.gradle.jvmargs=\"-Xmx4g -XX:MaxMetaspaceSize=1g -XX:+HeapDumpOnOutOfMemoryError -Dfile.encoding=UTF-8\" -Dorg.gradle.parallel=false -Dorg.gradle.workers.max=2 -Dorg.gradle.daemon=false -Dkotlin.daemon.jvm.options=-Xmx2g"
       }
     }
   },
