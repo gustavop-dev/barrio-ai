@@ -938,11 +938,11 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
                 Añadir una imagen
               </T>
               <View style={styles.photoButtons}>
-                <Pressable accessibilityRole="button" onPress={() => void addPhotos('camera')} style={styles.photoPick}>
+                <Pressable accessibilityRole="button" onPress={() => void addPhotos('camera')} style={styles.photoPick} testID="capture-camara">
                   <Icon name="camara" size={22} />
                   <T>Tomar foto</T>
                 </Pressable>
-                <Pressable accessibilityRole="button" onPress={() => void addPhotos('gallery')} style={styles.photoPick}>
+                <Pressable accessibilityRole="button" onPress={() => void addPhotos('gallery')} style={styles.photoPick} testID="capture-galeria">
                   <Icon name="galeria" size={22} />
                   <T>Galería</T>
                 </Pressable>
@@ -950,6 +950,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
               {fotos.length ? (
                 <View
                   style={styles.thumbs}
+                  testID="capture-fotos"
                   accessibilityLabel="Fotos adjuntas"
                   onLayout={(event) => thumbRow.set({ x: event.nativeEvent.layout.x, y: event.nativeEvent.layout.y })}
                 >

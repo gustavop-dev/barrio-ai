@@ -33,6 +33,16 @@ log "pantalla: $(adb shell wm size | tr -d '\r' | tail -n1) · $(adb shell wm de
 log "instalando ${QA_APK:?QA_APK sin definir}"
 adb install -r -g "$QA_APK"
 
+# CAP-05: a picture in the emulator's gallery for Android's photo picker (one of the PNGs seed_qa generated).
+pic=$(find "$INFRA/media/galeria" -name '*.png' 2> /dev/null | head -n1)
+if [ -n "$pic" ]; then
+  adb push "$pic" /sdcard/Pictures/qa-pizarra.png > /dev/null
+  adb shell am broadcast -a android.intent.action.MEDIA_SCANNER_SCAN_FILE -d file:///sdcard/Pictures/qa-pizarra.png > /dev/null 2>&1 || true
+  adb shell content call --uri content://media --method scan_volume --arg external_primary > /dev/null 2>&1 || true
+else
+  log "no hay una foto sembrada para el selector de fotos"
+fi
+
 adb logcat -c
 adb logcat -v threadtime > "$OUT/logcat/logcat-completo.txt" 2>&1 &
 LOGCAT_PID=$!

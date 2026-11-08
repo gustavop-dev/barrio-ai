@@ -1,3 +1,4 @@
+# cubre: NOT-01, NOT-02, NOT-03, NOT-04, NOT-05
 # Notificaciones: what is coming («Próximo», computed) and what happened in the last 7 days, read and unread.
 # The bell carries a dot while something is unread; the Todas / Sin leer filters; tapping a row marks it read
 # and opens its link in the app (the blocked piece, Andrés Restrepo's card); «Marcar todo como leído» clears
@@ -10,6 +11,7 @@ tags: [notificaciones]
 - runFlow: comun/entrar.yaml
 
 # ---------------------------------------------------------------- the bell
+# cubre: NOT-05
 - extendedWaitUntil:
     visible:
       id: unread-dot
@@ -26,6 +28,7 @@ tags: [notificaciones]
     timeout: 30000
 
 # ---------------------------------------------------------------- «Próximo»: tomorrow's piece and the invitations
+# cubre: NOT-03
 - extendedWaitUntil:
     visible: 'Pr[óÓ]ximo'
     timeout: 30000
@@ -38,6 +41,7 @@ tags: [notificaciones]
 - takeScreenshot: 06-notificaciones-02-proximo
 
 # ---------------------------------------------------------------- the last 7 days
+# cubre: NOT-01
 # Unread rows say «Nueva» (it ends their accessible label); read ones do not. Each search starts from the
 # top because the rows are grouped by day, newest first.
 - scrollUntilVisible:
@@ -81,6 +85,7 @@ tags: [notificaciones]
     timeout: 20000
 
 # ---------------------------------------------------------------- filter «Sin leer»
+# cubre: NOT-02
 # Only the unread rows: «Próximo» and what was read leave the list.
 - runFlow: comun/notificaciones-arriba.yaml
 - tapOn:
@@ -122,6 +127,7 @@ tags: [notificaciones]
     selected: true
 
 # ---------------------------------------------------------------- a row opens its link: the blocked piece
+# cubre: NOT-04
 - scrollUntilVisible:
     element:
       text: 'El verificador bloqueó la pieza del [0-9]{2}/[0-9]{2}'
@@ -180,6 +186,7 @@ tags: [notificaciones]
     id: unread-dot
 
 # ---------------------------------------------------------------- «Marcar todo como leído»
+# cubre: NOT-02, NOT-05
 - runFlow: comun/notificaciones-arriba.yaml
 - tapOn:
     id: notif-marcar-todo

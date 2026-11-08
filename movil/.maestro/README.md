@@ -14,6 +14,8 @@ Esta carpeta tiene los flujos de [Maestro](https://maestro.dev) que **usan la ap
 
 Android bloquea el HTTP sin cifrar en las builds release, y el backend del runner no tiene certificado. `app.config.js` añade `android:usesCleartextTraffic="true"` al manifiesto **solo cuando `OFFICE_QA_BUILD=1`**, y esa variable solo la pone este workflow. Los perfiles de EAS (`eas.json`) no la definen: el APK y el AAB de producción siguen aceptando solo HTTPS.
 
+La misma condición apaga `updates.enabled`: el APK del emulador ejecuta el JS que lleva dentro y nunca consulta el servidor de actualizaciones de Expo al arrancar. Fuera de la QA la configuración nativa no cambia, así que la huella (`runtimeVersion: fingerprint`) de las builds de producción es la misma.
+
 Se eligió una release con el JS empaquetado, en vez de una build debug, para probar lo mismo que se instala en el teléfono: Hermes, R8, sin Metro y sin el menú de desarrollo.
 
 ## Lanzar una QA

@@ -1,3 +1,4 @@
+# cubre: PRS-01, PRS-02, PRS-03, PRS-05, PRS-07, PRS-08, PRS-12
 # Personas. Barrio: the stage chips filter the list (Por clasificar → Pedro Salazar, Encaja → Laura Gómez, Te invitó →
 # Natalia Rojas, at the end of the strip) and the search box too («Pedro», then «Laura»); Laura's card shows her name,
 # stage, next step, journey and history, and takes a written note. Oportunidades: Valentina Castro moves from
@@ -29,6 +30,7 @@ tags: [personas]
 - takeScreenshot: 09-personas-01-barrio
 
 # ---------------------------------------------------------------- Barrio: the stage chips
+# cubre: PRS-01, PRS-02
 - tapOn:
     text: "Por clasificar( · \\d+)?"
     childOf:
@@ -94,6 +96,7 @@ tags: [personas]
       id: stage-chips
 
 # ---------------------------------------------------------------- Barrio: the search box (no stage filter now)
+# cubre: PRS-02
 - tapOn:
     id: barrio-search
 - inputText: "Pedro"
@@ -116,6 +119,7 @@ tags: [personas]
 - takeScreenshot: 09-personas-06-buscar-laura
 
 # ---------------------------------------------------------------- Laura's card
+# cubre: PRS-03, PRS-05
 - tapOn: "Laura Gómez"
 - extendedWaitUntil:
     visible:
@@ -225,6 +229,7 @@ tags: [personas]
     id: barrio-list
 
 # ---------------------------------------------------------------- Oportunidades: change a stage with the selector
+# cubre: PRS-07, PRS-08
 - tapOn: "Oportunidades"
 - extendedWaitUntil:
     visible:
@@ -320,6 +325,7 @@ tags: [personas]
 - takeScreenshot: 09-personas-14-movida-guardada
 
 # ---------------------------------------------------------------- Referentes: the add form validates before sending
+# cubre: PRS-12
 - scrollUntilVisible:
     element:
       text: "Referentes"

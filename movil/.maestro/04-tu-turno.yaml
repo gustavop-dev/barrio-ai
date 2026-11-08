@@ -1,3 +1,4 @@
+# cubre: TUR-01, TUR-02, TUR-04, TUR-07, TUR-08, TUR-09, TUR-11, TUR-15, TUR-19, INB-03, INB-04, SEM-08
 # Tu turno: what only Gustavo can resolve. The urgent «¿Salió o no?» card (shown as «Comprueba si salió tu
 # comentario»), Sofía's conversation and the team's questions; then resolving them the four ways the screen
 # offers: a swipe right that asks for a note in a sheet, a written answer, a swipe right that runs at once,
@@ -12,6 +13,7 @@ tags: [turno]
 - runFlow: comun/entrar.yaml
 
 # ---------------------------------------------------------------- the top bar counter, then the screen
+# cubre: TUR-01, TUR-02
 - extendedWaitUntil:
     visible:
       id: turn-counter
@@ -29,6 +31,7 @@ tags: [turno]
     timeout: 30000
 
 # URGENTE: the uncertain INT-03 comment with its two answers (both ask what Gustavo checked).
+# cubre: TUR-04
 - extendedWaitUntil:
     visible: 'Comprueba si salió tu comentario|¿Salió o no\?'
     timeout: 30000
@@ -43,6 +46,7 @@ tags: [turno]
 - takeScreenshot: 04-turno-01-urgente
 
 # IMPORTANTE: the dated question first (it has a deadline), then Sofía's conversation with her latest message.
+# cubre: TUR-07, INB-03
 - scrollUntilVisible:
     element:
       text: 'Importante · 2'
@@ -70,6 +74,7 @@ tags: [turno]
 - takeScreenshot: 04-turno-02-conversacion
 
 # CUANDO PUEDAS: the choice and yes/no questions with their answer forms, and the weekly orientation.
+# cubre: TUR-08, SEM-08
 # Their order depends on creation times, so each search starts again from the top.
 - runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
@@ -105,6 +110,7 @@ tags: [turno]
 - takeScreenshot: 04-turno-04-cuando-puedas
 
 # ---------------------------------------------------------------- swipe right on the urgent card
+# cubre: TUR-04, TUR-19
 # Its primary action «Sí, se aplicó» needs a note: the swipe opens the confirmation sheet and the card springs back.
 - runFlow: comun/turno-arriba.yaml
 - swipe:
@@ -143,6 +149,7 @@ tags: [turno]
     timeout: 15000
 
 # ---------------------------------------------------------------- answer the text question
+# cubre: TUR-09
 # The free-text field is the only answer field whose testID is «answer-<uuid>» (no «submit»/«fix» in it).
 - runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
@@ -192,6 +199,7 @@ tags: [turno]
     timeout: 15000
 
 # ---------------------------------------------------------------- swipe right on the conversation
+# cubre: TUR-19, INB-04
 # Right runs its first request action, «Hecho, respondí» (no note): the card flies off and does not come back.
 - runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
@@ -218,6 +226,7 @@ tags: [turno]
     timeout: 15000
 
 # ---------------------------------------------------------------- swipe left on the choice question: «Más tarde»
+# cubre: TUR-11, TUR-19
 - runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
     element:
@@ -243,6 +252,7 @@ tags: [turno]
     timeout: 15000
 
 # ---------------------------------------------------------------- «Más tarde» with the button on the yes/no question
+# cubre: TUR-11
 # It is the last open question, so its «Más tarde» is the only one on the list.
 - runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
@@ -266,6 +276,7 @@ tags: [turno]
     timeout: 20000
 
 # ---------------------------------------------------------------- «Pospuestas»: the seeded one and the two sent there
+# cubre: TUR-11
 - scrollUntilVisible:
     element:
       id: pospuestas
@@ -300,6 +311,7 @@ tags: [turno]
     timeout: 20000
 
 # ---------------------------------------------------------------- «Lo que el equipo sabe de ti»
+# cubre: TUR-15
 # The answer just given is the newest fact (first); the seeded ones follow.
 - runFlow: comun/turno-arriba.yaml
 - tapOn: 'Lo que el equipo sabe de ti'

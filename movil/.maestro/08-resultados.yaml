@@ -1,3 +1,4 @@
+# cubre: RES-01, RES-05, SEM-05, SEM-06, CAL-07
 # Resultados. The weekly summary: the analyst's lists and proposed orientation, the previous weeks fold, «Usar como
 # orientación» then «Deshacer» and «Descartar» then «Deshacer» (the card says what was decided, and the buttons come
 # back). «Periodo» 7 / 90 / 28 días: the period note and the impressions chart change with it (28 días has the posts
@@ -33,6 +34,7 @@ tags: [resultados]
 - takeScreenshot: 08-resultados-01-resumen
 
 # ---------------------------------------------------------------- the weekly summary
+# cubre: SEM-05, SEM-06
 - scrollUntilVisible:
     element:
       text: "Prioriza posts sobre cómo validar un MVP.*"
@@ -144,6 +146,7 @@ tags: [resultados]
 - takeScreenshot: 08-resultados-05-descarte-deshecho
 
 # ---------------------------------------------------------------- Periodo: 28 días (default), 7, 90 and back to 28
+# cubre: RES-01, RES-05
 - scrollUntilVisible:
     element:
       id: res-periodo
@@ -208,6 +211,7 @@ tags: [resultados]
     timeout: 20000
 
 # ---------------------------------------------------------------- the impressions chart: its ⓘ and a bar
+# cubre: RES-05, CAL-07
 - scrollUntilVisible:
     element:
       text: "Definición de Impresiones por post.*"

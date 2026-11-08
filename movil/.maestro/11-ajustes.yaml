@@ -1,3 +1,4 @@
+# cubre: AJU-04, AJU-11, PUS-04, ACC-08, ACC-09
 # Ajustes: every section top to bottom (its heading on screen), Autonomía y límites unfolded, one push type
 # switched off in Notificaciones, the devices list (the seeded «Pixel 7 de Gustavo (QA)» and this phone), and
 # finally «Cerrar sesión», which lands on the login. This flow runs last, so signing out is fine.
@@ -18,6 +19,7 @@ tags: [ajustes]
     selected: true
 
 # ---------------------------------------------------------------- Máquina (not paused in the seed)
+# cubre: AJU-11
 - extendedWaitUntil:
     visible: "MÁQUINA"
     timeout: 20000
@@ -41,6 +43,7 @@ tags: [ajustes]
 - takeScreenshot: 11-ajustes-02-orientacion
 
 # ---------------------------------------------------------------- Autonomía y límites (folded)
+# cubre: AJU-04
 - scrollUntilVisible:
     element:
       text: "Autonomía y límites"
@@ -93,6 +96,7 @@ tags: [ajustes]
 - takeScreenshot: 11-ajustes-06-captura
 
 # ---------------------------------------------------------------- Notificaciones: one push type off
+# cubre: PUS-04
 # The heading is looked up inside its own section: the top bar's bell is also labelled «Notificaciones».
 - scrollUntilVisible:
     element:
@@ -138,6 +142,7 @@ tags: [ajustes]
 - takeScreenshot: 11-ajustes-08-push-apagada
 
 # ---------------------------------------------------------------- Dispositivos con la app
+# cubre: ACC-09
 - scrollUntilVisible:
     element:
       text: "DISPOSITIVOS CON LA APP"
@@ -165,6 +170,7 @@ tags: [ajustes]
 - takeScreenshot: 11-ajustes-10-sabe
 
 # ---------------------------------------------------------------- Sesión y Acerca de: sign out
+# cubre: ACC-08
 - scrollUntilVisible:
     element:
       text: "SESIÓN Y ACERCA DE"

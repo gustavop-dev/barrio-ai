@@ -1,3 +1,4 @@
+# cubre: ACC-06, OFI-09
 # Navegación: the shell. Every bottom-bar tab, the four top-bar accesses, Android back through the tab history
 # (backBehavior="history": each visit moves the tab to the end of the history, back pops it), a detail screen
 # (the person card) closed with its «‹ Personas», and the 0ff1ce signature back to the Oficina.
@@ -7,12 +8,21 @@ name: Navegación
 tags: [navegacion]
 ---
 - runFlow: comun/entrar.yaml
+# cubre: ACC-06 — opening the app again keeps the session: straight to the Oficina, no login.
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 45000
+- assertNotVisible:
+    id: login
 - assertVisible:
     id: tab-index
     selected: true
 - takeScreenshot: 02-navegacion-01-oficina
 
 # ---------------------------------------------------------------- bottom bar: Resultados, Personas, Galería, Oficina
+# cubre: OFI-09
 - tapOn:
     id: tab-resultados
 - extendedWaitUntil:
@@ -77,6 +87,7 @@ tags: [navegacion]
 - takeScreenshot: 02-navegacion-05-oficina-otra-vez
 
 # ---------------------------------------------------------------- top bar: Tu turno, Notificaciones, Calendario, Ajustes
+# cubre: OFI-09 (accesos de arriba)
 # They open with the push; the bottom bar stays and no bottom tab is selected.
 - tapOn:
     id: top-tu-turno
@@ -145,6 +156,7 @@ tags: [navegacion]
 - takeScreenshot: 02-navegacion-09-ajustes
 
 # ---------------------------------------------------------------- Android back through the tab history
+# cubre: OFI-09
 # History now: Resultados, Personas, Galería, Oficina, Tu turno, Notificaciones, Calendario, Ajustes.
 - back
 - extendedWaitUntil:

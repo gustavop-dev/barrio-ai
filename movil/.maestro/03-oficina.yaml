@@ -1,3 +1,4 @@
+# cubre: OFI-02, OFI-04, OFI-06
 # Oficina: a tap on a character of the Skia scene opens its sheet (SnapSheet), the sheet is dragged to full and
 # down to close; the team strip opens a team, a member of it and, scrolled sideways, the library; Android back
 # closes the sheet without leaving the Oficina.
@@ -24,6 +25,7 @@ tags: [oficina]
 - takeScreenshot: 03-oficina-01-escena
 
 # ---------------------------------------------------------------- a character in the scene
+# cubre: OFI-02, OFI-06
 # The canvas has no views per character, so the tap goes to a point of `office-scene` (absolute px inside the
 # element, Maestro's element-relative point). On the 390 dp screen at 3x the plan (192x336 logical px) is drawn
 # at 2x, centred: 3 dp of margin, no vertical offset while nothing is selected or panned. The target is
@@ -79,6 +81,7 @@ tags: [oficina]
 - takeScreenshot: 03-oficina-04-ficha-cerrada
 
 # ---------------------------------------------------------------- the team strip
+# cubre: OFI-04
 - tapOn:
     id: team-chip-estrategia
 - extendedWaitUntil:

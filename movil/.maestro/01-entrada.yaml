@@ -1,3 +1,4 @@
+# cubre: ACC-02, ACC-10, APP-01, APP-02
 # Login: a wrong password shows the error; the right one plays the entrance and lands in Oficina.
 appId: co.projectapp.office
 name: Entrada
@@ -13,6 +14,7 @@ tags: [entrada]
     timeout: 60000
 - assertVisible: Entrar
 - takeScreenshot: 01-entrada-01-pantalla
+# cubre: ACC-02 (login de la app)
 - tapOn:
     id: login-usuario
 - inputText: ${QA_USER}
@@ -56,6 +58,7 @@ tags: [entrada]
 - tapOn:
     id: login-entrar
 # The entrance: the door opens and the picture zooms into the live Oficina.
+# cubre: ACC-10
 - takeScreenshot: 01-entrada-05-puerta
 - extendedWaitUntil:
     visible:

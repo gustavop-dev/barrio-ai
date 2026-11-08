@@ -1,3 +1,4 @@
+# cubre: CAP-01, CAP-02, CAP-03, CAP-04, CAP-05, CAP-08, CAP-10, CAP-11, CAP-13, CAP-14
 # Captura: the raised aguamarina button in the centre of the bottom bar. A tap opens the sheet (note,
 # «Para qué es», recording from the sheet); closing it with something written asks «¿Cerrar sin enviar?»;
 # holding the button records; and a capture sent to the team shows in «Lo que enviaste» with its state and
@@ -24,6 +25,7 @@ tags: [captura]
       - takeScreenshot: 05-captura-01-pista-primer-uso
 
 # ---------------------------------------------------------------- a tap opens the sheet
+# cubre: CAP-01, CAP-08
 - tapOn:
     id: capture-button
 - extendedWaitUntil:
@@ -105,6 +107,7 @@ tags: [captura]
       - takeScreenshot: 05-captura-04-microfono-sin-permiso
 
 # ---------------------------------------------------------------- closing with something unsent asks first
+# cubre: CAP-14
 - tapOn:
     id: capture-cerrar
 - extendedWaitUntil:
@@ -122,6 +125,7 @@ tags: [captura]
     id: capture-button
 
 # ---------------------------------------------------------------- holding the button records
+# cubre: CAP-02, CAP-13
 # The recording starts after 220 ms of hold; longPressOn holds about 3 s and releases, which ends it and opens
 # the sheet with the audio ready (never sent alone). If the microphone could not start, the sheet opens with
 # «No se pudo usar el micrófono» instead. The hold overlay (time strip, lock, trash) only shows while the
@@ -171,6 +175,7 @@ tags: [captura]
     timeout: 15000
 
 # ---------------------------------------------------------------- send a note to the team
+# cubre: CAP-03, CAP-08
 - tapOn:
     id: capture-button
 - extendedWaitUntil:
@@ -211,6 +216,7 @@ tags: [captura]
     timeout: 15000
 
 # ---------------------------------------------------------------- «Lo que enviaste»
+# cubre: CAP-11, CAP-10
 - tapOn:
     id: capture-button
 - extendedWaitUntil:
@@ -271,3 +277,107 @@ tags: [captura]
 - assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
 - assertVisible: 'Usada en la pieza del .*'
 - takeScreenshot: 05-captura-12-historial-semilla
+
+# ---------------------------------------------------------------- a capture with a photo from the phone
+# cubre: CAP-05
+# correr-maestro.sh puts a picture in the emulator's Pictures (one of the seeded gallery PNGs). «Galería» opens
+# Android's photo picker; the picture comes back as a thumbnail and travels with the capture (multipart upload).
+- tapOn: 'Volver a la captura'
+- extendedWaitUntil:
+    visible:
+      id: capture-galeria
+    timeout: 15000
+- tapOn:
+    id: capture-galeria
+- extendedWaitUntil:
+    visible: '(Photo|Foto).*'
+    timeout: 25000
+- takeScreenshot: 05-captura-13-selector-de-fotos
+# The newest picture is the first cell of the grid. Its description is «Photo taken on …» on current pickers.
+- runFlow:
+    when:
+      visible: 'Photo taken on.*'
+    commands:
+      - tapOn:
+          text: 'Photo taken on.*'
+          index: 0
+- runFlow:
+    when:
+      notVisible: 'Photo taken on.*'
+    commands:
+      - tapOn:
+          point: '17%,25%'
+# With several photos allowed the picker asks to confirm the selection.
+- runFlow:
+    when:
+      visible: '(Add|Agregar|Añadir)( \(1\))?'
+    commands:
+      - tapOn: '(Add|Agregar|Añadir)( \(1\))?'
+- extendedWaitUntil:
+    visible:
+      id: capture-fotos
+    timeout: 25000
+- takeScreenshot: 05-captura-14-foto-adjunta
+- tapOn:
+    id: capture-note
+- inputText: Foto de QA de la pizarra
+- tapOn: 'A[ñÑ]adir una imagen'
+- scrollUntilVisible:
+    element:
+      id: capture-send
+    direction: DOWN
+    timeout: 15000
+- tapOn:
+    id: capture-send
+- extendedWaitUntil:
+    visible: 'Enviado al equipo\.'
+    timeout: 45000
+- assertNotVisible:
+    id: capture-send-error
+- takeScreenshot: 05-captura-15-foto-enviada
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- a voice note sent to the team
+# cubre: CAP-04
+# Hold the button again and send what it recorded. On this emulator (-noaudio) the microphone either records
+# silence or does not start: if the audio comes back it is sent and must reach the team (multipart upload with
+# the audio file); if not, the screenshot shows why. Nothing is faked.
+- longPressOn:
+    id: capture-button
+- extendedWaitUntil:
+    visible:
+      id: capture-sheet
+    timeout: 20000
+- extendedWaitUntil:
+    visible: 'Escuchar el audio|No se pudo usar el micrófono|Para grabar, 0ff1ce necesita el micrófono|El micrófono está bloqueado|Grabar un audio'
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: capture-audio
+    commands:
+      - takeScreenshot: 05-captura-16-audio-listo
+      - scrollUntilVisible:
+          element:
+            id: capture-send
+          direction: DOWN
+          timeout: 15000
+      - tapOn:
+          id: capture-send
+      - extendedWaitUntil:
+          visible: 'Enviado al equipo\.'
+          timeout: 45000
+      - assertNotVisible:
+          id: capture-send-error
+      - takeScreenshot: 05-captura-17-audio-enviado
+- runFlow:
+    when:
+      notVisible:
+        id: capture-audio
+    commands:
+      - takeScreenshot: 05-captura-16-sin-audio
+      - tapOn:
+          id: capture-cerrar

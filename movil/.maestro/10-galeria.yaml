@@ -1,3 +1,4 @@
+# cubre: GAL-01, GAL-03, GAL-04, GAL-06
 # Galería: the grid of the seeded photos and a filter; the photo sheet of «Nueva» (note typed and saved, the
 # AI-edit switch turned off, both still there when it opens again); the full-screen viewer closed by dragging
 # the photo down, and by «Cerrar» after swiping to the next photo (the sheet then follows that photo).
@@ -27,6 +28,7 @@ tags: [galeria]
 - takeScreenshot: 10-galeria-01-rejilla
 
 # ---------------------------------------------------------------- a filter
+# cubre: GAL-01
 - tapOn:
     id: filtro-publicadas
 - extendedWaitUntil:
@@ -45,6 +47,7 @@ tags: [galeria]
     timeout: 15000
 
 # ---------------------------------------------------------------- the photo sheet: note and AI switch
+# cubre: GAL-03, GAL-04
 - tapOn: "Foto.*, nueva"
 - extendedWaitUntil:
     visible:
@@ -117,6 +120,7 @@ tags: [galeria]
 - takeScreenshot: 10-galeria-06-nota-guardada
 
 # ---------------------------------------------------------------- the viewer
+# cubre: GAL-06
 # Drag the photo down to close it: back to the same sheet.
 - tapOn:
     id: photo-sheet-image

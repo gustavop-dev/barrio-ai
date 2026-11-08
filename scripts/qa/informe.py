@@ -17,6 +17,9 @@ APP = 'co.projectapp.office'
 LINE = re.compile(r'^\d\d-\d\d \d\d:\d\d:\d\d\.\d+\s+(\d+)\s+(\d+)\s+([VDIWEFA])\s+(.*?)\s*: (.*)$')
 START = re.compile(r'Start proc (\d+):' + re.escape(APP) + r'[/ ]')
 CRASH = re.compile(r'FATAL EXCEPTION|Fatal signal \d+|ANR in ' + re.escape(APP) + r'|Process ' + re.escape(APP) + r' \(pid \d+\) has died|Force finishing activity ' + re.escape(APP))
+FLOWS = Path(__file__).resolve().parents[2] / 'movil' / '.maestro'
+COVERS = re.compile(r'^# cubre:\s*(.+)$')
+FEATURE = re.compile(r'\b[A-Z]{3}(?:-[A-Z]{3})?-\d{2}\b')
 ERROR_TAGS = {'ReactNativeJS', 'ReactNative', 'AndroidRuntime', 'unknown:ReactNative', 'Expo', 'ExpoModulesCore', 'libc', 'DEBUG', 'CRASH'}
 
 
@@ -47,7 +50,22 @@ def read_flows(out):
                 lines = [l for l in log.read_text(errors='replace').splitlines() if l.strip()]
                 flow['failure'] = next((l for l in reversed(lines) if 'FAILED' in l or 'Error' in l or 'failed' in l), lines[-1] if lines else '')
         flow['ok'] = flow['code'] == 0
+        flow['covers'] = covered(flow['name'])
     return flows
+
+
+def covered(name):
+    """Feature IDs of docs/funcionalidades a flow declares in its header (`# cubre: CAP-01, CAP-02`)."""
+    path = FLOWS / f'{name}.yaml'
+    if not path.exists():
+        return []
+    for line in path.read_text().splitlines():
+        if line.strip() == '---':
+            break
+        m = COVERS.match(line)
+        if m:
+            return FEATURE.findall(m.group(1))
+    return []
 
 
 def split_logcat(out):
@@ -95,7 +113,7 @@ def write_html(out, flows, logcat, api):
     videos = sorted(p.name for p in (out / 'videos').glob('*.mp4')) if (out / 'videos').exists() else []
     rows = ''.join(
         f"<tr class=\"{'ok' if f['ok'] else 'ko'}\"><td>{html.escape(f['name'])}</td><td>{'pasa' if f['ok'] else 'falla'}</td>"
-        f"<td>{f['seconds']} s</td><td><pre>{html.escape(f['failure'])}</pre></td></tr>" for f in flows)
+        f"<td>{f['seconds']} s</td><td>{html.escape(', '.join(f['covers']))}</td><td><pre>{html.escape(f['failure'])}</pre></td></tr>" for f in flows)
     def gallery(prefix):
         items = [s for s in shots if s.startswith(prefix[:2] + '-')]
         items += [s for s in fails if s.startswith(prefix + '--')]
@@ -111,7 +129,7 @@ body{{font:15px/1.45 system-ui,sans-serif;margin:16px;color:#1d1d1b;background:#
 td,th{{border:1px solid #ccc;padding:4px 8px;vertical-align:top;text-align:left}}tr.ok td:nth-child(2){{color:#00715e}}tr.ko td:nth-child(2),.ko{{color:#b3261e;font-weight:700}}
 pre{{white-space:pre-wrap;margin:0;font-size:12px}}.g{{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:12px}}
 figure{{margin:0}}img{{width:100%;border:1px solid #ccc}}figcaption{{font-size:12px;word-break:break-all}}</style>
-<h1>QA móvil</h1><table><tr><th>Flujo</th><th>Resultado</th><th>Duración</th><th>Fallo</th></tr>{rows}</table>
+<h1>QA móvil</h1><table><tr><th>Flujo</th><th>Resultado</th><th>Duración</th><th>Cubre</th><th>Fallo</th></tr>{rows}</table>
 {crash}<p>Errores de ReactNativeJS en logcat: {logcat['js_errors']} · API: {api['5xx']} respuestas 5xx, {api['429']} respuestas 429, {api['traceback']} tracebacks.</p>
 {body}</html>"""
     (out / 'informe.html').write_text(page)
@@ -130,12 +148,18 @@ def main():
     lines = ['## QA móvil', '',
              f"**{passed} de {len(flows)} flujos pasan** · crash: **{'sí' if logcat['crash'] else 'no'}** · "
              f"errores ReactNativeJS: {logcat['js_errors']} · API: {api['5xx']}×5xx, {api['429']}×429 · {total // 60} min de flujos", '',
-             '| Flujo | Resultado | Duración | Motivo |', '|---|---|---|---|']
+             '| Flujo | Resultado | Duración | Cubre | Motivo |', '|---|---|---|---|---|']
     for f in flows:
         reason = f['failure'].replace('\n', ' ').replace('|', '\\|')[:220]
-        lines.append(f"| `{f['name']}` | {'✅ pasa' if f['ok'] else '❌ falla'} | {f['seconds']} s | {reason} |")
+        lines.append(f"| `{f['name']}` | {'✅ pasa' if f['ok'] else '❌ falla'} | {f['seconds']} s | {', '.join(f['covers'])} | {reason} |")
     if not flows:
-        lines.append('| — | no se ejecutó ningún flujo | — | — |')
+        lines.append('| — | no se ejecutó ningún flujo | — | — | — |')
+    good = sorted({i for f in flows if f['ok'] for i in f['covers']})
+    bad = sorted({i for f in flows if not f['ok'] for i in f['covers']})
+    if flows:
+        lines += ['', f"**Funciones del catálogo (`docs/funcionalidades/`) cubiertas: {len(set(good) | set(bad))}**",
+                  f"- en flujos que pasan ({len(good)}): {', '.join(good) or '—'}",
+                  f"- en flujos que fallan ({len(bad)}): {', '.join(bad) or '—'}"]
     if logcat['crash']:
         lines += ['', '<details><summary>Crash en logcat</summary>', '', '```', *logcat['crashes'][:10], '```', '</details>']
     if not logcat['present']:
