@@ -49,6 +49,41 @@ export function stackOf(root: unknown, key: string): { routes: readonly { key: s
   return undefined;
 }
 
+/** What «‹» says for each screen it can go back to: the tabs by name, a detail by its kind. */
+const BACK_LABEL: Record<string, string> = {
+  index: 'Oficina',
+  'tu-turno': 'Tu turno',
+  notificaciones: 'Notificaciones',
+  calendario: 'Calendario',
+  ajustes: 'Ajustes',
+  resultados: 'Resultados',
+  personas: 'Personas',
+  galeria: 'Galería',
+  'calendario/pieza/[id]': 'Pieza',
+  'personas/[id]': 'Persona',
+};
+
+interface NamedStack {
+  routes: readonly { key: string; name?: string; state?: { index?: number; routes?: readonly { name?: string }[] } }[];
+}
+
+/**
+ * The label of «‹» on the detail `key`: the screen it goes back to (the focused tab under it, or the detail it was
+ * opened from), so a piece opened from Tu turno says «‹ Tu turno», not «‹ Calendario». Without a screen underneath
+ * «‹» goes to `fallback`'s section, whose name is `fallback`.
+ */
+export function backLabel(stack: NamedStack | undefined, key: string, fallback: string): string {
+  const index = stack?.routes.findIndex((route) => route.key === key) ?? -1;
+  const previous = index > 0 ? stack!.routes[index - 1] : undefined;
+  if (!previous?.name) return fallback;
+  if (previous.name === '(tabs)') {
+    const tabs = previous.state;
+    const focused = tabs?.routes?.[tabs.index ?? 0]?.name;
+    return (focused && BACK_LABEL[focused]) || fallback;
+  }
+  return BACK_LABEL[previous.name] ?? fallback;
+}
+
 /** The root view of the screen at `level`, so a flight can measure a row against its resting place. */
 export function registerLayer(level: number, node: unknown): () => void {
   layers.set(level, node);

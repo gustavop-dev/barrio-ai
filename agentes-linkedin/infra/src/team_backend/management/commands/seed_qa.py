@@ -308,7 +308,9 @@ class Command(BaseCommand):
             ages=[('24h',timedelta(hours=24),0.45),('72h',timedelta(hours=72),0.8)]+([('7d',timedelta(days=7),1.0)] if key=='publicada8' else [])
             for kind,age,share in ages:
                 PostMetric.objects.create(id=uid(f'metric:{key}:{kind}'),piece=piece,provider_post_id=f'qa-{key}',share_url=f'{FAKE_URL}/feed/update/qa-{key}',kind=kind,
-                    impressions=int(impressions*share),reactions=int(42*share),comments=int(11*share),reposts=int(3*share),published_at=started,captured_at=started+age+timedelta(minutes=20),
+                    impressions=int(impressions*share),reactions=int(42*share),comments=int(11*share),published_at=started,
+                    # A reading that did not return the reposts (CAL-07, RES-06: «—», never 0).
+                    reposts=None if (key,kind)==('publicada3','72h') else int(3*share),captured_at=started+age+timedelta(minutes=20),
                     commenters=[{'provider_user_id':'qa-user-andres-restrepo','name':'Andrés Restrepo','substantive':True,'role':'comprador','fit':True},
                                 {'provider_user_id':'qa-user-pedro-salazar','name':'Pedro Salazar','substantive':False,'role':'par','fit':False}])
 
@@ -365,6 +367,12 @@ class Command(BaseCommand):
                         external_url=people[handle].profile_url,key=f'red:{handle}:{capability}')
         self.action(p[7],'INT-03',{'text':'La demo de los viernes cambia quién se siente dueño del producto.'},'failed',
                     created=self.at(-6,11),decided=self.at(-6,11,10),executed=self.at(-6,11,20),key='comentario:fallido')
+        # «En cola» (Calendario › Lista and the day panel, CAL-04 and CAL-13): approved, waiting for the window or the
+        # spacing, each with its Vetar. Nothing executes them in the QA world (no worker runs).
+        self.action(p[5],'INT-02',{'reaction':'linkedin_celebrate'},'approved',created=self.ago(hours=1,minutes=30),decided=self.ago(hours=1),
+                    rationale='Una práctica de contratación que encaja con el pilar de equipo.',key='cola:reaccion')
+        self.action(people['camila-ortiz'],'RED-02',{},'approved',created=self.ago(hours=2,minutes=30),decided=self.ago(hours=2),
+                    rationale='Terminó la espera tras seguirla: invitación sin nota.',key='cola:red02:camila')
 
     def opportunities(self):
         def opportunity(key,stage,modality,contact=None,person='',company='',created_days=20,steps=(),next_action='',next_at=None,need=''):

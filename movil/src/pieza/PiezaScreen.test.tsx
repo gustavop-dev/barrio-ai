@@ -9,7 +9,7 @@ import '@/api/transport';
 import { flushVetoes } from '@/calendario/pendingVeto';
 import { useCaptureSheet } from '@/capture/store';
 import { renderApp } from '@/test/render';
-import { fakeServer, type FakeReply } from '@/test/server';
+import { fakeServer, type FakeHandler, type FakeReply } from '@/test/server';
 import * as motion from '@/theme/motion';
 import { PiezaScreen } from './PiezaScreen';
 
@@ -37,7 +37,7 @@ const SCHEDULED = piece({
   external_url: null,
 });
 
-function server(detail: PieceDetailFull | FakeReply, extra: Record<string, FakeReply> = {}) {
+function server(detail: PieceDetailFull | FakeReply, extra: Record<string, FakeHandler> = {}) {
   const id = 'id' in detail ? detail.id : 'p7';
   return fakeServer({
     'GET /api/v1/operador/overview': { body: shellOverview() },
@@ -272,6 +272,8 @@ describe('Detalle de una pieza · veto con «Deshacer»', () => {
     await fireEvent.press(screen.getByText('Vetar'));
     const confirm = await screen.findByTestId('confirm-sheet');
     expect(within(confirm).getByText('Vetar la pieza')).toBeOnTheScreen();
+    // Why «Vetar» does nothing yet: the note is marked as required, as in the PWA.
+    expect(within(confirm).getByText('Nota · obligatoria')).toBeOnTheScreen();
     const send = within(confirm).getAllByText('Vetar').at(-1)!;
     await fireEvent.press(send);
     expect(screen.getByTestId('confirm-sheet')).toBeOnTheScreen();
@@ -296,6 +298,27 @@ describe('Detalle de una pieza · veto con «Deshacer»', () => {
     await fireEvent.press(within(confirm).getAllByText('Vetar').at(-1)!);
     await waitFor(() => expect(api.find('POST', '/api/v1/operador/actions/act-8/reject')[0]?.body).toEqual({ note: 'No es el momento' }));
     await waitFor(() => expect(api.find('GET', '/api/v1/editorial/pieces/p8').length).toBeGreaterThan(1));
+  });
+
+  // E2E wave, E4 bug 1: the veto had its own 5 s timer, started before its toast appeared, so «Deshacer» was still on
+  // screen when the veto had already gone (tapping it then said «El veto ya se había enviado»).
+  it('sends the veto only once its «Deshacer» has left the screen', async () => {
+    jest.replaceProperty(motion.toastDurations as { withUndo: number }, 'withUndo', 30);
+    const undoOnScreenAtSend: boolean[] = [];
+    const api = server(SCHEDULED, {
+      'POST /api/v1/operador/actions/act-8/reject': () => {
+        undoOnScreenAtSend.push(screen.queryByText('Deshacer') !== null);
+        return { body: {} };
+      },
+    });
+    await renderPieza('p8');
+    await fireEvent.press(await screen.findByText('Vetar'));
+    const confirm = await screen.findByTestId('confirm-sheet');
+    await fireEvent.changeText(within(confirm).getByTestId('confirm-note'), 'No es el momento');
+    await fireEvent.press(within(confirm).getAllByText('Vetar').at(-1)!);
+    expect(within(await screen.findByTestId('toast')).getByText('Deshacer')).toBeOnTheScreen();
+    await waitFor(() => expect(api.find('POST', '/api/v1/operador/actions/act-8/reject')).toHaveLength(1));
+    expect(undoOnScreenAtSend).toEqual([false]);
   });
 
   it('sends a pending veto at once when the app goes to the background', async () => {

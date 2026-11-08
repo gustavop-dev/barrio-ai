@@ -22,7 +22,7 @@ export function VetoButton({ target, block = false, size, accessibilityHint }: {
   const confirm = (note: string) => {
     setOpen(false);
     haptic('actionSuccess');
-    const undo = scheduleVeto({
+    const veto = scheduleVeto({
       actionId: target.actionId,
       note,
       client,
@@ -32,10 +32,12 @@ export function VetoButton({ target, block = false, size, accessibilityHint }: {
         toast.show(`No se pudo vetar. ${errorMessage(error)}`, { tone: 'error' });
       },
     });
+    // The veto goes when this toast leaves the screen: «Deshacer» is never on screen once it has gone.
     toast.show('Vetada', {
       undo: () => {
-        toast.show(undo() ? 'Veto deshecho' : 'El veto ya se había enviado');
+        toast.show(veto.undo() ? 'Veto deshecho' : 'El veto ya se había enviado');
       },
+      onExpire: veto.send,
     });
   };
 

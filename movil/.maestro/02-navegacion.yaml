@@ -426,9 +426,9 @@ onFlowComplete:
     visible:
       id: detail-panel
     timeout: 30000
-# cubre: OFI-09.3 — a piece shows «‹ Calendario»
+# cubre: OFI-09.3 — «‹» names where it goes back to: opened over Tu turno, the piece shows «‹ Tu turno»
 - assertVisible:
-    text: Calendario
+    text: Tu turno
     childOf:
       id: top-volver
 - takeScreenshot: 02-navegacion-17-enlace-pieza
