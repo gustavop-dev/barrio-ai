@@ -1,6 +1,6 @@
 // «Lo que enviaste»: the capture history inside the sheet (Captura.dc.html, rev 18).
 import { useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { captureKeys, sameOrigin, undoCaptura, useCapturaLive, useCapturas, type CaptureOutput } from '../api/capturas';
 import { keys } from '../api/queryClient';
@@ -22,13 +22,26 @@ function Listen({ url }: { url: string }) {
   );
 }
 
+/** Re-renders when the 2 minutes of «Deshacer» run out, so the button goes away on time (CAP-10). */
+function useUndoClock(capture: CaptureOutput): number {
+  const [now, setNow] = useState(() => Date.now());
+  const until = capture.can_undo && capture.undo_until ? Date.parse(capture.undo_until) : NaN;
+  useEffect(() => {
+    const left = until - Date.now();
+    if (!(left > 0)) return;
+    const timer = setTimeout(() => setNow(Date.now()), left + 50);
+    return () => clearTimeout(timer);
+  }, [until]);
+  return now;
+}
+
 function CaptureCard({ initial, onNavigate }: { initial: CaptureOutput; onNavigate: () => void }) {
   const live = useCapturaLive(initial);
   const capture = live.data ?? initial;
   const client = useQueryClient();
   const toast = useToast();
   const [undoing, setUndoing] = useState(false);
-  const [now] = useState(() => Date.now());
+  const now = useUndoClock(capture);
   const contents = contentsOf(capture);
   const text = capture.transcript?.trim() ? `«${excerpt(capture.transcript, 240)}»` : capture.note?.trim() ? excerpt(capture.note, 240) : '';
   const noteToo = Boolean(capture.transcript?.trim() && capture.note?.trim());

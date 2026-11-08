@@ -287,6 +287,25 @@ tags: [personas]
 - assertNotVisible: "Julián Herrera"
 - assertNotVisible: "Pedro Salazar"
 - takeScreenshot: 09-personas-12-compradores
+# A card opened right after a sheet closed: every block must show, not only the header (its blocks used to fade in with
+# Reanimated `entering`, which after a Modal closes can stay at opacity 0; run 42486187324, 14-fichas).
+- tapOn: "Laura Gómez"
+- extendedWaitUntil:
+    visible:
+      id: persona-name
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "Head of Product en un marketplace B2B"
+    timeout: 15000
+- assertVisible: "Marcar como oportunidad"
+- assertVisible:
+    id: next-step
+- takeScreenshot: 09-personas-12b-ficha-tras-hoja
+- back
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 15000
 - tapOn: "Más filtros: rol, modalidad y origen \\(1 activo\\)"
 - extendedWaitUntil:
     visible:
@@ -502,14 +521,12 @@ tags: [personas]
       id: opportunity-form
     waitToSettleTimeoutMs: 500
 - takeScreenshot: 09-personas-19b-tras-registrar
-# KNOWN BUG (toast at sheet close): the toast shown as the opportunity form closes is often missing; it never shows on
-# the person card (screenshot right after the tap) and only sometimes on the board, like «Enviado al equipo.» in
-# 05-captura. It is checked as optional until the toast and sheet fix lands; what was saved is checked below.
-- assertVisible:
-    text: "Oportunidad registrada"
-    childOf:
-      id: toast
-    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Oportunidad registrada"
+      childOf:
+        id: toast
+    timeout: 15000
 - extendedWaitUntil:
     notVisible:
       id: opportunity-form

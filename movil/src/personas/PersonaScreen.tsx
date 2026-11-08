@@ -25,7 +25,7 @@ import { daysInStage, DISCARDABLE, longDate, messageWhen, personStage, shortDate
 import { router } from 'expo-router';
 import { useCallback, useEffect, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from 'react';
 import { Keyboard, KeyboardAvoidingView, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { useSession } from '@/auth/session';
 import { openCaptureSheet } from '@/capture/store';
 import { Icon } from '@/components/icons';
@@ -34,7 +34,7 @@ import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Avatar, Badge, Button, Card, ConfirmSheet, EmptyState, EmptyText, ErrorRetry, Field, LabelChip, Section, Skeleton, T, pageContent, useToast } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { isHttps } from '@/navigation';
-import { haptic, navLayout, useMotion } from '@/theme/motion';
+import { haptic, navTiming, navValues, useMotion } from '@/theme/motion';
 import { colors, radius, space, type as typeScale } from '@/theme/tokens';
 import { ConversationBlock } from './ConversationBlock';
 import { Journey } from './Journey';
@@ -60,6 +60,23 @@ function FlightName({ contactId, color, style, children }: { contactId: string; 
       <Animated.View style={hidden}>{children}</Animated.View>
     </View>
   );
+}
+
+/**
+ * MovDetalle: block `step` of the card fades in and rises, staggered after the push. A shared value, not Reanimated
+ * `entering`: a card opened after a sheet's Modal had closed stayed blank under its header, the blocks stuck at opacity 0
+ * (run 42486187324, 14-fichas: Pedro Salazar's card; E3 saw the same on Laura Gómez's). With reduced motion it is
+ * visible at once.
+ */
+function BlockIn({ step, style, children }: { step: number; style?: StyleProp<ViewStyle>; children: ReactNode }) {
+  const { reduced } = useMotion();
+  const shown = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    const config = navTiming('cardBlock');
+    shown.set(withDelay(navValues.cardBlockDelayMs + step * navValues.cardBlockStepMs, withTiming(1, config), config.reduceMotion));
+  }, [shown, step]);
+  const motion = useAnimatedStyle(() => ({ opacity: shown.value, transform: [{ translateY: (1 - shown.value) * navValues.cardBlockRise }] }));
+  return <Animated.View style={[style, motion]}>{children}</Animated.View>;
 }
 
 function NextStep({ contact }: { contact: Contact }) {
@@ -417,9 +434,9 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
           <View style={styles.head} testID="persona-head">
             <View style={styles.top}>
               <FlightAvatar contactId={contactId} name={name} />
-              <Animated.View entering={navLayout.cardBlock(0)}>
+              <BlockIn step={0}>
                 <Badge tone={stage.tone}>{stage.label}</Badge>
-              </Animated.View>
+              </BlockIn>
             </View>
             {profile ? (
               <Pressable accessibilityRole="link" accessibilityHint="Abre su perfil en LinkedIn" onPress={() => void Linking.openURL(profile)} style={styles.nameLink} testID="persona-name">
@@ -438,16 +455,16 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
               </FlightName>
             )}
             {person.headline || meta ? (
-              <Animated.View entering={navLayout.cardBlock(0)} style={styles.head}>
+              <BlockIn step={0} style={styles.head}>
                 {person.headline ? <T soft>{person.headline}</T> : null}
                 {meta ? (
                   <T variant="detalle" soft>
                     {meta}
                   </T>
                 ) : null}
-              </Animated.View>
+              </BlockIn>
             ) : null}
-            <Animated.View entering={navLayout.cardBlock(1)} style={styles.actions}>
+            <BlockIn step={1} style={styles.actions}>
               {profile ? (
                 <Button variant="primary" block icon={<Icon name="external" size={20} color={colors.onBrand} />} accessibilityHint="Se abre en LinkedIn" onPress={() => void Linking.openURL(profile)}>
                   Abrir en LinkedIn
@@ -463,18 +480,18 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
                   Descartar
                 </Button>
               ) : null}
-            </Animated.View>
+            </BlockIn>
           </View>
 
           {contact.isError ? <ErrorRetry title="No se pudo actualizar la ficha" error={contact.error} onRetry={() => void contact.refetch()} /> : null}
 
           {nextStepView(person) ? (
-            <Animated.View entering={navLayout.cardBlock(2)}>
+            <BlockIn step={2}>
               <NextStep contact={person} />
-            </Animated.View>
+            </BlockIn>
           ) : null}
 
-          <Animated.View entering={navLayout.cardBlock(3)} style={styles.rest}>
+          <BlockIn step={3} style={styles.rest}>
             <Section label="Recorrido">
               <Journey stages={journey(person)} label={`Recorrido de ${name}`} />
             </Section>
@@ -500,7 +517,7 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
             <Section label="Historial completo">
               <History contact={person} />
             </Section>
-          </Animated.View>
+          </BlockIn>
         </ScrollView>
       </KeyboardAvoidingView>
 

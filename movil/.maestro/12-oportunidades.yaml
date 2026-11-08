@@ -414,14 +414,12 @@ tags: [personas, oportunidades]
       id: opportunity-form
     waitToSettleTimeoutMs: 500
 - takeScreenshot: 12-oportunidades-12b-tras-registrar
-# KNOWN BUG (toast at sheet close): the toast shown as the opportunity form closes is often missing; it never shows on
-# the person card (screenshot right after the tap) and only sometimes on the board, like «Enviado al equipo.» in
-# 05-captura. It is checked as optional until the toast and sheet fix lands; what was saved is checked below.
-- assertVisible:
-    text: "Oportunidad registrada"
-    childOf:
-      id: toast
-    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Oportunidad registrada"
+      childOf:
+        id: toast
+    timeout: 15000
 - extendedWaitUntil:
     notVisible:
       id: opportunity-form
@@ -475,14 +473,12 @@ tags: [personas, oportunidades]
       id: opportunity-form
     waitToSettleTimeoutMs: 500
 - takeScreenshot: 12-oportunidades-13b-tras-guardar
-# KNOWN BUG (toast at sheet close): the toast shown as the opportunity form closes is often missing; it never shows on
-# the person card (screenshot right after the tap) and only sometimes on the board, like «Enviado al equipo.» in
-# 05-captura. It is checked as optional until the toast and sheet fix lands; what was saved is checked below.
-- assertVisible:
-    text: "Cambios guardados"
-    childOf:
-      id: toast
-    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Cambios guardados"
+      childOf:
+        id: toast
+    timeout: 15000
 - extendedWaitUntil:
     notVisible:
       id: opportunity-form
@@ -527,14 +523,12 @@ tags: [personas, oportunidades]
     childOf:
       id: opportunity-form
     waitToSettleTimeoutMs: 500
-# KNOWN BUG (toast at sheet close): the toast shown as the opportunity form closes is often missing; it never shows on
-# the person card (screenshot right after the tap) and only sometimes on the board, like «Enviado al equipo.» in
-# 05-captura. It is checked as optional until the toast and sheet fix lands; what was saved is checked below.
-- assertVisible:
-    text: "Oportunidad eliminada"
-    childOf:
-      id: toast
-    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Oportunidad eliminada"
+      childOf:
+        id: toast
+    timeout: 15000
 - extendedWaitUntil:
     notVisible:
       id: opportunity-form

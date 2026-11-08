@@ -21,6 +21,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { haptic, rubberBand, sheetMotion, spring } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
+import { ToastOutlet } from './Toast';
 
 /**
  * MovHojas: where a released sheet goes. `position` and the `snaps` share one unit (a fraction of the
@@ -203,6 +204,7 @@ export function Sheet({ label, onClose, children, header, suspended, canClose, o
       <SheetFrameContext.Provider value={frame}>
         <GestureHandlerRootView
           style={styles.root}
+          testID={testID ? `${testID}-modal` : undefined}
           onLayout={(event) => {
             width.set(event.nativeEvent.layout.width);
             rootHeight.set(event.nativeEvent.layout.height);
@@ -252,6 +254,8 @@ export function Sheet({ label, onClose, children, header, suspended, canClose, o
               {overlay}
             </View>
           ) : null}
+          {/* A toast shown while this sheet is open is drawn here, in its window: in the app's it would sit under it. */}
+          <ToastOutlet />
         </GestureHandlerRootView>
       </SheetFrameContext.Provider>
     </Modal>

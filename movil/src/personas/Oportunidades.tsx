@@ -9,8 +9,8 @@ import { OPPORTUNITY_STAGES, type Opportunity, type OpportunityStage } from '@co
 import { closedMeta, movedToast, nextActionText, opportunityName, stageDays, stageGroups, undoFailedToast } from '@compartido/logic/barrio';
 import { MODALITY_SHORT, OPPORTUNITY_STAGE_LABEL } from '@compartido/logic/personas';
 import { router } from 'expo-router';
-import { useCallback, useLayoutEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
-import { Pressable, RefreshControl, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ComponentProps, type ComponentRef, type ReactNode } from 'react';
+import { Pressable, RefreshControl, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
@@ -21,13 +21,14 @@ import Animated, {
   useScrollViewOffset,
   useSharedValue,
   withSpring,
+  withTiming,
   type SharedValue,
 } from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Avatar, Badge, Button, EmptyState, EmptyText, ErrorRetry, Fold, Skeleton, T, pageContent, useToast } from '@/components/ui';
 import { Select } from '@/components/ui/Select';
-import { gestures, haptic, layout, spring } from '@/theme/motion';
+import { gestures, haptic, layout, spring, timing, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { autoScrollDelta, stageAt, type DropZone } from './drag';
 import { OportunidadForm } from './OportunidadForm';
@@ -167,6 +168,25 @@ function DraggableCard({ opportunity, ctx, dimmed, children }: { opportunity: Op
         {children}
       </View>
     </GestureDetector>
+  );
+}
+
+/**
+ * A group or a card fading in as it joins the board (`timings.listEnter`). A shared value, not Reanimated `entering`:
+ * views mounted right after a sheet's Modal closed (the board reloading after «Registrar oportunidad») can stay at
+ * opacity 0, invisible to Gustavo (E3's runs; see GaleriaScreen's TileIn). With reduced motion it is visible at once.
+ */
+function ListIn({ children, style, layout: move, onLayout, testID }: { children: ReactNode; style?: StyleProp<ViewStyle>; layout?: ComponentProps<typeof Animated.View>['layout']; onLayout?: (event: LayoutChangeEvent) => void; testID?: string }) {
+  const { reduced } = useMotion();
+  const shown = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    shown.set(withTiming(1, timing('listEnter')));
+  }, [shown]);
+  const fade = useAnimatedStyle(() => ({ opacity: shown.value }));
+  return (
+    <Animated.View layout={move} onLayout={onLayout} testID={testID} style={[style, fade]}>
+      {children}
+    </Animated.View>
   );
 }
 
@@ -380,9 +400,8 @@ export function Oportunidades({ header }: { header: ReactNode }) {
         {groups.map((group) => {
           const target = Boolean(drag) && hover === group.stage;
           return (
-            <Animated.View
+            <ListIn
               key={group.stage}
-              entering={layout.listEnter()}
               onLayout={zoneLayout(group.stage)}
               testID={`opp-zone-${group.stage}`}
               style={[styles.group, drag ? styles.zone : null, target ? styles.zoneOn : null]}
@@ -391,11 +410,11 @@ export function Oportunidades({ header }: { header: ReactNode }) {
                 {`${group.label} · ${group.items.length}`}
               </T>
               {group.items.map((opportunity) => (
-                <Animated.View key={opportunity.id} entering={layout.listEnter()} layout={layout.listMove()}>
+                <ListIn key={opportunity.id} layout={layout.listMove()}>
                   <DraggableCard opportunity={opportunity} ctx={ctx} dimmed={drag?.id === opportunity.id}>
                     <CardBody opportunity={opportunity} onMove={move} onEdit={edit} />
                   </DraggableCard>
-                </Animated.View>
+                </ListIn>
               ))}
               {drag && !group.items.length ? (
                 <View style={styles.drop}>
@@ -404,7 +423,7 @@ export function Oportunidades({ header }: { header: ReactNode }) {
                   </T>
                 </View>
               ) : null}
-            </Animated.View>
+            </ListIn>
           );
         })}
 

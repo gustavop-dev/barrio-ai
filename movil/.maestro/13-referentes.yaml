@@ -237,14 +237,12 @@ tags: [personas, referentes]
 - tapOn:
     id: referent-submit
     waitToSettleTimeoutMs: 500
-# KNOWN BUG (toast at sheet close): the toast shown as this sheet closes is sometimes missing, like the opportunity form's
-# and «Enviado al equipo.» in 05-captura. It is checked as optional until the toast and sheet fix lands; the sheet
-# closing without an error is the saved result.
-- assertVisible:
-    text: "Referente añadido"
-    childOf:
-      id: toast
-    optional: true
+- extendedWaitUntil:
+    visible:
+      text: "Referente añadido"
+      childOf:
+        id: toast
+    timeout: 15000
 - extendedWaitUntil:
     notVisible:
       id: add-referent
