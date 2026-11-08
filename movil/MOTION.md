@@ -361,7 +361,7 @@ Ya no los usa la captura: `timings.recordDot` (la franja muestra el punto quieto
 | `haptics.chipToggle` | selección | Elegir o soltar un chip de filtro. |
 | `microMotion.copyTurnDeg` / `copyCheckFrom` | 90° / 0,6 | «Copiado»: el icono de copiar gira 90° y se va, y la marca entra girando desde −90° y creciendo desde 0,6 (fast, EASE_OUT). Pasado `copiedLabelMs`, ambos vuelven sin animación. |
 | `microMotion.skeletonPeriodMs` / `skeletonLow` / `skeletonLag` / `skeletonStill` | 1200 ms / 0,55 / 0,4 rad / 0,7 | Cada bloque de carga late en opacidad entre el 55 % y el 100 % cada 1,2 s, 0,4 rad detrás del anterior. Con movimiento reducido queda quieto al 70 %. |
-| `microMotion.toastRise` | 12 px | El aviso entra subiendo 12 px (fast, EASE_OUT) y sale bajando (fast, EASE_IN) (`microLayout.toastIn`/`toastOut`). |
+| `microMotion.toastRise` | 12 px | El aviso entra subiendo 12 px (fast, EASE_OUT) y sale bajando (fast, EASE_IN), con un valor compartido en `ToastCard` (no con `entering`/`exiting`: en Android una animación de entrada que empezaba mientras se cerraba el Modal de una hoja podía quedarse invisible). Dentro de una hoja abierta, el aviso se dibuja en su ventana (`ToastOutlet`). |
 
 El campo de texto no anima: al enfocarlo, el borde pasa a 2 px 0ff1ce hondo (el relleno devuelve el píxel, así el texto no se mueve) y la etiqueta pasa a 0ff1ce hondo.
 

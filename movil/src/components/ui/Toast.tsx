@@ -1,8 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
-import Animated from 'react-native-reanimated';
+import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { microLayout, toastDurations } from '@/theme/motion';
+import { durations, microMotion, timingWith, toastDurations, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { T } from './Text';
 
@@ -45,46 +45,67 @@ interface ToastHost {
 
 const ToastHostContext = createContext<ToastHost | null>(null);
 
-/** The toast itself, at `bottom` px from the bottom of its window. */
+/**
+ * One toast. MovCaptura: it fades in rising 12 px (fast, EASE_OUT) and, `leaving`, fades out sinking back (fast, EASE_IN).
+ * Driven by a shared value, not by Reanimated `entering`/`exiting`: in the QA, toasts shown in the frame a sheet's Modal
+ * closed («Enviado al equipo.», «Foto quitada de la galería.») sometimes never became visible, with or without the
+ * outlet, and an entering animation that never starts leaves the toast at opacity 0. With reduced motion it starts
+ * fully visible.
+ */
+function ToastCard({ toast, leaving, close, onGone }: { toast: ToastState; leaving: boolean; close: () => void; onGone: () => void }) {
+  const { reduced } = useMotion();
+  const shown = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    shown.set(withTiming(leaving ? 0 : 1, timingWith(durations.fast, leaving ? 'exit' : 'enter')));
+    if (!leaving) return;
+    // A JS timer, not the animation's callback: the toast goes even if the animation never reports back.
+    const timer = setTimeout(onGone, durations.fast);
+    return () => clearTimeout(timer);
+  }, [leaving, shown, onGone]);
+  const motion = useAnimatedStyle(() => ({ opacity: shown.value, transform: [{ translateY: (1 - shown.value) * microMotion.toastRise }] }));
+  return (
+    <Animated.View
+      style={[styles.toast, toast.tone === 'error' ? styles.error : null, motion]}
+      accessibilityRole="alert"
+      accessibilityLiveRegion="polite"
+      testID="toast"
+    >
+      <T color={colors.paper} style={styles.message}>
+        {toast.message}
+      </T>
+      {toast.undo ? (
+        <Pressable
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={() => {
+            const undo = toast.undo;
+            close();
+            undo?.();
+          }}
+          style={styles.undo}
+        >
+          <T color={colors.brand}>{toast.undoLabel ?? 'Deshacer'}</T>
+        </Pressable>
+      ) : null}
+    </Animated.View>
+  );
+}
+
+/** The toast region, at `bottom` px from the bottom of its window: the current toast, or the last one fading out. */
 function ToastRegion({ toast, close, bottom }: { toast: ToastState | null; close: () => void; bottom: number }) {
+  const [drawn, setDrawn] = useState<ToastState | null>(toast);
+  // A new toast replaces the one on screen at once.
+  if (toast && toast !== drawn) setDrawn(toast);
+  const gone = useCallback(() => setDrawn(null), []);
   return (
     <View pointerEvents="box-none" style={[styles.region, { bottom }]}>
-      {toast ? (
-        <Animated.View
-          key={toast.id}
-          entering={microLayout.toastIn()}
-          exiting={microLayout.toastOut()}
-          style={[styles.toast, toast.tone === 'error' ? styles.error : null]}
-          accessibilityRole="alert"
-          accessibilityLiveRegion="polite"
-          testID="toast"
-        >
-          <T color={colors.paper} style={styles.message}>
-            {toast.message}
-          </T>
-          {toast.undo ? (
-            <Pressable
-              accessibilityRole="button"
-              hitSlop={8}
-              onPress={() => {
-                const undo = toast.undo;
-                close();
-                undo?.();
-              }}
-              style={styles.undo}
-            >
-              <T color={colors.brand}>{toast.undoLabel ?? 'Deshacer'}</T>
-            </Pressable>
-          ) : null}
-        </Animated.View>
-      ) : null}
+      {drawn ? <ToastCard key={drawn.id} toast={drawn} leaving={!toast} close={close} onGone={gone} /> : null}
     </View>
   );
 }
 
 /**
  * Mount once near the root. It floats above the bottom bar; screen readers announce each toast.
- * MovCaptura: it fades in rising 12 px (fast, EASE_OUT) and fades out sinking back (fast, EASE_IN).
  *
  * A Modal (a sheet) is a window of its own, drawn over the app's: a toast drawn in the app's window would sit under
  * it, where Gustavo cannot see it. So each sheet mounts a ToastOutlet, and while one is mounted the newest draws the
