@@ -26,6 +26,10 @@ import { AgentPortrait, Badge, Button, Card, ConfirmSheet, EmptyState, EmptyText
 import { haptic, layout, timing } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 
+// Built on the JS thread: timing() is not a worklet, and calling it inside a style worklet crashes the app on the UI
+// runtime («Tried to synchronously call a Remote Function»).
+const FOLD = timing('fold');
+
 function Items({ title, items, empty }: { title: string; items: WeeklySummaryItem[]; empty: string }) {
   return (
     <View style={styles.list}>
@@ -189,7 +193,7 @@ function Generate({ offer }: { offer: WeeklySummaryGenerate }) {
 function Week({ summary }: { summary: WeeklySummary }) {
   const [open, setOpen] = useState(false);
   const badge = SUMMARY_STATE_BADGE[summary.state];
-  const chevron = useAnimatedStyle(() => ({ transform: [{ rotate: withTiming(open ? '180deg' : '0deg', timing('fold')) }] }), [open]);
+  const chevron = useAnimatedStyle(() => ({ transform: [{ rotate: withTiming(open ? '180deg' : '0deg', FOLD) }] }), [open]);
   return (
     <View style={styles.week}>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen((value) => !value)} style={styles.weekHead}>
