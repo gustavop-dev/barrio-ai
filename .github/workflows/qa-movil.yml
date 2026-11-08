@@ -161,6 +161,11 @@ jobs:
       INBOX_ENABLED: 'true'
       # The window is open all day so nothing in the QA world waits for 07:00.
       OPERATOR_WINDOW: '00:00-23:59'
+      # A placeholder LinkedIn app, so Ajustes offers «Conectar LinkedIn» (AJU-07): the app only opens the office web on
+      # this runner. Nothing here is a real credential, and no flow starts the OAuth or reaches LinkedIn.
+      LINKEDIN_CLIENT_ID: qa-solo-ci
+      LINKEDIN_CLIENT_SECRET: qa-solo-ci-no-es-un-secreto
+      LINKEDIN_REDIRECT_URI: https://qa.invalid/api/v1/linkedin/oauth/callback
       TIKTOKEN_CACHE_DIR: ${{ github.workspace }}/agentes-linkedin/infra/assets/tiktoken
       # CI-only account created by seed_qa; it never exists outside this job.
       QA_SEED: permitido

@@ -207,6 +207,33 @@ describe('Personas · Oportunidades', () => {
     expect(server.find('PATCH', '/api/v1/oportunidades/o-2')[1]!.body).toEqual({ stage: 'conversacion' });
   });
 
+  it('says so when «Deshacer» fails, and the card stays in the stage it was moved to (PRS-07)', async () => {
+    // The server keeps what it saved: it accepts the move and refuses the undo.
+    let stage = 'conversacion';
+    let patches = 0;
+    const server = await renderPersonas(
+      {
+        'GET /api/v1/oportunidades': () => page(board.map((item) => (item.id === 'o-2' ? { ...item, stage } : item))),
+        'PATCH /api/v1/oportunidades/o-2': (request) => {
+          patches += 1;
+          if (patches > 1) return { status: 500, body: { detail: 'Error del servidor' } };
+          stage = (request.body as { stage: string }).stage;
+          return { body: { ...board[1], stage } };
+        },
+      },
+      { pestana: 'oportunidades' },
+    );
+    const marta = within(await screen.findByTestId('opp-o-2'));
+    await fireEvent.press(marta.getByRole('button', { name: 'Etapa de Marta Inventada' }));
+    await fireEvent.press(marta.getByRole('radio', { name: 'Reunión' }));
+    expect(await screen.findByText('Movida a «Reunión»')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Deshacer'));
+    await waitFor(() => expect(server.find('PATCH', '/api/v1/oportunidades/o-2')).toHaveLength(2));
+    expect(await screen.findByText('No se pudo deshacer: sigue en «Reunión»')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Marta Inventada, Reunión')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('Marta Inventada, Conversación')).toBeNull();
+  });
+
   it('moves a card by dragging it onto another stage after a long press, with «Deshacer»', async () => {
     const server = await renderPersonas(
       { 'GET /api/v1/oportunidades': page(board), 'PATCH /api/v1/oportunidades/o-2': (request) => ({ body: { ...board[1], ...(request.body as object) } }) },

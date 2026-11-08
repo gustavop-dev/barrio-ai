@@ -1,0 +1,319 @@
+# cubre: PRS-12, COM-10
+# Personas › Referentes. Each referent with its link, «Activo», its reason, when it was observed and how many people
+# came from its posts; «Observar ahora» queues an observation; «Desactivar» Ana Lucía Torres with «Deshacer», then
+# deactivate and «Reactivar» her; «Añadir referente» refuses an empty form, a URL that is not a LinkedIn profile and a
+# missing reason, says why when LinkedIn does not know the profile (the simulated connector of the QA API knows no
+# profiles), and closes with «Referente añadido» for a profile the API resolves (one that is already a referent: the
+# API answers 200 with it, so nothing is duplicated); «Quitar» Carlos Andrés Mejía after its confirmation; and the
+# other account, without referents, shows «Aún no hay referentes». Cards are found by their testID (referent-<id>,
+# the seed's fixed uuid5 values) or by the labels of their buttons («Desactivar a …», «Quitar a …»).
+appId: co.projectapp.office
+name: Referentes
+tags: [personas, referentes]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-personas
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- tapOn: "Referentes"
+- extendedWaitUntil:
+    visible:
+      id: referentes-list
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: referent-add
+    timeout: 20000
+# With two accounts (the seed has the simulated LinkedIn one and the official API one) the screen shows «Cuenta»:
+# make sure the referents are read from Gustavo's simulated LinkedIn account, whatever order the accounts come in.
+# If it is already chosen, the first match is the field's own value and the tap just closes the list.
+- runFlow:
+    when:
+      visible:
+        id: referent-account
+    commands:
+      - tapOn:
+          id: referent-account
+      - tapOn: "LinkedIn de Gustavo.*"
+
+# ---------------------------------------------------------------- the list
+# cubre: PRS-12
+# Newest first: Ana Lucía Torres, Carlos Andrés Mejía, María Fernanda Ruiz.
+- extendedWaitUntil:
+    visible: "Ana Lucía Torres"
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: referent-a1297b0c-2445-5f73-b9c7-14fa8cf4b16f
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+# A card is a plain View (its texts are not its children for Maestro): the texts are checked on screen.
+- assertVisible: "Activo"
+- assertVisible: "Escribe sobre descubrimiento de producto con equipos pequeños; sus lectores son fundadores\\."
+- assertVisible: "Observado hace .* · \\d+ (persona del barrio salió|personas del barrio salieron) de sus posts"
+- assertVisible: "Desactivar a María Fernanda Ruiz"
+- assertVisible: "Quitar a María Fernanda Ruiz"
+- takeScreenshot: 13-referentes-01-lista
+- scrollUntilVisible:
+    element:
+      text: "Carlos Andrés Mejía"
+    direction: UP
+    timeout: 20000
+- takeScreenshot: 13-referentes-02-todos
+
+# ---------------------------------------------------------------- «Observar ahora»
+# cubre: PRS-12
+- scrollUntilVisible:
+    element:
+      text: "Observar ahora"
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- tapOn: "Observar ahora"
+- extendedWaitUntil:
+    visible:
+      text: "Observación encolada\\. Los posts nuevos aparecerán en unos minutos"
+      childOf:
+        id: toast
+    timeout: 15000
+- takeScreenshot: 13-referentes-03-observar
+
+# ---------------------------------------------------------------- deactivate with «Deshacer», then reactivate
+# cubre: PRS-12
+- scrollUntilVisible:
+    element:
+      text: "Desactivar a Ana Lucía Torres"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Desactivar a Ana Lucía Torres"
+- extendedWaitUntil:
+    visible:
+      text: "Referente desactivado"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Reactivar a Ana Lucía Torres"
+    timeout: 10000
+- tapOn:
+    text: "Deshacer"
+    childOf:
+      id: toast
+- extendedWaitUntil:
+    visible: "Desactivar a Ana Lucía Torres"
+    timeout: 15000
+- assertNotVisible: "Inactivo"
+- takeScreenshot: 13-referentes-04-desactivar-deshecho
+# Deactivated for real: «Inactivo» and «Reactivar».
+- tapOn: "Desactivar a Ana Lucía Torres"
+- extendedWaitUntil:
+    visible:
+      text: "Referente desactivado"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Reactivar a Ana Lucía Torres"
+    timeout: 15000
+- assertVisible: "Inactivo"
+- takeScreenshot: 13-referentes-05-inactivo
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- tapOn: "Reactivar a Ana Lucía Torres"
+- extendedWaitUntil:
+    visible:
+      text: "Referente reactivado"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Desactivar a Ana Lucía Torres"
+    timeout: 15000
+- assertNotVisible: "Inactivo"
+
+# ---------------------------------------------------------------- «Añadir referente»: the form validates before sending
+# cubre: PRS-12
+- scrollUntilVisible:
+    element:
+      id: referent-add
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: referent-add
+- extendedWaitUntil:
+    visible:
+      id: add-referent
+    timeout: 10000
+# Empty: both fields complain.
+- tapOn:
+    id: referent-submit
+- extendedWaitUntil:
+    visible:
+      text: "Pega la URL de un perfil.*"
+      childOf:
+        id: add-referent
+    timeout: 10000
+- assertVisible:
+    text: "El motivo es obligatorio.*"
+    childOf:
+      id: add-referent
+- takeScreenshot: 13-referentes-06-vacio
+# A URL that is not a LinkedIn profile keeps the URL error.
+- tapOn:
+    id: referent-url
+- inputText: "twitter.com/alguien"
+- pressKey: Enter
+- assertVisible:
+    text: "Pega la URL de un perfil.*"
+    childOf:
+      id: add-referent
+- takeScreenshot: 13-referentes-07-url-invalida
+# A profile URL clears it; the reason is still missing, so «Añadir referente» does not send.
+- tapOn:
+    id: referent-url
+- eraseText: 40
+- inputText: "linkedin.com/in/perfil-que-no-existe-qa"
+- pressKey: Enter
+- extendedWaitUntil:
+    notVisible:
+      text: "Pega la URL de un perfil.*"
+      childOf:
+        id: add-referent
+    timeout: 10000
+- tapOn:
+    id: referent-submit
+- assertVisible:
+    id: add-referent
+- assertVisible:
+    text: "El motivo es obligatorio.*"
+    childOf:
+      id: add-referent
+- takeScreenshot: 13-referentes-08-sin-motivo
+# With a reason it is sent; LinkedIn does not know that profile, and the sheet says so and stays open.
+- tapOn:
+    id: referent-reason
+- inputText: "Prueba de QA: habla de producto"
+- hideKeyboard
+- tapOn:
+    id: referent-submit
+- extendedWaitUntil:
+    visible:
+      text: "No encontramos ese perfil en LinkedIn: revisa la URL\\."
+      childOf:
+        id: add-referent
+    timeout: 15000
+- assertVisible:
+    id: add-referent
+- takeScreenshot: 13-referentes-09-perfil-desconocido
+# A profile the API resolves: the sheet closes with «Referente añadido». (A fresh sheet: a tap puts the cursor where it
+# lands, so erasing the long URL is not reliable.)
+- tapOn:
+    id: referent-cancel
+- extendedWaitUntil:
+    notVisible:
+      id: add-referent
+    timeout: 10000
+- tapOn:
+    id: referent-add
+- extendedWaitUntil:
+    visible:
+      id: add-referent
+    timeout: 10000
+- tapOn:
+    id: referent-url
+- inputText: "linkedin.com/in/mafe-ruiz-producto"
+- tapOn:
+    id: referent-reason
+- inputText: "Prueba de QA: habla de producto"
+- hideKeyboard
+- tapOn:
+    id: referent-submit
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      text: "Referente añadido"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: add-referent
+    timeout: 15000
+- assertNotVisible: ".*perfil-que-no-existe-qa.*"
+- scrollUntilVisible:
+    element:
+      text: "María Fernanda Ruiz"
+    direction: DOWN
+    timeout: 30000
+- takeScreenshot: 13-referentes-10-anadido
+# Pending the failure switch (PR #48, comun/qa-fallo.js): a 500 on POST /api/v1/operador/referents keeps the sheet
+# open with the error, and «vacio» on the list shows «Aún no hay referentes» for this account too.
+
+# ---------------------------------------------------------------- «Quitar», after its confirmation
+# cubre: PRS-12
+- scrollUntilVisible:
+    element:
+      text: "Quitar a Carlos Andrés Mejía"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Quitar a Carlos Andrés Mejía"
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- assertVisible:
+    text: "Quitar a Carlos Andrés Mejía"
+    childOf:
+      id: confirm-sheet
+- assertVisible: "El equipo deja de leer sus posts\\. Las personas que ya salieron de ellos siguen en el barrio\\. Si solo quieres una pausa, desactívalo\\."
+- takeScreenshot: 13-referentes-11-confirmar-quitar
+- tapOn:
+    text: "Quitar"
+    childOf:
+      id: confirm-sheet
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      text: "Referente quitado"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Carlos Andrés Mejía"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Ana Lucía Torres"
+    direction: UP
+    timeout: 20000
+- takeScreenshot: 13-referentes-12-quitado
+
+# ---------------------------------------------------------------- the other account has no referents
+# cubre: PRS-12
+- scrollUntilVisible:
+    element:
+      id: referent-account
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: referent-account
+- tapOn: "API oficial.*"
+- extendedWaitUntil:
+    visible: "Aún no hay referentes"
+    timeout: 15000
+- assertVisible: "Añade a alguien cuya conversación importe para tu barrio: el equipo empieza a descubrir personas en sus posts\\."
+- assertNotVisible: "María Fernanda Ruiz"
+- takeScreenshot: 13-referentes-13-sin-referentes

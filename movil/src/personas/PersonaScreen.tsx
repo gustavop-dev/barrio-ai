@@ -2,6 +2,8 @@
 // journey with dates, why the person fits and where they came from, the conversation read from the inbox, the
 // opportunity, notes (written or by voice, through the capture sheet) and the whole history. Actions:
 // «Marcar como oportunidad» and «Descartar» (with a mandatory note, only in the stages the API allows).
+// The app is drawn edge to edge, so the window no longer shrinks for the keyboard: the card pads itself by it
+// (KeyboardAvoidingView) and scrolls the note being written above it.
 import { ApiError } from '@compartido/api/client';
 import { useAddContactNote, useContact, useDiscardContact, useOportunidades } from '@compartido/api/hooks';
 import type { Contact, ContactNote, Opportunity } from '@compartido/api/types';
@@ -21,9 +23,9 @@ import { CONTACT_AFFINITY_LABEL, CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, con
 import { journey } from '@compartido/logic/journey';
 import { daysInStage, DISCARDABLE, longDate, messageWhen, personStage, shortDate } from '@compartido/logic/personas';
 import { router } from 'expo-router';
-import { useState, type ReactNode } from 'react';
-import { Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { useCallback, useEffect, useRef, useState, type ComponentRef, type ReactNode, type RefObject } from 'react';
+import { Keyboard, KeyboardAvoidingView, Linking, Pressable, RefreshControl, ScrollView, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { useSession } from '@/auth/session';
 import { openCaptureSheet } from '@/capture/store';
 import { Icon } from '@/components/icons';
@@ -32,7 +34,7 @@ import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Avatar, Badge, Button, Card, ConfirmSheet, EmptyState, EmptyText, ErrorRetry, Field, LabelChip, Section, Skeleton, T, pageContent, useToast } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { isHttps } from '@/navigation';
-import { haptic, navLayout } from '@/theme/motion';
+import { haptic, navTiming, navValues, useMotion } from '@/theme/motion';
 import { colors, radius, space, type as typeScale } from '@/theme/tokens';
 import { ConversationBlock } from './ConversationBlock';
 import { Journey } from './Journey';
@@ -58,6 +60,23 @@ function FlightName({ contactId, color, style, children }: { contactId: string; 
       <Animated.View style={hidden}>{children}</Animated.View>
     </View>
   );
+}
+
+/**
+ * MovDetalle: block `step` of the card fades in and rises, staggered after the push. A shared value, not Reanimated
+ * `entering`: a card opened after a sheet's Modal had closed stayed blank under its header, the blocks stuck at opacity 0
+ * (run 42486187324, 14-fichas: Pedro Salazar's card; E3 saw the same on Laura Gómez's). With reduced motion it is
+ * visible at once.
+ */
+function BlockIn({ step, style, children }: { step: number; style?: StyleProp<ViewStyle>; children: ReactNode }) {
+  const { reduced } = useMotion();
+  const shown = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    const config = navTiming('cardBlock');
+    shown.set(withDelay(navValues.cardBlockDelayMs + step * navValues.cardBlockStepMs, withTiming(1, config), config.reduceMotion));
+  }, [shown, step]);
+  const motion = useAnimatedStyle(() => ({ opacity: shown.value, transform: [{ translateY: (1 - shown.value) * navValues.cardBlockRise }] }));
+  return <Animated.View style={[style, motion]}>{children}</Animated.View>;
 }
 
 function NextStep({ contact }: { contact: Contact }) {
@@ -194,7 +213,7 @@ function OpportunityBlock({ contact, onEdit }: { contact: Contact; onEdit: (oppo
   );
 }
 
-function Notes({ contact, name }: { contact: Contact; name: string }) {
+function Notes({ contact, name, editor }: { contact: Contact; name: string; editor: RefObject<ComponentRef<typeof View> | null> }) {
   const session = useSession();
   const add = useAddContactNote();
   const toast = useToast();
@@ -237,7 +256,7 @@ function Notes({ contact, name }: { contact: Contact; name: string }) {
           </T>
         )}
         {writing ? (
-          <View style={styles.field}>
+          <View ref={editor} collapsable={false} style={styles.field}>
             <Field label="Nota" value={text} onChangeText={setText} multiline autoFocus editable={!add.isPending} testID="note-text" />
             <ErrorRetry error={add.error} />
             <View style={styles.actions}>
@@ -311,6 +330,35 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
   const [refreshing, setRefreshing] = useState(false);
   // Opened from a row: its name, so the header is there for the portrait and the name to land while the rest loads.
   const flightName = useFlightName(contactId);
+  const { reduced } = useMotion();
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
+  const scrollY = useRef(0);
+  const keyboardTop = useRef(0);
+  const editor = useRef<ComponentRef<typeof View>>(null);
+
+  // With the keyboard up, the note being written scrolls above it; again once the KeyboardAvoidingView's padding
+  // has shrunk the scroll view (its onLayout), since the first scroll may have hit the old end of the list.
+  const revealEditor = useCallback(() => {
+    const top = keyboardTop.current;
+    if (!top || !editor.current) return;
+    editor.current.measureInWindow((_x, y, _width, height) => {
+      const overflow = y + height + space[3] - top;
+      if (overflow > 0) scrollRef.current?.scrollTo({ y: scrollY.current + overflow, animated: !reduced });
+    });
+  }, [reduced]);
+  useEffect(() => {
+    const up = Keyboard.addListener('keyboardDidShow', (event) => {
+      keyboardTop.current = event.endCoordinates.screenY;
+      requestAnimationFrame(revealEditor);
+    });
+    const down = Keyboard.addListener('keyboardDidHide', () => {
+      keyboardTop.current = 0;
+    });
+    return () => {
+      up.remove();
+      down.remove();
+    };
+  }, [revealEditor]);
 
   const refresh = async () => {
     setRefreshing(true);
@@ -369,101 +417,109 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
 
   return (
     <>
-      <ScrollView
-        style={styles.screen}
-        contentContainerStyle={[pageContent, { paddingBottom: bottom }]}
-        keyboardShouldPersistTaps="handled"
-        testID="persona"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} colors={[colors.brandDeep]} />}
-      >
-        <View style={styles.head} testID="persona-head">
-          <View style={styles.top}>
-            <FlightAvatar contactId={contactId} name={name} />
-            <Animated.View entering={navLayout.cardBlock(0)}>
-              <Badge tone={stage.tone}>{stage.label}</Badge>
-            </Animated.View>
-          </View>
-          {profile ? (
-            <Pressable accessibilityRole="link" accessibilityHint="Abre su perfil en LinkedIn" onPress={() => void Linking.openURL(profile)} style={styles.nameLink} testID="persona-name">
-              <FlightName contactId={contactId} color={colors.brandDeep} style={styles.shrinkBox}>
-                <T variant="titulo" accessibilityRole="header" style={styles.shrink}>
+      <KeyboardAvoidingView style={styles.screen} behavior="padding">
+        <ScrollView
+          ref={scrollRef}
+          style={styles.screen}
+          contentContainerStyle={[pageContent, { paddingBottom: bottom }]}
+          keyboardShouldPersistTaps="handled"
+          onScroll={(event) => {
+            scrollY.current = event.nativeEvent.contentOffset.y;
+          }}
+          scrollEventThrottle={16}
+          onLayout={revealEditor}
+          testID="persona"
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} colors={[colors.brandDeep]} />}
+        >
+          <View style={styles.head} testID="persona-head">
+            <View style={styles.top}>
+              <FlightAvatar contactId={contactId} name={name} />
+              <BlockIn step={0}>
+                <Badge tone={stage.tone}>{stage.label}</Badge>
+              </BlockIn>
+            </View>
+            {profile ? (
+              <Pressable accessibilityRole="link" accessibilityHint="Abre su perfil en LinkedIn" onPress={() => void Linking.openURL(profile)} style={styles.nameLink} testID="persona-name">
+                <FlightName contactId={contactId} color={colors.brandDeep} style={styles.shrinkBox}>
+                  <T variant="titulo" accessibilityRole="header" style={styles.shrink}>
+                    {name}
+                  </T>
+                </FlightName>
+                <Icon name="external" size={22} color={colors.brandDeep} />
+              </Pressable>
+            ) : (
+              <FlightName contactId={contactId} color={colors.ink}>
+                <T variant="titulo" accessibilityRole="header" testID="persona-name">
                   {name}
                 </T>
               </FlightName>
-              <Icon name="external" size={22} color={colors.brandDeep} />
-            </Pressable>
-          ) : (
-            <FlightName contactId={contactId} color={colors.ink}>
-              <T variant="titulo" accessibilityRole="header" testID="persona-name">
-                {name}
-              </T>
-            </FlightName>
-          )}
-          {person.headline || meta ? (
-            <Animated.View entering={navLayout.cardBlock(0)} style={styles.head}>
-              {person.headline ? <T soft>{person.headline}</T> : null}
-              {meta ? (
-                <T variant="detalle" soft>
-                  {meta}
-                </T>
+            )}
+            {person.headline || meta ? (
+              <BlockIn step={0} style={styles.head}>
+                {person.headline ? <T soft>{person.headline}</T> : null}
+                {meta ? (
+                  <T variant="detalle" soft>
+                    {meta}
+                  </T>
+                ) : null}
+              </BlockIn>
+            ) : null}
+            <BlockIn step={1} style={styles.actions}>
+              {profile ? (
+                <Button variant="primary" block icon={<Icon name="external" size={20} color={colors.onBrand} />} accessibilityHint="Se abre en LinkedIn" onPress={() => void Linking.openURL(profile)}>
+                  Abrir en LinkedIn
+                </Button>
               ) : null}
-            </Animated.View>
-          ) : null}
-          <Animated.View entering={navLayout.cardBlock(1)} style={styles.actions}>
-            {profile ? (
-              <Button variant="primary" block icon={<Icon name="external" size={20} color={colors.onBrand} />} accessibilityHint="Se abre en LinkedIn" onPress={() => void Linking.openURL(profile)}>
-                Abrir en LinkedIn
-              </Button>
-            ) : null}
-            {!person.opportunity ? (
-              <Button block onPress={() => setForm({ opportunity: null })}>
-                Marcar como oportunidad
-              </Button>
-            ) : null}
-            {canDiscard ? (
-              <Button block variant="danger" onPress={() => setDiscarding(true)}>
-                Descartar
-              </Button>
-            ) : null}
-          </Animated.View>
-        </View>
-
-        {contact.isError ? <ErrorRetry title="No se pudo actualizar la ficha" error={contact.error} onRetry={() => void contact.refetch()} /> : null}
-
-        {nextStepView(person) ? (
-          <Animated.View entering={navLayout.cardBlock(2)}>
-            <NextStep contact={person} />
-          </Animated.View>
-        ) : null}
-
-        <Animated.View entering={navLayout.cardBlock(3)} style={styles.rest}>
-          <Section label="Recorrido">
-            <Journey stages={journey(person)} label={`Recorrido de ${name}`} />
-          </Section>
-
-          <Section label="Por qué encaja">
-            <WhyFits contact={person} />
-          </Section>
-
-          <Section label="De dónde salió">
-            <Origin contact={person} />
-          </Section>
-
-          <View testID="conversation">
-            <Section label="Conversación">
-              <ConversationBlock conversation={person.conversation} name={name} profileUrl={person.profile_url} />
-            </Section>
+              {!person.opportunity ? (
+                <Button block onPress={() => setForm({ opportunity: null })}>
+                  Marcar como oportunidad
+                </Button>
+              ) : null}
+              {canDiscard ? (
+                <Button block variant="danger" onPress={() => setDiscarding(true)}>
+                  Descartar
+                </Button>
+              ) : null}
+            </BlockIn>
           </View>
 
-          <OpportunityBlock contact={person} onEdit={(opportunity) => setForm({ opportunity })} />
+          {contact.isError ? <ErrorRetry title="No se pudo actualizar la ficha" error={contact.error} onRetry={() => void contact.refetch()} /> : null}
 
-          <Notes contact={person} name={name} />
+          {nextStepView(person) ? (
+            <BlockIn step={2}>
+              <NextStep contact={person} />
+            </BlockIn>
+          ) : null}
 
-          <Section label="Historial completo">
-            <History contact={person} />
-          </Section>
-        </Animated.View>
-      </ScrollView>
+          <BlockIn step={3} style={styles.rest}>
+            <Section label="Recorrido">
+              <Journey stages={journey(person)} label={`Recorrido de ${name}`} />
+            </Section>
+
+            <Section label="Por qué encaja">
+              <WhyFits contact={person} />
+            </Section>
+
+            <Section label="De dónde salió">
+              <Origin contact={person} />
+            </Section>
+
+            <View testID="conversation">
+              <Section label="Conversación">
+                <ConversationBlock conversation={person.conversation} name={name} profileUrl={person.profile_url} />
+              </Section>
+            </View>
+
+            <OpportunityBlock contact={person} onEdit={(opportunity) => setForm({ opportunity })} />
+
+            <Notes contact={person} name={name} editor={editor} />
+
+            <Section label="Historial completo">
+              <History contact={person} />
+            </Section>
+          </BlockIn>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {form ? (
         <OportunidadForm

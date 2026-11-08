@@ -219,6 +219,30 @@ describe('Personas · Oportunidades', () => {
     expect(screen.getByText('Faro Salud · ProjectApp · cerrada el 30 de octubre')).toBeInTheDocument();
   });
 
+  it('says so when «Deshacer» fails, and the card stays in the stage it was moved to (PRS-07)', async () => {
+    // The server keeps what it saved: it accepts the move and refuses the undo.
+    let stage = 'conversacion';
+    let patches = 0;
+    const api = server({
+      'GET /api/v1/oportunidades': () => page(board.map((item) => (item.id === 'o-2' ? { ...item, stage } : item))),
+      'PATCH /api/v1/oportunidades/o-2': ({ body }) => {
+        patches += 1;
+        if (patches > 1) return { status: 500, body: { detail: 'Error del servidor' } };
+        stage = (body as { stage: string }).stage;
+        return { body: { ...board[1], stage } };
+      },
+    });
+    renderApp('/personas?pestana=oportunidades');
+    const marta = await screen.findByRole('article', { name: 'Marta Inventada, Conversación' });
+    await userEvent.selectOptions(within(marta).getByRole('combobox', { name: /^Etapa de Marta Inventada/ }), 'reunion');
+    expect(await screen.findByText('Movida a «Reunión»')).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Deshacer' }));
+    await waitFor(() => expect(api.find('PATCH', '/api/v1/oportunidades/o-2')).toHaveLength(2));
+    expect(await screen.findByText('No se pudo deshacer: sigue en «Reunión»')).toBeInTheDocument();
+    expect(screen.getByRole('article', { name: 'Marta Inventada, Reunión' })).toBeInTheDocument();
+    expect(screen.queryByRole('article', { name: 'Marta Inventada, Conversación' })).not.toBeInTheDocument();
+  });
+
   it('shows a board with a column per stage on desktop', async () => {
     wide();
     server({ 'GET /api/v1/oportunidades': page(board) });
