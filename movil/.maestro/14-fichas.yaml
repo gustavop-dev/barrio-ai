@@ -1,0 +1,276 @@
+# cubre: PRS-03, PRS-04, PRS-05, PRS-06, PRS-10
+# Person cards beyond Laura's (09-personas). Sofía Martínez: the conversation read from the inbox (the team's read and
+# its numbers, the last messages, «La app nunca envía mensajes…» and «Abrir en LinkedIn»). Andrés Restrepo: his open
+# opportunity in «Reunión» with «Editar oportunidad», a note already written by qa («Tu nota · …») and no «Descartar»
+# (he is connected). Pedro Salazar: «Descartar» asks for a reason and the card ends in «Descartado». A link to a
+# person that does not exist shows «No encontramos a esta persona» with «Volver a Personas».
+# The search box takes ASCII only (Maestro types through adb), so names are searched by their first letters.
+appId: co.projectapp.office
+name: Fichas
+tags: [personas, fichas]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-personas
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- extendedWaitUntil:
+    visible:
+      id: "person-.*"
+    timeout: 30000
+
+# ---------------------------------------------------------------- Sofía: the conversation
+# cubre: PRS-03, PRS-04
+- tapOn:
+    id: barrio-search
+- inputText: "Sof"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Sofía Martínez"
+    timeout: 15000
+- hideKeyboard
+- tapOn: "Sofía Martínez"
+- extendedWaitUntil:
+    visible:
+      id: persona-name
+    timeout: 20000
+- assertVisible: "Sofía Martínez"
+- takeScreenshot: 14-fichas-01-sofia
+# She invited Gustavo: that is where she came from.
+- scrollUntilVisible:
+    element:
+      text: "DE DÓNDE SALIÓ"
+      childOf:
+        id: persona
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "Te invitó"
+    childOf:
+      id: persona
+- scrollUntilVisible:
+    element:
+      id: conversation-link
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    text: "Posible oportunidad · ProjectApp"
+    childOf:
+      id: conversation
+- assertVisible:
+    text: "Espera tu respuesta"
+    childOf:
+      id: conversation
+- assertVisible:
+    text: "Oportunidad 86 % · Espera respuesta 91 % · Venta o spam 4 %"
+    childOf:
+      id: conversation
+- assertVisible:
+    text: "La app nunca envía mensajes: respondes tú en LinkedIn\\."
+    childOf:
+      id: conversation
+- assertVisible:
+    text: "Abrir en LinkedIn"
+    childOf:
+      id: conversation
+- takeScreenshot: 14-fichas-02-conversacion
+- scrollUntilVisible:
+    element:
+      id: messages
+    direction: UP
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "Tú · .*"
+    childOf:
+      id: messages
+- assertVisible:
+    text: "¡Con gusto, Sofía! Un placer\\."
+    childOf:
+      id: messages
+- assertVisible:
+    text: "Sofía Martínez · .*"
+    childOf:
+      id: messages
+- scrollUntilVisible:
+    element:
+      text: "Hola Gustavo, vi tu post sobre MVPs\\..*"
+      childOf:
+        id: messages
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 14-fichas-03-mensajes
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: persona
+    timeout: 15000
+
+# ---------------------------------------------------------------- Andrés: his opportunity and an earlier note
+# cubre: PRS-05, PRS-06, PRS-10
+- tapOn: "Borrar la búsqueda"
+- tapOn:
+    id: barrio-search
+- inputText: "Andr"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Andrés Restrepo"
+    timeout: 15000
+- hideKeyboard
+- tapOn: "Andrés Restrepo"
+- extendedWaitUntil:
+    visible:
+      id: persona-name
+    timeout: 20000
+- assertVisible: "Andrés Restrepo"
+- assertVisible: "OPORTUNIDAD"
+# Connected and with an opportunity: neither «Marcar como oportunidad» nor «Descartar».
+- assertNotVisible: "Marcar como oportunidad"
+- assertNotVisible: "Descartar"
+- takeScreenshot: 14-fichas-04-andres
+- scrollUntilVisible:
+    element:
+      text: "Editar oportunidad"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Acelerar la entrega de la plataforma de citas médicas\\."
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: "Reunión"
+    childOf:
+      id: persona
+- takeScreenshot: 14-fichas-05-oportunidad
+- tapOn: "Editar oportunidad"
+- extendedWaitUntil:
+    visible:
+      id: opportunity-form
+    timeout: 15000
+- assertVisible:
+    text: "Editar oportunidad"
+    childOf:
+      id: opportunity-form
+- assertVisible:
+    text: "Andrés Restrepo"
+    childOf:
+      id: opp-picked
+- scrollUntilVisible:
+    element:
+      text: "Cancelar"
+      childOf:
+        id: opportunity-form
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Cancelar"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 15000
+# The note seeded as written by qa: «Tu nota».
+- scrollUntilVisible:
+    element:
+      text: "Hablamos en el meetup de producto; le interesa el tema de MVPs\\."
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Tu nota · .*"
+- takeScreenshot: 14-fichas-06-nota
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: persona
+    timeout: 15000
+
+# ---------------------------------------------------------------- Pedro: «Descartar» with a reason
+# cubre: PRS-06
+- tapOn: "Borrar la búsqueda"
+- tapOn:
+    id: barrio-search
+- inputText: "Pedro"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Pedro Salazar"
+    timeout: 15000
+- hideKeyboard
+- tapOn: "Pedro Salazar"
+- extendedWaitUntil:
+    visible:
+      id: persona-name
+    timeout: 20000
+- assertVisible: "POR CLASIFICAR"
+- tapOn: "Descartar"
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 10000
+- assertVisible:
+    text: "Descartar a Pedro Salazar"
+    childOf:
+      id: confirm-sheet
+- assertVisible: "No volverá a proponerse: el equipo no la seguirá ni la invitará\\. Si tiene una acción abierta, se veta\\."
+- assertVisible: "Por qué la descartas"
+# The reason is required.
+- assertVisible:
+    text: "Descartar"
+    childOf:
+      id: confirm-sheet
+    enabled: false
+- takeScreenshot: 14-fichas-07-confirmar-descarte
+- tapOn:
+    id: confirm-note
+- inputText: "No trabaja en producto"
+- hideKeyboard
+- tapOn:
+    text: "Descartar"
+    childOf:
+      id: confirm-sheet
+    enabled: true
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "Descartada: no volverá a proponerse"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "DESCARTADO"
+    timeout: 15000
+- assertNotVisible: "Descartar"
+- takeScreenshot: 14-fichas-08-descartado
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: persona
+    timeout: 15000
+
+# ---------------------------------------------------------------- a link to somebody who does not exist
+# cubre: PRS-03
+- openLink: "oficina0ff1ce://personas/00000000-0000-4000-8000-000000000000"
+- extendedWaitUntil:
+    visible: "No encontramos a esta persona"
+    timeout: 30000
+- assertVisible: "Puede que el enlace sea viejo\\."
+- takeScreenshot: 14-fichas-09-no-existe
+- tapOn: "Volver a Personas"
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 20000
+- assertNotVisible: "No encontramos a esta persona"

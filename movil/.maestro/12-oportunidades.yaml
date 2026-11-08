@@ -1,0 +1,480 @@
+# cubre: PRS-07, PRS-08
+# Personas › Oportunidades. The board grouped by stage, most advanced first (Acuerdo → Conversación), each card with
+# company, modality, «Siguiente acción», days in the stage, «Etapa» and «Editar»; «Cerradas sin acuerdo» folded.
+# Valentina Castro moves from «Necesidad identificada» to «Cualificada» with the «Etapa» selector, «Deshacer» brings
+# her back, and a second move survives leaving the tab. (The drag needs a long press held still before moving, which
+# Maestro cannot do: Jest covers it, and a person on a real phone.) «Nueva oportunidad»: the required fields complain,
+# «De Personas» finds Laura from two letters, then «Alguien fuera de la red» with a wrong date and the right one
+# registers «Lucia Prueba QA». Isabel Duarte's opportunity is edited («Cambios guardados») and deleted after its
+# confirmation («Oportunidad eliminada»). Cards are found by their testID (opp-<id>, the seed's fixed uuid5 values).
+appId: co.projectapp.office
+name: Oportunidades
+tags: [personas, oportunidades]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-personas
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- tapOn: "Oportunidades"
+- extendedWaitUntil:
+    visible:
+      id: oportunidades-list
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: opp-zone-acuerdo
+    timeout: 20000
+
+# ---------------------------------------------------------------- the board
+# cubre: PRS-07
+- assertVisible:
+    text: Oportunidades
+    selected: true
+- assertVisible: "Acuerdo · 1"
+- assertVisible: "Nueva oportunidad"
+- takeScreenshot: 12-oportunidades-01-tablero
+# Mauricio Peña (opportunity:mauricio), in «Propuesta», someone outside the network.
+- scrollUntilVisible:
+    element:
+      id: opp-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Propuesta · 1"
+- assertVisible: "Mauricio Peña, Propuesta"
+- assertVisible:
+    text: "Agrotech del Valle"
+    childOf:
+      id: opp-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
+- assertVisible:
+    text: "ProjectApp"
+    childOf:
+      id: opp-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
+- assertVisible:
+    text: "Siguiente acción"
+    childOf:
+      id: opp-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
+- assertVisible:
+    text: "Enviar la propuesta revisada · mañana"
+    childOf:
+      id: opp-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
+- assertVisible:
+    text: "\\d+ días? en esta etapa"
+    childOf:
+      id: opp-e1ab138f-db05-5df2-8ed3-cbfb6b3e6e52
+- assertVisible: "Etapa de Mauricio Peña"
+- assertVisible: "Editar la oportunidad con Mauricio Peña"
+- takeScreenshot: 12-oportunidades-02-tarjeta
+
+# ---------------------------------------------------------------- change a stage with the selector, and «Deshacer»
+# cubre: PRS-07
+- scrollUntilVisible:
+    element:
+      text: "Etapa de Valentina Castro"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Valentina Castro, Necesidad identificada"
+- tapOn: "Etapa de Valentina Castro"
+- scrollUntilVisible:
+    element:
+      text: "Cualificada"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 12-oportunidades-03-selector-etapa
+- tapOn: "Cualificada"
+- extendedWaitUntil:
+    visible:
+      text: "Movida a «Cualificada»"
+      childOf:
+        id: toast
+    timeout: 15000
+- assertVisible: "Valentina Castro, Cualificada"
+# «Deshacer» puts her back in «Necesidad identificada».
+- tapOn:
+    text: "Deshacer"
+    childOf:
+      id: toast
+- extendedWaitUntil:
+    visible: "Valentina Castro, Necesidad identificada"
+    timeout: 15000
+- takeScreenshot: 12-oportunidades-04-movida-deshecha
+# Pending the failure switch (PR #48, comun/qa-fallo.js): arm a 500 on the undo's PATCH and check that
+# «No se pudo deshacer: sigue en «Cualificada»» shows and the card stays in «Cualificada» (PRS-07, criterion 4;
+# Jest covers it today), and a 500 on the move itself shows «No se pudo cambiar la etapa» (criterion 3).
+# Move her again and leave it: after going to Barrio and back, she is still «Cualificada».
+- scrollUntilVisible:
+    element:
+      text: "Etapa de Valentina Castro"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- tapOn: "Etapa de Valentina Castro"
+- scrollUntilVisible:
+    element:
+      text: "Cualificada"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: "Cualificada"
+- extendedWaitUntil:
+    visible:
+      text: "Movida a «Cualificada»"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Barrio"
+    direction: UP
+    timeout: 20000
+- tapOn: "Barrio"
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 20000
+- tapOn: "Oportunidades"
+- extendedWaitUntil:
+    visible:
+      id: oportunidades-list
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Valentina Castro, Cualificada"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: opp-zone-cualificada
+- assertNotVisible:
+    id: opp-zone-necesidad
+- takeScreenshot: 12-oportunidades-05-movida-guardada
+
+# ---------------------------------------------------------------- «Cerradas sin acuerdo», folded
+# cubre: PRS-07
+- scrollUntilVisible:
+    element:
+      text: "Cerradas sin acuerdo · 1"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertNotVisible: "Ricardo Gil"
+- tapOn: "Cerradas sin acuerdo · 1"
+- scrollUntilVisible:
+    element:
+      text: "Logística Andina · ProjectApp · cerrada el .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible: "Ricardo Gil"
+- assertVisible: "Editar la oportunidad con Ricardo Gil"
+- takeScreenshot: 12-oportunidades-06-cerradas
+# Pending the failure switch: «vacio» on /api/v1/oportunidades shows «Aún no hay oportunidades» (criterion 5).
+
+# ---------------------------------------------------------------- «Nueva oportunidad»: required fields
+# cubre: PRS-08
+- scrollUntilVisible:
+    element:
+      text: "Nueva oportunidad"
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn: "Nueva oportunidad"
+- extendedWaitUntil:
+    visible:
+      id: opportunity-form
+    timeout: 15000
+- assertVisible:
+    text: "Nueva oportunidad"
+    childOf:
+      id: opportunity-form
+- scrollUntilVisible:
+    element:
+      text: "Registrar oportunidad"
+      childOf:
+        id: opportunity-form
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Registrar oportunidad"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    visible: "Falta algo obligatorio: revisa los campos marcados\\."
+    timeout: 10000
+- assertVisible:
+    id: opportunity-form
+- scrollUntilVisible:
+    element:
+      text: "Elige cómo llegó\\."
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Elige la modalidad\\."
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Elige a alguien de Personas\\."
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 12-oportunidades-07-obligatorios
+# «De Personas»: two letters find Laura, and choosing her fills the person.
+- tapOn:
+    id: opp-person-search
+- inputText: "Lau"
+- extendedWaitUntil:
+    visible:
+      text: "Laura Gómez"
+      childOf:
+        id: opportunity-form
+    timeout: 15000
+- hideKeyboard
+- tapOn:
+    text: "Laura Gómez"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    visible:
+      id: opp-picked
+    timeout: 10000
+- assertNotVisible: "Elige a alguien de Personas\\."
+- takeScreenshot: 12-oportunidades-08-de-personas
+# «Alguien fuera de la red»: the name is required too.
+- tapOn:
+    text: "Alguien fuera de la red"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    visible:
+      id: opp-name
+    timeout: 10000
+- assertVisible: "Escribe el nombre de la persona\\."
+- tapOn:
+    id: opp-name
+- inputText: "Lucia Prueba QA"
+- hideKeyboard
+- tapOn:
+    id: opp-company
+- inputText: "Cooperativa QA"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      id: opp-modality
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: opp-modality
+- tapOn:
+    text: "Startups \\(personal\\)"
+    childOf:
+      id: opportunity-form
+- scrollUntilVisible:
+    element:
+      id: opp-attribution
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: opp-attribution
+- tapOn:
+    text: "Se infiere"
+    childOf:
+      id: opportunity-form
+- scrollUntilVisible:
+    element:
+      id: opp-next
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: opp-next
+- inputText: "Llamada de QA"
+- hideKeyboard
+# The app has no date picker: a date it cannot read is refused.
+- scrollUntilVisible:
+    element:
+      id: opp-date
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    id: opp-date
+- inputText: "manana"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Registrar oportunidad"
+      childOf:
+        id: opportunity-form
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Registrar oportunidad"
+    childOf:
+      id: opportunity-form
+- scrollUntilVisible:
+    element:
+      text: "Escribe la fecha como AAAA-MM-DD\\."
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    id: opportunity-form
+- takeScreenshot: 12-oportunidades-09-fecha-invalida
+- tapOn:
+    id: opp-date
+- eraseText: 20
+- inputText: "2027-01-15"
+- hideKeyboard
+- assertNotVisible: "Escribe la fecha como AAAA-MM-DD\\."
+- scrollUntilVisible:
+    element:
+      text: "Registrar oportunidad"
+      childOf:
+        id: opportunity-form
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Registrar oportunidad"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "Oportunidad registrada"
+      childOf:
+        id: toast
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Lucia Prueba QA, Conversación"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Cooperativa QA"
+- takeScreenshot: 12-oportunidades-10-registrada
+- scrollUntilVisible:
+    element:
+      text: "Conversación · 2"
+    direction: UP
+    timeout: 15000
+
+# ---------------------------------------------------------------- edit and delete Isabel Duarte's opportunity
+# cubre: PRS-08
+- scrollUntilVisible:
+    element:
+      text: "Editar la oportunidad con Isabel Duarte"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Editar la oportunidad con Isabel Duarte"
+- extendedWaitUntil:
+    visible:
+      id: opportunity-form
+    timeout: 15000
+- assertVisible:
+    text: "Editar oportunidad"
+    childOf:
+      id: opportunity-form
+- tapOn:
+    id: opp-company
+- inputText: "Startup QA"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Guardar cambios"
+      childOf:
+        id: opportunity-form
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Guardar cambios"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "Cambios guardados"
+      childOf:
+        id: toast
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Startup QA"
+      childOf:
+        id: opp-248c540a-0323-5363-a6b1-ea307f707153
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 12-oportunidades-11-editada
+# «Eliminar» asks first, in the same sheet.
+- tapOn: "Editar la oportunidad con Isabel Duarte"
+- extendedWaitUntil:
+    visible:
+      id: opportunity-form
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Eliminar"
+      childOf:
+        id: opportunity-form
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn:
+    text: "Eliminar"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    visible:
+      text: "Eliminar la oportunidad"
+      childOf:
+        id: opportunity-form
+    timeout: 10000
+- assertVisible: "Se borra la oportunidad con Isabel Duarte y su historial\\. Deja de contar en Resultados\\. No se puede deshacer\\."
+- takeScreenshot: 12-oportunidades-12-confirmar-eliminar
+- tapOn:
+    text: "Eliminar"
+    childOf:
+      id: opportunity-form
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      text: "Oportunidad eliminada"
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Isabel Duarte"
+    timeout: 15000
+- assertNotVisible:
+    id: opp-248c540a-0323-5363-a6b1-ea307f707153
+- takeScreenshot: 12-oportunidades-13-eliminada

@@ -8,7 +8,8 @@ import httpx
 from django.utils import timezone
 from knowledge import db, memory, providers
 from team_backend import autopiloto, guardas, jobs, operador, preguntas
-from team_backend.models import ActionExecution, ActionProposal, Contact, Opportunity, TeamQuestion
+from team_backend.connectors import ConnectorError, FakeConnector
+from team_backend.models import ActionExecution, ActionProposal, Contact, Opportunity, Referent, TeamQuestion
 from team_backend.tests.test_operador import OperatorBase
 from team_backend.tests.test_publicacion import EditorialBase, answers
 
@@ -270,6 +271,20 @@ class PersonasAndCalendarTests(OperatorBase):
         off=self.human.patch(f'/api/v1/operador/referents/{referent["id"]}',{'active':False},format='json').json()
         self.assertFalse(off['active'])
         self.assertEqual(self.human.delete(f'/api/v1/operador/referents/{referent["id"]}').status_code,204)
+
+    def test_adding_a_referent_linkedin_cannot_find_says_why_instead_of_a_500(self):
+        # PRS-12: found by the QA flow 13-referentes. The provider's 404 used to escape as a server error.
+        add=lambda identifier:self.human.post('/api/v1/operador/referents',{'account':str(self.account.id),'identifier':identifier,
+                                                                             'reason':'Habla de producto'},format='json')
+        missing=add('https://www.linkedin.com/in/nadie-con-este-perfil/')
+        self.assertEqual(missing.status_code,400,missing.content)
+        self.assertEqual(missing.json()['detail'],'No encontramos ese perfil en LinkedIn: revisa la URL.')
+        with patch.object(FakeConnector,'get_user',side_effect=ConnectorError('Simulado: sin conexión.',kind='not_sent')):
+            down=add('referente-ai')
+        self.assertEqual(down.status_code,503,down.content)
+        self.assertEqual(down.json()['detail'],'No se pudo consultar LinkedIn: Simulado: sin conexión.')
+        self.assertFalse(Referent.objects.exists())
+        self.assertEqual(add('referente-ai').status_code,201)
 
     def test_calendar_days_bring_counts_and_layered_events(self):
         post=self.observed()[0]

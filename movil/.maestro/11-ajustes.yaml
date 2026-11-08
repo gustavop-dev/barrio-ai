@@ -1,8 +1,11 @@
-# cubre: AJU-04, AJU-11, PUS-04, ACC-08, ACC-09
-# Ajustes: every section top to bottom (its heading on screen), Autonomía y límites unfolded, one push type
-# switched off in Notificaciones, the devices list (the seeded «Pixel 7 de Gustavo (QA)» and this phone), and
-# finally «Cerrar sesión», which lands on the login. This flow runs last, so signing out is fine.
-# Section headings are etiquetas (drawn UPPERCASE); text matching is case-insensitive anyway.
+# cubre: AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-09, AJU-11
+# Ajustes, opened from the top bar, from Máquina to Captura y galería (Notificaciones, devices, «Lo que el equipo sabe
+# de ti», the section links and the session are in 15-ajustes-sesion): «Parada total» with its required reason, the
+# banner and «Reanudar»; pausing and resuming the simulated Unipile account; the orientation («Descartar cambios»,
+# then «Guardar orientación»); Autonomía y límites unfolded; Gasto de IA; LinkedIn oficial and «Conectar LinkedIn»,
+# which opens the office web in the phone's browser and refreshes on return; the microphone and the AI edit default,
+# off and on. Everything it changes is undone or re-seeded before the next flow (scripts/qa/correr-maestro.sh runs
+# seed_qa). Maestro matches text case-insensitively: section labels and badges are drawn UPPERCASE.
 appId: co.projectapp.office
 name: Ajustes
 tags: [ajustes]
@@ -15,22 +18,164 @@ tags: [ajustes]
     visible:
       id: screen-ajustes
     timeout: 20000
+# cubre: AJU-11
 - assertVisible:
     id: top-ajustes
     selected: true
 
-# ---------------------------------------------------------------- Máquina (not paused in the seed)
-# cubre: AJU-11
+# ---------------------------------------------------------------- Máquina: «Parada total» and «Reanudar»
+# cubre: AJU-01
 - extendedWaitUntil:
     visible: "MÁQUINA"
     timeout: 20000
 - extendedWaitUntil:
-    visible: "La máquina está en marcha\\..*"
+    visible: "La máquina está en marcha\\. Observa, redacta y actúa dentro de los topes\\."
     timeout: 20000
-- assertVisible: Parada total
+- assertVisible: "En marcha"
+- assertVisible: "Parada total"
 - takeScreenshot: 11-ajustes-01-maquina
+- tapOn: "Parada total"
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible:
+    text: "Se detiene todo el ciclo y ninguna acción se ejecuta hasta que la reanudes\\."
+    childOf:
+      id: confirm-sheet
+# The reason is required.
+- assertVisible:
+    text: "Detener la máquina"
+    childOf:
+      id: confirm-sheet
+    enabled: false
+- tapOn:
+    id: confirm-note
+- inputText: "Pausa de QA para revisar los topes"
+- hideKeyboard
+- takeScreenshot: 11-ajustes-02-parada-motivo
+- tapOn:
+    text: "Detener la máquina"
+    childOf:
+      id: confirm-sheet
+    enabled: true
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "Máquina detenida\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Detenida"
+    timeout: 15000
+- assertVisible: "Motivo: Pausa de QA para revisar los topes\\."
+- assertVisible: "Origen: Desde la app"
+- assertVisible: "Quién: qa"
+# Every view shows the pause under the top bar (OFI-07).
+- extendedWaitUntil:
+    visible: "Máquina en pausa · Pausa de QA para revisar los topes"
+    timeout: 20000
+- takeScreenshot: 11-ajustes-03-detenida
+- tapOn: "Reanudar"
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible:
+    text: "¿Reanudar la máquina\\?"
+    childOf:
+      id: confirm-sheet
+- tapOn:
+    text: "Reanudar"
+    childOf:
+      id: confirm-sheet
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "Máquina en marcha\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "En marcha"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Máquina en pausa.*"
+    timeout: 20000
+- takeScreenshot: 11-ajustes-04-en-marcha
+
+# ---------------------------------------------------------------- Máquina: pause only the Unipile account
+# cubre: AJU-02
+- scrollUntilVisible:
+    element:
+      text: "Pausar solo esta cuenta: LinkedIn de Gustavo \\(simulado\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "LinkedIn de Gustavo \\(simulado\\) \\(simulada\\)"
+- assertVisible: "Conectada"
+- assertVisible: "Comprobada hace .*"
+- tapOn: "Pausar solo esta cuenta: LinkedIn de Gustavo \\(simulado\\)"
+- extendedWaitUntil:
+    visible:
+      id: confirm-sheet
+    timeout: 15000
+- assertVisible:
+    text: "Pausar la cuenta"
+    childOf:
+      id: confirm-sheet
+    enabled: false
+- tapOn:
+    id: confirm-note
+- inputText: "Reviso la cuenta de QA"
+- hideKeyboard
+- tapOn:
+    text: "Pausar la cuenta"
+    childOf:
+      id: confirm-sheet
+    enabled: true
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
+    timeout: 15000
+- extendedWaitUntil:
+    visible:
+      text: "Cuenta en pausa\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "En pausa"
+    timeout: 15000
+- assertVisible: "Reviso la cuenta de QA"
+- takeScreenshot: 11-ajustes-05-cuenta-en-pausa
+- scrollUntilVisible:
+    element:
+      text: "Reanudar la cuenta"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: "Reanudar la cuenta"
+- extendedWaitUntil:
+    visible:
+      text: "Cuenta reanudada\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    visible: "Pausar solo esta cuenta: LinkedIn de Gustavo \\(simulado\\)"
+    timeout: 15000
+- assertNotVisible: "En pausa"
 
 # ---------------------------------------------------------------- Orientación para el equipo
+# cubre: AJU-03
 - scrollUntilVisible:
     element:
       text: "ORIENTACIÓN PARA EL EQUIPO"
@@ -40,8 +185,63 @@ tags: [ajustes]
     element:
       id: orientacion-field
     direction: DOWN
+    centerElement: true
     timeout: 30000
-- takeScreenshot: 11-ajustes-02-orientacion
+- assertVisible:
+    id: orientacion-field
+    text: "Habla a fundadores de startups latinoamericanas en etapa temprana\\. Evita el tono de vendedor\\."
+- assertVisible: "\\d+ de 4000 caracteres\\. Es privada: orienta las decisiones y nunca aparece en un texto público\\."
+- assertVisible: "Actualizada hace .* por qa\\."
+- assertVisible:
+    text: "Guardar orientación"
+    enabled: false
+- takeScreenshot: 11-ajustes-06-orientacion
+# A change can be discarded…
+- tapOn:
+    id: orientacion-field
+- eraseText: 200
+- inputText: "Prioriza casos de ProjectApp esta semana"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Descartar cambios"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: "Descartar cambios"
+- extendedWaitUntil:
+    visible:
+      id: orientacion-field
+      text: "Habla a fundadores de startups latinoamericanas.*"
+    timeout: 10000
+- assertNotVisible: "Descartar cambios"
+# …or saved.
+- tapOn:
+    id: orientacion-field
+- eraseText: 200
+- inputText: "Prioriza casos de ProjectApp esta semana"
+- hideKeyboard
+- scrollUntilVisible:
+    element:
+      text: "Guardar orientación"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- tapOn: "Guardar orientación"
+- extendedWaitUntil:
+    visible:
+      text: "Orientación guardada\\. El equipo la usa desde su próxima tarea\\."
+      childOf:
+        id: toast
+    timeout: 15000
+- assertVisible:
+    id: orientacion-field
+    text: "Prioriza casos de ProjectApp esta semana"
+- extendedWaitUntil:
+    visible: "Actualizada (hace .*|ahora.*) por qa\\."
+    timeout: 15000
+- assertNotVisible: "Descartar cambios"
+- takeScreenshot: 11-ajustes-07-orientacion-guardada
 
 # ---------------------------------------------------------------- Autonomía y límites (folded)
 # cubre: AJU-04
@@ -55,6 +255,16 @@ tags: [ajustes]
 - tapOn: "Autonomía y límites"
 - scrollUntilVisible:
     element:
+      text: "MODO POR CAPACIDAD · SOLO LECTURA"
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "El equipo actúa solo en modo Auto\\..*"
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
       text: "VENTANA HORARIA"
     direction: DOWN
     timeout: 30000
@@ -64,149 +274,140 @@ tags: [ajustes]
       text: "Horario: 00:00.23:59 · America/Bogota"
     direction: DOWN
     timeout: 30000
+- assertVisible: "Ahora: Abierta"
 - scrollUntilVisible:
     element:
       text: "TOPES DE HOY"
     direction: DOWN
     timeout: 30000
-- takeScreenshot: 11-ajustes-03-autonomia
+- takeScreenshot: 11-ajustes-08-autonomia
+- scrollUntilVisible:
+    element:
+      text: "LECTURAS DE LA RED"
+    direction: DOWN
+    timeout: 30000
 
-# ---------------------------------------------------------------- Gasto, LinkedIn oficial, Captura y galería
+# ---------------------------------------------------------------- Gasto de IA
+# cubre: AJU-05
 - scrollUntilVisible:
     element:
       text: "GASTO DE IA · HOY"
     direction: DOWN
     timeout: 30000
-- takeScreenshot: 11-ajustes-04-gasto
+- scrollUntilVisible:
+    element:
+      text: "General \\(comentarios\\)"
+    direction: DOWN
+    timeout: 30000
+- assertVisible: "Editorial"
+- scrollUntilVisible:
+    element:
+      text: "Este mes: .* USD de .* USD"
+    direction: DOWN
+    timeout: 30000
+- assertVisible: "Desde el inicio: .* USD"
+- assertVisible: "Agente líder, este mes: .* USD"
+- assertVisible: "Transcripción de audios, este mes: .* USD"
+- takeScreenshot: 11-ajustes-09-gasto
+
+# ---------------------------------------------------------------- LinkedIn oficial: «Conectar LinkedIn» opens the office web
+# cubre: AJU-06, AJU-07
 - scrollUntilVisible:
     element:
       text: "LINKEDIN OFICIAL · PUBLICACIÓN"
     direction: DOWN
     timeout: 30000
-- takeScreenshot: 11-ajustes-05-linkedin
+- scrollUntilVisible:
+    element:
+      text: "Sin conectar"
+    direction: DOWN
+    timeout: 30000
+- assertVisible: "La publicación real está desactivada en el servidor \\(LIVE_LINKEDIN_OFFICIAL=false\\).*"
+- scrollUntilVisible:
+    element:
+      text: "Versión de la API: .*"
+    direction: DOWN
+    timeout: 30000
+# The QA workflow configures a placeholder LinkedIn app (LINKEDIN_CLIENT_ID…), so the button shows. Nothing reaches
+# LinkedIn: the app only opens the office web (/ajustes#linkedin on the QA server) in the phone's browser.
+- scrollUntilVisible:
+    element:
+      text: "Conectar LinkedIn"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Se abre la oficina web dentro de la app.*"
+- takeScreenshot: 11-ajustes-10-linkedin
+- tapOn: "Conectar LinkedIn"
+- extendedWaitUntil:
+    notVisible:
+      id: screen-ajustes
+    timeout: 30000
+- takeScreenshot: 11-ajustes-11-oficina-web
+# Back from the browser (twice if Chrome shows its first-run screen first), the app refreshes the status.
+- repeat:
+    times: 3
+    while:
+      notVisible:
+        id: screen-ajustes
+    commands:
+      - back
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "Conectar LinkedIn"
+    timeout: 20000
+- assertNotVisible: "Esperando a que vuelvas…"
+- assertVisible: "Sin conectar"
+
+# ---------------------------------------------------------------- Captura y galería
+# cubre: AJU-08, AJU-09
 - scrollUntilVisible:
     element:
       text: "CAPTURA Y GALERÍA"
     direction: DOWN
     timeout: 30000
+# The QA install grants every permission (adb install -g).
+- scrollUntilVisible:
+    element:
+      text: "Se usa solo mientras mantienes el botón aguamarina o grabas desde la hoja de captura\\."
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Permitido"
 - scrollUntilVisible:
     element:
       text: "El equipo puede editar mis fotos con IA"
     direction: DOWN
-    timeout: 30000
-- takeScreenshot: 11-ajustes-06-captura
-
-# ---------------------------------------------------------------- Notificaciones: one push type off
-# cubre: PUS-04
-# The heading is looked up inside its own section: the top bar's bell is also labelled «Notificaciones».
-- scrollUntilVisible:
-    element:
-      text: "NOTIFICACIONES"
-      childOf:
-        id: ajustes-notificaciones
-    direction: DOWN
-    timeout: 30000
-- scrollUntilVisible:
-    element:
-      text: "Este dispositivo"
-    direction: DOWN
-    timeout: 30000
-- scrollUntilVisible:
-    element:
-      text: "Por tipo de notificación"
-    direction: DOWN
     centerElement: true
     timeout: 30000
-- assertNotVisible:
-    id: push-question
-- tapOn: "Por tipo de notificación"
-- scrollUntilVisible:
-    element:
-      id: push-question
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-# «Pregunta nueva del equipo» pushes by default (push_disabled is empty in the seed).
 - assertVisible:
-    id: push-question
-    text: Pregunta nueva del equipo
+    text: "El equipo puede editar mis fotos con IA"
     checked: true
-- takeScreenshot: 11-ajustes-07-tipos-de-push
-- tapOn:
-    id: push-question
+- takeScreenshot: 11-ajustes-12-captura
+- tapOn: "El equipo puede editar mis fotos con IA"
 - extendedWaitUntil:
-    visible: "Push apagada: Pregunta nueva del equipo\\."
+    visible:
+      text: "Las fotos nuevas no se editarán con IA\\."
+      childOf:
+        id: toast
     timeout: 15000
 - assertVisible:
-    id: push-question
+    text: "El equipo puede editar mis fotos con IA"
     checked: false
-- takeScreenshot: 11-ajustes-08-push-apagada
-
-# ---------------------------------------------------------------- Dispositivos con la app
-# cubre: ACC-09
-- scrollUntilVisible:
-    element:
-      text: "DISPOSITIVOS CON LA APP"
-    direction: DOWN
-    timeout: 30000
-- scrollUntilVisible:
-    element:
-      text: "Pixel 7 de Gustavo \\(QA\\)"
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-- assertVisible: "Cerrar la sesión de Pixel 7 de Gustavo \\(QA\\)"
-# This phone: its row has the «Este» badge and its own revoke label.
-- assertVisible: "Cerrar la sesión de este teléfono"
-- assertVisible: "ESTE"
-- takeScreenshot: 11-ajustes-09-dispositivos
-
-# ---------------------------------------------------------------- Lo que el equipo sabe de ti
-- scrollUntilVisible:
-    element:
-      id: sabe-link
-    direction: DOWN
-    timeout: 30000
-- assertVisible: "Lo que el equipo sabe de ti\\. 3 datos confirmados"
-- takeScreenshot: 11-ajustes-10-sabe
-
-# ---------------------------------------------------------------- Sesión y Acerca de: sign out
-# cubre: ACC-08
-- scrollUntilVisible:
-    element:
-      text: "SESIÓN Y ACERCA DE"
-    direction: DOWN
-    timeout: 30000
-- scrollUntilVisible:
-    element:
-      id: logout
-    direction: DOWN
-    centerElement: true
-    timeout: 30000
-- assertVisible: "Has entrado como qa\\."
-- assertVisible: "Versión: app .*"
-- takeScreenshot: 11-ajustes-11-sesion
-- tapOn:
-    id: logout
 - extendedWaitUntil:
-    visible:
-      id: confirm-sheet
+    notVisible:
+      id: toast
     timeout: 15000
-- assertVisible: "Este teléfono deja de recibir avisos y olvida su acceso\\..*"
-- takeScreenshot: 11-ajustes-12-confirmar-salida
-# Inside the sheet «Cerrar sesión» is both the title and the action; sorted top to bottom, the action is second.
-- tapOn:
-    text: Cerrar sesión
-    childOf:
-      id: confirm-sheet
-    index: 1
+- tapOn: "El equipo puede editar mis fotos con IA"
 - extendedWaitUntil:
     visible:
-      id: login
-    timeout: 30000
+      text: "Las fotos nuevas se podrán editar con IA\\."
+      childOf:
+        id: toast
+    timeout: 15000
 - assertVisible:
-    id: login-usuario
-- assertVisible: Entrar
-- assertNotVisible:
-    id: screen-ajustes
-- takeScreenshot: 11-ajustes-13-login
+    text: "El equipo puede editar mis fotos con IA"
+    checked: true
