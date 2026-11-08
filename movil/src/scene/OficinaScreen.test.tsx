@@ -87,7 +87,8 @@ it('receives a successful capture-sheet send without changing the POST, closing 
   await fireEvent.changeText(screen.getByTestId('capture-note'), 'Una idea para el equipo');
   await fireEvent.press(screen.getByTestId('capture-send'));
   expect(await screen.findByText('Llegó tu captura a la oficina.')).toBeOnTheScreen();
-  expect(screen.queryByTestId('capture-sheet')).toBeNull();
+  // MovCaptura: the sheet closes at the end of the envelope choreography (captureTimeline.send).
+  await waitFor(() => expect(screen.queryByTestId('capture-sheet')).toBeNull(), { timeout: 4000 });
   expect(api.find('POST', '/api/v1/capturas')).toHaveLength(1);
   expect(api.find('POST', '/api/v1/capturas')[0]!.body).toEqual([['nota', 'Una idea para el equipo']]);
   expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);

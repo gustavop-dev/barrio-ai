@@ -64,7 +64,7 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `toastDurations.withUndo` | 5000 | Lo que dura un aviso con «Deshacer» o «Recuperar», la ventana de acción reversible (`components/ui/Toast.tsx`). |
 | `toastDurations.plain` | 4000 | Lo que dura un aviso sin acción. |
 | `toastDurations.withUndo` (veto) | 5000 | El veto de una pieza o de una acción en cola espera esta ventana antes de enviarse, para que «Deshacer» lo anule (`calendario/pendingVeto.ts`). |
-| `copiedLabelMs` | 2000 | Lo que dura «Copiado» en el botón Copiar del texto final (`pieza/FinalText.tsx`). |
+| `copiedLabelMs` | 1500 | Lo que dura «Copiado» en el botón Copiar (`components/ui/CopyButton.tsx`, en `pieza/FinalText.tsx`; MovMicro: 1,5 s). |
 | `viewerFade` | 180 (fast) · enter | El visor de fotos a pantalla completa aparece y desaparece (`layout.viewerIn` y `layout.viewerOut`, en `galeria/PhotoViewer.tsx`). |
 | `progress` | 260 (base) · standard | La barra de «Subir fotos» avanza cada vez que entra una petición de hasta diez fotos (`galeria/UploadProgressCard.tsx`). |
 
@@ -111,7 +111,7 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `swipeThreshold` | selección | La tarjeta cruza el umbral de confirmación, también al volver atrás (`turno/SwipeableCard.tsx`). |
 | `swipeCommit` | impacto medio | El deslizamiento confirma su acción. |
 | `captureStart` | impacto medio | Empieza a grabar al mantener el botón, o al pulsar «Grabar un audio» en la hoja. |
-| `captureLock` | impacto ligero | Deslizar hacia arriba bloquea la grabación. |
+| `captureLock` | éxito | Deslizar hacia arriba bloquea la grabación (MovCaptura: «HÁPTICO · ÉXITO»). |
 | `captureDiscard` | aviso (warning) | Deslizar hacia la izquierda descarta la grabación. |
 | `captureSent` | éxito | La captura llegó al equipo (`capture/CaptureSheet.tsx`). |
 | `actionSuccess` | éxito | Una acción de tarjeta, una respuesta o una oportunidad se guardaron (`turno/*`). |
@@ -124,7 +124,7 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `toggle` | sin vibración | Marcar un chip o una opción (`components/ui/Chip.tsx`, `components/ui/Options.tsx`). |
 | `pageChange` | selección | Calendario: deslizar pasa la semana o el mes (`calendario/Pager.tsx`). |
 | `copied` | éxito | El texto final quedó en el portapapeles (`pieza/FinalText.tsx`). |
-| `switchToggle` | sin vibración | Cambiar un interruptor de fila: Ajustes y la hoja de la foto (`components/ui/SwitchRow.tsx`). |
+| `switchToggle` | selección | Cambiar un interruptor de fila: Ajustes y la hoja de la foto (`components/ui/SwitchRow.tsx`; MovMicro: «HÁPTICO · SELECCIÓN»). |
 | `uploadDone` | éxito | Las fotos llegaron a la Galería (`galeria/upload.ts`). |
 
 ## Usos en Galería, Ajustes y Notificaciones
@@ -180,6 +180,46 @@ sesión de desarrollo y observar `[Oficina/UI]` cada 300 frames. `meanSimulation
 los deltas incluyen el ritmo de presentación, no aíslan el coste de GPU. Comprobar también pan,
 pinch, regreso del fondo y movimiento reducido. El render local de CanvasKit y las pruebas no
 constituyen una medición de 60 fps en Android.
+
+## Tu turno y Notificaciones (MovTuTurno, MovNotificaciones)
+
+Los tableros de la fase 2 en `diseno-movimiento/tableros/`. Los valores viven en el bloque «Tu turno and Notificaciones» al final de `motion.ts`.
+
+**Tu turno** (`turno/exits.ts` lleva los pasos). Una tarjeta solo sale cuando el backend confirma. Desde el POST hasta el final, la lista conserva las filas que mostraba y reproduce sobre ellas:
+
+1. la salida de la tarjeta, según cómo se resolvió;
+2. el colapso;
+3. los contadores.
+
+Con movimiento reducido, cada paso es inmediato.
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `turnoTimings.check` / `turnoMotion.checkFrom` | 180 (fast) · enter, desde 0.6 | El botón que resolvió la tarjeta pasa a 0ff1ce-hondo con un ✓ que crece. La tarjeta se vuelve 0ff1ce-claro (`turno/DoneButton.tsx`, `turno/TurnoCard.tsx`, `turno/QuestionForm.tsx`). |
+| `turnoMotion.doneHoldMs` | 220 ms | Lo que la tarjeta resuelta enseña el ✓ antes de colapsar. Si se deslizó a la derecha, el ✓ es el del fondo que dejó al salir. |
+| `turnoTimings.laterSlide` / `turnoMotion.laterShift` | 260 (base) · exit, 40 · 6 pt | «Más tarde» con su botón: la tarjeta se desliza a la derecha y abajo, hacia «Pospuestas», mientras se desvanece (`turno/ExitRow.tsx`). |
+| `turnoTimings.collapse`, `turnoLayout.collapse` / `collapseSpace` / `listMove` | 260 (base) · exit | La tarjeta colapsa: su altura se cierra y se desvanece. La lista cierra el hueco al mismo ritmo (`itemLayoutAnimation` en `turno/TuTurnoScreen.tsx`). Igual si se resolvió con botón o deslizando. |
+| `turnoTimings.rollOut` / `rollIn`, `turnoMotion.rollDistance` | 90 · exit, luego 90 · enter, 8 pt | Un contador cambia girando: el número viejo sube y se va, y el nuevo entra desde abajo (`turno/RollingNumber.tsx`). Los usan el contador de cada grupo, «Pospuestas · N» y el de la barra superior. |
+| `turnoSprings.badge` / `turnoMotion.badgePop` | SOFT, desde 1.25 | El contador de Tu turno en la barra superior salta y vuelve cuando cambia (`components/shell/TopBar.tsx`). Baja cuando la tarjeta ya salió, no cuando el backend la quita (`turno/heldCount.ts`). |
+| `turnoMotion.labelDelayMs` | 260 ms (base) | La etiqueta de un grupo que se queda en 0 colapsa este tiempo después de que su última tarjeta deja de contar. |
+| `turnoMotion.emptyDelayMs` / `emptyRise`, `turnoTimings.emptyIn` | 340 ms, 8 pt, 260 (base) · enter | «Nada depende de ti hoy» aparece tras la última tarjeta, cuando el hueco ya se cerró. El bibliotecario sube 8 pt mientras aparece. |
+| `turnoMotion.postponedFlashMs` (`postponedFlashTiming()`) | 420 ms · lineal | La fila «Pospuestas» se ilumina en 0ff1ce-claro, subiendo y bajando como un seno, cuando recibe una tarjeta (`turno/PostponedFold.tsx`). |
+| `haptics.turnoLater` | impacto ligero | «Más tarde» manda la tarjeta a «Pospuestas», con el botón o deslizando (LEVE). Resolver con el botón sigue usando `actionSuccess` (ÉXITO). |
+
+**Notificaciones**
+
+Una notificación nueva puede llegar de dos formas:
+
+- el refresco de GET /tu-turno trae un `notifications_unread` mayor;
+- llega una push con la app abierta, y entonces la barra superior refresca Notificaciones y Tu turno (`notificaciones/arrival.ts`).
+
+| Token | Valor | Dónde se usa |
+|---|---|---|
+| `notifTimings.arrive`, `notifLayout.arrive` / `arriveContent` / `listMove`, `notifMotion.arriveDrop` | 260 (base) · enter, 8 pt | La notificación nueva abre su espacio arriba y cae 8 pt hasta su sitio. El resto de la lista baja al mismo ritmo: cada celda lleva una animación de layout (`notificaciones/NotificacionesScreen.tsx`). |
+| `notifMotion.bellSway` / `bellSwayMs` / `bellPivot`, `notifTimings.bellStep` | 12°, −9°, 6°, −3°, 0° en 600 ms; cada paso 120 · enter, pivote arriba al centro | La campana se balancea al llegar una notificación (`components/shell/TopBar.tsx`). Con movimiento reducido no se mueve. |
+| `notifSprings.dotIn` / `dotOut` | SOFT / FIRM | El punto de la campana salta desde 0 cuando llega una (`dot`) y se cierra cuando todo está leído. |
+| `notifMotion.readStaggerMs` / `readChipTo`, `notifTimings.readOff` | 30 ms por fila, 0.7, 180 (fast) · exit | «Marcar todo como leído» apaga «Nueva» y el resaltado de cada fila en cascada, de arriba abajo. La etiqueta encoge a 0.7 mientras se desvanece. |
+| `haptics.notificationArrive` | impacto ligero | Llega una notificación con la app abierta (LEVE). Vibra una sola vez aunque haya una barra superior por pestaña. |
 
 ### MovOficina · selección, captura y narración
 
@@ -252,3 +292,77 @@ Grupos propios en `motion.ts`: `navSprings`, `navTimings`, `navValues`, `navGest
 | `navTimings.entradaCut` | 0 | La puerta y el zoom saltan, nunca se interpolan. |
 | `entrada.formOutMs` / `formDrop` · `navTimings.entradaFormOut` | 160 ms · 16 pt · 180 (fast) · exit | El formulario baja y se va con el lema (`app/login.tsx`). |
 | `entrada.fadeMs` · `navTimings.entradaFade` | 460 ms · 260 (base) · enter | El login se funde con la Oficina viva, que ya está montada debajo. Con movimiento reducido es lo único que pasa (`crossfade()`). |
+
+## Captura, hojas y microinteracciones (MovCaptura, MovHojas, MovMicro)
+
+Los valores salen del código de los tableros `MovCaptura`, `MovHojas` y `MovMicro`. Los grupos viven al final de `motion.ts`: `sheetMotion`, `captureMotion`, `captureTimeline`, `microMotion`, `microLayout` y `curves`, con los ayudantes `springWith()`, `timingWith()` y `timelineWith()`.
+
+### Hojas (`components/ui/Sheet.tsx`, `SnapSheet.tsx` y, a través de `Sheet`, `ConfirmSheet.tsx`)
+
+La posición de la hoja (`p`) sube y baja con `springs.sheetOpen` (FIRM), también al cerrarse. La hoja deja de estar en cuanto `p` llega a 0, sin esperar a que el resorte se asiente. El fondo oscuro sigue a `p`.
+
+| Token | Valor | Qué hace |
+|---|---|---|
+| `sheetMotion.snaps` | 0,5 / 0,9 | Puntos de ajuste de `SnapSheet`, sobre el espacio disponible (`SNAPS`). El primero es `officeGestures.sheetHalf`, el que la Oficina deja a su escena. La hoja modal tiene un solo punto: su altura. |
+| `sheetMotion.projectionS` | 0,15 s | Al soltar, la hoja se proyecta 150 ms en la dirección del impulso (`p + v · 0,15`) y va al punto de ajuste más cercano a esa proyección. |
+| `sheetMotion.closeBelow` | 0,5 | Si la proyección queda bajo la mitad del punto más bajo, se cierra (0,25 de la pantalla con el punto 0,5; la mitad de su altura en la hoja modal). |
+| `rubberBand()` / `RUBBER` | 0,35 | Pasado el punto más alto, la hoja conserva el 35 % del arrastre. |
+| `sheetMotion.closedGap` | 20 px | Cerrada, la hoja queda 20 px por debajo de su altura, para que ningún borde asome (`SH + 20` de MovCaptura). |
+| `sheetMotion.activation` | 8 pt | Recorrido antes de que la manija tome el arrastre, hacia arriba o hacia abajo. Adaptación nativa: así los toques en la cabecera siguen funcionando. `SnapSheet` mantiene `officeGestures.sheetActivation`. |
+| `haptics.sheetSnap` | impacto ligero | La hoja se asienta en un punto nuevo, también al abrirse («HÁPTICO · LEVE»). La hoja de captura abierta desde el botón no vibra, porque su apertura es parte de la coreografía de la captura. |
+
+Ya no los usan las hojas: `gestures.sheet.dismissDistance` y `dismissVelocity` (los sustituye la proyección), `timings.backdrop` y `timings.sheetClose` (el fondo y el cierre siguen a FIRM) y `officeGestures.sheetFull` (lo sustituye `sheetMotion.snaps`).
+
+### Botón de captura (`capture/CaptureButton.tsx`, `capture/hold.ts`)
+
+| Token | Valor | Qué hace |
+|---|---|---|
+| `springs.captureGrow` | SOFT | El botón crece a `captureMotion.holdScale` (1,2) al empezar a grabar, y vuelve desde 0 tras descartar. |
+| `springs.captureFollow` | FIRM | El botón vuelve a su sitio y a escala 1 cuando el gesto termina en la hoja. |
+| `captureMotion.follow` | 0,6 | El botón sigue el 60 % del dedo, solo hacia arriba y hacia la izquierda. Sigue al dedo directamente, sin resorte. |
+| `captureMotion.lockRise` / `lockFollow` | 12 px / 0,35 | El candado sube 12 px al aparecer y acompaña al botón con el 35 % de su subida. |
+| `captureMotion.lockRestOpacity` / `lockRestScale` | 0,55 / 0,85 | Opacidad y escala del candado antes de mover el dedo; llegan a 1 en el punto de bloqueo. |
+| `captureMotion.shackleDrop` / `shackleMs` | 3 px / 120 ms | Al bloquear, el arco del candado baja 3 px en 120 ms (EASE_OUT). |
+| `captureMotion.barRise` / `barCancelFade` | 56 px / 0,6 | La franja con el tiempo sube desde 56 px (fast, EASE_OUT al entrar y EASE_IN al salir) y pierde el 60 % de su opacidad en el punto de descarte. |
+| `captureMotion.holdDim` | 0,5 | Al deslizar hacia arriba, la pantalla se oscurece hasta la mitad del fondo de las hojas. |
+| `captureMotion.trashShowAt` / `trashRestScale` / `lidOpenDeg` | 0,05 / 0,8 / −28° | La papelera aparece pasado el 5 % del camino a la izquierda, crece desde 0,8 y su tapa se abre hasta −28°. |
+| `captureMotion.dropScale` / `trashLingerMs` | 0,2 / 220 ms | Al descartar, el botón cae en la papelera encogiéndose a 0,2 (fast, EASE_IN). La papelera espera `fast + 220` ms, se cierra, el botón vuelve con SOFT y llega el aviso con «Recuperar». |
+| `captureMotion.sentPulse` / `pulse` | 1,18 / SOFT | Tras «Guardar», el botón late de 1,18 a 1. |
+| `haptics.captureStart` / `captureLock` / `captureDiscard` | medio / éxito / aviso | Empezar a grabar, bloquear y descartar. |
+
+### Hoja de captura (`capture/CaptureSheet.tsx`, `capture/choreo.ts`, `capture/glyphs.tsx`)
+
+| Token | Valor | Qué hace |
+|---|---|---|
+| `captureMotion.morph` | SOFT | Abierta desde el botón, el botón se convierte en el elemento de audio de la hoja: la bola de grabación, el icono de «Grabar un audio» o el botón de escuchar. |
+| `captureMotion.dockWithin` | 0,002 | Adaptación nativa: la bola que vuela cede su lugar al elemento de la hoja cuando está a menos del 0,2 % del final y quieta, o en cuanto la hoja se arrastra o se cierra. |
+| `captureMotion.ballBeat` / `ballPausedScale` | 0,08 / 0,96 | La bola late con la voz (1 + 0,08 · nivel). En pausa queda a 0,96, en 0ff1ce claro con un aro de 3 px. |
+| `captureMotion.ringBase` / `ringLevel` / `ringOpacity` / `ringFade` | 4 px / 18 px / 0,35 / 0,5 | El aro alrededor de la bola viva: 4 px más 18 px por el nivel, al 35 %, y se aclara a la mitad con la voz. |
+| `captureMotion.levelFollow` / `levelRelease` | 0,25 / 0,2 | El nivel sigue al micrófono a esa tasa por fotograma de 60 Hz, y vuelve al silencio a la otra. Se calcula en el hilo de la interfaz. |
+| `captureMotion.levelEveryMs` | 90 ms | La onda suma una barra cada 90 ms (`capture/recorder.tsx`). |
+| `captureMotion.pausedBlinkMs` / `pausedBlinkOpacity` | 500 ms / 0,35 | En pausa, el tiempo parpadea cada 500 ms hasta el 35 %. |
+| `captureMotion.iconTurnDeg` / `pauseFrom` / `playFrom` | 90° / 0,8 / 0,6 | Los iconos de la bola se cruzan girando 90° (fast, EASE_OUT): la pausa crece desde 0,8 y escuchar desde 0,6. |
+| `captureMotion.thumbFrom` / `thumbOvershoot` / `thumbPeakAt` | 0,6 / 1,06 / 60 % | Cada foto añadida entra de 0,6 a 1,06 al 60 % del tiempo y se asienta en 1 (`durations.base`, EASE_OUT; `microLayout.thumbIn`). |
+| `captureTimeline.discard` | 780 ms | «Descartar» la grabación: los controles se desvanecen (0–0,2), la papelera aparece con un rebote del 10 % (0–0,2) a 116 px bajo la bola, la tapa se abre, la bola vuela en arco (60 px a la derecha, 40 px arriba) y cae encogiéndose a 22 px (0,22–0,55, EASE_IN), «HÁPTICO · AVISO» a 0,55, la tapa se cierra (0,55–0,66), la papelera tiembla ±4 px (0,66–0,82) y se va (0,82–1). |
+| `captureTimeline.send` | 1000 ms | «Guardar», cuando el equipo ya tiene la captura: el contenido se desvanece (0–0,16), el audio se encoge al 45 % y entra en el sobre (0–0,36), el sobre aparece (0,02–0,2), las fotos vuelan a él escalonadas 40 ms, la solapa se cierra (0,3–0,42), «HÁPTICO · ÉXITO» a 0,42, la hoja baja a 0,45 y el sobre sale volando arriba a la derecha (0,45–1, EASE_IN), girando −18° y encogiéndose al 60 %. Al final, el botón late y llega el aviso. |
+| `curves.enter` / `curves.exit` | EASE_OUT / EASE_IN | Las curvas del diseño como funciones, para colocar piezas a lo largo de una línea de tiempo. |
+| `timelineWith()` | lineal | El reloj de esas líneas de tiempo. Corre también con movimiento reducido: como en los tableros, ese modo elige piezas más simples (el sobre se desvanece en vez de volar, la bola se encoge sin rebote, la papelera no tiembla) y las hojas saltan a su sitio. |
+
+Ya no los usa la captura: `timings.recordDot` (la franja muestra el punto quieto, como en el tablero), `timings.recordPulse` (la bola late con la voz), `timings.holdOverlay` y `layout.overlayIn`/`overlayOut` (la franja y el candado tienen sus tiempos), y `gestures.capture.maxLift` (el seguimiento es el 60 % del dedo).
+
+### Microinteracciones (`components/ui/Button.tsx`, `SwitchRow.tsx`, `Chip.tsx`, `CopyButton.tsx`, `Field.tsx`, `Skeleton.tsx`, `Toast.tsx`)
+
+| Token | Valor | Qué hace |
+|---|---|---|
+| `microMotion.pressDown` / `pressedScale` | 60 · 900 · 1 / 0,97 | Al presionar, el botón cede a 0,97 con un resorte rígido. |
+| `microMotion.pressUp` | FIRM | Al soltar, vuelve a 1. |
+| `microMotion.switchKnob` / `switchColorAt` | FIRM / 0,5 | La perilla del interruptor se desliza con FIRM. La pista y el borde de la perilla pasan a 0ff1ce hondo a mitad de un tween fast con EASE_OUT. |
+| `microMotion.chipCheckShift` | 6 px | Al elegir un chip, se rellena de tinta al instante y su marca entra desde 6 px a la izquierda (fast; EASE_OUT al entrar, EASE_IN al salir). |
+| `haptics.chipToggle` | selección | Elegir o soltar un chip de filtro. |
+| `microMotion.copyTurnDeg` / `copyCheckFrom` | 90° / 0,6 | «Copiado»: el icono de copiar gira 90° y se va, y la marca entra girando desde −90° y creciendo desde 0,6 (fast, EASE_OUT). Pasado `copiedLabelMs`, ambos vuelven sin animación. |
+| `microMotion.skeletonPeriodMs` / `skeletonLow` / `skeletonLag` / `skeletonStill` | 1200 ms / 0,55 / 0,4 rad / 0,7 | Cada bloque de carga late en opacidad entre el 55 % y el 100 % cada 1,2 s, 0,4 rad detrás del anterior. Con movimiento reducido queda quieto al 70 %. |
+| `microMotion.toastRise` | 12 px | El aviso entra subiendo 12 px (fast, EASE_OUT) y sale bajando (fast, EASE_IN) (`microLayout.toastIn`/`toastOut`). |
+
+El campo de texto no anima: al enfocarlo, el borde pasa a 2 px 0ff1ce hondo (el relleno devuelve el píxel, así el texto no se mueve) y la etiqueta pasa a 0ff1ce hondo.
+
+Ya no los usan los botones ni el aviso: `timings.press` y `springs.press` en `Button.tsx` (la barra inferior sigue usando `springs.press`), `springs.toast`, `layout.toastIn` y `layout.toastOut`.

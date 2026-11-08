@@ -2,6 +2,7 @@
 // «Para qué es», the context chip, the multipart upload with its 5 s «Deshacer», and the microphone
 // explained before the system asks).
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
+import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { State } from 'react-native-gesture-handler';
 import { createGestureController, fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
@@ -9,11 +10,11 @@ import '@/api/transport';
 import { audio, resetFakeAudio } from '@/test/fakeAudio';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
-import { toastDurations } from '@/theme/motion';
+import { captureMotion, captureTimeline, gestures, toastDurations } from '@/theme/motion';
 import { CaptureButton } from './CaptureButton';
 import { CaptureSheetHost } from './CaptureSheet';
 import { checkPhotos, toPickedPhoto } from './photos';
-import { holdDecision, holdLift, isTooShort } from './hold';
+import { discardProgress, holdDecision, holdFollow, isTooShort, lockProgress } from './hold';
 import { closeCaptureSheet, openCaptureSheet, resetCaptureStoreForTests } from './store';
 
 const CAPTURE = { id: 'c1', state: 'recibida', state_label: 'Recibida', undo_until: new Date(Date.now() + 120_000).toISOString(), can_undo: true };
@@ -50,16 +51,30 @@ afterEach(async () => {
   await act(async () => closeCaptureSheet());
 });
 
-describe('capture rules (motion.ts gestures.capture)', () => {
+describe('capture rules (motion.ts gestures.capture, MovCaptura)', () => {
   it('slide up 64 to lock, left 110 to discard; up wins', () => {
-    expect(holdDecision(0, -65)).toBe('lock');
-    expect(holdDecision(-111, 0)).toBe('discard');
+    expect(holdDecision(0, -64)).toBe('lock');
+    expect(holdDecision(-110, 0)).toBe('discard');
     expect(holdDecision(-120, -70)).toBe('lock');
     expect(holdDecision(-50, -30)).toBe('none');
-    expect(holdLift(-200)).toBe(-60);
-    expect(holdLift(30)).toBe(0);
     expect(isTooShort(1000, 1500)).toBe(true);
     expect(isTooShort(1000, 1700)).toBe(false);
+  });
+
+  it('the button follows 60 % of the finger, only up and left, and the lock and trash fill on the way', () => {
+    expect(holdFollow(-100)).toBe(-60);
+    expect(holdFollow(30)).toBe(0);
+    expect(lockProgress(holdFollow(-gestures.capture.lockDistance))).toBe(1);
+    expect(lockProgress(holdFollow(-32))).toBeCloseTo(0.5);
+    expect(discardProgress(holdFollow(-55))).toBeCloseTo(0.5);
+    expect(discardProgress(holdFollow(20))).toBe(0);
+  });
+
+  it('uses the board values: hold scale, follow, lock and trash, and the two timelines', () => {
+    expect(captureMotion).toMatchObject({ holdScale: 1.2, follow: 0.6, lockRise: 12, shackleDrop: 3, shackleMs: 120, lidOpenDeg: -28, dropScale: 0.2, trashLingerMs: 220, sentPulse: 1.18 });
+    expect(captureMotion.morph).toEqual({ damping: 14, stiffness: 160, mass: 1 });
+    expect(captureTimeline.discard).toMatchObject({ ms: 780, dropAt: 0.55, binBelow: 116, shrinkTo: 22 });
+    expect(captureTimeline.send).toMatchObject({ ms: 1000, sealAt: 0.42, closeAt: 0.45, thumbStagger: 0.04 });
   });
 
   it('keeps JPEG, PNG, WebP or HEIC up to 10 MB, ten per capture', () => {
@@ -109,6 +124,7 @@ describe('capture button', () => {
     now.mockReturnValue(10_100);
     await act(async () => {});
     expect(audio.recorder.record).toHaveBeenCalled();
+    expect(Haptics.impactAsync).toHaveBeenCalledWith('medium');
     expect(screen.getByText('Desliza hacia arriba para bloquear')).toBeOnTheScreen();
     now.mockReturnValue(12_000);
     await act(async () => {
@@ -132,6 +148,26 @@ describe('capture button', () => {
     expect(await screen.findByTestId('capture-recording')).toBeOnTheScreen();
     expect(screen.getByText('Grabando · bloqueado')).toBeOnTheScreen();
     expect(audio.recorder.stop).not.toHaveBeenCalled();
+    // «HÁPTICO · ÉXITO» at the lock point.
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('success');
+  });
+
+  it('«Descartar» in the sheet throws the ball into the bin, then offers to record again', async () => {
+    capturaServer();
+    await renderCapture();
+    const hold = await startHold();
+    await act(async () => {
+      hold.update({ translationY: -80 });
+      hold.end({ translationY: -80 });
+    });
+    const panel = await screen.findByTestId('capture-recording');
+    await fireEvent.press(within(panel).getByText('Descartar'));
+    // The panel stays while the ball falls; the recording is already stopped.
+    expect(screen.getByTestId('capture-recording')).toBeOnTheScreen();
+    expect(await screen.findByText('Grabar un audio', {}, { timeout: 4000 })).toBeOnTheScreen();
+    expect(screen.queryByTestId('capture-recording')).toBeNull();
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('warning');
+    expect(screen.getByTestId('capture-sheet')).toBeOnTheScreen();
   });
 
   it('sliding left discards it, and «Recuperar» brings the audio back', async () => {
@@ -142,7 +178,9 @@ describe('capture button', () => {
       hold.update({ translationX: -130 });
       hold.end({ translationX: -130 });
     });
-    expect(await screen.findByText('Grabación descartada.')).toBeOnTheScreen();
+    // The button falls into the trash first (fast + trashLingerMs), then the toast.
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('warning');
+    expect(await screen.findByText('Grabación descartada.', {}, { timeout: 4000 })).toBeOnTheScreen();
     expect(screen.queryByText('Para el equipo')).toBeNull();
     await fireEvent.press(screen.getByText('Recuperar'));
     expect(await screen.findByTestId('capture-audio')).toBeOnTheScreen();
@@ -188,8 +226,11 @@ describe('capture sheet', () => {
       ['nota', 'Para el post del jueves'],
       ['para', 'post'],
     ]);
-    expect(await screen.findByText('Enviado al equipo.')).toBeOnTheScreen();
+    // The envelope choreography plays first: the sheet goes and the toast comes at its end.
+    expect(screen.getByTestId('capture-sheet')).toBeOnTheScreen();
+    expect(await screen.findByText('Enviado al equipo.', {}, { timeout: 4000 })).toBeOnTheScreen();
     expect(screen.queryByTestId('capture-sheet')).toBeNull();
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('success');
 
     await fireEvent.press(screen.getByText('Deshacer'));
     await waitFor(() => expect(server.find('DELETE', '/api/v1/capturas/c1')).toHaveLength(1));
@@ -243,6 +284,15 @@ describe('capture sheet', () => {
     await fireEvent.press(within(sheet).getByText('Foto para la galería'));
     expect(within(sheet).getByText('Para «Foto para la galería» adjunta al menos una foto.')).toBeOnTheScreen();
     expect(within(sheet).getByTestId('capture-send')).toBeDisabled();
+  });
+
+  it('the close button slides an empty sheet away', async () => {
+    capturaServer();
+    await renderCapture();
+    await act(async () => openCaptureSheet());
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.press(within(sheet).getByLabelText('Cerrar sin guardar'));
+    await waitFor(() => expect(screen.queryByTestId('capture-sheet')).toBeNull());
   });
 
   it('closing with content asks first', async () => {

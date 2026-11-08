@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { layout, toastDurations } from '@/theme/motion';
+import { microLayout, toastDurations } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { T } from './Text';
 
@@ -34,7 +34,10 @@ export function useToast(): ToastApi {
   return useContext(ToastContext);
 }
 
-/** Mount once near the root. It floats above the bottom bar; screen readers announce each toast. */
+/**
+ * Mount once near the root. It floats above the bottom bar; screen readers announce each toast.
+ * MovCaptura: it fades in rising 12 px (fast, EASE_OUT) and fades out sinking back (fast, EASE_IN).
+ */
 export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: { children: ReactNode; bottomOffset?: number }) {
   const [toast, setToast] = useState<ToastState | null>(null);
   const nextId = useRef(1);
@@ -63,8 +66,8 @@ export function ToastProvider({ children, bottomOffset = shell.tabBarHeight }: {
         {toast ? (
           <Animated.View
             key={toast.id}
-            entering={layout.toastIn()}
-            exiting={layout.toastOut()}
+            entering={microLayout.toastIn()}
+            exiting={microLayout.toastOut()}
             style={[styles.toast, toast.tone === 'error' ? styles.error : null]}
             accessibilityRole="alert"
             accessibilityLiveRegion="polite"

@@ -1,5 +1,7 @@
 // A Tu turno card (the PWA's TurnoCardView): type, priority, deadline, who asks, title, body by type,
 // actions and «Creada hace X», inside a SwipeableCard (right: the primary action; left: «Más tarde»).
+// MovTuTurno: once the backend confirms, the button that resolved it turns into a check and the card
+// goes 0ff1ce-claro, then it leaves the list (exits.ts runs the steps; a swipe skips the check).
 import { usePostponePregunta, useTurnoAction } from '@compartido/api/hooks';
 import type { TurnoAction, TurnoCard as TurnoCardData, TurnoOpportunity, TurnoPriority } from '@compartido/api/types';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '@compartido/logic/format';
@@ -14,6 +16,8 @@ import { isHttps, openLink } from '@/navigation';
 import { haptic } from '@/theme/motion';
 import { colors, space } from '@/theme/tokens';
 import { cardTitle, modalFor, orderedActions, successMessage, swipeIntents, TYPE_ICON, TYPE_LABEL, typeTone, withNote, type SwipeIntent } from './actions';
+import { DoneButton } from './DoneButton';
+import { buttonKey, useTurnoExitsApi, type CardExit } from './exits';
 import { OpportunitySheet } from './OpportunitySheet';
 import { QuestionForm } from './QuestionForm';
 import { SwipeableCard } from './SwipeableCard';
@@ -22,22 +26,27 @@ import type { SwipeSide } from './swipe';
 const TYPE_COLOR = { suave: colors.inkSoft, alerta: colors.alert, hondo: colors.brandDeep, info: colors.info } as const;
 
 /** Runs card actions: the POST (with its modal when it needs one) and the toasts. Shared by the buttons and the swipe. */
-function useActionRunner() {
+function useActionRunner(cardId: string) {
   const toast = useToast();
   const run = useTurnoAction();
+  const exits = useTurnoExitsApi();
   const [asking, setAsking] = useState<TurnoAction | null>(null);
   const [running, setRunning] = useState<TurnoAction | null>(null);
 
-  const execute = async (action: TurnoAction, note = ''): Promise<boolean> => {
+  /** `flown`: a swipe already took the card off screen (no check in the button). */
+  const execute = async (action: TurnoAction, note = '', flown = false): Promise<boolean> => {
     setRunning(action);
+    exits.begin(cardId);
     try {
       await run.mutateAsync(withNote(action, note));
       setAsking(null);
       haptic('actionSuccess');
       toast.show(successMessage(action));
+      exits.resolve(cardId, { kind: 'done', lead: flown ? 'flown' : 'check', by: buttonKey.action(action.label) });
       return true;
     } catch {
       haptic('actionError');
+      exits.cancel(cardId);
       return false;
     } finally {
       setRunning(null);
@@ -45,13 +54,13 @@ function useActionRunner() {
   };
 
   /** Tap or swipe: ask first when the action needs a note or a confirmation. */
-  const start = async (action: TurnoAction): Promise<boolean> => {
+  const start = async (action: TurnoAction, flown = false): Promise<boolean> => {
     run.reset();
     if (modalFor(action)) {
       setAsking(action);
       return false;
     }
-    return execute(action);
+    return execute(action, '', flown);
   };
 
   return { run, asking, setAsking, running, execute, start };
@@ -59,13 +68,22 @@ function useActionRunner() {
 
 type Runner = ReturnType<typeof useActionRunner>;
 
-function CardActions({ card, runner, onOpportunity }: { card: TurnoCardData; runner: Runner; onOpportunity: (prefill: TurnoOpportunity) => void }) {
+interface CardActionsProps {
+  card: TurnoCardData;
+  runner: Runner;
+  onOpportunity: (prefill: TurnoOpportunity) => void;
+  /** The button that resolved the card (`buttonKey`): it shows the check. */
+  resolvedBy: string | null;
+}
+
+function CardActions({ card, runner, onOpportunity, resolvedBy }: CardActionsProps) {
   const ordered = orderedActions(card.actions ?? []);
   if (!ordered.length) return null;
   const [first, second, ...rest] = ordered;
 
   const render = (action: TurnoAction, variant: ButtonVariant) => {
     const block = variant !== 'ghost';
+    if (resolvedBy === buttonKey.action(action.label)) return <DoneButton key={action.label} label={action.label} block={block} />;
     if (action.opportunity) {
       const prefill = action.opportunity;
       return (
@@ -227,7 +245,7 @@ function ConversationBody({ card }: { card: TurnoCardData }) {
   );
 }
 
-function QuestionBody({ card }: { card: TurnoCardData }) {
+function QuestionBody({ card, resolvedBy }: { card: TurnoCardData; resolvedBy: string | null }) {
   const question = card.question!;
   const purpose = question.purpose || card.body;
   return (
@@ -240,7 +258,7 @@ function QuestionBody({ card }: { card: TurnoCardData }) {
           <T soft>{purpose}</T>
         </View>
       ) : null}
-      <QuestionForm question={question} />
+      <QuestionForm question={question} cardId={card.id} resolved={resolvedBy === buttonKey.answer} />
     </>
   );
 }
@@ -253,11 +271,14 @@ export interface TurnoCardProps {
   priority: TurnoPriority | null;
   /** Shows «NUEVA». */
   isNew?: boolean;
+  /** MovTuTurno: the card is on its way out (exits.ts). */
+  exit?: CardExit;
 }
 
-export function TurnoCard({ card, priority, isNew = false }: TurnoCardProps) {
+export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProps) {
   const toast = useToast();
-  const runner = useActionRunner();
+  const runner = useActionRunner(card.id);
+  const exits = useTurnoExitsApi();
   const postpone = usePostponePregunta();
   const [opportunity, setOpportunity] = useState<TurnoOpportunity | null>(null);
   const expired = priority === null;
@@ -266,28 +287,35 @@ export function TurnoCard({ card, priority, isNew = false }: TurnoCardProps) {
   const tone = typeTone(card, priority);
   const intents = swipeIntents(card, expired);
 
-  const swipe = async (side: SwipeSide): Promise<boolean> => {
+  /** `flown`: the finger swiped the card off screen; false from the screen reader's actions (the card leaves as with its button). */
+  const swipe = async (side: SwipeSide, flown: boolean): Promise<boolean> => {
     const intent: SwipeIntent | null = side === 'right' ? intents.right : intents.left;
     if (!intent) return false;
-    if (intent.kind === 'run') return runner.start(intent.action);
+    if (intent.kind === 'run') return runner.start(intent.action, flown);
+    exits.begin(card.id);
     try {
       const result = await postpone.mutateAsync(intent.questionId);
       const back = longDate(result?.postponed_until);
+      haptic('turnoLater');
       toast.show(back ? `Pospuesta. Vuelve el ${back}` : 'Pospuesta 3 días');
+      exits.resolve(card.id, { kind: 'later', lead: flown ? 'flown' : 'slide' });
       return true;
     } catch (error) {
       haptic('actionError');
+      exits.cancel(card.id);
       toast.show(error instanceof Error ? error.message : 'No se pudo posponer', { tone: 'error' });
       return false;
     }
   };
 
   const spec = runner.asking ? modalFor(runner.asking) : null;
+  // MovTuTurno: after the backend confirms, the resolving button holds a check and the card turns 0ff1ce-claro.
+  const resolvedBy = exit && exit.phase !== 'acting' && exit.lead === 'check' ? (exit.by ?? null) : null;
 
   return (
     <>
       <SwipeableCard testID={`turno-card-${card.id}`} rightLabel={intents.right?.label ?? null} leftLabel={intents.left?.label ?? null} onSwipe={swipe}>
-        <Card tone={priority === 'urgente' ? 'bad' : null}>
+        <Card tone={priority === 'urgente' ? 'bad' : null} style={resolvedBy ? styles.resolved : null}>
           <View style={styles.head}>
             <View style={styles.type}>
               <Icon name={TYPE_ICON[card.type] ?? 'aviso'} size={18} color={TYPE_COLOR[tone]} />
@@ -321,8 +349,16 @@ export function TurnoCard({ card, priority, isNew = false }: TurnoCardProps) {
           <T variant="subtitulo" accessibilityRole="header">
             {cardTitle(card)}
           </T>
-          {card.question ? <QuestionBody card={card} /> : card.attempt ? <Attempt card={card} /> : card.conversation ? <ConversationBody card={card} /> : <NoticeBody card={card} />}
-          {card.question ? null : <CardActions card={card} runner={runner} onOpportunity={setOpportunity} />}
+          {card.question ? (
+            <QuestionBody card={card} resolvedBy={resolvedBy} />
+          ) : card.attempt ? (
+            <Attempt card={card} />
+          ) : card.conversation ? (
+            <ConversationBody card={card} />
+          ) : (
+            <NoticeBody card={card} />
+          )}
+          {card.question ? null : <CardActions card={card} runner={runner} onOpportunity={setOpportunity} resolvedBy={resolvedBy} />}
           {created ? (
             <T variant="detalle" soft>
               {created}
@@ -365,4 +401,5 @@ const styles = StyleSheet.create({
   chips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: space[1] },
   actions: { gap: space[2] },
   ghosts: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], justifyContent: 'center' },
+  resolved: { backgroundColor: colors.brandLight },
 });

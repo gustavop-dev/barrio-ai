@@ -41,6 +41,29 @@ export function useCaptureSheet(): CaptureSheetState {
   return useSyncExternalStore(subscribe, () => state, () => state);
 }
 
+// ---------------------------------------------------------------- sent (MovCaptura: the button pulses)
+
+let sentCount = 0;
+const sentListeners = new Set<() => void>();
+
+/** A capture reached the team: the capture button pulses once. */
+export function notifyCaptureSent() {
+  sentCount += 1;
+  sentListeners.forEach((listener) => listener());
+}
+
+function subscribeSent(listener: () => void) {
+  sentListeners.add(listener);
+  return () => {
+    sentListeners.delete(listener);
+  };
+}
+
+/** How many captures were sent since the app started (changes on each one). */
+export function useCaptureSentCount(): number {
+  return useSyncExternalStore(subscribeSent, () => sentCount, () => sentCount);
+}
+
 // ---------------------------------------------------------------- first use
 
 const USED_KEY = 'oficina.captura-usada';
