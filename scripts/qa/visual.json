@@ -1,0 +1,12 @@
+{
+  "nota": "Regresión visual de la QA móvil (scripts/qa/visual.py). tolerancia: parte de los píxeles que puede cambiar; umbral_pixel: cuánto debe moverse un canal (0-255) para contar; mascaras: [x, y, ancho, alto] en dp de 390x844 que no se comparan (la barra de estado siempre). En capturas, patrones fnmatch con tolerancia, mascaras o ignorar.",
+  "tolerancia": 0.015,
+  "umbral_pixel": 40,
+  "mascaras": [[0, 0, 390, 24]],
+  "capturas": {
+    "01-entrada-05-puerta": {"ignorar": true, "nota": "a mitad de la animación de entrada"},
+    "01-entrada-*": {"tolerancia": 0.05, "nota": "flujo con animaciones: la escena del héroe se mueve"},
+    "03-oficina-*": {"tolerancia": 0.25, "nota": "flujo con animaciones: los personajes caminan"},
+    "07-calendario-*": {"tolerancia": 0.06, "nota": "las fechas del calendario cambian cada día"}
+  }
+}
