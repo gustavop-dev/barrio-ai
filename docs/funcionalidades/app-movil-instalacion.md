@@ -2,7 +2,7 @@
 
 Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, qué permisos pide y qué falta para que todo funcione en un teléfono real.
 
-- **Código:** `movil/eas.json`, `movil/app.json`, `movil/src/api/config.ts`, `movil/src/api/transport.ts`, `movil/src/api/token.ts`, `movil/package.json`; CI `.github/workflows/barrio-ai.yml` (trabajo `movil`).
+- **Código:** `movil/eas.json`, `movil/app.json`, `movil/src/api/config.ts`, `movil/src/api/transport.ts`, `movil/src/api/token.ts`, `movil/package.json`, `movil/jest.config.js`; CI `.github/workflows/barrio-ai.yml` (trabajo `movil`) y `.github/workflows/eas-update.yml`.
 - **Documentación:** [`movil/README.md`](../../movil/README.md), [`movil/AGENTS.md`](../../movil/AGENTS.md), [`app-movil-backend.md`](../../agentes-linkedin/infra/docs/app-movil-backend.md).
 
 ## Resumen
@@ -19,6 +19,7 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
 | [APP-08](#app-08) | Mensajes de error de red en español | app | con fallo conocido |
 | [APP-09](#app-09) | App para iPhone | app | no implementado |
 | [APP-10](#app-10) | Comprobaciones automáticas de la app | app | funciona |
+| [APP-11](#app-11) | Actualizaciones OTA sin reinstalar | app | funciona |
 
 ---
 
@@ -89,7 +90,7 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
 - **Criterios de aceptación:**
   1. **Dado** la app instalada con sesión, **cuando** instala un APK nuevo del mismo paquete y firma, **entonces** al abrirla sigue dentro sin escribir la contraseña.
   2. **Dado** que desinstala la app, **cuando** la vuelve a instalar, **entonces** tiene que entrar de nuevo y el dispositivo viejo queda en la lista hasta que lo cierre ([ACC-09](acceso.md#acc-09)).
-- **Brechas código/docs:** no hay `expo-updates`: cada cambio exige una build nueva.
+- **Brechas código/docs:** — (desde [APP-11](#app-11), solo los cambios nativos exigen un APK nuevo; los de JavaScript llegan como actualización OTA).
 - **Cobertura QA:** pendiente
 
 ### APP-06 · Probar con Expo Go <a id="app-06"></a>
@@ -147,13 +148,36 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
 
 - **Dónde:** app
 - **Estado:** funciona
-- **Qué hace para Gustavo:** cada PR que toca la app o el código compartido pasa tipos, lint, pruebas y un empaquetado de Android antes de fusionarse.
-- **Código:** `.github/workflows/barrio-ai.yml`, trabajo `movil` (`npm ci && npm run typecheck && npm run lint && npm test -- --ci && npx expo export --platform android`).
+- **Qué hace para Gustavo:** cada PR que toca la app o el código compartido pasa tipos, lint, pruebas y un empaquetado de Android antes de fusionarse, y dice qué parte del código cubren las pruebas.
+- **Código:** `.github/workflows/barrio-ai.yml`, trabajo `movil` (`npm ci && npm run typecheck && npm run lint && npm run test:cobertura -- --ci && npx expo export --platform android`); `movil/jest.config.js` (cobertura de `movil/src` y `compartido/src`); `.github/scripts/cobertura.py` (tabla del resumen).
 - **Criterios de aceptación:**
-  1. **Dado** un PR que cambia `movil/`, `compartido/` o el workflow, **cuando** corre CI, **entonces** pasa el trabajo `movil` completo.
+  1. **Dado** un PR que cambia `movil/`, `compartido/`, el workflow o `.github/scripts/`, **cuando** corre CI, **entonces** pasa el trabajo `movil` completo.
   2. **Dado** un PR que no toca esas carpetas, **cuando** corre CI, **entonces** el trabajo `movil` se salta.
   3. **Dado** CI, **cuando** termina, **entonces** no compila ninguna build de EAS: el APK se compila a mano.
+  4. **Dado** el trabajo `movil`, **cuando** terminan las pruebas, **entonces** su resumen muestra «Cobertura · movil + compartido» con sentencias, ramas, funciones y líneas de `movil/src/`, `compartido/src/` y el total, y el informe completo (lcov y HTML) queda en el artefacto `cobertura-movil`.
+  5. **Dado** una cobertura más baja que la anterior, **cuando** corre CI, **entonces** el trabajo no falla por eso: la cobertura es solo informe, sin umbrales.
 - **Brechas código/docs:** las pruebas de la app simulan `fetch` (`movil/src/test/server.ts`), así que no cubren el comportamiento real de `expo/fetch` (multipart y errores de red). El filtro de rutas del workflow no incluye `docs/`: un PR solo de documentación no dispara CI.
+- **Cobertura QA:** pendiente
+
+### APP-11 · Actualizaciones OTA sin reinstalar <a id="app-11"></a>
+
+- **Dónde:** app
+- **Estado:** funciona
+- **Qué hace para Gustavo:** los cambios de pantallas, textos y lógica llegan solos a la app instalada, sin compilar ni reinstalar el APK. Solo los cambios nativos piden un APK nuevo.
+- **Código:** `expo-updates` en `movil/package.json`; `movil/app.json` (`updates.url: https://u.expo.dev/704ea73a-9382-4918-b361-ea6d83bd582e`, `runtimeVersion: { policy: "fingerprint" }`); `movil/eas.json` (`channel: preview` y `channel: production`); `.github/workflows/eas-update.yml` (`eas update --branch preview --environment preview --platform android`).
+- **Depende de:** el secreto `EXPO_TOKEN` del repositorio y un APK compilado con este código. Los APK anteriores no tienen `expo-updates` y no reciben nada.
+- **Criterios de aceptación:**
+  1. **Dado** un APK del perfil `preview`, **cuando** se compila, **entonces** lleva el canal `preview` y una `runtimeVersion` calculada con la política `fingerprint`. Uno del perfil `production` lleva el canal `production`.
+  2. **Dado** un push a `main` que cambia `movil/src` o `compartido/src`, **cuando** corre «Actualización OTA (preview)», **entonces** pasa tipos, lint y pruebas y publica una actualización Android en la rama `preview`, con el asunto del commit como mensaje.
+  3. **Dado** un push a `main` que solo cambia archivos `.md` o `movil/diseno-movimiento/`, **cuando** llega a GitHub, **entonces** no se publica nada.
+  4. **Dado** que los tipos, el lint o las pruebas fallan en ese commit, **cuando** corre el workflow, **entonces** termina en rojo sin publicar.
+  5. **Dado** que no existe el secreto `EXPO_TOKEN`, **cuando** corre el workflow, **entonces** termina en verde con el aviso «Actualización OTA omitida» y no publica nada.
+  6. **Dado** un APK `preview` instalado y una actualización nueva publicada solo con cambios de JavaScript, **cuando** Gustavo cierra la app del todo y la abre, como mucho dos veces, **entonces** ve el cambio sin reinstalar y sin perder la sesión.
+  7. **Dado** un cambio nativo (un módulo nativo nuevo, un plugin, un campo nativo de `app.json` o un `script` de `package.json`), **cuando** se publica su actualización, **entonces** tiene otro fingerprint y no llega a los APK anteriores, que siguen funcionando con su propio código.
+  8. **Dado** el teléfono sin conexión o EAS caído, **cuando** abre la app, **entonces** arranca enseguida con el código que ya tenía (`checkAutomatically: ON_LOAD`, `fallbackToCacheTimeout: 0`).
+  9. **Dado** una actualización mala, **cuando** se ejecuta `npx eas-cli@latest update:rollback` o `update:roll-back-to-embedded --branch preview`, **entonces** en el siguiente arranque los teléfonos vuelven a la actualización anterior o al código del APK.
+  10. **Dado** el repositorio, **cuando** se revisa, **entonces** no contiene el token de Expo ni ningún otro secreto: el workflow lo lee de `secrets.EXPO_TOKEN` y solo lo pasa al paso que publica.
+- **Brechas código/docs:** la rama `production` no se publica sola: cuando haya builds de producción, se publica a mano (`movil/README.md`, «Actualizaciones OTA»).
 - **Cobertura QA:** pendiente
 
 ## Retiradas

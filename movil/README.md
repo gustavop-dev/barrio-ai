@@ -179,17 +179,9 @@ npx eas-cli@latest channel:pause preview              # deja de servir actualiza
 - La siguiente publicación, por ejemplo el próximo push a `main`, vuelve a llegar a todos.
 - Si una actualización hace fallar la app al arrancar, `expo-updates` intenta volver solo a la última que funcionaba.
 
-### Criterios de aceptación: actualizaciones OTA
+### Criterios de aceptación
 
-- [ ] El APK del perfil `preview` lleva el canal `preview` y `runtimeVersion` con la política `fingerprint`. El del perfil `production` lleva el canal `production`.
-- [ ] Un push a `main` que cambia `movil/src` o `compartido/src` publica una actualización en la rama `preview`, con el asunto del commit como mensaje.
-- [ ] Si los tipos, el lint o las pruebas fallan en ese commit, no se publica nada.
-- [ ] Sin el secreto `EXPO_TOKEN`, el workflow termina en verde, con un aviso, sin publicar.
-- [ ] Un cambio solo de JavaScript llega a un APK `preview` ya instalado sin reinstalarlo: se ve después de cerrar y abrir la app, como mucho dos veces.
-- [ ] Un cambio nativo (un módulo nativo nuevo o un campo nativo de `app.json`) cambia el fingerprint. Su actualización no llega a los APK anteriores, que siguen funcionando con su propio código.
-- [ ] La app arranca sin esperar a la red, también sin conexión.
-- [ ] `update:rollback` o `update:roll-back-to-embedded` devuelve los teléfonos a la versión anterior en el siguiente arranque.
-- [ ] No hay tokens ni secretos en el repositorio.
+Están en el catálogo de funcionalidades: [APP-11 · Actualizaciones OTA sin reinstalar](../docs/funcionalidades/app-movil-instalacion.md#app-11).
 
 ## Qué funciona en Expo Go y qué necesitará una build de desarrollo
 
