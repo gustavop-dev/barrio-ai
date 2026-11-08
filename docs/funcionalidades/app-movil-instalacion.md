@@ -16,7 +16,7 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
 | [APP-05](#app-05) | Instalar una versión nueva sin perder la sesión | app | funciona |
 | [APP-06](#app-06) | Probar con Expo Go | app | funciona |
 | [APP-07](#app-07) | Build de desarrollo | app | no implementado |
-| [APP-08](#app-08) | Mensajes de error de red en español | app | con fallo conocido |
+| [APP-08](#app-08) | Mensajes de error de red en español | app | funciona |
 | [APP-09](#app-09) | App para iPhone | app | no implementado |
 | [APP-10](#app-10) | Comprobaciones automáticas de la app | app | funciona |
 | [APP-11](#app-11) | Actualizaciones OTA sin reinstalar | app | funciona |
@@ -35,7 +35,7 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
   3. **Dado** la build, **cuando** compila, **entonces** lo hace solo para `arm64-v8a` (`ORG_GRADLE_PROJECT_reactNativeArchitectures`), para que Skia no se quede sin memoria en la máquina gratuita de EAS.
   4. **Dado** el perfil `production`, **cuando** se compila, **entonces** produce un `.aab` para Google Play e incrementa el número de build solo.
 - **Brechas código/docs:** `movil/README.md` también dice, en otra sección, que «No hay cuentas de Expo ni builds de EAS hechas» y propone el paquete `co.projectapp.oficina`; ya hay proyecto de EAS y el paquete es `co.projectapp.office`.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** el APK x86_64 de la QA se compila e instala en cada ejecución de `qa-movil.yml`; APP-01.1–4 (EAS) sin prueba · 2026-11-08
 
 ### APP-02 · A qué oficina se conecta <a id="app-02"></a>
 
@@ -64,7 +64,7 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
   4. **Dado** la app, **cuando** gira el teléfono, **entonces** se queda en vertical.
   5. **Dado** Ajustes › Sesión, **cuando** lo abre, **entonces** ve «Versión: app 0.1.0».
 - **Brechas código/docs:** la versión mostrada es la de `app.json`; el número de build de EAS no aparece en ninguna parte.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** APP-03.3 en `movil/.maestro/02-navegacion.yaml` (`oficina0ff1ce://tu-turno` y una pieza) · el resto sin prueba E2E · 2026-11-08 · pasa
 
 ### APP-04 · Permisos del teléfono <a id="app-04"></a>
 
@@ -120,17 +120,16 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
 ### APP-08 · Mensajes de error de red en español <a id="app-08"></a>
 
 - **Dónde:** app
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** cuando el teléfono no tiene conexión, cada pantalla le dice en español que no hay conexión.
 - **Código:** `compartido/src/api/errors.ts` (`errorMessage`), `movil/src/auth/loginProblems.ts`, `movil/src/auth/session.tsx`; `expo/src/winter/fetch/FetchErrors.ts` (`FetchError extends Error`).
-- **El fallo:** Expo SDK 58 sustituye el `fetch` global por `expo/fetch` (`EXPO_PUBLIC_USE_RN_FETCH` no está definido). Un fallo de red llega como `FetchError`, no como `TypeError`, y los tres sitios que reconocen la falta de red por `instanceof TypeError` no la reconocen: todos los avisos de error muestran `fetch failed: <mensaje del sistema en inglés>`, la entrada no muestra su mensaje de sin conexión ([ACC-02](acceso.md#acc-02)) y abrir la app sin red cierra la sesión ([ACC-06](acceso.md#acc-06)). Las pruebas de Jest no lo detectan porque sustituyen `fetch` por un simulacro.
 - **Criterios de aceptación:**
   1. **Dado** el teléfono en modo avión, **cuando** cualquier pantalla falla al cargar, **entonces** muestra «No hay conexión con el servidor. Comprueba tu red.».
   2. **Dado** una acción que falla sin conexión (vetar, responder, enviar), **cuando** vuelve el error, **entonces** el mensaje está en español.
   3. **Dado** cualquier error, **cuando** se muestra, **entonces** nunca aparece texto técnico en inglés (`fetch failed: …`, `Unsupported FormDataPart implementation`).
   4. **Dado** la barra superior, **cuando** no hay red, **entonces** muestra «Sin conexión. Mostrando lo último que cargó.» (esto ya funciona, con NetInfo).
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** APP-08.3 en `movil/.maestro/01-entrada.yaml` (sin conexión, la entrada en español, nunca «fetch failed») · APP-08.1–3 en `movil/src/api/transport.test.ts` (FetchError → NetworkError) · APP-08.4 en `movil/.maestro/02-navegacion.yaml` · 2026-11-08 · pasa
 
 ### APP-09 · App para iPhone <a id="app-09"></a>
 

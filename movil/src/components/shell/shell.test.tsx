@@ -37,6 +37,10 @@ describe('top bar', () => {
     expect(await screen.findByText('Máquina en pausa')).toBeOnTheScreen();
     await waitFor(() => expect(screen.queryByTestId('turn-counter')).toBeNull());
     expect(screen.queryByTestId('unread-dot')).toBeNull();
+    // From the tabs it focuses Ajustes › Máquina like the top bar does (navigate), never pushing another shell.
+    await fireEvent.press(screen.getByRole('link', { name: /Máquina en pausa/ }));
+    expect(router.navigate).toHaveBeenCalledWith({ pathname: '/ajustes', params: { ancla: 'maquina' } });
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('builds the accessible Tu turno label', () => {

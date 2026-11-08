@@ -2,7 +2,8 @@
 // handle, leaving content scroll native. Its position `p` (a fraction of the room above `bottom`) opens
 // at the half snap on FIRM, follows the handle with a rubber band past the full snap, and on release is
 // projected along its velocity to the nearest snap, or closes («HÁPTICO · LEVE» on each new snap).
-// Accessible expand/collapse actions, Android back and an explicit close.
+// Accessible expand/collapse actions, Android back and an explicit close. `onRest` tells the screen which
+// snap it rests on (the Oficina pauses its scene while the sheet covers it at full height).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { BackHandler, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
@@ -15,8 +16,15 @@ import { settleSnap } from './Sheet';
 export interface SnapSheetProps {
   label: string; onClose: () => void; children: ReactNode;
   bottom: number; availableHeight?: number; testID?: string;
+  /** Called with the snap the sheet rests on (sheetMotion.snaps), on opening and after every drag or action. */
+  onRest?: (snap: number) => void;
+  /**
+   * Whether Android back closes the sheet (default). BackHandler listeners are global: a screen that is not shown (a tab
+   * left with its sheet open) must turn this off, or back on the screen in front would close the hidden sheet instead.
+   */
+  backCloses?: boolean;
 }
-export function SnapSheet({ label, onClose, children, bottom, availableHeight, testID }: SnapSheetProps) {
+export function SnapSheet({ label, onClose, children, bottom, availableHeight, testID, onRest, backCloses = true }: SnapSheetProps) {
   const window = useWindowDimensions();
   const room = (availableHeight ?? window.height) - bottom;
   const [half, full] = sheetMotion.snaps;
@@ -35,6 +43,9 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
   useEffect(() => {
     latestClose.current = onClose;
   }, [onClose]);
+  useEffect(() => {
+    onRest?.(resting);
+  }, [resting, onRest]);
   useEffect(() => {
     span.set(room);
   }, [room, span]);
@@ -81,9 +92,10 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
   }, [half, snap, p]);
 
   useEffect(() => {
+    if (!backCloses) return;
     const listener = BackHandler.addEventListener('hardwareBackPress', () => { dismiss(); return true; });
     return () => listener.remove();
-  }, [dismiss]);
+  }, [dismiss, backCloses]);
 
   const drag = usePanGesture({
     testID: 'snap-sheet-drag', minDistance: officeGestures.sheetActivation,

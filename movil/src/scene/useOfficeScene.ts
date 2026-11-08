@@ -11,8 +11,10 @@ import { subscribeCaptureReceipts } from './captureReceipts';
 function reportFrames(frames: number, meanDelta: number, maxDelta: number, slow: number, meanWork: number) {
   console.info('[Oficina/UI]', { frames, meanDeltaMs: meanDelta, maxDeltaMs: maxDelta, overBudget: slow, meanSimulationMs: meanWork });
 }
-export function useOfficeScene({ active, live, paused, reduced, statuses, page }: {
+export function useOfficeScene({ active, live, paused, reduced, statuses, page, covered = false }: {
   active: boolean; live: boolean; paused: boolean; reduced: boolean; statuses: StatusMap; page?: OficinaEventos;
+  /** Something covers the whole scene (the capture sheet, a panel at full height): its clock stops, nothing redraws. */
+  covered?: boolean;
 }) {
   const client = useQueryClient();
   const [initial] = useState(() => createScene({ frozen: true, still: reduced }, officeMotion));
@@ -63,9 +65,11 @@ export function useOfficeScene({ active, live, paused, reduced, statuses, page }
       }
     }
   }, false);
+  // While covered the frame callback stops: the Skia scene stops redrawing (battery on the phone, and the software GPU
+  // of the QA emulator) and its clock waits; events still queue and play once it shows again.
   useEffect(() => {
-    frame.setActive(active && live && !paused && !reduced);
+    frame.setActive(active && live && !paused && !reduced && !covered);
     return () => frame.setActive(false);
-  }, [frame, active, live, paused, reduced]);
+  }, [frame, active, live, paused, reduced, covered]);
   return { scene, snapshot };
 }

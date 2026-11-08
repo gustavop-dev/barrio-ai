@@ -9,7 +9,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
-| [OFI-01](#ofi-01) | La escena refleja la actividad real | PWA · app · backend | con fallo conocido |
+| [OFI-01](#ofi-01) | La escena refleja la actividad real | PWA · app · backend | funciona |
 | [OFI-02](#ofi-02) | Estado de cada personaje | PWA · app · backend | funciona |
 | [OFI-03](#ofi-03) | Línea de lo que pasa ahora y eventos del equipo | PWA · app · backend | funciona |
 | [OFI-04](#ofi-04) | Paneles de equipo y de rol | PWA · app | funciona |
@@ -24,7 +24,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
 ### OFI-01 · La escena refleja la actividad real <a id="ofi-01"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** abre 0ff1ce y ve a su equipo trabajando, sin simulaciones: si nadie trabaja, nadie se mueve.
 - **Código:** `GET /api/v1/oficina/actividad` (cada 15 s), `GET /api/v1/operador/overview` (cada 30 s); PWA `OfficeCanvas.tsx` (canvas); app `OfficeCanvas.tsx` (Skia), `useOfficeScene.ts`, `useOfficeLifecycle.ts`.
 - **Criterios de aceptación:**
@@ -32,15 +32,14 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   2. **Dado** un trabajo en cola, **cuando** se consulta, **entonces** el rol muestra «Trabajo en cola».
   3. **Dado** un rol implementado sin trabajo, **cuando** se consulta, **entonces** está `en_espera` con «Último: <tarea> (<resultado>)» si hubo uno.
   4. **Dado** un rol que no tiene ningún trabajo implementado, **cuando** se consulta, **entonces** está `diseno` con «Contrato diseñado; aún sin implementar»; ningún rol con código aparece en diseño.
-  5. **Dado** `INBOX_ENABLED=true` y un trabajo `read_inbox` corriendo, **cuando** se consulta, **entonces** `conversaciones_inbox` está `trabajando`. **Hoy falla:** `JOB_ROLES` no incluye `read_inbox`, así que el agente de inbox sale siempre «en diseño» aunque esté leyendo el inbox.
+  5. **Dado** `INBOX_ENABLED=true` y un trabajo `read_inbox` corriendo, **cuando** se consulta, **entonces** `conversaciones_inbox` está `trabajando`.
   6. **Dado** que la actividad no se puede leer, **cuando** falla, **entonces** ve «No se pudo leer la actividad.» con «Mientras tanto los personajes quedan quietos: la oficina no simula trabajo.» y «Reintentar», y los personajes quedan quietos.
   7. **Dado** que el dibujo de la oficina no carga, **cuando** falla, **entonces** ve «No se pudo cargar el dibujo de la oficina.» (en la PWA, «… Recarga la página.»; en la app, con «Reintentar»).
   8. **Dado** la leyenda, **cuando** se pinta, **entonces** muestra Trabajando, En espera y En diseño, y «Actividad real · hace X», «Leyendo actividad…» o «Actividad no disponible».
   9. **Dado** la app en segundo plano o en otra pestaña, **cuando** pasa el tiempo, **entonces** la escena deja de consultar y de animar hasta volver.
   10. **Dado** «reducir movimiento» en el sistema, **cuando** abre la oficina, **entonces** la escena queda quieta.
-- **El fallo:** el agente de inbox (`conversaciones_inbox`) aparece siempre «en diseño» porque `oficina_views.JOB_ROLES` no asigna el trabajo `read_inbox` a ningún rol. El contrato dice que `diseno` significa «tiene contrato pero aún no está implementado», y el inbox está implementado y encendido en producción.
 - **Brechas código/docs:** `oficina/README.md` describe los botones «Activar ambiente» y «Luz de tarde», que no existen en el código actual.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** OFI-01.4, OFI-01.5 (el agente de inbox en espera, con su último read_inbox) y OFI-01.8 en `movil/.maestro/03-oficina.yaml` · OFI-01.1–3 y 5 en `team_backend/tests/test_oficina.py` · OFI-01.6, 7, 9 y 10 sin prueba E2E · 2026-11-08 · pasa
 
 ### OFI-02 · Estado de cada personaje <a id="ofi-02"></a>
 
@@ -54,7 +53,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   3. **Dado** un rol `diseno`, **cuando** se pinta, **entonces** está atenuado, quieto y con la etiqueta «EN DISEÑO».
   4. **Dado** un rol sin dato, **cuando** se pinta, **entonces** está quieto y sin luz.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** OFI-02 en `movil/.maestro/03-oficina.yaml` (estado de un personaje en su panel) · 2026-11-08 · pasa
 
 ### OFI-03 · Línea de lo que pasa ahora y eventos del equipo <a id="ofi-03"></a>
 
@@ -70,8 +69,8 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   5. **Dado** la máquina en pausa, **cuando** se pinta la línea, **entonces** dice «La máquina está en pausa. Nadie toca tu LinkedIn.»; sin nadie trabajando, «Nadie camina: el equipo está en espera.».
   6. **Dado** un `desde` inválido, **cuando** se pide a la API, **entonces** responde 400 «desde debe ser una fecha ISO».
   7. **Dado** que la API de eventos responde 403 o 404, **cuando** pasa, **entonces** se deja de consultar; la app dice «El registro de eventos no está disponible. Se muestra la actividad real de cada rol.».
-- **Brechas código/docs:** en la app la línea se retira sola a los 3,5 s; en la PWA no. La PWA no muestra ningún aviso si fallan los eventos por otro motivo.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** en la app la línea se retira sola a los 3,5 s; en la PWA no. La PWA no muestra ningún aviso si fallan los eventos por otro motivo. Además de las etapas editoriales y los comentarios, el trabajo de fondo emite entregas (`oficina_eventos.job_done` y `lead_reviewed`): observar referentes, descubrir y clasificar personas, leer el inbox, medir y la revisión del líder.
+- **Cobertura QA:** OFI-03.2 y 4 en `movil/.maestro/03-oficina.yaml` (entregas de fondo sembradas, resumidas en «Lo último que hizo») · OFI-03.1–3 y 6 en `team_backend/tests/test_eventos.py` · 2026-11-08 · pasa
 
 ### OFI-04 · Paneles de equipo y de rol <a id="ofi-04"></a>
 
@@ -87,7 +86,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   5. **Dado** «Ver en el Calendario», **cuando** lo pulsa, **entonces** abre `/calendario` (sin filtrar por rol).
   6. **Dado** la PWA en escritorio, **cuando** abre la oficina, **entonces** el panel lateral muestra Operación por defecto.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** OFI-04.1, 2 y 5 en `movil/.maestro/03-oficina.yaml` · OFI-04.6 es de la PWA · 2026-11-08 · pasa
 
 ### OFI-05 · La captura llega a la oficina <a id="ofi-05"></a>
 
@@ -101,7 +100,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   3. **Dado** una captura con audio o fotos en la app, **cuando** la envía, **entonces** ve la animación. **Hoy falla** porque el envío falla ([CAP-04](captura.md#cap-04)).
   4. **Dado** una captura que se deshace, **cuando** se deshace, **entonces** no debería quedar la animación de entrega. **Hoy:** la app la reproduce igual.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** sin prueba E2E: la línea «Llegó tu captura a la oficina.» se retira a los 3,5 s y el sobre es dibujo de Skia sin vistas; en el emulador con render por software Maestro no la ve de forma fiable. Lo cubren `movil/src/scene/OficinaScreen.test.tsx` y `compartido/src/scene/engine.suite.ts` · 2026-11-08
 
 ### OFI-06 · Gestos en la escena <a id="ofi-06"></a>
 
@@ -115,7 +114,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   3. **Dado** la pantalla, **cuando** tira hacia abajo, **entonces** se vuelven a pedir la actividad y los eventos.
   4. **Dado** un toque en un personaje, **cuando** lo hace, **entonces** vibra levemente y se abre su panel.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** OFI-06.1, 3 y 4 y el doble toque de OFI-06.2 en `movil/.maestro/03-oficina.yaml` (arrastre, doble toque y tirar para recargar, sin cierres) · el pellizco de OFI-06.2 no se puede hacer en Maestro (un solo dedo) · 2026-11-08 · pasa
 
 ### OFI-07 · Banner de máquina o cuenta en pausa <a id="ofi-07"></a>
 
@@ -130,7 +129,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   4. **Dado** que la consulta del estado falla, **cuando** pasa, **entonces** la franja no aparece y no hay aviso (comportamiento actual en las dos interfaces).
   5. **Dado** la máquina detenida, **cuando** abre la oficina, **entonces** la escena se oscurece y se detiene.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** OFI-07.1, 3 y 5 en `movil/.maestro/03-oficina.yaml` (máquina parada con `comun/qa-api.js`) · OFI-07.2 sin prueba E2E · 2026-11-08 · pasa
 
 ### OFI-08 · Franja sin conexión <a id="ofi-08"></a>
 
@@ -142,8 +141,8 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   1. **Dado** que el dispositivo se queda sin red, **cuando** pasa, **entonces** aparece «Sin conexión. Mostrando lo último que cargó.» y los datos ya cargados siguen visibles.
   2. **Dado** que vuelve la red, **cuando** pasa, **entonces** la franja desaparece y las consultas se reanudan.
   3. **Dado** que recarga la PWA sin red, **cuando** abre una vista, **entonces** la aplicación abre (el service worker sirve la página), pero las vistas muestran error: no se guardan datos entre sesiones.
-- **Brechas código/docs:** en la app, abrirla sin conexión cierra la sesión ([ACC-06](acceso.md#acc-06)), y los errores de red salen en inglés ([APP-08](app-movil-instalacion.md#app-08)).
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** —
+- **Cobertura QA:** OFI-08.1–2 en `movil/.maestro/02-navegacion.yaml` (modo avión) · OFI-08.3 es de la PWA · 2026-11-08 · pasa
 
 ### OFI-09 · Navegación <a id="ofi-09"></a>
 
@@ -158,7 +157,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   4. **Dado** «Saltar al contenido», **cuando** navega con teclado en la PWA, **entonces** es lo primero que recibe el foco.
   5. **Dado** cada vista de la PWA, **cuando** se abre, **entonces** el título de la pestaña es «<Vista> · 0ff1ce».
 - **Brechas código/docs:** el diseño original (`DISENO-VISTAS.md`, rama `feat/rediseno-oficina`) tenía cinco entradas en la barra inferior (Oficina, Tu turno, Calendario, Resultados, Personas); el código actual pone Galería en la barra inferior y Tu turno y Calendario arriba, como el diseño móvil de `movil/diseno-movimiento`.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** OFI-09.2–3 en `movil/.maestro/02-navegacion.yaml` (barras, contador y punto, atrás de Android por el historial, una ficha con «‹», atrás y arrastre del borde, «‹ Calendario» en una pieza) · OFI-09.1, 4 y 5 son de la PWA · 2026-11-08 · pasa
 
 ## Retiradas
 

@@ -30,10 +30,10 @@ describe('deep links of Galería, Ajustes and Notificaciones', () => {
 
   it('opens them in the app', () => {
     openLink('/ajustes#notificaciones');
-    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/ajustes', params: { ancla: 'notificaciones' } });
+    expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/ajustes', params: { ancla: 'notificaciones' } });
     openLink('/galeria?filtro=publicadas');
-    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/galeria', params: { filtro: 'publicadas' } });
+    expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/galeria', params: { filtro: 'publicadas' } });
     openLink('/memoria');
-    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/tu-turno', params: { tab: 'sabe' } });
+    expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/tu-turno', params: { tab: 'sabe' } });
   });
 });

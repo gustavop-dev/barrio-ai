@@ -1,6 +1,8 @@
 // The native transport: absolute URLs, the bearer token, no cookies and no CSRF.
 import { api, onUnauthorized } from '@compartido/api/client';
 import { captureForm } from '@compartido/api/capturas';
+import { errorMessage } from '@compartido/api/errors';
+import { problemOf } from '@/auth/loginProblems';
 import { fakeServer } from '@/test/server';
 import { API_URL, apiUrl } from './config';
 import { isFilePartFailure, UploadNetworkError } from './multipart';
@@ -92,5 +94,26 @@ describe('native transport', () => {
     fakeServer({ 'GET /api/v1/tu-turno': { status: 401, body: { detail: 'Token inválido.' } } });
     await expect(api.get('/api/v1/tu-turno')).rejects.toMatchObject({ status: 401 });
     expect(unauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  // APP-08: since expo/fetch is the global fetch, a request without a connection rejects with expo's FetchError
+  // («fetch failed: …», a plain Error). Every screen used to show that English text, and the login and the start-up
+  // did not recognise it as «no connection».
+  it('a request without a connection reaches the app as a network failure, in Spanish (not «fetch failed»)', async () => {
+    await saveToken('0ff1ce_dt_prueba');
+    fakeServer({ 'GET /api/v1/tu-turno': { fetchError: 'Failed to connect to /10.0.2.2:8787' } });
+    const error = await api.get('/api/v1/tu-turno').catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(TypeError);
+    expect(errorMessage(error)).toBe('No hay conexión con el servidor. Comprueba tu red.');
+    expect(problemOf(error)).toBe('offline');
+    expect(String((error as Error).message)).not.toMatch(/^fetch failed/);
+  });
+
+  it('a request the app cancelled stays a cancellation, not «no connection»', async () => {
+    fakeServer({ 'GET /api/v1/tu-turno': { fetchError: 'The operation was aborted.' } });
+    const controller = new AbortController();
+    controller.abort();
+    const error = await api.get('/api/v1/tu-turno', controller.signal).catch((e: unknown) => e);
+    expect(error).not.toBeInstanceOf(TypeError);
   });
 });
