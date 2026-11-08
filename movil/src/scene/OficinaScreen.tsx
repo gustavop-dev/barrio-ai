@@ -1,23 +1,25 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
-import Animated from 'react-native-reanimated';
+import { runOnUI } from 'react-native-reanimated';
 import { GestureDetector, useNativeGesture } from 'react-native-gesture-handler';
 import { useOfficeQueries, feedUnavailable } from '@compartido/api/oficinaQueries';
 import { REFRESH } from '@compartido/api/hooks';
 import { statusesFrom, type SceneStatus } from '@compartido/scene/activity';
 import { nowLine } from '@compartido/scene/presentation';
+import { narrateSceneSelection, selectScene } from '@compartido/scene/runtime';
 import { PLAN_HEIGHT, sceneScale } from '@compartido/scene/plan';
 import { CHARACTER_BY_ID, LIBRARIAN_ID, TEAMS, teamById, type CharacterId, type TeamId } from '@compartido/scene/roles';
 import type { PanelData } from '@compartido/scene/panels';
 import { timeAgo } from '@compartido/logic/format';
-import { AgentPortrait, Button, ErrorRetry, Note, SnapSheet, T } from '@/components/ui';
+import { Button, ErrorRetry, Note, SnapSheet, T } from '@/components/ui';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { haptic, officeGestures, officeLayout, useMotion } from '@/theme/motion';
+import { haptic, officeGestures, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { OfficeCanvas, type ScenePick } from './OfficeCanvas';
 import { RolePanel, TeamPanel } from './OfficePanels';
 import { useOfficeLifecycle } from './useOfficeLifecycle';
 import { useOfficeScene } from './useOfficeScene';
+import { OfficeNarration } from './OfficeNarration';
 
 type Selection = { kind: 'team'; id: TeamId } | { kind: 'role'; id: CharacterId };
 const TEAMS_AND_LIBRARY = [...TEAMS.map((t) => ({ id: t.id, name: t.name })), { id: 'biblioteca' as const, name: 'Biblioteca' }];
@@ -47,7 +49,19 @@ export function OficinaScreen() {
   const [selection, setSelection] = useState<Selection | null>(null);
   const select = useCallback((next: Selection) => {
     haptic('officePick'); scroll.current?.scrollTo({ y: 0, animated: !reduced }); setSelection(next);
-  }, [reduced]);
+    runOnUI(() => {
+      scene.modify((s) => {
+        const role = next.kind === 'role' ? next.id : null;
+        selectScene(s, role, role ? CHARACTER_BY_ID[role].team : next.id as TeamId);
+        if (role) { s.wallTime = Date.now(); narrateSceneSelection(s, role); }
+        return s;
+      });
+    })();
+  }, [reduced, scene]);
+  const clearSelection = () => {
+    setSelection(null);
+    runOnUI(() => { scene.modify((s) => { selectScene(s, null, null); return s; }); })();
+  };
   const onPick = useCallback((pick: ScenePick) => {
     select(pick.kind === 'role' ? pick : pick.id === 'biblioteca' ? { kind: 'role', id: LIBRARIAN_ID } : { kind: 'team', id: pick.id });
   }, [select]);
@@ -72,9 +86,7 @@ export function OficinaScreen() {
       <View>
         <OfficeCanvas scrollGesture={pageScroll} scene={scene} width={window.width} height={sceneHeight} visibleHeight={selection ? Math.min(sceneHeight, (height - insets.bottom + space[10]) * (1 - officeGestures.sheetHalf)) : sceneHeight} scale={scale} selectedRole={selectedRole} selectedZone={selectedZone} statuses={statuses} onPick={onPick} />
         {paused ? <View testID="oficina-pausa" pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paused]} /> : null}
-        {line ? <Animated.View key={line.text} pointerEvents="none" entering={reduced ? undefined : officeLayout.nowIn()} exiting={reduced ? undefined : officeLayout.nowOut()} style={styles.now}>
-          <AgentPortrait role={line.role} /><T variant="detalle" accessibilityLiveRegion="polite" style={styles.nowText}>{line.text}</T>
-        </Animated.View> : null}
+        <OfficeNarration line={line} revision={snapshot.now?.key ?? 0} reduced={reduced} />
       </View>
       <View style={styles.below}>
         <View style={styles.legend}>
@@ -96,7 +108,7 @@ export function OficinaScreen() {
       <T variant="detalle" soft style={styles.credit}>Arte: LimeZu — Modern Interiors</T>
     </ScrollView>
     </GestureDetector>
-    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={() => setSelection(null)}>
+    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection}>
       {selection.kind === 'team' ? <TeamPanel team={selection.id} data={data} onRole={(id) => select({ kind: 'role', id })} /> : <RolePanel id={selection.id} data={data} onTeam={(id) => select({ kind: 'team', id })} />}
     </SnapSheet> : null}
   </View>;
@@ -104,9 +116,6 @@ export function OficinaScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   paused: { backgroundColor: colors.backdrop },
-  now: { position: 'absolute', top: space[2], left: space[2], right: space[2], backgroundColor: colors.surface, borderColor: colors.line, borderWidth: 1,
-    borderRadius: radius.md, padding: space[2], gap: space[2], flexDirection: 'row', alignItems: 'center' },
-  nowText: { flex: 1 },
   below: { padding: space[4], gap: space[2] },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: space[1] },

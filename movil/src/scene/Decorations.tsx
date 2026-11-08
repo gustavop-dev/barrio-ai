@@ -2,11 +2,12 @@ import { Group, ImageShader, Picture, Rect, Skia, type SkImage, type SkPicture }
 import { useMemo, useState } from 'react';
 import { useAnimatedReaction, useDerivedValue, useSharedValue, type SharedValue } from 'react-native-reanimated';
 import type { BubbleIcon } from '@compartido/scene/model';
-import { sceneStatus, type SceneState } from '@compartido/scene/runtime';
+import { sceneBracketLength, sceneStatus, type SceneState } from '@compartido/scene/runtime';
 import { CHARACTERS, LIBRARY, TEAMS, type CharacterId, type ZoneId } from '@compartido/scene/roles';
 import { ATLAS } from '@compartido/scene/atlas';
+import { officeMotion } from '@/theme/motion';
 import { colors, officeRoom } from '@/theme/tokens';
-import { bubblePicture, pointerPicture, zonePicture } from './decorations';
+import { bubblePicture, mailPicture, pointerPicture, zonePicture } from './decorations';
 
 export type BubblePictures = Record<BubbleIcon, SkPicture>;
 export function useDecorations() {
@@ -29,7 +30,7 @@ function ActorMarks({ index, scene, pictures, chatter, pointer, selected }: {
   });
   const light = useDerivedValue(() => {
     const s = scene.value; const a = s.actors[index]!;
-    return !s.paused && !a.away && sceneStatus(s, a.id) === 'trabajando' ? 1 : 0;
+    return !s.paused && !s.frozen && !a.away && sceneStatus(s, a.id) === 'trabajando' ? 1 : 0;
   });
   const lightColor = useDerivedValue(() => scene.value.still || Math.floor(scene.value.clock / scene.value.motion.lightMs + index) % 3 !== 0 ? colors.brand : colors.brandDeep);
   const bubbleVisible = useDerivedValue(() => scene.value.actors[index]!.bubble ? 1 : 0);
@@ -59,7 +60,7 @@ function Monitor({ index, scene, atlas }: { index: number; scene: SharedValue<Sc
   const r = ATLAS.monitorFront!;
   const lit = useDerivedValue(() => {
     const s = scene.value; const a = s.actors[index]!;
-    return !s.paused && !a.away && sceneStatus(s, a.id) === 'trabajando' ? 1 : 0;
+    return !s.paused && !s.frozen && !a.away && sceneStatus(s, a.id) === 'trabajando' ? 1 : 0;
   });
   return <Group transform={[{ translateX: x }, { translateY: y }]}>
     <Rect x={0} y={0} width={r[2]} height={r[3]}>
@@ -82,9 +83,22 @@ export function Monitors({ scene, atlas }: { scene: SharedValue<SceneState>; atl
 export function Decorations({ scene, selected, zone }: { scene: SharedValue<SceneState>; selected: CharacterId | null; zone: ZoneId | null }) {
   const pictures = useDecorations();
   const box = zone === 'biblioteca' ? LIBRARY.box : TEAMS.find((t) => t.id === zone)?.box;
-  const selectedZone = useMemo(() => box ? zonePicture(box) : null, [box]);
+  const brackets = useMemo(() => box ? Array.from({ length: officeMotion.bracketPx }, (_, i) => zonePicture(box, i + 1)) : [], [box]);
+  const selectedZone = useDerivedValue(() => brackets[sceneBracketLength(scene.value) - 1]!);
   return <>
     {CHARACTERS.map((a, index) => <ActorMarks key={a.id} index={index} scene={scene} selected={selected} {...pictures} />)}
-    {selectedZone ? <Picture picture={selectedZone} /> : null}
+    <CaptureMail scene={scene} />
+    {box ? <Picture picture={selectedZone} /> : null}
   </>;
+}
+
+function CaptureMail({ scene }: { scene: SharedValue<SceneState> }) {
+  const [picture] = useState(mailPicture);
+  const [initialMatrix] = useState(() => Skia.Matrix());
+  const matrix = useSharedValue(initialMatrix);
+  useAnimatedReaction(() => scene.value, (s) => {
+    if (s.mail) matrix.modify((m) => m.identity().translate(Math.round(s.mail!.x), Math.round(s.mail!.y)));
+  });
+  const opacity = useDerivedValue(() => scene.value.mail && !scene.value.still ? 1 : 0);
+  return <Group opacity={opacity} matrix={matrix}><Picture picture={picture} /></Group>;
 }
