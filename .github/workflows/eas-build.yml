@@ -1,0 +1,52 @@
+name: APK en EAS (a mano)
+# Starts an Android build on EAS from a clean checkout and `npm ci`, never from a laptop: EAS computes the
+# native fingerprint (runtimeVersion policy `fingerprint`) from node_modules, and it must match what
+# eas-update.yml publishes, or the APK would never receive OTA updates. The build runs on EAS; this job only
+# queues it (--no-wait) and writes the build link in the summary. Needs the EXPO_TOKEN secret.
+on:
+  workflow_dispatch:
+    inputs:
+      perfil:
+        description: 'Perfil de movil/eas.json (preview = APK interno con OTA; development = cliente de desarrollo)'
+        required: true
+        default: preview
+        type: choice
+        options: [preview, development, production]
+permissions:
+  contents: read
+concurrency:
+  group: eas-build-${{ inputs.perfil }}
+  cancel-in-progress: false
+jobs:
+  encolar:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: movil/package-lock.json
+      - name: Dependencias
+        working-directory: movil
+        run: npm ci
+      - name: Encolar el build en EAS
+        working-directory: movil
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          test -n "$EXPO_TOKEN" || { echo "::error::Falta el secreto EXPO_TOKEN"; exit 1; }
+          npx eas-cli@latest build -p android --profile "${{ inputs.perfil }}" --non-interactive --no-wait --json \
+            > build.json
+          cat build.json
+          python3 - <<'PY' >> "$GITHUB_STEP_SUMMARY"
+          import json
+          builds = json.load(open('build.json'))
+          b = builds[0] if isinstance(builds, list) else builds
+          print('### Build de EAS encolado\n')
+          print(f"Perfil `${{ inputs.perfil }}` · commit `${{ github.sha }}`\n")
+          print(f"- Estado: {b.get('status')}")
+          print(f"- Runtime: `{b.get('runtimeVersion')}`")
+          print(f"- Enlace: https://expo.dev/accounts/gustavoperez/projects/office/builds/{b.get('id')}")
+          PY
