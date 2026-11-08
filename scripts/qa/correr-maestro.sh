@@ -33,8 +33,12 @@ adb shell cmd alarm set-timezone America/Bogota > /dev/null 2>&1 || true
 adb shell date
 log "pantalla: $(adb shell wm size | tr -d '\r' | tail -n1) · $(adb shell wm density | tr -d '\r' | tail -n1)"
 
-# A cold emulator under load sometimes shows «Pixel Launcher isn't responding» over everything for the first
-# minute: wait for the system to settle and dismiss any such dialog before the first flow.
+# Resizing the screen makes the launcher relayout on the software GPU, and it hangs: «Pixel Launcher isn't
+# responding» then covers the app for the whole run. System error dialogs are hidden (crashes of the app are read
+# from logcat, not from a dialog), the launcher restarts fresh, and any dialog left is dismissed before the first flow.
+adb shell settings put global hide_error_dialogs 1
+adb shell settings put global anr_show_background 0
+adb shell am force-stop com.google.android.apps.nexuslauncher > /dev/null 2>&1 || true
 settle_system() {
   for _ in $(seq 1 12); do
     if adb shell dumpsys window 2> /dev/null | grep -qiE "mCurrentFocus=.*(Application Not Responding|not responding)"; then
