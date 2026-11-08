@@ -342,8 +342,10 @@ describe('the top bar on the real shell', () => {
     });
     await advance(SETTLE_MS);
     await fireEvent.press(within(screen.getByTestId('detail-panel')).getByTestId('top-tu-turno'));
-    // The detail first runs its push back to rest (FIRM), then the tab changes with the push.
-    await advance(2 * SETTLE_MS);
+    // The detail first runs its push back to rest (FIRM) and only then lets the navigation go on: that
+    // commit lands when the act() ends, so the tab's own push needs a second act to run.
+    await advance(SETTLE_MS);
+    await advance(TAB_MS);
     expectShown('tu-turno');
     // The detail went (after its push back), and no second shell was stacked over it.
     expect(screen.queryByTestId('pantalla-persona', { includeHiddenElements: true })).toBeNull();
