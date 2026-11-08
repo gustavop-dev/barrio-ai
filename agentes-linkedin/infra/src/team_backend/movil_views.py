@@ -1,18 +1,24 @@
 """API of the 0ff1ce mobile app (docs/app-movil-backend.md): device-token login and Expo push registration.
 A device token is Gustavo himself on his phone: a human session without cookies or CSRF. Every other endpoint is the
 PWA's own (oficina/CONTRATO-API.md) and accepts the device token unchanged."""
+import json
+import logging
 from django.utils import timezone
 from rest_framework import serializers
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import APIException, NotFound
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.throttling import UserRateThrottle
 from rest_framework.views import APIView
 from . import expo
 from .authentication import digest, new_device_token
 from .jobs import audit
-from .models import DeviceToken, ExpoPushToken
+from .models import AppClientError, DeviceToken, ExpoPushToken
 from .oficina_views import _user_payload, check_login
 from .operador_views import human_session, valid
+from .permissions import require
+
+logger=logging.getLogger('team_backend.app')
 
 def _device_name(value,fallback='App móvil'):
     return (str(value or '').strip() or fallback)[:120]
@@ -92,3 +98,71 @@ class ExpoPush(APIView):
         token=(request.data.get('token') if isinstance(request.data,dict) else None) or request.query_params.get('token','')
         ExpoPushToken.objects.filter(user=request.user,token=str(token).strip()).delete()
         return Response(status=204)
+
+# --------------------------------------------------------------------------- client error reports
+
+CLIENT_ERRORS_KEPT=200  # newest reports kept; older ones are deleted on each new report
+CLIENT_ERROR_MAX_BYTES=8*1024
+CLIENT_ERROR_MAX_PARTS=12
+CLIENT_ERROR_FIELDS=('kind','name','message','status','detail','platform','os_version','app_version')
+
+class ReportTooLarge(APIException):
+    status_code=413
+    default_detail='El informe de error es demasiado grande.'
+
+class ClientErrorThrottle(UserRateThrottle):
+    """Reports are cheap but must never flood the log: 30 an hour per user, on top of the usual API rate."""
+    scope='app_errores'
+    rate='30/hour'
+
+class ReportedPartInput(serializers.Serializer):
+    field=serializers.CharField(max_length=20)
+    type=serializers.CharField(max_length=80,allow_blank=True)
+    scheme=serializers.CharField(max_length=16,allow_blank=True)
+    size=serializers.IntegerField(min_value=0,allow_null=True,required=False,default=None)
+
+class ClientErrorInput(serializers.Serializer):
+    kind=serializers.RegexField(r'^[a-z0-9_.-]{1,40}$',max_length=40,error_messages={'invalid':'Usa minúsculas, cifras, _ . o -.'})
+    name=serializers.CharField(max_length=80,allow_blank=True,default='')
+    message=serializers.CharField(max_length=500,allow_blank=True,default='')
+    status=serializers.IntegerField(min_value=0,max_value=599,allow_null=True,default=None)
+    detail=serializers.CharField(max_length=500,allow_blank=True,default='')
+    parts=ReportedPartInput(many=True,required=False)
+    platform=serializers.CharField(max_length=20,allow_blank=True,default='')
+    os_version=serializers.CharField(max_length=40,allow_blank=True,default='')
+    app_version=serializers.CharField(max_length=40,allow_blank=True,default='')
+    def validate_parts(self,value):
+        if len(value)>CLIENT_ERROR_MAX_PARTS:raise serializers.ValidationError(f'Como mucho {CLIENT_ERROR_MAX_PARTS} partes.')
+        return value
+
+def _report_too_large(request):
+    try:length=int(request.META.get('CONTENT_LENGTH') or 0)
+    except ValueError:length=0
+    return length>CLIENT_ERROR_MAX_BYTES or len(request.body)>CLIENT_ERROR_MAX_BYTES
+
+def client_error_payload(report):
+    return {'id':str(report.id),'created_at':report.created_at,'device':report.device.name if report.device else None,
+            'parts':report.parts,**{field:getattr(report,field) for field in CLIENT_ERROR_FIELDS}}
+
+class ClientErrors(APIView):
+    """POST /api/v1/app/errores: a failure the app reports (metadata only: never the audio, the photos, the note or a
+    token). It is logged to the app log and kept with the newest CLIENT_ERRORS_KEPT. GET: the newest 50, for diagnosis."""
+    def get_throttles(self):
+        if self.request.method=='POST':return [*super().get_throttles(),ClientErrorThrottle()]
+        return super().get_throttles()
+    def get(self,request):
+        require(request.user,'operate_linkedin')
+        return Response([client_error_payload(r) for r in AppClientError.objects.select_related('device')[:50]])
+    def post(self,request):
+        human_session(request)
+        if _report_too_large(request):raise ReportTooLarge()
+        data=valid(ClientErrorInput,request)
+        device=request.auth if isinstance(request.auth,DeviceToken) else None
+        fields={field:data[field] for field in CLIENT_ERROR_FIELDS}
+        parts=[dict(part) for part in data.get('parts') or []]
+        report=AppClientError.objects.create(user=request.user,device=device,parts=parts,**fields)
+        logger.warning('app_client_error %s',json.dumps({'id':str(report.id),'user':request.user.get_username(),
+                       'device':device.name if device else None,'parts':parts,**fields},ensure_ascii=False,sort_keys=True))
+        stale=list(AppClientError.objects.order_by('-created_at').values_list('id',flat=True)[CLIENT_ERRORS_KEPT:])
+        if stale:AppClientError.objects.filter(id__in=stale).delete()
+        return Response({'id':str(report.id)},status=201)

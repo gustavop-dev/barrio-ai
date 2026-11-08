@@ -18,7 +18,6 @@ import {
   type CaptureOutput,
   type CapturePurpose,
 } from '@compartido/api/capturas';
-import { ApiError } from '@compartido/api/client';
 import { asList, listPreguntas } from '@compartido/api/endpoints';
 import { audioFilename, mmss } from '@compartido/logic/audio';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -39,9 +38,10 @@ import Animated, {
   type SharedValue,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { localPart, reportError, type LocalPart } from '@/api/errorReport';
 import { keys } from '@/api/queryClient';
 import { Icon } from '@/components/icons';
-import { Button, ConfirmSheet, ErrorRetry, FilterChip, Note, Options, Sheet, T, errorMessage, useToast } from '@/components/ui';
+import { Button, ConfirmSheet, FilterChip, Note, Options, Sheet, T, errorMessage, useToast } from '@/components/ui';
 import { Field } from '@/components/ui/Field';
 import { useSheetFrame, type SheetFrame, type SheetHandle } from '@/components/ui/Sheet';
 import { captureMotion, captureTimeline, curves, durations, haptic, microLayout, springWith, timelineWith, timingWith, useMotion } from '@/theme/motion';
@@ -51,6 +51,7 @@ import { BIN, BinGlyph, ENVELOPE, EnvelopeGlyph } from './glyphs';
 import { CaptureHistory } from './History';
 import { checkPhotos, pickFromGallery, takePhoto } from './photos';
 import { useRecorder, useRecorderLive } from './recorder';
+import { DRAFT_KEPT, describeSendError } from './sendError';
 import { closeCaptureSheet, notifyCaptureSent, openCaptureSheet, useCaptureSheet } from './store';
 import type { CaptureDraft, CaptureOrigin, CaptureSeed, CaptureTarget, MicNoteKind, PickedPhoto, RecordedAudio } from './types';
 import { Wave } from './Wave';
@@ -591,6 +592,37 @@ function Thumb({
   );
 }
 
+// ---------------------------------------------------------------- a failed send
+
+/**
+ * Why «Guardar y enviar al equipo» failed, right above the button (a toast would sit under the sheet's
+ * Modal): the reason, that the draft is still here, the technical detail and «Reintentar».
+ */
+function SendError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
+  const problem = describeSendError(error);
+  return (
+    <View testID="capture-send-error">
+      <Note
+        tone={problem.tone}
+        title={problem.title}
+        actions={
+          <Button variant="secondary" size="small" onPress={onRetry}>
+            Reintentar
+          </Button>
+        }
+      >
+        <T variant="detalle">{problem.message}</T>
+        <T variant="detalle">{DRAFT_KEPT}</T>
+        {problem.technical ? (
+          <T variant="detalle" soft selectable>
+            Detalle: {problem.technical}
+          </T>
+        ) : null}
+      </Note>
+    </View>
+  );
+}
+
 // ---------------------------------------------------------------- the sheet
 
 export function CaptureSheet({ context: initialContext, seed, onClose }: { context: CaptureTarget | null; seed: CaptureSeed; onClose: () => void }) {
@@ -774,15 +806,22 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
     if (cannotSend || sending || leaving) return;
     setSending(true);
     let finalAudio = readyAudio;
-    if (audio.kind === 'recording' && recorder.phase !== 'idle') finalAudio = await recorder.stop();
+    // A live recording (or one whose stop is on its way) is finished first: the file is complete
+    // when stop() resolves, and only then does it go up.
+    if (audio.kind === 'recording' && !autoStopped) finalAudio = (await recorder.stop()) ?? readyAudio;
+    // From here on the audio is part of the draft: a failed send keeps it in the sheet.
     if (finalAudio) setAudio({ kind: 'done', audio: finalAudio });
     const draft: CaptureDraft = { audio: finalAudio, fotos, nota, para, publicUse: publicChoice };
     const sentContext = context;
+    const mime = finalAudio?.mime || 'audio/mp4';
+    const parts: LocalPart[] = [
+      ...(finalAudio ? [localPart('audio', { uri: finalAudio.uri, type: mime })] : []),
+      ...fotos.map((foto) => localPart('fotos', foto)),
+    ];
     create.mutate(
       {
-        audio: finalAudio
-          ? { blob: { uri: finalAudio.uri, name: audioFilename(finalAudio.mime), type: finalAudio.mime }, filename: audioFilename(finalAudio.mime), durationS: finalAudio.duration }
-          : null,
+        // Native parts: a URI with a scheme, a name and always a type (compartido nativePart).
+        audio: finalAudio ? { blob: { uri: finalAudio.uri, name: audioFilename(mime), type: mime }, filename: audioFilename(mime), durationS: finalAudio.duration } : null,
         fotos: fotos.map(({ uri, name, type }) => ({ uri, name, type })),
         nota,
         para,
@@ -794,7 +833,11 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
           sent.current = true;
           leave(() => toast.show('Enviado al equipo.', { undo: () => void undo(capture, draft, sentContext) }));
         },
-        onError: () => haptic('actionError'),
+        onError: (error) => {
+          haptic('actionError');
+          // Only metadata: the error, the status and each part's field, type, scheme and size.
+          reportError('captura_envio', error, parts);
+        },
         onSettled: () => setSending(false),
       },
     );
@@ -987,13 +1030,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
               ) : null}
             </View>
 
-            {create.error instanceof ApiError && create.error.status === 413 ? (
-              <Note tone="error" title="El envío es demasiado grande">
-                El audio puede pesar hasta 25 MB y cada foto hasta 10 MB. Quita alguna foto o graba un audio más corto.
-              </Note>
-            ) : (
-              <ErrorRetry error={create.error} />
-            )}
+            {create.error && !sending ? <SendError error={create.error} onRetry={() => void send()} /> : null}
             <Button variant="primary" block disabled={cannotSend} loading={sending || leaving} loadingLabel="Enviando…" onPress={() => void send()} testID="capture-send">
               Guardar y enviar al equipo
             </Button>

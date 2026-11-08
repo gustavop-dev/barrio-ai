@@ -863,7 +863,9 @@ Un `href` que empieza por `/` y no por `/api/` es una vista de la oficina: la PW
 
 ## App móvil: login por dispositivo y push nativo
 
-La app nativa (React Native + Expo) usa todas las rutas de este contrato sin cambios, incluidas las subidas `multipart/form-data` a `/api/v1/capturas` y `/api/v1/galeria` y los archivos de audio e imagen. Solo cambia cómo se autentica. Detalle del backend en `agentes-linkedin/infra/docs/app-movil-backend.md`.
+La app nativa (React Native + Expo) usa todas las rutas de este contrato sin cambios, incluidas las subidas `multipart/form-data` a `/api/v1/capturas` y `/api/v1/galeria` y los archivos de audio e imagen. Solo cambia cómo se autentica.
+
+**Subidas desde la app.** Cada parte de archivo va como `{ uri, name, type }` de React Native: el `uri` siempre con esquema (`file://…` o `content://…`) y siempre con `type`. El audio va como `audio/mp4`, `captura.m4a`. Cada foto va con el tipo real de sus bytes: en Android, expo-image-picker vuelve a codificar un HEIC como JPEG, y entonces va como `image/jpeg`. Estas subidas salen por el `XMLHttpRequest` de React Native, no por el `fetch` global (`expo/fetch` no admite partes `{ uri }`). Detalle del backend en `agentes-linkedin/infra/docs/app-movil-backend.md`.
 
 **Autenticación:**
 - Cada petición lleva `Authorization: Bearer <token>`, sin cookies ni `X-CSRFToken`.
@@ -905,6 +907,37 @@ La app nativa (React Native + Expo) usa todas las rutas de este contrato sin cam
 - `priority` es `high` en los tipos urgentes de Tu turno y en la prueba.
 - La app debe crear el canal Android `default`.
 - `POST /api/v1/push/test` («Probar notificación») llega también a los teléfonos del usuario y responde `{ sent }` con el total. Sin VAPID y sin teléfonos registrados responde 403.
+
+### Errores del cliente
+
+Cuando una subida falla en el teléfono (una captura con audio o fotos, «Subir fotos» de la Galería), la app lo cuenta al backend para que el equipo lo diagnostique sin tener el teléfono.
+
+| Método y ruta | Cuerpo | Respuesta |
+| --- | --- | --- |
+| POST `/api/v1/app/errores` | `ClientErrorReport` (abajo), JSON de 8 KB como mucho | 201 `{ id }`. 400 si un campo no es válido; 413 si pasa de 8 KB; 429 a partir de 30 informes por hora y usuario; 403 con un token de servicio. |
+| GET `/api/v1/app/errores` | — | Los 50 más nuevos, del más nuevo al más viejo: `[{ id, created_at, device, kind, name, message, status, detail, parts, platform, os_version, app_version }]`. `device` es el nombre del dispositivo, o `null` si llegó con la sesión de la PWA. Exige `operate_linkedin`. |
+
+```json
+{ "kind": "captura_envio", "name": "UploadNetworkError",
+  "message": "Network request failed: Could not retrieve file for uri file://….m4a",
+  "status": null, "detail": "",
+  "parts": [{ "field": "audio", "type": "audio/mp4", "scheme": "file", "size": null },
+            { "field": "fotos", "type": "image/jpeg", "scheme": "content", "size": 2048 }],
+  "platform": "android", "os_version": "35", "app_version": "0.1.0" }
+```
+
+| Campo | Valor |
+| --- | --- |
+| `kind` | Qué falló: `captura_envio` o `galeria_subida`. Minúsculas, cifras, `_`, `.` o `-`, hasta 40 caracteres |
+| `name` y `message` | La clase del error y su mensaje (hasta 80 y 500 caracteres). La app quita las rutas locales y deja solo el esquema y la extensión |
+| `status` y `detail` | El código HTTP y el `detail` del servidor si respondió; `null` y vacío si la petición no salió del teléfono |
+| `parts` | Hasta 12 partes de archivo: `field`, `type`, `scheme` (`file`, `content` o `none`) y `size` en bytes, o `null` si no se conoce |
+| `platform`, `os_version` y `app_version` | `android` o `ios`, la versión del sistema y la versión de la app (`app.json`) |
+
+- **Nunca** lleva el audio, las fotos, el texto de la nota, nombres de archivo, URIs ni tokens.
+- Exige una sesión humana: el token de dispositivo o la sesión de la PWA.
+- Cada informe se escribe en el log del backend (`team_backend.app`, línea `app_client_error {…}`) y se guarda en `AppClientError`, visible en el admin de Django. Solo se guardan los 200 más nuevos.
+- La app no reintenta un informe que falla, no informa de un 401 ni de una petición cancelada, y manda el mismo fallo una sola vez cada 30 s.
 
 ### Ajustes
 

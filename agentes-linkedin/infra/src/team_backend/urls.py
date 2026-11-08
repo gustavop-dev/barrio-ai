@@ -78,4 +78,6 @@ urlpatterns=[
  path('auth/token',mv.TokenIssue.as_view()),path('auth/token/revocar',mv.TokenRevoke.as_view()),
  path('auth/dispositivos',mv.Devices.as_view()),path('auth/dispositivos/<uuid:did>',mv.DeviceDetail.as_view()),
  path('push/expo',mv.ExpoPush.as_view()),
+ # Client error reports of the app (CONTRATO-API.md «Errores del cliente»): metadata only, logged and kept.
+ path('app/errores',mv.ClientErrors.as_view()),
 ]
