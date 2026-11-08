@@ -90,7 +90,7 @@ export function CalendarioScreen() {
   const [screenHeight, setScreenHeight] = useState<number | undefined>(undefined);
   // The day sheet's room starts under the grid: the screen, the grid's frame and the scroll that brings it to the top.
   const screenRef = useRef<ComponentRef<typeof View>>(null);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const gridRef = useRef<ComponentRef<typeof View>>(null);
   const scrollY = useRef(0);
   const contentHeight = useRef(0);
@@ -161,7 +161,7 @@ export function CalendarioScreen() {
       const reachable = Math.max(0, contentHeight.current - (screenHeight ?? 0));
       const landed = Math.min(target, reachable);
       setGridBottom(Math.max(0, y + height - (landed - scrollY.current)));
-      scrollRef.current?.scrollTo?.({ y: target, animated: !reduced });
+      scrollRef.current?.scrollTo({ y: target, animated: !reduced });
     });
   };
 
@@ -176,7 +176,7 @@ export function CalendarioScreen() {
     setSheetDay(null);
     const before = scrollBeforeSheet.current;
     scrollBeforeSheet.current = null;
-    if (before !== null) scrollRef.current?.scrollTo?.({ y: before, animated: !reduced });
+    if (before !== null) scrollRef.current?.scrollTo({ y: before, animated: !reduced });
   };
   const shift = useCallback((direction: 1 | -1) => select(shifted(vista, fecha, direction)), [select, vista, fecha]);
 
