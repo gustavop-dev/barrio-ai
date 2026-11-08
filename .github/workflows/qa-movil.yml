@@ -171,7 +171,7 @@ jobs:
       QA_FLOW_TIMEOUT: '480'
       # The QA failure switch (team_backend.qa_fallos): only these settings load it. See movil/.maestro/README.md.
       QA_MODE: 'true'
-      QA_FAULTS_FILE: ${{ runner.temp }}/qa-fallos.json
+      QA_FAULTS_FILE: /tmp/qa-fallos.json
     steps:
       - uses: actions/checkout@v4
 
