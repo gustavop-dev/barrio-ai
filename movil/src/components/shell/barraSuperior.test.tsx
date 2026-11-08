@@ -341,23 +341,9 @@ describe('the top bar on the real shell', () => {
       router.push('/personas/7');
     });
     await advance(SETTLE_MS);
-    const animCalls = (NativeModules.NativeAnimatedModule.startAnimatingNode as jest.Mock).mock.calls;
-    const callsBefore = animCalls.length;
     await fireEvent.press(within(screen.getByTestId('detail-panel')).getByTestId('top-tu-turno'));
-    await advance(SETTLE_MS);
-    // TEMP diagnostics
-    const diag = (label: string) => {
-      const el = screen.queryByTestId('pantalla-tu-turno', { includeHiddenElements: true });
-      const chain: unknown[] = [];
-      for (let node: TestInstance | null = el; node; node = node.parent) {
-        const st = liveStyle(node) as { transform?: unknown; opacity?: unknown };
-        if (st.transform || st.opacity !== undefined || node.props.testID) chain.push({ type: node.type, testID: node.props.testID, transform: st.transform, opacity: st.opacity, activityState: node.props.activityState });
-      }
-      console.log(`DIAG ${label}`, JSON.stringify({ path: pathname(), toValues: animCalls.slice(callsBefore).map((c) => [c[1], (c[2] as { toValue?: number; type?: string }).toValue, (c[2] as { type?: string }).type]), chain, root: rootState() }));
-    };
-    diag('after-1500');
-    await advance(SETTLE_MS);
-    diag('after-3000');
+    // The detail first runs its push back to rest (FIRM), then the tab changes with the push.
+    await advance(2 * SETTLE_MS);
     expectShown('tu-turno');
     // The detail went (after its push back), and no second shell was stacked over it.
     expect(screen.queryByTestId('pantalla-persona', { includeHiddenElements: true })).toBeNull();
