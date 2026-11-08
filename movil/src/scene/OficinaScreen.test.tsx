@@ -1,6 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import { AppState, Dimensions, type AppStateStatus } from 'react-native';
 import { State } from 'react-native-gesture-handler';
+import * as Haptics from 'expo-haptics';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { REFRESH } from '@compartido/api/hooks';
 import { oficinaEventosKey } from '@compartido/api/oficina';
@@ -8,6 +9,9 @@ import { PLAN_WIDTH, sceneScale } from '@compartido/scene/plan';
 import { renderApp } from '@/test/render';
 import { fakeServer, type FakeHandler } from '@/test/server';
 import '@/api/transport';
+import { CaptureSheetHost } from '@/capture/CaptureSheet';
+import { closeCaptureSheet, openCaptureSheet, resetCaptureStoreForTests } from '@/capture/store';
+import { resetFakeAudio } from '@/test/fakeAudio';
 import { OficinaScreen } from './OficinaScreen';
 
 // Only the GPU boundary is mocked; the real lifecycle, shared engine, polling and gestures run.
@@ -61,12 +65,35 @@ it('opens an agent sheet from a scene tap, switches to its team and closes', asy
   const x = (w - PLAN_WIDTH * scale) / 2 + 96 * scale;
   await act(async () => fireGestureHandler(getByGestureTestId('office-tap'), [{ state: State.ACTIVE, x, y: 44 * scale }]));
   const panel = await screen.findByTestId('office-panel');
+  expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
+  expect(screen.getByText('Operador de cuenta · Trabajando en su puesto')).toBeOnTheScreen();
   expect(within(panel).getByText('Operador de cuenta')).toBeOnTheScreen();
   expect(within(panel).getByText('Es un servicio de software, no un agente de IA. Solo ejecuta lo que el equipo ya decidió.')).toBeOnTheScreen();
   await fireEvent.press(within(panel).getByText('Ver su equipo · Operación'));
   expect(within(screen.getByTestId('office-panel')).getByText('ESPACIO DEL EQUIPO')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: 'Cerrar' }));
   await waitFor(() => expect(screen.queryByTestId('office-panel')).toBeNull());
+});
+
+it('receives a successful capture-sheet send without changing the POST, closing or success haptic', async () => {
+  resetCaptureStoreForTests(); resetFakeAudio();
+  const api = server({
+    'GET /api/v1/capturas': { body: [] },
+    'POST /api/v1/capturas': { status: 201, body: { id: 'motion-c1', state: 'recibida', can_undo: true } },
+  });
+  await renderApp(<><OficinaScreen /><CaptureSheetHost /></>, { recorder: true });
+  await screen.findByText('Operación: Ejecutando comentario aprobado');
+  await act(async () => openCaptureSheet());
+  await fireEvent.changeText(screen.getByTestId('capture-note'), 'Una idea para el equipo');
+  await fireEvent.press(screen.getByTestId('capture-send'));
+  expect(await screen.findByText('Llegó tu captura a la oficina.')).toBeOnTheScreen();
+  expect(screen.queryByTestId('capture-sheet')).toBeNull();
+  expect(api.find('POST', '/api/v1/capturas')).toHaveLength(1);
+  expect(api.find('POST', '/api/v1/capturas')[0]!.body).toEqual([['nota', 'Una idea para el equipo']]);
+  expect(Haptics.notificationAsync).toHaveBeenCalledTimes(1);
+  expect(Haptics.notificationAsync).toHaveBeenCalledWith('success');
+  expect(screen.getByText('Deshacer')).toBeOnTheScreen();
+  await act(async () => closeCaptureSheet());
 });
 it('narrates events once, advances the cursor and retains history after empty pages', async () => {
   const api = server({ [E]: { body: events } }); const { client } = await renderApp(<OficinaScreen />);

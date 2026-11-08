@@ -8,7 +8,7 @@
 // not animate by itself (pulses, the hold overlay, the toast slide).
 import * as Haptics from 'expo-haptics';
 import { SCENE_MOTION } from '@compartido/scene/motion';
-import { Easing, FadeIn, FadeInDown, FadeOut, LinearTransition, ReduceMotion, useReducedMotion, type WithSpringConfig, type WithTimingConfig } from 'react-native-reanimated';
+import { Easing, FadeIn, FadeInDown, FadeOut, LinearTransition, ReduceMotion, useReducedMotion, withDelay, withTiming, type WithSpringConfig, type WithTimingConfig } from 'react-native-reanimated';
 
 // ---------------------------------------------------------------- reduced motion
 
@@ -129,8 +129,10 @@ export const timings = {
   viewerFade: { duration: durations.fast, easing: 'enter' },
   /** An upload progress bar moving to its new value. */
   progress: { duration: durations.base, easing: 'standard' },
-  officeNowIn: { duration: durations.base, easing: 'enter' },
-  officeNowOut: { duration: durations.fast, easing: 'exit' },
+  /** MovOficina: new narration enters after the previous one starts leaving. */
+  officeNowIn: { duration: durations.fast, easing: 'enter' },
+  officeNowOut: { duration: 120, easing: 'exit' },
+  officeNowRetire: { duration: durations.fast, easing: 'exit' },
 } as const satisfies Record<string, TimingToken>;
 
 export type TimingName = keyof typeof timings;
@@ -351,15 +353,42 @@ export const layout = {
 };
 
 // Oficina: choreography is shared with the PWA; all native overrides belong here.
-export const officeMotion = { ...SCENE_MOTION };
-export const officeFrames = { stepMs: 16, maxDeltaMs: 64, reportFrames: 300, slowFrameMs: 1000 / 60 } as const;
+/** MovOficina: shared interpreter values, in logical pixels and milliseconds. */
+export const officeMotion = {
+  ...SCENE_MOTION,
+  ambientEvery: 11000,
+  hopPx: 2, hopSettlePx: 1, hopStepMs: 90, hopEndMs: durations.fast,
+  bracketPx: 7, bracketMs: 120,
+  mailX: 98, mailStartY: -6, mailLandingY: 68, mailAcceleration: 0.9, mailStepMs: 16,
+  captureQuestionMs: 700, captureSheetMs: 1600, capturePickupMs: 500, captureHandoffMs: 1800,
+  captureFreePollMs: 300,
+};
+/** MovOficina: caption text swaps independently from the box's automatic retirement. */
+export const officeNarration = { enterY: 6, exitY: -4, retireY: -6, enterDelayMs: 60, holdMs: 3500 } as const;
+export const officeFrames = { stepMs: 16, maxDeltaMs: 60, reportFrames: 300, slowFrameMs: 1000 / 60 } as const;
 export const officeGestures = {
   minZoom: 1, maxZoom: 3, panDistance: 8, tapDistance: 10, tapDurationMs: 250, doubleTapMs: 280,
   touchTarget: 48, sheetActivation: 8, sheetHalf: 0.5, sheetFull: 0.88,
 } as const;
 export const officeLayout = {
-  nowIn: () => FadeIn.duration(timings.officeNowIn.duration).reduceMotion(reduce()),
-  nowOut: () => FadeOut.duration(timings.officeNowOut.duration).reduceMotion(reduce()),
+  /** MovOficina: text layers overlap; the new one starts at 60 ms. */
+  nowIn: () => {
+    const config = timing('officeNowIn'); const reduced = reduce();
+    return () => {
+      'worklet';
+      return { initialValues: { opacity: 0, transform: [{ translateY: officeNarration.enterY }] },
+        animations: { opacity: withDelay(officeNarration.enterDelayMs, withTiming(1, config), reduced),
+          transform: [{ translateY: withDelay(officeNarration.enterDelayMs, withTiming(0, config), reduced) }] } };
+    };
+  },
+  nowOut: () => {
+    const config = timing('officeNowOut');
+    return () => {
+      'worklet';
+      return { initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
+        animations: { opacity: withTiming(0, config), transform: [{ translateY: withTiming(officeNarration.exitY, config) }] } };
+    };
+  },
 };
 
 // ---------------------------------------------------------------- navigation, entrance and detail (MovNavegacion, MovEntrada, MovDetalle)

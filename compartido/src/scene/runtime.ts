@@ -11,12 +11,15 @@ import { SCENE_MOTION, type SceneMotion } from './motion';
 
 import { PLACES, planRoute, type PlaceId } from './plan';
 
-import { CHARACTERS, LIBRARIAN_ID, isCharacterId, isRoleId, type CharacterId, type Point, type TeamId } from './roles';
+import { CHARACTERS, LIBRARIAN_ID, isCharacterId, isRoleId, type CharacterId, type Point, type TeamId, type ZoneId } from './roles';
 
 type Command =
   | { op: 'claim'; place: PlaceId | 'library' }
   | { op: 'go' | 'release' | 'home' | 'finish' | 'requestBook' | 'awaitBook' | 'bookDone' }
   | { op: 'sleep'; ms: number }
+  | { op: 'capturePickup' | 'captureDone' }
+  | { op: 'narrate'; text: string; role: CharacterId }
+  | { op: 'doing'; text: string }
   | { op: 'say'; icon: BubbleIcon; ms: number; target?: CharacterId }
   | { op: 'reading'; value: boolean }
   | { op: 'fade'; value: number }
@@ -25,7 +28,7 @@ type Command =
 
 interface Task {
   actor: CharacterId;
-  kind: 'play' | 'ambient' | 'librarian';
+  kind: 'play' | 'ambient' | 'librarian' | 'capture';
   commands: Command[];
   index: number;
   started: boolean;
@@ -54,6 +57,13 @@ export interface SceneState {
   feed: FeedEntry[];
   motion: SceneMotion;
   wallTime: number;
+  selectedRole: CharacterId | null;
+  selectedZone: ZoneId | null;
+  hopAt: number;
+  teamAt: number;
+  captures: number;
+  captureActive: boolean;
+  mail: { x: number; y: number; vy: number; nextStep: number; landed: boolean; checkFreeAt: number } | null;
 }
 
 // Dependencies precede callers: worklets capture their closures during module initialization.
@@ -67,6 +77,8 @@ export function createScene(options: EngineOptions = {}, motion?: SceneMotion): 
     queue: createQueue(options.queue), statuses: {}, clock: 0, paused: false, frozen: options.frozen ?? false,
     still: options.still ?? false, tasks: [], occupied: {}, libraryJobs: [], booksReady: {}, nextStart: 0,
     nextAmbient: config.ambientFirst, ambientTurn: 0, version: 0, now: null, feed: [], motion: config, wallTime: 0,
+    selectedRole: null, selectedZone: null, hopAt: -config.hopEndMs, teamAt: -config.bracketMs,
+    captures: 0, captureActive: false, mail: null,
   };
 }
 
@@ -146,6 +158,59 @@ function serveNext(s: SceneState) {
   ], visitor.id);
 }
 
+function narrate(s: SceneState, text: string, role: string | null) {
+  'worklet';
+  s.now = { key: (s.now?.key ?? 0) + 1, text, role: isCharacterId(role) ? role : null, at: s.wallTime };
+  s.version++;
+}
+
+/** MovOficina: selection only changes presentation; it never interrupts an actor's route. */
+export function selectScene(s: SceneState, role: CharacterId | null, zone: ZoneId | null) {
+  'worklet';
+  if (role && role !== s.selectedRole) s.hopAt = s.clock;
+  if (zone && zone !== s.selectedZone) s.teamAt = s.clock;
+  s.selectedRole = role; s.selectedZone = zone;
+}
+
+export function narrateSceneSelection(s: SceneState, id: CharacterId) {
+  'worklet';
+  const a = actorById(s, id);
+  const status = sceneStatus(s, id);
+  const activity = s.frozen ? 'Sin datos de actividad' : s.paused ? 'Quieto: la máquina está en pausa'
+    : status === 'diseno' ? 'Todavía no trabaja' : a.doing ?? (id === LIBRARIAN_ID ? 'Ordenando la biblioteca'
+      : a.reading ? 'Leyendo un borrador' : status === 'trabajando' ? 'Trabajando en su puesto'
+        : status === 'desconocido' ? 'Sin datos de actividad' : 'En espera, sin encargo');
+  narrate(s, `${a.role.name} · ${activity}`, id);
+}
+
+export function sceneHop(s: SceneState, id: CharacterId): number {
+  'worklet';
+  if (s.still || s.paused || s.frozen || id !== s.selectedRole) return 0;
+  const elapsed = s.clock - s.hopAt;
+  return elapsed < s.motion.hopStepMs ? s.motion.hopPx : elapsed < s.motion.hopEndMs ? s.motion.hopSettlePx : 0;
+}
+
+export function sceneBracketLength(s: SceneState): number {
+  'worklet';
+  if (s.still || s.paused || s.frozen) return s.motion.bracketPx;
+  return Math.max(1, Math.round(s.motion.bracketPx * Math.min(1, (s.clock - s.teamAt) / s.motion.bracketMs)));
+}
+
+/** A confirmed local send, separate from the backend event feed and its real-work history. */
+export function receiveSceneCapture(s: SceneState) {
+  'worklet';
+  narrate(s, 'Llegó tu captura a la oficina.', 'operador_cuenta');
+  if (s.still) return;
+  s.captures++;
+  if (!s.captureActive) {
+    const m = s.motion;
+    s.captureActive = true;
+    // The board performs the first fall step synchronously on receipt.
+    s.mail = { x: m.mailX, y: m.mailStartY + m.mailAcceleration, vy: m.mailAcceleration,
+      nextStep: s.clock + m.mailStepMs, landed: false, checkFreeAt: 0 };
+  }
+}
+
 function runTask(s: SceneState, t: Task) {
   'worklet';
   const a = actorById(s, t.actor);
@@ -189,6 +254,10 @@ function runTask(s: SceneState, t: Task) {
       case 'fade': a.fade = c.value; break;
       case 'face': a.dir = c.dir; if (c.seated) a.away = false; break;
       case 'finish': finish(s, a); break;
+      case 'doing': a.doing = c.text; s.version++; break;
+      case 'narrate': narrate(s, c.text, c.role); break;
+      case 'capturePickup': s.mail = null; break;
+      case 'captureDone': s.captures--; s.captureActive = false; break;
       case 'requestBook':
         s.libraryJobs.push(a.id);
         if (s.libraryJobs.length === 1) serveNext(s);
@@ -209,7 +278,7 @@ function runTask(s: SceneState, t: Task) {
 function runningPlays(s: SceneState): number {
   'worklet';
   let n = 0;
-  for (const t of s.tasks) if (t.kind === 'play' && t.index < t.commands.length) n++;
+  for (const t of s.tasks) if ((t.kind === 'play' || t.kind === 'capture') && t.index < t.commands.length) n++;
   return n;
 }
 
@@ -254,15 +323,49 @@ function record(s: SceneState, event: OfficeEvent) {
   if (entries.length) { s.feed = [...entries, ...s.feed].slice(0, 60); s.version++; }
 }
 
-function narrate(s: SceneState, text: string, role: string | null) {
+
+function pumpCapture(s: SceneState) {
   'worklet';
-  s.now = { key: (s.now?.key ?? 0) + 1, text, role: isCharacterId(role) ? role : null, at: s.wallTime };
-  s.version++;
+  if (s.still || !s.captures) return;
+  const m = s.motion;
+  if (!s.captureActive) {
+    s.captureActive = true;
+    s.mail = { x: m.mailX, y: m.mailStartY + m.mailAcceleration, vy: m.mailAcceleration,
+      nextStep: s.clock + m.mailStepMs, landed: false, checkFreeAt: 0 };
+    narrate(s, 'Llegó tu captura a la oficina.', 'operador_cuenta');
+  }
+  const mail = s.mail;
+  if (!mail) return;
+  while (!mail.landed && s.clock >= mail.nextStep) {
+    if (mail.y < m.mailLandingY) {
+      mail.vy += m.mailAcceleration;
+      mail.y = Math.min(m.mailLandingY, mail.y + mail.vy);
+    } else mail.landed = true;
+    mail.nextStep += m.mailStepMs;
+  }
+  if (!mail.landed || s.clock < mail.checkFreeAt) return;
+  const o = actorById(s, 'operador_cuenta');
+  if (o.busy) { mail.checkFreeAt = s.clock + m.captureFreePollMs; return; }
+  begin(s, o, 'Recogiendo tu captura');
+  runTask(s, addTask(s, o.id, 'capture', [
+    { op: 'face', dir: 3 }, { op: 'say', icon: 'pregunta', ms: m.captureQuestionMs },
+    { op: 'sleep', ms: m.captureQuestionMs }, { op: 'capturePickup' },
+    { op: 'say', icon: 'hoja', ms: m.captureSheetMs }, { op: 'sleep', ms: m.capturePickupMs },
+    { op: 'doing', text: 'Llevando tu captura a Mesa editorial' },
+    { op: 'narrate', text: 'Operación lleva tu captura a Mesa editorial.', role: o.id },
+    { op: 'claim', place: 'editorial' }, { op: 'go' },
+    { op: 'say', icon: 'hoja', ms: m.captureHandoffMs },
+    { op: 'say', target: 'director_editorial', icon: 'charla', ms: m.captureHandoffMs },
+    { op: 'narrate', text: 'Director editorial recibe tu captura.', role: 'director_editorial' },
+    { op: 'sleep', ms: m.deliveryMs }, { op: 'release' }, { op: 'home' },
+    { op: 'finish' }, { op: 'captureDone' },
+  ]));
 }
 
 export function pumpScene(s: SceneState) {
   'worklet';
   if (s.paused || s.frozen) return;
+  pumpCapture(s);
   for (;;) {
     if (!s.still && s.clock < s.nextStart) return;
     const summary = s.queue.summary;
@@ -297,6 +400,8 @@ export function setSceneStill(s: SceneState, still: boolean) {
   if (s.still === still) return;
   s.still = still;
   if (still) {
+    s.mail = null; s.captures = 0; s.captureActive = false;
+    s.hopAt = s.clock - s.motion.hopEndMs; s.teamAt = s.clock - s.motion.bracketMs;
     s.tasks.length = 0; s.libraryJobs.length = 0; s.occupied = {}; s.booksReady = {};
     for (const a of s.actors) {
       a.x = a.role.home[0]; a.y = a.role.home[1]; a.dir = a.role.facing; a.path = null; a.at = null;
@@ -311,19 +416,21 @@ function ambient(s: SceneState) {
   'worklet';
   if (s.still || s.clock < s.nextAmbient) return;
   s.nextAmbient = s.clock + s.motion.ambientEvery;
-  if (runningPlays(s) || queueSize(s.queue)) return;
-  const free = s.actors.filter((a) => !a.role.service && !a.busy && !a.away && sceneStatus(s, a.id) === 'en_espera');
-  if (!free.length) return;
-  const a = free[s.ambientTurn++ % free.length]!;
-  const mate = free.find((b) => b.id !== a.id && b.role.team === a.role.team);
-  const coffee = !s.occupied.cafe;
+  if (s.captures || runningPlays(s) || queueSize(s.queue)) return;
+  // MovOficina: only these waiting roles visit the coffee machine. Backend status still wins.
+  const free = s.actors.filter((a) => !a.busy && !a.away && sceneStatus(s, a.id) === 'en_espera'
+    && ['posicionamiento', 'perfil', 'investigador_referentes', 'lector_par', 'lector_divulgador'].includes(a.id));
   const m = s.motion;
-  if (mate && (s.ambientTurn % 2 === 0 || !coffee)) {
-    runTask(s, addTask(s, a.id, 'ambient', [{ op: 'say', icon: 'charla', ms: m.chatMs }, { op: 'sleep', ms: m.chatReplyMs }, { op: 'say', target: mate.id, icon: 'charla', ms: m.chatMs }]));
-  } else if (coffee) {
+  if (free.length && !s.occupied.cafe) {
+    const a = free[Math.floor(s.clock / 1000) % free.length]!;
     begin(s, a, 'Por un café');
     runTask(s, addTask(s, a.id, 'ambient', [{ op: 'claim', place: 'cafe' }, { op: 'go' }, { op: 'say', icon: 'cafe', ms: m.coffeeMs },
       { op: 'sleep', ms: m.coffeeMs }, { op: 'release' }, { op: 'home' }, { op: 'finish' }]));
+  }
+  const relations = actorById(s, 'relaciones_comunidad'), inbox = actorById(s, 'conversaciones_inbox');
+  if ([relations, inbox].every((a) => !a.busy && !a.away && sceneStatus(s, a.id) === 'en_espera')) {
+    runTask(s, addTask(s, relations.id, 'ambient', [{ op: 'say', icon: 'charla', ms: m.chatMs },
+      { op: 'sleep', ms: m.chatReplyMs }, { op: 'say', target: inbox.id, icon: 'charla', ms: m.chatMs }]));
   }
 }
 

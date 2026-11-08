@@ -3,7 +3,7 @@ import { EventQueue } from './events';
 import type { StatusMap } from './activity';
 import type { EngineOptions, EngineSnapshot } from './model';
 import { SCENE_MOTION } from './motion';
-import { createScene, hitScene, ingestScene, sceneSnapshot, sceneStatus, setSceneStill, stepScene } from './runtime';
+import { createScene, hitScene, ingestScene, receiveSceneCapture, sceneSnapshot, sceneStatus, setSceneStill, stepScene } from './runtime';
 import type { CharacterId } from './roles';
 export type * from './model';
 export const WALK_SPEED = SCENE_MOTION.walkSpeed;
@@ -42,6 +42,7 @@ export class OfficeEngine {
     this.state.wallTime = this.wall();
     const n = ingestScene(this.state, events, serverNow); this.flush(); return n;
   }
+  receiveCapture() { this.state.wallTime = this.wall(); receiveSceneCapture(this.state); this.flush(); }
   statusOf(id: CharacterId) { return sceneStatus(this.state, id); }
   hit(x: number, y: number) { return hitScene(this.state, x, y); }
   step(dt: number) { this.state.wallTime = this.wall(); stepScene(this.state, dt); this.flush(); }
