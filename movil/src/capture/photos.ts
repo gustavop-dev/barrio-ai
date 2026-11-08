@@ -1,19 +1,46 @@
 // Photos for a capture: the camera or the gallery (expo-image-picker), checked against the contract
 // (JPEG, PNG, WebP or HEIC, 10 MB each, 10 per capture).
-import { CAPTURE_LIMITS, isAcceptedPhoto } from '@compartido/api/capturas';
+import { CAPTURE_LIMITS, isAcceptedPhoto, nativeUri, PHOTO_TYPES, typeFromName } from '@compartido/api/capturas';
 import * as ImagePicker from 'expo-image-picker';
 import type { PickedPhoto } from './types';
 
 let seq = 0;
 
-/** Type and name of a picked asset; HEIC from some phones comes without a type. */
+const EXTENSION: Record<string, string> = { 'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp', 'image/heic': 'heic', 'image/heif': 'heif' };
+
+/** The name with the extension of its real type (`IMG_1.heic` re-encoded as JPEG → `IMG_1.jpg`). */
+function withExtension(name: string, type: string): string {
+  const ext = EXTENSION[type];
+  if (!ext || typeFromName(name) === type) return name;
+  const base = name.replace(/\.[a-z0-9]+$/i, '') || 'foto';
+  return `${base}.${ext}`;
+}
+
+/**
+ * URI, name and type of a picked asset, as the upload sends them.
+ *
+ * - The URI always has a scheme (`file://`, or `content://` as given).
+ * - The type is the one of the bytes in the file. With `quality` below 1, expo-image-picker on Android
+ *   re-encodes the picture into its cache (`…/ImagePicker/<uuid>.jpeg`, `.png` or `.webp`) but keeps the
+ *   source's `mimeType` and `fileName`: a HEIC comes back as JPEG bytes labelled `image/heic` and
+ *   `IMG_1.heic`. So for an image the extension of the local file wins, then `mimeType`, then the
+ *   name's extension (HEIC from some phones comes without a type), then JPEG. Anything that is not an
+ *   image keeps its type, so the checks below refuse it.
+ */
 export function toPickedPhoto(asset: Pick<ImagePicker.ImagePickerAsset, 'uri' | 'fileName' | 'mimeType' | 'fileSize'>): PickedPhoto {
   seq += 1;
-  const fromUri = asset.uri.split('/').pop()?.split('?')[0] ?? '';
-  const name = asset.fileName || fromUri || `foto-${seq}.jpg`;
-  const ext = name.split('.').pop()?.toLowerCase() ?? '';
-  const guessed = ext === 'png' ? 'image/png' : ext === 'webp' ? 'image/webp' : ext === 'heic' || ext === 'heif' ? 'image/heic' : 'image/jpeg';
-  return { id: `f${seq}`, uri: asset.uri, name, type: asset.mimeType || guessed, size: typeof asset.fileSize === 'number' ? asset.fileSize : null };
+  const uri = nativeUri(asset.uri);
+  const fromUri = uri.split(/[?#]/)[0]?.split('/').pop() ?? '';
+  const size = typeof asset.fileSize === 'number' ? asset.fileSize : null;
+  const declared = (asset.mimeType ?? '').trim().toLowerCase();
+  if (declared && !declared.startsWith('image/')) {
+    return { id: `f${seq}`, uri, name: asset.fileName || fromUri || `archivo-${seq}`, type: declared, size };
+  }
+  const fromFile = uri.startsWith('file:') ? typeFromName(uri) : null;
+  const written = fromFile && PHOTO_TYPES.includes(fromFile) ? fromFile : null;
+  const type = written || declared || typeFromName(asset.fileName ?? '') || typeFromName(fromUri) || 'image/jpeg';
+  const name = withExtension(asset.fileName || (typeFromName(fromUri) ? fromUri : '') || `foto-${seq}.jpg`, type);
+  return { id: `f${seq}`, uri, name, type, size };
 }
 
 export interface PhotoCheck {

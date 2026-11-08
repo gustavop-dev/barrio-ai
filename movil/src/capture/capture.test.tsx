@@ -6,6 +6,7 @@ import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
 import { State } from 'react-native-gesture-handler';
 import { createGestureController, fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+import { resetErrorReportsForTests } from '@/api/errorReport';
 import '@/api/transport';
 import { audio, resetFakeAudio } from '@/test/fakeAudio';
 import { renderApp } from '@/test/render';
@@ -15,9 +16,15 @@ import { CaptureButton } from './CaptureButton';
 import { CaptureSheetHost } from './CaptureSheet';
 import { checkPhotos, toPickedPhoto } from './photos';
 import { discardProgress, holdDecision, holdFollow, isTooShort, lockProgress } from './hold';
+import { DRAFT_KEPT } from './sendError';
 import { closeCaptureSheet, openCaptureSheet, resetCaptureStoreForTests } from './store';
+import type { RecordedAudio } from './types';
 
 const CAPTURE = { id: 'c1', state: 'recibida', state_label: 'Recibida', undo_until: new Date(Date.now() + 120_000).toISOString(), can_undo: true };
+
+/** A finished voice note as expo-audio leaves it in the cache (here without its file:// scheme). */
+const AUDIO: RecordedAudio = { uri: '/data/user/0/co.projectapp.office/cache/Audio/recording-1.m4a', mime: 'audio/mp4', duration: 4.24, levels: Array.from({ length: 24 }, () => 0.3) };
+const AUDIO_PART = { uri: 'file:///data/user/0/co.projectapp.office/cache/Audio/recording-1.m4a', name: 'captura.m4a', type: 'audio/mp4' };
 
 function capturaServer(extra: Parameters<typeof fakeServer>[0] = {}) {
   return fakeServer({
@@ -45,6 +52,7 @@ async function renderCapture() {
 beforeEach(() => {
   resetFakeAudio();
   resetCaptureStoreForTests(true);
+  resetErrorReportsForTests();
 });
 
 afterEach(async () => {
@@ -86,6 +94,31 @@ describe('capture rules (motion.ts gestures.capture, MovCaptura)', () => {
     expect(result.kept).toEqual([ok]);
     expect(result.problem).toMatch(/No se añadió big\.jpg, x\.gif/);
     expect(checkPhotos([ok, ok], 9).problem).toMatch(/hasta 10 fotos/);
+  });
+
+  it('describes a picked photo as the bytes the picker wrote: a URI with a scheme, the real type and a matching name', () => {
+    // Android re-encodes a HEIC into …/ImagePicker/<uuid>.jpeg (quality 0.85) but keeps the source's type and name.
+    expect(toPickedPhoto({ uri: 'file:///data/user/0/x/cache/ImagePicker/1.jpeg', fileName: 'IMG_1.heic', mimeType: 'image/heic', fileSize: 1000 })).toMatchObject({
+      uri: 'file:///data/user/0/x/cache/ImagePicker/1.jpeg',
+      name: 'IMG_1.jpg',
+      type: 'image/jpeg',
+    });
+    expect(toPickedPhoto({ uri: '/data/user/0/x/cache/2.png', fileName: null, mimeType: undefined, fileSize: undefined })).toMatchObject({
+      uri: 'file:///data/user/0/x/cache/2.png',
+      name: '2.png',
+      type: 'image/png',
+      size: null,
+    });
+    expect(toPickedPhoto({ uri: 'content://media/external/images/media/3', fileName: 'IMG_3.webp', mimeType: 'image/webp', fileSize: 5 })).toMatchObject({
+      uri: 'content://media/external/images/media/3',
+      name: 'IMG_3.webp',
+      type: 'image/webp',
+    });
+    const unnamed = toPickedPhoto({ uri: 'content://media/external/images/media/4', fileName: null, mimeType: undefined, fileSize: 5 });
+    expect(unnamed.type).toBe('image/jpeg');
+    expect(unnamed.name).toMatch(/^foto-\d+\.jpg$/);
+    // Not an image: it keeps its type, so the checks refuse it.
+    expect(toPickedPhoto({ uri: 'file:///a/1.jpg', fileName: 'video.mov', mimeType: 'video/quicktime', fileSize: 5 })).toMatchObject({ name: 'video.mov', type: 'video/quicktime' });
   });
 });
 
@@ -303,6 +336,141 @@ describe('capture sheet', () => {
     await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Algo');
     await fireEvent.press(within(sheet).getByLabelText('Cerrar sin guardar'));
     expect(await screen.findByText('¿Cerrar sin enviar?')).toBeOnTheScreen();
+  });
+
+  it('a voice note goes up as a file:// part named captura.m4a of type audio/mp4, through XMLHttpRequest', async () => {
+    const server = capturaServer();
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { audio: AUDIO }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/capturas')).toHaveLength(1));
+    const sent = server.find('POST', '/api/v1/capturas')[0]!;
+    expect(sent.via).toBe('xhr');
+    expect(sent.headers['content-type']).toBeUndefined();
+    expect(sent.body).toEqual([
+      ['audio', AUDIO_PART],
+      ['audio_duration_s', '4.2'],
+    ]);
+    expect(await screen.findByText('Enviado al equipo.', {}, { timeout: 4000 })).toBeOnTheScreen();
+  });
+
+  it('a locked recording is finished first, and the file the recorder wrote goes up', async () => {
+    const server = capturaServer();
+    await renderCapture();
+    const hold = createGestureController('capture-hold');
+    await act(async () => {
+      hold.begin();
+      hold.activate();
+    });
+    await waitFor(() => expect(audio.recorder.record).toHaveBeenCalled());
+    await act(async () => {
+      hold.update({ translationY: -80 });
+      hold.end({ translationY: -80 });
+    });
+    expect(await screen.findByTestId('capture-recording')).toBeOnTheScreen();
+    const sheet = screen.getByTestId('capture-sheet');
+    audio.recorder.stop.mockImplementationOnce(async () => {
+      audio.recorder.isRecording = false;
+      audio.recorder.uri = '/data/user/0/co.projectapp.office/cache/Audio/recording-2.m4a';
+    });
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/capturas')).toHaveLength(1));
+    expect(audio.recorder.stop).toHaveBeenCalledTimes(1);
+    const [part] = server.find('POST', '/api/v1/capturas')[0]!.body as [string, unknown][];
+    expect(part).toEqual(['audio', { uri: 'file:///data/user/0/co.projectapp.office/cache/Audio/recording-2.m4a', name: 'captura.m4a', type: 'audio/mp4' }]);
+  });
+
+  it('a send that fails on the phone says why, keeps the audio, the photo and the note, reports only metadata, and «Reintentar» sends it', async () => {
+    const server = capturaServer({
+      'POST /api/v1/capturas': { networkError: 'Could not retrieve file for uri file:///data/user/0/co.projectapp.office/cache/Audio/recording-1.m4a' },
+      'POST /api/v1/app/errores': { status: 201, body: { id: 'e1' } },
+    });
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///cache/foto.jpg', fileName: 'foto.jpg', mimeType: 'image/jpeg', fileSize: 2048, width: 10, height: 10 }],
+    } as never);
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { audio: AUDIO }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.press(within(sheet).getByText('Galería'));
+    expect(await within(sheet).findByLabelText('Foto adjunta 1')).toBeOnTheScreen();
+    await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Idea secreta del jueves');
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+
+    const problem = await within(sheet).findByTestId('capture-send-error');
+    expect(within(problem).getByText('El teléfono no pudo leer un archivo')).toBeOnTheScreen();
+    expect(within(problem).getByText(DRAFT_KEPT)).toBeOnTheScreen();
+    expect(within(problem).getByText(/Detalle: Network request failed: Could not retrieve file for uri/)).toBeOnTheScreen();
+    expect(Haptics.notificationAsync).toHaveBeenCalledWith('error');
+    // Nothing is lost: the sheet stays open with the audio, the photo and the note.
+    expect(screen.getByTestId('capture-sheet')).toBeOnTheScreen();
+    expect(within(sheet).getByTestId('capture-audio')).toBeOnTheScreen();
+    expect(within(sheet).getByLabelText('Foto adjunta 1')).toBeOnTheScreen();
+    expect(within(sheet).getByDisplayValue('Idea secreta del jueves')).toBeOnTheScreen();
+
+    await waitFor(() => expect(server.find('POST', '/api/v1/app/errores')).toHaveLength(1));
+    const report = server.find('POST', '/api/v1/app/errores')[0]!.body;
+    expect(report).toMatchObject({
+      kind: 'captura_envio',
+      name: 'UploadNetworkError',
+      status: null,
+      parts: [
+        { field: 'audio', type: 'audio/mp4', scheme: 'file', size: null },
+        { field: 'fotos', type: 'image/jpeg', scheme: 'file', size: 2048 },
+      ],
+    });
+    expect(JSON.stringify(report)).not.toMatch(/Idea secreta|recording-1|foto\.jpg|0ff1ce_dt_/);
+
+    server.on('POST /api/v1/capturas', { status: 201, body: CAPTURE });
+    await fireEvent.press(within(problem).getByText('Reintentar'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/capturas')).toHaveLength(2));
+    const [first, second] = server.find('POST', '/api/v1/capturas');
+    expect(second!.body).toEqual(first!.body);
+    expect(second!.body).toEqual([
+      ['audio', AUDIO_PART],
+      ['audio_duration_s', '4.2'],
+      ['fotos', { uri: 'file:///cache/foto.jpg', name: 'foto.jpg', type: 'image/jpeg' }],
+      ['nota', 'Idea secreta del jueves'],
+    ]);
+    expect(await screen.findByText('Enviado al equipo.', {}, { timeout: 4000 })).toBeOnTheScreen();
+  });
+
+  it('no network says so, and the draft stays', async () => {
+    capturaServer({ 'POST /api/v1/capturas': { networkError: 'Unable to resolve host "office.projectapp.co"' } });
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { audio: AUDIO }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+    const problem = await within(sheet).findByTestId('capture-send-error');
+    expect(within(problem).getByText('No hay conexión con el servidor')).toBeOnTheScreen();
+    expect(within(sheet).getByTestId('capture-audio')).toBeOnTheScreen();
+  });
+
+  it('a 400 shows the server message', async () => {
+    capturaServer({ 'POST /api/v1/capturas': { status: 400, body: { detail: 'Tipo de audio no admitido: desconocido.' } } });
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { audio: AUDIO }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+    const problem = await within(sheet).findByTestId('capture-send-error');
+    expect(within(problem).getByText('El servidor no aceptó el envío')).toBeOnTheScreen();
+    expect(within(problem).getByText('Tipo de audio no admitido: desconocido.')).toBeOnTheScreen();
+    expect(within(problem).getByText('Detalle: HTTP 400')).toBeOnTheScreen();
+    expect(within(sheet).getByTestId('capture-audio')).toBeOnTheScreen();
+  });
+
+  it('a 409 says why it cannot go with that context', async () => {
+    capturaServer({ 'POST /api/v1/capturas': { status: 409, body: { detail: 'La pregunta ya no está abierta.' } } });
+    await renderCapture();
+    await act(async () => openCaptureSheet({ tipo: 'pregunta', id: 'q1', label: '¿Aceptas proyectos de 3 meses?' }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Sí.');
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+    const problem = await within(sheet).findByTestId('capture-send-error');
+    expect(within(problem).getByText('No se puede enviar así ahora')).toBeOnTheScreen();
+    expect(within(problem).getByText('La pregunta ya no está abierta. Quita el contexto de arriba para enviarlo suelto.')).toBeOnTheScreen();
+    expect(within(sheet).getByDisplayValue('Sí.')).toBeOnTheScreen();
   });
 
   it('a 413 says the upload is too big', async () => {

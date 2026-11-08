@@ -4,6 +4,7 @@
 //
 // Two contexts: the controls and phase (change rarely) and the live meter (every LEVEL_INTERVAL_MS),
 // so only the wave and the timer re-render while recording.
+import { nativeUri } from '@compartido/api/capturas';
 import { MAX_SECONDS, toBars, WAVE_BARS } from '@compartido/logic/audio';
 import {
   getRecordingPermissionsAsync,
@@ -43,7 +44,10 @@ export interface RecorderApi {
   start: () => Promise<boolean>;
   pause: () => void;
   resume: () => void;
-  /** Ends the recording and hands back the audio (null if nothing was recorded). */
+  /**
+   * Ends the recording and hands back the audio once its file is complete (null if nothing was
+   * recorded). While a stop is on its way, it hands back that same audio.
+   */
   stop: () => Promise<RecordedAudio | null>;
   /** Ends it without using it; the audio comes back for «Recuperar». */
   discard: () => Promise<RecordedAudio | null>;
@@ -95,6 +99,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
   const history = useRef<number[]>([]);
   const elapsed = useRef(0);
   const phaseRef = useRef<RecorderPhase>('idle');
+  const finishing = useRef<Promise<RecordedAudio | null> | null>(null);
 
   const setPhaseBoth = useCallback((next: RecorderPhase) => {
     phaseRef.current = next;
@@ -110,22 +115,35 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
     setLive({ elapsed: elapsed.current, levels: toBars(recent, WAVE_BARS) });
   }, [phase, status.isRecording, status.durationMillis, status.metering]);
 
-  const finish = useCallback(async (): Promise<RecordedAudio | null> => {
-    if (phaseRef.current === 'idle') return null;
+  const finish = useCallback((): Promise<RecordedAudio | null> => {
+    // A stop already on its way («Terminar» and then «Guardar» a moment later): the same file, once.
+    if (finishing.current) return finishing.current;
+    if (phaseRef.current === 'idle') return Promise.resolve(null);
     const duration = Math.max(elapsed.current, recorder.currentTime || 0);
     setPhaseBoth('idle');
-    try {
-      await recorder.stop();
-    } catch {
-      // Already stopped (or never started): use whatever file there is.
-    }
-    setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
-    const uri = recorder.uri;
-    const levels = toBars(history.current, WAVE_BARS);
-    history.current = [];
-    elapsed.current = 0;
-    setLive({ elapsed: 0, levels: EMPTY_LEVELS });
-    return uri ? { uri, mime: MIME, duration, levels } : null;
+    const run = (async (): Promise<RecordedAudio | null> => {
+      try {
+        // The file is complete once this resolves: on Android expo-audio's stop() runs
+        // MediaRecorder.stop(), which writes the end of the MP4 and closes it, before it resolves.
+        await recorder.stop();
+      } catch {
+        // Already stopped (or never started): use whatever file there is.
+      }
+      setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
+      // expo-audio gives `file:///…/Audio/recording-<uuid>.m4a`; a bare path would not upload.
+      const uri = recorder.uri ? nativeUri(recorder.uri) : '';
+      const levels = toBars(history.current, WAVE_BARS);
+      history.current = [];
+      elapsed.current = 0;
+      setLive({ elapsed: 0, levels: EMPTY_LEVELS });
+      return uri ? { uri, mime: MIME, duration, levels } : null;
+    })();
+    finishing.current = run;
+    const done = () => {
+      if (finishing.current === run) finishing.current = null;
+    };
+    run.then(done, done);
+    return run;
   }, [recorder, setPhaseBoth]);
 
   // The contract caps audio at 1800 s: stop by itself, and let the sheet pick the audio up.
