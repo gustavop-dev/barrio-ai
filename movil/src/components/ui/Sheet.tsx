@@ -5,7 +5,7 @@
 // opening is a snap («HÁPTICO · LEVE»). Inside a Modal Android starts a new root, so it brings its
 // GestureHandlerRootView.
 import { createContext, useCallback, useContext, useEffect, useImperativeHandle, useRef, type ReactNode, type Ref } from 'react';
-import { KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { KeyboardAvoidingView, Modal, Pressable, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, GestureHandlerRootView, usePanGesture } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
@@ -211,7 +211,9 @@ export function Sheet({ label, onClose, children, header, suspended, canClose, o
           <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, shade]}>
             <Pressable style={StyleSheet.absoluteFill} accessibilityLabel="Cerrar" accessibilityRole="button" onPress={requestClose} />
           </Animated.View>
-          <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.avoid} pointerEvents="box-none">
+          {/* The app is drawn edge to edge, so on Android too the window no longer shrinks for the keyboard: the
+              sheet pads itself by it and shrinks (flexShrink), so a note and the buttons under it stay above it. */}
+          <KeyboardAvoidingView behavior="padding" style={styles.avoid} pointerEvents="box-none">
             <Animated.View
               testID={testID}
               accessibilityViewIsModal
@@ -261,6 +263,7 @@ const styles = StyleSheet.create({
   backdrop: { backgroundColor: colors.backdrop },
   avoid: { flex: 1, justifyContent: 'flex-end' },
   sheet: {
+    flexShrink: 1,
     backgroundColor: colors.surface,
     borderTopLeftRadius: radius.sheet,
     borderTopRightRadius: radius.sheet,

@@ -186,11 +186,11 @@ tags: [ajustes]
 
 # ---------------------------------------------------------------- Sesión y Acerca de: sign out, and back in
 # cubre: ACC-08
-- scrollUntilVisible:
-    element:
-      text: "SESIÓN Y ACERCA DE"
-    direction: DOWN
-    timeout: 30000
+# And ?ancla=sesion goes straight to the last section.
+- openLink: "oficina0ff1ce://ajustes?ancla=sesion"
+- extendedWaitUntil:
+    visible: "SESIÓN Y ACERCA DE"
+    timeout: 20000
 - scrollUntilVisible:
     element:
       id: logout

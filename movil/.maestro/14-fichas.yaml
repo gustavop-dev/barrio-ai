@@ -65,18 +65,6 @@ tags: [personas, fichas]
     centerElement: true
     timeout: 30000
 - assertVisible:
-    text: "Posible oportunidad · ProjectApp"
-    childOf:
-      id: conversation
-- assertVisible:
-    text: "Espera tu respuesta"
-    childOf:
-      id: conversation
-- assertVisible:
-    text: "Oportunidad 86 % · Espera respuesta 91 % · Venta o spam 4 %"
-    childOf:
-      id: conversation
-- assertVisible:
     text: "La app nunca envía mensajes: respondes tú en LinkedIn\\."
     childOf:
       id: conversation
@@ -84,13 +72,14 @@ tags: [personas, fichas]
     text: "Abrir en LinkedIn"
     childOf:
       id: conversation
-- takeScreenshot: 14-fichas-02-conversacion
-- scrollUntilVisible:
-    element:
+- assertVisible:
+    text: "Hola Gustavo, vi tu post sobre MVPs\\..*"
+    childOf:
       id: messages
-    direction: UP
-    centerElement: true
-    timeout: 20000
+- assertVisible:
+    text: "Sofía Martínez · .*"
+    childOf:
+      id: messages
 - assertVisible:
     text: "Tú · .*"
     childOf:
@@ -99,19 +88,25 @@ tags: [personas, fichas]
     text: "¡Con gusto, Sofía! Un placer\\."
     childOf:
       id: messages
-- assertVisible:
-    text: "Sofía Martínez · .*"
-    childOf:
-      id: messages
+- takeScreenshot: 14-fichas-02-mensajes
+# The team's read sits above the messages.
 - scrollUntilVisible:
     element:
-      text: "Hola Gustavo, vi tu post sobre MVPs\\..*"
+      text: "Posible oportunidad · ProjectApp"
       childOf:
-        id: messages
-    direction: DOWN
+        id: conversation
+    direction: UP
     centerElement: true
     timeout: 20000
-- takeScreenshot: 14-fichas-03-mensajes
+- assertVisible:
+    text: "Espera tu respuesta"
+    childOf:
+      id: conversation
+- assertVisible:
+    text: "Oportunidad 86 % · Espera respuesta 91 % · Venta o spam 4 %"
+    childOf:
+      id: conversation
+- takeScreenshot: 14-fichas-03-conversacion
 - back
 - extendedWaitUntil:
     notVisible:

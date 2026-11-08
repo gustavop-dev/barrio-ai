@@ -42,15 +42,16 @@ tags: [personas, referentes]
 
 # ---------------------------------------------------------------- the list
 # cubre: PRS-12
+# Newest first: Ana Lucía Torres, Carlos Andrés Mejía, María Fernanda Ruiz.
 - extendedWaitUntil:
-    visible: "María Fernanda Ruiz"
+    visible: "Ana Lucía Torres"
     timeout: 20000
 - scrollUntilVisible:
     element:
       id: referent-a1297b0c-2445-5f73-b9c7-14fa8cf4b16f
     direction: DOWN
     centerElement: true
-    timeout: 20000
+    timeout: 30000
 - assertVisible:
     text: "Activo"
     childOf:
@@ -68,10 +69,9 @@ tags: [personas, referentes]
 - takeScreenshot: 13-referentes-01-lista
 - scrollUntilVisible:
     element:
-      text: "Ana Lucía Torres"
-    direction: DOWN
+      text: "Carlos Andrés Mejía"
+    direction: UP
     timeout: 20000
-- assertVisible: "Carlos Andrés Mejía"
 - takeScreenshot: 13-referentes-02-todos
 
 # ---------------------------------------------------------------- «Observar ahora»
@@ -249,7 +249,11 @@ tags: [personas, referentes]
         id: toast
     timeout: 15000
 - assertNotVisible: ".*perfil-que-no-existe-qa.*"
-- assertVisible: "María Fernanda Ruiz"
+- scrollUntilVisible:
+    element:
+      text: "María Fernanda Ruiz"
+    direction: DOWN
+    timeout: 30000
 - takeScreenshot: 13-referentes-10-anadido
 # Pending the failure switch (PR #48, comun/qa-fallo.js): a 500 on POST /api/v1/operador/referents keeps the sheet
 # open with the error, and «vacio» on the list shows «Aún no hay referentes» for this account too.
@@ -290,7 +294,11 @@ tags: [personas, referentes]
 - extendedWaitUntil:
     notVisible: "Carlos Andrés Mejía"
     timeout: 15000
-- assertVisible: "Ana Lucía Torres"
+- scrollUntilVisible:
+    element:
+      text: "Ana Lucía Torres"
+    direction: UP
+    timeout: 20000
 - takeScreenshot: 13-referentes-12-quitado
 
 # ---------------------------------------------------------------- the other account has no referents

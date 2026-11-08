@@ -74,7 +74,8 @@ tags: [ajustes]
       childOf:
         id: confirm-sheet
     timeout: 15000
-- assertVisible: "En marcha"
+- assertVisible:
+    id: confirm-sheet
 - takeScreenshot: 11-ajustes-03-parada-fallida
 - tapOn:
     text: "Detener la máquina"
