@@ -29,15 +29,15 @@ tags: [oficina]
 # ---------------------------------------------------------------- a character in the scene
 # cubre: OFI-02, OFI-06
 # The canvas has no views per character, so the tap goes to a point of `office-scene` (absolute px inside the
-# element, Maestro's element-relative point). On the 390 dp screen at 3x the plan (192x336 logical px) is drawn
+# element, Maestro's element-relative point). On the 390 dp screen at 2x (320 dpi) the plan (192x336 logical px) is drawn
 # at 2x, centred: 3 dp of margin, no vertical offset while nothing is selected or panned. The target is
 # «Conversaciones e inbox», seated at logical (170, 100): hitScene takes x 158..182, y 72..102 (a 24 dp touch
 # target at 2x). It never walks (no backend event moves it and it is not one of the roles that go for coffee),
 # and the tap at logical (175, 80) stays out of the boxes of Relaciones (146, 100) and of a visitor standing at
-# the Relaciones spot (158, 110). Logical (175, 80) -> dp (3 + 350, 160) -> px (1059, 480).
+# the Relaciones spot (158, 110). Logical (175, 80) -> dp (3 + 350, 160) -> px (706, 320).
 - tapOn:
     id: office-scene
-    point: "1059,480"
+    point: "706,320"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
