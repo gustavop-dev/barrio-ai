@@ -183,10 +183,11 @@ tags: [turno]
 
 # ---------------------------------------------------------------- the choice question: an option, then «Deshacer»
 # cubre: TUR-09
+- runFlow: comun/turno-final.yaml
 - scrollUntilVisible:
     element:
       text: 'Fintech'
-    direction: DOWN
+    direction: UP
     speed: 20
     timeout: 60000
     centerElement: true
@@ -252,12 +253,7 @@ tags: [turno]
 # cubre: TUR-08
 # Dated on this week's Monday, its place among the questions changes with the weekday: down to the next group's
 # label, then up to it.
-- scrollUntilVisible:
-    element:
-      id: pospuestas
-    direction: DOWN
-    speed: 20
-    timeout: 60000
+- runFlow: comun/turno-final.yaml
 - scrollUntilVisible:
     element:
       text: 'Descartar'

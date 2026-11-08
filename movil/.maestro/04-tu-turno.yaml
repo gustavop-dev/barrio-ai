@@ -180,10 +180,11 @@ tags: [turno]
 # Monday, so its place among them changes with the weekday: it is looked for last, going up from «Ya no es urgente».
 # The choice question, swiped left: «Más tarde».
 # cubre: TUR-11, TUR-19
+- runFlow: comun/turno-final.yaml
 - scrollUntilVisible:
     element:
       text: '¿Con qué tipo de startups prefieres trabajar\?'
-    direction: DOWN
+    direction: UP
     speed: 20
     timeout: 60000
     centerElement: true
@@ -207,12 +208,13 @@ tags: [turno]
 
 # The yes/no question, «Más tarde» with its button (the expired question below has one too: look inside this card).
 # cubre: TUR-11
+- runFlow: comun/turno-final.yaml
 - scrollUntilVisible:
     element:
       text: 'Más tarde'
       childOf:
         id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
-    direction: DOWN
+    direction: UP
     speed: 20
     timeout: 60000
     centerElement: true
@@ -228,12 +230,7 @@ tags: [turno]
 
 # The analyst's orientation, alone in its group now: down to the folds at the end, then up to it.
 # cubre: TUR-08, SEM-08
-- scrollUntilVisible:
-    element:
-      id: pospuestas
-    direction: DOWN
-    speed: 20
-    timeout: 60000
+- runFlow: comun/turno-final.yaml
 - scrollUntilVisible:
     element:
       text: 'Ver el resumen'
