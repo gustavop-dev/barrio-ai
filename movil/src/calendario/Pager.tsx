@@ -3,9 +3,8 @@
 // (or a flick) it turns with the pageSnap spring; otherwise it springs back. The header arrows animate
 // the same way through the ref, and screen readers get «anterior» and «siguiente» actions.
 //
-// Pages are placed at an absolute index × width, so when the parent moves its date the page that slid in
-// keeps its place: nothing jumps between the spring and the new render. The current page and the side
-// pages have different keys, so the one that slid in is mounted afresh without the side pages' hiding.
+// Pages are keyed by an absolute index and placed at index × width, so when the parent moves its date
+// the page that slid in keeps its place: nothing jumps between the spring and the new render.
 //
 // The frame's height is MovCalendario's `h`: the parent keeps it (so it carries from the week to the
 // month) and the frame eases to the current page's height, clipping what is still outside it.
@@ -132,6 +131,10 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
   const strip = useAnimatedStyle(() => ({ transform: [{ translateX: -offset.value }] }));
   const frame = useAnimatedStyle(() => (height && height.value >= 0 ? { height: height.value } : {}));
   const pages: { key: number; offset: PageOffset }[] = width ? [-1, 0, 1].map((step) => ({ key: index + step, offset: step as PageOffset })) : [{ key: index, offset: 0 }];
+  // The strip's own box spans its three pages (from the previous one): a page laid out outside its parent's box is
+  // drawn, but Android does not count it as on screen, so after a swipe TalkBack (and the QA flows) lost the days of the
+  // week that slid in. A page's place on screen stays index × width − offset whatever `first` is.
+  const first = index - 1;
 
   return (
     <Animated.View
@@ -148,18 +151,16 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
       testID={testID}
     >
       <GestureDetector gesture={pan}>
-        <Animated.View style={strip}>
+        <Animated.View style={[strip, width ? { left: first * width, width: 3 * width } : null]}>
           {pages.map((page) =>
             page.offset === 0 ? (
-              // Its own key: a side page that slid in is mounted afresh as the current one, at the same place, so it
-              // never keeps the side page's hiding (Android left the slid-in week out of TalkBack and the QA flows).
-              <View key={`actual-${page.key}`} style={[styles.current, { left: page.key * width }]} onLayout={measure(page.key)}>
+              <View key={page.key} style={[styles.current, { left: (page.key - first) * width }, width ? { width } : null]} onLayout={measure(page.key)}>
                 {renderPage(0)}
               </View>
             ) : (
               <View
-                key={`lado-${page.key}`}
-                style={[styles.side, { left: page.key * width, width }]}
+                key={page.key}
+                style={[styles.side, { left: (page.key - first) * width, width }]}
                 onLayout={measure(page.key)}
                 accessibilityElementsHidden
                 importantForAccessibility="no-hide-descendants"

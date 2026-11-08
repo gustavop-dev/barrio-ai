@@ -269,6 +269,8 @@ describe('Detalle de una pieza · veto con «Deshacer»', () => {
     await fireEvent.press(screen.getByText('Vetar'));
     const confirm = await screen.findByTestId('confirm-sheet');
     expect(within(confirm).getByText('Vetar la pieza')).toBeOnTheScreen();
+    // Why «Vetar» does nothing yet: the note is marked as required, as in the PWA.
+    expect(within(confirm).getByText('Nota · obligatoria')).toBeOnTheScreen();
     const send = within(confirm).getAllByText('Vetar').at(-1)!;
     await fireEvent.press(send);
     expect(screen.getByTestId('confirm-sheet')).toBeOnTheScreen();

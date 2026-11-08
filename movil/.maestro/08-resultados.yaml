@@ -320,7 +320,7 @@ tags: [resultados]
 - assertVisible: "\\d+ publicados? · — con respuesta"
 - assertVisible: "\\d+ seguidos? · \\d+ invitados? · \\d+ aceptados?"
 - assertVisible: "\\d+ publicadas? · \\d+ bloqueadas? · \\d+ vetadas?"
-- assertVisible: ".*\\$.* hoy"
+- assertVisible: "[0-9.,]+ de [0-9.,]+ USD hoy"
 - takeScreenshot: 08-resultados-14-equipo
 
 # ---------------------------------------------------------------- 1 · Negocio: a missing figure, the funnel, an opportunity

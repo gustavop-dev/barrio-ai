@@ -7,6 +7,8 @@ export interface FieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
   /** « · opcional» after the label. */
   optional?: boolean;
+  /** « · obligatoria» after the label, as the PWA marks a note its confirm button waits for. */
+  required?: boolean;
   hint?: string;
   error?: string | null;
   multiline?: boolean;
@@ -21,17 +23,17 @@ const FOCUS_BORDER = 2;
  * Label, input (tinta-suave border, radius 6) and help or error under it. MovMicro: focused, the border
  * turns 2 px 0ff1ce-hondo and so does the label.
  */
-export function Field({ label, optional, hint, error, multiline, ref, ...input }: FieldProps) {
+export function Field({ label, optional, required, hint, error, multiline, ref, ...input }: FieldProps) {
   const [focused, setFocused] = useState(false);
   return (
     <View style={styles.field}>
       <T variant="detalle" color={focused ? colors.brandDeep : undefined}>
         {label}
-        {optional ? <T variant="detalle" soft>{' · opcional'}</T> : null}
+        {optional ? <T variant="detalle" soft>{' · opcional'}</T> : required ? <T variant="detalle" soft>{' · obligatoria'}</T> : null}
       </T>
       <TextInput
         ref={ref}
-        accessibilityLabel={label}
+        accessibilityLabel={required ? `${label}, obligatoria` : label}
         placeholderTextColor={colors.inkSoft}
         multiline={multiline}
         textAlignVertical={multiline ? 'top' : 'center'}
