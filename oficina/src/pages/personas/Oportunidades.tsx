@@ -6,7 +6,7 @@ import type { Opportunity, OpportunityStage } from '../../api/types';
 import { OPPORTUNITY_STAGES } from '../../api/types';
 import { IconChevronDown, IconPlus } from '../../components/icons';
 import { Avatar, Badge, Button, EmptyState, ErrorRetry, Skeleton, useToast } from '../../components/ui';
-import { nextActionText } from '../../../../compartido/src/logic/barrio';
+import { nextActionText, undoFailedToast } from '../../../../compartido/src/logic/barrio';
 import { OPPORTUNITY_BOARD_KEY, useOpportunityBoard } from './api';
 import { BOARD_STAGES, daysInStage, longDate, MODALITY_SHORT, OPPORTUNITY_STAGE_LABEL } from './labels';
 import { OportunidadForm } from './OportunidadForm';
@@ -141,7 +141,16 @@ export function Oportunidades() {
           toast.show(`Movida a «${OPPORTUNITY_STAGE_LABEL[stage]}»`, {
             undo: () => {
               setStageLocally(opportunity.id, previous);
-              update.mutate({ opportunityId: opportunity.id, patch: { stage: previous } });
+              update.mutate(
+                { opportunityId: opportunity.id, patch: { stage: previous } },
+                {
+                  // The undo failed: the card goes back to where the server still has it, and Gustavo is told.
+                  onError: () => {
+                    setStageLocally(opportunity.id, stage);
+                    toast.show(undoFailedToast(stage), { tone: 'error' });
+                  },
+                },
+              );
             },
           }),
         onError: () => {

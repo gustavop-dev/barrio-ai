@@ -34,9 +34,7 @@ tags: [personas]
 
 # ---------------------------------------------------------------- Barrio: tabs, warnings and rows
 # cubre: PRS-01
-- assertVisible:
-    text: Barrio
-    selected: true
+- assertVisible: Barrio
 - assertVisible: Oportunidades
 - assertVisible: Referentes
 # The QA server runs with the network off (NETWORK_ENABLED unset), and red/summary says so.

@@ -225,6 +225,11 @@ export function movedToast(stage: OpportunityStage): string {
   return `Movida a «${OPPORTUNITY_STAGE_LABEL[stage]}»`;
 }
 
+/** «Deshacer» a move failed: the card stays in the stage it was moved to. */
+export function undoFailedToast(stage: OpportunityStage): string {
+  return `No se pudo deshacer: sigue en «${OPPORTUNITY_STAGE_LABEL[stage]}»`;
+}
+
 export function stageDays(opportunity: Pick<Opportunity, 'days_in_stage'>): string {
   return daysInStage(opportunity.days_in_stage);
 }

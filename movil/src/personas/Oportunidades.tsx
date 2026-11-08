@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useUpdateOportunidad } from '@compartido/api/hooks';
 import { OPPORTUNITY_BOARD_KEY, useOpportunityBoard } from '@compartido/api/personas';
 import { OPPORTUNITY_STAGES, type Opportunity, type OpportunityStage } from '@compartido/api/types';
-import { closedMeta, movedToast, nextActionText, opportunityName, stageDays, stageGroups } from '@compartido/logic/barrio';
+import { closedMeta, movedToast, nextActionText, opportunityName, stageDays, stageGroups, undoFailedToast } from '@compartido/logic/barrio';
 import { MODALITY_SHORT, OPPORTUNITY_STAGE_LABEL } from '@compartido/logic/personas';
 import { router } from 'expo-router';
 import { useCallback, useLayoutEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
@@ -242,7 +242,17 @@ export function Oportunidades({ header }: { header: ReactNode }) {
           toast.show(movedToast(stage), {
             undo: () => {
               setStageLocally(opportunity.id, previous);
-              update.mutate({ opportunityId: opportunity.id, patch: { stage: previous } });
+              update.mutate(
+                { opportunityId: opportunity.id, patch: { stage: previous } },
+                {
+                  // The undo failed: the card goes back to where the server still has it, and Gustavo is told.
+                  onError: () => {
+                    setStageLocally(opportunity.id, stage);
+                    haptic('actionError');
+                    toast.show(undoFailedToast(stage), { tone: 'error' });
+                  },
+                },
+              );
             },
           });
         },

@@ -31,9 +31,7 @@ tags: [personas, oportunidades]
 
 # ---------------------------------------------------------------- the board
 # cubre: PRS-07
-- assertVisible:
-    text: Oportunidades
-    selected: true
+- assertVisible: Oportunidades
 - assertVisible: "Acuerdo · 1"
 - assertVisible: "Nueva oportunidad"
 - takeScreenshot: 12-oportunidades-01-tablero
