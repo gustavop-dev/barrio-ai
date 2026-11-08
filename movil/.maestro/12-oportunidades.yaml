@@ -413,15 +413,15 @@ tags: [personas, oportunidades]
     childOf:
       id: opportunity-form
 - extendedWaitUntil:
-    notVisible:
-      id: opportunity-form
-    timeout: 20000
-- extendedWaitUntil:
     visible:
       text: "Oportunidad registrada"
       childOf:
         id: toast
     timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 20000
 - scrollUntilVisible:
     element:
       text: "Lucia Prueba QA, Conversación"
@@ -470,15 +470,15 @@ tags: [personas, oportunidades]
     childOf:
       id: opportunity-form
 - extendedWaitUntil:
-    notVisible:
-      id: opportunity-form
-    timeout: 20000
-- extendedWaitUntil:
     visible:
       text: "Cambios guardados"
       childOf:
         id: toast
     timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 20000
 - scrollUntilVisible:
     element:
       text: "Startup QA"
@@ -519,15 +519,15 @@ tags: [personas, oportunidades]
     childOf:
       id: opportunity-form
 - extendedWaitUntil:
-    notVisible:
-      id: opportunity-form
-    timeout: 20000
-- extendedWaitUntil:
     visible:
       text: "Oportunidad eliminada"
       childOf:
         id: toast
     timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 20000
 - extendedWaitUntil:
     notVisible: "Isabel Duarte"
     timeout: 15000

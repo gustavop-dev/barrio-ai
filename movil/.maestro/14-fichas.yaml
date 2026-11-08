@@ -66,12 +66,8 @@ tags: [personas, fichas]
     timeout: 30000
 - assertVisible:
     text: "La app nunca envía mensajes: respondes tú en LinkedIn\\."
-    childOf:
-      id: conversation
 - assertVisible:
-    text: "Abrir en LinkedIn"
-    childOf:
-      id: conversation
+    id: conversation-link
 - assertVisible:
     text: "Hola Gustavo, vi tu post sobre MVPs\\..*"
     childOf:
@@ -93,19 +89,13 @@ tags: [personas, fichas]
 - scrollUntilVisible:
     element:
       text: "Posible oportunidad · ProjectApp"
-      childOf:
-        id: conversation
     direction: UP
     centerElement: true
     timeout: 20000
 - assertVisible:
     text: "Espera tu respuesta"
-    childOf:
-      id: conversation
 - assertVisible:
     text: "Oportunidad 86 % · Espera respuesta 91 % · Venta o spam 4 %"
-    childOf:
-      id: conversation
 - takeScreenshot: 14-fichas-03-conversacion
 - back
 - extendedWaitUntil:
@@ -177,9 +167,11 @@ tags: [personas, fichas]
     childOf:
       id: opportunity-form
 - assertVisible:
+    id: opp-picked
+- assertVisible:
     text: "Andrés Restrepo"
     childOf:
-      id: opp-picked
+      id: opportunity-form
 - scrollUntilVisible:
     element:
       text: "Cancelar"
@@ -257,14 +249,14 @@ tags: [personas, fichas]
       id: confirm-sheet
     enabled: true
 - extendedWaitUntil:
-    notVisible:
-      id: confirm-sheet
-    timeout: 15000
-- extendedWaitUntil:
     visible:
       text: "Descartada: no volverá a proponerse"
       childOf:
         id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
     timeout: 15000
 - extendedWaitUntil:
     visible: "DESCARTADO"

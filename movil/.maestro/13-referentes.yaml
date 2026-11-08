@@ -52,18 +52,10 @@ tags: [personas, referentes]
     direction: DOWN
     centerElement: true
     timeout: 30000
-- assertVisible:
-    text: "Activo"
-    childOf:
-      id: referent-a1297b0c-2445-5f73-b9c7-14fa8cf4b16f
-- assertVisible:
-    text: "Escribe sobre descubrimiento de producto con equipos pequeños; sus lectores son fundadores\\."
-    childOf:
-      id: referent-a1297b0c-2445-5f73-b9c7-14fa8cf4b16f
-- assertVisible:
-    text: "Observado hace .* · \\d+ (persona del barrio salió|personas del barrio salieron) de sus posts"
-    childOf:
-      id: referent-a1297b0c-2445-5f73-b9c7-14fa8cf4b16f
+# A card is a plain View (its texts are not its children for Maestro): the texts are checked on screen.
+- assertVisible: "Activo"
+- assertVisible: "Escribe sobre descubrimiento de producto con equipos pequeños; sus lectores son fundadores\\."
+- assertVisible: "Observado hace .* · \\d+ (persona del barrio salió|personas del barrio salieron) de sus posts"
 - assertVisible: "Desactivar a María Fernanda Ruiz"
 - assertVisible: "Quitar a María Fernanda Ruiz"
 - takeScreenshot: 13-referentes-01-lista
@@ -116,10 +108,7 @@ tags: [personas, referentes]
 - extendedWaitUntil:
     visible: "Desactivar a Ana Lucía Torres"
     timeout: 15000
-- assertVisible:
-    text: "Activo"
-    childOf:
-      id: referent-e7653e07-4b37-5215-aadf-005ec293209e
+- assertNotVisible: "Inactivo"
 - takeScreenshot: 13-referentes-04-desactivar-deshecho
 # Deactivated for real: «Inactivo» and «Reactivar».
 - tapOn: "Desactivar a Ana Lucía Torres"
@@ -132,10 +121,7 @@ tags: [personas, referentes]
 - extendedWaitUntil:
     visible: "Reactivar a Ana Lucía Torres"
     timeout: 15000
-- assertVisible:
-    text: "Inactivo"
-    childOf:
-      id: referent-e7653e07-4b37-5215-aadf-005ec293209e
+- assertVisible: "Inactivo"
 - takeScreenshot: 13-referentes-05-inactivo
 - extendedWaitUntil:
     notVisible:
@@ -151,10 +137,7 @@ tags: [personas, referentes]
 - extendedWaitUntil:
     visible: "Desactivar a Ana Lucía Torres"
     timeout: 15000
-- assertVisible:
-    text: "Activo"
-    childOf:
-      id: referent-e7653e07-4b37-5215-aadf-005ec293209e
+- assertNotVisible: "Inactivo"
 
 # ---------------------------------------------------------------- «Añadir referente»: the form validates before sending
 # cubre: PRS-12
@@ -239,14 +222,14 @@ tags: [personas, referentes]
 - tapOn:
     id: referent-submit
 - extendedWaitUntil:
-    notVisible:
-      id: add-referent
-    timeout: 15000
-- extendedWaitUntil:
     visible:
       text: "Referente añadido"
       childOf:
         id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: add-referent
     timeout: 15000
 - assertNotVisible: ".*perfil-que-no-existe-qa.*"
 - scrollUntilVisible:
@@ -282,14 +265,14 @@ tags: [personas, referentes]
     childOf:
       id: confirm-sheet
 - extendedWaitUntil:
-    notVisible:
-      id: confirm-sheet
-    timeout: 15000
-- extendedWaitUntil:
     visible:
       text: "Referente quitado"
       childOf:
         id: toast
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: confirm-sheet
     timeout: 15000
 - extendedWaitUntil:
     notVisible: "Carlos Andrés Mejía"

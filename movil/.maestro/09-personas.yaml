@@ -470,9 +470,11 @@ tags: [personas]
     childOf:
       id: opportunity-form
 - assertVisible:
+    id: opp-picked
+- assertVisible:
     text: "Laura Gómez"
     childOf:
-      id: opp-picked
+      id: opportunity-form
 - takeScreenshot: 09-personas-19-marcar-oportunidad
 - scrollUntilVisible:
     element:
@@ -499,15 +501,15 @@ tags: [personas]
     childOf:
       id: opportunity-form
 - extendedWaitUntil:
-    notVisible:
-      id: opportunity-form
-    timeout: 20000
-- extendedWaitUntil:
     visible:
       text: "Oportunidad registrada"
       childOf:
         id: toast
     timeout: 15000
+- extendedWaitUntil:
+    notVisible:
+      id: opportunity-form
+    timeout: 20000
 # The card now shows the opportunity (new today, with «Editar oportunidad»), and her stage is «Oportunidad».
 - extendedWaitUntil:
     notVisible: "Marcar como oportunidad"

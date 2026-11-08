@@ -221,7 +221,8 @@ tags: [ajustes]
     id: orientacion-field
     text: "Habla a fundadores de startups latinoamericanas en etapa temprana\\. Evita el tono de vendedor\\."
 - assertVisible: "\\d+ de 4000 caracteres\\. Es privada: orienta las decisiones y nunca aparece en un texto público\\."
-- assertVisible: "Actualizada hace .* por qa\\."
+# Older than a week, the date is written out («Actualizada 27/10/2026, 4:57 a. m. por qa.»).
+- assertVisible: "Actualizada .* por qa\\."
 - assertVisible:
     text: "Guardar orientación"
     enabled: false
@@ -268,7 +269,7 @@ tags: [ajustes]
     id: orientacion-field
     text: "Prioriza casos de ProjectApp esta semana"
 - extendedWaitUntil:
-    visible: "Actualizada (hace .*|ahora.*) por qa\\."
+    visible: "Actualizada hace .* por qa\\."
     timeout: 15000
 - assertNotVisible: "Descartar cambios"
 - takeScreenshot: 11-ajustes-08-orientacion-guardada
