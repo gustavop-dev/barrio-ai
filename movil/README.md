@@ -265,3 +265,21 @@ npm run icons        # regenera iconos, splash y retratos desde oficina/public/b
 ```
 
 Las pruebas no llaman a la red ni a servicios de pago: `fetch`, el almacén seguro, el audio, la cámara, las notificaciones y las vibraciones están simulados (`jest.setup.tsx`, `src/test/`).
+
+## Seeing changes instantly on the phone (development build)
+
+You don't need to rebuild the APK to see a JavaScript change. Install the **development build** once, and from then on every change shows on the phone in 1–2 seconds (Fast Refresh).
+
+1. Build it once, about 15 min on EAS:
+   ```bash
+   cd movil && npx eas-cli@latest build -p android --profile development
+   ```
+   Install the APK from the link it prints. It shows up as «0ff1ce» with the Expo development menu.
+2. Each working session, on the laptop:
+   ```bash
+   cd movil && npx expo start --dev-client
+   ```
+   Open the app on the phone and pick the laptop's server. The phone and the laptop must be on the same Wi-Fi; otherwise add `--tunnel`. Every file you save reloads on the phone right away.
+3. The development build talks to `https://office.projectapp.co`, the same backend as the installed app.
+
+Rebuild the development build only when a native dependency or `app.json` changes. Metro is much lighter than a local emulator or Gradle. The Maestro tests still run on GitHub (`qa-movil.yml`).
