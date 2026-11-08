@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """Report of a QA run (.github/workflows/qa-movil.yml), standard library only.
 
-Usage: informe.py <qa-artefactos>. Reads flujos.txt, junit/*.xml, maestro/*.log and logcat/logcat-completo.txt;
-writes logcat/logcat-app.txt, logcat/logcat-errores.txt, informe.html and resultado.txt ('ok' or 'fallo'), and
-prints the Markdown summary (job summary and PR comment) on stdout.
+Usage: informe.py <qa-artefactos>. Reads what every emulator job left there (flujos-N.txt, junit/*.xml, maestro/*.log,
+logcat/logcat-completo-N.txt, api-N.log); writes logcat/logcat-app.txt, logcat/logcat-errores.txt, informe.html and
+resultado.txt ('ok' or 'fallo'), and prints the Markdown summary (job summary and PR comment) on stdout.
 """
 import gzip
 import html
+import os
 import re
 import sys
 import xml.etree.ElementTree as ET
@@ -25,12 +26,13 @@ ERROR_TAGS = {'ReactNativeJS', 'ReactNative', 'AndroidRuntime', 'unknown:ReactNa
 
 def read_flows(out):
     flows = []
-    path = out / 'flujos.txt'
-    if path.exists():
+    for path in sorted(out.glob('flujos*.txt')):
+        shard = path.stem.partition('-')[2] or '1'
         for line in path.read_text().splitlines():
             parts = line.split()
             if len(parts) == 3:
-                flows.append({'name': parts[0], 'code': int(parts[1]), 'seconds': int(parts[2])})
+                flows.append({'name': parts[0], 'code': int(parts[1]), 'seconds': int(parts[2]), 'shard': shard})
+    flows.sort(key=lambda f: f['name'])
     for flow in flows:
         flow['failure'] = ''
         junit = out / 'junit' / f"{flow['name']}.xml"
@@ -69,13 +71,29 @@ def covered(name):
 
 
 def split_logcat(out):
-    """Keeps the app's lines (by pid), the crashes and the JS errors; compresses the full log."""
-    full = out / 'logcat' / 'logcat-completo.txt'
-    if not full.exists():
+    """Keeps the app's lines (by pid), the crashes and the JS errors of every emulator; compresses the full logs."""
+    files = sorted((out / 'logcat').glob('logcat-completo*.txt')) if (out / 'logcat').exists() else []
+    if not files:
         return {'crash': False, 'crashes': [], 'js_errors': 0, 'present': False}
-    text = full.read_text(errors='replace').splitlines()
-    pids = {m.group(1) for line in text for m in [START.search(line)] if m}
     app, errors, crashes = [], [], []
+    js_errors = 0
+    for full in files:
+        name = full.stem.replace('logcat-completo', 'emulador').strip('-') or 'emulador'
+        text = full.read_text(errors='replace').splitlines()
+        app.append(f'===== {name}');errors.append(f'===== {name}')
+        found = scan(text, app, errors, crashes)
+        js_errors += found
+        with gzip.open(full.with_suffix('.txt.gz'), 'wt') as fh:
+            fh.write('\n'.join(text) + '\n')
+        full.unlink()
+    (out / 'logcat' / 'logcat-app.txt').write_text('\n'.join(app) + '\n')
+    (out / 'logcat' / 'logcat-errores.txt').write_text('\n'.join(errors) + '\n')
+    return {'crash': bool(crashes), 'crashes': crashes[:20], 'js_errors': js_errors, 'present': True}
+
+
+def scan(text, app, errors, crashes):
+    """One emulator's logcat: appends its app lines, errors and crashes; returns its count of ReactNativeJS errors."""
+    pids = {m.group(1) for line in text for m in [START.search(line)] if m}
     js_errors = 0
     for line in text:
         m = LINE.match(line)
@@ -90,19 +108,11 @@ def split_logcat(out):
             errors.append(line)
             if tag == 'ReactNativeJS' and level == 'E':
                 js_errors += 1
-    (out / 'logcat' / 'logcat-app.txt').write_text('\n'.join(app) + '\n')
-    (out / 'logcat' / 'logcat-errores.txt').write_text('\n'.join(errors) + '\n')
-    with gzip.open(out / 'logcat' / 'logcat-completo.txt.gz', 'wt') as fh:
-        fh.write('\n'.join(text) + '\n')
-    full.unlink()
-    return {'crash': bool(crashes), 'crashes': crashes[:20], 'js_errors': js_errors, 'present': True}
+    return js_errors
 
 
 def api_problems(out):
-    log = out / 'api.log'
-    if not log.exists():
-        return {'5xx': 0, '429': 0, 'traceback': 0}
-    text = log.read_text(errors='replace')
+    text = ''.join(log.read_text(errors='replace') for log in sorted(out.glob('api*.log')))
     status = re.findall(r'" (\d{3}) ', text)
     return {'5xx': sum(1 for s in status if s.startswith('5')), '429': status.count('429'), 'traceback': text.count('Traceback (most recent call last)')}
 
@@ -145,7 +155,8 @@ def main():
     ok = bool(flows) and passed == len(flows) and not logcat['crash']
     (out / 'resultado.txt').write_text('ok\n' if ok else 'fallo\n')
     total = sum(f['seconds'] for f in flows)
-    lines = ['## QA móvil', '',
+    plan = os.environ.get('QA_PLAN', '').strip()
+    lines = ['## QA móvil', '', *([f'_{plan}_', ''] if plan else []),
              f"**{passed} de {len(flows)} flujos pasan** · crash: **{'sí' if logcat['crash'] else 'no'}** · "
              f"errores ReactNativeJS: {logcat['js_errors']} · API: {api['5xx']}×5xx, {api['429']}×429 · {total // 60} min de flujos", '',
              '| Flujo | Resultado | Duración | Cubre | Motivo |', '|---|---|---|---|---|']

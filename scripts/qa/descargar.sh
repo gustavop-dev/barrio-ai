@@ -48,4 +48,4 @@ echo "Ejecución: https://github.com/$REPO/actions/runs/$run"
 echo "Artefactos en: $out"
 [ -f "$out/resumen.md" ] && cat "$out/resumen.md"
 echo
-echo "Abre $out/informe.html (capturas por flujo, videos y fallos); logcat en $out/logcat/, API en $out/api.log."
+echo "Abre $out/informe.html (capturas por flujo, videos y fallos); logcat en $out/logcat/, API en $out/api-N.log (uno por emulador)."

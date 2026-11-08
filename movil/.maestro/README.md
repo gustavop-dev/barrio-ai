@@ -4,11 +4,19 @@ Esta carpeta tiene los flujos de [Maestro](https://maestro.dev) que **usan la ap
 
 ## Qué hace una ejecución
 
-1. **Backend de demostración en el runner.** PostgreSQL con pgvector como servicio, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
-2. **APK de QA.** `expo prebuild` y Gradle `assembleRelease -PreactNativeArchitectures=x86_64`: una build release, con el JS empaquetado y R8, igual que la de EAS, pero para el emulador x86_64. `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, que es el runner visto desde el emulador. El APK queda en caché mientras no cambien `movil/` (salvo esta carpeta) ni `compartido/`, así que cambiar solo los flujos o el backend no recompila.
-3. **Emulador.** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`). La pantalla queda en **390×844 dp** (1170×2532 px a 480 dpi), el tamaño de los tableros de `diseno-movimiento/`, con las animaciones activadas y la zona horaria `America/Bogota`, la misma del backend.
-4. **Flujos.** `scripts/qa/correr-maestro.sh` corre cada `NN-*.yaml` por separado y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
-5. **Artefactos y resumen.** `scripts/qa/informe.py` escribe el resumen del job, un comentario en el PR y `informe.html`. El job falla si falla un flujo o si la app se cae.
+El workflow tiene cuatro jobs:
+
+1. **`plan`** decide qué flujos corren y los reparte en hasta **4 emuladores en paralelo**, equilibrando su duración. En cada emulador los flujos van en orden numérico, así que `11-ajustes`, que cierra la sesión, siempre va el último del suyo.
+2. **`apk`** compila la app una sola vez: `expo prebuild` y Gradle `assembleRelease -PreactNativeArchitectures=x86_64`. Es una build release, con el JS empaquetado y R8, igual que la de EAS, pero para el emulador x86_64. Usa `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, que es el runner visto desde el emulador.
+   - El APK queda en caché por el hash de lo que lo compone: `movil/` (sin esta carpeta ni los `.md`), `compartido/`, el `package-lock.json` y `app.config.js`.
+   - Un push que solo cambia flujos, `seed_qa` o los scripts no vuelve a compilar: el job termina en segundos.
+3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
+   - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
+   - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. La pantalla queda en **390×844 dp** (1170×2532 px a 480 dpi), el tamaño de los tableros de `diseno-movimiento/`, con las animaciones activadas.
+   - **Flujos:** `scripts/qa/correr-maestro.sh` corre sus flujos uno a uno y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
+4. **`qa`** junta los artefactos de todos los emuladores. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR (con las funciones del catálogo que cubre cada flujo) e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
+
+Una nueva ejecución en la misma rama cancela la anterior (`concurrency` con `cancel-in-progress`).
 
 ### Por qué HTTP en claro solo en esta build
 
@@ -21,15 +29,16 @@ Se eligió una release con el JS empaquetado, en vez de una build debug, para pr
 ## Lanzar una QA
 
 - **En un PR:** corre sola cuando el PR toca `movil/`, `compartido/`, `agentes-linkedin/`, `scripts/qa/` o el workflow.
+- **Solo algunos flujos:** pon `[qa: …]` en el mensaje del último commit del PR, con nombres o números separados por espacios o comas. Por ejemplo, `fix(movil): … [qa: 05-captura 09]` corre solo `05-captura` y `09-personas`. Sirve para arreglar un flujo sin volver a correr los once; antes de terminar, un push sin `[qa: …]` los corre todos.
 - **A mano**, una vez que el workflow esté en `main`:
 
   ```bash
-  gh workflow run qa-movil.yml                    # sobre main
-  gh workflow run qa-movil.yml --ref mi-rama      # sobre otra rama
+  gh workflow run qa-movil.yml                                  # todos, sobre main
+  gh workflow run qa-movil.yml --ref mi-rama -f flujos="05 09"  # solo esos, sobre otra rama
   gh run watch $(gh run list --workflow qa-movil.yml --limit 1 --json databaseId --jq '.[0].databaseId')
   ```
 
-Una ejecución completa tarda unos 25 a 40 minutos la primera vez, porque compila el APK, y bastante menos con el APK y el AVD en caché.
+Con el APK en caché, una ejecución completa tarda lo que el emulador más lento, unos 15 minutos. Si hay que compilar el APK, se suman unos 17.
 
 ## Revisar una ejecución (personas y agentes revisores)
 
@@ -52,9 +61,8 @@ Descarga el artefacto `qa-movil-<n>` en `qa-descargas/<run id>/`:
 | `maestro/NN-flujo.log`, `maestro/NN-flujo/` | la salida de Maestro y su carpeta de depuración (comandos, jerarquía de la vista al fallar) |
 | `logcat/logcat-errores.txt` | crashes, `FATAL EXCEPTION`, señales nativas, ANR y errores de `ReactNativeJS` |
 | `logcat/logcat-app.txt` | todo lo que escribió el proceso de la app y React Native |
-| `logcat/logcat-completo.txt.gz` | el logcat entero, comprimido |
-| `api.log` | el log de gunicorn: cada petición de la app con su código |
-| `seed.log` | la salida de `seed_qa` antes de cada flujo |
+| `logcat/logcat-completo-N.txt.gz` | el logcat entero de cada emulador, comprimido |
+| `seed-N.log`, `api-N.log`, `flujos-N.txt` | por emulador: la salida de `seed_qa`, el log de gunicorn y lo que tardó cada flujo |
 
 Para comparar con el diseño, abre las capturas junto a los tableros `movil/diseno-movimiento/tableros/*.dc.html` (390×844) y `movil/MOTION.md`.
 

@@ -1,15 +1,23 @@
 name: QA móvil
-# UI QA of the 0ff1ce app on an Android emulator, against a seeded demo backend on the runner.
+# UI QA of the 0ff1ce app on Android emulators, against a seeded demo backend on each runner.
 # Nothing here reaches production, LinkedIn or a paid provider: the API runs with FakeConnector
 # (LIVE_LINKEDIN=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
 # EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 (the runner, as the emulator sees it). See movil/.maestro/README.md.
+#
+# Jobs: plan (which flows, split in up to 4 emulators) → apk (built once, cached by what affects the app) →
+# flujos (one emulator + backend per shard, in parallel) → qa (one report, the PR comment and the verdict).
+# Run only some flows: `[qa: 05-captura 09]` in the PR's head commit message, or the `flujos` input of a manual run.
 on:
   workflow_dispatch:
+    inputs:
+      flujos:
+        description: 'Flujos a correr (nombres o números separados por espacios, p. ej. «05 09-personas»); vacío = todos'
+        required: false
+        default: ''
   pull_request:
     paths: ['movil/**', 'compartido/**', 'agentes-linkedin/**', 'scripts/qa/**', '.github/workflows/qa-movil.yml']
 permissions:
   contents: read
-  pull-requests: write
 concurrency:
   group: qa-movil-${{ github.ref }}
   cancel-in-progress: true
@@ -19,9 +27,92 @@ env:
   API_LEVEL: 35
   MAESTRO_VERSION: 2.12.0
 jobs:
-  qa:
+  plan:
     runs-on: ubuntu-24.04
-    timeout-minutes: 120
+    timeout-minutes: 5
+    outputs:
+      matriz: ${{ steps.plan.outputs.matriz }}
+      resumen: ${{ steps.plan.outputs.resumen }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          QA_SELECCION: ${{ inputs.flujos }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ -n "$HEAD_SHA" ]; then
+            export QA_MENSAJE="$(gh api "repos/$GITHUB_REPOSITORY/commits/$HEAD_SHA" --jq .commit.message || true)"
+          fi
+          python3 scripts/qa/plan.py
+
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    outputs:
+      key: ${{ steps.apk.outputs.cache-primary-key }}
+    steps:
+      - uses: actions/checkout@v4
+      # What goes into the APK: the app (not its flows or docs), compartido/, the lockfile and app.config.js (QA switch).
+      - name: APK cache
+        id: apk
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: apk-${{ env.APK_CACHE_VERSION }}-${{ hashFiles('movil/**', '!movil/.maestro/**', '!movil/**/*.md', 'compartido/**') }}
+          lookup-only: true
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: movil/package-lock.json
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          # Write the Gradle cache from PRs too, so the next build of the same branch starts warm.
+          cache-read-only: false
+      - name: APK · npm ci and expo prebuild (QA switch on)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil
+        env:
+          OFFICE_QA_BUILD: '1'
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+        run: |
+          npm ci
+          npx expo prebuild --platform android --no-install --clean
+          grep -n 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml
+      - name: APK · gradle assembleRelease (x86_64)
+        if: steps.apk.outputs.cache-hit != 'true'
+        working-directory: movil/android
+        env:
+          OFFICE_QA_BUILD: '1'
+          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
+          NODE_ENV: production
+        run: |
+          ./gradlew assembleRelease -PreactNativeArchitectures=x86_64
+          mkdir -p "$RUNNER_TEMP/apk"
+          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/apk/qa.apk"
+          ls -la "$RUNNER_TEMP/apk"
+      - if: steps.apk.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: ${{ steps.apk.outputs.cache-primary-key }}
+
+  flujos:
+    needs: [plan, apk]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matriz) }}
+    name: flujos (${{ matrix.shard }})
     services:
       postgres:
         image: pgvector/pgvector:0.8.2-pg17
@@ -51,6 +142,8 @@ jobs:
       QA_PASSWORD: qa-0ff1ce-solo-ci
       QA_OUT: ${{ github.workspace }}/qa-artefactos
       INFRA_DIR: ${{ github.workspace }}/agentes-linkedin/infra
+      QA_SHARD: ${{ matrix.shard }}
+      QA_FLOWS: ${{ matrix.flujos }}
     steps:
       - uses: actions/checkout@v4
 
@@ -60,7 +153,15 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # ---------------------------------------------------------------- demo backend
+      # ---------------------------------------------------------------- the APK of this run (built by the apk job)
+      - name: APK
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/apk
+          key: ${{ needs.apk.outputs.key }}
+          fail-on-cache-miss: true
+
+      # ---------------------------------------------------------------- demo backend of this emulator
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: '3.12'
@@ -79,64 +180,16 @@ jobs:
         working-directory: agentes-linkedin/infra
         run: |
           nohup uv run gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 3 --timeout 120 \
-            --access-logfile - --error-logfile - --capture-output > "$QA_OUT/api.log" 2>&1 &
+            --access-logfile - --error-logfile - --capture-output > "$QA_OUT/api-$QA_SHARD.log" 2>&1 &
           for i in $(seq 1 60); do
             curl -fsS http://127.0.0.1:8787/health && exit 0
             sleep 1
           done
-          echo "The API did not start"; cat "$QA_OUT/api.log"; exit 1
+          echo "The API did not start"; cat "$QA_OUT/api-$QA_SHARD.log"; exit 1
       - name: Backend · the QA user can log in
         run: |
           curl -fsS -X POST http://127.0.0.1:8787/api/v1/auth/token -H 'Content-Type: application/json' \
             -d "{\"username\":\"qa\",\"password\":\"$QA_PASSWORD\",\"device_name\":\"curl de CI\"}" -o /dev/null -w '%{http_code}\n'
-
-      # ---------------------------------------------------------------- QA APK (x86_64, release, bundled JS)
-      - name: APK cache
-        id: apk
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ runner.temp }}/apk
-          key: apk-${{ env.APK_CACHE_VERSION }}-${{ hashFiles('movil/**', '!movil/.maestro/**', '!movil/**/*.md', 'compartido/**') }}
-      - if: steps.apk.outputs.cache-hit != 'true'
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          cache: npm
-          cache-dependency-path: movil/package-lock.json
-      - if: steps.apk.outputs.cache-hit != 'true'
-        uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - if: steps.apk.outputs.cache-hit != 'true'
-        uses: gradle/actions/setup-gradle@v4
-      - name: APK · npm ci and expo prebuild (QA switch on)
-        if: steps.apk.outputs.cache-hit != 'true'
-        working-directory: movil
-        env:
-          OFFICE_QA_BUILD: '1'
-          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
-        run: |
-          npm ci
-          npx expo prebuild --platform android --no-install --clean
-          grep -n 'usesCleartextTraffic' android/app/src/main/AndroidManifest.xml
-      - name: APK · gradle assembleRelease (x86_64)
-        if: steps.apk.outputs.cache-hit != 'true'
-        working-directory: movil/android
-        env:
-          OFFICE_QA_BUILD: '1'
-          EXPO_PUBLIC_API_URL: http://10.0.2.2:8787
-          NODE_ENV: production
-        run: |
-          ./gradlew assembleRelease -PreactNativeArchitectures=x86_64 --no-daemon
-          mkdir -p "$RUNNER_TEMP/apk"
-          cp app/build/outputs/apk/release/app-release.apk "$RUNNER_TEMP/apk/qa.apk"
-          ls -la "$RUNNER_TEMP/apk"
-      - if: steps.apk.outputs.cache-hit != 'true'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ runner.temp }}/apk
-          key: ${{ steps.apk.outputs.cache-primary-key }}
 
       # ---------------------------------------------------------------- emulator and Maestro
       - uses: actions/setup-java@v4
@@ -173,13 +226,13 @@ jobs:
           script: echo "AVD snapshot generated."
       - if: steps.avd.outputs.cache-hit != 'true'
         uses: actions/cache/save@v4
+        continue-on-error: true  # another emulator job may have saved the same key first
         with:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
           key: ${{ steps.avd.outputs.cache-primary-key }}
       - name: Maestro flows on the emulator
-        id: flows
         uses: reactivecircus/android-emulator-runner@v2
         env:
           QA_APK: ${{ runner.temp }}/apk/qa.apk
@@ -194,17 +247,41 @@ jobs:
           emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: false
           script: bash scripts/qa/correr-maestro.sh
-
-      # ---------------------------------------------------------------- artifacts and summary
-      - name: Collect logs
+      - name: Upload this emulator's artifacts
         if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qa-flujos-${{ matrix.shard }}
+          path: qa-artefactos
+          retention-days: 3
+          if-no-files-found: warn
+
+  qa:
+    needs: [plan, flujos]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: write
+    env:
+      QA_OUT: ${{ github.workspace }}/qa-artefactos
+      QA_PLAN: ${{ needs.plan.outputs.resumen }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Gather the emulators' artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: qa-flujos-*
+          merge-multiple: true
+          path: qa-artefactos
+      - name: Report
         run: |
           mkdir -p "$QA_OUT"
           python3 scripts/qa/informe.py "$QA_OUT" > "$QA_OUT/resumen.md" || echo "No se pudo escribir el resumen." > "$QA_OUT/resumen.md"
           cat "$QA_OUT/resumen.md" >> "$GITHUB_STEP_SUMMARY"
-      - name: Upload artifacts
+      - name: Upload the report
         id: upload
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: qa-movil-${{ github.run_number }}
@@ -212,8 +289,7 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
       - name: Comment on the PR
-        # A run cancelled by a newer push says nothing: the newer run will comment.
-        if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+        if: github.event_name == 'pull_request'
         env:
           GH_TOKEN: ${{ github.token }}
           ARTIFACT_URL: ${{ steps.upload.outputs.artifact-url }}
@@ -227,6 +303,5 @@ jobs:
           else
             gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$PR/comments" -f body="$body" > /dev/null
           fi
-      - name: Fail when a flow failed
-        if: always()
+      - name: Fail when a flow failed or the app crashed
         run: test -f "$QA_OUT/resultado.txt" && grep -qx 'ok' "$QA_OUT/resultado.txt"

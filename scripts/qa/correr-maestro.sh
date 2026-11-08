@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Runs inside reactivecircus/android-emulator-runner (.github/workflows/qa-movil.yml): installs the QA APK, sizes the
-# screen to 390x844 dp, and runs every Maestro flow of movil/.maestro on its own. Before each flow the backend is
-# re-seeded (seed_qa), so a flow never depends on what another one changed. Each flow gets a screen recording,
-# its JUnit report and Maestro's own output. It always exits 0: scripts/qa/informe.py decides pass or fail.
+# screen to 390x844 dp, and runs the Maestro flows of this emulator job (QA_FLOWS, names separated by spaces; all of
+# movil/.maestro when empty) one by one. Before each flow the backend is re-seeded (seed_qa), so a flow never depends
+# on what another one changed. Each flow gets a screen recording, its JUnit report and Maestro's own output; files
+# shared by the job carry its number (QA_SHARD) so several jobs merge into one report. It always exits 0:
+# scripts/qa/informe.py decides pass or fail.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -10,10 +12,11 @@ OUT=${QA_OUT:?QA_OUT sin definir}
 INFRA=${INFRA_DIR:-$ROOT/agentes-linkedin/infra}
 FLOWS="$ROOT/movil/.maestro"
 APP=co.projectapp.office
+SHARD=${QA_SHARD:-1}
 export MAESTRO_CLI_NO_ANALYTICS=1 MAESTRO_CLI_ANALYSIS_NOTIFICATION_DISABLED=true
 
 mkdir -p "$OUT"/capturas/fallos "$OUT"/videos "$OUT"/junit "$OUT"/maestro "$OUT"/logcat
-: > "$OUT/flujos.txt"
+: > "$OUT/flujos-$SHARD.txt"
 
 log() { echo "[qa] $*"; }
 
@@ -44,7 +47,7 @@ else
 fi
 
 adb logcat -c
-adb logcat -v threadtime > "$OUT/logcat/logcat-completo.txt" 2>&1 &
+adb logcat -v threadtime > "$OUT/logcat/logcat-completo-$SHARD.txt" 2>&1 &
 LOGCAT_PID=$!
 
 REC_FLAG=""
@@ -72,10 +75,17 @@ record_stop() {
   adb shell rm -rf /sdcard/qa-rec > /dev/null 2>&1
 }
 
-for flow in "$FLOWS"/[0-9][0-9]-*.yaml; do
+if [ -n "${QA_FLOWS:-}" ]; then
+  selected=$(for name in $QA_FLOWS; do echo "$FLOWS/$name.yaml"; done)
+else
+  selected=$(ls "$FLOWS"/[0-9][0-9]-*.yaml)
+fi
+log "emulador $SHARD: $(echo $selected | xargs -n1 basename | tr '\n' ' ')"
+
+for flow in $selected; do
   name=$(basename "$flow" .yaml)
   log "flujo $name: sembrando el mundo de QA"
-  (cd "$INFRA" && uv run python manage.py seed_qa >> "$OUT/seed.log" 2>&1) || log "seed_qa falló antes de $name"
+  (cd "$INFRA" && uv run python manage.py seed_qa >> "$OUT/seed-$SHARD.log" 2>&1) || log "seed_qa falló antes de $name"
   record_start "$name"
   start=$(date +%s)
   maestro test "$flow" \
@@ -88,7 +98,7 @@ for flow in "$FLOWS"/[0-9][0-9]-*.yaml; do
   end=$(date +%s)
   record_stop "$name"
   log "flujo $name: código $code en $((end - start)) s"
-  echo "$name $code $((end - start))" >> "$OUT/flujos.txt"
+  echo "$name $code $((end - start))" >> "$OUT/flujos-$SHARD.txt"
   # takeScreenshot files are named NN-screen-step; Maestro's failure screenshots go apart, prefixed by the flow.
   while IFS= read -r png; do
     base=$(basename "$png")
@@ -100,7 +110,7 @@ for flow in "$FLOWS"/[0-9][0-9]-*.yaml; do
 done
 
 # The app's state at the end, for the record.
-adb shell dumpsys activity processes 2> /dev/null | grep -i "$APP" > "$OUT/logcat/procesos.txt" || true
+adb shell dumpsys activity processes 2> /dev/null | grep -i "$APP" > "$OUT/logcat/procesos-$SHARD.txt" || true
 kill "$LOGCAT_PID" 2> /dev/null
 wait "$LOGCAT_PID" 2> /dev/null
 log "listo"
