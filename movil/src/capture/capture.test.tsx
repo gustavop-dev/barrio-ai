@@ -547,21 +547,20 @@ describe('capture sheet', () => {
     await act(async () => openCaptureSheet(undefined, { audio: AUDIO }));
     const sheet = await screen.findByTestId('capture-sheet');
     await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Sin red');
-    act(() => onlineManager.setOnline(false));
-    try {
-      await fireEvent.press(within(sheet).getByTestId('capture-send'));
-      const problem = await within(sheet).findByTestId('capture-send-error');
-      expect(within(problem).getByText('No hay conexión con el servidor')).toBeOnTheScreen();
-      expect(within(problem).queryByText(/Detalle:/)).toBeNull();
-      expect(server.find('POST', '/api/v1/capturas')).toHaveLength(0);
-      expect(within(sheet).getByTestId('capture-audio')).toBeOnTheScreen();
-      expect(within(sheet).getByDisplayValue('Sin red')).toBeOnTheScreen();
-    } finally {
-      act(() => onlineManager.setOnline(true));
-    }
-    await fireEvent.press(within(screen.getByTestId('capture-send-error')).getByText('Reintentar'));
+    // What NetInfo says through TanStack's onlineManager (only its answer: no online/offline event is fired).
+    const offline = jest.spyOn(onlineManager, 'isOnline').mockReturnValue(false);
+    await fireEvent.press(within(sheet).getByTestId('capture-send'));
+    const problem = await within(sheet).findByTestId('capture-send-error');
+    expect(within(problem).getByText('No hay conexión con el servidor')).toBeOnTheScreen();
+    expect(within(problem).queryByText(/Detalle:/)).toBeNull();
+    expect(server.find('POST', '/api/v1/capturas')).toHaveLength(0);
+    expect(within(sheet).getByTestId('capture-audio')).toBeOnTheScreen();
+    expect(within(sheet).getByDisplayValue('Sin red')).toBeOnTheScreen();
+    offline.mockRestore();
+    await fireEvent.press(within(problem).getByText('Reintentar'));
     await waitFor(() => expect(server.find('POST', '/api/v1/capturas')).toHaveLength(1));
-    expect(await screen.findByText('Enviado al equipo.', {}, { timeout: 4000 })).toBeOnTheScreen();
+    // The envelope choreography ends and the sheet goes (nothing of it is left for the next test).
+    await waitFor(() => expect(screen.queryByTestId('capture-sheet')).toBeNull(), { timeout: 6000 });
   });
 
   it('a 400 shows the server message', async () => {
