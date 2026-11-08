@@ -3,8 +3,9 @@
 // (or a flick) it turns with the pageSnap spring; otherwise it springs back. The header arrows animate
 // the same way through the ref, and screen readers get «anterior» and «siguiente» actions.
 //
-// Pages are keyed by an absolute index and placed at index × width, so when the parent moves its date
-// the page that slid in keeps its place: nothing jumps between the spring and the new render.
+// Pages are placed at an absolute index × width, so when the parent moves its date the page that slid in
+// keeps its place: nothing jumps between the spring and the new render. The current page and the side
+// pages have different keys, so the one that slid in is mounted afresh without the side pages' hiding.
 //
 // The frame's height is MovCalendario's `h`: the parent keeps it (so it carries from the week to the
 // month) and the frame eases to the current page's height, clipping what is still outside it.
@@ -150,21 +151,14 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
         <Animated.View style={strip}>
           {pages.map((page) =>
             page.offset === 0 ? (
-              // A page keeps its key as it slides in, so the side page's props must be undone explicitly: left out,
-              // Android kept the slid-in week untouchable and hidden from TalkBack (and from the QA flows).
-              <View
-                key={page.key}
-                style={[styles.current, { left: page.key * width }]}
-                onLayout={measure(page.key)}
-                accessibilityElementsHidden={false}
-                importantForAccessibility="auto"
-                pointerEvents="auto"
-              >
+              // Its own key: a side page that slid in is mounted afresh as the current one, at the same place, so it
+              // never keeps the side page's hiding (Android left the slid-in week out of TalkBack and the QA flows).
+              <View key={`actual-${page.key}`} style={[styles.current, { left: page.key * width }]} onLayout={measure(page.key)}>
                 {renderPage(0)}
               </View>
             ) : (
               <View
-                key={page.key}
+                key={`lado-${page.key}`}
                 style={[styles.side, { left: page.key * width, width }]}
                 onLayout={measure(page.key)}
                 accessibilityElementsHidden
