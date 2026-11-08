@@ -47,8 +47,8 @@ function page(results: PhotoOutput[], next: string | null = null) {
 
 async function renderGaleria(routes: Record<string, FakeHandler> = {}) {
   const server = fakeServer({ 'GET /api/v1/galeria': { body: page(PHOTOS) }, ...routes });
-  await renderApp(<GaleriaScreen />);
-  return server;
+  const { client } = await renderApp(<GaleriaScreen />);
+  return Object.assign(server, { client });
 }
 
 function asset(index: number, extra: Partial<ImagePicker.ImagePickerAsset> = {}): ImagePicker.ImagePickerAsset {
@@ -211,6 +211,18 @@ describe('Galería', () => {
     expect(within(sheet).getByRole('switch', { name: 'El equipo puede editarla con IA' })).not.toBeChecked();
     expect(within(sheet).getByRole('button', { name: 'Guardar' })).toBeDisabled();
     expect(within(sheet).getByLabelText('Foto: Sin nombres de clientes')).toBeOnTheScreen();
+  });
+
+  it('an open photo follows a fresher copy from the server while its fields are untouched', async () => {
+    const server = await renderGaleria();
+    await fireEvent.press(await screen.findByLabelText('Foto del 3 nov, nueva'));
+    const sheet = await screen.findByTestId('photo-sheet');
+    expect(within(sheet).getByTestId('photo-note')).toHaveDisplayValue('');
+    server.on('GET /api/v1/galeria', { body: page([{ ...PHOTOS[0]!, note: 'Desde la PWA', allow_ai_edit: false }, ...PHOTOS.slice(1)]) });
+    await act(async () => server.client.invalidateQueries({ queryKey: ['galeria'] }));
+    await waitFor(() => expect(within(screen.getByTestId('photo-sheet')).getByTestId('photo-note')).toHaveDisplayValue('Desde la PWA'));
+    expect(within(screen.getByTestId('photo-sheet')).getByRole('switch', { name: 'El equipo puede editarla con IA' })).not.toBeChecked();
+    expect(within(screen.getByTestId('photo-sheet')).getByRole('button', { name: 'Guardar' })).toBeDisabled();
   });
 
   it('removes a photo after confirming, warning where it is used', async () => {

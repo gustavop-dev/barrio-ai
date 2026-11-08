@@ -197,11 +197,11 @@ describe('Captura · hoja', () => {
     await screen.findByRole('heading', { name: 'Galería', level: 1 });
     await user.click(screen.getByRole('button', { name: CAPTURE_LABEL }));
     await user.type(within(dialog()).getByLabelText('Nota para el equipo (opcional)'), 'Algo');
-    await user.click(within(dialog()).getByRole('button', { name: 'Cerrar sin guardar' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'Cerrar sin enviar' }));
     const confirm = screen.getByRole('dialog', { name: '¿Cerrar sin enviar?' });
     await user.click(within(confirm).getByRole('button', { name: 'Seguir aquí' }));
     expect(dialog()).toBeInTheDocument();
-    await user.click(within(dialog()).getByRole('button', { name: 'Cerrar sin guardar' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'Cerrar sin enviar' }));
     await user.click(within(screen.getByRole('dialog', { name: '¿Cerrar sin enviar?' })).getByRole('button', { name: 'Cerrar sin enviar' }));
     expect(screen.queryByRole('dialog', { name: 'Captura para el equipo' })).not.toBeInTheDocument();
   });
@@ -213,7 +213,7 @@ describe('Captura · hoja', () => {
     await screen.findByRole('heading', { name: 'Galería', level: 1 });
     expect(screen.getByText('Mantén oprimido para grabar. Toca para foto o nota.')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: CAPTURE_LABEL }));
-    await user.click(within(dialog()).getByRole('button', { name: 'Cerrar sin guardar' }));
+    await user.click(within(dialog()).getByRole('button', { name: 'Cerrar sin enviar' }));
     expect(screen.queryByText('Mantén oprimido para grabar. Toca para foto o nota.')).not.toBeInTheDocument();
   });
 });

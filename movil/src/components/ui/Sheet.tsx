@@ -203,6 +203,7 @@ export function Sheet({ label, onClose, children, header, suspended, canClose, o
       <SheetFrameContext.Provider value={frame}>
         <GestureHandlerRootView
           style={styles.root}
+          testID={testID ? `${testID}-modal` : undefined}
           onLayout={(event) => {
             width.set(event.nativeEvent.layout.width);
             rootHeight.set(event.nativeEvent.layout.height);

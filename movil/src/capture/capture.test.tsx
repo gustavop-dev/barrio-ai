@@ -4,7 +4,6 @@
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import * as ImagePicker from 'expo-image-picker';
-import { Modal } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { createGestureController, fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { resetErrorReportsForTests } from '@/api/errorReport';
@@ -298,7 +297,7 @@ describe('capture sheet', () => {
     expect(await screen.findByText('Envío deshecho. Lo tienes otra vez en la hoja.')).toBeOnTheScreen();
     const again = await screen.findByTestId('capture-sheet');
     // The sheet opens again on top: the toast is drawn in its window, where Gustavo sees it, not under it.
-    expect(within(screen.UNSAFE_getByType(Modal)).getByText('Envío deshecho. Lo tienes otra vez en la hoja.')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('capture-sheet-modal')).getByText('Envío deshecho. Lo tienes otra vez en la hoja.')).toBeOnTheScreen();
     expect(within(again).getByDisplayValue('Para el post del jueves')).toBeOnTheScreen();
     expect(within(again).getByLabelText('Foto adjunta 1')).toBeOnTheScreen();
   });
@@ -384,10 +383,24 @@ describe('capture sheet', () => {
     await fireEvent.press(within(sheet).getByText('Deshacer'));
     await waitFor(() => expect(server.find('DELETE', '/api/v1/capturas/c9')).toHaveLength(1));
     // The toast is drawn in the sheet's window, above it.
-    await waitFor(() => expect(within(screen.UNSAFE_getByType(Modal)).getByText('Envío deshecho.')).toBeOnTheScreen());
+    await waitFor(() => expect(within(screen.getByTestId('capture-sheet-modal')).getByText('Envío deshecho.')).toBeOnTheScreen());
     await waitFor(() => expect(within(screen.getByTestId('capture-sheet')).queryByText('Idea para el post del jueves')).toBeNull());
     expect(within(screen.getByTestId('capture-sheet')).getByText('Lo que enviaste · 0')).toBeOnTheScreen();
     expect(within(screen.getByTestId('capture-sheet')).getByText('Todavía no has enviado nada')).toBeOnTheScreen();
+  });
+
+  it('«Deshacer» in «Lo que enviaste» goes away when its 2 minutes run out, with the list still open', async () => {
+    const sent = historyCapture({ undo_until: new Date(Date.now() + 1500).toISOString() });
+    capturaServer({
+      'GET /api/v1/capturas': { body: { count: 1, next: null, previous: null, results: [sent] } },
+      'GET /api/v1/capturas/c9': { body: sent },
+    });
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { view: 'history' }));
+    const sheet = await screen.findByTestId('capture-sheet');
+    expect(await within(sheet).findByText('Deshacer')).toBeOnTheScreen();
+    await waitFor(() => expect(within(screen.getByTestId('capture-sheet')).queryByText('Deshacer')).toBeNull(), { timeout: 5000 });
+    expect(within(screen.getByTestId('capture-sheet')).getByText('Idea para el post del jueves')).toBeOnTheScreen();
   });
 
   it('closing with content asks first', async () => {
