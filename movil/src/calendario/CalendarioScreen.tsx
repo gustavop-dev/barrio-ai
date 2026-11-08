@@ -93,9 +93,10 @@ export function CalendarioScreen() {
   const scrollRef = useRef<ComponentRef<typeof ScrollView>>(null);
   const gridRef = useRef<ComponentRef<typeof View>>(null);
   const scrollY = useRef(0);
-  const contentHeight = useRef(0);
   const scrollBeforeSheet = useRef<number | null>(null);
   const [gridBottom, setGridBottom] = useState(0);
+  /** While the sheet is open: the scroll that puts the grid on top, and the content height that keeps it reachable. */
+  const [sheetScroll, setSheetScroll] = useState<number | null>(null);
   // The tab stays mounted under other screens: its sheet (and the Android back it listens to) waits
   // until the calendar is back, and comes back open on the same day.
   const here = usePathname() === '/calendario';
@@ -147,7 +148,11 @@ export function CalendarioScreen() {
 
   const select = useCallback((day: string) => update({ fecha: day === today ? null : day }), [update, today]);
 
-  /** Where the grid ends on screen once it is scrolled to the top (the scroll is clamped to the content). */
+  /**
+   * Scrolls the grid to the top, under a small gap (`scroll`), or only measures where it ends on screen. While the sheet
+   * is open the content keeps at least the height that scroll needs (sheetScroll + the screen), so a short day panel,
+   * or one loading after a swipe, never pulls the calendar back under the header.
+   */
   const placeGrid = useCallback((scroll: boolean) => {
     const grid = gridRef.current;
     const screen = screenRef.current;
@@ -157,21 +162,20 @@ export function CalendarioScreen() {
         setGridBottom(Math.max(0, y + height));
         return;
       }
-      // A small gap above the strip, so its cells' edge is not flush with the top bar.
-      const target = Math.max(0, scrollY.current + y - space[2]);
-      const reachable = Math.max(0, contentHeight.current - (screenHeight ?? 0));
-      const landed = Math.min(target, reachable);
-      setGridBottom(Math.max(0, y + height - (landed - scrollY.current)));
-      scrollRef.current?.scrollTo({ y: target, animated: !reduced });
+      setSheetScroll(Math.max(0, scrollY.current + y - space[2]));
+      setGridBottom(space[2] + height);
     });
-  }, [screenHeight, reduced]);
+  }, []);
 
-  // While the sheet is open, keep the grid at the top: changing day or week can shrink the content for a moment (the
-  // panel loading) and leave the calendar scrolled back under the header.
-  const dayLoaded = Boolean(selectedDay);
+  // The scroll goes once the content is tall enough for it (the floor below renders with it).
+  useEffect(() => {
+    if (sheetScroll !== null) scrollRef.current?.scrollTo({ y: sheetScroll, animated: !reduced });
+  }, [sheetScroll, reduced]);
+
+  // While the sheet is open, keep the grid on top when the day or the week changes.
   useEffect(() => {
     if (openSheetDay) placeGrid(true);
-  }, [openSheetDay, fecha, dayLoaded, placeGrid]);
+  }, [openSheetDay, fecha, placeGrid]);
 
   const openDay = (day: string) => {
     select(day);
@@ -182,6 +186,7 @@ export function CalendarioScreen() {
 
   const closeSheet = () => {
     setSheetDay(null);
+    setSheetScroll(null);
     const before = scrollBeforeSheet.current;
     scrollBeforeSheet.current = null;
     if (before !== null) scrollRef.current?.scrollTo({ y: before, animated: !reduced });
@@ -278,16 +283,18 @@ export function CalendarioScreen() {
         onScroll={(event) => {
           scrollY.current = event.nativeEvent.contentOffset.y;
         }}
-        onContentSizeChange={(_width, height) => {
-          contentHeight.current = height;
-        }}
         onScrollEndDrag={() => {
           if (openSheetDay) placeGrid(false);
         }}
         onMomentumScrollEnd={() => {
           if (openSheetDay) placeGrid(false);
         }}
-        contentContainerStyle={[pageContent, styles.content, { paddingBottom: bottom }]}
+        contentContainerStyle={[
+          pageContent,
+          styles.content,
+          { paddingBottom: bottom },
+          openSheetDay && sheetScroll !== null && screenHeight ? { minHeight: sheetScroll + screenHeight } : null,
+        ]}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} colors={[colors.brandDeep]} />}
       >
         {header}
