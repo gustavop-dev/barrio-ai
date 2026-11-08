@@ -94,6 +94,16 @@ else
 fi
 log "emulador $SHARD: $(echo $selected | xargs -n1 basename | tr '\n' ' ')"
 
+# The QA failure switch works from Maestro (the helpers flows use): checked once, by the first emulator.
+if [ "$SHARD" = "1" ]; then
+  if maestro test "$ROOT/scripts/qa/autoprueba-fallos.yaml" > "$OUT/maestro/autoprueba-fallos.log" 2>&1; then
+    echo ok > "$OUT/autoprueba-fallos.txt"; log "interruptor de fallos: responde desde Maestro"
+  else
+    echo fallo > "$OUT/autoprueba-fallos.txt"; log "interruptor de fallos: NO responde desde Maestro (maestro/autoprueba-fallos.log)"
+  fi
+  curl -fsS -X DELETE "${QA_API:-http://127.0.0.1:8787}/api/v1/qa/fallos" > /dev/null 2>&1 || true
+fi
+
 # System animations: on only for the flows that test motion (the entrance and the Oficina scene); off for the rest, so
 # the app runs with reduced motion, the scene stands still and Maestro sees each screen settle at once.
 ANIMATED=${QA_FLUJOS_ANIMADOS-01-entrada 03-oficina}

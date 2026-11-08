@@ -1,0 +1,20 @@
+# Self-test of the QA failure switch from Maestro (run once per QA run by correr-maestro.sh, not a flow of the app):
+# arms a fault with the helper flows use, checks the API answers it, clears it with the other helper and checks again.
+appId: co.projectapp.office
+name: Autoprueba del interruptor de fallos
+---
+- runScript:
+    file: ../../movil/.maestro/comun/qa-fallo.js
+    env:
+      RUTA: '^/health$'
+      EFECTO: '503'
+      VECES: '-1'
+- runScript:
+    file: autoprueba-fallos.js
+    env:
+      ESPERADO: '503'
+- runScript: ../../movil/.maestro/comun/qa-fallos-limpiar.js
+- runScript:
+    file: autoprueba-fallos.js
+    env:
+      ESPERADO: '200'

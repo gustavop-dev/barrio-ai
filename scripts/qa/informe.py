@@ -203,6 +203,10 @@ def main():
     except Exception as exc:  # the report never fails for the coverage count
         lines += ['', f'No se pudo calcular la cobertura del catálogo: {exc}']
     lines += visual_section(out)
+    selftest = out / 'autoprueba-fallos.txt'
+    if selftest.exists() and selftest.read_text().strip() != 'ok':
+        lines += ['', '⚠️ El interruptor de fallos de QA no respondió desde Maestro (`maestro/autoprueba-fallos.log`): '
+                  'los flujos que simulan errores no son fiables en esta ejecución.']
     if logcat['crash']:
         lines += ['', '<details><summary>Crash en logcat</summary>', '', '```', *logcat['crashes'][:10], '```', '</details>']
     if not logcat['present']:
