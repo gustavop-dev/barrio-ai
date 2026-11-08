@@ -134,7 +134,8 @@ def alerts(now=None):
     from . import connectors_linkedin as li
     now=now or timezone.now();out=[]
     status=li.status_payload()
-    if status.get('connected') and status.get('expired'):
+    # status_payload reports `connected` only while the token is valid: an expired one has `expired` alone.
+    if status.get('expired'):
         out.append(_card('linkedin_expired','aviso','Reconecta LinkedIn','El acceso caducó y la publicación diaria está en pausa.',
                          [{'label':'Reconectar LinkedIn','href':'/api/v1/linkedin/oauth/start','primary':True}],critical=True,tone='bad',
                          expires_at=status.get('expires_at')))
@@ -163,6 +164,8 @@ def alerts(now=None):
                 [{'label':'Reanudar','endpoint':'/api/v1/operador/control','body':{'paused':False},'note_required':False,'primary':True}],
                 critical=True,tone='bad',created_at=control.updated_at,stopped_by=control.updated_by.get_username() if control.updated_by else None))
     for account in ConnectorAccount.objects.filter(paused=True):
+        # Paused only because the token expired: «Reconecta LinkedIn» above is the card; resuming would not help.
+        if status.get('expired') and (account.paused_reason or '').startswith(li.TOKEN_PAUSE):continue
         out.append(_card(f'account_paused:{account.id}','aviso','Reanuda la cuenta de LinkedIn',f'{account.label}: {account.paused_reason or "sin motivo registrado"}',
             [{'label':'Reanudar la cuenta','endpoint':f'/api/v1/operador/accounts/{account.id}/pause','body':{'paused':False},'primary':True}],
             priority='importante'))
@@ -199,6 +202,43 @@ def _summary_card(summary):
                  agent=resumen_semanal.ROLE,priority='cuando_puedas',created_at=summary.created_at,
                  summary={'id':str(summary.id),'week_start':summary.week_start,'label':resumen_semanal.payload(summary)['label'],
                           'titular':analysis.get('titular')})
+
+APPROVAL_TITLE={'RED-01':'¿Apruebas seguir a {name}?','RED-02':'¿Apruebas invitar a {name}?','RED-04':'¿Apruebas aceptar la invitación de {name}?',
+                'INT-03':'¿Apruebas el comentario en el post de {name}?','INT-02':'¿Apruebas la reacción al post de {name}?'}
+APPROVAL_SENTENCE={'RED-01':'Seguir a {name}','RED-02':'Invitar a {name} (sin nota)','RED-04':'Aceptar la invitación de {name}',
+                   'INT-03':'Comentario en el post de {name}','INT-02':'Reacción al post de {name}'}
+
+def awaiting_approval():
+    """Proposals that wait for Gustavo: still `proposed`, never executed, of a capability in `approval` mode (the policy
+    leaves them alone, autopiloto.policy_review). Each is a Tu turno card and a row of the calendar's «En cola»."""
+    rows=ActionProposal.objects.select_related('post','piece','contact').filter(state='proposed',execution__isnull=True).order_by('created_at')
+    return [p for p in rows if autopiloto.autonomy(p.capability)=='approval']
+
+def approval_expiry(p):
+    """When it stops waiting: an own piece at its hour; anything else when the autopilot lets it expire (TTL)."""
+    if p.piece_id:return p.piece.scheduled_for
+    return p.created_at+timedelta(hours=int(os.environ.get('OPERATOR_PROPOSAL_TTL_HOURS','48')))
+
+def approval_sentence(p):
+    if p.capability=='CONT-09':return f'La pieza del {p.piece.slot_date:%d/%m}' if p.piece_id else 'Una publicación'
+    return APPROVAL_SENTENCE.get(p.capability,LABELS.get(p.capability,p.capability)+' · {name}').format(name=_target(p)['name'] or 'una persona')
+
+def _approval_card(p):
+    """«¿Apruebas seguir a Laura Gómez?» (importante): Aprobar sends the exact version (`expected_hash`); Vetar asks for
+    a note and, on a network action, discards the person for good. A piece links to its detail, a person to her card."""
+    target=_target(p)
+    title=(f'¿Apruebas la pieza del {p.piece.slot_date:%d/%m}?' if p.piece_id else '¿Apruebas la publicación?') if p.capability=='CONT-09' else \
+        APPROVAL_TITLE.get(p.capability,'¿Apruebas esta acción?').format(name=target['name'] or 'esta persona')
+    actions=[{'label':'Aprobar','endpoint':f'/api/v1/operador/actions/{p.id}/approve','body':{'expected_hash':p.payload_hash},'primary':True},
+             {'label':'Vetar','endpoint':f'/api/v1/operador/actions/{p.id}/reject','note_required':True}]
+    if p.piece_id:actions.append({'label':'Ver la pieza','href':f'/calendario/pieza/{p.piece_id}'})
+    elif target.get('contact_id'):actions.append({'label':'Ver ficha','href':f'/personas/{target["contact_id"]}'})
+    expires=approval_expiry(p)
+    return _card(f'approval:{p.id}','aprobacion',title,p.rationale or 'El equipo lo propone y espera tu aprobación.',actions,
+                 agent=ACTOR.get(p.capability,'operador_cuenta'),priority='importante',deadline=expires,created_at=p.created_at,
+                 approval={'proposal_id':str(p.id),'capability':p.capability,'label':LABELS.get(p.capability,p.capability),'text':p.payload.get('text'),
+                           'reaction':p.payload.get('reaction'),'target':target,'piece_id':str(p.piece_id) if p.piece_id else None,
+                           'network':p.capability.startswith('RED-'),'expires_at':expires})
 
 def _question_priority(q,now):
     """Rises to Importante when less than 48 h remain before its deadline (rev 18 «Escalada»)."""
@@ -258,14 +298,16 @@ class TuTurno(APIView):
         from . import resumen_semanal
         summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal()] if s]
         tasks={'perfil':[],'conversaciones':conversation_cards,'resumen':summary_cards}  # profile cycle (PERF): a later phase of the plan
+        approval_cards=[_approval_card(p) for p in awaiting_approval()]
         question_cards=[_question_card(q,now) for q in pending];later=[_question_card(q,now) for q in later_q]
-        cards=warnings+question_cards+conversation_cards+summary_cards
+        cards=warnings+question_cards+conversation_cards+summary_cards+approval_cards
         seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]
         return Response({'count':len(active),'critical':any(c['priority']=='urgente' for c in active),
                          'urgent_count':sum(1 for c in active if c['priority']=='urgente'),
-                         'counts':{'avisos':len(warnings),'preguntas':len(pending),'tareas':sum(len(v) for v in tasks.values())},
+                         'counts':{'avisos':len(warnings),'preguntas':len(pending),'tareas':sum(len(v) for v in tasks.values()),
+                                   'aprobaciones':len(approval_cards)},
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
                          'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved(),
@@ -325,8 +367,12 @@ class NotificationsRead(APIView):
 
 def _resolved_alerts(days=7):
     since=timezone.now()-timedelta(days=days);out=[]
-    for event in AuditEvent.objects.filter(created_at__gte=since,action__in=['operator.execution_confirmed','operator.execution_failed','linkedin.connected','operator.machine_resumed']).order_by('-created_at')[:50]:
-        if event.action.startswith('operator.execution_'):
+    for event in AuditEvent.objects.filter(created_at__gte=since,action__in=['operator.execution_confirmed','operator.execution_failed','linkedin.connected',
+                                                                        'operator.machine_resumed','operator.approved']).order_by('-created_at')[:50]:
+        if event.action=='operator.approved':
+            proposal=ActionProposal.objects.select_related('post','piece','contact').filter(id=event.target).first()
+            if proposal:out.append({'kind':'alert','id':f'approval:{event.target}','title':approval_sentence(proposal),'at':event.created_at,'how':'Aprobada'})
+        elif event.action.startswith('operator.execution_'):
             execution=ActionExecution.objects.filter(proposal_id=event.target,note__startswith='Resolución humana').first()
             if not execution:continue
             out.append({'kind':'alert','id':f'uncertain:{event.target}','title':'¿Salió o no?','at':event.created_at,
@@ -483,9 +529,12 @@ def upcoming(now=None):
     pieces=[_piece_card(p) for p in EditorialPiece.objects.filter(state__in=['preparing','ready'],scheduled_for__gt=now-timedelta(hours=1))
             .order_by('scheduled_for')[:5] if not (p.state=='ready' and editorial.status(p,editorial.latest_action(p)) in ('published','failed','uncertain'))]
     expected=next_execution_time(now)
-    queued=[dict(item(p),expected_at=expected) for p in ActionProposal.objects.select_related('post','piece','contact')
+    # What waits for Gustavo's approval comes first, with the exact version to approve and when it stops waiting.
+    waiting=[dict(item(p),expected_at=None,awaiting_approval=True,payload_hash=p.payload_hash,expires_at=approval_expiry(p))
+             for p in awaiting_approval() if not p.piece_id][:50]
+    queued=[dict(item(p),expected_at=expected,awaiting_approval=False) for p in ActionProposal.objects.select_related('post','piece','contact')
             .filter(state='approved',execution__isnull=True,piece__isnull=True).order_by('created_at')[:50]]
-    return {'pieces':pieces,'queued':queued}
+    return {'pieces':pieces,'queued':waiting+queued}
 
 class Activity(APIView):
     """Calendario → vista Lista: «Próximo» and every day with everything that happened, newest first."""

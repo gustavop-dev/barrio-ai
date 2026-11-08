@@ -13,7 +13,7 @@ import { isOnItsWay, pieceLeaves, pieceWhen, preparationStages, publishedAt, sta
 import { Resultado } from './calendario/Resultado';
 import type { PieceDetailFull, TeamComment } from './calendario/types';
 import { useIsDesktop, useNow } from './calendario/useMedia';
-import { VetoButton } from './calendario/Veto';
+import { ApproveButton, VetoButton } from './calendario/Veto';
 import './calendario/calendario.css';
 
 function StatusNote({ piece }: { piece: PieceDetailFull }) {
@@ -184,7 +184,15 @@ export function PiezaDetalle() {
 
       {piece.status === 'published' || piece.snapshots?.length ? <Resultado piece={piece} timeZone={timeZone} now={now} desktop={desktop} /> : null}
 
-      {canVeto ? (
+      {canVeto && piece.status === 'awaiting_approval' && piece.action?.payload_hash ? (
+        <Section label="Aprobación" id="veto">
+          <Card>
+            <p>La publicación diaria espera tu aprobación: si la apruebas, sale a las {hour}; si la vetas, ese día quedará sin publicación.</p>
+            <ApproveButton actionId={piece.action.id} expectedHash={piece.action.payload_hash} />
+            <VetoButton block target={{ actionId: piece.action.id, kind: 'pieza', when: `a las ${hour}` }} />
+          </Card>
+        </Section>
+      ) : canVeto ? (
         <Section label="Veto" id="veto">
           <Card>
             <p>El equipo publica solo. Si no quieres que salga, vétala antes de las {hour}: ese día quedará sin publicación.</p>

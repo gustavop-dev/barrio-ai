@@ -66,7 +66,8 @@ iteration() {
   warm_bundle
   adb reverse tcp:8081 tcp:8081
   adb shell am force-stop "$APP"
-  adb shell am start -W -a android.intent.action.VIEW -d "$QA_DEVCLIENT_URL" "$APP"
+  # Quoted for the device shell: an unquoted & in the link split the command there.
+  adb shell "am start -W -a android.intent.action.VIEW -d '$QA_DEVCLIENT_URL' $APP"
   python3 "$UTIL" preparar "$ROOT" "$OUT/flujos" "$BIN/sesion-abrir.yaml"
   timeout --foreground --kill-after=10 90 maestro test "$ROOT/scripts/qa/autoprueba-fallos.yaml" \
     > "$OUT/autoprueba-fallos.log" 2>&1
@@ -253,7 +254,9 @@ python3 "$UTIL" sonda "$ROOT" "$HEAD"
 # Host advertised in Expo's manifest must be reachable through adb reverse, not the runner's LAN IP.
 (
   cd "$ROOT/movil"
-  export CI=1 EXPO_OFFLINE=1 REACT_NATIVE_PACKAGER_HOSTNAME=localhost
+  # CI=false: with CI=true (GitHub's default) Metro disables file watching, and the pushes reset by the loop would
+  # never reach the bundle (run 42510134236: «reloads are disabled»).
+  export CI=false EXPO_OFFLINE=1 REACT_NATIVE_PACKAGER_HOSTNAME=localhost
   exec setsid npx expo start --dev-client --no-dev --minify --port 8081
 ) > "$SESSION/metro.log" 2>&1 &
 METRO_PID=$!

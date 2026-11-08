@@ -38,6 +38,7 @@ import {
   markResumenVisto,
   planPiece,
   postponePregunta,
+  approveAction,
   rejectAction,
   resolveAction,
   retireHecho,
@@ -339,6 +340,15 @@ export function useVeto() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ actionId, note }: { actionId: string; note: string }) => rejectAction(actionId, note),
+    onSettled: () => invalidate(client, keys.editorialAll, keys.calendarioAll, keys.actividadAll, keys.actionsAll, keys.redAll, keys.tuTurno),
+  });
+}
+
+/** Approve the exact version (`payload_hash`) of a proposal that waits for Gustavo (a capability in `approval` mode). */
+export function useApproveAction() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ actionId, expectedHash, note = '' }: { actionId: string; expectedHash: string; note?: string }) => approveAction(actionId, expectedHash, note),
     onSettled: () => invalidate(client, keys.editorialAll, keys.calendarioAll, keys.actividadAll, keys.actionsAll, keys.redAll, keys.tuTurno),
   });
 }

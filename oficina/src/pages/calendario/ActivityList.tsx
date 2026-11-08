@@ -1,12 +1,12 @@
 // The full timeline of what the team did (GET /api/v1/actividad): vista Lista and «Ver todo lo del día».
 import { useId } from 'react';
 import { useActividad } from '../../api/hooks';
-import type { ActividadTipo, ActivityItem, CalendarLayer } from '../../api/types';
+import type { ActividadTipo, ActivityItem, CalendarLayer, QueuedItem } from '../../api/types';
 import { Button, ChipStrip, EmptyState, ErrorRetry, FilterChip, Skeleton, Timeline, TimelineItem } from '../../components/ui';
 import { formatTime } from '../../lib/format';
 import { dayOf, longDayTitle, relativeDay } from './dates';
-import { isNetworkCapability, itemLayer, itemLink, itemSentence, itemSub, queuedSentence, queuedWhen, stateBadge, TIPOS } from './events';
-import { VetoButton } from './Veto';
+import { awaitingSentence, isNetworkCapability, itemLayer, itemLink, itemSentence, itemSub, queuedSentence, queuedWhen, stateBadge, TIPOS } from './events';
+import { ApproveButton, VetoButton } from './Veto';
 
 /** One activity item as a timeline row, with the post excerpt, the full comment and «Por qué» folded. */
 export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: string }) {
@@ -44,25 +44,19 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
   );
 }
 
-/** A queued action with its Vetar (a network action discards the person). */
-export function QueuedRow({
-  item,
-  today,
-  timeZone,
-  windowOpen,
-}: {
-  item: ActivityItem & { expected_at: string | null };
-  today: string;
-  timeZone: string;
-  windowOpen: boolean | undefined;
-}) {
+/** A queued action with its Vetar (a network action discards the person); one that waits for approval also has Aprobar. */
+export function QueuedRow({ item, today, timeZone, windowOpen }: { item: QueuedItem; today: string; timeZone: string; windowOpen: boolean | undefined }) {
   const titleId = useId();
+  const awaiting = Boolean(item.awaiting_approval && item.payload_hash);
   return (
     <li className="cal-row">
       <span className="cal-row-text">
         <span id={titleId}>{queuedSentence(item)}</span>
-        <span className="cal-row-sub">{queuedWhen(item.expected_at, { today, timeZone, windowOpen })}</span>
+        <span className="cal-row-sub">
+          {awaiting ? awaitingSentence(item.expires_at, { today, timeZone }) : queuedWhen(item.expected_at, { today, timeZone, windowOpen })}
+        </span>
       </span>
+      {awaiting ? <ApproveButton size="small" describedBy={titleId} actionId={item.id} expectedHash={item.payload_hash!} /> : null}
       <VetoButton
         size="small"
         describedBy={titleId}

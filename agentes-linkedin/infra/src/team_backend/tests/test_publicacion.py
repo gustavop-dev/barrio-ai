@@ -176,7 +176,9 @@ class PostsApiContractTests(PublicationBase):
         with patch('team_backend.alerts.notify') as notify:autopiloto.tick(bot)
         credential.account.refresh_from_db()
         self.assertTrue(credential.account.paused);self.assertIn(li.TOKEN_PAUSE,credential.account.paused_reason)
-        self.assertIn('pausa',notify.call_args.args[0])
+        # «LinkedIn caducado» (urgent), not the generic «cuenta en pausa»: the body says publishing is paused.
+        self.assertEqual(notify.call_args.args[0],'LinkedIn caducado');self.assertIn('pausa',notify.call_args.args[1])
+        self.assertTrue(notify.call_args.kwargs['urgent'])
 
 
 class MemoryGuardTests(PublicationBase):

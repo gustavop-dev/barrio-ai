@@ -387,6 +387,16 @@ export function queuedWhen(expectedAt: string | null, { today, timeZone, windowO
   return windowOpen === false ? `Saldrá cuando abra la ventana, ${when}` : `Saldrá ${when}, según el espaciado`;
 }
 
+/** The toast after «Aprobar» (Tu turno, «En cola» and the piece). */
+export const APPROVED_MESSAGE = 'Aprobada. Sale cuando lo permitan la ventana y los topes.';
+
+/** «Espera tu aprobación · caduca mañana a las 14:05»: a queued row that waits for Gustavo. */
+export function awaitingSentence(expiresAt: string | null | undefined, { today, timeZone }: { today: string; timeZone: string }): string {
+  if (!expiresAt) return 'Espera tu aprobación';
+  const day = dayOf(expiresAt, timeZone) ?? today;
+  return `Espera tu aprobación · caduca ${relativeDayInSentence(day, today)} a las ${formatTime(expiresAt, timeZone)}`;
+}
+
 export function isNetworkCapability(capability: string | null | undefined): boolean {
   return String(capability).startsWith('RED-');
 }

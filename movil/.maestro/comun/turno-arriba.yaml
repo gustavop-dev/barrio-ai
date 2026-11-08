@@ -1,7 +1,24 @@
-# Tu turno: scrolls the list back to its header (the «Pendiente» tab), so the next search can go down
-# from the top whatever order the cards came in.
+# Tu turno: scrolls the list back to its header (the «Pendiente» tab), so the next search can go down from the top.
+# A few quick flings first (no view hierarchy is read between them, and reading it is what makes each scroll step
+# slow on the runner's emulator); they end above the bottom bar, so they never touch the capture button. Then a
+# short search finishes the way up.
 appId: co.projectapp.office
 ---
+- swipe:
+    start: 50%, 30%
+    end: 50%, 80%
+    duration: 120
+    waitToSettleTimeoutMs: 500
+- swipe:
+    start: 50%, 30%
+    end: 50%, 80%
+    duration: 120
+    waitToSettleTimeoutMs: 500
+- swipe:
+    start: 50%, 30%
+    end: 50%, 80%
+    duration: 120
+    waitToSettleTimeoutMs: 500
 - scrollUntilVisible:
     element:
       text: Pendiente

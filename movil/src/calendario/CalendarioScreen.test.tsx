@@ -257,6 +257,22 @@ describe('Calendario · semana', () => {
     expect(within(confirm).getByText(/descarta a Sofía Muestra para siempre/)).toBeOnTheScreen();
   });
 
+  it('approves from «Programado» what waits for Gustavo, with its exact version', async () => {
+    const base = actividadFixture();
+    const waiting = { ...base.upcoming.queued[1]!, id: 'q-3', state: 'proposed', expected_at: null, awaiting_approval: true, payload_hash: 'b'.repeat(64), expires_at: '2026-11-08T20:00:00Z' };
+    const api = server({
+      'GET /api/v1/actividad': { body: { ...base, upcoming: { ...base.upcoming, queued: [waiting, ...base.upcoming.queued] } } },
+      'POST /api/v1/operador/actions/q-3/approve': { status: 202, body: {} },
+    });
+    await renderCalendario();
+    const row = await within(panel()).findByTestId('en-cola-q-3');
+    expect(within(row).getByText(/^Espera tu aprobación · caduca /)).toBeOnTheScreen();
+    expect(within(within(panel()).getByTestId('en-cola-q-2')).queryByText('Aprobar')).toBeNull();  // already approved: only Vetar
+    await fireEvent.press(within(row).getByText('Aprobar'));
+    await waitFor(() => expect(api.find('POST', '/api/v1/operador/actions/q-3/approve')[0]?.body).toEqual({ expected_hash: 'b'.repeat(64), note: '' }));
+    expect(await screen.findByText('Aprobada. Sale cuando lo permitan la ventana y los topes.')).toBeOnTheScreen();
+  });
+
   it('says when a day is too far ahead', async () => {
     server();
     await renderCalendario({ fecha: '2026-11-30' });

@@ -11,7 +11,7 @@ import { turnoAnchor } from '@compartido/logic/turno';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useNow } from '@/calendario/useNow';
-import { VetoButton } from '@/calendario/Veto';
+import { ApproveButton, VetoButton } from '@/calendario/Veto';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Badge, Button, Card, ErrorRetry, Note, PageHeader, Section, Skeleton, T, pageContent } from '@/components/ui';
 import { openLink } from '@/navigation';
@@ -143,7 +143,15 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
 
       {piece.status === 'published' || piece.snapshots?.length ? <Resultado piece={piece} timeZone={timeZone} now={now} /> : null}
 
-      {canVeto && piece.action ? (
+      {canVeto && piece.action && piece.status === 'awaiting_approval' && piece.action.payload_hash ? (
+        <Section label="Aprobación">
+          <Card>
+            <T>{`La publicación diaria espera tu aprobación: si la apruebas, sale a las ${hour}; si la vetas, ese día quedará sin publicación.`}</T>
+            <ApproveButton block actionId={piece.action.id} expectedHash={piece.action.payload_hash} />
+            <VetoButton block target={{ actionId: piece.action.id, kind: 'pieza', when: `a las ${hour}` }} />
+          </Card>
+        </Section>
+      ) : canVeto && piece.action ? (
         <Section label="Veto">
           <Card>
             <T>{`El equipo publica solo. Si no quieres que salga, vétala antes de las ${hour}: ese día quedará sin publicación.`}</T>

@@ -138,6 +138,37 @@ export const EXPIRING_CARD: TurnoCard = cardFixture({
   actions: [{ label: 'Reconectar LinkedIn', href: '/api/v1/linkedin/oauth/start', primary: true }],
 });
 
+/** A follow (RED-01) in `approval` mode, waiting for Gustavo: Aprobar sends the exact version, Vetar discards the person. */
+export const APPROVAL_CARD: TurnoCard = cardFixture({
+  id: 'approval:a-1',
+  type: 'aprobacion',
+  tone: 'warn',
+  priority: 'importante',
+  state: 'nueva',
+  agent: 'relaciones_comunidad',
+  agent_label: 'Relaciones con la comunidad',
+  title: '¿Apruebas seguir a Laura Prueba?',
+  body: 'Lidera producto en un marketplace B2B.',
+  deadline: hoursFromNow(40),
+  created_at: hoursFromNow(-5),
+  actions: [
+    { label: 'Aprobar', endpoint: '/api/v1/operador/actions/a-1/approve', body: { expected_hash: 'a'.repeat(64) }, primary: true },
+    { label: 'Vetar', endpoint: '/api/v1/operador/actions/a-1/reject', note_required: true },
+    { label: 'Ver ficha', href: '/personas/c-9' },
+  ],
+  approval: {
+    proposal_id: 'a-1',
+    capability: 'RED-01',
+    label: 'Seguimiento',
+    text: null,
+    reaction: null,
+    target: { kind: 'person', name: 'Laura Prueba', headline: 'Head of Product en un marketplace B2B', url: null, contact_id: 'c-9', role: 'comprador' },
+    piece_id: null,
+    network: true,
+    expires_at: hoursFromNow(40),
+  },
+});
+
 export function factFixture(overrides: Partial<MemoryFact> = {}): MemoryFact {
   return {
     key: 'idioma.textos',

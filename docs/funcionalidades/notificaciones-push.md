@@ -13,7 +13,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
 | [PUS-02](#pus-02) | Probar una notificación | PWA · app · backend | funciona |
 | [PUS-03](#pus-03) | Desactivar las notificaciones en este dispositivo | PWA · app · backend | parcial |
 | [PUS-04](#pus-04) | Encender o apagar la push de cada tipo | PWA · app · backend | funciona |
-| [PUS-05](#pus-05) | Qué tipos envían push | backend | parcial |
+| [PUS-05](#pus-05) | Qué tipos envían push | backend | funciona |
 | [PUS-06](#pus-06) | Mostrar y abrir una Web Push | PWA | funciona |
 | [PUS-07](#pus-07) | Registrar el teléfono para recibir avisos | app · backend | parcial |
 | [PUS-08](#pus-08) | Tocar un aviso en el teléfono | app | funciona |
@@ -54,7 +54,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   3. **Dado** el servidor sin VAPID y sin teléfonos registrados, **cuando** lo pide, **entonces** recibe 403 «Notificaciones no configuradas en el servidor (VAPID).».
   4. **Dado** un token de servicio, **cuando** lo pide, **entonces** recibe 403.
 - **Brechas código/docs:** las dos interfaces ignoran `sent`: con `sent: 0` también dicen que se envió.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones-avisos` (criterio 3: sin VAPID ni teléfonos, «No se pudo completar» con el motivo). El 1 necesita FCM.
 
 ### PUS-03 · Desactivar las notificaciones en este dispositivo <a id="pus-03"></a>
 
@@ -75,31 +75,32 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** elige qué tipos de aviso le llegan como push; el aviso sigue apareciendo en Tu turno o en Notificaciones.
-- **Código:** `push_types` de `GET /api/v1/ajustes`, `PATCH /api/v1/ajustes/preferencias {push_disabled}` (`OfficePreference.push_disabled`), `notificaciones.push_enabled`.
+- **Código:** `push_types` de `GET /api/v1/ajustes`, `PATCH /api/v1/ajustes/preferencias {push_disabled, push_enabled}` (`OfficePreference.push_disabled` y `push_enabled`), `notificaciones.push_enabled`; `pushPreferencesPatch` en `compartido/src/logic/ajustes.ts`.
 - **Criterios de aceptación:**
   1. **Dado** el pliegue «Por tipo de notificación», **cuando** lo abre, **entonces** ve un interruptor por tipo con «Va a Tu turno» o «Va a Notificaciones» e «Apagar la push de un tipo no lo borra: el aviso sigue llegando a Tu turno o a Notificaciones.».
   2. **Dado** los valores por defecto, **cuando** lo abre, **entonces** están encendidos todos los de Tu turno (acción incierta, LinkedIn caducado, máquina detenida desde la app, LinkedIn caduca pronto, cuenta en pausa, conversación, pregunta, tarea de perfil) y, de Notificaciones, pieza lista o programada, pieza publicada, pieza bloqueada, máquina detenida desde el servidor, el líder no aprueba nada y resumen de la semana.
-  3. **Dado** que apaga «Pieza publicada», **cuando** se guarda, **entonces** se envía `push_disabled` con todos los tipos apagados, aparece «Push apagada: Pieza publicada.» y la próxima pieza publicada aparece en Notificaciones sin push, en la PWA y en el teléfono.
+  3. **Dado** que apaga «Pieza publicada», **cuando** se guarda, **entonces** se envían `push_disabled` con todos los tipos apagados y `push_enabled` con los encendidos, aparece «Push apagada: Pieza publicada.» y la próxima pieza publicada aparece en Notificaciones sin push, en la PWA y en el teléfono.
+  6. **Dado** un tipo apagado por defecto («Conexión nueva que encaja»), **cuando** lo enciende, **entonces** aparece «Push activada: Conexión nueva que encaja.», sigue encendido al volver a abrir la app y la próxima conexión que encaja llega como push. Un cliente que solo envía `push_disabled` no lo apaga salvo que lo incluya.
   4. **Dado** un tipo desconocido o un cuerpo vacío, **cuando** llega a la API, **entonces** responde 400.
   5. **Dado** que guardar falla, **cuando** vuelve el error, **entonces** el interruptor vuelve a su valor y aparece un aviso de error.
-- **Brechas código/docs:** en la PWA el pliegue no tiene estado de carga: sale vacío mientras carga `/ajustes`. Algunos tipos se pueden apagar pero nunca se envían ([PUS-05](#pus-05)).
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** en la PWA el pliegue no tiene estado de carga: sale vacío mientras carga `/ajustes`.
+- **Cobertura QA:** E2E `06-notificaciones-avisos` (criterio 6: encender un tipo apagado por defecto y que siga encendido al reabrir) y `11-ajustes` (3, apagar uno). Backend `PushSwitchTests`.
 
 ### PUS-05 · Qué tipos envían push <a id="pus-05"></a>
 
 - **Dónde:** backend
-- **Estado:** parcial
+- **Estado:** funciona
 - **Qué hace para Gustavo:** cada tipo que tiene push encendida le llega cuando pasa.
-- **Código:** llamadas a `notificaciones.avisar` en `operador.py`, `autopiloto.py`, `editorial.py`, `red.py`, `connectors_linkedin.py`, `resumen_semanal.py`, `oportunidades.py`, `capturas.py`, `conversaciones.py`, `preguntas.py`.
+- **Código:** llamadas a `notificaciones.avisar` en `operador.py` (`set_global_pause`, `check_env_pause`, `set_account_pause`), `autopiloto.py`, `editorial.py`, `red.py`, `connectors_linkedin.py` (`check_tokens`), `resumen_semanal.py`, `oportunidades.py`, `capturas.py`, `conversaciones.py`, `preguntas.py`.
 - **Criterios de aceptación:**
   1. **Dado** cada tipo con push encendida, **cuando** ocurre el evento, **entonces** llega su push: acción incierta («¿Salió o no?»), LinkedIn caduca pronto, cuenta en pausa, conversación que le toca, pregunta nueva («<Rol> te pregunta»), pieza lista, publicada o bloqueada, el líder no aprueba nada y resumen de la semana.
   2. **Dado** un aviso de Tu turno, **cuando** llega la push, **entonces** abre `/tu-turno`; uno de Notificaciones abre su enlace (o `/notificaciones`).
   3. **Dado** los tipos urgentes (acción incierta, LinkedIn caducado, máquina detenida), **cuando** se envían, **entonces** van con prioridad alta en el teléfono.
-  4. **Dado** que el token de LinkedIn caduca, **cuando** pasa, **entonces** llega la push «LinkedIn caducado». **Hoy no:** nada emite `linkedin_expired`; llega «LinkedIn: cuenta en pausa» (`account_paused`) porque la cuenta se pausa.
-  5. **Dado** que la máquina se detiene desde el servidor (`OPERATOR_PAUSED`), **cuando** pasa, **entonces** llega la push «Máquina detenida desde el servidor». **Hoy no:** `machine_paused_env` solo se calcula en «Próximo» y nunca se envía.
-  6. **Dado** los tipos «Máquina detenida desde la app» y «Tarea de perfil nueva», **cuando** se revisan, **entonces** tienen un emisor. **Hoy no:** nada los emite (el primero lo provoca Gustavo mismo; el segundo depende del ciclo de Perfil, [TUR-18](tu-turno.md#tur-18)).
-- **Brechas código/docs:** `CONTRATO-API.md` lista `machine_paused_env` entre los tipos con push por defecto y la tabla de Ajustes muestra los cuatro tipos sin emisor como si funcionaran.
-- **Cobertura QA:** pendiente
+  4. **Dado** que el token de LinkedIn caduca, **cuando** el autopiloto lo ve, **entonces** pausa la cuenta y llega la push urgente «LinkedIn caducado» (una vez), no «LinkedIn: cuenta en pausa».
+  5. **Dado** que la máquina se detiene desde el servidor (`OPERATOR_PAUSED`), **cuando** el autopiloto lo ve, **entonces** llega una vez la push urgente «Máquina detenida desde el servidor» con destino `/notificaciones`; no se guarda en el feed («Próximo» la muestra mientras dura) y una parada nueva, tras levantarla, vuelve a avisar.
+  6. **Dado** que Gustavo detiene la máquina desde la app, **cuando** pasa, **entonces** llega la push urgente «Máquina detenida» con el motivo. «Tarea de perfil nueva» no tiene evento hasta que exista el ciclo de Perfil ([TUR-18](tu-turno.md#tur-18)): Ajustes no ofrece su interruptor y la API lo sigue aceptando.
+- **Brechas código/docs:** —
+- **Cobertura QA:** Backend (`PushEmitterTests`, `LinkedInExpiredTests`, `test_publicacion`).
 
 ### PUS-06 · Mostrar y abrir una Web Push <a id="pus-06"></a>
 
@@ -133,7 +134,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   7. **Dado** el servidor, **cuando** abre Ajustes, **entonces** ve «Teléfonos que reciben avisos», «Último aviso entregado» y «Último error de Expo» (`ajustes.expo_push`).
   8. **Dado** el mismo token registrado otra vez, **cuando** llega, **entonces** se actualiza y reactiva con el mismo `id`; un token sin formato `ExponentPushToken[…]` recibe 400 «Token de Expo inválido: se espera ExponentPushToken[…].».
 - **Brechas código/docs:** `movil/README.md` dice que las push «necesitan además las credenciales de FCM (Firebase), que se cargan en EAS con `npx eas-cli@latest credentials`» y que hace falta una build de desarrollo; `eas.json` no tiene perfil `development` ([APP-07](app-movil-instalacion.md#app-07)).
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** E2E `06-notificaciones-avisos` (criterios 5 y 7: «Avisos push aún no disponibles · Los avisos push solo llegan a un teléfono real.» y «Teléfonos que reciben avisos»). El 1 a 4 necesitan un teléfono real con FCM.
 
 ### PUS-08 · Tocar un aviso en el teléfono <a id="pus-08"></a>
 
@@ -148,7 +149,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   4. **Dado** una URL absoluta o que empieza por `/api/`, **cuando** toca el aviso, **entonces** no navega.
   5. **Dado** una ruta que la app no tiene, **cuando** toca el aviso, **entonces** ve «Esta vista no existe» con «Ir a la Oficina».
 - **Brechas código/docs:** no se comprobó qué pasa si toca un aviso con la sesión cerrada.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** Sin E2E: necesita una push real (FCM y el servicio de Expo). Los enlaces `oficina0ff1ce://` los recorre `02-navegacion`.
 
 ### PUS-09 · Envío desde el servidor <a id="pus-09"></a>
 
@@ -177,7 +178,7 @@ Los avisos que llegan al teléfono o al navegador aunque 0ff1ce esté cerrada: W
   1. **Dado** la app abierta, **cuando** llega un aviso, **entonces** se muestra como banner, sin sonido ni número en el icono.
   2. **Dado** ese aviso, **cuando** llega, **entonces** Notificaciones y Tu turno se actualizan, la campana se balancea y el teléfono vibra una vez.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** Sin E2E: necesita una push real con la app abierta.
 
 ### PUS-11 · Copia de las alertas a un webhook <a id="pus-11"></a>
 

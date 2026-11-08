@@ -123,7 +123,11 @@ export function SwipeableCard({ children, rightLabel, leftLabel, onSwipe, testID
         </View>
       ) : null}
       <GestureDetector gesture={pan}>
-        <Animated.View style={card}>{children}</Animated.View>
+        {/* `-contenido`: the view that holds the card. On Android the outer view (with the screen reader's actions) is
+            reported apart from it, so UI tests look for a button inside the card here. */}
+        <Animated.View style={card} testID={testID ? `${testID}-contenido` : undefined}>
+          {children}
+        </Animated.View>
       </GestureDetector>
     </View>
   );

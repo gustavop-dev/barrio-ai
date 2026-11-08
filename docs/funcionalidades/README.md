@@ -127,9 +127,7 @@ Las brechas de cada función van en su ficha. Estas afectan a varias.
   - abrir la app sin conexión, o con el servidor dando un 5xx, cerraba la sesión: [ACC-06](acceso.md#acc-06). **Arreglado** en el PR #52: solo un 401 o `authenticated:false` cierran la sesión al arrancar.
 
   Las pruebas de Jest de la app sustituyen `fetch` por un simulacro (`movil/src/test/server.ts`), así que ninguna los detecta.
-- **No hay forma de aprobar desde la interfaz.** `POST /api/v1/operador/actions/<id>/approve` existe y `compartido` define `approveAction`, pero ninguna pantalla lo usa. Una capacidad en modo `approval` (las de red lo están por defecto) solo se puede vetar o dejar caducar: [BAR-13](red.md#bar-13), [CAL-15](calendario-piezas.md#cal-15). Producción está en `auto` para todo, así que hoy no se nota.
 - **El inbox existe, pero varias partes siguen como si no.** La escena mostraba al agente de inbox «en diseño» ([OFI-01](oficina.md#ofi-01), arreglado en el PR #52), `red/summary.stages.conversation` es siempre `null` ([BAR-11](red.md#bar-11)) y la capa Conversaciones del calendario sigue «parcial» sin conversaciones ([CAL-02](calendario-piezas.md#cal-02)).
-- **Tipos de push sin emisor.** Ajustes ofrece interruptores para `linkedin_expired`, `machine_paused`, `machine_paused_env` y `profile_task`, pero nada los envía: [PUS-05](notificaciones-push.md#pus-05).
 
 **Documentos desfasados:**
 - **Techo de Anthropic.** `CONTRATO-API.md` y el texto `definition` de `resultados.spend` dicen que `ANTHROPIC_LIMIT_USD` es un techo acumulado; desde B5 (`knowledge/providers.limit_window_start`) es mensual por defecto. Las interfaces lo muestran frente al mes, que es lo correcto: [AJU-05](ajustes.md#aju-05), [RES-07](resultados.md#res-07).

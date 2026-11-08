@@ -52,7 +52,7 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertIn('Mundo de QA listo',self.seed())
         first=self.counts()
         statuses={editorial.status(p,editorial.latest_action(p)) for p in EditorialPiece.objects.all()}
-        self.assertTrue({'scheduled','published','blocked','skipped','failed'}<=statuses,statuses)
+        self.assertTrue({'scheduled','published','blocked','skipped','failed','awaiting_approval'}<=statuses,statuses)
         self.assertTrue(set(Contact.Stage.values)<=set(Contact.objects.values_list('stage',flat=True)))
         self.assertEqual(set(PostMetric.objects.values_list('kind',flat=True)),{'24h','72h','7d'})
         self.assertGreaterEqual(Opportunity.objects.values('stage').distinct().count(),5)
@@ -61,8 +61,14 @@ class SeedQaTests(MediaMixin,OperatorBase):
 
         app=self.device()
         turno=app.get('/api/v1/tu-turno').json()
-        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen'})
-        self.assertTrue(turno['critical']);self.assertEqual(len(turno['later']),1)
+        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion'})
+        # The network block waits for approval by default (OPERATOR_AUTONOMY is empty): Laura's follow and Julián's invitation.
+        self.assertEqual(sorted(c['title'] for c in turno['items'] if c['type']=='aprobacion'),
+                         ['¿Apruebas invitar a Julián Herrera?','¿Apruebas seguir a Laura Gómez?'])
+        self.assertEqual((turno['count'],turno['urgent_count']),(8,1))
+        self.assertTrue(turno['critical']);self.assertEqual(sorted(c['state'] for c in turno['later']),['caducada','pospuesta'])
+        queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
+        self.assertEqual(sorted(q['capability'] for q in queued if q['awaiting_approval']),['RED-01','RED-02'])
         notifications=app.get('/api/v1/notificaciones').json()
         self.assertEqual(notifications['unread'],5)
         self.assertEqual({u['kind'] for u in notifications['upcoming']},{'piece_scheduled','invites_expected'})
@@ -76,9 +82,12 @@ class SeedQaTests(MediaMixin,OperatorBase):
                      '/api/v1/resultados/resumen-semanal','/api/v1/red/contacts','/api/v1/red/summary','/api/v1/oportunidades',
                      '/api/v1/operador/referents','/api/v1/galeria','/api/v1/capturas','/api/v1/oficina/actividad','/api/v1/operador/overview'):
             self.assertEqual(app.get(path).status_code,200,path)
-        # Calendario › Lista «En cola» (CAL-04, CAL-13): a reaction and a network action, approved and waiting.
+        # Calendario › Lista «En cola» (CAL-04, CAL-13): a reaction and a network action, approved and waiting; and the two
+        # network proposals in approval mode, listed first with «Aprobar» (BAR-13, CAL-15).
         queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
-        self.assertEqual(sorted(q['capability'] for q in queued),['INT-02','RED-02'])
+        self.assertEqual(sorted(q['capability'] for q in queued if not q['awaiting_approval']),['INT-02','RED-02'])
+        self.assertEqual(sorted(q['capability'] for q in queued if q['awaiting_approval']),['RED-01','RED-02'])
+        self.assertTrue(all(q['awaiting_approval'] for q in queued[:2]))
 
         # A flow changes the world (answers, vetoes, reads); the next seed puts it back and keeps the app signed in.
         question=TeamQuestion.objects.get(question__startswith='¿Cuántos proyectos')

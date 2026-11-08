@@ -1,0 +1,100 @@
+# cubre: PUS-02, PUS-04, PUS-07
+# Notificaciones · avisos push, in Ajustes › Notificaciones. «Este dispositivo» says what this phone can receive (the
+# emulator has no Firebase: no Expo token) and «Probar notificación» answers (on the runner there is neither VAPID nor
+# a registered phone, so the server refuses it and the reason shows). Then «Por tipo de notificación»: a type whose
+# push is off by default («Conexión nueva que encaja») is turned on, and it stays on after the app starts again from
+# scratch (the switch reads what the server kept, not the screen's memory).
+appId: co.projectapp.office
+name: Notificaciones · avisos push
+tags: [notificaciones]
+---
+- runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- this phone and «Probar notificación»
+# cubre: PUS-07, PUS-02
+- tapOn:
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-ajustes
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Este dispositivo"
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Probar notificación"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: 'Te avisan aquí de lo que pide tu acción \(Tu turno\) y de lo importante que pasa \(Notificaciones\)\.'
+- assertVisible: 'Teléfonos que reciben avisos.*'
+# The emulator has no Expo token: the reason, and no phone registered.
+- assertVisible: 'Avisos push aún no disponibles'
+- assertVisible: 'Los avisos push solo llegan a un teléfono real\.'
+- takeScreenshot: 06-avisos-01-este-dispositivo
+# Neither VAPID nor a registered phone on the runner: the server refuses it and the reason shows (PUS-02.3).
+- tapOn: "Probar notificación"
+- extendedWaitUntil:
+    visible: 'Notificaciones no configuradas en el servidor \(VAPID\)\.'
+    timeout: 20000
+- assertVisible: 'No se pudo completar'
+
+- takeScreenshot: 06-avisos-02-probar
+
+# The fold is further down in the same section (the heading is already above the screen).
+- scrollUntilVisible:
+    element:
+      text: "Por tipo de notificación"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- tapOn: "Por tipo de notificación"
+
+# ---------------------------------------------------------------- a push that is off by default, turned on
+# cubre: PUS-04
+- scrollUntilVisible:
+    element:
+      id: push-connection_fit
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: push-connection_fit
+    text: 'Conexión nueva que encaja'
+    checked: false
+- takeScreenshot: 06-avisos-03-conexion-apagada
+- tapOn:
+    id: push-connection_fit
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible: 'Push activada: Conexión nueva que encaja\.'
+    timeout: 15000
+- assertVisible:
+    id: push-connection_fit
+    checked: true
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- the server kept it: a cold start shows it on
+- launchApp
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 45000
+- runFlow: comun/ajustes-por-tipo.yaml
+- scrollUntilVisible:
+    element:
+      id: push-connection_fit
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    id: push-connection_fit
+    checked: true
+- takeScreenshot: 06-avisos-04-conexion-encendida

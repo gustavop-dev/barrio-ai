@@ -1,0 +1,156 @@
+# cubre: BAR-13, CAL-15, TUR-02, TUR-14
+# Tu turno · aprobar. The QA backend runs with OPERATOR_AUTONOMY empty, so the network block (RED-01, RED-02, RED-04)
+# waits for Gustavo's approval, and the seed's two proposals are Importante cards: «¿Apruebas seguir a Laura Gómez?»
+# and «¿Apruebas invitar a Julián Herrera?». Laura's follow is approved from its card: it leaves Tu turno, the top
+# bar counter drops, «Hecho recientemente» says «Aprobada» and the calendar's «En cola» lists it as approved.
+# Julián's invitation is approved from «En cola» in Calendario › Lista. Last, the piece in three days, whose daily post
+# waits in `proposed` (as it does in approval mode), shows «Aprobar» next to «Vetar» in its detail and is approved.
+# Card and row testIDs carry the seed's deterministic ids (seed_qa.uid): action:red01:laura and action:red02:julian.
+# The «Aprobada» toast is not asserted (Maestro misses it on some runs; the screenshots show it): the card leaving, the
+# row changing and the piece's status are.
+appId: co.projectapp.office
+name: Tu turno · aprobar
+tags: [turno]
+---
+- runFlow: comun/entrar.yaml
+
+# ---------------------------------------------------------------- the counter counts the two approvals
+# cubre: TUR-02
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 8 pendientes, 1 urgente'
+    timeout: 30000
+- tapOn:
+    id: top-tu-turno
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: turno-list
+    timeout: 30000
+
+# ---------------------------------------------------------------- «¿Apruebas seguir a Laura Gómez?»: Aprobar
+# cubre: BAR-13
+- scrollUntilVisible:
+    element:
+      text: '¿Apruebas seguir a Laura Gómez\?'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+# Bring the card's buttons up, clear of the bottom bar: a tap on «Aprobar» right above it once hit the capture button.
+- swipe:
+    start: 50%, 70%
+    end: 50%, 40%
+    duration: 800
+- assertVisible: 'Lidera producto en un marketplace B2B\.'
+- assertVisible:
+    text: 'Vetar'
+    childOf:
+      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1-contenido'
+- takeScreenshot: 04-aprobar-01-tarjeta
+- tapOn:
+    text: 'Aprobar'
+    childOf:
+      id: 'turno-card-approval:48be6cb6-07ed-5976-ac8c-0044d7f25be1-contenido'
+    waitToSettleTimeoutMs: 300
+- takeScreenshot: 04-aprobar-02-aprobada
+- extendedWaitUntil:
+    notVisible: '¿Apruebas seguir a Laura Gómez\?'
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 7 pendientes, 1 urgente'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# ---------------------------------------------------------------- «Hecho recientemente»
+# cubre: TUR-14
+- scrollUntilVisible:
+    element:
+      text: 'Hecho recientemente · 1'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- tapOn: 'Hecho recientemente · 1'
+- extendedWaitUntil:
+    visible: 'Seguir a Laura Gómez'
+    timeout: 15000
+- assertVisible: 'APROBADA|Aprobada'
+- takeScreenshot: 04-aprobar-03-hecho-recientemente
+
+# ---------------------------------------------------------------- Calendario › Lista › «En cola»: Julián's invitation
+# cubre: CAL-15, BAR-13
+- tapOn:
+    id: top-calendario
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: calendario
+    timeout: 30000
+- tapOn:
+    text: 'Lista'
+- extendedWaitUntil:
+    visible:
+      id: calendario-lista
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- assertVisible: 'Invitar a Julián Herrera \(sin nota\)'
+- assertVisible: 'Espera tu aprobación.*'
+# Laura's follow, approved a moment ago, waits for the window and the spacing.
+- assertVisible:
+    id: 'en-cola-48be6cb6-07ed-5976-ac8c-0044d7f25be1'
+- assertVisible: 'Seguir a Laura Gómez'
+- takeScreenshot: 04-aprobar-04-en-cola
+# Julián's is the only row that still waits, so its «Aprobar» is the only one in «En cola» (the row's own view is
+# reported apart from its buttons on Android, so `childOf` cannot reach them).
+- tapOn:
+    text: 'Aprobar'
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    notVisible: 'Espera tu aprobación.*'
+    timeout: 20000
+- assertVisible:
+    id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
+- takeScreenshot: 04-aprobar-05-en-cola-aprobada
+
+# ---------------------------------------------------------------- a piece awaiting approval: «Aprobar» in its detail
+# cubre: CAL-15
+# Opened by its link, as a notification would (seed_qa piece:aprobacion).
+- openLink: oficina0ff1ce://calendario/pieza/74a9cae0-2507-5628-8dba-f09a48a4115f
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 30000
+- extendedWaitUntil:
+    visible: 'PENDIENTE DE APROBACIÓN|Pendiente de aprobación'
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: 'Aprobar'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- assertVisible: 'La publicación diaria espera tu aprobación.*'
+- assertVisible: 'Vetar'
+- takeScreenshot: 04-aprobar-06-pieza-pendiente
+- tapOn:
+    text: 'Aprobar'
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    visible: 'PROGRAMADA|Programada'
+    timeout: 20000
+- assertNotVisible: 'La publicación diaria espera tu aprobación.*'
+- takeScreenshot: 04-aprobar-07-pieza-aprobada
