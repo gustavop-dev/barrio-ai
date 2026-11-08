@@ -70,6 +70,7 @@ tags: [turno]
     element:
       text: 'Sofía Martínez te escribió'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - swipe:
@@ -86,6 +87,7 @@ tags: [turno]
     element:
       text: 'Fallo simulado por QA \(503\)\.'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'No responder'

@@ -100,11 +100,13 @@ tags: [turno]
     element:
       text: 'Importante · 4'
     direction: DOWN
+    speed: 20
     timeout: 60000
 - scrollUntilVisible:
     element:
       id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: '¿Cuántos proyectos de software entregó ProjectApp en 2025\?'
@@ -118,6 +120,7 @@ tags: [turno]
     element:
       id: 'answer-submit-3db4be49-1ddb-518e-bb02-794907c57c95'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - tapOn:
@@ -142,12 +145,14 @@ tags: [turno]
     element:
       text: 'Sofía Martínez te escribió'
     direction: DOWN
+    speed: 20
     timeout: 60000
 # The card is tall: centre its «Hecho, respondí»; her message sits just above it.
 - scrollUntilVisible:
     element:
       text: 'Hecho, respondí'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: '.*Estamos armando la plataforma de nuestra cooperativa.*'
@@ -179,6 +184,7 @@ tags: [turno]
     element:
       text: '¿Con qué tipo de startups prefieres trabajar\?'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'Fintech'
@@ -207,6 +213,7 @@ tags: [turno]
       childOf:
         id: 'turno-card-question:370dbfe2-981c-5f7c-a6a5-4a4f47117056-contenido'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - tapOn:
@@ -219,17 +226,19 @@ tags: [turno]
     notVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
     timeout: 20000
 
-# The analyst's orientation, alone in its group now: down to the next group's label, then up to it.
+# The analyst's orientation, alone in its group now: down to the folds at the end, then up to it.
 # cubre: TUR-08, SEM-08
 - scrollUntilVisible:
     element:
-      text: 'Ya no es urgente · 1'
+      id: pospuestas
     direction: DOWN
+    speed: 20
     timeout: 60000
 - scrollUntilVisible:
     element:
       text: 'Ver el resumen'
     direction: UP
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'El analista propone una orientación'
@@ -240,15 +249,12 @@ tags: [turno]
 # cubre: TUR-13
 - scrollUntilVisible:
     element:
-      text: 'Ya no es urgente · 1'
-    direction: DOWN
-    timeout: 60000
-- scrollUntilVisible:
-    element:
       text: '¿Fuiste al meetup de producto del martes\?'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
+- assertVisible: 'Ya no es urgente · 1'
 - assertVisible:
     text: 'CADUCADA|Caducada'
     childOf:
@@ -262,6 +268,7 @@ tags: [turno]
     element:
       id: pospuestas
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - extendedWaitUntil:
@@ -277,6 +284,7 @@ tags: [turno]
     element:
       text: 'Cómo se ordena lo que depende de ti'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: '.*¿En qué ciudad vives actualmente\?'
@@ -296,6 +304,7 @@ tags: [turno]
     element:
       text: 'Hecho recientemente · 3'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - tapOn: 'Hecho recientemente · 3'
@@ -303,6 +312,7 @@ tags: [turno]
     element:
       text: 'Cómo se ordena lo que depende de ti'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'CONFIRMASTE QUE SE APLICÓ|Confirmaste que se aplicó'
@@ -328,5 +338,6 @@ tags: [turno]
     element:
       text: 'Fundé ProjectApp en Medellín\.'
     direction: DOWN
+    speed: 20
     timeout: 60000
 - takeScreenshot: 04-turno-16-sabe-semilla

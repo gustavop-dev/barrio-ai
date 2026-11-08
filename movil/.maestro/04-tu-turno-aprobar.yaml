@@ -35,6 +35,7 @@ tags: [turno]
     element:
       text: '¿Apruebas seguir a Laura Gómez\?'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'Lidera producto en un marketplace B2B\.'
@@ -68,6 +69,7 @@ tags: [turno]
     element:
       text: 'Hecho recientemente · 1'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - tapOn: 'Hecho recientemente · 1'
@@ -96,6 +98,7 @@ tags: [turno]
     element:
       id: 'en-cola-be534b31-9e7e-59fa-8375-c4d25e03b7fd'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'Invitar a Julián Herrera \(sin nota\)'
@@ -132,6 +135,7 @@ tags: [turno]
     element:
       text: 'Aprobar'
     direction: DOWN
+    speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'La publicación diaria espera tu aprobación.*'
