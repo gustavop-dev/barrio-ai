@@ -35,3 +35,5 @@ The `Mov*` boards are:
 - **Phase 1:** Captura, Navegación and Hojas.
 - **Phase 2:** Tu turno, Notificaciones and Oficina.
 - **Phase 3:** Entrada (from login to the Oficina), Calendario, Resultados, Detalle (shared element from a list to a detail) and Micro (buttons, switch, chips, copy, text field, loading).
+
+**`tableros/Infografias.dc.html`** («Infografías hechas con IA · reglas») is not a motion board. It is the brand rule for every image the team creates from scratch: formats, grid, colour, type, charts, the four templates, the yes/no list, a JSON spec for the agents, and the 10-point review list. The catalog's `IMG-INF-*` features (`docs/funcionalidades/imagenes-en-publicaciones.md`) follow it.
