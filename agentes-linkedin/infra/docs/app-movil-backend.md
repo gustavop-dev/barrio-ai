@@ -1,14 +1,15 @@
 # App móvil: backend del login por dispositivo y la push nativa
 
-La app móvil de 0ff1ce (React Native + Expo) usa la misma API que la PWA ([CONTRATO-API.md](../../../oficina/CONTRATO-API.md)). Para ella, el backend añade dos cosas:
+La app móvil de 0ff1ce (React Native + Expo) usa la misma API que la PWA ([CONTRATO-API.md](../../../oficina/CONTRATO-API.md)). Para ella, el backend añade tres cosas:
 - un **login por dispositivo**: una sesión humana sin cookies ni CSRF;
-- la **push nativa a través de Expo**, con los mismos avisos que la Web Push de la PWA.
+- la **push nativa a través de Expo**, con los mismos avisos que la Web Push de la PWA;
+- los **errores del cliente** (`POST /api/v1/app/errores`): cuando una subida falla en el teléfono, la app manda qué falló (sin el contenido), y el backend lo escribe en el log y guarda los 200 más nuevos.
 
 El código está en:
 - `src/team_backend/authentication.py`: `DeviceTokenAuthentication`, `device_bearer` y `device_for`;
 - `src/team_backend/movil_views.py`: las rutas nuevas;
 - `src/team_backend/expo.py`: el envío a Expo y los recibos;
-- los modelos `DeviceToken` y `ExpoPushToken` (migración `0016_app_movil`).
+- los modelos `DeviceToken` y `ExpoPushToken` (migración `0016_app_movil`) y `AppClientError` (migración `0017_app_errores_cliente`).
 
 ## Límites
 
@@ -77,6 +78,14 @@ flowchart LR
 6. **Fallos de la petición.** Un error de red, un 4xx o 5xx o un `TOO_MANY_REQUESTS` quedan en el log (`expo_request_failed`, con el código y sin datos) y no cuentan contra el token: una caída de Expo no desactiva los teléfonos. No hay reintentos, porque la push es de mejor esfuerzo, igual que la Web Push.
 7. **«Probar notificación».** `POST /api/v1/push/test` llega a las suscripciones de la PWA y a los teléfonos del usuario, con prioridad alta y `data.url: /ajustes`. Responde `{ sent }` con la suma de los dos envíos. Si no hay VAPID ni teléfonos registrados, responde 403 como antes.
 
+## Errores del cliente
+
+`ClientErrors` en `movil_views.py`. La forma exacta está en el contrato, en «Errores del cliente».
+- **Solo metadatos.** El nombre y el mensaje del error, el código HTTP y el `detail`, y de cada parte de archivo su campo, tipo, esquema del URI y tamaño. Ni el audio, ni las fotos, ni la nota, ni nombres de archivo, ni tokens.
+- **Sesión humana.** Un token de servicio recibe 403. Se apunta el dispositivo si el informe llega con un token de dispositivo.
+- **Límites.** 8 KB por informe (413), 30 informes por hora y usuario (`ClientErrorThrottle`, 429), hasta 12 partes. Solo se guardan los `CLIENT_ERRORS_KEPT` (200) más nuevos.
+- **Dónde mirar.** En el log, la línea `app_client_error {…}` del logger `team_backend.app`. En el admin de Django, «App client errors». Por la API, `GET /api/v1/app/errores` (los 50 más nuevos, con `operate_linkedin`).
+
 ## Ajustes
 
 `GET /api/v1/ajustes` añade dos claves, para que la PWA y la app puedan mostrar «Dispositivos con la app». Las dos son del usuario que pregunta:
@@ -112,6 +121,8 @@ flowchart LR
 - el mismo modelo de permisos que la sesión, y que con Bearer no haga falta CSRF;
 - la lista de dispositivos, revocar uno a distancia y las claves nuevas de Ajustes;
 - registrar y quitar un token de push;
+- los errores del cliente: el log y la fila guardada con su dispositivo, la validación, el límite de 8 KB, quién puede informar, el límite por hora y que solo se guarden los más nuevos;
+- una nota de voz m4a de Android (`audio/mp4`) y una foto HEIC que llega como JPEG, subidas con el token de dispositivo;
 - los lotes, el contenido del mensaje y `EXPO_ACCESS_TOKEN`;
 - `DeviceNotRegistered` en tickets y recibos, los interruptores por tipo y que un fallo de Expo no rompa el aviso;
 - «Probar notificación», y las subidas multipart de capturas y Galería con Bearer.

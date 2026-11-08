@@ -9,14 +9,15 @@ from unittest.mock import patch
 import httpx
 from django.contrib.auth.models import User
 from django.core.cache import cache
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.utils import timezone
 from rest_framework.exceptions import PermissionDenied
 from rest_framework.test import APIClient
 from knowledge import providers
-from team_backend import expo, notificaciones
+from team_backend import expo, movil_views, notificaciones
 from team_backend.authentication import DEVICE_PREFIX
-from team_backend.models import ApiCredential, AuditEvent, Capture, DeviceToken, ExpoPushToken, GalleryPhoto
+from team_backend.models import ApiCredential, AppClientError, AuditEvent, Capture, DeviceToken, ExpoPushToken, GalleryPhoto
 from team_backend.operador_views import human_session
 from team_backend.tests.test_capturas import MediaMixin, photo
 from team_backend.tests.test_operador import OperatorBase
@@ -290,3 +291,80 @@ class BearerUploadTests(MediaMixin,AppMovilBase):
         image=browser.get(f'/api/v1/galeria/{uploaded.json()[0]["id"]}/imagen',HTTP_AUTHORIZATION='Bearer '+token)
         self.assertEqual(image.status_code,200)
         self.assertEqual(self.api.post('/api/v1/capturas',{'nota':'Hola'},format='multipart').status_code,403)
+
+    def test_the_android_voice_note_and_a_reencoded_heic_are_accepted(self):
+        """What the Android app sends: expo-audio's m4a as `audio/mp4` named captura.m4a, and a photo that expo-image-picker
+        re-encoded to JPEG while its asset still says image/heic (the app now declares image/jpeg; both must pass)."""
+        token=self.token()
+        m4a=SimpleUploadedFile('captura.m4a',b'\x00\x00\x00\x1cftypM4A '+bytes(60),content_type='audio/mp4')
+        response=Client().post('/api/v1/capturas',{'audio':m4a,'audio_duration_s':'4.2','fotos':[photo(mime='image/heic',name='IMG_1.heic')]},
+                               HTTP_AUTHORIZATION='Bearer '+token)
+        self.assertEqual(response.status_code,201,response.content)
+        capture=Capture.objects.get(id=response.json()['id'])
+        self.assertEqual((capture.audio_mime,capture.audio_duration_s),('audio/mp4',4.2))
+        self.assertEqual(capture.photos.get().mime,'image/jpeg')
+
+
+class ClientErrorTests(AppMovilBase):
+    """POST /api/v1/app/errores: the app reports a failed upload (metadata only); it is logged and the newest are kept."""
+    REPORT={'kind':'captura_envio','name':'UploadNetworkError','message':'Network request failed: Could not retrieve file for uri file://….m4a',
+            'status':None,'detail':'','platform':'android','os_version':'35','app_version':'0.1.0',
+            'parts':[{'field':'audio','type':'audio/mp4','scheme':'file','size':None},{'field':'fotos','type':'image/jpeg','scheme':'file','size':2048}]}
+
+    def report(self,client,body=None):
+        return client.post('/api/v1/app/errores',self.REPORT if body is None else body,format='json')
+
+    def test_a_report_is_logged_and_kept_with_its_device_and_the_team_reads_it_back(self):
+        token=self.token();phone=self.bearer(token)
+        with self.assertLogs('team_backend.app','WARNING') as logs:
+            response=self.report(phone)
+        self.assertEqual(response.status_code,201,response.content)
+        report=AppClientError.objects.get(id=response.json()['id'])
+        self.assertEqual((report.user,report.device.name),(self.gustavo,'Pixel de Gustavo'))
+        self.assertEqual((report.kind,report.name,report.status,report.platform,report.os_version,report.app_version),
+                         ('captura_envio','UploadNetworkError',None,'android','35','0.1.0'))
+        self.assertEqual(report.parts,self.REPORT['parts'])
+        line='\n'.join(logs.output)
+        for expected in ('app_client_error','captura_envio','UploadNetworkError','audio/mp4','Pixel de Gustavo'):self.assertIn(expected,line)
+        self.assertNotIn(token,line)
+        # A session report has no device; a 400 answer keeps its status and detail.
+        with self.assertLogs('team_backend.app','WARNING'):
+            session=self.report(self.human,{**self.REPORT,'kind':'galeria_subida','name':'ApiError','status':400,'detail':'Tipo de imagen no admitido: image/gif.','parts':[]})
+        self.assertEqual(session.status_code,201,session.content)
+        self.assertIsNone(AppClientError.objects.get(id=session.json()['id']).device)
+        # The team reads them back, newest first (a service token with operate_linkedin is enough to diagnose).
+        listed=self.api.get('/api/v1/app/errores')
+        self.assertEqual(listed.status_code,200,listed.content)
+        self.assertEqual([r['id'] for r in listed.json()],[session.json()['id'],str(report.id)])
+        self.assertEqual((listed.json()[0]['status'],listed.json()[0]['detail']),(400,'Tipo de imagen no admitido: image/gif.'))
+        self.assertEqual(listed.json()[1]['device'],'Pixel de Gustavo')
+
+    def test_validation_size_cap_and_who_may_report(self):
+        phone=self.bearer(self.token())
+        self.assertEqual(self.report(phone,{**self.REPORT,'kind':'Con espacios'}).status_code,400)
+        self.assertEqual(self.report(phone,{**self.REPORT,'message':'x'*501}).status_code,400)
+        self.assertEqual(self.report(phone,{**self.REPORT,'status':700}).status_code,400)
+        self.assertEqual(self.report(phone,{**self.REPORT,'parts':[self.REPORT['parts'][0]]*13}).status_code,400)
+        self.assertEqual(self.report(phone,[]).status_code,400)
+        # More than 8 KB is refused before it is read.
+        big=phone.post('/api/v1/app/errores',json.dumps({**self.REPORT,'relleno':'x'*9000}),content_type='application/json')
+        self.assertEqual(big.status_code,413)
+        # A service token is not a person; nobody unauthenticated may report.
+        self.assertEqual(self.report(self.api).status_code,403)
+        self.assertIn(self.report(APIClient()).status_code,(401,403))
+        self.assertFalse(AppClientError.objects.exists())
+        # Only the team reads them.
+        self.assertIn(APIClient().get('/api/v1/app/errores').status_code,(401,403))
+
+    def test_rate_limited_per_user(self):
+        phone=self.bearer(self.token())
+        with patch.object(movil_views.ClientErrorThrottle,'rate','2/hour'),self.assertLogs('team_backend.app','WARNING'):
+            codes=[self.report(phone).status_code for _ in range(3)]
+        self.assertEqual(codes,[201,201,429])
+        self.assertEqual(AppClientError.objects.count(),2)
+
+    def test_only_the_newest_are_kept(self):
+        phone=self.bearer(self.token())
+        with patch.object(movil_views,'CLIENT_ERRORS_KEPT',2),self.assertLogs('team_backend.app','WARNING'):
+            ids=[self.report(phone,{**self.REPORT,'message':f'fallo {n}'}).json()['id'] for n in range(3)]
+        self.assertEqual(sorted(str(i) for i in AppClientError.objects.values_list('id',flat=True)),sorted(ids[1:]))

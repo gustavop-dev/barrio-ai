@@ -169,3 +169,14 @@ class ExpoPushTokenAdmin(ReadOnlyAdmin):
     list_display=['device_name','user','active','last_success_at','last_error','created_at']
     fields=['device_name','user','device','active','created_at','updated_at','last_success_at','last_error']
     readonly_fields=fields
+
+from .models import AppClientError
+
+@admin.register(AppClientError)
+class AppClientErrorAdmin(ReadOnlyAdmin):
+    """Failures the mobile app reported (POST /api/v1/app/errores): metadata only, never what was being sent."""
+    list_display=['created_at','kind','name','status','platform','app_version','user']
+    list_filter=['kind','platform']
+    fields=['created_at','user','device','kind','name','message','status','detail','parts','platform','os_version','app_version']
+    readonly_fields=fields
+    list_select_related=['user']
