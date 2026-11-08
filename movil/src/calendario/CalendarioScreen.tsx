@@ -3,27 +3,37 @@
 // params. Swipe the week or the month to turn it; tap a day to open its panel in a sheet (half and
 // full, not modal: the calendar above stays usable); the selected day's panel also sits under the
 // calendar. Days are Bogotá's.
+//
+// Motion (MovCalendario): the selection slides to the tapped day (Selection.tsx); the day panel, inline
+// and in the sheet, enters from the side the date moved to (DaySwap.tsx); Semana ↔ Mes makes the week
+// leave, the month enter row by row and the selection travel to its cell, while the calendar's height
+// eases between both (ViewSwitch.tsx, Grids.tsx, Pager.tsx).
 import { getCalendario } from '@compartido/api/endpoints';
 import { REFRESH, useActividad, useCalendario, useOverview } from '@compartido/api/hooks';
 import { keys } from '@compartido/api/queryClient';
-import type { CalendarioDay } from '@compartido/api/types';
+import type { Calendario, CalendarioDay } from '@compartido/api/types';
 import { addDays, addMonths, CALENDAR_TZ, deviceDiffers, longDayTitle, monthGrid, monthOf, monthTitle, todayIn, weekDays, weekRangeLabel } from '@compartido/logic/dates';
 import { DEFAULT_VISTA, monthIsEmpty, toggledLayers, VISTAS, visibleLayers, type Vista } from '@compartido/logic/events';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { usePathname } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import { useSharedValue } from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { ErrorRetry, Note, PageHeader, Segmented, SnapSheet, T, pageContent } from '@/components/ui';
+import { useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 import { DayHeading, DayPanel } from './DayPanel';
-import { MonthDots, WeekStrip } from './Grids';
+import { DaySwap, useDaySwap } from './DaySwap';
+import { MonthDots, WeekStrip, type GridProps } from './Grids';
 import { LayerChips } from './LayerChips';
 import { ListView } from './ListView';
 import { Pager, type PageOffset, type PagerHandle } from './Pager';
 import { useCalendarParams } from './params';
+import { usePill } from './Selection';
 import { useNow } from './useNow';
+import { LeavingView, useViewSwitch, type GridVista } from './ViewSwitch';
 
 /** The days a view asks for: the week, or the Monday-to-Sunday grid of the month. */
 export function rangeOf(vista: Vista, fecha: string): [string, string] {
@@ -41,6 +51,10 @@ function NavButton({ label, icon, text, onPress }: { label: string; icon?: 'chev
       {icon ? <Icon name={icon} size={20} /> : <T variant="detalle">{text}</T>}
     </Pressable>
   );
+}
+
+function Grid({ vista, ...props }: GridProps & { vista: GridVista }) {
+  return vista === 'mes' ? <MonthDots {...props} /> : <WeekStrip {...props} />;
 }
 
 /** A neighbour page's data, if it is cached (the screen prefetches both neighbours). Never fetches by itself. */
@@ -71,6 +85,15 @@ export function CalendarioScreen() {
   // until the calendar is back, and comes back open on the same day.
   const here = usePathname() === '/calendario';
   const openSheetDay = here ? sheetDay : null;
+  const { reduced } = useMotion();
+  // The motion that outlives a view: the selection, the calendar's height (−1: not measured), the switch
+  // between Semana and Mes, and the panels changing day.
+  const pill = usePill(reduced);
+  const calendarHeight = useSharedValue(-1);
+  const viewSwitch = useViewSwitch(vista, reduced);
+  const panelSwap = useDaySwap(vista === 'lista' ? null : fecha, reduced);
+  const sheetSwap = useDaySwap(openSheetDay, reduced);
+  const { reset: resetPill } = pill;
 
   const data = calendar.data;
   const timeZone = data?.timezone || CALENDAR_TZ;
@@ -87,6 +110,13 @@ export function CalendarioScreen() {
   const windowOpen = overview.data?.window?.open_now;
   const loaded = calendar.isSuccess && !calendar.isPlaceholderData;
 
+  // Lista replaces the calendar: coming back, the selection and the height start where they land.
+  useEffect(() => {
+    if (vista !== 'lista') return;
+    resetPill();
+    calendarHeight.set(-1);
+  }, [vista, resetPill, calendarHeight]);
+
   // The neighbours, so a swipe lands on a page that already has its dots.
   useEffect(() => {
     if (!loaded || vista === 'lista') return;
@@ -95,6 +125,10 @@ export function CalendarioScreen() {
       void client.prefetchQuery({ queryKey: keys.calendario(from, to), queryFn: () => getCalendario(from, to), staleTime: REFRESH.calendario });
     }
   }, [client, loaded, vista, fecha]);
+
+  /** A day's data for a panel that is leaving: from the pages on screen, else from the cache. */
+  const cachedDay = (day: string) =>
+    byDate.get(day) ?? client.getQueryData<Calendario>(keys.calendario(...rangeOf(vista, day)))?.days.find((item) => item.date === day);
 
   const select = useCallback((day: string) => update({ fecha: day === today ? null : day }), [update, today]);
   const openDay = (day: string) => {
@@ -130,7 +164,7 @@ export function CalendarioScreen() {
   const header = (
     <View style={styles.top}>
       <PageHeader title="Calendario" subtitle={otherZone ? `${rango} · Horas de Bogotá` : rango} actions={nav} />
-      <Segmented<Vista> label="Vista" options={VISTAS} value={vista} onChange={(value) => update({ vista: value === DEFAULT_VISTA ? null : value })} />
+      <Segmented<Vista> label="Vista" testID="vista" options={VISTAS} value={vista} onChange={(value) => update({ vista: value === DEFAULT_VISTA ? null : value })} />
       <LayerChips layers={data?.layers} visible={visible} onToggle={(layer) => update({ capas: toggledLayers(visible, available, layer) })} />
     </View>
   );
@@ -168,18 +202,20 @@ export function CalendarioScreen() {
     );
   }
 
-  const renderPage = (offset: PageOffset) => {
-    const grid = {
-      fecha: offset ? shifted(vista, fecha, offset) : fecha,
-      today,
-      byDate,
-      visible,
-      onSelect: openDay,
-      loading: offset ? false : gridLoading,
-      preview: offset !== 0,
-    };
-    return vista === 'mes' ? <MonthDots {...grid} /> : <WeekStrip {...grid} />;
-  };
+  const renderPage = (offset: PageOffset) => (
+    <Grid
+      vista={vista}
+      fecha={offset ? shifted(vista, fecha, offset) : fecha}
+      today={today}
+      byDate={byDate}
+      visible={visible}
+      onSelect={openDay}
+      loading={offset ? false : gridLoading}
+      preview={offset !== 0}
+      pill={offset ? undefined : pill}
+      enter={offset === 0 && viewSwitch.from !== null}
+    />
+  );
 
   return (
     <View style={styles.screen} onLayout={(event: LayoutChangeEvent) => setScreenHeight(event.nativeEvent.layout.height)}>
@@ -192,10 +228,36 @@ export function CalendarioScreen() {
         {header}
         <View style={styles.calendar}>
           <ErrorRetry error={calendar.isError ? calendar.error : null} onRetry={() => void calendar.refetch()} title="No se pudo cargar el calendario" />
-          <Pager key={vista} ref={pager} renderPage={renderPage} onShift={shift} previousLabel={previousLabel} nextLabel={nextLabel} testID={`pager-${vista}`} />
+          <View style={styles.viewport}>
+            {viewSwitch.from ? (
+              <LeavingView key={viewSwitch.from} onDone={viewSwitch.done}>
+                <Grid vista={viewSwitch.from} fecha={fecha} today={today} byDate={byDate} visible={visible} onSelect={openDay} preview />
+              </LeavingView>
+            ) : null}
+            <Pager
+              key={vista}
+              ref={pager}
+              renderPage={renderPage}
+              onShift={shift}
+              previousLabel={previousLabel}
+              nextLabel={nextLabel}
+              testID={`pager-${vista}`}
+              height={calendarHeight}
+            />
+          </View>
           {monthEmpty ? <Note tone="info">No hay nada registrado en este mes.</Note> : null}
         </View>
-        <DayPanel key={fecha} date={fecha} day={selectedDay} loading={dayLoading} {...dayPanelProps} />
+        <DaySwap
+          date={fecha}
+          swap={panelSwap}
+          render={(date, leaving) =>
+            leaving ? (
+              <DayPanel date={date} day={cachedDay(date)} loading={false} testID="panel-dia-saliente" {...dayPanelProps} />
+            ) : (
+              <DayPanel date={date} day={selectedDay} loading={dayLoading} {...dayPanelProps} />
+            )
+          }
+        />
       </ScrollView>
       {openSheetDay ? (
         <SnapSheet
@@ -205,14 +267,22 @@ export function CalendarioScreen() {
           onClose={() => setSheetDay(null)}
           testID="hoja-dia"
         >
-          <DayHeading date={openSheetDay} today={today} />
-          <DayPanel
+          <DaySwap
             date={openSheetDay}
-            day={byDate.get(openSheetDay)}
-            loading={!calendar.isError && !byDate.get(openSheetDay) && gridLoading}
-            showHeading={false}
-            testID="panel-dia-hoja"
-            {...dayPanelProps}
+            swap={sheetSwap}
+            render={(date, leaving) => (
+              <View style={styles.sheetDay}>
+                <DayHeading date={date} today={today} />
+                <DayPanel
+                  date={date}
+                  day={leaving ? cachedDay(date) : byDate.get(date)}
+                  loading={!leaving && !calendar.isError && !byDate.get(date) && gridLoading}
+                  showHeading={false}
+                  testID={leaving ? 'panel-dia-hoja-saliente' : 'panel-dia-hoja'}
+                  {...dayPanelProps}
+                />
+              </View>
+            )}
           />
         </SnapSheet>
       ) : null}
@@ -225,6 +295,9 @@ const styles = StyleSheet.create({
   content: { gap: space[4] },
   top: { gap: space[3] },
   calendar: { gap: space[3] },
+  // The calendar's frame: what is still outside the eased height (the leaving month) is clipped.
+  viewport: { overflow: 'hidden' },
+  sheetDay: { gap: space[3] },
   nav: { flexDirection: 'row', gap: space[1] },
   navButton: {
     minWidth: shell.touch,

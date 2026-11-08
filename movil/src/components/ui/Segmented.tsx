@@ -1,12 +1,52 @@
-import { Pressable, StyleSheet, View } from 'react-native';
-import { haptic } from '@/theme/motion';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { calendarSpring, haptic, useMotion } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 import { T } from './Text';
 
-/** Segmented control (ui.css .segmented, the Calendario's Mes · Semana · Lista): a linea track, the chosen one on superficie. */
-export function Segmented<V extends string>({ label, options, value, onChange }: { label: string; options: readonly { value: V; label: string }[]; value: V; onChange: (value: V) => void }) {
+const PAD = space[1];
+const GAP = space[1];
+
+/**
+ * Segmented control (ui.css .segmented, the Calendario's Mes · Semana · Lista, Resultados' Periodo): a linea
+ * track, the chosen one on superficie. The superficie is one piece that slides to the chosen option
+ * (MovCalendario and MovResultados, `seg`); until the track is measured the chosen option paints it itself.
+ */
+export function Segmented<V extends string>({
+  label,
+  options,
+  value,
+  onChange,
+  testID,
+}: {
+  label: string;
+  options: readonly { value: V; label: string }[];
+  value: V;
+  onChange: (value: V) => void;
+  testID?: string;
+}) {
+  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  const [width, setWidth] = useState(0);
+  const { reduced } = useMotion();
+  const seg = useSharedValue(index);
+
+  useEffect(() => {
+    seg.set(reduced ? index : withSpring(index, calendarSpring('segment')));
+  }, [index, reduced, seg]);
+
+  const optionWidth = width ? (width - PAD * 2 - GAP * (options.length - 1)) / options.length : 0;
+  const indicator = useAnimatedStyle(() => ({ width: optionWidth, transform: [{ translateX: seg.value * (optionWidth + GAP) }] }), [optionWidth]);
+
   return (
-    <View style={styles.track} accessibilityRole="tablist" accessibilityLabel={label}>
+    <View
+      style={styles.track}
+      accessibilityRole="tablist"
+      accessibilityLabel={label}
+      testID={testID}
+      onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
+    >
+      {width ? <Animated.View testID={testID ? `${testID}-seleccion` : undefined} pointerEvents="none" style={[styles.indicator, indicator]} /> : null}
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -20,7 +60,7 @@ export function Segmented<V extends string>({ label, options, value, onChange }:
               haptic('tabChange');
               onChange(option.value);
             }}
-            style={[styles.option, selected ? styles.selected : null]}
+            style={[styles.option, selected && !width ? styles.selected : null]}
           >
             <T variant="detalle" color={selected ? colors.ink : colors.inkSoft}>
               {option.label}
@@ -33,7 +73,8 @@ export function Segmented<V extends string>({ label, options, value, onChange }:
 }
 
 const styles = StyleSheet.create({
-  track: { flexDirection: 'row', gap: space[1], padding: space[1], backgroundColor: colors.line, borderRadius: radius.md },
+  track: { flexDirection: 'row', gap: GAP, padding: PAD, backgroundColor: colors.line, borderRadius: radius.md },
+  indicator: { position: 'absolute', top: PAD, bottom: PAD, left: PAD, borderRadius: radius.sm, backgroundColor: colors.surface },
   option: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },
   selected: { backgroundColor: colors.surface },
 });

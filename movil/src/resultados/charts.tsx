@@ -2,6 +2,8 @@
 // in a sheet, funnels and bar lists, the stacked 60/40 split, and the impressions per post (react-native-svg)
 // with the dashed median line, where tapping a bar opens the piece. The numbers come from
 // compartido/src/logic/resultados.ts, the same rules as the PWA.
+// Motion (MovResultados, CountUp.tsx): the KPI figures and the funnel counts count up, and the bars of the
+// funnels and bar lists grow in a cascade.
 import {
   barRows,
   formatKpiValue,
@@ -25,6 +27,7 @@ import Svg, { Defs, Line, Path, Pattern, Polyline, Rect } from 'react-native-svg
 import { Icon } from '@/components/icons';
 import { Button, Sheet, T } from '@/components/ui';
 import { colors, radius, space } from '@/theme/tokens';
+import { CountUp, GrowBar } from './CountUp';
 
 // ---------------------------------------------------------------- ⓘ definition
 
@@ -111,7 +114,12 @@ export function KpiTile({ label, kpi, unit = 'number', better = 'up', deltaAsPer
       </View>
       {available && kpi ? (
         <>
-          <T variant="titulo">{formatKpiValue(kpi.value as number, unit, format)}</T>
+          {format ? (
+            // A figure with its own wording («24 de 28») has nothing to count.
+            <T variant="titulo">{formatKpiValue(kpi.value as number, unit, format)}</T>
+          ) : (
+            <CountUp value={kpi.value as number} text={formatKpiValue(kpi.value as number, unit)} unit={unit} testID={`kpi-cifra-${label}`} />
+          )}
           {delta ? (
             <T variant="detalle" color={DELTA_COLOR[delta.tone]} accessibilityLabel={delta.spoken}>
               {delta.text}
@@ -156,7 +164,7 @@ export function KpiGrid({ children }: { children: ReactNode }) {
 
 // ---------------------------------------------------------------- bars
 
-function Track({ width, color, spoken }: { width: number; color: string; spoken?: string }) {
+function Track({ width, color, spoken, index }: { width: number; color: string; spoken?: string; index: number }) {
   return (
     <View
       style={styles.track}
@@ -165,7 +173,7 @@ function Track({ width, color, spoken }: { width: number; color: string; spoken?
       accessibilityLabel={spoken}
       importantForAccessibility={spoken ? 'yes' : 'no-hide-descendants'}
     >
-      <View style={[styles.bar, { width: `${width}%`, backgroundColor: color }]} />
+      <GrowBar width={width} color={color} index={index} />
     </View>
   );
 }
@@ -174,18 +182,22 @@ function Track({ width, color, spoken }: { width: number; color: string; spoken?
 export function Funnel({ steps, showConversion = true, color = colors.brandDeep, aside }: { steps: readonly FunnelStepInput[]; showConversion?: boolean; color?: string; aside?: string | null }) {
   return (
     <View style={styles.bars}>
-      {funnelRows(steps, showConversion).map((row) => (
+      {funnelRows(steps, showConversion).map((row, index) => (
         <View key={row.key} style={styles.barRow}>
           <View style={styles.barHead} importantForAccessibility="no-hide-descendants" accessibilityElementsHidden>
             <T variant="detalle" style={styles.grow}>
               {row.label}
             </T>
-            <T variant="detalle">
-              {row.valueText}
-              {row.conversion !== null ? ` · ${row.conversion} %` : ''}
-            </T>
+            <View style={styles.count}>
+              {row.value === null ? (
+                <T variant="detalle">{row.valueText}</T>
+              ) : (
+                <CountUp value={row.value} text={row.valueText} variant="detalle" />
+              )}
+              {row.conversion !== null ? <T variant="detalle">{` · ${row.conversion} %`}</T> : null}
+            </View>
           </View>
-          <Track width={row.width} color={color} spoken={row.spoken} />
+          <Track width={row.width} color={color} spoken={row.spoken} index={index} />
         </View>
       ))}
       {aside ? (
@@ -207,7 +219,7 @@ export interface BarItem extends BarInput {
 export function BarList({ items, label, color = colors.brandDeep }: { items: readonly BarItem[]; label: string; color?: string }) {
   return (
     <View style={styles.bars} accessibilityLabel={label} testID={`bars-${label}`}>
-      {barRows(items).map((item) => (
+      {barRows(items).map((item, index) => (
         <View key={item.key} style={styles.barRow} accessible accessibilityLabel={`${item.label}${item.sub ? ` ${item.sub}` : ''}: ${item.text}${item.value === null ? ', sin dato' : ''}`}>
           <View style={styles.barHead}>
             <T variant="detalle" style={styles.grow}>
@@ -216,7 +228,7 @@ export function BarList({ items, label, color = colors.brandDeep }: { items: rea
             </T>
             <T variant="detalle">{item.text}</T>
           </View>
-          <Track width={item.width} color={color} />
+          <Track width={item.width} color={color} index={index} />
         </View>
       ))}
     </View>
@@ -387,8 +399,8 @@ const styles = StyleSheet.create({
   bars: { gap: space[3] },
   barRow: { gap: 6 },
   barHead: { flexDirection: 'row', alignItems: 'flex-end', gap: space[2] },
+  count: { flexDirection: 'row', alignItems: 'flex-end' },
   track: { height: 8, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' },
-  bar: { height: 8, borderRadius: radius.pill },
   dot: { width: 10, height: 10, borderRadius: radius.pill },
   legend: { flexDirection: 'row', flexWrap: 'wrap', columnGap: space[4], rowGap: space[1] },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
