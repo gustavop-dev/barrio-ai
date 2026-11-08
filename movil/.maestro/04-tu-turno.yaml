@@ -244,19 +244,33 @@ tags: [turno]
 
 # ---------------------------------------------------------------- «Ya no es urgente»: the question whose deadline passed
 # cubre: TUR-13
+# Check the group count before entering its tall card: centering the question can scroll the header off screen.
 - scrollUntilVisible:
     element:
-      text: '¿Fuiste al meetup de producto del martes\?'
+      text: 'Ya no es urgente · 1'
+      childOf:
+        id: turno-list
     direction: DOWN
     speed: 20
     timeout: 60000
     centerElement: true
 - assertVisible: 'Ya no es urgente · 1'
+- scrollUntilVisible:
+    element:
+      text: '¿Fuiste al meetup de producto del martes\?'
+      childOf:
+        id: 'turno-card-question:2917ba0c-b05b-5be2-b9fb-daf7e1a84885-contenido'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
 - assertVisible:
     text: 'CADUCADA|Caducada'
     childOf:
       id: 'turno-card-question:2917ba0c-b05b-5be2-b9fb-daf7e1a84885-contenido'
-- assertVisible: 'Ya no es urgente, pero sigue siendo útil\.'
+- assertVisible:
+    text: 'Ya no es urgente, pero sigue siendo útil\.'
+    childOf:
+      id: 'turno-card-question:2917ba0c-b05b-5be2-b9fb-daf7e1a84885-contenido'
 - takeScreenshot: 04-turno-12-caducada
 
 # ---------------------------------------------------------------- «Pospuestas»: the seeded one and the two sent there

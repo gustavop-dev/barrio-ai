@@ -75,6 +75,10 @@ tags: [resultados]
     timeout: 10000
 
 # «Usar como orientación»: the toast offers «Deshacer» for 5 s and the card already says it was used; undo at once.
+# Let the decision taps settle normally and shorten settling only for «Deshacer». Match the visible decision text
+# directly, as before, without depending on the partly off-screen summary wrapper. Check the toast's message in the
+# undo selector, avoiding a separate hierarchy read before the deadline. «Deshecho» lasts 4 s and may be missed by
+# Maestro; both enabled buttons returning and the decided sentence disappearing are mandatory.
 - scrollUntilVisible:
     element:
       id: resumen-usar
@@ -83,30 +87,33 @@ tags: [resultados]
     timeout: 20000
 - tapOn:
     id: resumen-usar
+    enabled: true
 - extendedWaitUntil:
     visible:
-      text: "Orientación actualizada.*"
-      childOf:
-        id: toast
+      text: "La usaste como orientación del equipo.*"
     timeout: 15000
-- assertVisible:
-    text: "La usaste como orientación del equipo.*"
 - tapOn:
     text: "Deshacer"
     childOf:
       id: toast
+      containsDescendants:
+        - text: "Orientación actualizada.*"
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       text: "Deshecho"
       childOf:
         id: toast
-    timeout: 15000
+    timeout: 2000
+    optional: true
 - extendedWaitUntil:
     visible:
       id: resumen-usar
+      enabled: true
     timeout: 10000
 - assertVisible:
     id: resumen-descartar
+    enabled: true
 - assertNotVisible:
     text: "La usaste como orientación del equipo.*"
 - takeScreenshot: 08-resultados-04-orientacion-deshecha
@@ -114,28 +121,33 @@ tags: [resultados]
 # «Descartar», then «Deshacer».
 - tapOn:
     id: resumen-descartar
+    enabled: true
 - extendedWaitUntil:
     visible:
-      text: "Resumen descartado"
-      childOf:
-        id: toast
+      text: "La descartaste.*"
     timeout: 15000
-- assertVisible:
-    text: "La descartaste.*"
 - tapOn:
     text: "Deshacer"
     childOf:
       id: toast
+      containsDescendants:
+        - text: "Resumen descartado"
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       text: "Deshecho"
       childOf:
         id: toast
-    timeout: 15000
+    timeout: 2000
+    optional: true
 - extendedWaitUntil:
     visible:
       id: resumen-descartar
+      enabled: true
     timeout: 10000
+- assertVisible:
+    id: resumen-usar
+    enabled: true
 - assertNotVisible:
     text: "La descartaste.*"
 - takeScreenshot: 08-resultados-05-descarte-deshecho
@@ -347,20 +359,35 @@ tags: [resultados]
     notVisible:
       id: definition-sheet
     timeout: 10000
+# Check each chart's heading before scrolling to its contents or the next chart. Centering the funnel's last row
+# can put its heading above the viewport; the following chart headings must be reached independently too.
+# The Negocio chip and its KPIs above locate this section. Match its unique chart text directly: Android can flatten
+# the res-negocio View, so requiring it as a childOf parent can miss visible text and scroll past the whole section.
 - scrollUntilVisible:
     element:
-      text: "Cerrada sin acuerdo: \\d+"
+      text: "EMBUDO DE OPORTUNIDADES"
     direction: DOWN
     centerElement: true
     timeout: 20000
 - assertVisible: "EMBUDO DE OPORTUNIDADES"
 - scrollUntilVisible:
     element:
-      text: "OPORTUNIDADES ACTIVAS"
+      text: "Cerrada sin acuerdo: \\d+"
+    direction: DOWN
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "REPARTO POR MODALIDAD"
     direction: DOWN
     centerElement: true
     timeout: 20000
 - assertVisible: "REPARTO POR MODALIDAD"
+- scrollUntilVisible:
+    element:
+      text: "OPORTUNIDADES ACTIVAS"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
 - scrollUntilVisible:
     element:
       text: "Andrés Restrepo"
