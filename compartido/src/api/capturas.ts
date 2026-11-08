@@ -72,11 +72,61 @@ function isNativeFile(file: Blob | NativeFile): file is NativeFile {
   return typeof (file as NativeFile).uri === 'string' && !(typeof Blob !== 'undefined' && file instanceof Blob);
 }
 
+/** The types the contract accepts, by file extension (for a part that comes without a type). */
+const TYPE_BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  heic: 'image/heic',
+  heif: 'image/heif',
+  m4a: 'audio/mp4',
+  mp4: 'audio/mp4',
+  aac: 'audio/aac',
+  mp3: 'audio/mpeg',
+  ogg: 'audio/ogg',
+  webm: 'audio/webm',
+  wav: 'audio/wav',
+  flac: 'audio/flac',
+};
+
+/** The type a file name or URI implies by its extension (`IMG_1.HEIC` → `image/heic`), or null. */
+export function typeFromName(name: string): string | null {
+  const path = name.split(/[?#]/)[0] ?? '';
+  const ext = /\.([a-z0-9]+)$/i.exec(path)?.[1]?.toLowerCase();
+  return (ext && TYPE_BY_EXTENSION[ext]) || null;
+}
+
+/**
+ * A URI that Android's networking can open. It reads a part with ContentResolver.openInputStream,
+ * which needs a scheme: a bare path (`/data/…/a.m4a`) fails with «Could not retrieve file for uri», so
+ * it becomes `file:///data/…/a.m4a`. `file://`, `content://` and any other scheme stay as they are.
+ */
+export function nativeUri(uri: string): string {
+  const value = uri.trim();
+  if (/^[a-z][a-z0-9+.-]*:/i.test(value)) return value;
+  if (value.startsWith('/')) return `file://${value}`;
+  return value;
+}
+
+/**
+ * A React Native file part that the phone can send: a URI with a scheme, a file name, and always a
+ * type (Android refuses a binary part without one: «Binary FormData part needs a content-type
+ * header»). The type is the declared one, else the one its name or URI implies.
+ */
+export function nativePart(file: NativeFile, filename?: string): NativeFile {
+  const uri = nativeUri(String(file.uri || ''));
+  const fromUri = uri.split(/[?#]/)[0]?.split('/').pop() ?? '';
+  const name = (filename || '').trim() || String(file.name || '').trim() || fromUri || 'archivo';
+  const type = String(file.type || '').trim().toLowerCase() || typeFromName(name) || typeFromName(uri) || 'application/octet-stream';
+  return { uri, name, type };
+}
+
 /** Appends a file part: a Blob with its filename on the web, the `{uri, name, type}` object in React Native. */
 function appendFile(form: FormData, field: string, file: Blob | NativeFile, filename: string) {
   if (isNativeFile(file)) {
     // React Native's FormData reads uri/name/type from the object; the DOM typing only knows Blob.
-    form.append(field, { ...file, name: filename } as unknown as Blob);
+    form.append(field, nativePart(file, filename) as unknown as Blob);
     return;
   }
   form.append(field, file, filename);

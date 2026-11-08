@@ -3,6 +3,7 @@ import { api, onUnauthorized } from '@compartido/api/client';
 import { captureForm } from '@compartido/api/capturas';
 import { fakeServer } from '@/test/server';
 import { API_URL, apiUrl } from './config';
+import { isFilePartFailure, UploadNetworkError } from './multipart';
 import { clearToken, saveToken } from './token';
 import './transport';
 
@@ -43,8 +44,11 @@ describe('native transport', () => {
       nota: '  una idea  ',
       para: 'post',
     });
-    await api.postForm('/api/v1/capturas', form);
+    await expect(api.postForm('/api/v1/capturas', form)).resolves.toEqual({ id: 'c1' });
     const [sent] = server.requests;
+    // React Native's XMLHttpRequest, not expo/fetch (which throws on `{uri}` parts).
+    expect(sent?.via).toBe('xhr');
+    expect(sent?.url).toBe('https://office.projectapp.co/api/v1/capturas');
     expect(sent?.headers['content-type']).toBeUndefined();
     expect(sent?.headers.authorization).toBe('Bearer 0ff1ce_dt_prueba');
     expect(sent?.body).toEqual([
@@ -54,6 +58,31 @@ describe('native transport', () => {
       ['nota', 'una idea'],
       ['para', 'post'],
     ]);
+  });
+
+  it('JSON keeps going through fetch', async () => {
+    const server = fakeServer({ 'POST /api/v1/preguntas/q1/mas-tarde': { body: { id: 'q1' } } });
+    await api.post('/api/v1/preguntas/q1/mas-tarde');
+    expect(server.requests[0]?.via).toBe('fetch');
+  });
+
+  it('a multipart error answer reaches the client as an ApiError with the server detail', async () => {
+    await saveToken('0ff1ce_dt_prueba');
+    fakeServer({ 'POST /api/v1/capturas': { status: 400, body: { detail: 'Tipo de audio no admitido: desconocido.' } } });
+    const form = captureForm({ audio: { blob: { uri: 'file:///cache/a.m4a', name: 'captura.m4a', type: 'audio/mp4' }, filename: 'captura.m4a', durationS: 1 } });
+    await expect(api.postForm('/api/v1/capturas', form)).rejects.toMatchObject({ name: 'ApiError', status: 400, detail: 'Tipo de audio no admitido: desconocido.' });
+  });
+
+  it('an upload that never left the phone carries the native reason', async () => {
+    await saveToken('0ff1ce_dt_prueba');
+    fakeServer({ 'POST /api/v1/capturas': { networkError: 'Could not retrieve file for uri /cache/a.m4a' } });
+    const form = captureForm({ audio: { blob: { uri: 'file:///cache/a.m4a', name: 'captura.m4a', type: 'audio/mp4' }, filename: 'captura.m4a', durationS: 1 } });
+    const error = await api.postForm('/api/v1/capturas', form).catch((e: unknown) => e);
+    expect(error).toBeInstanceOf(UploadNetworkError);
+    expect(error).toBeInstanceOf(TypeError);
+    expect((error as UploadNetworkError).reason).toBe('Could not retrieve file for uri /cache/a.m4a');
+    expect(isFilePartFailure(error)).toBe(true);
+    expect(isFilePartFailure(new UploadNetworkError('Unable to resolve host "office.projectapp.co"'))).toBe(false);
   });
 
   it('a 401 (revoked or unknown token) reaches the unauthorized handler', async () => {
