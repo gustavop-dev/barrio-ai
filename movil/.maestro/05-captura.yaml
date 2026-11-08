@@ -285,6 +285,7 @@ tags: [captura]
 - tapOn:
     id: capture-send
     waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-captura-tras-enviar-1
 # Once the team has it the envelope flies off, the sheet closes and the toast offers «Deshacer» for 5 s.
 - extendedWaitUntil:
     visible: 'Enviado al equipo\.'
@@ -296,6 +297,8 @@ tags: [captura]
     text: 'Deshacer'
     rightOf:
       text: 'Enviado al equipo\.'
+    waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-captura-10-deshecho-aviso
 # Undone: the toast says so over the sheet, which opens again with the same draft.
 - extendedWaitUntil:
     visible:
@@ -308,7 +311,7 @@ tags: [captura]
 - assertVisible:
     id: capture-para-post
     selected: true
-- takeScreenshot: 05-captura-10-deshecho-con-el-borrador
+- takeScreenshot: 05-captura-11-deshecho-con-el-borrador
 
 # The same draft goes again.
 - scrollUntilVisible:
@@ -319,6 +322,7 @@ tags: [captura]
 - tapOn:
     id: capture-send
     waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-captura-tras-enviar-2
 - extendedWaitUntil:
     visible: 'Enviado al equipo\.'
     timeout: 30000
@@ -359,7 +363,7 @@ tags: [captura]
     text: 'Deshacer'
     below:
       text: 'Nota de QA idea para un post sobre validar un MVP con clientes'
-- takeScreenshot: 05-captura-11-historial-nueva
+- takeScreenshot: 05-captura-12-historial-nueva
 
 # «Deshacer» from the history: «Envío deshecho.» shows over the sheet, and the capture leaves the list at once.
 - tapOn:
@@ -367,10 +371,10 @@ tags: [captura]
     below:
       text: 'Nota de QA idea para un post sobre validar un MVP con clientes'
     waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-captura-13-historial-deshecho
 - extendedWaitUntil:
     visible: 'Envío deshecho\.'
     timeout: 15000
-- takeScreenshot: 05-captura-12-historial-deshecho
 - extendedWaitUntil:
     notVisible: 'Nota de QA idea para un post sobre validar un MVP con clientes'
     timeout: 10000
@@ -392,7 +396,7 @@ tags: [captura]
     timeout: 20000
 - assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
 - assertVisible: 'Usada en la pieza del .*'
-- takeScreenshot: 05-captura-13-historial-semilla
+- takeScreenshot: 05-captura-14-historial-semilla
 - tapOn: 'Volver a la captura'
 - extendedWaitUntil:
     visible:

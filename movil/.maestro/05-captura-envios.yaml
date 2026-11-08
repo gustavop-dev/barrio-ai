@@ -67,6 +67,7 @@ onFlowComplete:
 - tapOn:
     id: capture-send
     waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-envios-tras-enviar-1
 - extendedWaitUntil:
     visible: 'Enviado al equipo\.'
     timeout: 45000
@@ -137,6 +138,7 @@ onFlowComplete:
 - tapOn:
     id: capture-send
     waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-envios-tras-enviar-2
 - extendedWaitUntil:
     visible: 'Enviado al equipo\.'
     timeout: 45000
@@ -164,7 +166,7 @@ onFlowComplete:
     text: 'Escuchar'
     below:
       text: 'Audio 0:0[1-9]'
-- assertVisible: 'El equipo lo transcribe y decide'
+- assertVisible: 'Hoy, .* · El equipo lo transcribe y decide'
 - takeScreenshot: 05-envios-08-historial-audio
 - tapOn: 'Volver a la captura'
 - extendedWaitUntil:
@@ -192,6 +194,7 @@ onFlowComplete:
 - tapOn:
     id: capture-send
     waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-envios-tras-enviar-3
 # The reason, in Spanish and without scrolling, right above the button; the draft stays.
 - extendedWaitUntil:
     visible:
@@ -263,6 +266,7 @@ onFlowComplete:
 - tapOn:
     id: capture-send
     waitToSettleTimeoutMs: 500
+- takeScreenshot: 05-envios-tras-enviar-4
 - extendedWaitUntil:
     visible:
       id: capture-send-error

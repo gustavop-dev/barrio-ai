@@ -291,6 +291,7 @@ tags: [galeria]
     visible: "¿Quitar esta foto de la galería\\?"
     timeout: 15000
 - tapOn: "Quitar la foto"
+- takeScreenshot: 10-galeria-tras-quitar
 - extendedWaitUntil:
     visible: "Foto quitada de la galería\\."
     timeout: 20000
