@@ -90,6 +90,25 @@ tags: [oficina]
 - assertNotVisible: "MISIÓN"
 - takeScreenshot: 03-oficina-04-ficha-cerrada
 
+# ---------------------------------------------------------------- the machine stopped elsewhere
+# cubre: OFI-07.1, OFI-07.5 — the banner «Máquina en pausa · <motivo>» in the views, the scene darkened and still. The
+# team strip and the library run with the machine stopped: the still scene does not redraw, so the emulator's software
+# GPU answers each step in a fraction of a second instead of several seconds (the character above needed it running).
+- runScript:
+    file: comun/qa-api.js
+    env:
+      ACCION: pausar
+      QA_USER: ${QA_USER}
+      QA_PASSWORD: ${QA_PASSWORD}
+- extendedWaitUntil:
+    visible: "Máquina en pausa · Pausa de la QA"
+    timeout: 60000
+- extendedWaitUntil:
+    visible:
+      id: oficina-pausa
+    timeout: 20000
+- takeScreenshot: 03-oficina-04b-maquina-en-pausa
+
 # ---------------------------------------------------------------- the team strip
 # cubre: OFI-04
 - tapOn:
@@ -212,23 +231,7 @@ tags: [oficina]
     selected: false
 - takeScreenshot: 03-oficina-08-atras-cierra
 
-# ---------------------------------------------------------------- the machine stopped elsewhere
-# cubre: OFI-07.1, OFI-07.5 — the banner «Máquina en pausa · <motivo>» in the views, the scene darkened; the banner leads
-# to Ajustes › Máquina; once resumed, it goes (OFI-07.3)
-- runScript:
-    file: comun/qa-api.js
-    env:
-      ACCION: pausar
-      QA_USER: ${QA_USER}
-      QA_PASSWORD: ${QA_PASSWORD}
-- extendedWaitUntil:
-    visible: "Máquina en pausa · Pausa de la QA"
-    timeout: 60000
-- extendedWaitUntil:
-    visible:
-      id: oficina-pausa
-    timeout: 20000
-- takeScreenshot: 03-oficina-10-maquina-en-pausa
+# The banner leads to Ajustes › Máquina; once resumed, it goes (OFI-07.3).
 - tapOn: "Máquina en pausa · Pausa de la QA"
 - extendedWaitUntil:
     visible:
@@ -238,7 +241,7 @@ tags: [oficina]
     id: top-ajustes
     selected: true
 - assertVisible: "Máquina en pausa · Pausa de la QA"
-- takeScreenshot: 03-oficina-11-pausa-en-ajustes
+- takeScreenshot: 03-oficina-08b-pausa-en-ajustes
 - runScript:
     file: comun/qa-api.js
     env:
