@@ -103,6 +103,29 @@ class PublicURLTests(SimpleTestCase):
         facts,sources,errors=research.native_findings(answer,'now')
         self.assertEqual(sources[0].url,URL);self.assertEqual(len(facts),1);self.assertTrue(errors)
 
+    def test_fetch_array_without_native_citations_preserves_only_literal_document(self):
+        answer={'stop_reason':'end_turn','usage':{'web_search_requests':2,'web_fetch_requests':2},'content':[
+            {'type':'web_search_tool_result','content':[{'type':'web_search_result','url':URL,'title':'Release','encrypted_content':'opaque'}]},
+            {'type':'web_search_tool_result','content':[]},
+            {'type':'web_fetch_tool_result','content':[{'type':'web_fetch_result','url':URL,
+                'content':{'type':'document','title':'Release','source':{'type':'text','data':'Verified literal text.'}}}]},
+            {'type':'web_fetch_tool_result','content':{'type':'web_fetch_tool_result_error','error_code':'unavailable'}},
+            {'type':'text','text':'An unsupported conclusion with https://invented.example.com.'}]}
+        facts,sources,errors=research.native_findings(answer,'2026-11-09T08:00:00Z')
+        self.assertEqual(len(sources),1);self.assertEqual(sources[0].url,URL)
+        self.assertEqual(facts[0].text,'Verified literal text.');self.assertEqual(facts[0].source_ids,(sources[0].id,))
+        self.assertTrue(errors)
+        answer['content'][2]['content'][0]['content']['source']={'type':'base64','data':'not-readable'}
+        self.assertEqual(research.native_findings(answer,'now')[:2],([],[]))
+
+    def test_fetch_array_native_citation_resolves_document_index(self):
+        answer={'content':[
+            {'type':'web_fetch_tool_result','content':[{'type':'web_fetch_result','url':URL,
+                'content':{'type':'document','title':'Release','source':{'type':'text','data':'New feature.'}}}]},
+            {'type':'text','text':'New feature.','citations':[{'type':'char_location','document_index':0,'cited_text':'New feature.'}]}]}
+        facts,sources,errors=research.native_findings(answer,'now')
+        self.assertEqual(sources[0].url,URL);self.assertEqual(len(facts),1);self.assertFalse(errors)
+
 
 @override_settings(WEB_RESEARCH_ENABLED=True)
 class GitHubTests(SimpleTestCase):

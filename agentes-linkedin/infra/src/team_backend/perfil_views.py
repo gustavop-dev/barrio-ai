@@ -107,7 +107,7 @@ class Decision(APIView):
                     raise Conflict('Cambió una referencia o autorización; pide ajuste.')
                 if section['id'] in ('photo','banner') and action!='decline':
                     kinds=set(proposal.assets.filter(version=proposal.version,review__ok=True).values_list('kind',flat=True))
-                    if not perfil.ASSET_KINDS <= kinds:raise Conflict('Los assets revisados de esta versión están incompletos.')
+                    if not perfil.SECTION_ASSETS[section['id']] <= kinds:raise Conflict('Los assets revisados de esta sección están incompletos.')
                 if action in ('choose_A','choose_B'):
                     kinds=set(proposal.assets.filter(version=proposal.version,review__ok=True).values_list('kind',flat=True))
                     if section['id']!='photo' or not {'A','B'}<=kinds:raise Conflict('Necesitas ambas opciones válidas antes de elegir.')

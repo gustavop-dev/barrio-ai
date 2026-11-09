@@ -43,4 +43,24 @@ describe('Private profile proposal', () => {
     expect(await screen.findByText('La propuesta cambió; revisa la versión vigente.')).toBeInTheDocument();
     expect(screen.getByLabelText('Nota · Titular')).toHaveValue('Shorten this headline');
   });
+  it('shows available copy and downloads separately from pending questions in a partial proposal', async () => {
+    const user = userEvent.setup();
+    const proposal = structuredClone(PROFILE_PROPOSAL);
+    proposal.sections.push({ ...proposal.sections[0], id: 'experience', title: 'Experiencia', readiness: 'needs_input',
+      copy: '[exact title] — Built useful software.',
+      missing: [{ key: 'perfil.experience.title', question: '¿Cuál fue el cargo exacto?', purpose: 'Completar el cargo.' }] });
+    proposal.assets = [{ id: 'asset-a', kind: 'A', width: 800, height: 800, url: '/api/v1/perfil/profile-qa/assets/asset-a', review: { ok: true } }];
+    fakeServer({ 'GET /api/v1/auth/session': { body: SESSION_OK }, 'GET /api/v1/perfil/profile-qa': { body: proposal } });
+    renderAt('/perfil', [{ path: '/perfil', element: <ProfileProposal id="profile-qa" /> }]);
+    await user.click(screen.getByRole('button', { name: 'Abrir propuesta de perfil' }));
+    expect(await screen.findByText('Secciones listas: 1 · Assets descargables: 1')).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Preguntas pendientes' })).toHaveTextContent('¿Cuál fue el cargo exacto?');
+    await user.click(screen.getByText('Fotos, banner y previews'));
+    expect(screen.getByRole('link', { name: 'Descargar Foto A · grises' })).toHaveAttribute('href', proposal.assets[0].url);
+    await user.click(screen.getByText(/Experiencia · Copy preparado/));
+    expect(screen.getByText('[exact title] — Built useful software.')).toBeInTheDocument();
+    expect(screen.getByText('Completa los placeholders con tus datos antes de pegar.')).toBeInTheDocument();
+    await user.click(screen.getByText(/Titular · Pendiente de revisar/));
+    expect(screen.getByRole('button', { name: 'Aceptar propuesta' })).toBeEnabled();
+  });
 });

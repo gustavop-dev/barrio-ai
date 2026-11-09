@@ -7,7 +7,7 @@ export interface ProfileSection {
   copy: string; audience: string; benefit: string; reason: string;
   citations: { unit_id: string; reason: string }[]; evidence: string[]; steps: string[];
   missing: { key: string; question: string; purpose: string }[]; issues?: string[];
-  readiness: 'ready' | 'blocked'; decision: 'pending' | 'accepted' | 'declined';
+  readiness: 'ready' | 'needs_input' | 'blocked'; decision: 'pending' | 'accepted' | 'declined';
   application: 'pending' | 'applied' | 'checked'; applied_at?: string; applied_text?: string; checked_at?: string;
   current: { text: string; source: string; at: string } | null; limit: number; limit_source: string;
 }

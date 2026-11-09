@@ -44,6 +44,19 @@ def references(owner):
                  consent=p.profile_consent,sha256=imagenes.sha(imagenes.read(p.image))) for p in rows]
 
 
+def evidence(refs):
+    """Versioned, role-scoped IDs; consent is evidence of permission, never biography."""
+    result=[]
+    for ref in refs:
+        consent=ref.get('consent',{})
+        if not (consent.get('allowed') and consent.get('scope')=='perfil' and consent.get('version')==CONSENT_VERSION):continue
+        result.append({'id':f'gallery:{ref["id"]}:v{ref["version"]}:role:{ref["role"]}',
+                       'kind':'reference','role':ref['role'],'note':ref['note']})
+        result.append({'id':f'consent:{ref["id"]}:{CONSENT_VERSION}',
+                       'kind':'consent','version':CONSENT_VERSION,'role':ref['role']})
+    return result
+
+
 def stale(refs,owner):
     try:current={p['id']:p for p in references(owner)}
     except (OSError,ValueError):return True

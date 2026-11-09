@@ -40,3 +40,22 @@ it('keeps the note and the pending state after a failed decision', async () => {
   expect(screen.getByTestId('profile-note-headline').props.value).toBe('Please shorten it');
   expect(screen.getByText('Pendiente de revisar')).toBeOnTheScreen();
 });
+
+it('keeps ready sections usable and shows pending questions with placeholder copy', async () => {
+  await saveToken('0ff1ce_dt_perfil_fake');
+  const proposal = JSON.parse(JSON.stringify(PROFILE_PROPOSAL)) as typeof PROFILE_PROPOSAL;
+  proposal.sections.push({ ...proposal.sections[0], id: 'experience', title: 'Experiencia', readiness: 'needs_input',
+    copy: '[exact title] — Built useful software.',
+    missing: [{ key: 'perfil.experience.title', question: '¿Cuál fue el cargo exacto?', purpose: 'Completar el cargo.' }] });
+  fakeServer({ 'GET /api/v1/perfil/profile-qa': { body: proposal } });
+  await renderApp(<ProfileProposal id="profile-qa" />);
+  await fireEvent.press(screen.getByTestId('profile-open'));
+  expect(await screen.findByText('Secciones listas: 1 · Assets descargables: 0')).toBeOnTheScreen();
+  expect(screen.getByText('Preguntas pendientes')).toBeOnTheScreen();
+  expect(screen.getByText('Experiencia: ¿Cuál fue el cargo exacto?')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByTestId('profile-section-experience'));
+  expect(screen.getByText('[exact title] — Built useful software.')).toBeOnTheScreen();
+  expect(screen.queryByTestId('profile-experience-accept')).not.toBeOnTheScreen();
+  await fireEvent.press(screen.getByTestId('profile-section-headline'));
+  expect(screen.getByTestId('profile-headline-accept')).toBeOnTheScreen();
+});
