@@ -7,7 +7,7 @@ import { keys } from '../api/queryClient';
 import { IconChevronLeft, IconPausa, IconPlay } from '../components/icons';
 import { Badge, Button, EmptyState, ErrorRetry, Skeleton, errorMessage, useToast } from '../components/ui';
 import { excerpt } from '../lib/format';
-import { canUndo, CONTEXT_PREFIX, contentsOf, purposeOf, STATE_TONE } from '../../../compartido/src/logic/capturas';
+import { publishAsapLines, canUndo, CONTEXT_PREFIX, contentsOf, purposeOf, STATE_TONE } from '../../../compartido/src/logic/capturas';
 import { useAudioPlayback, whenLabel } from './parts';
 
 // Labels shared with the native app (compartido/src/logic/capturas.ts).
@@ -35,9 +35,9 @@ function useUndoClock(capture: CaptureOutput): number {
   return now;
 }
 
-function CaptureCard({ initial, onNavigate }: { initial: CaptureOutput; onNavigate: () => void }) {
+function CaptureCard({ initial, listUpdatedAt, onNavigate }: { initial: CaptureOutput; listUpdatedAt: number; onNavigate: () => void }) {
   const live = useCapturaLive(initial);
-  const capture = live.data ?? initial;
+  const capture = live.data && live.dataUpdatedAt >= listUpdatedAt ? live.data : initial;
   const client = useQueryClient();
   const toast = useToast();
   const [undoing, setUndoing] = useState(false);
@@ -78,6 +78,11 @@ function CaptureCard({ initial, onNavigate }: { initial: CaptureOutput; onNaviga
         <p className="t-detalle text-suave">
           {CONTEXT_PREFIX[capture.context.tipo] ?? 'Sobre'}: {capture.context.label}
         </p>
+      ) : null}
+      {capture.publish_asap ? (
+        <div data-testid={`capture-asap-${capture.id}`}>
+          {publishAsapLines(capture).map((line, index) => <p key={index} className="t-detalle text-suave">{line}</p>)}
+        </div>
       ) : null}
       {text ? <p className="cap-sent-text">{text}</p> : null}
       {noteToo ? <p className="t-detalle text-suave">Nota: {excerpt(capture.note, 200)}</p> : null}
@@ -126,7 +131,7 @@ export function CaptureHistory({ onBack, onNavigate }: { onBack: () => void; onN
       {history.items.length ? (
         <ul className="cap-sent-list">
           {history.items.map((capture) => (
-            <CaptureCard key={capture.id} initial={capture} onNavigate={onNavigate} />
+            <CaptureCard key={capture.id} initial={capture} listUpdatedAt={history.dataUpdatedAt} onNavigate={onNavigate} />
           ))}
         </ul>
       ) : null}

@@ -160,16 +160,15 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** decide si, por defecto, el equipo puede editar con IA las fotos que suba a partir de ahora.
-- **Código:** `GET|PATCH /api/v1/ajustes/preferencias {gallery_ai_edit_default}` (`OfficePreference`); `capturas._save_photos` lo copia a cada foto nueva; interruptor «El equipo puede editar mis fotos con IA» en `ajustes/Captura.tsx` de las dos interfaces.
+- **Qué hace para Gustavo:** elige «No editar», «Que decida el equipo» (inicial) o «Editar» para las fotos nuevas.
+- **Código:** `GET|PATCH /api/v1/ajustes/preferencias {gallery_ai_edit}`; `ajustes/Captura.tsx` y `AIEditControl.tsx` de ambas interfaces.
 - **Criterios de aceptación:**
-  1. **Dado** el interruptor encendido (valor inicial), **cuando** lo apaga, **entonces** se envía `{gallery_ai_edit_default: false}` y aparece «Las fotos nuevas no se editarán con IA.»; al encenderlo, «Las fotos nuevas se podrán editar con IA.».
-  2. **Dado** el valor apagado, **cuando** sube una foto o la manda con una captura, **entonces** la foto nueva llega con `allow_ai_edit: false`; las fotos que ya estaban no cambian.
-  3. **Dado** un error al guardar, **cuando** vuelve, **entonces** el interruptor vuelve a su valor y aparece un aviso de error.
-  4. **Dado** que las preferencias aún no cargaron, **cuando** mira el interruptor, **entonces** está desactivado.
-  5. **Dado** un `PATCH` vacío, **cuando** llega a la API, **entonces** responde 400 «Envía gallery_ai_edit_default o push_disabled».
-- **Brechas código/docs:** el valor se guarda y se copia a las fotos, pero aún no tiene efecto porque no hay edición de imágenes ([GAL-04](galeria.md#gal-04), [IMG-07](imagenes-en-publicaciones.md#img-07)).
-- **Cobertura QA:** pendiente
+  1. **Dado** el selector «Edición con IA», **cuando** cambia la opción, **entonces** envía `gallery_ai_edit` (no/auto/si) y muestra «Edición con IA guardada para las fotos nuevas.».
+  2. **Dado** ese valor guardado, **cuando** adjunta fotos en captura o sube a Galería, **entonces** lo toman las fotos nuevas; las existentes no cambian.
+  3. **Dado** un error al guardar, **cuando** termina, **entonces** vuelve la selección anterior y aparece el aviso de error.
+  4. **Dado** que las preferencias no han cargado o se están guardando, **cuando** mira el selector, **entonces** está desactivado.
+- **Brechas código/docs:** implementación terminada; validación de fase 2 en CI pendiente.
+- **Cobertura QA:** `11-ajustes` (guardar y revertir tras error), `05-captura-envios`; Jest y Vitest de Ajustes y captura. Escritos; ejecución pendiente de Claude.
 
 ### AJU-10 · Acceso a «Lo que el equipo sabe de ti» <a id="aju-10"></a>
 

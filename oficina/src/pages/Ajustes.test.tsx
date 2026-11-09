@@ -106,7 +106,7 @@ function server(
     'GET /api/v1/red/summary': { body: RED },
     'GET /api/v1/linkedin/status': { body: status },
     'GET /api/v1/orientacion': { body: AJUSTES.orientation },
-    'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: true, updated_at: null } },
+    'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } },
     ...extra,
   });
 }
@@ -397,7 +397,7 @@ describe('Ajustes · Notificaciones', () => {
   });
 
   it('turns the push of one type off and saves every disabled type', async () => {
-    const api = server(undefined, { 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: true, updated_at: null } } });
+    const api = server(undefined, { 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } } });
     const user = userEvent.setup();
     renderAt('/ajustes', routes);
     const published = await within(section()).findByRole('switch', { name: /Pieza publicada/ });
@@ -415,16 +415,16 @@ describe('Ajustes · Captura y galería', () => {
   const section = () => region('Captura y galería');
 
   it('shows the microphone permission and saves the AI-edit default', async () => {
-    const api = server(undefined, { 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: false, updated_at: null } } });
+    const api = server(undefined, { 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'no', updated_at: null } } });
     const user = userEvent.setup();
     renderAt('/ajustes', routes);
     expect(within(section()).getByText('Permitido')).toBeInTheDocument();
-    const toggle = within(section()).getByRole('switch', { name: 'El equipo puede editar mis fotos con IA' });
+    const toggle = within(section()).getByRole('radio', { name: 'No editar' });
     await waitFor(() => expect(toggle).toBeEnabled());
-    expect(toggle).toBeChecked();
+    expect(toggle).not.toBeChecked();
     await user.click(toggle);
-    expect(await screen.findByText('Las fotos nuevas no se editarán con IA.')).toBeInTheDocument();
-    expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ gallery_ai_edit_default: false });
+    expect(await screen.findByText('Edición con IA guardada para las fotos nuevas.')).toBeInTheDocument();
+    expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ gallery_ai_edit: 'no' });
   });
 
   it('asks for the microphone when it was never asked', async () => {

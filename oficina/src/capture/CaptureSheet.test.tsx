@@ -70,6 +70,7 @@ function server(extra: Record<string, Handler | Reply> = {}) {
     'GET /api/v1/operador/overview': { body: overviewFixture() },
     'GET /api/v1/galeria': { body: EMPTY_PAGE },
     'GET /api/v1/capturas': { body: EMPTY_PAGE },
+    'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } },
     ...extra,
   });
 }
@@ -119,6 +120,8 @@ describe('Captura · hoja', () => {
     expect(within(sheet).getByRole('button', { name: 'Idea para un post' })).toHaveAttribute('aria-pressed', 'true');
     await user.upload(within(sheet).getByLabelText('Galería'), [photo('pizarra.jpg'), photo('evento.jpg')]);
     expect(within(sheet).getAllByRole('img', { name: /Foto adjunta/ })).toHaveLength(2);
+    expect(within(sheet).getByRole('radio', { name: 'Que decida el equipo' })).toBeChecked();
+    await user.click(within(sheet).getByRole('radio', { name: 'Editar' }));
     await user.click(within(sheet).getByRole('button', { name: 'Quitar la foto 2' }));
     await user.upload(within(sheet).getByLabelText('Galería'), [photo('evento.jpg')]);
 
@@ -129,6 +132,8 @@ describe('Captura · hoja', () => {
     const form = sentForm(api.fetch, '/api/v1/capturas');
     expect(form.get('nota')).toBe('Para el post del jueves');
     expect(form.get('para')).toBe('post');
+    expect(form.get('ai_edit')).toBe('si');
+    expect(form.has('allow_ai_edit')).toBe(false);
     expect(form.getAll('fotos').map((f) => (f as File).name)).toEqual(['pizarra.jpg', 'evento.jpg']);
     expect(form.has('audio')).toBe(false);
     expect(form.has('contexto_tipo')).toBe(false);
@@ -143,6 +148,7 @@ describe('Captura · hoja', () => {
     const again = await screen.findByRole('dialog', { name: 'Captura para el equipo' });
     expect(within(again).getByLabelText('Nota para el equipo (opcional)')).toHaveValue('Para el post del jueves');
     expect(within(again).getAllByRole('img', { name: /Foto adjunta/ })).toHaveLength(2);
+    expect(within(again).getByRole('radio', { name: 'Editar' })).toBeChecked();
   });
 
   it('shows the question as a removable chip with its visibility, and sends both', async () => {
@@ -383,5 +389,34 @@ describe('Captura · Lo que enviaste', () => {
     await screen.findByRole('heading', { name: 'Galería', level: 1 });
     act(() => openCaptureSheet(undefined, { view: 'history' }));
     expect(await within(dialog()).findByText('Todavía no has enviado nada')).toBeInTheDocument();
+  });
+});
+
+
+describe('IMG-16 / CAP-16 · opciones e intención', () => {
+  it('takes the saved default for attached photos and offers all three radio options', async () => {
+    server({ 'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'no', updated_at: null } } });
+    const user = userEvent.setup();
+    renderWithCapture();
+    await screen.findByRole('heading', { name: 'Galería', level: 1 });
+    act(() => openCaptureSheet(undefined, { draft: { audio: null, fotos: [photo('demo.jpg')], nota: '', para: null, publicUse: null } }));
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'No editar' })).toBeChecked());
+    for (const name of ['Que decida el equipo', 'Editar', 'No editar']) {
+      await user.click(screen.getByRole('radio', { name }));
+      expect(screen.getByRole('radio', { name })).toBeChecked();
+    }
+  });
+
+  it('shows the interpreted priority, Bogotá forecast, conditions and evidence', async () => {
+    server({ 'GET /api/v1/capturas': { body: [captureFixture({
+      state: 'usado', publish_asap: true, publish_asap_expected_slot: '2026-11-10T01:30:00Z',
+      publish_asap_evidence: 'Publícalo lo antes posible.', publish_asap_reason: 'Sujeto a verificación y veto.',
+    })] } });
+    renderWithCapture();
+    await screen.findByRole('heading', { name: 'Galería', level: 1 });
+    act(() => openCaptureSheet(undefined, { view: 'history' }));
+    expect(await screen.findByText(/Saldrá lo antes posible.*lunes.*9.*20:30/)).toBeInTheDocument();
+    expect(screen.getByText('«Publícalo lo antes posible.»')).toBeInTheDocument();
+    expect(screen.getByText('Sujeto a verificación y veto.')).toBeInTheDocument();
   });
 });

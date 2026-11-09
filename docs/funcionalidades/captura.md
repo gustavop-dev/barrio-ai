@@ -25,7 +25,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 | [CAP-13](#cap-13) | Permiso del micrófono | PWA · app | funciona |
 | [CAP-14](#cap-14) | Cerrar la hoja sin enviar | PWA · app | funciona |
 | [CAP-15](#cap-15) | Límites de tamaño, tipo y duración | PWA · app · backend | parcial |
-| [CAP-16](#cap-16) | Interpretar «publícalo lo antes posible» | backend | funciona |
+| [CAP-16](#cap-16) | Interpretar «publícalo lo antes posible» | PWA · app · backend | funciona |
 
 ---
 
@@ -270,9 +270,9 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 
 ### CAP-16 · Interpretar «publícalo lo antes posible» <a id="cap-16"></a>
 
-- **Dónde:** backend (campos y avisos; presentación de fase 2 pendiente)
+- **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Código:** `capture_intent.py`, `capturas.classify` y `process`.
+- **Código:** `capture_intent.py`, `capturas.classify` y `process`; `compartido/src/logic/capturas.ts` y `capture/History.tsx` de ambas interfaces.
 - **Criterios de aceptación:**
   1. **Dado** una nota o transcripción que pide publicar pronto, **cuando** se procesa, **entonces** la clasificación estructurada guarda `publish_asap` y una cita literal sin añadir otra llamada; en destinos explícitos sin clasificación usa una consulta Jev Noul.
   2. **Dado** una negación, una cita ajena o una urgencia de otro asunto, **cuando** se interpreta, **entonces** no se activa prioridad.
@@ -280,11 +280,11 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   4. **Dado** que falla la interpretación, **cuando** se guarda la captura, **entonces** conserva el texto y registra el error; no inventa una urgencia ni repite el paso pagado.
   5. **Dado** una idea urgente, **cuando** se consulta, **entonces** muestra evidencia, fecha prevista y condiciones, sin botón ni campo editable de urgencia.
 - **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
-- **Cobertura QA:**
+- **Cobertura QA:** `16-imagenes` (línea, fecha prevista, evidencia y condiciones); Jest/Vitest de captura (zona de Bogotá) y lógica compartida (sin fecha y sin urgencia). Escritos; ejecución pendiente de Claude.
 
 ## Imágenes
 
-Las fotos que Gustavo manda con la captura son la materia prima del flujo de imagen, implementado en el backend; su interfaz queda para fase 2 ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)). Lo que cambiará en la captura:
+Las fotos que Gustavo manda con la captura son la materia prima del flujo de imagen, implementado en el backend; el selector y el detalle visual están implementados en fase 2, con CI pendiente ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)). Comportamiento de la captura:
 - [IMG-01](imagenes-en-publicaciones.md#img-01): la nota de voz o escrita es contexto de las fotos y, si la trae, una instrucción («úsala tal cual», «recórtala», «quita el fondo», «más luz»);
 - [IMG-02](imagenes-en-publicaciones.md#img-02): «Para qué es» gana la opción «Propuesta de post», y el clasificador puede elegirla cuando Gustavo no elige nada;
 - [IMG-03](imagenes-en-publicaciones.md#img-03): las fotos llegan siempre a la Galería con su nota, sea cual sea el destino de la captura (implementado para todos los destinos).

@@ -1,6 +1,7 @@
 // Galería (FUNCIONES-NUEVAS rev 18 «Galería»): the filters, the tone of each photo's state, its
 // accessible name and what the photo sheet PATCHes. Shared by the PWA and the native app.
 import type { GaleriaFiltro, PhotoOutput, PhotoPatch } from '../api/capturas';
+import type { AIEdit } from '../api/imagenes';
 import { shortDay } from './capturas';
 import type { Tone } from './tone';
 
@@ -27,11 +28,11 @@ export function photoName(photo: Pick<PhotoOutput, 'created_at' | 'label'>): str
   return `Foto${day}, ${photo.label.toLowerCase()}`;
 }
 
-/** Only what changed in the photo sheet: the trimmed note and the AI-edit switch. Empty when nothing did. */
-export function photoPatch(photo: Pick<PhotoOutput, 'note' | 'allow_ai_edit'>, note: string, allowAi: boolean): PhotoPatch {
+/** Only what changed in the photo sheet: the trimmed note and the AI-edit choice. Empty when nothing did. */
+export function photoPatch(photo: Pick<PhotoOutput, 'note' | 'ai_edit'>, note: string, aiEdit: AIEdit): PhotoPatch {
   const patch: PhotoPatch = {};
   if (note.trim() !== (photo.note ?? '').trim()) patch.note = note.trim();
-  if (allowAi !== photo.allow_ai_edit) patch.allow_ai_edit = allowAi;
+  if (aiEdit !== photo.ai_edit) patch.ai_edit = aiEdit;
   return patch;
 }
 

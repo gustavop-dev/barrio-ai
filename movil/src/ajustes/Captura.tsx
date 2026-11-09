@@ -1,13 +1,15 @@
 // Ajustes › Captura y galería (rev 18): the microphone permission (asked here, or the phone's settings
-// when it was blocked; checked again when Gustavo comes back from them) and the default «El equipo
-// puede editar mis fotos con IA» (PATCH /api/v1/ajustes/preferencias).
+// when it was blocked; checked again when Gustavo comes back from them) and the default
+// «Edición con IA» (PATCH /api/v1/ajustes/preferencias).
+import { AIEditControl } from '@/components/ui/AIEditControl';
+import type { AIEdit } from '@compartido/api/imagenes';
 import { usePreferencias, useSavePreferencias } from '@compartido/api/capturas';
 import { isUnavailable } from '@compartido/logic/ajustes';
 import { useEffect, useState } from 'react';
 import { AppState, Linking, StyleSheet, View } from 'react-native';
 import { useRecorder, type MicState } from '@/capture/recorder';
 import { Icon } from '@/components/icons';
-import { Badge, Button, Card, ErrorRetry, Note, Section, SwitchRow, T, errorMessage, useToast } from '@/components/ui';
+import { Badge, Button, Card, ErrorRetry, Note, Section, T, errorMessage, useToast } from '@/components/ui';
 import type { Tone } from '@/theme/tokens';
 import { colors, space } from '@/theme/tokens';
 import { CardHead } from './parts';
@@ -94,16 +96,17 @@ function AiEditDefault() {
   const prefs = usePreferencias();
   const save = useSavePreferencias();
   const toast = useToast();
-  const [pending, setPending] = useState<boolean | null>(null);
+  const [pending, setPending] = useState<AIEdit | null>(null);
   const unavailable = isUnavailable(prefs.error);
-  const checked = pending ?? prefs.data?.gallery_ai_edit_default ?? true;
+  const value = pending ?? prefs.data?.gallery_ai_edit ?? 'auto';
 
-  const change = (next: boolean) => {
+  const change = (next: AIEdit) => {
+    if (next === value) return;
     setPending(next);
     save.mutate(
-      { gallery_ai_edit_default: next },
+      { gallery_ai_edit: next },
       {
-        onSuccess: () => toast.show(next ? 'Las fotos nuevas se podrán editar con IA.' : 'Las fotos nuevas no se editarán con IA.'),
+        onSuccess: () => toast.show('Edición con IA guardada para las fotos nuevas.'),
         onError: (error) => toast.show(errorMessage(error), { tone: 'error' }),
         onSettled: () => setPending(null),
       },
@@ -112,7 +115,7 @@ function AiEditDefault() {
 
   return (
     <View style={styles.ai}>
-      <SwitchRow label="El equipo puede editar mis fotos con IA" value={checked} disabled={!prefs.isSuccess || save.isPending} onChange={change} />
+      <AIEditControl testID="default-ai" value={value} disabled={!prefs.isSuccess || save.isPending} onChange={change} />
       <T variant="detalle" soft>
         {unavailable ? 'Aún no disponible: el servidor todavía no guarda esta preferencia.' : 'Es el valor por defecto de cada foto nueva; puedes cambiarlo foto por foto en la Galería.'}
       </T>

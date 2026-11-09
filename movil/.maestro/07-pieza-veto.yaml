@@ -1,4 +1,4 @@
-# cubre: CAL-04, CAL-06, CAL-08, CAL-09, CAL-11, CAL-12, CAL-14, EDI-02
+# cubre: CAL-04, CAL-06, CAL-08, CAL-09, CAL-11, CAL-12, CAL-14, EDI-02, IMG-11
 # Tomorrow's piece (seed_qa: ready, its CONT-09 approved). Opened from «Próximo» in Lista: «Pieza del <día>»,
 # «Programada», «Sale mañana a las …» and the veto card; the final text with «Copiar» → «Copiado»; «Comentario para el
 # equipo» opens the capture tied to the piece; vetar and «Deshacer» at once («Veto deshecho», nothing sent); every
@@ -57,22 +57,46 @@ tags: [calendario]
       id: pieza
 - takeScreenshot: 07-pieza-veto-01-programada
 
-# ---------------------------------------------------------------- final text and «Copiar»
-# cubre: CAL-08
+# cubre: IMG-11 — the photo belongs to this same piece and is covered by its veto.
 - scrollUntilVisible:
     element:
-      text: "TEXTO FINAL"
+      id: piece-image-1
     direction: DOWN
+    centerElement: true
     timeout: 20000
+- assertVisible: "Se publica tal cual"
+- takeScreenshot: 07-pieza-veto-01-imagen
+
+# ---------------------------------------------------------------- final text and «Copiar»
+# cubre: CAL-08
+# Read the first paragraph before centering «Copiar», which can scroll it above the viewport.
+- scrollUntilVisible:
+    element:
+      id: piece-final-paragraph-1
+      childOf:
+        id: pieza
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    text: "TEXTO FINAL"
+    childOf:
+      id: pieza
+- assertVisible:
+    id: piece-final-paragraph-1
+    text: "We lost two weeks once because nobody remembered why we had dropped a queue."
+    childOf:
+      id: pieza
 - scrollUntilVisible:
     element:
       id: copiar
+      childOf:
+        id: pieza
     direction: DOWN
     centerElement: true
     timeout: 20000
 - assertVisible: "[0-9.]+ caracteres"
 - assertVisible: "Se publica tal cual, en inglés."
-- assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue."
 # «Copiado» lasts 1.5 s and a tap on this long screen takes Maestro longer than that, so the flow checks that the
 # copy did not fail («No se pudo copiar» stays as long).
 - tapOn:
@@ -448,6 +472,14 @@ tags: [calendario]
       id: pieza
 - assertNotVisible: "El veto ya se había enviado"
 - takeScreenshot: 07-pieza-veto-14-la-vetaste
+- scrollUntilVisible:
+    element:
+      id: piece-image-1
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 07-pieza-veto-14-imagen-vetada
+
 - back
 - extendedWaitUntil:
     notVisible:

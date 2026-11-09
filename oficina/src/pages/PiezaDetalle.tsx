@@ -5,12 +5,13 @@ import { useCapture } from '../capture/CaptureContext';
 import { useTopBarBack, turnoAnchor } from '../components/Layout';
 import { IconChevronLeft, IconMicrofono } from '../components/icons';
 import { Badge, Button, Card, charCount, CopyButton, ErrorRetry, Note, Page, Section, Skeleton, StageTrack } from '../components/ui';
-import { pieceStatus, vetoable } from '../lib/editorial';
+import { pieceStatus } from '../lib/editorial';
 import { formatNumber, formatTime, timeAgo } from '../lib/format';
 import { ComoSeEscribio } from './calendario/ComoSeEscribio';
 import { CALENDAR_TZ, longDay, todayIn } from './calendario/dates';
-import { isOnItsWay, pieceLeaves, pieceWhen, preparationStages, publishedAt, stageShort } from './calendario/piece';
+import { isOnItsWay, pieceLeaves, pieceWhen, pieceVetoable, preparationStages, publishedAt, stageShort } from './calendario/piece';
 import { Resultado } from './calendario/Resultado';
+import { PieceImages } from './calendario/PieceImages';
 import type { PieceDetailFull, TeamComment } from './calendario/types';
 import { useIsDesktop, useNow } from './calendario/useMedia';
 import { ApproveButton, VetoButton } from './calendario/Veto';
@@ -124,7 +125,7 @@ function TeamComments({ comments, now }: { comments: TeamComment[]; now: number 
 export function PiezaDetalle() {
   const { pieceId = '' } = useParams();
   const query = usePiece(pieceId);
-  const piece = query.data as PieceDetailFull | undefined;
+  const piece = query.data;
   const { openCapture } = useCapture();
   const desktop = useIsDesktop();
   const now = useNow();
@@ -158,7 +159,7 @@ export function PiezaDetalle() {
       : isOnItsWay(piece.status)
         ? pieceLeaves(piece.scheduled_for, { today, timeZone })
         : pieceWhen(piece.status, piece.scheduled_for, { today, timeZone, now, published: publishedAt(piece) });
-  const canVeto = Boolean(piece.action && vetoable(piece.action));
+  const canVeto = pieceVetoable(piece, now);
   const hour = formatTime(piece.scheduled_for, timeZone);
   const comments = piece.team_comments ?? [];
   const captureButton = (
@@ -210,6 +211,7 @@ export function PiezaDetalle() {
         </Section>
       ) : null}
 
+      <PieceImages piece={piece} />
       <FinalText piece={piece} />
 
       {comments.length ? (

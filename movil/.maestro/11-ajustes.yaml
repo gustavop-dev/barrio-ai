@@ -1,4 +1,4 @@
-# cubre: AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-09, AJU-11, OFI-07
+# cubre: AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-09, AJU-11, OFI-07, IMG-16
 # Ajustes, opened from the top bar, from Máquina to Captura y galería (Notificaciones, devices, «Lo que el equipo sabe
 # de ti», the section links and the session are in 15-ajustes-sesion): «Parada total» with its required reason, a
 # first try that fails (failure switch) and a second that stops the machine, the banner and «Reanudar»; pausing and resuming the simulated Unipile account; the orientation («Descartar cambios»,
@@ -422,37 +422,39 @@ tags: [ajustes]
 - assertVisible: "Permitido"
 - scrollUntilVisible:
     element:
-      text: "El equipo puede editar mis fotos con IA"
+      id: default-ai-auto
     direction: DOWN
     centerElement: true
     timeout: 30000
 - assertVisible:
-    text: "El equipo puede editar mis fotos con IA"
+    id: default-ai-auto
     checked: true
 - takeScreenshot: 11-ajustes-13-captura
-- tapOn: "El equipo puede editar mis fotos con IA"
+- tapOn:
+    id: default-ai-no
 - extendedWaitUntil:
     visible:
-      text: "Las fotos nuevas no se editarán con IA\\."
+      text: "Edición con IA guardada para las fotos nuevas\\."
       childOf:
         id: toast
     timeout: 15000
 - assertVisible:
-    text: "El equipo puede editar mis fotos con IA"
-    checked: false
+    id: default-ai-no
+    checked: true
 - extendedWaitUntil:
     notVisible:
       id: toast
     timeout: 15000
-- tapOn: "El equipo puede editar mis fotos con IA"
+- tapOn:
+    id: default-ai-auto
 - extendedWaitUntil:
     visible:
-      text: "Las fotos nuevas se podrán editar con IA\\."
+      text: "Edición con IA guardada para las fotos nuevas\\."
       childOf:
         id: toast
     timeout: 15000
 - assertVisible:
-    text: "El equipo puede editar mis fotos con IA"
+    id: default-ai-auto
     checked: true
 # A failed save puts the switch back and says why (failure switch).
 - extendedWaitUntil:
@@ -465,7 +467,8 @@ tags: [ajustes]
       RUTA: '^/api/v1/ajustes/preferencias$'
       METODO: PATCH
       EFECTO: '500'
-- tapOn: "El equipo puede editar mis fotos con IA"
+- tapOn:
+    id: default-ai-no
 - extendedWaitUntil:
     visible:
       text: "Fallo simulado por QA \\(500\\)\\."
@@ -474,7 +477,7 @@ tags: [ajustes]
     timeout: 15000
 - extendedWaitUntil:
     visible:
-      text: "El equipo puede editar mis fotos con IA"
+      id: default-ai-auto
       checked: true
     timeout: 10000
 - takeScreenshot: 11-ajustes-14-captura-error
