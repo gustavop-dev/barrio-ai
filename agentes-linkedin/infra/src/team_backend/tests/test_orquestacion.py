@@ -324,6 +324,9 @@ class DispatcherTests(TransactionTestCase):
         self.assertEqual(by_id['referentes_mensuales']['limits']['cost_cap_usd'],5)
         self.assertEqual(by_id['referentes_mensuales']['limits']['cost_period'],'month')
         self.assertEqual(by_id['perfil_periodico']['limits']['cost_cap_usd'],10)
+        # Phase 8 activated perfil_periodico; a cycle marked planned in the graph still cannot be opened by invocation.
+        self.open(cycle='perfil_periodico').stop('done')
+        self.cycle('perfil_periodico')['status']='planned'
         with self.assertRaises(runtime.UndeclaredCall):self.open(cycle='perfil_periodico')
 
     def test_human_resume_keeps_call_cost_and_plan_history(self):
