@@ -28,6 +28,8 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 | [TUR-17](#tur-17) | Editar o retirar un dato | PWA · app · backend | funciona |
 | [TUR-18](#tur-18) | Tareas de perfil | PWA · app · backend | no implementado |
 | [TUR-19](#tur-19) | Deslizar una tarjeta | app | funciona |
+| [TUR-20](#tur-20) | Decidir altas, bajas y sustituciones de referentes | PWA · app · backend | no implementado |
+| [TUR-21](#tur-21) | Decidir un experimento de participación | PWA · app · backend | no implementado |
 
 ---
 
@@ -284,14 +286,26 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 
 - **Dónde:** PWA · app · backend
 - **Estado:** no implementado
-- **Qué hace para Gustavo:** el equipo le propondría cambios en su perfil de LinkedIn (titular, Acerca de…) con el texto actual, el propuesto, el porqué y los pasos para aplicarlo él.
+- **Qué hace para Gustavo:** recibe el Markdown de cambios, los assets y una checklist sincronizada por sección; revisa el copy listo para pegar y aplica él mismo lo que elige en LinkedIn.
+- **Responsable:** `perfil` coordina las tareas, `posicionamiento` sustenta el mensaje y `editor_visual` prepara foto/mural; Gustavo decide y aplica.
+- **Cadencia:** propuesta completa cada seis meses ([EST-01](estrategia-perfil.md#est-01)); mensual para destacados, artículos y actividad ([EST-02](estrategia-perfil.md#est-02)); bajo demanda desde captura ([EST-05](estrategia-perfil.md#est-05)). Una tarea por sección y versión, agrupada por propuesta.
+- **Tu turno:** «Aceptar propuesta», «Pedir ajuste», «Más tarde» y «No lo haré»; foto exige «Elegir A» o «Elegir B» sin preselección. Banner muestra la nota de composición estilizada para decidirlo aparte. Aceptar no significa aplicar; después, «Hecho, lo apliqué» o «Lo cambié con otro texto». Gustavo puede aceptar/aplicar solo algunas secciones.
+- **Datos necesarios y disponibilidad:** memoria, orientación, biblioteca y marca del tablero existen; faltan paquete estructurado/versionado, estado actual completo del perfil, categoría Perfil, checklist y confirmación por sección. Fotos y assets dependen de GAL-08 y EST-03/04. La relectura automática no está disponible para todas las secciones; no se promete una verificación imposible.
 - **Código:** no existe. `tasks.perfil` llega siempre vacío; el tipo de push `profile_task` existe en el backend, pero Ajustes no ofrece su interruptor hasta que haya evento. Diseño en `DISENO-VISTAS.md` (rama `feat/rediseno-oficina`), sección 2.C1.
 - **Criterios de aceptación:**
-  1. **Dado** una propuesta de perfil, **cuando** abre Tu turno, **entonces** ve la sección, el texto actual (o «No pudimos leer tu perfil actual»), el propuesto con «Copiar» y el contador frente al límite de LinkedIn (titular 220, Acerca de 2.600), el porqué y los pasos.
-  2. **Dado** «Hecho», **cuando** lo pulsa, **entonces** la tarea pasa a «Aplicado, pendiente de comprobar» y después a «Comprobado» cuando el equipo relee el perfil.
+  1. **Dado** una propuesta de perfil, **cuando** abre Tu turno, **entonces** descarga el Markdown y ve por sección texto actual con fuente/fecha o «No pudimos leer tu perfil actual», copy inglés con «Copiar», porqué, IDs del curso por recomendación, evidencia y pasos. El contador usa el límite de LinkedIn verificado al generar (la ficha previa citaba titular 220 y Acerca de 2.600); un límite no comprobado aparece pendiente. **A y B, cada una 800×800 PNG/JPG**, banner 1584×396 PNG y previews móvil/escritorio con cada retrato tienen descarga y comparación privada con referencias de Perfil; todos pertenecen a la versión del documento/checklist.
+  2. **Dado** «Hecho, lo apliqué», **cuando** lo pulsa, **entonces** la sección pasa a «Aplicado por Gustavo, pendiente de comprobar». Solo una relectura autorizada que compare el contenido permite «Comprobado»; si la sección no es legible, queda «Aplicado por Gustavo; comprobación automática no disponible», con fecha y evidencia manual opcional. El clic no prueba una escritura en LinkedIn.
   3. **Dado** «Lo cambié con otro texto», **cuando** lo pulsa, **entonces** puede pegar lo que usó.
   4. **Dado** «No lo haré», **cuando** lo pulsa, **entonces** se pide un motivo obligatorio.
-- **Brechas código/docs:** el ciclo de Perfil (PERF-*) está diseñado y sin implementar (`mapa-agentes-runtime.md`: perfil «Parcial (a mano)»).
+  5. **Dado** secciones aceptadas y otras pendientes, **cuando** vuelve a abrir, **entonces** conserva por sección propuesta, decisión, versión y estado de aplicación; puede copiar y aplicar de forma independiente. Todas las secciones EST-01, incluida URL personalizada, figuran aunque alguna indique «Falta información», «No aplica» o «Conservar»; falta de fotos no bloquea revisar copy.
+  6. **Dado** una nueva versión o un cambio conocido del perfil actual, **cuando** intenta aceptar/aplicar desde una tarjeta antigua, **entonces** ve el cambio y debe revisar la versión vigente. Repetir una confirmación ya guardada no duplica tareas ni historial.
+  7. **Dado** una tarea aceptada, **cuando** se registra o descarga su recurso, **entonces** ningún trabajo ni conector escribe el perfil de LinkedIn. «Abrir LinkedIn» y copiar/descargar solo ayudan a Gustavo a hacerlo.
+  8. **Dado** error de guardado, recurso ausente o propuesta incompleta, **cuando** intenta decidir, **entonces** conserva los cambios locales y muestra el motivo/reintento; no marca la sección aceptada o aplicada hasta confirmar el guardado. Sin propuestas muestra el estado vacío existente.
+  9. **Dado** A, B y banner propuestos, **cuando** revisa la checklist, **entonces** ve ocho puntos por opción (punto 3: A grises, B color natural sin aguamarina en piel/ropa), visión de identidad contra **03**, **sonrisa de 01 en los tres** y transitions claras como en 03, nunca gafas de sol; fallo/resultado incierto bloquea el asset. Preview aprobado no equivale a comprobación final en la app de LinkedIn.
+  10. **Dado** A y B completas y válidas, **cuando** Gustavo pulsa «Elegir A» o «Elegir B», **entonces** registra opción/versión en documento y checklist y conserva ambas descargas. No hay elección automática ni aprobación de foto por aceptar otra sección; si falta una opción la entrega de foto sigue parcial. Elegir retrato no aprueba banner ni publica.
+  11. **Dado** el banner con micrófono y ninguna charla confirmada en memoria, **cuando** lo revisa, **entonces** ve junto al copy y en el Markdown que es una composición de estilo, no evidencia de evento real; no aparece «speaker» ni prueba social inventada. Decide aceptar, ajustar o descartar esa propuesta de forma independiente.
+  12. **Dado** un hecho imprescindible de perfil no encontrado en memoria ni fuentes legibles, **cuando** Perfil necesita aclararlo, **entonces** Tu turno muestra **una pregunta por hecho faltante** con la sección afectada; no vuelve a preguntar hechos acreditados ni repite el mismo en varias tarjetas. Sin respuesta queda pendiente solo lo dependiente y se omite prueba social sin evidencia. La frase del banner llega propuesta y citada por Perfil; el texto de prueba es solo fallback EST-04, no una pregunta abierta de copy para Gustavo.
+- **Brechas código/docs:** el ciclo de Perfil está diseñado y sin implementar (`mapa-agentes-runtime.md`: perfil «Parcial (a mano)»). Se amplía el ID reservado TUR-18; no se crea una segunda checklist ni se supone que el perfil completo pueda releerse con los conectores actuales.
 - **Cobertura QA:** pendiente
 
 ### TUR-19 · Deslizar una tarjeta <a id="tur-19"></a>
@@ -309,6 +323,46 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   6. **Dado** que la API responde con un error, **cuando** vuelve, **entonces** la tarjeta vuelve y se ve el `detail` del error.
 - **Brechas código/docs:** no se comprobó en un teléfono un caso posible: si tras un deslizamiento correcto la tarjeta sigue en la respuesta de la API, podría quedar fuera de la pantalla e invisible (`SwipeableCard.tsx:218-225`, `exits.ts:305-309`). Los errores de red salen en inglés ([APP-08](app-movil-instalacion.md#app-08)).
 - **Cobertura QA:** E2E `04-tu-turno` (criterios 1 a 3: derecha con acción directa, derecha que pide nota y la hoja, izquierda «Más tarde») y `04-tu-turno-estados` (6: la API rechaza y la tarjeta vuelve con el motivo). El 4 y el 5, Jest.
+
+### TUR-20 · Decidir altas, bajas y sustituciones de referentes <a id="tur-20"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** revisa los diez lugares variables los días 1–5; los cinco main permanecen protegidos y ve qué se aplicará al cierre si no responde.
+- **Responsable:** `investigador_lider` presenta; Gustavo aprueba/rechaza/edita; backend aplica el vencimiento autorizado OBS-02. El líder/Jev no suplanta la decisión humana ni puede tocar main.
+- **Cadencia:** lote del día 1, recordatorios días 1 y 4 y cierre al terminar el día 5 en America/Bogota, con una tarjeta por decisión/versionado y eventos deduplicados. Gestión de protegidos solo bajo acción explícita de Gustavo, sin plazo automático.
+- **Tu turno:** «Aprobar alta», «Aprobar baja», «Aprobar sustitución», «Rechazar», «Editar», «Guardar y aplicar cambios», «Pedir ajuste» y «Más tarde». La pareja muestra «sale X · entra Y». Se explica «Si no respondes, se aplicará al terminar el día 5»; responder para ajustar/posponer excluye esa tarjeta del automatismo.
+- **Gestión propia de Gustavo:** acceso «Gestionar protegidos» en Tu turno y en Personas › Referentes. Mover/reemplazar/proteger/desproteger es una acción iniciada y guardada por él, con efecto antes/después y auditoría OBS-02; ningún agente la propone ni el cierre mensual la ejecuta. La etiqueta main muestra protección vigente y el historial de quién la cambió.
+- **Datos necesarios y disponibilidad:** lista y métricas parciales existen; faltan main protegidos, lote/versiones, evidencia, estados de respuesta, avisos, plazo y control de concurrencia OBS-02.
+- **Código:** no existe la tarjeta. Referencias: `rediseno_views`, [COM-10](comentarios-y-lider.md#com-10), [OBS-01/02](observatorio-referentes.md#obs-01).
+- **Criterios de aceptación:**
+  1. **Dado** el lote mensual, **cuando** abre Tu turno, **entonces** distingue cinco main protegidos de diez plazas variables y ve identidad/enlace, acción, objetivos, evidencia, muestra/límites, motivo, ocupación antes/después y plazo local. La evidencia de Top Voice tiene fuente o dice «No verificado»; main nunca ofrece una propuesta de baja.
+  2. **Dado** un swap, **cuando** lo presenta, **entonces** muestra una sola pareja «sale X · entra Y», con ambos perfiles y efecto conjunto; aprobarla o aplicarla al plazo ejecuta ambas partes atómicamente. Altas y bajas solas tienen tarjeta propia, sin sustitución implícita.
+  3. **Dado** rechazo, edición sin aplicar, petición de ajuste o aplazamiento, **cuando** llega el cierre, **entonces** no aplica esa versión por silencio. «Guardar y aplicar cambios» valida main/capacidad/evidencia y aplica exactamente la versión editada, conservando historial.
+  4. **Dado** una propuesta elegible sin respuesta al final del día 5, **cuando** ejecuta el cierre OBS-02, **entonces** la aplica una sola vez y muestra «Aplicada por plazo autorizado», nunca «Aprobada por Gustavo». Registra aviso con cambios, evidencias y número de main/variables, sin afectar protegidos.
+  5. **Dado** días 1 y 4 con pendientes, **cuando** recuerda, **entonces** avisa una vez por mes/día qué requiere revisión y qué significa no responder; la tarjeta muestra fecha/hora en America/Bogota. Recordatorio o push no sustituye el registro verificable de la propuesta.
+  6. **Dado** decisión concurrente, tarjeta obsoleta, lote tardío, error de red o llamada sin autorización, **cuando** intenta aplicar, **entonces** cumple OBS-02: valida versión/estado/protección transaccionalmente, conserva pendientes o rechaza y no declara éxito sin guardado. Solo el job de cierre con las condiciones verificadas puede usar el mandato por plazo.
+  7. **Dado** un main y Gustavo autenticado, **cuando** inicia desde Tu turno o Personas › Referentes un cambio explícito de posición, reemplazo o protección, **entonces** ve/guarda la decisión concreta con capacidad/versiones validadas y auditoría de actor, fecha, origen y valores anteriores/nuevos. La sustitución transfiere protección atómicamente y la desprotección respeta plazas OBS-02. La misma solicitud con identidad de agente/job falla; no existe propuesta del agente de desproteger ni aprobación por silencio.
+- **Brechas código/docs:** no existen estos estados/plazos ni el job de cierre. La autorización específica del quinto addendum permite silencio en diez plazas variables; no cambia el veto/autonomía genérica de LinkedIn ni la aprobación de TUR-21.
+- **Cobertura QA:** pendiente
+
+### TUR-21 · Decidir un experimento de participación <a id="tur-21"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** sabe qué va a probar el equipo, durante cuánto tiempo y qué resultado ayudaría a decidir sobre un referente.
+- **Responsable:** `analista_barrio_resultados` presenta; Gustavo decide; `relaciones_comunidad` ejecuta el foco aprobado con las guardas actuales.
+- **Cadencia:** al proponer/modificar un experimento OBS-04; seguimiento semanal informativo y resultado al cierre.
+- **Tu turno:** «Aprobar experimento», «Pedir ajuste», «Descartar», «Más tarde» y «Detener» mientras esté activo. Aprobar no acepta futuras altas/bajas ni cambia la orientación.
+- **Datos necesarios y disponibilidad:** referentes, ejecuciones y clasificación parcial existen; faltan plan, fechas, métricas predefinidas, línea base y versiones de OBS-04.
+- **Código:** no existe. Referencias: `rediseno_views`, `resumen_semanal`, `autopiloto`.
+- **Criterios de aceptación:**
+  1. **Dado** un experimento propuesto, **cuando** se muestra, **entonces** incluye hipótesis, referente activo, público, fechas de base/foco/seguimiento, participación máxima, comparación, métrica, umbral, muestra mínima, presupuesto dentro de topes y limitaciones de datos/atribución.
+  2. **Dado** aprobación de la versión vigente, **cuando** empieza la fecha acordada, **entonces** activa solo ese plan; sin aprobación, con versión obsoleta o con otro foco activo, no inicia y explica el motivo. No se inicia retroactivamente una prueba cuyo periodo aprobado ya pasó.
+  3. **Dado** «Detener» o una modificación de público/duración/criterio, **cuando** la registra, **entonces** detiene futuras acciones de foco o crea una revisión pendiente de aprobación, conserva lo ya ejecutado y marca su impacto en la comparación; no borra resultados anteriores.
+  4. **Dado** un resultado al cierre, **cuando** recomienda una baja, alta u orientación, **entonces** abre la decisión correspondiente con enlace al experimento, sin aplicarla por la aprobación inicial. Un fallo al guardar la decisión deja el estado anterior y permite reintentar sin duplicar el plan.
+- **Brechas código/docs:** los comentarios ya tienen política autónoma; esta aprobación solo decide el cambio deliberado de foco, no cada comentario ni la composición de referentes.
+- **Cobertura QA:** pendiente
 
 ## Retiradas
 

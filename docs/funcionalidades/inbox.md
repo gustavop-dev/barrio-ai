@@ -137,6 +137,10 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn de Gustavo (solo lectu
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
+## Ampliación prevista de biblioteca
+
+[BIB-04](biblioteca-equipos.md#bib-04), **no implementado**, añade una guía del curso para interpretar las conversaciones. Mantiene el inbox de solo lectura, las tarjetas actuales y la decisión de responder en Gustavo; no habilita envíos ni cambia las funciones INB anteriores.
+
 ## Retiradas
 
 Ninguna.

@@ -15,7 +15,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [tu-turno.md](tu-turno.md) | `TUR` | Tarjetas que solo Gustavo puede resolver, preguntas y «Lo que el equipo sabe de ti» |
 | [notificaciones.md](notificaciones.md) | `NOT` | La bandeja de Notificaciones dentro de la PWA y de la app |
 | [captura.md](captura.md) | `CAP` | El botón de captura: nota, voz, fotos, contexto, «Lo que enviaste» y «Deshacer» |
-| [galeria.md](galeria.md) | `GAL` | Las fotos para los posts, su nota y el permiso de edición con IA |
+| [galeria.md](galeria.md) | `GAL` | Fotos, notas y permiso de edición para posts; futura categoría Perfil para foto y banner |
 | [calendario-piezas.md](calendario-piezas.md) | `CAL` | Calendario (Mes, Semana, Lista), panel del día y detalle de una pieza con su veto |
 | [resultados.md](resultados.md) | `RES` | Indicadores, gráficos y tabla de posts |
 | [personas-oportunidades.md](personas-oportunidades.md) | `PRS` | El barrio, la ficha de una persona, las oportunidades y los referentes |
@@ -28,14 +28,37 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [notificaciones-push.md](notificaciones-push.md) | `PUS` | Web Push de la PWA, push nativa de la app y sus interruptores |
 | [app-movil-instalacion.md](app-movil-instalacion.md) | `APP` | Compilar e instalar la app, a qué servidor apunta, sus permisos y sus actualizaciones OTA |
 | [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md) | `IMG`, `IMG-INF` | La imagen de cada post: foto de la Galería, infografía o carrusel, hasta LinkedIn (no implementado) |
+| [observatorio-referentes.md](observatorio-referentes.md) | `OBS` | Cinco main protegidos, diez plazas variables, altas/bajas/swaps con ventana días 1–5 y experimentos con evidencia |
+| [comunidad-lectores.md](comunidad-lectores.md) | `LEC` | Estudio de la comunidad, sus límites de privacidad y su uso por los cinco lectores |
+| [estrategia-perfil.md](estrategia-perfil.md) | `EST` | Propuestas semestrales/mensuales y desde captura: assets de Perfil, previews, Markdown fundamentado y checklist manual |
+| [biblioteca-equipos.md](biblioteca-equipos.md) | `BIB` | Unidades curadas para Observatorio, red, inbox, líder y resumen semanal; política de invitaciones y evaluaciones. Capturas no necesita biblioteca |
+| [arquitectura-agentes.md](arquitectura-agentes.md) | `ARQ` | Registro único ejecutable, orquestadores, especialistas como herramientas, bucles, ledgers, límites, Mermaid y Mapa del equipo |
 
 Los prefijos no coinciden con los códigos del [catálogo de acciones de LinkedIn](../../agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md) (`ADM`, `APRE`, `CHAT`, `CONT`, `DESC`, `INT`, `LI`, `PERF`, `RED`). Por eso la red usa `BAR` (barrio) y Personas usa `PRS`. Cuando una ficha cita `CONT-09` o `RED-02`, habla de una capacidad de LinkedIn, no de otra ficha de este catálogo.
 
 ## Imágenes en las publicaciones
 
-Gustavo quiere que cada post salga con al menos una imagen. El equipo de redacción decide por contexto si lleva una foto de su Galería (editada con la API de imágenes de OpenAI solo cuando su nota no diga ya qué hacer), una infografía o un carrusel. Las infografías y los carruseles los dibuja código con su manual «Infografías hechas con IA · reglas», nunca un modelo de imagen. **Nada de eso existe hoy.** El flujo completo está en [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md) (`IMG-01` a `IMG-15` e `IMG-INF-01` a `IMG-INF-08`), todo en estado `no implementado`. Queda una decisión pendiente de confirmar: si las ediciones que el equipo decide por su cuenta se aplican y se muestran para veto sin preguntarle antes (el valor por defecto es que sí).
+Gustavo quiere que cada post salga con al menos una imagen. El equipo decide por contexto entre una foto de la Galería, una infografía y un carrusel. La opción de edición de Gustavo decide si puede editarse una foto y su nota indica cómo ([IMG-07](imagenes-en-publicaciones.md#img-07), [IMG-16](imagenes-en-publicaciones.md#img-16)); las ediciones permitidas se muestran para veto según IMG-08. Las infografías y los carruseles los dibuja código con su manual «Infografías hechas con IA · reglas», nunca un modelo de imagen. El flujo completo está en [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md) (`IMG-01` a `IMG-16` e `IMG-INF-01` a `IMG-INF-08`), en estado `no implementado` en este catálogo. Su implementación está en curso en `feat/imagenes-backend`; este trabajo no la verifica ni la duplica.
 
 Captura, Galería, Calendario, Ajustes y el motor editorial enlazan a las fichas `IMG` que les tocan.
+
+## Ampliación de equipos de Gustavo
+
+Las fichas OBS, LEC, EST y BIB, EDI-21, OFI-10, GAL-08, BAR-14, COM-11, TUR-20/21 y la ampliación del ID reservado TUR-18 describen trabajo **no implementado**. Base revisada localmente: `1ba4e43`, 8 de noviembre de 2026, sin red. No cambian los estados de las funcionalidades existentes ni presentan los contratos documentales de los agentes como código activo.
+
+Los addenda incorporan [listas curadas y política de red](biblioteca-equipos.md#unidades-por-rol) y la [arquitectura declarativa](arquitectura-agentes.md), también **no implementado**. BIB-06 se retira por decisión de Gustavo, con su ID reservado. Primero se migrará el pipeline real al registro; después se conectarán las capacidades nuevas. Los especialistas proponen y sus orquestadores deciden dentro de las compuertas existentes.
+
+El tercer addendum incorpora la [marca ya entregada](estrategia-perfil.md#marca), el banner con recorte propio (excepción a «sin fotos»), fotos solo de la categoría Perfil, edición/revisión obligatorias y entregables exactos con citas por recomendación. EST-05 añade la petición desde captura. El punto de partida de Observatorio es de cinco referentes, confirmado por Gustavo: no exige bajas antes de activar la revisión mensual.
+
+El cuarto fija dos opciones obligatorias de retrato —A grises, B color— para elección de Gustavo, y banner con figura de cintura arriba y micrófono como estilo, sin afirmar charlas no confirmadas. [EST/GAL-08](estrategia-perfil.md#referencias-privadas) asignan 01 a pose, 02 a cuerpo y 03 a identidad, con carga privada futura por Claude. Ninguna referencia se incorpora al repo público; Diandra solo se describe en palabras. Fotos/derivados de Perfil quedan excluidos de posts y sus notas son instrucciones de Perfil.
+
+El quinto hace vinculantes: sonrisa de 01 y transitions claras de 03 en A/B/banner; cinco main protegidos; cierre autorizado de propuestas variables sin respuesta al terminar el día 5 America/Bogota, recordatorios 1/4; [ritmo diario y rampa/configuración BAR-15](red.md#bar-15); reparto literal del curso BIB-08; estudio mensual público de hasta 50 personas/90 días; todo texto público en inglés; fallback de datos sin inventar identidades y prueba social verificable. Caps [ARQ-05](arquitectura-agentes.md#arq-05): pieza 2 USD, referentes 5 USD/mes, Perfil 10 USD/ciclo; parar y avisar al agotarse. El quinto reemplaza las reglas anteriores que exigían aprobación positiva de todo cambio de referente o dejaban reparto/presupuesto abiertos.
+
+El sexto confirma [cuenta gratuita y notas excepcionales BAR-16](red.md#bar-16), tier configurable y ninguna automatización de outreach paralela. Reserva solo a Gustavo mover/reemplazar/desproteger main, con `protected` y auditoría en [OBS-02](observatorio-referentes.md#obs-02), desde Personas › Referentes o Tu turno. Perfil propone la frase inglesa del banner con curso/posicionamiento; la frase de prueba es solo fallback. [EST-01](estrategia-perfil.md#est-01) consulta memoria/lecturas antes de preguntar y crea una pregunta por hecho imprescindible faltante, sin inventar. No quedan decisiones de producto abiertas.
+
+El [plan de equipos](../plan-equipos.md) ordena las fases y decisiones pendientes. La fase de acceso web ya prevista (`web_search`, `web_fetch` para el equipo y enlaces en capturas) es dependencia previa, no otra implementación de este catálogo. [EDI-21](motor-editorial.md#edi-21) formaliza el agente visual sobre IMG. Revisión conserva su función y Relaciones sus flujos; [COM-11](comentarios-y-lider.md#com-11) y [BAR-14](red.md#bar-14) precisan el uso de información de referentes. Los límites reales de seguidores, comentaristas y reactores están en la [matriz de conectores](observatorio-referentes.md#datos-conectores).
+
+Estas fichas de diseño añaden a la plantilla **Responsable**, **Cadencia**, **Tu turno** (qué decide Gustavo, o ninguna aprobación adicional) y **Datos necesarios y disponibilidad**. Un campo de «Código» identifica referencias existentes y lo que falta; no acredita que la ampliación esté implementada.
 
 ## Cómo leer una ficha
 
