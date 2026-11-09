@@ -359,6 +359,35 @@ class ParticipationTests(NetworkBase):
 
 
 class CourseGroundingTests(NetworkBase):
+    def test_network_plan_continues_with_complete_units_above_the_old_budget(self):
+        self.contact('follow-budget','Follow Budget')
+        self.contact('invite-budget','Invite Budget',stage='followed',followed_hours=72)
+        incoming=self.contact('accept-budget','Accept Budget',stage='incoming')
+        incoming.invitation_id='inv-budget';incoming.save(update_fields=['invitation_id'])
+        with patch('team_backend.operador.ENC.encode',return_value=range(3000)):
+            result=red.plan(self.gustavo,self.account)
+        self.assertNotIn('stopped',result)
+        self.assertEqual((result['follow'],result['invite'],result['accept']),(1,1,1))
+        self.assertEqual(result['course_status'],'disponible')
+        self.assertEqual((result['course_missing'],result['course_omitted']),([],[]))
+        self.assertEqual(result['course_citations'],red.NETWORK_UNITS)
+        self.assertEqual(self.fake.state['writes'],0)
+
+    def test_network_plan_stops_for_a_real_missing_unit_and_distinguishes_a_paused_account(self):
+        unit=red.NETWORK_UNITS[-1]
+        from knowledge import db
+        with db.connect() as connection:connection.execute('UPDATE units SET active=false WHERE id=%s',(unit,))
+        result=red.plan(self.gustavo,self.account)
+        self.assertEqual(result['stopped'],'Biblioteca no disponible')
+        self.assertEqual(result['course_missing'],[unit])
+        self.assertNotIn(unit,result['course_citations'])
+        self.assertFalse(ActionProposal.objects.exists())
+        with db.connect() as connection:connection.execute('UPDATE units SET active=true WHERE id=%s',(unit,))
+        self.account.paused=True;self.account.save(update_fields=['paused'])
+        result=red.plan(self.gustavo,self.account)
+        self.assertEqual(result['stopped'],'Cuenta pausada')
+        self.assertEqual(result['course_status'],'disponible')
+
     def test_observatory_returns_sources_and_evidence_without_changing_referents(self):
         from team_backend.models import Referent
         self.observed();before=list(Referent.objects.values_list('pk','active'))
@@ -384,6 +413,15 @@ class CourseGroundingTests(NetworkBase):
             post=self.observed()[0]
             result=lider.comment_worthy(post)
         self.assertEqual(result['decision'],'unavailable');self.assertEqual(result['course_citations'],[]);jev.assert_not_called()
+
+    def test_a_single_missing_comment_unit_blocks_before_the_paid_draft(self):
+        from knowledge import db
+        post=self.observed()[0]
+        unit=operador.COMMENT_UNITS[-1]
+        with db.connect() as connection:connection.execute('UPDATE units SET active=false WHERE id=%s',(unit,))
+        with patch('knowledge.providers.claude') as draft,self.assertRaisesRegex(ValueError,'Biblioteca no disponible'):
+            operador.propose_comment(self.gustavo,post.pk)
+        draft.assert_not_called()
 
     def test_inbox_and_lead_criteria_are_grounded_in_the_actual_typed_request(self):
         conversation=Conversation(account=self.account,provider_chat_id='fake',attendee_name='Synthetic',messages=[

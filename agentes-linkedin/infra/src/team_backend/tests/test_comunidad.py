@@ -34,7 +34,7 @@ class CommunityTests(TransactionTestCase):
             ('django.utils.timezone.now', {'return_value': self.now}),
             ('team_backend.comunidad.operador.globally_paused', {'return_value': False}),
             ('team_backend.comunidad.red._read', {'return_value': None}),
-            ('team_backend.comunidad.operador.course_context', {'return_value': ([{'unit_id': cm.operador.ANALYSIS_UNITS[0], 'text': 'Synthetic course'}], [])}),
+            ('team_backend.comunidad.operador.course_context', {'return_value': ([{'unit_id': cm.operador.ANALYSIS_UNITS[0], 'text': 'Synthetic course'}], [], [])}),
             ('knowledge.providers.claude', {'side_effect': self.fake_analysis}),
             ('team_backend.notificaciones.avisar', {'return_value': None}),
             ('httpx.post', {'side_effect': AssertionError('Network forbidden')}),
@@ -51,6 +51,20 @@ class CommunityTests(TransactionTestCase):
 
     def study(self):
         return cm.enqueue(self.user, self.account, now=self.now)[0]
+
+    def test_missing_course_units_block_analysis_but_budget_omissions_do_not(self):
+        who=self.person(1);study=self.study();cm.sample(study);self.source(study,who)
+        included=cm.operador.ANALYSIS_UNITS[0];other=cm.operador.ANALYSIS_UNITS[-1]
+        units=[{'unit_id':included,'text':'Synthetic course'}]
+        with patch('team_backend.comunidad.operador.course_context',return_value=(units,[other],[])), \
+                patch('knowledge.providers.claude') as analyst:
+            with self.assertRaisesRegex(ValueError,'Biblioteca no disponible'):cm.analyze(study)
+        analyst.assert_not_called()
+        with patch('team_backend.comunidad.operador.course_context',return_value=(units,[],[other])):
+            cm.analyze(study)
+        self.assertEqual(study.summary['missing_units'],[])
+        self.assertEqual(study.summary['course_omitted'],[other])
+        self.assertNotIn(other,study.summary['citations'])
 
     def comment(self, who, cid='public-comment', **extra):
         return dict({'id': cid, 'text': 'How do you measure delivery cost?', 'created_at': self.at,

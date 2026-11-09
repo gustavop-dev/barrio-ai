@@ -409,9 +409,10 @@ def _findings(study, rows):
 def analyze(study):
     now = timezone.now()
     rows = list(study.sources.filter(retired_at__isnull=True, expires_at__gt=now).order_by('id'))
-    known_units, cited_units, missing = [], [], []
+    known_units, cited_units, missing, omitted = [], [], [], []
     if rows:
-        units, missing = operador.course_context(operador.ANALYSIS_UNITS, 6000)
+        units, missing, omitted = operador.course_context(operador.ANALYSIS_UNITS)
+        if missing: raise ValueError('Biblioteca no disponible para el estudio de comunidad.')
         if not units: raise ValueError('Sin biblioteca para el estudio de comunidad.')
         answer = providers.claude(ANALYST_SYSTEM, json.dumps({'public_excerpts': [
             {'source': str(r.pk), 'kind': r.kind, 'text': r.text, 'date': evidencia.iso(r.event_at)} for r in rows],
@@ -457,6 +458,7 @@ def analyze(study):
         findings = _findings(study, rows)
         qualitative = {r.person_id for r in rows if r.kind == 'public_comment'}
         study.summary = {'findings': findings, 'units': known_units, 'citations': cited_units, 'missing_units': missing,
+            'course_omitted': omitted,
             'unknown_follow_reason': len(study.selection)-len({r.person_id for r in rows if r.analysis['follow_status'] == 'declared'}),
             'uncertainties': LIMITATIONS, 'qualitative_people': len(qualitative)}
         study.state = 'partial' if findings else 'insufficient'

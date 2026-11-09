@@ -208,7 +208,7 @@ class ProfileCycleTests(MediaMixin,OperatorBase):
         self.assertEqual(perfil.queue(self.gustavo,{'capture':str(capture.id)}).pk,first.pk)
         self.assertEqual(Job.objects.filter(params__proposal=str(first.id)).count(),1)
         capture.note='No hazme la propuesta del perfil'
-        with self.assertRaisesRegex(ValueError,'Aclara'):capturas._destination(capture)
+        self.assertEqual(capturas._destination(capture)[0],'perfil_aclaracion')
 
     def test_monthly_no_changes_is_informative_and_activity_artifacts_do_not_schedule_posts(self):
         def unchanged(ctx):

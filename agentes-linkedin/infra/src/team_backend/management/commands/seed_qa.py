@@ -116,6 +116,7 @@ class Command(BaseCommand):
 
     def add_arguments(self,parser):
         parser.add_argument('--referentes-mensual',action='store_true',help='Escenario OBS/TUR del flujo 19, con cinco main protegidos.')
+        parser.add_argument('--perfil-capturas',action='store_true',help='Nota ambigua de perfil procesada como pregunta para el flujo 18-perfil.')
 
     def handle(self,**options):
         self.guard()
@@ -134,6 +135,17 @@ class Command(BaseCommand):
                 from team_backend.models import ReferentControl
                 ReferentControl.objects.create(account=self.fake,issue='Identificar los cinco main iniciales.')
             self.community()
+        if options.get('perfil_capturas'):
+            # This flow has no worker. Exercise the real routing after committing
+            # the seed (knowledge memory uses a separate connection), without push.
+            from unittest.mock import patch
+            from team_backend import capturas
+            capture=Capture.objects.create(id=uid('capture:perfil-alcance'),created_by=self.user,
+                note='Quiero mejorar mi perfil, pero no sé por dónde empezar.')
+            with patch('team_backend.alerts.notify'):
+                result=capturas.process(capture.pk)
+            if result.state!=Capture.State.NOTED or result.routed_to.get('kind')!='perfil_aclaracion':
+                raise CommandError('La nota ambigua de perfil no produjo una pregunta en Tu turno.')
         self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
 
     # ------------------------------------------------------------------ safety and reset

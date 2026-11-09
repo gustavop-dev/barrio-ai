@@ -295,7 +295,7 @@ def _destination(capture):
     from .perfil import EXPLICIT
     if EXPLICIT.fullmatch(text):return 'perfil','Petición explícita de propuesta de perfil',True
     if re.search(r'\bperfil\b',text,re.I) and not capture.purpose:
-        raise ValueError('Aclara el alcance: para el paquete completo di «hazme la propuesta del perfil».')
+        return 'perfil_aclaracion','Falta aclarar el alcance de la nota sobre el perfil',True
     if capture.purpose:return {'post':'idea','propuesta':'idea','dato':'dato','respuesta':'dato','galeria':'galeria'}[capture.purpose],'',False
     try:kind,reason=classify(text,photos,capture)
     except ValueError as exc:
@@ -348,10 +348,12 @@ def _route_gallery(capture,user,text):
 def _route_empty(capture,user,text):
     return ({},_outcome('sin_usar','No había nada que usar: el audio no tenía voz y no había nota ni fotos'),Capture.State.UNUSED,None)
 
-from .perfil import capture_request
-ROUTES={'perfil':capture_request,'pregunta':_route_question,'persona':_route_person,'pieza':_route_piece,'dato':_route_fact,'idea':_route_idea,
+from .perfil import capture_request, capture_clarification
+ROUTES={'perfil':capture_request,'perfil_aclaracion':capture_clarification,
+        'pregunta':_route_question,'persona':_route_person,'pieza':_route_piece,'dato':_route_fact,'idea':_route_idea,
         'galeria':_route_gallery,'vacia':_route_empty}
-EVENT_DETAILS={'perfil':'Solicitud de propuesta de perfil','pregunta':'Respuesta de Gustavo a una pregunta','persona':'Nota de Gustavo sobre una persona',
+EVENT_DETAILS={'perfil':'Solicitud de propuesta de perfil','perfil_aclaracion':'Pregunta sobre el alcance de la propuesta de perfil',
+               'pregunta':'Respuesta de Gustavo a una pregunta','persona':'Nota de Gustavo sobre una persona',
                'pieza':'Comentario de Gustavo sobre una pieza','dato':'Un dato de Gustavo para la memoria',
                'idea':'Una idea de Gustavo para un post','galeria':'Fotos de Gustavo para la galería'}
 
@@ -407,7 +409,7 @@ def process(capture_id):
         from . import research, web_sources
         requested,question=research.capture_question(capture)
         urls=web_sources.detect_urls(capture.text)
-        if kind!='perfil' and (requested or urls):
+        if kind not in ('perfil','perfil_aclaracion') and (requested or urls):
             if not Capture.objects.filter(pk=capture.pk,state=Capture.State.PROCESSING).exists():return _current(capture)
             investigation=research.research(research.ResearchRequest(
                 key=f'capture:{capture.id}',public_question=question,urls=tuple(urls),search=requested,purpose='web-research-capture'))
@@ -458,6 +460,8 @@ def _revert(capture,user):
     if kind=='perfil':
         from .perfil import withdraw_capture
         withdraw_capture(capture)
+    elif kind=='perfil_aclaracion':
+        TeamQuestion.objects.filter(pk=routed.get('question'),state=TeamQuestion.State.OPEN).update(state=TeamQuestion.State.DECLINED)
     elif kind=='pregunta':
         try:preguntas.undo(user,routed['question'])
         except (Conflict,PermissionDenied,TeamQuestion.DoesNotExist):

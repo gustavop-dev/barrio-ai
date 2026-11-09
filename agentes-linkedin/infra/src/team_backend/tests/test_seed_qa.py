@@ -51,6 +51,17 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual(ConnectorAccount.objects.count(),before+1)
         self.assertTrue(ConnectorAccount.objects.filter(pk=real.pk).exists())
 
+    def test_profile_flow_seeds_a_processed_clarification_in_tu_turno(self):
+        self.seed(perfil_capturas=True)
+        capture=Capture.objects.get(pk=uid('capture:perfil-alcance'))
+        self.assertEqual((capture.state,capture.error),(Capture.State.NOTED,''))
+        question=TeamQuestion.objects.get(pk=capture.routed_to['question'])
+        turn=self.device().get('/api/v1/tu-turno').json()
+        self.assertEqual(turn['count'],11)
+        card=next(item for item in turn['items'] if item['id']==f'question:{question.pk}')
+        self.assertIn('hazme la propuesta del perfil',card['question']['purpose'])
+        self.assertEqual(ProfileProposal.objects.count(),1)  # the existing manual checklist only
+
     def test_builds_every_state_and_is_idempotent(self):
         """Catch a flow losing its data: every state the app shows exists, the API serves it, and reseeding repeats it."""
         self.assertIn('Mundo de QA listo',self.seed())
