@@ -265,7 +265,10 @@ def research(request:ResearchRequest)->ResearchResult:
     from .orquestacion import ensure_current
     ensure_current()
     saved=WebResearchRun.objects.filter(pk=run.pk,state='running').update(state=result.status,result=result.to_dict())
-    if saved:oficina_eventos.emit('entrega','investigador_referentes','director_editorial',outcome_text(result.to_dict()))
+    from .orquestacion import current
+    # Monthly branches already report their real owner/node through the dispatcher.
+    if saved and not (current() and current().cycle['id']=='referentes_mensuales'):
+        oficina_eventos.emit('entrega','investigador_referentes','director_editorial',outcome_text(result.to_dict()))
     return result
 
 

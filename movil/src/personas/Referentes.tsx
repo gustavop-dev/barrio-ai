@@ -1,3 +1,5 @@
+import { ReferentHistory } from './ReferentHistory';
+import { ProtectedReferent } from './ProtectedReferent';
 // Personas › Referentes: who the team reads to discover people. «Añadir referente» (a linkedin.com/in/… URL,
 // checked in the field, and a mandatory reason), «Observar ahora», deactivate or reactivate with «Deshacer»,
 // and remove after confirming. The account selector only shows with more than one account.
@@ -78,7 +80,7 @@ function AddReferentSheet({ account, onClose }: { account: string; onClose: () =
   );
 }
 
-function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (referent: Referent) => void }) {
+function ReferentCard({ referent, candidates, onRemove }: { referent: Referent; candidates: Referent[]; onRemove: (referent: Referent) => void }) {
   const update = useUpdateReferent();
   const toast = useToast();
   const active = referent.active !== false;
@@ -86,12 +88,12 @@ function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (r
 
   const toggle = () => {
     update.mutate(
-      { referentId: referent.id, patch: { active: !active } },
+      { referentId: referent.id, patch: { active: !active, version: referent.revision } },
       {
-        onSuccess: () => {
+        onSuccess: (saved) => {
           haptic('actionSuccess');
           toast.show(active ? 'Referente desactivado' : 'Referente reactivado', {
-            undo: () => update.mutate({ referentId: referent.id, patch: { active } }),
+            undo: () => update.mutate({ referentId: referent.id, patch: { active, version: saved.revision } }),
           });
         },
         onError: () => haptic('actionError'),
@@ -111,6 +113,7 @@ function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (r
             <T>{name}</T>
           )}
         </View>
+        {referent.protected ? <Badge tone="info">Main · Protegido</Badge> : null}
         {active ? <Badge tone="ok">Activo</Badge> : <Badge tone="muted">Inactivo</Badge>}
       </View>
       {referent.reason ? <T>{referent.reason}</T> : null}
@@ -118,7 +121,8 @@ function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (r
         {referentMeta(referent)}
       </T>
       <ErrorRetry error={update.error} />
-      <View style={styles.row}>
+      <ProtectedReferent referent={referent} candidates={candidates} />
+      {!referent.protected ? <View style={styles.row}>
         <View style={styles.grow}>
           <Button size="small" block onPress={toggle} loading={update.isPending} loadingLabel="Guardando…" accessibilityLabel={`${active ? 'Desactivar' : 'Reactivar'} a ${name}`}>
             {active ? 'Desactivar' : 'Reactivar'}
@@ -129,7 +133,7 @@ function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (r
             Quitar
           </Button>
         </View>
-      </View>
+      </View> : null}
     </View>
   );
 }
@@ -194,7 +198,8 @@ export function Referentes({ header }: { header: ReactNode }) {
             Observar ahora
           </Button>
         </View>
-        <ErrorRetry error={observe.error} />
+        <ReferentHistory account={account} />
+      <ErrorRetry error={observe.error} />
         {referents.isPending ? <Skeleton variant="card" count={2} label="Cargando referentes…" /> : null}
         <ErrorRetry error={referents.error} onRetry={() => void referents.refetch()} />
         {referents.isSuccess && !list.length ? (
@@ -221,7 +226,7 @@ export function Referentes({ header }: { header: ReactNode }) {
             {top}
           </View>
         }
-        renderItem={({ item }) => <ReferentCard referent={item} onRemove={setRemoving} />}
+        renderItem={({ item }) => <ReferentCard referent={item} candidates={list} onRemove={setRemoving} />}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} colors={[colors.brandDeep]} />}
       />
       {adding ? <AddReferentSheet account={account} onClose={() => setAdding(false)} /> : null}

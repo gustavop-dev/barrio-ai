@@ -6,15 +6,19 @@ import os
 from unittest.mock import patch
 from django.core.management import call_command
 from django.core.management.base import CommandError
+from django.test import override_settings
 from rest_framework.test import APIClient
 from team_backend import editorial
 from team_backend.management.commands.seed_qa import EXTRA_DEVICE, QA_PASSWORD_DEFAULT, uid
-from team_backend.models import (ActionProposal, Capture, ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Notification, Opportunity,
-                                 PostMetric, Referent, TeamQuestion, WeeklySummary)
+from team_backend.models import (ActionProposal, Capture, CommunitySource, CommunityStudy, CommunityWithdrawal,
+                                 ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Notification, Opportunity,
+                                 PostMetric, Referent, ReferentChange, ReferentControl, ReferentExperiment, ReferentNotice,
+                                 ReferentReview, TeamQuestion, WeeklySummary)
 from team_backend.tests.test_capturas import MediaMixin
 from team_backend.tests.test_operador import OperatorBase
 
-COUNTED=(ConnectorAccount,Referent,Contact,EditorialPiece,PostMetric,ActionProposal,Opportunity,TeamQuestion,Notification,Capture,GalleryPhoto,WeeklySummary)
+COUNTED=(ConnectorAccount,Referent,Contact,EditorialPiece,PostMetric,ActionProposal,Opportunity,TeamQuestion,Notification,Capture,GalleryPhoto,WeeklySummary,
+         CommunityStudy,CommunitySource,CommunityWithdrawal,ReferentControl,ReferentReview,ReferentChange,ReferentNotice,ReferentExperiment)
 
 class SeedQaTests(MediaMixin,OperatorBase):
     def setUp(self):
@@ -22,8 +26,8 @@ class SeedQaTests(MediaMixin,OperatorBase):
         env=patch.dict(os.environ,{'QA_SEED':'permitido','INBOX_ENABLED':'true','LIVE_LINKEDIN_OFFICIAL':'false','QA_PASSWORD':''})
         env.start();self.addCleanup(env.stop)
 
-    def seed(self):
-        out=io.StringIO();call_command('seed_qa',stdout=out)
+    def seed(self,**options):
+        out=io.StringIO();call_command('seed_qa',stdout=out,**options)
         return out.getvalue()
 
     def counts(self):
@@ -105,8 +109,11 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual(len(app.get('/api/v1/memoria/hechos').json()),3)
         for path in ('/api/v1/calendario','/api/v1/actividad','/api/v1/resultados?dias=7','/api/v1/resultados?dias=90',
                      '/api/v1/resultados/resumen-semanal','/api/v1/red/contacts','/api/v1/red/summary','/api/v1/oportunidades',
-                     '/api/v1/operador/referents','/api/v1/galeria','/api/v1/capturas','/api/v1/oficina/actividad','/api/v1/operador/overview'):
+                     '/api/v1/operador/referents','/api/v1/galeria','/api/v1/capturas','/api/v1/oficina/actividad','/api/v1/operador/overview',
+                     f'/api/v1/comunidad?account={uid("account:unipile")}','/api/v1/referentes/revisiones'):
             self.assertEqual(app.get(path).status_code,200,path)
+        self.assertEqual((CommunityStudy.objects.count(),CommunitySource.objects.count()),(1,6))
+        self.assertEqual(ReferentReview.objects.count(),0)  # Monthly proposals are opt-in for flow 19.
         # Calendario › Lista «En cola» (CAL-04, CAL-13): a reaction and a network action, approved and waiting; and the two
         # network proposals in approval mode, listed first with «Aprobar» (BAR-13, CAL-15).
         queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
@@ -124,3 +131,44 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual(TeamQuestion.objects.get(question__startswith='¿Cuántos proyectos').state,'open')
         self.assertEqual(Notification.objects.filter(read_at__isnull=True).count(),5)
         self.assertEqual(app.get('/api/v1/tu-turno').status_code,200)
+
+    @override_settings(REFERENTS_GUSTAVO_USERNAME='qa')
+    def test_monthly_seed_keeps_community_and_reseeds_both_phases(self):
+        self.seed(referentes_mensual=True)
+        first=self.counts()
+        app=self.device()
+        account_id=uid('account:unipile')
+        control=ReferentControl.objects.get(account_id=account_id)
+        self.assertTrue(control.initialized)
+        self.assertEqual(set(control.initial_main),{str(uid(f'main:{n}')) for n in range(1,6)})
+        self.assertEqual(Referent.objects.filter(account_id=account_id,protected=True).count(),5)
+        self.assertEqual(Referent.objects.filter(account_id=account_id,protected=False,active=True).count(),3)
+        self.assertEqual((ReferentReview.objects.count(),ReferentChange.objects.count(),
+                          ReferentExperiment.objects.count(),ReferentNotice.objects.count()),(1,3,1,1))
+        reviews=app.get('/api/v1/referentes/revisiones').json()
+        self.assertEqual([r['id'] for r in reviews],[str(uid('review:monthly'))])
+        self.assertEqual({c['proposal']['kind'] for c in reviews[0]['changes']},{'swap','add','remove'})
+        turn=app.get('/api/v1/tu-turno').json()
+        self.assertEqual((turn['count'],turn['urgent_count']),(12,1))
+        self.assertEqual([c['id'] for c in turn['items'] if c['id'].startswith('referents_setup:')],[])
+        changes=[c for c in turn['items'] if c['type']=='referente']
+        self.assertEqual({c['id'] for c in changes},{f'referent_change:{uid(f"monthly-change:{n}")}' for n in range(3)})
+        self.assertTrue(all(c['referent_change']['can_decide'] and c['actions'] for c in changes))
+        experiments=[c for c in turn['items'] if c['type']=='experimento']
+        self.assertEqual(len(experiments),1)
+        self.assertEqual(experiments[0]['actions'][0]['body']['decision'],'approve')
+        community=app.get(f'/api/v1/comunidad?account={account_id}').json()
+        self.assertEqual((community['status'],community['study']['id'],len(community['sources'])),
+                         ('Estudio parcial',str(uid('community:study')),6))
+        # A referents decision cannot remove the independent study, and reseeding restores both.
+        item=changes[0]
+        response=app.post(item['referent_change']['endpoint'],
+                          {'version':item['referent_change']['version'],'decision':'reject'},format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        self.assertEqual(ReferentChange.objects.filter(state='rejected').count(),1)
+        self.assertEqual(CommunitySource.objects.count(),6)
+        self.seed(referentes_mensual=True)
+        self.assertEqual(self.counts(),first)
+        self.assertEqual(ReferentChange.objects.filter(state='pending').count(),3)
+        self.assertEqual(app.get(f'/api/v1/comunidad?account={account_id}').json()['study']['id'],str(uid('community:study')))
+        self.assertEqual(app.get('/api/v1/referentes/revisiones').json()[0]['id'],str(uid('review:monthly')))

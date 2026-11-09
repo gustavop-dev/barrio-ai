@@ -11,8 +11,13 @@ from . import capturas_views as cv
 from . import movil_views as mv
 from .grafo_views import EquipoGrafo
 from .orquestacion_views import CycleDecision
+from . import referentes_views as refs
 from .comunidad_views import Community, WithdrawSource
 urlpatterns=[
+ path('referentes/revisiones',refs.Reviews.as_view()),
+ path('referentes/main-inicial',refs.InitialMain.as_view()),
+ path('referentes/cambios/<uuid:cid>/decidir',refs.ChangeDecision.as_view()),
+ path('referentes/experimentos/<uuid:eid>/decidir',refs.ExperimentDecision.as_view()),
  path('comunidad',Community.as_view()),
  path('comunidad/fuentes/<uuid:sid>/retirar',WithdrawSource.as_view()),
  path('equipo/grafo',EquipoGrafo.as_view()),

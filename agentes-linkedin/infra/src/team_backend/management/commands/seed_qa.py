@@ -114,6 +114,9 @@ def verification_ok(text):
 class Command(BaseCommand):
     help='Rehace el mundo de demostración de la QA móvil (solo CI: exige QA_SEED=permitido).'
 
+    def add_arguments(self,parser):
+        parser.add_argument('--referentes-mensual',action='store_true',help='Escenario OBS/TUR del flujo 19, con cinco main protegidos.')
+
     def handle(self,**options):
         self.guard()
         with transaction.atomic():
@@ -124,6 +127,9 @@ class Command(BaseCommand):
             self.accounts();self.network();self.pieces();self.proposals();self.opportunities();self.conversation()
             self.questions();self.facts();self.notifications();self.captures();self.gallery();self.results();self.summaries()
             self.image_examples();self.spend();self.settings();self.devices();self.office()
+            if options.get('referentes_mensual'):
+                from team_backend.seed_referentes_qa import seed
+                seed(self.user,self.fake,self.now,uid)
             self.community()
         self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
 

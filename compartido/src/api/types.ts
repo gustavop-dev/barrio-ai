@@ -660,6 +660,11 @@ export interface LinkedInStatus {
 // ---------------------------------------------------------------- referents
 
 export interface Referent {
+  protected?: boolean;
+  position?: number;
+  revision?: number;
+  can_manage_protected?: boolean;
+  protection_history?: { actor__username: string | null; created_at: string; metadata: { source: string; before: Record<string, unknown>; after: Record<string, unknown> } }[];
   id: string;
   account_id?: string;
   public_identifier?: string;
@@ -739,7 +744,7 @@ export interface Activity {
 // ---------------------------------------------------------------- Tu turno
 
 /** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados). */
-export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion' | 'resumen' | 'aprobacion';
+export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion' | 'resumen' | 'aprobacion' | 'referente' | 'experimento';
 export type TurnoTone = 'bad' | 'warn' | 'info' | 'ok' | 'muted';
 
 /** A card action: either a POST (`endpoint` + `body`, plus `note` when `note_required`) or a full navigation (`href`). */
@@ -803,6 +808,8 @@ export interface TurnoApproval {
 }
 
 export interface TurnoCard {
+  referent_change?: import('./referentes').ReferentChangeCard;
+  referent_experiment?: import('./referentes').ReferentExperimentCard;
   /** `linkedin_expired`, `linkedin_expiring`, `uncertain:<id>`, `machine_paused`, `machine_paused_env`, `account_paused:<id>`, `question:<id>`, `approval:<id>`. */
   id: string;
   type: TurnoCardType;
@@ -864,7 +871,7 @@ export interface TuTurno {
   questions: TurnoCard[];
   /** Postponed or expired questions (muted tone). */
   later: TurnoCard[];
-  tasks: { perfil: TurnoCard[]; conversaciones: TurnoCard[]; resumen?: TurnoCard[] };
+  tasks: { perfil: TurnoCard[]; conversaciones: TurnoCard[]; resumen?: TurnoCard[]; referentes?: TurnoCard[] };
   recent: TurnoRecent[];
   summary: { done_today: DoneToday; next_piece: { id: string; scheduled_for: string } | null };
   /** Unread items in Notificaciones, for the bell dot (being added to the backend). */
@@ -1176,6 +1183,11 @@ export interface OpportunityFilters {
 }
 
 export interface ReferentPatch {
+  version?: number;
+  protected?: boolean;
+  position?: number;
+  replacement?: string;
+  source?: 'personas' | 'tu_turno';
   active?: boolean;
   reason?: string;
 }

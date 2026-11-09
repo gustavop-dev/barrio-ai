@@ -1,3 +1,4 @@
+import { monthlyCountdown } from './referentes';
 // Pure rules of Tu turno (FUNCIONES-NUEVAS rev 18 «Tu turno: prioridades y estados»), kept apart so
 // they can be tested without rendering. The backend sends `priority`, `state` and `items`; until it
 // does, the same rules are derived here from `critical`, `tone`, `deadline` and the question flags.
@@ -77,6 +78,7 @@ export function activeCards(data: TuTurno, now: number = Date.now()): TurnoCard[
     ...(data.tasks?.perfil ?? []),
     ...(data.tasks?.conversaciones ?? []),
     ...(data.tasks?.resumen ?? []),
+    ...(data.tasks?.referentes ?? []),
   ];
   return all.sort((a, b) => compareCards(a, b, now));
 }
@@ -182,6 +184,7 @@ export interface DeadlineInfo {
 
 /** The «Plazo» line of a card, or null when it has none. */
 export function deadlineInfo(card: TurnoCard, now: number = Date.now()): DeadlineInfo | null {
+  if (card.type === 'referente' && card.deadline) return { text: monthlyCountdown(card.deadline, now), soon: new Date(card.deadline).getTime() - now < DAY };
   const deadline = time(card.deadline);
   if (deadline === null) return null;
   const left = deadline - now;

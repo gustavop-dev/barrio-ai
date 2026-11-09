@@ -52,6 +52,9 @@ class GraphTests(SimpleTestCase):
     def test_jobs_autopilot_and_office_mapping_cannot_drift(self):
         bindings = self.graph['code_bindings']
         self.assertEqual(bindings['job_roles'], oficina_views.JOB_ROLES)
+        # Every mapped job must have a visible activity role, including both monthly phases.
+        self.assertLessEqual(set(bindings['job_roles'].values()), set(oficina_views.ROLES))
+        self.assertEqual(len(oficina_views.ROLES), len(set(oficina_views.ROLES)))
         self.assertEqual(bindings['stage_roles'], editorial.STAGE_ROLES)
         self.assertEqual(bindings['network_ramp_stages'], [list(stage) for stage in red.RAMP_STAGES])
         self.assertEqual(bindings['network_read_caps'], red.READ_CAPS)

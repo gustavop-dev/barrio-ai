@@ -1,3 +1,4 @@
+import { ReferentDecision } from './ReferentDecision';
 // A Tu turno card (the PWA's TurnoCardView): type, priority, deadline, who asks, title, body by type,
 // actions and «Creada hace X», inside a SwipeableCard (right: the primary action; left: «Más tarde»).
 // MovTuTurno: once the backend confirms, the button that resolved it turns into a check and the card
@@ -43,7 +44,8 @@ function useActionRunner(card: TurnoCardData) {
       setAsking(null);
       haptic('actionSuccess');
       toast.show(successMessage(action));
-      exits.resolve(cardId, { kind: 'done', lead: flown ? 'flown' : 'check', by: buttonKey.action(action.label) });
+      if (action.body?.decision === 'adjust' || (card.referent_experiment && action.body?.decision === 'approve')) exits.cancel(cardId);
+      else exits.resolve(cardId, { kind: 'done', lead: flown ? 'flown' : 'check', by: buttonKey.action(action.label) });
       return true;
     } catch {
       haptic('actionError');
@@ -379,7 +381,9 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
           <T variant="subtitulo" accessibilityRole="header">
             {cardTitle(card)}
           </T>
-          {card.question ? (
+          {card.referent_change || card.referent_experiment ? (
+        <ReferentDecision card={card} />
+      ) : card.question ? (
             <QuestionBody card={card} resolvedBy={resolvedBy} />
           ) : card.attempt ? (
             <Attempt card={card} />

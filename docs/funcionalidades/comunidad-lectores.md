@@ -74,7 +74,7 @@ Base: [contratos de lectores](../../agentes-linkedin/equipos/lectores/), [contra
 
 ## Entrega de fase 6
 
-Migración **`0024_community_study`**, dependiente de `0023_shared_evidence`; solo tres tablas nuevas. Claude debe conciliar la numeración con fase 5. Grafo `6.1`: ciclo `comunidad_mensual` activo, dueño `director_editorial`; `evidencia_comunidad`, `leer_comunidad` y `analizar_comunidad` con contratos y respuesta obligatoria. El nodo de lectura es determinista; el análisis lo hace `analista_barrio_resultados` con `operador.ANALYSIS_UNITS`.
+Migración **`0024_community_study`**, dependiente de `0023_shared_evidence`; solo tres tablas nuevas. Numeración conciliada: fase 5 continúa con `0025_referentes_monthly`, dependiente de `0024_community_study`. Grafo `6.1`: ciclo `comunidad_mensual` activo, dueño `director_editorial`; `evidencia_comunidad`, `leer_comunidad` y `analizar_comunidad` con contratos y respuesta obligatoria. El nodo de lectura es determinista; el análisis lo hace `analista_barrio_resultados` con `operador.ANALYSIS_UNITS`.
 
 Límites ARQ-05: **1 USD, 20 llamadas, 600 segundos activos, 120 segundos por llamada**, dos llamadas de modelo como máximo, profundidad uno y un replanteamiento tras dos intentos sin avance. Primera versión y una revisión del periodo comparten ledger y bucket mensual; ocho lecturas públicas por versión permiten reservar capacidad para ambas. Los caps diarios de red/perfil y la pausa siguen vigentes. Se paga por `community-study`; ningún paso autoriza escritura en LinkedIn. Vencer el cap conserva resultados y emite el aviso 3b.
 

@@ -324,7 +324,7 @@ class DispatcherTests(TransactionTestCase):
         self.assertEqual(by_id['referentes_mensuales']['limits']['cost_cap_usd'],5)
         self.assertEqual(by_id['referentes_mensuales']['limits']['cost_period'],'month')
         self.assertEqual(by_id['perfil_periodico']['limits']['cost_cap_usd'],10)
-        with self.assertRaises(runtime.UndeclaredCall):self.open(cycle='referentes_mensuales')
+        with self.assertRaises(runtime.UndeclaredCall):self.open(cycle='perfil_periodico')
 
     def test_human_resume_keeps_call_cost_and_plan_history(self):
         from django.contrib.auth.models import Permission

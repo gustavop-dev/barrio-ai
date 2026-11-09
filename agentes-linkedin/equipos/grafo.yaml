@@ -158,6 +158,10 @@
       "source": "team_backend.jobs",
       "description": "Paso determinista o humano sin llamada pagada."
     },
+    "referentes": {
+      "source": "team_backend.orquestacion.provider_metadata",
+      "description": "5 USD por mes natural America/Bogota, reservas de las tres ramas web y selección, compartido entre cuentas/reintentos. Sin reiniciar ledger."
+    },
     "comunidad": {
       "source": "team_backend.orquestacion.Runtime",
       "description": "ARQ-05: 1 USD por ciclo mensual, 20 llamadas/10 minutos activos; una revisión dentro del mismo ledger, reservas 3b y caps BAR-15 compartidos. Bucket mensual conservador para impedir reinicios mediante otra instancia."
@@ -458,6 +462,38 @@
       "binding": "team_backend.evidencia.EvidenceResult",
       "kind": "dataclass",
       "description": "Personas deduplicadas, cobertura, versiones de encaje, informes observacionales y contadores sin identidad; sin mensajes privados."
+    },
+    "referents_request": {
+      "binding": "team_backend.referentes_research.REQUEST_SCHEMA",
+      "kind": "json_schema"
+    },
+    "referents_dossier": {
+      "binding": "team_backend.referentes_research.DOSSIER_SCHEMA",
+      "kind": "json_schema"
+    },
+    "referents_review": {
+      "binding": "team_backend.models.ReferentReview",
+      "kind": "model"
+    },
+    "referents_change": {
+      "binding": "team_backend.models.ReferentChange",
+      "kind": "model"
+    },
+    "referents_experiment": {
+      "binding": "team_backend.models.ReferentExperiment",
+      "kind": "model"
+    },
+    "referents_signals_request": {
+      "binding": "team_backend.experimentos.SIGNAL_REQUEST",
+      "kind": "json_schema"
+    },
+    "referents_signals": {
+      "binding": "team_backend.experimentos.RESULT_SCHEMA",
+      "kind": "json_schema"
+    },
+    "experiment_request": {
+      "binding": "team_backend.experimentos.EVALUATION_REQUEST",
+      "kind": "json_schema"
     },
     "community_study": {
       "kind": "model",
@@ -1989,25 +2025,42 @@
       "label": "Referentes mensuales",
       "group": "observatorio",
       "role": "orchestrator",
-      "status": "planned",
-      "binding": null,
-      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "status": "active",
+      "binding": "team_backend.referentes_research.run",
+      "description": "Coordina el dossier mensual, tres investigaciones paralelas y selección; entrega decisiones humanas y planes versionados. Nunca modifica main ni escribe en LinkedIn.",
       "skills": [
-        "En diseño"
+        "OBS-01",
+        "OBS-02",
+        "OBS-04",
+        "TUR-20",
+        "TUR-21"
       ],
-      "tools": [],
+      "tools": [
+        "research",
+        "evidencia.report",
+        "referentes_research.select"
+      ],
       "course_lists": [],
       "course_units": [],
       "course_note": "Este paso no carga una lista curada del curso.",
       "model": null,
       "effort": null,
-      "model_note": "Servicio determinista, humano o todavía planificado.",
-      "budget_ref": "ninguno",
-      "input_schemas": [],
-      "output_schemas": [],
+      "model_note": "Workflow determinista; las llamadas pagadas pertenecen a los especialistas declarados.",
+      "budget_ref": "referentes",
+      "input_schemas": [
+        "referents_request"
+      ],
+      "output_schemas": [
+        "referents_review"
+      ],
       "activity": {
-        "job_kinds": [],
-        "event_roles": []
+        "job_kinds": [
+          "review_referents",
+          "advance_experiments"
+        ],
+        "event_roles": [
+          "investigador_lider"
+        ]
       }
     },
     {
@@ -2110,6 +2163,215 @@
           "community_study"
         ],
         "event_roles": []
+      }
+    },
+    {
+      "id": "investigador_producto",
+      "label": "Investigación · producto y startups",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.research.research",
+      "description": "Rama pública acotada, sin memoria privada ni delegación. Devuelve citas fechadas al investigador líder.",
+      "skills": [
+        "OBS-01"
+      ],
+      "tools": [
+        "web_search",
+        "web_fetch"
+      ],
+      "course_units": [],
+      "course_lists": [],
+      "course_note": "No carga unidades; recibe evidencia estructurada.",
+      "model": "WEB_RESEARCH_MODEL (claude-sonnet-5-5)",
+      "effort": "low",
+      "model_note": "Modelo de investigación configurado en fase 1.",
+      "budget_ref": "referentes",
+      "input_schemas": [
+        "research_request"
+      ],
+      "output_schemas": [
+        "research_result"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "investigador_producto"
+        ]
+      }
+    },
+    {
+      "id": "investigador_ia",
+      "label": "Investigación · IA aplicada",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.research.research",
+      "description": "Rama pública acotada, sin memoria privada ni delegación. Devuelve citas fechadas al investigador líder.",
+      "skills": [
+        "OBS-01"
+      ],
+      "tools": [
+        "web_search",
+        "web_fetch"
+      ],
+      "course_units": [],
+      "course_lists": [],
+      "course_note": "No carga unidades; recibe evidencia estructurada.",
+      "model": "WEB_RESEARCH_MODEL (claude-sonnet-5-5)",
+      "effort": "low",
+      "model_note": "Modelo de investigación configurado en fase 1.",
+      "budget_ref": "referentes",
+      "input_schemas": [
+        "research_request"
+      ],
+      "output_schemas": [
+        "research_result"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "investigador_ia"
+        ]
+      }
+    },
+    {
+      "id": "investigador_audiencia",
+      "label": "Investigación · audiencias del nicho",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.research.research",
+      "description": "Rama pública acotada, sin memoria privada ni delegación. Devuelve citas fechadas al investigador líder.",
+      "skills": [
+        "OBS-01"
+      ],
+      "tools": [
+        "web_search",
+        "web_fetch"
+      ],
+      "course_units": [],
+      "course_lists": [],
+      "course_note": "No carga unidades; recibe evidencia estructurada.",
+      "model": "WEB_RESEARCH_MODEL (claude-sonnet-5-5)",
+      "effort": "low",
+      "model_note": "Modelo de investigación configurado en fase 1.",
+      "budget_ref": "referentes",
+      "input_schemas": [
+        "research_request"
+      ],
+      "output_schemas": [
+        "research_result"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "investigador_audiencia"
+        ]
+      }
+    },
+    {
+      "id": "seleccion_referentes",
+      "label": "Selección mensual de referentes",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.referentes_research.select",
+      "description": "Sintetiza curso, memoria, posicionamiento, investigación y evidencia; propone cambios variables y una hipótesis experimental.",
+      "skills": [
+        "OBS-01"
+      ],
+      "tools": [],
+      "course_units": [
+        "LI-03-V009-K04",
+        "LI-03-V018-K02",
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V020-K05"
+      ],
+      "course_lists": [
+        "operador.REFERENTS_UNITS"
+      ],
+      "course_note": "Selección curada de referentes de fase 2, en orden de carga.",
+      "model": "WEB_RESEARCH_MODEL (claude-sonnet-5-5)",
+      "effort": "medium",
+      "model_note": "Modelo de investigación configurado en fase 1.",
+      "budget_ref": "referentes",
+      "input_schemas": [
+        "referents_request"
+      ],
+      "output_schemas": [
+        "referents_dossier"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "seleccion_referentes"
+        ]
+      }
+    },
+    {
+      "id": "analista_experimentos",
+      "label": "Análisis de experimentos",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.experimentos.evaluate",
+      "description": "Evalúa cobertura, muestra, exposición y encaje con umbrales aprobados e inmutables. Resultado observacional, nunca causal.",
+      "skills": [
+        "OBS-04"
+      ],
+      "tools": [],
+      "course_units": [],
+      "course_lists": [],
+      "course_note": "No carga unidades; recibe evidencia estructurada.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista sin proveedor.",
+      "budget_ref": "ninguno",
+      "input_schemas": [
+        "experiment_request"
+      ],
+      "output_schemas": [
+        "referents_signals"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "analista_experimentos"
+        ]
+      }
+    },
+    {
+      "id": "senales_referentes",
+      "label": "Señales de referentes para Relaciones",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.experimentos.signals",
+      "description": "Entrega dossier público, evidencia agregada y foco aprobado al dueño del ciclo de red, sin datos privados ni seguidores inventados.",
+      "skills": [
+        "OBS-04"
+      ],
+      "tools": [],
+      "course_units": [],
+      "course_lists": [],
+      "course_note": "No carga unidades; recibe evidencia estructurada.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista sin proveedor.",
+      "budget_ref": "ninguno",
+      "input_schemas": [
+        "referents_signals_request"
+      ],
+      "output_schemas": [
+        "referents_signals"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "senales_referentes"
+        ]
       }
     }
   ],
@@ -2931,7 +3193,7 @@
       }
     },
     {
-      "id": "evidencia_referentes_futura",
+      "id": "evidencia_referentes",
       "from": "investigador_lider",
       "to": "evidencia_compartida",
       "cycles": [
@@ -2942,7 +3204,173 @@
       "response_schema": "evidence_result",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "planned"
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "referentes_producto",
+      "from": "investigador_lider",
+      "to": "investigador_producto",
+      "cycles": [
+        "referentes_mensuales"
+      ],
+      "request_kind": "call",
+      "request_schema": "research_request",
+      "response_schema": "research_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "web-research-tool"
+          ]
+        }
+      }
+    },
+    {
+      "id": "referentes_ia",
+      "from": "investigador_lider",
+      "to": "investigador_ia",
+      "cycles": [
+        "referentes_mensuales"
+      ],
+      "request_kind": "call",
+      "request_schema": "research_request",
+      "response_schema": "research_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "web-research-tool"
+          ]
+        }
+      }
+    },
+    {
+      "id": "referentes_audiencia",
+      "from": "investigador_lider",
+      "to": "investigador_audiencia",
+      "cycles": [
+        "referentes_mensuales"
+      ],
+      "request_kind": "call",
+      "request_schema": "research_request",
+      "response_schema": "research_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "web-research-tool"
+          ]
+        }
+      }
+    },
+    {
+      "id": "seleccionar_referentes",
+      "from": "investigador_lider",
+      "to": "seleccion_referentes",
+      "cycles": [
+        "referentes_mensuales"
+      ],
+      "request_kind": "call",
+      "request_schema": "referents_request",
+      "response_schema": "referents_dossier",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "referents-monthly"
+          ]
+        }
+      }
+    },
+    {
+      "id": "decidir_referentes",
+      "from": "investigador_lider",
+      "to": "gustavo",
+      "cycles": [
+        "referentes_mensuales"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "referents_review",
+      "response_schema": "referents_change",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "foco_aprobado",
+      "from": "investigador_lider",
+      "to": "relaciones_comunidad",
+      "cycles": [
+        "referentes_mensuales"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "referents_experiment",
+      "response_schema": "referents_signals",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "senales_referentes",
+      "from": "relaciones_comunidad",
+      "to": "senales_referentes",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "call",
+      "request_schema": "referents_signals_request",
+      "response_schema": "referents_signals",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "evidencia_experimento",
+      "from": "investigador_lider",
+      "to": "evidencia_compartida",
+      "cycles": [
+        "experimentos_referentes"
+      ],
+      "request_kind": "call",
+      "request_schema": "evidence_request",
+      "response_schema": "evidence_result",
+      "max_calls_per_cycle": 3,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "evaluar_experimento",
+      "from": "investigador_lider",
+      "to": "analista_experimentos",
+      "cycles": [
+        "experimentos_referentes"
+      ],
+      "request_kind": "call",
+      "request_schema": "experiment_request",
+      "response_schema": "referents_signals",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      }
     },
     {
       "id": "evidencia_comunidad",
@@ -3122,7 +3550,8 @@
         "lider_jev",
         "gustavo",
         "operador_cuenta",
-        "evidencia_compartida"
+        "evidencia_compartida",
+        "senales_referentes"
       ],
       "triggers": [
         {
@@ -3475,37 +3904,49 @@
     {
       "id": "referentes_mensuales",
       "label": "Referentes mensuales",
-      "status": "planned",
+      "status": "active",
       "orchestrator": "investigador_lider",
       "participants": [
         "investigador_lider",
-        "investigacion_web",
-        "evidencia_compartida"
+        "evidencia_compartida",
+        "investigador_producto",
+        "investigador_ia",
+        "investigador_audiencia",
+        "seleccion_referentes",
+        "gustavo",
+        "relaciones_comunidad"
       ],
       "triggers": [
         {
-          "kind": null,
-          "cadence": "Mensual (perfil también semestral); aún sin activar.",
-          "binding": "planned",
-          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+          "kind": "review_referents",
+          "cadence": "Prepara el último día del mes, publica día 1; recordatorios 1/4 a las 09:00 y cierre día 6 00:00 America/Bogota.",
+          "binding": "team_backend.referentes.tick",
+          "deduplication": "Cuenta/mes y UUID estable; versión y aviso inicial transaccionales."
         }
       ],
       "loops": [
         {
           "id": "fan_out",
-          "status": "planned",
-          "edges": [],
+          "status": "active",
+          "edges": [
+            "referentes_producto",
+            "referentes_ia",
+            "referentes_audiencia"
+          ],
           "max_rounds": 1,
-          "description": "Investigación paralela con gather acotado; no existe fan-out en fase 1."
+          "description": "Tres ramas paralelas con contextvars/ledger común y gather de todas antes de liberar lease. Una llamada por rama; no delegan."
         }
       ],
       "gates": [],
       "limits": {
-        "budget_refs": [],
+        "budget_refs": [
+          "referentes",
+          "research"
+        ],
         "max_depth": 1,
         "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
-        "max_calls": 40,
-        "max_provider_calls": 40,
+        "max_calls": 6,
+        "max_provider_calls": 4,
         "cost_cap_usd": 5,
         "cost_period": "month",
         "call_timeout_s": 120,
@@ -3514,10 +3955,16 @@
         "max_replans": 1
       },
       "ledger": {
-        "status": "planned",
-        "records": [],
-        "checkpoint_resume": false,
-        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+        "status": "runtime",
+        "records": [
+          "CycleLedger",
+          "ReferentReview",
+          "ReferentChange",
+          "ReferentNotice",
+          "UsageEntry"
+        ],
+        "checkpoint_resume": true,
+        "note": "Checkpoints confirmados; ante incertidumbre conserva incompleto, sin replay pagado."
       }
     },
     {
@@ -3666,6 +4113,53 @@
         "checkpoint_resume": true,
         "note": "Consulta determinista y resultado tipado; el estudio mensual usa su propio ciclo bajo el director."
       }
+    },
+    {
+      "id": "experimentos_referentes",
+      "label": "Experimentos de referentes",
+      "status": "active",
+      "orchestrator": "investigador_lider",
+      "participants": [
+        "investigador_lider",
+        "evidencia_compartida",
+        "analista_experimentos"
+      ],
+      "triggers": [
+        {
+          "kind": "advance_experiments",
+          "cadence": "Tick horario con planes aprobados; cortes semanales y cierre tras 14/28/7 días.",
+          "binding": "team_backend.experimentos.tick",
+          "deduplication": "UUID por hora; corte por experimento/versión/fecha."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "ninguno"
+        ],
+        "max_depth": 1,
+        "scope": "Análisis determinista, ninguna arista autoriza proveedores; sin gasto. El cupo de foco se valida al redactar y ejecutar dentro de BAR-15.",
+        "max_calls": 4,
+        "max_provider_calls": 1,
+        "cost_cap_usd": 0.01,
+        "cost_period": "cycle",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 1200,
+        "max_stalls": 2,
+        "max_replans": 1
+      },
+      "ledger": {
+        "status": "runtime",
+        "records": [
+          "CycleLedger",
+          "ReferentExperiment",
+          "ReferentAttribution",
+          "ActionExecution"
+        ],
+        "checkpoint_resume": true,
+        "note": "Plan congelado por aprobación positiva; mide solo exposiciones confirmadas."
+      }
     }
   ],
   "code_bindings": {
@@ -3682,6 +4176,8 @@
       "process_capture": "operador_cuenta",
       "weekly_summary": "analista_barrio_resultados",
       "read_inbox": "conversaciones_inbox",
+      "review_referents": "investigador_lider",
+      "advance_experiments": "investigador_lider",
       "community_study": "analista_barrio_resultados"
     },
     "stage_roles": {

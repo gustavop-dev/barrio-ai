@@ -194,6 +194,9 @@ def comment_request(run,post,revision=None):
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     inputs={'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':[],
             'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation}
+    from . import experimentos
+    inputs['referent_evidence']=experimentos.signals(post)
+    inputs['comment_language']='English; useful contribution, never an empty compliment or pitch.'
     if revision:inputs['revision']=revision
     return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
             'output_schema':operador.COMMENT_SCHEMA,'effort':'medium','context':operador.course_block(units)},units
@@ -649,6 +652,7 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
     report={'modo':'ejecucion' if execute else 'ensayo','desde':run.since.date().isoformat(),'generado':run.now.isoformat(),
             'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{},'curso':course_preview(),
             'evidencia':dict(EVIDENCE_CASE,status='pendiente de evaluación con fakes en test_evidencia'),
+            'referentes':dict(REFERENTS_CASE,status='pendiente de evaluación con fakes en test_referentes_mensuales'),
             'comunidad':dict(COMMUNITY_CASE,status='pendiente de evaluación con fakes en test_comunidad')}
     chosen={}
     for agent in agents:
@@ -705,6 +709,26 @@ COMMUNITY_CASE={
 def grade_community_case(result):
     errors=[key for key,value in COMMUNITY_CASE['expected'].items() if result.get(key)!=value]
     return {'case':COMMUNITY_CASE['id'],'passed':not errors,'errors':errors}
+
+
+REFERENTS_CASE={
+    'id':'OBS-01-02-seleccion', 'units':operador.REFERENTS_UNITS,
+    'sources':['synthetic-public-source','synthetic-attribution'],
+    'input':{'main':['protected-main'],'active':15,'variable':'variable-ref','classified':0,'exposure':0},
+    'expected':{'changes':[], 'reason':'Sin muestra suficiente: seguir midiendo, conservar main.'},
+    'incorrect':{'changes':[{'kind':'swap','outgoing':'protected-main','incoming':{'identifier':'popular-account'},'evidence':[]}]},
+}
+
+
+def grade_referents_case(dossier):
+    """Synthetic negative evidence case: lack of sample never licenses removal, popularity or main changes."""
+    errors=[]
+    for change in dossier.get('changes',[]):
+        if change.get('outgoing') in REFERENTS_CASE['input']['main']:errors.append('protected')
+        if change.get('kind') in ('remove','swap'):errors.append('insufficient_sample')
+        if change.get('kind')=='add':errors.append('capacity')
+        if not change.get('evidence') or set(change['evidence'])-set(REFERENTS_CASE['sources']):errors.append('evidence')
+    return {'case':REFERENTS_CASE['id'],'passed':not errors,'errors':errors}
 
 
 def grade_evidence_case(result):

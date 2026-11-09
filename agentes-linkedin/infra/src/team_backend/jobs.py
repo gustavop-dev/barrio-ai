@@ -47,6 +47,8 @@ def enqueue(user,data,request_id=''):
         return job,True
 
 OPERATION_PERMISSIONS={
+    'review_referents':['operate_linkedin','run_agents','use_paid_providers'],
+    'advance_experiments':['operate_linkedin'],
     'observe':['operate_linkedin'],
     'propose_comment':['operate_linkedin','run_agents','use_paid_providers'],
     'execute_action':['execute_actions'],
@@ -62,7 +64,7 @@ OPERATION_PERMISSIONS={
     'weekly_summary':['operate_linkedin','run_agents','use_paid_providers'],
     'community_study':['operate_linkedin','run_agents','use_paid_providers'],
 }
-PAID_OPERATIONS=('propose_comment','prepare_piece','classify_contacts','process_capture','read_inbox','weekly_summary','community_study')
+PAID_OPERATIONS=('propose_comment','prepare_piece','classify_contacts','process_capture','read_inbox','weekly_summary','review_referents','community_study')
 
 def enqueue_operation(user,kind,params,request_id=None,audit_request_id=''):
     """Queue an account-operator step with the same idempotency rules as agent runs."""

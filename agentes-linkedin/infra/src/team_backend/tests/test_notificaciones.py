@@ -64,16 +64,17 @@ class TuTurnoPriorityTests(OperatorBase):
         with patch.dict(os.environ,{'OPERATOR_PAUSED':'true'}):
             turn=self.human.get('/api/v1/tu-turno').json()
         order=[(c['id'].split(':')[0],c['priority'],c['state']) for c in turn['items']]
-        self.assertEqual(order,[('uncertain','urgente','nueva'),('question','importante','nueva'),('question','cuando_puedas','nueva')])
+        self.assertEqual(order,[('uncertain','urgente','nueva'),('question','importante','nueva'),
+                                ('referents_setup','importante','nueva'),('question','cuando_puedas','nueva')])
         self.assertNotIn('machine_paused_env',[c['id'] for c in turn['items']])  # a server stop is a Notificación
-        self.assertEqual((turn['count'],turn['urgent_count'],turn['critical'],turn['notifications_unread']),(3,1,True,1))  # the Observatorio found posts
+        self.assertEqual((turn['count'],turn['urgent_count'],turn['critical'],turn['notifications_unread']),(4,1,True,1))  # setup is a card; only the Observatorio notification is unread
         self.human.post('/api/v1/tu-turno/vistos',{'ids':[f'question:{calm.id}']},format='json')
         turn=self.human.get('/api/v1/tu-turno').json()
         self.assertEqual(next(c['state'] for c in turn['items'] if c['id']==f'question:{calm.id}'),'vista')
-        self.assertEqual(turn['count'],3)  # seen still counts
+        self.assertEqual(turn['count'],4)  # seen still counts
         self.human.post(f'/api/v1/preguntas/{calm.id}/mas-tarde',{},format='json')
         turn=self.human.get('/api/v1/tu-turno').json()
-        self.assertEqual(turn['count'],2);self.assertEqual(turn['later'][0]['state'],'pospuesta')
+        self.assertEqual(turn['count'],3);self.assertEqual(turn['later'][0]['state'],'pospuesta')
         self.assertEqual(self.api.post('/api/v1/tu-turno/vistos',{'ids':['x']},format='json').status_code,403)
         self.assertTrue(InboxSeen.objects.filter(item_id=f'question:{calm.id}').exists())
         self.assertEqual(soon.state,'open')
@@ -175,7 +176,9 @@ class ApprovalTests(OperatorBase):
             card=next(c for c in turn['items'] if c['type']=='aprobacion')
             self.assertEqual((card['id'],card['priority'],card['state']),(f'approval:{action["id"]}','importante','nueva'))
             self.assertTrue(card['title'].startswith('¿Apruebas el comentario en el post de'),card['title'])
-            self.assertEqual((turn['count'],turn['counts']['aprobaciones']),(1,1))
+            self.assertEqual((turn['count'],turn['counts']['aprobaciones']),(2,1))
+            self.assertEqual({c['id'] for c in turn['items']},
+                             {f'approval:{action["id"]}',f'referents_setup:{self.account.id}'})
             approve,reject=card['actions'][:2]
             self.assertEqual((approve['label'],approve['body'],approve['primary']),('Aprobar',{'expected_hash':action['payload_hash']},True))
             self.assertEqual((reject['label'],reject['note_required']),('Vetar',True))
