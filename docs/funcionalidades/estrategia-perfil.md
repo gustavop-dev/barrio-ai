@@ -1,0 +1,211 @@
+# Estrategia y perfil (`EST`)
+
+Propuestas que Gustavo aplica por su cuenta en LinkedIn. `perfil` coordina el ciclo; `posicionamiento` aporta dirección y `editor_visual` prepara recursos. La **biblioteca es el insumo principal**: la pauta de Daniela es «qué puedo hacer por otros», no una «egoteca». La trayectoria y las pruebas respaldan una utilidad para el público. Memoria, orientación, resultados y web aportan evidencia del caso; no sustituyen el fundamento del curso.
+
+Los [contratos del equipo](../../agentes-linkedin/equipos/estrategia-perfil/) y `knowledge/agents.py` permiten consultas manuales de biblioteca. No hay ciclo semestral/mensual, lectura completa del perfil ni propuestas conectadas a Tu turno. El equipo **no edita LinkedIn**, aunque el proveedor documente operaciones de perfil. Este diseño incorpora los seis addenda de Gustavo y la marca del tablero; todas sus capacidades siguen **no implementado**.
+
+## Resumen
+
+| ID | Función | Dónde | Estado |
+| --- | --- | --- | --- |
+| [EST-01](#est-01) | Propuesta completa de perfil cada seis meses | PWA · app · backend | no implementado |
+| [EST-02](#est-02) | Revisión mensual de destacados, artículos y actividad | PWA · app · backend | no implementado |
+| [EST-03](#est-03) | Dos opciones de foto de perfil para elegir | PWA · app · backend | no implementado |
+| [EST-04](#est-04) | Banner de marca con foto recortada y render por código | PWA · app · backend | no implementado |
+| [EST-05](#est-05) | Pedir la propuesta del perfil desde una captura | PWA · app · backend | no implementado |
+
+## Fundamento por sección <a id="unidades-perfil"></a>
+
+IDs comprobados en el JSONL local indicado en [BIB](biblioteca-equipos.md#unidades-por-rol) para clase 02 y en [clase-01-unidades.json](../../agentes-linkedin/equipos/estrategia-perfil/clase-01-unidades.json) para posicionamiento. La implementación comprobará su disponibilidad en `retrieval.unit`; no se presupone su carga en la base. Listas base por función, ampliables mediante búsqueda pertinente; originales completos con límites, fuentes y versión según BIB-01. En el registro ARQ se declaran una vez y cada nodo expone su lista efectiva.
+
+| Lista / uso | IDs curados y criterio |
+| --- | --- |
+| `POSITIONING_PROFILE_UNITS`, especialista posicionamiento y contexto común de Perfil | `LI-01-M006-K02`: cliente, urgencia, transformación y freno; `LI-01-M007-K03`: mensaje centrado en problema y cambio, sin convertir su ejemplo de seis meses en promesa; `LI-02-V021-K01`: utilidad para el comprador y pruebas reales; `LI-02-V003-K03`: cliente, problema y resultado en la cabecera. |
+| `PROFILE_COPY_UNITS`, Perfil | `LI-02-V015-K03`: titular empieza por cómo ayuda, antes del cargo; `LI-02-V016-K05`: Acerca de explica misión y destinatario, sin duplicar Experiencia; `LI-02-V019-K01`: conectar experiencias solo con hechos reales; `LI-02-M008-K02`: habilidades relevantes y respaldadas; `LI-02-M015-K03`: URL breve y memorable, sin fijarla al cargo; `LI-02-V010-K03`: revisar el conjunto y las demás secciones. |
+| `PROFILE_MONTHLY_UNITS`, Perfil | `LI-02-M011-K01`: destacados por calidad/vigencia; `LI-02-V021-K01`: utilidad y evidencia para elegir artículos/actividad. La revisión mensual es decisión de Gustavo, no una obligación atribuida al curso. |
+| `PROFILE_VISUAL_UNITS`, Perfil y visual en este ciclo | `LI-02-V011-K02`: foto accesible y natural; `LI-02-V011-K03`: marca coherente y poca saturación; `LI-02-V014-K06`: comprobar solapamientos y legibilidad en teléfono; `LI-02-V015-K02`: preferencia del curso por una foto real y segunda foto opcional. **Gustavo exige su figura y autoriza la composición con micrófono**, sin presentarla como registro de un evento real ni atribuir esa decisión al curso. |
+
+Cada recomendación del Markdown, incluidas conservar una sección, elegir foto o componer el banner, lleva IDs pertinentes y una explicación de cómo se aplican, además de evidencia propia cuando afirma hechos. No basta un listado de citas al final. Los hexadecimales, dimensiones y tratamientos se atribuyen al tablero/Gustavo, no a Daniela. Ninguna recomendación sin fundamento en curso o evidencia; el entregable exige además su vínculo con el criterio del curso. Si falta la unidad o la evidencia imprescindible, queda «Falta fundamento» y no se ofrece como lista para aplicar. Las citas y razones están fuera del bloque de copy público.
+
+## Marca entregada y precedencia <a id="marca"></a>
+
+Fuente local leída íntegramente: [PerfilLinkedIn.dc.html](../../movil/diseno-movimiento/tableros/PerfilLinkedIn.dc.html), secciones Sistema, Foto, Portada, Juntas, Producción y Revisión. Las decisiones tercera a sexta de Gustavo prevalecen sobre el tablero: **siempre dos opciones de retrato, A en grises y B en color, para que él elija**, y banner de tinta con su figura y micrófono. Perfil propone su frase con fundamento; el copy público sigue en inglés. El tablero es una referencia de diseño con previsualización local; no implementa el pipeline de edición ni exportación.
+
+| Elemento | Regla vigente |
+| --- | --- |
+| Tokens y fuente | Aguamarina `#0FF1CE`, tinta `#1E1E2B`, papel `#F7F6F0`, 0ff1ce-hondo `#00715E`. Ubuntu Regular y Bold; usar archivos reales de esas fuentes, sin sustitución silenciosa. |
+| Ambas opciones de foto | Cada una PNG por defecto, o JPG validado, **800×800**, sRGB, menos de 8 MB, fondo plano exacto `#0FF1CE`. Cabeza y hombros; rostro 55–60 % de la altura, ojos en tercio superior, aproximadamente 8 % de aire arriba. Identidad y pelo de 03; sonrisa de 01 en A y B. Sus gafas son fotocromáticas (transitions), siempre claras como en 03; ojos legibles a 32 px, nunca cristales oscuros ni gafas de sol. |
+| Opción A · manual | Persona en grises de alto contraste, sin quemar luces ni perder textura, conforme al tablero. Elegir una toma de Perfil compatible con el encuadre y las restricciones del manual; conservar sus rasgos y aplicar la sonrisa de 01, según la quinta decisión. |
+| Opción B · color | Pose y sonrisa de 01: cabeza girada hacia un lado, relajado y natural, conservando sus facciones. Camiseta blanca lisa, oversized, de algodón grueso, cuello redondo cerrado (crew neck), holgada, sin logos/estampados ni restos del jersey de fútbol. Gafas transparentes de montura fina de 03, nunca gafas de sol. Color fotográfico, piel natural, sin filtros de belleza ni aguamarina en piel o ropa; adaptar el encuadre al giro sin forzar una pose frontal. |
+| Originales autorizados | Solo categoría «Perfil», incluidas referencias privadas 01–03 cargadas por Claude por encargo de Gustavo según GAL-08; preferible 2.000 px o más y ojos enfocados. Las decisiones cuarta y quinta autorizan ropa/gafas, sonrisa de 01 en todos los assets y composición del banner; no autorizan cambiar identidad ni inventar acontecimientos. |
+| Banner | PNG **1584×396**, sRGB, menos de 8 MB; fondo tinta. Etiqueta de rol y compañía en mayúsculas, aguamarina, Ubuntu Regular 22 px y espaciado 0,08 em. Frase en inglés de dos líneas, Ubuntu Regular **56 px**, una palabra en aguamarina. Línea de acento **72×4** y patrón decorativo de 0/1 a la derecha. |
+| Geometría del banner | Texto importante dentro de **x 600–1260 / y 60–336**. Reservar abajo a la izquierda **568×264** para el solapamiento de la foto de LinkedIn (x 0–568 / y 132–396 en este lienzo). Aproximación móvil del tablero: 60 % central, x ≈ 317–1267; patrón decorativo puede recortarse. Comprobar ambos previews y después en LinkedIn real; no presentar esta aproximación como garantía de todos los dispositivos. |
+| Figura en banner | Gustavo **de cintura hacia arriba, presentando con un micrófono de mano**. Referencia 02 para cuerpo/postura, 03 para rostro, pelo y gafas; misma camiseta blanca oversized y gafas claras de B. Expresión natural al hablar **sonriendo como en 01**, aunque 02 no sonría; 02 solo manda en cuerpo/postura. Composición estilizada autorizada, no fotografía documental de una charla. Fuera del área tapada y preferentemente toda la figura en el 60 % central móvil, sin invadir el texto. |
+| Frase del banner | **La propone Perfil**, desde posicionamiento vigente y unidades de biblioteca, en inglés, dos líneas y dentro de la zona segura. «Software and AI for early-stage startups.» es **solo el fallback** del tablero, no el mensaje elegido de antemano. Incluso el fallback requiere coherencia con hechos/oferta confirmados; no rellena datos ausentes. La etiqueta de prueba «PRODUCT ENGINEER · FOUNDER AT PROJECTAPP» solo se conserva si cargo/empresa están acreditados. |
+| Restricciones | Sin logos de clientes, teléfonos, emails, efectos, marcos ni texto generado por modelo de imagen. Sin tonos aguamarina en la piel del retrato ni filtros de belleza. El recurso se reconoce a tamaño pequeño; no se usa la variante teñida o sin recortar del tablero como entregable final. |
+
+**Referencia descrita, sin imágenes:** Gustavo toma del banner de Diandra Escobar el color de firma memorable, figura recortada presentando con micrófono de mano, título grande, pequeñas burbujas de prueba social y llamada a la comunidad. Se adapta con aguamarina, fondo tinta y copy inglés propio. Solo se conserva esta descripción verbal de la referencia externa, nunca su imagen en Galería, proveedor, adjuntos, artefactos o repositorio.
+
+**Honestidad:** el micrófono **se mantiene por decisión de Gustavo como estilo**, no como afirmación de marca ni prueba de una charla real. Sin un evento/actividad de ponente confirmado en memoria, no escribir «speaker» ni atribuir charlas, escenarios, clientes o resultados. Las pruebas sociales opcionales requieren hecho real, fuente y fecha; si faltan, se omiten. La llamada a la comunidad requiere un destino existente. El Markdown indica «Composición estilizada con micrófono; no documenta una charla o evento real» cuando no existe esa evidencia, para que Gustavo decida al revisar. La excepción a «sin fotos» y los cambios visuales autorizados no dispensan la verificación de afirmaciones.
+
+### Referencias privadas y notas de uso <a id="referencias-privadas"></a>
+
+El repositorio es **público**. Directorio privado externo al repo: `/home/cerrotico/personal/linkedin/Recursos visuales/perfil-referencias/`. Solo se comprobó existencia local, sin abrir, copiar ni subir las imágenes en esta tarea documental; eso no verifica todavía su calidad/aptitud. Cuando GAL-08 esté implementado, **Claude carga únicamente 01–03 en la categoría Perfil del servidor**, por encargo explícito de Gustavo, con estas notas y roles:
+
+| Referencia local | Nota/instrucción para Perfil | Uso permitido |
+| --- | --- | --- |
+| `01-pose-foto-perfil-sonriendo-de-lado.png` | «Pose para B y sonrisa para A, B y banner: conservar cabeza girada en B y sonrisa natural de esta referencia en todos los assets. Sustituir jersey por camiseta blanca oversized de algodón grueso, cuello crew neck, sin logos; gafas claras de 03.» | Pose de B y sonrisa de todos los assets; no conserva automáticamente su ropa o gafas originales. |
+| `02-cuerpo-completo-referencia-portada.png` | «Cuerpo y postura para el banner: recortar de cintura arriba, presentando con micrófono de mano, camiseta blanca oversized y gafas claras; expresión natural hablando con la sonrisa de 01.» | Cuerpo/postura del banner; el rostro se contrasta con 03. |
+| `03-rostro-angulos-identidad.png` | «Identidad para A, B y banner: vistas frontal, lateral y posterior de rostro y pelo; preservar facciones/cabello y mostrar sus gafas fotocromáticas (transitions) claras, como aquí. Comparar por visión cada resultado con esta referencia.» | Referencia de identidad obligatoria de los tres derivados, privada en el pipeline. |
+| `ref-externa-diandra-portada-microfono.png` | Referencia externa de estilo ya descrita en palabras; **excluida de la carga**. | No subirla a Galería ni a servicios de imagen/visión, no copiarla, almacenarla de nuevo o incorporarla al repo. Solo descripción verbal. |
+
+Los originales 01–03, derivados, previews y comparaciones viven en almacenamiento privado; no se incorporan al repo, Git, fixtures, documentos públicos ni como base64/miniaturas. En docs solo nombres/roles y reglas; en auditoría solo identificadores/metadatos, sin imágenes. Las notas son instrucciones del agente de perfil, no contexto editorial ni permiso de selección para posts. [GAL-08](galeria.md#gal-08) impone esa exclusión también a derivados.
+
+### Prompt de edición del tablero <a id="prompt-foto"></a>
+
+Texto base del tablero para la **opción A** con OpenAI image edit, modelo configurado por `OPENAI_IMAGE_MODEL`, sobre originales de GAL-08. Se conserva como fuente; las adaptaciones de B y del banner se registran aparte:
+
+```text
+Professional headshot of the person in the attached photo, head and shoulders,
+centered, eyes in the upper third, face about 55–60% of the frame height.
+Convert the person to black and white with rich contrast (deep blacks, clean
+highlights, natural skin texture, no beauty filters). Remove the original
+background and replace it with a flat solid color #0FF1CE, no gradient,
+no texture, no shadow, no halo around the hair. Square 800 x 800 px.
+Do not change the person's features, clothing or expression.
+```
+
+Guardar prompt base, versión de decisiones y adaptación efectiva de cada salida, con las referencias separadas por función. En A, B y banner prevalecen la sonrisa de 01 y las transitions claras de 03; adaptar la orden original de no cambiar expresión, sin alterar identidad. Para B se sustituye la orden de grises por color fotográfico natural y la de conservar ropa por la camiseta especificada; 01 manda en pose/sonrisa y 03 en identidad/gafas. Para el banner, 02 manda en cuerpo/postura y 03 en identidad/gafas; se autorizan camiseta, gesto de presentación con micrófono y expresión natural hablando con la sonrisa de 01. No conservar órdenes contradictorias del prompt base ni usar la imagen externa de Diandra como entrada.
+
+Si el modelo admite fondo transparente, pedir recorte con alfa; código compone el fondo exacto. Si no lo admite, verificar/extraer la máscara antes de componer; sin máscara fiable el recurso queda pendiente. Código aplica grises **solo a A**, verifica color natural de B con visión, y aplica encuadre/fondo a ambas; compone la figura del banner sobre tinta. Ningún modelo dibuja letras o el banner completo. La edición autorizada cambia ropa/gesto cuando corresponde, nunca identidad; el modelo no garantiza geometría, color ni fidelidad facial por sí solo.
+
+### Revisión de ocho puntos del tablero <a id="revision-ocho"></a>
+
+Cada punto registra resultado, evidencia y responsable **para A y B por separado**; los puntos de banner se comprueban con ambos retratos en los previews. Preparar previews no equivale a verificar el perfil ya aplicado; el punto 6 conserva la comprobación manual final en teléfono.
+
+1. Foto reconocible y ojos legibles a 32 px; cara grande y ojos en el tercio superior. Sin gafas de sol ni cristales oscurecidos; en A y B, transitions claras como en 03.
+2. Fondo de la foto plano `#0FF1CE`, sin gradientes ni texturas.
+3. **A:** persona en grises, sin aguamarina en la piel. **B:** color natural, sin aguamarina sobre la piel ni la ropa.
+4. Ningún contenido importante del banner en el área inferior izquierda tapada.
+5. Texto del banner dentro de x 600–1260 / y 60–336.
+6. Banner legible en teléfono: preview móvil antes de aprobar y comprobación de Gustavo en la app de LinkedIn al aplicarlo.
+7. Texto público en inglés.
+8. Sin logos de clientes, teléfonos ni emails en el banner.
+
+Además: comparación por visión de **A, B y figura del banner contra 03**, usando sus vistas frontal/lateral/posterior para comprobar identidad y pelo, sin forzar a igualar pose o expresión entre ángulos. Los tres assets se comparan con 01 para sonrisa; B además para pose, y el banner con 02 para cuerpo/postura. La expresión sin sonrisa de 02 no se reproduce. Revisar bordes, ojos visibles y cambios autorizados de ropa/gafas/expresión; estos cambios no cuentan por sí mismos como fallo de identidad. Vista lado a lado privada en Tu turno. Fallo o resultado incierto impide marcar ese asset listo. Código comprueba tamaño, fondo, desaturación de A, encuadre, máscaras, áreas seguras y texto literal; visión comprueba identidad y aspecto natural de B/banner.
+
+### EST-01 · Propuesta completa de perfil cada seis meses <a id="est-01"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** recibe assets, un documento Markdown con los cambios exactos y una checklist para aplicar su perfil por secciones.
+- **Responsable:** `perfil` es el único orquestador; llama a `posicionamiento`, analista/investigador y visual mediante aristas declaradas. Los especialistas devuelven resultados; Perfil decide la propuesta y conserva el contexto ([ARQ-02](arquitectura-agentes.md#arq-02)).
+- **Cadencia:** primera propuesta al habilitar el ciclo y cada seis meses calendario desde esa fecha, en `OPERATOR_TIMEZONE`; también bajo demanda mediante EST-05. Reintentos y aplicación tardía no duplican el periodo.
+- **Tu turno:** checklist [TUR-18](tu-turno.md#tur-18), con documento, assets y previews; elección explícita entre A y B, y decisión sobre el banner con su nota de composición estilizada. Gustavo aprueba, ajusta, descarta y aplica manualmente por sección; audiencia/oferta nuevas son decisiones pendientes.
+- **Datos necesarios y disponibilidad:** biblioteca, consultas manuales y marca existen. Referencias 01–03 disponibles localmente fuera del repo, pendientes de carga privada por Claude cuando exista GAL-08 y de comprobar aptitud; no se usan directamente fuera de ese flujo. Memoria, orientación y resultados aportan hechos, pero perfil completo, trayectoria o enlaces pueden faltar. No existen categoría Perfil, dossier ni ciclo automático.
+- **Dependencias:** web previsto, [BIB-01](biblioteca-equipos.md#bib-01), grafo ARQ, GAL-08 y `feat/imagenes-backend` para assets. Web verifica datos públicos/restricciones vigentes; no busca fotos sustitutas ni expone memoria privada.
+- **Código:** no existe este ciclo. Referencias: `knowledge/retrieval.py: AGENTS/search/unit`, `knowledge/agents.py`, `team_backend/posicionamiento.py`, `connectors._profile` (perfil reducido), `rediseno_views` (`tasks.perfil` vacío).
+- **Contrato de entrega:** un paquete privado/versionado con id de ciclo, versión de marca, fuentes y fecha, `propuesta-perfil.md`, **foto A y foto B, cada una 800×800 PNG/JPG**, banner 1584×396 PNG, previews móvil/escritorio del banner con cada retrato y checklist enlazada. Cada asset referencia originales/versiones/roles de GAL-08, edición/modelo/prompt, render y revisión. Documento y checklist registran A/B sin selección automática, la opción que Gustavo elija y la nota de honestidad del micrófono. Todo corresponde a la misma versión; fuentes, notas e imágenes privadas no se incrustan en copy público ni se guardan en el repo.
+- **Datos faltantes, default vinculante:** consultar primero memoria confirmada, perfil/fuentes accesibles y lectura web autorizada. Reutilizar hechos acreditados; conservar u omitir lo no necesario. Solo si un hecho imprescindible sigue ausente o contradictorio, preguntar en Tu turno **una pregunta por cada hecho faltante**, identificando sección y por qué hace falta, sin pedir otra vez datos que ya puede leer. Deduplicar por hecho entre secciones/ciclos; una respuesta actualiza memoria con procedencia y solo las secciones afectadas. Sin respuesta, dejar esa parte pendiente u omitir la prueba social; continuar lo independiente. No convertir una falta técnica de biblioteca o acceso en un cuestionario para Gustavo ni inventar cargos, fechas, logros, clientes o enlaces.
+- **Criterios de aceptación:**
+  1. **Dado** el vencimiento semestral o una petición completa EST-05, **cuando** prepara el paquete, **entonces** entrega las tres partes del contrato, con **ambas opciones A/B y el banner** incluidos, y el Markdown cubre foto, mural, titular, Acerca de, experiencia, destacados, habilidades, **URL personalizada** y otras secciones aplicables (educación, certificaciones, servicios, proyectos, idiomas, voluntariado y recomendaciones); ninguna se omite sin razón.
+  2. **Dado** cada sección del Markdown, **cuando** se presenta, **entonces** indica actual con fuente/fecha o «No pudimos leer tu perfil actual», acción (cambiar/conservar/no aplica/falta información), copy final en inglés en bloque separado, destinatario/utilidad, explicación, IDs del curso pertinentes, evidencia y pasos exactos para aplicarlo. Experiencia trae copy por puesto; destacados orden/título/descripción/enlace; habilidades nombres/orden; URL propuesta y disponibilidad por comprobar. No basta una lista de consejos.
+  3. **Dado** una recomendación de texto, imagen o conservación, **cuando** se valida, **entonces** tiene citas por recomendación de las listas pertinentes y respaldo real para cargos, resultados, clientes, habilidades y pruebas sociales. Si falta fundamento marca esa parte pendiente; solo un hecho imprescindible no recuperable desde memoria/lecturas genera una pregunta en Tu turno, una por hecho y sin duplicados. No se completa con datos inventados.
+  4. **Dado** biblioteca, memoria, tablero y web, **cuando** los usa, **entonces** prioriza el criterio del curso para orientar a la audiencia, aplica las decisiones explícitas de Gustavo y separa cada fuente con versión/fecha. La marca no se atribuye al curso y una página externa no reemplaza unidades faltantes. No copia otro perfil ni filtra información privada a búsquedas/copy público.
+  5. **Dado** EST-03/04 terminados, **cuando** los incorpora, **entonces** permite descargar A, B y banner, con previews del conjunto para cada retrato, ocho puntos y visión contra 03; enlaza instrucciones/elección y nota del micrófono en Markdown y TUR-18. Si falta una opción, referencia apta, fuente o verificación, marca el paquete parcial: no reduce la entrega a un solo retrato ni elige por Gustavo para terminar.
+  6. **Dado** web caída, restricciones técnicas sin comprobar o datos incompletos, **cuando** se genera, **entonces** muestra el alcance parcial; no declara el perfil «optimizado» ni cumplimiento técnico sin evidencia. Reintentar completa la propuesta con nueva versión, sin repetir gasto ya conciliado.
+  7. **Dado** aprobación del paquete, **cuando** se registra, **entonces** solo permite continuar la checklist manual. Ningún conector escribe el perfil ni lo declara aplicado antes de la confirmación de Gustavo.
+  8. **Dado** un banner con micrófono sin charla confirmada en memoria, **cuando** verifica la propuesta, **entonces** el copy no dice «speaker» ni atribuye eventos, clientes o resultados; el Markdown identifica la composición como estilo sin evidencia de una charla real y deja la decisión del banner a Gustavo, independiente de elegir A o B.
+  9. **Dado** el cap de **10 USD por ciclo de Perfil** confirmado por Gustavo, **cuando** reserva o liquida costes de texto, visión, A/B, banner y herramientas, **entonces** se detiene y avisa al alcanzar el cap o antes de excederlo según ARQ-05. Conserva avances y referencias; reintentar/ajustar la misma propuesta no reinicia el saldo ni elimina una opción para declarar completo el paquete.
+  10. **Dado** cargo confirmado en memoria, fecha de inicio ausente y un resultado comercial no verificable, **cuando** prepara experiencia y banner, **entonces** reutiliza el cargo sin preguntar, crea solo una pregunta sobre la fecha si es imprescindible y omite el resultado de la prueba social. No agrupa varios hechos en una pregunta ni bloquea el resto del paquete; responder la fecha no aprueba ni aplica el perfil.
+- **Brechas código/docs:** las consultas de biblioteca no producen este paquete ni checklist. El tablero define marca y previews de diseño, no una implementación de edición/exportación.
+- **Cobertura QA:** pendiente
+
+### EST-02 · Revisión mensual de destacados, artículos y actividad <a id="est-02"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** mantiene vigentes las piezas que demuestran utilidad para su audiencia, con cambios concretos listos para aplicar.
+- **Responsable:** `perfil`, con evidencia del analista y artefactos del director editorial; sin llamadas entre especialistas.
+- **Cadencia:** una propuesta mensual; si coincide con la revisión completa, integrar los cambios sin duplicar tareas. No regenera foto/banner cada mes por defecto.
+- **Tu turno:** Markdown mensual y checklist TUR-18 para destacados, artículos y actividad. «Sin cambios recomendados» es informativo y no crea tareas vacías.
+- **Datos necesarios y disponibilidad:** existen piezas, métricas y resumen semanal; no hay inventario completo de destacados/artículos ni toda la actividad. Consultar biblioteca primero, URLs accesibles y aportes fechados de Gustavo; likes no sustituyen encaje.
+- **Código:** no existe. Referencias: `editorial.py`, `metricas.py`, `resumen_semanal.py`, `knowledge/agents.py`.
+- **Criterios de aceptación:**
+  1. **Dado** un nuevo mes, **cuando** revisa, **entonces** propone conservar, añadir, retirar o reordenar destacados con enlaces/títulos/descripciones listos para pegar en inglés, citas por recomendación de PROFILE_MONTHLY_UNITS y evidencia de audiencia/vigencia/resultados; sin cambios útiles, explica ese resultado con fundamento.
+  2. **Dado** un artículo a crear o actualizar, **cuando** lo propone, **entonces** el Markdown entrega título y copy completo de la creación o cambio, objetivo, unidades/evidencia y pasos manuales. Sin evidencia suficiente queda idea pendiente, no artículo listo ni publicación programada.
+  3. **Dado** actividad reciente, **cuando** recomienda, **entonces** distingue acciones manuales posibles de sugerencias para publicaciones futuras, entregadas al director como artefactos. No promete editar la sección automática de actividad ni cambia el calendario al aprobar esta revisión.
+  4. **Dado** una tarea pendiente o revisión completa coincidente, **cuando** genera, **entonces** compara versiones, conserva lo aplicado y reúne o sustituye visiblemente lo pendiente; no reutiliza una aprobación sobre otro texto.
+  5. **Dado** una fuente inaccesible o falta de unidad, **cuando** comprueba, **entonces** marca enlace/fundamento pendiente, busca evidencia alternativa accesible y no presenta la recomendación como verificada. Aplica el default de EST-01: solo pregunta en Tu turno por hechos imprescindibles que no encontró, una pregunta por hecho; una biblioteca no disponible se reintenta como bloqueo técnico.
+- **Brechas código/docs:** las recomendaciones semanales actuales no equivalen a propuestas mensuales de perfil.
+- **Cobertura QA:** pendiente
+
+### EST-03 · Dos opciones de foto de perfil para elegir <a id="est-03"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** recibe siempre dos retratos: A según el manual en grises y B en color con la pose, ropa y gafas acordadas. Gustavo elige cuál aplicar.
+- **Responsable:** `perfil` encarga y presenta ambas propuestas con fundamento; `editor_visual` prepara edición/composición y devuelve resultados; código y visión comprueban; Gustavo elige A/B.
+- **Cadencia:** con cada propuesta completa semestral o bajo demanda EST-05. Subir o etiquetar una foto no dispara edición ni gasto por sí solo.
+- **Tu turno:** A y B lado a lado, referencias privadas por función, motivo/unidades, ocho puntos por opción, visión contra 03, preview circular/a 32 px y descarga de ambas; «Elegir A», «Elegir B» o pedir ajustes. Nada queda elegido por defecto; aplicación manual por TUR-18.
+- **Datos necesarios y disponibilidad:** originales privados y notas de Galería existen; las referencias 01 y 03 están en el directorio privado, sin verificar aún su calidad ni cargarlas al servidor. Falta [GAL-08](galeria.md#gal-08). Marca/prompt/decisiones ya entregados; edición OpenAI, conservación y revisión reutilizan `feat/imagenes-backend`.
+- **Código:** no existe esta producción. Referencias: `models.GalleryPhoto`, `capturas.photo_payload`, [IMG-07–10](imagenes-en-publicaciones.md#img-07); `OPENAI_IMAGE_MODEL` es la configuración del flujo previsto.
+- **Criterios de aceptación:**
+  1. **Dado** cualquier ciclo que proponga la foto de perfil, **cuando** entrega la sección completa, **entonces** ofrece **dos archivos y opciones distintas A/B**, ambos validados, y espera la elección explícita de Gustavo. Puede explicar diferencias sin seleccionar, descartar una opción ni sustituirla por una recomendación textual. La revisión mensual sin propuesta de foto no dispara estas ediciones.
+  2. **Dado** las referencias privadas cargadas en Perfil, **cuando** prepara las entradas, **entonces** usa 01 para pose de B y sonrisa de ambas, y 03 para identidad/gafas claras, con ids/versiones y sus notas como instrucciones; A parte de una toma apta de esa misma categoría. No usa fotos de posts, web, tablero ni la imagen de Diandra.
+  3. **Dado** la opción A, **cuando** la produce, **entonces** cumple el manual: persona en grises con alto contraste natural sobre fondo plano #0FF1CE, sin filtros de belleza, halos, logos ni gafas de sol; conserva identidad/pelo de 03, **sonríe como en 01** y muestra sus transitions claras con ojos legibles a 32 px.
+  4. **Dado** la opción B, **cuando** la produce, **entonces** conserva la pose de 01, cabeza girada hacia un lado, sonrisa y expresión relajada, con sus facciones de 03. Sustituye el jersey de fútbol por camiseta **blanca, lisa, oversized, de algodón grueso, cuello redondo crew neck, holgada y no ajustada**, sin logos ni estampados ni restos del jersey. Usa las gafas **transparentes de montura fina de 03**, nunca gafas de sol; color fotográfico/piel natural, sin filtros de belleza ni aguamarina en piel o ropa.
+  5. **Dado** los insumos autorizados, **cuando** edita ambas variantes, **entonces** invoca OpenAI image edit con `OPENAI_IMAGE_MODEL`, prompt del tablero/adaptación explícita por opción y transparencia cuando se admita; registra qué referencia aporta pose o identidad. Conserva originales, máscaras, derivados, coste y trazabilidad privada IMG; el cambio autorizado de ropa/gafas no autoriza cambiar rasgos.
+  6. **Dado** las salidas de edición, **cuando** compone con código, **entonces** ambas cumplen 800×800, sRGB, menos de 8 MB, fondo exacto #0FF1CE, cabeza/hombros, rostro 55–60 %, ojos en tercio superior y margen superior aproximado. Adapta el recorte de B al giro, sin frontalizarlo. Desatura solo A; el fondo exterior a la máscara es uniforme y el sujeto opaco de A es gris antes de componer bordes con alfa. PNG es la salida por defecto.
+  7. **Dado** ambas opciones compuestas, **cuando** valida, **entonces** ejecuta los **ocho puntos en cada opción**, cambiando solo el punto 3 de B a «color natural, sin aguamarina sobre la piel ni la ropa», y compara por visión A/B con las vistas de **03**. Comprueba sonrisa de A y B y pose de B contra 01, transitions claras de 03 y ojos visibles a 32 px; entrega evidencia privada. Cambios de identidad, halos, encuadre fallido o resultado incierto bloquean esa variante.
+  8. **Dado** categoría vacía, 01/03 ausente o retirada, permiso revocado, edición fallida o presupuesto insuficiente, **cuando** intenta completar, **entonces** informa el bloqueo y conserva avances/revisiones. No declara completa la sección con una sola opción, no entrega el original sin tratar como resultado final, ni toma fotos de otra categoría; pide solo el insumo o ajuste necesario.
+  9. **Dado** A y B válidas, **cuando** Gustavo elige una en TUR-18, **entonces** registra id/versión de la opción y actualiza documento/checklist/previews seleccionados, conservando ambas descargas. El banner mantiene su camiseta/gafas/estilo acordados aunque elija A; elegir retrato no aprueba el banner ni escribe LinkedIn.
+  10. **Dado** cambio de referencia, nota, permiso o tratamiento después de aprobar, **cuando** regenera, **entonces** crea una versión pendiente con nueva revisión, invalida la elección/aprobación afectada y no declara cambios en LinkedIn.
+- **Brechas código/docs:** IMG prepara medios de posts; se reutilizan sus primitivas con la autorización específica de GAL-08 y receta de perfil. No se replica almacenamiento, editor, gasto o proveedor.
+- **Cobertura QA:** pendiente
+
+### EST-04 · Banner de marca con foto recortada y render por código <a id="est-04"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** recibe un banner de tinta con su figura de cintura arriba presentando con micrófono, marca reconocible y mensaje inglés honesto sobre lo que hace por su audiencia.
+- **Responsable:** `perfil` decide el mensaje/propuesta con el curso; visual prepara recorte y composición; código dibuja diseño/texto. No hay llamadas entre especialistas.
+- **Cadencia:** propuesta completa semestral o bajo demanda EST-05; un cambio de marca solicitado genera versión nueva.
+- **Tu turno:** copy, motivo/citas, pruebas sociales, comparación privada con 01/02/03, banner descargable, previews con A/B y nota del Markdown que distingue composición estilizada de evento real; Gustavo decide por TUR-18.
+- **Datos necesarios y disponibilidad:** [marca](#marca), estilo verbal y referencias 01/02/03 existen localmente; faltan carga privada en Perfil, comprobación de aptitud, plantilla y producción. No se ha confirmado una charla en memoria en esta tarea; no se presume evidencia de ponente ni prueba social.
+- **Código:** no existe el banner. Reutilización futura de [IMG-INF-02](imagenes-en-publicaciones.md#img-inf-02), [IMG-INF-03](imagenes-en-publicaciones.md#img-inf-03) e [IMG-INF-08](imagenes-en-publicaciones.md#img-inf-08) para render/comprobación, y OpenAI image edit de IMG solo para la foto.
+- **Criterios de aceptación:**
+  1. **Dado** marca y posicionamiento vigentes, **cuando** diseña, **entonces** Perfil propone la frase en inglés desde la utilidad para la audiencia y las unidades PROFILE_VISUAL_UNITS/posicionamiento, con citas y razón en Markdown. Usa «Software and AI for early-stage startups.» únicamente como fallback si no hay una propuesta mejor fundamentada y esa oferta está confirmada; no pide a Gustavo inventar el eslogan. Registra versión de marca/copy y compone por código PNG 1584×396 de tinta con etiqueta mayúscula acreditada, dos líneas inglesas Ubuntu 56 px dentro de la zona segura, una palabra aguamarina, acento 72×4 y patrón 0/1. Si no cabe, acorta la frase manteniendo fundamento y geometría. Ningún modelo de imagen dibuja texto ni el banner completo.
+  2. **Dado** 01, 02 y 03 cargadas en Perfil, **cuando** prepara la figura, **entonces** usa **02 para cuerpo/postura y 03 para rostro/pelo**, y OpenAI image edit con el prompt adaptado para representarlo **de cintura arriba presentando con micrófono de mano**. Lleva la misma camiseta blanca oversized de algodón grueso, holgada, cuello crew neck sin logos/estampados, y gafas claras de montura fina de B. **Sonríe en el banner como en 01**, con expresión natural de presentación, aunque la toma corporal 02 no sonría. Las gafas fotocromáticas se muestran claras, nunca oscurecidas. El recorte usa transparencia donde se admita y máscara fiable; nunca la foto externa de Diandra como entrada.
+  3. **Dado** figura y copy, **cuando** calcula el layout, **entonces** deja la figura fuera del rectángulo tapado por el círculo de perfil 568×264, mantiene rostro y micrófono visibles en móvil y sitúa toda la figura dentro del 60 % central donde sea posible. Texto relevante dentro de x 600–1260 / y 60–336, sin colisiones. Código comprueba ambos previews con A y B; cualquier recorte periférico inevitable se muestra para revisión, nunca ocultando rostro/micrófono. Si no cabe, ajusta composición o propone copy más breve sin reducir silenciosamente los 56 px ni omitir la figura.
+  4. **Dado** la referencia verbal de Diandra, **cuando** adapta, **entonces** conserva tinta, inglés, aguamarina y patrón 0/1 sin subir, copiar o almacenar su imagen en repo, servidor o proveedor. Burbujas solo con pruebas reales verificables y fuente/fecha; llamada a comunidad solo con destino real. Sin evidencia omite esas adiciones.
+  5. **Dado** el render, **cuando** se revisa, **entonces** aplica los ocho puntos con cada retrato A/B y sus reglas de color, comprueba texto, tamaño, contraste, solapamientos y peso, y compara **rostro/pelo con 03** y cuerpo/postura con 02 y sonrisa con 01 mediante visión; comprueba transitions claras y ojos visibles. Distingue cambios autorizados de ropa/gesto de un cambio de identidad. Entrega previews móvil/escritorio con overlay y guías; revisión real en la app queda a Gustavo.
+  6. **Dado** 01/02/03 no disponibles en Perfil, fuente Ubuntu o máscara ausente, cara alterada, resultado de visión incierto, render fallido o presupuesto agotado, **cuando** intenta finalizar, **entonces** marca la sección pendiente con causa y remedio. No toma fotos de otro ámbito ni de Diandra, no entrega el banner sin Gustavo y no usa un modelo para dibujar letras.
+  7. **Dado** cambio de copy, foto o marca después de aprobar, **cuando** se renderiza, **entonces** conserva versiones, invalida la aprobación para la nueva variante y devuelve el paquete sincronizado a Tu turno.
+  8. **Dado** el principio de honestidad del verificador, **cuando** contrasta copy y pruebas sociales con memoria/evidencia, **entonces** rechaza eventos, charlas, clientes o resultados no confirmados. Sin actividad real de ponente confirmada no permite «speaker»; el micrófono por sí solo no cuenta como evidencia ni registra una charla en memoria.
+  9. **Dado** la composición con micrófono sin charla confirmada, **cuando** entrega el Markdown y Tu turno, **entonces** indica que la imagen es un recurso de estilo y no documenta un evento real, para que Gustavo acepte, pida ajustes o descarte el banner. La autorización de generar ese estilo no equivale a aprobar su aplicación ni a permitir afirmaciones falsas.
+- **Brechas código/docs:** el manual de infografías aporta primitivas; la plantilla de banner usa la marca del tablero con la excepción explícita de Gustavo. Ningún asset final se genera en esta tarea documental.
+- **Cobertura QA:** pendiente
+
+### EST-05 · Pedir la propuesta del perfil desde una captura <a id="est-05"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** puede decir o escribir «hazme la propuesta del perfil» y recibir el paquete completo sin esperar al semestre.
+- **Responsable:** ruteo de captura/workflow registra el trigger declarado; `perfil` es el único orquestador. Capturas no consulta el curso ni llama especialistas.
+- **Cadencia:** bajo demanda explícita, con límites de ARQ; no reinicia el ancla semestral ni la revisión mensual.
+- **Tu turno:** mismo paquete y checklist TUR-18; si falta algo imprescindible, pregunta concreta dentro de esa propuesta. Solicitar el trabajo no aprueba resultados ni cambios en LinkedIn.
+- **Datos necesarios y disponibilidad:** captura de texto/voz, transcripción, historial y ruteo existen; no existe esta intención ni su trigger/correlación con perfil. Se necesitan biblioteca y fotos de Perfil; una foto adjunta sin categoría no se usa hasta que Gustavo la etiquete.
+- **Código:** no existe esta ruta. Referencias: `capturas.classify`, `jobs`, [CAP](captura.md), grafo/ledgers [ARQ-01](arquitectura-agentes.md#arq-01) y [ARQ-04](arquitectura-agentes.md#arq-04).
+- **Criterios de aceptación:**
+  1. **Dado** la petición explícita en texto o voz transcrita, **cuando** se procesa, **entonces** el workflow inicia la propuesta completa EST-01 con las dos opciones A/B de EST-03 y el banner EST-04, enlaza captura y `cycle_id` y muestra su progreso/resultado en «Lo que enviaste». No la pierde como una idea editorial.
+  2. **Dado** la misma captura reintentada o un ciclo completo equivalente ya en curso, **cuando** se recibe, **entonces** deduplica por captura y reúne la petición en la instancia compatible, conservando presupuesto/checkpoint. Si cambia objetivo o fuentes, registra nueva versión explícita sin ocultar decisiones previas ni gastar de nuevo por un retry.
+  3. **Dado** una mención ambigua al perfil, **cuando** se clasifica, **entonces** pide aclarar el alcance antes de generar assets; la frase explícita anterior basta para una propuesta completa, sin otra confirmación de intención.
+  4. **Dado** falta de fotos, información, biblioteca o presupuesto, **cuando** trabaja, **entonces** conserva el avance parcial y el bloqueo en el mismo ciclo; no toma fotos de otras categorías, no publica, ni aumenta topes por ser una petición manual.
+  5. **Dado** una captura deshecha, **cuando** se procesa la cancelación, **entonces** retira su solicitud y cancela trabajo pendiente si era su único motivo, conserva costes ya incurridos y no revierte aplicación manual ni cancela un ciclo semestral que también la atendía.
+- **Brechas código/docs:** se añade un trigger al ciclo, no otro agente de perfil ni consumo de biblioteca por Capturas (BIB-06 retirada).
+- **Cobertura QA:** pendiente
+
+## Retiradas
+
+Ninguna.
