@@ -40,12 +40,17 @@ async function elapsedUntil(done: () => boolean, step = 4, limit = 2000): Promis
 
 afterEach(() => jest.useRealTimers());
 
+/** The arrival is the newest item: «now», or just after the latest fixture item, so the test does not depend on the
+ * hour (the fixture's «n-hoy» is today at 00:30, which is later than «now» between 00:00 and 00:30). */
+const newest = (items: { at: string }[]) =>
+  new Date(Math.max(Date.now(), ...items.map((item) => Date.parse(item.at) + 60_000))).toISOString();
+
 describe('Notificaciones · the list (MovNotificaciones)', () => {
   it('a notification that arrives enters at the top with the arrival motion; the others do not', async () => {
     const first = notificacionesFixture();
     const arrived: Notificaciones = {
       ...first,
-      items: [notificationFixture({ id: 'n-nueva', title: 'Sofía Muestra aceptó tu invitación', layer: 'red', link: '/personas/c9', at: new Date().toISOString() }), ...first.items],
+      items: [notificationFixture({ id: 'n-nueva', title: 'Sofía Muestra aceptó tu invitación', layer: 'red', link: '/personas/c9', at: newest(first.items) }), ...first.items],
       unread: first.unread + 1,
     };
     let later = false;
