@@ -255,6 +255,7 @@ class EditorialPiece(models.Model):
     state=models.CharField(max_length=20,choices=State.choices,default=State.PREPARING,db_index=True)
     stage=models.CharField(max_length=20,blank=True)
     brief=models.JSONField(default=dict,blank=True)
+    research=models.JSONField(default=list,blank=True)
     variants=models.JSONField(default=dict,blank=True)
     panel=models.JSONField(default=dict,blank=True)
     selection=models.JSONField(default=dict,blank=True)
@@ -615,6 +616,7 @@ class Capture(models.Model):
     publish_asap_expected_slot=models.DateTimeField(null=True,blank=True)
     publish_asap_reason=models.TextField(blank=True)
     understanding=models.JSONField(default=dict,blank=True)
+    investigation=models.JSONField(default=dict,blank=True)
     context_type=models.CharField(max_length=10,choices=Context.choices,blank=True)
     context_id=models.CharField(max_length=64,blank=True)
     # Visibility chosen when the capture answers a question (null: the question's suggestion).
@@ -637,6 +639,19 @@ class Capture(models.Model):
     def text(self):
         """The note plus the transcript: what the team routes."""
         return '\n\n'.join(part.strip() for part in (self.note,self.transcript) if part and part.strip())
+
+class WebResearchRun(models.Model):
+    """One durable research attempt per caller key, including failures and interrupted work.
+
+    Generic ownership prepares the phase 3 tool adapter; a retry never resets the daily quota.
+    Request bodies are not stored, only a hash and the bounded result. No private memory here.
+    """
+    key=models.CharField(max_length=160,primary_key=True)
+    request_hash=models.CharField(max_length=64)
+    created_at=models.DateTimeField(default=timezone.now,db_index=True)
+    state=models.CharField(max_length=20,default='running')
+    result=models.JSONField(default=dict,blank=True)
+
 
 class GalleryPhoto(models.Model):
     """«Galería»: photos for Gustavo's posts. The team decides when to use them and whether to edit them with AI."""

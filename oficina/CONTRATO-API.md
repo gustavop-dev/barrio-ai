@@ -1010,3 +1010,48 @@ La prioridad se interpreta de nota más transcripción; no existe botón. `publi
 El veto y la aprobación usan los endpoints actuales `POST /api/v1/operador/actions/<id>/reject` y `/approve`; el segundo exige `expected_hash`. `action_detail.payload.media` congela `{kind,images:[{id,sha256,alt}],document_sha256}` junto con el texto bajo el mismo `payload_hash`. La fase 2 debe usar el hash recibido, sin recalcularlo ni editar el manifiesto. Los archivos o el alt cambiados invalidan la propuesta.
 
 `seed_qa`: la pieza `manana` tiene foto; `aprobacion` tiene infografía; captura `uid("capture:urgente")` contiene «Publícalo lo antes posible.» y fecha prevista. Los identificadores anteriores de piezas, fotos, capturas y tarjetas se conservan. QA de interfaz pendiente de fase 2.
+
+## Acceso web del equipo · fase 1 (CAP-17/18, EDI-03/07/13/17)
+
+Implementado en backend; no requiere cambios de envío de captura. Los enlaces se extraen de `note` y `transcript`.
+Las peticiones de investigación se interpretan en el contexto de la nota; no se añade un interruptor que la interfaz
+deba adivinar por palabras. No cambia ningún permiso ni se expone un endpoint público para fetch arbitrario.
+
+| Endpoint/campo | Contrato aditivo |
+| --- | --- |
+| `GET /api/v1/capturas` y `GET /api/v1/capturas/<id>` | `investigation: ResearchResult \| null`; `outcome.text` incluye el resultado de investigación y el destino de la captura. |
+| `GET /api/v1/editorial/pieces/<id>` | `research: ResearchResult[]` conserva las investigaciones ofrecidas al director y la solicitada para la pieza. `team_comments[]` añade `investigation`. |
+| `DELETE /api/v1/capturas/<id>` | Retira también investigación y contenido del intento, sin borrar uso monetario ni liberar cupo diario. Mantiene la ventana y permisos existentes. |
+| Eventos de Oficina | `entrega` real desde `investigador_referentes` a `director_editorial`, con resumen de fuentes o limitación; sin consultas ni contenido de capturas. |
+| `GET /api/v1/ajustes`, gasto editorial | El total editorial incluye investigación de piezas e imágenes de ambos proveedores. La fila de imágenes es un sublímite, no otro gasto que sumar al total editorial. |
+
+`ResearchResult` (solo lectura, `schema_version: 1`):
+
+```typescript
+type ResearchResult = {
+  schema_version: 1;
+  question: string;                 // pregunta pública; vacía si no se pudo separar
+  status: 'complete' | 'partial' | 'unavailable' | 'skipped' | 'running';
+  researched_at: string;            // ISO datetime
+  findings: { text: string; source_ids: string[] }[];
+  sources: {
+    id: string; url: string; title: string; quoted_text: string;
+    retrieved_at: string; kind: 'web' | 'github'; truncated: boolean;
+  }[];
+  limitations: string[];
+  usage: {
+    model?: string | null; request_id?: string | null; ledger_id?: string | null;
+    estimated_usd?: number | null; input_tokens?: number; output_tokens?: number;
+    cache_creation_input_tokens?: number; cache_read_input_tokens?: number;
+    web_search_requests?: number; web_fetch_requests?: number; stop_reason?: string;
+  };
+};
+```
+
+Para la fase de interfaz: mostrar «Fuentes» en el detalle de captura/pieza, título con enlace, fecha y extracto como
+texto escapado, más las limitaciones. No renderizar HTML de fuentes ni tratar sus instrucciones como acciones.
+`partial` no equivale a investigación completa; `unavailable/skipped` no equivale a «no existe esa noticia».
+`running` puede ser un intento interrumpido: consultar estado no reintenta ni paga. Cuando no hay investigación,
+mantener la vista habitual. El outcome ya comunica «Investigó… (N fuentes) · …» o el motivo de omisión.
+
+Configuración, prompts y comprobaciones para Claude: `agentes-linkedin/infra/docs/acceso-web-equipo.md`.

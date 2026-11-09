@@ -129,4 +129,6 @@ class ImageMigrationTests(TransactionTestCase):
             self.assertEqual(Photo.objects.get(pk=denied.pk).ai_edit,'no')
             self.assertEqual(Photo.objects.get(pk=denied.pk).image.name,'original-b.png')
             self.assertEqual(apps.get_model('team_backend','OfficePreference').objects.get(pk=1).gallery_ai_edit,'no')
-        finally:MigrationExecutor(connection).migrate(after)
+        finally:
+            executor=MigrationExecutor(connection)
+            executor.migrate(executor.loader.graph.leaf_nodes())

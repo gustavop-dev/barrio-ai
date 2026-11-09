@@ -26,6 +26,8 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 | [CAP-14](#cap-14) | Cerrar la hoja sin enviar | PWA · app | funciona |
 | [CAP-15](#cap-15) | Límites de tamaño, tipo y duración | PWA · app · backend | parcial |
 | [CAP-16](#cap-16) | Interpretar «publícalo lo antes posible» | backend | funciona |
+| [CAP-17](#cap-17) | Enlaces que el equipo lee | backend | funciona |
+| [CAP-18](#cap-18) | Pídele al equipo que investigue | backend | funciona |
 
 ---
 
@@ -281,6 +283,37 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** una idea urgente, **cuando** se consulta, **entonces** muestra evidencia, fecha prevista y condiciones, sin botón ni campo editable de urgencia.
 - **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
 - **Cobertura QA:**
+
+### CAP-17 · Enlaces que el equipo lee <a id="cap-17"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** el equipo lee los enlaces públicos de una nota o transcripción y conserva evidencia para Editorial.
+- **Código:** `web_sources.detect_urls/read_github`, `research.research`, `capturas.process/ideas_for_director`.
+- **Criterios de aceptación:**
+  1. **Dado** enlaces en nota y audio, **cuando** procesa la captura, **entonces** deduplica los enlaces y guarda `investigation` con pregunta, hallazgos, fuentes (URL, título, extracto y fecha), estado y limitaciones.
+  2. **Dado** la raíz de un repositorio público de GitHub, **cuando** lo lee, **entonces** obtiene descripción, temas, lenguajes, README acotado y commits recientes por REST. Si falla, puede usar `web_fetch`; nunca deduce contenido del nombre. Un enlace a un archivo o issue sigue siendo ese enlace.
+  3. **Dado** credenciales, parámetros de consulta, direcciones privadas, DNS mixto, redirecciones o exceso de tamaño, **cuando** intenta leer, **entonces** omite el enlace inseguro o detiene esa lectura, conserva la captura y muestra la limitación. El cliente directo solo contacta GitHub, con IP pública fijada y TLS para el host original.
+  4. **Dado** fuentes leídas, **cuando** termina, **entonces** el resultado de la captura lo dice y la Oficina recibe una entrega de `investigador_referentes` a `director_editorial`, sin texto privado ni URLs en el evento.
+  5. **Dado** `LIVE_PROVIDERS` desactivado, **cuando** recibe enlaces, **entonces** no hace DNS, HTTP ni llamadas al modelo de investigación, tampoco al GitHub gratuito.
+- **Brechas código/docs:** esta fase entrega backend y contrato; la vista detallada de fuentes en PWA/app queda para la fase de interfaz. URLs con parámetros se omiten de forma conservadora. «funciona» identifica la implementación; validación de CI pendiente.
+- **Cobertura QA:** `test_web_research.py`, escrito con DNS/HTTP/SDK falsos; ejecución a cargo de Claude.
+
+### CAP-18 · Pídele al equipo que investigue <a id="cap-18"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** puede pedir en texto o voz que el equipo investigue un tema público y lo lleve con fuentes a la mesa editorial.
+- **Código:** `capture_intent`, `research.ResearchRequest/ResearchResult`, `WebResearchRun`, `knowledge.providers.WebTools`.
+- **Criterios de aceptación:**
+  1. **Dado** «investiga la nueva versión de Python», **cuando** interpreta la captura, **entonces** usa la llamada de clasificación existente o las preguntas de Jev de la ruta explícita, exige evidencia literal y separa una pregunta pública. Negaciones, citas ajenas y evidencia inventada no activan la investigación.
+  2. **Dado** información privada mezclada con la petición, **cuando** prepara la consulta, **entonces** solo envía el tema público separado; si no puede separarlo con seguridad, informa la limitación. No envía la nota, transcript, memoria, orientación ni inbox al contexto de herramientas web.
+  3. **Dado** búsquedas con respuesta, **cuando** guarda hallazgos, **entonces** usa citas nativas enlazadas a resultados reales de herramientas. Una URL escrita por el modelo sin cita no es evidencia.
+  4. **Dado** cap diario, presupuesto agotado, timeout, herramienta fallida o respuesta parcial, **cuando** termina, **entonces** conserva el destino de la captura y hace visible el límite. No vuelve a pagar al repetir la misma clave, ni continúa automáticamente un `pause_turn`.
+  5. **Dado** una idea con investigación, **cuando** el director la recibe, **entonces** conserva fuentes y fechas como datos no confiables; nunca trata instrucciones dentro de páginas o README como órdenes.
+  6. **Dado** Deshacer durante o después de una investigación, **cuando** se aplica, **entonces** retira el contenido de captura y resultado persistido sin borrar el gasto ni liberar el cupo consumido.
+- **Brechas código/docs:** el catálogo de `plan-equipos` remite a esta fase sin reservar IDs web nuevos; CAP-17/18 proceden del brief. No se implementa aquí el observatorio mensual ni el dispatcher de fase 3.
+- **Cobertura QA:** `test_web_research.py`, pendiente de ejecución en CI.
 
 ## Imágenes
 

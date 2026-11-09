@@ -21,6 +21,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [personas-oportunidades.md](personas-oportunidades.md) | `PRS` | El barrio, la ficha de una persona, las oportunidades y los referentes |
 | [ajustes.md](ajustes.md) | `AJU` | Máquina, autonomía, gasto, LinkedIn, notificaciones, orientación y sesión |
 | [motor-editorial.md](motor-editorial.md) | `EDI` | El circuito que prepara, verifica y publica la pieza diaria |
+| [observatorio-referentes.md](observatorio-referentes.md) | `OBS` | Dependencia web disponible y alcance reservado a las siguientes fases del plan de equipos |
 | [red.md](red.md) | `BAR` | Descubrir, clasificar, seguir, invitar y aceptar personas del barrio |
 | [comentarios-y-lider.md](comentarios-y-lider.md) | `COM` | Comentarios en posts de referentes y el agente líder que aprueba o descarta |
 | [inbox.md](inbox.md) | `INB` | Lectura del inbox de LinkedIn y conversaciones que le tocan a Gustavo |

@@ -218,7 +218,7 @@ class ImageProviderContracts(PublicationBase):
         self.assertEqual(len(calls),2)
         with db.connect() as c:self.assertEqual(c.execute("SELECT status FROM usage_ledger WHERE request_hash='second'").fetchone()['status'],'uncertain')
 
-    def test_image_budget_reserves_both_providers_and_does_not_use_editorial_or_comment_budget(self):
+    def test_image_subcap_reserves_both_providers_and_counts_in_editorial_total(self):
         with patch.dict(os.environ,{'IMAGE_DAILY_USD':'0.10','OPENAI_LIMIT_USD':'10','ANTHROPIC_LIMIT_USD':'10'}):
             rid=providers.reserve('openai','image-edit',Decimal('.08'))
             with self.assertRaises(ValueError):providers.reserve('anthropic','image-check',Decimal('.03'))
@@ -226,7 +226,7 @@ class ImageProviderContracts(PublicationBase):
             providers.reserve('anthropic','image-check',Decimal('.03'))
         self.assertEqual(imagenes.spent_today(),Decimal('.07'))
         from team_backend import editorial
-        self.assertEqual(editorial.spent_today(),0);self.assertEqual(autopiloto.llm_spent_today(),0)
+        self.assertEqual(editorial.spent_today(),Decimal('.07'));self.assertEqual(autopiloto.llm_spent_today(),0)
         budgets=self.human.get('/api/v1/ajustes').json()['ai_spend']['today']
         self.assertEqual(next(b for b in budgets if b['budget']=='imagenes')['spent_usd'],.07)
 
