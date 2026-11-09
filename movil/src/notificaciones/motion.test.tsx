@@ -42,8 +42,8 @@ afterEach(() => jest.useRealTimers());
 
 /** The arrival is the newest item: «now», or just after the latest fixture item, so the test does not depend on the
  * hour (the fixture's «n-hoy» is today at 00:30, which is later than «now» between 00:00 and 00:30). */
-const newest = (items: { at: string }[]) =>
-  new Date(Math.max(Date.now(), ...items.map((item) => Date.parse(item.at) + 60_000))).toISOString();
+const newest = (items: { at?: string | null }[]) =>
+  new Date(Math.max(Date.now(), ...items.map((item) => (item.at ? Date.parse(item.at) + 60_000 : 0)))).toISOString();
 
 describe('Notificaciones · the list (MovNotificaciones)', () => {
   it('a notification that arrives enters at the top with the arrival motion; the others do not', async () => {
