@@ -35,6 +35,7 @@ export const STAGE_LABEL: Record<string, string> = {
   seleccion: 'Selección del texto final',
   verificador: 'Verificador',
   reparacion: 'Ronda de reparación',
+  visual: 'Editor visual: medios de la pieza',
 };
 
 export const MODALITY_LABEL: Record<string, string> = {
@@ -191,6 +192,7 @@ const COST_STAGES: { key: string; label: string }[] = [
   { key: 'seleccion', label: 'Selección' },
   { key: 'verificador', label: 'Verificador' },
   { key: 'reparacion', label: 'Reparación' },
+  { key: 'visual', label: 'Editor visual' },
 ];
 
 /** Cost per stage in circuit order (unknown stages last); rows without an estimate are left out, never 0. */

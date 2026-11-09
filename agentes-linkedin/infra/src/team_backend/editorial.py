@@ -29,7 +29,7 @@ from decimal import Decimal
 from django.db import IntegrityError
 from django.utils import timezone
 from knowledge import providers
-from . import guardas, operador, orientacion, posicionamiento, voz, infografias, imagenes, urgente, research, orquestacion
+from . import guardas, operador, orientacion, posicionamiento, voz, infografias, imagenes, urgente, research, orquestacion, editor_visual
 from .exceptions import Conflict
 from .jobs import enqueue_operation
 from .models import OPEN_PIECE_STATES, ConnectorAccount, EditorialPiece, Job, ObservedPost, TeamQuestion
@@ -49,9 +49,10 @@ GUIDE_UNITS=[f'LI-06-M001-K{i:02d}' for i in range(1,17)]          # rules guide
 READERS=['lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par']
 MODALITIES=posicionamiento.modalities('editorial')  # stored in brief['modality']; mapping in posicionamiento.py
 PILLARS=list(posicionamiento.PILLARS)
-EDITORIAL_ROLES=['director_editorial','copywriter_a','copywriter_b',*READERS,'editor_verificador']
+EDITORIAL_ROLES=['director_editorial','copywriter_a','copywriter_b',*READERS,'editor_verificador','editor_visual']
 STAGE_ROLES={'director':['director_editorial'],'redactor':['copywriter_a','copywriter_b'],'lectores':READERS,
-             'seleccion':['director_editorial'],'verificador':['editor_verificador'],'reparacion':['director_editorial']}
+             'seleccion':['director_editorial'],'verificador':['editor_verificador'],'reparacion':['director_editorial'],
+             'visual':['editor_visual']}
 SIGNAL_DAYS=7;SIGNAL_LIMIT=12;HISTORY_LIMIT=20
 RESULT_AGES=('72h','7d');PERFORMANCE_DAYS=30;RESULT_FIELDS=('impressions','reactions','comments')
 
@@ -624,7 +625,7 @@ def _run(piece,user,now,origin_job):
                link=f'/calendario/pieza/{piece.id}',ref=f'piece_blocked:{piece.id}')
         return _close(piece,EditorialPiece.State.BLOCKED,'; '.join(reasons))
     try:
-        imagenes.prepare(piece,public,private)
+        _visual(piece,public,private)
         urgente.ensure_veto(piece)
     except ValueError as exc:
         from .notificaciones import avisar
@@ -639,6 +640,40 @@ def _run(piece,user,now,origin_job):
     if latest_action(piece) is None:operador.create_proposal(user,None,'CONT-09',{'text':final,'media':imagenes.manifest(piece)},rationale=rationale[:4000],citations=piece.citations,risks=risks,
                              source='agent',origin_job=origin_job,model=model,piece=piece)
     return _close(piece,EditorialPiece.State.READY,'Lista para la política autónoma.')
+
+def _visual(piece,public,private):
+    """The director requests tools sequentially; specialists never dispatch nested calls."""
+    piece.stage='visual';piece.save(update_fields=['stage','updated_at'])
+    runtime=orquestacion.current()
+    make_request=lambda:editor_visual.request(piece,public,private)
+    request=runtime.snapshot('visual_input',make_request) if runtime else make_request()
+    try:
+        proposal=orquestacion.call('proponer_visual',request,lambda:editor_visual.propose(request),key='visual:proposal')
+    except (ValueError,OSError) as exc:
+        # Providers report some ambiguous failures as ValueError; their reservation is authoritative.
+        from .models import UsageEntry
+        if runtime and UsageEntry.objects.filter(usage__cycle_id=str(runtime.id),purpose='editorial-visual',
+                status__in=['reserved','uncertain']).exists():
+            runtime.stop('uncertain')
+            raise orquestacion.CycleStopped('uncertain') from exc
+        # Only a known selector failure can keep IMG's original fallback.
+        proposal=editor_visual.fallback(request,str(exc))
+    editor_visual.accept(piece,proposal,public,private)
+    if not any(u.get('stage')=='visual' for u in piece.usage):
+        piece.usage=list(piece.usage)+[{'stage':'visual','mode':proposal['mode']}]
+        piece.save(update_fields=['usage','updated_at'])
+    imagenes.prepare(piece,public,private)
+    package=orquestacion.call('entregar_visual',{'piece':str(piece.id),'payload':imagenes.manifest(piece)},
+        lambda:editor_visual.deliver(piece,public,private,request),key='visual:package')
+    # Recheck even a replayed package before the operator receives the proposal.
+    if package['media']!=imagenes.manifest(piece) or package['text_sha256']!=_sha(piece.final_text):
+        raise ValueError('El paquete visual cambió después de su entrega')
+    problems=editor_visual.freshness_issues(piece)
+    if problems:raise ValueError('; '.join(problems))
+    piece.selection=dict(piece.selection,visual=dict(piece.selection['visual'],media=package['media'],
+        final_kind=piece.image_kind,final_reason=piece.image_reason))
+    piece.save(update_fields=['selection','updated_at'])
+
 
 def _sha(text):
     return hashlib.sha256(text.encode()).hexdigest()

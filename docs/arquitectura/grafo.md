@@ -2,9 +2,9 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `3b.1` · SHA-256 `76200edcef76547f1efcec98834e7e1be0e35d9f950c3ca101a618a93be6d3d2`.
+Versión `2026-11-08-fase7` · SHA-256 `438a98f3db2f1729a8bf98f59a706dce136ade6116c9894ee88fd2ebd0c9f0de`.
 
-38 nodos (34 activos), 42 aristas y 11 ciclos.
+36 nodos (33 activos), 43 aristas y 11 ciclos.
 
 Pieza diaria y red ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
@@ -27,11 +27,8 @@ flowchart TD
     seleccion_editorial["Selección editorial · specialist"]
     reparacion_editorial["Reparación editorial · specialist"]
     editor_verificador["Verificador editorial · gate"]
-    diseno_imagen["Diseño de infografía y carrusel · specialist"]
-    edicion_foto["Edición de foto · specialist"]
     revision_visual["Revisión de imagen · gate"]
-    editor_visual["Especialista visual · EDI-21 · En diseño · specialist"]
-    class editor_visual planned;
+    editor_visual["Editor visual · specialist"]
   end
   subgraph grupo_observatorio["observatorio"]
     investigador_referentes["Observación de referentes · specialist"]
@@ -74,15 +71,15 @@ flowchart TD
   director_editorial -->|"reparar · workflow_step · ≤1"| reparacion_editorial
   director_editorial -->|"verificar · workflow_step · ≤2"| editor_verificador
   director_editorial -->|"investigar_pieza · workflow_step · ≤1"| investigacion_web
-  director_editorial -->|"disenar · workflow_step · ≤2"| diseno_imagen
-  director_editorial -->|"editar_foto · workflow_step · ≤8"| edicion_foto
+  director_editorial -->|"disenar · workflow_step · ≤2"| editor_visual
+  director_editorial -->|"editar_foto · workflow_step · ≤8"| editor_visual
   director_editorial -->|"revisar_imagen · workflow_step · ≤8"| revision_visual
   director_editorial -->|"leer_lector_comprador · workflow_step · ≤1 · agrupada lectores"| lector_comprador
   director_editorial -->|"leer_lector_recomendador · workflow_step · ≤1 · agrupada lectores"| lector_recomendador
   director_editorial -->|"leer_lector_divulgador · workflow_step · ≤1 · agrupada lectores"| lector_divulgador
   director_editorial -->|"leer_lector_lider · workflow_step · ≤1 · agrupada lectores"| lector_lider
   director_editorial -->|"leer_lector_par · workflow_step · ≤1 · agrupada lectores"| lector_par
-  director_editorial -.->|"visual_futuro · workflow_step · ≤1"| editor_visual
+  director_editorial -->|"proponer_visual · call · ≤1"| editor_visual
   relaciones_comunidad -->|"observar · workflow_step · ≤1"| investigador_referentes
   relaciones_comunidad -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
   relaciones_comunidad -->|"clasificar · workflow_step · ≤1"| clasificador_red
@@ -109,6 +106,7 @@ flowchart TD
   capturas -->|"captura_memoria · handoff · ≤1"| posicionamiento
   metricas -->|"resultados_editorial · handoff · ≤1"| director_editorial
   analista_barrio_resultados -->|"resumen_editorial · handoff · ≤1"| director_editorial
+  director_editorial -->|"entregar_visual · call · ≤1"| editor_visual
 ```
 
 ## Pieza diaria
@@ -134,11 +132,8 @@ flowchart TD
     seleccion_editorial["Selección editorial · specialist"]
     reparacion_editorial["Reparación editorial · specialist"]
     editor_verificador["Verificador editorial · gate"]
-    diseno_imagen["Diseño de infografía y carrusel · specialist"]
-    edicion_foto["Edición de foto · specialist"]
     revision_visual["Revisión de imagen · gate"]
-    editor_visual["Especialista visual · EDI-21 · En diseño · specialist"]
-    class editor_visual planned;
+    editor_visual["Editor visual · specialist"]
   end
   subgraph grupo_operacion["operacion"]
     lider_jev["Líder · Jev · gate"]
@@ -155,23 +150,24 @@ flowchart TD
   director_editorial -->|"reparar · workflow_step · ≤1"| reparacion_editorial
   director_editorial -->|"verificar · workflow_step · ≤2"| editor_verificador
   director_editorial -->|"investigar_pieza · workflow_step · ≤1"| investigacion_web
-  director_editorial -->|"disenar · workflow_step · ≤2"| diseno_imagen
-  director_editorial -->|"editar_foto · workflow_step · ≤8"| edicion_foto
+  director_editorial -->|"disenar · workflow_step · ≤2"| editor_visual
+  director_editorial -->|"editar_foto · workflow_step · ≤8"| editor_visual
   director_editorial -->|"revisar_imagen · workflow_step · ≤8"| revision_visual
   director_editorial -->|"leer_lector_comprador · workflow_step · ≤1 · agrupada lectores"| lector_comprador
   director_editorial -->|"leer_lector_recomendador · workflow_step · ≤1 · agrupada lectores"| lector_recomendador
   director_editorial -->|"leer_lector_divulgador · workflow_step · ≤1 · agrupada lectores"| lector_divulgador
   director_editorial -->|"leer_lector_lider · workflow_step · ≤1 · agrupada lectores"| lector_lider
   director_editorial -->|"leer_lector_par · workflow_step · ≤1 · agrupada lectores"| lector_par
-  director_editorial -.->|"visual_futuro · workflow_step · ≤1"| editor_visual
+  director_editorial -->|"proponer_visual · call · ≤1"| editor_visual
   editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤5"| lider_jev
   lider_jev -->|"pieza_diaria_gate_1 · gate · ≤1"| gustavo
   gustavo -->|"pieza_diaria_gate_2 · gate · ≤1"| operador_cuenta
+  director_editorial -->|"entregar_visual · call · ≤1"| editor_visual
 ```
 
 Bucle `evaluator_optimizer` (active, máximo 2 rondas): Copywriters A/B agrupados, verificación inicial y una reparación con el binding histórico del director; máximo dos evaluaciones. Sin delegación entre especialistas.
 
-Bucle `imagen_actual` (active, máximo 2 rondas): Un diseño inicial y una corrección.
+Bucle `imagen_actual` (active, máximo 2 rondas): Editor visual: un diseño inicial y una corrección de IMG-INF, con el mismo gate de visión. La propuesta de formato y la entrega final se piden una vez por versión ganadora.
 
 Gate `publicacion` (CONT-09): editor_verificador → lider_jev → gustavo → operador_cuenta.
 - Reglas y verificador sobre el hash exacto; imagen preparada y manifest validado.
@@ -392,8 +388,7 @@ flowchart TD
     class ciclo_perfil planned;
   end
   subgraph grupo_editorial["editorial"]
-    editor_visual["Especialista visual · EDI-21 · En diseño · specialist"]
-    class editor_visual planned;
+    editor_visual["Editor visual · specialist"]
   end
 ```
 
@@ -476,6 +471,9 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `classify_result` | `json_schema` | [team_backend.orquestacion_schemas.CLASSIFY_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `plan_result` | `json_schema` | [team_backend.orquestacion_schemas.PLAN_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `sync_result` | `json_schema` | [team_backend.orquestacion_schemas.SYNC_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `visual_request` | `json_schema` | [team_backend.editor_visual.REQUEST_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editor_visual.py) |
+| `visual_proposal` | `json_schema` | [team_backend.editor_visual.PROPOSAL_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editor_visual.py) |
+| `visual_package` | `json_schema` | [team_backend.editor_visual.PACKAGE_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editor_visual.py) |
 
 ## Aristas y contratos
 
@@ -496,7 +494,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `leer_lector_divulgador` | `panel_input` | `panel` |
 | `leer_lector_lider` | `panel_input` | `panel` |
 | `leer_lector_par` | `panel_input` | `panel` |
-| `visual_futuro` | `piece` | `image_choice` |
+| `proponer_visual` | `visual_request` | `visual_proposal` |
 | `observar` | `network_input` | `observe_result` |
 | `descubrir` | `network_input` | `discover_result` |
 | `clasificar` | `network_input` | `classify_result` |
@@ -523,3 +521,4 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `captura_memoria` | `capture` | `capture` |
 | `resultados_editorial` | `metrics_result` | `metrics_result` |
 | `resumen_editorial` | `weekly` | `weekly` |
+| `entregar_visual` | `image_input` | `visual_package` |

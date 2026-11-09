@@ -403,7 +403,7 @@ export type PieceStatus =
   | 'expired'
   | 'superseded';
 
-export type EditorialStage = '' | 'director' | 'redactor' | 'lectores' | 'seleccion' | 'verificador';
+export type EditorialStage = '' | 'director' | 'redactor' | 'lectores' | 'seleccion' | 'verificador' | 'visual';
 
 export interface PieceActionRef {
   id: string;
@@ -723,6 +723,7 @@ export type RoleStatus = 'trabajando' | 'en_espera' | 'diseno';
 
 export interface RoleActivity {
   status: RoleStatus;
+  piece_id?: string;
   detail: string;
   since: string | null;
 }

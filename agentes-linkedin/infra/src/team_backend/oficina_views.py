@@ -7,6 +7,7 @@ from decimal import Decimal
 from django.contrib.auth import authenticate, login, logout
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_protect, ensure_csrf_cookie
@@ -133,7 +134,7 @@ class Feed(APIView):
 # --------------------------------------------------------------------------- office scene
 
 ROLES=['posicionamiento','perfil','investigador_referentes','analista_barrio_resultados','director_editorial','copywriter_a',
-       'copywriter_b','lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par',
+       'copywriter_b','editor_visual','lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par',
        'editor_verificador','relaciones_comunidad','conversaciones_inbox','operador_cuenta']
 # Real work behind each implemented role. Roles without work here are contracts in design.
 JOB_ROLES={'observe':'investigador_referentes','propose_comment':'relaciones_comunidad',
@@ -152,12 +153,20 @@ DESCRIPTIONS={'observe':'Leyendo publicaciones de referentes','propose_comment':
 STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',
                     'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
                     'verificador':'Verificando afirmaciones, voz y privacidad',
-                    'reparacion':'Corrigiendo la versión final con los hallazgos'}
+                    'reparacion':'Corrigiendo la versión final con los hallazgos',
+                    'visual':'Preparando foto, infografía o carrusel para la pieza'}
 
-def _roles(job):
-    """Roles doing the job. A running editorial job shows only the stage's roles (no query for finished jobs)."""
+def _roles(job,visual_jobs=None):
+    """A running job shows its stage; finished visual work needs persisted evidence."""
     if job.kind=='prepare_piece':
-        if job.state!=Job.State.RUNNING:return editorial.EDITORIAL_ROLES
+        if job.state==Job.State.QUEUED:return editorial.EDITORIAL_ROLES
+        if job.state!=Job.State.RUNNING:
+            roles=[r for r in editorial.EDITORIAL_ROLES if r!='editor_visual']
+            worked=(str(job.id) in visual_jobs) if visual_jobs is not None else EditorialPiece.objects.filter(
+                Q(stage='visual')|Q(usage__contains=[{'stage':'visual'}]),origin_job=str(job.id)).exists()
+            if worked:
+                roles.append('editor_visual')
+            return roles
         stage=EditorialPiece.objects.filter(origin_job=str(job.id)).values_list('stage',flat=True).first() or 'director'
         return editorial.STAGE_ROLES.get(stage,['director_editorial'])
     role=job.agent if job.kind=='agent_run' else JOB_ROLES.get(job.kind)
@@ -179,12 +188,21 @@ class Actividad(APIView):
                 if role not in roles:continue
                 if job.state==Job.State.RUNNING:
                     roles[role]={'status':'trabajando','detail':_describe(job),'since':job.started_at}
+                    if role=='editor_visual':
+                        piece=EditorialPiece.objects.filter(origin_job=str(job.id)).first()
+                        if piece:roles[role].update(piece_id=str(piece.id),detail=f'{STAGE_DESCRIPTIONS["visual"]} del {piece.slot_date:%d/%m}')
                 elif roles[role]['status']!='trabajando':
                     roles[role]['detail']='Trabajo en cola'
+        finished=list(Job.objects.filter(state__in=[Job.State.COMPLETE,Job.State.FAILED]).order_by('-finished_at')[:200])
+        visual_pieces={p.origin_job:p for p in EditorialPiece.objects.filter(
+            Q(stage='visual')|Q(usage__contains=[{'stage':'visual'}]),origin_job__in=[str(j.id) for j in finished])}
         for role in implemented:
             if roles[role]['status']=='en_espera' and not roles[role]['detail']:
-                last=next((j for j in Job.objects.filter(state__in=[Job.State.COMPLETE,Job.State.FAILED]).order_by('-finished_at')[:200] if role in _roles(j)),None)
+                last=next((j for j in finished if role in _roles(j,visual_pieces)),None)
                 if last:roles[role].update(detail=f'Último: {DESCRIPTIONS.get(last.kind,last.kind).lower()} ({last.result_status or last.state})',since=last.finished_at)
+                if last and role=='editor_visual' and last.kind=='prepare_piece':
+                    piece=visual_pieces[str(last.id)]
+                    roles[role].update(piece_id=str(piece.id),detail=f'Último: medios de la pieza del {piece.slot_date:%d/%m} ({piece.get_state_display()})')
         if operador.globally_paused():
             for role in implemented:
                 if roles[role]['status']!='trabajando':roles[role]['detail']='Máquina en pausa'

@@ -87,7 +87,8 @@ class OfficeTests(OperatorBase):
     def test_activity_reflects_real_jobs_only(self):
         self.sign_in()
         roles=self.browser.get('/api/v1/oficina/actividad').json()['roles']
-        self.assertEqual(len(roles),16)
+        self.assertEqual(len(roles),17)
+        self.assertEqual(roles['editor_visual']['status'],'en_espera')
         # Every role with code is implemented: the inbox agent reads the inbox (read_inbox), so it is never «en diseño» (OFI-01.4).
         self.assertEqual([r for r,v in roles.items() if v['status']=='diseno'],[])
         self.assertEqual(roles['conversaciones_inbox']['status'],'en_espera')

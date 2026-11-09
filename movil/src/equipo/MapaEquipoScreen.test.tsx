@@ -46,11 +46,12 @@ it('shows units, job and handoff evidence, and navigates a connection', async ()
   expect(server.requests.every((call) => call.method === 'GET')).toBe(true);
 });
 
-it('marks future agents and shows empty activity without execution controls', async () => {
+it('shows the active visual editor with empty activity without inventing work', async () => {
   state.params = { agente: 'editor_visual' };
   fakeServer({ [PATH]: { body: graphFixture() } });
   await renderApp(<MapaEquipoScreen />);
-  expect(await screen.findByText('Este agente aún no ejecuta trabajo.')).toBeOnTheScreen();
+  expect(await screen.findByText('Editor visual')).toBeOnTheScreen();
+  expect(screen.queryByText('Este agente aún no ejecuta trabajo.')).not.toBeOnTheScreen();
   expect(screen.getByText('Sin actividad registrada para este agente.')).toBeOnTheScreen();
   await fireEvent.press(screen.getByRole('button', { name: 'Ver todos los agentes' }));
   expect(router.setParams).toHaveBeenCalledWith({ agente: '' });
@@ -65,6 +66,15 @@ it('retries errors and handles an empty graph', async () => {
   server.on(PATH, { body: { ...graphFixture(), nodes: [] } });
   await fireEvent.press(screen.getByRole('button', { name: 'Reintentar' }));
   expect(await screen.findByText('El mapa todavía no tiene agentes.')).toBeOnTheScreen();
+});
+
+it('preserves the planned state declared by a registry without the visual runtime', async () => {
+  state.params = { agente: 'editor_visual' };
+  const graph = graphFixture();
+  graph.nodes[2]!.status = 'planned';
+  fakeServer({ [PATH]: { body: graph } });
+  await renderApp(<MapaEquipoScreen />);
+  expect(await screen.findByText('Este agente aún no ejecuta trabajo.')).toBeOnTheScreen();
 });
 
 it('keeps a loading state while the fake request is pending', async () => {

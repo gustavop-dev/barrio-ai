@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "3b.1",
+  "graph_version": "2026-11-08-fase7",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -444,6 +444,21 @@
       "binding": "team_backend.orquestacion_schemas.SYNC_RESULT",
       "kind": "json_schema",
       "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "visual_request": {
+      "binding": "team_backend.editor_visual.REQUEST_SCHEMA",
+      "kind": "json_schema",
+      "description": "Contrato EDI-21 sobre IMG/IMG-INF; respuesta al director, sin permiso de publicación."
+    },
+    "visual_proposal": {
+      "binding": "team_backend.editor_visual.PROPOSAL_SCHEMA",
+      "kind": "json_schema",
+      "description": "Contrato EDI-21 sobre IMG/IMG-INF; respuesta al director, sin permiso de publicación."
+    },
+    "visual_package": {
+      "binding": "team_backend.editor_visual.PACKAGE_SCHEMA",
+      "kind": "json_schema",
+      "description": "Contrato EDI-21 sobre IMG/IMG-INF; respuesta al director, sin permiso de publicación."
     }
   },
   "nodes": [
@@ -1735,85 +1750,13 @@
       }
     },
     {
-      "id": "diseno_imagen",
-      "label": "Diseño de infografía y carrusel",
-      "group": "editorial",
-      "role": "specialist",
-      "status": "active",
-      "binding": "team_backend.imagenes.design",
-      "description": "Propone datos para plantillas; el código renderiza. Una corrección como máximo antes de fallback.",
-      "skills": [
-        "Propone datos para plantillas; el código renderiza"
-      ],
-      "tools": [
-        "render_templates"
-      ],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
-      "model": "ANTHROPIC_VISION_MODEL (claude-sonnet-5-5)",
-      "effort": "low",
-      "model_note": null,
-      "budget_ref": "imagenes",
-      "input_schemas": [
-        "piece",
-        "image_input"
-      ],
-      "output_schemas": [
-        "image_design"
-      ],
-      "activity": {
-        "job_kinds": [
-          "prepare_piece"
-        ],
-        "event_roles": [],
-        "piece_evidence": "design"
-      }
-    },
-    {
-      "id": "edicion_foto",
-      "label": "Edición de foto",
-      "group": "editorial",
-      "role": "specialist",
-      "status": "active",
-      "binding": "team_backend.connectors_images.ImageConnector.edit",
-      "description": "Prepara una edición de la foto elegida; se publica el original si la revisión no aprueba la edición.",
-      "skills": [
-        "Prepara una edición de la foto elegida; se publica el original si la revisión no aprueba la edición"
-      ],
-      "tools": [
-        "image_edit"
-      ],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
-      "model": "OPENAI_IMAGE_MODEL (gpt-image-2)",
-      "effort": null,
-      "model_note": null,
-      "budget_ref": "imagenes",
-      "input_schemas": [
-        "photo",
-        "edit_input"
-      ],
-      "output_schemas": [
-        "image_bytes"
-      ],
-      "activity": {
-        "job_kinds": [
-          "prepare_piece"
-        ],
-        "event_roles": [],
-        "piece_evidence": "edited"
-      }
-    },
-    {
       "id": "revision_visual",
       "label": "Revisión de imagen",
       "group": "editorial",
       "role": "gate",
       "status": "active",
       "binding": "team_backend.connectors_images.ImageConnector.check",
-      "description": "Revisa contenido visual y vincula el veredicto a los bytes finales. No es el especialista visual futuro EDI-21.",
+      "description": "Gate IMG: revisa contenido visual y vincula el veredicto a los bytes finales. El workflow del director lo aplica al trabajo del Editor visual; sin cambios de criterio ni fallback.",
       "skills": [
         "Revisa contenido visual y vincula el veredicto a los bytes finales"
       ],
@@ -1917,29 +1860,51 @@
     },
     {
       "id": "editor_visual",
-      "label": "Especialista visual · EDI-21",
+      "label": "Editor visual",
       "group": "editorial",
       "role": "specialist",
-      "status": "planned",
-      "binding": null,
-      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "status": "active",
+      "binding": "team_backend.editor_visual.propose",
+      "description": "Propone foto, infografía o carrusel para el texto ganador exacto y devuelve al director los medios preparados por IMG/IMG-INF. El director decide; conserva revisión visual, verificador, Jev, veto y Operación. Perfil continúa en diseño.",
       "skills": [
-        "En diseño"
+        "Elige formato y fotos de Galería",
+        "Prepara ediciones conservando originales",
+        "Entrega datos de plantillas, alt y verificaciones por hash"
       ],
-      "tools": [],
+      "tools": [
+        "gallery_read",
+        "image_edit",
+        "render_templates",
+        "vision"
+      ],
       "course_lists": [],
       "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
-      "model": null,
-      "effort": null,
-      "model_note": "Servicio determinista, humano o todavía planificado.",
-      "budget_ref": "ninguno",
-      "input_schemas": [],
-      "output_schemas": [],
+      "course_note": "No carga unidades del curso. Reutiliza la regla versionada de infografías (team_backend/recursos/infografias.html) y el brief fundamentado del director.",
+      "model": "ANTHROPIC_VISION_MODEL (claude-sonnet-5-5); edición: OPENAI_IMAGE_MODEL (gpt-image-2)",
+      "effort": "low",
+      "model_note": "Elección: editorial-visual bajo el cap editorial y agregado. Diseño/edición/revisión: image-* bajo el subpresupuesto IMG existente. Render determinista; conserva el gate de visión.",
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "visual_request",
+        "image_input",
+        "edit_input"
+      ],
+      "output_schemas": [
+        "visual_proposal",
+        "image_design",
+        "image_bytes",
+        "visual_package"
+      ],
       "activity": {
-        "job_kinds": [],
-        "event_roles": []
-      }
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "editor_visual"
+        ],
+        "stage": "visual"
+      },
+      "definition": "equipos/editorial/editor_visual.json"
     },
     {
       "id": "investigador_lider",
@@ -2179,7 +2144,7 @@
     {
       "id": "disenar",
       "from": "director_editorial",
-      "to": "diseno_imagen",
+      "to": "editor_visual",
       "cycles": [
         "pieza_diaria"
       ],
@@ -2202,7 +2167,7 @@
     {
       "id": "editar_foto",
       "from": "director_editorial",
-      "to": "edicion_foto",
+      "to": "editor_visual",
       "cycles": [
         "pieza_diaria"
       ],
@@ -2358,18 +2323,25 @@
       }
     },
     {
-      "id": "visual_futuro",
+      "id": "proponer_visual",
       "from": "director_editorial",
       "to": "editor_visual",
       "cycles": [
         "pieza_diaria"
       ],
-      "request_kind": "workflow_step",
-      "request_schema": "piece",
-      "response_schema": "image_choice",
+      "request_kind": "call",
+      "request_schema": "visual_request",
+      "response_schema": "visual_proposal",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "planned"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-visual"
+          ]
+        }
+      }
     },
     {
       "id": "observar",
@@ -2797,6 +2769,24 @@
       "response_required": false,
       "status": "active",
       "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
+    },
+    {
+      "id": "entregar_visual",
+      "from": "director_editorial",
+      "to": "editor_visual",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "call",
+      "request_schema": "image_input",
+      "response_schema": "visual_package",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      },
+      "condition": "Recoge el paquete IMG ya preparado. La respuesta vuelve al director; no llama proveedores ni publica."
     }
   ],
   "cycles": [
@@ -2817,8 +2807,6 @@
         "seleccion_editorial",
         "reparacion_editorial",
         "editor_verificador",
-        "diseno_imagen",
-        "edicion_foto",
         "revision_visual",
         "editor_visual",
         "investigacion_web",
@@ -2867,7 +2855,7 @@
             "revisar_imagen"
           ],
           "max_rounds": 2,
-          "description": "Un diseño inicial y una corrección."
+          "description": "Editor visual: un diseño inicial y una corrección de IMG-INF, con el mismo gate de visión. La propuesta de formato y la entrega final se piden una vez por versión ganadora."
         }
       ],
       "gates": [
@@ -3429,6 +3417,9 @@
       ],
       "reparacion": [
         "director_editorial"
+      ],
+      "visual": [
+        "editor_visual"
       ]
     },
     "autopilot_direct_kinds": [

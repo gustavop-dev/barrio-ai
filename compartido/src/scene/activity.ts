@@ -26,7 +26,7 @@ export const STATUS_TONE: Record<SceneStatus, Tone> = {
 
 const KNOWN: ReadonlySet<string> = new Set<RoleStatus>(['trabajando', 'en_espera', 'diseno']);
 
-/** Status of each of the 16 roles. Loading, errors and unknown values all read «desconocido». */
+/** Status of each role. Loading, errors and unknown values all read «desconocido». */
 export function statusesFrom(activity: Activity | null | undefined): Record<RoleId, SceneStatus> {
   const map = {} as Record<RoleId, SceneStatus>;
   for (const role of ROLES) {

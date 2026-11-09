@@ -24,8 +24,9 @@ describe('Mapa del equipo', () => {
     await user.click(screen.getByRole('button', { name: /Solicita a: Copywriter A/ }));
     expect(screen.getByText('Sin actividad registrada para este agente.')).toBeVisible();
     await user.click(screen.getByRole('button', { name: /Recibe de: Director editorial/ }));
-    await user.click(screen.getByRole('button', { name: /Solicita a: Especialista visual/ }));
-    expect(screen.getByText('Este agente aún no ejecuta trabajo.')).toBeVisible();
+    await user.click(screen.getByRole('button', { name: /Solicita a: Editor visual/ }));
+    expect(screen.queryByText('Este agente aún no ejecuta trabajo.')).not.toBeInTheDocument();
+    expect(screen.getByText('Sin actividad registrada para este agente.')).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Ver todos los agentes' }));
     expect(screen.getByText('Mesa editorial · 3')).toBeVisible();
     expect(server.requests.every((call) => call.method === 'GET')).toBe(true);
@@ -36,6 +37,14 @@ describe('Mapa del equipo', () => {
     renderMap();
     expect(screen.getByText('Cargando el mapa…', { selector: '[role="status"]' })).toBeVisible();
     expect(screen.queryByText(/Brief entregado/)).not.toBeInTheDocument();
+  });
+
+  it('keeps the planned state when the registry has no runtime for a role', async () => {
+    const graph = graphFixture();
+    graph.nodes[2]!.status = 'planned';
+    fakeServer({ [PATH]: { body: graph } });
+    renderMap('/equipo?agente=editor_visual');
+    expect(await screen.findByText('Este agente aún no ejecuta trabajo.')).toBeVisible();
   });
 
   it('retries an error and renders the empty state', async () => {
@@ -63,7 +72,7 @@ describe('Mapa del equipo', () => {
     renderMap();
     await user.selectOptions(await screen.findByLabelText('Ver ciclo'), 'visual_future');
     await user.click(screen.getByText('Mesa editorial · 1'));
-    expect(screen.getByRole('button', { name: /Especialista visual/ })).toBeVisible();
+    expect(screen.getByRole('button', { name: /Editor visual/ })).toBeVisible();
     expect(screen.queryByRole('button', { name: /Copywriter A/ })).not.toBeInTheDocument();
   });
 });

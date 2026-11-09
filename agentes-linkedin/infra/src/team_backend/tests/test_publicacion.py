@@ -303,7 +303,7 @@ class EditorialCircuitTests(EditorialBase):
         from team_backend.models import ActionProposal
         self.observed()
         piece=self.plan(answers(signals_used=['first']))
-        self.assertEqual((piece.state,piece.stage),('ready','verificador'))
+        self.assertEqual((piece.state,piece.stage),('ready','visual'))
         self.assertEqual([c[0] for c in self.calls],['editorial-director','editorial-redactor','editorial-lectores','editorial-seleccion','editorial-verificador'])
         director=self.calls[0][1]
         self.assertEqual(director['public_facts'],[])  # empty memory: no experiences can be attributed

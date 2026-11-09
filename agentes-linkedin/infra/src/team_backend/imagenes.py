@@ -243,6 +243,8 @@ def issues(piece,expected=None):
         try:
             if not piece.image_document or sha(read(piece.image_document))!=piece.image_document_sha256:errors.append('El documento cambió')
         except (ValueError,OSError):errors.append('Documento no disponible')
+    from .editor_visual import freshness_issues
+    errors+=freshness_issues(piece)
     return errors
 
 

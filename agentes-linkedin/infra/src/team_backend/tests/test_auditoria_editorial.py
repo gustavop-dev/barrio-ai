@@ -74,7 +74,7 @@ class RulesBeforeVerifierTests(EditorialAuditBase):
         self.assertEqual((sent['text'],sent['findings'][0]['detail'],sent['brief']['thesis']),(WITH_LINK,'Contiene enlaces',plan['director']['thesis']))
         self.assertIn('public_facts',sent);self.assertIn('private_guidance',sent)
         self.assertIn('<tono_de_voz',next(s for p,_,s in self.calls if p=='editorial-reparacion'))
-        self.assertEqual([u['stage'] for u in piece.usage],['director','redactor','lectores','seleccion','reparacion','verificador'])
+        self.assertEqual([u['stage'] for u in piece.usage],['director','redactor','lectores','seleccion','reparacion','verificador','visual'])
         proposal=ActionProposal.objects.get(piece=piece)
         self.assertEqual(proposal.payload['text'],GOOD_POST)
         self.assertTrue(any(r.startswith('Reparada en una ronda') for r in proposal.risks))

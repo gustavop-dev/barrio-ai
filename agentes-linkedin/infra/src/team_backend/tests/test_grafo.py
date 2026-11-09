@@ -79,7 +79,7 @@ class GraphTests(SimpleTestCase):
         self.bad(lambda g: g['nodes'].append(dict(g['nodes'][1], id='orphan')), 'no alcanzable')
         self.bad(lambda g: g['nodes'].append(g['nodes'][0]), 'duplicado')
         self.bad(lambda g: g['edges'][0].update(to='missing'), 'extremo desconocido')
-        self.bad(lambda g: next(e for e in g['edges'] if e['id'] == 'visual_futuro').update(status='active'), 'planned')
+        self.bad(lambda g: next(n for n in g['nodes'] if n['id'] == 'editor_visual').update(status='planned'), 'planned')
 
     def test_specialists_depth_contracts_and_units(self):
         self.bad(lambda g: next(e for e in g['edges'] if e['id'] == 'redactar_a').update(**{'from': 'copywriter_b'}), 'especialista a especialista')
