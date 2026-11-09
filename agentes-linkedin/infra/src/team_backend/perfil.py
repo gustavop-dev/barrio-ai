@@ -240,7 +240,8 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
                 for asset in proposal.assets.filter(version=proposal.version,kind__in=['A','B'],review__ok=True).order_by('kind'):
                     for viewport in ('mobile','desktop'):
                         selected[f'{viewport}_{asset.kind}']=visual.preview(imagenes.read(asset.image),selected[kind],viewport=='mobile')
-            render_evidence=package.get('evidence',[])
+            render_evidence=[e for e in package.get('evidence',[]) if e['id'] not in ('render.preview_mobile','render.preview_desktop')]
+            render_evidence+=visual.preview_evidence(selected)
             context={'option':kind,'geometry':package['geometry'] if kind=='banner' else {},'copy':banner if kind=='banner' else {},
                 'review_version':visual.REVIEW_VERSION,'render_evidence':render_evidence,
                 'library':[u for u in evidence_context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS],
@@ -252,6 +253,8 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
             if not review.get('ok') or review.get('sha256')!=[imagenes.sha(v) for v in selected.values()]:
                 raise ValueError('Revisión visual bloqueada o incierta: '+kind)
             if gallery.stale(scoped,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
+            render_evidence=[dict(e,reviewed=True) if e['id'] in ('render.preview_mobile','render.preview_desktop') else e
+                for e in render_evidence]
             provenance={'references':scoped,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
                 'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{kind:instruction},'geometry':package['geometry'],
                 'mask':package.get('masks',{}).get(kind),'matte_version':visual.perfil_chroma.VERSION,

@@ -1,4 +1,6 @@
 # Convenciones
+La aprobación del asset y la de su explicación son resultados distintos: no inferir esa distinción de una cadena de error antigua. Reparar solo campos autorizados, revisar una vez y reservar margen de llamadas para el trabajo esencial. Un layout aproximado no demuestra que exista un preview; los previews requieren hashes y revisión visual antes de acreditar comprobaciones.
+
 En assets, separar la identidad de la petición pagada de la versión del render local. Conservar blobs confirmados entre continuaciones y fallar sin regenerar si falta storage. Las medidas exactas de color/encuadre pertenecen al render y deben viajar a visión ligadas a sus bytes; distinguir estimaciones de máscara de landmarks faciales.
 
 No confundir integridad técnica con revisión humana. Referencias de evidencia llevan sesión. RRF calibrado se documenta como evaluación de desarrollo. Las claves solo en .env. Presets upstream son metodología, no una dependencia Python ni licencia para reescribir conocimiento.

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.3-fase8-assets",
+  "graph_version": "6.4-fase8-assets-explanation",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -611,7 +611,22 @@
     "profile_assets_request": {
       "kind": "json_schema",
       "binding": "team_backend.perfil_assets.REQUEST_SCHEMA",
-      "description": "Solo photo/banner, evidencia actual y copy existente; sin redacción ni web."
+      "description": "Solo photo/banner pendientes, evidencia actual y copy existente; sin web."
+    },
+    "profile_assets_review": {
+      "kind": "json_schema",
+      "binding": "team_backend.perfil_assets.REVIEW_SCHEMA",
+      "description": "Separa aprobación del asset de la de reason/benefit/steps."
+    },
+    "profile_explanation_request": {
+      "kind": "json_schema",
+      "binding": "team_backend.perfil_assets.REPAIR_REQUEST",
+      "description": "Una sección, frase/diseño fijos y evidencia acotada."
+    },
+    "profile_explanation": {
+      "kind": "json_schema",
+      "binding": "team_backend.perfil_assets.REPAIR_SCHEMA",
+      "description": "Solo reason, benefit y steps; sin cambiar copy, etiqueta ni diseño."
     }
   },
   "nodes": [
@@ -3946,8 +3961,8 @@
       ],
       "request_kind": "call",
       "request_schema": "profile_assets_request",
-      "response_schema": "profile_review",
-      "max_calls_per_cycle": 1,
+      "response_schema": "profile_assets_review",
+      "max_calls_per_cycle": 2,
       "response_required": true,
       "status": "active",
       "call_timeout_s": 300,
@@ -3957,6 +3972,22 @@
             "profile-assets-review"
           ]
         }
+      }
+    },
+    {
+      "id": "perfil_reparar_explicacion",
+      "from": "perfil",
+      "to": "ciclo_perfil",
+      "cycles": ["perfil_assets"],
+      "request_kind": "call",
+      "request_schema": "profile_explanation_request",
+      "response_schema": "profile_explanation",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {"anthropic": ["profile-assets-explanation"]}
       }
     }
   ],
@@ -4728,6 +4759,7 @@
       "orchestrator": "perfil",
       "participants": [
         "perfil",
+        "ciclo_perfil",
         "revision_perfil",
         "editor_visual",
         "revision_visual"
@@ -4747,7 +4779,7 @@
           "perfil"
         ],
         "max_depth": 1,
-        "scope": "Una revisión de photo/banner y A, B, banner secuenciales; comparte el bucket original de 10 USD. Sin copy, positioning, lecturas ni web.",
+        "scope": "Revisión de assets pendientes; una reparación de reason/benefit/steps y una segunda revisión si caben en los topes vigentes, reservando llamadas de assets. Comparte bucket original de 10 USD. Sin reescribir frase, etiqueta, posicionamiento ni propuesta; sin lecturas ni web.",
         "max_calls": 10,
         "max_provider_calls": 7,
         "cost_cap_usd": 10,

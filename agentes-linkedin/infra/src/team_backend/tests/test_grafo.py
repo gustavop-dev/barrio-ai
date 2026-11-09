@@ -118,11 +118,16 @@ class GraphTests(SimpleTestCase):
             g['edges'].append(dict(gate,id='undeclared_jev_tool'))
         self.bad(duplicate_gate,'runtime fuera del orquestador')
 
-    def test_assets_cycle_has_no_text_web_or_positioning_and_cannot_increase_parent_cap(self):
+    def test_assets_cycle_allows_only_bounded_explanation_repair_without_increasing_caps(self):
         cycle=next(c for c in self.graph['cycles'] if c['id']=='perfil_assets')
         self.assertEqual(cycle['budget_parent_cycle'],'perfil_periodico')
         self.assertEqual({e['id'] for e in self.graph['edges'] if 'perfil_assets' in e['cycles']},
-            {'perfil_revision_assets','perfil_editar_persona','perfil_render','perfil_revision_visual'})
+            {'perfil_revision_assets','perfil_reparar_explicacion','perfil_editar_persona','perfil_render','perfil_revision_visual'})
+        edges={e['id']:e for e in self.graph['edges']}
+        self.assertEqual(edges['perfil_reparar_explicacion']['max_calls_per_cycle'],1)
+        self.assertEqual(edges['perfil_revision_assets']['max_calls_per_cycle'],2)
+        self.assertEqual(cycle['limits']['max_calls'],10)
+        self.assertEqual(cycle['limits']['max_provider_calls'],7)
         self.bad(lambda g:next(c for c in g['cycles'] if c['id']=='perfil_assets')['limits'].update(cost_cap_usd=11),
             'amplía presupuesto padre')
 
