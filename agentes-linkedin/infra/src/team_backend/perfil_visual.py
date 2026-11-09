@@ -9,8 +9,11 @@ import re
 from PIL import Image, ImageCms, ImageColor, ImageDraw, ImageEnhance, ImageOps
 from knowledge import providers
 from . import connectors_images, imagenes, infografias, orquestacion, perfil_chroma
-from .perfil_marca import (ACCENT, INK, PAPER, BRAND_VERSION, PHOTO_SIZE, BANNER_SIZE, SAFE, COVER, MOBILE,
+from .perfil_marca import (ACCENT, INK, PAPER, BRAND_VERSION, PHOTO_SIZE, BANNER_SIZE, SAFE, COVER, MOBILE, banner_word, normalize_banner,
     TEXT, FIGURE, MAX_LINE_WIDTH, FONT_FAMILY, FONT_PX, LABEL_PX, LABEL_TRACKING_EM, LABEL_Y, LINE_Y, LINE_HEIGHT)
+
+RENDER_VERSION='profile-render-v2'
+REVIEW_VERSION='profile-vision-v2'
 
 BASE_PROMPT=f'''Professional headshot of the person in the attached photo, head and shoulders,
 centered, eyes in the upper third, face about 55–60% of the frame height.
@@ -20,7 +23,7 @@ background and replace it with a flat solid color {ACCENT}, no gradient,
 no texture, no shadow, no halo around the hair. Square {PHOTO_SIZE[0]} x {PHOTO_SIZE[1]} px.
 Do not change the person's features, clothing or expression.'''
 CHECKS=[
-    'Cara reconocible a 32 px, 55–60 % de altura, ojos en tercio superior, aire arriba ~8 %.',
+    'Cara reconocible a 32 px; cabeza con pelo 55–60 % de altura, ojos en tercio superior, aire arriba 8–10 %.',
     f'Fondo del retrato plano exacto {ACCENT}, sin textura, sombras ni halos.',
     'A: persona en grises sin aguamarina; B: color natural sin aguamarina en piel ni ropa.',
     f'Banner: nada importante en x {COVER[0]}–{COVER[2]}, y {COVER[1]}–{COVER[3]}.',
@@ -79,20 +82,29 @@ def cutout(raw):
     return perfil_chroma.validate(image)
 
 
-def portrait(raw,kind):
+def portrait(raw,kind,*,with_evidence=False):
     im=cutout(raw)
     if im.width!=im.height:raise ValueError('Encuadre del retrato no cuadrado')
-    im=im.resize(PHOTO_SIZE,Image.Resampling.LANCZOS);alpha=im.getchannel('A')
+    im,framing=perfil_chroma.frame_portrait(im,PHOTO_SIZE);alpha=im.getchannel('A')
     if kind=='A':
         gray=ImageEnhance.Contrast(ImageOps.grayscale(im)).enhance(1.08)
         im=Image.merge('RGBA',(gray,gray,gray,alpha))
+    im,spill=perfil_chroma.despill(im)
     out=Image.new('RGB',PHOTO_SIZE,ACCENT);out.paste(im,(0,0),alpha)
     # Exact color outside the mask; fully opaque A pixels must be neutral before alpha compositing.
     background=ImageColor.getrgb(ACCENT)
+    exterior=0;mismatches=0;observed=None
     for (r,g,b),a in zip(out.getdata(),alpha.getdata()):
-        if a==0 and (r,g,b)!=background:raise ValueError('Fondo incorrecto')
+        if a==0:
+            exterior+=1;mismatches+=(r,g,b)!=background
+            if observed is None:observed=[r,g,b]
         if kind=='A' and a==255 and not r==g==b:raise ValueError('A no está en grises')
-    return png(out)
+    background={'id':'render.background','kind':'render','version':RENDER_VERSION,
+        'ok':exterior>0 and mismatches==0,'expected':ACCENT,'rgb':observed,
+        'outside_pixels':exterior,'mismatched_pixels':mismatches,'sampling':'Todos los píxeles con alfa=0 del render final'}
+    raw=png(out)
+    evidence=[dict(item,asset=kind,sha256=imagenes.sha(raw)) for item in (background,spill,framing)]
+    return (raw,evidence) if with_evidence else raw
 
 
 def inside(box,zone):return zone[0]<=box[0]<=box[2]<=zone[2] and zone[1]<=box[1]<=box[3]<=zone[3]
@@ -100,8 +112,9 @@ def overlaps(a,b):return max(a[0],b[0])<min(a[2],b[2]) and max(a[1],b[1])<min(a[
 
 
 def banner(raw,copy):
+    copy=normalize_banner(copy)
     lines=copy.get('lines',[]);label=copy.get('label','');highlight=copy.get('highlight','')
-    if len(lines)!=2 or not all(s.strip() for s in lines) or not highlight or sum(line.split().count(highlight) for line in lines)!=1:
+    if len(lines)!=2 or not all(s.strip() for s in lines) or not highlight or sum(banner_word(word)==highlight for line in lines for word in line.split())!=1:
         raise ValueError('El banner necesita dos líneas y exactamente una palabra destacada')
     if label and label!=label.upper():raise ValueError('La etiqueta acreditada debe estar en mayúsculas')
     if re.search(r'https?://|@|\+?\d[\d ()-]{6,}',label+' '+' '.join(lines)):raise ValueError('Banner con contacto o enlace')
@@ -126,7 +139,7 @@ def banner(raw,copy):
             box=(x,y,x+width,y+FONT_PX)
             if not inside(box,TEXT) or box[2]-TEXT[0]>MAX_LINE_WIDTH:
                 raise ValueError(f'Acorta la frase: no cabe en {MAX_LINE_WIDTH} px a {FONT_FAMILY} {FONT_PX} px con la figura')
-            draw.text((x,y),word,font=regular,fill=ACCENT if word==highlight else PAPER,anchor='lt')
+            draw.text((x,y),word,font=regular,fill=ACCENT if banner_word(word)==highlight else PAPER,anchor='lt')
             boxes.append(box);x+=width+draw.textlength(' ',font=regular)
         line_widths.append(box[2]-TEXT[0])
     draw.rectangle((600,286,671,289),fill=ACCENT)
@@ -152,6 +165,7 @@ def banner(raw,copy):
 
 def banner_fit(copy):
     """Preflight the exact copy before semantic review; never certify the person or real LinkedIn UI."""
+    copy=normalize_banner(copy)
     inputs={'lines':list(copy.get('lines',[])),'highlight':copy.get('highlight',''),'label':copy.get('label','')}
     result={'id':'render.banner_fit','kind':'render','version':BRAND_VERSION,
         'source':'team_backend.perfil_visual.banner(None, banner)','input':inputs,
@@ -189,31 +203,54 @@ def tiny_portrait(raw):
 
 
 def render(edits,copy):
-    files={};geometry={};errors={};masks={}
+    files={};geometry={};errors={};masks={};evidence=[]
     for kind,raw in edits.items():
         try:
             person=cutout(raw)
             mask=io.BytesIO();person.save(mask,format='PNG');masks[kind]=mask.getvalue()
             if kind=='banner':files[kind],geometry=banner(person,copy)
-            else:files[kind]=portrait(person,kind)
+            else:
+                files[kind],measurements=portrait(person,kind,with_evidence=True)
+                evidence.extend(measurements)
         except (ValueError,OSError) as exc:errors[kind]=str(exc)
     if 'banner' in files:
         for option in ('A','B'):
             if option in files:
                 for viewport in ('mobile','desktop'):
                     files[f'{viewport}_{option}']=preview(files[option],files['banner'],viewport=='mobile')
-    return {'files':files,'masks':masks,'geometry':dict(geometry,errors=errors)}
+    return {'files':files,'masks':masks,'geometry':dict(geometry,errors=errors),'evidence':evidence}
 
 
 def check(images,refs,context):
     portrait_present=any(k in images for k in ('A','B'));banner_present='banner' in images
+    measurements={}
+    for kind in ('A','B'):
+        if kind not in images:continue
+        measurements[kind]={e['id']:e for e in context.get('render_evidence',[])
+            if e.get('asset')==kind and e.get('sha256')==imagenes.sha(images[kind])}
+    # Only byte-bound evidence produced by the renderer is authoritative. Notes
+    # or stale catalog entries cannot certify a different image.
+    verified=[e for rows in measurements.values() for e in rows.values()]
+    context=dict(context,render_evidence=verified,evidence_catalog=[e for e in context.get('evidence_catalog',[])
+        if e['id'] not in ('render.background','render.spill','render.framing')]+verified)
     points=set(range(1,9)) if portrait_present and banner_present else ({1,2,3,7,8} if portrait_present else {4,5,6,7,8})
     system=('Verifica solo los puntos applicable_checks del tablero, cada uno una sola vez. '
         'Compara identidad/cara/pelo contra TODAS las vistas 03; sonrisa contra 01; pose B contra 01, cuerpo banner contra 02. '
         'Transitions siempre claras, sin gafas de sol. A/B/banner camiseta blanca oversized gruesa crew neck sin logos. '
         'A en grises, B color natural sin aguamarina en piel/ropa. No confundas cambios autorizados de ropa/gesto con identidad. '
-        'Revisa bytes finales y previews móvil/escritorio; cara/ojos a 32px, rostro 55–60%, ojos en tercio superior, aire ~8%. '
-        'face_height, eyes_y y head_top son fracciones medidas del retrato; 0 si solo hay banner. Ante duda ok=false. '
+        'Revisa bytes finales y previews móvil/escritorio; identidad y ojos reconocibles a 32px. '
+        'render.background, render.spill y render.framing son evidencia determinista vinculada al SHA-256 de estos bytes. '
+        'Resuelve el color exacto y uniformidad exterior con render.background (todos los píxeles alfa=0); '
+        'no rechaces por no poder verificar #0FF1CE en bytes. Resuelve el derrame cian en borde y zonas claras '
+        'con render.spill.after y sus umbrales: no marques falso por un posible reflejo cuando ok=true. '
+        'El antialias sobre el fondo aguamarina no es derrame en la persona. '
+        'Para el encuadre usa render.framing: el 55–60% corresponde a cabeza CON pelo hasta cuello, no solo la cara. '
+        'face_height debe reflejar head_height y head_top el valor determinista; eyes_y puede usar eyes_y_estimate, '
+        'que es una estimación anatómica, no un landmark medido. fallback_reason documenta una heurística, no un fallo automático. '
+        'Conserva el juicio visual de identidad, sonrisa, gafas claras, camiseta, pose y ausencia de texto/logos; '
+        'la evidencia no acredita esos aspectos ni la reconocibilidad a 32px. '
+        'Si falta evidencia, evalúa el aspecto visual y expresa la limitación sin inventar medidas en bytes. '
+        'face_height, eyes_y y head_top son fracciones del retrato; 0 si solo hay banner. '
         'Evalúa únicamente los assets presentes; ausencia de otro asset no es un fallo. Si solo hay banner, revisa '
         'su región móvil indicada en geometry y los previews disponibles. pose_01 solo aplica a B; body_02 solo al banner. '
         'evidence_catalog contiene marca.*: decisiones acreditadas de Gustavo sobre colores, fuente y layout para foto/banner. '
@@ -228,7 +265,14 @@ def check(images,refs,context):
     result=json.loads(answer['text']);orquestacion.validate(result,CHECK_SCHEMA)
     passed=(result['ok'] and len(result['checks'])==len(points) and {c['point'] for c in result['checks']}==points
             and all(c['ok'] for c in result['checks']) and all(result[k] for k in ('identity_03','smile_01','clear_glasses','clothing')))
-    if portrait_present:passed=passed and .55<=result['face_height']<=.60 and .15<=result['eyes_y']<=1/3 and .04<=result['head_top']<=.12
+    if portrait_present:
+        for rows in measurements.values():
+            if all(eid in rows for eid in ('render.background','render.spill','render.framing')):
+                framing=rows['render.framing']
+                passed=passed and all(rows[eid]['ok'] for eid in ('render.background','render.spill','render.framing'))
+                passed=passed and .55<=framing['head_height']<=.60 and .08<=framing['head_top']<=.10
+            else:
+                passed=passed and .55<=result['face_height']<=.60 and .15<=result['eyes_y']<=1/3 and .04<=result['head_top']<=.12
     if 'B' in images:passed=passed and result['pose_01']
     if banner_present:passed=passed and result['body_02']
     return dict(result,ok=bool(passed),sha256=[imagenes.sha(raw) for raw in images.values()],brand_version=BRAND_VERSION)
@@ -238,4 +282,5 @@ def render_tool(edits,copy):
     """The JSON checkpoint holds private storage references, never JSON-encoded image bytes."""
     package=render(edits,copy)
     return {'files':{kind:orquestacion.pack(raw) for kind,raw in package['files'].items()},
-        'masks':{kind:orquestacion.pack(raw) for kind,raw in package['masks'].items()},'geometry':package['geometry']}
+        'masks':{kind:orquestacion.pack(raw) for kind,raw in package['masks'].items()},
+        'geometry':package['geometry'],'evidence':package['evidence']}

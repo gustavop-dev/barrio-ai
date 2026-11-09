@@ -3,11 +3,113 @@
 Geometry checks reject unreliable masks; identity and hair/glasses still require
 vision against 03 on the final composition. No inference service or paid retry.
 """
+from statistics import median
 from PIL import Image, ImageColor, ImageFilter
 from .connectors_images import CHROMA_COLOR
 
 VERSION='profile-chroma-v1'
 KEY=ImageColor.getrgb(CHROMA_COLOR)
+FRAMING_VERSION='profile-framing-v1'
+SPILL_VERSION='profile-spill-v1'
+
+
+def head_bounds(alpha):
+    """Estimate hair-to-neck from the silhouette, never claim facial landmarks."""
+    small=alpha.copy();small.thumbnail((512,512),Image.Resampling.NEAREST)
+    w,h=small.size;pixels=small.tobytes();rows=[]
+    for y in range(h):
+        xs=[x for x in range(w) if pixels[y*w+x]>=128]
+        rows.append((xs[0],xs[-1]+1) if xs else (0,0))
+    occupied=[y for y,(left,right) in enumerate(rows) if right>left]
+    if not occupied:raise ValueError('No hay figura opaca para estimar la cabeza')
+    top,bottom=occupied[0],occupied[-1]+1;span=bottom-top
+    radius=max(1,round(h*.008))
+    widths=[right-left for left,right in rows]
+    smooth=[median(widths[max(top,y-radius):min(bottom,y+radius+1)]) if top<=y<bottom else 0 for y in range(h)]
+    candidates=[]
+    for y in range(top+max(radius*3,round(span*.22)),top+round(span*.72)):
+        peak=max(smooth[top:y-radius],default=0)
+        shoulders=max(smooth[y+radius:min(bottom,y+round(span*.25))],default=0)
+        local=smooth[max(top,y-radius*2):min(bottom,y+radius*2+1)]
+        if (peak and smooth[y]<=min(local) and smooth[y]<=peak*.82 and shoulders>=peak*1.2
+                and .85<=(y-top)/peak<=2):
+            candidates.append((smooth[y]/peak,y))
+    reason='';method='alpha-neck-minimum'
+    if candidates and top>0:
+        _,neck=min(candidates)
+    else:
+        method='alpha-width-fallback'
+        reason='La máscara toca el borde superior' if top==0 else 'Sin mínimo de cuello fiable entre cabeza y hombros'
+        upper=smooth[top+round(span*.1):top+round(span*.35)]
+        # A head is approximately 1.3 times its width; bound the fallback so a
+        # flat/occluded silhouette cannot produce an extreme zoom.
+        neck=top+round(max(span*.3,min(span*.65,median(upper or [w*.35])*1.3)))
+    head_rows=rows[top:neck]
+    left=min(l for l,r in head_rows if r>l);right=max(r for l,r in head_rows)
+    sx,sy=alpha.width/w,alpha.height/h
+    return {'top':top*sy,'neck':neck*sy,'left':left*sx,'right':right*sx,
+        'method':method,'fallback_reason':reason}
+
+
+def frame_portrait(image,size):
+    bounds=head_bounds(image.getchannel('A'));height=bounds['neck']-bounds['top']
+    scale=size[1]*.58/height
+    center=(bounds['left']+bounds['right'])/2
+    # Transform directly to the bounded output instead of allocating an enlarged
+    # source image. Pillow resamples RGBA with premultiplied alpha.
+    left=center-size[0]/(2*scale);top=bounds['top']-size[1]*.09/scale
+    out=image.transform(size,Image.Transform.AFFINE,(1/scale,0,left,0,1/scale,top),
+        resample=Image.Resampling.BICUBIC)
+    visible=out.getchannel('A').point(lambda a:255 if a>=128 else 0).getbbox()
+    if visible is None:raise ValueError('El encuadre no contiene una figura visible')
+    head_top=visible[1]/size[1]
+    head_height=(bounds['neck']-top)*scale/size[1]-head_top
+    evidence={'id':'render.framing','kind':'render','version':FRAMING_VERSION,
+        'method':bounds['method'],'fallback_reason':bounds['fallback_reason'],
+        'source_head_height':height/image.height,'head_height':head_height,'head_top':head_top,
+        'eyes_y_estimate':head_top+head_height*.4,'eyes_measured':False,
+        'scale':scale,'source_head':bounds,'crop_box':[left,top,left+size[0]/scale,top+size[1]/scale],
+        'size_px':list(size),'scope':'Cabeza con pelo hasta cuello estimados por alfa; ojos estimados, no landmarks faciales.'}
+    evidence['ok']=.55<=head_height<=.60 and .08<=head_top<=.10
+    return out,evidence
+
+
+def spill_regions(image):
+    alpha=image.getchannel('A');inner=alpha.filter(ImageFilter.MinFilter(9))
+    for (r,g,b,a),near in zip(image.getdata(),inner.getdata()):
+        yield a>=32 and near<250, a>=250 and min(r,g,b)>=100 and max(r,g,b)>=160
+
+
+def spill_index(image):
+    """Cyan excess in uncomposited RGB; the brand background is never spill."""
+    totals={name:{'pixels':0,'affected_pixels':0,'sum':0} for name in ('edge','light')}
+    for (r,g,b,_),regions in zip(image.getdata(),spill_regions(image)):
+        excess=max(0,min(g,b)-r)
+        for name,selected in zip(totals,regions):
+            if selected:
+                row=totals[name];row['pixels']+=1;row['sum']+=excess;row['affected_pixels']+=excess>12
+    for row in totals.values():
+        count=row['pixels'];row['index']=row.pop('sum')/(255*count) if count else 0
+        row['affected_fraction']=row['affected_pixels']/count if count else 0
+    return totals
+
+
+def despill(image):
+    before=spill_index(image)
+    def clean(metrics):return all(r['index']<=.02 and r['affected_fraction']<=.005 for r in metrics.values())
+    corrected=0
+    if not clean(before):
+        colors=[]
+        for (r,g,b,a),(edge,light) in zip(image.getdata(),spill_regions(image)):
+            excess=max(0,min(g,b)-r) if edge or light else 0
+            corrected+=excess>0
+            colors.append((r,g-excess,b-excess,a))
+        image=image.copy();image.putdata(colors)
+    after=spill_index(image) if corrected else before
+    return image,{'id':'render.spill','kind':'render','version':SPILL_VERSION,'ok':clean(after),
+        'before':before,'after':after,'corrected_pixels':corrected,
+        'thresholds':{'cyan_excess_rgb':12,'index':.02,'affected_fraction':.005},
+        'scope':'RGB de la persona antes de componer; borde alfa y zonas claras, sin segmentación semántica de piel/camiseta.'}
 
 
 def components(mask,value):

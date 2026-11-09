@@ -27,3 +27,5 @@ pagadas como parte de la documentación.
 
 - [x] Corregir assets de Perfil tras #90: capacidades de transparencia, recorte croma validado, diagnóstico 400 y recuperación del banner desde la sección; tests con fakes escritos.
 - [ ] QA de `test_perfil_chroma`, `test_perfil_assets`, `test_perfil` y `test_imagenes` en el entorno autorizado. No ejecutados localmente; sin llamadas pagadas, builds ni despliegue en esta sesión.
+- [x] Tras #91: encuadre por alfa, métricas deterministas para visión, despill cian, normalización del highlight y reutilización entre ciclos `perfil_assets`; regresiones con fakes escritas.
+- [ ] Ejecutar esas regresiones en entorno autorizado y comprobar el relanzamiento productivo de `perfil_assets 8aa8c51c` con sus blobs confirmados. No se accedió a producción en esta sesión.

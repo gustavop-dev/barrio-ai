@@ -1,4 +1,6 @@
 # Arquitectura
+Perfil conserva la edición de persona como checkpoint independiente. Las continuaciones consultan el ciclo original y los ciclos `perfil_assets` de su misma versión/propietario/presupuesto; el render local versionado produce composición y evidencia cuantitativa ligada al SHA-256 para la revisión visual. No se reinician ledgers ni presupuestos al cambiar el render.
+
 Navegador/API → autenticación Django y permisos → serializers/servicios → biblioteca compartida o Job persistente → worker → knowledge.agents → proveedores. Las tablas históricas permanecen; Django añade tablas de autenticación, credenciales hash, trabajos y auditoría. Las unidades y evidencias son de solo lectura en Admin.
 
 ```mermaid

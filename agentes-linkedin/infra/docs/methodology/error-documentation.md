@@ -1,4 +1,6 @@
 # Errores conocidos
+Perfil tras #91: redimensionar a 800×800 conservaba una cabeza de ~40%; la visión además intentaba inferir colores exactos y derrame desde la imagen. Se añade encuadre por máscara y evidencia cuantitativa de los bytes finales. El highlight vacío o con puntuación distinta se normaliza incluso al recuperar líneas existentes. Un nuevo job de render ya no pierde ediciones confirmadas guardadas en un ciclo hijo `perfil_assets`. Tests escritos, no ejecutados; comportamiento y blobs de 8aa8c51c pendientes de comprobar en producción.
+
 Conservar reserva de solicitudes inciertas y revisar antes de repetir. ConnectError antes de envío admite reintento acotado. Evidencias contienen NUL: preservar columna json original, no convertir a jsonb. No reiniciar automáticamente trabajos running al perder el trabajador.
 
 Revisión Django: corregidos dos fallos antes de activar el backend. Un fallo del hilo de latidos ahora detiene nuevas reclamaciones. La escritura de memoria y su auditoría utilizan una sola transacción psycopg: un error de auditoría revierte la propuesta/confirmación. Pruebas de regresión cubren ambos casos. El admin difiere los blobs de unidades/ejecuciones en listados.

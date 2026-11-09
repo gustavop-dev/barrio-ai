@@ -1,4 +1,6 @@
 """Gustavo's approved profile brand and render constraints, shared with evidence consumers."""
+import unicodedata
+from collections import Counter
 
 BRAND_VERSION='PerfilLinkedIn-gustavo-addenda-6-v1'
 SOURCE='docs/funcionalidades/estrategia-perfil.md#marca'
@@ -11,6 +13,29 @@ SAFE=(600,60,1260,336);COVER=(0,132,568,396);MOBILE=(317,0,1267,396)
 TEXT=(600,60,1078,336);FIGURE=(1088,36,1260,372)
 MAX_LINE_WIDTH=470;FONT_PX=56;LABEL_PX=22;LABEL_TRACKING_EM=.08
 LABEL_Y=66;LINE_Y=126;LINE_HEIGHT=68
+
+
+def banner_word(word):
+    """Ignore surrounding punctuation/case, retaining contractions and hyphens."""
+    word=unicodedata.normalize('NFKC',word).strip()
+    while word and unicodedata.category(word[0]).startswith('P'):word=word[1:]
+    while word and unicodedata.category(word[-1]).startswith('P'):word=word[:-1]
+    return word.casefold()
+
+
+def normalize_banner(banner):
+    result=dict(banner);lines=result.get('lines',[])
+    words=[banner_word(word) for line in lines for word in line.split()]
+    counts=Counter(words)
+    def valid(word):
+        return (bool(word) and word[0].isalpha() and word[-1].isalpha()
+            and all(ch.isalpha() or ch in "'’-" for ch in word) and counts[word]==1)
+    highlight=banner_word(result.get('highlight') or '')
+    if not valid(highlight):
+        highlight=next((banner_word(word) for line in lines[1:]+lines[:1] for word in line.split()
+            if valid(banner_word(word))),'')
+    result['highlight']=highlight
+    return result
 
 
 def evidence():
