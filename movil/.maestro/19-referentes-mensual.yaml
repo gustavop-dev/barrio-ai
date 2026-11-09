@@ -246,17 +246,25 @@ tags: [referentes, turno, experimentos]
       id: toast
     timeout: 15000
 - takeScreenshot: 19-referentes-04-experimento-detenido
-# The independent profile proposal survives referent decisions and opens its checklist.
+# seed_qa.profile() runs before the monthly branch: owner qa, state partial, uid('profile:proposal').
+# It remains in Cuando puedas, after the English question (same created_at; questions win the stable sort).
+# qa86d exhausted a 60 s DOWN search from the header at that question, before reaching profile-open.
+# Reset after the collapse, then use the faster footer helper and a short UP search, as in 04-tu-turno.
 - runFlow: comun/turno-arriba.yaml
+- runFlow: comun/turno-final.yaml
 - scrollUntilVisible:
     element:
       id: profile-open
-    direction: DOWN
+      childOf:
+        id: 'turno-card-perfil:ea374018-b4df-5cf8-8097-73c5a8a39491-contenido'
+    direction: UP
     speed: 20
     timeout: 60000
     centerElement: true
 - tapOn:
     id: profile-open
+    childOf:
+      id: 'turno-card-perfil:ea374018-b4df-5cf8-8097-73c5a8a39491-contenido'
 # Profile details load only on opening; wait for their first controls before scrolling past them.
 - extendedWaitUntil:
     visible: "Documento Markdown"
