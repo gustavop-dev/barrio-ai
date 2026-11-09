@@ -70,3 +70,11 @@ El log `f3b-ci-1.log` termina con **9 FAIL y 7 ERROR** (553 tests). Se leyeron t
 - Este documento describe el cambio aditivo del feed y la migración.
 
 Claude debe repetir la suite backend completa con fakes y comprobar los 16 casos originales, además de los casos nuevos. Especial atención a presupuesto agotado antes/durante la reparación, reservas concurrentes/mensuales, imagen incierta y secuencias de Oficina. Esta corrección solo editó archivos y revisó el diff; no se ejecutaron tests, builds, migraciones ni generadores localmente.
+
+## Corrección del CI de PR #79
+
+El log `f3b-ci-79.log` termina con **1 FAIL y 0 ERROR** (557 tests). El único traceback corresponde a `GraphTests.test_specialists_depth_contracts_and_units`: al cambiar el origen de `redactar_a` al verificador, su pertenencia al bucle omitía el control de profundidad y el rechazo llegaba después como `runtime fuera del orquestador`.
+
+`team_backend/grafo.py` limita la excepción de profundidad por bucle a las aristas sin runtime. Las llamadas ejecutables del bucle deben salir del orquestador, igual que exige el dispatcher. Se conserva el test existente, las dos evaluaciones máximas, la excepción explícita de Jev y la validación de rutas sin bypass. No cambia el registro ni sus diagramas, los workflows, los contratos o las unidades.
+
+Revisión estática solamente, sin ejecutar pruebas, builds, gestores de paquetes ni usar la red, commit o push. Pendiente en CI: repetir `team_backend.tests.test_grafo` y la suite backend para confirmar el resultado.
