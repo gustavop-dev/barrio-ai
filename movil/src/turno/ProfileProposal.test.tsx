@@ -44,7 +44,9 @@ it('keeps the note and the pending state after a failed decision', async () => {
 it('keeps ready sections usable and shows pending questions with placeholder copy', async () => {
   await saveToken('0ff1ce_dt_perfil_fake');
   const proposal = JSON.parse(JSON.stringify(PROFILE_PROPOSAL)) as typeof PROFILE_PROPOSAL;
-  proposal.sections.push({ ...proposal.sections[0], id: 'experience', title: 'Experiencia', readiness: 'needs_input',
+  const [first] = proposal.sections;
+  if (!first) throw new Error('PROFILE_PROPOSAL needs a section');
+  proposal.sections.push({ ...first, id: 'experience', title: 'Experiencia', readiness: 'needs_input',
     copy: '[exact title] — Built useful software.',
     missing: [{ key: 'perfil.experience.title', question: '¿Cuál fue el cargo exacto?', purpose: 'Completar el cargo.' }] });
   fakeServer({ 'GET /api/v1/perfil/profile-qa': { body: proposal } });
