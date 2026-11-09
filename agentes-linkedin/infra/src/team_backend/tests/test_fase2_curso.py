@@ -72,6 +72,9 @@ class ParticipationTests(NetworkBase):
         self.assertEqual(operador.limits(saturday)['INT-03'],(2,25))
         self.assertEqual(operador.limits(saturday)['CONT-09'],(1,7))
         self.assertEqual(operador.capacity_left(self.account,'RED-02',saturday),0)
+        # Reading a future weekend's cap must not create an invitation pause today.
+        self.assertIsNone(red.ramp_state(self.now)['pause_until'])
+        self.assertEqual(red.invites_blocked(self.now),(False,''))
         with patch.dict(os.environ,{'OPERATOR_DAILY_LIMITS':'RED-02=21','OPERATOR_WEEKLY_LIMITS':'RED-02=101'}):
             self.assertEqual(operador.limits(self.now)['RED-02'],(20,100))
             self.assertEqual(operador.capacity_left(self.account,'RED-02',self.now),5)
@@ -83,6 +86,7 @@ class ParticipationTests(NetworkBase):
         self.assertFalse(ActionExecution.objects.filter(proposal=p).exists())
         operador._audit(None,'network.recipient_blocked',p.payload['user_id'],status=422)
         with self.assertRaisesRegex(operador.OperatorBlocked,'Destinatario'):operador.execute(self.gustavo,p.id)
+        self.assertFalse(ActionExecution.objects.filter(proposal=p).exists())
         self.assertEqual(self.fake.state['writes'],0)
 
     def test_window_is_bogota_and_end_exclusive(self):
@@ -161,6 +165,21 @@ class ParticipationTests(NetworkBase):
         red.provider_failure(self.account,p,ConnectorError('throttle',status=429,kind='rate_limit',pause=True))
         self.account.refresh_from_db();self.assertTrue(self.account.paused);self.assertTrue(red.invites_blocked()[0])
 
+    def test_real_pause_deadline_survives_health_reviews_and_expiry_requires_account_review(self):
+        p=self.approved()
+        red.provider_failure(self.account,p,ConnectorError('throttle',status=429,kind='rate_limit',pause=True))
+        until=self.now+timedelta(days=7)
+        self.assertEqual(red.ramp_state()['pause_until'],until.isoformat())
+        for when in (self.now,until-timedelta(seconds=1)):
+            self.assertEqual(red.ramp_limits(self.account,when),(0,0))
+            self.assertTrue(red.invites_blocked(when)[0])
+        self.assertEqual(red.ramp_limits(self.account,until),(5,20))
+        self.assertEqual(red.invites_blocked(until),(False,''))
+        with patch('django.utils.timezone.now',return_value=until),self.assertRaisesRegex(operador.OperatorBlocked,'Cuenta en pausa'):
+            operador.execute(self.gustavo,p.id)
+        self.assertFalse(ActionExecution.objects.filter(proposal=p).exists())
+        self.assertEqual(self.fake.state['writes'],0)
+
     def test_profile_reads_share_atomic_ceiling_across_accounts_and_paths(self):
         other=ConnectorAccount.objects.create(provider='fake',external_account_id='acc_other',label='Other connector')
         AuditEvent.objects.bulk_create([AuditEvent(action='operator.profile_read',target='member',metadata={}) for _ in range(79)])
@@ -217,6 +236,7 @@ class ParticipationTests(NetworkBase):
         with ThreadPoolExecutor(max_workers=4) as pool:results=list(pool.map(reserve,proposals))
         self.assertEqual(sum(results),3)
         self.assertEqual(AuditEvent.objects.filter(action='network.note_reserved').count(),3)
+        self.assertEqual(AuditEvent.objects.filter(action='network.account_tier').count(),1)
 
     def test_pause_arriving_during_profile_preflight_stops_the_write(self):
         p=self.approved();real=type(self.fake).get_profile
@@ -275,10 +295,24 @@ class ParticipationTests(NetworkBase):
 
     def test_tier_validates_and_upgrade_preserves_notes_and_ramp(self):
         self.assertEqual(red.note_policy()['tier'],'free');self.assertIsNone(red.note_policy()['provider_remaining'])
-        red.reserve_note(self.approved(note=True));self.ramp(stage=0)
+        p=self.approved(note=True)
+        self.assertTrue(red.reserve_note(p));self.ramp(stage=0)
+        event=operador.policy_event('network.account_tier')
+        self.assertIsNone(event.actor_id)
+        self.assertEqual(event.metadata,{'tier':'free','previous':None,'change_source':'server_configuration',
+                                        'capability_source':'local_product_cap'})
         with patch.dict(os.environ,{'LINKEDIN_ACCOUNT_TIER':'premium'}):
             self.assertEqual(red.note_room(),2);self.assertEqual(red.note_policy()['max_chars'],200)
             self.assertEqual(red.ramp_limits(self.account,self.now),(5,20))
+            # Reusing the reservation records the new tier, without consuming another note.
+            self.assertTrue(red.reserve_note(p));self.assertTrue(red.reserve_note(p))
+            self.assertEqual(red.note_room(),2)
+            event=operador.policy_event('network.account_tier')
+            self.assertIsNone(event.actor_id)
+            self.assertEqual(event.metadata,{'tier':'premium','previous':'free','change_source':'server_configuration',
+                                            'capability_source':'local_product_cap'})
+        self.assertEqual(AuditEvent.objects.filter(action='network.account_tier').count(),2)
+        self.assertEqual(AuditEvent.objects.filter(action='network.note_reserved').count(),1)
         with patch.dict(os.environ,{'LINKEDIN_ACCOUNT_TIER':'unknown'}),self.assertRaises(ValueError):red.note_policy()
 
     def test_explicit_note_quota_contract_only(self):

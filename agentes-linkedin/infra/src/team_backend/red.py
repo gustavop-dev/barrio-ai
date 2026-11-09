@@ -123,8 +123,9 @@ def invitation_health(now=None):
 
 def ramp_state(now=None):
     now=now or timezone.now();event=operador.policy_event('network.ramp')
+    # A new ramp has no pause; only a health or provider event sets a deadline.
     return dict(event.metadata) if event else {'stage':0,'stage_since':now.isoformat(),'freeze_until':now.isoformat(),
-                                              'pause_until':now.isoformat(),'last_sample':'','last_rate':None}
+                                              'pause_until':None,'last_sample':'','last_rate':None}
 
 def health_snapshot(at):
     """Historical reporting uses the saved cut, never today's profile state as yesterday's evidence."""
@@ -177,7 +178,7 @@ def review_health(account,now=None):
 
 def ramp_limits(account,now=None):
     state=review_health(account,now) if account is not None else ramp_state(now)
-    if (now or timezone.now())<datetime.fromisoformat(state['pause_until']):return 0,0
+    if state.get('pause_until') and (now or timezone.now())<datetime.fromisoformat(state['pause_until']):return 0,0
     health=state.get('health',{})
     if (health.get('mature',0)>=max(20,int(setting('OPERATOR_INVITE_SAMPLE_MIN','20'))) and
             health.get('rate') is not None and health['rate']<max(0.25,float(setting('OPERATOR_INVITE_ACCEPTANCE_PAUSE','0.25')))):
@@ -267,7 +268,7 @@ def reserve_note(proposal):
     last=operador.policy_event('network.account_tier')
     if last is None or last.metadata['tier']!=policy['tier']:
         operador._audit(None,'network.account_tier','member',tier=policy['tier'],previous=last.metadata['tier'] if last else None,
-                        actor='server_configuration',capability_source=policy['source'])
+                        change_source='server_configuration',capability_source=policy['source'])
     existing=operador.policy_event('network.note_reserved',proposal.id)
     if existing:return True
     if note_blocked():return False
@@ -544,7 +545,8 @@ def invites_blocked(now=None):
     """LinkedIn refused invitations for a limit in the last 7 days: invitations wait."""
     since=(now or timezone.now())-timedelta(days=7)
     state=ramp_state(now)
-    if (now or timezone.now())<datetime.fromisoformat(state['pause_until']):return True,'Pausa de invitaciones por salud o proveedor; mínimo siete días.'
+    if state.get('pause_until') and (now or timezone.now())<datetime.fromisoformat(state['pause_until']):
+        return True,'Pausa de invitaciones por salud o proveedor; mínimo siete días.'
     health=state.get('health',{})
     if (health.get('mature',0)>=max(20,int(setting('OPERATOR_INVITE_SAMPLE_MIN','20'))) and
             health.get('rate') is not None and health['rate']<max(0.25,float(setting('OPERATOR_INVITE_ACCEPTANCE_PAUSE','0.25')))):
