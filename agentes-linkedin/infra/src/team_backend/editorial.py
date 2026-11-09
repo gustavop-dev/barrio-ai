@@ -152,6 +152,7 @@ Cómo decidir:
   dirección y el lector; pon en ideas_used el id de las que uses (vacía si ninguna). Son su punto de partida, no
   hechos: nunca las cites como hechos salvo que sean hechos sobre él (y en público solo si están en public_facts).
   feedback_from_gustavo son sus comentarios sobre piezas recientes: tenlos en cuenta.
+  profile_guidance son sugerencias de actividad aceptadas en Perfil: artefactos de orientación, no hechos nuevos ni autorización de publicar; no las incluyas en ideas_used.
 - weekly_recommendations (o null) trae las recomendaciones del último resumen semanal del analista de resultados: una
   pista más para elegir, no una orientación; orientation pesa más y solo Gustavo la cambia.
 Cita en citations solo IDs de unidades del contexto.'''
@@ -534,7 +535,7 @@ def _context(piece,now):
     from . import preguntas
     asked={'open':[{'question':q.question,'memory_key':q.memory_key} for q in TeamQuestion.objects.filter(state='open')[:20]],
            'closed_keys':sorted(preguntas.closed_keys()|{q for q in TeamQuestion.objects.filter(state='answered').values_list('memory_key',flat=True)})}
-    from . import capturas, resumen_semanal
+    from . import capturas, resumen_semanal, perfil
     urgente.assign_slots(now)
     ideas=capturas.ideas_for_director(now)
     ideas=[i for i in ideas if not i['publish_asap'] or (i['expected_slot'] and datetime.fromisoformat(i['expected_slot'])==piece.scheduled_for)]
@@ -546,7 +547,8 @@ def _context(piece,now):
     director_input=dict(memory,slot={'date':piece.slot_date,'weekday':piece.slot_date.strftime('%A')},
                    signals={'observed_posts':signals},history=history,modality_mix_30d=mix,performance_30d=_performance(now),
                    team_questions=asked,ideas_from_gustavo=ideas,feedback_from_gustavo=feedback,
-                   weekly_recommendations=resumen_semanal.for_director(now),gallery=gallery,priority_capture=priority)
+                   weekly_recommendations=resumen_semanal.for_director(now),gallery=gallery,priority_capture=priority,
+                   profile_guidance=perfil.editorial_guidance())
     return dict(director_input=director_input,research=piece.research)
 
 

@@ -15,15 +15,19 @@
       "grupo": "estrategia_perfil",
       "contrato": "equipos/estrategia-perfil/contratos-v1/posicionamiento.json",
       "contrato_ejecutable": false,
-      "estado": "parcial",
+      "estado": "activo",
       "runtime": {
-        "implementa": ["knowledge/agents.py: SYSTEM / run (trabajo agent_run, POST /api/v1/runs)", "knowledge/retrieval.py: AGENTS['posicionamiento']"],
+        "implementa": [
+          "knowledge/agents.py: SYSTEM / run (trabajo agent_run, POST /api/v1/runs)",
+          "knowledge/retrieval.py: AGENTS['posicionamiento']",
+          "team_backend/perfil_contenido.py: positioning"
+        ],
         "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
-        "effort": "sin fijar",
+        "effort": "low en perfil_periodico; ruta manual conservada",
         "max_tokens": "ANTHROPIC_MAX_TOKENS (8000)",
-        "proposito_ledger": "agent-run",
-        "activacion": "A mano. La salida queda en runs (needs_review) y no llega al bucle autónomo.",
-        "difiere_del_contrato": "No produce positioning_proposal ni neighborhood_criteria. La dirección que leen los demás está escrita a mano en team_backend/posicionamiento.py (posicionamiento-v1); de ahí salen editorial.DIRECTION, red.CLASSIFY_SYSTEM y lider.CRITERIA_DEL_BARRIO."
+        "proposito_ledger": "profile-positioning / profile-copy / profile-review; cap agregado 10 USD",
+        "activacion": "Fase 8: prepare_profile; semestral/mensual por PROFILE_ENABLED y captura explícita.",
+        "difiere_del_contrato": "Paquete EST privado y manual; no escribe LinkedIn ni cambia la dirección editorial global. CI/QA pendientes."
       }
     },
     {
@@ -31,15 +35,19 @@
       "grupo": "estrategia_perfil",
       "contrato": "equipos/estrategia-perfil/contratos-v1/perfil.json",
       "contrato_ejecutable": false,
-      "estado": "parcial",
+      "estado": "activo",
       "runtime": {
-        "implementa": ["knowledge/agents.py: SYSTEM / run (trabajo agent_run, POST /api/v1/runs)", "knowledge/retrieval.py: AGENTS['perfil']"],
+        "implementa": [
+          "knowledge/agents.py: SYSTEM / run (trabajo agent_run, POST /api/v1/runs)",
+          "knowledge/retrieval.py: AGENTS['perfil']",
+          "team_backend/perfil.py: run/schedule"
+        ],
         "modelo": "ANTHROPIC_MODEL (claude-opus-5-5)",
-        "effort": "sin fijar",
+        "effort": "low en perfil_periodico; ruta manual conservada",
         "max_tokens": "ANTHROPIC_MAX_TOKENS (8000)",
-        "proposito_ledger": "agent-run",
-        "activacion": "A mano. La salida queda en runs y no llega al bucle.",
-        "difiere_del_contrato": "No propone ni aplica cambios de perfil (PERF-*)."
+        "proposito_ledger": "profile-positioning / profile-copy / profile-review; cap agregado 10 USD",
+        "activacion": "Fase 8: prepare_profile; semestral/mensual por PROFILE_ENABLED y captura explícita.",
+        "difiere_del_contrato": "Paquete EST privado y manual; no escribe LinkedIn ni cambia la dirección editorial global. CI/QA pendientes."
       }
     },
     {

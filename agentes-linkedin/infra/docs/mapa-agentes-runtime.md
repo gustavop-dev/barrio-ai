@@ -21,8 +21,8 @@ Los 16 contratos de `agentes-linkedin/equipos/` son plantillas de diseño de 30�
 
 | Rol | Estado | Código | Modelo · effort |
 | --- | --- | --- | --- |
-| posicionamiento | Parcial (a mano) | `knowledge/agents.py: run` | Opus 5.5 · sin fijar |
-| perfil | Parcial (a mano) | `knowledge/agents.py: run` | Opus 5.5 · sin fijar |
+| posicionamiento | Activo como herramienta de Perfil; manual disponible | `perfil_contenido.positioning`, `knowledge/agents.py: run` | ANTHROPIC_MODEL · low en Perfil |
+| perfil | Activo (fase 8; activación por entorno) | `perfil.run/schedule`, `perfil_contenido`, `perfil_visual` | ANTHROPIC_MODEL · low; OpenAI solo persona |
 | investigador_referentes | Parcial | `red.py: CLASSIFY_SYSTEM / classify`, `discover`, `operador.py: observe` | Sonnet 5.5 · medium |
 | analista_barrio_resultados | Parcial | `metricas.py: collect`, `resultados.py`, `resumen_semanal.py: run` | Opus 5.5 · medium (resumen semanal) |
 | director_editorial | Activo | `editorial.py: DIRECTOR_SYSTEM / _stage('director')`, `SELECTION_SYSTEM / _stage('seleccion')`, `REPAIR_SYSTEM / _stage('reparacion')` | Opus 5.5 · medium |
@@ -37,7 +37,13 @@ Los 16 contratos de `agentes-linkedin/equipos/` son plantillas de diseño de 30�
 
 ## Roles
 
-### posicionamiento y perfil
+### Perfil en fase 8
+
+`perfil_periodico` produce el dossier privado EST-01–05/GAL-08/TUR-18, sin escribir LinkedIn. Biblioteca primero, propuestas inglesas con citas por sección, cadencia semestral/mensual y captura explícita. `ProfileProposal` conserva decisiones/versiones; `CycleLedger` conserva el cap agregado 10 USD y checkpoints. `perfil_visual` compone A/B, banner y previews con revisión contra las referencias privadas. Despliegue y QA pendientes: [guía](../../../docs/arquitectura/fase8-verificacion.md).
+
+La dirección editorial general en `posicionamiento.py` sigue siendo independiente: esta fase no la sustituye.
+
+### Consultas manuales de posicionamiento y perfil (ruta previa)
 
 | | |
 | --- | --- |

@@ -299,10 +299,12 @@ class TuTurno(APIView):
         conversation_cards=[_conversation_card(c,now) for c in conversaciones.needing_gustavo(now)]
         from . import resumen_semanal
         summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal()] if s]
-        tasks={'perfil':[],'conversaciones':conversation_cards,'resumen':summary_cards}  # profile cycle (PERF): a later phase of the plan
+        from .perfil import cards as profile_cards
+        profile=profile_cards(request.user,_card)
+        tasks={'perfil':profile,'conversaciones':conversation_cards,'resumen':summary_cards}
         approval_cards=[_approval_card(p) for p in awaiting_approval()]
-        question_cards=[_question_card(q,now) for q in pending];later=[_question_card(q,now) for q in later_q]
-        cards=warnings+question_cards+conversation_cards+summary_cards+approval_cards
+        question_cards=[_question_card(q,now) for q in pending];later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)
+        cards=warnings+question_cards+conversation_cards+summary_cards+approval_cards+profile
         seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]

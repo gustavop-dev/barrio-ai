@@ -4,8 +4,8 @@
 # writing; Sofía's conversation swiped right is done; the choice question swiped left and the yes/no question's «Más
 # tarde» are postponed; the expired question sits under «Ya no es urgente»; «Pospuestas» and «Hecho recientemente»
 # list what happened; the top bar counter follows; and the answer shows up in «Lo que el equipo sabe de ti».
-# The seed (seed_qa) gives 8 cards: 1 urgente; 4 importantes (the dated question, the two network approvals of
-# 04-tu-turno-aprobar and the conversation); 3 cuando puedas (the analyst's orientation, then the choice and yes/no
+# The seed (seed_qa) gives 9 cards: 1 urgente; 4 importantes (the dated question, the two network approvals of
+# 04-tu-turno-aprobar and the conversation); 4 cuando puedas (profile, the analyst's orientation, then the choice and yes/no
 # questions, newest first). Plus «¿En qué ciudad vives actualmente?» postponed and «¿Fuiste al meetup…?» expired.
 # Each search goes down from where the last one ended (the order inside each group is fixed by the seed's dates);
 # the list goes back to its header only once, for the «Lo que el equipo sabe de ti» tab (comun/turno-arriba.yaml).
@@ -27,7 +27,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 8 pendientes, 1 urgente'
+      text: 'Tu turno, 9 pendientes, 1 urgente'
     timeout: 30000
 - tapOn:
     id: top-tu-turno
@@ -36,7 +36,7 @@ tags: [turno]
     visible:
       id: turno-list
     timeout: 30000
-- assertVisible: '1 urgente · 4 importantes · 3 cuando puedas'
+- assertVisible: '1 urgente · 4 importantes · 4 cuando puedas'
 
 # ---------------------------------------------------------------- URGENTE: «¿Salió o no?», swiped right
 # cubre: TUR-03, TUR-04, TUR-19
@@ -86,7 +86,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 7 pendientes'
+      text: 'Tu turno, 8 pendientes'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
@@ -306,7 +306,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 3 pendientes'
+      text: 'Tu turno, 4 pendientes'
     timeout: 20000
 
 # ---------------------------------------------------------------- «Hecho recientemente»

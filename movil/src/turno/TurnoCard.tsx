@@ -1,3 +1,4 @@
+import { ProfileProposal } from './ProfileProposal';
 // A Tu turno card (the PWA's TurnoCardView): type, priority, deadline, who asks, title, body by type,
 // actions and «Creada hace X», inside a SwipeableCard (right: the primary action; left: «Más tarde»).
 // MovTuTurno: once the backend confirms, the button that resolved it turns into a check and the card
@@ -379,7 +380,9 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
           <T variant="subtitulo" accessibilityRole="header">
             {cardTitle(card)}
           </T>
-          {card.question ? (
+          {card.profile_id ? (
+            <ProfileProposal id={card.profile_id} />
+          ) : card.question ? (
             <QuestionBody card={card} resolvedBy={resolvedBy} />
           ) : card.attempt ? (
             <Attempt card={card} />

@@ -145,10 +145,10 @@ class PushEmitterTests(OperatorBase):
         with patch.dict(os.environ,{'OPERATOR_PAUSED':'true'}):self.assertTrue(operador.check_env_pause())  # a new stop pushes again
         self.assertEqual(len(self.push.call_args_list),2)
 
-    def test_profile_task_has_no_switch_until_its_event_exists(self):
-        """Catch a switch for a push that nothing can send (profile tasks are not implemented, TUR-18)."""
+    def test_profile_task_has_switch_for_profile_proposals(self):
+        """TUR-18 now emits profile_task from the private strategy cycle."""
         kinds=[t['kind'] for t in self.human.get('/api/v1/ajustes').json()['push_types']]
-        self.assertNotIn('profile_task',kinds)
+        self.assertIn('profile_task',kinds)
         self.assertTrue({'linkedin_expired','machine_paused','machine_paused_env'}<=set(kinds))
         self.assertEqual(self.human.patch('/api/v1/ajustes/preferencias',{'push_disabled':['profile_task']},format='json').status_code,200)  # still accepted
 

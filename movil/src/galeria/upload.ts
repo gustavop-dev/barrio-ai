@@ -1,7 +1,7 @@
 // «Subir fotos»: several photos from the phone's library (expo-image-picker), checked against the
 // contract (JPEG, PNG, WebP or HEIC of up to 10 MB) and sent ten per request, with the progress of
 // each request for the screen.
-import { CAPTURE_LIMITS, isAcceptedPhoto, useUploadFotos, type NativeFile, type UploadProgress } from '@compartido/api/capturas';
+import { CAPTURE_LIMITS, isAcceptedPhoto, useUploadFotos, type PhotoCategory, type NativeFile, type UploadProgress } from '@compartido/api/capturas';
 import { rejectedMessage, uploadedMessage } from '@compartido/logic/galeria';
 import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useState } from 'react';
@@ -43,22 +43,24 @@ export interface GalleryUpload {
   dismiss: () => void;
 }
 
-export function useGalleryUpload(): GalleryUpload {
+export function useGalleryUpload(category: PhotoCategory = 'posts'): GalleryUpload {
   const toast = useToast();
+  const [batchCategory, setBatchCategory] = useState<PhotoCategory>(category);
   const [photos, setPhotos] = useState<PickedPhoto[]>([]);
   const [progress, setProgress] = useState<UploadProgress | null>(null);
   const [rejected, setRejected] = useState<string | null>(null);
-  const upload = useUploadFotos({ onProgress: setProgress });
+  const upload = useUploadFotos({ onProgress: setProgress, category });
 
   const send = useCallback(
-    (ok: PickedPhoto[]) => {
+    (ok: PickedPhoto[], selectedCategory: PhotoCategory) => {
+      setBatchCategory(selectedCategory);
       setPhotos(ok);
       setProgress({ done: 0, sending: 0, total: ok.length });
       const files: NativeFile[] = ok.map(({ uri, name, type }) => ({ uri, name, type }));
-      upload.mutate(files, {
+      upload.mutate({ files, category: selectedCategory }, {
         onSuccess: (created) => {
           haptic('uploadDone');
-          toast.show(uploadedMessage(created.length || ok.length));
+          toast.show(selectedCategory === 'perfil' ? 'Fotos subidas a Perfil.' : uploadedMessage(created.length || ok.length));
           setPhotos([]);
           setProgress(null);
         },
@@ -77,13 +79,13 @@ export function useGalleryUpload(): GalleryUpload {
     if (!picked) return;
     const { ok, rejected: bad } = splitPicked(picked);
     setRejected(rejectedMessage(bad));
-    if (ok.length) send(ok);
-  }, [upload.isPending, send]);
+    if (ok.length) send(ok, category);
+  }, [upload.isPending, send, category]);
 
   const retry = useCallback(() => {
     const left = photos.slice(progress?.done ?? 0);
-    if (left.length) send(left);
-  }, [photos, progress, send]);
+    if (left.length) send(left, batchCategory);
+  }, [photos, progress, send, batchCategory]);
 
   const dismiss = useCallback(() => {
     upload.reset();

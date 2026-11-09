@@ -851,6 +851,10 @@ NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','plan
 
 def run_job(job):
     from . import orquestacion
+    if job.kind=='prepare_profile':
+        from .perfil import run
+        proposal=run(job)
+        return ('failed' if proposal.state=='stopped' else 'complete'),proposal.state,''
     if job.kind not in ('observe','propose_comment',*NETWORK_JOBS):return _run_job(job)
     runtime=orquestacion.Runtime.open('red',str(job.id),job.owner,job,
         facts={'trigger':job.kind},plan=[job.kind])

@@ -64,10 +64,10 @@ beforeEach(async () => {
 describe('Galería', () => {
   it('shows the header, the note, the filters and a grid with each photo’s state, loading the images with the token', async () => {
     const server = await renderGaleria();
-    expect(screen.getByText('Fotos para tus posts.')).toBeOnTheScreen();
+    expect(screen.getByText('Fotos para tus posts y tu perfil.')).toBeOnTheScreen();
     expect(screen.getByText('Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería».')).toBeOnTheScreen();
     expect(screen.getByText('El equipo decide cuándo usarlas y si las edita con IA. Tú puedes dejar una nota o prohibir la edición en cada foto.')).toBeOnTheScreen();
-    for (const label of ['Todas', 'Sin usar', 'Elegidas', 'Publicadas']) expect(screen.getByRole('button', { name: label })).toBeOnTheScreen();
+    for (const label of ['Perfil', 'Todas', 'Sin usar', 'Elegidas', 'Publicadas']) expect(screen.getAllByRole('button', { name: label }).length).toBeGreaterThan(0);
     expect(await screen.findByLabelText('Foto del 3 nov, elegida · jue 12')).toBeOnTheScreen();
     expect(screen.getByText('Publicada · 2 nov')).toBeOnTheScreen();
     expect(server.find('GET', '/api/v1/galeria')[0]?.path).toBe('/api/v1/galeria?filtro=todas');
@@ -264,4 +264,13 @@ describe('Galería', () => {
     await waitFor(() => expect(screen.queryByTestId('photo-viewer')).toBeNull());
     expect(within(screen.getByTestId('photo-sheet')).getByText('Publicada · 2 nov')).toBeOnTheScreen();
   });
+});
+
+it('saves Perfil as an explicit category and scoped authorization', async () => {
+  const server = await renderGaleria({ 'PATCH /api/v1/galeria/p1': (request) => ({ body: { ...PHOTOS[0], ...(request.body as object) } }) });
+  await fireEvent.press(await screen.findByTestId('photo-p1'));
+  await fireEvent.press(screen.getByTestId('photo-category-perfil'));
+  expect(screen.getByText(/Estas fotos no se usan en posts/)).toBeOnTheScreen();
+  await fireEvent.press(screen.getByTestId('photo-save'));
+  await waitFor(() => expect(server.find('PATCH', '/api/v1/galeria/p1')[0]?.body).toEqual({ category: 'perfil', profile_edit: true }));
 });

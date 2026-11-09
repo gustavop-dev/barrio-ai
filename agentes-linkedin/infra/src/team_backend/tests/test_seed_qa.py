@@ -7,14 +7,14 @@ from unittest.mock import patch
 from django.core.management import call_command
 from django.core.management.base import CommandError
 from rest_framework.test import APIClient
-from team_backend import editorial
+from team_backend import editorial, perfil_contenido
 from team_backend.management.commands.seed_qa import EXTRA_DEVICE, QA_PASSWORD_DEFAULT, uid
 from team_backend.models import (ActionProposal, Capture, ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Notification, Opportunity,
-                                 PostMetric, Referent, TeamQuestion, WeeklySummary)
+                                 PostMetric, Referent, TeamQuestion, WeeklySummary, ProfileProposal, ProfileAsset, ProfileSchedule)
 from team_backend.tests.test_capturas import MediaMixin
 from team_backend.tests.test_operador import OperatorBase
 
-COUNTED=(ConnectorAccount,Referent,Contact,EditorialPiece,PostMetric,ActionProposal,Opportunity,TeamQuestion,Notification,Capture,GalleryPhoto,WeeklySummary)
+COUNTED=(ConnectorAccount,Referent,Contact,EditorialPiece,PostMetric,ActionProposal,Opportunity,TeamQuestion,Notification,Capture,GalleryPhoto,WeeklySummary,ProfileProposal,ProfileAsset,ProfileSchedule)
 
 class SeedQaTests(MediaMixin,OperatorBase):
     def setUp(self):
@@ -56,7 +56,7 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertTrue(set(Contact.Stage.values)<=set(Contact.objects.values_list('stage',flat=True)))
         self.assertEqual(set(PostMetric.objects.values_list('kind',flat=True)),{'24h','72h','7d'})
         self.assertGreaterEqual(Opportunity.objects.values('stage').distinct().count(),5)
-        self.assertEqual(GalleryPhoto.objects.count(),4)
+        self.assertEqual(GalleryPhoto.objects.count(),5)
         self.assertTrue(all(photo.image.storage.exists(photo.image.name) for photo in GalleryPhoto.objects.all()))
 
         from team_backend.models import Capture, PieceImage
@@ -85,12 +85,22 @@ class SeedQaTests(MediaMixin,OperatorBase):
         response=app.get(detail['image_document_url'])
         self.assertEqual(response.status_code,200)
         self.assertEqual(b''.join(response.streaming_content).count(b'/Alt '),4)
+        profile=ProfileProposal.objects.get(pk=uid('profile:proposal'))
+        self.assertEqual(profile.assets.count(),7)
+        self.assertEqual(GalleryPhoto.objects.filter(category='perfil').count(),1)
+        package=app.get(f'/api/v1/perfil/{profile.id}').json()
+        self.assertEqual(package['photo_choice'],'')
+        self.assertIn('LI-02-M015-K03',package['markdown'])
+        self.assertEqual({s['id'] for s in package['sections']},set(perfil_contenido.SECTIONS))
+        for asset in package['assets']:
+            self.assertEqual(app.get(asset['url']).status_code,200)
+            self.assertIn(APIClient().get(asset['url']).status_code,(401,403))
         turno=app.get('/api/v1/tu-turno').json()
-        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion'})
+        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion','perfil'})
         # The network block waits for approval by default (OPERATOR_AUTONOMY is empty): Laura's follow and Julián's invitation.
         self.assertEqual(sorted(c['title'] for c in turno['items'] if c['type']=='aprobacion'),
                          ['¿Apruebas invitar a Julián Herrera?','¿Apruebas seguir a Laura Gómez?'])
-        self.assertEqual((turno['count'],turno['urgent_count']),(8,1))
+        self.assertEqual((turno['count'],turno['urgent_count']),(9,1))
         self.assertTrue(turno['critical']);self.assertEqual(sorted(c['state'] for c in turno['later']),['caducada','pospuesta'])
         queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
         self.assertEqual(sorted(q['capability'] for q in queued if q['awaiting_approval']),['RED-01','RED-02'])

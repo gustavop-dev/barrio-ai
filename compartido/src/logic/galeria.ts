@@ -1,11 +1,12 @@
 // Galería (FUNCIONES-NUEVAS rev 18 «Galería»): the filters, the tone of each photo's state, its
 // accessible name and what the photo sheet PATCHes. Shared by the PWA and the native app.
-import type { GaleriaFiltro, PhotoOutput, PhotoPatch } from '../api/capturas';
+import type { GaleriaFiltro, PhotoOutput, PhotoPatch, PhotoCategory, ProfileRole } from '../api/capturas';
 import type { AIEdit } from '../api/imagenes';
 import { shortDay } from './capturas';
 import type { Tone } from './tone';
 
 export const FILTERS: readonly { value: GaleriaFiltro; label: string }[] = [
+  { value: 'perfil', label: 'Perfil' },
   { value: 'todas', label: 'Todas' },
   { value: 'sin_usar', label: 'Sin usar' },
   { value: 'elegidas', label: 'Elegidas' },
@@ -52,4 +53,17 @@ export function uploadedMessage(count: number): string {
 /** The line under «Subir fotos» when some files were refused (null when none was). */
 export function rejectedMessage(names: readonly string[]): string | null {
   return names.length ? `No se subió ${names.join(', ')}: solo JPEG, PNG, WebP o HEIC de hasta 10 MB.` : null;
+}
+
+export const PROFILE_CONSENT = 'Perfil autoriza dos retratos para elegir (A en grises y B en color) y un banner con micrófono, camiseta blanca oversized y gafas claras, conservando tu identidad y sonrisa. Las notas instruyen a Perfil. Revisas los resultados antes de aplicarlos. Estas fotos no se usan en posts.';
+export const PROFILE_ROLES: readonly { value: ProfileRole; label: string }[] = [
+  { value: '', label: 'Sin asignar' }, { value: '01', label: '01 · Pose y sonrisa' },
+  { value: '02', label: '02 · Cuerpo del banner' }, { value: '03', label: '03 · Identidad y gafas' },
+];
+export function profilePhotoPatch(photo: PhotoOutput, category: PhotoCategory, allowed: boolean, role: ProfileRole): PhotoPatch {
+  const patch: PhotoPatch = {};
+  if (category !== (photo.category ?? 'posts')) patch.category = category;
+  if (allowed !== (photo.profile_edit ?? false)) patch.profile_edit = allowed;
+  if (role !== (photo.profile_role ?? '')) patch.profile_role = role;
+  return patch;
 }

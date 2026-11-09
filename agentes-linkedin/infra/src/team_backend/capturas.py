@@ -155,13 +155,30 @@ def _save_photos(user,checked,saved,capture=None):
         photo.save();photos.append(photo)
     return photos
 
-def add_photos(user,uploads):
+def add_photos(user,uploads,metadata=None):
     """«Subir fotos» in the Galería."""
     require(user,'approve_actions')
     if not uploads:raise ValueError('Añade al menos una foto.')
     checked=check_photos(uploads);saved=[]
     try:
-        with transaction.atomic():photos=_save_photos(user,checked,saved)
+        with transaction.atomic():
+            if metadata and metadata.get('category')=='perfil':
+                # A retried private upload reuses the original by hash; never creates a second active reference.
+                from django.contrib.auth import get_user_model
+                from . import imagenes
+                get_user_model().objects.select_for_update().get(pk=user.pk)
+                originals={imagenes.sha(imagenes.read(p.image)):p for p in GalleryPhoto.objects.filter(created_by=user,category='perfil')}
+                photos=[]
+                for upload,mime,ext in checked:
+                    digest=imagenes.sha(upload.read());upload.seek(0)
+                    photo=originals.get(digest)
+                    if photo is None:
+                        photo=_save_photos(user,[(upload,mime,ext)],saved)[0];originals[digest]=photo
+                    if photo not in photos:photos.append(photo)
+            else:photos=_save_photos(user,checked,saved)
+            if metadata:
+                from .perfil_galeria import update
+                photos=[update(user,p,metadata) for p in photos]
     except Exception:
         _discard(saved);raise
     audit(user,'gallery.uploaded','galeria',photos=len(photos))
@@ -272,6 +289,10 @@ def _destination(capture):
     photos=capture.photos.count();text=capture.text
     if not text:return ('galeria' if photos else 'vacia'),'',False
     if capture.context_type:return capture.context_type,'',False
+    from .perfil import EXPLICIT
+    if EXPLICIT.fullmatch(text):return 'perfil','Petición explícita de propuesta de perfil',True
+    if re.search(r'\bperfil\b',text,re.I) and not capture.purpose:
+        raise ValueError('Aclara el alcance: para el paquete completo di «hazme la propuesta del perfil».')
     if capture.purpose:return {'post':'idea','propuesta':'idea','dato':'dato','respuesta':'dato','galeria':'galeria'}[capture.purpose],'',False
     try:kind,reason=classify(text,photos,capture)
     except ValueError as exc:
@@ -324,9 +345,10 @@ def _route_gallery(capture,user,text):
 def _route_empty(capture,user,text):
     return ({},_outcome('sin_usar','No había nada que usar: el audio no tenía voz y no había nota ni fotos'),Capture.State.UNUSED,None)
 
-ROUTES={'pregunta':_route_question,'persona':_route_person,'pieza':_route_piece,'dato':_route_fact,'idea':_route_idea,
+from .perfil import capture_request
+ROUTES={'perfil':capture_request,'pregunta':_route_question,'persona':_route_person,'pieza':_route_piece,'dato':_route_fact,'idea':_route_idea,
         'galeria':_route_gallery,'vacia':_route_empty}
-EVENT_DETAILS={'pregunta':'Respuesta de Gustavo a una pregunta','persona':'Nota de Gustavo sobre una persona',
+EVENT_DETAILS={'perfil':'Solicitud de propuesta de perfil','pregunta':'Respuesta de Gustavo a una pregunta','persona':'Nota de Gustavo sobre una persona',
                'pieza':'Comentario de Gustavo sobre una pieza','dato':'Un dato de Gustavo para la memoria',
                'idea':'Una idea de Gustavo para un post','galeria':'Fotos de Gustavo para la galería'}
 
@@ -370,7 +392,8 @@ def process(capture_id):
         capture.photos.filter(note='').update(note=_clip(capture.text,2000))
         capture.photos.filter(note=_clip(capture.note,2000)).update(note=_clip(capture.text,2000))
         from . import capture_intent
-        if capture.text and (capture.purpose or capture.context_type):
+        from .perfil import EXPLICIT
+        if capture.text and not EXPLICIT.fullmatch(capture.text) and (capture.purpose or capture.context_type):
             if capture.photos.exists():
                 # Same structured understanding call also assigns each photo's instruction; routing stays explicit.
                 try:classify(capture.text,capture.photos.count(),capture)
@@ -381,7 +404,7 @@ def process(capture_id):
         from . import research, web_sources
         requested,question=research.capture_question(capture)
         urls=web_sources.detect_urls(capture.text)
-        if requested or urls:
+        if kind!='perfil' and (requested or urls):
             if not Capture.objects.filter(pk=capture.pk,state=Capture.State.PROCESSING).exists():return _current(capture)
             investigation=research.research(research.ResearchRequest(
                 key=f'capture:{capture.id}',public_question=question,urls=tuple(urls),search=requested,purpose='web-research-capture'))
@@ -429,7 +452,10 @@ def _tombstone(key,user,capture):
 
 def _revert(capture,user):
     routed=capture.routed_to or {};kind=routed.get('kind')
-    if kind=='pregunta':
+    if kind=='perfil':
+        from .perfil import withdraw_capture
+        withdraw_capture(capture)
+    elif kind=='pregunta':
         try:preguntas.undo(user,routed['question'])
         except (Conflict,PermissionDenied,TeamQuestion.DoesNotExist):
             if routed.get('memory_key'):_tombstone(routed['memory_key'],user,capture)
@@ -485,7 +511,7 @@ def ideas_for_director(now=None):
              'investigation':c.investigation,
              'purpose':c.purpose,'publish_asap':c.publish_asap,'evidence':c.publish_asap_evidence,
              'expected_slot':c.publish_asap_expected_slot.isoformat() if c.publish_asap_expected_slot else None,
-             'photos':[{'id':str(p.id),'note':p.note,'ai_edit':p.ai_edit} for p in c.photos.all()]} for c in rows]
+             'photos':[{'id':str(p.id),'note':p.note,'ai_edit':p.ai_edit} for p in c.photos.filter(category='posts')]} for c in rows]
 
 def feedback_for_director(now=None):
     """`feedback_from_gustavo`: his comments on pieces in the last 30 days, with the piece's thesis."""
@@ -585,7 +611,9 @@ def photo_used_in(p):
 
 def photo_payload(p,now=None):
     display,label,tone=photo_status(p,now)
+    if p.category=='perfil':label='Perfil';tone='info'
     return {'id':str(p.id),'url':f'/api/v1/galeria/{p.id}/imagen','created_at':p.created_at,'state':p.state,'display_state':display,
+            'category':p.category,'profile_edit':p.profile_edit,'profile_role':p.profile_role,'profile_version':p.profile_version,
             'label':label,'tone':tone,'note':p.note,'ai_edit':p.ai_edit,'instruction':p.instruction,'instruction_kind':p.instruction_kind,
             'versions':_photo_versions(p),'allow_ai_edit':p.allow_ai_edit,'used_in':photo_used_in(p),
             'capture_id':str(p.capture_id) if p.capture_id else None,'mime':p.mime,'size_bytes':p.size_bytes,

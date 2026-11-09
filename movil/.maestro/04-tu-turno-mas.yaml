@@ -54,7 +54,7 @@ tags: [turno]
 - assertVisible: 'Urgente · 2'
 - assertVisible:
     id: top-tu-turno
-    text: 'Tu turno, 9 pendientes, 2 urgentes'
+    text: 'Tu turno, 10 pendientes, 2 urgentes'
 - takeScreenshot: 04-mas-01-maquina-detenida
 - tapOn:
     text: 'Reanudar'

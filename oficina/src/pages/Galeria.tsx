@@ -2,9 +2,10 @@
 // uploads for his posts; the team decides when to use them and whether to edit them with AI.
 import { useState, type ChangeEvent, type DragEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { CAPTURE_LIMITS, isAcceptedPhoto, sameOrigin, useGaleria, useUploadFotos, type GaleriaFiltro, type PhotoOutput } from '../api/capturas';
+import { CAPTURE_LIMITS, isAcceptedPhoto, sameOrigin, useGaleria, useUploadFotos, type PhotoCategory, type GaleriaFiltro, type PhotoOutput } from '../api/capturas';
 import { IconGaleria } from '../components/icons';
 import { Badge, Button, ChipStrip, EmptyState, ErrorRetry, FilterChip, Note, Page, Skeleton, useToast } from '../components/ui';
+import { PROFILE_CONSENT } from './galeria/photo';
 import { PhotoSheet } from './galeria/PhotoSheet';
 import { FILTERS, isFiltro, photoName, photoTone, rejectedMessage, uploadedMessage } from './galeria/photo';
 import '../capture/capture.css';
@@ -29,7 +30,8 @@ export function Galeria() {
   const raw = params.get('filtro');
   const filtro: GaleriaFiltro = isFiltro(raw) ? raw : 'todas';
   const galeria = useGaleria(filtro);
-  const upload = useUploadFotos();
+  const [category, setCategory] = useState<PhotoCategory>('posts');
+  const upload = useUploadFotos({ category });
   const toast = useToast();
   const [selected, setSelected] = useState<PhotoOutput | null>(null);
   const [rejected, setRejected] = useState<string | null>(null);
@@ -55,7 +57,7 @@ export function Galeria() {
     if (!ok.length) return;
     upload.mutate(ok, {
       onSuccess: (created) => {
-        toast.show(uploadedMessage(created.length || ok.length));
+        toast.show(category === 'perfil' ? 'Fotos subidas a Perfil.' : uploadedMessage(created.length || ok.length));
       },
     });
   };
@@ -77,7 +79,7 @@ export function Galeria() {
   const current = selected ? (galeria.items.find((photo) => photo.id === selected.id) ?? selected) : null;
 
   return (
-    <Page title="Galería" subtitle="Fotos para tus posts.">
+    <Page title="Galería" subtitle="Fotos para tus posts y tu perfil.">
       <div
         className={dragging ? 'gal-body dragging' : 'gal-body'}
         onDragOver={(event) => {
@@ -90,6 +92,12 @@ export function Galeria() {
         }}
         onDrop={onDrop}
       >
+        <label>Categoría al subir
+          <select aria-label="Categoría al subir" value={category} disabled={upload.isPending} onChange={(e) => setCategory(e.target.value as PhotoCategory)}>
+            <option value="posts">Posts</option><option value="perfil">Perfil</option>
+          </select>
+        </label>
+        {category === 'perfil' ? <Note tone="info">{PROFILE_CONSENT}</Note> : null}
         <label className={upload.isPending ? 'gal-upload busy' : 'gal-upload'}>
           <IconGaleria size={22} />
           {upload.isPending ? 'Subiendo…' : 'Subir fotos'}
@@ -130,7 +138,7 @@ export function Galeria() {
         {emptyGallery ? (
           <EmptyState title="Todavía no hay fotos">Sube fotos tuyas, de eventos o de tu trabajo. El equipo las usará en tus posts cuando encajen.</EmptyState>
         ) : null}
-        {emptyFilter ? <p className="t-detalle text-suave gal-nomatch">No hay fotos con este filtro.</p> : null}
+        {emptyFilter ? <p className="t-detalle text-suave gal-nomatch">{filtro === 'perfil' ? 'Añade fotos a Perfil' : 'No hay fotos con este filtro.'}</p> : null}
       </div>
       {current ? <PhotoSheet key={current.id} photo={current} onClose={() => setSelected(null)} /> : null}
     </Page>

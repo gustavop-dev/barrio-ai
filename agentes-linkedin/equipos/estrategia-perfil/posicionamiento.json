@@ -1,5 +1,5 @@
 {
-  "status": "diseño_con_conocimiento_asignado_no_ejecutable",
+  "status": "implementado_fase8_ci_pendiente",
   "knowledge": "base-clase-01.json",
   "memory": "memoria-compartida.json",
   "load_policy": "Leer reglas comunes y propias; recuperar unidades y evidencia por ID cuando la tarea lo requiera. No cargar todo el curso en cada petición.",
@@ -7,7 +7,7 @@
   "permissions": {
     "publish_to_linkedin": false,
     "send_messages": false,
-    "paid_requests": false,
+    "paid_requests": true,
     "modify_confirmed_user_facts_without_approval": false
   },
   "missing_information": "Preguntar solo lo que afecte la decisión actual. No completar huecos con estereotipos ni atribuir al usuario ejemplos del curso.",
@@ -32,7 +32,7 @@
     "P06"
   ],
   "workflow": [
-    "Cuando el usuario lo indique, recoger oferta, capacidades, casos demostrables y antecedentes de clientes. Ahora mantener esos datos pendientes.",
+    "Leer hechos confirmados, orientación y unidades pertinentes; proponer dirección sustentada sin modificar la dirección global ni declarar nuevas audiencias aprobadas.",
     "Proponer opciones de nicho justificadas y señalar qué falta para elegir; no declarar demanda validada por intuición.",
     "Describir compradores prioritarios con las cuatro dimensiones, detonante, semana y consecuencias; relacionarlos con la oferta real.",
     "Separar comprador de aliados y divulgadores del barrio; dejar el desarrollo posterior de esos roles para su equipo y clases pertinentes.",
@@ -64,5 +64,13 @@
     "publicaciones finales",
     "diseño técnico completo del perfil",
     "investigación de mercado no realizada"
-  ]
+  ],
+  "runtime": {
+    "cycle": "perfil_periodico",
+    "binding": "team_backend.perfil_contenido.positioning",
+    "registry": "../grafo.yaml",
+    "evaluation": "../../infra/src/team_backend/tests/test_perfil.py",
+    "writes_linkedin": false,
+    "budget": "Solo dentro del ledger agregado de perfil_periodico; 10 USD por propuesta."
+  }
 }

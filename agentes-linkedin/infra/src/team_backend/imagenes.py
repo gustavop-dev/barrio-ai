@@ -26,10 +26,10 @@ def spent_today(now=None):
 
 def candidates(ideas=()):
     preferred=[p['id'] for idea in ideas for p in idea.get('photos',[])]
-    rows=list(GalleryPhoto.objects.select_related('capture','chosen_piece').filter(state__in=['sin_usar','publicada']).order_by('-created_at')[:40])
+    rows=list(GalleryPhoto.objects.select_related('capture','chosen_piece').filter(category='posts',state__in=['sin_usar','publicada']).order_by('-created_at')[:40])
     # A proposal's own photos are offered even when the recent gallery page is full.
     by_id={str(p.id):p for p in rows}
-    for p in GalleryPhoto.objects.select_related('capture','chosen_piece').filter(id__in=preferred):by_id[str(p.id)]=p
+    for p in GalleryPhoto.objects.select_related('capture','chosen_piece').filter(category='posts',id__in=preferred):by_id[str(p.id)]=p
     rows=sorted(by_id.values(),key=lambda p:(str(p.id) not in preferred,p.state=='publicada',-p.created_at.timestamp()))[:12]
     return [{'id':str(p.id),'note':p.note,'instruction':p.instruction,'instruction_kind':p.instruction_kind,
              'capture_note':p.capture.note if p.capture else '', 'transcript':p.capture.transcript if p.capture else '',
@@ -39,7 +39,7 @@ def candidates(ideas=()):
 
 def previews(rows):
     blocks=[]
-    for p in GalleryPhoto.objects.filter(id__in=[r['id'] for r in rows]):
+    for p in GalleryPhoto.objects.filter(category='posts',id__in=[r['id'] for r in rows]):
         try:preview=connector.block(read(p.image))
         except (OSError,ValueError,Image.DecompressionBombError):continue
         blocks.extend([{'type':'text','text':'Gallery photo '+str(p.id)},preview])
@@ -78,6 +78,7 @@ def _check_call(piece,images,context,client,original=None,instruction='',key=Non
 
 
 def _photo(piece,photo,choice,index,client,public,private):
+    if photo.category=='perfil':raise ValueError('Perfil está excluido de posts')
     raw=read(photo.image)
     with Image.open(io.BytesIO(raw)) as decoded:
         if decoded.format not in ('JPEG','PNG','WEBP'):raise ValueError('Formato de foto no publicable por este conector')
@@ -198,7 +199,7 @@ def prepare(piece,public=(),private=(),client=None):
                 if piece.images.filter(source_photo_id=selection['id']).exists():continue
                 # Claim the source durably, then release DB locks before any paid call.
                 with transaction.atomic():
-                    photo=GalleryPhoto.objects.select_for_update().filter(id=selection['id']).first()
+                    photo=GalleryPhoto.objects.select_for_update().filter(id=selection['id'],category='posts').first()
                     if photo is None or (photo.state not in ['sin_usar','publicada'] and photo.chosen_piece_id!=piece.id):continue
                     previous_state=photo.state if photo.state in ('sin_usar','publicada') else 'sin_usar'
                     previous_piece=photo.chosen_piece_id if photo.chosen_piece_id!=piece.id else None
@@ -233,6 +234,8 @@ def issues(piece,expected=None):
     if not rows or not piece.image_review.get('ok'):return ['La pieza no tiene ninguna imagen válida']
     if expected is None or manifest(piece)!=expected:errors.append('Las imágenes no coinciden con la versión propuesta')
     for row in rows:
+        if row.profile_exclusive or (row.source_photo_id and row.source_photo.category=='perfil'):
+            errors.append('Las fotos y derivados de Perfil están excluidos de posts')
         if not row.alt.strip():errors.append('Imagen sin texto alternativo')
         try:
             if sha(read(row.image))!=row.sha256:errors.append('Los bytes de la imagen cambiaron')
@@ -273,6 +276,8 @@ def upload(piece,client):
             raw=read(piece.image_document)
             if sha(raw)!=piece.image_document_sha256:raise ValueError('El documento cambió')
             return [client.upload_media(raw,'application/pdf','\n'.join(p.alt for p in rows),'Ideas · Gustavo')]
+        if any(p.profile_exclusive or (p.source_photo_id and p.source_photo.category=='perfil') for p in rows):
+            raise ValueError('Perfil está excluido de posts')
         files=[(p,read(p.image)) for p in rows]
         if any(sha(raw)!=p.sha256 for p,raw in files):raise ValueError('Una imagen cambió')
         return [client.upload_media(raw,p.mime,p.alt,'') for p,raw in files]

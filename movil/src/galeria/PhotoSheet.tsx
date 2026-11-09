@@ -3,12 +3,12 @@
 // is PATCHed) and «Quitar de la galería» behind a confirmation.
 import { AIEditControl } from '@/components/ui/AIEditControl';
 import type { AIEdit } from '@compartido/api/imagenes';
-import { useDeleteFoto, useUpdateFoto, type PhotoOutput } from '@compartido/api/capturas';
-import { inUseWarning, photoName, photoPatch, photoTone } from '@compartido/logic/galeria';
+import { useDeleteFoto, useUpdateFoto, type PhotoOutput, type PhotoCategory, type ProfileRole } from '@compartido/api/capturas';
+import { PROFILE_CONSENT, PROFILE_ROLES, profilePhotoPatch, inUseWarning, photoName, photoPatch, photoTone } from '@compartido/logic/galeria';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/icons';
-import { ApiImage, Badge, Button, ConfirmSheet, ErrorRetry, Field, Sheet, T, useToast } from '@/components/ui';
+import { ApiImage, Badge, Button, ConfirmSheet, ErrorRetry, Field, FilterChip, Note, Sheet, T, useToast } from '@/components/ui';
 import { haptic } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 
@@ -31,31 +31,34 @@ export function PhotoSheet({
   const toast = useToast();
   const update = useUpdateFoto();
   const remove = useDeleteFoto();
+  const [category, setCategory] = useState<PhotoCategory>(photo.category ?? 'posts');
+  const [profileEdit, setProfileEdit] = useState(photo.profile_edit ?? false);
+  const [role, setRole] = useState<ProfileRole>(photo.profile_role ?? '');
   const [note, setNote] = useState(photo.note ?? '');
   const [aiEdit, setAiEdit] = useState(photo.ai_edit);
   const [confirming, setConfirming] = useState(false);
   // The photo the fields started from. When a fresher copy arrives (the Galería reloaded) and Gustavo has not
   // touched the fields, they follow it instead of keeping the old values.
   const [base, setBase] = useState(photo);
-  if (base !== photo && (base.note !== photo.note || base.ai_edit !== photo.ai_edit)) {
-    const untouched = Object.keys(photoPatch(base, note, aiEdit)).length === 0;
+  if (base !== photo) {
+    const untouched = Object.keys({ ...photoPatch(base, note, aiEdit), ...profilePhotoPatch(base, category, profileEdit, role) }).length === 0;
     setBase(photo);
     if (untouched) {
-      setNote(photo.note ?? '');
-      setAiEdit(photo.ai_edit);
+      setNote(photo.note ?? ''); setAiEdit(photo.ai_edit);
+      setCategory(photo.category ?? 'posts'); setProfileEdit(photo.profile_edit ?? false); setRole(photo.profile_role ?? '');
     }
   }
-  const patch = photoPatch(photo, note, aiEdit);
+  const patch = { ...photoPatch(photo, note, aiEdit), ...profilePhotoPatch(photo, category, profileEdit, role) };
   const dirty = Object.keys(patch).length > 0;
   const warning = inUseWarning(photo);
 
   const changeNote = (text: string) => {
     setNote(text);
-    onDirtyChange?.(Object.keys(photoPatch(photo, text, aiEdit)).length > 0);
+    onDirtyChange?.(Object.keys({ ...photoPatch(photo, text, aiEdit), ...profilePhotoPatch(photo, category, profileEdit, role) }).length > 0);
   };
   const changeAi = (next: AIEdit) => {
     setAiEdit(next);
-    onDirtyChange?.(Object.keys(photoPatch(photo, note, next)).length > 0);
+    onDirtyChange?.(Object.keys({ ...photoPatch(photo, note, next), ...profilePhotoPatch(photo, category, profileEdit, role) }).length > 0);
   };
 
   const save = () => {
@@ -118,8 +121,19 @@ export function PhotoSheet({
             {photo.used_in?.text || 'Todavía sin usar'}
           </T>
         </View>
+        <T variant="detalle">Categoría</T>
+        <View style={{ flexDirection: 'row', gap: space[2] }}>
+          <FilterChip pressed={category === 'posts'} onPress={() => { setCategory('posts'); setProfileEdit(false); onDirtyChange?.(true); }}>Posts</FilterChip>
+          <FilterChip pressed={category === 'perfil'} testID="photo-category-perfil" onPress={() => { setCategory('perfil'); setProfileEdit(true); onDirtyChange?.(true); }}>Perfil</FilterChip>
+        </View>
+        {category === 'perfil' ? <>
+          <Note tone="info">{PROFILE_CONSENT}</Note>
+          <FilterChip pressed={profileEdit} onPress={() => { setProfileEdit(!profileEdit); onDirtyChange?.(true); }} testID="photo-profile-edit">Autorizar edición para Perfil</FilterChip>
+          <T variant="detalle">Función de referencia</T>
+          {PROFILE_ROLES.map((item) => <FilterChip key={item.value} pressed={role === item.value} onPress={() => { setRole(item.value); onDirtyChange?.(true); }}>{item.label}</FilterChip>)}
+        </> : null}
         <Field
-          label="Nota para el equipo (opcional)"
+          label={category === 'perfil' ? 'Instrucciones para Perfil' : 'Nota para el equipo (opcional)'}
           value={note}
           onChangeText={changeNote}
           multiline

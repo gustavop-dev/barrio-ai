@@ -11,7 +11,7 @@ from django.contrib.auth.models import Permission
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
-from team_backend import autopiloto, conversaciones, editorial, lider, metricas, oficina_views, operador, red, resumen_semanal
+from team_backend import autopiloto, conversaciones, editorial, lider, metricas, oficina_views, operador, red, resumen_semanal, perfil_contenido
 from team_backend.grafo import GraphError, load_graph, validate_bindings, validate_graph
 from team_backend.jobs import OPERATION_PERMISSIONS
 from team_backend.models import AuditEvent, Capture, ConnectorAccount, DeviceToken, EditorialPiece, Job, WebResearchRun
@@ -28,7 +28,7 @@ class GraphTests(SimpleTestCase):
 
     def test_curated_lists_and_stage_units_match_code(self):
         actual = {f'{module.__name__.split(".")[-1]}.{name}': getattr(module, name)
-                  for module in (operador, editorial) for name in dir(module) if name.endswith('_UNITS')}
+                  for module in (operador, editorial, perfil_contenido) for name in dir(module) if name.endswith('_UNITS')}
         actual['editorial.TEXT_FORMAT_UNIT'] = [editorial.TEXT_FORMAT_UNIT]
         self.assertEqual(self.graph['course_lists'], actual)
         nodes = {n['id']: n for n in self.graph['nodes']}

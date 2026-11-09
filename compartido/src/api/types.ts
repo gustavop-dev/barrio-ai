@@ -802,6 +802,7 @@ export interface TurnoApproval {
 }
 
 export interface TurnoCard {
+  profile_id?: string;
   /** `linkedin_expired`, `linkedin_expiring`, `uncertain:<id>`, `machine_paused`, `machine_paused_env`, `account_paused:<id>`, `question:<id>`, `approval:<id>`. */
   id: string;
   type: TurnoCardType;

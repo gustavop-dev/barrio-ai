@@ -44,8 +44,8 @@ def render(graph):
     lines = ['# Grafo del equipo', '', '<!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->', '',
              f'Versión `{graph["graph_version"]}` · SHA-256 `{graph_hash(graph)}`.', '',
              f'{len(graph["nodes"])} nodos ({active} activos), {len(graph["edges"])} aristas y {len(graph["cycles"])} ciclos.', '',
-             'Pieza diaria y red ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.', '',
-             'Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Los otros ciclos conservan su estado y contratos descriptivos; referentes y Perfil periódico todavía no se activan.', '', '## Grafo completo', '', diagram(graph['nodes'], graph['edges'])]
+             'Pieza diaria, red y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.', '',
+             'Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Los otros ciclos conservan su estado y contratos descriptivos; referentes continúa en diseño. Perfil entrega propuestas privadas y no escribe LinkedIn.', '', '## Grafo completo', '', diagram(graph['nodes'], graph['edges'])]
     for cycle in graph['cycles']:
         lines += ['', f'## {cycle["label"]}', '', f'Estado: `{cycle["status"]}`. Orquestador: `{cycle["orchestrator"]}`.', '']
         lines += [f'- `{t["kind"] or "planned"}`: {t["cadence"]}' for t in cycle['triggers']]
