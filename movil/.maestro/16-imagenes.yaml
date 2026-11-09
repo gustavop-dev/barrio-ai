@@ -157,7 +157,18 @@ tags: [calendario, captura, imagenes]
     direction: DOWN
     centerElement: true
     timeout: 20000
-- assertVisible: 'Saldrá lo antes posible · fecha prevista: .*08:30.*'
-- assertVisible: '«Publícalo lo antes posible\.»'
-- assertVisible: 'Primer hueco libre; sujeto a verificación, aprobación y veto\.'
+# Android's es-CO formatter renders 8:30 without a leading zero. Keep the forecast date and
+# the seeded Bogotá time (8:30 or 08:30, never 18:30), with evidence and conditions in this capture.
+- assertVisible:
+    text: '^Saldrá lo antes posible · fecha prevista: .+, 0?8:30$'
+    childOf:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
+- assertVisible:
+    text: '«Publícalo lo antes posible\.»'
+    childOf:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
+- assertVisible:
+    text: 'Primer hueco libre; sujeto a verificación, aprobación y veto\.'
+    childOf:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
 - takeScreenshot: 16-imagenes-06-lo-antes-posible
