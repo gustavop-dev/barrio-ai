@@ -65,6 +65,61 @@ def ask(agent,question,purpose,memory_key,suggested_public=False,origin='',answe
     avisar('question',f'{agent_label(agent)} te pregunta',question[:200])
     return item
 
+
+def withdraw_origin(origin,reason='Propuesta reemplazada',keys=None):
+    """Retire pending requests, including postponed ones; preserve answers and history."""
+    rows=TeamQuestion.objects.filter(origin=origin,state=TeamQuestion.State.OPEN)
+    if keys is not None:rows=rows.filter(memory_key__in=keys)
+    ids=list(rows.values_list('id',flat=True))
+    count=rows.update(state=TeamQuestion.State.WITHDRAWN)
+    for qid in ids:audit(None,'team.question_withdrawn',qid,reason=reason)
+    return count
+
+
+@transaction.atomic
+def clean_profile_questions(owner):
+    """Latest active proposal owns each section; exact keys are also unique per owner.
+
+    Section provenance resolves legacy Spanish/English wording without guessing that
+    two different facts are synonyms. Requests with unknown provenance remain intact.
+    """
+    from django.contrib.auth import get_user_model
+    from .models import ProfileProposal
+    get_user_model().objects.select_for_update().get(pk=owner.pk)
+    proposals=list(ProfileProposal.objects.filter(owner=owner).order_by('-created_at','-id'))
+    by_origin={f'perfil:{p.id}':p for p in proposals};latest={}
+    for p in proposals:
+        if p.state in ('superseded','cancelled'):continue
+        for section in p.sections:
+            if not section.get('superseded_by'):latest.setdefault(section['id'],p.id)
+    seen=set();retired=0
+    for question in TeamQuestion.objects.filter(agent='perfil',state='open',origin__in=by_origin).order_by('-created_at','-id'):
+        proposal=by_origin[question.origin]
+        sections=[s for s in proposal.sections if any(m['key']==question.memory_key for m in s.get('missing',[]))]
+        stale=proposal.state in ('superseded','cancelled')
+        if sections:stale=stale or not any(not s.get('superseded_by') and latest.get(s['id'])==proposal.id for s in sections)
+        # Keys deduplicate even when a fact was requested in more than one section.
+        key=question.memory_key
+        if stale or key in seen:
+            retired+=withdraw_origin(question.origin,reason='Perfil: sección reemplazada o pregunta duplicada',keys=[key])
+        else:seen.add(key)
+    return retired
+
+
+@transaction.atomic
+def ask_profile(proposal):
+    """Serialize cleanup + asking by owner, before the global key constraint in ask()."""
+    clean_profile_questions(proposal.owner)
+    if proposal.state in ('superseded','cancelled'):return
+    from .models import ProfileProposal
+    newer=ProfileProposal.objects.filter(owner=proposal.owner,created_at__gt=proposal.created_at).exclude(state__in=['superseded','cancelled'])
+    covered={s['id'] for p in newer for s in p.sections if not s.get('superseded_by')}
+    for row in proposal.sections:
+        if row.get('superseded_by') or row['id'] in covered:continue
+        for missing in row.get('missing',[]):
+            ask('perfil',missing['question'],f'{row["title"]}: {missing["purpose"]}',missing['key'],
+                origin=f'perfil:{proposal.id}',suggested_public=True)
+
 def agent_label(agent):
     return {'director_editorial':'Director editorial','posicionamiento':'Posicionamiento','perfil':'Perfil',
             'analista_barrio_resultados':'Analista del barrio','relaciones_comunidad':'Relaciones con la comunidad',
@@ -147,6 +202,9 @@ def undo(user,question_id):
         item.state=TeamQuestion.State.OPEN;item.answer='';item.public_use=None;item.memory_version=None
         item.answered_by=None;item.answered_at=None;item.save()
     audit(user,'team.question_undone',item.id,key=item.memory_key)
+    if item.agent=='perfil':
+        clean_profile_questions(user)
+        item.refresh_from_db()
     return item
 
 def postpone(user,question_id):

@@ -8,8 +8,9 @@ import base64
 import hashlib
 import io
 import json
+import math
 import os
-from decimal import Decimal
+from decimal import Decimal, ROUND_UP
 import httpx
 from PIL import Image, ImageOps
 from knowledge import providers
@@ -22,7 +23,14 @@ EDIT_URL='https://api.openai.com/v1/images/edits'
 EDIT_MODEL=os.environ.get('OPENAI_IMAGE_MODEL','gpt-image-2').strip() or 'gpt-image-2'
 # Baseline image-model USD/M tokens (review against the live price of OPENAI_IMAGE_MODEL); bounded input 1024 px, 2000 chars, one medium output.
 EDIT_PRICES={'text':Decimal('5'),'image':Decimal('10'),'output':Decimal('40')}
-EDIT_RESERVATION=Decimal('1')  # deliberately conservative, including input image tokens
+EDIT_MARGIN=Decimal('1.5')
+EDIT_MINIMUM=Decimal('0.05')
+# Local budgeting baseline, not a guaranteed model invoice. Reconcile from usage.
+EDIT_OUTPUT_TOKENS={
+    '1024x1024':{'low':272,'medium':1056,'high':4160},
+    '1024x1536':{'low':408,'medium':1584,'high':6240},
+    '1536x1024':{'low':408,'medium':1584,'high':6240},
+}
 VISION_MODEL=os.environ.get('ANTHROPIC_VISION_MODEL','claude-sonnet-5-5').strip() or 'claude-sonnet-5-5'
 CHECK_SCHEMA=infografias.obj(ok={'type':'boolean'},reasons=infografias.array(infografias.string()),
     checks=infografias.array(infografias.obj(point={'type':'number'},ok={'type':'boolean'},reason=infografias.string())))
@@ -44,6 +52,27 @@ def block(raw):
     return {'type':'image','source':{'type':'base64','media_type':'image/png','data':base64.b64encode(thumbnail(raw)).decode()}}
 
 
+def edit_reservation(previews,prompt,size,quality):
+    """Estimate the actual multipart payload AFTER thumbnail, including every reference.
+
+    Budget 65 base + 129 per 512px tile per input. UTF-8 bytes bound prompt tokens
+    conservatively (including Spanish/emoji), with framing overhead. Size/quality
+    must be explicit; auto or unsupported settings cannot silently under-reserve.
+    """
+    output=EDIT_OUTPUT_TOKENS[size][quality]
+    image_tokens=0;dimensions=[]
+    for raw in previews:
+        with Image.open(io.BytesIO(raw)) as im:
+            dimensions.append(list(im.size))
+            image_tokens+=65+129*math.ceil(im.width/512)*math.ceil(im.height/512)
+    text_tokens=len(prompt.encode('utf-8'))+32
+    estimate=(Decimal(text_tokens)*EDIT_PRICES['text']+Decimal(image_tokens)*EDIT_PRICES['image']+
+              Decimal(output)*EDIT_PRICES['output'])/1_000_000
+    amount=max(EDIT_MINIMUM,estimate*EDIT_MARGIN).quantize(Decimal('0.000001'),rounding=ROUND_UP)
+    return amount,{'estimate':{'text_tokens':text_tokens,'image_tokens':image_tokens,'output_tokens':output,
+        'dimensions':dimensions,'size':size,'quality':quality,'margin':str(EDIT_MARGIN),'minimum_usd':str(EDIT_MINIMUM)}}
+
+
 class ImageConnector:
     def edit(self,raw,instruction,request_id):
         return self._edit(raw,instruction,request_id)
@@ -58,13 +87,16 @@ class ImageConnector:
         prompt=('Edit only the requested photographic correction. Preserve identity, faces, bodies, people count, '
                 'all existing text and logos. Never add typography, data, people or objects. '+instruction)[:2000]
         files={'image':('photo.png',preview,'image/png')}
+        previews=[preview]
         data={'model':EDIT_MODEL,'prompt':prompt,'n':'1','size':'1024x1024','quality':'medium'}
         if references:
             # Gustavo's scoped edits override the stricter post correction prompt. Never render typography here.
             data.update(prompt=instruction[:12000],background='transparent',output_format='png')
             files=[('image[]',(role+'.png',thumbnail(value),'image/png')) for role,value in sorted(references.items())]
+            previews=[value[1][1] for value in files]
+        amount,estimate=edit_reservation(previews,data['prompt'],data['size'],data['quality'])
         rid=providers.reserve('openai','profile-image-edit' if references else 'image-edit',
-                              Decimal('2') if references else EDIT_RESERVATION,request_hash=request_id)
+                              amount,request_hash=request_id,metadata=estimate)
         try:
             with httpx.Client(transport=TRANSPORT,timeout=httpx.Timeout(orquestacion.timeout(180),connect=10)) as http:
                 response=http.post(EDIT_URL,headers={'Authorization':'Bearer '+key},

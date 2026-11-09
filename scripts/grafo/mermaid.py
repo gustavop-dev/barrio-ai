@@ -49,6 +49,8 @@ def render(graph):
     for cycle in graph['cycles']:
         lines += ['', f'## {cycle["label"]}', '', f'Estado: `{cycle["status"]}`. Orquestador: `{cycle["orchestrator"]}`.', '']
         lines += [f'- `{t["kind"] or "planned"}`: {t["cadence"]}' for t in cycle['triggers']]
+        if cycle.get('budget_parent_cycle'):
+            lines += ['', f'Comparte el límite de {cycle["limits"]["cost_cap_usd"]} USD con `{cycle["budget_parent_cycle"]}` de la misma propuesta, incluidos gasto y reservas previos. No crea saldo nuevo.']
         lines += ['', diagram([n for n in graph['nodes'] if n['id'] in cycle['participants']],
                               [e for e in graph['edges'] if cycle['id'] in e['cycles']])]
         for loop in cycle['loops']:

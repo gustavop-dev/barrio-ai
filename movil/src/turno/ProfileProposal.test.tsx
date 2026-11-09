@@ -6,6 +6,28 @@ import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
 import { ProfileProposal } from './ProfileProposal';
 
+it('queues photos and banner once and keeps the existing copy visible', async () => {
+  await saveToken('0ff1ce_dt_perfil_fake');
+  let proposal = { ...PROFILE_PROPOSAL, can_prepare_assets: true, assets_pending: false };
+  const server = fakeServer({
+    'GET /api/v1/perfil/profile-qa': () => ({ body: proposal }),
+    'POST /api/v1/perfil/profile-qa/decision': () => {
+      proposal = { ...proposal, assets_pending: true };
+      return { body: proposal };
+    },
+  });
+  await renderApp(<ProfileProposal id="profile-qa" />);
+  await fireEvent.press(screen.getByTestId('profile-open'));
+  await fireEvent.press(await screen.findByTestId('profile-prepare-assets'));
+  expect(await screen.findByText('Preparando fotos y banner; el texto se conserva.')).toBeOnTheScreen();
+  expect(screen.getByTestId('profile-prepare-assets')).toBeDisabled();
+  expect(server.find('POST', '/api/v1/perfil/profile-qa/decision').map((r) => r.body)).toEqual([
+    { revision: 1, action: 'prepare_assets' },
+  ]);
+  await fireEvent.press(screen.getByTestId('profile-section-headline'));
+  expect(screen.getByText(PROFILE_PROPOSAL.sections[0]!.copy)).toBeOnTheScreen();
+});
+
 it('opens a private proposal, cites each recommendation and distinguishes manual application', async () => {
   await saveToken('0ff1ce_dt_perfil_fake');
   let proposal = JSON.parse(JSON.stringify(PROFILE_PROPOSAL)) as typeof PROFILE_PROPOSAL;

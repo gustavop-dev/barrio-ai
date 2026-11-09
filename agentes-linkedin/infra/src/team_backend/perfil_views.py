@@ -10,7 +10,7 @@ from rest_framework.exceptions import NotFound, ValidationError
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import imagenes, orquestacion, perfil, perfil_galeria
+from . import imagenes, orquestacion, perfil, perfil_galeria, perfil_assets
 from .capturas_views import FileView, serve
 from .exceptions import Conflict
 from .jobs import audit
@@ -34,10 +34,12 @@ def payload(proposal):
         row=dict(section)
         if invalid and row['id'] in ('photo','banner'):
             row.update(readiness='blocked',copy='',issues=['Cambió o se revocó una referencia de Perfil; pide ajuste.'])
-        if row.get('superseded_by'):row.update(readiness='blocked',copy='',issues=['Sustituida por una propuesta más reciente.'])
+        if row.get('superseded_by'):row.update(readiness='blocked',copy='',missing=[],issues=['Sustituida por una propuesta más reciente.'])
+        if proposal.state in ('superseded','cancelled'):row['missing']=[]
         rows.append(row)
     visual_superseded=any(s.get('superseded_by') for s in rows if s['id'] in ('photo','banner'))
     return {'id':str(proposal.id),'version':proposal.version,'revision':proposal.revision,'mode':proposal.mode,
+        'assets_pending':perfil_assets.pending(proposal),'can_prepare_assets':perfil_assets.available(proposal),
         'state':proposal.state,'sections':rows,'photo_choice':proposal.photo_choice,'findings':proposal.findings,
         'microphone_note':perfil.content.MICROPHONE_NOTE,'markdown':perfil.markdown(proposal),
         'document_url':f'/api/v1/perfil/{proposal.id}/documento','references_valid':not invalid,
@@ -55,14 +57,15 @@ class Detail(APIView):
 class DecisionInput(serializers.Serializer):
     revision=serializers.IntegerField(min_value=1)
     section=serializers.CharField(required=False,allow_blank=True,default='')
-    action=serializers.ChoiceField(choices=['accept','adjust','later','decline','applied','changed','choose_A','choose_B','verify'])
+    action=serializers.ChoiceField(choices=['accept','adjust','later','decline','applied','changed','choose_A','choose_B','verify','prepare_assets'])
     note=serializers.CharField(required=False,allow_blank=True,max_length=12000,default='')
 
 
 def revise(proposal,note,affected=None):
     used=sum(c['edge']=='perfil_copy' for c in proposal.cycle.progress_ledger.get('calls',{}).values()) if proposal.cycle_id else 0
     if proposal.version>=2 or used>=2:raise Conflict('Ya se usaron las dos rondas de esta propuesta. Se conserva el presupuesto; requiere revisión del ciclo.')
-    if proposal.state in ('queued','running','cancelled'):raise Conflict('Espera al ciclo vigente antes de pedir un ajuste.')
+    if perfil_assets.pending(proposal):raise Conflict('Espera a que terminen las fotos y el banner.')
+    if proposal.state in ('queued','running','cancelled','superseded'):raise Conflict('Espera al ciclo vigente antes de pedir un ajuste.')
     if proposal.cycle_id and proposal.cycle.state=='stopped':raise Conflict('El ciclo está detenido; concilia el motivo sin reiniciar saldo.')
     proposal.history.append({'version':proposal.version,'sections':proposal.sections,'photo_choice':proposal.photo_choice,
                              'at':timezone.now().isoformat(),'reason':note})
@@ -83,12 +86,19 @@ class Decision(APIView):
     def post(self,request,pid):
         human_session(request);require(request.user,'approve_actions');data=valid(DecisionInput,request)
         action=data['action'];note=data['note'].strip()
+        if action=='prepare_assets':
+            with transaction.atomic():
+                proposal=get(request.user,pid,True)
+                perfil_assets.queue(request.user,proposal.id,expected_revision=data['revision'])
+                proposal.refresh_from_db()
+                return Response(payload(proposal))
         if action=='verify':return verify(request,pid,data)
         with transaction.atomic():
             proposal=get(request.user,pid,True)
             # Repeated network submissions acknowledge the already saved event without a second history entry.
             fingerprint=orquestacion.digest(dict(data,actor=request.user.pk))
             if any(e.get('request')==fingerprint for e in proposal.history):return Response(payload(proposal))
+            if perfil_assets.pending(proposal):raise Conflict('Espera a que terminen las fotos y el banner.')
             if proposal.revision!=data['revision']:raise Conflict('La propuesta cambió; abre la versión vigente antes de decidir.')
             if proposal.state in ('queued','running','cancelled','superseded'):raise Conflict('Esta versión todavía no admite decisiones.')
             if action!='later':proposal.postponed_until=None
@@ -137,6 +147,7 @@ class Decision(APIView):
 def verify(request,pid,data):
     """External reads are outside the decision transaction: failed checks keep their read/cycle ledger."""
     proposal=get(request.user,pid)
+    if perfil_assets.pending(proposal):raise Conflict('Espera a que terminen las fotos y el banner.')
     fingerprint=orquestacion.digest(dict(data,actor=request.user.pk))
     if any(e.get('request')==fingerprint for e in proposal.history):return Response(payload(proposal))
     section=next((s for s in proposal.sections if s['id']==data['section']),None)

@@ -910,6 +910,10 @@ NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','plan
 
 def run_job(job):
     from . import orquestacion
+    if job.kind=='prepare_profile_assets':
+        from .perfil_assets import run
+        proposal=run(job)
+        return 'complete',proposal.state,''
     if job.kind=='prepare_profile':
         from .perfil import run
         proposal=run(job)

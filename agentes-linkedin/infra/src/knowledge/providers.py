@@ -6,7 +6,7 @@ import time
 import re
 from dataclasses import dataclass
 from functools import lru_cache
-from decimal import Decimal
+from decimal import Decimal, ROUND_UP
 import httpx
 from psycopg.types.json import Jsonb
 from .config import live
@@ -112,7 +112,9 @@ def reserve(provider,purpose,amount,request_hash=None,metadata=None):
         since=limit_window_start(provider)
         spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s AND (%s::timestamptz IS NULL OR created_at>=%s)",(provider,since,since)).fetchone()['spent']
         if spent+amount>limit:
-            raise ValueError(f'Límite local de {provider} alcanzado'+(' este mes' if since else '')+'; incluye reservas pendientes.')
+            missing=(spent+amount-limit).quantize(Decimal('0.000001'),rounding=ROUND_UP)
+            raise ValueError(f'Límite local de {provider} alcanzado'+(' este mes' if since else '')+
+                f'; faltan {missing} USD; límite {limit}, gastado {spent} (incluye reservas pendientes); reserva {amount} USD.')
         c.execute('INSERT INTO usage_ledger(id,provider,purpose,reserved_usd,status,request_hash,usage) VALUES(%s,%s,%s,%s,%s,%s,%s)',(rid,provider,purpose,amount,'reserved',request_hash,Jsonb(metadata or {})))
     return rid
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.2-fase8",
+  "graph_version": "6.3-fase8-assets",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -607,6 +607,11 @@
       "kind": "json_schema",
       "binding": "team_backend.comunidad.ANALYSIS_SCHEMA",
       "description": "LEC-01–03: contrato de comunidad pública."
+    },
+    "profile_assets_request": {
+      "kind": "json_schema",
+      "binding": "team_backend.perfil_assets.REQUEST_SCHEMA",
+      "description": "Solo photo/banner, evidencia actual y copy existente; sin redacción ni web."
     }
   },
   "nodes": [
@@ -1998,7 +2003,7 @@
       "role": "orchestrator",
       "status": "active",
       "binding": "team_backend.perfil.run",
-      "description": "Dueño del ciclo de estrategia-perfil: biblioteca, posicionamiento, evidencia, copy y assets. Entrega Markdown y checklist privados; Gustavo aplica. Conserva consultas manuales.",
+      "description": "Dueño del ciclo de estrategia-perfil: biblioteca, posicionamiento, evidencia, copy y assets. Entrega Markdown y checklist privados; Gustavo aplica. Conserva consultas manuales. Permite continuar solo fotos y banner en perfil_assets con el presupuesto original y sin repetir texto.",
       "skills": [
         "Coordina propuesta privada de perfil, con citas y decisiones por sección; preserva presupuesto y evidencia."
       ],
@@ -2048,7 +2053,8 @@
       "activity": {
         "job_kinds": [
           "agent_run",
-          "prepare_profile"
+          "prepare_profile",
+          "prepare_profile_assets"
         ],
         "event_roles": [
           "perfil"
@@ -3571,7 +3577,8 @@
       "from": "perfil",
       "to": "editor_visual",
       "cycles": [
-        "perfil_periodico"
+        "perfil_periodico",
+        "perfil_assets"
       ],
       "request_kind": "call",
       "request_schema": "profile_edit",
@@ -3593,12 +3600,13 @@
       "from": "perfil",
       "to": "editor_visual",
       "cycles": [
-        "perfil_periodico"
+        "perfil_periodico",
+        "perfil_assets"
       ],
       "request_kind": "call",
       "request_schema": "profile_request",
       "response_schema": "profile_render",
-      "max_calls_per_cycle": 2,
+      "max_calls_per_cycle": 6,
       "response_required": true,
       "status": "active",
       "call_timeout_s": 300,
@@ -3611,7 +3619,8 @@
       "from": "perfil",
       "to": "revision_visual",
       "cycles": [
-        "perfil_periodico"
+        "perfil_periodico",
+        "perfil_assets"
       ],
       "request_kind": "call",
       "request_schema": "profile_request",
@@ -3927,6 +3936,28 @@
         }
       },
       "call_timeout_s": 120
+    },
+    {
+      "id": "perfil_revision_assets",
+      "from": "perfil",
+      "to": "revision_perfil",
+      "cycles": [
+        "perfil_assets"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_assets_request",
+      "response_schema": "profile_review",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "profile-assets-review"
+          ]
+        }
+      }
     }
   ],
   "cycles": [
@@ -4689,6 +4720,57 @@
         "checkpoint_resume": true,
         "note": "Plan congelado por aprobación positiva; mide solo exposiciones confirmadas."
       }
+    },
+    {
+      "id": "perfil_assets",
+      "label": "Solo fotos y banner de Perfil",
+      "status": "active",
+      "orchestrator": "perfil",
+      "participants": [
+        "perfil",
+        "revision_perfil",
+        "editor_visual",
+        "revision_visual"
+      ],
+      "triggers": [
+        {
+          "kind": "prepare_profile_assets",
+          "cadence": "Acción explícita en app/PWA o command perfil_assets sobre propuesta existente.",
+          "binding": "team_backend.perfil_assets.queue",
+          "deduplication": "UUID por propuesta, versión, referencias y marca; lease y checkpoints. Solo assets faltantes."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "perfil"
+        ],
+        "max_depth": 1,
+        "scope": "Una revisión de photo/banner y A, B, banner secuenciales; comparte el bucket original de 10 USD. Sin copy, positioning, lecturas ni web.",
+        "max_calls": 10,
+        "max_provider_calls": 7,
+        "cost_cap_usd": 10,
+        "cost_period": "cycle",
+        "call_timeout_s": 300,
+        "cycle_timeout_s": 1800,
+        "max_stalls": 2,
+        "max_replans": 1
+      },
+      "ledger": {
+        "status": "runtime",
+        "records": [
+          "CycleLedger",
+          "ProfileProposal",
+          "ProfileAsset",
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": true,
+        "note": "Ledger acotado ligado al presupuesto original sin modificar checkpoints antiguos; misma propuesta y versión. Incertidumbre nunca se repite automáticamente."
+      },
+      "budget_parent_cycle": "perfil_periodico"
     }
   ],
   "code_bindings": {
@@ -4708,7 +4790,8 @@
       "prepare_profile": "perfil",
       "review_referents": "investigador_lider",
       "advance_experiments": "investigador_lider",
-      "community_study": "analista_barrio_resultados"
+      "community_study": "analista_barrio_resultados",
+      "prepare_profile_assets": "perfil"
     },
     "stage_roles": {
       "director": [

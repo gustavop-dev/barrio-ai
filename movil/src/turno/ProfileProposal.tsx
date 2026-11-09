@@ -34,6 +34,11 @@ export function ProfileProposal({ id }: { id: string }) {
       {proposal ? <>
         <T>Versión {proposal.version} · {proposal.state} · Aplicación manual</T>
         <T>{profileAvailability(proposal)}</T>
+        {proposal.can_prepare_assets ? <Button testID="profile-prepare-assets" disabled={decision.isPending || proposal.assets_pending}
+          onPress={() => decision.mutate({ revision: proposal.revision, action: 'prepare_assets' })}>
+          Generar fotos y banner
+        </Button> : null}
+        {proposal.assets_pending ? <T>Preparando fotos y banner; el texto se conserva.</T> : null}
         {proposal.findings.map((finding, index) => <T key={index}>{finding}</T>)}
         <Button onPress={() => void download()}>Descargar Markdown</Button>
         <Button onPress={() => setDocumentOpen(!documentOpen)}>Documento Markdown</Button>

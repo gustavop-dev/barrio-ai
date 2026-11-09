@@ -311,7 +311,7 @@ class ProfileContentTests(SimpleTestCase):
         self.assertEqual(perfil.add_months(date(2026,8,31),12),date(2027,8,31))
 
 
-class ProfileCycleTests(MediaMixin,OperatorBase):
+class ProfileBase(MediaMixin,OperatorBase):
     def setUp(self):
         super().setUp();self.use_media()
         for target in ('knowledge.providers.claude','httpx.Client.send','team_backend.connectors.get_connector'):
@@ -339,6 +339,8 @@ class ProfileCycleTests(MediaMixin,OperatorBase):
             'image_client':FakeProfileImages(),'image_checker':vision}
         options.update(kwargs);return perfil.run(job,**options)
 
+
+class ProfileCycleTests(ProfileBase):
     def test_full_cycle_has_all_sections_assets_citations_and_no_linkedin_write(self):
         self.references();proposal=self.proposal();client=FakeProfileImages()
         result=self.run_proposal(proposal,image_client=client)

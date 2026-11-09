@@ -15,7 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 from PIL import Image
 from . import guardas, imagenes, orquestacion, perfil_contenido as content, perfil_galeria as gallery, perfil_visual as visual, research
-from .models import ActionExecution, Capture, ConnectorAccount, Job, ProfileAsset, ProfileProposal, ProfileSchedule
+from .models import ActionExecution, Capture, ConnectorAccount, Job, ProfileAsset, ProfileProposal, ProfileSchedule, TeamQuestion
 from .jobs import audit, enqueue_operation
 
 NS=uuid.UUID('0ff1ce08-0000-4000-8000-000000000008')
@@ -158,7 +158,7 @@ def withdraw_capture(capture):
     proposal.triggers=[t for t in proposal.triggers if t.get('capture')!=str(capture.id)]
     if not proposal.triggers:
         proposal.state='cancelled'
-        Job.objects.filter(kind='prepare_profile',params__proposal=str(proposal.id),state='queued').update(state='cancelled',finished_at=timezone.now())
+        Job.objects.filter(kind__in=['prepare_profile','prepare_profile_assets'],params__proposal=str(proposal.id),state='queued').update(state='cancelled',finished_at=timezone.now())
         if proposal.cycle_id:
             runtime=orquestacion.Runtime(proposal.cycle,orquestacion.load_graph());runtime.stop('cancelled',business=False)
     proposal.save()
@@ -166,12 +166,16 @@ def withdraw_capture(capture):
 
 def _persist(proposal,**fields):
     # Never resurrect cancelled requests while a provider call was in flight.
-    if not ProfileProposal.objects.filter(pk=proposal.pk).exclude(state='cancelled').update(**fields,updated_at=timezone.now()):
+    if not ProfileProposal.objects.filter(pk=proposal.pk).exclude(state__in=['cancelled','superseded']).update(**fields,updated_at=timezone.now()):
         raise orquestacion.CycleStopped('cancelled')
     for k,v in fields.items():setattr(proposal,k,v)
 
 
+@transaction.atomic
 def save_asset(proposal,kind,raw,review,provenance):
+    current=ProfileProposal.objects.select_for_update().get(pk=proposal.pk)
+    if current.state in ('cancelled','superseded') or current.version!=proposal.version:
+        raise orquestacion.CycleStopped('cancelled')
     existing=proposal.assets.filter(version=proposal.version,kind=kind).first()
     if existing:return existing
     with Image.open(io.BytesIO(raw)) as im:width,height=im.size
@@ -181,48 +185,53 @@ def save_asset(proposal,kind,raw,review,provenance):
     return row
 
 
-def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','banner')):
+def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','banner'),reuse_from=None,evidence_context=None):
+    """Finish and persist each asset before attempting the next; no group failure."""
     client=client or imagenes.connector.ImageConnector();checker=checker or visual.check
-    edits={};errors={};provenance={'references':proposal.references,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
-        'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{}}
+    evidence_context=proposal.context if evidence_context is None else evidence_context
+    errors={}
     for kind in kinds:
+        if not ProfileProposal.objects.filter(pk=proposal.pk,version=proposal.version).exclude(state__in=['cancelled','superseded']).exists():
+            raise orquestacion.CycleStopped('cancelled')
+        if proposal.assets.filter(version=proposal.version,kind=kind,review__ok=True).exists():continue
         scoped=[r for r in proposal.references if r['role'] in (('01','03') if kind!='banner' else ('01','02','03'))]
         try:
             gallery.roles(scoped,needed=('01','03') if kind!='banner' else ('01','02','03'))
             refs=gallery.raw_references(scoped,proposal.owner)
-            instruction=visual.prompt(kind,scoped,proposal.context.get('adjustment',''));provenance['effective_prompts'][kind]=instruction
+            instruction=visual.prompt(kind,scoped,proposal.context.get('adjustment',''))
             request={'proposal':str(proposal.id),'kind':kind,'references':scoped,'instruction':instruction}
-            # Same inputs reuse durable edits; failures and uncertain calls are never paid again.
-            edits[kind]=runtime.call('perfil_editar_persona',request,
-                lambda:client.edit_profile(refs,instruction,f'{proposal.id}:{kind}'),key='person:'+orquestacion.digest(request))
-        except (ValueError,OSError) as exc:errors[kind]=str(exc)
-    if not edits:return errors
-    render_input={'sha256':{k:imagenes.sha(v) for k,v in edits.items()},'copy':banner,'brand':content.BRAND_VERSION}
-    package=runtime.call('perfil_render',render_input,lambda:visual.render_tool(edits,banner),key='render:'+orquestacion.digest(render_input))
-    files={kind:orquestacion.unpack(blob) for kind,blob in package['files'].items()};reviews={}
-    errors.update(package['geometry'].get('errors',{}))
-    provenance['geometry']=package['geometry']
-    for kind in ('A','B','banner'):
-        if kind not in files:continue
-        selected={kind:files[kind]}
-        if kind in ('A','B'):selected[f'circle_{kind}_32']=visual.tiny_portrait(files[kind])
-        if kind=='banner':
-            for option in reviews:
-                for viewport in ('mobile','desktop'):
-                    key=f'{viewport}_{option}'
-                    if key in files:selected[key]=files[key]
-        scoped=[r for r in proposal.references if r['role'] in (('01','03') if kind!='banner' else ('01','02','03'))]
-        context={'option':kind,'geometry':package['geometry'] if kind=='banner' else {},'copy':banner if kind=='banner' else {},
-                 'library':[u for u in proposal.context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS],
-                 'evidence_catalog':content.evidence_catalog(dict(proposal.context,references=scoped))}
-        request={'hashes':{k:imagenes.sha(v) for k,v in selected.items()},'references':scoped,'context':context}
-        try:
-            refs=gallery.raw_references(scoped,proposal.owner)
-            review=runtime.call('perfil_revision_visual',request,lambda:checker(selected,refs,context),key='vision:'+orquestacion.digest(request))
+            cached=None
+            if reuse_from:
+                for call in reuse_from.progress_ledger.get('calls',{}).values():
+                    if call['edge']=='perfil_editar_persona' and call['request_hash']==orquestacion.digest(request):
+                        if call['state']=='answered':cached=orquestacion.unpack(call['result'])
+                        elif call['state']=='pending':raise ValueError('Edición anterior incierta; conciliar antes de repetir.')
+            edited=runtime.call('perfil_editar_persona',request,
+                lambda:cached if cached is not None else client.edit_profile(refs,instruction,f'{proposal.id}:{kind}'),
+                key='person:'+orquestacion.digest(request))
+            render_input={'sha256':{kind:imagenes.sha(edited)},'copy':banner if kind=='banner' else {},'brand':content.BRAND_VERSION}
+            package=runtime.call('perfil_render',render_input,lambda:visual.render_tool({kind:edited},banner),
+                key='render:'+orquestacion.digest(render_input))
+            if kind not in package['files']:
+                raise ValueError(package['geometry'].get('errors',{}).get(kind,'Render incompleto'))
+            selected={kind:orquestacion.unpack(package['files'][kind])}
+            if kind in ('A','B'):selected[f'circle_{kind}_32']=visual.tiny_portrait(selected[kind])
+            if kind=='banner':
+                for asset in proposal.assets.filter(version=proposal.version,kind__in=['A','B'],review__ok=True).order_by('kind'):
+                    for viewport in ('mobile','desktop'):
+                        selected[f'{viewport}_{asset.kind}']=visual.preview(imagenes.read(asset.image),selected[kind],viewport=='mobile')
+            context={'option':kind,'geometry':package['geometry'] if kind=='banner' else {},'copy':banner if kind=='banner' else {},
+                'library':[u for u in evidence_context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS],
+                'evidence_catalog':content.evidence_catalog(dict(evidence_context,references=scoped))}
+            check_request={'hashes':{k:imagenes.sha(v) for k,v in selected.items()},'references':scoped,'context':context}
+            if not ProfileProposal.objects.filter(pk=proposal.pk,version=proposal.version).exclude(state__in=['cancelled','superseded']).exists():
+                raise orquestacion.CycleStopped('cancelled')
+            review=runtime.call('perfil_revision_visual',check_request,lambda:checker(selected,refs,context),key='vision:'+orquestacion.digest(check_request))
             if not review.get('ok') or review.get('sha256')!=[imagenes.sha(v) for v in selected.values()]:
                 raise ValueError('Revisión visual bloqueada o incierta: '+kind)
             if gallery.stale(scoped,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
-            reviews[kind]=review
+            provenance={'references':scoped,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
+                'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{kind:instruction},'geometry':package['geometry']}
             for name,raw in selected.items():
                 if name in ASSET_KINDS:save_asset(proposal,name,raw,{'ok':True,'options':{kind:review},'sha256':[imagenes.sha(raw)]},provenance)
         except (ValueError,OSError) as exc:errors[kind]=str(exc)
@@ -247,7 +256,7 @@ def proposal_state(sections,mode):
 
 def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=None,researcher=None,image_client=None,image_checker=None):
     proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
-    if proposal.state in ('cancelled','ready','partial') or proposal.version!=job.params['version']:return proposal
+    if proposal.state in ('cancelled','superseded','ready','partial') or proposal.version!=job.params['version']:return proposal
     runtime=orquestacion.Runtime.open('perfil_periodico',str(proposal.id),job.owner,job,
         facts={'proposal':str(proposal.id),'mode':proposal.mode},plan=['biblioteca','lecturas','posicionamiento','copy','revisión','assets','Tu turno'])
     _persist(proposal,state='running',cycle_id=runtime.id)
@@ -323,10 +332,6 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
                 sections=[replacements.get(s['id'],s) for s in proposal.sections]
                 for row in sections:row['version']=proposal.version
             _persist(proposal,sections=sections,context=context)
-            from .preguntas import ask
-            for row in sections:
-                for missing in row.get('missing',[]):
-                    ask('perfil',missing['question'],f'{row["title"]}: {missing["purpose"]}',missing['key'],origin=f'perfil:{proposal.id}',suggested_public=True)
             if proposal.mode=='full':
                 try:
                     if affected and not {'photo','banner'} & set(affected) and not gallery.stale(proposal.references,proposal.owner):
@@ -340,11 +345,13 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
                 except (ValueError,OSError) as exc:
                     mark_missing_assets(proposal,sections,{kind:str(exc) for kind in ('A','B','banner')})
             reconcile_previous(proposal,sections)
+            from .preguntas import ask_profile
+            ask_profile(proposal)
             _persist(proposal,sections=sections,state=proposal_state(sections,proposal.mode))
             runtime.finish({'proposal':str(proposal.id),'version':proposal.version,'state':proposal.state})
     except (orquestacion.CycleStopped,ValueError,OSError) as exc:
         proposal.refresh_from_db()
-        if proposal.state!='cancelled':
+        if proposal.state not in ('cancelled','superseded'):
             if proposal.mode=='full':mark_missing_assets(proposal,proposal.sections,{kind:str(exc) for kind in ('A','B','banner')})
             _persist(proposal,state='stopped',sections=proposal.sections,findings=[str(exc)])
     notify(proposal)
@@ -352,7 +359,7 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
 
 
 def notify(proposal):
-    if proposal.state=='cancelled':return
+    if proposal.state in ('cancelled','superseded'):return
     from .notificaciones import avisar
     if no_changes(proposal):
         detail=' · '.join(s['title']+': '+s['reason']+' '+', '.join(c['unit_id'] for c in s['citations']) for s in proposal.sections)
@@ -388,7 +395,8 @@ def markdown(proposal):
         lines+=['- '+s for s in row.get('steps',[])]
         lines+=['Pendiente: '+s for s in row.get('issues',[])]
         if row.get('applied_text'):lines+=['Texto aplicado por Gustavo:',row['applied_text']]
-    questions=[(row['title'],m) for row in proposal.sections for m in row.get('missing',[])]
+    questions=[(row['title'],m) for row in proposal.sections if not row.get('superseded_by')
+        and proposal.state not in ('superseded','cancelled') for m in row.get('missing',[])]
     if questions:
         lines+=['','## Preguntas pendientes','']
         lines += [f'- {title}: {m["question"]}' for title,m in questions]
@@ -429,7 +437,7 @@ def cards(user,card,postponed=False):
         ready=sum(s['readiness']=='ready' for s in proposal.sections)
         downloadable=proposal.assets.filter(version=proposal.version,kind__in=['A','B','banner'],review__ok=True).count()
         if downloadable and gallery.stale(proposal.references,proposal.owner):downloadable=0
-        questions=len({m['key'] for s in proposal.sections for m in s.get('missing',[])})
+        questions=TeamQuestion.objects.filter(origin=f'perfil:{proposal.id}',state='open').count()
         detail=f'Secciones listas: {ready} · Assets descargables: {downloadable} · Preguntas pendientes: {questions}. Aplicación manual.'
         result.append(card(f'perfil:{proposal.id}','perfil','Propuesta de perfil'+(' · mensual' if proposal.mode=='monthly' else ''),
             detail,[],agent='perfil',priority='cuando_puedas',
@@ -442,7 +450,7 @@ def cards(user,card,postponed=False):
 def reconcile_previous(proposal,sections):
     """Replace overlapping pending tasks visibly, retaining applied decisions and earlier documents."""
     current={s['id']:s for s in sections}
-    for previous in ProfileProposal.objects.select_for_update().filter(owner=proposal.owner,state__in=['ready','partial']).exclude(pk=proposal.pk):
+    for previous in ProfileProposal.objects.select_for_update().filter(owner=proposal.owner,state__in=['ready','partial','stopped'],created_at__lt=proposal.created_at).exclude(pk=proposal.pk):
         changed=False
         for row in previous.sections:
             replacement=current.get(row['id'])
@@ -452,7 +460,11 @@ def reconcile_previous(proposal,sections):
                 for field in ('decision','application','applied_at','applied_text','checked_at','check_evidence'):
                     if field in row:replacement[field]=row[field]
             row['superseded_by']=str(proposal.id);changed=True
-        if changed:previous.revision+=1;previous.save()
+        if changed:
+            if all(s.get('superseded_by') for s in previous.sections):previous.state='superseded'
+            previous.revision+=1;previous.save()
+    from .preguntas import clean_profile_questions
+    clean_profile_questions(proposal.owner)
 
 
 def fact_answered(memory_key):
