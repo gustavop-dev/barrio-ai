@@ -16,9 +16,12 @@ it('shows the same study and removes dependent evidence on withdrawal', async ()
   await renderApp(<Comunidad header={null} />);
   expect(await screen.findByText('medición del resultado')).toBeOnTheScreen();
   expect(screen.queryByText('How do you measure delivery cost?')).toBeNull();
-  fireEvent.press(screen.getByTestId('community-sources'));
+  await fireEvent.press(screen.getByTestId('community-sources'));
   expect(screen.getByText('How do you measure delivery cost?')).toBeOnTheScreen();
-  fireEvent.press(screen.getByTestId('community-withdraw-0'));
+  expect(screen.getByRole('button', { name: 'Retirar fuente 1' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Excluir persona de fuente 1' })).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Marcar fuente 1 incorrecta' })).toBeOnTheScreen();
+  await fireEvent.press(screen.getByTestId('community-withdraw-0'));
   expect(await screen.findByText('Sin estudio vigente')).toBeOnTheScreen();
   await waitFor(() => expect(screen.queryByText('How do you measure delivery cost?')).toBeNull());
 });
