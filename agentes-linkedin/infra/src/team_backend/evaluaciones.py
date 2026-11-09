@@ -200,9 +200,7 @@ def comment_request(run,post,revision=None):
 
 def classify_request(run,contacts):
     """red.classify for a batch, with the profile data stored today."""
-    people=[{'id':str(c.id),'name':c.display_name,'headline':c.headline[:300],'location':c.location,'network_distance':c.network_distance,
-             'source':c.source,'evidence':{k:v for k,v in c.evidence.items() if k in ('referent','comment','query','invitation_message') and v}}
-            for c in contacts]
+    people=red.classification_people(contacts)
     message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':red.note_policy()},ensure_ascii=False,default=str)
     units,missing=run.context(red.NETWORK_UNITS,12000)
     if missing:raise ValueError('Biblioteca no disponible para clasificar')
