@@ -159,6 +159,7 @@ class Referent(models.Model):
     profile_url=models.TextField(blank=True)
     reason=models.TextField(help_text='Por qué conviene observar a esta persona (pertinencia, no popularidad).')
     active=models.BooleanField(default=True)
+    archived_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True)
     created_at=models.DateTimeField(default=timezone.now)
     last_observed_at=models.DateTimeField(null=True,blank=True)
@@ -867,6 +868,81 @@ class AppClientError(models.Model):
     app_version=models.CharField(max_length=40,blank=True)
     class Meta:ordering=['-created_at']
     def __str__(self):return f'{self.kind} · {self.name}'
+
+
+class EvidencePerson(models.Model):
+    """Identity in one connector account. Never merged by name, slug or URN prefix."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='evidence_people')
+    provider_user_id=models.CharField(max_length=200)
+    display_name=models.CharField(max_length=200,blank=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','provider_user_id'],name='unique_evidence_person')]
+
+
+class PersonEvidence(models.Model):
+    """Minimized observations; unknown event time stays null. No inbox text or invitation message."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    person=models.ForeignKey(EvidencePerson,on_delete=models.PROTECT,related_name='observations')
+    key=models.CharField(max_length=64)
+    kind=models.CharField(max_length=32)
+    source=models.CharField(max_length=40)
+    source_id=models.CharField(max_length=200)
+    referent=models.ForeignKey(Referent,on_delete=models.PROTECT,null=True,blank=True,related_name='person_evidence')
+    post_id=models.CharField(max_length=200,blank=True)
+    interaction_id=models.CharField(max_length=200,blank=True)
+    source_url=models.TextField(blank=True)
+    event_at=models.DateTimeField(null=True,blank=True)
+    observed_at=models.DateTimeField(db_index=True)
+    recorded_at=models.DateTimeField(default=timezone.now)
+    coverage=models.JSONField(default=dict)
+    details=models.JSONField(default=dict)
+    experiment_id=models.CharField(max_length=200,blank=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['person','key'],name='unique_person_evidence')]
+
+
+class EvidenceCoverage(models.Model):
+    """A read/cut even when no identifiable people were returned. Counts may be unknown."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='evidence_coverage')
+    source=models.CharField(max_length=40)
+    source_id=models.CharField(max_length=200)
+    referent=models.ForeignKey(Referent,on_delete=models.PROTECT,null=True,blank=True)
+    observed_at=models.DateTimeField(db_index=True)
+    status=models.CharField(max_length=20)
+    details=models.JSONField(default=dict)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','source','source_id'],name='unique_evidence_coverage')]
+
+
+class FitClassification(models.Model):
+    """Append-only fit history; operational Contact.classification remains compatible."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    person=models.ForeignKey(EvidencePerson,on_delete=models.PROTECT,related_name='fit_versions')
+    key=models.CharField(max_length=64)
+    criterion_version=models.CharField(max_length=100)
+    classified_at=models.DateTimeField(null=True,blank=True)
+    recorded_at=models.DateTimeField(default=timezone.now)
+    sufficient=models.BooleanField(default=False)
+    fit=models.BooleanField(null=True,blank=True)
+    details=models.JSONField(default=dict)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['person','key'],name='unique_fit_version')]
+
+
+class ReferentAttribution(models.Model):
+    """Versioned observational report, including its baseline and exposure evidence."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    referent=models.ForeignKey(Referent,on_delete=models.PROTECT,related_name='attribution_reports')
+    key=models.CharField(max_length=64)
+    window_start=models.DateTimeField()
+    window_end=models.DateTimeField()
+    as_of=models.DateTimeField()
+    created_at=models.DateTimeField(default=timezone.now)
+    report=models.JSONField(default=dict)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['referent','key'],name='unique_referent_attribution')]
 
 
 class CycleLedger(models.Model):

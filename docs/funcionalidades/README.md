@@ -21,7 +21,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [personas-oportunidades.md](personas-oportunidades.md) | `PRS` | El barrio, la ficha de una persona, las oportunidades y los referentes |
 | [ajustes.md](ajustes.md) | `AJU` | Máquina, autonomía, gasto, LinkedIn, notificaciones, orientación y sesión |
 | [motor-editorial.md](motor-editorial.md) | `EDI` | El circuito que prepara, verifica y publica la pieza diaria |
-| [observatorio-referentes.md](observatorio-referentes.md) | `OBS` | Dependencia web disponible y alcance reservado a las siguientes fases del plan de equipos |
+| [observatorio-referentes.md](observatorio-referentes.md) | `OBS` | Evidencia compartida OBS-03 disponible; investigación mensual y experimentos en siguientes fases |
 | [red.md](red.md) | `BAR` | Descubrir, clasificar, seguir, invitar y aceptar personas del barrio |
 | [comentarios-y-lider.md](comentarios-y-lider.md) | `COM` | Comentarios en posts de referentes y el agente líder que aprueba o descarta |
 | [inbox.md](inbox.md) | `INB` | Lectura del inbox de LinkedIn y conversaciones que le tocan a Gustavo |
@@ -45,7 +45,7 @@ Captura, Galería, Calendario, Ajustes y el motor editorial enlazan a las fichas
 
 ## Ampliación de equipos de Gustavo
 
-Las fichas OBS, LEC, EST y BIB, EDI-21, OFI-10, GAL-08, BAR-14, COM-11, TUR-20/21 y la ampliación del ID reservado TUR-18 describen trabajo **no implementado**. Base revisada localmente: `1ba4e43`, 8 de noviembre de 2026, sin red. No cambian los estados de las funcionalidades existentes ni presentan los contratos documentales de los agentes como código activo.
+El diseño inicial sobre `1ba4e43` (8 de noviembre de 2026, sin red) reservó OBS, LEC, EST, BIB, EDI-21, OFI-10, GAL-08, BAR-14, COM-11, TUR-20/21 y la ampliación de TUR-18. Las fichas individuales reflejan ahora las entregas del [plan de equipos](../plan-equipos.md). La fase 4 marca **funciona** a [OBS-03](observatorio-referentes.md#obs-03) y [BAR-14](red.md#bar-14): evidencia compartida tipada, procedencias, cobertura y atribución observacional; CI/QA pendientes de Claude. Las capacidades posteriores conservan su estado planificado.
 
 Los addenda incorporan [listas curadas y política de red](biblioteca-equipos.md#unidades-por-rol) y la [arquitectura declarativa](arquitectura-agentes.md), también **no implementado**. BIB-06 se retira por decisión de Gustavo, con su ID reservado. Primero se migrará el pipeline real al registro; después se conectarán las capacidades nuevas. Los especialistas proponen y sus orquestadores deciden dentro de las compuertas existentes.
 

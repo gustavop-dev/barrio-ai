@@ -662,7 +662,8 @@ def _visual(piece,public,private):
         proposal=editor_visual.fallback(request,str(exc))
     editor_visual.accept(piece,proposal,public,private)
     if not any(u.get('stage')=='visual' for u in piece.usage):
-        piece.usage=list(piece.usage)+[{'stage':'visual','mode':proposal['mode']}]
+        piece.usage=list(piece.usage)+[{'stage':'visual','mode':proposal['mode'],
+            'model':imagenes.connector.VISION_MODEL if proposal['mode']=='model' else None}]
         piece.save(update_fields=['usage','updated_at'])
     imagenes.prepare(piece,public,private)
     package=orquestacion.call('entregar_visual',{'piece':str(piece.id),'payload':imagenes.manifest(piece)},

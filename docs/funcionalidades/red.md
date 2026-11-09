@@ -23,7 +23,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 | [BAR-11](#bar-11) | Resumen de la red | PWA · app · backend | funciona |
 | [BAR-12](#bar-12) | Aviso de conexión nueva que encaja | backend | funciona |
 | [BAR-13](#bar-13) | Aprobar acciones de red en modo aprobación | PWA · app · backend | funciona |
-| [BAR-14](#bar-14) | Procedencia de referentes para Relaciones y el analista | backend | no implementado |
+| [BAR-14](#bar-14) | Procedencia de referentes para Relaciones y el analista | backend | funciona |
 | [BAR-15](#bar-15) | Ritmo diario, rampa semanal y configuración del operador | PWA · app · backend | no implementado |
 | [BAR-16](#bar-16) | Cuenta gratuita y notas de invitación reservadas por encaje | PWA · app · backend | no implementado |
 
@@ -220,21 +220,21 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 ### BAR-14 · Procedencia de referentes para Relaciones y el analista <a id="bar-14"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** el equipo puede explicar en qué conversación de un referente encontró a una persona y qué relación tiene con la participación y el aprendizaje del barrio.
 - **Responsable:** `relaciones_comunidad` usa la procedencia; `investigador_referentes` descubre/clasifica; `analista_barrio_resultados` mide.
 - **Cadencia:** en cada descubrimiento, nueva evidencia y planificación de relaciones; corte semanal/mensual para el analista.
 - **Tu turno:** ninguna aprobación nueva de lecturas o clasificación. Las acciones conservan su autonomía/aprobación actual, y altas/bajas de referentes siempre van por TUR-20.
-- **Datos necesarios y disponibilidad:** BAR-01 ya descubre autores de comentarios de referentes; `Contact.evidence` guarda post, URL, nombre del referente y extracto, y `classification` guarda encaje. Falta historial de varias procedencias y su enlace a experimentos; reactores y seguidores identificados no están disponibles hoy ([matriz](observatorio-referentes.md#datos-conectores)).
-- **Código:** no existe el historial ampliado. Referencias: `red.discover/classify/plan`, `models.Contact`, `operador.propose_comment`.
+- **Datos necesarios y disponibilidad:** BAR-01 alimenta `PersonEvidence` antes de filtrar candidatos a invitación. Conserva personas ya conocidas, comentarios repetidos con ids diferentes y varios referentes; no reemplaza `Contact.evidence`. `FitClassification` conserva criterio/fecha/umbral/suficiencia, y `experiment_id` permite enlazar evidencia y decisiones futuras. Reactores y seguidores identificados automáticamente siguen ausentes ([matriz](observatorio-referentes.md#datos-conectores)).
+- **Código:** `evidencia.referent_comments/relationship/contact_context/consult`; `red.discover/classify/_propose/sync/on_confirmed`; `operador.run_job`, `operador_views.ReferentDetail`; migración `0023_shared_evidence`. El grafo declara el servicio y su arista desde Relaciones. Las propuestas conservan los ids/fechas/fuentes y posibles ids de experimento en `review.case_evidence.provenance`.
 - **Criterios de aceptación:**
   1. **Dado** un contacto descubierto en el post de un referente, **cuando** Relaciones prepara su siguiente paso, **entonces** dispone del referente/post, fuente, fecha, evidencia concreta y encaje del contacto, y conserva esa procedencia en la decisión; la audiencia de un referente no equivale a su lista completa de seguidores.
   2. **Dado** una persona ya conocida que aparece en otro referente o vuelve a comentar, **cuando** se observa, **entonces** añade la evidencia al mismo contacto, sin duplicarlo ni sustituir su procedencia anterior; el analista puede reconstruir asociaciones compartidas según OBS-03.
   3. **Dado** un experimento de foco aprobado, **cuando** Relaciones planifica, **entonces** relaciona la evidencia y acciones con el experimento y mantiene clasificación, reglas, topes, pausas y veto existentes. No sigue/invita a alguien solo porque pertenece a esa audiencia ni inicia mensajes privados.
   4. **Dado** un referente dado de baja, **cuando** se revisa su audiencia, **entonces** conserva la evidencia histórica y los contactos, pero no inicia nuevos barridos de ese referente; su baja no descarta automáticamente personas que ya encajan.
   5. **Dado** identidad ambigua, comentario inaccesible o solo contador de reacciones, **cuando** se registra, **entonces** conserva la limitación y no crea una identidad ni un vínculo causal. Si en el futuro se conecta lectura de reactores, registra esa fuente separadamente tras validarla.
-- **Brechas código/docs:** confirma el uso actual de comentarios de referentes (BAR-01) y añade trazabilidad/múltiples fuentes; `red.discover` hoy omite personas ya conocidas. Los criterios de biblioteca para red están en [BIB-03](biblioteca-equipos.md#bib-03).
-- **Cobertura QA:** pendiente
+- **Límites conservados:** añadir evidencia no cambia clasificación operativa, reglas, caps, gates ni veto. Quitar un referente archiva (`active=false`, `archived_at`), oculta su ficha y conserva posts/personas/evidencia; una alta explícita restaura el mismo id. No se recuperan procedencias perdidas antes de fase 4 ni se unen personas por nombres/prefijos. Los experimentos aprobados y sus planes se implementan en fase 5; este servicio conserva su referencia. Criterios de biblioteca: [BIB-03](biblioteca-equipos.md#bib-03).
+- **Cobertura QA:** `test_evidencia.py`, regresiones de red/métricas/resumen/grafo y caso del harness `OBS-03-BAR-14-evidencia`. Claude ejecuta CI y sesión QA en vivo: `[qa: 03 08-resultados 09-personas 11 13-referentes 17-mapa-equipo]`; no se ejecutaron suites locales.
 
 ## Política y coordinación previstas
 
