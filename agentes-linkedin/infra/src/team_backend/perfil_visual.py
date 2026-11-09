@@ -12,7 +12,7 @@ from . import connectors_images, imagenes, infografias, orquestacion, perfil_chr
 from .perfil_marca import (ACCENT, INK, PAPER, BRAND_VERSION, PHOTO_SIZE, BANNER_SIZE, SAFE, COVER, MOBILE, banner_word, normalize_banner,
     TEXT, FIGURE, MAX_LINE_WIDTH, FONT_FAMILY, FONT_PX, LABEL_PX, LABEL_TRACKING_EM, LABEL_Y, LINE_Y, LINE_HEIGHT)
 
-RENDER_VERSION='profile-render-v2'
+RENDER_VERSION='profile-render-v3'  # v3: shared text baseline, bottom-anchored banner figure (#94)
 REVIEW_VERSION='profile-vision-v2'
 
 BASE_PROMPT=f'''Professional headshot of the person in the attached photo, head and shoulders,
