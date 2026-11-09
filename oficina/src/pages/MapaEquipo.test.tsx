@@ -34,7 +34,7 @@ describe('Mapa del equipo', () => {
   it('shows loading without invented activity', () => {
     fakeServer({ [PATH]: () => new Promise<Reply>(() => {}) });
     renderMap();
-    expect(screen.getByRole('status')).toHaveTextContent('Cargando el mapa');
+    expect(screen.getByText('Cargando el mapa…', { selector: '[role="status"]' })).toBeVisible();
     expect(screen.queryByText(/Brief entregado/)).not.toBeInTheDocument();
   });
 
