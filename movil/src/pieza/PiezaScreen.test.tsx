@@ -346,7 +346,7 @@ describe('IMG-11 · imágenes de la pieza', () => {
 
   it('shows the original photo and reason, and keeps the existing veto for the whole piece', async () => {
     useFakeNow('2026-11-07T15:00:00Z');
-    server({ ...SCHEDULED, images: [pieceImage()], image_kind: 'foto' });
+    server({ ...SCHEDULED, images: [pieceImage()], image_kind: 'foto' as const });
     await renderPieza('p8');
     await measureImage();
     expect(screen.getByLabelText('People sharing a product demonstration.')).toBeOnTheScreen();
@@ -373,7 +373,7 @@ describe('IMG-11 · imágenes de la pieza', () => {
   });
 
   it('shows an infographic, its template, alt and review', async () => {
-    server({ ...PUBLISHED, image_kind: 'infografia', images: [pieceImage({ ...CAROUSEL_IMAGES[1]!, kind: 'infografia' })] });
+    server({ ...PUBLISHED, image_kind: 'infografia' as const, images: [pieceImage({ ...CAROUSEL_IMAGES[1]!, kind: 'infografia' })] });
     await renderPieza();
     await measureImage();
     expect(screen.getByText('Infografía')).toBeOnTheScreen();
@@ -383,7 +383,7 @@ describe('IMG-11 · imágenes de la pieza', () => {
   });
 
   it('orders carousel slides, swipes them and exposes only the active alt to screen readers', async () => {
-    server({ ...PUBLISHED, image_kind: 'carrusel', images: [...CAROUSEL_IMAGES].reverse() });
+    server({ ...PUBLISHED, image_kind: 'carrusel' as const, images: [...CAROUSEL_IMAGES].reverse() });
     await renderPieza();
     await measureImage();
     expect(screen.getByText('1/3')).toBeOnTheScreen();
@@ -399,7 +399,7 @@ describe('IMG-11 · imágenes de la pieza', () => {
   });
 
   it('does not call a fixed brand card a dynamic visual verification', async () => {
-    server({ ...PUBLISHED, image_kind: 'tarjeta', images: [pieceImage({ kind: 'tarjeta', review: { ok: true, mode: 'fixed_brand_card' } })] });
+    server({ ...PUBLISHED, image_kind: 'tarjeta' as const, images: [pieceImage({ kind: 'tarjeta', review: { ok: true, mode: 'fixed_brand_card' } })] });
     await renderPieza();
     expect(await screen.findByText('Plantilla fija de marca; sin revisión visual dinámica.')).toBeOnTheScreen();
     expect(screen.queryByText('Comprobación aprobada')).toBeNull();

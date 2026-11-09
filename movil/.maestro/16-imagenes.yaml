@@ -29,9 +29,11 @@ tags: [calendario, captura, imagenes]
     centerElement: true
     timeout: 20000
 - assertVisible: Se publica tal cual
+# expo-image exposes its testID on the native wrapper and its alt on the descendant ImageView.
 - assertVisible:
-    id: piece-image-1
     text: A workshop scene provided by Gustavo, with people sharing a product demonstration.
+    childOf:
+      id: piece-image-1
 - takeScreenshot: 16-imagenes-01-foto
 - scrollUntilVisible:
     element:
@@ -87,8 +89,9 @@ tags: [calendario, captura, imagenes]
     timeout: 20000
 - assertVisible: 1/4
 - assertVisible:
-    id: piece-image-1
     text: "Cover: Make the decision explicit. A small guide to comparing options."
+    childOf:
+      id: piece-image-1
 - assertVisible: 'Plantilla: Portada'
 - takeScreenshot: 16-imagenes-03-portada
 - swipe:
@@ -99,8 +102,9 @@ tags: [calendario, captura, imagenes]
     visible: 2/4
     timeout: 10000
 - assertVisible:
-    id: piece-image-2
     text: "Three steps: name the decision, compare the options, and record the reason."
+    childOf:
+      id: piece-image-2
 - assertVisible: 'Plantilla: Pasos'
 - takeScreenshot: 16-imagenes-04-pasos
 - tapOn:
@@ -109,8 +113,9 @@ tags: [calendario, captura, imagenes]
     visible: 3/4
     timeout: 10000
 - assertVisible:
-    id: piece-image-3
     text: "Three steps in this guide. Keep a reason with each decision."
+    childOf:
+      id: piece-image-3
 - assertVisible: 'Plantilla: Número'
 - tapOn:
     id: piece-image-next
@@ -118,8 +123,9 @@ tags: [calendario, captura, imagenes]
     visible: 4/4
     timeout: 10000
 - assertVisible:
-    id: piece-image-4
     text: "Closing question: Which decision needs a reason? Start with one question."
+    childOf:
+      id: piece-image-4
 - assertVisible: 'Plantilla: Cierre'
 - assertVisible:
     id: piece-image-next

@@ -23,7 +23,7 @@ export function FinalText({ piece }: { piece: PieceDetail }) {
       <Card>
         <View style={styles.text}>
           {lines.map((line, index) => (
-            <T key={index} selectable>
+            <T key={index} testID={`piece-final-paragraph-${index + 1}`} selectable>
               {line}
             </T>
           ))}

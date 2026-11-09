@@ -69,20 +69,34 @@ tags: [calendario]
 
 # ---------------------------------------------------------------- final text and «Copiar»
 # cubre: CAL-08
+# Read the first paragraph before centering «Copiar», which can scroll it above the viewport.
 - scrollUntilVisible:
     element:
-      text: "TEXTO FINAL"
+      id: piece-final-paragraph-1
+      childOf:
+        id: pieza
     direction: DOWN
+    centerElement: true
     timeout: 20000
+- assertVisible:
+    text: "TEXTO FINAL"
+    childOf:
+      id: pieza
+- assertVisible:
+    id: piece-final-paragraph-1
+    text: "We lost two weeks once because nobody remembered why we had dropped a queue."
+    childOf:
+      id: pieza
 - scrollUntilVisible:
     element:
       id: copiar
+      childOf:
+        id: pieza
     direction: DOWN
     centerElement: true
     timeout: 20000
 - assertVisible: "[0-9.]+ caracteres"
 - assertVisible: "Se publica tal cual, en inglés."
-- assertVisible: "We lost two weeks once because nobody remembered why we had dropped a queue."
 # «Copiado» lasts 1.5 s and a tap on this long screen takes Maestro longer than that, so the flow checks that the
 # copy did not fail («No se pudo copiar» stays as long).
 - tapOn:

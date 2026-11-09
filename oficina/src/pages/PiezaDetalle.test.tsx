@@ -272,7 +272,7 @@ describe('Detalle de una pieza · escritorio', () => {
 describe('IMG-11 · imágenes de la pieza', () => {
   it('shows a photo with its alt and reason, retaining the whole-piece veto', async () => {
     vi.setSystemTime(new Date('2026-11-07T15:00:00Z'));
-    server({ ...SCHEDULED, image_kind: 'foto', images: [pieceImage()] });
+    server({ ...SCHEDULED, image_kind: 'foto' as const, images: [pieceImage()] });
     renderCalendario('/calendario/pieza/p8');
     expect(await screen.findByRole('img', { name: 'People sharing a product demonstration.' })).toHaveAttribute('src', pieceImage().url);
     expect(screen.getByText('Se publica tal cual')).toBeInTheDocument();
@@ -298,7 +298,7 @@ describe('IMG-11 · imágenes de la pieza', () => {
   });
 
   it('shows an infographic with its template and actual checklist', async () => {
-    server({ ...PUBLISHED, image_kind: 'infografia', images: [pieceImage({ ...CAROUSEL_IMAGES[1]!, kind: 'infografia' })] });
+    server({ ...PUBLISHED, image_kind: 'infografia' as const, images: [pieceImage({ ...CAROUSEL_IMAGES[1]!, kind: 'infografia' })] });
     renderCalendario('/calendario/pieza/p7');
     expect(await screen.findByText('Infografía')).toBeInTheDocument();
     expect(screen.getByText('Plantilla: Pasos')).toBeInTheDocument();
@@ -307,7 +307,7 @@ describe('IMG-11 · imágenes de la pieza', () => {
   });
 
   it('orders and browses the carousel and exposes only the active slide to screen readers', async () => {
-    server({ ...PUBLISHED, image_kind: 'carrusel', images: [...CAROUSEL_IMAGES].reverse() });
+    server({ ...PUBLISHED, image_kind: 'carrusel' as const, images: [...CAROUSEL_IMAGES].reverse() });
     const user = userEvent.setup();
     renderCalendario('/calendario/pieza/p7');
     expect(await screen.findByText('1/3')).toBeInTheDocument();
@@ -369,7 +369,7 @@ it('explains a rejected edit while showing the original that will be published',
 });
 
 it('labels the fixed brand card without claiming a dynamic visual verification', async () => {
-  server({ ...PUBLISHED, image_kind: 'tarjeta', images: [pieceImage({ kind: 'tarjeta', review: { ok: true, mode: 'fixed_brand_card' } })] });
+  server({ ...PUBLISHED, image_kind: 'tarjeta' as const, images: [pieceImage({ kind: 'tarjeta', review: { ok: true, mode: 'fixed_brand_card' } })] });
   renderCalendario('/calendario/pieza/p7');
   expect(await screen.findByText('Plantilla fija de marca; sin revisión visual dinámica.')).toBeInTheDocument();
   expect(screen.queryByText('Comprobación aprobada')).toBeNull();

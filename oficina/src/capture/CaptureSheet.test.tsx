@@ -121,7 +121,7 @@ describe('Captura · hoja', () => {
     await user.upload(within(sheet).getByLabelText('Galería'), [photo('pizarra.jpg'), photo('evento.jpg')]);
     expect(within(sheet).getAllByRole('img', { name: /Foto adjunta/ })).toHaveLength(2);
     expect(within(sheet).getByRole('radio', { name: 'Que decida el equipo' })).toBeChecked();
-    await user.click(within(sheet).getByRole('radio', { name: 'Editar', exact: true }));
+    await user.click(within(sheet).getByRole('radio', { name: 'Editar' }));
     await user.click(within(sheet).getByRole('button', { name: 'Quitar la foto 2' }));
     await user.upload(within(sheet).getByLabelText('Galería'), [photo('evento.jpg')]);
 
@@ -148,7 +148,7 @@ describe('Captura · hoja', () => {
     const again = await screen.findByRole('dialog', { name: 'Captura para el equipo' });
     expect(within(again).getByLabelText('Nota para el equipo (opcional)')).toHaveValue('Para el post del jueves');
     expect(within(again).getAllByRole('img', { name: /Foto adjunta/ })).toHaveLength(2);
-    expect(within(again).getByRole('radio', { name: 'Editar', exact: true })).toBeChecked();
+    expect(within(again).getByRole('radio', { name: 'Editar' })).toBeChecked();
   });
 
   it('shows the question as a removable chip with its visibility, and sends both', async () => {
@@ -402,8 +402,8 @@ describe('IMG-16 / CAP-16 · opciones e intención', () => {
     act(() => openCaptureSheet(undefined, { draft: { audio: null, fotos: [photo('demo.jpg')], nota: '', para: null, publicUse: null } }));
     await waitFor(() => expect(screen.getByRole('radio', { name: 'No editar' })).toBeChecked());
     for (const name of ['Que decida el equipo', 'Editar', 'No editar']) {
-      await user.click(screen.getByRole('radio', { name, exact: true }));
-      expect(screen.getByRole('radio', { name, exact: true })).toBeChecked();
+      await user.click(screen.getByRole('radio', { name }));
+      expect(screen.getByRole('radio', { name })).toBeChecked();
     }
   });
 

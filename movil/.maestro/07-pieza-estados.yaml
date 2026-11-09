@@ -320,12 +320,20 @@ tags: [calendario]
 - assertVisible: "COMPRADOR · 1"
 - assertVisible: "PAR · 1"
 - takeScreenshot: 07-pieza-estados-09-quien-comento
+# Images add a full section before the final text. The first run reached «Copiar» at 14 s,
+# then the centering swipe exhausted the old 15 s budget despite the button being visible.
 - scrollUntilVisible:
     element:
       id: copiar
+      childOf:
+        id: pieza
     direction: DOWN
     centerElement: true
-    timeout: 15000
+    timeout: 30000
+- assertVisible:
+    id: copiar
+    childOf:
+      id: pieza
 - assertVisible: "Se publica tal cual, en inglés."
 - back
 - extendedWaitUntil:

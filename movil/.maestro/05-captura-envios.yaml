@@ -87,7 +87,7 @@ onFlowComplete:
     id: capture-note
     waitToSettleTimeoutMs: 500
 - inputText: Foto de QA de la pizarra
-- tapOn: 'Nota para el equipo \(opcional\)'
+- hideKeyboard
 - takeScreenshot: 05-envios-02-foto-adjunta
 - scrollUntilVisible:
     element:
@@ -220,7 +220,7 @@ onFlowComplete:
     id: capture-note
     waitToSettleTimeoutMs: 500
 - inputText: Nota de QA sin conexion
-- tapOn: 'Nota para el equipo \(opcional\)'
+- hideKeyboard
 - tapOn:
     id: capture-para-dato
     waitToSettleTimeoutMs: 500
@@ -234,22 +234,48 @@ onFlowComplete:
     id: capture-send
     waitToSettleTimeoutMs: 500
 - takeScreenshot: 05-envios-tras-enviar-3
-# The reason, in Spanish and without scrolling, right above the button; the draft stays.
+# The draft stays; inspect it and then the complete error, which can extend below the viewport.
 - extendedWaitUntil:
     visible:
       id: capture-send-error
     timeout: 30000
-- assertVisible: 'No hay conexión con el servidor'
-- assertVisible: 'Tu audio, tus fotos y tu nota siguen aquí\. Puedes reintentar\.'
-- assertNotVisible: '.*(fetch failed|Network request failed|Unsupported FormDataPart).*'
+- scrollUntilVisible:
+    element:
+      id: capture-note
+    direction: UP
+    centerElement: true
+    timeout: 15000
 - assertVisible:
-    text: 'Reintentar'
-    below:
-      text: 'No hay conexión con el servidor'
-- assertVisible: 'Nota de QA sin conexion'
+    id: capture-note
+    text: 'Nota de QA sin conexion'
+- scrollUntilVisible:
+    element:
+      id: capture-para-dato
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - assertVisible:
     id: capture-para-dato
     selected: true
+- scrollUntilVisible:
+    element:
+      id: capture-send-retry
+      childOf:
+        id: capture-send-error
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    text: 'No hay conexión con el servidor'
+    childOf:
+      id: capture-send-error
+- assertVisible: 'Tu audio, tus fotos y tu nota siguen aquí\. Puedes reintentar\.'
+- assertNotVisible: '.*(fetch failed|Network request failed|Unsupported FormDataPart).*'
+- assertVisible:
+    id: capture-send-retry
+    text: 'Reintentar'
+    childOf:
+      id: capture-send-error
 - assertVisible:
     id: capture-sheet
 - takeScreenshot: 05-envios-09-sin-conexion
@@ -262,10 +288,18 @@ onFlowComplete:
           visible: 'Texto que nunca aparece: espera a que vuelva la red'
           timeout: 6000
           optional: true
+      - scrollUntilVisible:
+          element:
+            id: capture-send-retry
+            childOf:
+              id: capture-send-error
+          direction: DOWN
+          centerElement: true
+          timeout: 15000
       - tapOn:
-          text: 'Reintentar'
-          below:
-            text: 'No hay conexión con el servidor|No se pudo enviar|El servidor falló al recibirlo'
+          id: capture-send-retry
+          childOf:
+            id: capture-send-error
       - extendedWaitUntil:
           visible: 'Enviado al equipo\.'
           timeout: 20000
@@ -293,7 +327,7 @@ onFlowComplete:
     id: capture-note
     waitToSettleTimeoutMs: 500
 - inputText: Nota de QA demasiado grande
-- tapOn: 'Nota para el equipo \(opcional\)'
+- hideKeyboard
 # The next capture POST answers 413 (once).
 - runScript:
     file: comun/qa-fallo.js
@@ -316,15 +350,31 @@ onFlowComplete:
     visible:
       id: capture-send-error
     timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: capture-note
+    direction: UP
+    centerElement: true
+    timeout: 15000
+- assertVisible:
+    id: capture-note
+    text: 'Nota de QA demasiado grande'
+- scrollUntilVisible:
+    element:
+      id: capture-send-retry
+      childOf:
+        id: capture-send-error
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - assertVisible: 'El envío es demasiado grande'
 - assertVisible: 'El audio puede pesar hasta 25 MB y cada foto hasta 10 MB\. Quita alguna foto o graba un audio más corto\.'
 - assertVisible: 'Tu audio, tus fotos y tu nota siguen aquí\. Puedes reintentar\.'
-- assertVisible: 'Nota de QA demasiado grande'
 - takeScreenshot: 05-envios-11-413
 - tapOn:
-    text: 'Reintentar'
-    below:
-      text: 'El envío es demasiado grande'
+    id: capture-send-retry
+    childOf:
+      id: capture-send-error
 - extendedWaitUntil:
     visible: 'Enviado al equipo\.'
     timeout: 30000

@@ -621,12 +621,12 @@ function Thumb({
 function SendError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   const problem = describeSendError(error);
   return (
-    <View testID="capture-send-error">
+    <View testID="capture-send-error" collapsable={false}>
       <Note
         tone={problem.tone}
         title={problem.title}
         actions={
-          <Button variant="secondary" size="small" onPress={onRetry}>
+          <Button variant="secondary" size="small" onPress={onRetry} testID="capture-send-retry">
             Reintentar
           </Button>
         }
