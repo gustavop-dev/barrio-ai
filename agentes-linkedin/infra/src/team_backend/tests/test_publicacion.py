@@ -9,7 +9,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 from cryptography.fernet import Fernet
 from django.utils import timezone
-from team_backend import autopiloto, connectors_linkedin as li
+from team_backend import autopiloto, connectors_linkedin as li, editorial
 from team_backend.connectors import ConnectorError, ConnectorUncertain
 from team_backend.models import ConnectorAccount, LinkedInCredential
 from team_backend.tests.test_operador import OperatorBase
@@ -216,7 +216,9 @@ INVENTED='''Last year I built an AI pipeline for a fintech client that cut their
 The lesson was simple: start from the decision the software supports, not from the feature list the founder brings. Who makes the call, how often, and what does a wrong call cost? Those answers decide the scope, the data you need and whether AI belongs in the product at all.
 
 Which decision is your product helping someone make this week?'''
-EDITORIAL_UNITS=['LI-04-M005-K01','LI-05-M001-K02','LI-05-M002-K04','LI-06-M002-K09','LI-05-V005-K05']
+# Successful circuits need the complete curated lists; missing-unit cases remove
+# an actual row explicitly instead of relying on a partial corpus in every test.
+EDITORIAL_UNITS=list(dict.fromkeys(uid for stage in editorial.STAGES.values() for uid in stage[2]))
 
 def answers(final=GOOD_POST,decision='write',verdict='ready_for_execution',findings=(),claims=None,signals_used=()):
     claims=claims if claims is not None else [{'text':'A weekly decision rarely needs real-time data.','kind':'general_knowledge','ref':''}]
@@ -251,7 +253,7 @@ class EditorialBase(PublicationBase):
         with db.connect() as c:
             for uid in EDITORIAL_UNITS:
                 c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
-                    VALUES(%s,5,%s,'{"title":"Unidad de prueba"}','abc','fixture','/units/0','{}')''',(uid,uid))
+                    VALUES(%s,5,%s,'{"title":"Unidad de prueba"}','abc','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''',(uid,uid))
         self.official=operador.register_account(self.gustavo,'linkedin_fake','urn:li:person:fake','LinkedIn simulado')
         self.linkedin=li.FakeLinkedInOfficial(self.official)
         self.autobot=self.bot();self.calls=[]
@@ -297,6 +299,15 @@ class EditorialBase(PublicationBase):
 
 
 class EditorialCircuitTests(EditorialBase):
+    def test_a_missing_curated_unit_blocks_before_any_paid_stage(self):
+        from knowledge import db
+        with db.connect() as connection:
+            connection.execute('UPDATE units SET active=false WHERE id=%s',(editorial.APPROACH_UNITS[-1],))
+        piece=self.plan(answers())
+        self.assertEqual(piece.state,'failed')
+        self.assertIn('Biblioteca no disponible',piece.note)
+        self.assertEqual(self.calls,[])
+
     def test_full_circuit_publishes_once_without_a_human(self):
         """Director → copywriters A/B → readers → selection → verifier → policy → Posts API → reconciliation."""
         from team_backend import operador
