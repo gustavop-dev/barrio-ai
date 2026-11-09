@@ -55,9 +55,9 @@ export function Comunidad({ header }: { header: ReactNode }) {
         <T>{s.text}</T><T>{s.event_at?.slice(0, 10) ?? 'Fecha de publicación desconocida'} · Leído {s.observed_at.slice(0, 10)}</T>
         {s.url ? <ExternalLink href={s.url}>Abrir fuente pública</ExternalLink> : null}
         {s.analysis.follow_quote ? <T>Motivo declarado: {s.analysis.follow_quote}</T> : null}
-        <Button disabled={withdraw.isPending} onPress={() => withdraw.mutate({ source: s.id })} testID={`community-withdraw-${i}`}>Retirar fuente {i + 1}</Button>
-        <Button disabled={withdraw.isPending} onPress={() => withdraw.mutate({ source: s.id, wholePerson: true })}>Excluir persona de fuente {i + 1}</Button>
-        <Button disabled={withdraw.isPending} onPress={() => withdraw.mutate({ source: s.id, reason: 'incorrect' })}>Marcar fuente {i + 1} incorrecta</Button>
+        <Button disabled={withdraw.isPending} onPress={() => withdraw.mutate({ source: s.id })} testID={`community-withdraw-${i}`}>{`Retirar fuente ${i + 1}`}</Button>
+        <Button disabled={withdraw.isPending} onPress={() => withdraw.mutate({ source: s.id, wholePerson: true })}>{`Excluir persona de fuente ${i + 1}`}</Button>
+        <Button disabled={withdraw.isPending} onPress={() => withdraw.mutate({ source: s.id, reason: 'incorrect' })}>{`Marcar fuente ${i + 1} incorrecta`}</Button>
       </View>)}
     </View> : null}
   </ScrollView>;
