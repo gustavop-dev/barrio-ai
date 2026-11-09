@@ -1,4 +1,10 @@
 import type { ProfileProposal, ProfileSection } from '../api/perfil';
+import type { TurnoCard } from '../api/types';
+export const PROFILE_CARD: TurnoCard = {
+  id: 'perfil:profile-qa', type: 'perfil', profile_id: 'profile-qa', priority: 'cuando_puedas', state: 'nueva',
+  critical: false, tone: 'info', agent: 'perfil', agent_label: 'Perfil', title: 'Propuesta de perfil',
+  body: 'Cambios por sección. Tú decides y los aplicas en LinkedIn.', deadline: null, created_at: null, actions: [],
+};
 export const PROFILE_HEADLINE: ProfileSection = {
   id: 'headline', title: 'Titular', action: 'change', copy: 'Helping product teams build useful software',
   audience: 'Product teams', benefit: 'Useful product decisions', reason: 'Lead with usefulness for the visitor.',

@@ -18,7 +18,9 @@ def stage(name, required, **props):
 BRIEF_INPUT = stage('director', ('slot', 'public_facts', 'private_guidance'), slot=OBJECT,
                     public_facts=ARRAY, private_guidance=ARRAY)
 WRITER_INPUT = stage('redactor', ('brief', 'sources'), brief=OBJECT, sources=ARRAY)
-PANEL_INPUT = stage('lectores', ('brief', 'drafts'), brief=OBJECT, drafts=obj(('A', 'B'), A=STRING, B=STRING))
+PANEL_INPUT = stage('lectores', ('brief', 'drafts'), brief=OBJECT, drafts=obj(('A', 'B'), A=STRING, B=STRING),
+                    community=obj(('status', 'study_id', 'version', 'findings'), status=STRING, study_id=STRING,
+                                  version=INTEGER, findings={'type':'array','items':STRING}))
 SELECTION_INPUT = stage('seleccion', ('brief', 'variants', 'panel'), brief=OBJECT, variants=OBJECT, panel=OBJECT)
 VERIFIER_INPUT = stage('verificador', ('text', 'brief', 'claims'), text=STRING, brief=OBJECT, claims=ARRAY)
 REPAIR_INPUT = stage('reparacion', ('text', 'brief', 'findings'), text=STRING, brief=OBJECT, findings=ARRAY)

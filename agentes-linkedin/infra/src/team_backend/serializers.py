@@ -79,6 +79,15 @@ class ReferentInput(serializers.Serializer):
     reason=UTF8CharField(max_length=1000)
 
 class ReferentOutput(serializers.ModelSerializer):
+    can_manage_protected=serializers.SerializerMethodField()
+    protection_history=serializers.SerializerMethodField()
+    def get_can_manage_protected(self,obj):
+        from .referentes import is_gustavo
+        request=self.context.get('request')
+        return is_gustavo(request.user) if request else False
+    def get_protection_history(self,obj):
+        from .referentes import history
+        return history(obj)
     contacts_count=serializers.SerializerMethodField()
     def get_contacts_count(self,obj):
         """People of the neighborhood discovered in this referent's posts."""
@@ -87,9 +96,14 @@ class ReferentOutput(serializers.ModelSerializer):
     class Meta:
         model=Referent
         fields=['id','account_id','public_identifier','provider_user_id','display_name','profile_url','reason','active','created_at',
-                'last_observed_at','contacts_count']
+                'last_observed_at','contacts_count','protected','position','revision','can_manage_protected','protection_history']
 
 class ReferentPatch(serializers.Serializer):
+    version=serializers.IntegerField(required=False,min_value=1)
+    protected=serializers.BooleanField(required=False)
+    position=serializers.IntegerField(required=False,min_value=0,max_value=15)
+    replacement=serializers.UUIDField(required=False)
+    source=serializers.ChoiceField(choices=['personas','tu_turno'],default='personas')
     active=serializers.BooleanField(required=False)
     reason=serializers.CharField(required=False,max_length=2000)
 

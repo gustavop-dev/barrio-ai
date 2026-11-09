@@ -300,11 +300,16 @@ class TuTurno(APIView):
         from . import resumen_semanal
         summary_cards=[_summary_card(s) for s in [resumen_semanal.pending_proposal()] if s]
         from .perfil import cards as profile_cards
+        from .referentes_views import cards as referent_cards
         profile=profile_cards(request.user,_card)
-        tasks={'perfil':profile,'conversaciones':conversation_cards,'resumen':summary_cards}
+        monthly_cards=referent_cards(request.user,_card,now)
+        monthly_later=[c for c in monthly_cards if c.get('state_override')=='pospuesta']
+        monthly_cards=[c for c in monthly_cards if c.get('state_override')!='pospuesta']
+        tasks={'perfil':profile,'conversaciones':conversation_cards,'resumen':summary_cards,'referentes':monthly_cards}
         approval_cards=[_approval_card(p) for p in awaiting_approval()]
-        question_cards=[_question_card(q,now) for q in pending];later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)
-        cards=warnings+question_cards+conversation_cards+summary_cards+approval_cards+profile
+        question_cards=[_question_card(q,now) for q in pending]
+        later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)+monthly_later
+        cards=warnings+question_cards+conversation_cards+summary_cards+approval_cards+profile+monthly_cards
         seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]

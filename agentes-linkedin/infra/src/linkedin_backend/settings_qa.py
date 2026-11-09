@@ -12,3 +12,6 @@ QA_MODE = True
 QA_FAULTS_FILE = os.environ.get('QA_FAULTS_FILE', '/tmp/qa-fallos.json')
 MIDDLEWARE = [*MIDDLEWARE, 'team_backend.qa_fallos.QaFaultMiddleware']
 ROOT_URLCONF = 'linkedin_backend.urls_qa'
+
+# Explicit human identity for synthetic monthly referent decisions; never used in production.
+REFERENTS_GUSTAVO_USERNAME = 'qa'

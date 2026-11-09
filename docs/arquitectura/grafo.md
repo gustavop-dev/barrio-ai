@@ -2,13 +2,13 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `4.2-fase8` · SHA-256 `30b591cb8d5aacdf3ff9d71aa5aed038f8ec6b4f988d04755d493dd2e27fdc59`.
+Versión `6.2-fase8` · SHA-256 `656a787b31caeeeab84c65461a1861a78d9c591f4835aec6d2979eafd1a04946`.
 
-40 nodos (38 activos), 58 aristas y 12 ciclos.
+46 nodos (46 activos), 69 aristas y 13 ciclos.
 
-Pieza diaria, red y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
+Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes, comunidad mensual y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. Las variantes A/B de redacción comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
-Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Los otros ciclos conservan su estado y contratos descriptivos; referentes continúa en diseño. Perfil entrega propuestas privadas y no escribe LinkedIn.
+Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Referentes activa su fan-out mensual y experimentos; comunidad entrega un estudio público versionado al panel de lectores. Perfil entrega propuestas privadas y no escribe LinkedIn.
 
 ## Grafo completo
 
@@ -35,13 +35,17 @@ flowchart TD
     descubrimiento_red["Descubrimiento de personas · specialist"]
     clasificador_red["Clasificación de personas · specialist"]
     metricas["Métricas · orchestrator"]
-    analista_barrio_resultados["Analista · resumen semanal · orchestrator"]
+    analista_barrio_resultados["Analista · resultados y comunidad · orchestrator"]
     investigacion_web["Investigación web · specialist"]
-    investigador_lider["Referentes mensuales · En diseño · orchestrator"]
-    class investigador_lider planned;
-    estudio_comunidad["Estudio de comunidad · En diseño · specialist"]
-    class estudio_comunidad planned;
+    investigador_lider["Referentes mensuales · orchestrator"]
+    estudio_comunidad["Estudio de comunidad · specialist"]
     evidencia_compartida["Evidencia compartida · specialist"]
+    investigador_producto["Investigación · producto y startups · specialist"]
+    investigador_ia["Investigación · IA aplicada · specialist"]
+    investigador_audiencia["Investigación · audiencias del nicho · specialist"]
+    seleccion_referentes["Selección mensual de referentes · specialist"]
+    analista_experimentos["Análisis de experimentos · specialist"]
+    senales_referentes["Señales de referentes para Relaciones · specialist"]
   end
   subgraph grupo_relaciones["relaciones"]
     relaciones_comunidad["Relaciones y comentarios · orchestrator"]
@@ -123,8 +127,19 @@ flowchart TD
   perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
   relaciones_comunidad -->|"evidencia_red · call · ≤1"| evidencia_compartida
   analista_barrio_resultados -->|"evidencia_analista · call · ≤1"| evidencia_compartida
-  investigador_lider -.->|"evidencia_referentes_futura · call · ≤1"| evidencia_compartida
-  analista_barrio_resultados -.->|"evidencia_comunidad_futura · call · ≤1"| evidencia_compartida
+  investigador_lider -->|"evidencia_referentes · call · ≤1"| evidencia_compartida
+  investigador_lider -->|"referentes_producto · call · ≤1"| investigador_producto
+  investigador_lider -->|"referentes_ia · call · ≤1"| investigador_ia
+  investigador_lider -->|"referentes_audiencia · call · ≤1"| investigador_audiencia
+  investigador_lider -->|"seleccionar_referentes · call · ≤1"| seleccion_referentes
+  investigador_lider -->|"decidir_referentes · handoff · ≤1"| gustavo
+  investigador_lider -->|"foco_aprobado · handoff · ≤1"| relaciones_comunidad
+  relaciones_comunidad -->|"senales_referentes · call · ≤1"| senales_referentes
+  investigador_lider -->|"evidencia_experimento · call · ≤3"| evidencia_compartida
+  investigador_lider -->|"evaluar_experimento · call · ≤1"| analista_experimentos
+  director_editorial -->|"evidencia_comunidad · call · ≤2"| evidencia_compartida
+  director_editorial -->|"leer_comunidad · call · ≤16"| estudio_comunidad
+  director_editorial -->|"analizar_comunidad · call · ≤2"| analista_barrio_resultados
 ```
 
 ## Pieza diaria
@@ -214,6 +229,7 @@ flowchart TD
     descubrimiento_red["Descubrimiento de personas · specialist"]
     clasificador_red["Clasificación de personas · specialist"]
     evidencia_compartida["Evidencia compartida · specialist"]
+    senales_referentes["Señales de referentes para Relaciones · specialist"]
   end
   subgraph grupo_relaciones["relaciones"]
     relaciones_comunidad["Relaciones y comentarios · orchestrator"]
@@ -238,6 +254,7 @@ flowchart TD
   relaciones_comunidad -->|"entregar_comentario · handoff · ≤1"| lider_jev
   plan_red -->|"entregar_plan · handoff · ≤1"| lider_jev
   relaciones_comunidad -->|"evidencia_red · call · ≤1"| evidencia_compartida
+  relaciones_comunidad -->|"senales_referentes · call · ≤1"| senales_referentes
 ```
 
 Bucle `comentario_actual` (active, máximo 2 rondas): Un borrador y una reescritura de reglas; no especialistas entre sí.
@@ -299,7 +316,7 @@ flowchart TD
     director_editorial["Director editorial · orchestrator"]
   end
   subgraph grupo_observatorio["observatorio"]
-    analista_barrio_resultados["Analista · resumen semanal · orchestrator"]
+    analista_barrio_resultados["Analista · resultados y comunidad · orchestrator"]
   end
   subgraph grupo_operacion["operacion"]
     gustavo["Gustavo · veto · gate"]
@@ -376,25 +393,37 @@ flowchart TD
 
 ## Referentes mensuales
 
-Estado: `planned`. Orquestador: `investigador_lider`.
+Estado: `active`. Orquestador: `investigador_lider`.
 
-- `planned`: Mensual (perfil también semestral); aún sin activar.
+- `review_referents`: Prepara el último día del mes, publica día 1; recordatorios 1/4 a las 09:00 y cierre día 6 00:00 America/Bogota.
 
 ```mermaid
 flowchart TD
   classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
-  subgraph grupo_observatorio["observatorio"]
-    investigacion_web["Investigación web · specialist"]
-    investigador_lider["Referentes mensuales · En diseño · orchestrator"]
-    class investigador_lider planned;
-    estudio_comunidad["Estudio de comunidad · En diseño · specialist"]
-    class estudio_comunidad planned;
-    evidencia_compartida["Evidencia compartida · specialist"]
+  subgraph grupo_relaciones["relaciones"]
+    relaciones_comunidad["Relaciones y comentarios · orchestrator"]
   end
-  investigador_lider -.->|"evidencia_referentes_futura · call · ≤1"| evidencia_compartida
+  subgraph grupo_operacion["operacion"]
+    gustavo["Gustavo · veto · gate"]
+  end
+  subgraph grupo_observatorio["observatorio"]
+    investigador_lider["Referentes mensuales · orchestrator"]
+    evidencia_compartida["Evidencia compartida · specialist"]
+    investigador_producto["Investigación · producto y startups · specialist"]
+    investigador_ia["Investigación · IA aplicada · specialist"]
+    investigador_audiencia["Investigación · audiencias del nicho · specialist"]
+    seleccion_referentes["Selección mensual de referentes · specialist"]
+  end
+  investigador_lider -->|"evidencia_referentes · call · ≤1"| evidencia_compartida
+  investigador_lider -->|"referentes_producto · call · ≤1"| investigador_producto
+  investigador_lider -->|"referentes_ia · call · ≤1"| investigador_ia
+  investigador_lider -->|"referentes_audiencia · call · ≤1"| investigador_audiencia
+  investigador_lider -->|"seleccionar_referentes · call · ≤1"| seleccion_referentes
+  investigador_lider -->|"decidir_referentes · handoff · ≤1"| gustavo
+  investigador_lider -->|"foco_aprobado · handoff · ≤1"| relaciones_comunidad
 ```
 
-Bucle `fan_out` (planned, máximo 1 rondas): Investigación paralela con gather acotado; no existe fan-out en fase 1.
+Bucle `fan_out` (active, máximo 1 rondas): Tres ramas paralelas con contextvars/ledger común y gather de todas antes de liberar lease. Una llamada por rama; no delegan.
 
 ## Estrategia y perfil
 
@@ -437,21 +466,27 @@ Bucle `perfil_ajuste` (active, máximo 2 rondas): Primera propuesta y un ajuste 
 
 ## Estudio mensual de comunidad
 
-Estado: `planned`. Orquestador: `analista_barrio_resultados`.
+Estado: `active`. Orquestador: `director_editorial`.
 
-- `planned`: Mensual; todavía sin activar.
+- `community_study`: Mensual tras el corte anterior; 90 días, hasta 50 personas; una revisión adicional como máximo.
 
 ```mermaid
 flowchart TD
   classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
+  subgraph grupo_editorial["editorial"]
+    director_editorial["Director editorial · orchestrator"]
+  end
   subgraph grupo_observatorio["observatorio"]
-    analista_barrio_resultados["Analista · resumen semanal · orchestrator"]
-    estudio_comunidad["Estudio de comunidad · En diseño · specialist"]
-    class estudio_comunidad planned;
+    analista_barrio_resultados["Analista · resultados y comunidad · orchestrator"]
+    estudio_comunidad["Estudio de comunidad · specialist"]
     evidencia_compartida["Evidencia compartida · specialist"]
   end
-  analista_barrio_resultados -.->|"evidencia_comunidad_futura · call · ≤1"| evidencia_compartida
+  director_editorial -->|"evidencia_comunidad · call · ≤2"| evidencia_compartida
+  director_editorial -->|"leer_comunidad · call · ≤16"| estudio_comunidad
+  director_editorial -->|"analizar_comunidad · call · ≤2"| analista_barrio_resultados
 ```
+
+Bucle `revision_comunidad` (active, máximo 2 rondas): Primera versión y una revisión trazable por refresco o solicitud; conserva fuentes exitosas, presupuesto y contadores. Sin fan-out ni delegación.
 
 ## Consulta de evidencia compartida
 
@@ -463,10 +498,28 @@ Estado: `active`. Orquestador: `analista_barrio_resultados`.
 flowchart TD
   classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
   subgraph grupo_observatorio["observatorio"]
-    analista_barrio_resultados["Analista · resumen semanal · orchestrator"]
+    analista_barrio_resultados["Analista · resultados y comunidad · orchestrator"]
     evidencia_compartida["Evidencia compartida · specialist"]
   end
   analista_barrio_resultados -->|"evidencia_analista · call · ≤1"| evidencia_compartida
+```
+
+## Experimentos de referentes
+
+Estado: `active`. Orquestador: `investigador_lider`.
+
+- `advance_experiments`: Tick horario con planes aprobados; cortes semanales y cierre tras 14/28/7 días.
+
+```mermaid
+flowchart TD
+  classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
+  subgraph grupo_observatorio["observatorio"]
+    investigador_lider["Referentes mensuales · orchestrator"]
+    evidencia_compartida["Evidencia compartida · specialist"]
+    analista_experimentos["Análisis de experimentos · specialist"]
+  end
+  investigador_lider -->|"evidencia_experimento · call · ≤3"| evidencia_compartida
+  investigador_lider -->|"evaluar_experimento · call · ≤1"| analista_experimentos
 ```
 
 ## Contratos referenciados
@@ -547,6 +600,18 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `profile_vision` | `json_schema` | [team_backend.perfil_visual.CHECK_RESULT](../../agentes-linkedin/infra/src/team_backend/perfil_visual.py) |
 | `evidence_request` | `dataclass` | [team_backend.evidencia.EvidenceRequest](../../agentes-linkedin/infra/src/team_backend/evidencia.py) |
 | `evidence_result` | `dataclass` | [team_backend.evidencia.EvidenceResult](../../agentes-linkedin/infra/src/team_backend/evidencia.py) |
+| `referents_request` | `json_schema` | [team_backend.referentes_research.REQUEST_SCHEMA](../../agentes-linkedin/infra/src/team_backend/referentes_research.py) |
+| `referents_dossier` | `json_schema` | [team_backend.referentes_research.DOSSIER_SCHEMA](../../agentes-linkedin/infra/src/team_backend/referentes_research.py) |
+| `referents_review` | `model` | [team_backend.models.ReferentReview](../../agentes-linkedin/infra/src/team_backend/models.py) |
+| `referents_change` | `model` | [team_backend.models.ReferentChange](../../agentes-linkedin/infra/src/team_backend/models.py) |
+| `referents_experiment` | `model` | [team_backend.models.ReferentExperiment](../../agentes-linkedin/infra/src/team_backend/models.py) |
+| `referents_signals_request` | `json_schema` | [team_backend.experimentos.SIGNAL_REQUEST](../../agentes-linkedin/infra/src/team_backend/experimentos.py) |
+| `referents_signals` | `json_schema` | [team_backend.experimentos.RESULT_SCHEMA](../../agentes-linkedin/infra/src/team_backend/experimentos.py) |
+| `experiment_request` | `json_schema` | [team_backend.experimentos.EVALUATION_REQUEST](../../agentes-linkedin/infra/src/team_backend/experimentos.py) |
+| `community_study` | `model` | [team_backend.models.CommunityStudy](../../agentes-linkedin/infra/src/team_backend/models.py) |
+| `community_read` | `dataclass` | [team_backend.comunidad.PublicRead](../../agentes-linkedin/infra/src/team_backend/comunidad.py) |
+| `community_read_result` | `dataclass` | [team_backend.comunidad.ReadResult](../../agentes-linkedin/infra/src/team_backend/comunidad.py) |
+| `community_analysis` | `json_schema` | [team_backend.comunidad.ANALYSIS_SCHEMA](../../agentes-linkedin/infra/src/team_backend/comunidad.py) |
 
 ## Aristas y contratos
 
@@ -608,5 +673,16 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `perfil_orientacion_editorial` | `profile_proposal` | `profile_proposal` |
 | `evidencia_red` | `evidence_request` | `evidence_result` |
 | `evidencia_analista` | `evidence_request` | `evidence_result` |
-| `evidencia_referentes_futura` | `evidence_request` | `evidence_result` |
-| `evidencia_comunidad_futura` | `evidence_request` | `evidence_result` |
+| `evidencia_referentes` | `evidence_request` | `evidence_result` |
+| `referentes_producto` | `research_request` | `research_result` |
+| `referentes_ia` | `research_request` | `research_result` |
+| `referentes_audiencia` | `research_request` | `research_result` |
+| `seleccionar_referentes` | `referents_request` | `referents_dossier` |
+| `decidir_referentes` | `referents_review` | `referents_change` |
+| `foco_aprobado` | `referents_experiment` | `referents_signals` |
+| `senales_referentes` | `referents_signals_request` | `referents_signals` |
+| `evidencia_experimento` | `evidence_request` | `evidence_result` |
+| `evaluar_experimento` | `experiment_request` | `referents_signals` |
+| `evidencia_comunidad` | `community_study` | `community_study` |
+| `leer_comunidad` | `community_read` | `community_read_result` |
+| `analizar_comunidad` | `community_study` | `community_study` |

@@ -1,4 +1,5 @@
 import { ProfileProposal } from './ProfileProposal';
+import { ReferentDecision } from './ReferentDecision';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { useTurnoAction } from '../../api/hooks';
@@ -15,6 +16,8 @@ import { QuestionForm } from './QuestionForm';
 import type { ObserveCard } from './useSeenCards';
 
 const TYPE_LABEL: Record<TurnoCardType, string> = {
+  referente: 'Referentes del mes',
+  experimento: 'Experimento',
   aviso: 'Aviso',
   pregunta: 'Pregunta',
   perfil: 'Perfil',
@@ -24,6 +27,8 @@ const TYPE_LABEL: Record<TurnoCardType, string> = {
 };
 
 const TYPE_ICON: Record<TurnoCardType, typeof IconAviso> = {
+  referente: IconAviso,
+  experimento: IconAviso,
   aviso: IconAviso,
   pregunta: IconPregunta,
   perfil: IconPerfil,
@@ -402,6 +407,8 @@ export function TurnoCardView({ card, priority, isNew = false, observe }: TurnoC
       </h3>
       {card.profile_id ? (
         <ProfileProposal id={card.profile_id} />
+      ) : card.referent_change || card.referent_experiment ? (
+        <ReferentDecision card={card} />
       ) : card.question ? (
         <QuestionBody card={card} />
       ) : card.attempt ? (

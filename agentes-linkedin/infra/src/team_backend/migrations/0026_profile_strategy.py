@@ -7,7 +7,7 @@ import team_backend.models
 
 
 class Migration(migrations.Migration):
-    dependencies=[('team_backend','0023_shared_evidence'),migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
+    dependencies=[('team_backend','0025_referentes_monthly'),migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
     operations=[
         migrations.AddField('galleryphoto','category',models.CharField(max_length=12,default='posts',choices=[('posts','Posts'),('perfil','Perfil')],db_index=True)),
         migrations.AddField('galleryphoto','profile_edit',models.BooleanField(default=False)),

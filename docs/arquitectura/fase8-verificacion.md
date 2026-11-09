@@ -6,7 +6,7 @@ El ciclo `perfil_periodico` pertenece a Perfil. Recupera biblioteca original, he
 
 ## Migración y configuración
 
-Migración **`team_backend/0024_profile_strategy.py`**, dependiente de `0023_shared_evidence`: categoría, consentimiento/versiones/rol de GalleryPhoto; exclusión persistente en PieceImage; ProfileSchedule, ProfileProposal y ProfileAsset. No lleva datos privados ni modifica el SQL legado. Defaults conservan las fotos existentes como posts; autorizar Perfil no cambia el permiso de edición de posts.
+Migración **`team_backend/0026_profile_strategy.py`**, dependiente de `0025_referentes_monthly`: categoría, consentimiento/versiones/rol de GalleryPhoto; exclusión persistente en PieceImage; ProfileSchedule, ProfileProposal y ProfileAsset. No lleva datos privados ni modifica el SQL legado. Defaults conservan las fotos existentes como posts; autorizar Perfil no cambia el permiso de edición de posts.
 
 Variables nuevas, nombres sin valores: `PROFILE_ENABLED`, `PROFILE_OWNER_USERNAME`. La primera habilita la cadencia periódica; la segunda identifica al usuario humano dueño de las referencias y propuestas. El propietario no es el robot de autopiloto. La captura explícita es una solicitud independiente del interruptor periódico.
 
@@ -71,7 +71,7 @@ El inventario de esta entrega se mantiene al final de este documento. Incluye el
 - [agentes-linkedin/infra/src/team_backend/imagenes.py](../../agentes-linkedin/infra/src/team_backend/imagenes.py)
 - [agentes-linkedin/infra/src/team_backend/jobs.py](../../agentes-linkedin/infra/src/team_backend/jobs.py)
 - [agentes-linkedin/infra/src/team_backend/management/commands/seed_qa.py](../../agentes-linkedin/infra/src/team_backend/management/commands/seed_qa.py)
-- [agentes-linkedin/infra/src/team_backend/migrations/0024_profile_strategy.py](../../agentes-linkedin/infra/src/team_backend/migrations/0024_profile_strategy.py) — nuevo
+- [agentes-linkedin/infra/src/team_backend/migrations/0026_profile_strategy.py](../../agentes-linkedin/infra/src/team_backend/migrations/0026_profile_strategy.py) — nuevo
 - [agentes-linkedin/infra/src/team_backend/models.py](../../agentes-linkedin/infra/src/team_backend/models.py)
 - [agentes-linkedin/infra/src/team_backend/notificaciones.py](../../agentes-linkedin/infra/src/team_backend/notificaciones.py)
 - [agentes-linkedin/infra/src/team_backend/oficina_views.py](../../agentes-linkedin/infra/src/team_backend/oficina_views.py)

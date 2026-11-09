@@ -228,7 +228,7 @@ export function useTurnoAction() {
   return useMutation({
     mutationFn: ({ action, note }: { action: TurnoAction; note?: string }) => runTurnoAction(action, note),
     // redAll: closing a conversation card changes «Te toca» on the person card.
-    onSettled: () => invalidate(client, keys.tuTurno, keys.overview, keys.actionsAll, keys.calendarioAll, keys.actividadAll, keys.linkedin, keys.redAll),
+    onSettled: () => invalidate(client, keys.tuTurno, keys.overview, keys.actionsAll, keys.calendarioAll, keys.actividadAll, keys.linkedin, keys.redAll, ['referents']),
   });
 }
 

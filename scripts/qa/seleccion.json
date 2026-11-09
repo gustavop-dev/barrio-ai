@@ -45,7 +45,7 @@
     },
     {
       "rutas": ["movil/src/turno/**", "movil/src/app/(app)/(tabs)/tu-turno.tsx"],
-      "flujos": ["04-*", "15-*", "18-perfil"],
+      "flujos": ["04-*", "15-*", "18-perfil", "19-*"],
       "cubre": ["TUR-*"]
     },
     {
@@ -60,7 +60,7 @@
     },
     {
       "rutas": ["movil/src/personas/**", "movil/src/app/(app)/(tabs)/personas.tsx", "movil/src/app/(app)/personas/**"],
-      "flujos": ["05-captura-contexto", "09-*", "12-*", "13-*", "14-*"],
+      "flujos": ["05-captura-contexto", "09-*", "12-*", "13-*", "14-*", "19-*"],
       "cubre": ["PRS-*", "BAR-*"]
     },
     {

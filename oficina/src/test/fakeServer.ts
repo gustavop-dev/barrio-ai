@@ -20,7 +20,7 @@ export type Handler = (request: RecordedRequest) => Reply | Promise<Reply>;
 
 export function fakeServer(routes: Record<string, Handler | Reply>) {
   const requests: RecordedRequest[] = [];
-  const table = new Map(Object.entries(routes));
+  const table = new Map<string, Handler | Reply>(Object.entries({ 'GET /api/v1/referentes/revisiones': { body: [] }, ...routes }));
 
   const fetchMock = vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
     const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, 'http://localhost');

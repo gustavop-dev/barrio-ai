@@ -24,6 +24,7 @@ INBOX_KINDS={
 # Notificaciones kinds: (calendar layer, push by default, label in Ajustes).
 FEED_KINDS={
     'profile_reviewed':('tuyo',False,'Revisión de perfil sin cambios'),
+    'referents_review':('conversaciones',True,'Revisión mensual y experimentos de referentes'),
     'capture_scheduled':('publicaciones',True,'Fecha de una idea urgente'),
     'piece_scheduled':('publicaciones',True,'Pieza lista o programada'),
     'piece_published':('publicaciones',True,'Pieza publicada'),

@@ -52,6 +52,18 @@ tags: [perfil, galeria, turno]
 - takeScreenshot: 18-perfil-01-categoria
 - tapOn:
     id: top-tu-turno
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 10 pendientes, 1 urgente'
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: Identificar los cinco referentes main
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: Gestionar protegidos
 - scrollUntilVisible:
     element:
       id: profile-open

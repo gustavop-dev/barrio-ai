@@ -4,7 +4,7 @@
 # writing; Sofía's conversation swiped right is done; the choice question swiped left and the yes/no question's «Más
 # tarde» are postponed; the expired question sits under «Ya no es urgente»; «Pospuestas» and «Hecho recientemente»
 # list what happened; the top bar counter follows; and the answer shows up in «Lo que el equipo sabe de ti».
-# The seed (seed_qa) gives 9 cards: 1 urgente; 4 importantes (the dated question, the two network approvals of
+# The seed (seed_qa) gives 10 cards: 1 urgente; 5 importantes (the dated question, referents setup, the two network approvals of
 # 04-tu-turno-aprobar and the conversation); 4 cuando puedas (profile, the analyst's orientation, then the choice and yes/no
 # questions, newest first). Plus «¿En qué ciudad vives actualmente?» postponed and «¿Fuiste al meetup…?» expired.
 # Each search goes down from where the last one ended (the order inside each group is fixed by the seed's dates);
@@ -27,7 +27,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 9 pendientes, 1 urgente'
+      text: 'Tu turno, 10 pendientes, 1 urgente'
     timeout: 30000
 - tapOn:
     id: top-tu-turno
@@ -36,7 +36,7 @@ tags: [turno]
     visible:
       id: turno-list
     timeout: 30000
-- assertVisible: '1 urgente · 4 importantes · 4 cuando puedas'
+- assertVisible: '1 urgente · 5 importantes · 4 cuando puedas'
 
 # ---------------------------------------------------------------- URGENTE: «¿Salió o no?», swiped right
 # cubre: TUR-03, TUR-04, TUR-19
@@ -86,7 +86,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 8 pendientes'
+      text: 'Tu turno, 9 pendientes'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
@@ -98,7 +98,7 @@ tags: [turno]
 # The free-text field is the only answer field whose testID is «answer-<uuid>» (no «submit»/«fix» in it).
 - scrollUntilVisible:
     element:
-      text: 'Importante · 4'
+      text: 'Importante · 5'
     direction: DOWN
     speed: 20
     timeout: 60000
@@ -139,7 +139,7 @@ tags: [turno]
 
 # ---------------------------------------------------------------- IMPORTANTE: Sofía's conversation, swiped right
 # cubre: TUR-07, TUR-19, INB-03, INB-04
-# It has no deadline, so it is the last Importante card. Right runs its first request action, «Hecho, respondí»
+# It has no deadline and precedes referents setup. Right runs its first request action, «Hecho, respondí»
 # (no note): the card flies off and does not come back.
 - scrollUntilVisible:
     element:
@@ -228,7 +228,7 @@ tags: [turno]
     notVisible: '¿Te parece bien que el equipo comente en publicaciones en inglés\?'
     timeout: 20000
 
-# The analyst's orientation, alone in its group now: down to the folds at the end, then up to it.
+# The analyst's orientation, alongside the pending profile: down to the folds at the end, then up to it.
 # cubre: TUR-08, SEM-08
 - runFlow: comun/turno-final.yaml
 - scrollUntilVisible:
@@ -302,11 +302,11 @@ tags: [turno]
 - assertVisible: '.*¿Con qué tipo de startups prefieres trabajar\?'
 - assertVisible: '.*¿Te parece bien que el equipo comente en publicaciones en inglés\?'
 - takeScreenshot: 04-turno-13-pospuestas
-# Left: the two approvals and the analyst's orientation (no longer urgent).
+# Left: the two approvals, referents setup, the analyst's orientation and profile (no longer urgent).
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 4 pendientes'
+      text: 'Tu turno, 5 pendientes'
     timeout: 20000
 
 # ---------------------------------------------------------------- «Hecho recientemente»

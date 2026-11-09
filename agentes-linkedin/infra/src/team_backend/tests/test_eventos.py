@@ -29,10 +29,12 @@ class OfficeEventTests(OperatorBase):
         calls=[(e['tipo'],e['rol'],e['destino']) for e in events if e.get('source')=='orchestration']
         self.assertEqual(calls,[('entrega','relaciones_comunidad','investigador_referentes'),
                                ('entrega','investigador_referentes','relaciones_comunidad'),
+                               ('entrega','relaciones_comunidad','senales_referentes'),
+                               ('entrega','senales_referentes','relaciones_comunidad'),
                                ('entrega','relaciones_comunidad','relaciones_comunidad'),
                                ('entrega','relaciones_comunidad','relaciones_comunidad')])
         self.assertEqual([e.get('source','workflow') for e in events],
-                         ['orchestration','orchestration','workflow','orchestration',
+                         ['orchestration','orchestration','workflow','orchestration','orchestration','orchestration',
                           'workflow','workflow','orchestration','workflow'])
         later=(timezone.now()+timedelta(minutes=1)).isoformat()
         self.assertEqual(self.human.get('/api/v1/oficina/eventos',{'desde':later}).json()['events'],[])

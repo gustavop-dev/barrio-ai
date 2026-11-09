@@ -159,6 +159,9 @@ class Referent(models.Model):
     profile_url=models.TextField(blank=True)
     reason=models.TextField(help_text='Por qué conviene observar a esta persona (pertinencia, no popularidad).')
     active=models.BooleanField(default=True)
+    protected=models.BooleanField(default=False)
+    position=models.PositiveIntegerField(default=0)
+    revision=models.PositiveIntegerField(default=1)
     archived_at=models.DateTimeField(null=True,blank=True)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True)
     created_at=models.DateTimeField(default=timezone.now)
@@ -167,6 +170,78 @@ class Referent(models.Model):
         ordering=['display_name']
         constraints=[models.UniqueConstraint(fields=['account','public_identifier'],name='unique_referent_per_account')]
     def __str__(self):return self.display_name or self.public_identifier
+
+
+class ReferentControl(models.Model):
+    """Account row is the common lock for CRUD, monthly decisions and experiments."""
+    account=models.OneToOneField(ConnectorAccount,on_delete=models.CASCADE,primary_key=True)
+    initialized=models.BooleanField(default=False)
+    initial_main=models.JSONField(default=list)
+    revision=models.PositiveIntegerField(default=1)
+    issue=models.TextField(blank=True)
+
+
+class ReferentReview(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
+    month=models.DateField()
+    state=models.CharField(max_length=24,default='preparing')
+    dossier=models.JSONField(default=dict)
+    expected_revision=models.PositiveIntegerField(default=1)
+    published_at=models.DateTimeField(null=True,blank=True)
+    deadline=models.DateTimeField()
+    closed_at=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','month'],name='unique_referent_month')]
+
+
+class ReferentChange(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    review=models.ForeignKey(ReferentReview,on_delete=models.CASCADE,related_name='changes')
+    ordinal=models.PositiveIntegerField()
+    version=models.PositiveIntegerField(default=1)
+    # One immutable snapshot per version is retained in history before every decision/edit.
+    proposal=models.JSONField(default=dict)
+    history=models.JSONField(default=list)
+    state=models.CharField(max_length=24,default='pending')
+    responded_at=models.DateTimeField(null=True,blank=True)
+    applied_at=models.DateTimeField(null=True,blank=True)
+    conflict=models.TextField(blank=True)
+    class Meta:
+        ordering=['ordinal']
+        constraints=[models.UniqueConstraint(fields=['review','ordinal'],name='unique_referent_change')]
+
+
+class ReferentNotice(models.Model):
+    review=models.ForeignKey(ReferentReview,on_delete=models.CASCADE,related_name='notices')
+    event=models.CharField(max_length=24)
+    payload=models.JSONField(default=dict)
+    created_at=models.DateTimeField(default=timezone.now)
+    pushed_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['review','event'],name='unique_referent_notice')]
+
+
+class ReferentExperiment(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
+    referent=models.ForeignKey(Referent,on_delete=models.PROTECT)
+    review=models.ForeignKey(ReferentReview,on_delete=models.SET_NULL,null=True,blank=True)
+    version=models.PositiveIntegerField(default=1)
+    state=models.CharField(max_length=24,default='proposed')
+    plan=models.JSONField(default=dict)
+    history=models.JSONField(default=list)
+    approved_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True)
+    approved_at=models.DateTimeField(null=True,blank=True)
+    starts_at=models.DateTimeField()
+    focus_at=models.DateTimeField()
+    followup_at=models.DateTimeField()
+    ends_at=models.DateTimeField()
+    results=models.JSONField(default=dict)
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account'],condition=models.Q(state='approved'),name='one_referent_experiment')]
 
 class ObservedPost(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
@@ -325,6 +400,8 @@ class AudienceSnapshot(models.Model):
     def __str__(self):return str(self.day)
 
 class ActionProposal(models.Model):
+    referent_experiment=models.ForeignKey('ReferentExperiment',on_delete=models.PROTECT,null=True,blank=True)
+    referent_experiment_version=models.PositiveIntegerField(null=True,blank=True)
     class Capability(models.TextChoices):
         COMMENT='INT-03','Comentar en una publicación ajena'
         REACT='INT-02','Reaccionar a una publicación'
@@ -943,6 +1020,56 @@ class ReferentAttribution(models.Model):
     report=models.JSONField(default=dict)
     class Meta:
         constraints=[models.UniqueConstraint(fields=['referent','key'],name='unique_referent_attribution')]
+
+
+class CommunityStudy(models.Model):
+    """Monthly community artifact. Identifiable sources never enter the reader packet."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
+    period=models.DateField()
+    version=models.PositiveIntegerField(default=1)
+    window_start=models.DateTimeField()
+    window_end=models.DateTimeField()
+    created_at=models.DateTimeField(default=timezone.now)
+    completed_at=models.DateTimeField(null=True,blank=True)
+    expires_at=models.DateTimeField()
+    state=models.CharField(max_length=24,default='building')
+    positioning_version=models.CharField(max_length=100)
+    selection=models.JSONField(default=list)
+    coverage=models.JSONField(default=dict)
+    summary=models.JSONField(default=dict)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','period','version'],name='unique_community_version')]
+
+
+class CommunitySource(models.Model):
+    """Public-only derived layer; retired rows retain just ids, hashes and dates."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    study=models.ForeignKey(CommunityStudy,on_delete=models.CASCADE,related_name='sources')
+    person=models.ForeignKey(EvidencePerson,on_delete=models.PROTECT)
+    key=models.CharField(max_length=64)
+    target=models.CharField(max_length=64)
+    kind=models.CharField(max_length=24)
+    url=models.TextField(blank=True)
+    text=models.TextField(blank=True)
+    event_at=models.DateTimeField(null=True,blank=True)
+    observed_at=models.DateTimeField(default=timezone.now)
+    expires_at=models.DateTimeField()
+    retired_at=models.DateTimeField(null=True,blank=True)
+    analysis=models.JSONField(default=dict)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['study','person','key'],name='unique_community_source')]
+
+
+class CommunityWithdrawal(models.Model):
+    """Non-content tombstone: prevents recollection without touching operational data."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
+    key=models.CharField(max_length=64)
+    created_at=models.DateTimeField(default=timezone.now)
+    reason=models.CharField(max_length=24)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','key'],name='unique_community_withdrawal')]
 
 
 class CycleLedger(models.Model):

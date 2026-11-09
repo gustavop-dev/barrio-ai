@@ -227,6 +227,10 @@ def tick(user,now=None):
     from .connectors_linkedin import check_tokens
     report['linkedin_token']=check_tokens(now)  # expiry alerts reach Gustavo even with the machine stopped
     if operador.check_env_pause():report['env_paused_alert']=1  # the server stop pushes once per stop
+    from . import comunidad, referentes
+    try:referentes.tick(user,now)
+    except Exception as exc:report['referents_error']=type(exc).__name__
+    comunidad.maintain(now)  # retention also runs when collection/the machine is paused
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
     ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')))
     # Own pieces are prepared ahead of time: their TTL runs from the scheduled hour, not from creation.
@@ -248,6 +252,8 @@ def tick(user,now=None):
     try:report['plan']=_editorial(user,now)
     except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
     for account in ConnectorAccount.objects.filter(paused=False):
+        try:report['community_study']=report.get('community_study',0)+comunidad.schedule(user,account,now)
+        except Exception as exc:report['community_error']=type(exc).__name__
         report['observe']+=_observe(user,account,now)
         report['propose']+=_propose(user,account,now)
         report['network']=report.get('network',0)+_network(user,account,now)
@@ -343,8 +349,13 @@ def _propose(user,account,now):
     candidates=(ObservedPost.objects.filter(account=account,is_repost=False,posted_at__gte=now-max_age,referent__active=True)
                 .exclude(text='').exclude(proposals__capability='INT-03').exclude(referent_id__in=recent_comment_authors(account,now))
                 .exclude(id__in=[pid for pid,decision in verdicts.items() if decision=='skip']).order_by('-posted_at'))
+    from . import experimentos
+    focus=experimentos.active_focus(account,now)
+    selected=list(candidates[:30])
+    if focus:selected.sort(key=lambda post:post.referent_id!=focus.referent_id)
     asked=0
-    for post in candidates[:PREFILTER_PER_TICK+1]:
+    for post in selected:
+        if not experimentos.eligible(post,now):continue
         if prefilter and str(post.id) not in verdicts:
             if asked>=PREFILTER_PER_TICK:return 0  # the next candidates are judged on the next tick
             asked+=1

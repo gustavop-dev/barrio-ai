@@ -122,7 +122,9 @@ animations() {
 for flow in $selected; do
   name=$(basename "$flow" .yaml)
   log "flujo $name: sembrando el mundo de QA"
-  (cd "$INFRA" && uv run python manage.py seed_qa >> "$OUT/seed-$SHARD.log" 2>&1) || log "seed_qa falló antes de $name"
+  referent_seed=()
+  [ "$name" = "19-referentes-mensual" ] && referent_seed=(--referentes-mensual)
+  (cd "$INFRA" && uv run python manage.py seed_qa "${referent_seed[@]}" >> "$OUT/seed-$SHARD.log" 2>&1) || log "seed_qa falló antes de $name"
   # No simulated failure left over from another flow (QA failure switch, team_backend.qa_fallos).
   curl -fsS -X DELETE "${QA_API:-http://127.0.0.1:8787}/api/v1/qa/fallos" > /dev/null 2>&1 || true
   scale=0

@@ -28,8 +28,8 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 | [TUR-17](#tur-17) | Editar o retirar un dato | PWA · app · backend | funciona |
 | [TUR-18](#tur-18) | Tareas de perfil | PWA · app · backend | funciona |
 | [TUR-19](#tur-19) | Deslizar una tarjeta | app | funciona |
-| [TUR-20](#tur-20) | Decidir altas, bajas y sustituciones de referentes | PWA · app · backend | no implementado |
-| [TUR-21](#tur-21) | Decidir un experimento de participación | PWA · app · backend | no implementado |
+| [TUR-20](#tur-20) | Decidir altas, bajas y sustituciones de referentes | PWA · app · backend | funciona |
+| [TUR-21](#tur-21) | Decidir un experimento de participación | PWA · app · backend | funciona |
 
 ---
 
@@ -327,14 +327,14 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 ### TUR-20 · Decidir altas, bajas y sustituciones de referentes <a id="tur-20"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** revisa los diez lugares variables los días 1–5; los cinco main permanecen protegidos y ve qué se aplicará al cierre si no responde.
 - **Responsable:** `investigador_lider` presenta; Gustavo aprueba/rechaza/edita; backend aplica el vencimiento autorizado OBS-02. El líder/Jev no suplanta la decisión humana ni puede tocar main.
 - **Cadencia:** lote del día 1, recordatorios días 1 y 4 y cierre al terminar el día 5 en America/Bogota, con una tarjeta por decisión/versionado y eventos deduplicados. Gestión de protegidos solo bajo acción explícita de Gustavo, sin plazo automático.
 - **Tu turno:** «Aprobar alta», «Aprobar baja», «Aprobar sustitución», «Rechazar», «Editar», «Guardar y aplicar cambios», «Pedir ajuste» y «Más tarde». La pareja muestra «sale X · entra Y». Se explica «Si no respondes, se aplicará al terminar el día 5»; responder para ajustar/posponer excluye esa tarjeta del automatismo.
 - **Gestión propia de Gustavo:** acceso «Gestionar protegidos» en Tu turno y en Personas › Referentes. Mover/reemplazar/proteger/desproteger es una acción iniciada y guardada por él, con efecto antes/después y auditoría OBS-02; ningún agente la propone ni el cierre mensual la ejecuta. La etiqueta main muestra protección vigente y el historial de quién la cambió.
-- **Datos necesarios y disponibilidad:** lista y métricas parciales existen; faltan main protegidos, lote/versiones, evidencia, estados de respuesta, avisos, plazo y control de concurrencia OBS-02.
-- **Código:** no existe la tarjeta. Referencias: `rediseno_views`, [COM-10](comentarios-y-lider.md#com-10), [OBS-01/02](observatorio-referentes.md#obs-01).
+- **Datos necesarios y disponibilidad:** Lote/versiones, pares y evidencia, protección main, plazo Bogotá, respuestas y conflictos transaccionales disponibles.
+- **Código:** `referentes_views.cards/ChangeDecision`, `ReferentDecision` en PWA/app, lógica compartida `logic/referentes.ts`.
 - **Criterios de aceptación:**
   1. **Dado** el lote mensual, **cuando** abre Tu turno, **entonces** distingue cinco main protegidos de diez plazas variables y ve identidad/enlace, acción, objetivos, evidencia, muestra/límites, motivo, ocupación antes/después y plazo local. La evidencia de Top Voice tiene fuente o dice «No verificado»; main nunca ofrece una propuesta de baja.
   2. **Dado** un swap, **cuando** lo presenta, **entonces** muestra una sola pareja «sale X · entra Y», con ambos perfiles y efecto conjunto; aprobarla o aplicarla al plazo ejecuta ambas partes atómicamente. Altas y bajas solas tienen tarjeta propia, sin sustitución implícita.
@@ -343,26 +343,26 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   5. **Dado** días 1 y 4 con pendientes, **cuando** recuerda, **entonces** avisa una vez por mes/día qué requiere revisión y qué significa no responder; la tarjeta muestra fecha/hora en America/Bogota. Recordatorio o push no sustituye el registro verificable de la propuesta.
   6. **Dado** decisión concurrente, tarjeta obsoleta, lote tardío, error de red o llamada sin autorización, **cuando** intenta aplicar, **entonces** cumple OBS-02: valida versión/estado/protección transaccionalmente, conserva pendientes o rechaza y no declara éxito sin guardado. Solo el job de cierre con las condiciones verificadas puede usar el mandato por plazo.
   7. **Dado** un main y Gustavo autenticado, **cuando** inicia desde Tu turno o Personas › Referentes un cambio explícito de posición, reemplazo o protección, **entonces** ve/guarda la decisión concreta con capacidad/versiones validadas y auditoría de actor, fecha, origen y valores anteriores/nuevos. La sustitución transfiere protección atómicamente y la desprotección respeta plazas OBS-02. La misma solicitud con identidad de agente/job falla; no existe propuesta del agente de desproteger ni aprobación por silencio.
-- **Brechas código/docs:** no existen estos estados/plazos ni el job de cierre. La autorización específica del quinto addendum permite silencio en diez plazas variables; no cambia el veto/autonomía genérica de LinkedIn ni la aprobación de TUR-21.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** implementación entregada en fase 5; ejecución de CI/QA delegada a Claude, sin pruebas locales. Conservar los límites observacionales de OBS-03.
+- **Cobertura QA:** casos sintéticos en `test_referentes_mensuales.py`, Jest/Vitest y `19-referentes-mensual.yaml`; pendientes de ejecución por Claude. [Entrega y verificaciones](../../agentes-linkedin/infra/docs/referentes-mensuales.md).
 
 ### TUR-21 · Decidir un experimento de participación <a id="tur-21"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** sabe qué va a probar el equipo, durante cuánto tiempo y qué resultado ayudaría a decidir sobre un referente.
 - **Responsable:** `analista_barrio_resultados` presenta; Gustavo decide; `relaciones_comunidad` ejecuta el foco aprobado con las guardas actuales.
 - **Cadencia:** al proponer/modificar un experimento OBS-04; seguimiento semanal informativo y resultado al cierre.
 - **Tu turno:** «Aprobar experimento», «Pedir ajuste», «Descartar», «Más tarde» y «Detener» mientras esté activo. Aprobar no acepta futuras altas/bajas ni cambia la orientación.
-- **Datos necesarios y disponibilidad:** referentes, ejecuciones y clasificación parcial existen; faltan plan, fechas, métricas predefinidas, línea base y versiones de OBS-04.
-- **Código:** no existe. Referencias: `rediseno_views`, `resumen_semanal`, `autopiloto`.
+- **Datos necesarios y disponibilidad:** Planes versionados, aprobación positiva, 14/28/7 días, dos comentarios por semana, umbrales congelados y resultados en Personas › Referentes.
+- **Código:** `experimentos`, `referentes_views.ExperimentDecision` y `ReferentDecision` en PWA/app.
 - **Criterios de aceptación:**
   1. **Dado** un experimento propuesto, **cuando** se muestra, **entonces** incluye hipótesis, referente activo, público, fechas de base/foco/seguimiento, participación máxima, comparación, métrica, umbral, muestra mínima, presupuesto dentro de topes y limitaciones de datos/atribución.
   2. **Dado** aprobación de la versión vigente, **cuando** empieza la fecha acordada, **entonces** activa solo ese plan; sin aprobación, con versión obsoleta o con otro foco activo, no inicia y explica el motivo. No se inicia retroactivamente una prueba cuyo periodo aprobado ya pasó.
   3. **Dado** «Detener» o una modificación de público/duración/criterio, **cuando** la registra, **entonces** detiene futuras acciones de foco o crea una revisión pendiente de aprobación, conserva lo ya ejecutado y marca su impacto en la comparación; no borra resultados anteriores.
   4. **Dado** un resultado al cierre, **cuando** recomienda una baja, alta u orientación, **entonces** abre la decisión correspondiente con enlace al experimento, sin aplicarla por la aprobación inicial. Un fallo al guardar la decisión deja el estado anterior y permite reintentar sin duplicar el plan.
-- **Brechas código/docs:** los comentarios ya tienen política autónoma; esta aprobación solo decide el cambio deliberado de foco, no cada comentario ni la composición de referentes.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** implementación entregada en fase 5; ejecución de CI/QA delegada a Claude, sin pruebas locales. Conservar los límites observacionales de OBS-03.
+- **Cobertura QA:** casos sintéticos en `test_referentes_mensuales.py`, Jest/Vitest y `19-referentes-mensual.yaml`; pendientes de ejecución por Claude. [Entrega y verificaciones](../../agentes-linkedin/infra/docs/referentes-mensuales.md).
 
 ## Retiradas
 
