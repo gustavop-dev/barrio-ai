@@ -1,6 +1,14 @@
 # Seed: seed_qa --referentes-mensual (selected by correr-maestro.sh for this flow).
 # Monthly dates stay canonical; on days 6+ the countdown reads «Plazo terminado».
 # Backend fake-clock tests cover day1/day4/day6, auto-apply and concurrent decisions.
+# The seed gives 1 urgente, 8 importantes and 4 cuando puedas. Within a priority, deadlines come first,
+# then newest creation: monthly changes (same deadline, ordinal swap/add/remove) and the experiment are
+# importantes; the independent profile is cuando puedas. Their positions relative to other cards vary by date.
+# Each monthly proposal is its own card: approving the swap removes only that card (13 → 12). Ivo and the
+# removal remain, possibly ABOVE the viewport after the collapse. Editing Ivo and approving the experiment
+# keep their cards/count; stopping the experiment removes it (12 → 11). Reset before each new search.
+# UUIDs below are seed_qa.uid('monthly-change:0'), uid('monthly-change:1') and uid('main:1'). The experiment
+# gets a random UUID, so scope its actions to the sole referent_experiment card created by this seed.
 appId: co.projectapp.office
 name: Referentes mensuales y experimento
 # cubre: OBS-01 OBS-02 OBS-04 TUR-20 TUR-21 COM-11
@@ -20,123 +28,348 @@ tags: [referentes, turno, experimentos]
     visible:
       id: turno-list
     timeout: 30000
+- assertVisible: '1 urgente · 8 importantes · 4 cuando puedas'
+
+# The countdown precedes the title; looking for it after centering the title can leave it off screen.
+- runFlow: comun/turno-arriba.yaml
+- scrollUntilVisible:
+    element:
+      text: '.*(Queda.*|Plazo terminado).*America/Bogota.*'
+      childOf:
+        id: 'turno-card-referent_change:9b9b9c51-0132-5566-927d-c5346beea860-contenido'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
 - scrollUntilVisible:
     element:
       text: "sale Carlos Andrés Mejía · entra Nora Investigación"
+      childOf:
+        id: 'turno-card-referent_change:9b9b9c51-0132-5566-927d-c5346beea860-contenido'
     direction: DOWN
-    timeout: 30000
-- assertVisible: ".*(Queda.*|Plazo terminado).*America/Bogota.*"
+    speed: 20
+    timeout: 60000
+    centerElement: true
 - scrollUntilVisible:
     element:
       text: "5 main protegidos.*"
+      childOf:
+        id: 'turno-card-referent_change:9b9b9c51-0132-5566-927d-c5346beea860-contenido'
     direction: DOWN
-    timeout: 20000
+    speed: 20
+    timeout: 60000
+    centerElement: true
 - takeScreenshot: 19-referentes-01-pareja
 - scrollUntilVisible:
     element:
       text: "Aprobar sustitución"
+      childOf:
+        id: 'turno-card-referent_change:9b9b9c51-0132-5566-927d-c5346beea860-contenido'
     direction: DOWN
-    timeout: 20000
-- tapOn: "Aprobar sustitución"
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- tapOn:
+    text: "Aprobar sustitución"
+    childOf:
+      id: 'turno-card-referent_change:9b9b9c51-0132-5566-927d-c5346beea860-contenido'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
-    notVisible: "sale Carlos Andrés Mejía · entra Nora Investigación"
+    notVisible:
+      id: 'turno-card-referent_change:9b9b9c51-0132-5566-927d-c5346beea860-contenido'
     timeout: 20000
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
       text: 'Tu turno, 12 pendientes, 1 urgente'
     timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+
+# The swap's collapse can pull Ivo above the viewport. Start at the header, as in 04-tu-turno.
+- runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
     element:
       text: "Alta: Ivo Producto"
+      childOf:
+        id: 'turno-card-referent_change:93b796f6-65d3-5604-b2fd-dbb10620fc6c-contenido'
     direction: DOWN
-    timeout: 20000
+    speed: 20
+    timeout: 60000
+    centerElement: true
 - takeScreenshot: 19-referentes-02-alta
+# Every proposal and the experiment have an «Editar»: use Ivo's existing testID.
 - scrollUntilVisible:
     element:
-      text: "Editar"
+      id: 'edit-referent_change:93b796f6-65d3-5604-b2fd-dbb10620fc6c'
     direction: DOWN
-    timeout: 20000
-- tapOn: "Editar"
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- tapOn:
+    id: 'edit-referent_change:93b796f6-65d3-5604-b2fd-dbb10620fc6c'
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     visible:
       id: referent-edit
-    timeout: 10000
-- tapOn:
-    id: referent-edit-reason
-- eraseText: 200
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: referent-edit-reason
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
+# As in 04-tu-turno-sabe, a tap can leave the cursor mid-text. Re-tap/erase the suffix; three passes also
+# clear this short seeded reason on a narrow screen. The exact field and persisted body are checked below.
+- repeat:
+    times: 3
+    commands:
+      - tapOn:
+          id: referent-edit-reason
+      - eraseText: 60
 - inputText: "Hipotesis ajustada por Gustavo en QA"
+- assertVisible:
+    id: referent-edit-reason
+    text: "Hipotesis ajustada por Gustavo en QA"
 - hideKeyboard
 - scrollUntilVisible:
     element:
-      text: "Guardar cambios"
+      id: referent-edit-name
     direction: DOWN
-- tapOn: "Guardar cambios"
+    speed: 20
+    timeout: 30000
+    centerElement: true
+- assertVisible:
+    id: referent-edit-name
+    text: "Ivo Producto"
+- scrollUntilVisible:
+    element:
+      text: "Guardar cambios"
+      childOf:
+        id: referent-edit
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- tapOn:
+    text: "Guardar cambios"
+    childOf:
+      id: referent-edit
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     notVisible:
       id: referent-edit
     timeout: 20000
+# Saving edits keeps the card and disables application by silence. Assert the persisted body, not just the closed sheet.
+- runFlow: comun/turno-arriba.yaml
+- scrollUntilVisible:
+    element:
+      text: 'Hipotesis ajustada por Gustavo en QA\s*Requiere decisión explícita; esta versión no se aplicará por silencio\.'
+      childOf:
+        id: 'turno-card-referent_change:93b796f6-65d3-5604-b2fd-dbb10620fc6c-contenido'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- assertVisible:
+    id: top-tu-turno
+    text: 'Tu turno, 12 pendientes, 1 urgente'
 - takeScreenshot: 19-referentes-03-edicion
+
+- runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
     element:
       text: "Experimento: Ana Lucía Torres"
+      childOf:
+        id: 'turno-card-referent_experiment:.*-contenido'
     direction: DOWN
-    timeout: 20000
+    speed: 20
+    timeout: 60000
+    centerElement: true
 - scrollUntilVisible:
     element:
       text: "Aprobar experimento"
+      childOf:
+        id: 'turno-card-referent_experiment:.*-contenido'
     direction: DOWN
-    timeout: 20000
-- tapOn: "Aprobar experimento"
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- tapOn:
+    text: "Aprobar experimento"
+    childOf:
+      id: 'turno-card-referent_experiment:.*-contenido'
+    waitToSettleTimeoutMs: 300
+# Approval keeps this card, replacing its actions with «Detener». Wait for the refresh before searching again.
 - extendedWaitUntil:
-    visible: "Detener"
+    notVisible:
+      text: "Aprobar experimento"
+      childOf:
+        id: 'turno-card-referent_experiment:.*-contenido'
     timeout: 20000
-- tapOn: "Detener"
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
+- runFlow: comun/turno-arriba.yaml
+- scrollUntilVisible:
+    element:
+      text: "Detener"
+      childOf:
+        id: 'turno-card-referent_experiment:.*-contenido'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- assertVisible:
+    id: top-tu-turno
+    text: 'Tu turno, 12 pendientes, 1 urgente'
+- tapOn:
+    text: "Detener"
+    childOf:
+      id: 'turno-card-referent_experiment:.*-contenido'
+    waitToSettleTimeoutMs: 300
+- extendedWaitUntil:
+    notVisible:
+      id: 'turno-card-referent_experiment:.*-contenido'
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 11 pendientes, 1 urgente'
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: toast
+    timeout: 15000
 - takeScreenshot: 19-referentes-04-experimento-detenido
 # The independent profile proposal survives referent decisions and opens its checklist.
+- runFlow: comun/turno-arriba.yaml
 - scrollUntilVisible:
     element:
       id: profile-open
     direction: DOWN
-    timeout: 30000
+    speed: 20
+    timeout: 60000
     centerElement: true
 - tapOn:
     id: profile-open
+# Profile details load only on opening; wait for their first controls before scrolling past them.
+- extendedWaitUntil:
+    visible: "Documento Markdown"
+    timeout: 20000
 - scrollUntilVisible:
     element:
       text: Checklist por sección
     direction: DOWN
-    timeout: 30000
+    speed: 20
+    timeout: 60000
+    centerElement: true
 - assertVisible: Checklist por sección
 - assertNotVisible: '^Comprobado$'
 - takeScreenshot: 19-referentes-06-perfil-conservado
+
+# Personas has its own list and tabs. Select the simulated account explicitly, as in 13-referentes.
 - tapOn:
     id: tab-personas
-- tapOn: "Referentes"
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: barrio-list
+    timeout: 30000
+- tapOn:
+    id: personas-referentes
+- extendedWaitUntil:
+    visible:
+      id: referentes-list
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: referent-add
+    timeout: 20000
+- runFlow:
+    when:
+      visible:
+        id: referent-account
+    commands:
+      - tapOn:
+          id: referent-account
+      - tapOn: "LinkedIn de Gustavo.*"
+# Referents are sorted by protection, position and name: Main QA 1 is the first card. Bring the whole card
+# into view before checking its badge/absent actions. These plain Views do not expose text children on Android
+# (see 13-referentes), so use the card ID for scrolling and the unique action labels for negative assertions.
 - scrollUntilVisible:
     element:
-      text: "Main QA 1"
+      id: referent-3fbd31c2-35a0-5c12-a23d-a9af8cb1fdf6
     direction: DOWN
-    timeout: 20000
-- scrollUntilVisible:
-    element:
-      text: "Main · Protegido"
-    direction: DOWN
-    timeout: 20000
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- assertVisible: "Main QA 1"
+- assertVisible: "Main · Protegido"
+- assertVisible: "Activo"
 - assertNotVisible: "Quitar a Main QA 1"
+- assertNotVisible: "Desactivar a Main QA 1"
 - scrollUntilVisible:
     element:
-      text: "Gestionar protección de Main QA 1"
+      id: protect-3fbd31c2-35a0-5c12-a23d-a9af8cb1fdf6
     direction: DOWN
-    timeout: 20000
-- tapOn: "Gestionar protección de Main QA 1"
+    speed: 20
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    id: protect-3fbd31c2-35a0-5c12-a23d-a9af8cb1fdf6
 - extendedWaitUntil:
     visible:
       id: referent-protection
-    timeout: 10000
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: 'Main protegido → Main protegido; activo; posición 1 → 1\.'
+      childOf:
+        id: referent-protection
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
 - takeScreenshot: 19-referentes-05-main
-- tapOn: "Guardar decisión"
+- scrollUntilVisible:
+    element:
+      text: "Guardar decisión"
+      childOf:
+        id: referent-protection
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    text: "Guardar decisión"
+    childOf:
+      id: referent-protection
+    waitToSettleTimeoutMs: 300
 - extendedWaitUntil:
     notVisible:
       id: referent-protection
     timeout: 20000
+# The unchanged decision must preserve Main QA 1's protection and activity after the refresh.
+- scrollUntilVisible:
+    element:
+      id: referent-add
+    direction: UP
+    speed: 20
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: referent-3fbd31c2-35a0-5c12-a23d-a9af8cb1fdf6
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
+- assertVisible: "Main QA 1"
+- assertVisible: "Main · Protegido"
+- assertVisible: "Activo"
+- assertNotVisible: "Quitar a Main QA 1"
+- assertNotVisible: "Desactivar a Main QA 1"
