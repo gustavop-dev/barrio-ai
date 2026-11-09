@@ -11,7 +11,12 @@ from . import capturas_views as cv
 from . import movil_views as mv
 from .grafo_views import EquipoGrafo
 from .orquestacion_views import CycleDecision
+from . import referentes_views as refs
 urlpatterns=[
+ path('referentes/revisiones',refs.Reviews.as_view()),
+ path('referentes/main-inicial',refs.InitialMain.as_view()),
+ path('referentes/cambios/<uuid:cid>/decidir',refs.ChangeDecision.as_view()),
+ path('referentes/experimentos/<uuid:eid>/decidir',refs.ExperimentDecision.as_view()),
  path('equipo/grafo',EquipoGrafo.as_view()),
  path('equipo/ciclos/<uuid:cid>/decision',CycleDecision.as_view()),
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),

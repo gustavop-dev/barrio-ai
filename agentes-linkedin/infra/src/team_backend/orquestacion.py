@@ -148,6 +148,15 @@ def amount(rows):
                 if r.status in ('reserved', 'uncertain', 'complete') else Decimal(0) for r in rows), Decimal(0))
 
 
+def effective_budget_bucket(row):
+    # A monthly fan-out may straddle midnight on the last day. Charge each new
+    # reservation to its actual Bogotá calendar month; never move existing usage.
+    if row.limits.get('cost_period') == 'month':
+        local = timezone.now().astimezone(ZoneInfo('America/Bogota'))
+        return f'{row.cycle}:{local:%Y-%m}'
+    return row.budget_bucket
+
+
 def context_version(graph):
     # Pin resolved code/contracts and non-secret model/policy overrides. A deploy
     # cannot change a running plan's schemas, model or repair policy invisibly.
@@ -406,7 +415,7 @@ class Runtime:
             self.stop('cost_cap')
             raise CycleStopped('cost_cap')
         if self.limits.get('cost_period') == 'month':
-            spent = amount(UsageEntry.objects.filter(usage__budget_bucket=row.budget_bucket))
+            spent = amount(UsageEntry.objects.filter(usage__budget_bucket=effective_budget_bucket(row)))
             if spent >= Decimal(str(self.limits['cost_cap_usd'])):
                 self.stop('cost_cap')
                 raise CycleStopped('cost_cap')
@@ -483,6 +492,7 @@ def provider_metadata(provider, purpose, amount_usd, connection):
         runtime.stop('call_timeout', business=False)
         raise CycleStopped('call_timeout')
     row = CycleLedger.objects.get(pk=runtime.id)
+    budget_bucket = effective_budget_bucket(row)
     if row.state == 'stopped' or row.lease_token != runtime.token:
         raise CycleStopped('Trabajador obsoleto')
     used = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
@@ -495,7 +505,7 @@ def provider_metadata(provider, purpose, amount_usd, connection):
     if runtime.limits.get('cost_period') == 'month':
         spent = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
             WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent
-            FROM usage_ledger WHERE usage->>'budget_bucket'=%s""", (row.budget_bucket,)).fetchone()['spent']
+            FROM usage_ledger WHERE usage->>'budget_bucket'=%s""", (budget_bucket,)).fetchone()['spent']
     if spent + amount_usd > Decimal(str(runtime.limits['cost_cap_usd'])):
         runtime.stop('cost_cap')
         raise CycleStopped('cost_cap')
@@ -507,7 +517,7 @@ def provider_metadata(provider, purpose, amount_usd, connection):
         if daily_spent + amount_usd > Decimal(str(runtime.limits['daily_cost_cap_usd'])):
             runtime.stop('cost_cap')
             raise CycleStopped('cost_cap')
-    return {'cycle_id': str(runtime.id), 'cycle': runtime.cycle['id'], 'budget_bucket': row.budget_bucket,
+    return {'cycle_id': str(runtime.id), 'cycle': runtime.cycle['id'], 'budget_bucket': budget_bucket,
             'edge': call['edge'], 'call': call['key'], 'node': call['nodes'][0],
             'graph_hash': row.graph_hash, 'job_id': str(row.job_id or '')}
 

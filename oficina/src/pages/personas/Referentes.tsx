@@ -1,3 +1,5 @@
+import { ReferentHistory } from './ReferentHistory';
+import { ProtectedReferent } from './ProtectedReferent';
 import { useId, useState, type FormEvent } from 'react';
 import { useAccounts, useDeleteReferent, useReferents, useUpdateReferent } from '../../api/hooks';
 import type { Referent } from '../../api/types';
@@ -91,7 +93,7 @@ function AddReferentModal({ account, onClose }: { account: string; onClose: () =
   );
 }
 
-function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (referent: Referent) => void }) {
+function ReferentCard({ referent, candidates, onRemove }: { referent: Referent; candidates: Referent[]; onRemove: (referent: Referent) => void }) {
   const update = useUpdateReferent();
   const toast = useToast();
   const active = referent.active !== false;
@@ -102,11 +104,11 @@ function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (r
 
   const toggle = () => {
     update.mutate(
-      { referentId: referent.id, patch: { active: !active } },
+      { referentId: referent.id, patch: { active: !active, version: referent.revision } },
       {
-        onSuccess: () =>
+        onSuccess: (saved) =>
           toast.show(active ? 'Referente desactivado' : 'Referente reactivado', {
-            undo: () => update.mutate({ referentId: referent.id, patch: { active } }),
+            undo: () => update.mutate({ referentId: referent.id, patch: { active, version: saved.revision } }),
           }),
       },
     );
@@ -122,6 +124,7 @@ function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (r
         ) : (
           <span className="ref-name">{name}</span>
         )}
+        {referent.protected ? <Badge tone="info">Main · Protegido</Badge> : null}
         {active ? <Badge tone="ok">Activo</Badge> : <Badge tone="muted">Inactivo</Badge>}
       </div>
       {referent.reason ? <p className="ref-reason">{referent.reason}</p> : null}
@@ -130,14 +133,15 @@ function ReferentCard({ referent, onRemove }: { referent: Referent; onRemove: (r
         {people}
       </p>
       <ErrorRetry error={update.error} />
-      <div className="ref-actions">
+      <ProtectedReferent referent={referent} candidates={candidates} />
+      {!referent.protected ? <div className="ref-actions">
         <Button size="small" onClick={toggle} loading={update.isPending} loadingLabel="Guardando…">
           {active ? 'Desactivar' : 'Reactivar'} <span className="vh">a {name}</span>
         </Button>
         <Button size="small" variant="danger" onClick={() => onRemove(referent)}>
           Quitar <span className="vh">a {name}</span>
         </Button>
-      </div>
+      </div> : null}
     </li>
   );
 }
@@ -193,6 +197,7 @@ export function Referentes() {
           Observar ahora
         </Button>
       </div>
+      <ReferentHistory account={account} />
       <ErrorRetry error={observe.error} />
       {referents.isPending ? <Skeleton variant="card" count={2} label="Cargando referentes…" /> : null}
       <ErrorRetry error={referents.error} onRetry={() => void referents.refetch()} />
@@ -202,7 +207,7 @@ export function Referentes() {
       {list.length ? (
         <ul className="ref-list" aria-label="Referentes">
           {list.map((referent) => (
-            <ReferentCard key={referent.id} referent={referent} onRemove={setRemoving} />
+            <ReferentCard key={referent.id} referent={referent} candidates={list} onRemove={setRemoving} />
           ))}
         </ul>
       ) : null}

@@ -5,6 +5,8 @@ import { APPROVED_MESSAGE, vetoConsequence } from '@compartido/logic/events';
 import type { IconName } from '@/components/icons';
 
 export const TYPE_LABEL: Record<TurnoCardType, string> = {
+  referente: 'Referentes del mes',
+  experimento: 'Experimento',
   aviso: 'Aviso',
   pregunta: 'Pregunta',
   perfil: 'Perfil',
@@ -14,6 +16,8 @@ export const TYPE_LABEL: Record<TurnoCardType, string> = {
 };
 
 export const TYPE_ICON: Record<TurnoCardType, IconName> = {
+  referente: 'personas',
+  experimento: 'resultados',
   aviso: 'aviso',
   pregunta: 'pregunta',
   perfil: 'perfil',

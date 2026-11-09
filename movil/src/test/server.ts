@@ -141,7 +141,7 @@ class FakeXMLHttpRequest {
 }
 
 export function fakeServer(routes: Record<string, FakeHandler> = {}) {
-  const table = new Map(Object.entries(routes));
+  const table = new Map(Object.entries({ 'GET /api/v1/referentes/revisiones': { body: [] }, ...routes }));
   const requests: SentRequest[] = [];
   const fetchMock = jest.fn(async (input: string, init: FetchInit = {}) => {
     const url = String(input);

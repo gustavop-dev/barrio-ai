@@ -295,21 +295,40 @@ def set_paused(user,account,paused,reason=''):
 
 def add_referent(user,account,identifier,reason):
     require(user,'operate_linkedin')
+    from . import referentes
     if not reason.strip():raise ValueError('Explica por qué esta persona es pertinente')
     slug=public_identifier(identifier)
-    existing=Referent.objects.filter(account=account,public_identifier=slug).first()
-    if existing:
-        if existing.archived_at:
-            existing.archived_at=None;existing.active=True;existing.reason=reason.strip()
-            existing.save(update_fields=['archived_at','active','reason'])
-            _audit(user,'operator.referent_restored',existing.id)
-        return existing,False
+
+    def store(profile=None):
+        with transaction.atomic():
+            control=referentes.lock(account)
+            existing=Referent.objects.filter(account=account,public_identifier=slug).first()
+            if existing:
+                if existing.archived_at:
+                    if existing.protected:referentes.require_gustavo(user)
+                    before=referentes.snapshot(existing)
+                    existing.archived_at=None;existing.active=True;existing.reason=reason.strip()
+                    referentes.changed(control,user,existing,before,'personas','Restaurar referente')
+                    referentes.capacity(account)
+                    _audit(user,'operator.referent_restored',existing.id)
+                return existing,False
+            counts=referentes.capacity(account)
+            if counts['total']>=15 or counts['variables']>=10:
+                raise ValueError('No hay una plaza variable libre; usa una sustitución.')
+            if profile is None:return None
+            referent=Referent.objects.create(account=account,public_identifier=slug,provider_user_id=profile['id'],
+                display_name=profile['display_name'],profile_url=profile['profile_url'],reason=reason.strip(),created_by=user)
+            referentes.changed(control,user,referent,{},'personas','Añadir referente')
+            _audit(user,'operator.referent_added',referent.id,public_identifier=slug)
+            return referent,True
+
+    existing=store()
+    if existing:return existing
+    # Reserve the real read durably, outside the list transaction. A connector failure or
+    # concurrent capacity change must not roll back BAR-15's already-consumed read quota.
     reserve_profile_read(account,'referent')
     profile=get_connector(account).get_user(slug)
-    referent=Referent.objects.create(account=account,public_identifier=slug,provider_user_id=profile['id'],
-        display_name=profile['display_name'],profile_url=profile['profile_url'],reason=reason.strip(),created_by=user)
-    _audit(user,'operator.referent_added',referent.id,public_identifier=slug)
-    return referent,True
+    return store(profile)  # rechecks capacity and duplicates under the account lock
 
 def observe(user,account,referent_ids=None,limit=5):
     """DESC-04: read recent posts of active referents. Read-only; deduplicated by post id."""
@@ -530,6 +549,8 @@ def final_write_gate(execution,proposal,user):
     policy_lock()
     from .orquestacion import cycle_issues
     issues=cycle_issues(proposal)
+    from . import experimentos
+    issues.extend(experimentos.execution_issues(proposal))
     if globally_paused() or ConnectorAccount.objects.filter(paused=True).exists():issues.append('Cuenta o máquina en pausa')
     if not within_window():issues.append('Fuera de ventana')
     if capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
@@ -586,6 +607,9 @@ def execute(user,proposal_id):
         if existing:return existing
         from .orquestacion import cycle_issues
         if cycle_issues(proposal):raise OperatorBlocked('; '.join(cycle_issues(proposal)))
+        from . import experimentos
+        experiment_issues=experimentos.execution_issues(proposal)
+        if experiment_issues:raise OperatorBlocked('; '.join(experiment_issues))
         if proposal.state!=ActionProposal.State.APPROVED:raise Conflict('Solo se ejecutan propuestas aprobadas.')
         if not (proposal.approved_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('La versión aprobada no coincide con la propuesta; requiere nueva aprobación.')
@@ -819,6 +843,9 @@ def _within_budget():
 def propose_comment(user,post_id,origin_job=''):
     require(user,'operate_linkedin');require(user,'use_paid_providers')
     post=ObservedPost.objects.select_related('account').get(id=post_id)
+    from . import experimentos, orquestacion
+    if not post.text.strip():raise ValueError('Sin contenido base verificable; no redactar.')
+    if not experimentos.eligible(post):raise ValueError('Cupo del foco experimental agotado.')
     if ActionProposal.objects.filter(post=post,capability='INT-03',state__in=OPEN_ACTION_STATES+['confirmed']).exists():
         raise Conflict('Ya hay un comentario abierto o publicado en esta publicación; no se genera otro.')
     units,missing=course_context()
@@ -828,6 +855,10 @@ def propose_comment(user,post_id,origin_job=''):
     public_facts,private_guidance=memory.confirmed_blocks()
     inputs={'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':others,
              'public_facts':public_facts,'private_guidance':private_guidance,'orientation':orientacion.text()}
+    runtime=orquestacion.current()
+    inputs['referent_evidence']=(runtime.snapshot('referent_signals',lambda:experimentos.signals(post))
+                                if runtime else experimentos.signals(post))
+    inputs['comment_language']='English; useful contribution, never an empty compliment or pitch.'
     from . import oficina_eventos
     oficina_eventos.emit('consulta_biblioteca','relaciones_comunidad','biblioteca','Fundamentos del curso para un comentario')
     answer,data,citations,risks=_draft_comment(json.dumps(inputs,ensure_ascii=False,default=str),units)
@@ -847,8 +878,15 @@ def propose_comment(user,post_id,origin_job=''):
         return create_proposal(user,post,'INT-03',{'text':data.get('comment','')},rationale=data.get('rationale',''),
             citations=citations,risks=risks,source='agent',origin_job=origin_job,model=answer['model'],
             state=ActionProposal.State.DISCARDED)
-    return create_proposal(user,post,'INT-03',{'text':data['comment']},rationale=data.get('rationale',''),
+    proposal=create_proposal(user,post,'INT-03',{'text':data['comment']},rationale=data.get('rationale',''),
         citations=citations,risks=risks,source='agent',origin_job=origin_job,model=answer['model'])
+    focus=inputs['referent_evidence'].get('experiment')
+    if focus:
+        # Preserve the plan used to draft even if Gustavo stopped it during the model call.
+        proposal.referent_experiment_id=focus['id']
+        proposal.referent_experiment_version=focus['version']
+        proposal.save(update_fields=['referent_experiment','referent_experiment_version'])
+    return proposal
 
 # --------------------------------------------------------------------------- worker entry point
 
@@ -861,6 +899,11 @@ def run_job(job):
         facts={'trigger':job.kind},plan=[job.kind])
     try:
         with runtime.session():
+            if job.kind=='propose_comment':
+                from . import experimentos
+                post=ObservedPost.objects.select_related('referent','account').get(pk=job.params['post'])
+                signals=runtime.call('senales_referentes',{'post':str(post.pk)},lambda:experimentos.signals(post),key='signals')
+                runtime.snapshot('referent_signals',lambda:signals)
             if job.kind in NETWORK_JOBS:
                 from . import evidencia
                 def evidence_request():
@@ -889,6 +932,14 @@ def _run_job(job):
     from . import oficina_eventos
     params=job.params or {};user=job.owner
     try:
+        if job.kind=='review_referents':
+            from . import referentes_research
+            review=referentes_research.run(job)
+            return 'complete',review.state,''
+        if job.kind=='advance_experiments':
+            from . import experimentos
+            experimentos.tick()
+            return 'complete','experiments',''
         if job.kind=='observe':
             account=ConnectorAccount.objects.get(id=params['account'])
             summary=_network_tool(job,lambda:observe(user,account,params.get('referents'),int(params.get('limit',5))))

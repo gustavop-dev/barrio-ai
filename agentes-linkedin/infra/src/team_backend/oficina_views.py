@@ -136,13 +136,13 @@ ROLES=['posicionamiento','perfil','investigador_referentes','analista_barrio_res
        'copywriter_b','lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par',
        'editor_verificador','relaciones_comunidad','conversaciones_inbox','operador_cuenta']
 # Real work behind each implemented role. Roles without work here are contracts in design.
-JOB_ROLES={'observe':'investigador_referentes','propose_comment':'relaciones_comunidad',
+JOB_ROLES={'review_referents':'investigador_lider','advance_experiments':'investigador_lider','observe':'investigador_referentes','propose_comment':'relaciones_comunidad',
            'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta',
            'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
            'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad',
            'collect_metrics':'analista_barrio_resultados','process_capture':'operador_cuenta',
            'weekly_summary':'analista_barrio_resultados','read_inbox':'conversaciones_inbox'}
-DESCRIPTIONS={'observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
+DESCRIPTIONS={'review_referents':'Revisando referentes del mes','advance_experiments':'Midiendo el experimento de referentes','observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
               'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día',
               'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',

@@ -58,10 +58,11 @@ class Referents(ListAPIView):
     serializer_class=ReferentOutput
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
-        qs=Referent.objects.filter(archived_at__isnull=True)
+        qs=Referent.objects.filter(archived_at__isnull=True).order_by('-protected','position','display_name')
         account=self.request.query_params.get('account')
         return qs.filter(account_id=account) if account else qs
     def post(self,request):
+        human_session(request)
         data=valid(ReferentInput,request)
         try:
             referent,created=operador.add_referent(request.user,get_or_404(ConnectorAccount,id=data['account']),data['identifier'],data['reason'])
@@ -76,21 +77,23 @@ class ReferentDetail(APIView):
     def patch(self,request,rid):
         human_session(request);require(request.user,'operate_linkedin');data=valid(ReferentPatch,request)
         referent=get_or_404(Referent,id=rid,archived_at__isnull=True)
-        for field in ('active','reason'):
-            if field in data:setattr(referent,field,data[field])
-        referent.save()
-        from .jobs import audit
-        audit(request.user,'operator.referent_updated',referent.id,active=referent.active)
-        return Response(ReferentOutput(referent).data)
+        from . import referentes
+        if referent.protected and 'version' not in data:
+            return Response({'detail':'Recarga la ficha protegida antes de cambiarla.'},status=409)
+        try:
+            referent=referentes.manage(request.user,referent,version=data.pop('version',referent.revision),
+                source=data.pop('source'),replacement=data.pop('replacement',None),changes=data)
+        except ValueError as exc:return Response({'detail':str(exc)},status=400)
+        return Response(ReferentOutput(referent,context={'request':request}).data)
     def delete(self,request,rid):
         human_session(request);require(request.user,'approve_actions')
         referent=get_or_404(Referent,id=rid)
-        from .jobs import audit
-        # Evidence and historical posts retain their referent; discovery already filters active=True.
-        from django.utils import timezone
-        referent.active=False;referent.archived_at=timezone.now()
-        referent.save(update_fields=['active','archived_at'])
-        audit(request.user,'operator.referent_removed',str(rid),historical_evidence_preserved=True)
+        from . import referentes
+        if referent.protected and 'version' not in request.query_params:
+            return Response({'detail':'Recarga la ficha protegida antes de quitarla.'},status=409)
+        try:
+            referentes.manage(request.user,referent,version=int(request.query_params.get('version',referent.revision)),changes={'archive':True})
+        except ValueError as exc:return Response({'detail':str(exc)},status=400)
         return Response(status=204)
 
 class Observe(APIView):
