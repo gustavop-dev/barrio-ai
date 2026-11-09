@@ -10,7 +10,7 @@ FONT_FAMILY='Ubuntu';FONT_STYLES=('Regular','Bold');BANNER_FONT_STYLE='Regular'
 PHOTO_SIZE=(800,800);BANNER_SIZE=(1584,396)
 SAFE=(600,60,1260,336);COVER=(0,132,568,396);MOBILE=(317,0,1267,396)
 # The copy budget leaves a margin inside TEXT and never shrinks the font.
-TEXT=(600,60,1078,336);FIGURE=(1088,36,1260,372)
+TEXT=(600,60,1078,336);FIGURE=(1084,24,1267,396)  # bottom-anchored on the banner edge, widest column inside MOBILE right of TEXT
 MAX_LINE_WIDTH=470;FONT_PX=56;LABEL_PX=22;LABEL_TRACKING_EM=.08
 LABEL_Y=66;LINE_Y=126;LINE_HEIGHT=68
 
