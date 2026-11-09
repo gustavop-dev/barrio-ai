@@ -74,7 +74,7 @@ tags: [calendario, captura, imagenes]
       id: pieza
     timeout: 15000
 
-# Carousel: four ordered slides, swipe forward and accessible buttons back/forward.
+# Carousel: four ordered slides using the accessible buttons forward and back.
 - openLink: oficina0ff1ce://calendario/pieza/8c51152c-8ffd-53da-9b94-3664683287e1
 - extendedWaitUntil:
     visible:
@@ -87,55 +87,119 @@ tags: [calendario, captura, imagenes]
     direction: DOWN
     centerElement: true
     timeout: 20000
-- assertVisible: 1/4
+- assertVisible:
+    id: piece-image-count
+    text: '1/4'
+    childOf:
+      id: piece-images
+- assertVisible:
+    id: piece-image-prev
+    enabled: false
+    childOf:
+      id: piece-images
 - assertVisible:
     text: "Cover: Make the decision explicit. A small guide to comparing options."
     childOf:
       id: piece-image-1
-- assertVisible: 'Plantilla: Portada'
+- assertVisible:
+    text: 'Plantilla: Portada'
+    childOf:
+      id: piece-images
 - takeScreenshot: 16-imagenes-03-portada
-- swipe:
-    from:
-      id: piece-image-1
-    direction: LEFT
+# Centering the controls can leave the image clipped. The image swipe did not advance in QA;
+# use the visible next button and require both the new counter and the corresponding image.
+- tapOn:
+    id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
 - extendedWaitUntil:
-    visible: 2/4
+    visible:
+      id: piece-image-count
+      text: '2/4'
+      childOf:
+        id: piece-images
     timeout: 10000
 - assertVisible:
     text: "Three steps: name the decision, compare the options, and record the reason."
     childOf:
       id: piece-image-2
-- assertVisible: 'Plantilla: Pasos'
+- assertVisible:
+    text: 'Plantilla: Pasos'
+    childOf:
+      id: piece-images
 - takeScreenshot: 16-imagenes-04-pasos
 - tapOn:
     id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
 - extendedWaitUntil:
-    visible: 3/4
+    visible:
+      id: piece-image-count
+      text: '3/4'
+      childOf:
+        id: piece-images
     timeout: 10000
 - assertVisible:
     text: "Three steps in this guide. Keep a reason with each decision."
     childOf:
       id: piece-image-3
-- assertVisible: 'Plantilla: Número'
+- assertVisible:
+    text: 'Plantilla: Número'
+    childOf:
+      id: piece-images
 - tapOn:
     id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
 - extendedWaitUntil:
-    visible: 4/4
+    visible:
+      id: piece-image-count
+      text: '4/4'
+      childOf:
+        id: piece-images
     timeout: 10000
 - assertVisible:
     text: "Closing question: Which decision needs a reason? Start with one question."
     childOf:
       id: piece-image-4
-- assertVisible: 'Plantilla: Cierre'
+- assertVisible:
+    text: 'Plantilla: Cierre'
+    childOf:
+      id: piece-images
 - assertVisible:
     id: piece-image-next
     enabled: false
+    childOf:
+      id: piece-images
 - takeScreenshot: 16-imagenes-05-cierre
 - tapOn:
     id: piece-image-prev
+    enabled: true
+    childOf:
+      id: piece-images
 - extendedWaitUntil:
-    visible: 3/4
+    visible:
+      id: piece-image-count
+      text: '3/4'
+      childOf:
+        id: piece-images
     timeout: 10000
+- assertVisible:
+    text: "Three steps in this guide. Keep a reason with each decision."
+    childOf:
+      id: piece-image-3
+- assertVisible:
+    text: 'Plantilla: Número'
+    childOf:
+      id: piece-images
+- assertVisible:
+    id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
 - back
 - extendedWaitUntil:
     notVisible:
