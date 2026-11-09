@@ -331,7 +331,13 @@ tags: [ajustes]
       text: "General \\(comentarios\\)"
     direction: DOWN
     timeout: 30000
-- assertVisible: "Editorial"
+- scrollUntilVisible:
+    element:
+      text: "Editorial \\(incluye imágenes e investigación de piezas\\)"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Editorial \\(incluye imágenes e investigación de piezas\\)"
 # The list runs under the floating tab bar: the last row is centred so the ones above it are really on screen.
 - scrollUntilVisible:
     element:

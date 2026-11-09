@@ -2,6 +2,7 @@
 // of a conversation, the opportunity form and the referents.
 import { contactFixture, conversationFixture, opportunityFixture, redSummaryFixture, referentFixture } from '../fixtures/personas';
 import {
+  nextActionText,
   nextStepView,
   noResultsTitle,
   opportunityErrors,
@@ -32,6 +33,34 @@ const draft = (extra: Partial<OpportunityDraft> = {}): OpportunityDraft => ({
   nextAt: '',
   notes: '',
   ...extra,
+});
+
+describe('Opportunity dates in Bogotá', () => {
+  beforeEach(() => { jest.useFakeTimers(); });
+  afterEach(() => { jest.useRealTimers(); });
+
+  it.each([
+    ['2026-11-11T23:59:59Z', '2026-11-12T20:00:00Z', 'mañana'],
+    ['2026-11-12T00:00:00Z', '2026-11-12T20:00:00Z', 'mañana'],
+    ['2026-11-12T02:00:00Z', '2026-11-12T15:00:00-05:00', 'mañana'],
+    ['2026-11-12T03:00:00Z', '2026-11-12T20:00:00Z', 'mañana'],
+    ['2026-11-12T04:59:59Z', '2026-11-12T20:00:00Z', 'mañana'],
+    ['2026-11-12T05:00:00Z', '2026-11-12T20:00:00Z', 'hoy'],
+    ['2026-11-13T05:00:00Z', '2026-11-12T20:00:00Z', 'ayer'],
+    ['2026-11-11T15:00:00Z', '2026-11-12T02:00:00Z', 'hoy'],
+    ['2026-11-12T02:00:00Z', '2026-11-12', 'mañana'],
+    ['2026-11-12T02:00:00Z', '2026-12-01T02:00:00Z', '30 nov'],
+  ])('at %s, the action for %s says %s', (now, nextAt, label) => {
+    jest.setSystemTime(new Date(now));
+    expect(nextActionText({ next_action: 'Enviar la propuesta revisada', next_action_at: nextAt }))
+      .toBe(`Enviar la propuesta revisada · ${label}`);
+  });
+
+  it.each([null, '', 'not-a-date'])('omits an absent or invalid action date (%s)', (nextAt) => {
+    jest.setSystemTime(new Date('2026-11-12T02:00:00Z'));
+    expect(nextActionText({ next_action: 'Enviar la propuesta revisada', next_action_at: nextAt }))
+      .toBe('Enviar la propuesta revisada');
+  });
 });
 
 describe('Personas rules', () => {

@@ -1,6 +1,7 @@
 // Vocabularies of Personas (DISENO-VISTAS «Etapa de una persona», «Etapa de una oportunidad») and the
 // short dates the design screens use («12 nov», «21 de octubre», «hoy»).
 import type { ContactStage, ConversationMessage, DisplayStage, OpportunityAttribution, OpportunityChannel, OpportunityModality, OpportunityStage } from '../api/types';
+import { dayOf, daysBetween } from './dates';
 import { formatTime } from './format';
 import type { Tone } from './tone';
 
@@ -119,17 +120,17 @@ export function longDate(value: string | null | undefined): string {
   return p ? `${p.d} de ${MONTHS_LONG[p.m]}` : '';
 }
 
-/** «hoy», «mañana», «ayer» or «12 nov». */
+/** «hoy», «mañana», «ayer» or «12 nov», in the calendar's Bogotá time zone. */
 export function relativeDay(value: string | null | undefined, now: Date = new Date()): string {
-  const p = parts(value);
-  if (!p) return '';
-  const target = Date.UTC(p.y, p.m, p.d);
-  const today = Date.UTC(now.getFullYear(), now.getMonth(), now.getDate());
-  const diff = Math.round((target - today) / 86_400_000);
+  if (!value) return '';
+  const day = /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : dayOf(value);
+  const today = dayOf(now);
+  if (!day || !today) return '';
+  const diff = daysBetween(today, day);
   if (diff === 0) return 'hoy';
   if (diff === 1) return 'mañana';
   if (diff === -1) return 'ayer';
-  return shortDate(value);
+  return shortDate(day);
 }
 
 /** A local AAAA-MM-DD (for <input type="date">) from an ISO instant. */
