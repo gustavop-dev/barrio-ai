@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.2-fase8` · SHA-256 `656a787b31caeeeab84c65461a1861a78d9c591f4835aec6d2979eafd1a04946`.
+Versión `6.2-fase8` · SHA-256 `878304aaa2e762f31295ea70798e8495e4f159a4075a866345fed0558a2e6df5`.
 
 46 nodos (46 activos), 69 aristas y 13 ciclos.
 
@@ -122,7 +122,7 @@ flowchart TD
   perfil -->|"perfil_web · call · ≤1"| investigacion_web
   perfil -->|"perfil_editar_persona · call · ≤6"| editor_visual
   perfil -->|"perfil_render · call · ≤2"| editor_visual
-  perfil -->|"perfil_revision_visual · call · ≤4"| revision_visual
+  perfil -->|"perfil_revision_visual · call · ≤6"| revision_visual
   capturas -->|"captura_perfil · handoff · ≤1"| perfil
   perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
   relaciones_comunidad -->|"evidencia_red · call · ≤1"| evidencia_compartida
@@ -458,7 +458,7 @@ flowchart TD
   perfil -->|"perfil_web · call · ≤1"| investigacion_web
   perfil -->|"perfil_editar_persona · call · ≤6"| editor_visual
   perfil -->|"perfil_render · call · ≤2"| editor_visual
-  perfil -->|"perfil_revision_visual · call · ≤4"| revision_visual
+  perfil -->|"perfil_revision_visual · call · ≤6"| revision_visual
   perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
 ```
 

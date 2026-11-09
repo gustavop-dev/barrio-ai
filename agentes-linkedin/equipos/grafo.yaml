@@ -1914,7 +1914,7 @@
       "role": "gate",
       "status": "active",
       "binding": "team_backend.connectors_images.ImageConnector.check",
-      "description": "Gate IMG: revisa contenido visual y vincula el veredicto a los bytes finales. El workflow del director lo aplica al trabajo del Editor visual; sin cambios de criterio ni fallback. En Perfil, el adaptador perfil_visual.check exige ocho puntos, identidad 03, sonrisa 01 y gafas claras para A/B y banner; sin fallback de original.",
+      "description": "Gate IMG: revisa contenido visual y vincula el veredicto a los bytes finales. El workflow del director lo aplica al trabajo del Editor visual; sin cambios de criterio ni fallback. En Perfil, perfil_visual.check revisa A, B y banner por separado: puntos aplicables del tablero, identidad 03, sonrisa 01, gafas claras y camiseta autorizada; sin fallback de original.",
       "skills": [
         "Revisa contenido visual y vincula el veredicto a los bytes finales"
       ],
@@ -3616,7 +3616,7 @@
       "request_kind": "call",
       "request_schema": "profile_request",
       "response_schema": "profile_vision",
-      "max_calls_per_cycle": 4,
+      "max_calls_per_cycle": 6,
       "response_required": true,
       "status": "active",
       "call_timeout_s": 300,

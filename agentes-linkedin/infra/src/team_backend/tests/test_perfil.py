@@ -32,7 +32,7 @@ def synthetic(alpha=True):
 
 
 def library(mode='full'):
-    units=list(dict.fromkeys(content.POSITIONING_PROFILE_UNITS+content.PROFILE_COPY_UNITS+content.PROFILE_MONTHLY_UNITS+content.PROFILE_VISUAL_UNITS))
+    units=list(dict.fromkeys(content.POSITIONING_PROFILE_UNITS+content.PROFILE_COPY_UNITS+content.PROFILE_MONTHLY_UNITS+content.PROFILE_VISUAL_UNITS+['LI-02-V017-K03','LI-02-V023-K03','LI-02-V025-K02']))
     return {'units':[{'unit_id':uid,'original':{'title':'Synthetic: audience usefulness; never invent facts'},'sha256':'synthetic'} for uid in units],'missing':[]}
 
 
@@ -120,11 +120,82 @@ class ProfileContentTests(SimpleTestCase):
         ctx=context(['headline','experience']);data=draft(ctx)
         data['sections'][1].update(action='missing',copy='',missing=[{'key':'perfil.experience.start_date','question':'¿En qué fecha empezaste ese cargo?','purpose':'Fechar experiencia.'}])
         rows,_=content.validate(data,ctx,verdict(dict(ctx,draft=data)))
-        self.assertEqual(rows[0]['readiness'],'ready');self.assertEqual(rows[1]['readiness'],'blocked')
+        self.assertEqual(rows[0]['readiness'],'ready');self.assertEqual(rows[1]['readiness'],'needs_input')
         self.assertEqual(len(rows[1]['missing']),1)
         ctx['public_facts'].append({'key':'perfil.experience.start_date','fact':'2020','version':1})
         rows,_=content.validate(data,ctx,verdict(dict(ctx,draft=data)))
         self.assertEqual(rows[1]['missing'],[])
+
+    def test_legacy_evidence_resolves_actual_snapshot_facts_pieces_roles_and_consent(self):
+        ctx=context(['headline']);ctx['public_facts']=[{'key':'identidad.rol','fact':'Engineer','version':3}]
+        source='profile:synthetic:headline:2026-11-09T08:00:00Z'
+        ctx['snapshot']={'sections':{'headline':{'text':'Engineer','source':source,'at':'2026-11-09T08:00:00Z'}},'evidence':[]}
+        ctx['recent_pieces']=[{'id':'piece:12345678-abcd','text':'Synthetic','url':'https://example.com/post'}]
+        ctx['references']=[{'id':'synthetic-03','version':2,'role':'03','note':'Identity',
+            'consent':{'allowed':True,'scope':'perfil','version':gallery.CONSENT_VERSION}}]
+        values=['snapshot headline 2026-11-09','public_facts identidad.rol v3','recent_pieces piece:12345678',
+            'references rol 03 (identidad/transiciones), consentimiento '+gallery.CONSENT_VERSION,'truly unknown']
+        self.assertEqual(set(content.normalize_evidence(values,ctx)),{source,'identidad.rol','piece:12345678-abcd',
+            'gallery:synthetic-03:v2:role:03','consent:synthetic-03:'+gallery.CONSENT_VERSION})
+        self.assertEqual(content.normalize_evidence(['public_facts identidad.rol v2','snapshot headline 2020-01-01',
+            'gallery:invented:v2:role:03','piece:12345678-invented'],ctx),[])
+        ctx['references'][0]['consent']['allowed']=False
+        self.assertEqual(content.normalize_evidence(values[3:4],ctx),[])
+
+    def test_unknown_evidence_is_removed_without_erasing_supported_copy(self):
+        ctx=context(['headline']);data=draft(ctx);data['sections'][0]['evidence']+=['invented']
+        rows,_=content.validate(data,ctx,verdict(dict(ctx,draft=data)))
+        self.assertEqual(rows[0]['readiness'],'ready');self.assertTrue(rows[0]['copy'])
+        self.assertEqual(rows[0]['evidence'],['offer'])
+
+    def test_real_drafter_contract_normalizes_empty_banner_before_schema_validation(self):
+        ctx=context();data=draft(ctx);data['banner']={}
+        with patch.object(providers,'claude',return_value={'text':json.dumps(data)}) as model:
+            result=content.draft(ctx)
+        self.assertEqual(result['banner'],{'lines':[],'highlight':'','label':'','evidence':[]})
+        payload=json.loads(model.call_args.args[1])
+        self.assertEqual(payload['evidence_catalog'][0]['id'],'offer')
+
+    def test_rejected_copy_keeps_valid_fact_questions_for_repair(self):
+        ctx=context(['experience']);data=draft(ctx)
+        data['sections'][0]['missing']=[{'key':'perfil.experience.title','question':'¿Cuál fue el cargo exacto?','purpose':'No inventarlo.'}]
+        check=verdict(dict(ctx,draft=data));check['sections'][0].update(ok=False,reason='Invented title')
+        rows,_=content.validate(data,ctx,check)
+        self.assertEqual(rows[0]['copy'],'');self.assertEqual(len(rows[0]['missing']),1)
+
+    def test_unreadable_section_preserves_copy_placeholders_and_valid_questions(self):
+        ctx=context(['experience']);data=draft(ctx)
+        data['sections'][0].update(copy='[exact title] — [start date]\nBuilt useful software for product teams.',missing=[
+            {'key':'perfil.experience.title','question':'¿Cuál fue tu cargo exacto?','purpose':'Completar el cargo.'},
+            {'key':'perfil.experience.start_date','question':'¿Cuándo empezaste?','purpose':'Completar la fecha.'}])
+        rows,_=content.validate(data,ctx,verdict(dict(ctx,draft=data)))
+        self.assertEqual(rows[0]['readiness'],'needs_input');self.assertIsNone(rows[0]['current'])
+        self.assertIn('[exact title]',rows[0]['copy']);self.assertEqual(len(rows[0]['missing']),2)
+        self.assertEqual(perfil.proposal_state(rows,'full'),'ready')
+
+    def test_optional_omissions_and_automatic_activity_need_no_fake_foundation(self):
+        ctx=context(['activity','volunteering','recommendations']);data=draft(ctx)
+        data['sections'][0].update(copy='',citations=[{'unit_id':'LI-02-V017-K03','reason':'Recorrido del lector.'}])
+        data['sections'][1].update(action='not_applicable',copy='',citations=[],evidence=[])
+        data['sections'][2].update(action='missing',copy='',citations=[],evidence=[],reason='No hay recomendaciones verificadas.')
+        rows,_=content.validate(data,ctx,verdict(dict(ctx,draft=data)))
+        self.assertEqual([r['readiness'] for r in rows],['ready','ready','needs_input'])
+        self.assertEqual(rows[0]['action'],'keep');self.assertEqual(perfil.proposal_state(rows,'full'),'ready')
+
+    def test_visual_checks_only_require_the_asset_under_review_and_clothing_for_a(self):
+        result={'ok':True,'checks':[{'point':n,'ok':True,'reason':'Synthetic'} for n in (1,2,3,7,8)],
+            'identity_03':True,'smile_01':True,'clear_glasses':True,'pose_01':False,'body_02':False,'clothing':True,
+            'face_height':.57,'eyes_y':.3,'head_top':.08,'reasons':[]}
+        with patch.object(providers,'claude',return_value={'text':json.dumps(result)}):
+            self.assertTrue(visual.check({'A':synthetic()},{},{'option':'A'})['ok'])
+        with patch.object(providers,'claude',return_value={'text':json.dumps(dict(result,clothing=False))}):
+            self.assertFalse(visual.check({'A':synthetic()},{},{'option':'A'})['ok'])
+        result.update(checks=[{'point':n,'ok':True,'reason':'Synthetic'} for n in (4,5,6,7,8)],body_02=True,
+                      face_height=0,eyes_y=0,head_top=0)
+        with patch.object(providers,'claude',return_value={'text':json.dumps(result)}):
+            self.assertTrue(visual.check({'banner':synthetic()},{},{'option':'banner'})['ok'])
+        for kind in ('A','B','banner'):
+            self.assertIn('heavyweight cotton T-shirt',visual.prompt(kind,[]))
 
     def test_reviewer_rejection_hides_copy_and_technical_questions(self):
         ctx=context(['about']);data=draft(ctx);data['sections'][0]['missing']=[{'key':'perfil.library','question':'¿Cuál es el curso?','purpose':'Technical'}]
@@ -197,6 +268,121 @@ class ProfileCycleTests(MediaMixin,OperatorBase):
         self.assertFalse(any(c['edge'].startswith('ejecutar') for c in ledger.progress_ledger['calls'].values()))
         self.run_proposal(result,image_client=client)
         self.assertEqual(len(client.calls),3)
+
+    def test_production_shape_recovers_empty_banner_legacy_evidence_and_unreadable_sections(self):
+        """Sanitized reproduction: no production copy, private guidance or real photographs."""
+        self.references();proposal=self.proposal();client=FakeProfileImages();attempts=[]
+        at='2026-11-09T08:00:00Z';source='profile:synthetic:headline:'+at
+        snapshot={'sections':{'headline':{'text':'Product engineer: useful software for teams','source':source,'at':at}},
+                  'evidence':[source],'at':at,'limitations':['El conector no expone todas las secciones.']}
+        def production_facts(mode):
+            ctx=context();ctx['public_facts']=[{'key':'identidad.rol','fact':'Product engineer: useful software for teams','version':3}]
+            ctx['recent_pieces']=[{'id':'piece:12345678-abcd','text':'Synthetic product engineering piece',
+                'url':'https://example.com/published','published_at':at,'metrics':{}}]
+            return dict(ctx,mode=mode,brand_version=content.BRAND_VERSION)
+        def production_draft(ctx):
+            attempts.append(ctx);self.assertIn(source,{r['id'] for r in ctx['evidence_catalog']})
+            self.assertTrue(any(r['kind']=='consent' for r in ctx['evidence_catalog']))
+            data=draft(ctx)
+            for row in data['sections']:
+                row['evidence']=['public_facts identidad.rol v3','unknown evidence']
+                if row['id']=='headline':row['evidence']+=['snapshot headline 2026-11-09']
+                if row['id']=='photo':
+                    row['evidence']=['references rol 01 (sonrisa), consentimiento '+gallery.CONSENT_VERSION,
+                        'references rol 03 (identidad/transiciones), consentimiento '+gallery.CONSENT_VERSION]
+                    row['citations']=[{'unit_id':uid,'reason':'Foto accesible y natural.'} for uid in
+                        ('LI-02-V011-K02','LI-02-V015-K02','LI-02-V017-K03')]
+                if row['id']=='featured':row['evidence']=['recent_pieces piece:12345678 published 2026-11-09']
+                if row['id']=='experience':row.update(copy='[exact title] — [start date]\nBuilt useful software for teams.',missing=[
+                    {'key':'perfil.experience.title','question':'¿Cuál fue tu cargo exacto?','purpose':'Completar cargo sin inventar.'},
+                    {'key':'perfil.experience.start_date','question':'¿Cuándo empezaste?','purpose':'Completar fecha sin inventar.'}])
+                if row['id'] in ('education','certifications','languages','recommendations','articles'):
+                    row.update(action='missing',copy='',citations=[],evidence=[],reason='No hay hechos verificados para esta sección.')
+                if row['id']=='volunteering':row.update(action='not_applicable',copy='',citations=[],evidence=[],reason='Sin datos pertinentes; se omite.')
+                if row['id']=='activity':row['copy']=''
+            data['banner']=dict(data['banner'],evidence=['snapshot headline 2026-11-09','public_facts identidad.rol v3']) if ctx.get('previous_draft') else {}
+            return data
+        def inspect_review(ctx):
+            known={r['id'] for r in ctx['evidence_catalog']}
+            for row in ctx['draft']['sections']:self.assertTrue(set(row['evidence'])<=known)
+            self.assertEqual(next(r for r in ctx['draft']['sections'] if r['id']=='activity')['action'],'keep')
+            result=verdict(ctx);result['banner_ok']=bool(ctx['draft']['banner']['lines']);return result
+        with patch('team_backend.perfil.facts',side_effect=production_facts):
+            result=self.run_proposal(proposal,drafter=production_draft,reviewer=inspect_review,reader=lambda:snapshot,
+                positioning=lambda ctx:{'audience':'Product teams','benefit':'Build useful software','direction':'Useful software first',
+                    'citations':[{'unit_id':'LI-02-V003-K03','reason':'Resultado útil'}],'evidence':['identidad.rol']},
+                image_client=client,researcher=lambda req:ResearchResult(req.public_question,'unavailable',at,
+                    usage={'web_search_requests':2,'web_fetch_requests':2,'stop_reason':'end_turn'}))
+        self.assertEqual(len(attempts),2);self.assertEqual(result.state,'ready',result.sections)
+        self.assertEqual(set(result.assets.values_list('kind',flat=True)),perfil.ASSET_KINDS)
+        self.assertEqual(len(client.calls),3);self.assertTrue(result.context['banner']['lines'])
+        self.assertTrue(all(s['readiness'] in ('ready','needs_input') for s in result.sections))
+        sections={s['id']:s for s in result.sections}
+        self.assertEqual(sections['headline']['current'],snapshot['sections']['headline'])
+        self.assertIn(source,sections['headline']['evidence']);self.assertTrue(sections['about']['copy'])
+        self.assertEqual(sections['experience']['readiness'],'needs_input')
+        self.assertIn('[exact title]',sections['experience']['copy']);self.assertEqual(TeamQuestion.objects.count(),2)
+        response=self.human.get(f'/api/v1/perfil/{result.id}')
+        self.assertEqual(len(response.data['assets']),7)
+        self.assertIn(content.UNREADABLE,response.data['markdown']);self.assertIn('## Preguntas pendientes',response.data['markdown'])
+        self.assertEqual(CycleLedger.objects.get(pk=result.cycle_id).limits['cost_cap_usd'],10)
+
+    def test_banner_rejection_does_not_block_portraits_or_their_manual_selection(self):
+        self.references();client=FakeProfileImages()
+        def reject_banner(ctx):return dict(verdict(ctx),banner_ok=False,banner_reason='Unsupported banner claim')
+        result=self.run_proposal(self.proposal(),reviewer=reject_banner,image_client=client)
+        self.assertEqual(result.state,'partial');self.assertEqual(set(result.assets.values_list('kind',flat=True)),{'A','B'})
+        self.assertEqual(len(client.calls),2)
+        photo=next(s for s in result.sections if s['id']=='photo');self.assertEqual(photo['readiness'],'ready')
+        response=self.human.post(f'/api/v1/perfil/{result.id}/decision',
+            {'revision':result.revision,'section':'photo','action':'choose_B'},format='json')
+        self.assertEqual(response.status_code,200,response.data)
+
+    def test_photo_rejection_does_not_block_banner_or_its_manual_acceptance(self):
+        self.references();client=FakeProfileImages()
+        def reject_photo(ctx):
+            result=verdict(ctx)
+            for row in result['sections']:
+                if row['id']=='photo':row.update(ok=False,reason='Unsupported photo recommendation')
+            return result
+        result=self.run_proposal(self.proposal(),reviewer=reject_photo,image_client=client)
+        self.assertEqual(set(result.assets.values_list('kind',flat=True)),{'banner'});self.assertEqual(len(client.calls),1)
+        response=self.human.post(f'/api/v1/perfil/{result.id}/decision',
+            {'revision':result.revision,'section':'banner','action':'accept'},format='json')
+        self.assertEqual(response.status_code,200,response.data)
+
+    def test_failed_vision_of_one_portrait_keeps_other_assets_and_valid_previews(self):
+        self.references()
+        def checker(images,refs,ctx):return dict(vision(images,refs,ctx),ok=ctx['option']!='B')
+        result=self.run_proposal(self.proposal(),image_checker=checker)
+        self.assertEqual(result.state,'partial')
+        self.assertEqual(set(result.assets.values_list('kind',flat=True)),{'A','banner','mobile_A','desktop_A'})
+        self.assertEqual(next(s for s in result.sections if s['id']=='banner')['readiness'],'ready')
+
+    def test_missing_banner_reference_keeps_a_and_b_and_optional_web_failure_keeps_copy(self):
+        self.references();GalleryPhoto.objects.filter(profile_role='02').delete()
+        def unavailable(req):raise ValueError('Research unavailable')
+        result=self.run_proposal(self.proposal(),researcher=unavailable)
+        self.assertEqual(set(result.assets.values_list('kind',flat=True)),{'A','B'})
+        self.assertEqual(next(s for s in result.sections if s['id']=='headline')['readiness'],'ready')
+        self.assertEqual(result.context['web']['status'],'unavailable')
+
+    def test_bad_alpha_in_banner_does_not_discard_valid_portraits(self):
+        self.references()
+        class BadBanner(FakeProfileImages):
+            def edit_profile(self,refs,prompt,rid):return synthetic(alpha=not rid.endswith(':banner'))
+        result=self.run_proposal(self.proposal(),image_client=BadBanner())
+        self.assertEqual(set(result.assets.values_list('kind',flat=True)),{'A','B'})
+        self.assertEqual(next(s for s in result.sections if s['id']=='photo')['readiness'],'ready')
+
+    def test_interrupted_repair_keeps_previously_reviewed_copy(self):
+        self.references()
+        def interrupted(ctx):
+            if ctx.get('previous_draft'):raise orquestacion.CycleStopped('cost_cap')
+            data=draft(ctx);data['banner']={};return data
+        result=self.run_proposal(self.proposal(),drafter=interrupted)
+        self.assertEqual(result.state,'stopped')
+        self.assertTrue(next(s for s in result.sections if s['id']=='headline')['copy'])
 
     def test_monthly_never_edits_people_and_full_request_deduplicates(self):
         client=FakeProfileImages();proposal=self.proposal('monthly')

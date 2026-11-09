@@ -31,6 +31,7 @@ EXPLICIT=re.compile(
     rf'(?:{_SEPARATOR}+{_COURTESY})*{_SEPARATOR}*',re.I)
 READ_SCHEMA={'type':'object','required':['sections','evidence','at','limitations']}
 ASSET_KINDS={'A','B','banner','mobile_A','mobile_B','desktop_A','desktop_B'}
+SECTION_ASSETS={'photo':{'A','B'},'banner':{'banner'}}
 PUBLIC_QUESTION='LinkedIn Help personal profile headline About character limits custom profile URL requirements'
 
 
@@ -180,35 +181,67 @@ def save_asset(proposal,kind,raw,review,provenance):
     return row
 
 
-def assets(proposal,runtime,banner,client=None,checker=None):
+def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','banner')):
     client=client or imagenes.connector.ImageConnector();checker=checker or visual.check
-    gallery.roles(proposal.references)
-    refs=gallery.raw_references(proposal.references,proposal.owner)
-    edits={};provenance={'references':proposal.references,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
+    edits={};errors={};provenance={'references':proposal.references,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
         'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{}}
-    for kind in ('A','B','banner'):
+    for kind in kinds:
         scoped=[r for r in proposal.references if r['role'] in (('01','03') if kind!='banner' else ('01','02','03'))]
-        instruction=visual.prompt(kind,scoped,proposal.context.get('adjustment',''));provenance['effective_prompts'][kind]=instruction
-        request={'proposal':str(proposal.id),'kind':kind,'references':scoped,'instruction':instruction}
-        # Keys include input fingerprint: same edits are reused across copy revisions, never paid twice on retry.
-        edits[kind]=runtime.call('perfil_editar_persona',request,
-            lambda:client.edit_profile({r['role']:refs[r['role']] for r in scoped},instruction,f'{proposal.id}:{kind}'),
-            key='person:'+orquestacion.digest(request))
+        try:
+            gallery.roles(scoped,needed=('01','03') if kind!='banner' else ('01','02','03'))
+            refs=gallery.raw_references(scoped,proposal.owner)
+            instruction=visual.prompt(kind,scoped,proposal.context.get('adjustment',''));provenance['effective_prompts'][kind]=instruction
+            request={'proposal':str(proposal.id),'kind':kind,'references':scoped,'instruction':instruction}
+            # Same inputs reuse durable edits; failures and uncertain calls are never paid again.
+            edits[kind]=runtime.call('perfil_editar_persona',request,
+                lambda:client.edit_profile(refs,instruction,f'{proposal.id}:{kind}'),key='person:'+orquestacion.digest(request))
+        except (ValueError,OSError) as exc:errors[kind]=str(exc)
+    if not edits:return errors
     render_input={'sha256':{k:imagenes.sha(v) for k,v in edits.items()},'copy':banner,'brand':content.BRAND_VERSION}
     package=runtime.call('perfil_render',render_input,lambda:visual.render_tool(edits,banner),key='render:'+orquestacion.digest(render_input))
     files={kind:orquestacion.unpack(blob) for kind,blob in package['files'].items()};reviews={}
-    for option in ('A','B'):
-        selected={key:files[key] for key in (option,'banner',f'mobile_{option}',f'desktop_{option}')}
-        context={'option':option,'geometry':package['geometry'],'copy':banner,
-                 'library':[u for u in proposal.context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS]}
-        request={'hashes':{k:imagenes.sha(v) for k,v in selected.items()},'references':proposal.references,'context':context}
-        review=runtime.call('perfil_revision_visual',request,lambda:checker(selected,refs,context),key='vision:'+orquestacion.digest(request))
-        if not review.get('ok') or review.get('sha256')!=[imagenes.sha(v) for v in selected.values()]:
-            raise ValueError('Revisión visual bloqueada o incierta: '+option)
-        reviews[option]=review
-    if gallery.stale(proposal.references,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
+    errors.update(package['geometry'].get('errors',{}))
     provenance['geometry']=package['geometry']
-    for kind,raw in files.items():save_asset(proposal,kind,raw,{'ok':True,'options':reviews,'sha256':[imagenes.sha(raw)]},provenance)
+    for kind in ('A','B','banner'):
+        if kind not in files:continue
+        selected={kind:files[kind]}
+        if kind in ('A','B'):selected[f'circle_{kind}_32']=visual.tiny_portrait(files[kind])
+        if kind=='banner':
+            for option in reviews:
+                for viewport in ('mobile','desktop'):
+                    key=f'{viewport}_{option}'
+                    if key in files:selected[key]=files[key]
+        scoped=[r for r in proposal.references if r['role'] in (('01','03') if kind!='banner' else ('01','02','03'))]
+        context={'option':kind,'geometry':package['geometry'] if kind=='banner' else {},'copy':banner if kind=='banner' else {},
+                 'library':[u for u in proposal.context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS]}
+        request={'hashes':{k:imagenes.sha(v) for k,v in selected.items()},'references':scoped,'context':context}
+        try:
+            refs=gallery.raw_references(scoped,proposal.owner)
+            review=runtime.call('perfil_revision_visual',request,lambda:checker(selected,refs,context),key='vision:'+orquestacion.digest(request))
+            if not review.get('ok') or review.get('sha256')!=[imagenes.sha(v) for v in selected.values()]:
+                raise ValueError('Revisión visual bloqueada o incierta: '+kind)
+            if gallery.stale(scoped,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
+            reviews[kind]=review
+            for name,raw in selected.items():
+                if name in ASSET_KINDS:save_asset(proposal,name,raw,{'ok':True,'options':{kind:review},'sha256':[imagenes.sha(raw)]},provenance)
+        except (ValueError,OSError) as exc:errors[kind]=str(exc)
+    return errors
+
+
+def mark_missing_assets(proposal,sections,errors=None):
+    available=set(proposal.assets.filter(version=proposal.version,review__ok=True).values_list('kind',flat=True))
+    for row in sections:
+        missing=SECTION_ASSETS.get(row['id'],set())-available
+        if missing:
+            issues=[f'{kind}: '+(errors or {}).get(kind,'Asset pendiente de generación o revisión') for kind in sorted(missing)]
+            row.update(readiness='blocked',issues=list(dict.fromkeys(row.get('issues',[])+issues)))
+
+
+def proposal_state(sections,mode):
+    essential=set(content.MONTHLY) if mode=='monthly' else {'photo','banner','headline','about'}
+    incomplete=any(s['id'] in essential and (s['readiness']=='blocked' or
+        s['readiness']=='needs_input' and not s.get('copy')) for s in sections)
+    return 'partial' if incomplete else 'ready'
 
 
 def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=None,researcher=None,image_client=None,image_checker=None):
@@ -227,9 +260,14 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
             context['library']=runtime.call('perfil_biblioteca',{'mode':proposal.mode},lambda:(library or content.library)(proposal.mode),key=prefix+'library')
             context['snapshot']=runtime.call('perfil_lectura',{},reader or read_profile,key=prefix+'read')
             web_request=research.ResearchRequest(key=f'profile:{proposal.id}',public_question=PUBLIC_QUESTION,search=True)
-            web=runtime.call('perfil_web',web_request,lambda:(researcher or research.research)(web_request),key='web')
+            try:
+                web=runtime.call('perfil_web',web_request,lambda:(researcher or research.research)(web_request),key='web')
+            except (ValueError,OSError):
+                web=research.ResearchResult(PUBLIC_QUESTION,'unavailable',context['snapshot']['at'],
+                    limitations=('Investigación opcional no disponible; continuar sin límites web verificados.',))
             context['web']=web.to_dict()
             context['references']=proposal.references
+            context['evidence_catalog']=content.evidence_catalog(context)
             context['adjustment']=previous_context.get('adjustment','')
             _persist(proposal,context=context)
             if not context['library']['units']:
@@ -239,24 +277,30 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
                 context['positioning']=runtime.call('perfil_posicionamiento',context,
                     lambda:(positioning or content.positioning)(context),key=prefix+'positioning')
                 for attempt in range(2):
-                    data=runtime.call('perfil_copy',context,lambda:(drafter or content.draft)(context),key=prefix+f'copy:{attempt}')
+                    data=runtime.call('perfil_copy',context,
+                        lambda:content.prepare_draft((drafter or content.draft)(context),context),key=prefix+f'copy:{attempt}')
                     check_context=dict(context,draft=data)
                     verdict=runtime.call('perfil_revision_copy',check_context,lambda:(reviewer or content.review)(check_context),key=prefix+f'review:{attempt}')
                     sections,banner=content.validate(data,context,verdict)
                     if verdict['reference_conflicts']:
                         for row in sections:
                             if row['id'] in ('photo','banner'):row.update(readiness='blocked',issues=verdict['reference_conflicts'],copy='')
+                    findings=[row['id']+': '+'; '.join(row['issues']) for row in sections if row['readiness']=='blocked']
+                    findings += [row['id']+': entrega copy desde los hechos disponibles, con placeholders para los datos puntuales; '
+                        'no omitas la recomendación por no poder leer la versión actual.' for row in sections
+                        if row['id'] in ('headline','about') and row['readiness']=='needs_input' and not row['copy']]
                     try:
                         if proposal.mode=='full' and banner and any(s['id']=='banner' and s['readiness']=='ready' for s in sections):
                             visual.banner(None,banner)  # Check exact Ubuntu dimensions BEFORE any paid person edit.
-                        break
                     except (ValueError,OSError) as exc:
-                        if attempt or proposal.version>1:
-                            banner={}
-                            for row in sections:
-                                if row['id']=='banner':row.update(readiness='blocked',issues=[str(exc)],copy='')
-                            break
-                        context=dict(context,previous_draft=data,findings=[str(exc)+' Acorta frase/etiqueta manteniendo fuentes y tamaño.'])
+                        banner={}
+                        for row in sections:
+                            if row['id']=='banner':row.update(readiness='blocked',issues=[str(exc)],copy='')
+                        findings.append(str(exc)+' Acorta frase/etiqueta manteniendo fuentes y tamaño.')
+                    if not findings or attempt or proposal.version>1:break
+                    # A later budget/provider stop must still expose the copy already reviewed.
+                    _persist(proposal,sections=sections,context=dict(context,banner=banner))
+                    context=dict(context,previous_draft=data,findings=findings)
             if affected and not {'photo','banner'} & set(affected):banner=previous_context.get('banner',{})
             context['banner']=banner
             # Keep manual history for identical content. A changed section always requires a fresh decision.
@@ -282,21 +326,19 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
                         for asset in proposal.assets.filter(version=proposal.version-1):
                             save_asset(proposal,asset.kind,imagenes.read(asset.image),asset.review,asset.provenance)
                     elif not ASSET_KINDS <= set(proposal.assets.filter(version=proposal.version).values_list('kind',flat=True)):
-                        visual_rows=[r for r in sections if r['id'] in ('photo','banner')]
-                        if not banner or any(r['readiness']!='ready' for r in visual_rows):raise ValueError('Falta fundamento o copy del banner; assets pendientes.')
-                        assets(proposal,runtime,banner,image_client,image_checker)
+                        eligible={r['id'] for r in sections if r['readiness']=='ready'}
+                        kinds=tuple(k for k in ('A','B','banner') if ('photo' if k in ('A','B') else 'banner') in eligible and (k!='banner' or banner))
+                        errors=assets(proposal,runtime,banner,image_client,image_checker,kinds=kinds) if kinds else {}
+                        mark_missing_assets(proposal,sections,errors)
                 except (ValueError,OSError) as exc:
-                    for row in sections:
-                        if row['id'] in ('photo','banner'):row.update(readiness='blocked',issues=[str(exc)],copy='')
+                    mark_missing_assets(proposal,sections,{kind:str(exc) for kind in ('A','B','banner')})
             reconcile_previous(proposal,sections)
-            _persist(proposal,sections=sections,state='partial' if any(s['readiness']=='blocked' for s in sections) else 'ready')
+            _persist(proposal,sections=sections,state=proposal_state(sections,proposal.mode))
             runtime.finish({'proposal':str(proposal.id),'version':proposal.version,'state':proposal.state})
     except (orquestacion.CycleStopped,ValueError,OSError) as exc:
         proposal.refresh_from_db()
         if proposal.state!='cancelled':
-            if proposal.mode=='full' and not ASSET_KINDS <= set(proposal.assets.filter(version=proposal.version).values_list('kind',flat=True)):
-                for row in proposal.sections:
-                    if row['id'] in ('photo','banner'):row.update(readiness='blocked',copy='',issues=['Assets incompletos: '+str(exc)])
+            if proposal.mode=='full':mark_missing_assets(proposal,proposal.sections,{kind:str(exc) for kind in ('A','B','banner')})
             _persist(proposal,state='stopped',sections=proposal.sections,findings=[str(exc)])
     notify(proposal)
     return proposal
@@ -329,17 +371,20 @@ def markdown(proposal):
                 f'Decisión: {row.get("decision","pending")}. Aplicación: {row.get("application","pending")}.']
         if row.get('superseded_by'):lines.append('Sustituida por propuesta: '+row['superseded_by'])
         current=row.get('current')
-        lines+=['Actual: '+(f'{current["text"]} — {current["source"]} · {current["at"]}' if current else 'No pudimos leer tu perfil actual'),
+        lines+=['Actual: '+(f'{current["text"]} — {current["source"]} · {current["at"]}' if current else content.UNREADABLE),
                 'Audiencia: '+row.get('audience',''),'Utilidad: '+row.get('benefit',''),'Motivo: '+row.get('reason','')]
         for c in row.get('citations',[]):lines.append(f'- [{c["unit_id"]}] {c["reason"]}')
         lines+=['Evidencia: '+', '.join(row.get('evidence',[])),
             'Límite: '+(str(row['limit'])+' · '+row['limit_source'] if row.get('limit') else 'Pendiente de comprobar')]
-        if row.get('copy') and not row.get('superseded_by') and row['readiness']=='ready' and not (invalid and row['id'] in ('photo','banner')):
-            lines+=['\nCopy público (English):','```text',row['copy'],'```']
+        if row.get('copy') and not row.get('superseded_by') and row['readiness'] in ('ready','needs_input') and not (invalid and row['id'] in ('photo','banner')):
+            lines+=['\nCopy público (English)'+(' · completa los placeholders antes de pegar:' if row['readiness']=='needs_input' else ':'),'```text',row['copy'],'```']
         lines+=['- '+s for s in row.get('steps',[])]
         lines+=['Pendiente: '+s for s in row.get('issues',[])]
-        for missing in row.get('missing',[]):lines.append('Falta información: '+missing['question'])
         if row.get('applied_text'):lines+=['Texto aplicado por Gustavo:',row['applied_text']]
+    questions=[(row['title'],m) for row in proposal.sections for m in row.get('missing',[])]
+    if questions:
+        lines+=['','## Preguntas pendientes','']
+        lines += [f'- {title}: {m["question"]}' for title,m in questions]
     if invalid:lines+=['\nReferencias revocadas o cambiadas: revisa los assets antes de aplicarlos.']
     else:
         for asset in proposal.assets.filter(version=proposal.version):
@@ -374,8 +419,13 @@ def cards(user,card,postponed=False):
         if proposal.sections and all(s.get('superseded_by') or s.get('decision')=='declined' or s.get('application')=='checked' or
             s.get('application')=='applied' and s['id']!='headline' or
             s['action'] in ('keep','not_applicable') and s.get('decision')=='accepted' for s in proposal.sections):continue
+        ready=sum(s['readiness']=='ready' for s in proposal.sections)
+        downloadable=proposal.assets.filter(version=proposal.version,kind__in=['A','B','banner'],review__ok=True).count()
+        if downloadable and gallery.stale(proposal.references,proposal.owner):downloadable=0
+        questions=len({m['key'] for s in proposal.sections for m in s.get('missing',[])})
+        detail=f'Secciones listas: {ready} · Assets descargables: {downloadable} · Preguntas pendientes: {questions}. Aplicación manual.'
         result.append(card(f'perfil:{proposal.id}','perfil','Propuesta de perfil'+(' · mensual' if proposal.mode=='monthly' else ''),
-            'Cambios por sección. Tú decides y los aplicas en LinkedIn.',[],agent='perfil',priority='cuando_puedas',
+            detail,[],agent='perfil',priority='cuando_puedas',
             created_at=proposal.created_at,profile_id=str(proposal.id),
             **({'state_override':'pospuesta','postponed_until':proposal.postponed_until} if postponed else {})))
     return result

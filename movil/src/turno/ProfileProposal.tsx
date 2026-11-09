@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Linking, View } from 'react-native';
 import { profileDownload, useProfile, useProfileDecision } from '@compartido/api/perfil';
-import { applicationLabel, needsProfileNote, PROFILE_ACTION_LABELS, PROFILE_ASSET_LABELS, sectionActions } from '@compartido/logic/perfil';
+import { applicationLabel, needsProfileNote, PROFILE_ACTION_LABELS, PROFILE_ASSET_LABELS, PROFILE_UNREADABLE, profileAvailability, profileQuestions, sectionActions } from '@compartido/logic/perfil';
 import { sameOrigin } from '@compartido/api/capturas';
 import { ApiImage, Button, CopyButton, ErrorRetry, Field, T } from '@/components/ui';
 import { apiUrl } from '@/api/config';
@@ -33,6 +33,7 @@ export function ProfileProposal({ id }: { id: string }) {
       <ErrorRetry error={query.error} onRetry={() => void query.refetch()} />
       {proposal ? <>
         <T>Versión {proposal.version} · {proposal.state} · Aplicación manual</T>
+        <T>{profileAvailability(proposal)}</T>
         {proposal.findings.map((finding, index) => <T key={index}>{finding}</T>)}
         <Button onPress={() => void download()}>Descargar Markdown</Button>
         <Button onPress={() => setDocumentOpen(!documentOpen)}>Documento Markdown</Button>
@@ -43,8 +44,8 @@ export function ProfileProposal({ id }: { id: string }) {
           <T>{PROFILE_ASSET_LABELS[asset.kind] ?? asset.kind} · {asset.width}×{asset.height}</T>
           <ApiImage path={asset.url} style={{ width: '100%', aspectRatio: asset.width / asset.height }} recyclingKey={asset.id} />
           <Button onPress={() => void download(asset.id)}>Descargar {PROFILE_ASSET_LABELS[asset.kind] ?? asset.kind}</Button>
-          {(asset.kind === 'A' || asset.kind === 'B') ? Object.entries(asset.review.options ?? {}).filter(([option]) => option === asset.kind).map(([option, review]) => <View key={option}>
-            <T>Revisión de {option} · 8 puntos e identidad</T>
+          {['A', 'B', 'banner'].includes(asset.kind) ? Object.entries(asset.review.options ?? {}).filter(([option]) => option === asset.kind).map(([option, review]) => <View key={option}>
+            <T>Revisión de {option} · comprobaciones e identidad</T>
             {review.checks.map((check) => <T key={check.point}>{check.point}. {check.ok ? 'Pasa' : 'Pendiente'} · {check.reason}</T>)}
             <T>Identidad 03: {review.identity_03 ? 'Pasa' : 'Pendiente'} · Sonrisa 01: {review.smile_01 ? 'Pasa' : 'Pendiente'} · Gafas claras: {review.clear_glasses ? 'Pasa' : 'Pendiente'}</T>
           </View>) : null}
@@ -55,20 +56,20 @@ export function ProfileProposal({ id }: { id: string }) {
           <T>{ref.role} · v{ref.version} · {ref.note}</T>
         </View>) : null}
         <T accessibilityRole="header">Checklist por sección</T>
-        {proposal.sections.map((row) => <View key={row.id} style={{ gap: space[2] }}>
+        {[...proposal.sections].sort((a, b) => Number(b.readiness === 'ready') - Number(a.readiness === 'ready')).map((row) => <View key={row.id} style={{ gap: space[2] }}>
           <Button testID={`profile-section-${row.id}`} onPress={() => setExpanded(expanded === row.id ? null : row.id)}>{row.title}</Button>
           <T>{applicationLabel(row)}</T>
           {expanded === row.id ? <>
             <T>{row.action === 'keep' ? 'Conservar' : row.action === 'not_applicable' ? 'No aplica' : row.action === 'missing' ? 'Falta información' : 'Cambiar'}</T>
-            <T>{row.current ? `${row.current.text} · ${row.current.source} · ${row.current.at}` : 'No pudimos leer tu perfil actual'}</T>
+            <T>{row.current ? `${row.current.text} · ${row.current.source} · ${row.current.at}` : PROFILE_UNREADABLE}</T>
             <T>{row.audience} · {row.benefit}</T><T>{row.reason}</T>
             {row.citations.map((cite) => <T key={cite.unit_id}>[{cite.unit_id}] {cite.reason}</T>)}
             {row.evidence.length ? <T>Evidencia: {row.evidence.join(', ')}</T> : null}
+            {row.readiness === 'needs_input' && row.copy ? <T>Completa los placeholders con tus datos antes de pegar.</T> : null}
             {row.copy ? <><T selectable>{row.copy}</T><CopyButton text={row.copy} /></> : null}
             <T>{row.copy.length} caracteres · {row.limit ? `límite comprobado: ${row.limit}` : 'Límite pendiente de comprobar'}</T>
             {row.steps.map((step, index) => <T key={index}>{index + 1}. {step}</T>)}
             {row.issues?.map((issue, index) => <T key={index}>{issue}</T>)}
-            {row.missing.map((missing) => <T key={missing.key}>{missing.question}</T>)}
             {row.id === 'banner' ? <T>{proposal.microphone_note}</T> : null}
             {row.id === 'photo' ? <T>Opción elegida: {proposal.photo_choice || 'Ninguna'}</T> : null}
             {row.applied_at ? <T>{applicationLabel(row)} · {row.applied_at}</T> : null}
@@ -82,6 +83,9 @@ export function ProfileProposal({ id }: { id: string }) {
             </Button>)}
           </> : null}
         </View>)}
+        {profileQuestions(proposal).length ? <View><T accessibilityRole="header">Preguntas pendientes</T>
+          {profileQuestions(proposal).map((question) => <T key={`${question.section}:${question.key}`}>{question.title}: {question.question}</T>)}
+        </View> : null}
         <ErrorRetry error={decision.error} /><ErrorRetry error={error} />
         <Button disabled={decision.isPending} onPress={() => decision.mutate({ revision: proposal.revision, action: 'later' })}>Más tarde</Button>
       </> : null}

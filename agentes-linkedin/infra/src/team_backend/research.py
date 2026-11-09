@@ -92,6 +92,8 @@ INTENT_GUIDE='''
 '''
 SYSTEM='''Eres investigador_referentes como herramienta de lectura pública del equipo.
 Responde en español con hallazgos breves y citas NATIVAS en cada afirmación factual. No inventes URLs ni citas.
+La salida es texto con bloques de citas nativas, NO JSON, Markdown con enlaces como sustituto de citas, ni un resumen
+sin citas. Después de buscar/leer devuelve hallazgos citados; si una lectura falla usa las fuentes verificadas restantes.
 Lee los enlaces indicados; para una pregunta de actualidad busca fuentes primarias y contrasta las fechas.
 Si una página no se puede leer, dilo; no deduzcas contenido a partir del nombre o el título de un repositorio.
 La pregunta contiene solo un tema público. Las búsquedas deben limitarse a ese tema.
@@ -139,7 +141,7 @@ def _source(url,title,quote,at,kind='web',truncated=False):
 
 
 def native_findings(answer,at):
-    """Only provider citation blocks tied to real server results become evidence. Prose URLs are ignored."""
+    """Keep native citations and literal fetched documents; never infer evidence from prose URLs."""
     blocks=answer.get('content') or [];search_urls={};documents=[];limitations=[]
     for block in blocks:
         if not isinstance(block,dict):continue
@@ -150,8 +152,11 @@ def native_findings(answer,at):
                     if isinstance(item,dict) and item.get('type')=='web_search_result':search_urls[item.get('url')]=item.get('title','')
             else:limitations.append('Una búsqueda no devolvió resultados utilizables')
         if block.get('type')=='web_fetch_tool_result':
-            if isinstance(content,dict) and content.get('type')=='web_fetch_result':documents.append(content)
-            else:limitations.append('No se pudo leer una de las páginas')
+            # SDK/server versions can wrap fetch results in an array, like search results.
+            fetched=content if isinstance(content,list) else [content]
+            for item in fetched:
+                if isinstance(item,dict) and item.get('type')=='web_fetch_result':documents.append(item)
+                else:limitations.append('No se pudo leer una de las páginas')
     sources={};findings=[]
     for block in blocks:
         if not isinstance(block,dict) or block.get('type')!='text' or not isinstance(block.get('text'),str):continue
@@ -173,6 +178,23 @@ def native_findings(answer,at):
             except ValueError:continue
             sources[source.id]=source;refs.append(source.id)
         if refs:findings.append(Finding(block['text'][:6000].replace('\x00',''),tuple(dict.fromkeys(refs))))
+    # A successful fetch is still evidence if the final prose forgot native citations.
+    # Retain only literal server document text, never promote that uncited prose or encrypted search blobs.
+    cited_urls={s.url for s in sources.values()}
+    for doc in documents:
+        if doc.get('url') in cited_urls:continue
+        document=doc.get('content',{})
+        if not isinstance(document,dict):continue
+        source_data=document.get('source',{})
+        if not isinstance(source_data,dict):continue
+        quote=source_data.get('data') if source_data.get('type')=='text' else None
+        if source_data.get('type')=='content' and isinstance(source_data.get('content'),list):
+            quote='\n'.join(b['text'] for b in source_data['content'] if isinstance(b,dict) and b.get('type')=='text' and isinstance(b.get('text'),str))
+        try:source=_source(doc.get('url'),document.get('title'),quote,at)
+        except (ValueError,TypeError):continue
+        sources[source.id]=source
+        findings.append(Finding(source.quoted_text[:6000],(source.id,)))
+        limitations.append('Se conservó el extracto literal de una página leída; el resumen no aportó citas nativas para ella')
     return findings,list(sources.values()),limitations
 
 

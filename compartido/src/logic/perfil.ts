@@ -7,6 +7,11 @@ export const PROFILE_ASSET_LABELS: Record<string, string> = {
   A: 'Foto A · grises', B: 'Foto B · color', banner: 'Banner', mobile_A: 'Preview móvil · A', mobile_B: 'Preview móvil · B',
   desktop_A: 'Preview escritorio · A', desktop_B: 'Preview escritorio · B',
 };
+export const PROFILE_UNREADABLE = 'No pude leer tu versión actual; compárala tú con esta recomendación nueva.';
+export const profileQuestions = (proposal: ProfileProposal) => proposal.sections.flatMap((row) =>
+  row.missing.map((question) => ({ ...question, section: row.id, title: row.title })));
+export const profileAvailability = (proposal: ProfileProposal) =>
+  `Secciones listas: ${proposal.sections.filter((row) => row.readiness === 'ready').length} · Assets descargables: ${proposal.assets.filter((asset) => ['A', 'B', 'banner'].includes(asset.kind)).length}`;
 export function applicationLabel(section: ProfileSection): string {
   if (section.application === 'checked') return 'Comprobado';
   if (section.application === 'applied') return section.id === 'headline'
@@ -14,6 +19,7 @@ export function applicationLabel(section: ProfileSection): string {
     : 'Aplicado por Gustavo; comprobación automática no disponible';
   if (section.decision === 'declined') return 'No lo haré';
   if (section.readiness === 'blocked') return 'Pendiente de información o fundamento';
+  if (section.readiness === 'needs_input') return section.copy ? 'Copy preparado; faltan tus datos' : 'Faltan tus datos';
   if (section.decision === 'accepted') return 'Aceptado; pendiente de aplicar';
   return 'Pendiente de revisar';
 }

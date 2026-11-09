@@ -1,5 +1,5 @@
 import { PROFILE_HEADLINE, PROFILE_PROPOSAL } from '../fixtures/perfil';
-import { applicationLabel, sectionActions } from './perfil';
+import { applicationLabel, profileAvailability, profileQuestions, sectionActions } from './perfil';
 import { profilePhotoPatch } from './galeria';
 import type { PhotoOutput } from '../api/capturas';
 
@@ -21,5 +21,17 @@ describe('Perfil manual and scoped gallery consent', () => {
     const photo = { category: 'posts', profile_edit: false, profile_role: '', ai_edit: 'no' } as PhotoOutput;
     expect(profilePhotoPatch(photo, 'perfil', true, '03')).toEqual({ category: 'perfil', profile_edit: true, profile_role: '03' });
     expect(profilePhotoPatch({ ...photo, category: 'perfil', profile_edit: true }, 'perfil', false, '')).toEqual({ profile_edit: false });
+  });
+  it('keeps ready copy available while facts pending are separate and cannot be applied', () => {
+    const pending = { ...PROFILE_HEADLINE, id: 'experience', title: 'Experiencia', readiness: 'needs_input' as const,
+      copy: '[exact title] — Built useful software.',
+      missing: [{ key: 'perfil.experience.title', question: '¿Cuál fue el cargo exacto?', purpose: 'Completar el cargo.' }] };
+    const proposal = { ...PROFILE_PROPOSAL, sections: [PROFILE_HEADLINE, pending] };
+    expect(profileAvailability(proposal)).toBe('Secciones listas: 1 · Assets descargables: 0');
+    expect(profileQuestions(proposal)[0]).toMatchObject({ section: 'experience', question: '¿Cuál fue el cargo exacto?' });
+    expect(applicationLabel(pending)).toBe('Copy preparado; faltan tus datos');
+    expect(sectionActions(pending, proposal)).not.toContain('accept');
+    expect(sectionActions(pending, proposal)).not.toContain('applied');
+    expect(sectionActions(PROFILE_HEADLINE, proposal)).toContain('accept');
   });
 });
