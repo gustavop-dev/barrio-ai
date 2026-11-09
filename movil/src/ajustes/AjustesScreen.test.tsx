@@ -245,7 +245,7 @@ describe('Ajustes · Orientación, autonomía y gasto', () => {
     expect(within(screen.getByLabelText('Topes de la semana')).getByText('4 de 12')).toBeOnTheScreen();
     const reads = within(screen.getByLabelText('Lecturas de la red'));
     expect(reads.getByText('4 de 60')).toBeOnTheScreen();
-    expect(reads.getByLabelText('Comprobaciones antes y después de escribir: 6 hoy · sin tope: ninguna escritura sale sin ellas')).toBeOnTheScreen();
+    expect(reads.getByLabelText('Comprobaciones antes y después de escribir: 6 hoy · cuentan en el tope compartido de perfiles')).toBeOnTheScreen();
   });
 
   it('shows a line per budget, the month against its limit, the total, the lead agent and transcription', async () => {

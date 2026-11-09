@@ -341,7 +341,7 @@ class PaidRunTests(EvalBase):
         c=self.contacts();calls=[]
         fits={str(c['accepted'].id):True,str(c['commenter'].id):True,str(c['risky'].id):True}  # one disagreement: the risky one
         answer=lambda purpose,data:{'contacts':[{'id':p['id'],'fit':fits.get(p['id'],False),'role':'par','modality':'comunidad_autoridad',
-                                                 'affinity':'desconocida','reason':'r','confidence':0.8} for p in data['people']]}
+                                                 'affinity':'desconocida','reason':'r','confidence':0.8,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''} for p in data['people']]}
         with patch('knowledge.providers.claude',side_effect=recorder(calls,answer)):
             report=self.evaluate(['clasificador'],execute=True,max_usd=Decimal('2'),models=['claude-haiku-5-5'])
         self.assertEqual(len(calls),1)
@@ -477,10 +477,10 @@ class MirrorClassifierTests(NetworkBase):
                                        source='search',evidence={'query':'founder pre-seed'},stage='candidate')
         calls=[]
         answer=lambda purpose,data:{'contacts':[{'id':p['id'],'fit':True,'role':'comprador','modality':'projectapp','affinity':'desconocida',
-                                                 'reason':'r','confidence':0.9} for p in data['people']]}
+                                                 'reason':'r','confidence':0.9,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''} for p in data['people']]}
         with patch('knowledge.providers.claude',side_effect=recorder(calls,answer)):self.job('classify_contacts')
         contact.refresh_from_db()
         request=evaluaciones.classify_request(evaluaciones.Run(None),[contact])
         production=calls[0]
         self.assertEqual(json.loads(request['message']),production['data'])
-        for key in ('system','max_tokens','output_schema','effort'):self.assertEqual(request[key],production[key],key)
+        for key in ('system','max_tokens','output_schema','effort','context'):self.assertEqual(request[key],production[key],key)

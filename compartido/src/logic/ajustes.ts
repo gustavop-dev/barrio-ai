@@ -128,12 +128,13 @@ export function spacingLabel(seconds: number): string {
 
 /** Usage of a capability: the overview accounts (INT-*, CONT-09) or the network summary (RED-*). */
 export function capacityOf(code: string, overview: Overview | undefined, red: RedSummary | undefined): CapacityInfo | null {
+  const network = red?.capacity?.[code as keyof RedSummary['capacity']];
+  if (network) return network;
   for (const account of overview?.accounts ?? []) {
     const capacity = account.capacity?.[code];
     if (capacity) return capacity;
   }
-  const network = red?.capacity?.[code as keyof RedSummary['capacity']];
-  return network ?? null;
+  return null;
 }
 
 /** A line of the caps or reads: a meter with its usage, or only the cap («sin dato de uso», never 0). */
@@ -152,21 +153,21 @@ export function capLines(ajustes: Ajustes | undefined, overview: Overview | unde
     if (capacity) {
       const max = period === 'daily' ? capacity.daily : capacity.weekly;
       const used = period === 'daily' ? capacity.daily_used : capacity.weekly_used;
-      if (typeof max === 'number' && max > 0 && typeof used === 'number') {
+      if (typeof max === 'number' && max >= 0 && typeof used === 'number') {
         lines.push({ key: code, label, used, max });
         continue;
       }
     }
     const limit = ajustes?.limits?.[code];
     const cap = limit ? (period === 'daily' ? limit.daily : limit.weekly) : null;
-    if (typeof cap === 'number' && cap > 0) lines.push({ key: code, label, text: `Tope ${cap} · sin dato de uso` });
+    if (typeof cap === 'number' && cap >= 0) lines.push({ key: code, label, text: `Tope ${cap} · sin dato de uso` });
   }
   return lines;
 }
 
 export const EXECUTION_CHECKS_LABEL = 'Comprobaciones antes y después de escribir';
 
-/** «Lecturas de la red»: each read against its cap, plus the checks around every write (no cap). */
+/** «Lecturas de la red»: each read against its cap; profile checks share the profile-read cap. */
 export function readLines(red: RedSummary): { lines: LimitLine[]; execution: string | null } {
   const lines: LimitLine[] = [];
   for (const { key, label } of READS) {
@@ -176,7 +177,7 @@ export function readLines(red: RedSummary): { lines: LimitLine[]; execution: str
     lines.push(typeof used === 'number' ? { key, label, used, max } : { key, label, text: `Tope ${max} · sin dato de uso` });
   }
   const execution = red.reads_today?.execution;
-  return { lines, execution: typeof execution === 'number' ? `${execution} hoy · sin tope: ninguna escritura sale sin ellas` : null };
+  return { lines, execution: typeof execution === 'number' ? `${execution} hoy · cuentan en el tope compartido de perfiles` : null };
 }
 
 // ---------------------------------------------------------------- Gasto de IA

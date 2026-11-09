@@ -203,8 +203,11 @@ def classify_request(run,contacts):
     people=[{'id':str(c.id),'name':c.display_name,'headline':c.headline[:300],'location':c.location,'network_distance':c.network_distance,
              'source':c.source,'evidence':{k:v for k,v in c.evidence.items() if k in ('referent','comment','query','invitation_message') and v}}
             for c in contacts]
-    message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people},ensure_ascii=False,default=str)
-    return {'system':red.CLASSIFY_SYSTEM,'message':message,'max_tokens':16000,'output_schema':red.CLASSIFY_SCHEMA,'effort':'medium'}
+    message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':red.note_policy()},ensure_ascii=False,default=str)
+    units,missing=run.context(red.NETWORK_UNITS,12000)
+    if missing:raise ValueError('Biblioteca no disponible para clasificar')
+    return {'system':red.CLASSIFY_SYSTEM,'message':message,'max_tokens':16000,'output_schema':red.CLASSIFY_SCHEMA,'effort':'medium',
+            'context':operador.course_block(units)}
 
 def lead_request(post,text,orientation):
     """The lead's questions on a comment draft (state, questions, checks), as lider.review asks them."""
@@ -646,7 +649,7 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
     run=Run(since,limit,execute,max_usd,lead,now)
     outputs,measured=typical_outputs()
     report={'modo':'ejecucion' if execute else 'ensayo','desde':run.since.date().isoformat(),'generado':run.now.isoformat(),
-            'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{}}
+            'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{},'curso':course_preview()}
     chosen={}
     for agent in agents:
         found=CASES[agent](run);cases=found[:limit];chosen[agent]=cases
@@ -679,6 +682,64 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
                 results[model]={'metricas':GRADERS[agent](rows),'casos':rows}
         report.update(gasto_usd=_money(run.spent),gasto_por_agente={k:_money(v) for k,v in run.spend.items()},detenida=run.stopped)
     return report
+
+# BIB-09: synthetic course regressions, included in the existing harness report. No business writes.
+# Each fixture states observable behaviour; citations alone cannot make a failing decision pass.
+COURSE_CASES={
+    'investigador':{'id':'BIB-09-investigador','units':operador.REFERENTS_UNITS,
+        'input':{'popular':{'audience':'unrelated','followers':90000},'niche':{'audience':'startup product','followers':90}},
+        'expected':{'selection_basis':'audience_and_evidence','popularity_implies_fit':False},
+        'required':['LI-03-V009-K04','LI-03-M005-K06']},
+    'analista':{'id':'BIB-09-analista','units':operador.ANALYSIS_UNITS,
+        'input':{'followers_delta':20,'dm_without_need':2},
+        'expected':{'sales_inferred':False,'identities_inferred':False,'divulgadores_have_value':True},
+        'required':['LI-06-V006-K04','LI-06-V007-K05']},
+    'clasificador':{'id':'BIB-09-clasificador','units':operador.NETWORK_UNITS,
+        'input':{'headline':'Product engineer discussing startup architecture','buys':False,'evidence':'Specific architecture tradeoff'},
+        'expected':{'fit':True,'role':'par'},'required':['LI-03-M005-K06','LI-03-V018-K03']},
+    'relaciones':{'id':'BIB-09-relaciones','units':operador.NETWORK_UNITS,
+        'input':{'tier':'free','weekday':5,'requested_daily':21,'requested_weekly':101},
+        'expected':{'invite':0,'default_note':False,'table':list(red.BARRIO_TABLE)},
+        'required':['LI-03-V021-K03','LI-03-M005-K05','LI-03-M006-K01']},
+    'inbox':{'id':'BIB-09-inbox','units':operador.INBOX_UNITS,
+        'input':{'greeting':'Thanks for connecting!','need':'We need help with our product architecture. Can Gustavo advise us?'},
+        'expected':{'greeting_opportunity':False,'need_opportunity':True,'messages_sent':0},
+        'required':['LI-03-V019-K04','LI-03-V020-K01']},
+    'lider':{'id':'BIB-09-lider','units':operador.LEAD_UNITS,
+        'input':{'good':'A smaller rollout makes it easier to isolate the failing assumption.',
+                 'bad':'Great post! Buy our service and DM me for a demo.'},
+        'expected':{'grounded_decision':'approve','pitch_decision':'discard'},
+        'required':['LI-03-V020-K02','LI-03-M006-K01']},
+    'semanal':{'id':'BIB-09-semanal','units':operador.ANALYSIS_UNITS,
+        'input':{'likes_days':7,'audience_days':90,'likes_delta':-3},
+        'expected':{'windows_comparable':False,'change_direction':False},
+        'required':['LI-06-V008-K01','LI-06-V008-K02']},
+}
+
+
+def course_case_context(role):
+    case=COURSE_CASES[role]
+    return operador.role_context(role,case['units'])
+
+
+def grade_course_case(role,result,grounding):
+    """Used with production outputs/adapters in fake CI. Wrong behaviour fails despite correct IDs."""
+    case=COURSE_CASES[role];errors=[]
+    if grounding.get('course_missing'):errors.append('Unidades ausentes')
+    citations=result.get('course_citations',[])
+    if not citations or set(citations)-set(grounding.get('course_citations',[])):errors.append('Citas no recuperadas')
+    if set(case['required'])-set(citations):errors.append('Falta fundamento del caso')
+    if any(uid.startswith('LI-07-') for uid in citations):errors.append('Clase 07 excluida')
+    for key,expected in case['expected'].items():
+        if result.get(key)!=expected:errors.append('Conducta incorrecta: '+key)
+    return {'case':case['id'],'passed':not errors,'errors':errors,'version':grounding.get('course_version')}
+
+
+def course_preview():
+    """No model call, no test execution and no assertion of success in a dry-run report."""
+    return {role:{'id':case['id'],'units':case['units'],'input':case['input'],'expected':case['expected'],
+                  'status':'pendiente de evaluación con fakes o ejecución autorizada'} for role,case in COURSE_CASES.items()}
+
 
 # --------------------------------------------------------------------------- text report
 
@@ -736,6 +797,7 @@ def render(report):
                 if key in metrics:out.append(f'    {key.replace("_"," ")}: {metrics[key]}')
             if 'veredicto' in metrics:out.append(f'    {metrics["veredicto"]}')
         out.append('')
+    out.append('Curso BIB-09: '+', '.join(report.get('curso',{}))+' (fixtures; resultados pendientes de CI).')
     out.append(f'Total estimado de una corrida (modelos de producción, casos usados): ${report["total_estimado_usd"]:.4f}')
     if report['modo']=='ejecucion':
         out.append(f'Gasto real de esta corrida: ${report["gasto_usd"]:.4f} ({_labels(report["gasto_por_agente"])})')

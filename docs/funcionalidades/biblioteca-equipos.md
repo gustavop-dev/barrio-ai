@@ -2,7 +2,9 @@
 
 La biblioteca es el curso de las clases 01–06: aporta criterios con sus excepciones y fuentes, no hechos sobre personas ni permisos para actuar. No se modifican las unidades originales ni se incorpora clase 07. La fase web prevista (`web_search`, `web_fetch`, enlaces en capturas) aporta fuentes externas separadas; este archivo no vuelve a definirla.
 
-## Punto de partida y reparto
+> Catálogo copiado del worktree de especificación. Estado `funciona` describe la integración implementada de fase 2; la validación de CI sigue pendiente. Los criterios que requieren ciclos futuros no afirman que esos ciclos existan.
+
+## Punto de partida histórico y reparto
 
 | Consumidor | Uso comprobado hoy | Uso propuesto |
 | --- | --- | --- |
@@ -41,25 +43,25 @@ El sexto addendum confirma **cuenta gratuita**: invitaciones sin nota por defect
 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
-| [BIB-01](#bib-01) | Consulta compartida con evidencia y versión | backend | no implementado |
-| [BIB-02](#bib-02) | Criterios del curso para Observatorio | backend | no implementado |
-| [BIB-03](#bib-03) | Criterios del curso para la red | backend | no implementado |
-| [BIB-04](#bib-04) | Guía de conversación para inbox de solo lectura | backend | no implementado |
-| [BIB-05](#bib-05) | Fundamentos para el juicio acotado del líder | backend | no implementado |
-| [BIB-07](#bib-07) | Aprendizaje semanal con curso y resultados separados | backend | no implementado |
-| [BIB-08](#bib-08) | Política de invitaciones: días, techo y diversidad | backend | no implementado |
-| [BIB-09](#bib-09) | Evaluar el uso efectivo del curso por cada rol | backend | no implementado |
+| [BIB-01](#bib-01) | Consulta compartida con evidencia y versión | backend | funciona |
+| [BIB-02](#bib-02) | Criterios del curso para Observatorio | backend | funciona |
+| [BIB-03](#bib-03) | Criterios del curso para la red | backend | funciona |
+| [BIB-04](#bib-04) | Guía de conversación para inbox de solo lectura | backend | funciona |
+| [BIB-05](#bib-05) | Fundamentos para el juicio acotado del líder | backend | funciona |
+| [BIB-07](#bib-07) | Aprendizaje semanal con curso y resultados separados | backend | funciona |
+| [BIB-08](#bib-08) | Política de invitaciones: días, techo y diversidad | backend | funciona |
+| [BIB-09](#bib-09) | Evaluar el uso efectivo del curso por cada rol | backend | funciona |
 
 ### BIB-01 · Consulta compartida con evidencia y versión <a id="bib-01"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** cada equipo puede explicar qué criterio del curso utilizó y cómo lo adaptó a su contexto, sin atribuir al curso reglas inventadas.
 - **Responsable:** cada rol consumidor responde de su consulta; `posicionamiento` mantiene la coherencia con la dirección aprobada de Gustavo.
 - **Cadencia:** por decisión o cambio de versión; paquetes comunes reutilizables por rol y versión de curso/criterios, no una búsqueda pagada en cada tick.
 - **Tu turno:** solo conflictos estratégicos o información imprescindible de Gustavo. La recuperación de conocimiento no requiere aprobación; no confirma memoria ni cambia orientación por sí misma.
-- **Datos necesarios y disponibilidad:** `retrieval.search/unit`, unidades con original, hash, fuentes y relaciones, y contexto de `knowledge/agents.py` existen; se han leído las unidades del JSONL local indicadas arriba, sin consultar la base de datos. Faltan integración con consumidores nuevos, artefactos y trazabilidad común; se validará que esos IDs estén disponibles en `retrieval.unit` al implementar.
-- **Código:** no existe la integración transversal. Referencias: `knowledge/retrieval.py`, `knowledge/agents.py: context`, `team_backend/operador.py: course_context`.
+- **Disponibilidad al redactar la especificación (histórico):** `retrieval.search/unit`, unidades con original, hash, fuentes y relaciones, y contexto de `knowledge/agents.py` existen; se han leído las unidades del JSONL local indicadas arriba, sin consultar la base de datos. Faltan integración con consumidores nuevos, artefactos y trazabilidad común; se validará que esos IDs estén disponibles en `retrieval.unit` al implementar.
+- **Código implementado en fase 2:** `operador.course_context/role_context`: originales completos, fuentes, hashes, versiones, omisiones, mapa de criterios y bloques estables. No se añade búsqueda por rol ni se modifica `retrieval.search`.
 - **Criterios de aceptación:**
   1. **Dado** un rol consumidor nuevo, **cuando** consulta, **entonces** dispone de una identidad y política de recuperación explícita sin hacerse pasar por `perfil`; registra tarea, consulta, modo real (léxico/híbrido), unidades utilizadas, hash, fuentes, omisiones y versiones del contexto.
   2. **Dado** una recomendación, **cuando** cita el curso, **entonces** solo cita unidades recuperadas completas con condiciones y excepciones, y distingue pauta del curso, dato confirmado de Gustavo, evidencia externa e hipótesis. Un id válido por sí solo no prueba que respalde la afirmación.
@@ -69,92 +71,92 @@ El sexto addendum confirma **cuenta gratuita**: invitaciones sin nota por defect
   6. **Dado** contenido de una unidad, captura o web que pida actuar, **cuando** lo interpreta, **entonces** lo trata como fuente y mantiene reglas de Gustavo, privacidad y reparto de acciones. La consulta no reescribe unidades, confirma hechos personales ni habilita clase 07.
   7. **Dado** un rol de la tabla curada, **cuando** prepara contexto, **entonces** carga su lista por ID en un bloque estable/cacheable y limita la búsqueda adicional al tema variable; registra por separado la lista base y las unidades adicionales. No resume una regla perdiendo sus excepciones.
   8. **Dado** cualquier salida del rol, incluida abstención, juicio tipado o plan determinista, **cuando** se persiste, **entonces** su envoltorio incluye `course_citations` (IDs efectivamente utilizados) y `criterion_sources` (criterio → IDs), versiones y evidencia del caso. Las citas son metadatos internos, no texto a publicar. Una salida técnica sin conocimiento disponible lleva lista vacía y motivo explícito; no puede pasar por decisión fundamentada. En Jev el backend adjunta el mapa de criterios cargado, sin pedir al modelo generar citas ni atribuirle lectura de unidades ausentes.
-- **Brechas código/docs:** existen dos mecanismos de lectura (búsqueda manual y unidades fijas), pero no un consumo trazable para todos estos roles; las fichas nuevas no reclasifican como ausente el uso editorial ya implementado.
-- **Cobertura QA:** pendiente
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.
 
 ### BIB-02 · Criterios del curso para Observatorio <a id="bib-02"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** la búsqueda de referentes y la lectura de su comunidad responden a sus objetivos y al concepto de barrio del curso, no solo al alcance.
 - **Responsable:** `investigador_referentes` para selección; `analista_barrio_resultados` para comunidad y experimentos.
 - **Cadencia:** revisión mensual, diseño de experimento y actualización del estudio comunitario; reutilizar criterios vigentes durante la observación diaria.
 - **Tu turno:** las propuestas OBS-01/02/04 y las decisiones de orientación; ninguna aprobación extra por consultar el curso.
-- **Datos necesarios y disponibilidad:** listas `REFERENTS_UNITS` y `ANALYSIS_UNITS` verificadas en el JSONL local, posicionamiento y observaciones parciales; falta su recuperación efectiva en el ciclo de Observatorio. El investigador líder recibe las fuentes del especialista y conserva la decisión de ciclo según ARQ-02.
-- **Código:** no existe este consumo. Referencias: `operador.observe`, `red.discover/classify`, contratos de Observatorio y `knowledge/retrieval.py`.
+- **Disponibilidad al redactar la especificación (histórico):** listas `REFERENTS_UNITS` y `ANALYSIS_UNITS` verificadas en el JSONL local, posicionamiento y observaciones parciales; falta su recuperación efectiva en el ciclo de Observatorio. El investigador líder recibe las fuentes del especialista y conserva la decisión de ciclo según ARQ-02.
+- **Código implementado en fase 2:** `operador.observe`, `red.discover` y `metricas.collect` adjuntan contexto y límites de interpretación al resultado/auditoría. No modifican referentes. El dossier mensual, main protegidos y swaps se implementan en fase 5; esta ficha marca como funciona el fundamento de las rutas existentes.
 - **Criterios de aceptación:**
   1. **Dado** una selección de referentes, **cuando** usa el curso, **entonces** traduce las unidades recuperadas a criterios sobre audiencia, problemas y aportación, y cada recomendación los relaciona con evidencia del candidato y objetivos vigentes, sin convertir insignias o popularidad en encaje.
   2. **Dado** un estudio o experimento, **cuando** define aprendizaje, **entonces** distingue compradores, pares, recomendadores, líderes y divulgadores, admite incertidumbre y conserva los límites de las unidades sobre inferencias y causalidad.
   3. **Dado** falta de unidad o evidencia, **cuando** prepara el dossier, **entonces** muestra la brecha y conserva los criterios previamente fundamentados si siguen vigentes; no presenta un criterio nuevo como instrucción de Daniela ni inventa resultados para rellenar la recomendación.
   4. **Dado** un dossier del investigador o informe del analista, **cuando** lo entrega al orquestador, **entonces** cada propuesta/hallazgo lleva citas de su lista y evidencia del caso, y supera su caso de evaluación BIB-09. No se cambia la lista de referentes desde un especialista.
-- **Brechas código/docs:** estos conocimientos figuran en contratos no ejecutables, no en `observe` ni en el análisis mensual que aún falta.
-- **Cobertura QA:** pendiente
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.
 
 ### BIB-03 · Criterios del curso para la red <a id="bib-03"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** el encaje de cada persona tiene fundamento y evidencia, y la red conserva la diferencia entre comunidad, posible comprador y oportunidad confirmada.
 - **Responsable:** `investigador_referentes` clasifica; `relaciones_comunidad` usa esa clasificación para su plan.
 - **Cadencia:** al preparar/actualizar el paquete de criterios y en cada lote de clasificación; `red.plan` reutiliza la decisión y mantiene su funcionamiento determinista.
 - **Tu turno:** solo propuestas de cambio de público/criterios estratégicos y las acciones que ya requieran aprobación por configuración. No se añade aprobación individual a toda clasificación.
-- **Datos necesarios y disponibilidad:** `Contact.classification`, evidencia y `posicionamiento.network_criteria` existen; `NETWORK_UNITS` se comprobó en el corpus local. Faltan recuperación, citas y versión del fundamento en clasificación/plan; las brechas de días, límites y reparto están en BIB-08.
-- **Código:** no existe la consulta. Referencias: `red.CLASSIFY_SYSTEM/classify/plan`, `posicionamiento.py`.
+- **Disponibilidad al redactar la especificación (histórico):** `Contact.classification`, evidencia y `posicionamiento.network_criteria` existen; `NETWORK_UNITS` se comprobó en el corpus local. Faltan recuperación, citas y versión del fundamento en clasificación/plan; las brechas de días, límites y reparto están en BIB-08.
+- **Código implementado en fase 2:** `red.classify` carga NETWORK_UNITS como contexto cacheable y valida citas; `red.plan` conserva el plan determinista y registra evidencia, tabla, adaptación y límites.
 - **Criterios de aceptación:**
   1. **Dado** un lote de contactos, **cuando** clasifica, **entonces** guarda criterio/versionado, unidades, motivo basado en perfil o interacción, confianza y datos faltantes; ser «comprador» sigue siendo hipótesis y una persona de la audiencia de un referente no hereda automáticamente su encaje.
   2. **Dado** una pauta general del curso sobre conexión, **cuando** el plan la consume, **entonces** aplica la política explícita BIB-08 y conserva pausas, cupos menores, esperas y veto; ninguna cifra de aula aumenta automáticamente límites ni habilita mensajes outbound.
   3. **Dado** biblioteca fallida, **cuando** hay criterios previamente válidos, **entonces** puede clasificar con ese paquete y registra la versión; sin criterios fundamentados deja el lote pendiente y explica la falta, sin descartar personas por el fallo de infraestructura.
   4. **Dado** un lote clasificado y un plan, **cuando** se entregan a Relaciones como orquestador, **entonces** incluyen `course_citations` y el mapa de criterios de BIB-01; se conservan los resultados de las evaluaciones de clasificador y plan de BIB-09.
-- **Brechas código/docs:** el prompt usa criterios escritos en código; el plan no necesita convertirse en otro agente de recuperación ni el líder repetir el juicio de encaje.
-- **Cobertura QA:** pendiente
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.
 
 ### BIB-04 · Guía de conversación para inbox de solo lectura <a id="bib-04"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** las conversaciones que le llegan a Tu turno se interpretan con criterios sobre escucha, necesidades expresadas y límites de una propuesta comercial.
 - **Responsable:** `conversaciones_inbox`.
 - **Cadencia:** preparar guía al activarse o cambiar sus fuentes; reutilizarla en cada evaluación horaria de mensajes nuevos.
 - **Tu turno:** las tarjetas de conversación actuales; responder, negociar y marcar oportunidades continúa en manos de Gustavo.
-- **Datos necesarios y disponibilidad:** hilo limitado, remitente/contacto y probabilidades de `conversaciones.assess` existen; `INBOX_UNITS` está verificada localmente. Falta incorporarla a las preguntas/estado de evaluación y a las citas de su salida.
-- **Código:** no existe este consumo. Referencias: `conversaciones.py: assess/_questions`, [INB-08](inbox.md#inb-08).
+- **Disponibilidad al redactar la especificación (histórico):** hilo limitado, remitente/contacto y probabilidades de `conversaciones.assess` existen; `INBOX_UNITS` está verificada localmente. Falta incorporarla a las preguntas/estado de evaluación y a las citas de su salida.
+- **Código implementado en fase 2:** `conversaciones._questions/assess` incorpora las unidades al estado Jev y el mapa de criterios al juicio persistido. Ante fallo conserva la evaluación anterior y deja pendiente la nueva. Sigue solo lectura.
 - **Criterios de aceptación:**
   1. **Dado** un mensaje nuevo, **cuando** lo evalúa con la guía, **entonces** distingue interés expresado, pregunta pendiente y venta entrante, sin interpretar cortesía o interacción como intención de compra; registra unidades/versionado sin copiar el mensaje privado a consultas web o a otros equipos.
   2. **Dado** una unidad que hable de conversar o proponer una reunión, **cuando** se usa, **entonces** solo orienta la lectura y la prioridad. No se envían respuestas, se marca leído, se crean oportunidades ni se comprometen condiciones por esa recomendación.
   3. **Dado** fallo de biblioteca, **cuando** llega un mensaje, **entonces** usa el último paquete vigente si existe y cita su versión; sin paquete válido conserva la lectura y deja la evaluación pendiente, sin inventar un juicio fundamentado ni borrar tarjetas ya justificadas. El fallo queda visible para reintentar dentro de los límites.
   4. **Dado** una evaluación con guía vigente, **cuando** se guarda, **entonces** el envoltorio lleva citas por criterio y la versión de `INBOX_UNITS`; la salida estrecha de TypeSafe no se convierte en una redacción libre ni una instrucción de envío. El caso de BIB-09 distingue agradecimiento de necesidad expresada.
-- **Brechas código/docs:** el contrato describe más conversación que el código; esta ficha preserva el inbox de solo lectura y no implementa envío ni borradores de respuesta.
-- **Cobertura QA:** pendiente
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.
 
 ### BIB-05 · Fundamentos para el juicio acotado del líder <a id="bib-05"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** el líder entiende las razones de las reglas de aporte y respeto y puede dejar una trazabilidad de sus juicios sin asumir nuevas decisiones.
 - **Responsable:** agente líder (`lider.py`); no se añade otro cargo ni se amplía su autoridad.
 - **Cadencia:** paquete de guía por versión; se usa al prefiltrar/revisar propuestas dentro de la cadencia actual.
 - **Tu turno:** ninguna aprobación nueva; los avisos actuales por inactividad permanecen y solo Gustavo cambia orientación o configuración.
-- **Datos necesarios y disponibilidad:** preguntas `noul`, `state`, criterios `true`/`false` y umbrales existen; `LEAD_UNITS` se comprobó en el JSONL. Falta recuperar el paquete y registrar qué unidades fundamentan cada pregunta.
-- **Código:** no existe esta consulta. Referencias: `lider.review/comment_worthy`, `autopiloto.policy_review`, [COM-05](comentarios-y-lider.md#com-05).
+- **Disponibilidad al redactar la especificación (histórico):** preguntas `noul`, `state`, criterios `true`/`false` y umbrales existen; `LEAD_UNITS` se comprobó en el JSONL. Falta recuperar el paquete y registrar qué unidades fundamentan cada pregunta.
+- **Código implementado en fase 2:** `lider._questions/review/comment_worthy` fundamenta las preguntas acotadas y adjunta las citas desde backend. No vuelve a decidir encaje. Inglés y revisión de notas conservan umbrales y abstención.
 - **Criterios de aceptación:**
   1. **Dado** una propuesta de comentario, **cuando** revisa con su guía, **entonces** las preguntas sobre aporte, pitch, invención y respeto usan criterios documentados y conservan respuestas tipadas, umbrales y fundamentos; no reescribe el comentario ni cambia sus comprobaciones deterministas.
   2. **Dado** una acción de red ya clasificada, **cuando** el líder la juzga, **entonces** solo evalúa el riesgo que le corresponde; no vuelve a clasificar `fit`, elige referentes ni aprueba cambios de perfil.
   3. **Dado** un fallo de biblioteca o una contradicción con la política vigente, **cuando** revisa, **entonces** usa la guía válida anterior si existe; sin paquete válido mantiene pendiente el juicio Jev. Las reglas deterministas siguen pudiendo bloquear, pero no se sustituye una revisión requerida por una aprobación sin fundamento; un fallo del modelo mantiene el reintento acotado.
   4. **Dado** una revisión Jev, **cuando** se construye la petición, **entonces** `state.course_criteria` o los criterios de cada pregunta contienen la pauta pertinente con sus límites, manteniendo preguntas `noul` separadas sobre aporte, pitch, evidencia, respeto, idioma, riesgo u orientación según la capacidad. El código aplica los umbrales; Jev no decide nuevas reglas ni genera un plan.
   5. **Dado** `review` o `comment_worthy`, **cuando** devuelven resultado, **entonces** el backend añade `course_citations` y `criterion_sources` de las preguntas realmente enviadas, respuestas, umbrales y versión; pasan el caso del líder en BIB-09. Sin paquete válido se registra modo degradado explícito, no «fundamentado en el curso».
-- **Brechas código/docs:** no existe recuperación en el líder; aprender del curso no lo convierte en director ni en autoridad estratégica.
-- **Cobertura QA:** pendiente
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.
 
 ### BIB-07 · Aprendizaje semanal con curso y resultados separados <a id="bib-07"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** el resumen conecta resultados con aprendizajes del curso y propone qué comprobar después, explicando los límites de lo observado.
 - **Responsable:** `analista_barrio_resultados`.
 - **Cadencia:** en cada resumen semanal del lunes, reutilizando el corte determinista y un paquete de unidades pertinente al resultado.
 - **Tu turno:** orientación propuesta por [SEM-06](resumen-semanal.md#sem-06); experimentos por TUR-21 y cambios de referentes por TUR-20, cada decisión separada. Las recomendaciones de aprendizaje son informativas.
-- **Datos necesarios y disponibilidad:** `resumen_semanal.stats/validate`, estadísticas, orientación y comentarios de Gustavo existen. Faltan consulta y relación con estudios/experimentos; se usará `WEEKLY_UNITS`, referencia de `ANALYSIS_UNITS`, comprobada en el corpus.
-- **Código:** no existe esta integración. Referencias: `resumen_semanal.SYSTEM/message/run/validate`, [SEM-02](resumen-semanal.md#sem-02).
+- **Disponibilidad al redactar la especificación (histórico):** `resumen_semanal.stats/validate`, estadísticas, orientación y comentarios de Gustavo existen. Faltan consulta y relación con estudios/experimentos; se usará `WEEKLY_UNITS`, referencia de `ANALYSIS_UNITS`, comprobada en el corpus.
+- **Código implementado en fase 2:** `resumen_semanal.WEEKLY_UNITS` referencia ANALYSIS_UNITS; cada hallazgo guarda citas separadas de cifras. Sin biblioteca guarda datos deterministas y aprendizaje pendiente, sin llamada al modelo ni cambio de orientación.
 - **Criterios de aceptación:**
   1. **Dado** el corte semanal y unidades pertinentes, **cuando** escribe, **entonces** cada aprendizaje separa cifra observada (clave, ventana y cobertura), criterio del curso (unidad) e interpretación/experimento propuesto; las fórmulas siguen calculadas por backend.
   2. **Dado** citas y ejemplos numéricos del curso, **cuando** valida, **entonces** no los admite como métricas de Gustavo ni confunde números de IDs con resultados. Conserva el validador de cifras y descarta afirmaciones numéricas sin respaldo en estadísticas.
@@ -162,19 +164,19 @@ El sexto addendum confirma **cuenta gratuita**: invitaciones sin nota por defect
   4. **Dado** poca evidencia o biblioteca fallida sin paquete vigente, **cuando** genera el resumen, **entonces** muestra los datos deterministas disponibles con sus advertencias y «Aprendizaje del curso pendiente»; no emite una interpretación nueva sin fundamento, inventa citas ni propone cambiar la dirección a partir de una semana insuficiente.
   5. **Dado** una orientación, alta/baja o prueba sugerida, **cuando** entrega el resumen, **entonces** mantiene su carácter de propuesta y el director solo recibe recomendaciones; no cambia memoria confirmada, referentes ni planes aprobados.
   6. **Dado** el resumen, **cuando** se guarda, **entonces** cada aprendizaje lleva los IDs usados y su evidencia estadística; el caso del analista/resumen de BIB-09 verifica que una caída de likes no se transforma por sí sola en un cambio de público.
-- **Brechas código/docs:** hoy el resumen ya propone orientación con aprobación humana, pero no consulta la biblioteca ni recibe experimentos o estudios comunitarios versionados.
-- **Cobertura QA:** pendiente
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.
 
 ### BIB-08 · Política de invitaciones: días, techo y diversidad <a id="bib-08"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** las invitaciones salen de lunes a viernes, nunca más de 20 por día, y se distribuyen entre papeles pertinentes del barrio.
 - **Responsable:** `relaciones_comunidad` decide el plan del ciclo; el planificador y `operador_cuenta` aplican los límites en código, no Jev ni un prompt.
 - **Cadencia:** plan de red dentro de su frecuencia actual; asignación por día local y control de cada envío. Registro semanal de distribución y huecos.
 - **Tu turno:** reparto del curso, días, techo y rampa ya decididos; no se pide otra aprobación de esa política ni de cada invitación en auto. Gustavo conserva veto y recibe avisos de salud/límite. Cambiar posteriormente el mandato requiere una decisión explícita.
-- **Datos necesarios y disponibilidad:** `Contact.classification.role/fit/confidence`, propuestas, ejecuciones y zona horaria existen. Faltan política de días, reparto persistido por papel, reservas de cupos por papel y procedencia del criterio; `NETWORK_UNITS` da el fundamento.
-- **Código:** no existe esta política completa. Hoy `operador.DEFAULT_LIMITS['RED-02']=(5,20)` y `deploy/.env.example` reflejan 5/día y 20/semana; `OPERATOR_DAILY_LIMITS`/`OPERATOR_WEEKLY_LIMITS` pueden sobrescribirlos sin techo fijo de 20. `within_window` comprueba hora pero no día laboral. `red.plan` ordena por `followed_at`, espera 48 h por defecto, descuenta propuestas abiertas y cupos, pero no reparte por papel. `execute` vuelve a comprobar límites; no se inspeccionó la configuración privada desplegada.
+- **Disponibilidad al redactar la especificación (histórico):** `Contact.classification.role/fit/confidence`, propuestas, ejecuciones y zona horaria existen. Faltan política de días, reparto persistido por papel, reservas de cupos por papel y procedencia del criterio; `NETWORK_UNITS` da el fundamento.
+- **Código implementado en fase 2:** `red.BARRIO_TABLE`, `diverse_candidates`, `plan`, y los gates de `operador.execute` aplican tabla, diversidad, días, rampa y reservas. No hay cuotas porcentuales de invitación ni invitaciones automáticas a líderes; aliados sin asignación y pares sin interacción previa no se convierten en envíos.
 - **Política vinculante:** `D = min(20, límite diario configurado, etapa de rampa)`; límite semanal mínimo entre **100**, configuración y etapa. Restar ejecuciones/reservas/posibles envíos por día local y semana ISO, en America/Bogota. La subida **5/20 → 10/50 → 20/100** está ahora autorizada bajo salud/plazos de [BAR-15](red.md#bar-15); no es un salto automático. Espaciado, enfriamiento, restricciones, autonomía/veto y caps menores efectivos prevalecen.
 - **Reparto del curso confirmado, sin una distribución inventada:** se aplica literalmente `LI-03-V021-K03`, fuente `03:c7f1f10c349724396998:p040`, con sus condiciones orales `03:qt00456–qt00459`, y `LI-03-M006-K04`. Sustituye la rotación uniforme propuesta antes. La tabla es de **perfiles semanales y acciones**, suma 90 perfiles de referencia; no define porcentajes de invitaciones ni obliga a invitar a 90/100 personas.
 
@@ -194,20 +196,20 @@ El sexto addendum confirma **cuenta gratuita**: invitaciones sin nota por defect
   4. **Dado** falta de actores o de encaje, **cuando** adapta, **entonces** justifica el hueco frente a la tabla y activa descubrimiento sin rellenarlo con compradores o invitaciones indebidas. Registra por separado planeado/ejecutado y no proclama diversidad con acciones fallidas; comentarios a líderes y relación con pares conservan su valor aunque no haya invitación.
   5. **Dado** invitación incierta, cancelada o definitivamente no enviada, **cuando** concilia/recalcula, **entonces** la incierta conserva su cupo hasta resolverla, y la no enviada libera solo su reserva una vez. La política se vuelve a validar inmediatamente antes de escribir, también en rutas manuales de la app.
   6. **Dado** una pauta del curso con metas de aula, **cuando** explica el plan, **entonces** cita unidades y registra reglas ejecutadas, papel, huecos y límites efectivos; no promete aceptación/ventas ni sustituye el techo de Gustavo por el 30 o el mínimo de 80 del ejemplo didáctico.
-- **Brechas código/docs:** hay topes y control antes de escribir; faltan calendario laboral, techo 20/100, rampa/salud y aplicación trazable de la tabla. Ya no queda pendiente decidir reparto: rige el curso con su flexibilidad, por instrucción del quinto addendum.
-- **Cobertura QA:** pendiente
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.
 
 ### BIB-09 · Evaluar el uso efectivo del curso por cada rol <a id="bib-09"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** permite comprobar que el curso cambia decisiones concretas y que las citas no son un adorno.
 - **Responsable:** cada rol responde de su caso; su orquestador conserva el resultado y la versión evaluada. El líder sigue siendo una compuerta del producto, no juez libre de estas pruebas.
 - **Cadencia:** al integrar un rol y al cambiar lista de unidades, contexto, criterios Jev, modelo, schemas o política; antes de activar el cambio.
 - **Tu turno:** ninguna aprobación de fixtures o pruebas simuladas; cambios de público, reparto o gasto se proponen por sus fichas. Las evaluaciones pagadas conservan opt-in y tope, no se ejecutan en esta tarea documental.
-- **Datos necesarios y disponibilidad:** `evaluaciones.py`, constructores que reflejan peticiones de producción, validadores y `tests/test_evaluaciones.py` existen. El harness hoy enumera verificador, comentarios, clasificador, lectores y director; faltan casos/entradas para investigador, analista, plan de red, inbox y líder por separado.
-- **Código:** no existe esta cobertura. Referencias: `team_backend/evaluaciones.py: AGENTS/Run/gate`, `tests/test_evaluaciones.py`; adaptar el harness existente, sin otro sistema paralelo.
-- **Casos mínimos de aceptación por rol:**
+- **Disponibilidad al redactar la especificación (histórico):** `evaluaciones.py`, constructores que reflejan peticiones de producción, validadores y `tests/test_evaluaciones.py` existen. El harness hoy enumera verificador, comentarios, clasificador, lectores y director; faltan casos/entradas para investigador, analista, plan de red, inbox y líder por separado.
+- **Código implementado en fase 2:** `evaluaciones.COURSE_CASES`, `course_case_context`, `grade_course_case` y el apartado curso del informe incorporan siete fixtures de esta fase. El informe de ensayo no declara aprobadas las pruebas. Perfil/posicionamiento/visual y la gestión mensual de referentes pertenecen a fases posteriores; no se declaran evaluados aquí.
+- **Casos mínimos de aceptación por rol (los siete primeros pertenecen a esta fase):**
 
   | Caso / rol | Unidad que debe influir | Entrada y resultado observable |
   | --- | --- | --- |
@@ -226,27 +228,5 @@ El sexto addendum confirma **cuenta gratuita**: invitaciones sin nota por defect
   1. **Dado** cada caso de la tabla, **cuando** se evalúa con fixtures locales, **entonces** se construye el mismo contexto/esquema que producción y se comprueban decisión, regla concreta, evidencia y citas conocidas; una salida con citas correctas y conducta contraria falla.
   2. **Dado** la migración del harness, **cuando** se ejecuta sin opt-in pagado, **entonces** produce previsualización/estimación o usa proveedores simulados; no publica, envía invitaciones ni crea tareas de negocio. Una evaluación real requiere `execute`, `max_usd` y `EVAL_LIMIT_USD`, y se contabiliza.
   3. **Dado** unidades ausentes, una cita inventada, lista de clase 07 o criterio Jev desconectado de su petición, **cuando** se valida, **entonces** el caso falla e identifica el rol/versión; no se activa como fundamentado hasta corregirlo.
-- **Brechas código/docs:** el harness existente comprueba cinco entradas y espejos de peticiones; los casos nuevos y sus umbrales de evaluación aún no están implementados. No se afirma haber ejecutado estas evaluaciones en esta tarea.
-- **Cobertura QA:** pendiente
-
-## Retiradas
-
-### BIB-06 · Enriquecer capturas cuando lo requiere su destino <a id="bib-06"></a>
-
-- **Dónde:** backend
-- **Estado:** no implementado
-- **Retirada:** 8 de noviembre de 2026, por el addendum explícito de Gustavo: procesar capturas no necesita biblioteca. ID reservado, no reutilizar. La ficha nunca se implementó.
-- **Alcance retirado:** añadir un enriquecimiento propio posterior a la captura. Editorial/Perfil pueden usar el curso al realizar su trabajo habitual sobre una idea recibida, sin otro agente, consulta o presupuesto específico de Capturas.
-- **Qué hace para Gustavo (diseño retirado):** una idea capturada llegaría al equipo acompañada de criterios útiles del curso, manteniendo intactas su nota y su intención.
-- **Responsable:** rol destinatario, `director_editorial` para ideas y `perfil`/`posicionamiento` para sus preguntas; el ruteador resolvía el envío.
-- **Cadencia:** se proponía una vez por versión tras guardar/enrutar; no se implementará esta cadencia adicional.
-- **Tu turno:** se contemplaban preguntas por información o destino ambiguo; el retiro no añade tareas ni cambia el flujo actual de Capturas.
-- **Datos necesarios y disponibilidad:** texto, transcripción, fotos, propósito y contexto existen; el enriquecimiento propio no se implementó. Enlaces siguen dependiendo de la fase web, independiente de esta retirada.
-- **Código:** no existe; referencias históricas `capturas.classify/process`, `ideas_for_director` y `knowledge/retrieval.py`.
-- **Criterios de aceptación históricos, retirados:**
-  1. **Dado** una nota «Idea para un post», **cuando** el director la preparase como insumo, **entonces** podría consultar unidades y adjuntar sugerencias con citas en un artefacto separado, conservando el original.
-  2. **Dado** subida de foto, transcripción o destino conocido, **cuando** se guardase/enrutase, **entonces** no necesitaría consultar el curso para completar esa operación.
-  3. **Dado** una captura con enlace, **cuando** necesitase su contenido, **entonces** usaría la salida trazable de la fase web, separada de las unidades del curso.
-  4. **Dado** biblioteca caída o sin resultados, **cuando** terminase el envío, **entonces** la captura seguiría guardada, con enriquecimiento pendiente/vacío y sin duplicar ideas al reintentar.
-- **Brechas código/docs:** estos criterios se conservan como historia de la ficha retirada, no como trabajo pendiente ni exigencia de QA. La conducta vigente es no añadir consumo propio de biblioteca a Capturas.
-- **Cobertura QA:** no aplica a una función retirada.
+- **Alcance:** integración de fase 2; las capacidades de fases posteriores conservan su estado independiente. CI pendiente.
+- **Cobertura QA:** fixtures y regresiones en `test_fase2_curso.py`; ejecución pendiente de CI, no ejecutada localmente.

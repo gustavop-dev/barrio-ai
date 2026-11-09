@@ -27,7 +27,10 @@ def analysis(**overrides):
     data={'titular':'Semana con 3 posts','lo_que_funciono':[{'texto':'El post de IA aplicada llegó a 1.200 impresiones.','cifra':'1200'}],
           'lo_que_no':[],'recomendaciones':[{'texto':'Repetir applied_ai: 3,5 % de interacción.','cifra':'3.5'}],
           'orientacion_propuesta':PROPOSAL,'advertencias':['Pocos datos: 2 posts.'],'validacion':{'ok':True,'descartado':[]}}
-    data.update(overrides);return data
+    data.update(overrides)
+    for field in ('lo_que_funciono','lo_que_no','recomendaciones'):
+        for item in data.get(field,[]):item.setdefault('course_citations',['LI-06-V008-K01','LI-06-V008-K02'])
+    return data
 
 
 def model_answer(**overrides):
@@ -39,7 +42,10 @@ def model_answer(**overrides):
           'recomendaciones':[{'texto':'Repetir el pilar applied_ai: su post tuvo 3,5 % de interacción.','cifra':'interaccion_pct: 3.5'},
                              {'texto':'Publicar con más constancia.','cifra':'ninguna'}],
           'orientacion_propuesta':PROPOSAL,'advertencias':['Pocos datos: 2 posts con corte de 72 h.']}
-    data.update(overrides);return data
+    data.update(overrides)
+    for field in ('lo_que_funciono','lo_que_no','recomendaciones'):
+        for item in data.get(field,[]):item.setdefault('course_citations',['LI-06-V008-K01','LI-06-V008-K02'])
+    return data
 
 
 class SummaryBase(MetricsBase):
@@ -239,9 +245,16 @@ class StatsTests(SummaryBase):
             'destino_de_los_borradores':{'descartado_por_el_lider':1,'descartado_por_la_politica':1,'publicado':1,
                                          'saltado_por_el_redactor':1,'vetado_por_gustavo':1},
             'lider':{'aprobados':1,'descartados':1},'posts_saltados_por_el_prefiltro':1})
+        health={'rate':None,'mature':0,'accepted':0,'unknown':None,'reason':'Sin corte de salud guardado para esta ventana'}
+        rhythm={'weekly_target':50,'confirmed_social':{'INT-03':1,'INT-02':0,'RED-01':0,'RED-02':0,'RED-04':0},
+            'own_pieces':3,'research_results':0,'unique_people':0,'useful_total':1,'deficit':49,
+            'limits':{'INT-03':(5,25),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)},
+            'reason':'Objetivo gradual, no cuota. Faltantes dependen de encaje, material, presupuesto, salud y ventana; no se rellena.',
+            'invitation_health':health,'source':'confirmed_executions_and_research_results'}
+        # Contact history still reports network moves; the rhythm counts confirmed executions only.
         self.assertEqual(week['red'],{'disponible':True,'descubiertos':1,'clasificados':10,'clasificados_que_encajan':4,'seguidos':1,
             'invitados':1,'conectados':1,'conectados_que_encajan':1,'invitaciones_recibidas':1,
-            'aceptacion':{'conectadas':1,'resueltas':2,'tasa_pct':50.0}})
+            'aceptacion':{'conectadas':1,'resueltas':2,'tasa_pct':50.0},'salud_cohortes':health,'ritmo':rhythm})
         self.assertEqual(week['oportunidades'],{'disponible':True,'creadas':1,'creadas_por_etapa':{'conversacion':1},'movidas':1,
             'movidas_a_etapa':{'reunion':1},'abiertas_al_cierre':1,'creadas_por_modalidad':{'projectapp':1}})
         self.assertEqual(week['conversaciones'],{'disponible':True,'lecturas':1,'mensajes_juzgados':3,'te_tocaron':2,

@@ -63,13 +63,20 @@ class NetworkClassifierCapTests(NetworkBase):
         ana=self.contact('founder-ana','Ana Founder',stage='candidate')
         Contact.objects.filter(pk=ana.pk).update(classification={})
         seen={}
-        def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None):
+        def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
             seen.update(max_tokens=max_tokens,effort=effort)
+            self.assertIn('LI-03-M005-K06',context)
             people=json.loads(message)['people']
             return {'text':json.dumps({'contacts':[{'id':p['id'],'fit':True,'role':'comprador','modality':'projectapp','affinity':'desconocida',
-                                                    'reason':'r','confidence':0.9} for p in people]}),'model':model}
-        with patch('knowledge.providers.claude',side_effect=fake):self.job('classify_contacts')
+                                                    'reason':'r','confidence':0.9,'course_citations':['LI-03-M005-K06'],
+                                                    'invitation_note':'','note_reason':''} for p in people]}),'model':model}
+        with patch('knowledge.providers.claude',side_effect=fake) as call:job=self.job('classify_contacts')
+        self.assertEqual(job.state,'complete',job.error)
+        call.assert_called_once()
         self.assertEqual(seen,{'max_tokens':16000,'effort':'medium'})
+        ana.refresh_from_db()
+        self.assertEqual(ana.stage,'fit')
+        self.assertEqual(ana.classification['course_citations'],['LI-03-M005-K06'])
 
 
 class CommentDraftRoomTests(OperatorBase):

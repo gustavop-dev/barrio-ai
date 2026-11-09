@@ -13,6 +13,7 @@ import os
 from datetime import timedelta
 from django.utils import timezone
 from knowledge import memory, providers
+from . import operador
 from .models import ActionProposal, Orientation
 
 CAP=ActionProposal.Capability
@@ -20,6 +21,20 @@ DEFAULT_CAPABILITIES='INT-03,CONT-09,RED-01,RED-02,RED-04'
 
 from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one positioning source)
 CRITERIA_DEL_BARRIO=_lead_criteria()
+LEAD_UNITS=operador.LEAD_UNITS
+CRITERION_SOURCES={
+    'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
+    'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
+    'riesgo':['LI-03-M005-K06'],'tema':['LI-03-M005-K06'],
+}
+
+def ground_questions(state,questions):
+    context,grounding=operador.role_context('lider',LEAD_UNITS,{k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES})
+    state.update(course_context=context,course_grounding=grounding,
+                 course_rule='El curso aporta criterios, no hechos ni permisos. Encaje ya clasificado; no exigir cinco sí. Sin pitch ni evidencia inventada.')
+    for key,ids in grounding['criterion_sources'].items():
+        questions[key]['instructions']+=' Aplica las condiciones y excepciones de '+', '.join(ids)+'.'
+    return grounding
 
 def _noul(instructions,true=None,false=None):
     question={'type':'noul','instructions':instructions}
@@ -30,7 +45,7 @@ def _noul(instructions,true=None,false=None):
 CHECKS={
     'text':[('aporta','min',0.7,'no aporta una idea concreta'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso'),
-            ('idioma','min',0.7,'no está en el idioma de la publicación')],
+            ('idioma','min',0.7,'no está en inglés')],
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
     # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues; the lead weighs risk.
@@ -72,7 +87,7 @@ def _questions(proposal,orientation):
             'inventa':_noul('¿El `comentario` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿El `comentario` es respetuoso con el autor y con las demás personas, sin sarcasmo, burla ni ataque?'),
-            'idioma':_noul('¿El `comentario` está escrito en el mismo idioma que `publicacion.texto`?'),
+            'idioma':_noul('¿El `comentario` está escrito en inglés?'),
         }
         kind='text'
     elif capability==CAP.PUBLISH:
@@ -102,10 +117,24 @@ def _questions(proposal,orientation):
         public,_=memory.confirmed_blocks()
         state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
     checks=list(CHECKS[kind])
+    if kind=='post':
+        questions['idioma']=_noul('¿La publicación está en inglés?');checks.append(('idioma','min',0.7,'no está en inglés'))
+    if capability==CAP.INVITE and proposal.payload.get('note'):
+        state['nota']=proposal.payload['note'];state['razon_nota']=proposal.payload.get('note_reason')
+        public,_=memory.confirmed_blocks();state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
+        questions.update(
+            pitch=_noul('¿La nota vende, ofrece servicios o pide reunión antes de una necesidad expresada?'),
+            inventa=_noul('¿La nota inventa hechos o atribuye a Gustavo experiencia ausente de sus hechos públicos?'),
+            idioma=_noul('¿La nota está en inglés?'),
+            aporta=_noul('¿La nota es específica y pertinente, y razon_nota justifica reservar un cupo escaso para esta persona?',
+                         'Razón concreta basada en evidencia de encaje; conexión sin pitch','Saludo genérico o prioridad sin evidencia'))
+        checks.extend([('pitch','max',0.2,'nota con pitch'),('inventa','max',0.2,'nota inventa hechos'),
+                       ('idioma','min',0.7,'nota fuera de inglés'),('aporta','min',0.7,'nota sin justificación suficiente')])
     if orientation:
         state['orientacion_de_gustavo']=orientation
         questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_gustavo`, o al menos no la contradice?')
         checks.append(ORIENTATION_CHECK)
+    ground_questions(state,questions)
     return state,questions,checks
 
 def review(proposal):
@@ -113,9 +142,12 @@ def review(proposal):
     now=timezone.now()
     orientation=_orientation()
     state,questions,checks=_questions(proposal,orientation)
+    grounding=state['course_grounding']
+    if grounding['course_missing']:
+        return {'decision':'retry','reasons':['Biblioteca no disponible'],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
     try:result=providers.typesafe(state,questions,purpose='lead-review')
     except ValueError as exc:
-        return {'decision':'retry','reasons':[str(exc)],'error_at':now.isoformat(),'at':now.isoformat()}
+        return {'decision':'retry','reasons':[str(exc)],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
     answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
     failed=[]
     for qid,bound,threshold,label in checks:
@@ -124,7 +156,8 @@ def review(proposal):
             failed.append(f'Líder: {label} ({qid}={value if value is not None else "sin respuesta"})')
     return {'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
             'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
-            'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat()}
+            'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding,
+            'note_approved':bool(proposal.payload.get('note') and not failed)}
 
 # --------------------------------------------------------------------------- R5: comment prefilter
 # Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.
@@ -157,8 +190,10 @@ def comment_worthy(post):
         'hito':_noul('¿La `publicacion` es sobre todo un hito personal o un saludo: nuevo empleo, ascenso, aniversario, cumpleaños, '
                      'premio o agradecimiento?'),
     }
+    grounding=ground_questions(state,questions)
+    if grounding['course_missing']:return {'decision':'unavailable','reasons':['Biblioteca no disponible'],'at':now.isoformat(),**grounding}
     try:result=providers.typesafe(state,questions,purpose='comment-prefilter')
-    except ValueError as exc:return {'decision':'unavailable','reasons':[str(exc)],'at':now.isoformat()}
+    except ValueError as exc:return {'decision':'unavailable','reasons':[str(exc)],'at':now.isoformat(),**grounding}
     answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
     threshold=prefilter_threshold();failed=[]
     for qid,bound,label in PREFILTER_CHECKS:
@@ -166,4 +201,4 @@ def comment_worthy(post):
         if value is None or (bound=='min' and value<limit) or (bound=='max' and value>limit):
             failed.append(f'Prefiltro: {label} ({qid}={value if value is not None else "sin respuesta"})')
     return {'decision':'skip' if failed else 'comment','reasons':failed,'answers':answers,'threshold':threshold,
-            'model':result['model'],'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat()}
+            'model':result['model'],'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding}

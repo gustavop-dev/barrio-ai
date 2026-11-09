@@ -35,6 +35,7 @@ from .permissions import require
 
 PURPOSE='weekly-summary'
 ROLE='analista_barrio_resultados'
+WEEKLY_UNITS=operador.ANALYSIS_UNITS
 MAX_TOKENS=12000  # Opus 5.5 always thinks and the thinking counts here: room for it plus a short JSON
 EFFORT='medium'
 MAX_ITEMS=3;MAX_ITEM_CHARS=300;MAX_ORIENTATION_CHARS=600
@@ -182,7 +183,8 @@ def network(w):
             'conectados':Contact.objects.filter(**_between('connected_at',w)).count(),
             'conectados_que_encajan':Contact.objects.filter(classification__fit=True,**_between('connected_at',w)).count(),
             'invitaciones_recibidas':Contact.objects.filter(source=Contact.Source.INCOMING,**_between('discovered_at',w)).count(),
-            'aceptacion':acceptance}
+            'aceptacion':acceptance,'salud_cohortes':red.health_snapshot(w.end),
+            'ritmo':red.weekly_rhythm(w.end,start=w.start,end=w.end)}
 
 def opportunities(w):
     everything=list(Opportunity.objects.filter(created_at__lt=w.end))
@@ -325,7 +327,7 @@ def _s():return {'type':'string'}
 def _arr(items):return {'type':'array','items':items}
 def _obj(**props):return {'type':'object','additionalProperties':False,'required':list(props),'properties':props}
 
-ITEM=_obj(texto=_s(),cifra=_s())
+ITEM=_obj(texto=_s(),cifra=_s(),course_citations=_arr(_s()))
 SCHEMA=_obj(titular=_s(),lo_que_funciono=_arr(ITEM),lo_que_no=_arr(ITEM),recomendaciones=_arr(ITEM),orientacion_propuesta=_s(),
             advertencias=_arr(_s()))
 
@@ -353,6 +355,10 @@ Qué escribir (en español, frases cortas y concretas):
   corrieron y comparaciones que no se pueden hacer. `estadisticas.avisos_de_datos` trae las que ya se detectaron.
 
 Criterio:
+- Cada hallazgo/recomendación lleva course_citations con IDs recuperados que sustentan el criterio,
+  separados de cifra (evidencia observada). El curso no prueba resultados de Gustavo.
+- No compares likes de siete días con composición de público de noventa. Conserva ventanas comparables.
+- DM no equivale a venta; seguidores agregados no revelan identidades ni motivos. Pares y divulgadores tienen valor.
 - `posicionamiento` y `orientacion_actual` mandan sobre los números: las impresiones no son negocio. No propongas abandonar
   la dirección ni la mezcla de modalidades por perseguir alcance.
 - Con menos de tres posts medidos, cualquier patrón es una pista, no una conclusión: dilo en advertencias.
@@ -425,7 +431,7 @@ def unknown_numbers(text,allowed):
         if not any(any(abs(round(v,decimals)-value)<1e-9 for v in allowed) for value,decimals in _readings(token)):bad.append(token)
     return bad
 
-def validate(raw,data,week_start):
+def validate(raw,data,week_start,grounding=None):
     """Keep only what the stats support. A list entry must quote at least one number and every number must be in the stats;
     otherwise it is dropped. A headline with an unknown number is replaced; the summary records what was dropped."""
     allowed=allowed_numbers(data);dropped=[]
@@ -442,7 +448,9 @@ def validate(raw,data,week_start):
         for item in (raw.get(field) or [])[:MAX_ITEMS]:
             if not isinstance(item,dict):continue
             text=' '.join(str(item.get('texto') or '').split())[:MAX_ITEM_CHARS];figure=' '.join(str(item.get('cifra') or '').split())[:200]
-            if text and check(field,text,figure,tethered=True):items.append({'texto':text,'cifra':figure})
+            if text and check(field,text,figure,tethered=True):
+                citations=operador.validate_course_citations(item.get('course_citations'),grounding) if grounding else item.get('course_citations',[])
+                items.append({'texto':text,'cifra':figure,'course_citations':citations})
         clean[field]=items
     proposal=' '.join(str(raw.get('orientacion_propuesta') or '').split())[:MAX_ORIENTATION_CHARS]
     clean['orientacion_propuesta']=proposal if proposal and check('orientacion_propuesta',proposal) else None
@@ -451,6 +459,7 @@ def validate(raw,data,week_start):
     if dropped:warnings.append(f'Se quitaron {len(dropped)} frases del análisis con cifras que no están en los datos de la semana.')
     clean['advertencias']=warnings
     clean['validacion']={'ok':not dropped,'descartado':dropped}
+    if grounding:clean.update(grounding)
     return clean
 
 # --------------------------------------------------------------------------- the job
@@ -466,12 +475,20 @@ def run(user,week_start,origin_job=''):
     now=timezone.now()
     if week_start+timedelta(days=7)>_local(now).date():raise Conflict('Esa semana aún no terminó.')
     data=stats(week_start,now)
-    _guard(now)
-    answer=providers.claude(SYSTEM,message(week_start,data),max_tokens=MAX_TOKENS,output_schema=SCHEMA,effort=EFFORT,purpose=PURPOSE)
-    try:raw=json.loads(answer['text'])
-    except (json.JSONDecodeError,TypeError):raise ValueError('El analista no devolvió JSON válido.') from None
-    if not isinstance(raw,dict):raise ValueError('El analista no devolvió un objeto.')
-    analysis=validate(raw,data,week_start)
+    context,grounding=operador.role_context('semanal',WEEKLY_UNITS,
+        {'interpretacion':WEEKLY_UNITS,'ventanas':['LI-06-V008-K01','LI-06-V008-K02']})
+    if grounding['course_missing']:
+        answer={}
+        analysis=dict(grounding,titular='Aprendizaje del curso pendiente',lo_que_funciono=[],lo_que_no=[],recomendaciones=[],
+                      orientacion_propuesta=None,advertencias=[*data['avisos_de_datos'],'Biblioteca no disponible'],
+                      validacion={'ok':False,'descartado':[]},course_citations=[])
+    else:
+        _guard(now)
+        answer=providers.claude(SYSTEM,message(week_start,data),max_tokens=MAX_TOKENS,output_schema=SCHEMA,effort=EFFORT,purpose=PURPOSE,context=context)
+        try:raw=json.loads(answer['text'])
+        except (json.JSONDecodeError,TypeError):raise ValueError('El analista no devolvió JSON válido.') from None
+        if not isinstance(raw,dict):raise ValueError('El analista no devolvió un objeto.')
+        analysis=validate(raw,data,week_start,grounding)
     cost=answer.get('estimated_usd')
     try:
         with transaction.atomic():

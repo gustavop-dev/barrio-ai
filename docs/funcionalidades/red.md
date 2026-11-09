@@ -27,6 +27,9 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 | [BAR-15](#bar-15) | Ritmo diario, rampa semanal y configuración del operador | PWA · app · backend | no implementado |
 | [BAR-16](#bar-16) | Cuenta gratuita y notas de invitación reservadas por encaje | PWA · app · backend | no implementado |
 
+| [BAR-15](#bar-15) | Ritmo, rampa, salud y reservas compartidas | backend | funciona |
+| [BAR-16](#bar-16) | Tier y notas excepcionales con alternativa sin nota | backend | funciona |
+
 ---
 
 ### BAR-01 · Descubrir personas en los comentarios de los referentes <a id="bar-01"></a>
@@ -91,9 +94,9 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 - **Qué hace para Gustavo:** 48 horas después de seguir a alguien que sigue en 2.º o 3.er grado, el equipo le manda una invitación sin nota.
 - **Código:** `red.plan` (`NETWORK_INVITE_AFTER_HOURS`), `red.execute_action`, `red.network_issues`.
 - **Criterios de aceptación:**
-  1. **Dado** un contacto `followed` hace 49 h, **cuando** corre `plan_network`, **entonces** se propone RED-02 con `payload` igual a `{user_id}` y nada más.
+  1. **Dado** un contacto `followed` hace 49 h, **cuando** corre `plan_network`, **entonces** se propone RED-02 con `{user_id}` por defecto; las notas excepcionales siguen BAR-16 y el calendario/rampa BAR-15.
   2. **Dado** un contacto `followed` hace 47 h, **cuando** corre, **entonces** no se propone.
-  3. **Dado** una propuesta RED-02 con algo más que `user_id` en `payload` (por ejemplo una nota), **cuando** la revisa la compuerta en modo `auto`, **entonces** se descarta.
+  3. **Dado** una propuesta RED-02 con nota, **cuando** la revisa la compuerta, **entonces** exige el contrato BAR-16: razón, alternativa sin nota, validación de texto y revisión del líder; campos desconocidos se rechazan.
   4. **Dado** la invitación enviada, **cuando** se confirma, **entonces** el contacto pasa a `invited` con `invited_at`.
   5. **Dado** que la persona salió del 2.º y 3.er grado, **cuando** se ejecuta, **entonces** no se escribe, sigue en `followed` con `out_of_network` y no se vuelve a proponer hasta `NETWORK_RETRY_AFTER_HOURS` (48).
 - **Brechas código/docs:** —
@@ -125,7 +128,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
   2. **Dado** un perfil de primer grado, **cuando** se comprueba, **entonces** no se escribe y el contacto pasa a `connected` (`already_connected`).
   3. **Dado** una invitación previa ignorada o retirada, **cuando** se comprueba, **entonces** no se escribe y pasa a `closed` (`previous_invitation`).
   4. **Dado** un perfil restringido, **cuando** se comprueba, **entonces** pasa a `discarded` (`restricted`).
-  5. **Dado** que la ejecución no escribió, **cuando** se calculan topes y espaciado, **entonces** no cuenta.
+  5. **Dado** que la ejecución no escribió, **cuando** se calculan topes, **entonces** no consume cupo de escritura; la espera aleatoria ya reservada se conserva para evitar ráfagas de reintentos.
   6. **Dado** un resultado incierto, **cuando** se concilia, **entonces** se relee el perfil y nunca se repite la escritura.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
@@ -137,8 +140,8 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 - **Qué hace para Gustavo:** la red trabaja dentro de límites conservadores para no arriesgar su cuenta.
 - **Código:** `red.read_caps`, `red._read`, `operador.limits`, `operador.capacity_left`, `operador.spacing_ok`.
 - **Criterios de aceptación:**
-  1. **Dado** los topes por defecto, **cuando** se consulta `GET /api/v1/red/summary`, **entonces** `capacity` muestra RED-01 10/día y 40/semana, RED-02 5 y 20, RED-04 10 y 40, y `read_caps` muestra `comments` 60, `search` 20, `profile` 30, `sync` 4.
-  2. **Dado** que se agotó el cupo de lecturas de perfil, **cuando** toca clasificar, **entonces** se detiene y lo dice en su error; la comprobación previa de una ejecución sigue funcionando.
+  1. **Dado** los topes por defecto, **cuando** se consulta `GET /api/v1/red/summary`, **entonces** `capacity` muestra RED-01 10/día y 50/semana, RED-02 según etapa (inicialmente 5 y 20), RED-04 10 y 40, y `read_caps` muestra `comments` 60, `search` 20, `profile` 80, `sync` 4. Fin de semana y reservas compartidas siguen BAR-15.
+  2. **Dado** que se agotó el cupo de lecturas de perfil, **cuando** toca clasificar, **entonces** se detiene y lo dice en su error; el preflight usa además el contador global compartido y, si este se agota, la escritura espera sin saltarse la comprobación.
   3. **Dado** una escritura de red, un comentario y una publicación, **cuando** se programan, **entonces** comparten el espaciado mínimo común.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
@@ -327,3 +330,79 @@ Inventariar únicamente estas claves permitidas del env real sin copiar secretos
 ## Retiradas
 
 Ninguna.
+
+## Participación: fase 2
+
+Implementación en archivos; CI pendiente. Se conservan los criterios copiados de la especificación como contrato de revisión. El alcance de esta rama es backend.
+
+### BAR-15 · Ritmo diario, rampa semanal y configuración del operador <a id="bar-15"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** el barrio recibe participación útil todos los días, con objetivo semanal de al menos unas 100 interacciones de distintos tipos tras una rampa gradual, sin ráfagas ni comentarios de relleno.
+- **Responsable:** Relaciones prepara el plan; backend calcula agenda, reservas, salud y contadores; Operación es el único escritor. Investigador y analista aportan perfiles/evidencia; verificador/líder conservan reglas del curso.
+- **Cadencia:** plan semanal en America/Bogota, agenda distinta por día, ejecución solo en OPERATOR_WINDOW, revisión diaria de salud y conciliación; fines de semana más ligeros, sin invitaciones salientes.
+- **Tu turno:** ninguna aprobación adicional para acciones cuya autonomía sea auto; conserva veto/modos actuales. Avisos de límite, aceptación baja, meta no alcanzada y presupuesto agotado; no pide incrementar topes para completar una cuota.
+- **Datos de partida de la especificación:** propuestas/ejecuciones, lecturas auditadas, invitaciones/conexiones y fechas existen parcialmente. Faltan contadores unificados, cohortes de aceptación, rampa persistida, agenda aleatoria y reservas conjuntas de lecturas. No se inspeccionó el env privado del servidor; Gustavo informa que tiene overrides.
+- **Código:** `operador.py`, `red.py`, `lider.py`, `metricas.py`, `resumen_semanal.py`; extensión mínima de notas y error tipado en `connectors.py`. Estado persistente en AuditEvent y exclusión transaccional mediante OperatorControl; sin migración.
+
+**Defaults que deberá tener la implementación en `operador.py` (día/semana local):**
+
+| Capacidad | Hoy en DEFAULT_LIMITS | Nuevo default de techo | Regla de uso |
+| --- | --- | --- | --- |
+| INT-03 · comentarios | 3 / 12 | **5 / 25** | Oportunidades diarias, calidad/aporte antes que cantidad; reglas del curso y cooldown por autor, hoy 48 h. |
+| INT-02 · reacciones | 15 / 60 | **20 / 100** | Solo contenido pertinente leído; no reaccionar en serie para llenar meta. |
+| CONT-09 · pieza propia | 1 / 7 | **1 / 7** | Mantener; se informa aparte, no rellena el objetivo de participación en el barrio. |
+| RED-01 · seguir | 10 / 40 | **10 / 50** | Encaje y evidencia; no seguir solo por cupo. |
+| RED-02 · invitar | 5 / 20 | **20 / 100** | Techo tras rampa, solo lunes–viernes; empieza efectivamente en 5 / 20. |
+| RED-04 · aceptar | 10 / 40 | **10 / 40** | Solo entradas reales con encaje; no existe una meta obligatoria de aceptaciones. |
+
+Los nuevos caps de comentarios/reacciones/seguimientos y parámetros de salud son defaults operativos elegidos para concretar el mandato; no límites oficiales ni cifras atribuidas al curso. El **techo de invitaciones 20/día, 100/semana**, interacción diaria y subida en 2–3 semanas vienen de Gustavo. Su referencia a un límite observado de LinkedIn de unas 100 invitaciones/semana (algunos proveedores hablan de hasta 200) y a unas 80–100 visitas/día es contexto aportado, no verificación de red ni garantía de capacidad de esta cuenta. No se sube a 200. No se conocen aquí límites publicados de comentarios/reacciones/follows: el proveedor puede restringir por comportamiento y sus respuestas prevalecen.
+
+**Plan y rampa:** objetivo de actividad útil 50 → 75 → **al menos aproximadamente 100 por semana** en tres etapas de una semana como mínimo. Cuenta comentarios, reacciones, follows, invitaciones/aceptaciones confirmadas y búsquedas/lecturas de perfil hechas por investigación con propósito y resultado. Distingue acciones sociales de investigación; no cuenta borradores, fallos, resultados inciertos, lecturas de preflight/conciliación ni relecturas técnicas para inflar la meta. Un mismo perfil puede tener acciones distintas, pero cada ejecución cuenta una vez. Ejemplo de semana estable: 16 acciones útiles por día laborable y 10 por día de fin de semana = 100; no exige 100 invitaciones ni ejecutar todos los máximos simultáneamente.
+
+Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100**, sin saltar por cambiar env o reintentar. Revisa diariamente y avanza solo después de al menos siete días en la etapa con salud suficiente. Default de salud: tasa de aceptación ≥40 % sobre ≥20 invitaciones únicas de cohortes con al menos siete días de maduración, enviadas en los últimos 28 días; desconocidas se muestran aparte. Sin muestra suficiente mantiene etapa, aunque tarde más de tres semanas. Tasa por debajo de 40 % o caída de ≥10 puntos porcentuales frente al último corte comparable reduce una etapa y congela crecimiento siete días; por debajo de 25 % pausa invitaciones siete días. No reduce repetidamente por el mismo corte. Son umbrales configurables de producto, no una promesa de LinkedIn.
+
+**Errores:** 429, cuota/throttle o restricción de cuenta pausa invitaciones al menos siete días (o el plazo mayor indicado por proveedor), avisa y reanuda desde una etapa menor tras comprobar estado. El 422 con tipo `cannot_resend_yet` reportado por Gustavo bloquea ese destinatario sin reenvío, reduce una etapa y congela crecimiento; si se repite en dos destinatarios durante 24 h, aplica pausa de cuenta de siete días. Guarda código/tipo/alcance; no considera todo 422 un límite global ni prueba otro conector para eludirlo. Sin fecha válida para reinvitar a ese destinatario, queda bloqueado hasta aclararla, no se prueba periódicamente.
+
+**Agenda:** OPERATOR_WINDOW 07:00–21:00, America/Bogota; separación común entre escrituras aleatoria **1200–2400 s**, con horas de inicio y descansos variables dentro de la ventana. Reservar/persistir `next_action_at` por cuenta para evitar que dos workers formen una ráfaga; reiniciar no sortea otra espera más corta. Plan nuevo por fecha, sin clonar la secuencia de ayer; si coincide, reprogramar antes de ejecutar. Sábado/domingo factor **0,5** sobre objetivos y caps diarios de interacción (redondeo hacia abajo), cero RED-02; no reduce CONT-09. No recuperar una cola con ráfagas al volver. Los caps son máximos, no agenda obligatoria; esta variación no garantiza ausencia de restricciones ni permite ignorarlas.
+
+**Despliegue:** [nota de fase 2](../despliegue-fase2-curso.md), con nombres de claves y validaciones pendientes; no se leyó el env privado.
+
+- **Criterios de aceptación:**
+  1. **Dado** una cuenta sana en etapa estable con candidatos/recursos suficientes, **cuando** planifica la semana, **entonces** programa actividad útil todos los días y objetivo ≥100 entre tipos, con comentario diario pertinente, fin de semana más ligero y RED-02 solo laborable. Sin material de calidad, datos o presupuesto muestra el déficit y motivo, no genera relleno ni lecturas artificiales.
+  2. **Dado** activación desde 5/20, **cuando** aplica los nuevos defaults/env, **entonces** RED-02 permanece en 5/20 hasta cumplir etapa/salud; después 10/50 y 20/100. Sin muestra madura mantiene etapa; rechazo/error/degradación aplica reducción o pausa y notifica sin intervención de Gustavo.
+  3. **Dado** config 30/día o 200/semana y dos workers concurrentes, **cuando** reservan/envían, **entonces** el mínimo entre rampa, 20/100, env válido, reservas y límites del proveedor impide excesos. Un fin de semana bloquea RED-02 aunque haya aprobación previa.
+  4. **Dado** cohortes de 20 maduras con 10 aceptadas y otras 15 recién enviadas, **cuando** calcula salud, **entonces** muestra 50 % sobre 20 y las 15 inmaduras aparte, sin contar perfiles repetidos. Una caída válida de 10 puntos o bajo 40 % reduce; no inventa tasa si falta conciliación.
+  5. **Dado** 422 `cannot_resend_yet`, **cuando** lo registra, **entonces** bloquea al destinatario, frena la rampa y aplica la regla de repetición/alcance anterior; un 429 de cuenta activa la pausa correspondiente. No reenvía por otro conector ni presenta un fallo como interacción realizada.
+  6. **Dado** agenda de varios tipos y jobs simultáneos, **cuando** ejecuta, **entonces** todos comparten reserva horaria, huecos aleatorios y ventana colombiana; no hay ráfagas, repetición diaria de patrón ni recuperación acelerada de atrasos. La espera se mantiene al reanudar y una pausa prevalece sobre cualquier meta.
+  7. **Dado** 79 lecturas de perfil consumidas y dos operaciones listas, **cuando** reservan con cap 80, **entonces** solo una sale. Clasificación, preflight y conciliación comparten contador por request; no se salta con otra cuenta/conector ni se contabiliza dos veces una llamada. Si no cabe una comprobación requerida, la escritura espera.
+  8. **Dado** el corte semanal, **cuando** informa, **entonces** desglosa social/investigación, acciones confirmadas, personas únicas, aceptación/cohortes, cupos, gasto, déficits y causas. No llama visitas públicas a `get_profile`, seguidores a conexiones ni ventas a invitaciones.
+  9. **Dado** servidor con overrides antiguos o rampa ausente, **cuando** se valida el despliegue, **entonces** muestra la diferencia con la tabla y no declara aplicado este ritmo hasta resolver configuración/estado, manteniendo pausas/gates. El proceso no registra claves de proveedor ni el contenido completo del env.
+  10. **Dado** una salida pública propuesta por el plan, **cuando** pasa la verificación, **entonces** comentarios, posts, artículos, texto de imágenes y perfil están en **inglés**; contenido pendiente en otro idioma se corrige antes de publicar. Nombres propios/fuentes no se falsifican y la interfaz interna puede seguir en español.
+- **Validación pendiente:** CI debe ejecutar los fakes y comprobar el contrato real de notas con una fixture redactada del proveedor. Solo el rechazo explícito de nota, con certeza de no creación, habilita fallback. UI y capacidades de perfil/imagen de otras fases no se amplían aquí.
+- **Cobertura QA:** `test_fase2_curso.py` y regresiones de red/operador; ejecución pendiente de CI, no ejecutada localmente.
+
+### BAR-16 · Cuenta gratuita y notas de invitación reservadas por encaje <a id="bar-16"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** usa su cuenta gratuita principalmente con invitaciones sin nota y reserva las pocas notas personalizadas para las personas de mayor encaje, explicando el motivo.
+- **Responsable:** `relaciones_comunidad` selecciona y justifica; investigador/clasificador aporta evidencia; verificador y líder/Jev revisan el texto; `operador_cuenta` es el único escritor. Código controla tier, saldo, reservas, fallback y auditoría.
+- **Cadencia:** plan diario de lunes a viernes dentro de BAR-15; saldo de notas mensual por cuenta, revisado antes de cada envío y al cambiar tier o recibir restricciones. Las notas no aumentan la frecuencia de invitaciones.
+- **Tu turno:** no se pide aprobar cada invitación bajo la autonomía ya autorizada. En modo aprobación se muestra texto exacto, razón de gastar nota y alternativa sin nota; Gustavo conserva veto. Avisos por discrepancia de tier o límites incluyen estado y acción necesaria, sin proponer comprar Premium automáticamente.
+- **Datos de partida de la especificación:** Gustavo confirma **free**, sin Premium ni Sales Navigator; clasificación/razón/confianza, propuestas e invitaciones existen. El conector y la validación hoy solo aceptan `user_id`, sin nota. Faltan tier configurable, texto opcional validado, saldo/reservas y error tipado de cuota de notas. Los comentarios del conector documentan «unas pocas al mes»; no existe lectura integrada de cuota restante ni una cifra universal verificada. La API oficial conectada no aporta aquí esa capacidad.
+- **Código:** `operador.py`, `red.py`, `lider.py`, `metricas.py`, `resumen_semanal.py`; extensión mínima de notas y error tipado en `connectors.py`. Estado persistente en AuditEvent y exclusión transaccional mediante OperatorControl; sin migración.
+- **Configuración y política:** `LINKEDIN_ACCOUNT_TIER=free|premium|sales_navigator`, default **free**; valor desconocido falla validación. No inferir upgrade por volumen de actividad. `LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT=3` es un default conservador de producto por mes natural America/Bogota, configurable y válido también como 0 para deshabilitar notas; **no afirma que LinkedIn conceda tres**. El límite efectivo es el menor entre configuración y disponibilidad/restricciones verificadas del proveedor. Si no se conoce su saldo, mostrar «Desconocido» y permitir solo intentos reservados dentro del cap local, nunca anunciar tres notas disponibles. Agotamiento confirmado cierra notas hasta el reinicio acreditado por el proveedor; cambiar el mes local o reiniciar un job no borra ese bloqueo. En Premium/Sales Navigator se adapta la validación de notas (longitud/cupo) a capacidades verificadas del tier, manteniendo el cap local anterior hasta configurar uno sustentado; nunca asumir notas ilimitadas ni alterar la distribución del curso, la rampa o el techo general 20/100.
+- **Riesgo y exclusividad:** **no lemlist ni otra herramienta de automatización de outreach junto a 0ff1ce**, tampoco tras un upgrade. Duplicaría invitaciones/acciones y la actividad automática sobre la cuenta, fuera de sus reservas y auditoría. Registrar esta condición al activar/cambiar cuenta; si se conoce una automatización paralela activa, pausar el outreach de 0ff1ce y avisar hasta que esté desactivada. No se instala ni conecta ninguna herramienta alternativa.
+- **Criterios de aceptación:**
+  1. **Dado** la cuenta gratuita actual y una invitación ordinaria, **cuando** Relaciones la planifica, **entonces** propone la invitación sin nota por defecto. No añade un saludo genérico para consumir saldo ni interpreta free como imposibilidad de invitar sin nota.
+  2. **Dado** candidatos de alto encaje y saldo local reservable, **cuando** selecciona una excepción con nota, **entonces** prioriza los de mayor encaje sustentado en clasificación/evidencia vigente y explica por qué merece gastar ese cupo frente a invitar sin nota. Cita `NETWORK_UNITS`, especialmente `LI-03-M006-K01` (conexión sin pitch); la nota es breve, pertinente, en inglés y sin hechos inventados. Conserva el reparto por papeles de BIB-08 y no consume cupo para cumplir una cuota de notas.
+  3. **Dado** varias propuestas con nota y workers concurrentes, **cuando** reservan, **entonces** deduplican por cuenta/destinatario/propósito y restan consumidas, reservadas y envíos inciertos del saldo local; con cap 3, la cuarta usa la alternativa sin nota. El ledger diferencia intento rechazado, envío confirmado y resultado incierto, con fuente del límite, periodo, tier y motivo de selección; no afirma consumo del proveedor sin evidencia.
+  4. **Dado** un rechazo inequívoco **solo por cuota de notas** y confirmación de que no se creó invitación, **cuando** el operador procesa el error, **entonces** bloquea nuevas notas, registra motivo y programa esa misma invitación **sin nota**, bajo los mismos gates, veto, ventana, espaciado, preflight y límites RED-02. Vincula ambos intentos a una sola intención; solo el envío real cuenta como invitación realizada. La aprobación de la variante con nota incluye esta alternativa explícita; no exige otra decisión por quitarla.
+  5. **Dado** timeout, respuesta ambigua, invitación ya pendiente o error de límite general/429/422 `cannot_resend_yet`, **cuando** considera el fallback, **entonces** no reenvía automáticamente sin nota. Concilia primero una posible escritura; si no puede descartarla, conserva la reserva y espera. Límites generales y destinatario bloqueado siguen BAR-15; un error genérico que contiene «quota» no basta para clasificarlo como cuota de notas ni eludir una pausa.
+  6. **Dado** un upgrade o downgrade confirmado, **cuando** cambia `LINKEDIN_ACCOUNT_TIER`, **entonces** audita valor anterior/nuevo, actor, fecha y evidencia de capacidades, adapta política/validación y recalcula propuestas pendientes antes de enviarlas. Mantiene reservas, consumos, restricciones y rampas; un tier de pago no aumenta por sí solo volumen, gasto o longitud de notas. Si el proveedor contradice la configuración, usa la capacidad más restrictiva y avisa.
+  7. **Dado** agotamiento de notas sin restricción general de invitaciones, **cuando** sigue el plan, **entonces** continúa con invitaciones sin nota elegibles y registra el fallback en actividad/auditoría. No aplica la pausa general BAR-09 a un error específico de notas ya clasificado; nunca evita una pausa de cuenta vigente.
+  8. **Dado** despliegue o evidencia de outreach externo concurrente, **cuando** se valida la cuenta, **entonces** la configuración visible muestra tier efectivo, cupo local/observado, política sin nota y operador único. El riesgo conocido de lemlist/otra automatización activa bloquea la activación o pausa el outreach, con aviso; no se declara comprobada su ausencia mediante una API que no permite verla.
+- **Validación pendiente:** CI debe ejecutar los fakes y comprobar el contrato real de notas con una fixture redactada del proveedor. Solo el rechazo explícito de nota, con certeza de no creación, habilita fallback. UI y capacidades de perfil/imagen de otras fases no se amplían aquí.
+- **Cobertura QA:** `test_fase2_curso.py` y regresiones de red/operador; ejecución pendiente de CI, no ejecutada localmente.
