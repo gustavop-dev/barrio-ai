@@ -202,6 +202,97 @@ class ProfileAssetsTests(ProfileBase):
         client=FakeProfileImages();result=self.run_assets(proposal,image_client=client)
         self.assertEqual(client.calls,[]);self.assertEqual(result.state,'ready')
 
+    def test_relaunch_after_render_upgrade_reuses_child_person_blobs_without_paid_edits_or_copy_review(self):
+        proposal=self.blocked_proposal();client=FakeProfileImages()
+        # An old deployment completed OpenAI edits but vision rejected the renders.
+        with patch.object(visual,'RENDER_VERSION','before-framing'):
+            self.run_assets(proposal,image_client=client,image_checker=lambda *args:dict(vision(*args),ok=False))
+        self.assertEqual(len(client.calls),3);self.assertFalse(proposal.assets.exists())
+        previous=CycleLedger.objects.get(cycle='perfil_assets')
+        confirmed={key:copy.deepcopy(call) for key,call in previous.progress_ledger['calls'].items() if key.startswith('person:')}
+        self.assertEqual(len(confirmed),3)
+        self.assertTrue(all(c['state']=='answered' and '__blob__' in c['result'] for c in confirmed.values()))
+        self.assertTrue(all(orquestacion.unpack(c['result'])==synthetic() for c in confirmed.values()))
+        old_usage=list(UsageEntry.objects.values());checked=[];render=visual.render_tool
+        def check(selected,refs,ctx):
+            checked.append(ctx['option'])
+            if ctx['option'] in ('A','B'):
+                self.assertEqual({e['id'] for e in ctx['render_evidence']},
+                    {'render.background','render.spill','render.framing'})
+                self.assertTrue(all(e['sha256']==perfil.imagenes.sha(selected[ctx['option']]) for e in ctx['render_evidence']))
+            return vision(selected,refs,ctx)
+        def no_semantic_review(ctx):raise AssertionError('Semantic review must be reused')
+        with patch.object(client,'edit_profile',side_effect=AssertionError('OpenAI edit must be reused')), \
+             patch.object(visual,'render_tool',wraps=render) as rendered:
+            call_command('perfil_assets',str(proposal.id)[:8],stdout=io.StringIO())
+            result=self.run_assets(proposal,image_client=client,image_checker=check,
+                reviewer=no_semantic_review)
+        self.assertEqual(result.state,'ready',result.findings)
+        self.assertEqual(checked,['A','B','banner']);self.assertEqual(rendered.call_count,3)
+        current=CycleLedger.objects.filter(cycle='perfil_assets').exclude(pk=previous.pk).get()
+        self.assertEqual(current.budget_bucket,previous.budget_bucket)
+        calls=current.progress_ledger['calls']
+        self.assertEqual({key for key in calls if key.startswith('person:')},set(confirmed))
+        self.assertFalse({key for key in calls if key.startswith('render:')} & set(previous.progress_ledger['calls']))
+        previous.refresh_from_db()
+        self.assertEqual({key:previous.progress_ledger['calls'][key] for key in confirmed},confirmed)
+        self.assertEqual(list(UsageEntry.objects.values()),old_usage)
+        for asset in result.assets.filter(kind__in=['A','B','banner']):
+            self.assertEqual(asset.provenance['reused_edit']['cycle'],str(previous.id))
+
+    def assert_cached_failure(self,state):
+        proposal=self.blocked_proposal()
+        with patch.object(visual,'RENDER_VERSION','old-'+state):
+            self.run_assets(proposal,image_checker=lambda *args:dict(vision(*args),ok=False))
+        child=CycleLedger.objects.get(cycle='perfil_assets',task_ledger__facts__proposal=str(proposal.id))
+        for key,call in child.progress_ledger['calls'].items():
+            if not key.startswith('person:'):continue
+            if state=='pending':call['state']='pending'
+            elif state=='corrupt-blob':call['result']['sha256']='0'*64
+            else:call['result']['__blob__']='cycles/missing-confirmed-blob'
+        child.save(update_fields=['progress_ledger'])
+        client=FakeProfileImages()
+        result=self.run_assets(proposal,image_client=client)
+        self.assertEqual(client.calls,[]);self.assertFalse(result.assets.exists())
+        self.assertEqual(result.state,'partial')
+
+    def test_confirmed_missing_blob_never_falls_back_to_openai(self):
+        self.assert_cached_failure('missing-blob')
+
+    def test_uncertain_sibling_never_falls_back_to_openai(self):
+        self.assert_cached_failure('pending')
+
+    def test_corrupt_confirmed_blob_never_falls_back_to_openai(self):
+        self.assert_cached_failure('corrupt-blob')
+
+    def test_previous_edit_requires_exact_request_and_same_proposal_version_owner_and_budget(self):
+        proposal=self.blocked_proposal()
+        with patch.object(visual,'RENDER_VERSION','old-scope'):
+            self.run_assets(proposal,image_checker=lambda *args:dict(vision(*args),ok=False))
+        child=CycleLedger.objects.get(cycle='perfil_assets')
+        call=next(c for c in child.progress_ledger['calls'].values() if c['edge']=='perfil_editar_persona')
+        request=orquestacion.unpack(call['request'])
+        self.assertEqual(perfil.cached_person(request,perfil.asset_checkpoints(proposal,proposal.cycle))[0],synthetic())
+        self.assertIsNone(perfil.cached_person(dict(request,instruction='Changed identity request'),[child])[0])
+        for field,value in [('owner_id',self.service.pk),('budget_bucket','different-bucket')]:
+            original=getattr(child,field);setattr(child,field,value);child.save()
+            self.assertNotIn(child.pk,{c.pk for c in perfil.asset_checkpoints(proposal,proposal.cycle)})
+            setattr(child,field,original);child.save()
+        child.task_ledger['facts']['version']+=1;child.save()
+        self.assertNotIn(child.pk,{c.pk for c in perfil.asset_checkpoints(proposal,proposal.cycle)})
+
+    def test_existing_banner_lines_with_missing_highlight_reach_fit_as_complete_object(self):
+        proposal=self.blocked_proposal()
+        proposal.context['banner'].update(lines=['Your workflow,','built to ship.'],highlight='')
+        proposal.save();real_fit=visual.banner_fit;inputs=[]
+        def fit(banner):inputs.append(copy.deepcopy(banner));return real_fit(banner)
+        with patch.object(visual,'banner_fit',side_effect=fit):result=self.run_assets(proposal)
+        self.assertEqual(result.state,'ready',result.findings)
+        self.assertEqual(len(inputs),1)
+        self.assertEqual(inputs[0]['highlight'],'built')
+        self.assertEqual(inputs[0]['lines'],['Your workflow,','built to ship.'])
+        self.assertIn('evidence',inputs[0]);self.assertIn('label',inputs[0])
+
     def test_partial_package_preserves_existing_asset_ids_and_checks_only_missing_b(self):
         self.references()
         proposal=self.run_proposal(self.proposal(),drafter=brand_draft,reviewer=brand_reviewer,

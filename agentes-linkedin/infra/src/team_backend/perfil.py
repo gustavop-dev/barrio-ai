@@ -15,7 +15,7 @@ from django.db import transaction
 from django.utils import timezone
 from PIL import Image
 from . import guardas, imagenes, orquestacion, perfil_contenido as content, perfil_galeria as gallery, perfil_visual as visual, research
-from .models import ActionExecution, Capture, ConnectorAccount, Job, ProfileAsset, ProfileProposal, ProfileSchedule, TeamQuestion
+from .models import ActionExecution, Capture, ConnectorAccount, CycleLedger, Job, ProfileAsset, ProfileProposal, ProfileSchedule, TeamQuestion
 from .jobs import audit, enqueue_operation
 
 NS=uuid.UUID('0ff1ce08-0000-4000-8000-000000000008')
@@ -185,11 +185,35 @@ def save_asset(proposal,kind,raw,review,provenance):
     return row
 
 
+def asset_checkpoints(proposal,reuse_from):
+    """Same owner, proposal version and durable budget, including pre-deploy jobs."""
+    if reuse_from is None:return []
+    return [reuse_from]+list(CycleLedger.objects.filter(owner_id=proposal.owner_id,
+        cycle='perfil_assets',budget_bucket=reuse_from.budget_bucket,
+        task_ledger__facts__proposal=str(proposal.id),task_ledger__facts__version=proposal.version).order_by('-created_at'))
+
+
+def cached_person(request,checkpoints):
+    fingerprint=orquestacion.digest(request);confirmed=[]
+    for ledger in checkpoints:
+        for key,call in ledger.progress_ledger.get('calls',{}).items():
+            if call['edge']!='perfil_editar_persona' or call['request_hash']!=fingerprint:continue
+            if call['state']=='answered':confirmed.append((ledger,key,call))
+            elif call['state']=='pending' or (call['state']=='failed' and call.get('error_type') not in ('ValueError','OSError','ContractError')):
+                raise ValueError('Edición anterior incierta; conciliar antes de repetir.')
+    if not confirmed:return None,{}
+    ledger,key,call=confirmed[0]
+    # Missing/corrupt confirmed blobs must fail closed, never trigger another edit.
+    raw=orquestacion.unpack(call['result'])
+    if not isinstance(raw,bytes) or not raw:raise ValueError('Edición confirmada sin blob válido; recuperar storage antes de repetir.')
+    return raw,{'cycle':str(ledger.id),'call':key,'sha256':imagenes.sha(raw)}
+
+
 def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','banner'),reuse_from=None,evidence_context=None):
     """Finish and persist each asset before attempting the next; no group failure."""
     client=client or imagenes.connector.ImageConnector();checker=checker or visual.check
     evidence_context=proposal.context if evidence_context is None else evidence_context
-    errors={}
+    errors={};checkpoints=asset_checkpoints(proposal,reuse_from)
     for kind in kinds:
         if not ProfileProposal.objects.filter(pk=proposal.pk,version=proposal.version).exclude(state__in=['cancelled','superseded']).exists():
             raise orquestacion.CycleStopped('cancelled')
@@ -200,17 +224,12 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
             refs=gallery.raw_references(scoped,proposal.owner)
             instruction=visual.prompt(kind,scoped,proposal.context.get('adjustment',''))
             request={'proposal':str(proposal.id),'kind':kind,'references':scoped,'instruction':instruction}
-            cached=None
-            if reuse_from:
-                for call in reuse_from.progress_ledger.get('calls',{}).values():
-                    if call['edge']=='perfil_editar_persona' and call['request_hash']==orquestacion.digest(request):
-                        if call['state']=='answered':cached=orquestacion.unpack(call['result'])
-                        elif call['state']=='pending':raise ValueError('Edición anterior incierta; conciliar antes de repetir.')
+            cached,reused=cached_person(request,checkpoints)
             edited=runtime.call('perfil_editar_persona',request,
                 lambda:cached if cached is not None else client.edit_profile(refs,instruction,f'{proposal.id}:{kind}'),
                 key='person:'+orquestacion.digest(request))
             render_input={'sha256':{kind:imagenes.sha(edited)},'copy':banner if kind=='banner' else {},
-                'brand':content.BRAND_VERSION,'matte':visual.perfil_chroma.VERSION}
+                'brand':content.BRAND_VERSION,'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION}
             package=runtime.call('perfil_render',render_input,lambda:visual.render_tool({kind:edited},banner),
                 key='render:'+orquestacion.digest(render_input))
             if kind not in package['files']:
@@ -221,9 +240,11 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
                 for asset in proposal.assets.filter(version=proposal.version,kind__in=['A','B'],review__ok=True).order_by('kind'):
                     for viewport in ('mobile','desktop'):
                         selected[f'{viewport}_{asset.kind}']=visual.preview(imagenes.read(asset.image),selected[kind],viewport=='mobile')
+            render_evidence=package.get('evidence',[])
             context={'option':kind,'geometry':package['geometry'] if kind=='banner' else {},'copy':banner if kind=='banner' else {},
+                'review_version':visual.REVIEW_VERSION,'render_evidence':render_evidence,
                 'library':[u for u in evidence_context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS],
-                'evidence_catalog':content.evidence_catalog(dict(evidence_context,references=scoped))}
+                'evidence_catalog':content.evidence_catalog(dict(evidence_context,references=scoped))+render_evidence}
             check_request={'hashes':{k:imagenes.sha(v) for k,v in selected.items()},'references':scoped,'context':context}
             if not ProfileProposal.objects.filter(pk=proposal.pk,version=proposal.version).exclude(state__in=['cancelled','superseded']).exists():
                 raise orquestacion.CycleStopped('cancelled')
@@ -233,7 +254,8 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
             if gallery.stale(scoped,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
             provenance={'references':scoped,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
                 'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{kind:instruction},'geometry':package['geometry'],
-                'mask':package.get('masks',{}).get(kind),'matte_version':visual.perfil_chroma.VERSION}
+                'mask':package.get('masks',{}).get(kind),'matte_version':visual.perfil_chroma.VERSION,
+                'render_version':visual.RENDER_VERSION,'render_evidence':render_evidence,'reused_edit':reused}
             for name,raw in selected.items():
                 if name in ASSET_KINDS:save_asset(proposal,name,raw,{'ok':True,'options':{kind:review},'sha256':[imagenes.sha(raw)]},provenance)
         except (ValueError,OSError) as exc:errors[kind]=str(exc)

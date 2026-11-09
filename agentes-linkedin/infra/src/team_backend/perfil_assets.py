@@ -35,7 +35,7 @@ def queue(user,pid,*,expected_revision=None):
         return Job.objects.filter(kind='prepare_profile_assets',params__proposal=str(pid),state__in=['queued','running']).first()
     refs=gallery.references(user)
     signature=orquestacion.digest({'references':refs,'brand':content.BRAND_VERSION,
-        'matte':visual.perfil_chroma.VERSION,'model':connectors_images.EDIT_MODEL,
+        'matte':visual.perfil_chroma.VERSION,'render':visual.RENDER_VERSION,'review':visual.REVIEW_VERSION,'model':connectors_images.EDIT_MODEL,
         'transparent':connectors_images.supports_transparency()})
     jid=uuid.uuid5(perfil.NS,f'{pid}:v{proposal.version}:assets:{signature}')
     existing=Job.objects.filter(pk=jid,owner=user).first()
@@ -68,7 +68,7 @@ def review(context):
 def recover_banner(section,previous):
     """Recover layout from the existing section without rewriting the proposal or its claims."""
     text=section.get('copy','').strip()
-    if not text:return copy.deepcopy(previous)
+    if not text:return content.brand.normalize_banner(copy.deepcopy(previous))
     # Legacy sections sometimes carry label/phrase as prose or Markdown, not JSON.
     text=re.sub(r'[*`]', '',text)
     label=section.get('label','').strip()
@@ -93,7 +93,7 @@ def recover_banner(section,previous):
     if phrase==old_phrase and len(previous.get('lines',[]))==2:
         result=copy.deepcopy(previous)
         if label:result['label']=label
-        return result
+        return content.brand.normalize_banner(result)
     words=phrase.split()
     if len(words)<2:
         return {'lines':[phrase] if phrase else [],'highlight':'','label':label,'evidence':list(section.get('evidence',[]))}
@@ -103,10 +103,8 @@ def recover_banner(section,previous):
     fitting=[pair for pair in candidates if max(measure(s) for s in pair)<=visual.MAX_LINE_WIDTH]
     lines=min(fitting or candidates,key=lambda pair:(abs(len(pair[0].split())-len(pair[1].split())),
         max(measure(s) for s in pair)))
-    # Pick a unique complete word; punctuation stays in the phrase unchanged.
-    highlight=next((word for word in lines[1].split()+lines[0].split()
-        if re.fullmatch(r"[A-Za-z][A-Za-z'-]*[.,!?;:]?",word) and words.count(word)==1),'')
-    return {'lines':lines,'highlight':highlight,'label':label,'evidence':list(section.get('evidence',[]))}
+    return content.brand.normalize_banner({'lines':lines,'highlight':previous.get('highlight',''),
+        'label':label,'evidence':list(section.get('evidence',[]))})
 
 
 def review_context(proposal,refs):
@@ -154,6 +152,29 @@ def review_context(proposal,refs):
     return ctx
 
 
+def cached_review(context,checkpoints):
+    """Reuse semantic approval when only deterministic highlight/layout evidence changed."""
+    def semantic(value):
+        value=copy.deepcopy(value)
+        value.pop('render_evidence',None)
+        value['evidence_catalog']=[e for e in value.get('evidence_catalog',[]) if e['id']!='render.banner_fit']
+        # The highlighted word adds no claim; lines, label, references, citations
+        # and every other semantic input must still match exactly.
+        value['draft']['banner'].pop('highlight',None)
+        return value
+    expected=orquestacion.digest(semantic(context))
+    for ledger in checkpoints:
+        for call in ledger.progress_ledger.get('calls',{}).values():
+            if call['edge']!='perfil_revision_assets' or call['state']!='answered':continue
+            previous=orquestacion.unpack(call['request'])
+            if orquestacion.digest(semantic(previous))!=expected:continue
+            result=orquestacion.unpack(call['result'])
+            # Never turn a previous semantic rejection into approval.
+            if result['banner_ok'] and not result['reference_conflicts'] and all(r['ok'] for r in result['sections']):
+                return result
+    return None
+
+
 def run(job,*,reviewer=None,image_client=None,image_checker=None):
     proposal=ProfileProposal.objects.select_related('cycle').get(pk=job.params['proposal'],owner=job.owner)
     if proposal.state in ('cancelled','superseded') or proposal.version!=job.params['version']:return proposal
@@ -167,7 +188,9 @@ def run(job,*,reviewer=None,image_client=None,image_checker=None):
             if gallery.stale(refs,job.owner):raise ValueError('Cambiaron las referencias; vuelve a solicitar los assets con las notas vigentes.')
             ctx=runtime.snapshot('review-context',lambda:review_context(proposal,refs))
             if not ctx['section_ids']:raise ValueError('Las secciones visuales ya no están pendientes en esta propuesta.')
-            verdict=runtime.call('perfil_revision_assets',ctx,lambda:(reviewer or review)(ctx),key='review')
+            previous=cached_review(ctx,perfil.asset_checkpoints(proposal,proposal.cycle))
+            verdict=runtime.call('perfil_revision_assets',ctx,
+                lambda:previous if previous is not None else (reviewer or review)(ctx),key='review')
             rows,banner=content.validate(ctx['draft'],ctx,verdict)
             for row in rows:
                 issues=list(row.get('issues',[]))+verdict['reference_conflicts']

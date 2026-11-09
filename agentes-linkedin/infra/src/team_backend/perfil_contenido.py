@@ -184,7 +184,7 @@ def prepare_draft(data,context):
         row['evidence']=normalize_evidence(row.get('evidence',[]),context)
         if row['id']=='activity' and row['action'] not in ('keep','not_applicable'):row['action']='keep'
     banner=data.get('banner') or {}
-    data['banner']={key:banner.get(key,[] if key in ('lines','evidence') else '') for key in ('lines','highlight','label','evidence')}
+    data['banner']=brand.normalize_banner({key:banner.get(key,[] if key in ('lines','evidence') else '') for key in ('lines','highlight','label','evidence')})
     data['banner']['evidence']=normalize_evidence(data['banner']['evidence'],context)
     for row in data['sections']:
         if row['id']=='banner' and data['banner']['lines']:

@@ -1,12 +1,13 @@
 """Synthetic mattes and HTTP fakes only; no real image/vision provider."""
 import base64
 import io
+import json
 from unittest.mock import patch
 import httpx
 from django.test import SimpleTestCase
 from PIL import Image, ImageDraw
 from knowledge import providers
-from team_backend import connectors_images as images, perfil_assets, perfil_chroma as chroma, perfil_visual as visual
+from team_backend import connectors_images as images, imagenes, perfil_assets, perfil_chroma as chroma, perfil_visual as visual
 
 
 def keyed_photo(*,hole=False,size=256):
@@ -18,7 +19,95 @@ def keyed_photo(*,hole=False,size=256):
     out=io.BytesIO();image.save(out,format='PNG');return out.getvalue()
 
 
+def small_head():
+    """Hair-to-neck is 320/800 (~40%); white chest extends below the frame."""
+    image=Image.new('RGBA',(800,800))
+    draw=ImageDraw.Draw(image)
+    draw.polygon([(360,420),(440,420),(650,560),(700,799),(100,799),(150,560)],fill=(240,240,240,255))
+    draw.rectangle((360,320,439,455),fill=(170,120,85,255))
+    draw.ellipse((272,72,527,391),fill=(170,120,85,255))
+    return image
+
+
 class ChromaTests(SimpleTestCase):
+    def test_forty_percent_head_is_scaled_to_fifty_eight_for_both_portraits(self):
+        source=small_head();alpha=source.getchannel('A')
+        bounds=chroma.head_bounds(alpha)
+        self.assertEqual(bounds['method'],'alpha-neck-minimum')
+        self.assertAlmostEqual((bounds['neck']-bounds['top'])/800,.40,delta=.025)
+        framed,framing=chroma.frame_portrait(source,(800,800))
+        actual=chroma.head_bounds(framed.getchannel('A'))
+        self.assertAlmostEqual((actual['neck']-actual['top'])/800,.58,delta=.025)
+        self.assertAlmostEqual(actual['top']/800,.09,delta=.01)
+        self.assertGreater(framing['scale'],1.4)
+        self.assertLess(framing['crop_box'][3],800)  # Crop the chest, not padded full body.
+        evidence=[]
+        for kind in ('A','B'):
+            raw,rows=visual.portrait(source,kind,with_evidence=True)
+            measured={row['id']:row for row in rows};evidence.append(measured['render.framing'])
+            self.assertTrue(all(row['ok'] for row in rows))
+            self.assertEqual({row['sha256'] for row in rows},{imagenes.sha(raw)})
+            self.assertAlmostEqual(measured['render.framing']['head_height'],.58,delta=.01)
+            self.assertLessEqual(measured['render.framing']['eyes_y_estimate'],1/3)
+            with Image.open(io.BytesIO(raw)) as final:
+                outside=[rgb for rgb,a in zip(final.getdata(),framed.getchannel('A').getdata()) if a==0]
+                self.assertGreater(len(outside),0)
+                self.assertEqual(set(outside),{(15,241,206)})
+                self.assertEqual(measured['render.background']['outside_pixels'],len(outside))
+        self.assertEqual(evidence[0]['crop_box'],evidence[1]['crop_box'])
+
+    def test_unidentifiable_neck_uses_bounded_fallback_and_records_reason(self):
+        person=visual.cutout(keyed_photo())
+        framed,evidence=chroma.frame_portrait(person,(800,800))
+        self.assertEqual(evidence['method'],'alpha-width-fallback')
+        self.assertIn('Sin mínimo',evidence['fallback_reason'])
+        self.assertTrue(evidence['ok']);self.assertFalse(evidence['eyes_measured'])
+        self.assertEqual(framed.size,(800,800))
+        self.assertLess(evidence['scale'],4)
+
+    def test_cyan_edges_and_light_shirt_are_corrected_without_changing_alpha_or_warm_skin(self):
+        person=small_head();draw=ImageDraw.Draw(person)
+        draw.rectangle((280,650,520,799),fill=(180,225,220,255))  # Cyan white shirt.
+        draw.line((360,395,360,418),fill=(80,160,150,180),width=2)  # Mixed edge.
+        original_alpha=person.getchannel('A').tobytes();skin=person.getpixel((400,200))
+        cleaned,evidence=chroma.despill(person)
+        self.assertGreater(evidence['before']['light']['affected_fraction'],.005)
+        self.assertGreater(evidence['before']['edge']['affected_pixels'],0)
+        self.assertGreater(evidence['corrected_pixels'],0);self.assertTrue(evidence['ok'])
+        self.assertEqual(evidence['after']['light']['affected_pixels'],0)
+        self.assertEqual(evidence['after']['edge']['affected_pixels'],0)
+        self.assertEqual(cleaned.getchannel('A').tobytes(),original_alpha)
+        self.assertEqual(cleaned.getpixel((400,200)),skin)
+        unchanged,clean=chroma.despill(small_head())
+        self.assertEqual(clean['corrected_pixels'],0)
+        self.assertEqual(unchanged.tobytes(),small_head().tobytes())
+
+    def test_review_uses_bound_measurements_but_keeps_identity_and_clothing_checks(self):
+        raw,rows=visual.portrait(small_head(),'A',with_evidence=True)
+        result={'ok':True,'checks':[{'point':n,'ok':True,'reason':'Synthetic'} for n in (1,2,3,7,8)],
+            'identity_03':True,'smile_01':True,'clear_glasses':True,'pose_01':True,'body_02':True,'clothing':True,
+            'face_height':.4,'eyes_y':.38,'head_top':.09,'reasons':[]}
+        def provider(system,message,**kwargs):
+            self.assertIn('no rechaces por no poder verificar #0FF1CE',system)
+            self.assertNotIn('Ante duda ok=false',system)
+            payload=json.loads(message[0]['text'])
+            self.assertEqual(payload['render_evidence'],rows)
+            return {'text':json.dumps(result)}
+        with patch.object(providers,'claude',side_effect=provider):
+            self.assertTrue(visual.check({'A':raw},{},{'render_evidence':rows})['ok'])
+            for key in ('identity_03','smile_01','clear_glasses','clothing'):
+                result[key]=False
+                self.assertFalse(visual.check({'A':raw},{},{'render_evidence':rows})['ok'])
+                result[key]=True
+            result['checks'][-1]['ok']=False  # Text/logo still blocks.
+            self.assertFalse(visual.check({'A':raw},{},{'render_evidence':rows})['ok'])
+        result['checks'][-1]['ok']=True
+        stale=[dict(row,sha256='old-bytes') for row in rows]
+        with patch.object(providers,'claude',return_value={'text':json.dumps(result)}):
+            self.assertFalse(visual.check({'A':raw},{},{'render_evidence':stale})['ok'])
+            bad=[dict(row,ok=False) if row['id']=='render.spill' else row for row in rows]
+            self.assertFalse(visual.check({'A':raw},{},{'render_evidence':bad})['ok'])
+
     def test_opaque_key_becomes_alpha_with_tolerance_despill_and_feather(self):
         source=Image.open(io.BytesIO(keyed_photo()))
         draw=ImageDraw.Draw(source)
@@ -61,6 +150,32 @@ class ChromaTests(SimpleTestCase):
 
 
 class BannerRecoveryTests(SimpleTestCase):
+    def test_invalid_highlight_is_repaired_even_when_existing_lines_are_preserved(self):
+        lines=['Your workflow,','built to ship.']
+        for highlight in ('','missing','workflow,','SHIP.','built to'):
+            previous={'lines':lines,'highlight':highlight,'label':'','evidence':['offer']}
+            recovered=perfil_assets.recover_banner({'copy':'\n'.join(lines)},previous)
+            expected={'workflow,':'workflow','SHIP.':'ship'}.get(highlight,'built')
+            self.assertEqual(recovered['highlight'],expected)
+            self.assertEqual(recovered['lines'],lines)
+            fit=visual.banner_fit(recovered)
+            self.assertTrue(fit['ok'],fit['error'])
+            self.assertEqual(fit['input'],{k:recovered[k] for k in ('lines','highlight','label')})
+            self.assertEqual(previous['highlight'],highlight)
+
+    def test_normalized_duplicates_choose_unique_word_and_impossible_copy_fails(self):
+        fit=visual.banner_fit({'lines':['Ship, ship.','Build it.'],'highlight':'ship','label':''})
+        self.assertTrue(fit['ok']);self.assertEqual(fit['input']['highlight'],'build')
+        impossible=visual.banner_fit({'lines':['Ship,','ship.'],'highlight':'ship','label':''})
+        self.assertFalse(impossible['ok'])
+        self.assertIn('exactamente una palabra',impossible['error'])
+
+    def test_punctuation_normalization_paints_exactly_one_complete_word(self):
+        with patch.object(ImageDraw.ImageDraw,'text') as text:
+            visual.banner(None,{'lines':['Your workflow,','built to ship.'],'highlight':'WORKFLOW','label':''})
+        accented=[call.args[1] for call in text.call_args_list if call.kwargs.get('fill')==visual.ACCENT]
+        self.assertEqual(accented,['workflow,'])
+
     def test_section_recovers_phrase_label_and_highlight_without_context_or_writer(self):
         variants=[
             {'copy':'Software that holds up.','label':'FOUNDER, PROJECTAPP'},
