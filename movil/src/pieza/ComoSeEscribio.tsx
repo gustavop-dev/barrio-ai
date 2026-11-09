@@ -1,6 +1,7 @@
 // «Cómo se escribió» (Pieza.dc.html): brief, variants, readers, selection, verifier, repair round and
 // sources, every fold closed by default. The variants are tabs you can also swipe, marked «Elegida».
 import type { PieceDetail, Variant } from '@compartido/api/types';
+import { communityEffects, communityTrace } from '@compartido/logic/comunidad';
 import {
   asArray,
   assessmentLine,
@@ -204,6 +205,7 @@ function PanelFold({ piece, finished }: { piece: PieceDetail; finished: boolean 
             Cinco perspectivas simuladas: son hipótesis sobre comprensión y utilidad, no métricas.
           </T>
           {panel.summary ? <T>{panel.summary}</T> : null}
+          <T>{communityTrace(panel)}</T>
           <View>
             {asArray(panel.readers).map((reader, index) => {
               const badge = readerBadge(reader);
@@ -211,6 +213,7 @@ function PanelFold({ piece, finished }: { piece: PieceDetail; finished: boolean 
                 <View key={`${reader.reader}-${index}`} style={styles.reader}>
                   <View style={styles.readerText}>
                     <T>{readerLabel(reader.reader)}</T>
+                    {communityEffects(reader).map((line, i) => <T key={i}>{line}</T>)}
                     {[assessmentLine('A', reader.variant_a), assessmentLine('B', reader.variant_b)].filter(Boolean).map((line) => (
                       <T key={line} variant="detalle" soft>
                         {line}

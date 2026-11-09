@@ -8,19 +8,21 @@ import { space } from '@/theme/tokens';
 import { Barrio } from './Barrio';
 import { Oportunidades } from './Oportunidades';
 import { Referentes } from './Referentes';
+import { Comunidad } from './Comunidad';
 
-type Tab = 'barrio' | 'oportunidades' | 'referentes';
+type Tab = 'barrio' | 'oportunidades' | 'referentes' | 'comunidad';
 
 const TABS: readonly { value: Tab; label: string }[] = [
   { value: 'barrio', label: 'Barrio' },
   { value: 'oportunidades', label: 'Oportunidades' },
   { value: 'referentes', label: 'Referentes' },
+  { value: 'comunidad', label: 'Comunidad' },
 ];
 
 export const PERSONAS_PARAMS = ['pestana', 'etapa', 'q', 'rol', 'modalidad', 'origen'] as const;
 
 function readTab(value: string): Tab {
-  return value === 'oportunidades' || value === 'referentes' ? value : 'barrio';
+  return value === 'oportunidades' || value === 'referentes' || value === 'comunidad' ? value : 'barrio';
 }
 
 export function PersonasScreen() {
@@ -33,12 +35,13 @@ export function PersonasScreen() {
   const header = (
     <View style={styles.header}>
       <PageHeader title="Personas" />
-      <TabBar<Tab> label="Personas" tabs={TABS} value={tab} onChange={choose} />
+      <TabBar<Tab> label="Personas" tabs={TABS} value={tab} onChange={choose} testIDPrefix="personas" />
     </View>
   );
 
   if (tab === 'oportunidades') return <Oportunidades header={header} />;
   if (tab === 'referentes') return <Referentes header={header} />;
+  if (tab === 'comunidad') return <Comunidad header={header} />;
   return (
     <Barrio
       header={header}

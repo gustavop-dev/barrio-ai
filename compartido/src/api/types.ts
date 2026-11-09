@@ -489,6 +489,7 @@ export type ObjectionSeverity = 'material' | 'preference' | 'missing_data';
 export interface Assessment {
   strengths?: string[];
   objections?: { text: string; severity: ObjectionSeverity }[];
+  community?: { study_id: string; finding_id: string; basis: 'observed_in_sample' | 'reader_hypothesis'; effect: string; uncertainty: string }[];
 }
 
 export interface ReaderAssessment {
@@ -501,6 +502,7 @@ export interface Panel {
   readers?: ReaderAssessment[];
   summary?: string;
   citations?: string[];
+  community_study?: { status: string; study_id: string; version: number };
 }
 
 export interface Selection {
