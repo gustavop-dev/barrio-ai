@@ -40,6 +40,10 @@ NETWORK_UNITS=['LI-03-M005-K05','LI-03-M005-K06','LI-03-V018-K02','LI-03-V018-K0
 INBOX_UNITS=['LI-03-V019-K03','LI-03-V019-K04','LI-03-V020-K01','LI-06-V006-K04']
 LEAD_UNITS=['LI-03-V020-K02','LI-03-M006-K01','LI-03-M005-K06','LI-06-M001-K04','LI-06-M001-K07']
 COURSE_VERSION='bib-v1'
+# Whole curated lists (including editorial's writing guide) share this allowance.
+# The local corpus needs ~23k for network; even the writing guide with every
+# possible approach stays below 54k, including original sources and relations.
+COURSE_TOKEN_BUDGET=64000
 EXECUTION_NAMESPACE=uuid.UUID('6f1d8c0e-6a43-4a8e-9a55-7d1b0c2f4e11')
 
 class OperatorBlocked(Conflict):
@@ -778,9 +782,13 @@ Las unidades del curso van en el contexto, a continuación de estas instruccione
 Cita en "citations" solo IDs de unidades del contexto que fundamenten tu enfoque.
 Enumera en "claims_needing_evidence" cualquier afirmación que Gustavo deba comprobar.'''
 
-def course_context(unit_ids=COMMENT_UNITS,token_budget=12000):
-    """Whole original units, in priority order, within a token budget; also used by editorial.py."""
-    chosen=[];missing=[];tokens=0
+def course_context(unit_ids=COMMENT_UNITS,token_budget=COURSE_TOKEN_BUDGET):
+    """Return (whole units, missing/unreadable IDs, IDs omitted only for budget).
+
+    Read every requested unit even after the budget fills: a real absence still blocks.
+    Omitted units must never appear among the citations of the returned context.
+    """
+    chosen=[];missing=[];omitted=[];tokens=0
     for uid in dict.fromkeys(unit_ids):
         if not re.fullmatch(r'LI-0[1-6]-[A-Z0-9]+-K\d+',uid):missing.append(uid);continue
         try:row=retrieval.unit(uid)
@@ -789,29 +797,29 @@ def course_context(unit_ids=COMMENT_UNITS,token_budget=12000):
                'hash':row.get('sha256') or hashlib.sha256(json.dumps(row['original'],sort_keys=True,ensure_ascii=False,default=str).encode()).hexdigest(),
                'sources':row.get('sources',[]),'relations':row.get('relations',[])}
         n=len(ENC.encode(json.dumps(entry,ensure_ascii=False,default=str)))
-        if tokens+n>token_budget:missing.append(uid);continue
+        if tokens+n>token_budget:omitted.append(uid);continue
         chosen.append(entry);tokens+=n
-    return chosen,missing
+    return chosen,missing,omitted
 
 def course_block(units):
     """Course units as stable system context: the same units in the same order every time, so they stay cached."""
     return 'Unidades del curso (course_units):\n'+json.dumps(units,ensure_ascii=False,default=str)
 
-def role_context(role,unit_ids,criteria=None):
+def role_context(role,unit_ids,criteria=None,token_budget=COURSE_TOKEN_BUDGET):
     """Stable complete source block and a versioned envelope. No retrieval identity impersonation.
 
     Sources are data, never authorization. Read current active units each time so a retired/changed
     unit invalidates the provider's prefix cache; historical envelopes retain their content hashes.
     """
-    units,missing=course_context(unit_ids)
+    units,missing,omitted=course_context(unit_ids,token_budget)
     loaded=[u['unit_id'] for u in units]
     sources={key:[uid for uid in ids if uid in loaded] for key,ids in (criteria or {'contexto':unit_ids}).items()}
     metadata={'course_role':role,'course_citations':loaded,'criterion_sources':sources,
               'course_version':COURSE_VERSION,'course_hashes':{u['unit_id']:u['hash'] for u in units},
               'criterion_version':hashlib.sha256(json.dumps(sources,sort_keys=True).encode()).hexdigest(),
               'orientation_hash':hashlib.sha256(orientacion.text().encode()).hexdigest(),
-              'course_missing':missing,'course_mode':'curated_ids','course_base':list(unit_ids),'course_additional':[],
-              'course_status':'Biblioteca no disponible' if missing or not units else 'disponible'}
+              'course_missing':missing,'course_omitted':omitted,'course_mode':'curated_ids','course_base':list(unit_ids),'course_additional':[],
+              'course_status':'Biblioteca no disponible' if missing else 'disponible'}
     return course_block(units),metadata
 
 def validate_course_citations(citations,grounding):
@@ -853,8 +861,11 @@ def propose_comment(user,post_id,origin_job=''):
     if not experimentos.eligible(post):raise ValueError('Cupo del foco experimental agotado.')
     if ActionProposal.objects.filter(post=post,capability='INT-03',state__in=OPEN_ACTION_STATES+['confirmed']).exists():
         raise Conflict('Ya hay un comentario abierto o publicado en esta publicación; no se genera otro.')
-    units,missing=course_context()
+    units,missing,omitted=course_context()
+    if missing:raise ValueError('Biblioteca no disponible para fundamentar el comentario.')
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
+    _audit(user,'operator.comment_grounded',post.id,course_missing=missing,course_omitted=omitted,
+           course_citations=[u['unit_id'] for u in units])
     try:others=[{'author':c['author']['display_name'],'text':c['text'][:600]} for c in get_connector(post.account).list_comments(post.provider_post_id,limit=10)]
     except ConnectorError:others=[]
     public_facts,private_guidance=memory.confirmed_blocks()
@@ -878,7 +889,7 @@ def propose_comment(user,post_id,origin_job=''):
             risks.append('Reescrito una vez por las reglas fijas: '+'; '.join(issues))
         except ValueError as exc:risks.append(f'No se pudo reescribir ({exc}); queda el primer borrador.')
     oficina_eventos.emit('entrega','relaciones_comunidad','operador_cuenta','Comentario redactado')
-    if missing:risks.append('Unidades no incluidas: '+', '.join(missing))
+    if omitted:risks.append('Unidades omitidas por presupuesto de contexto: '+', '.join(omitted))
     if data.get('decision')!='comment' or not data.get('comment','').strip():
         return create_proposal(user,post,'INT-03',{'text':data.get('comment','')},rationale=data.get('rationale',''),
             citations=citations,risks=risks,source='agent',origin_job=origin_job,model=answer['model'],

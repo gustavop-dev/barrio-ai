@@ -653,7 +653,7 @@ def plan(user,account,now=None):
         summary['distribution'].append(dict(row,available=count,gap=max(0,row['profiles']-count),
             adaptation='Referencia adaptable de perfiles; no cuota de invitaciones. Faltantes requieren descubrimiento, nunca relleno.'))
     if grounding['course_missing'] or operador.globally_paused() or account.paused:
-        summary['stopped']='Biblioteca no disponible o cuenta pausada'
+        summary['stopped']='Biblioteca no disponible' if grounding['course_missing'] else 'Cuenta pausada'
         operador._audit(user,'network.planned',account.id,**summary);return summary
     def room(capability):
         reserved=ActionProposal.objects.filter(capability=capability,state__in=['proposed','approved']).count()

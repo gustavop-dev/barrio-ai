@@ -166,7 +166,8 @@ def stage_request(run,name,payload,unit_ids=None):
     """editorial._stage without the piece: same system, voice, units, schema, caps and effort."""
     system,schema,default_units,budget,max_tokens,effort=editorial.STAGES[name][:6]
     if name in editorial.VOICED_STAGES:system=voz.with_voice(system)
-    units,_=run.context(unit_ids or default_units,budget)
+    units,missing,_=run.context(unit_ids or default_units,budget)
+    if missing:raise ValueError(f'Biblioteca no disponible para la etapa {name}.')
     if not units:raise ValueError(f'Sin unidades del curso para la etapa {name}.')
     message=json.dumps(dict(payload,course_units=units),ensure_ascii=False,default=str)
     return {'system':system,'message':message,'max_tokens':max_tokens,'output_schema':schema,'effort':effort}
@@ -190,7 +191,8 @@ def selection_request(run,piece,panel=True):
 def comment_request(run,post,revision=None):
     """operador._draft_comment without reading LinkedIn (existing_comments stays empty): instructions, voice and course
     units in cached system blocks; `revision` makes it the redraft after a rule violation."""
-    units,_=run.context(operador.COMMENT_UNITS,12000)
+    units,missing,_=run.context(operador.COMMENT_UNITS)
+    if missing:raise ValueError('Biblioteca no disponible para fundamentar el comentario.')
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     inputs={'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':[],
             'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation}
@@ -205,7 +207,7 @@ def classify_request(run,contacts):
     """red.classify for a batch, with the profile data stored today."""
     people=red.classification_people(contacts)
     message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':red.note_policy()},ensure_ascii=False,default=str)
-    units,missing=run.context(red.NETWORK_UNITS,12000)
+    units,missing,_=run.context(red.NETWORK_UNITS)
     if missing:raise ValueError('Biblioteca no disponible para clasificar')
     return {'system':red.CLASSIFY_SYSTEM,'message':message,'max_tokens':16000,'output_schema':red.CLASSIFY_SCHEMA,'effort':'medium',
             'context':operador.course_block(units)}
@@ -340,7 +342,7 @@ class Run:
     def editorial_memory(self):
         return {'public_facts':self.public,'private_guidance':self.private,'orientation':self.orientation}
 
-    def context(self,unit_ids,budget):
+    def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET):
         key=(tuple(unit_ids),budget)
         if key not in self._units:self._units[key]=operador.course_context(list(unit_ids),budget)
         return self._units[key]

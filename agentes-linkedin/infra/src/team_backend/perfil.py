@@ -19,7 +19,16 @@ from .models import ActionExecution, Capture, ConnectorAccount, Job, ProfileAsse
 from .jobs import audit, enqueue_operation
 
 NS=uuid.UUID('0ff1ce08-0000-4000-8000-000000000008')
-EXPLICIT=re.compile(r'^\s*(?:por favor[, ]*)?(?:hazme|prepara|genera|quiero)\s+(?:la|una)\s+propuesta\s+(?:del|de mi)\s+perfil[.!?\s]*$',re.I)
+# Match the entire request: a quoted example, a negation or a note about someone
+# else's profile must never enqueue the paid full-profile cycle.
+_SEPARATOR=r'[\s,.;:!?¡¿…"“”«»]'
+_COURTESY=r'(?:por\s+favor|porfa|muchas\s+gracias|gracias|hola|buenos\s+d[ií]as|buenas\s+tardes|buenas\s+noches)'
+EXPLICIT=re.compile(
+    rf'{_SEPARATOR}*(?:{_COURTESY}{_SEPARATOR}+)*'
+    r'(?:(?:hazme|haz|prep[aá]rame|prepara|genera|quiero(?:\s+que\s+me\s+hagas)?)\s+)?'
+    r'(?:(?:la|una)\s+)?propuesta\s+(?:completa\s+)?'
+    r'(?:del|de(?:\s+mi)?|para\s+mi)\s+perfil(?:\s+de\s+linkedin)?'
+    rf'(?:{_SEPARATOR}+{_COURTESY})*{_SEPARATOR}*',re.I)
 READ_SCHEMA={'type':'object','required':['sections','evidence','at','limitations']}
 ASSET_KINDS={'A','B','banner','mobile_A','mobile_B','desktop_A','desktop_B'}
 SECTION_ASSETS={'photo':{'A','B'},'banner':{'banner'}}
@@ -125,6 +134,21 @@ def capture_request(capture,user,text):
     proposal=queue(user,{'capture':str(capture.id)})
     return ({'proposal':str(proposal.id)}, {'kind':'perfil','text':'Perfil está preparando tu propuesta',
         'link':f'/tu-turno#turno-perfil:{proposal.id}'},Capture.State.NOTED,'perfil')
+
+
+def capture_clarification(capture,user,text):
+    """Unclear scope is a question for Gustavo, not a failed capture or a paid cycle."""
+    from . import preguntas
+    from .models import TeamQuestion
+    key=f'perfil.solicitud-{capture.id.hex}'
+    question=preguntas.ask('perfil','¿Quieres una propuesta completa para tu perfil de LinkedIn?',
+        'Para pedirla, envía una nueva nota con la frase exacta «hazme la propuesta del perfil». '
+        'Si era una idea para un post o un dato, vuelve a enviarla eligiendo «Para qué es».',
+        key,origin=f'captura:{capture.id}')
+    if question is None:question=TeamQuestion.objects.filter(memory_key=key).first()
+    return ({'question':str(question.id) if question else None},
+        {'kind':'anotado','text':'Perfil te dejó una pregunta en Tu turno','link':'/tu-turno'},
+        Capture.State.NOTED,'perfil')
 
 
 @transaction.atomic

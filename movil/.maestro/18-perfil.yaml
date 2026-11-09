@@ -1,7 +1,10 @@
-# cubre: GAL-08, TUR-18, EST-01, EST-03, EST-04
+# cubre: GAL-08, TUR-18, EST-01, EST-03, EST-04, CAP-12, TUR-09
 # Real seeded API; generated PNG blocks, no real reference photo or paid provider.
+# seed_qa --perfil-capturas processes an ambiguous note through the real capture
+# router. It adds one pending question, with the exact phrase for a new request.
+# Natural text/audio requests and completed jobs are covered in test_perfil_capturas.py.
 appId: co.projectapp.office
-name: Perfil privado y checklist manual
+name: Perfil privado, aclaración de alcance y checklist manual
 tags: [perfil, galeria, turno]
 ---
 - runFlow: comun/entrar.yaml
@@ -55,7 +58,7 @@ tags: [perfil, galeria, turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 10 pendientes, 1 urgente'
+      text: 'Tu turno, 11 pendientes, 1 urgente'
     timeout: 30000
 - scrollUntilVisible:
     element:
@@ -64,6 +67,20 @@ tags: [perfil, galeria, turno]
     timeout: 30000
     centerElement: true
 - assertVisible: Gestionar protegidos
+- scrollUntilVisible:
+    element:
+      text: '¿Quieres una propuesta completa para tu perfil de LinkedIn\?'
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: '¿Quieres una propuesta completa para tu perfil de LinkedIn\?'
+- scrollUntilVisible:
+    element:
+      text: '.*envía una nueva nota con la frase exacta «hazme la propuesta del perfil».*'
+    direction: DOWN
+    centerElement: true
+- assertVisible: '.*envía una nueva nota con la frase exacta «hazme la propuesta del perfil».*'
+- takeScreenshot: 18-perfil-01b-aclaracion-en-tu-turno
 - scrollUntilVisible:
     element:
       id: profile-open

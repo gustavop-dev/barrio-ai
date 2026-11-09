@@ -56,7 +56,7 @@ class EvalBase(OperatorBase):
         with db.connect() as c:
             for uid in EDITORIAL_UNITS:
                 c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
-                    VALUES(%s,5,%s,'{"title":"Unidad de prueba"}','abc','fixture','/units/0','{}')''',(uid,uid))
+                    VALUES(%s,5,%s,'{"title":"Unidad de prueba"}','abc','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''',(uid,uid))
         env=patch.dict(os.environ,{'EVAL_LIMIT_USD':'0','LEAD_ENABLED':'false','ANTHROPIC_MODEL':'claude-opus-5-5','ANTHROPIC_MAX_TOKENS':'8000',
                                    'NETWORK_CLASSIFIER_MODEL':'claude-sonnet-5-5','NETWORK_MIN_CONFIDENCE':'0.6'})
         env.start();self.addCleanup(env.stop)

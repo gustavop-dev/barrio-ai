@@ -260,12 +260,12 @@ VOICED_STAGES=('redactor','seleccion','reparacion')
 # Opus 5.5 always thinks and its thinking counts against max_tokens: the caps leave room for it, so a
 # long deliberation never cuts the JSON (the answer is streamed and billed by what is actually used).
 STAGES={
-    'director':(DIRECTOR_SYSTEM,BRIEF_SCHEMA,PILLAR_UNITS+CADENCE_UNITS+APPROACH_UNITS+[TEXT_FORMAT_UNIT],22000,16000,'medium'),
-    'redactor':(WRITER_SYSTEM,WRITER_SCHEMA,[TEXT_FORMAT_UNIT]+EDIT_UNITS+GUIDE_UNITS,26000,16000,'medium'),
-    'lectores':(PANEL_SYSTEM,PANEL_SCHEMA,READER_UNITS,5000,12000,'low'),
-    'seleccion':(SELECTION_SYSTEM,SELECTION_SCHEMA,EDIT_UNITS+READER_UNITS,9000,16000,'medium'),
-    'verificador':(VERIFIER_SYSTEM,VERIFIER_SCHEMA,EDIT_UNITS+['LI-06-M001-K04','LI-06-M001-K07'],8000,16000,'high'),
-    'reparacion':(REPAIR_SYSTEM,REPAIR_SCHEMA,EDIT_UNITS+['LI-06-M001-K04','LI-06-M001-K07'],9000,16000,'medium'),
+    'director':(DIRECTOR_SYSTEM,BRIEF_SCHEMA,PILLAR_UNITS+CADENCE_UNITS+APPROACH_UNITS+[TEXT_FORMAT_UNIT],operador.COURSE_TOKEN_BUDGET,16000,'medium'),
+    'redactor':(WRITER_SYSTEM,WRITER_SCHEMA,[TEXT_FORMAT_UNIT]+EDIT_UNITS+GUIDE_UNITS,operador.COURSE_TOKEN_BUDGET,16000,'medium'),
+    'lectores':(PANEL_SYSTEM,PANEL_SCHEMA,READER_UNITS,operador.COURSE_TOKEN_BUDGET,12000,'low'),
+    'seleccion':(SELECTION_SYSTEM,SELECTION_SCHEMA,EDIT_UNITS+READER_UNITS,operador.COURSE_TOKEN_BUDGET,16000,'medium'),
+    'verificador':(VERIFIER_SYSTEM,VERIFIER_SCHEMA,EDIT_UNITS+['LI-06-M001-K04','LI-06-M001-K07'],operador.COURSE_TOKEN_BUDGET,16000,'high'),
+    'reparacion':(REPAIR_SYSTEM,REPAIR_SCHEMA,EDIT_UNITS+['LI-06-M001-K04','LI-06-M001-K07'],operador.COURSE_TOKEN_BUDGET,16000,'medium'),
 }
 
 # --------------------------------------------------------------------------- configuration and calendar
@@ -415,7 +415,8 @@ def _stage(piece,name,payload,unit_ids=None):
     if name in VOICED_STAGES:system=voz.with_voice(system)
     unit_ids=unit_ids or default_units
     _guard()
-    units,missing=operador.course_context(unit_ids,budget)
+    units,missing,omitted=operador.course_context(unit_ids,budget)
+    if missing:raise ValueError(f'Biblioteca no disponible para la etapa {name}.')
     if not units:raise ValueError(f'Sin unidades del curso para la etapa {name}.')
     piece.stage=name;piece.save(update_fields=['stage','updated_at'])
     if piece.research and name!='lectores':payload=dict(payload,untrusted_web_evidence=research.evidence(piece.research))
@@ -440,7 +441,8 @@ def _stage(piece,name,payload,unit_ids=None):
     data['citations']=[c for c in data.get('citations',[]) if c in known]
     piece.citations=list(dict.fromkeys(list(piece.citations)+data['citations']))
     piece.usage=list(piece.usage)+[{'stage':name,'model':answer.get('model'),'estimated_usd':answer.get('estimated_usd'),
-                                    'request_id':answer.get('request_id'),'units':sorted(known),'missing_units':missing}]
+                                    'request_id':answer.get('request_id'),'units':sorted(known),'missing_units':missing,
+                                    'course_omitted':omitted}]
     piece.save(update_fields=['citations','usage','updated_at'])
     return data,answer.get('model','')
 
