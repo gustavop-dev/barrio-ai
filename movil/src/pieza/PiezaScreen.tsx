@@ -4,9 +4,9 @@
 import type { PieceDetailFull } from '@compartido/api/calendario';
 import { usePiece } from '@compartido/api/hooks';
 import { CALENDAR_TZ, longDay, todayIn } from '@compartido/logic/dates';
-import { pieceStatus, vetoable } from '@compartido/logic/editorial';
+import { pieceStatus } from '@compartido/logic/editorial';
 import { formatTime } from '@compartido/logic/format';
-import { isOnItsWay, pieceLeaves, pieceWhen, preparationStages, publishedAt, stageShort } from '@compartido/logic/piece';
+import { isOnItsWay, pieceLeaves, pieceWhen, pieceVetoable, preparationStages, publishedAt, stageShort } from '@compartido/logic/piece';
 import { turnoAnchor } from '@compartido/logic/turno';
 import { useState } from 'react';
 import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -21,6 +21,7 @@ import { FinalText } from './FinalText';
 import { PreparationTrack } from './PreparationTrack';
 import { Resultado } from './Resultado';
 import { TeamComments } from './TeamComments';
+import { PieceImages } from './PieceImages';
 
 /** Blocked, skipped, vetoed, discarded, failed or uncertain: what happened, in the state's tone. */
 function StatusNote({ piece }: { piece: PieceDetailFull }) {
@@ -85,7 +86,7 @@ function StatusNote({ piece }: { piece: PieceDetailFull }) {
 
 export function PiezaScreen({ pieceId }: { pieceId: string }) {
   const query = usePiece(pieceId);
-  const piece = query.data as PieceDetailFull | undefined;
+  const piece = query.data;
   const now = useNow();
   const { bottom } = useContentInsets();
   const [refreshing, setRefreshing] = useState(false);
@@ -122,7 +123,7 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
       : isOnItsWay(piece.status)
         ? pieceLeaves(piece.scheduled_for, { today, timeZone })
         : pieceWhen(piece.status, piece.scheduled_for, { today, timeZone, now, published: publishedAt(piece) });
-  const canVeto = Boolean(piece.action && vetoable(piece.action));
+  const canVeto = pieceVetoable(piece, now);
   const hour = formatTime(piece.scheduled_for, timeZone);
 
   return (
@@ -169,6 +170,7 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
         </Section>
       ) : null}
 
+      <PieceImages piece={piece} />
       <FinalText piece={piece} />
       <TeamComments pieceId={piece.id} label={`Pieza del ${day}`} comments={piece.team_comments ?? []} now={now} />
       <ComoSeEscribio piece={piece} />

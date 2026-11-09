@@ -27,7 +27,7 @@ function photo(id: string, extra: Partial<PhotoOutput> = {}): PhotoOutput {
     label: 'Sin usar',
     tone: 'muted',
     note: '',
-    allow_ai_edit: true,
+    ai_edit: 'auto',
     used_in: null,
     capture_id: null,
     mime: 'image/jpeg',
@@ -178,15 +178,15 @@ describe('Galería', () => {
     expect(await screen.findByText('Foto guardada.')).toBeOnTheScreen();
   });
 
-  it('PATCHes only the AI switch when only it changed', async () => {
+  it.each([['no', 'No editar'], ['si', 'Editar']] as const)('PATCHes only the AI choice %s when only it changed', async (value, label) => {
     const server = await renderGaleria({ 'PATCH /api/v1/galeria/p1': { body: PHOTOS[0] } });
     await fireEvent.press(await screen.findByLabelText('Foto del 3 nov, nueva'));
     const sheet = await screen.findByTestId('photo-sheet');
-    const ai = within(sheet).getByRole('switch', { name: 'El equipo puede editarla con IA' });
-    expect(ai).toBeChecked();
+    const ai = within(sheet).getByRole('radio', { name: label });
+    expect(ai).not.toBeChecked();
     await fireEvent.press(ai);
     await fireEvent.press(within(sheet).getByRole('button', { name: 'Guardar' }));
-    await waitFor(() => expect(server.find('PATCH', '/api/v1/galeria/p1')[0]?.body).toEqual({ allow_ai_edit: false }));
+    await waitFor(() => expect(server.find('PATCH', '/api/v1/galeria/p1')[0]?.body).toEqual({ ai_edit: value }));
   });
 
   it('a photo opened again before the gallery reloads shows what was just saved', async () => {
@@ -201,14 +201,14 @@ describe('Galería', () => {
       return answer(...args);
     });
     await fireEvent.changeText(within(sheet).getByTestId('photo-note'), 'Sin nombres de clientes');
-    await fireEvent.press(within(sheet).getByRole('switch', { name: 'El equipo puede editarla con IA' }));
+    await fireEvent.press(within(sheet).getByRole('radio', { name: 'No editar' }));
     await fireEvent.press(within(sheet).getByRole('button', { name: 'Guardar' }));
     expect(await screen.findByText('Foto guardada.')).toBeOnTheScreen();
     await waitFor(() => expect(screen.queryByTestId('photo-sheet')).toBeNull());
     await fireEvent.press(screen.getByLabelText('Foto del 3 nov, nueva'));
     sheet = await screen.findByTestId('photo-sheet');
     expect(within(sheet).getByTestId('photo-note')).toHaveDisplayValue('Sin nombres de clientes');
-    expect(within(sheet).getByRole('switch', { name: 'El equipo puede editarla con IA' })).not.toBeChecked();
+    expect(within(sheet).getByRole('radio', { name: 'No editar' })).toBeChecked();
     expect(within(sheet).getByRole('button', { name: 'Guardar' })).toBeDisabled();
     expect(within(sheet).getByLabelText('Foto: Sin nombres de clientes')).toBeOnTheScreen();
   });
@@ -218,10 +218,10 @@ describe('Galería', () => {
     await fireEvent.press(await screen.findByLabelText('Foto del 3 nov, nueva'));
     const sheet = await screen.findByTestId('photo-sheet');
     expect(within(sheet).getByTestId('photo-note')).toHaveDisplayValue('');
-    server.on('GET /api/v1/galeria', { body: page([{ ...PHOTOS[0]!, note: 'Desde la PWA', allow_ai_edit: false }, ...PHOTOS.slice(1)]) });
+    server.on('GET /api/v1/galeria', { body: page([{ ...PHOTOS[0]!, note: 'Desde la PWA', ai_edit: 'no' }, ...PHOTOS.slice(1)]) });
     await act(async () => server.client.invalidateQueries({ queryKey: ['galeria'] }));
     await waitFor(() => expect(within(screen.getByTestId('photo-sheet')).getByTestId('photo-note')).toHaveDisplayValue('Desde la PWA'));
-    expect(within(screen.getByTestId('photo-sheet')).getByRole('switch', { name: 'El equipo puede editarla con IA' })).not.toBeChecked();
+    expect(within(screen.getByTestId('photo-sheet')).getByRole('radio', { name: 'No editar' })).toBeChecked();
     expect(within(screen.getByTestId('photo-sheet')).getByRole('button', { name: 'Guardar' })).toBeDisabled();
   });
 

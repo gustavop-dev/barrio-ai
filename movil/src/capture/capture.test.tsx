@@ -60,6 +60,7 @@ function capturaServer(extra: Parameters<typeof fakeServer>[0] = {}) {
     'POST /api/v1/capturas': { status: 201, body: CAPTURE },
     'DELETE /api/v1/capturas/c1': { body: { ...CAPTURE, state: 'deshecha' } },
     'GET /api/v1/preguntas': { body: [] },
+    'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } },
     ...extra,
   });
 }
@@ -285,6 +286,8 @@ describe('capture sheet', () => {
     expect(await within(sheet).findByLabelText('Foto adjunta 1')).toBeOnTheScreen();
     await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Para el post del jueves');
     await fireEvent.press(within(sheet).getByText('Idea para un post'));
+    expect(within(sheet).getByRole('radio', { name: 'Que decida el equipo' })).toBeChecked();
+    await fireEvent.press(within(sheet).getByRole('radio', { name: 'Editar' }));
     await fireEvent.press(within(sheet).getByTestId('capture-send'));
 
     await waitFor(() => expect(server.find('POST', '/api/v1/capturas')).toHaveLength(1));
@@ -294,6 +297,7 @@ describe('capture sheet', () => {
       ['fotos', { uri: 'file:///cache/foto.jpg', name: 'foto.jpg', type: 'image/jpeg' }],
       ['nota', 'Para el post del jueves'],
       ['para', 'post'],
+      ['ai_edit', 'si'],
     ]);
     // The envelope choreography plays first: the sheet goes and the toast comes at its end.
     expect(screen.getByTestId('capture-sheet')).toBeOnTheScreen();
@@ -309,6 +313,7 @@ describe('capture sheet', () => {
     expect(within(screen.getByTestId('capture-sheet-modal')).getByText('Envío deshecho. Lo tienes otra vez en la hoja.')).toBeOnTheScreen();
     expect(within(again).getByDisplayValue('Para el post del jueves')).toBeOnTheScreen();
     expect(within(again).getByLabelText('Foto adjunta 1')).toBeOnTheScreen();
+    expect(within(again).getByRole('radio', { name: 'Editar' })).toBeChecked();
   });
 
   it('«Deshacer» stays for 5 seconds (motion.ts toastDurations)', () => {
@@ -534,6 +539,7 @@ describe('capture sheet', () => {
       ['audio_duration_s', '4.2'],
       ['fotos', { uri: 'file:///cache/foto.jpg', name: 'foto.jpg', type: 'image/jpeg' }],
       ['nota', 'Idea secreta del jueves'],
+      ['ai_edit', 'auto'],
     ]);
     expect(await screen.findByText('Enviado al equipo.', {}, { timeout: 4000 })).toBeOnTheScreen();
   });
@@ -605,5 +611,31 @@ describe('capture sheet', () => {
     await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Algo');
     await fireEvent.press(within(sheet).getByTestId('capture-send'));
     expect(await screen.findByText('El envío es demasiado grande')).toBeOnTheScreen();
+  });
+});
+
+
+describe('IMG-16 / CAP-16 · opciones e intención', () => {
+  it('takes the saved photo default and lets a new capture choose all three states', async () => {
+    capturaServer({ 'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'no', updated_at: null } } });
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { draft: { audio: null, fotos: [{ id: 'f1', uri: 'file:///f.jpg', name: 'f.jpg', type: 'image/jpeg', size: 10 }], nota: '', para: null, publicUse: null } }));
+    await waitFor(() => expect(screen.getByRole('radio', { name: 'No editar' })).toBeChecked());
+    for (const name of ['Que decida el equipo', 'Editar', 'No editar']) {
+      await fireEvent.press(screen.getByRole('radio', { name }));
+      expect(screen.getByRole('radio', { name })).toBeChecked();
+    }
+  });
+
+  it('shows the interpreted priority, expected date in Bogotá, evidence and conditions', async () => {
+    capturaServer({ 'GET /api/v1/capturas': { body: [historyCapture({
+      state: 'usado', publish_asap: true, publish_asap_expected_slot: '2026-11-10T01:30:00Z',
+      publish_asap_evidence: 'Publícalo lo antes posible.', publish_asap_reason: 'Sujeto a verificación y veto.',
+    })] } });
+    await renderCapture();
+    await act(async () => openCaptureSheet(undefined, { view: 'history' }));
+    expect(await screen.findByText(/Saldrá lo antes posible.*lunes.*9.*20:30/)).toBeOnTheScreen();
+    expect(screen.getByText('«Publícalo lo antes posible.»')).toBeOnTheScreen();
+    expect(screen.getByText('Sujeto a verificación y veto.')).toBeOnTheScreen();
   });
 });

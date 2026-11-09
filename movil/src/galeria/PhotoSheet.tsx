@@ -1,12 +1,14 @@
 // The sheet of one photo (Galeria.dc.html): the big image (tap it for the full-screen viewer), its
-// state, where it was used, the note, «El equipo puede editarla con IA», Guardar (only what changed
+// state, where it was used, the note, «Edición con IA», Guardar (only what changed
 // is PATCHed) and «Quitar de la galería» behind a confirmation.
+import { AIEditControl } from '@/components/ui/AIEditControl';
+import type { AIEdit } from '@compartido/api/imagenes';
 import { useDeleteFoto, useUpdateFoto, type PhotoOutput } from '@compartido/api/capturas';
 import { inUseWarning, photoName, photoPatch, photoTone } from '@compartido/logic/galeria';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/icons';
-import { ApiImage, Badge, Button, ConfirmSheet, ErrorRetry, Field, Sheet, SwitchRow, T, useToast } from '@/components/ui';
+import { ApiImage, Badge, Button, ConfirmSheet, ErrorRetry, Field, Sheet, T, useToast } from '@/components/ui';
 import { haptic } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
 
@@ -30,29 +32,29 @@ export function PhotoSheet({
   const update = useUpdateFoto();
   const remove = useDeleteFoto();
   const [note, setNote] = useState(photo.note ?? '');
-  const [allowAi, setAllowAi] = useState(photo.allow_ai_edit);
+  const [aiEdit, setAiEdit] = useState(photo.ai_edit);
   const [confirming, setConfirming] = useState(false);
   // The photo the fields started from. When a fresher copy arrives (the Galería reloaded) and Gustavo has not
   // touched the fields, they follow it instead of keeping the old values.
   const [base, setBase] = useState(photo);
-  if (base !== photo && (base.note !== photo.note || base.allow_ai_edit !== photo.allow_ai_edit)) {
-    const untouched = Object.keys(photoPatch(base, note, allowAi)).length === 0;
+  if (base !== photo && (base.note !== photo.note || base.ai_edit !== photo.ai_edit)) {
+    const untouched = Object.keys(photoPatch(base, note, aiEdit)).length === 0;
     setBase(photo);
     if (untouched) {
       setNote(photo.note ?? '');
-      setAllowAi(photo.allow_ai_edit);
+      setAiEdit(photo.ai_edit);
     }
   }
-  const patch = photoPatch(photo, note, allowAi);
+  const patch = photoPatch(photo, note, aiEdit);
   const dirty = Object.keys(patch).length > 0;
   const warning = inUseWarning(photo);
 
   const changeNote = (text: string) => {
     setNote(text);
-    onDirtyChange?.(Object.keys(photoPatch(photo, text, allowAi)).length > 0);
+    onDirtyChange?.(Object.keys(photoPatch(photo, text, aiEdit)).length > 0);
   };
-  const changeAi = (next: boolean) => {
-    setAllowAi(next);
+  const changeAi = (next: AIEdit) => {
+    setAiEdit(next);
     onDirtyChange?.(Object.keys(photoPatch(photo, note, next)).length > 0);
   };
 
@@ -125,7 +127,7 @@ export function PhotoSheet({
           editable={!update.isPending}
           testID="photo-note"
         />
-        <SwitchRow label="El equipo puede editarla con IA" value={allowAi} onChange={changeAi} disabled={update.isPending} testID="photo-ai" />
+        <AIEditControl value={aiEdit} onChange={changeAi} disabled={update.isPending} testID="photo-ai" />
         <ErrorRetry error={update.error} />
         <Button variant="primary" block disabled={!dirty} loading={update.isPending} loadingLabel="Guardando…" onPress={save} testID="photo-save">
           Guardar

@@ -1,8 +1,13 @@
 // Shared wording for a piece: when it goes out, what it achieved and its editorial facts.
 import type { PieceCommenter, PieceDetail, PieceSnapshot } from '../api/types';
 import { dayOf, longDay, relativeDay, relativeDayInSentence, timeLeft } from './dates';
-import { label, MODALITY_LABEL, PILLAR_LABEL, readerLabel, STAGE_LABEL } from './editorial';
+import { label, MODALITY_LABEL, PILLAR_LABEL, readerLabel, STAGE_LABEL, vetoable } from './editorial';
 import { CONTACT_ROLE_LABEL, formatNumber, formatPct, formatTime } from './format';
+
+/** IMG-11: the veto covers the whole frozen piece, until its effective publication time. */
+export function pieceVetoable(piece: Pick<PieceDetail, 'action' | 'scheduled_for'>, now: number): boolean {
+  return vetoable(piece.action) && Date.parse(piece.scheduled_for) > now;
+}
 
 /** One step of the numbered preparation track (each app's StageTrack draws it). */
 export interface PreparationStage {

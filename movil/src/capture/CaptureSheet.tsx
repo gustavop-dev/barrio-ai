@@ -9,6 +9,8 @@
 // - photos pop in;
 // - «Guardar»: once the team has it, the content fades, the audio drops into an envelope that seals
 //   («ÉXITO»), the sheet goes down, the envelope flies off and the button pulses under the toast.
+import { AIEditControl } from '@/components/ui/AIEditControl';
+import type { AIEdit } from '@compartido/api/imagenes';
 import {
   CAPTURE_LIMITS,
   captureKeys,
@@ -16,6 +18,7 @@ import {
   undoCaptura,
   useCapturas,
   useCreateCaptura,
+  usePreferencias,
   type CaptureOutput,
   type CapturePurpose,
 } from '@compartido/api/capturas';
@@ -59,6 +62,7 @@ import { Wave } from './Wave';
 
 export const PURPOSES: readonly { value: CapturePurpose; label: string }[] = [
   { value: 'post', label: 'Idea para un post' },
+  { value: 'propuesta', label: 'Propuesta de post' },
   { value: 'dato', label: 'Dato sobre mí' },
   { value: 'respuesta', label: 'Responde una pregunta' },
   { value: 'galeria', label: 'Foto para la galería' },
@@ -646,6 +650,10 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
   const client = useQueryClient();
   const recorder = useRecorder();
   const create = useCreateCaptura();
+  const prefs = usePreferencias();
+  const [aiChoice, setAiChoice] = useState<AIEdit | null>(seed.draft?.ai_edit ?? null);
+  const aiEdit = aiChoice ?? prefs.data?.gallery_ai_edit ?? null;
+  const aiEditToSend = aiEdit ?? undefined;
   const history = useCapturas();
   const { reduced } = useMotion();
   const [view, setView] = useState<'form' | 'history'>(seed.view ?? 'form');
@@ -832,7 +840,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
     if (audio.kind === 'recording' && !autoStopped) finalAudio = (await recorder.stop()) ?? readyAudio;
     // From here on the audio is part of the draft: a failed send keeps it in the sheet.
     if (finalAudio) setAudio({ kind: 'done', audio: finalAudio });
-    const draft: CaptureDraft = { audio: finalAudio, fotos, nota, para, publicUse: publicChoice };
+    const draft: CaptureDraft = { audio: finalAudio, fotos, nota, para, publicUse: publicChoice, ai_edit: aiEditToSend };
     const sentContext = context;
     const mime = finalAudio?.mime || 'audio/mp4';
     const parts: LocalPart[] = [
@@ -845,6 +853,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
         audio: finalAudio ? { blob: { uri: finalAudio.uri, name: audioFilename(mime), type: mime }, filename: audioFilename(mime), durationS: finalAudio.duration } : null,
         fotos: fotos.map(({ uri, name, type }) => ({ uri, name, type })),
         nota,
+        ai_edit: fotos.length ? aiEditToSend : undefined,
         para,
         contexto: context ? { tipo: context.tipo, id: context.id } : null,
         publicUse: context?.tipo === 'pregunta' ? publicChoice : null,
@@ -996,6 +1005,11 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
                 </T>
               ) : null}
             </View>
+
+            {fotos.length ? <View style={styles.block}>
+              <AIEditControl testID="capture-ai" value={aiEdit} onChange={setAiChoice} disabled={sending} />
+              {aiEdit === null ? <T variant="detalle" soft>{prefs.isPending ? 'Cargando el valor de Ajustes…' : 'Se usará el valor de Ajustes si no eliges una opción.'}</T> : null}
+            </View> : null}
 
             <Field
               label="Nota para el equipo (opcional)"

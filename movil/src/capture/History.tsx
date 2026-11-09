@@ -1,7 +1,7 @@
 // «Lo que enviaste»: the capture history inside the sheet (Captura.dc.html, rev 18), with the same
 // labels as the PWA (compartido/src/logic/capturas.ts).
 import { captureKeys, removeCapturaFromHistory, sameOrigin, undoCaptura, useCapturaLive, useCapturas, type CaptureOutput } from '@compartido/api/capturas';
-import { canUndo, CONTEXT_PREFIX, contentsOf, purposeOf, STATE_TONE, whenLabel } from '@compartido/logic/capturas';
+import { publishAsapLines, canUndo, CONTEXT_PREFIX, contentsOf, purposeOf, STATE_TONE, whenLabel } from '@compartido/logic/capturas';
 import { excerpt } from '@compartido/logic/format';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
@@ -95,6 +95,11 @@ function CaptureCard({ initial, listUpdatedAt, onNavigate }: { initial: CaptureO
         <T variant="detalle" soft>
           Nota: {excerpt(capture.note, 200)}
         </T>
+      ) : null}
+      {capture.publish_asap ? (
+        <View testID={`capture-asap-${capture.id}`} collapsable={false} style={styles.history}>
+          {publishAsapLines(capture).map((line, index) => <T key={index} variant="detalle" soft>{line}</T>)}
+        </View>
       ) : null}
       <View style={styles.state}>
         <Badge tone={STATE_TONE[capture.state] ?? 'muted'}>{capture.state_label || capture.state}</Badge>

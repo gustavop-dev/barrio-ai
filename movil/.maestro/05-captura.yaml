@@ -3,7 +3,7 @@
 # recording from the sheet); an empty sheet closes at once, one with something in it asks «¿Cerrar sin enviar?»;
 # holding the button records; a note sent to the team shows the toast with «Deshacer», and «Deshacer» brings the draft
 # back in the sheet; sent again, it shows in «Lo que enviaste» with its state, and «Deshacer» there takes it out of the
-# list at once. The two seeded captures («Dato guardado» and «Usado») stay.
+# list at once. The three seeded captures (including the urgent idea) stay.
 # Photos, audio and the error states are in 05-captura-envios; captures tied to a question, a person or a piece in
 # 05-captura-contexto.
 #
@@ -340,9 +340,9 @@ tags: [captura]
     visible:
       id: capture-historial
     timeout: 20000
-# Two seeded captures and the one sent again (the undone one is not listed).
+# Three seeded captures and the one sent again (the undone one is not listed).
 - extendedWaitUntil:
-    visible: 'Lo que enviaste · 3'
+    visible: 'Lo que enviaste · 4'
     timeout: 20000
 - tapOn:
     id: capture-historial
@@ -378,7 +378,7 @@ tags: [captura]
 - extendedWaitUntil:
     notVisible: 'Nota de QA idea para un post sobre validar un MVP con clientes'
     timeout: 10000
-- assertVisible: 'Lo que enviaste · 2'
+- assertVisible: 'Lo que enviaste · 3'
 
 # The seeded ones, newest first: the transcribed voice note that became a fact, and the idea used in a piece.
 - scrollUntilVisible:
@@ -391,12 +391,17 @@ tags: [captura]
 - assertVisible: 'Escuchar'
 - scrollUntilVisible:
     element:
-      text: 'Usado'
+      text: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
     direction: DOWN
     timeout: 20000
 - assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
 - assertVisible: 'Usada en la pieza del .*'
 - takeScreenshot: 05-captura-14-historial-semilla
+- scrollUntilVisible:
+    element:
+      text: 'Volver a la captura'
+    direction: UP
+    timeout: 20000
 - tapOn: 'Volver a la captura'
 - extendedWaitUntil:
     visible:

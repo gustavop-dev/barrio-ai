@@ -1,6 +1,6 @@
-# cubre: GAL-01, GAL-03, GAL-04, GAL-05, GAL-06, GAL-07
+# cubre: GAL-01, GAL-03, GAL-04, GAL-05, GAL-06, GAL-07, IMG-16
 # Galería: the grid of the seeded photos, newest first, with its texts; the filters (and an empty one); the photo sheet
-# of «Nueva» (note typed and saved, the AI-edit switch turned off, both there when it opens again right away); the
+# of «Nueva» (note typed and saved, the AI-edit selector set to No editar, both there when it opens again right away); the
 # full-screen viewer (on ink, closed by dragging the photo down, double-tap zoom that holds the pager, a swipe to the
 # next photo and «Cerrar», after which the sheet follows that photo); and «Quitar de la galería» with its confirmation.
 # Photos, newest first: Nueva (today), Sin usar (3 days, note «Pizarra de la sesión de producto»), Elegida (for
@@ -95,7 +95,7 @@ tags: [galeria]
     visible: "Foto.*, nueva"
     timeout: 15000
 
-# ---------------------------------------------------------------- the photo sheet: note and AI switch
+# ---------------------------------------------------------------- the photo sheet: note and AI selector
 # cubre: GAL-03, GAL-04
 - tapOn: "Foto.*, nueva"
 - extendedWaitUntil:
@@ -104,17 +104,30 @@ tags: [galeria]
     timeout: 15000
 - assertVisible: "Todavía sin usar"
 - assertVisible: "Nota para el equipo \\(opcional\\)"
-- assertVisible: "El equipo puede editarla con IA"
-- assertVisible: "Quitar de la galería"
+- assertVisible: "EDICIÓN CON IA"
+- scrollUntilVisible:
+    element:
+      id: photo-ai
+    direction: DOWN
+    centerElement: true
 - assertVisible:
-    id: photo-ai
+    id: photo-ai-auto
     checked: true
+- scrollUntilVisible:
+    element:
+      id: photo-save
+    direction: DOWN
+    centerElement: true
 - assertVisible:
     id: photo-save
     enabled: false
 - takeScreenshot: 10-galeria-04-foto-abierta
 
 # The note is ASCII on purpose (Maestro types non-ASCII text through a slower path on Android).
+- scrollUntilVisible:
+    element:
+      id: photo-note
+    direction: UP
 - tapOn:
     id: photo-note
 - inputText: Recortala para que no se lean nombres de clientes
@@ -130,11 +143,46 @@ tags: [galeria]
 - assertVisible:
     id: photo-note
     text: Recortala para que no se lean nombres de clientes
+- scrollUntilVisible:
+    element:
+      id: photo-ai-no
+    direction: DOWN
+    centerElement: true
+- scrollUntilVisible:
+    element:
+      id: photo-ai-si
+    direction: DOWN
+    centerElement: true
 - tapOn:
-    id: photo-ai
+    id: photo-ai-si
+- scrollUntilVisible:
+    element:
+      id: photo-ai
+    direction: DOWN
+    centerElement: true
 - assertVisible:
-    id: photo-ai
-    checked: false
+    id: photo-ai-si
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: photo-ai-no
+    direction: UP
+    centerElement: true
+- tapOn:
+    id: photo-ai-no
+- scrollUntilVisible:
+    element:
+      id: photo-ai
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: photo-ai-no
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: photo-save
+    direction: DOWN
+    centerElement: true
 - assertVisible:
     id: photo-save
     enabled: true
@@ -160,7 +208,7 @@ tags: [galeria]
     timeout: 15000
 - takeScreenshot: 10-galeria-06-guardada
 
-# Open it again at once: the saved note and the switch.
+# Open it again at once: the saved note and the selected option.
 - tapOn: "Foto.*, nueva"
 - extendedWaitUntil:
     visible:
@@ -169,13 +217,28 @@ tags: [galeria]
 - assertVisible:
     id: photo-note
     text: Recortala para que no se lean nombres de clientes
+- scrollUntilVisible:
+    element:
+      id: photo-ai
+    direction: DOWN
+    centerElement: true
 - assertVisible:
-    id: photo-ai
-    checked: false
+    id: photo-ai-no
+    checked: true
+- scrollUntilVisible:
+    element:
+      id: photo-save
+    direction: DOWN
+    centerElement: true
 - assertVisible:
     id: photo-save
     enabled: false
 # The big image is labelled with the saved note.
+- scrollUntilVisible:
+    element:
+      id: photo-sheet-image
+    direction: UP
+    centerElement: true
 - assertVisible:
     id: photo-sheet-image
     text: "Foto: Recortala para que no se lean nombres de clientes"
@@ -206,6 +269,11 @@ tags: [galeria]
     notVisible:
       id: photo-viewer
     timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: photo-sheet-image
+    direction: UP
+    centerElement: true
 - assertVisible:
     id: photo-sheet-image
     text: "Foto: Recortala para que no se lean nombres de clientes"
@@ -260,8 +328,13 @@ tags: [galeria]
       id: photo-note
       text: Pizarra de la sesión de producto
     timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: photo-ai
+    direction: DOWN
+    centerElement: true
 - assertVisible:
-    id: photo-ai
+    id: photo-ai-auto
     checked: true
 - takeScreenshot: 10-galeria-11-sigue-la-foto
 
@@ -312,7 +385,7 @@ tags: [galeria]
     visible:
       id: photo-sheet
     timeout: 15000
-- assertVisible: "Elegida para .*"
+- assertVisible: "Usada en la pieza del .*"
 - scrollUntilVisible:
     element:
       text: "Quitar de la galería"
@@ -320,7 +393,7 @@ tags: [galeria]
     timeout: 15000
 - tapOn: "Quitar de la galería"
 - extendedWaitUntil:
-    visible: "Ojo: elegida para el post del .*"
+    visible: "Ojo: usada en la pieza del .*"
     timeout: 15000
 - takeScreenshot: 10-galeria-14-quitar-elegida
 - tapOn: "Cancelar"

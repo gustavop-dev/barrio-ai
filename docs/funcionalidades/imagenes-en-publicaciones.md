@@ -9,7 +9,7 @@ Gustavo quiere que cada post salga con al menos una imagen. El equipo de redacci
 
 Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si la trae, como instrucción. La API de imágenes de OpenAI solo se usa para editar sus fotos reales. Las infografías y los carruseles no los dibuja ningún modelo de imagen: el agente elige una plantilla y escribe el contenido como datos, y el código lo dibuja exactamente con las reglas de marca de Gustavo («Infografías hechas con IA · reglas», ver [Infografías y carruseles](#infografias-y-carruseles)).
 
-**Fase 1 backend implementada; CI pendiente de ejecutar por Claude.** `funciona` significa que hay implementación y pruebas de backend escritas; no acredita una ejecución local ni QA de interfaz. Las funciones mixtas quedan `parcial` hasta la fase 2. Cobertura QA permanece vacía para este flujo.
+**Fase 1 backend implementada; CI pendiente de ejecutar por Claude.** `funciona` significa que hay implementación y pruebas de backend escritas; no acredita una ejecución local ni QA de interfaz. IMG-11 e IMG-16 ya tienen UI en app y PWA, pruebas y flujos escritos en fase 2; su ejecución en CI y la QA visual siguen pendientes. Las demás funciones mixtas conservan su estado.
 
 - **Código:** `team_backend/{imagenes,infografias,connectors_images,capture_intent,urgente}.py`, circuito editorial, captura, galería y conector oficial. Migración `0019_imagenes_y_urgencia`.
 - **Regla de agente:** copia versionada íntegra del tablero local `movil/diseno-movimiento/tableros/Infografias.dc.html` en `team_backend/recursos/infografias.html`, con Ubuntu y su licencia incluidos. No se incorpora al corpus de unidades.
@@ -24,7 +24,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 | [IMG-02](#img-02) | Opción «Propuesta de post» en «Para qué es» | PWA · app · backend | parcial |
 | [IMG-03](#img-03) | Las fotos siempre llegan a la Galería con su nota | backend | funciona |
 | [IMG-15](#img-15) | El equipo elige por contexto: foto, infografía o carrusel | backend | funciona |
-| [IMG-16](#img-16) | Opción «Edición con IA» en la captura, la Galería y Ajustes | PWA · app · backend | parcial |
+| [IMG-16](#img-16) | Opción «Edición con IA» en la captura, la Galería y Ajustes | PWA · app · backend | funciona |
 | [IMG-04](#img-04) | El equipo ve la Galería y elige las fotos de un post | backend | funciona |
 | [IMG-05](#img-05) | Todo post se publica con al menos una imagen | backend | funciona |
 | [IMG-06](#img-06) | La nota de una propuesta de post alimenta el brief | backend | funciona |
@@ -32,7 +32,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 | [IMG-08](#img-08) | Ediciones que el equipo decide por su cuenta | backend | funciona |
 | [IMG-09](#img-09) | Editar con la API de imágenes de OpenAI sin perder el original | backend | funciona |
 | [IMG-10](#img-10) | Comprobación de la edición con un modelo con visión | backend | funciona |
-| [IMG-11](#img-11) | La imagen en el detalle de la pieza, con veto | PWA · app · backend | parcial |
+| [IMG-11](#img-11) | La imagen en el detalle de la pieza, con veto | PWA · app · backend | funciona |
 | [IMG-12](#img-12) | La Galería marca la foto «usada en la pieza del …» | PWA · app · backend | parcial |
 | [IMG-13](#img-13) | Coste de las imágenes en el ledger, con presupuesto propio | PWA · app · backend | parcial |
 | [IMG-14](#img-14) | Publicar en LinkedIn con la imagen o el carrusel | backend | funciona |
@@ -123,7 +123,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 ### IMG-16 · Opción «Edición con IA» en la captura, la Galería y Ajustes <a id="img-16"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** parcial
+- **Estado:** funciona
 - **Qué hace para Gustavo:** al adjuntar fotos elige si el equipo puede editarlas con IA, sin tener que decirlo en el audio: «No editar», «Que decida el equipo» o «Editar».
 - **Implementación backend:** `AIEdit`: no/auto/si; migración booleana; captura, galería y preferencias. Los booleanos de API siguen como alias transitorios.
 - **Criterios de aceptación:**
@@ -134,8 +134,8 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   5. **Dado** fotos guardadas antes del cambio, **cuando** se migra, **entonces** `allow_ai_edit=false` pasa a «No editar» y `true` a «Que decida el equipo», sin perder ninguna.
   6. **Dado** una foto ya usada en una pieza, **cuando** se cambia su opción, **entonces** solo afecta a usos futuros.
   7. **Dado** lectores de pantalla, **cuando** recorren el control, **entonces** es un grupo de opciones con nombre y la opción elegida anunciada.
-- **Brechas código/docs:** Interfaz y QA de fase 2 pendientes.
-- **Cobertura QA:**
+- **Brechas código/docs:** Implementación de interfaz terminada; CI y QA visual pendientes.
+- **Cobertura QA:** `05-captura-envios` (selector y envío), `10-galeria` (tres opciones y persistencia), `11-ajustes` (default y reversión tras error); Jest y Vitest de captura, Galería y Ajustes. Escritos; ejecución pendiente de Claude.
 
 ### IMG-04 · El equipo ve la Galería y elige las fotos de un post <a id="img-04"></a>
 
@@ -256,9 +256,9 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 ### IMG-11 · La imagen en el detalle de la pieza, con veto <a id="img-11"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** parcial
+- **Estado:** funciona
 - **Qué hace para Gustavo:** en el detalle de la pieza, en la PWA y en la app, ve la imagen que saldrá: la foto (original y editada, con el motivo de la edición), la infografía o las láminas del carrusel, con su texto alternativo, y puede vetar hasta la hora de salida.
-- **Implementación backend:** Detalle con images[], origen, alt, motivo, revisión y PDF privado; la fase 2 construye la presentación.
+- **Implementación backend:** Detalle con images[], origen, alt, motivo, revisión y PDF privado. `PieceImages.tsx` en app y PWA presenta foto, comparación y carrusel; tipos y lógica en `compartido/`.
 - **Criterios de aceptación:**
   1. **Dado** una pieza con una foto sin editar, **cuando** abre su detalle, **entonces** ve la foto con «Se publica tal cual» y el motivo («Instrucción de Gustavo: úsala tal cual», «Edición prohibida en la foto»…).
   2. **Dado** una pieza con una foto editada, **cuando** abre su detalle, **entonces** ve el original y la versión editada (lado a lado en escritorio, alternables en el teléfono), el motivo de la edición y el veredicto de la comprobación.
@@ -268,8 +268,8 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   6. **Dado** que ya pasó la hora o la pieza se está publicando, **cuando** abre el detalle, **entonces** no hay botón de veto.
   7. **Dado** que la imagen no carga, **cuando** abre el detalle, **entonces** ve un aviso en su lugar («No se pudo cargar la imagen») con «Reintentar», y el resto del detalle sigue.
   8. **Dado** una pieza en preparación sin imagen todavía, **cuando** abre el detalle, **entonces** ve «La imagen aparece cuando el equipo la prepare».
-- **Brechas código/docs:** Interfaz y QA de fase 2 pendientes.
-- **Cobertura QA:**
+- **Brechas código/docs:** Implementación de interfaz terminada; CI y QA visual pendientes.
+- **Cobertura QA:** `16-imagenes` (foto, infografía, carrusel de cuatro láminas y alt); `07-pieza-veto` (veto de la pieza completa). Jest/Vitest: original y editada, reintento, revisión, preparación, alt, paginación, hash recibido y fin del veto. Escritos; ejecución pendiente de Claude.
 
 ### IMG-12 · La Galería marca la foto «usada en la pieza del …» <a id="img-12"></a>
 

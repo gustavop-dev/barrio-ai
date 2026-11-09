@@ -1,11 +1,11 @@
 // The sheet of one photo (Galeria.dc.html): big image, state, where it was used, the note,
-// «El equipo puede editarla con IA», Guardar and «Quitar de la galería» (with confirmation).
+// «Edición con IA», Guardar and «Quitar de la galería» (with confirmation).
+import { AIEditControl } from '../../components/ui/AIEditControl';
 import { useId, useState } from 'react';
 import { sameOrigin, useDeleteFoto, useUpdateFoto, type PhotoOutput, type PhotoPatch } from '../../api/capturas';
 import { Sheet } from '../../capture/Sheet';
 import { IconCerrar } from '../../components/icons';
 import { Badge, Button, ConfirmModal, ErrorRetry, useToast } from '../../components/ui';
-import { SwitchRow } from '../ajustes/shared';
 import { inUseWarning, photoPatch, photoTone } from './photo';
 
 export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: () => void }) {
@@ -14,11 +14,11 @@ export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: ()
   const remove = useDeleteFoto();
   const noteId = useId();
   const [note, setNote] = useState(photo.note ?? '');
-  const [allowAi, setAllowAi] = useState(photo.allow_ai_edit);
+  const [aiEdit, setAiEdit] = useState(photo.ai_edit);
   const [confirming, setConfirming] = useState(false);
   const src = sameOrigin(photo.url);
   const warning = inUseWarning(photo);
-  const patch: PhotoPatch = photoPatch(photo, note, allowAi);
+  const patch: PhotoPatch = photoPatch(photo, note, aiEdit);
   const dirty = Object.keys(patch).length > 0;
 
   const save = () =>
@@ -66,7 +66,7 @@ export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: ()
             <label htmlFor={noteId}>Nota para el equipo (opcional)</label>
             <textarea id={noteId} rows={3} value={note} placeholder="Por ejemplo: recórtala para que no se lean nombres de clientes." onChange={(event) => setNote(event.target.value)} />
           </div>
-          <SwitchRow label="El equipo puede editarla con IA" checked={allowAi} onChange={setAllowAi} />
+          <AIEditControl value={aiEdit} onChange={setAiEdit} disabled={update.isPending} testID="photo-ai" />
           <ErrorRetry error={update.error} />
           <Button type="submit" variant="primary" block disabled={!dirty} loading={update.isPending} loadingLabel="Guardando…">
             Guardar
