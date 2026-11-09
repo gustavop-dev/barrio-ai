@@ -6,6 +6,7 @@ import base64
 import io
 import json
 import os
+import re
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
@@ -54,6 +55,64 @@ def draft(ctx):
 def verdict(ctx):
     return {'sections':[{'id':r['id'],'ok':True,'reason':'Synthetic verified facts','missing_valid':True} for r in ctx['draft']['sections']],
             'banner_ok':True,'banner_reason':'Synthetic offer supported','reference_conflicts':[]}
+
+
+BRAND_IDS={'marca.tokens','marca.fuente','marca.banner_layout','marca.restricciones_render'}
+
+
+def brand_draft(ctx,background='#1E1E2B'):
+    data=draft(ctx)
+    for row in data['sections']:
+        if row['id'] in ('photo','banner'):row['evidence']+=sorted(BRAND_IDS)
+        if row['id']=='photo':row['steps']=['Aplicar fondo plano #0FF1CE a ambas opciones.']
+        if row['id']=='banner':
+            row['steps']=[f'Aplicar fondo {background} y Ubuntu Regular definidos para la marca.',
+                'Respetar el presupuesto de 470 px por línea a Ubuntu 56 px; comprobar ajuste con render.banner_fit.']
+            row['reason']='El presupuesto de 470 px a Ubuntu 56 px reserva espacio para la figura.'
+    data['banner']['evidence']+=sorted(BRAND_IDS)
+    return data
+
+
+def brand_reviewer(ctx):
+    """Fake semantic boundary: cited design sources must actually support the claims."""
+    result=verdict(ctx);catalog={r['id']:r for r in ctx.get('evidence_catalog',[])}
+    rows={r['id']:r for r in ctx['draft']['sections']}
+    for check in result['sections']:
+        if check['id'] not in ('photo','banner'):continue
+        row=rows[check['id']];sources={eid:catalog[eid] for eid in row['evidence'] if eid in catalog}
+        tokens=sources.get('marca.tokens',{}).get('values',{}).get('tokens',{})
+        colors=set(re.findall(r'#[0-9A-Fa-f]{6}',row['reason']+' '+' '.join(row['steps'])))
+        supported=BRAND_IDS<=set(sources) and colors<=set(tokens.values())
+        if check['id']=='banner':
+            font=sources.get('marca.fuente',{}).get('values',{})
+            limits=sources.get('marca.restricciones_render',{}).get('values',{})
+            fit=sources.get('render.banner_fit',{})
+            supported=supported and font.get('family')=='Ubuntu' and limits.get('max_line_width_px')==470 and limits.get('font_px')==56
+            supported=supported and fit.get('ok') is True and fit.get('input')=={
+                key:ctx['draft']['banner'][key] for key in ('lines','highlight','label')}
+        check.update(ok=bool(supported),reason='Diseño acreditado' if supported else 'Inventa datos de diseño sin evidencia')
+    banner=next((r for r in result['sections'] if r['id']=='banner'),{'ok':True,'reason':''})
+    return dict(result,banner_ok=banner['ok'],banner_reason=banner['reason'])
+
+
+class BrandProviders:
+    def __init__(self,background='#1E1E2B'):
+        self.background=background;self.writers=[];self.reviewers=[];self.visuals=[]
+
+    def __call__(self,system,payload,**kwargs):
+        purpose=kwargs['purpose']
+        if purpose=='profile-copy':
+            ctx=json.loads(payload);self.writers.append(ctx);result=brand_draft(ctx,self.background)
+        elif purpose=='profile-review':
+            ctx=json.loads(payload);self.reviewers.append(ctx);result=brand_reviewer(ctx)
+        elif purpose=='profile-image-check':
+            ctx=json.loads(payload[0]['text']);self.visuals.append(ctx)
+            supported=BRAND_IDS<={r['id'] for r in ctx.get('evidence_catalog',[])}
+            result={'ok':supported,'checks':[{'point':n,'ok':supported,'reason':'Synthetic design evidence'} for n in ctx['applicable_checks']],
+                'identity_03':True,'smile_01':True,'clear_glasses':True,'pose_01':True,'body_02':True,'clothing':True,
+                'face_height':.57,'eyes_y':.3,'head_top':.08,'reasons':[]}
+        else:raise AssertionError('Unexpected provider purpose: '+purpose)
+        return {'text':json.dumps(result)}
 
 
 class FakeProfileImages:
@@ -149,12 +208,28 @@ class ProfileContentTests(SimpleTestCase):
         self.assertEqual(rows[0]['evidence'],['offer'])
 
     def test_real_drafter_contract_normalizes_empty_banner_before_schema_validation(self):
+        """Catches loss of canonical brand evidence at the actual writer provider boundary."""
         ctx=context();data=draft(ctx);data['banner']={}
         with patch.object(providers,'claude',return_value={'text':json.dumps(data)}) as model:
             result=content.draft(ctx)
         self.assertEqual(result['banner'],{'lines':[],'highlight':'','label':'','evidence':[]})
         payload=json.loads(model.call_args.args[1])
         self.assertEqual(payload['evidence_catalog'][0]['id'],'offer')
+        catalog={r['id']:r for r in payload['evidence_catalog']}
+        self.assertEqual(catalog['marca.tokens']['values']['tokens'],
+            {'aguamarina':'#0FF1CE','tinta':'#1E1E2B','papel':'#F7F6F0','0ff1ce-hondo':'#00715E'})
+        self.assertEqual(catalog['marca.fuente']['values']['styles'],['Regular','Bold'])
+        self.assertEqual(content.normalize_evidence(sorted(BRAND_IDS)+['marca.inventada','render.banner_fit'],ctx),sorted(BRAND_IDS))
+
+    def test_brand_and_render_evidence_cannot_replace_public_facts(self):
+        """Catches accidental accreditation of personal copy by design sources alone."""
+        ctx=context(['headline']);data=draft(ctx)
+        ctx['render_evidence']=[visual.banner_fit(data['banner'])]
+        data['sections'][0]['evidence']=sorted(BRAND_IDS)+['render.banner_fit']
+        rows,_=content.validate(data,ctx,verdict(dict(ctx,draft=data)))
+        self.assertEqual(rows[0]['readiness'],'blocked')
+        self.assertEqual(rows[0]['issues'],['Copy sin hechos acreditados'])
+        self.assertEqual(rows[0]['copy'],'')
 
     def test_rejected_copy_keeps_valid_fact_questions_for_repair(self):
         ctx=context(['experience']);data=draft(ctx)
@@ -204,6 +279,7 @@ class ProfileContentTests(SimpleTestCase):
         self.assertEqual((rows[0]['copy'],rows[0]['missing']),('',[]))
 
     def test_exact_size_colors_grayscale_and_mobile_geometry(self):
+        """Catches drift between preflight measurements and the final rendered banner."""
         package=visual.render({k:synthetic() for k in ('A','B','banner')},draft(context())['banner'])
         self.assertEqual(set(package['files']),{'A','B','banner','mobile_A','mobile_B','desktop_A','desktop_B'})
         for kind,size in [('A',(800,800)),('B',(800,800)),('banner',(1584,396))]:
@@ -215,6 +291,15 @@ class ProfileContentTests(SimpleTestCase):
         self.assertTrue(visual.inside(package['geometry']['figure'],visual.MOBILE))
         self.assertFalse(visual.overlaps(package['geometry']['figure'],visual.COVER))
         self.assertTrue(all(visual.inside(box,visual.SAFE) for box in package['geometry']['text_boxes']))
+        fit=visual.banner_fit(draft(context())['banner'])
+        geometry={key:value for key,value in package['geometry'].items() if key not in ('figure','errors')}
+        self.assertEqual(fit['ok'],True)
+        self.assertEqual(fit['geometry'],orquestacion.plain(geometry))
+        self.assertEqual(fit['geometry']['max_line_width_px'],470)
+        self.assertEqual(fit['geometry']['font_px'],56)
+        self.assertEqual(len(fit['geometry']['line_widths_px']),2)
+        self.assertLessEqual(max(fit['geometry']['line_widths_px']),470)
+        self.assertLessEqual(fit['geometry']['label_width_px'],470)
 
     def test_no_alpha_and_overflow_fail_closed_without_font_shrink(self):
         with self.assertRaisesRegex(ValueError,'máscara'):visual.portrait(synthetic(False),'A')
@@ -267,6 +352,69 @@ class ProfileCycleTests(MediaMixin,OperatorBase):
         self.assertEqual(ledger.limits['cost_cap_usd'],10)
         self.assertFalse(any(c['edge'].startswith('ejecutar') for c in ledger.progress_ledger['calls'].values()))
         self.run_proposal(result,image_client=client)
+        self.assertEqual(len(client.calls),3)
+
+    def test_brand_steps_and_measured_fit_reach_copy_and_visual_review_without_false_block(self):
+        """Reproduces the false design-invention block when brand or preflight evidence is omitted."""
+        self.references();fake=BrandProviders()
+        with patch.object(providers,'claude',side_effect=fake):
+            result=self.run_proposal(self.proposal(),drafter=content.draft,reviewer=content.review,image_checker=visual.check)
+        self.assertEqual(result.state,'ready',result.sections)
+        self.assertEqual(len(fake.writers),1);self.assertEqual(len(fake.reviewers),1)
+        self.assertEqual([ctx['option'] for ctx in fake.visuals],['A','B','banner'])
+        sections={s['id']:s for s in result.sections}
+        self.assertEqual(sections['banner']['readiness'],'ready')
+        self.assertEqual(sections['banner']['issues'],[])
+        self.assertEqual(sections['photo']['readiness'],'ready')
+        self.assertEqual(set(sections['banner']['evidence']),BRAND_IDS|{'offer','render.banner_fit'})
+        self.assertEqual(set(result.assets.values_list('kind',flat=True)),perfil.ASSET_KINDS)
+        catalogs=[{r['id']:r for r in ctx['evidence_catalog']} for ctx in fake.writers+fake.reviewers+fake.visuals]
+        self.assertEqual([c['marca.banner_layout']['values']['background'] for c in catalogs],['#1E1E2B']*5)
+        self.assertEqual([c['marca.fuente']['values']['family'] for c in catalogs],['Ubuntu']*5)
+        fit=catalogs[1]['render.banner_fit']
+        self.assertEqual(fit,visual.banner_fit(result.context['banner']))
+        self.assertEqual([c['render.banner_fit'] for c in catalogs[2:]],[fit]*3)
+        self.assertEqual(fit['input']['lines'],['Build useful','software.'])
+        self.assertEqual(fit['ok'],True)
+
+    def test_color_outside_brand_is_rejected_even_with_valid_brand_ids(self):
+        """Catches a reviewer fake blessing #FF0000 just because the draft cites valid brand IDs."""
+        self.references();fake=BrandProviders(background='#FF0000');client=FakeProfileImages()
+        with patch.object(providers,'claude',side_effect=fake):
+            result=self.run_proposal(self.proposal(),drafter=content.draft,reviewer=content.review,
+                image_checker=visual.check,image_client=client)
+        sections={s['id']:s for s in result.sections}
+        self.assertEqual(result.state,'partial')
+        self.assertEqual(sections['banner']['readiness'],'blocked')
+        self.assertEqual(sections['banner']['copy'],'')
+        self.assertIn('Inventa datos de diseño sin evidencia',sections['banner']['issues'])
+        self.assertEqual(sections['photo']['readiness'],'ready')
+        self.assertEqual(set(result.assets.values_list('kind',flat=True)),{'A','B'})
+        self.assertEqual(len(client.calls),2)
+
+    def test_banner_fit_failure_is_reviewed_and_recomputed_for_repaired_copy(self):
+        """Catches post-review-only measurement or reuse of an old fit when a repair changes the banner."""
+        self.references();reviews=[];client=FakeProfileImages()
+        long_line='This is a very long sentence that cannot possibly fit'
+        def overflowing_first(ctx):
+            data=draft(ctx)
+            if not ctx.get('previous_draft'):
+                data['banner'].update(lines=[long_line,'software.'],highlight='software.')
+            return data
+        def inspect_fit(ctx):
+            fit=next(r for r in ctx['evidence_catalog'] if r['id']=='render.banner_fit')
+            reviews.append(fit)
+            self.assertEqual(client.calls,[])
+            # Deliberately permissive: deterministic fit must still block and request a repair.
+            return verdict(ctx)
+        result=self.run_proposal(self.proposal(),drafter=overflowing_first,reviewer=inspect_fit,image_client=client)
+        self.assertEqual([r['ok'] for r in reviews],[False,True])
+        self.assertEqual(reviews[0]['input']['lines'],[long_line,'software.'])
+        self.assertEqual(reviews[0]['geometry'],{})
+        self.assertIn('Acorta',reviews[0]['error'])
+        self.assertEqual(reviews[1]['input']['lines'],['Build useful','software.'])
+        self.assertEqual(result.context['render_evidence'],[reviews[1]])
+        self.assertEqual(result.state,'ready',result.sections)
         self.assertEqual(len(client.calls),3)
 
     def test_production_shape_recovers_empty_banner_legacy_evidence_and_unreadable_sections(self):

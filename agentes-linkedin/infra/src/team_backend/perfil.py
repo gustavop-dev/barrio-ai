@@ -213,7 +213,8 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
                     if key in files:selected[key]=files[key]
         scoped=[r for r in proposal.references if r['role'] in (('01','03') if kind!='banner' else ('01','02','03'))]
         context={'option':kind,'geometry':package['geometry'] if kind=='banner' else {},'copy':banner if kind=='banner' else {},
-                 'library':[u for u in proposal.context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS]}
+                 'library':[u for u in proposal.context.get('library',{}).get('units',[]) if u['unit_id'] in content.PROFILE_VISUAL_UNITS],
+                 'evidence_catalog':content.evidence_catalog(dict(proposal.context,references=scoped))}
         request={'hashes':{k:imagenes.sha(v) for k,v in selected.items()},'references':scoped,'context':context}
         try:
             refs=gallery.raw_references(scoped,proposal.owner)
@@ -279,6 +280,14 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
                 for attempt in range(2):
                     data=runtime.call('perfil_copy',context,
                         lambda:content.prepare_draft((drafter or content.draft)(context),context),key=prefix+f'copy:{attempt}')
+                    fit=None
+                    if proposal.mode=='full' and 'banner' in context['section_ids']:
+                        # Recompute for EVERY draft, before review or any paid person edit. Never trust model measurements.
+                        fit=visual.banner_fit(data['banner'])
+                        context=dict(context,render_evidence=[fit])
+                        context['evidence_catalog']=content.evidence_catalog(context)
+                        data['banner']['evidence']=list(dict.fromkeys(data['banner']['evidence']+[fit['id']]))
+                        data=content.prepare_draft(data,context)
                     check_context=dict(context,draft=data)
                     verdict=runtime.call('perfil_revision_copy',check_context,lambda:(reviewer or content.review)(check_context),key=prefix+f'review:{attempt}')
                     sections,banner=content.validate(data,context,verdict)
@@ -289,14 +298,12 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
                     findings += [row['id']+': entrega copy desde los hechos disponibles, con placeholders para los datos puntuales; '
                         'no omitas la recomendación por no poder leer la versión actual.' for row in sections
                         if row['id'] in ('headline','about') and row['readiness']=='needs_input' and not row['copy']]
-                    try:
-                        if proposal.mode=='full' and banner and any(s['id']=='banner' and s['readiness']=='ready' for s in sections):
-                            visual.banner(None,banner)  # Check exact Ubuntu dimensions BEFORE any paid person edit.
-                    except (ValueError,OSError) as exc:
+                    if fit and not fit['ok']:
                         banner={}
                         for row in sections:
-                            if row['id']=='banner':row.update(readiness='blocked',issues=[str(exc)],copy='')
-                        findings.append(str(exc)+' Acorta frase/etiqueta manteniendo fuentes y tamaño.')
+                            if row['id']=='banner':
+                                row.update(readiness='blocked',issues=row.get('issues',[])+[fit['error']],copy='')
+                        findings.append(fit['error']+' Acorta frase/etiqueta manteniendo fuentes y tamaño.')
                     if not findings or attempt or proposal.version>1:break
                     # A later budget/provider stop must still expose the copy already reviewed.
                     _persist(proposal,sections=sections,context=dict(context,banner=banner))
