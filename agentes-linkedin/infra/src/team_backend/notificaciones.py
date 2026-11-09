@@ -22,6 +22,7 @@ INBOX_KINDS={
 }
 # Notificaciones kinds: (calendar layer, push by default, label in Ajustes).
 FEED_KINDS={
+    'capture_scheduled':('publicaciones',True,'Fecha de una idea urgente'),
     'piece_scheduled':('publicaciones',True,'Pieza lista o programada'),
     'piece_published':('publicaciones',True,'Pieza publicada'),
     'piece_blocked':('sistema',True,'Pieza bloqueada por el verificador'),

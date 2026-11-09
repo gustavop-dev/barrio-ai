@@ -44,7 +44,7 @@ Captura, Galería, Calendario, Ajustes y el motor editorial enlazan a las fichas
 
 ## Ampliación de equipos de Gustavo
 
-Las fichas OBS, LEC, EST y BIB, EDI-20, OFI-10, GAL-08, BAR-14, COM-11, TUR-20/21 y la ampliación del ID reservado TUR-18 describen trabajo **no implementado**. Base revisada localmente: `1ba4e43`, 8 de noviembre de 2026, sin red. No cambian los estados de las funcionalidades existentes ni presentan los contratos documentales de los agentes como código activo.
+Las fichas OBS, LEC, EST y BIB, EDI-21, OFI-10, GAL-08, BAR-14, COM-11, TUR-20/21 y la ampliación del ID reservado TUR-18 describen trabajo **no implementado**. Base revisada localmente: `1ba4e43`, 8 de noviembre de 2026, sin red. No cambian los estados de las funcionalidades existentes ni presentan los contratos documentales de los agentes como código activo.
 
 Los addenda incorporan [listas curadas y política de red](biblioteca-equipos.md#unidades-por-rol) y la [arquitectura declarativa](arquitectura-agentes.md), también **no implementado**. BIB-06 se retira por decisión de Gustavo, con su ID reservado. Primero se migrará el pipeline real al registro; después se conectarán las capacidades nuevas. Los especialistas proponen y sus orquestadores deciden dentro de las compuertas existentes.
 
@@ -56,7 +56,7 @@ El quinto hace vinculantes: sonrisa de 01 y transitions claras de 03 en A/B/bann
 
 El sexto confirma [cuenta gratuita y notas excepcionales BAR-16](red.md#bar-16), tier configurable y ninguna automatización de outreach paralela. Reserva solo a Gustavo mover/reemplazar/desproteger main, con `protected` y auditoría en [OBS-02](observatorio-referentes.md#obs-02), desde Personas › Referentes o Tu turno. Perfil propone la frase inglesa del banner con curso/posicionamiento; la frase de prueba es solo fallback. [EST-01](estrategia-perfil.md#est-01) consulta memoria/lecturas antes de preguntar y crea una pregunta por hecho imprescindible faltante, sin inventar. No quedan decisiones de producto abiertas.
 
-El [plan de equipos](../plan-equipos.md) ordena las fases y decisiones pendientes. La fase de acceso web ya prevista (`web_search`, `web_fetch` para el equipo y enlaces en capturas) es dependencia previa, no otra implementación de este catálogo. [EDI-20](motor-editorial.md#edi-20) formaliza el agente visual sobre IMG. Revisión conserva su función y Relaciones sus flujos; [COM-11](comentarios-y-lider.md#com-11) y [BAR-14](red.md#bar-14) precisan el uso de información de referentes. Los límites reales de seguidores, comentaristas y reactores están en la [matriz de conectores](observatorio-referentes.md#datos-conectores).
+El [plan de equipos](../plan-equipos.md) ordena las fases y decisiones pendientes. La fase de acceso web ya prevista (`web_search`, `web_fetch` para el equipo y enlaces en capturas) es dependencia previa, no otra implementación de este catálogo. [EDI-21](motor-editorial.md#edi-21) formaliza el agente visual sobre IMG. Revisión conserva su función y Relaciones sus flujos; [COM-11](comentarios-y-lider.md#com-11) y [BAR-14](red.md#bar-14) precisan el uso de información de referentes. Los límites reales de seguidores, comentaristas y reactores están en la [matriz de conectores](observatorio-referentes.md#datos-conectores).
 
 Estas fichas de diseño añaden a la plantilla **Responsable**, **Cadencia**, **Tu turno** (qué decide Gustavo, o ninguna aprobación adicional) y **Datos necesarios y disponibilidad**. Un campo de «Código» identifica referencias existentes y lo que falta; no acredita que la ampliación esté implementada.
 

@@ -29,7 +29,8 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-17](#edi-17) | Ideas y comentarios de Gustavo en el brief | backend | funciona |
 | [EDI-18](#edi-18) | Preparación interrumpida | backend | funciona |
 | [EDI-19](#edi-19) | Modelo configurable por etapa | backend | funciona |
-| [EDI-20](#edi-20) | Agente visual dedicado al post ganador | PWA · app · backend | no implementado |
+| [EDI-20](#edi-20) | Dar el siguiente hueco libre a una idea urgente | backend | funciona |
+| [EDI-21](#edi-21) | Agente visual dedicado al post ganador | PWA · app · backend | no implementado |
 
 ---
 
@@ -74,7 +75,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Qué hace para Gustavo:** el director editorial decide de qué va el post (lector, modalidad, pilar, tesis, enfoque) o decide no publicar ese día si no hay material genuino. Puede hacerle hasta dos preguntas.
 - **Código:** `editorial._run` (etapa `director`), `DIRECTOR_SYSTEM`, `BRIEF_SCHEMA`, `preguntas.ask`.
 - **Criterios de aceptación:**
-  1. **Dado** un hueco en preparación, **cuando** corre la etapa del director, **entonces** la pieza guarda `brief` con `decision`, `primary_reader`, `modality` (`personal_startups|projectapp|alianzas|comunidad`), `pillar`, `thesis`, `approach` (uno de los nueve enfoques), `format: "text_only"`, `positioning_version` y `stage: "director"`.
+  1. **Dado** un hueco en preparación, **cuando** corre la etapa del director, **entonces** la pieza guarda `brief` con `decision`, `primary_reader`, `modality` (`personal_startups|projectapp|alianzas|comunidad`), `pillar`, `thesis`, `approach` (uno de los nueve enfoques), `format: "foto|infografia|carrusel"` e `image` con la elección y su motivo, `positioning_version` y `stage: "director"`.
   2. **Dado** que el director responde `decision: "skip"`, **cuando** termina la etapa, **entonces** la pieza queda `skipped` con `skip_reason` como nota, no se paga ninguna etapa más y ese día no se reintenta solo.
   3. **Dado** que el brief trae `questions_for_gustavo` con tres preguntas, **cuando** se guarda, **entonces** se crean como mucho dos `TeamQuestion` del `director_editorial`, con plazo igual a `scheduled_for` de la pieza y origen `piece:<id>`, y cada una dispara la push «Director editorial te pregunta».
   4. **Dado** una clave de memoria ya abierta, rechazada, retirada o conocida, **cuando** el director la vuelve a preguntar, **entonces** no se crea una pregunta duplicada.
@@ -194,7 +195,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   5. **Dado** un 401, 403 o 429, **cuando** se publica, **entonces** la acción queda `failed`, la cuenta pasa a pausa con push «LinkedIn: cuenta en pausa» y no se reintenta.
   6. **Dado** un fallo de conexión antes de enviar, **cuando** se publica, **entonces** queda `failed` con `not_sent`.
   7. **Dado** `LIVE_LINKEDIN_OFFICIAL=false` y una cuenta real, **cuando** se intenta ejecutar, **entonces** no se publica nada («API oficial de LinkedIn desactivada…»).
-- **Brechas código/docs:** la publicación es solo texto; ver [IMG-14](imagenes-en-publicaciones.md#img-14).
+- **Brechas código/docs:** contrato de archivos añadido; ver [IMG-14](imagenes-en-publicaciones.md#img-14).
 - **Cobertura QA:** pendiente
 
 ### EDI-12 · Resultado incierto y conciliación <a id="edi-12"></a>
@@ -270,12 +271,12 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Qué hace para Gustavo:** lo que manda con el botón de captura como «Idea para un post» y sus comentarios sobre piezas llegan al director, que da prioridad a las ideas cuando encajan.
 - **Código:** `capturas.ideas_for_director`, `capturas.feedback_for_director`, `capturas.mark_used`, `capturas.release_ideas`, `capturas.expire_ideas`.
 - **Criterios de aceptación:**
-  1. **Dado** seis capturas en estado `idea` de los últimos 14 días, **cuando** corre el director, **entonces** recibe las 5 más recientes en `ideas_from_gustavo` con `{id, text, date}` (texto recortado a 1.500 caracteres).
+  1. **Dado** seis capturas en estado `idea` de los últimos 14 días, **cuando** corre el director, **entonces** recibe hasta 5 en `ideas_from_gustavo`, priorizando urgencias reservadas para el hueco; con texto (hasta 6.000 caracteres), fotos, fecha y evidencia.
   2. **Dado** que el brief devuelve `ideas_used` con el id de una idea ofrecida, **cuando** se guarda, **entonces** esa captura pasa a `usado` con «El Director editorial lo usó en el brief del <día>» y enlace a la pieza. Un id que no se le ofreció se ignora.
   3. **Dado** que esa pieza termina `skipped`, `blocked`, `failed`, descartada o vetada, **cuando** se cierra, **entonces** la idea vuelve a `idea` con «Vuelve a la mesa editorial: la pieza del … no salió (…)».
   4. **Dado** una idea con más de 14 días sin usar, **cuando** se listan las capturas o corre el director, **entonces** pasa a `sin_usar` con «Pasaron 14 días sin que encajara en un brief».
   5. **Dado** comentarios de pieza (capturas con contexto `pieza`) de los últimos 30 días, **cuando** corre el director, **entonces** recibe hasta 10 en `feedback_from_gustavo` con la fecha y la tesis de la pieza.
-- **Brechas código/docs:** el director solo recibe el texto de las capturas; las fotos y sus notas no le llegan (ver [IMG-06](imagenes-en-publicaciones.md#img-06)).
+- **Brechas código/docs:** el director recibe fotos, notas y prioridad; ver [IMG-06](imagenes-en-publicaciones.md#img-06).
 - **Cobertura QA:** pendiente
 
 ### EDI-18 · Preparación interrumpida <a id="edi-18"></a>
@@ -305,16 +306,31 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 
 ---
 
+### EDI-20 · Dar el siguiente hueco libre a una idea urgente <a id="edi-20"></a>
+
+- **Dónde:** backend (campos y avisos; presentación de fase 2 pendiente)
+- **Estado:** funciona
+- **Código:** `urgente.py`, `editorial.plan`, `_run`, `autopiloto._editorial`.
+- **Criterios de aceptación:**
+  1. **Dado** una idea urgente, **cuando** se planifica, **entonces** obtiene el primer hueco de publicación libre compatible con cadencia, topes y un mínimo de 60 minutos de veto.
+  2. **Dado** una pieza ya preparada o un trabajo en cola en ese hueco, **cuando** llega la urgencia, **entonces** conserva la pieza y registra por qué la idea va al siguiente hueco; no se pierde trabajo pagado ni una decisión anterior.
+  3. **Dado** varias urgencias, **cuando** se asignan, **entonces** se atienden por orden de llegada, una por hueco.
+  4. **Dado** el hueco de una urgencia, **cuando** decide el director, **entonces** usa esa idea o salta el día con motivo; nunca publica otra idea pasando por encima de la prioridad.
+  5. **Dado** pausa, modo off/aprobación, falta de presupuesto o bloqueo de calidad, **cuando** corre el circuito, **entonces** se conservan todas las compuertas, y la urgencia no autoriza publicar.
+  6. **Dado** una preparación que consume el plazo de veto, **cuando** termina, **entonces** mueve la pieza a otro hueco y avisa; no publica inmediatamente.
+- **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
+- **Cobertura QA:**
+
 ## Imágenes
 
-El flujo de imagen no existe todavía. Está descrito, con estado `no implementado`, en [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md). Las fichas que tocan este circuito:
+El flujo de imagen está implementado en el backend; la interfaz queda para fase 2. Está descrito en [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md). Las fichas que tocan este circuito:
 - [IMG-15](imagenes-en-publicaciones.md#img-15): el equipo de redacción elige por contexto una foto de la Galería, una infografía o un carrusel, y nunca publica sin imagen ([IMG-05](imagenes-en-publicaciones.md#img-05));
 - [IMG-04](imagenes-en-publicaciones.md#img-04) e [IMG-06](imagenes-en-publicaciones.md#img-06): el director ve la Galería y las propuestas de post de Gustavo;
 - [IMG-07](imagenes-en-publicaciones.md#img-07) a [IMG-10](imagenes-en-publicaciones.md#img-10): decidir, editar con OpenAI y comprobar las fotos;
 - [IMG-INF-01](imagenes-en-publicaciones.md#img-inf-01) a [IMG-INF-08](imagenes-en-publicaciones.md#img-inf-08): las infografías y los carruseles, con el manual de Gustavo como regla de agente (como la voz, [EDI-16](#edi-16)) y la lista de 10 puntos en el verificador;
 - [IMG-14](imagenes-en-publicaciones.md#img-14): publicar con imagen o carrusel.
 
-### EDI-20 · Agente visual dedicado al post ganador <a id="edi-20"></a>
+### EDI-21 · Agente visual dedicado al post ganador <a id="edi-21"></a>
 
 - **Dónde:** PWA · app · backend
 - **Estado:** no implementado

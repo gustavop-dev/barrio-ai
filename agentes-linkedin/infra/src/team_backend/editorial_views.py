@@ -4,8 +4,9 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas, editorial, operador, resultados
-from .models import EditorialPiece
+from . import capturas, editorial, operador, resultados, imagenes
+from .models import EditorialPiece, PieceImage
+from .capturas_views import FileView, serve
 from .operador_views import valid
 from .permissions import require
 from .serializers import ActionOutput, JobOutput, OptionalRequestInput
@@ -50,7 +51,25 @@ class PieceDetail(APIView):
             # APRE-01 (docs/metricas-resultados.md): snapshots at 24 h/72 h/7 d and who commented.
             snapshots=resultados.piece_snapshots(piece),commenters=resultados.piece_commenters(piece),
             # «Comentario para el equipo» sent with the capture button (docs/capturas-galeria.md).
-            team_comments=capturas.piece_comments(piece)))
+            team_comments=capturas.piece_comments(piece),image_kind=piece.image_kind or None,image_reason=piece.image_reason,
+            images=[imagenes.payload(row) for row in piece.images.all()],image_review=piece.image_review,
+            image_document_url=f'/api/v1/editorial/pieces/{piece.id}/document' if piece.image_document else None))
+
+
+class PieceImageFile(FileView):
+    def get(self,request,pid,iid):
+        require(request.user,'operate_linkedin')
+        row=PieceImage.objects.filter(piece_id=pid,id=iid).first()
+        if row is None:raise NotFound()
+        return serve(request,row.image,row.mime)
+
+
+class PieceDocument(FileView):
+    def get(self,request,pid):
+        require(request.user,'operate_linkedin')
+        piece=EditorialPiece.objects.filter(id=pid).first()
+        if piece is None or not piece.image_document:raise NotFound()
+        return serve(request,piece.image_document,'application/pdf')
 
 class Plan(APIView):
     """Queue the preparation of the next free slot (paid: the editorial circuit calls Claude)."""

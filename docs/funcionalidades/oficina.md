@@ -167,8 +167,8 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
 - **Qué hace para Gustavo:** ve quién está preparando los medios de cada pieza y puede abrir la misión y actividad de ese agente.
 - **Responsable:** `editor_visual`, coordinado por `director_editorial`.
 - **Cadencia:** con cada cambio de estado/evento del trabajo visual; reutiliza la actualización de actividad de la Oficina.
-- **Tu turno:** ninguna aprobación por mostrar al rol. Sus entregables siguen EDI-20 y, para perfil, TUR-18.
-- **Datos necesarios y disponibilidad:** escena, paneles, trabajos y eventos existen; falta el rol en registro, representación y asignación de trabajos. Su definición futura se especifica en [EDI-20](motor-editorial.md#edi-20).
+- **Tu turno:** ninguna aprobación por mostrar al rol. Sus entregables siguen EDI-21 y, para perfil, TUR-18.
+- **Datos necesarios y disponibilidad:** escena, paneles, trabajos y eventos existen; falta el rol en registro, representación y asignación de trabajos. Su definición futura se especifica en [EDI-21](motor-editorial.md#edi-21).
 - **Código:** no existe esta integración. Referencias: `team_backend/oficina_views.py`, `oficina_eventos.py`, `compartido/src/scene`, paneles de la PWA y app.
 - **Criterios de aceptación:**
   1. **Dado** el rol registrado, **cuando** abre Editorial en la PWA o app, **entonces** aparece «Editor visual», su misión y definición accesible desde el panel, y se actualiza el número de integrantes sin sustituir a director o copywriters.

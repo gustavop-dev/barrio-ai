@@ -59,6 +59,13 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual(GalleryPhoto.objects.count(),4)
         self.assertTrue(all(photo.image.storage.exists(photo.image.name) for photo in GalleryPhoto.objects.all()))
 
+        from team_backend.models import Capture, PieceImage
+        self.assertTrue(PieceImage.objects.filter(kind='foto',source_photo__isnull=False).exists())
+        self.assertTrue(PieceImage.objects.filter(kind='infografia',template='pasos').exists())
+        urgent=Capture.objects.get(publish_asap=True)
+        self.assertIn('lo antes posible',urgent.note)
+        self.assertIsNotNone(urgent.publish_asap_expected_slot)
+        self.assertTrue(all(row.alt for row in PieceImage.objects.all()))
         app=self.device()
         turno=app.get('/api/v1/tu-turno').json()
         self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion'})

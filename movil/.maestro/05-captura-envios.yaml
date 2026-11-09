@@ -94,7 +94,7 @@ onFlowComplete:
     id: capture-button
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: 'Lo que enviaste · 3'
+    visible: 'Lo que enviaste · 4'
     timeout: 20000
 - tapOn:
     id: capture-historial
@@ -158,7 +158,7 @@ onFlowComplete:
     id: capture-button
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: 'Lo que enviaste · 4'
+    visible: 'Lo que enviaste · 5'
     timeout: 20000
 - tapOn:
     id: capture-historial

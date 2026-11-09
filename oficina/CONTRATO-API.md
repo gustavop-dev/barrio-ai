@@ -954,3 +954,59 @@ Cuando una subida falla en el teléfono (una captura con audio o fotos, «Subir 
 - `devices` tiene la misma forma que `GET /api/v1/auth/dispositivos`.
 - `expo_push.active` cuenta los tokens de push activos del usuario.
 - `last_error` es el último error de Expo en un token activo (por ejemplo `MessageRateExceeded`), o vacío.
+
+
+## Fase 2: imágenes y publicación prioritaria
+
+Backend de fase 1. No cambia la autenticación: sesión humana y CSRF en PWA, token de dispositivo en app; lecturas con `operate_linkedin`, escrituras con `approve_actions`. Los archivos usan las mismas credenciales, `Cache-Control: private, max-age=3600`, `nosniff` y CSP sandbox. Sin archivo: 404; sin permiso: 401/403. No se devuelven URLs de almacenamiento ni claves.
+
+| Endpoint | Entrada o campos añadidos |
+| --- | --- |
+| `POST /api/v1/capturas` (multipart) | `nota`, `audio`, `fotos` repetido y los campos existentes; nuevo `para=propuesta`; `ai_edit?: "no" \| "auto" \| "si"` (omite para tomar Ajustes). `publish_asap*` es de solo lectura: enviarlo responde 400. |
+| `GET /api/v1/capturas` / `GET /api/v1/capturas/<id>` | Cada captura añade `ai_edit`, `publish_asap: boolean`, `publish_asap_evidence: string`, `publish_asap_expected_slot: ISO datetime \| null`, `publish_asap_reason: string`. La lista conserva `{count,next,previous,results}`. |
+| `GET /api/v1/galeria` / `GET /api/v1/galeria/<id>` | Añade `ai_edit`, `instruction: string`, `instruction_kind: "" \| "none" \| "original" \| "edit" \| "unsafe"`, `versions: PieceImage[]` (ediciones). Conserva `used_in: {piece_id: UUID \| null,date: YYYY-MM-DD \| null,text: string} \| null`. Su texto es «Usada en la pieza del …». |
+| `PATCH /api/v1/galeria/<id>` | Solo campos cambiados: `{note?: string, ai_edit?: "no" \| "auto" \| "si"}`. Cambiar permiso solo afecta usos futuros. Cambiar nota descarta su interpretación anterior. |
+| `POST /api/v1/galeria` (multipart) | `fotos` repetido; toma `gallery_ai_edit` para las nuevas. Respuesta: array de fotos. |
+| `DELETE /api/v1/galeria/<id>` | 204; borra original y derivados. Si ya había una propuesta, su manifiesto deja de ser válido y no puede publicarse sin imagen. |
+| `GET/PATCH /api/v1/ajustes/preferencias` | Nuevo `gallery_ai_edit: "no" \| "auto" \| "si"`; PATCH parcial. |
+| `GET /api/v1/editorial/pieces/<id>` | Añade `image_kind: "foto" \| "infografia" \| "carrusel" \| "tarjeta" \| null`, `image_reason: string`, `images: PieceImage[]` ordenado, `image_review: ImageReview`, `image_document_url: string \| null`. Antes de preparar: `images=[]`, tipo null. |
+| `GET /api/v1/editorial/pieces/<id>/images/<image_id>` | Bytes privados de la imagen publicada o prevista, en su MIME. |
+| `GET /api/v1/editorial/pieces/<id>/document` | PDF privado del carrusel. Cada página lleva `/Alt` en inglés; LinkedIn no ofrece un campo de alt por página en el cuerpo del post. |
+| `GET /api/v1/galeria/<id>/imagen` | Original privado; se conserva el endpoint existente. |
+| `GET /api/v1/ajustes` | Añade a `ai_spend.today` `{budget:"imagenes",label:"Imágenes",spent_usd:number,limit_usd:number}`; ambos proveedores, con reservas pendientes/inciertas. |
+
+```ts
+type AIEdit = "no" | "auto" | "si";
+type ImageReview = {
+  ok?: boolean;
+  started?: boolean;
+  stage?: "datos";
+  failures?: string[];
+  mode?: "fixed_brand_card";
+  rule_version?: string; // SHA-256 de la regla versionada
+  sha256?: string[];
+  reasons?: string[];
+  checks?: {point: number; ok: boolean; reason: string}[];
+  attempts?: ImageReview[];
+  previous?: ImageReview;
+};
+type PieceImage = {
+  id: string; kind: "foto" | "infografia" | "carrusel" | "tarjeta";
+  position: number; // desde 1
+  url: string; alt: string; width: number; height: number; mime: string; sha256: string;
+  source_photos: {id: string; url: string}[]; // [] para render; un original para foto
+  edited: boolean; ai_edit: AIEdit; reason: string;
+  template: "portada" | "pasos" | "barras" | "numero" | "cierre" | null;
+  review: ImageReview;
+};
+```
+
+`brief.image` guarda `{kind,reason,photos}` (elección del equipo); `image_kind` y `images` describen el resultado final, que puede ser una tarjeta de fallback. Una edición rechazada conserva `edited=false`, el original en `url`, y el motivo/revisión. `image_review.mode=fixed_brand_card` identifica la tarjeta de texto fijo sin llamada visual. No presentarla como una infografía dinámica verificada por un modelo.
+
+`allow_ai_edit` y `gallery_ai_edit_default` siguen siendo alias booleanos para las interfaces anteriores: false → no; true → auto. La fase 2 usa exclusivamente `ai_edit` y `gallery_ai_edit`. Enviar ambos alias y campo nuevo en un PATCH responde 400. La migración no modifica archivos originales ni preferencias de fotos antiguas.
+
+La prioridad se interpreta de nota más transcripción; no existe botón. `publish_asap_expected_slot` es una previsión condicionada, en la zona de la fecha ISO (mostrar con la zona del calendario). Null indica que todavía no hay fecha; `publish_asap_reason` explica pausa, falta de hueco o presupuesto. El aviso `capture_scheduled` se consulta en el feed existente y enlaza `/?enviado=1`. El calendario y `POST /api/v1/editorial/plan` conservan sus rutas; una urgencia ocupa el primer hueco libre y no sustituye una pieza preparada. La API de la pieza sigue usando `scheduled_for` como hora efectiva.
+
+El veto y la aprobación usan los endpoints actuales `POST /api/v1/operador/actions/<id>/reject` y `/approve`; el segundo exige `expected_hash`. `action_detail.payload.media` congela `{kind,images:[{id,sha256,alt}],document_sha256}` junto con el texto bajo el mismo `payload_hash`. La fase 2 debe usar el hash recibido, sin recalcularlo ni editar el manifiesto. Los archivos o el alt cambiados invalidan la propuesta.
+
+`seed_qa`: la pieza `manana` tiene foto; `aprobacion` tiene infografía; captura `uid("capture:urgente")` contiene «Publícalo lo antes posible.» y fecha prevista. Los identificadores anteriores de piezas, fotos, capturas y tarjetas se conservan. QA de interfaz pendiente de fase 2.

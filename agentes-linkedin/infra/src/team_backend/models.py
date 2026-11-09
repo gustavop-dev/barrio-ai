@@ -259,6 +259,12 @@ class EditorialPiece(models.Model):
     panel=models.JSONField(default=dict,blank=True)
     selection=models.JSONField(default=dict,blank=True)
     verification=models.JSONField(default=dict,blank=True)
+    image_kind=models.CharField(max_length=16,blank=True)
+    image_reason=models.TextField(blank=True)
+    image_spec=models.JSONField(default=dict,blank=True)
+    image_review=models.JSONField(default=dict,blank=True)
+    image_document=models.FileField(upload_to='piezas/documentos',max_length=200,blank=True)
+    image_document_sha256=models.CharField(max_length=64,blank=True)
     final_text=models.TextField(blank=True)
     citations=models.JSONField(default=list,blank=True)
     signals=models.JSONField(default=list,blank=True)
@@ -568,11 +574,17 @@ def _media_name(folder,filename):
 def capture_audio_path(instance,filename):return _media_name('capturas/audio',filename)
 def gallery_image_path(instance,filename):return _media_name('galeria',filename)
 
+class AIEdit(models.TextChoices):
+    NO='no','No editar'
+    AUTO='auto','Que decida el equipo'
+    YES='si','Editar'
+
 class Capture(models.Model):
     """«Botón de captura»: a voice note, photos and a note that the team transcribes and routes (capturas.py).
     `routed_to` records what processing created so «Deshacer» can revert it."""
     class Purpose(models.TextChoices):
         POST='post','Idea para un post'
+        PROPOSAL='propuesta','Propuesta de post'
         FACT='dato','Dato sobre mí'
         ANSWER='respuesta','Responde una pregunta'
         GALLERY='galeria','Foto para la galería'
@@ -596,6 +608,13 @@ class Capture(models.Model):
     created_at=models.DateTimeField(default=timezone.now,db_index=True)
     note=models.TextField(blank=True)
     purpose=models.CharField(max_length=12,choices=Purpose.choices,blank=True)
+    ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.AUTO)
+    publish_asap=models.BooleanField(default=False,db_index=True)
+    publish_asap_evidence=models.TextField(blank=True)
+    publish_asap_not_before=models.DateField(null=True,blank=True)
+    publish_asap_expected_slot=models.DateTimeField(null=True,blank=True)
+    publish_asap_reason=models.TextField(blank=True)
+    understanding=models.JSONField(default=dict,blank=True)
     context_type=models.CharField(max_length=10,choices=Context.choices,blank=True)
     context_id=models.CharField(max_length=64,blank=True)
     # Visibility chosen when the capture answers a question (null: the question's suggestion).
@@ -633,7 +652,9 @@ class GalleryPhoto(models.Model):
     width=models.PositiveIntegerField(null=True,blank=True)
     height=models.PositiveIntegerField(null=True,blank=True)
     note=models.TextField(blank=True)
-    allow_ai_edit=models.BooleanField(default=True)
+    ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.AUTO)
+    instruction=models.TextField(blank=True)
+    instruction_kind=models.CharField(max_length=12,blank=True)
     state=models.CharField(max_length=12,choices=State.choices,default=State.UNUSED,db_index=True)
     chosen_piece=models.ForeignKey(EditorialPiece,on_delete=models.SET_NULL,null=True,blank=True,related_name='gallery_photos')
     chosen_for=models.DateField(null=True,blank=True)
@@ -644,10 +665,40 @@ class GalleryPhoto(models.Model):
     class Meta:ordering=['-created_at']
     def __str__(self):return f'{self.id} · {self.get_state_display()}'
 
+    @property
+    def allow_ai_edit(self):return self.ai_edit!=AIEdit.NO
+    @allow_ai_edit.setter
+    def allow_ai_edit(self,value):self.ai_edit=AIEdit.AUTO if value else AIEdit.NO
+
+
+class PieceImage(models.Model):
+    """Frozen image and permission snapshot. Original files stay owned by GalleryPhoto."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    piece=models.ForeignKey(EditorialPiece,on_delete=models.CASCADE,related_name='images')
+    source_photo=models.ForeignKey(GalleryPhoto,on_delete=models.CASCADE,null=True,blank=True,related_name='uses')
+    position=models.PositiveSmallIntegerField(default=1)
+    kind=models.CharField(max_length=16)
+    image=models.FileField(upload_to='piezas/imagenes',max_length=200)
+    mime=models.CharField(max_length=40,default='image/png')
+    width=models.PositiveIntegerField()
+    height=models.PositiveIntegerField()
+    sha256=models.CharField(max_length=64)
+    alt=models.TextField()
+    edited=models.BooleanField(default=False)
+    ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.NO)
+    reason=models.TextField(blank=True)
+    template=models.CharField(max_length=20,blank=True)
+    data=models.JSONField(default=dict,blank=True)
+    review=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['position']
+        constraints=[models.UniqueConstraint(fields=['piece','position'],name='one_image_per_piece_position')]
+
 class OfficePreference(models.Model):
     """Singleton of Gustavo's office preferences (Ajustes)."""
     id=models.PositiveSmallIntegerField(primary_key=True,default=1,editable=False)
-    gallery_ai_edit_default=models.BooleanField(default=True)
+    gallery_ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.AUTO)
     # Ajustes › Notificaciones: event kinds whose push Gustavo turned off, and those he turned on although their default
     # is off (notificaciones.INBOX_KINDS and FEED_KINDS hold the defaults; off wins if a kind is in both).
     push_disabled=models.JSONField(default=list,blank=True)
@@ -657,6 +708,11 @@ class OfficePreference(models.Model):
     @classmethod
     def current(cls):
         return cls.objects.get_or_create(pk=1)[0]
+
+    @property
+    def gallery_ai_edit_default(self):return self.gallery_ai_edit!=AIEdit.NO
+    @gallery_ai_edit_default.setter
+    def gallery_ai_edit_default(self,value):self.gallery_ai_edit=AIEdit.AUTO if value else AIEdit.NO
 
 
 class Notification(models.Model):

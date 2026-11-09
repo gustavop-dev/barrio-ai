@@ -25,6 +25,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 | [CAP-13](#cap-13) | Permiso del micrófono | PWA · app | funciona |
 | [CAP-14](#cap-14) | Cerrar la hoja sin enviar | PWA · app | funciona |
 | [CAP-15](#cap-15) | Límites de tamaño, tipo y duración | PWA · app · backend | parcial |
+| [CAP-16](#cap-16) | Interpretar «publícalo lo antes posible» | backend | funciona |
 
 ---
 
@@ -154,7 +155,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Criterios de aceptación:**
   1. **Dado** «Idea para un post», **cuando** se procesa, **entonces** la captura queda «En la mesa editorial» con «Mesa editorial lo tendrá en cuenta» y llega al director ([EDI-17](motor-editorial.md#edi-17)).
   2. **Dado** «Dato sobre mí» o «Responde una pregunta» sin pregunta ligada, **cuando** se procesa, **entonces** se guarda un dato privado `nota.captura-<id>` y la captura dice «Está en Lo que el equipo sabe de ti · Privado».
-  3. **Dado** que no eligió nada y hay texto, **cuando** se procesa, **entonces** una clasificación decide entre post, dato y galería (esta solo con fotos), y la tarjeta muestra «… · lo decidió el equipo» con el motivo; ante la duda gana «dato».
+  3. **Dado** que no eligió nada y hay texto, **cuando** se procesa, **entonces** una clasificación decide entre post, propuesta, dato y galería (esta solo con fotos), y la tarjeta muestra «… · lo decidió el equipo» con el motivo; ante la duda gana «dato».
   4. **Dado** que no eligió nada y solo hay fotos, **cuando** se procesa, **entonces** las fotos quedan en la Galería sin pasar por el clasificador.
   5. **Dado** un audio sin voz y sin nota ni fotos, **cuando** se procesa, **entonces** la captura queda «Sin usar».
   6. **Dado** que la clasificación falla o devuelve algo inválido, **cuando** se procesa, **entonces** la captura queda en error con «No se pudo decidir a dónde va (…). El texto queda aquí: elige «Para qué es» y envíalo de nuevo.».
@@ -267,12 +268,26 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
+### CAP-16 · Interpretar «publícalo lo antes posible» <a id="cap-16"></a>
+
+- **Dónde:** backend (campos y avisos; presentación de fase 2 pendiente)
+- **Estado:** funciona
+- **Código:** `capture_intent.py`, `capturas.classify` y `process`.
+- **Criterios de aceptación:**
+  1. **Dado** una nota o transcripción que pide publicar pronto, **cuando** se procesa, **entonces** la clasificación estructurada guarda `publish_asap` y una cita literal sin añadir otra llamada; en destinos explícitos sin clasificación usa una consulta Jev Noul.
+  2. **Dado** una negación, una cita ajena o una urgencia de otro asunto, **cuando** se interpreta, **entonces** no se activa prioridad.
+  3. **Dado** «sácalo mañana», **cuando** se interpreta, **entonces** no se reserva antes de mañana ni se saltan verificaciones.
+  4. **Dado** que falla la interpretación, **cuando** se guarda la captura, **entonces** conserva el texto y registra el error; no inventa una urgencia ni repite el paso pagado.
+  5. **Dado** una idea urgente, **cuando** se consulta, **entonces** muestra evidencia, fecha prevista y condiciones, sin botón ni campo editable de urgencia.
+- **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
+- **Cobertura QA:**
+
 ## Imágenes
 
-Las fotos que Gustavo manda con la captura son la materia prima del flujo de imagen, que no existe todavía ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)). Lo que cambiará en la captura:
+Las fotos que Gustavo manda con la captura son la materia prima del flujo de imagen, implementado en el backend; su interfaz queda para fase 2 ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)). Lo que cambiará en la captura:
 - [IMG-01](imagenes-en-publicaciones.md#img-01): la nota de voz o escrita es contexto de las fotos y, si la trae, una instrucción («úsala tal cual», «recórtala», «quita el fondo», «más luz»);
 - [IMG-02](imagenes-en-publicaciones.md#img-02): «Para qué es» gana la opción «Propuesta de post», y el clasificador puede elegirla cuando Gustavo no elige nada;
-- [IMG-03](imagenes-en-publicaciones.md#img-03): las fotos llegan siempre a la Galería con su nota, sea cual sea el destino de la captura (hoy solo con el destino Galería).
+- [IMG-03](imagenes-en-publicaciones.md#img-03): las fotos llegan siempre a la Galería con su nota, sea cual sea el destino de la captura (implementado para todos los destinos).
 
 ## Biblioteca y fase web prevista
 

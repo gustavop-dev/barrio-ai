@@ -29,7 +29,7 @@ from decimal import Decimal
 from django.db import IntegrityError
 from django.utils import timezone
 from knowledge import providers
-from . import guardas, operador, orientacion, posicionamiento, voz
+from . import guardas, operador, orientacion, posicionamiento, voz, infografias, imagenes, urgente
 from .exceptions import Conflict
 from .jobs import enqueue_operation
 from .models import OPEN_PIECE_STATES, ConnectorAccount, EditorialPiece, Job, ObservedPost, TeamQuestion
@@ -65,7 +65,7 @@ def _obj(**props):return {'type':'object','additionalProperties':False,'required
 
 CLAIM=_obj(text=_s(),kind=_enum(['public_fact','observed_source','general_knowledge','opinion']),ref=_s())
 BRIEF_SCHEMA=_obj(decision=_enum(['write','skip']),skip_reason=_s(),primary_reader=_enum(READERS),modality=_enum(MODALITIES),
-    pillar=_enum(PILLARS),thesis=_s(),approach=_enum(APPROACH_UNITS),format=_enum(['text_only']),reader_value=_s(),
+    pillar=_enum(PILLARS),thesis=_s(),approach=_enum(APPROACH_UNITS),format=_enum(['foto','infografia','carrusel']),image=infografias.CHOICE_SCHEMA,reader_value=_s(),
     evidence=_arr(_obj(kind=_enum(['observed_post','public_fact','course_unit','general_knowledge']),ref=_s(),note=_s())),
     success_criterion=_s(),avoid=_arr(_s()),signals_used=_arr(_s()),citations=_arr(_s()),rationale=_s(),
     questions_for_gustavo=_arr(_obj(question=_s(),purpose=_s(),memory_key=_s(),public=_b())),ideas_used=_arr(_s()))
@@ -117,8 +117,14 @@ Cómo decidir:
   modalidad y enfoque: insiste en lo que funciona sin repetir tesis ni apertura y vuelve a probar lo que aún no
   tiene datos. Con menos de tres piezas medidas es una pista, no una conclusión. Las impresiones no son negocio: no
   abandones la dirección ni la mezcla de modalidades por perseguirlas; orientation pesa más que estos números.
-- approach es el ID de uno de los nueve enfoques del curso. format es text_only: en esta fase solo se
-  publica texto.
+- approach es el ID de uno de los nueve enfoques del curso. format e image.kind: foto, infografia o carrusel.
+  image.reason explica la elección por contexto. Las fotos de una propuesta son preferentes; explica si las descartas.
+  gallery trae notas, transcripciones, fecha, uso y permiso; las vistas reducidas llevan su ID. Elige solo IDs ofrecidos.
+  image.photos contiene id, reason, alt descriptivo en inglés, edit (none/light/straighten/crop/distractions) y edit_reason, instruction (cita literal de la nota) e instruction_kind (none/original/edit/unsafe).
+  En auto sin instrucción edita solo si hay un defecto visible concreto; ante la duda none. Nunca alteres personas,
+  texto ni logos. Un proceso en pasos puede llevar carrusel; un dato o una frase, infografia. Galería vacía: infografia.
+- priority_capture es la idea urgente reservada para este hueco, o null. Si existe, desarrolla esa idea e incluye su id
+  en ideas_used. Si no pasa los criterios de calidad, salta el día y explica por qué: urgencia nunca baja la calidad.
 - evidence enumera los apoyos: observed_post (ref = id de la señal), public_fact (ref = key), course_unit
   (ref = ID) o general_knowledge (conocimiento técnico ampliamente aceptado, sin cifras).
 - Si no hay material genuino o la pieza exigiría inventar, responde decision="skip" y explica el motivo en
@@ -329,7 +335,9 @@ def plan(user,request_id=None,audit_request_id=''):
     account=publishing_account()
     if account is None:raise Conflict('Conecta LinkedIn (API oficial) antes de planificar piezas.')
     if not can_publish(account):raise Conflict('La publicación está en pausa o desactivada (LIVE_LINKEDIN_OFFICIAL); no se prepara una pieza que no saldría.')
-    slot=next_slot(manual=True)
+    from .autopiloto import autonomy
+    if operador.globally_paused() or autonomy('CONT-09')=='off':raise Conflict('La publicación está detenida; no se prepara una pieza.')
+    slot=urgente.next_slot(manual=True) or next_slot(manual=True)
     if slot is None:raise Conflict('No hay un hueco libre en los próximos siete días.')
     job,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},request_id,audit_request_id)
     return job,created,slot
@@ -351,6 +359,7 @@ def _close(piece,state,note):
     if state in RELEASE_REASON:
         from . import capturas
         capturas.release_ideas(piece,RELEASE_REASON[state])
+        urgente.assign_slots()
     return piece
 
 class BudgetStop(ValueError):
@@ -369,6 +378,8 @@ def _stage(piece,name,payload,unit_ids=None):
     if not units:raise ValueError(f'Sin unidades del curso para la etapa {name}.')
     piece.stage=name;piece.save(update_fields=['stage','updated_at'])
     message=json.dumps(dict(payload,course_units=units),ensure_ascii=False,default=str)
+    if name=='director' and imagenes.connector.available('anthropic') and payload.get('gallery'):
+        message=[{'type':'text','text':message}]+imagenes.previews(payload['gallery'])
     from . import oficina_eventos
     role=STAGE_ROLES.get(name,['director_editorial'])[0]
     oficina_eventos.emit('consulta_biblioteca',role,'biblioteca',f'Unidades del curso para la etapa {name}')
@@ -452,6 +463,8 @@ def prepare(user,slot,origin_job=''):
     require(user,'operate_linkedin');require(user,'use_paid_providers')
     account=publishing_account()
     if account is None:raise ValueError('LinkedIn (API oficial) no está conectado; no se prepara la pieza.')
+    from .autopiloto import autonomy
+    if not can_publish(account) or operador.globally_paused() or autonomy('CONT-09')=='off':raise Conflict('Publicación detenida antes de preparar.')
     when=scheduled_for(slot);now=timezone.now()
     if when<=now:raise Conflict('La hora de ese hueco ya pasó.')
     _guard()
@@ -473,12 +486,19 @@ def _run(piece,user,now,origin_job):
     asked={'open':[{'question':q.question,'memory_key':q.memory_key} for q in TeamQuestion.objects.filter(state='open')[:20]],
            'closed_keys':sorted(preguntas.closed_keys()|{q for q in TeamQuestion.objects.filter(state='answered').values_list('memory_key',flat=True)})}
     from . import capturas, resumen_semanal
+    urgente.assign_slots(now)
     ideas=capturas.ideas_for_director(now)
+    ideas=[i for i in ideas if not i['publish_asap'] or (i['expected_slot'] and datetime.fromisoformat(i['expected_slot'])==piece.scheduled_for)]
+    priority=next((i for i in ideas if i['publish_asap']),None)
+    gallery=imagenes.candidates(ideas)
     brief,_=_stage(piece,'director',dict(memory,slot={'date':piece.slot_date,'weekday':piece.slot_date.strftime('%A')},
                    signals={'observed_posts':signals},history=history,modality_mix_30d=mix,performance_30d=_performance(now),
                    team_questions=asked,ideas_from_gustavo=ideas,feedback_from_gustavo=capturas.feedback_for_director(now),
-                   weekly_recommendations=resumen_semanal.for_director(now)))
+                   weekly_recommendations=resumen_semanal.for_director(now),gallery=gallery,priority_capture=priority))
     brief['positioning_version']=posicionamiento.VERSION
+    brief['gallery_offered']=[p['id'] for p in gallery]
+    if priority and priority['id'] not in brief.get('ideas_used',[]):
+        brief.update(decision='skip',skip_reason='La idea urgente no pasó el criterio editorial; se mantiene en la mesa')
     offered={i['id'] for i in ideas}
     used=[i for i in (brief.get('ideas_used') or []) if isinstance(i,str) and i in offered]
     if used:capturas.mark_used(used,piece)
@@ -523,13 +543,20 @@ def _run(piece,user,now,origin_job):
         avisar('piece_blocked',f'{who} la pieza del {piece.slot_date:%d/%m}',reasons[0][:300],
                link=f'/calendario/pieza/{piece.id}',ref=f'piece_blocked:{piece.id}')
         return _close(piece,EditorialPiece.State.BLOCKED,'; '.join(reasons))
+    try:
+        imagenes.prepare(piece,public,private)
+        urgente.ensure_veto(piece)
+    except ValueError as exc:
+        from .notificaciones import avisar
+        avisar('piece_blocked','Pieza bloqueada: imagen',str(exc)[:300],link=f'/calendario/pieza/{piece.id}',ref=f'piece_image_blocked:{piece.id}')
+        return _close(piece,EditorialPiece.State.BLOCKED,str(exc))
     risks=[f'Observación menor: {f.get("detail") or f.get("issue")}' for f in review.get('findings',[]) if f.get('severity')=='minor']
     risks+=[f'Objeción conservada: {o}' for o in selection.get('kept_objections',[])]
     if repair:
         source='las reglas' if repair['trigger']=='reglas' else 'el verificador'
         risks.append(f'Reparada en una ronda: {len(repair["findings"])} hallazgo(s) de {source} corregido(s)');model=repair.get('model') or model
     rationale=f'{frozen["thesis"]} — {selection.get("rationale","")}'.strip(' —')
-    operador.create_proposal(user,None,'CONT-09',{'text':final},rationale=rationale[:4000],citations=piece.citations,risks=risks,
+    operador.create_proposal(user,None,'CONT-09',{'text':final,'media':imagenes.manifest(piece)},rationale=rationale[:4000],citations=piece.citations,risks=risks,
                              source='agent',origin_job=origin_job,model=model,piece=piece)
     return _close(piece,EditorialPiece.State.READY,'Lista para la política autónoma.')
 
