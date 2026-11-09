@@ -115,9 +115,11 @@ def _capture(execution,kinds,post,now,commenters=None):
     for kind in kinds:
         try:
             with transaction.atomic():
-                PostMetric.objects.create(piece=execution.proposal.piece,kind=kind,provider_post_id=post['id'],share_url=post['share_url'],
+                metric=PostMetric.objects.create(piece=execution.proposal.piece,kind=kind,provider_post_id=post['id'],share_url=post['share_url'],
                     impressions=post['impressions'],reactions=post['reactions_counter'],comments=post['comments_counter'],
                     reposts=post['reposts_counter'],commenters=commenters,published_at=execution.started_at,captured_at=now)
+                from .evidencia import ingest_metric
+                ingest_metric(metric)
             created+=1
         except IntegrityError:continue
     return created
@@ -167,8 +169,10 @@ def collect_audience(account,connector,now,summary):
     except (ReadCapReached,ConnectorError) as exc:summary['views_error']=str(exc)  # never pauses: profile views are a bonus
     try:
         with transaction.atomic():
-            AudienceSnapshot.objects.create(day=day,followers=audience['followers'],connections=audience['connections'],
+            snapshot=AudienceSnapshot.objects.create(day=day,followers=audience['followers'],connections=audience['connections'],
                                             profile_views=views,profile_views_days=days if views is not None else None,captured_at=now)
+            from .evidencia import ingest_audience
+            ingest_audience(account,snapshot)
         summary['audience']='creada'
     except IntegrityError:summary['audience']='ya'
 
@@ -187,6 +191,9 @@ def collect(user,account,now=None):
     for step in (collect_posts,collect_audience):
         try:step(account,connector,now,summary)
         except (ReadCapReached,ConnectorError) as exc:
+            from .evidencia import record_coverage
+            record_coverage(account,'metrics_read',f'{step.__name__}:{now.isoformat()}',now,'missing',
+                            {'step':step.__name__,'reason':'source_unavailable'})
             summary['stopped']='; '.join(filter(None,[summary['stopped'],str(exc)]))
             if getattr(exc,'pause',False):
                 operador.set_account_pause(account,f'Métricas detenidas por el proveedor: {exc}');break

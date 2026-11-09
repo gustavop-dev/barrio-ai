@@ -410,9 +410,13 @@ def discover(user,account,now=None):
             _read(account,'comments');comments=connector.list_comments(post.provider_post_id,limit=50)
         except ReadCapReached as exc:summary['stopped']=str(exc);break
         except ConnectorError as exc:
+            from .evidencia import referent_comments
+            referent_comments(post,None,now)
             _pause_on(account,exc)
             if exc.pause:summary['stopped']=str(exc);break
             continue
+        from .evidencia import referent_comments
+        referent_comments(post,comments,now)
         post.commenters_scanned_at=now;post.save(update_fields=['commenters_scanned_at']);summary['posts']+=1
         for comment in comments:
             author=comment['author'];uid=author.get('id')
@@ -506,7 +510,9 @@ def classify(user,account,now=None,batch=10):
     contacts=_enrich(account,pending)
     if not contacts:return {'classified':0,'fit':0,'stopped':'Sin perfiles legibles hoy; se clasifican mañana.' if pending else '',**grounding}
     _,private=guardas.blocks()
+    from .evidencia import contact_context, record_classification, CRITERION_VERSION
     people=[{'id':str(c.id),'name':c.display_name,'headline':c.headline[:300],'location':c.location,'network_distance':c.network_distance,
+             'provenance':contact_context(c),
              'source':c.source,'evidence':{k:v for k,v in c.evidence.items() if k in ('referent','comment','query','invitation_message') and v}}
             for c in contacts]
     from . import orientacion
@@ -518,7 +524,11 @@ def classify(user,account,now=None,batch=10):
     except (json.JSONDecodeError,KeyError,TypeError):raise ValueError('El clasificador no devolvió JSON válido.') from None
     from .orquestacion import ensure_current
     ensure_current()
-    when=timezone.now().isoformat();fits=0;classified=0
+    criterion_version=CRITERION_VERSION+':'+hashlib.sha256(json.dumps({
+        'system':CLASSIFY_SYSTEM,'minimum_confidence':min_confidence(),
+        'course_version':grounding.get('course_version'),'orientation':orientacion.text(),
+    },sort_keys=True,ensure_ascii=False).encode()).hexdigest()[:16]
+    classified_at=now or timezone.now();when=classified_at.isoformat();fits=0;classified=0
     for contact in contacts:
         result=results.get(str(contact.id))
         if result is None:
@@ -528,13 +538,18 @@ def classify(user,account,now=None,batch=10):
         fit=bool(result.get('fit')) and confidence>=min_confidence()
         contact.classification={'fit':fit,'role':result.get('role'),'modality':result.get('modality'),'affinity':result.get('affinity'),
                                 'reason':(result.get('reason') or '')[:500],'confidence':round(confidence,2),
-                                'model':answer.get('model'),'classified_at':when,**grounding,'course_citations':citations,
+                                'model':answer.get('model'),'classified_at':when,
+                                'criterion_version':criterion_version,'minimum_confidence':min_confidence(),
+                                **grounding,'course_citations':citations,
                                 'invitation_note':result.get('invitation_note',''),'note_reason':result.get('note_reason',''),
                                 'evidence':contact.evidence,'missing_data':[] if contact.headline else ['headline']}
         if contact.stage=='candidate':
             _stage(contact,'fit' if fit else 'discarded','classified',contact.classification['reason'])
         else:note(contact,'classified',contact.classification['reason'])
-        fits+=int(fit);classified+=1;contact.save()
+        fits+=int(fit);classified+=1
+        with transaction.atomic():
+            contact.save()
+            record_classification(contact,observed_at=classified_at)
     operador._audit(user,'network.classified',account.id,classified=classified,fit=fits,model=answer.get('model'),**grounding)
     return {'classified':classified,'fit':fits,**grounding}
 
@@ -567,7 +582,9 @@ def _propose(user,contact,capability,payload,grounding=None):
                                           model=contact.classification.get('model') or '',contact=contact,
                                           citations=grounding['course_citations'])
     except Conflict:return None
-    proposal.review=dict(grounding,case_evidence={'contact':str(contact.id),'classification':contact.classification})
+    from .evidencia import contact_context
+    proposal.review=dict(grounding,case_evidence={'contact':str(contact.id),'classification':contact.classification,
+                                                'provenance':contact_context(contact)})
     proposal.save(update_fields=['review'])
     operador._audit(user,'network.proposed_grounding',proposal.id,**proposal.review)
     note(contact,'proposed',f'{capability} propuesto');contact.save()
@@ -583,6 +600,8 @@ def _settle(contact,profile):
     status=profile.get('relation_request_status') or ''
     if profile.get('network_distance')=='FIRST_DEGREE':
         contact.connected_at=contact.connected_at or timezone.now();_stage(contact,'connected','connected','Ya es conexión de primer grado.')
+        from .evidencia import relationship
+        relationship(contact,'connection',f'profile:{contact.pk}',timezone.now())
         return 'already_connected','Ya era conexión de primer grado; no se envió nada.'
     if status=='PENDING' and contact.stage!='incoming':
         contact.invited_at=contact.invited_at or timezone.now();_stage(contact,'invited','invited','Ya había una invitación pendiente.')
@@ -719,6 +738,9 @@ def sync(user,account,now=None):
             _stage(contact,'incoming','incoming','Te envió una invitación.')
         if contact.stage in ('incoming','discarded'):contact.invitation_id=invitation['id']
         contact.save()
+        from .evidencia import relationship
+        relationship(contact,'invitation',f'received:{invitation["id"]}',now,
+                     event_at=invitation.get('created_at'),direction='received')
     sent_to={i['user']['id'] for i in sent}
     for contact in Contact.objects.filter(account=account,stage='invited',provider_user_id__in=sent_to):
         contact.evidence=dict(contact.evidence,invitation_checked_at=now.isoformat());contact.save(update_fields=['evidence'])
@@ -842,6 +864,12 @@ def on_confirmed(proposal,execution):
         contact.connected_at=now;contact.network_distance='FIRST_DEGREE';_stage(contact,'connected','connected','Aceptaste su invitación.')
         notify_connection(contact,f'Aceptaste la invitación de {contact.display_name}')
     contact.save()
+
+    if proposal.capability in (RED.INVITE,RED.ACCEPT):
+        from .evidencia import relationship
+        relationship(contact,'invitation' if proposal.capability==RED.INVITE else 'connection',
+                     f'execution:{execution.pk}',now,
+                     direction='sent' if proposal.capability==RED.INVITE else 'accepted')
 
 @transaction.atomic
 def on_rejected(proposal,note_text=''):

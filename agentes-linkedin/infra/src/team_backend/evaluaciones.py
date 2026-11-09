@@ -649,7 +649,8 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
     run=Run(since,limit,execute,max_usd,lead,now)
     outputs,measured=typical_outputs()
     report={'modo':'ejecucion' if execute else 'ensayo','desde':run.since.date().isoformat(),'generado':run.now.isoformat(),
-            'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{},'curso':course_preview()}
+            'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{},'curso':course_preview(),
+            'evidencia':dict(EVIDENCE_CASE,status='pendiente de evaluación con fakes en test_evidencia')}
     chosen={}
     for agent in agents:
         found=CASES[agent](run);cases=found[:limit];chosen[agent]=cases
@@ -685,6 +686,24 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
 
 # BIB-09: synthetic course regressions, included in the existing harness report. No business writes.
 # Each fixture states observable behaviour; citations alone cannot make a failing decision pass.
+EVIDENCE_CASE={
+    'id':'OBS-03-BAR-14-evidencia', 'units':[],
+    'sources':['PostMetric.commenters','Contact.classification','PersonEvidence'],
+    'input':{'observed':12,'sufficient':8,'fit':5,'referents_per_person':2},
+    'expected':{'fit_pct':62.5,'classification_coverage':'8/12','unknown':4,'causal_claim':False},
+    'incorrect':{'fit_pct':41.67,'classification_coverage':'12/12','unknown':0,'causal_claim':True},
+}
+
+
+def grade_evidence_case(result):
+    """Grade the deterministic adapter output, never execute or pay a provider."""
+    actual={key:result.coverage.get(key) for key in ('fit_pct','classification_coverage','unknown')}
+    actual['causal_claim']=any(r.get('causal_claim', True) or any(a.get('causal_claim', True)
+        for a in r.get('associations', [])) for r in result.referents)
+    errors=[key for key,value in EVIDENCE_CASE['expected'].items() if actual.get(key)!=value]
+    return {'case':EVIDENCE_CASE['id'],'passed':not errors,'errors':errors}
+
+
 COURSE_CASES={
     'investigador':{'id':'BIB-09-investigador','units':operador.REFERENTS_UNITS,
         'input':{'popular':{'audience':'unrelated','followers':90000},'niche':{'audience':'startup product','followers':90}},

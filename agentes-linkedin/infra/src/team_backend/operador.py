@@ -298,7 +298,12 @@ def add_referent(user,account,identifier,reason):
     if not reason.strip():raise ValueError('Explica por qué esta persona es pertinente')
     slug=public_identifier(identifier)
     existing=Referent.objects.filter(account=account,public_identifier=slug).first()
-    if existing:return existing,False
+    if existing:
+        if existing.archived_at:
+            existing.archived_at=None;existing.active=True;existing.reason=reason.strip()
+            existing.save(update_fields=['archived_at','active','reason'])
+            _audit(user,'operator.referent_restored',existing.id)
+        return existing,False
     reserve_profile_read(account,'referent')
     profile=get_connector(account).get_user(slug)
     referent=Referent.objects.create(account=account,public_identifier=slug,provider_user_id=profile['id'],
@@ -856,6 +861,14 @@ def run_job(job):
         facts={'trigger':job.kind},plan=[job.kind])
     try:
         with runtime.session():
+            if job.kind in NETWORK_JOBS:
+                from . import evidencia
+                def evidence_request():
+                    end=timezone.now()
+                    return evidencia.EvidenceRequest(str(job.params['account']),
+                        (end-timedelta(days=90)).isoformat(),end.isoformat(),end.isoformat())
+                request=runtime.snapshot('evidence_request',evidence_request)
+                evidencia.consult(job.owner,request,runtime=runtime)
             result=_run_job(job)
             runtime.finish(result)
             return result

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "3b.1",
+  "graph_version": "4.1",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -444,6 +444,16 @@
       "binding": "team_backend.orquestacion_schemas.SYNC_RESULT",
       "kind": "json_schema",
       "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "evidence_request": {
+      "binding": "team_backend.evidencia.EvidenceRequest",
+      "kind": "dataclass",
+      "description": "Cuenta y ventana [inicio, fin), corte de conocimiento; fechas con zona horaria."
+    },
+    "evidence_result": {
+      "binding": "team_backend.evidencia.EvidenceResult",
+      "kind": "dataclass",
+      "description": "Personas deduplicadas, cobertura, versiones de encaje, informes observacionales y contadores sin identidad; sin mensajes privados."
     }
   },
   "nodes": [
@@ -1011,7 +1021,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.operador.observe",
-      "description": "Lee publicaciones de referentes y conserva evidencia. No cambia los referentes.",
+      "description": "Lee publicaciones de referentes y conserva evidencia. No cambia los referentes. Consume procedencias de evidencia_compartida entregadas por el orquestador; no invoca especialistas.",
       "skills": [
         "Lee publicaciones de referentes y conserva evidencia"
       ],
@@ -1103,7 +1113,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.red.classify",
-      "description": "Clasifica encaje y rol con evidencia del curso; no envía invitaciones.",
+      "description": "Clasifica encaje y rol con evidencia del curso; no envía invitaciones. Consume procedencias de evidencia_compartida entregadas por el orquestador; no invoca especialistas.",
       "skills": [
         "Clasifica encaje y rol con evidencia del curso; no envía invitaciones"
       ],
@@ -1159,7 +1169,8 @@
       "tools": [
         "unipile_read",
         "biblioteca",
-        "memoria"
+        "memoria",
+        "evidencia_compartida"
       ],
       "course_lists": [
         "operador.COMMENT_UNITS"
@@ -1201,7 +1212,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.red.plan",
-      "description": "Propone seguir, invitar y aceptar. Aplica BAR-15, diversidad por roles, rampa y notas mensuales.",
+      "description": "Propone seguir, invitar y aceptar. Aplica BAR-15, diversidad por roles, rampa y notas mensuales. Consume procedencias de evidencia_compartida entregadas por el orquestador; no invoca especialistas.",
       "skills": [
         "Propone seguir, invitar y aceptar"
       ],
@@ -1414,7 +1425,8 @@
       ],
       "tools": [
         "biblioteca",
-        "metricas"
+        "metricas",
+        "evidencia_compartida"
       ],
       "course_lists": [
         "operador.ANALYSIS_UNITS"
@@ -2014,6 +2026,41 @@
       "budget_ref": "ninguno",
       "input_schemas": [],
       "output_schemas": [],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "evidencia_compartida",
+      "label": "Evidencia compartida",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.evidencia.report",
+      "description": "Servicio determinista OBS-03/BAR-14. Reutiliza cortes y observaciones locales; conserva fuentes, fechas, versiones y cobertura. Coincidencia no demuestra causalidad; reactores/seguidores agregados sin identidad.",
+      "skills": [
+        "Deduplicar identidades opacas por cuenta",
+        "Conservar procedencias y versiones",
+        "Medir cobertura y asociaciones sin causalidad"
+      ],
+      "tools": [
+        "database_read",
+        "evidence_snapshot"
+      ],
+      "course_units": [],
+      "course_lists": [],
+      "course_note": "No clasifica ni carga curso: conserva las versiones y citas del clasificador. El analista interpreta con ANALYSIS_UNITS.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio local determinista, sin modelo ni lecturas externas.",
+      "budget_ref": "ninguno",
+      "input_schemas": [
+        "evidence_request"
+      ],
+      "output_schemas": [
+        "evidence_result"
+      ],
       "activity": {
         "job_kinds": [],
         "event_roles": []
@@ -2797,6 +2844,68 @@
       "response_required": false,
       "status": "active",
       "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
+    },
+    {
+      "id": "evidencia_red",
+      "from": "relaciones_comunidad",
+      "to": "evidencia_compartida",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "call",
+      "request_schema": "evidence_request",
+      "response_schema": "evidence_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "evidencia_analista",
+      "from": "analista_barrio_resultados",
+      "to": "evidencia_compartida",
+      "cycles": [
+        "consulta_evidencia"
+      ],
+      "request_kind": "call",
+      "request_schema": "evidence_request",
+      "response_schema": "evidence_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "evidencia_referentes_futura",
+      "from": "investigador_lider",
+      "to": "evidencia_compartida",
+      "cycles": [
+        "referentes_mensuales"
+      ],
+      "request_kind": "call",
+      "request_schema": "evidence_request",
+      "response_schema": "evidence_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "planned"
+    },
+    {
+      "id": "evidencia_comunidad_futura",
+      "from": "analista_barrio_resultados",
+      "to": "evidencia_compartida",
+      "cycles": [
+        "comunidad_mensual"
+      ],
+      "request_kind": "call",
+      "request_schema": "evidence_request",
+      "response_schema": "evidence_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "planned"
     }
   ],
   "cycles": [
@@ -2918,7 +3027,8 @@
         "sync_red",
         "lider_jev",
         "gustavo",
-        "operador_cuenta"
+        "operador_cuenta",
+        "evidencia_compartida"
       ],
       "triggers": [
         {
@@ -3276,7 +3386,8 @@
       "participants": [
         "investigador_lider",
         "investigacion_web",
-        "estudio_comunidad"
+        "estudio_comunidad",
+        "evidencia_compartida"
       ],
       "triggers": [
         {
@@ -3364,7 +3475,8 @@
       "orchestrator": "analista_barrio_resultados",
       "participants": [
         "analista_barrio_resultados",
-        "estudio_comunidad"
+        "estudio_comunidad",
+        "evidencia_compartida"
       ],
       "triggers": [
         {
@@ -3388,6 +3500,52 @@
         "records": [],
         "checkpoint_resume": false,
         "note": "Pendiente de implementar."
+      }
+    },
+    {
+      "id": "consulta_evidencia",
+      "label": "Consulta de evidencia compartida",
+      "status": "active",
+      "orchestrator": "analista_barrio_resultados",
+      "participants": [
+        "analista_barrio_resultados",
+        "evidencia_compartida"
+      ],
+      "triggers": [
+        {
+          "kind": "weekly_summary",
+          "cadence": "Al preparar el resumen semanal; herramienta local disponible para consultas de los orquestadores.",
+          "binding": "team_backend.evidencia.consult",
+          "deduplication": "Cuenta, actor, ventana y corte; checkpoint persistido."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "ninguno"
+        ],
+        "max_depth": 1,
+        "max_calls": 1,
+        "max_provider_calls": 1,
+        "cost_cap_usd": 0.01,
+        "cost_period": "cycle",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 180,
+        "max_stalls": 1,
+        "max_replans": 1,
+        "scope": "Sin gasto: ninguna arista autoriza proveedores. El cap positivo cumple el contrato genérico de 3b; no reserva presupuesto."
+      },
+      "ledger": {
+        "status": "runtime",
+        "records": [
+          "CycleLedger",
+          "PersonEvidence",
+          "FitClassification",
+          "ReferentAttribution"
+        ],
+        "checkpoint_resume": true,
+        "note": "Consulta determinista y resultado tipado; no inicia los ciclos mensuales de fases 5/6."
       }
     }
   ],
