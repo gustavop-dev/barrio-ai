@@ -7,6 +7,10 @@ name: Actualización OTA (preview)
 # It never publishes code that fails the checks of the `movil` CI job: it runs the same checks
 # (types, lint, tests) on this commit first, and `eas update` bundles the app like `expo export`.
 # Without the EXPO_TOKEN secret it skips with a notice and succeeds.
+#
+# A push that also changes the backend (agentes-linkedin/, not docs) does not publish: the app would reach
+# phones before the server it talks to is deployed, and the server would silently ignore the new fields.
+# After the deploy, publish it by hand: `gh workflow run eas-update.yml`. Manual runs always publish.
 on:
   push:
     branches: [main]
@@ -40,19 +44,38 @@ jobs:
               echo "Falta el secreto \`EXPO_TOKEN\`, así que no se publicó nada. Cómo crearlo: \`movil/README.md\`, «Actualizaciones OTA»."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-      - if: steps.token.outputs.present == 'true'
+      - id: backend
+        if: steps.token.outputs.present == 'true' && github.event_name == 'push'
+        name: ¿El mismo push cambia el backend?
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA" --jq '.files[].filename' 2>/dev/null || true)"
+          if printf '%s\n' "$files" | grep -E '^agentes-linkedin/' | grep -qvE '\.md$'; then
+            echo "wait=true" >> "$GITHUB_OUTPUT"
+            echo "::notice title=OTA en espera del despliegue::Este push también cambia el backend. Tras desplegar el servidor: gh workflow run eas-update.yml"
+            {
+              echo "### Actualización OTA en espera del despliegue"
+              echo ""
+              echo "Este push también cambia el backend (\`agentes-linkedin/\`). Publicarla antes del despliegue llevaría a los teléfonos pantallas que el servidor aún no entiende. Tras desplegar: \`gh workflow run eas-update.yml\`."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "wait=false" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
         uses: actions/checkout@v4
-      - if: steps.token.outputs.present == 'true'
+      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: movil/package-lock.json
-      - if: steps.token.outputs.present == 'true'
+      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
         name: Mismas comprobaciones que el job movil de CI
         working-directory: movil
         run: npm ci && npm run typecheck && npm run lint && npm test -- --ci
-      - if: steps.token.outputs.present == 'true'
+      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
         name: Publicar en la rama preview
         working-directory: movil
         env:
