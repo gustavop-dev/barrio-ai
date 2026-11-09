@@ -11,7 +11,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from knowledge import db
-from . import autopiloto, editorial, lider, notificaciones, operador, oportunidades, orientacion, preguntas, red
+from . import autopiloto, editorial, imagenes, lider, notificaciones, operador, oportunidades, orientacion, preguntas, red
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, EditorialPiece, Opportunity,
                      OperatorControl, TeamQuestion)
 from .operador_views import get_or_404, human_session, valid
@@ -665,6 +665,7 @@ class Settings(APIView):
                          'ai_spend':{'today':[
                              {'budget':'general','label':'General (comentarios)','spent_usd':_spend('propose-comment',day),'limit_usd':float(os.environ.get('OPERATOR_DAILY_LLM_USD','1'))},
                              {'budget':'editorial','label':'Editorial','spent_usd':_spend('editorial-%',day),'limit_usd':float(os.environ.get('EDITORIAL_DAILY_LLM_USD','1'))},
+                             {'budget':'imagenes','label':'Imágenes','spent_usd':float(imagenes.spent_today(now)),'limit_usd':float(os.environ.get('IMAGE_DAILY_USD','1'))},
                              {'budget':'red','label':'Red','spent_usd':_spend('network-%',day),'limit_usd':float(red.daily_budget())}],
                              'month_usd':_spend('%',month),'total_usd':_spend('%'),'limit_usd':float(os.environ.get('ANTHROPIC_LIMIT_USD','1')),
                              'lead_month_usd':_spend('%',month,provider='typesafe'),

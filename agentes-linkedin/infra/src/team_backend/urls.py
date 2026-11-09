@@ -45,6 +45,8 @@ urlpatterns=[
  # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).
  path('editorial/calendar',ed.Calendar.as_view()),path('editorial/pieces/<uuid:pid>',ed.PieceDetail.as_view()),
  path('editorial/plan',ed.Plan.as_view()),
+ path('editorial/pieces/<uuid:pid>/images/<uuid:iid>',ed.PieceImageFile.as_view()),
+ path('editorial/pieces/<uuid:pid>/document',ed.PieceDocument.as_view()),
  # Capture button and Galería (docs/capturas-galeria.md): private files, authenticated streaming only.
  path('capturas',cv.Captures.as_view()),path('capturas/<uuid:cid>',cv.CaptureDetail.as_view()),
  path('capturas/<uuid:cid>/audio',cv.CaptureAudio.as_view()),

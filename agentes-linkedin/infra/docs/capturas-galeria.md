@@ -125,8 +125,8 @@ El coste de una transcripción ya hecha no se devuelve.
   - `sin_usar` incluye las nuevas;
   - `elegidas` incluye las editadas;
   - `publicadas`.
-- **`allow_ai_edit`:** cada foto nueva lo toma de la preferencia `gallery_ai_edit_default` (Ajustes, activada por defecto). Gustavo lo cambia foto a foto.
-- **Fase de imagen.** Por ahora las piezas solo publican texto. Los estados `elegida`, `editada` y `publicada` y `chosen_piece`, `chosen_for` y `published_at` los fijará la fase de imagen del circuito editorial. `width` y `height` quedan en `null` porque Pillow no es dependencia.
+- **`ai_edit`:** no/auto/si; cada foto nueva toma la opción de la captura o `gallery_ai_edit` de Ajustes (auto por defecto). Los booleanos anteriores siguen como alias de API. La migración convierte false→no y true→auto.
+- **Fase de imagen implementada en backend.** `imagenes.py` selecciona, edita, verifica y marca usos; `PieceImage` conserva dimensiones, alt, origen y revisión. Pillow dibuja infografías y tarjeta fija sin claves. Véase `docs/imagenes-fase-1.md` del repositorio y la sección de fase 2 del contrato.
 
 ## Archivos privados y almacenamiento
 

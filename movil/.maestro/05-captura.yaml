@@ -340,9 +340,9 @@ tags: [captura]
     visible:
       id: capture-historial
     timeout: 20000
-# Two seeded captures and the one sent again (the undone one is not listed).
+# Three seeded captures (one is the «lo antes posible» example) and the one sent again (the undone one is not listed).
 - extendedWaitUntil:
-    visible: 'Lo que enviaste · 3'
+    visible: 'Lo que enviaste · 4'
     timeout: 20000
 - tapOn:
     id: capture-historial
@@ -378,7 +378,7 @@ tags: [captura]
 - extendedWaitUntil:
     notVisible: 'Nota de QA idea para un post sobre validar un MVP con clientes'
     timeout: 10000
-- assertVisible: 'Lo que enviaste · 2'
+- assertVisible: 'Lo que enviaste · 3'
 
 # The seeded ones, newest first: the transcribed voice note that became a fact, and the idea used in a piece.
 - scrollUntilVisible:
@@ -389,15 +389,27 @@ tags: [captura]
 - assertVisible: '.*Fundé ProjectApp en 2019 en Medellín.*'
 - assertVisible: 'Está en Lo que el equipo sabe de ti · ProjectApp'
 - assertVisible: 'Escuchar'
+# The «lo antes posible» example is also «Usado» and comes first: scroll to the idea's own line.
 - scrollUntilVisible:
     element:
-      text: 'Usado'
+      text: 'Usada en la pieza del .*'
     direction: DOWN
+    centerElement: true
     timeout: 20000
 - assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
 - assertVisible: 'Usada en la pieza del .*'
 - takeScreenshot: 05-captura-14-historial-semilla
-- tapOn: 'Volver a la captura'
+# The history was scrolled down to the idea: bring «Volver a la captura» back before tapping it, and retry the pair in
+# case the history redraws while the sheet refreshes.
+- retry:
+    maxRetries: 2
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: 'Volver a la captura'
+          direction: UP
+          timeout: 20000
+      - tapOn: 'Volver a la captura'
 - extendedWaitUntil:
     visible:
       id: capture-grabar

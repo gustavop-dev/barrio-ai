@@ -95,7 +95,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 - **Qué hace para Gustavo:** ve lo gastado hoy en cada presupuesto frente a su tope, lo del mes frente al techo de Anthropic, el total, lo del agente líder y lo de la transcripción.
 - **Código:** `ai_spend` de `GET /api/v1/ajustes` (`rediseno_views._spend`); PWA y app `ajustes/Gasto.tsx`; `compartido/src/logic/ajustes.ts`.
 - **Criterios de aceptación:**
-  1. **Dado** gasto de hoy, **cuando** abre «Gasto de IA · hoy», **entonces** ve un medidor «$gastado de $tope» para «General (comentarios)» (`OPERATOR_DAILY_LLM_USD`), «Editorial» (`EDITORIAL_DAILY_LLM_USD`) y «Red» (`NETWORK_DAILY_LLM_USD`).
+  1. **Dado** gasto de hoy, **cuando** abre «Gasto de IA · hoy», **entonces** ve un medidor «$gastado de $tope» para «General (comentarios)» (`OPERATOR_DAILY_LLM_USD`), «Editorial» (`EDITORIAL_DAILY_LLM_USD`) «Red» (`NETWORK_DAILY_LLM_USD`) e «Imágenes» (`IMAGE_DAILY_USD`, ambos proveedores; presentación nueva pendiente de fase 2).
   2. **Dado** el gasto del mes, **cuando** se pinta, **entonces** ve «Este mes: $X de $`ANTHROPIC_LIMIT_USD`», «Desde el inicio: $Y», «Agente líder, este mes» (TypeSafe) y «Transcripción de audios, este mes» (AssemblyAI).
   3. **Dado** un presupuesto con tope 0 o sin dato, **cuando** se pinta, **entonces** ve solo lo gastado o «sin dato».
   4. **Dado** ningún presupuesto diario configurado, **cuando** se pinta, **entonces** ve «Hoy no hay presupuestos de IA configurados.».
@@ -201,7 +201,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 
 ## Imágenes
 
-El gasto de las ediciones y comprobaciones de imagen tendrá su propio presupuesto y su línea en Gasto de IA cuando exista el flujo de imagen: ver [IMG-13](imagenes-en-publicaciones.md#img-13) ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)).
+El backend devuelve la línea Imágenes, con presupuesto propio IMAGE_DAILY_USD y gasto de ambos proveedores; la presentación queda para fase 2: ver [IMG-13](imagenes-en-publicaciones.md#img-13) ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)).
 
 ## Retiradas
 

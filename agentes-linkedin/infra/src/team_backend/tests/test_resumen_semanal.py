@@ -250,7 +250,7 @@ class StatsTests(SummaryBase):
             'por_estado':{'anotado':1,'usado':1},'comentarios_sobre_piezas':1,'ideas_usadas_en_piezas_de_la_semana':1})
         spend=week['gasto_ia']
         self.assertEqual((spend['total_usd'],spend['anthropic_por_presupuesto_usd'],spend['otros_proveedores_usd']),
-                         (0.81,{'general':0.3,'editorial':0.5,'red':0.0,'resumen_semanal':0.0,'otros':0.0},{'typesafe':0.01}))
+                         (0.81,{'general':0.3,'editorial':0.5,'red':0.0,'resumen_semanal':0.0,'imagenes':0.0,'otros':0.0},{'typesafe':0.01}))
         self.assertEqual(week['lider'],{'disponible':True,'por_capacidad':{'INT-03':{'aprobadas':1,'descartadas':1,
                                                                                     'preguntas_que_mas_fallan':{'aporta':1}}}})
         stops=week['pausas_y_bloqueos']

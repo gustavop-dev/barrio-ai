@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from . import capturas
 from .jobs import audit
-from .models import Capture, GalleryPhoto, OfficePreference
+from .models import AIEdit, Capture, GalleryPhoto, OfficePreference
 from .operador_views import get_or_404, human_session, valid
 from .permissions import require
 
@@ -68,6 +68,7 @@ class FileView(APIView):
 # --------------------------------------------------------------------------- serializers
 
 class CaptureInput(serializers.Serializer):
+    ai_edit=serializers.ChoiceField(choices=AIEdit.values,required=False)
     nota=serializers.CharField(required=False,allow_blank=True,max_length=capturas.NOTE_MAX)
     para=serializers.ChoiceField(choices=Capture.Purpose.values,required=False,allow_blank=True)
     contexto_tipo=serializers.ChoiceField(choices=Capture.Context.values,required=False,allow_blank=True)
@@ -76,6 +77,11 @@ class CaptureInput(serializers.Serializer):
     audio_duration_s=serializers.FloatField(required=False,allow_null=True,min_value=0,max_value=1800,
                                             error_messages={'max_value':'El audio puede durar como mucho 30 minutos.'})
 
+    def validate(self,attrs):
+        if any(key.startswith('publish_asap') for key in self.initial_data):
+            raise serializers.ValidationError('La prioridad se interpreta de la nota o transcripción; no es un campo editable.')
+        return attrs
+
 class CaptureOutput(serializers.BaseSerializer):
     def to_representation(self,obj):return capturas.capture_payload(obj)
 
@@ -83,10 +89,12 @@ class PhotoOutput(serializers.BaseSerializer):
     def to_representation(self,obj):return capturas.photo_payload(obj)
 
 class PhotoPatch(serializers.Serializer):
+    ai_edit=serializers.ChoiceField(choices=AIEdit.values,required=False)
     note=serializers.CharField(required=False,allow_blank=True,max_length=2000)
     allow_ai_edit=serializers.BooleanField(required=False)
 
 class PreferencesInput(serializers.Serializer):
+    gallery_ai_edit=serializers.ChoiceField(choices=AIEdit.values,required=False)
     gallery_ai_edit_default=serializers.BooleanField(required=False)
     push_disabled=serializers.ListField(child=serializers.CharField(max_length=40),required=False,max_length=40)
     push_enabled=serializers.ListField(child=serializers.CharField(max_length=40),required=False,max_length=40)
@@ -152,10 +160,14 @@ class PhotoDetail(APIView):
     def patch(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
         data=valid(PhotoPatch,request);photo=get_or_404(GalleryPhoto,id=pid)
-        for field in ('note','allow_ai_edit'):
+        if 'ai_edit' in data and 'allow_ai_edit' in data:raise ValidationError('Envía solo ai_edit')
+        for field in ('note','allow_ai_edit','ai_edit'):
             if field in data:setattr(photo,field,data[field].strip() if field=='note' else data[field])
-        photo.save(update_fields=['note','allow_ai_edit'])
-        audit(request.user,'gallery.updated',photo.id,allow_ai_edit=photo.allow_ai_edit)
+        if 'note' in data:
+            # An old interpretation must not outlive Gustavo changing the note.
+            photo.instruction='';photo.instruction_kind=''
+        photo.save(update_fields=['note','ai_edit','instruction','instruction_kind'])
+        audit(request.user,'gallery.updated',photo.id,ai_edit=photo.ai_edit)
         return Response(PhotoOutput(photo).data)
     def delete(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
@@ -172,7 +184,7 @@ class PhotoImage(FileView):
 
 def _preferences():
     current=OfficePreference.current()
-    return {'gallery_ai_edit_default':current.gallery_ai_edit_default,'push_disabled':current.push_disabled,'push_enabled':current.push_enabled,
+    return {'gallery_ai_edit':current.gallery_ai_edit,'gallery_ai_edit_default':current.gallery_ai_edit_default,'push_disabled':current.push_disabled,'push_enabled':current.push_enabled,
             'updated_at':current.updated_at}
 
 class Preferences(APIView):
@@ -186,6 +198,8 @@ class Preferences(APIView):
         data=valid(PreferencesInput,request);current=OfficePreference.current()
         if not data:raise ValidationError('Envía gallery_ai_edit_default, push_disabled o push_enabled')
         if 'gallery_ai_edit_default' in data:current.gallery_ai_edit_default=data['gallery_ai_edit_default']
+        if 'gallery_ai_edit' in data and 'gallery_ai_edit_default' in data:raise ValidationError('Envía solo gallery_ai_edit')
+        if 'gallery_ai_edit' in data:current.gallery_ai_edit=data['gallery_ai_edit']
         if 'push_disabled' in data or 'push_enabled' in data:
             from .notificaciones import FEED_KINDS, INBOX_KINDS
             off=set(data.get('push_disabled') or []);on=set(data.get('push_enabled') or [])

@@ -146,9 +146,10 @@ def validate_payload(capability,payload):
         return {'reaction':payload['reaction']}
     if capability==ActionProposal.Capability.PUBLISH:
         text=payload.get('text')
-        if set(payload)!={'text'} or not isinstance(text,str) or not text.strip():raise ValueError('La publicación requiere texto')
+        if set(payload)-{'text','media'} or not isinstance(text,str) or not text.strip():raise ValueError('La publicación requiere texto')
         if len(text.strip())>POST_MAX_CHARS or '\x00' in text:raise ValueError(f'La publicación supera {POST_MAX_CHARS} caracteres o contiene NUL')
-        return {'text':text.strip()}
+        if 'media' in payload and not isinstance(payload['media'],dict):raise ValueError('Manifiesto de imágenes inválido')
+        return dict(text=text.strip(),**({'media':payload['media']} if 'media' in payload else {}))
     if capability in (ActionProposal.Capability.FOLLOW,ActionProposal.Capability.INVITE):
         # RED-02 carries no note: the free account only has a handful of notes a month.
         if set(payload)!={'user_id'} or not USER_ID.fullmatch(str(payload.get('user_id'))):raise ValueError('La acción requiere solo user_id')
@@ -264,6 +265,9 @@ def create_proposal(user,post,capability,payload,rationale='',citations=(),risks
     expected=(False,False,True) if capability in NETWORK else (False,True,False) if capability==ActionProposal.Capability.PUBLISH else (True,False,False)
     if targets!=expected:
         raise ValueError('CONT-09 se propone sobre una pieza propia; RED-* sobre una persona; INT-* sobre una publicación observada')
+    if piece and 'media' not in payload:
+        from .imagenes import manifest
+        payload=dict(payload,media=manifest(piece))
     payload=validate_payload(capability,payload) if state!=ActionProposal.State.DISCARDED else payload
     account_id=(post or piece or contact).account_id
     digest=payload_hash(account_id,capability,target_of(post,piece,contact),payload)
@@ -354,6 +358,9 @@ def _finish(execution,state,actor,**fields):
     if state=='confirmed' and proposal.contact_id:
         from . import red
         red.on_confirmed(proposal,execution)
+    if state in ('sent','confirmed') and proposal.piece_id and execution.wrote:
+        from .imagenes import published
+        published(proposal.piece,execution.started_at)
     if state=='failed' and proposal.piece_id:
         # A publication LinkedIn refused (or never sent): the ideas behind it are not spent.
         from . import capturas
@@ -401,7 +408,9 @@ def _publish(execution,proposal,connector,user):
     if already:
         return _finish(execution,'confirmed',user,external_id=already['id'],external_url=already['share_url'],reconciled_at=now(),wrote=False,
                        note='Ya existía una publicación propia idéntica; no se publicó otra.')
-    created=connector.create_post(text)
+    from . import imagenes
+    media=imagenes.upload(proposal.piece,connector)
+    created=connector.create_post(text,media=media)
     execution.external_id=created['id'];execution.external_url=created['url']
     found,readable=_find_own_post(text)
     if found:
@@ -447,6 +456,12 @@ def execute(user,proposal_id):
             set_account_pause(account,f'Estado del conector: {status["status"]}',user)
             return _finish(execution,'failed',user,error_kind='account_not_running',note='No se envió: la cuenta no está operativa.',wrote=False)
         if proposal.capability==ActionProposal.Capability.PUBLISH:
+            from .autopiloto import post_issues
+            issues=post_issues(proposal)
+            if issues:
+                from .notificaciones import avisar
+                avisar('piece_blocked','No se publicó la pieza','; '.join(issues)[:300],link=f'/calendario/pieza/{proposal.piece_id}',ref=f'publish_gate:{proposal.id}')
+                return _finish(execution,'failed',user,error_kind='content_gate',note='; '.join(issues),wrote=False)
             return _publish(execution,proposal,connector,user)
         if proposal.capability in NETWORK:
             from . import red
@@ -477,8 +492,11 @@ def execute(user,proposal_id):
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
         if exc.pause:set_account_pause(account,f'Detenida por el proveedor: {exc}',user)
+        if proposal.piece_id:
+            from .notificaciones import avisar
+            avisar('piece_blocked','La pieza no pudo publicarse',str(exc),link=f'/calendario/pieza/{proposal.piece_id}',ref=f'publish_failed:{proposal.id}')
         # A failed read before the write proves nothing was sent; a rejected write was not applied.
-        return _finish(execution,'failed',user,error_kind=exc.kind,http_status=exc.status,note=str(exc))
+        return _finish(execution,'failed',user,error_kind=exc.kind,http_status=exc.status,note=str(exc),wrote=False if exc.kind=='upload' else execution.wrote)
 
 def reconcile(user,proposal_id):
     """ADM-05: settle sent/uncertain/stale executions by reading LinkedIn. Never writes."""
