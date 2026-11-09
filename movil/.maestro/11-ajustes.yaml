@@ -409,7 +409,16 @@ tags: [ajustes]
     visible: "Conectar LinkedIn"
     timeout: 20000
 - assertNotVisible: "Esperando a que vuelvas…"
+- scrollUntilVisible:
+    element:
+      text: "Sin conectar"
+      childOf:
+        id: ajustes-linkedin
+    direction: UP
+    centerElement: true
+    timeout: 30000
 - assertVisible: "Sin conectar"
+- takeScreenshot: 11-ajustes-12b-linkedin-al-volver
 
 # ---------------------------------------------------------------- Captura y galería
 # cubre: AJU-08, AJU-09

@@ -19,6 +19,28 @@ describe('Ajustes', () => {
     expect(capLines(undefined, undefined, undefined, 'weekly')).toEqual([]);
   });
 
+  it.each([5, 0])('shows the effective invitation cap (%s), including a paused or weekend limit', (daily) => {
+    const general = { daily: 20, weekly: 100, daily_used: 1, weekly_used: 2, left: 19 };
+    const accountOverview = { accounts: [{ capacity: { 'RED-02': general } }] } as unknown as Overview;
+    const network = { capacity: { 'RED-02': { ...general, daily, weekly: 20, left: Math.max(0, daily - 1) } } } as unknown as RedSummary;
+    expect(capLines(undefined, accountOverview, network, 'daily')).toEqual([
+      { key: 'RED-02', label: 'Invitaciones', used: 1, max: daily },
+    ]);
+    expect(capLines(undefined, accountOverview, network, 'weekly')).toEqual([
+      { key: 'RED-02', label: 'Invitaciones', used: 2, max: 20 },
+    ]);
+    expect(capLines(undefined, accountOverview, undefined, 'daily')).toEqual([
+      { key: 'RED-02', label: 'Invitaciones', used: 1, max: 20 },
+    ]);
+  });
+
+  it('keeps a zero invitation limit when usage is unavailable', () => {
+    const settings = { limits: { 'RED-02': { daily: 0, weekly: 100 } } } as unknown as Ajustes;
+    expect(capLines(settings, undefined, undefined, 'daily')).toEqual([
+      { key: 'RED-02', label: 'Invitaciones', text: 'Tope 0 · sin dato de uso' },
+    ]);
+  });
+
   it('builds the network reads and the checks around every write', () => {
     const red = { read_caps: { comments: 60, search: 20, profile: 0 }, reads_today: { comments: 4, execution: 6 } } as unknown as RedSummary;
     expect(readLines(red)).toEqual({
@@ -26,7 +48,7 @@ describe('Ajustes', () => {
         { key: 'comments', label: 'Comentarios leídos', used: 4, max: 60 },
         { key: 'search', label: 'Búsquedas', text: 'Tope 20 · sin dato de uso' },
       ],
-      execution: '6 hoy · sin tope: ninguna escritura sale sin ellas',
+      execution: '6 hoy · cuentan en el tope compartido de perfiles',
     });
   });
 
