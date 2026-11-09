@@ -34,7 +34,7 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
   const start = useSharedValue(0);
   const from = useSharedValue(0);
   const closing = useSharedValue(false);
-  // The snap it rests on: the content gets the hidden part as bottom padding, so all of it can be reached.
+  // The snap it rests on, also reported to the scene underneath.
   const [resting, setResting] = useState<number>(half);
   const closed = useRef(false);
   const latestClose = useRef(onClose);
@@ -126,8 +126,10 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
       runOnJS(setResting)(target);
     },
   });
-  const animated = useAnimatedStyle(() => ({ transform: [{ translateY: span.value * Math.max(0, 1 - Math.max(0, p.value)) }] }));
-  return <Animated.View testID={testID} accessibilityLabel={label} style={[styles.sheet, { bottom, height: room }, animated]}>
+  // Keep the native scroll viewport above the bottom bar at every snap. Translating a full-height sheet
+  // leaves rows underneath the bar exposed to accessibility even though they cannot receive a tap.
+  const animated = useAnimatedStyle(() => ({ height: span.value * Math.min(1, Math.max(0, p.value)) }));
+  return <Animated.View testID={testID} accessibilityLabel={label} style={[styles.sheet, { bottom }, animated]}>
     <GestureDetector gesture={drag}>
       <View style={styles.grip} accessibilityRole="adjustable" accessibilityLabel="Altura del panel" accessibilityHint="Desliza para ampliar o cerrar"
         accessibilityActions={[{ name: 'increment', label: 'Ampliar' }, { name: 'decrement', label: 'Media pantalla' }]}
@@ -136,7 +138,7 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
       </View>
     </GestureDetector>
     <View style={styles.close}><Button accessibilityLabel="Cerrar" onPress={dismiss}>Cerrar</Button></View>
-    <ScrollView key={label} contentContainerStyle={[styles.content, { paddingBottom: space[6] + room * (1 - resting) }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+    <ScrollView key={label} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">{children}</ScrollView>
   </Animated.View>;
 }
 const styles = StyleSheet.create({
@@ -145,5 +147,5 @@ const styles = StyleSheet.create({
   grip: { height: 56, marginRight: 100, justifyContent: 'center', alignItems: 'center' },
   handle: { width: 40, height: 4, backgroundColor: colors.inkSoft, borderRadius: radius.pill },
   close: { position: 'absolute', top: space[1], right: space[2] },
-  content: { padding: space[4], gap: space[3] },
+  content: { padding: space[4], paddingBottom: space[6], gap: space[3] },
 });

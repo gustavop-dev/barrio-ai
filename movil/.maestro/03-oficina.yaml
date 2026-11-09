@@ -209,9 +209,16 @@ tags: [oficina]
     direction: UP
     duration: 600
 - scrollUntilVisible:
-    element: "Editor visual, .*"
+    element:
+      text: "Editor visual, .*"
+      above:
+        id: tab-index
     direction: DOWN
-- tapOn: "Editor visual, .*"
+    centerElement: true
+- tapOn:
+    text: "Editor visual, .*"
+    above:
+      id: tab-index
 - extendedWaitUntil:
     visible: "AGENTE · MESA EDITORIAL"
     timeout: 10000

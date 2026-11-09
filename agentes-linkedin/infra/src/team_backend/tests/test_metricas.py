@@ -144,6 +144,31 @@ class PostSnapshotTests(MetricsBase):
 
 
 class AudienceTests(MetricsBase):
+    def test_read_caps_and_reservations_use_the_supplied_local_day(self):
+        late=datetime(2026,11,7,4,30,tzinfo=dt_timezone.utc)   # 6 Nov in Bogotá
+        early=late+timedelta(hours=1)                       # 7 Nov in Bogotá
+        # A different wall clock must not charge either collection to another day. Revisit the earlier day
+        # after recording the later one: neither future reads nor a recomputed baseline may charge it twice.
+        with patch('django.utils.timezone.now',return_value=early+timedelta(days=7)), \
+                patch.dict(os.environ,{'METRICS_READ_CAPS':'profile=2','OPERATOR_PROFILE_READ_DAILY_LIMIT':'2'}):
+            metricas._read(self.account,'profile',early)
+            metricas._read(self.account,'profile',late)
+            self.assertEqual(metricas.reads_today(self.account,'profile',late),1)
+            self.assertEqual(metricas.reads_today(self.account,'profile',early),1)
+            operador.reserve_profile_read(self.account,'preflight',late+timedelta(minutes=5))
+            with self.assertRaisesRegex(metricas.ReadCapReached,'Tope compartido'):
+                metricas._read(self.account,'profile',late+timedelta(minutes=20))
+            metricas._read(self.account,'profile',early+timedelta(minutes=10))
+            with self.assertRaisesRegex(metricas.ReadCapReached,'Tope diario'):
+                metricas._read(self.account,'profile',early+timedelta(minutes=20))
+        self.assertEqual(list(AuditEvent.objects.filter(action='metrics.read').order_by('created_at')
+            .values_list('created_at',flat=True)),[late,early,early+timedelta(minutes=10)])
+        self.assertEqual(list(AuditEvent.objects.filter(action='operator.profile_read').order_by('created_at')
+            .values_list('created_at',flat=True)),[late,late+timedelta(minutes=5),early,early+timedelta(minutes=10)])
+        baselines=AuditEvent.objects.filter(action='operator.profile_baseline').order_by('created_at')
+        self.assertEqual(list(baselines.values_list('metadata',flat=True)),
+            [{'day':'2026-11-06','used':0},{'day':'2026-11-07','used':0}])
+
     def test_one_snapshot_per_local_day(self):
         self.fake.seed_audience(followers=1200,connections=480,views=35)
         late=datetime(2026,11,7,4,30,tzinfo=dt_timezone.utc)   # 23:30 on 6 Nov in Bogotá

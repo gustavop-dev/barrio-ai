@@ -165,18 +165,23 @@ def reserve_profile_read(account,purpose,now=None):
     cap=max(0,min(100,int(os.environ.get('OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))
     with transaction.atomic():
         policy_lock()
-        baseline=policy_event('operator.profile_baseline')
-        if baseline is None or baseline.metadata['day']!=day.date().isoformat():
+        # Use the same clock for the local-day bucket and its durable reservation.
+        daily=AuditEvent.objects.filter(created_at__gte=day,created_at__lt=day+timedelta(days=1))
+        baseline=AuditEvent.objects.filter(action='operator.profile_baseline',target='member',
+            metadata__day=day.date().isoformat()).order_by('-created_at','-id').first()
+        if baseline is None:
             # Preserve reads already charged by the pre-BAR-15 counters on deployment day.
-            legacy=AuditEvent.objects.filter(
+            legacy=daily.filter(
                 Q(action='network.read',metadata__kind='profile')|
                 Q(action='network.read',metadata__kind='execution',metadata__read='profile')|
-                Q(action='metrics.read',metadata__kind='profile'),created_at__gte=day).count()
-            _audit(None,'operator.profile_baseline','member',day=day.date().isoformat(),used=legacy)
+                Q(action='metrics.read',metadata__kind='profile')).count()
+            AuditEvent.objects.create(action='operator.profile_baseline',target='member',created_at=now,
+                metadata={'day':day.date().isoformat(),'used':legacy})
         else:legacy=baseline.metadata['used']
-        used=legacy+AuditEvent.objects.filter(action='operator.profile_read',created_at__gte=day).count()
+        used=legacy+daily.filter(action='operator.profile_read').count()
         if used>=cap:raise ProfileReadCapReached('Tope compartido de lecturas de perfil alcanzado; la operación espera.')
-        _audit(None,'operator.profile_read','member',account=str(account.id),purpose=purpose)
+        AuditEvent.objects.create(action='operator.profile_read',target='member',created_at=now,
+            metadata={'account':str(account.id),'purpose':purpose})
 
 def env_paused():
     return os.environ.get('OPERATOR_PAUSED','false').lower()=='true'

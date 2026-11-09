@@ -22,10 +22,10 @@ class VisualTests(EditorialBase):
     photo = image_cases.ImageWorkflowTests.photo
     piece = image_cases.ImageWorkflowTests.piece
 
-    def visual(self, piece, client=None):
+    def visual(self, piece, client=None, available=False):
         public, private = guardas.blocks()
         run = orquestacion.Runtime.open('pieza_diaria', str(piece.id), self.gustavo)
-        with run.session(), patch('team_backend.connectors_images.available', return_value=False), \
+        with run.session(), patch('team_backend.connectors_images.available', return_value=available), \
                 patch('team_backend.connectors_images.ImageConnector', return_value=client or FakeImageConnector()):
             editorial._visual(piece, public, private)
         return run
@@ -47,6 +47,7 @@ class VisualTests(EditorialBase):
         self.assertEqual(imagenes.issues(piece, imagenes.manifest(piece)), [])
         self.assertEqual(piece.selection['visual']['decided_by'], 'director_editorial')
         self.assertEqual(piece.selection['visual']['final_kind'], 'tarjeta')
+        self.assertEqual(piece.usage, [{'stage': 'visual', 'mode': 'fallback', 'model': None}])
         ledger = CycleLedger.objects.get(pk=run.id)
         self.assertEqual(ledger.calls, 2)
         events = list(AuditEvent.objects.filter(action='office.orchestration').order_by('id').values_list('metadata', flat=True))
@@ -55,6 +56,16 @@ class VisualTests(EditorialBase):
             [('director_editorial', 'editor_visual'), ('editor_visual', 'director_editorial')] * 2)
         self.assertNotIn('public_facts', str(events))
         self.assertFalse(piece.proposals.exists())
+
+    def test_visual_usage_records_the_selector_model(self):
+        piece = self.piece(photo=self.photo(ai='no'))
+        with patch('knowledge.providers.claude', return_value={'text': json.dumps(piece.brief['image'])}) as model:
+            self.visual(piece, available=True)
+        model.assert_called_once()
+        self.assertEqual(model.call_args.kwargs['purpose'], 'editorial-visual')
+        self.assertEqual(piece.usage, [{'stage': 'visual', 'mode': 'model', 'model': model.call_args.kwargs['model']}])
+        self.assertEqual(piece.image_kind, 'foto')
+        self.assertFalse(piece.images.get().edited)
 
     def test_no_edit_and_vision_rejection_keep_img_outcomes(self):
         for ai, ok, edited in [('no', True, False), ('si', False, False), ('si', True, True)]:
@@ -92,9 +103,18 @@ class VisualTests(EditorialBase):
         self.assertEqual([call[0] for call in fake.calls], ['check'])
         self.assertEqual(model.call_args.kwargs['purpose'], 'image-design')
         self.assertEqual(imagenes.issues(piece, imagenes.manifest(piece)), [])
-        calls = list(CycleLedger.objects.get(pk=run.id).progress_ledger['calls'].values())
-        self.assertEqual([c['nodes'] for c in calls],
-            [['editor_visual'], ['editor_visual'], ['revision_visual'], ['editor_visual']])
+        calls = CycleLedger.objects.get(pk=run.id).progress_ledger['calls']
+        # JSONB objects have no execution order. Check dispatch by key, then the chronological handoffs.
+        self.assertEqual({key: (c['edge'], c['nodes'], c['state']) for key, c in calls.items()}, {
+            'visual:proposal': ('proponer_visual', ['editor_visual'], 'answered'),
+            'design:0': ('disenar', ['editor_visual'], 'answered'),
+            'check:design:0': ('revisar_imagen', ['revision_visual'], 'answered'),
+            'visual:package': ('entregar_visual', ['editor_visual'], 'answered'),
+        })
+        requests = AuditEvent.objects.filter(action='office.orchestration', metadata__cycle_id=str(run.id),
+            metadata__phase='request').order_by('created_at', 'id')
+        self.assertEqual(list(requests.values_list('metadata__edge', flat=True)),
+            ['proponer_visual', 'disenar', 'revisar_imagen', 'entregar_visual'])
 
     def test_known_selector_budget_failure_keeps_original_without_retry(self):
         piece = self.piece(photo=self.photo(ai='no'))

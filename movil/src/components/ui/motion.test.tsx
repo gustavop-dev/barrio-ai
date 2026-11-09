@@ -6,6 +6,8 @@ import * as Haptics from 'expo-haptics';
 import { BackHandler } from 'react-native';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
+// Reanimated's default declarations expose web stubs; Jest installs its native matchers in jest.setup.
+import type {} from 'react-native-reanimated/lib/typescript/jestUtils/index.native';
 import { renderApp } from '@/test/render';
 import { copiedLabelMs, FIRM, haptics, microMotion, sheetMotion } from '@/theme/motion';
 import { colors } from '@/theme/tokens';
@@ -133,6 +135,22 @@ describe('Sheet', () => {
 });
 
 describe('SnapSheet', () => {
+  it('keeps its scroll viewport above the bottom bar at half and full height', async () => {
+    await renderApp(
+      <SnapSheet testID="panel" label="Mesa editorial" availableHeight={800} bottom={100} onClose={() => undefined}>
+        <T>Editor visual</T>
+      </SnapSheet>,
+    );
+    await letItOpen();
+    const panel = screen.getByTestId('panel');
+    const handle = screen.getByLabelText('Altura del panel');
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 350 }), { timeout: 2000 });
+    await fireEvent(handle, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 630 }), { timeout: 2000 });
+    await fireEvent(handle, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 350 }), { timeout: 2000 });
+  });
+
   it('opens at the half snap with a haptic, and a flick up takes it to the full snap with another', async () => {
     await renderApp(
       <SnapSheet label="Mesa editorial" bottom={0} onClose={() => undefined}>

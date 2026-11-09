@@ -55,16 +55,18 @@ def local_day(now=None):
 
 def reads_today(account,kind,now=None):
     day,_=operador.period_starts(now)
-    return AuditEvent.objects.filter(action='metrics.read',target=str(account.id),metadata__kind=kind,created_at__gte=day).count()
+    return AuditEvent.objects.filter(action='metrics.read',target=str(account.id),metadata__kind=kind,
+                                    created_at__gte=day,created_at__lt=day+timedelta(days=1)).count()
 
 def _read(account,kind,now=None):
     """Count a read before making it; a spent cap stops the read."""
+    now=now or timezone.now()
     cap=read_caps()[kind]
     if reads_today(account,kind,now)>=cap:raise ReadCapReached(f'Tope diario de lecturas de métricas «{kind}» alcanzado ({cap}).')
     if kind=='profile':
         try:operador.reserve_profile_read(account,'metrics',now)
         except operador.ProfileReadCapReached as exc:raise ReadCapReached(str(exc)) from exc
-    AuditEvent.objects.create(action='metrics.read',target=str(account.id),metadata={'kind':kind})
+    AuditEvent.objects.create(action='metrics.read',target=str(account.id),metadata={'kind':kind},created_at=now)
 
 # --------------------------------------------------------------------------- what is due
 
