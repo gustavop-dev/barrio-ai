@@ -144,30 +144,38 @@ class PostSnapshotTests(MetricsBase):
 
 
 class AudienceTests(MetricsBase):
+    def _collect_at(self,now):
+        """Collect «at» a simulated time. The audit rows of this call get that time too, so the daily read caps count
+        the simulated day, not the real date the suite runs on (it failed on 2026-11-09, the test's last day)."""
+        from team_backend.models import AuditEvent
+        before=set(AuditEvent.objects.values_list('pk',flat=True))
+        try:return metricas.collect(self.bot,self.account,now=now)
+        finally:AuditEvent.objects.exclude(pk__in=before).update(created_at=now)
+
     def test_one_snapshot_per_local_day(self):
         self.fake.seed_audience(followers=1200,connections=480,views=35)
         late=datetime(2026,11,7,4,30,tzinfo=dt_timezone.utc)   # 23:30 on 6 Nov in Bogotá
         early=datetime(2026,11,7,5,30,tzinfo=dt_timezone.utc)  # 00:30 on 7 Nov: same UTC date, new local day
-        self.assertEqual(metricas.collect(self.bot,self.account,now=late)['audience'],'creada')
+        self.assertEqual(self._collect_at(late)['audience'],'creada')
         snapshot=AudienceSnapshot.objects.get()
         self.assertEqual((snapshot.day.isoformat(),snapshot.followers,snapshot.connections,snapshot.profile_views,snapshot.profile_views_days),
                          ('2026-11-06',1200,480,35,14))
-        self.assertEqual(metricas.collect(self.bot,self.account,now=late+timedelta(minutes=20))['audience'],'ya')
+        self.assertEqual(self._collect_at(late+timedelta(minutes=20))['audience'],'ya')
         self.fake.seed_audience(followers=1205)  # relations and profile views hidden this time
-        metricas.collect(self.bot,self.account,now=early)
+        self._collect_at(early)
         snapshot=AudienceSnapshot.objects.get(day='2026-11-07')
         self.assertEqual((snapshot.followers,snapshot.connections,snapshot.profile_views,snapshot.profile_views_days),(1205,None,None,None))
         self.assertEqual(AudienceSnapshot.objects.count(),2)
 
         refused=ConnectorError('Simulado: HTTP 403.',status=403,kind='errors/forbidden',pause=True)
         with patch.object(FakeConnector,'profile_views',side_effect=refused):
-            summary=metricas.collect(self.bot,self.account,now=early+timedelta(days=1))
+            summary=self._collect_at(early+timedelta(days=1))
         self.assertIn('403',summary['views_error']);self.assertEqual(AudienceSnapshot.objects.get(day='2026-11-08').followers,1205)
         self.account.refresh_from_db();self.assertFalse(self.account.paused)  # profile views are a bonus: never a pause
 
         expired=ConnectorError('Simulado: HTTP 401.',status=401,kind='provider/invalid_authorization',pause=True)
         with patch.object(FakeConnector,'own_audience',side_effect=expired),patch('team_backend.alerts.notify'):
-            summary=metricas.collect(self.bot,self.account,now=early+timedelta(days=2))
+            summary=self._collect_at(early+timedelta(days=2))
         self.assertIn('401',summary['stopped']);self.assertFalse(AudienceSnapshot.objects.filter(day='2026-11-09').exists())
         self.account.refresh_from_db();self.assertTrue(self.account.paused)
 
