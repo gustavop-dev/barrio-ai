@@ -462,6 +462,14 @@ tags: [calendario]
     text: "Tu nota: Prueba de QA, no debe salir"
     childOf:
       id: pieza
+- scrollUntilVisible:
+    element:
+      text: "Pieza del ${output.mananaLargo}"
+      childOf:
+        id: pieza
+    direction: UP
+    centerElement: true
+    timeout: 20000
 - assertVisible:
     text: "VETADA"
     childOf:

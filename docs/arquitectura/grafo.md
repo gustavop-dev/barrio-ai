@@ -2,13 +2,13 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `3a.1` · SHA-256 `d1e911fd8c49a56e4cef612294811daa3bad2a4fc24d13708321281ef12eb419`.
+Versión `4.1` · SHA-256 `f31c8004f7bc42e24e5d49418fdeaf882c35a8a3cd6bd7cae4801411c6d5f08c`.
 
-39 nodos (35 activos), 42 aristas y 11 ciclos.
+39 nodos (35 activos), 46 aristas y 12 ciclos.
 
-Inventario descriptivo del runtime actual. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada, y los cinco lectores otra. Los límites son por intento/subtrigger, no nuevos contadores de ciclo.
+Pieza diaria y red ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
-Los trazos discontinuos están en diseño. No hay task/progress ledger ni reanudación por checkpoint todavía. Los schemas que existen como contratos Python o preguntas tipadas se identifican como tales en el registro; no se presentan como JSON Schemas ya aplicados.
+Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Los otros ciclos conservan su estado y contratos descriptivos; referentes y Perfil periódico todavía no se activan.
 
 ## Grafo completo
 
@@ -33,14 +33,6 @@ flowchart TD
     editor_visual["Especialista visual · EDI-21 · En diseño · specialist"]
     class editor_visual planned;
   end
-  subgraph grupo_relaciones["relaciones"]
-    workflow_red["Ciclo de red · orchestrator"]
-    relaciones_comunidad["Relaciones y comentarios · specialist"]
-    plan_red["Plan de red · specialist"]
-    sync_red["Sincronización de red · specialist"]
-    workflow_inbox["Ciclo de inbox · orchestrator"]
-    conversaciones_inbox["Conversaciones e inbox · specialist"]
-  end
   subgraph grupo_observatorio["observatorio"]
     investigador_referentes["Observación de referentes · specialist"]
     descubrimiento_red["Descubrimiento de personas · specialist"]
@@ -52,6 +44,14 @@ flowchart TD
     class investigador_lider planned;
     estudio_comunidad["Estudio de comunidad · En diseño · specialist"]
     class estudio_comunidad planned;
+    evidencia_compartida["Evidencia compartida · specialist"]
+  end
+  subgraph grupo_relaciones["relaciones"]
+    relaciones_comunidad["Relaciones y comentarios · orchestrator"]
+    plan_red["Plan de red · specialist"]
+    sync_red["Sincronización de red · specialist"]
+    workflow_inbox["Ciclo de inbox · orchestrator"]
+    conversaciones_inbox["Conversaciones e inbox · specialist"]
   end
   subgraph grupo_operacion["operacion"]
     lider_jev["Líder · Jev · gate"]
@@ -84,23 +84,23 @@ flowchart TD
   director_editorial -->|"leer_lector_lider · workflow_step · ≤1 · agrupada lectores"| lector_lider
   director_editorial -->|"leer_lector_par · workflow_step · ≤1 · agrupada lectores"| lector_par
   director_editorial -.->|"visual_futuro · workflow_step · ≤1"| editor_visual
-  workflow_red -->|"observar · workflow_step · ≤1"| investigador_referentes
-  workflow_red -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
-  workflow_red -->|"clasificar · workflow_step · ≤1"| clasificador_red
-  workflow_red -->|"comentar · workflow_step · ≤2"| relaciones_comunidad
-  workflow_red -->|"planificar_red · workflow_step · ≤1"| plan_red
-  workflow_red -->|"sincronizar · workflow_step · ≤1"| sync_red
-  workflow_red -->|"prefiltro · workflow_step · ≤3"| lider_jev
+  relaciones_comunidad -->|"observar · workflow_step · ≤1"| investigador_referentes
+  relaciones_comunidad -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
+  relaciones_comunidad -->|"clasificar · workflow_step · ≤1"| clasificador_red
+  relaciones_comunidad -->|"comentar · workflow_step · ≤2"| relaciones_comunidad
+  relaciones_comunidad -->|"planificar_red · workflow_step · ≤1"| plan_red
+  relaciones_comunidad -->|"sincronizar · workflow_step · ≤1"| sync_red
+  relaciones_comunidad -->|"prefiltro · workflow_step · ≤3"| lider_jev
   workflow_inbox -->|"evaluar_inbox · workflow_step · ≤INBOX_ASSESS_PER_RUN=5"| conversaciones_inbox
   analista_barrio_resultados -->|"orientacion_propuesta · handoff · ≤1"| gustavo
   capturas -->|"rutear · workflow_step · ≤1"| ruteador_capturas
   capturas -->|"entender · workflow_step · ≤1"| intencion_captura
   capturas -->|"transcribir · workflow_step · ≤1"| transcripcion
   capturas -->|"investigar_captura · workflow_step · ≤1"| investigacion_web
-  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤1"| lider_jev
+  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤5"| lider_jev
   lider_jev -->|"pieza_diaria_gate_1 · gate · ≤1"| gustavo
   gustavo -->|"pieza_diaria_gate_2 · gate · ≤1"| operador_cuenta
-  workflow_red -->|"politica_red · gate · ≤LEAD_MAX_REVIEWS_PER_TICK=5"| lider_jev
+  relaciones_comunidad -->|"politica_red · gate · ≤5"| lider_jev
   lider_jev -->|"red_gate_0 · gate · ≤1"| gustavo
   gustavo -->|"red_gate_1 · gate · ≤1"| operador_cuenta
   relaciones_comunidad -->|"entregar_comentario · handoff · ≤1"| lider_jev
@@ -110,6 +110,10 @@ flowchart TD
   capturas -->|"captura_memoria · handoff · ≤1"| posicionamiento
   metricas -->|"resultados_editorial · handoff · ≤1"| director_editorial
   analista_barrio_resultados -->|"resumen_editorial · handoff · ≤1"| director_editorial
+  relaciones_comunidad -->|"evidencia_red · call · ≤1"| evidencia_compartida
+  analista_barrio_resultados -->|"evidencia_analista · call · ≤1"| evidencia_compartida
+  investigador_lider -.->|"evidencia_referentes_futura · call · ≤1"| evidencia_compartida
+  analista_barrio_resultados -.->|"evidencia_comunidad_futura · call · ≤1"| evidencia_compartida
 ```
 
 ## Pieza diaria
@@ -165,16 +169,14 @@ flowchart TD
   director_editorial -->|"leer_lector_lider · workflow_step · ≤1 · agrupada lectores"| lector_lider
   director_editorial -->|"leer_lector_par · workflow_step · ≤1 · agrupada lectores"| lector_par
   director_editorial -.->|"visual_futuro · workflow_step · ≤1"| editor_visual
-  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤1"| lider_jev
+  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤5"| lider_jev
   lider_jev -->|"pieza_diaria_gate_1 · gate · ≤1"| gustavo
   gustavo -->|"pieza_diaria_gate_2 · gate · ≤1"| operador_cuenta
 ```
 
-Bucle `reparacion_actual` (active, máximo 2 rondas): Primera comprobación más una reparación del director, no de copywriters.
+Bucle `evaluator_optimizer` (active, máximo 2 rondas): Copywriters A/B agrupados, verificación inicial y una reparación con el binding histórico del director; máximo dos evaluaciones. Sin delegación entre especialistas.
 
 Bucle `imagen_actual` (active, máximo 2 rondas): Un diseño inicial y una corrección.
-
-Bucle `copywriters_optimizer` (planned, máximo 2 rondas): Copywriters ⇄ verificador, aún no habilitado.
 
 Gate `publicacion` (CONT-09): editor_verificador → lider_jev → gustavo → operador_cuenta.
 - Reglas y verificador sobre el hash exacto; imagen preparada y manifest validado.
@@ -184,7 +186,7 @@ Gate `publicacion` (CONT-09): editor_verificador → lider_jev → gustavo → o
 
 ## Red y comentarios
 
-Estado: `active`. Orquestador: `workflow_red`.
+Estado: `active`. Orquestador: `relaciones_comunidad`.
 
 - `observe`: OPERATOR_OBSERVE_EVERY_MINUTES (180 min).
 - `discover_network`: NETWORK_DISCOVER_EVERY_MINUTES (360 min).
@@ -198,34 +200,35 @@ Estado: `active`. Orquestador: `workflow_red`.
 ```mermaid
 flowchart TD
   classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
-  subgraph grupo_relaciones["relaciones"]
-    workflow_red["Ciclo de red · orchestrator"]
-    relaciones_comunidad["Relaciones y comentarios · specialist"]
-    plan_red["Plan de red · specialist"]
-    sync_red["Sincronización de red · specialist"]
-  end
   subgraph grupo_observatorio["observatorio"]
     investigador_referentes["Observación de referentes · specialist"]
     descubrimiento_red["Descubrimiento de personas · specialist"]
     clasificador_red["Clasificación de personas · specialist"]
+    evidencia_compartida["Evidencia compartida · specialist"]
+  end
+  subgraph grupo_relaciones["relaciones"]
+    relaciones_comunidad["Relaciones y comentarios · orchestrator"]
+    plan_red["Plan de red · specialist"]
+    sync_red["Sincronización de red · specialist"]
   end
   subgraph grupo_operacion["operacion"]
     lider_jev["Líder · Jev · gate"]
     gustavo["Gustavo · veto · gate"]
     operador_cuenta["Operador de cuenta · executor"]
   end
-  workflow_red -->|"observar · workflow_step · ≤1"| investigador_referentes
-  workflow_red -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
-  workflow_red -->|"clasificar · workflow_step · ≤1"| clasificador_red
-  workflow_red -->|"comentar · workflow_step · ≤2"| relaciones_comunidad
-  workflow_red -->|"planificar_red · workflow_step · ≤1"| plan_red
-  workflow_red -->|"sincronizar · workflow_step · ≤1"| sync_red
-  workflow_red -->|"prefiltro · workflow_step · ≤3"| lider_jev
-  workflow_red -->|"politica_red · gate · ≤LEAD_MAX_REVIEWS_PER_TICK=5"| lider_jev
+  relaciones_comunidad -->|"observar · workflow_step · ≤1"| investigador_referentes
+  relaciones_comunidad -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
+  relaciones_comunidad -->|"clasificar · workflow_step · ≤1"| clasificador_red
+  relaciones_comunidad -->|"comentar · workflow_step · ≤2"| relaciones_comunidad
+  relaciones_comunidad -->|"planificar_red · workflow_step · ≤1"| plan_red
+  relaciones_comunidad -->|"sincronizar · workflow_step · ≤1"| sync_red
+  relaciones_comunidad -->|"prefiltro · workflow_step · ≤3"| lider_jev
+  relaciones_comunidad -->|"politica_red · gate · ≤5"| lider_jev
   lider_jev -->|"red_gate_0 · gate · ≤1"| gustavo
   gustavo -->|"red_gate_1 · gate · ≤1"| operador_cuenta
   relaciones_comunidad -->|"entregar_comentario · handoff · ≤1"| lider_jev
   plan_red -->|"entregar_plan · handoff · ≤1"| lider_jev
+  relaciones_comunidad -->|"evidencia_red · call · ≤1"| evidencia_compartida
 ```
 
 Bucle `comentario_actual` (active, máximo 2 rondas): Un borrador y una reescritura de reglas; no especialistas entre sí.
@@ -309,7 +312,7 @@ flowchart TD
     director_editorial["Director editorial · orchestrator"]
   end
   subgraph grupo_relaciones["relaciones"]
-    relaciones_comunidad["Relaciones y comentarios · specialist"]
+    relaciones_comunidad["Relaciones y comentarios · orchestrator"]
   end
   subgraph grupo_operacion["operacion"]
     capturas["Procesamiento de capturas · orchestrator"]
@@ -375,7 +378,9 @@ flowchart TD
     class investigador_lider planned;
     estudio_comunidad["Estudio de comunidad · En diseño · specialist"]
     class estudio_comunidad planned;
+    evidencia_compartida["Evidencia compartida · specialist"]
   end
+  investigador_lider -.->|"evidencia_referentes_futura · call · ≤1"| evidencia_compartida
 ```
 
 Bucle `fan_out` (planned, máximo 1 rondas): Investigación paralela con gather acotado; no existe fan-out en fase 1.
@@ -414,12 +419,30 @@ flowchart TD
     analista_barrio_resultados["Analista · resumen semanal · orchestrator"]
     estudio_comunidad["Estudio de comunidad · En diseño · specialist"]
     class estudio_comunidad planned;
+    evidencia_compartida["Evidencia compartida · specialist"]
   end
+  analista_barrio_resultados -.->|"evidencia_comunidad_futura · call · ≤1"| evidencia_compartida
+```
+
+## Consulta de evidencia compartida
+
+Estado: `active`. Orquestador: `analista_barrio_resultados`.
+
+- `weekly_summary`: Al preparar el resumen semanal; herramienta local disponible para consultas de los orquestadores.
+
+```mermaid
+flowchart TD
+  classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
+  subgraph grupo_observatorio["observatorio"]
+    analista_barrio_resultados["Analista · resumen semanal · orchestrator"]
+    evidencia_compartida["Evidencia compartida · specialist"]
+  end
+  analista_barrio_resultados -->|"evidencia_analista · call · ≤1"| evidencia_compartida
 ```
 
 ## Contratos referenciados
 
-Los nombres siguientes enlazan las definiciones existentes. `python_payload`, `model`, `serializer`, `dataclass`, `local_schema` y `typed_questions` conservan su naturaleza; no equivalen a validación JSON Schema en runtime. El dispatcher y la normalización de contratos quedan para 3b.
+Los nombres siguientes enlazan las definiciones existentes. Las aristas con runtime validan JSON Schema, modelos, dataclasses o bytes según el contrato. Los demás contratos conservan su naturaleza descriptiva hasta que se migre su ciclo.
 
 | Nombre | Tipo | Código |
 | --- | --- | --- |
@@ -456,40 +479,59 @@ Los nombres siguientes enlazan las definiciones existentes. `python_payload`, `m
 | `inbox_assessment` | `typed_questions` | [team_backend.conversaciones.assess](../../agentes-linkedin/infra/src/team_backend/conversaciones.py) |
 | `metrics_result` | `python_payload` | [team_backend.metricas.collect](../../agentes-linkedin/infra/src/team_backend/metricas.py) |
 | `network_plan` | `python_payload` | [team_backend.red.plan](../../agentes-linkedin/infra/src/team_backend/red.py) |
-| `read_result` | `python_payload` | [team_backend.operador.run_job](../../agentes-linkedin/infra/src/team_backend/operador.py) |
+| `read_result` | `json_schema` | [team_backend.orquestacion_schemas.READ_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `transcript` | `python_payload` | [knowledge.providers.assemblyai_transcribe](../../agentes-linkedin/infra/src/knowledge/providers.py) |
 | `manual_request` | `serializer` | [team_backend.serializers.RunInput](../../agentes-linkedin/infra/src/team_backend/serializers.py) |
 | `manual_result` | `python_payload` | [knowledge.agents.run](../../agentes-linkedin/infra/src/knowledge/agents.py) |
-| `image_bytes` | `python_payload` | [team_backend.connectors_images.ImageConnector.edit](../../agentes-linkedin/infra/src/team_backend/connectors_images.py) |
+| `image_bytes` | `bytes` | [team_backend.connectors_images.ImageConnector.edit](../../agentes-linkedin/infra/src/team_backend/connectors_images.py) |
 | `veto` | `python_payload` | [team_backend.operador.reject](../../agentes-linkedin/infra/src/team_backend/operador.py) |
 | `orientation_decision` | `python_payload` | [team_backend.resumen_semanal.apply](../../agentes-linkedin/infra/src/team_backend/resumen_semanal.py) |
+| `brief_input` | `json_schema` | [team_backend.orquestacion_schemas.BRIEF_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `writer_input` | `json_schema` | [team_backend.orquestacion_schemas.WRITER_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `panel_input` | `json_schema` | [team_backend.orquestacion_schemas.PANEL_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `selection_input` | `json_schema` | [team_backend.orquestacion_schemas.SELECTION_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `verifier_input` | `json_schema` | [team_backend.orquestacion_schemas.VERIFIER_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `repair_input` | `json_schema` | [team_backend.orquestacion_schemas.REPAIR_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `network_input` | `json_schema` | [team_backend.orquestacion_schemas.NETWORK_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `image_input` | `json_schema` | [team_backend.orquestacion_schemas.IMAGE_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `edit_input` | `json_schema` | [team_backend.orquestacion_schemas.EDIT_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `check_input` | `json_schema` | [team_backend.orquestacion_schemas.CHECK_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `check_result` | `json_schema` | [team_backend.orquestacion_schemas.CHECK_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `lead_result` | `json_schema` | [team_backend.orquestacion_schemas.LEAD_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `observe_result` | `json_schema` | [team_backend.orquestacion_schemas.OBSERVE_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `discover_result` | `json_schema` | [team_backend.orquestacion_schemas.DISCOVER_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `classify_result` | `json_schema` | [team_backend.orquestacion_schemas.CLASSIFY_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `plan_result` | `json_schema` | [team_backend.orquestacion_schemas.PLAN_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `sync_result` | `json_schema` | [team_backend.orquestacion_schemas.SYNC_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `evidence_request` | `dataclass` | [team_backend.evidencia.EvidenceRequest](../../agentes-linkedin/infra/src/team_backend/evidencia.py) |
+| `evidence_result` | `dataclass` | [team_backend.evidencia.EvidenceResult](../../agentes-linkedin/infra/src/team_backend/evidencia.py) |
 
 ## Aristas y contratos
 
 | Arista | Solicitud | Respuesta |
 | --- | --- | --- |
-| `brief` | `editorial_input` | `brief` |
-| `redactar_a` | `editorial_input` | `variants` |
-| `redactar_b` | `editorial_input` | `variants` |
-| `seleccionar` | `editorial_input` | `selection` |
-| `reparar` | `editorial_input` | `repair` |
-| `verificar` | `editorial_input` | `verification` |
+| `brief` | `brief_input` | `brief` |
+| `redactar_a` | `writer_input` | `variants` |
+| `redactar_b` | `writer_input` | `variants` |
+| `seleccionar` | `selection_input` | `selection` |
+| `reparar` | `repair_input` | `repair` |
+| `verificar` | `verifier_input` | `verification` |
 | `investigar_pieza` | `research_request` | `research_result` |
-| `disenar` | `piece` | `image_design` |
-| `editar_foto` | `photo` | `image_bytes` |
-| `revisar_imagen` | `piece_image` | `image_check` |
-| `leer_lector_comprador` | `editorial_input` | `panel` |
-| `leer_lector_recomendador` | `editorial_input` | `panel` |
-| `leer_lector_divulgador` | `editorial_input` | `panel` |
-| `leer_lector_lider` | `editorial_input` | `panel` |
-| `leer_lector_par` | `editorial_input` | `panel` |
+| `disenar` | `image_input` | `image_design` |
+| `editar_foto` | `edit_input` | `image_bytes` |
+| `revisar_imagen` | `check_input` | `check_result` |
+| `leer_lector_comprador` | `panel_input` | `panel` |
+| `leer_lector_recomendador` | `panel_input` | `panel` |
+| `leer_lector_divulgador` | `panel_input` | `panel` |
+| `leer_lector_lider` | `panel_input` | `panel` |
+| `leer_lector_par` | `panel_input` | `panel` |
 | `visual_futuro` | `piece` | `image_choice` |
-| `observar` | `job` | `read_result` |
-| `descubrir` | `job` | `read_result` |
-| `clasificar` | `contact` | `classification` |
-| `comentar` | `post` | `comment` |
-| `planificar_red` | `job` | `network_plan` |
-| `sincronizar` | `job` | `read_result` |
+| `observar` | `network_input` | `observe_result` |
+| `descubrir` | `network_input` | `discover_result` |
+| `clasificar` | `network_input` | `classify_result` |
+| `comentar` | `network_input` | `proposal` |
+| `planificar_red` | `network_input` | `plan_result` |
+| `sincronizar` | `network_input` | `sync_result` |
 | `prefiltro` | `post` | `prefilter` |
 | `evaluar_inbox` | `conversation` | `inbox_assessment` |
 | `orientacion_propuesta` | `weekly` | `orientation_decision` |
@@ -497,10 +539,10 @@ Los nombres siguientes enlazan las definiciones existentes. `python_payload`, `m
 | `entender` | `capture` | `intent` |
 | `transcribir` | `capture` | `transcript` |
 | `investigar_captura` | `research_request` | `research_result` |
-| `pieza_diaria_gate_0` | `proposal` | `lead` |
+| `pieza_diaria_gate_0` | `proposal` | `lead_result` |
 | `pieza_diaria_gate_1` | `proposal` | `veto` |
 | `pieza_diaria_gate_2` | `proposal` | `execution` |
-| `politica_red` | `proposal` | `lead` |
+| `politica_red` | `proposal` | `lead_result` |
 | `red_gate_0` | `proposal` | `veto` |
 | `red_gate_1` | `proposal` | `execution` |
 | `entregar_comentario` | `proposal` | `lead` |
@@ -510,3 +552,7 @@ Los nombres siguientes enlazan las definiciones existentes. `python_payload`, `m
 | `captura_memoria` | `capture` | `capture` |
 | `resultados_editorial` | `metrics_result` | `metrics_result` |
 | `resumen_editorial` | `weekly` | `weekly` |
+| `evidencia_red` | `evidence_request` | `evidence_result` |
+| `evidencia_analista` | `evidence_request` | `evidence_result` |
+| `evidencia_referentes_futura` | `evidence_request` | `evidence_result` |
+| `evidencia_comunidad_futura` | `evidence_request` | `evidence_result` |

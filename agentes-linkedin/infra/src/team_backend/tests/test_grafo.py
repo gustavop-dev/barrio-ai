@@ -108,6 +108,13 @@ class GraphTests(SimpleTestCase):
             with self.assertRaisesRegex(GraphError, 'Clave duplicada'):
                 load_graph(path)
 
+    def test_runtime_gate_exception_requires_a_declared_edge(self):
+        def duplicate_gate(g):
+            gate=next(e for e in g['edges'] if e['id']=='pieza_diaria_gate_0')
+            # The same safe topology does not authorize a new runtime tool.
+            g['edges'].append(dict(gate,id='undeclared_jev_tool'))
+        self.bad(duplicate_gate,'runtime fuera del orquestador')
+
 
 class GraphAPITests(TestCase):
     def setUp(self):

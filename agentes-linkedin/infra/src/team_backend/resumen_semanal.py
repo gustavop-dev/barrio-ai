@@ -339,6 +339,9 @@ Reglas de los números:
   ni sumas, ni porcentajes, ni diferencias. Las comparaciones con la semana anterior ya vienen hechas en
   `estadisticas.comparacion` (diferencia y variacion_pct); úsalas en lugar de calcularlas.
 - null es un dato que falta, nunca un cero. Una sección con disponible=false no se midió: dilo así, no la interpretes.
+- evidencia_compartida es una muestra parcial: encaje usa solo clasificados suficientes y siempre cita cobertura,
+  versión y fecha. Primera observación no es llegada; coincidencia o exposición no prueba causa. Un origen declarado
+  sigue siendo una declaración, nunca una conversión exclusiva. Reacciones/seguidores agregados están sin identidad.
 - Un corte "pendiente" aún no cumplió su edad (72 h o 7 días); "sin_dato" la cumplió pero no se pudo leer.
 - Cualquier cifra que no esté en los datos hace que se quite tu frase entera.
 
@@ -400,6 +403,13 @@ def message(week_start,data):
 
 NUMBER=re.compile(r'\d+(?:[.,]\d+)*')
 ISO_DAY=re.compile(r'(\d{4})-(\d{2})-(\d{2})')
+EVIDENCE_IDS={'account','person','provider_user_id','version_id','record_id','execution','evidence',
+              'declared_evidence','shared_with','experiment_id','criterion_version','criterion_versions',
+              'exposure_without_date'}
+# The evidence service never certifies causation. Declared origins can be described as declarations.
+CAUSAL_VERBS=re.compile(r'\b(lleg[oó]|llegaron|vino|vinieron|trajo|trajeron|atrajo|atrajeron|capt[oó]|captaron|'
+                        r'convirti[oó]|convirtieron|caus[oó]|causaron|gener[oó]|generaron|came|brought|converted|caused|drove)\b',re.I)
+CAUSAL_LINKS=re.compile(r'\b(referentes?|gracias a|por efecto de|because of|due to)\b',re.I)
 
 def _readings(token):
     """(value, decimals) readings of a number as written in Spanish or English: «1.840» is 1840 or 1.84, «3,1» is 3.1."""
@@ -419,7 +429,10 @@ def allowed_numbers(value,out=None):
         for day in ISO_DAY.findall(value):out.update(float(n) for n in day)
         for token in NUMBER.findall(ISO_DAY.sub(' ',value)):out.update(v for v,_ in _readings(token))
     elif isinstance(value,dict):
-        for key,item in value.items():allowed_numbers(str(key),out);allowed_numbers(item,out)
+        for key,item in value.items():
+            if key in EVIDENCE_IDS or (key=='referents' and isinstance(item,(list,tuple)) and all(isinstance(v,str) for v in item)):
+                continue
+            allowed_numbers(str(key),out);allowed_numbers(item,out)
     elif isinstance(value,(list,tuple)):
         for item in value:allowed_numbers(item,out)
     return out
@@ -436,6 +449,8 @@ def validate(raw,data,week_start,grounding=None):
     otherwise it is dropped. A headline with an unknown number is replaced; the summary records what was dropped."""
     allowed=allowed_numbers(data);dropped=[]
     def check(field,text,extra='',tethered=False):
+        if 'evidencia_compartida' in data and CAUSAL_VERBS.search(text+' '+extra) and CAUSAL_LINKS.search(text+' '+extra):
+            dropped.append({'campo':field,'texto':text[:MAX_ITEM_CHARS],'atribucion_no_acreditada':True});return False
         numbers=NUMBER.findall(f'{text} {extra}');bad=unknown_numbers(f'{text} {extra}',allowed)
         if bad or (tethered and not numbers):
             dropped.append({'campo':field,'texto':text[:MAX_ITEM_CHARS],'cifras_no_encontradas':bad,'sin_cifra':not numbers});return False
@@ -456,7 +471,9 @@ def validate(raw,data,week_start,grounding=None):
     clean['orientacion_propuesta']=proposal if proposal and check('orientacion_propuesta',proposal) else None
     warnings=[w for w in (' '.join(str(x).split())[:MAX_ITEM_CHARS] for x in (raw.get('advertencias') or [])[:5]) if w and check('advertencias',w)]
     if not warnings:warnings=list(data.get('avisos_de_datos') or [])
-    if dropped:warnings.append(f'Se quitaron {len(dropped)} frases del análisis con cifras que no están en los datos de la semana.')
+    causal=sum(bool(d.get('atribucion_no_acreditada')) for d in dropped)
+    if causal:warnings.append(f'Se quitaron {causal} frases con atribución causal no acreditada.')
+    if len(dropped)>causal:warnings.append(f'Se quitaron {len(dropped)-causal} frases del análisis con cifras que no están en los datos de la semana.')
     clean['advertencias']=warnings
     clean['validacion']={'ok':not dropped,'descartado':dropped}
     if grounding:clean.update(grounding)
@@ -475,6 +492,12 @@ def run(user,week_start,origin_job=''):
     now=timezone.now()
     if week_start+timedelta(days=7)>_local(now).date():raise Conflict('Esa semana aún no terminó.')
     data=stats(week_start,now)
+    from dataclasses import asdict
+    from . import evidencia
+    w=window(week_start)
+    data['evidencia_compartida']=[asdict(evidencia.consult(user,evidencia.EvidenceRequest(
+        str(account.pk),w.start.isoformat(),w.end.isoformat(),now.isoformat())))
+        for account in ConnectorAccount.objects.filter(provider__in=metricas.PROVIDERS).order_by('id')]
     context,grounding=operador.role_context('semanal',WEEKLY_UNITS,
         {'interpretacion':WEEKLY_UNITS,'ventanas':['LI-06-V008-K01','LI-06-V008-K02']})
     if grounding['course_missing']:

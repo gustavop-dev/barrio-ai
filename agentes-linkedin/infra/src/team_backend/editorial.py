@@ -29,7 +29,7 @@ from decimal import Decimal
 from django.db import IntegrityError
 from django.utils import timezone
 from knowledge import providers
-from . import guardas, operador, orientacion, posicionamiento, voz, infografias, imagenes, urgente, research
+from . import guardas, operador, orientacion, posicionamiento, voz, infografias, imagenes, urgente, research, orquestacion
 from .exceptions import Conflict
 from .jobs import enqueue_operation
 from .models import OPEN_PIECE_STATES, ConnectorAccount, EditorialPiece, Job, ObservedPost, TeamQuestion
@@ -384,7 +384,18 @@ class BudgetStop(ValueError):
 
 def _guard():
     if spent_today()>=daily_budget():
+        if orquestacion.current():
+            orquestacion.current().stop('cost_cap')
+            raise orquestacion.CycleStopped('cost_cap')
         raise BudgetStop(BUDGET_STOP+' (EDITORIAL_DAILY_LLM_USD); no se gasta más hoy.')
+
+def _call_stage(piece,name,payload,unit_ids=None):
+    runtime=orquestacion.current()
+    if runtime is None:return _stage(piece,name,payload,unit_ids)
+    edge=runtime.graph['code_bindings']['editorial_edges'][name]
+    request={'piece':str(piece.id),'stage':name,'payload':orquestacion.plain(payload),'units':unit_ids or []}
+    return runtime.call(edge,request,lambda:_stage(piece,name,payload,unit_ids))
+
 
 def _stage(piece,name,payload,unit_ids=None):
     system,schema,default_units,budget,max_tokens,effort=STAGES[name]
@@ -408,6 +419,7 @@ def _stage(piece,name,payload,unit_ids=None):
     try:data=json.loads(answer['text'])
     except (json.JSONDecodeError,TypeError):raise ValueError(f'La etapa {name} no devolvió JSON válido.') from None
     if not isinstance(data,dict):raise ValueError(f'La etapa {name} no devolvió un objeto.')
+    orquestacion.ensure_current()
     known={u['unit_id'] for u in units}
     data['citations']=[c for c in data.get('citations',[]) if c in known]
     piece.citations=list(dict.fromkeys(list(piece.citations)+data['citations']))
@@ -485,17 +497,35 @@ def prepare(user,slot,origin_job=''):
     if not can_publish(account) or operador.globally_paused() or autonomy('CONT-09')=='off':raise Conflict('Publicación detenida antes de preparar.')
     when=scheduled_for(slot);now=timezone.now()
     if when<=now:raise Conflict('La hora de ese hueco ya pasó.')
-    _guard()
-    try:piece=EditorialPiece.objects.create(account=account,slot_date=slot,scheduled_for=when,created_by=user,origin_job=origin_job)
-    except IntegrityError:raise Conflict('Ya hay una pieza abierta para ese día.') from None
-    operador._audit(user,'editorial.piece_started',piece.id,slot=slot.isoformat())
-    try:return _run(piece,user,now,origin_job)
+    piece=EditorialPiece.objects.filter(origin_job=origin_job).first() if origin_job else None
+    if piece is None:
+        _guard()  # Preserve the preflight failure: no piece or cycle is created without a budget.
+        try:piece=EditorialPiece.objects.create(account=account,slot_date=slot,scheduled_for=when,created_by=user,origin_job=origin_job)
+        except IntegrityError:raise Conflict('Ya hay una pieza abierta para ese día.') from None
+        operador._audit(user,'editorial.piece_started',piece.id,slot=slot.isoformat())
+    job=Job.objects.filter(id=origin_job).first() if origin_job else None
+    runtime=orquestacion.Runtime.open('pieza_diaria',str(piece.id),user,job,
+        facts={'piece':str(piece.id),'slot':slot.isoformat()},
+        plan=['brief','research_if_needed','variants','panel','selection','verify','repair_if_needed','images','proposal'])
+    try:
+        with runtime.session():
+            if piece.state!=EditorialPiece.State.PREPARING:
+                runtime.finish(piece)
+                return piece
+            result=_run(piece,user,now,origin_job)
+            runtime.finish(result,allow_stopped=result.state==EditorialPiece.State.BLOCKED)
+            return result
+    except orquestacion.CycleStopped as exc:
+        # A second worker must not close the first worker's piece.
+        from .models import CycleLedger
+        stopped=CycleLedger.objects.get(pk=runtime.id)
+        if stopped.state!='stopped':raise
+        return _close(piece,EditorialPiece.State.BLOCKED,'Ciclo detenido: '+str(exc))
     except ValueError as exc:return _close(piece,EditorialPiece.State.FAILED,str(exc))
     except Exception:
         _close(piece,EditorialPiece.State.FAILED,'Error interno en la preparación; no se repite el gasto.');raise
 
-def _run(piece,user,now,origin_job):
-    check_models()
+def _context(piece,now):
     public,private=guardas.blocks()
     signals=_signals(now);history,mix=_history(now)
     memory={'public_facts':public,'private_guidance':private,'orientation':orientacion.text()}
@@ -516,18 +546,35 @@ def _run(piece,user,now,origin_job):
                    signals={'observed_posts':signals},history=history,modality_mix_30d=mix,performance_30d=_performance(now),
                    team_questions=asked,ideas_from_gustavo=ideas,feedback_from_gustavo=feedback,
                    weekly_recommendations=resumen_semanal.for_director(now),gallery=gallery,priority_capture=priority)
-    brief,_=_stage(piece,'director',director_input)
+    return dict(director_input=director_input,research=piece.research)
+
+
+def _run(piece,user,now,origin_job):
+    check_models()
+    runtime=orquestacion.current()
+    context=runtime.snapshot('editorial_context',lambda:_context(piece,now)) if runtime else _context(piece,now)
+    director_input=context['director_input']
+    memory={k:director_input[k] for k in ('public_facts','private_guidance','orientation')}
+    public,private=memory['public_facts'],memory['private_guidance']
+    signals=director_input['signals']['observed_posts']
+    gallery,priority=director_input['gallery'],director_input['priority_capture']
+    ideas=director_input['ideas_from_gustavo']
+    piece.research=context['research']
+    from . import preguntas, capturas
+    brief,_=_call_stage(piece,'director',director_input)
     research_request=brief.get('research_request') or {}
     if brief.get('decision')=='write' and research_request.get('needed') is True:
         question=research_request.get('public_question','') if research_request.get('public_only') is True else ''
         if guardas.private_leaks(question,private):question=''
-        result=research.research(research.ResearchRequest(key=f'piece:{piece.id}',public_question=question,
-                                search=True,purpose='editorial-web-research'))
+        request=research.ResearchRequest(key=f'piece:{piece.id}',public_question=question,
+                                search=True,purpose='editorial-web-research')
+        result=orquestacion.call('investigar_pieza',request,lambda:research.research(request))
         piece.research=list(piece.research)+[result.to_dict()]
-        piece.usage=list(piece.usage)+[dict(result.usage,stage='investigacion',status=result.status)]
+        if not any(u.get('stage')=='investigacion' for u in piece.usage):
+            piece.usage=list(piece.usage)+[dict(result.usage,stage='investigacion',status=result.status)]
         piece.save(update_fields=['research','usage','updated_at'])
         # One return to the owner with the evidence/limitation, never a recursive specialist call.
-        brief,_=_stage(piece,'director',dict(director_input,provisional_brief=brief,research_completed=True))
+        brief,_=_call_stage(piece,'director',dict(director_input,provisional_brief=brief,research_completed=True))
     brief['positioning_version']=posicionamiento.VERSION
     brief['gallery_offered']=[p['id'] for p in gallery]
     if priority and priority['id'] not in brief.get('ideas_used',[]):
@@ -546,15 +593,15 @@ def _run(piece,user,now,origin_job):
     frozen={k:brief.get(k) for k in ('primary_reader','modality','pillar','thesis','approach','format','reader_value','evidence',
                                       'success_criterion','avoid')}
     # b) Copywriters A and B: two independent variants from the same brief and sources.
-    variants,_=_stage(piece,'redactor',dict(memory,brief=frozen,sources=piece.signals),
+    variants,_=_call_stage(piece,'redactor',dict(memory,brief=frozen,sources=piece.signals),
                       unit_ids=[brief['approach']]+STAGES['redactor'][2])  # the chosen approach first
     piece.variants=variants;piece.save(update_fields=['variants','updated_at'])
     drafts={'A':variants['variant_a']['text'],'B':variants['variant_b']['text']}
     # c) Readers panel: hypotheses per perspective, no memory or authorship.
-    panel,_=_stage(piece,'lectores',{'brief':{k:frozen[k] for k in ('primary_reader','modality','thesis')},'drafts':drafts})
+    panel,_=_call_stage(piece,'lectores',{'brief':{k:frozen[k] for k in ('primary_reader','modality','thesis')},'drafts':drafts})
     piece.panel=panel;piece.save(update_fields=['panel','updated_at'])
     # d) Director: choose or merge and fix the final text.
-    selection,model=_stage(piece,'seleccion',dict(memory,brief=frozen,variants=variants,panel=panel,sources=piece.signals))
+    selection,model=_call_stage(piece,'seleccion',dict(memory,brief=frozen,variants=variants,panel=panel,sources=piece.signals))
     final=(selection.get('final_text') or '').strip()
     piece.selection=selection;piece.final_text=final;piece.save(update_fields=['selection','final_text','updated_at'])
     if selection.get('decision')=='discard' or not final:
@@ -589,7 +636,7 @@ def _run(piece,user,now,origin_job):
         source='las reglas' if repair['trigger']=='reglas' else 'el verificador'
         risks.append(f'Reparada en una ronda: {len(repair["findings"])} hallazgo(s) de {source} corregido(s)');model=repair.get('model') or model
     rationale=f'{frozen["thesis"]} — {selection.get("rationale","")}'.strip(' —')
-    operador.create_proposal(user,None,'CONT-09',{'text':final,'media':imagenes.manifest(piece)},rationale=rationale[:4000],citations=piece.citations,risks=risks,
+    if latest_action(piece) is None:operador.create_proposal(user,None,'CONT-09',{'text':final,'media':imagenes.manifest(piece)},rationale=rationale[:4000],citations=piece.citations,risks=risks,
                              source='agent',origin_job=origin_job,model=model,piece=piece)
     return _close(piece,EditorialPiece.State.READY,'Lista para la política autónoma.')
 
@@ -613,7 +660,7 @@ def _check(piece,memory,frozen,text,claims,public,private):
     Each guard runs once per text version; the verdict itself only adds the verifier's reasons."""
     issues=text_rules(text,public,private)+research.source_issues(claims,piece.research)
     if issues:return None,issues,issues
-    review,_=_stage(piece,'verificador',dict(memory,text=text,brief=frozen,claims=claims,sources=piece.signals))
+    review,_=_call_stage(piece,'verificador',dict(memory,text=text,brief=frozen,claims=claims,sources=piece.signals))
     return review,_blocking(review)+research.source_issues(claims,piece.research,review),[]
 
 def _blocking(review):
@@ -644,15 +691,22 @@ def _repair_round(piece,memory,frozen,text,claims,review,reasons,issues,public,p
             if review is not None else None}
     def unrepaired(outcome,note,**extra):
         return dict(record,outcome=outcome,note=note,**extra),text,claims,review,reasons+[f'Ronda de reparación: {note}'],issues
-    try:data,model=_stage(piece,'reparacion',dict(memory,brief=frozen,text=text,claims=claims,findings=findings,sources=piece.signals))
-    except BudgetStop:return unrepaired('sin_presupuesto','sin presupuesto editorial para repararla hoy')
+    try:data,model=_call_stage(piece,'reparacion',dict(memory,brief=frozen,text=text,claims=claims,findings=findings,sources=piece.signals))
+    except (BudgetStop,orquestacion.CycleStopped) as exc:
+        if isinstance(exc,orquestacion.CycleStopped) and str(exc)!='cost_cap':raise
+        return unrepaired('sin_presupuesto','sin presupuesto editorial para repararla hoy')
     repaired=(data.get('final_text') or '').strip()
     record.update(decision=data.get('decision'),changes=data.get('changes') or [],rationale=data.get('rationale') or '',model=model)
     if data.get('decision')!='repaired' or not repaired:
         return unrepaired('descartada','la descartó: '+(data.get('rationale') or 'sin motivo'))
+    if orquestacion.current():
+        orquestacion.current().progress({'text':text,'reasons':reasons},key='repair:before')
+        orquestacion.current().progress({'text':repaired,'reasons':reasons if repaired==text else []},key='repair:after')
     if repaired==text:return unrepaired('sin_cambios','no cambió el texto')
     new_claims=data.get('claims') or []
     try:new_review,new_reasons,new_issues=_check(piece,memory,frozen,repaired,new_claims,public,private)
-    except BudgetStop:return unrepaired('sin_presupuesto','el texto reparado no se pudo verificar: presupuesto agotado',repaired_text=repaired)
+    except (BudgetStop,orquestacion.CycleStopped) as exc:
+        if isinstance(exc,orquestacion.CycleStopped) and str(exc)!='cost_cap':raise
+        return unrepaired('sin_presupuesto','el texto reparado no se pudo verificar: presupuesto agotado',repaired_text=repaired)
     record.update(outcome='bloqueada' if new_reasons else 'reparada',repaired_sha256=_sha(repaired))
     return record,repaired,new_claims,new_review,new_reasons,new_issues

@@ -18,11 +18,22 @@ class OfficeEventTests(OperatorBase):
         from team_backend.models import ActionProposal
         drafted=ActionProposal.objects.get(post=post,capability='INT-03')
         self.approve({'id':str(drafted.id),'payload_hash':drafted.payload_hash})
-        kinds=[(e['tipo'],e['rol'],e['destino']) for e in self.human.get('/api/v1/oficina/eventos').json()['events']]
+        events=self.human.get('/api/v1/oficina/eventos').json()['events']
+        # Phase 3b adds separately identified dispatcher traffic to the same feed.
+        # The original comment/publication sequence remains exactly intact.
+        kinds=[(e['tipo'],e['rol'],e['destino']) for e in events if e.get('source')!='orchestration']
         # Reading the referents handed their new posts to Relaciones first (background work moves the scene too).
         self.assertEqual(kinds,[('entrega','investigador_referentes','relaciones_comunidad'),
                                 ('consulta_biblioteca','relaciones_comunidad','biblioteca'),('entrega','relaciones_comunidad','operador_cuenta'),
                                 ('publicacion','operador_cuenta','linkedin')])
+        calls=[(e['tipo'],e['rol'],e['destino']) for e in events if e.get('source')=='orchestration']
+        self.assertEqual(calls,[('entrega','relaciones_comunidad','investigador_referentes'),
+                               ('entrega','investigador_referentes','relaciones_comunidad'),
+                               ('entrega','relaciones_comunidad','relaciones_comunidad'),
+                               ('entrega','relaciones_comunidad','relaciones_comunidad')])
+        self.assertEqual([e.get('source','workflow') for e in events],
+                         ['orchestration','orchestration','workflow','orchestration',
+                          'workflow','workflow','orchestration','workflow'])
         later=(timezone.now()+timedelta(minutes=1)).isoformat()
         self.assertEqual(self.human.get('/api/v1/oficina/eventos',{'desde':later}).json()['events'],[])
         self.assertEqual(self.human.get('/api/v1/oficina/eventos?desde=ayer').status_code,400)
