@@ -124,7 +124,8 @@ def banner(raw,copy):
         start=x
         for word in text.split(' '):
             for ch in word:
-                draw.text((x,y),ch,font=font,fill=color,anchor='lt');x+=draw.textlength(ch,font=font)+spacing
+                # Shared baseline: per-glyph top anchoring lifted the comma into an apostrophe.
+                draw.text((x,y+font.getmetrics()[0]),ch,font=font,fill=color,anchor='ls');x+=draw.textlength(ch,font=font)+spacing
             x+=draw.textlength(' ',font=font)+spacing
         box=(start,y,x-draw.textlength(' ',font=font)-spacing,y+font.size)
         if not inside(box,TEXT) or box[2]-start>MAX_LINE_WIDTH:
@@ -139,7 +140,7 @@ def banner(raw,copy):
             box=(x,y,x+width,y+FONT_PX)
             if not inside(box,TEXT) or box[2]-TEXT[0]>MAX_LINE_WIDTH:
                 raise ValueError(f'Acorta la frase: no cabe en {MAX_LINE_WIDTH} px a {FONT_FAMILY} {FONT_PX} px con la figura')
-            draw.text((x,y),word,font=regular,fill=ACCENT if banner_word(word)==highlight else PAPER,anchor='lt')
+            draw.text((x,y+regular.getmetrics()[0]),word,font=regular,fill=ACCENT if banner_word(word)==highlight else PAPER,anchor='ls')
             boxes.append(box);x+=width+draw.textlength(' ',font=regular)
         line_widths.append(box[2]-TEXT[0])
     draw.rectangle((600,286,671,289),fill=ACCENT)
