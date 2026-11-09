@@ -1,4 +1,6 @@
 # Errores conocidos
+Tras #92, el banner de 8aa8c51c se bloqueaba por afirmaciones antiguas en reason/benefit/steps («comprobado en móvil» y resultados exagerados), aunque ajuste y etiqueta estaban acreditados. El flujo ahora distingue defectos explicativos y visuales y permite reparación de una sección. Según el reporte del usuario, A/B productivas ya están guardadas a 800×800; esta sesión solo cambia código/tests, sin acceder a producción. Regresiones con fakes escritas y revisión estática; ejecución y relanzamiento pendientes.
+
 Perfil tras #91: redimensionar a 800×800 conservaba una cabeza de ~40%; la visión además intentaba inferir colores exactos y derrame desde la imagen. Se añade encuadre por máscara y evidencia cuantitativa de los bytes finales. El highlight vacío o con puntuación distinta se normaliza incluso al recuperar líneas existentes. Un nuevo job de render ya no pierde ediciones confirmadas guardadas en un ciclo hijo `perfil_assets`. Tests escritos, no ejecutados; comportamiento y blobs de 8aa8c51c pendientes de comprobar en producción.
 
 Conservar reserva de solicitudes inciertas y revisar antes de repetir. ConnectError antes de envío admite reintento acotado. Evidencias contienen NUL: preservar columna json original, no convertir a jsonb. No reiniciar automáticamente trabajos running al perder el trabajador.

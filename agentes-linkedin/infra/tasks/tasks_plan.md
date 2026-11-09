@@ -29,3 +29,5 @@ pagadas como parte de la documentación.
 - [ ] QA de `test_perfil_chroma`, `test_perfil_assets`, `test_perfil` y `test_imagenes` en el entorno autorizado. No ejecutados localmente; sin llamadas pagadas, builds ni despliegue en esta sesión.
 - [x] Tras #91: encuadre por alfa, métricas deterministas para visión, despill cian, normalización del highlight y reutilización entre ciclos `perfil_assets`; regresiones con fakes escritas.
 - [ ] Ejecutar esas regresiones en entorno autorizado y comprobar el relanzamiento productivo de `perfil_assets 8aa8c51c` con sus blobs confirmados. No se accedió a producción en esta sesión.
+- [x] Tras #92: revisión separada de asset/explicación, reparación de una sección con segunda revisión única, fallback `needs_input`, evidencia de previews y conservación de A/B/topes/checkpoints. Tests con fakes escritos.
+- [ ] Ejecutar `test_perfil_assets_explanation`, `test_perfil_assets`, `test_perfil`, `test_perfil_chroma` y `test_grafo` en entorno autorizado. Sin tests/builds locales ni proveedores pagados en esta sesión.
