@@ -1,4 +1,4 @@
-# cubre: CAP-04, CAP-05, CAP-06
+# cubre: CAP-04, CAP-05, CAP-06, IMG-16
 # Captura with files, the regression of PR #43 (with expo/fetch as the global fetch, a capture with a photo or an audio
 # never left the phone): a photo picked from the phone's gallery and a voice note recorded by holding the button reach
 # the backend. Each one shows the toast «Enviado al equipo.» and its row in «Lo que enviaste» («1 foto», «Audio 0:0N»);
@@ -57,16 +57,43 @@ onFlowComplete:
     visible: 'Foto adjunta 1'
     timeout: 10000
 - assertVisible: 'Quitar la foto 1'
+# cubre: IMG-16 — all three choices, default auto, then send an explicit si.
+- scrollUntilVisible:
+    element:
+      id: capture-ai-auto
+    direction: DOWN
+    centerElement: true
+- assertVisible:
+    id: capture-ai-auto
+    checked: true
+- tapOn:
+    id: capture-ai-no
+- assertVisible:
+    id: capture-ai-no
+    checked: true
+- tapOn:
+    id: capture-ai-si
+- assertVisible:
+    id: capture-ai-si
+    checked: true
+- takeScreenshot: 05-envios-02-edicion-ia
+
+- scrollUntilVisible:
+    element:
+      id: capture-note
+    direction: DOWN
+    centerElement: true
 - tapOn:
     id: capture-note
     waitToSettleTimeoutMs: 500
 - inputText: Foto de QA de la pizarra
-- tapOn: 'A[ñÑ]adir una imagen'
+- tapOn: 'Nota para el equipo \(opcional\)'
 - takeScreenshot: 05-envios-02-foto-adjunta
 - scrollUntilVisible:
     element:
       id: capture-send
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - tapOn:
     id: capture-send
@@ -138,6 +165,7 @@ onFlowComplete:
     element:
       id: capture-send
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - tapOn:
     id: capture-send
@@ -183,11 +211,16 @@ onFlowComplete:
 # Airplane mode cuts the emulator off the runner's API (10.0.2.2); Maestro drives the device over adb, unaffected.
 # It goes on first, so the phone knows it is offline (NetInfo) by the time the note is written.
 - setAirplaneMode: enabled
+- scrollUntilVisible:
+    element:
+      id: capture-note
+    direction: DOWN
+    centerElement: true
 - tapOn:
     id: capture-note
     waitToSettleTimeoutMs: 500
 - inputText: Nota de QA sin conexion
-- tapOn: 'A[ñÑ]adir una imagen'
+- tapOn: 'Nota para el equipo \(opcional\)'
 - tapOn:
     id: capture-para-dato
     waitToSettleTimeoutMs: 500
@@ -195,6 +228,7 @@ onFlowComplete:
     element:
       id: capture-send
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - tapOn:
     id: capture-send
@@ -250,11 +284,16 @@ onFlowComplete:
     visible:
       id: capture-sheet
     timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: capture-note
+    direction: DOWN
+    centerElement: true
 - tapOn:
     id: capture-note
     waitToSettleTimeoutMs: 500
 - inputText: Nota de QA demasiado grande
-- tapOn: 'A[ñÑ]adir una imagen'
+- tapOn: 'Nota para el equipo \(opcional\)'
 # The next capture POST answers 413 (once).
 - runScript:
     file: comun/qa-fallo.js
@@ -267,6 +306,7 @@ onFlowComplete:
     element:
       id: capture-send
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - tapOn:
     id: capture-send

@@ -526,6 +526,33 @@ class Command(BaseCommand):
             sha256=imagenes.sha(raw),alt=slide['alt'],template='pasos',data=slide,review=review)
         row.image.save('infografia-qa.png',ContentFile(raw),save=False);row.save()
         piece.image_kind='infografia';piece.image_spec={'slides':[slide]};piece.image_review=review;piece.save()
+        # Keep the existing dates, ids, counts and approval/veto flows. The older published piece
+        # gains four deterministic slides (cover, two interiors, close), with a tagged private PDF.
+        piece=self.piece['publicada8']
+        for row in piece.images.all():row.image.delete(save=False);row.delete()
+        slides=[dict(infografias.fallback(),template='portada',label='DECISIONS',title='Make the decision explicit',
+                     subtitle='A small guide to comparing options.',highlight='',
+                     alt='Cover: Make the decision explicit. A small guide to comparing options.'),
+                dict(infografias.fallback(),template='pasos',label='WORKFLOW',title='Compare the options',
+                     subtitle='',highlight='',steps=['Name the decision','Compare the options','Record the reason'],
+                     alt='Three steps: name the decision, compare the options, and record the reason.'),
+                dict(infografias.fallback(),template='numero',label='WORKFLOW',title='Keep a reason with each decision',
+                     subtitle='',highlight='',number='3',unit='steps',
+                     alt='Three steps in this guide. Keep a reason with each decision.'),
+                dict(infografias.fallback(),template='cierre',label='YOUR TURN',title='Which decision needs a reason?',
+                     subtitle='Start with one question.',highlight='',
+                     alt='Closing question: Which decision needs a reason? Start with one question.')]
+        pngs=[infografias.render(slide,i,len(slides),True) for i,slide in enumerate(slides,1)]
+        review=FakeImageConnector().check(pngs,{'design':{'slides':slides}})
+        for i,(slide,raw) in enumerate(zip(slides,pngs),1):
+            row=PieceImage(id=uid(f'image:carrusel:{i}'),piece=piece,kind='carrusel',position=i,width=1080,height=1350,
+                sha256=imagenes.sha(raw),alt=slide['alt'],template=slide['template'],data=slide,review=review)
+            row.image.save(f'carrusel-qa-{i}.png',ContentFile(raw),save=False);row.save()
+        pdf=infografias.document(pngs,[slide['alt'] for slide in slides])
+        piece.image_document.save('carrusel-qa.pdf',ContentFile(pdf),save=False)
+        piece.image_document_sha256=imagenes.sha(pdf)
+        piece.image_kind='carrusel';piece.image_spec={'slides':slides};piece.image_review=review
+        piece.image_reason='Carrusel de ejemplo para la fase 2';piece.save()
         for piece in self.piece.values():
             for action in piece.proposals.all():
                 action.payload=dict(action.payload,media=imagenes.manifest(piece))

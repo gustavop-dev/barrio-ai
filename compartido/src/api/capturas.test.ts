@@ -35,6 +35,12 @@ describe('native file parts', () => {
 });
 
 describe('captureForm with React Native parts', () => {
+  it.each(['no', 'auto', 'si'] as const)('sends ai_edit=%s without boolean aliases or writable urgency', (ai_edit) => {
+    expect(partsOf(captureForm({ nota: 'Una idea', ai_edit })).map((part) => [part.fieldName, part.string])).toEqual([
+      ['nota', 'Una idea'], ['ai_edit', ai_edit],
+    ]);
+  });
+
   it('sends the audio and photos with scheme, name and type, each part with its content-type header', () => {
     const form = captureForm({
       audio: { blob: { uri: '/data/user/0/co.projectapp.office/cache/Audio/recording-1.m4a', name: 'captura.m4a', type: '' }, filename: 'captura.m4a', durationS: 12.345 },

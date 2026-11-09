@@ -1,5 +1,6 @@
 // Detalle de una pieza: the cuts and the missing-data rules, the veto with «Deshacer», the preparation
 // steps, the final text with Copiar, the comments for the team, the folds and the variant tabs.
+import { CAROUSEL_IMAGES, pieceImage } from '@compartido/fixtures/imagenes';
 import type { PieceDetailFull } from '@compartido/api/calendario';
 import { piece, shellOverview } from '@compartido/fixtures/calendario';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react-native';
@@ -334,4 +335,108 @@ describe('Detalle de una pieza · veto con «Deshacer»', () => {
     handler('background');
     await waitFor(() => expect(api.find('POST', '/api/v1/operador/actions/act-8/reject')).toHaveLength(1));
   });
+});
+
+
+describe('IMG-11 · imágenes de la pieza', () => {
+  async function measureImage() {
+    await screen.findByTestId('piece-images');
+    await fireEvent(screen.getByTestId('piece-images-pager').parent!, 'layout', { nativeEvent: { layout: { x: 0, y: 0, width: 300, height: 375 } } });
+  }
+
+  it('shows the original photo and reason, and keeps the existing veto for the whole piece', async () => {
+    useFakeNow('2026-11-07T15:00:00Z');
+    server({ ...SCHEDULED, images: [pieceImage()], image_kind: 'foto' });
+    await renderPieza('p8');
+    await measureImage();
+    expect(screen.getByLabelText('People sharing a product demonstration.')).toBeOnTheScreen();
+    expect(screen.getByText('Se publica tal cual')).toBeOnTheScreen();
+    expect(screen.getByText('Instrucción de Gustavo: úsala tal cual')).toBeOnTheScreen();
+    expect(screen.getByText('Vetar')).toBeOnTheScreen();
+    expect(screen.queryByText('Ver original')).toBeNull();
+  });
+
+  it('compares an AI edit with its authenticated original and retries a failed image', async () => {
+    server({ ...PUBLISHED, images: [pieceImage({ edited: true, ai_edit: 'si', reason: 'Más luz', review: { ok: true } })] });
+    await renderPieza();
+    await measureImage();
+    expect(screen.getByText('Editada con IA')).toBeOnTheScreen();
+    expect(screen.getByText('Comprobación aprobada')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Ver original'));
+    expect(JSON.stringify(screen.getByTestId('piece-image-original').props.source)).toContain('/galeria/f1/imagen');
+    await fireEvent.press(screen.getByText('Ver editada'));
+    await fireEvent(screen.getByTestId('piece-image-1'), 'error', { nativeEvent: { error: '404' } });
+    expect(screen.getByText('No se pudo cargar la imagen')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Reintentar'));
+    expect(screen.getByTestId('piece-image-1')).toBeOnTheScreen();
+    expect(screen.queryByText('Vetar')).toBeNull();
+  });
+
+  it('shows an infographic, its template, alt and review', async () => {
+    server({ ...PUBLISHED, image_kind: 'infografia', images: [pieceImage({ ...CAROUSEL_IMAGES[1]!, kind: 'infografia' })] });
+    await renderPieza();
+    await measureImage();
+    expect(screen.getByText('Infografía')).toBeOnTheScreen();
+    expect(screen.getByText('Plantilla: Pasos')).toBeOnTheScreen();
+    expect(screen.getByText('1. Correcto: Texto legible')).toBeOnTheScreen();
+    expect(screen.getByLabelText(CAROUSEL_IMAGES[1]!.alt)).toBeOnTheScreen();
+  });
+
+  it('orders carousel slides, swipes them and exposes only the active alt to screen readers', async () => {
+    server({ ...PUBLISHED, image_kind: 'carrusel', images: [...CAROUSEL_IMAGES].reverse() });
+    await renderPieza();
+    await measureImage();
+    expect(screen.getByText('1/3')).toBeOnTheScreen();
+    expect(screen.getByLabelText(CAROUSEL_IMAGES[0]!.alt)).toBeOnTheScreen();
+    expect(screen.queryByLabelText(CAROUSEL_IMAGES[1]!.alt)).toBeNull();
+    await fireEvent(screen.getByTestId('piece-images-pager'), 'momentumScrollEnd', { nativeEvent: { contentOffset: { x: 300, y: 0 } } });
+    expect(screen.getByText('2/3')).toBeOnTheScreen();
+    expect(screen.getByLabelText(CAROUSEL_IMAGES[1]!.alt)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Siguiente'));
+    expect(screen.getByText('3/3')).toBeOnTheScreen();
+    expect(screen.getByText('Plantilla: Cierre')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+  });
+
+  it('does not call a fixed brand card a dynamic visual verification', async () => {
+    server({ ...PUBLISHED, image_kind: 'tarjeta', images: [pieceImage({ kind: 'tarjeta', review: { ok: true, mode: 'fixed_brand_card' } })] });
+    await renderPieza();
+    expect(await screen.findByText('Plantilla fija de marca; sin revisión visual dinámica.')).toBeOnTheScreen();
+    expect(screen.queryByText('Comprobación aprobada')).toBeNull();
+  });
+
+  it('explains that the image is still being prepared', async () => {
+    server(piece({ status: 'preparing', images: [], image_kind: null }));
+    await renderPieza();
+    expect(await screen.findByText('La imagen aparece cuando el equipo la prepare')).toBeOnTheScreen();
+  });
+});
+
+
+it('approves text and images using the received hash without changing the manifest', async () => {
+  useFakeNow('2026-11-07T15:00:00Z');
+  const api = server({ ...SCHEDULED, status: 'awaiting_approval', action: { id: 'act-8', state: 'proposed', payload_hash: 'frozen-text-and-images' }, images: CAROUSEL_IMAGES }, {
+    'POST /api/v1/operador/actions/act-8/approve': { body: {} },
+  });
+  await renderPieza('p8');
+  await fireEvent.press(await screen.findByText('Aprobar'));
+  await waitFor(() => expect(api.find('POST', '/api/v1/operador/actions/act-8/approve')[0]?.body).toEqual({ expected_hash: 'frozen-text-and-images', note: '' }));
+});
+
+it('hides the veto after the scheduled time even if the last response still says approved', async () => {
+  server({ ...SCHEDULED, images: [pieceImage()] });
+  await renderPieza('p8');
+  await screen.findByTestId('piece-images');
+  expect(screen.queryByText('Vetar')).toBeNull();
+});
+
+
+it('explains a rejected edit while showing the original that will be published', async () => {
+  server({ ...PUBLISHED, images: [pieceImage({ reason: 'Se conserva el original: la edición cambió un rostro', review: { ok: false, reasons: ['La edición cambió un rostro'] } })] });
+  await renderPieza();
+  expect(await screen.findByText('Se conserva el original: la edición cambió un rostro')).toBeOnTheScreen();
+  expect(screen.getByText('Se publica tal cual')).toBeOnTheScreen();
+  expect(screen.getByText('Comprobación no aprobada')).toBeOnTheScreen();
+  expect(screen.queryByText('Editada con IA')).toBeNull();
+  expect(screen.queryByText('Ver original')).toBeNull();
 });

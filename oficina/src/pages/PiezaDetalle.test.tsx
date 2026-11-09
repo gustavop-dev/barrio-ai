@@ -1,4 +1,5 @@
-import { screen, waitFor, within } from '@testing-library/react';
+import { CAROUSEL_IMAGES, pieceImage } from '../../../compartido/src/fixtures/imagenes';
+import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { fakeServer, SESSION_OK, type Reply } from '../test/fakeServer';
@@ -265,4 +266,111 @@ describe('Detalle de una pieza · escritorio', () => {
     expect(within(how).getByText('Variante A · Copywriter A')).toBeInTheDocument();
     expect(within(how).getByText('Variante B · Copywriter B')).toBeInTheDocument();
   });
+});
+
+
+describe('IMG-11 · imágenes de la pieza', () => {
+  it('shows a photo with its alt and reason, retaining the whole-piece veto', async () => {
+    vi.setSystemTime(new Date('2026-11-07T15:00:00Z'));
+    server({ ...SCHEDULED, image_kind: 'foto', images: [pieceImage()] });
+    renderCalendario('/calendario/pieza/p8');
+    expect(await screen.findByRole('img', { name: 'People sharing a product demonstration.' })).toHaveAttribute('src', pieceImage().url);
+    expect(screen.getByText('Se publica tal cual')).toBeInTheDocument();
+    expect(screen.getByText('Instrucción de Gustavo: úsala tal cual')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Vetar' })).toBeInTheDocument();
+  });
+
+  it('offers the original of an edited photo and retries a failed private image', async () => {
+    server({ ...PUBLISHED, images: [pieceImage({ edited: true, ai_edit: 'si', reason: 'Más luz', review: { ok: true } })] });
+    const user = userEvent.setup();
+    renderCalendario('/calendario/pieza/p7');
+    const image = await screen.findByRole('img', { name: 'People sharing a product demonstration.' });
+    expect(screen.getByText('Más luz')).toBeInTheDocument();
+    expect(screen.getByText('Comprobación aprobada')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Ver original' }));
+    expect(screen.getByAltText('Original de la foto. People sharing a product demonstration.')).toHaveAttribute('src', '/api/v1/galeria/f1/imagen');
+    await user.click(screen.getByRole('button', { name: 'Ver editada' }));
+    fireEvent.error(image);
+    expect(screen.getByText('No se pudo cargar la imagen')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Reintentar' }));
+    expect(screen.getByRole('img', { name: 'People sharing a product demonstration.' })).toHaveAttribute('src', pieceImage().url);
+    expect(screen.queryByRole('button', { name: 'Vetar' })).toBeNull();
+  });
+
+  it('shows an infographic with its template and actual checklist', async () => {
+    server({ ...PUBLISHED, image_kind: 'infografia', images: [pieceImage({ ...CAROUSEL_IMAGES[1]!, kind: 'infografia' })] });
+    renderCalendario('/calendario/pieza/p7');
+    expect(await screen.findByText('Infografía')).toBeInTheDocument();
+    expect(screen.getByText('Plantilla: Pasos')).toBeInTheDocument();
+    expect(screen.getByText('1. Correcto: Texto legible')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: CAROUSEL_IMAGES[1]!.alt })).toBeInTheDocument();
+  });
+
+  it('orders and browses the carousel and exposes only the active slide to screen readers', async () => {
+    server({ ...PUBLISHED, image_kind: 'carrusel', images: [...CAROUSEL_IMAGES].reverse() });
+    const user = userEvent.setup();
+    renderCalendario('/calendario/pieza/p7');
+    expect(await screen.findByText('1/3')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: CAROUSEL_IMAGES[0]!.alt })).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: CAROUSEL_IMAGES[1]!.alt })).toBeNull();
+    const pager = screen.getByRole('region', { name: 'Imágenes de la pieza' });
+    Object.defineProperty(pager, 'clientWidth', { configurable: true, value: 300 });
+    fireEvent.scroll(pager, { target: { scrollLeft: 300 } });
+    expect(screen.getByText('2/3')).toBeInTheDocument();
+    expect(screen.getByRole('img', { name: CAROUSEL_IMAGES[1]!.alt })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Siguiente' }));
+    expect(screen.getByText('3/3')).toBeInTheDocument();
+    expect(screen.getByText('Plantilla: Cierre')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled();
+  });
+
+  it('keeps unsafe media URLs out of requests and shows preparation without an image', async () => {
+    server({ ...PUBLISHED, images: [pieceImage({ url: 'https://elsewhere.example/private.png' })] });
+    renderCalendario('/calendario/pieza/p7');
+    expect(await screen.findByText('No se pudo cargar la imagen')).toBeInTheDocument();
+    expect(screen.queryByRole('img', { name: pieceImage().alt })).toBeNull();
+  });
+
+  it('explains the empty preparation state', async () => {
+    server(piece({ status: 'preparing', images: [] }));
+    renderCalendario('/calendario/pieza/p7');
+    expect(await screen.findByText('La imagen aparece cuando el equipo la prepare')).toBeInTheDocument();
+  });
+});
+
+
+it('approves the received text-and-media hash without rebuilding it', async () => {
+  vi.setSystemTime(new Date('2026-11-07T15:00:00Z'));
+  const api = server({ ...SCHEDULED, status: 'awaiting_approval', action: { id: 'act-8', state: 'proposed', payload_hash: 'frozen-text-and-images' }, images: CAROUSEL_IMAGES }, {
+    'POST /api/v1/operador/actions/act-8/approve': { body: {} },
+  });
+  const user = userEvent.setup();
+  renderCalendario('/calendario/pieza/p8');
+  await user.click(await screen.findByRole('button', { name: 'Aprobar' }));
+  await waitFor(() => expect(api.find('POST', '/api/v1/operador/actions/act-8/approve')[0]?.body).toEqual({ expected_hash: 'frozen-text-and-images', note: '' }));
+});
+
+it('hides the veto after the scheduled time even if the cached action still says approved', async () => {
+  server({ ...SCHEDULED, images: [pieceImage()] });
+  renderCalendario('/calendario/pieza/p8');
+  await screen.findByTestId('piece-images');
+  expect(screen.queryByRole('button', { name: 'Vetar' })).toBeNull();
+});
+
+
+it('explains a rejected edit while showing the original that will be published', async () => {
+  server({ ...PUBLISHED, images: [pieceImage({ reason: 'Se conserva el original: la edición cambió un rostro', review: { ok: false, reasons: ['La edición cambió un rostro'] } })] });
+  renderCalendario('/calendario/pieza/p7');
+  expect(await screen.findByText('Se conserva el original: la edición cambió un rostro')).toBeInTheDocument();
+  expect(screen.getByRole('img', { name: pieceImage().alt })).toHaveAttribute('src', pieceImage().url);
+  expect(screen.getByText('Comprobación no aprobada')).toBeInTheDocument();
+  expect(screen.queryByText('Editada con IA')).toBeNull();
+  expect(screen.queryByRole('button', { name: 'Ver original' })).toBeNull();
+});
+
+it('labels the fixed brand card without claiming a dynamic visual verification', async () => {
+  server({ ...PUBLISHED, image_kind: 'tarjeta', images: [pieceImage({ kind: 'tarjeta', review: { ok: true, mode: 'fixed_brand_card' } })] });
+  renderCalendario('/calendario/pieza/p7');
+  expect(await screen.findByText('Plantilla fija de marca; sin revisión visual dinámica.')).toBeInTheDocument();
+  expect(screen.queryByText('Comprobación aprobada')).toBeNull();
 });

@@ -24,6 +24,7 @@ export function ApiImage({
   accessibilityLabel,
   recyclingKey,
   testID,
+  onError,
 }: {
   path: string | null | undefined;
   style?: StyleProp<ImageStyle>;
@@ -33,6 +34,7 @@ export function ApiImage({
   /** For recycled list cells: the photo id. */
   recyclingKey?: string;
   testID?: string;
+  onError?: () => void;
 }) {
   const source = apiImageSource(path);
   if (!source) {
@@ -52,6 +54,7 @@ export function ApiImage({
       accessible={Boolean(accessibilityLabel)}
       accessibilityLabel={accessibilityLabel}
       cachePolicy="memory-disk"
+      onError={onError}
     />
   );
 }

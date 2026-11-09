@@ -1,0 +1,157 @@
+# cubre: IMG-11, CAP-16
+# Real private bytes from seed_qa: photo (manana), infographic (aprobacion), four-slide carousel
+# (publicada8). Deep links open the same Calendario detail used by the calendar cards.
+# Selector coverage: 05-captura-envios, 10-galeria and 11-ajustes (IMG-16).
+appId: co.projectapp.office
+name: Imágenes y publicación prioritaria
+tags: [calendario, captura, imagenes]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-galeria
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-galeria
+    timeout: 30000
+
+# Photo: the original chosen for tomorrow, same whole-piece veto.
+- openLink: oficina0ff1ce://calendario/pieza/074c7c81-dfc4-59a1-8fb8-f53d6ed1ba4c
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- assertVisible: Vetar
+- scrollUntilVisible:
+    element:
+      id: piece-image-1
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: Se publica tal cual
+- assertVisible:
+    id: piece-image-1
+    text: A workshop scene provided by Gustavo, with people sharing a product demonstration.
+- takeScreenshot: 16-imagenes-01-foto
+- scrollUntilVisible:
+    element:
+      text: Foto de ejemplo para la fase 2
+    direction: DOWN
+    centerElement: true
+- assertNotVisible: Ver original
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# Infographic: actual PNG, alt and checklist, without approving or recalculating the hash.
+- openLink: oficina0ff1ce://calendario/pieza/74a9cae0-2507-5628-8dba-f09a48a4115f
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- assertVisible: Aprobar
+- scrollUntilVisible:
+    element:
+      id: piece-image-1
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 16-imagenes-02-infografia
+- scrollUntilVisible:
+    element:
+      text: 'Plantilla: Pasos'
+    direction: DOWN
+    centerElement: true
+- assertVisible: 'Texto alternativo: Three steps: name the decision, compare the options, and record the reason. Make the decision explicit.'
+- assertVisible: Comprobación aprobada
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# Carousel: four ordered slides, swipe forward and accessible buttons back/forward.
+- openLink: oficina0ff1ce://calendario/pieza/8c51152c-8ffd-53da-9b94-3664683287e1
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- assertNotVisible: Vetar
+- scrollUntilVisible:
+    element:
+      id: piece-image-count
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: 1/4
+- assertVisible:
+    id: piece-image-1
+    text: "Cover: Make the decision explicit. A small guide to comparing options."
+- assertVisible: 'Plantilla: Portada'
+- takeScreenshot: 16-imagenes-03-portada
+- swipe:
+    from:
+      id: piece-image-1
+    direction: LEFT
+- extendedWaitUntil:
+    visible: 2/4
+    timeout: 10000
+- assertVisible:
+    id: piece-image-2
+    text: "Three steps: name the decision, compare the options, and record the reason."
+- assertVisible: 'Plantilla: Pasos'
+- takeScreenshot: 16-imagenes-04-pasos
+- tapOn:
+    id: piece-image-next
+- extendedWaitUntil:
+    visible: 3/4
+    timeout: 10000
+- assertVisible:
+    id: piece-image-3
+    text: "Three steps in this guide. Keep a reason with each decision."
+- assertVisible: 'Plantilla: Número'
+- tapOn:
+    id: piece-image-next
+- extendedWaitUntil:
+    visible: 4/4
+    timeout: 10000
+- assertVisible:
+    id: piece-image-4
+    text: "Closing question: Which decision needs a reason? Start with one question."
+- assertVisible: 'Plantilla: Cierre'
+- assertVisible:
+    id: piece-image-next
+    enabled: false
+- takeScreenshot: 16-imagenes-05-cierre
+- tapOn:
+    id: piece-image-prev
+- extendedWaitUntil:
+    visible: 3/4
+    timeout: 10000
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# The interpretation in Lo que enviaste, with evidence and the actual forecast, no urgency input.
+- tapOn:
+    id: capture-button
+- extendedWaitUntil:
+    visible:
+      id: capture-historial
+    timeout: 15000
+- tapOn:
+    id: capture-historial
+- scrollUntilVisible:
+    element:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: 'Saldrá lo antes posible · fecha prevista: .*08:30.*'
+- assertVisible: '«Publícalo lo antes posible\.»'
+- assertVisible: 'Primer hueco libre; sujeto a verificación, aprobación y veto\.'
+- takeScreenshot: 16-imagenes-06-lo-antes-posible
