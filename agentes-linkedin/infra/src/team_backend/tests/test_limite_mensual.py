@@ -33,7 +33,9 @@ class MonthlyLimitTests(TransactionTestCase):
         self.spend(9,providers.limit_window_start('anthropic')-timedelta(days=3))
         with patch.dict(os.environ,{'ANTHROPIC_LIMIT_WINDOW':'total'}):
             self.assertIsNone(providers.limit_window_start('anthropic'))
-            with self.assertRaisesRegex(ValueError,'Límite local de anthropic alcanzado; incluye'):
+            with self.assertRaisesRegex(ValueError,
+                    r'^Límite local de anthropic alcanzado; faltan 1\.000000 USD; límite 10, gastado 9 '
+                    r'\(incluye reservas pendientes\); reserva 2 USD\.$'):
                 providers.reserve('anthropic','prueba',2)
 
     def test_the_month_starts_at_local_midnight(self):

@@ -1,6 +1,6 @@
 import type { ProfileAction, ProfileProposal, ProfileSection } from '../api/perfil';
 export const PROFILE_ACTION_LABELS: Record<ProfileAction, string> = {
-  accept: 'Aceptar propuesta', adjust: 'Pedir ajuste', later: 'Más tarde', decline: 'No lo haré',
+  prepare_assets: 'Generar fotos y banner', accept: 'Aceptar propuesta', adjust: 'Pedir ajuste', later: 'Más tarde', decline: 'No lo haré',
   applied: 'Hecho, lo apliqué', changed: 'Lo cambié con otro texto', choose_A: 'Elegir A', choose_B: 'Elegir B', verify: 'Comprobar por relectura',
 };
 export const PROFILE_ASSET_LABELS: Record<string, string> = {
@@ -25,6 +25,7 @@ export function applicationLabel(section: ProfileSection): string {
 }
 export const needsProfileNote = (action: ProfileAction) => ['adjust', 'decline', 'changed'].includes(action);
 export function sectionActions(section: ProfileSection, proposal: ProfileProposal): ProfileAction[] {
+  if (proposal.assets_pending) return [];
   if (['queued', 'running', 'cancelled', 'superseded'].includes(proposal.state)) return [];
   const result: ProfileAction[] = ['adjust', 'decline'];
   if (section.id === 'photo' && section.readiness === 'ready' && proposal.photo_choice) result.unshift(proposal.photo_choice === 'A' ? 'choose_B' : 'choose_A');

@@ -2,9 +2,9 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.2-fase8` · SHA-256 `878304aaa2e762f31295ea70798e8495e4f159a4075a866345fed0558a2e6df5`.
+Versión `6.3-fase8-assets` · SHA-256 `278180911473a025409180d98f4e58e6f3701e491faefdfb53ce290e864c2d49`.
 
-46 nodos (46 activos), 69 aristas y 13 ciclos.
+46 nodos (46 activos), 70 aristas y 14 ciclos.
 
 Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes, comunidad mensual y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. Las variantes A/B de redacción comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
@@ -121,7 +121,7 @@ flowchart TD
   perfil -->|"perfil_revision_copy · call · ≤2"| revision_perfil
   perfil -->|"perfil_web · call · ≤1"| investigacion_web
   perfil -->|"perfil_editar_persona · call · ≤6"| editor_visual
-  perfil -->|"perfil_render · call · ≤2"| editor_visual
+  perfil -->|"perfil_render · call · ≤6"| editor_visual
   perfil -->|"perfil_revision_visual · call · ≤6"| revision_visual
   capturas -->|"captura_perfil · handoff · ≤1"| perfil
   perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
@@ -140,6 +140,7 @@ flowchart TD
   director_editorial -->|"evidencia_comunidad · call · ≤2"| evidencia_compartida
   director_editorial -->|"leer_comunidad · call · ≤16"| estudio_comunidad
   director_editorial -->|"analizar_comunidad · call · ≤2"| analista_barrio_resultados
+  perfil -->|"perfil_revision_assets · call · ≤1"| revision_perfil
 ```
 
 ## Pieza diaria
@@ -457,7 +458,7 @@ flowchart TD
   perfil -->|"perfil_revision_copy · call · ≤2"| revision_perfil
   perfil -->|"perfil_web · call · ≤1"| investigacion_web
   perfil -->|"perfil_editar_persona · call · ≤6"| editor_visual
-  perfil -->|"perfil_render · call · ≤2"| editor_visual
+  perfil -->|"perfil_render · call · ≤6"| editor_visual
   perfil -->|"perfil_revision_visual · call · ≤6"| revision_visual
   perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
 ```
@@ -520,6 +521,31 @@ flowchart TD
   end
   investigador_lider -->|"evidencia_experimento · call · ≤3"| evidencia_compartida
   investigador_lider -->|"evaluar_experimento · call · ≤1"| analista_experimentos
+```
+
+## Solo fotos y banner de Perfil
+
+Estado: `active`. Orquestador: `perfil`.
+
+- `prepare_profile_assets`: Acción explícita en app/PWA o command perfil_assets sobre propuesta existente.
+
+Comparte el límite de 10 USD con `perfil_periodico` de la misma propuesta, incluidos gasto y reservas previos. No crea saldo nuevo.
+
+```mermaid
+flowchart TD
+  classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
+  subgraph grupo_editorial["editorial"]
+    revision_visual["Revisión de imagen · gate"]
+    editor_visual["Editor visual · specialist"]
+  end
+  subgraph grupo_estrategia["estrategia"]
+    perfil["Perfil · orchestrator"]
+    revision_perfil["Revisión de fundamentos del perfil · specialist"]
+  end
+  perfil -->|"perfil_editar_persona · call · ≤6"| editor_visual
+  perfil -->|"perfil_render · call · ≤6"| editor_visual
+  perfil -->|"perfil_revision_visual · call · ≤6"| revision_visual
+  perfil -->|"perfil_revision_assets · call · ≤1"| revision_perfil
 ```
 
 ## Contratos referenciados
@@ -612,6 +638,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `community_read` | `dataclass` | [team_backend.comunidad.PublicRead](../../agentes-linkedin/infra/src/team_backend/comunidad.py) |
 | `community_read_result` | `dataclass` | [team_backend.comunidad.ReadResult](../../agentes-linkedin/infra/src/team_backend/comunidad.py) |
 | `community_analysis` | `json_schema` | [team_backend.comunidad.ANALYSIS_SCHEMA](../../agentes-linkedin/infra/src/team_backend/comunidad.py) |
+| `profile_assets_request` | `json_schema` | [team_backend.perfil_assets.REQUEST_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_assets.py) |
 
 ## Aristas y contratos
 
@@ -686,3 +713,4 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `evidencia_comunidad` | `community_study` | `community_study` |
 | `leer_comunidad` | `community_read` | `community_read_result` |
 | `analizar_comunidad` | `community_study` | `community_study` |
+| `perfil_revision_assets` | `profile_assets_request` | `profile_review` |

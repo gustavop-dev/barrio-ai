@@ -1,5 +1,20 @@
 # Fase 8: entrega y verificación por Claude
 
+## Corrección de producción tras #88 y #89: assets sin recomprar texto
+
+Implementada en `fix-perfil-assets`; **pendiente de CI/QA y despliegue**. En esta entrega no se usó red ni se ejecutaron tests, builds, migraciones, commands operativos, commit o push. Se actualizó el Mermaid con `scripts/grafo/mermaid.py` (generación documental stdlib).
+
+- Reserva por payload en `connectors_images`: referencias reducidas a 1024 px, prompt efectivo, tamaño y calidad de salida; `EDIT_PRICES` ×1,5 y mínimo 0,05 USD. Conserva conciliación/retención ante incertidumbre y muestra el déficit del límite mensual. Test de transporte fake: gasto previo de embeddings 0,036 USD + A/B/banner dentro de 1 USD.
+- `prepare_profile_assets`, en el nuevo ciclo `perfil_assets`: máximo 10 herramientas / 7 llamadas a proveedores, revisión photo/banner de 1600 tokens, A/B/banner secuenciales. Sin copy, positioning, web ni lectura de LinkedIn. Reutiliza borrador/checkpoints confirmados y actualiza la misma propuesta y versión. App/PWA: **Generar fotos y banner**; servidor: `python manage.py perfil_assets 8aa8c51c` (prefijo único, solo encola).
+- Presupuesto compartido con `perfil_periodico`: mantiene el bucket original de **10 USD**, incluida la factura de texto y las reservas inciertas antiguas. El nuevo ciclo no migra ni reinicia el ledger previo; puede atender una propuesta de un despliegue anterior. Límites del proveedor permanecen intactos. Cada reserva comprueba el total de la familia bajo el mismo lock del usage ledger.
+- Preguntas: transiciones a `superseded`/`cancelled` retiran pendientes con `withdrawn`; reconciliación por dueño/sección y clave evita duplicadas entre propuestas. Limpieza idempotente de datos existentes: `python manage.py perfil_preguntas`. Conserva historial y preguntas respondidas/rechazadas. No requiere migración de esquema.
+
+QA específico pendiente: `test_perfil_assets`, `test_perfil`, `test_imagenes`, `test_orquestacion`, `test_grafo`, `test_rediseno`, `test_oficina`, `test_seed_qa`; tests `ProfileProposal` en PWA/app y lógica compartida. Todo con fakes o MockTransport. Revisar que no hay llamadas a copy/positioning/web, que A queda guardada antes de B, que un fallo de B permite banner, que un segundo clic no crea otro job/asset, que notas v5 llegan a la revisión y que el saldo previo limita el nuevo ciclo. Verificar el command de limpieza dos veces y aislamiento por dueño, con educación/idiomas en dos idiomas. `18-perfil` comprueba que la propuesta sintética completa no ofrece generación adicional; el envío y bloqueo del botón pendiente se cubren con los fake servers de ambos clientes.
+
+Riesgos operativos: estimación de tokens/precios basada en el contrato local, sin contraste en red con `OPENAI_IMAGE_MODEL`; comparar con usage real antes de ajustar constantes. Una respuesta ambigua conserva reserva y no se reintenta por doble clic. Sin borrador privado recuperable o si el banner no cabe, el paso visual queda parcial y conserva el resto del texto. El cambio de grafo mantiene la política existente de detener reanudaciones antiguas; la continuación de assets usa su propio checkpoint con presupuesto compartido.
+
+Selección para esta corrección: **`[qa: 04 10 16-imagenes 17-mapa-equipo 18-perfil]`**.
+
 Implementación de EST-01–05, GAL-08 y TUR-18 en `feat/fase8-perfil`, sobre fases 3b y 7. Solo se editaron archivos: no hubo red, instalaciones, tests, builds, migraciones ejecutadas, commits, push, deploy ni generación de imágenes reales. El Mermaid se regeneró con el generador stdlib del repositorio. Las fichas del catálogo figuran como **funciona** por implementación; CI/QA y activación siguen pendientes.
 
 El ciclo `perfil_periodico` pertenece a Perfil. Recupera biblioteca original, hechos confirmados y publicaciones propias con enlaces/métricas fechadas; usa posicionamiento, copy, revisión, web pública, lectura propia y visual como herramientas declaradas. Publica el paquete privado en Tu turno y emite `profile_task`. Ninguna ruta escribe el perfil de LinkedIn.

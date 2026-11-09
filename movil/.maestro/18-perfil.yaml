@@ -89,6 +89,13 @@ tags: [perfil, galeria, turno]
     centerElement: true
 - tapOn:
     id: profile-open
+- extendedWaitUntil:
+    visible: 'Secciones listas: .* · Assets descargables: 3'
+    timeout: 15000
+- assertNotVisible:
+    id: profile-prepare-assets
+# This seeded proposal already has A, B and banner. Missing-assets submission and
+# disabled/polling states use explicit fake servers in ProfileProposal.test.tsx.
 - scrollUntilVisible:
     element:
       text: Checklist por sección

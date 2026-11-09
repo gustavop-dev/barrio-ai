@@ -199,6 +199,30 @@ def editorial_action(piece):return piece.proposals.get()
 
 
 class ImageProviderContracts(PublicationBase):
+    def test_profile_edits_fit_one_dollar_month_after_embeddings_and_report_shortfall(self):
+        raw=png((1024,1024));calls=[]
+        def handler(request):
+            calls.append(request)
+            self.assertEqual(request.content.count(b'name="image[]"'),2 if len(calls)<3 else 3)
+            return httpx.Response(200,json={'data':[{'b64_json':base64.b64encode(raw).decode()}],
+                'usage':{'input_tokens_details':{'text_tokens':500,'image_tokens':1200},'output_tokens':1056}})
+        with patch.dict(os.environ,{'LIVE_PROVIDERS':'true','OPENAI_API_KEY':'fake-only','OPENAI_LIMIT_USD':'1'}), \
+             patch.object(connectors_images,'TRANSPORT',httpx.MockTransport(handler)):
+            rid=providers.reserve('openai','embedding',Decimal('.036'));providers.settle(rid,'complete',{},Decimal('.036'))
+            for kind in ('A','B','banner'):
+                refs={'01':raw,'03':raw}
+                if kind=='banner':refs['02']=raw
+                connectors_images.ImageConnector().edit_profile(refs,'Only the authorized edit',kind)
+            self.assertEqual(len(calls),3)
+            with db.connect() as c:
+                rows=c.execute("SELECT * FROM usage_ledger WHERE purpose='profile-image-edit'").fetchall()
+            self.assertEqual(len(rows),3)
+            self.assertTrue(all(r['status']=='complete' and r['actual_usd']==Decimal('.05674') for r in rows))
+            self.assertTrue(all(Decimal('.05')<=r['reserved_usd']<Decimal('.25') for r in rows))
+            with self.assertRaisesRegex(ValueError,r'faltan [0-9.]+ USD; límite 1, gastado'):
+                providers.reserve('openai','profile-image-edit',Decimal('1'))
+            self.assertEqual(len(calls),3)
+
     def test_openai_multipart_usage_and_never_retry_timeout(self):
         calls=[];raw=png((1024,1024))
         def handler(request):
@@ -208,7 +232,7 @@ class ImageProviderContracts(PublicationBase):
             return httpx.Response(200,json={'data':[{'b64_json':base64.b64encode(raw).decode()}],
                 'usage':{'input_tokens_details':{'text_tokens':100,'image_tokens':200},'output_tokens':30}})
         # PublicationBase caps editorial at $1. Images now count there too: leave room for the
-        # settled first edit plus the next $1 reservation so this test actually reaches the timeout.
+        # settled first edit plus the next estimated reservation so this test actually reaches the timeout.
         env={'LIVE_PROVIDERS':'true','OPENAI_API_KEY':'fake-only','OPENAI_LIMIT_USD':'10','IMAGE_DAILY_USD':'10',
              'EDITORIAL_DAILY_LLM_USD':'10'}
         with patch.dict(os.environ,env),patch.object(connectors_images,'TRANSPORT',httpx.MockTransport(handler)):
@@ -223,7 +247,9 @@ class ImageProviderContracts(PublicationBase):
             with db.connect() as c:
                 uncertain=c.execute("SELECT * FROM usage_ledger WHERE request_hash='second'").fetchone()
             self.assertEqual(uncertain['status'],'uncertain')
-            self.assertEqual(uncertain['reserved_usd'],connectors_images.EDIT_RESERVATION)
+            self.assertEqual(uncertain['reserved_usd'],row['reserved_usd'])
+            self.assertGreaterEqual(uncertain['reserved_usd'],connectors_images.EDIT_MINIMUM)
+            self.assertLess(uncertain['reserved_usd'],Decimal('0.25'))
             self.assertIsNone(uncertain['actual_usd'])
             # Re-invoking the same request is also blocked before HTTP, without a new ledger row.
             with self.assertRaisesRegex(ValueError,'solicitud idéntica pendiente o incierta'):

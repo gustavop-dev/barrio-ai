@@ -18,11 +18,12 @@ export interface ProfileAsset {
 }
 export interface ProfileProposal {
   id: string; version: number; revision: number; mode: string; state: string;
+  assets_pending?: boolean; can_prepare_assets?: boolean;
   sections: ProfileSection[]; photo_choice: '' | 'A' | 'B'; findings: string[];
   microphone_note: string; markdown: string; document_url: string; references_valid: boolean;
   assets: ProfileAsset[]; references: { id: string; role: string; note: string; version: number; url: string }[];
 }
-export type ProfileAction = 'accept' | 'adjust' | 'later' | 'decline' | 'applied' | 'changed' | 'choose_A' | 'choose_B' | 'verify';
+export type ProfileAction = 'accept' | 'adjust' | 'later' | 'decline' | 'applied' | 'changed' | 'choose_A' | 'choose_B' | 'verify' | 'prepare_assets';
 export interface ProfileDecision { revision: number; section?: string; action: ProfileAction; note?: string }
 const path = (id: string) => `/api/v1/perfil/${encodeURIComponent(id)}`;
 export const profileKey = (id: string) => ['perfil', id] as const;
@@ -31,7 +32,7 @@ export const decideProfile = (id: string, data: ProfileDecision) => api.post<Pro
 export const profileDownload = (id: string, resource = 'documento') => api.post<{ url: string }>(`${path(id)}/descarga`, { resource });
 export function useProfile(id: string, enabled = true) {
   return useQuery({ queryKey: profileKey(id), queryFn: () => getProfile(id), enabled,
-    refetchInterval: (query) => ['queued', 'running'].includes(query.state.data?.state ?? '') ? 4000 : false });
+    refetchInterval: (query) => (query.state.data?.assets_pending || ['queued', 'running'].includes(query.state.data?.state ?? '')) ? 4000 : false });
 }
 export function useProfileDecision(id: string) {
   const client = useQueryClient();

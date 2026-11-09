@@ -7,6 +7,28 @@ import { renderAt } from '../../test/render';
 import { ProfileProposal } from './ProfileProposal';
 
 describe('Private profile proposal', () => {
+  it('queues only missing visuals and disables repeated clicks while preserving copy', async () => {
+    const user = userEvent.setup();
+    let proposal = { ...structuredClone(PROFILE_PROPOSAL), can_prepare_assets: true, assets_pending: false };
+    const server = fakeServer({
+      'GET /api/v1/auth/session': { body: SESSION_OK },
+      'GET /api/v1/perfil/profile-qa': () => ({ body: proposal }),
+      'POST /api/v1/perfil/profile-qa/decision': () => {
+        proposal = { ...proposal, assets_pending: true };
+        return { body: proposal };
+      },
+    });
+    renderAt('/perfil', [{ path: '/perfil', element: <ProfileProposal id="profile-qa" /> }]);
+    await user.click(screen.getByRole('button', { name: 'Abrir propuesta de perfil' }));
+    await user.click(await screen.findByRole('button', { name: 'Generar fotos y banner' }));
+    expect(await screen.findByText('Preparando fotos y banner; el texto se conserva.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Generar fotos y banner' })).toBeDisabled();
+    expect(server.requests.filter((r) => r.method === 'POST').map((r) => r.body)).toEqual([
+      { revision: 1, action: 'prepare_assets' },
+    ]);
+    expect(proposal.sections).toEqual(PROFILE_PROPOSAL.sections);
+  });
+
   it('shows per-section citations and records applied without claiming checked', async () => {
     const user = userEvent.setup();
     let proposal = structuredClone(PROFILE_PROPOSAL);

@@ -8,7 +8,7 @@ Contract: https://developer.unipile.com/v2.0/reference/api-usage.md (consulted 2
 import os
 import re
 import uuid
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 import httpx
 
@@ -256,10 +256,13 @@ class FakeConnector:
     def seed_user(self,public_id,display_name,posts=()):
         user={'id':'ACo'+public_id,'public_identifier':public_id,'display_name':display_name,'profile_url':'https://www.linkedin.com/in/'+public_id}
         self.state['users'][public_id]=user;self.state['users'][user['id']]=user
+        # Seed recent posts once; a fixed calendar date eventually empties the
+        # autopilot's 72-hour candidate window. Preserve chronological order.
+        posts=tuple(posts);now=datetime.now(timezone.utc)
         for i,text in enumerate(posts):
             pid=f'activity:{public_id}-{i}'
             self.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':text,
-                'created_at':datetime(2026,11,6,12,i,tzinfo=timezone.utc).isoformat(),'author':user,'comments_counter':0,
+                'created_at':(now-timedelta(minutes=len(posts)-i)).isoformat(),'author':user,'comments_counter':0,
                 'reactions_counter':[],'reposts_counter':0,'user_reacted':False,'is_repost':False}
             self.state['comments'][pid]=[]
         return user

@@ -146,8 +146,14 @@ class ProfileContentTests(SimpleTestCase):
                 patch.object(providers,'reserve',return_value='fake-ledger') as reserve,patch.object(providers,'settle') as settle:
             result=connectors_images.ImageConnector().edit_profile({role:synthetic() for role in ('01','02','03')},'Only person edits','fake-request')
         self.assertEqual(result,output.getvalue());self.assertEqual(len(calls),1)
-        self.assertEqual(reserve.call_args.args,('openai','profile-image-edit',Decimal('2')))
-        self.assertEqual(settle.call_args.args[1],'complete')
+        # 3 x (65 + 129 x 4) image tokens, 17 prompt bytes + 32 framing,
+        # 1056 medium output tokens; EDIT_PRICES x 1.5, rounded up to microdollars.
+        reserve.assert_called_once_with('openai','profile-image-edit',Decimal('0.089873'),request_hash='fake-request',
+            metadata={'estimate':{'text_tokens':49,'image_tokens':1743,'output_tokens':1056,
+                'dimensions':[[800,800],[800,800],[800,800]],'size':'1024x1024','quality':'medium',
+                'margin':'1.5','minimum_usd':'0.05'}})
+        settle.assert_called_once_with('fake-ledger','complete',
+            {'input_tokens_details':{'text_tokens':100,'image_tokens':200},'output_tokens':30},Decimal('0.0037'))
 
     def test_vision_requires_all_eight_points_and_identity_despite_positive_overall_verdict(self):
         result={'ok':True,'checks':[{'point':n,'ok':True,'reason':'Synthetic'} for n in range(1,9)],
@@ -311,7 +317,7 @@ class ProfileContentTests(SimpleTestCase):
         self.assertEqual(perfil.add_months(date(2026,8,31),12),date(2027,8,31))
 
 
-class ProfileCycleTests(MediaMixin,OperatorBase):
+class ProfileBase(MediaMixin,OperatorBase):
     def setUp(self):
         super().setUp();self.use_media()
         for target in ('knowledge.providers.claude','httpx.Client.send','team_backend.connectors.get_connector'):
@@ -339,6 +345,8 @@ class ProfileCycleTests(MediaMixin,OperatorBase):
             'image_client':FakeProfileImages(),'image_checker':vision}
         options.update(kwargs);return perfil.run(job,**options)
 
+
+class ProfileCycleTests(ProfileBase):
     def test_full_cycle_has_all_sections_assets_citations_and_no_linkedin_write(self):
         self.references();proposal=self.proposal();client=FakeProfileImages()
         result=self.run_proposal(proposal,image_client=client)

@@ -132,6 +132,11 @@ def validate_graph(graph):
         check(cycle.get('status') in ('active', 'planned'), f'ciclo {cid}: status inválido')
         check(owner in cycle['participants'] and all(p in nodes for p in cycle['participants']), f'ciclo {cid}: participantes inválidos')
         check(cycle.get('triggers') and cycle.get('ledger') and cycle.get('limits'), f'ciclo {cid}: falta trigger/ledger/límites')
+        if cycle.get('budget_parent_cycle'):
+            parent=cycles.get(cycle['budget_parent_cycle'])
+            check(parent is not None and parent['orchestrator']==owner and parent['limits']['cost_period']=='cycle',
+                  f'ciclo {cid}: presupuesto padre inválido')
+            check(cycle['limits']['cost_cap_usd']<=parent['limits']['cost_cap_usd'], f'ciclo {cid}: amplía presupuesto padre')
         check(cycle['limits'].get('max_depth') == 1, f'ciclo {cid}: profundidad máxima debe ser 1')
         if cycle['ledger']['status'] == 'runtime':
             limits = cycle['limits']

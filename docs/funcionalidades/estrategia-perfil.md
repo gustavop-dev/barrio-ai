@@ -29,6 +29,27 @@ Cada recomendación del Markdown, incluidas conservar una sección, elegir foto 
 
 No poder leer la sección actual no impide proponer una nueva: se indica «No pude leer tu versión actual; compárala tú». Un título, fecha o cifra ausente se conserva como placeholder explícito junto con su pregunta; el resto del copy sigue disponible. Las omisiones justificadas (`not_applicable` o `missing`, sin copy ni recomendación) no exigen inventar citas. La web es opcional y las fotos A/B se generan y revisan independientemente del banner. Los datos pendientes se muestran aparte de las secciones listas y de los assets descargables.
 
+## Continuar solo fotos y banner (tras #88 y #89)
+
+Cuando una propuesta completa ya tiene texto pero faltan A, B o banner, la app y la PWA ofrecen **Generar fotos y banner** dentro de la propuesta. Encola `prepare_profile_assets`; conserva el UUID, la versión, el copy de las otras secciones y sus decisiones/aplicaciones. El cliente muestra el progreso y consulta la misma propuesta. No vuelve a llamar a copy, positioning, web ni al conector de LinkedIn.
+
+`perfil_assets` es un ciclo acotado declarado en el grafo: una revisión pequeña (máximo 1600 tokens de salida) de photo/banner, seguida de edición → render → visión → guardado para A, B y banner, en ese orden. Reutiliza las unidades citadas, evidencia pública necesaria y borrador privado existente; incorpora `marca.*`, un `render.banner_fit` recalculado sobre el texto exacto y las notas vigentes de referencias (incluidas las decisiones v5). Un rechazo de marca no obliga a comprar otra redacción: el borrador se recupera del checkpoint. Si el texto no cabe o sigue sin respaldo, esa sección queda bloqueada.
+
+Cada recurso tiene su propia reserva y revisión. Un error de edición, render o visión no descarta los otros. Los retratos aprobados acompañan al banner en previews; no se ofrece como listo ningún recurso sin visión aprobada. El estado de la misma propuesta termina en `ready` o `partial`, con las incidencias de cada recurso. Un límite global del ciclo sí detiene nuevas llamadas.
+
+Los dos ciclos comparten **10 USD por propuesta**, sumando gasto real y reservas pendientes/inciertas, también las anteriores al despliegue. El ciclo acotado tiene como máximo 10 herramientas y 7 llamadas a proveedores; no reabre ni modifica el checkpoint antiguo cuando cambió el grafo. El UUID de job depende de propuesta, versión, referencias y marca; dos pulsaciones, o repetir el command, devuelven el mismo job. Se omiten assets ya guardados y se reutilizan ediciones confirmadas del ciclo original con inputs idénticos. Las llamadas inciertas requieren conciliación; repetir el botón no vuelve a pagarlas. Si cambiaron las referencias de recursos ya existentes, hace falta un ajuste visual para evitar atribuir aprobaciones antiguas a fotos nuevas.
+
+La reserva de OpenAI reemplaza los importes fijos de 1 USD (general) y 2 USD (Perfil). Calcula tokens de cada referencia **después de thumbnail a 1024 px**, prompt enviado y salida según tamaño/calidad, aplica `EDIT_PRICES`, margen **×1,5** y mínimo **0,05 USD**. La base local de entrada es 65 tokens más 129 por tile de 512 px; el prompt usa una cota conservadora por bytes UTF-8 más encuadre; salida medium 1024×1024: 1056 tokens. Son estimaciones locales, no tarifas/modelos comprobados en red en esta entrega. La respuesta concilia con `usage`; incertidumbre conserva la reserva. Si no cabe, el mensaje muestra «faltan X USD; límite Y, gastado Z», incluyendo reservas pendientes. `OPENAI_LIMIT_USD=1` permanece mensual y no se cambia.
+
+Operación desde el servidor (encola para el worker, no ejecuta proveedores en el command):
+
+```bash
+python manage.py perfil_assets 8aa8c51c
+python manage.py perfil_preguntas
+```
+
+El primer argumento admite UUID completo o prefijo único. `perfil_preguntas` limpia de forma idempotente las preguntas históricas abiertas: usa `withdrawn`, conserva respuestas, rechazos e historial y no escribe memoria. Al cancelar o reemplazar una propuesta, sus preguntas pendientes se retiran automáticamente. Por dueño, la propuesta vigente de cada sección posee las preguntas; se deduplican también claves iguales. Esto retira formulaciones antiguas en otros idiomas sin confundir hechos distintos de la sección vigente. No hay migración de esquema nueva.
+
 ## Marca entregada y precedencia <a id="marca"></a>
 
 Fuente local leída íntegramente: [PerfilLinkedIn.dc.html](../../movil/diseno-movimiento/tableros/PerfilLinkedIn.dc.html), secciones Sistema, Foto, Portada, Juntas, Producción y Revisión. Las decisiones tercera a sexta de Gustavo prevalecen sobre el tablero: **siempre dos opciones de retrato, A en grises y B en color, para que él elija**, y banner de tinta con su figura y micrófono. Perfil propone su frase con fundamento; el copy público sigue en inglés. El tablero es una referencia de diseño con previsualización local; no implementa el pipeline de edición ni exportación.

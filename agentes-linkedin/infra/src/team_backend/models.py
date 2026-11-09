@@ -1,6 +1,6 @@
 import uuid
 from django.conf import settings
-from django.db import models
+from django.db import models, transaction
 from django.utils import timezone
 
 class ApiCredential(models.Model):
@@ -1129,6 +1129,13 @@ class ProfileProposal(models.Model):
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
     class Meta:ordering=['-created_at']
+
+    @transaction.atomic
+    def save(self,*args,**kwargs):
+        super().save(*args,**kwargs)
+        if self.state in ('superseded','cancelled'):
+            from .preguntas import withdraw_origin
+            withdraw_origin(f'perfil:{self.id}',reason='Propuesta '+self.state)
 
 
 def profile_asset_path(instance,filename):return _media_name('perfil',filename)

@@ -157,6 +157,18 @@ def effective_budget_bucket(row):
     return row.budget_bucket
 
 
+def budget_cycle_ids(row):
+    """Include legacy entries carrying only cycle_id, without rewriting durable usage."""
+    return [str(pk) for pk in CycleLedger.objects.filter(budget_bucket=row.budget_bucket).values_list('pk',flat=True)]
+
+
+def budget_usage(row):
+    bucket=effective_budget_bucket(row)
+    query=models.Q(usage__budget_bucket=bucket)
+    if row.limits.get('cost_period')!='month':query|=models.Q(usage__cycle_id__in=budget_cycle_ids(row))
+    return UsageEntry.objects.filter(query)
+
+
 def context_version(graph):
     # Pin resolved code/contracts and non-secret model/policy overrides. A deploy
     # cannot change a running plan's schemas, model or repair policy invisibly.
@@ -182,7 +194,7 @@ class Runtime:
         self.ordinals = {}
 
     @classmethod
-    def open(cls, cycle, key, user, job=None, facts=None, plan=None):
+    def open(cls, cycle, key, user, job=None, facts=None, plan=None, *, budget_parent=None):
         graph = load_graph()
         definition = next((c for c in graph['cycles'] if c['id'] == cycle), None)
         if not definition or definition['status'] != 'active' or definition['ledger']['status'] != 'runtime':
@@ -193,6 +205,13 @@ class Runtime:
         local = timezone.localtime(timezone.now(), ZoneInfo('America/Bogota'))
         period = limits.get('cost_period', 'cycle')
         bucket = f'{cycle}:{local:%Y-%m}' if period == 'month' else f'{cycle}:{key}'
+        parent_cycle=definition.get('budget_parent_cycle')
+        if parent_cycle:
+            if not budget_parent or budget_parent.cycle!=parent_cycle or budget_parent.owner_id!=user.pk:
+                raise UndeclaredCall('Falta el ciclo padre autorizado para compartir presupuesto')
+            bucket=budget_parent.budget_bucket
+        elif budget_parent is not None:
+            raise UndeclaredCall('Presupuesto compartido no declarado')
         ledger, _ = CycleLedger.objects.get_or_create(cycle=cycle, key=key, defaults={
             'owner': user, 'job': job, 'orchestrator': definition['orchestrator'],
             'graph_version': graph['graph_version'], 'graph_hash': graph_hash(graph),
@@ -204,6 +223,8 @@ class Runtime:
         runtime = cls(ledger, graph)
         if ledger.owner_id != user.pk:
             raise UndeclaredCall('La instancia pertenece a otro usuario')
+        if ledger.budget_bucket!=bucket and parent_cycle:
+            raise UndeclaredCall('El presupuesto padre de la instancia cambió')
         if ledger.graph_hash != graph_hash(graph) or ledger.task_ledger.get('context_version')!=context_version(graph):
             runtime.stop('graph_changed')
             raise CycleStopped('El checkpoint necesita migración explícita del grafo')
@@ -414,11 +435,10 @@ class Runtime:
         if spent >= Decimal(str(self.limits['cost_cap_usd'])):
             self.stop('cost_cap')
             raise CycleStopped('cost_cap')
-        if self.limits.get('cost_period') == 'month':
-            spent = amount(UsageEntry.objects.filter(usage__budget_bucket=effective_budget_bucket(row)))
-            if spent >= Decimal(str(self.limits['cost_cap_usd'])):
-                self.stop('cost_cap')
-                raise CycleStopped('cost_cap')
+        spent = amount(budget_usage(row))
+        if spent >= Decimal(str(self.limits['cost_cap_usd'])):
+            self.stop('cost_cap')
+            raise CycleStopped('cost_cap')
 
         if self.limits.get('daily_cost_cap_usd') is not None:
             day=timezone.localtime(timezone.now(),ZoneInfo('America/Bogota')).replace(hour=0,minute=0,second=0,microsecond=0)
@@ -502,10 +522,11 @@ def provider_metadata(provider, purpose, amount_usd, connection):
         runtime.stop('provider_calls', business=False)
         raise CycleStopped('provider_calls')
     spent = used['spent']
-    if runtime.limits.get('cost_period') == 'month':
-        spent = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
-            WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent
-            FROM usage_ledger WHERE usage->>'budget_bucket'=%s""", (budget_bucket,)).fetchone()['spent']
+    family=[] if runtime.limits.get('cost_period')=='month' else budget_cycle_ids(row)
+    spent = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
+        WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent
+        FROM usage_ledger WHERE usage->>'budget_bucket'=%s OR usage->>'cycle_id'=ANY(%s)""",
+        (budget_bucket,family)).fetchone()['spent']
     if spent + amount_usd > Decimal(str(runtime.limits['cost_cap_usd'])):
         runtime.stop('cost_cap')
         raise CycleStopped('cost_cap')
