@@ -135,20 +135,35 @@ describe('Sheet', () => {
 });
 
 describe('SnapSheet', () => {
-  it('keeps its scroll viewport above the bottom bar at half and full height', async () => {
+  it('preserves Calendario\'s fixed viewport and translates it at half and full height by default', async () => {
     await renderApp(
-      <SnapSheet testID="panel" label="Mesa editorial" availableHeight={800} bottom={100} onClose={() => undefined}>
+      <SnapSheet testID="panel" label="Detalle del día" availableHeight={800} bottom={100} onClose={() => undefined}>
+        <T>Todavía no hay nada programado tan lejos.</T>
+      </SnapSheet>,
+    );
+    const panel = screen.getByTestId('panel');
+    const handle = screen.getByLabelText('Altura del panel');
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 700, transform: [{ translateY: 350 }] }), { timeout: 2000 });
+    await fireEvent(handle, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 700, transform: [{ translateY: 700 * (1 - 0.9) }] }), { timeout: 2000 });
+    await fireEvent(handle, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 700, transform: [{ translateY: 350 }] }), { timeout: 2000 });
+  });
+
+  it('keeps Oficina\'s scroll viewport above the bottom bar at half and full height when requested', async () => {
+    await renderApp(
+      <SnapSheet testID="panel" label="Mesa editorial" availableHeight={800} bottom={100} onClose={() => undefined} fitViewportToSnap>
         <T>Editor visual</T>
       </SnapSheet>,
     );
     await letItOpen();
     const panel = screen.getByTestId('panel');
     const handle = screen.getByLabelText('Altura del panel');
-    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 350 }), { timeout: 2000 });
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 350, transform: [{ translateY: 0 }] }), { timeout: 2000 });
     await fireEvent(handle, 'accessibilityAction', { nativeEvent: { actionName: 'increment' } });
-    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 630 }), { timeout: 2000 });
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 630, transform: [{ translateY: 0 }] }), { timeout: 2000 });
     await fireEvent(handle, 'accessibilityAction', { nativeEvent: { actionName: 'decrement' } });
-    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 350 }), { timeout: 2000 });
+    await waitFor(() => expect(panel).toHaveAnimatedStyle({ bottom: 100, height: 350, transform: [{ translateY: 0 }] }), { timeout: 2000 });
   });
 
   it('opens at the half snap with a haptic, and a flick up takes it to the full snap with another', async () => {
