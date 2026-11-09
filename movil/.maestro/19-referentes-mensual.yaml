@@ -26,7 +26,11 @@ tags: [referentes, turno, experimentos]
     direction: DOWN
     timeout: 30000
 - assertVisible: ".*(Queda.*|Plazo terminado).*America/Bogota.*"
-- assertVisible: "5 main protegidos.*"
+- scrollUntilVisible:
+    element:
+      text: "5 main protegidos.*"
+    direction: DOWN
+    timeout: 20000
 - takeScreenshot: 19-referentes-01-pareja
 - scrollUntilVisible:
     element:
@@ -114,8 +118,17 @@ tags: [referentes, turno, experimentos]
       text: "Main QA 1"
     direction: DOWN
     timeout: 20000
-- assertVisible: "Main · Protegido"
+- scrollUntilVisible:
+    element:
+      text: "Main · Protegido"
+    direction: DOWN
+    timeout: 20000
 - assertNotVisible: "Quitar a Main QA 1"
+- scrollUntilVisible:
+    element:
+      text: "Gestionar protección de Main QA 1"
+    direction: DOWN
+    timeout: 20000
 - tapOn: "Gestionar protección de Main QA 1"
 - extendedWaitUntil:
     visible:
