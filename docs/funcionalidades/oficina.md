@@ -18,6 +18,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
 | [OFI-07](#ofi-07) | Banner de máquina o cuenta en pausa | PWA · app · backend | funciona |
 | [OFI-08](#ofi-08) | Franja sin conexión | PWA · app | funciona |
 | [OFI-09](#ofi-09) | Navegación | PWA · app | funciona |
+| [OFI-10](#ofi-10) | Editor visual como integrante de Editorial | PWA · app · backend | no implementado |
 
 ---
 
@@ -158,6 +159,27 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
   5. **Dado** cada vista de la PWA, **cuando** se abre, **entonces** el título de la pestaña es «<Vista> · 0ff1ce».
 - **Brechas código/docs:** el diseño original (`DISENO-VISTAS.md`, rama `feat/rediseno-oficina`) tenía cinco entradas en la barra inferior (Oficina, Tu turno, Calendario, Resultados, Personas); el código actual pone Galería en la barra inferior y Tu turno y Calendario arriba, como el diseño móvil de `movil/diseno-movimiento`.
 - **Cobertura QA:** OFI-09.2–3 en `movil/.maestro/02-navegacion.yaml` (barras, contador y punto, atrás de Android por el historial, una ficha con «‹», atrás y arrastre del borde, «‹ Calendario» en una pieza) · OFI-09.1, 4 y 5 son de la PWA · 2026-11-08 · pasa
+
+### OFI-10 · Editor visual como integrante de Editorial <a id="ofi-10"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** ve quién está preparando los medios de cada pieza y puede abrir la misión y actividad de ese agente.
+- **Responsable:** `editor_visual`, coordinado por `director_editorial`.
+- **Cadencia:** con cada cambio de estado/evento del trabajo visual; reutiliza la actualización de actividad de la Oficina.
+- **Tu turno:** ninguna aprobación por mostrar al rol. Sus entregables siguen EDI-21 y, para perfil, TUR-18.
+- **Datos necesarios y disponibilidad:** escena, paneles, trabajos y eventos existen; falta el rol en registro, representación y asignación de trabajos. Su definición futura se especifica en [EDI-21](motor-editorial.md#edi-21).
+- **Código:** no existe esta integración. Referencias: `team_backend/oficina_views.py`, `oficina_eventos.py`, `compartido/src/scene`, paneles de la PWA y app.
+- **Criterios de aceptación:**
+  1. **Dado** el rol registrado, **cuando** abre Editorial en la PWA o app, **entonces** aparece «Editor visual», su misión y definición accesible desde el panel, y se actualiza el número de integrantes sin sustituir a director o copywriters.
+  2. **Dado** un trabajo visual real, **cuando** se consulta, **entonces** muestra en cola, trabajando, en espera o bloqueo, con el detalle de la tarea y la pieza/propuesta de perfil asociada; si aún no hay runtime, muestra «En diseño».
+  3. **Dado** una decisión/entrega visual, **cuando** llega su evento, **entonces** se atribuye a `editor_visual` y al destinatario real. Sin datos de actividad o con fallo de consulta queda quieto y muestra el aviso existente, sin simular trabajo.
+- **Brechas código/docs:** el flujo IMG no implica por sí solo que exista un personaje y una definición de agente; esta ficha completa su visibilidad.
+- **Cobertura QA:** pendiente
+
+## Mapa declarativo del equipo
+
+[ARQ-08](arquitectura-agentes.md#arq-08), **no implementado**, añade «Mapa del equipo» en PWA y app, con grupos, conexiones, fichas de agentes, unidades y actividad. Consume el mismo registro que gobierna las llamadas y genera Mermaid (ARQ-01/07), sin mantener otro grafo en la escena.
 
 ## Retiradas
 

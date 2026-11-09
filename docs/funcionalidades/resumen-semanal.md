@@ -153,6 +153,10 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
+## Ampliación prevista de aprendizaje
+
+[BIB-07](biblioteca-equipos.md#bib-07), **no implementado**, añade criterios del curso a la interpretación semanal y referencias a los estudios de comunidad y experimentos de [OBS-03/04](observatorio-referentes.md#obs-03). Conserva los cálculos deterministas, el validador de cifras y la aprobación de orientación de SEM-06; no cambia referentes por sí mismo.
+
 ## Retiradas
 
 Ninguna.

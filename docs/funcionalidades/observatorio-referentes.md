@@ -1,16 +1,135 @@
-# Observatorio: dependencia web de fase 1 (`OBS`)
+# Observatorio: referentes y experimentos (`OBS`)
 
-El catálogo de `plan-equipos` reserva estos IDs para fases posteriores:
+Ampliación solicitada por Gustavo. Todas las fichas son **no implementado**. Base leída: `docs/plan-equipos`, commit `1ba4e43`, 8 de noviembre de 2026; revisión local, sin red ni comprobaciones contra proveedores en esta tarea.
 
-| ID | Función | Estado |
-| --- | --- | --- |
-| OBS-01 | Investigación mensual de altas, continuidad y bajas | no implementado |
-| OBS-02 | Cinco main protegidos y ventana mensual para diez plazas | no implementado |
-| OBS-03 | Evidencia de audiencia y encaje por referente | no implementado |
-| OBS-04 | Experimentos de participación con resultado medible | no implementado |
+Hoy `operador.observe` lee los posts de `Referent.active=True`; los referentes los gestiona Gustavo ([COM-10](comentarios-y-lider.md#com-10)). `red.discover` descubre personas en sus comentarios y en búsquedas configuradas; no investiga nuevos referentes. Los contratos de [Investigador](../../agentes-linkedin/equipos/observatorio/investigador_referentes.json) y [Analista](../../agentes-linkedin/equipos/observatorio/analista_barrio_resultados.json) describen más capacidades que el runtime. Este archivo especifica esa ampliación, sin cambiar las funciones existentes de observación.
+
+**Quinto addendum vinculante:** los cinco referentes actuales son `main`, protegidos: el agente nunca propone ni ejecuta su baja o sustitución. Se registran sus cinco IDs al activar; no se consultó la base en esta tarea. Los otros diez lugares se revisan mensualmente, con altas, bajas o parejas «sale X · entra Y». Gustavo decide los días 1–5; una propuesta sin respuesta se aplica al terminar el día 5 en **America/Bogota**, con recordatorios los días 1 y 4 y aviso de aplicación. Esta autorización sustituye la aprobación positiva obligatoria del diseño anterior **solo para esos diez lugares**; no se extiende a experimentos, orientación ni perfil.
+
+**Sexto addendum vinculante:** solo Gustavo puede mover, reemplazar o desproteger main desde Personas › Referentes o Tu turno. [OBS-02](#obs-02) define `protected`, autorización y auditoría del actor; el agente tampoco puede proponer cambiar esa protección. La ventana mensual siempre respeta el conjunto protegido vigente tras las decisiones de Gustavo.
+
+## Resumen
+
+| ID | Función | Dónde | Estado |
+| --- | --- | --- | --- |
+| [OBS-01](#obs-01) | Investigación mensual de altas, continuidad y bajas | PWA · app · backend | no implementado |
+| [OBS-02](#obs-02) | Cinco main protegidos y ventana mensual para diez plazas | PWA · app · backend | no implementado |
+| [OBS-03](#obs-03) | Evidencia de audiencia y encaje por referente | backend | no implementado |
+| [OBS-04](#obs-04) | Experimentos de participación con resultado medible | PWA · app · backend | no implementado |
+
+## Datos disponibles y límites de los conectores <a id="datos-conectores"></a>
+
+Esta matriz distingue **lo conectado hoy** de capacidades mencionadas en documentación local. No certifica el catálogo actual del proveedor ni permisos de una cuenta real.
+
+| Dato necesario | Unipile en el código actual | API oficial conectada hoy | Consecuencia y alternativa |
+| --- | --- | --- | --- |
+| Total de seguidores y conexiones | `own_audience`: `GET users/me`, `followers_count` y `relations_count`; corte diario `AudienceSnapshot` | Ninguno: `openid`, `profile`, `w_member_social`; sin analítica | Comparar totales con fechas y cobertura. La diferencia es crecimiento **neto**, no altas identificadas. |
+| Identidades y fecha de nuevos seguidores | **No disponibles en el conector actual**: no hay listado ni ingesta de eventos de seguidores | No hay listado. La documentación local de `memberFollowersCount` describe recuentos, no identidades, y requiere `r_member_profileAnalytics`, no concedido por esta integración | Usar nuevas personas observadas en comentarios propios e invitaciones/conexiones comprobadas. Si Gustavo aporta una identidad y evidencia de seguimiento, registrarla como dato manual fechado, sin inferir la fecha de alta. No llamar a esa muestra «todos los nuevos seguidores». |
+| Autores de comentarios | `list_comments`, `GET posts/{id}/comments`: id de comentario, texto, fecha, autor e `is_sender`; hasta 50 recientes, sin recorrer páginas. `propose_comment` lee hasta 10 | Sin lectura de comentarios implementada ni permiso de lectura general del miembro | Es la fuente identificable disponible, con cobertura parcial. No encontrar un comentario no prueba que no exista. |
+| Comentaristas propios almacenados | `PostMetric.commenters`: una entrada **por comentario**, con id de persona, nombre, `substantive`, papel y `fit` si ya era `Contact`. Cortes 24 h, 72 h y 7 d; sin texto ni id/fecha del comentario en esa lista compacta | Ninguno | Deduplicar por persona antes de medir audiencia. El estudio cualitativo requiere nuevas lecturas acotadas de textos; no reconstruirlos desde el resumen. |
+| Identidades de quienes reaccionan | **No disponibles hoy**: `_post` suma `reactions_counter`; `add_reaction` escribe una reacción propia, no lista reactores | No hay lectura de reactores en `LinkedInOfficialConnector` | Medir volumen agregado, sin asignar personas ni `fit`. La matriz local documenta lectura de reacciones accesibles como posibilidad; validar endpoint, permisos, ids y paginación e implementar el adaptador antes de incluir personas. |
+| Perfiles y encaje | `get_profile` normaliza nombre, titular, URL, ubicación, distancia y estado de relación; `red.classify` guarda `fit`, papel, modalidad, razón, confianza y fecha | `userinfo` solo se usa para identidad del titular conectado; no entrega aquí perfiles completos de su audiencia | Enriquecer solo perfiles identificados y accesibles. No hay lectura completa de experiencia, Acerca de o motivos para seguir; pedir contexto o dejar desconocido. |
+| Audiencia de referentes en el barrio | `Contact.source=commenter` y `evidence` conservan post, URL, nombre del referente y extracto; se ignoran personas ya conocidas y comentarios de menos de 80 caracteres por defecto | Ninguno | Es procedencia de descubrimiento, no prueba de llegada a la comunidad propia. Falta historial de múltiples referentes e interacciones repetidas. |
+| Interacciones, conexiones y conversaciones | Ejecuciones de comentarios, historial de contactos e invitaciones; inbox de solo lectura. Visitas al perfil: solo contador agregado consumido | Publicación propia por Posts API | Conexión no equivale a seguidor; visita no identifica una llegada. No exportar mensajes privados al estudio de lectores. |
+
+Fuentes locales: [connectors.py](../../agentes-linkedin/infra/src/team_backend/connectors.py), [connectors_linkedin.py](../../agentes-linkedin/infra/src/team_backend/connectors_linkedin.py), [metricas.py](../../agentes-linkedin/infra/src/team_backend/metricas.py), [red.py](../../agentes-linkedin/infra/src/team_backend/red.py), [métricas](../../agentes-linkedin/infra/docs/metricas-resultados.md), [matriz de herramientas](../../agentes-linkedin/arquitectura/matriz-herramientas-linkedin-v2.json) y [permisos de analítica](../../agentes-linkedin/infra/docs/herramientas-linkedin-v2.md). La matriz menciona seguidores según acceso y eventos sin integración probada; eso no habilita su uso. La API oficial de analítica, si se obtuviera, tampoco convierte un recuento en identidades ni acredita causalidad por referente.
+
+### OBS-01 · Investigación mensual de altas, continuidad y bajas <a id="obs-01"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** cada mes recibe candidatos nuevos y una revisión de los actuales, priorizando voces destacadas de su nicho que congreguen a la comunidad que quiere construir.
+- **Responsable:** `investigador_lider` coordina la revisión mensual y conserva la decisión de qué recomendar; solicita investigación a `investigador_referentes` y evidencia a `analista_barrio_resultados`, ambos especialistas según [ARQ-02/03](arquitectura-agentes.md#arq-02). No se llaman entre sí.
+- **Cadencia:** preparar evidencia al final del mes anterior y publicar el lote mensual el día 1 en America/Bogota; ventana de decisión hasta el final del día 5. Reintentos comparten periodo. Las revisiones manuales conservan versiones y las condiciones de OBS-02, sin duplicar pendientes.
+- **Tu turno:** altas, bajas solas y parejas «sale X · entra Y» para las diez plazas variables, con evidencia y plazo visible; continuidad de main informativa. Las propuestas sin respuesta cumplen OBS-02 al vencimiento.
+- **Datos necesarios y disponibilidad:** posicionamiento (`posicionamiento.py`), memoria confirmada, orientación, referentes y posts existen. Faltan investigación web, dossier mensual y experimentos; el encaje disponible es parcial según la [matriz](#datos-conectores).
+- **Dependencias:** fase de acceso web ya prevista (`web_search`, `web_fetch` para el equipo y enlaces en capturas); [BIB-02](biblioteca-equipos.md#bib-02), [ARQ](arquitectura-agentes.md) y [OBS-03](#obs-03). El fan-out/gather de investigación tiene contratos y límites ARQ-03; aquí se consume la fase web, no se define otro navegador ni otro capturador de enlaces.
+- **Código:** no existe el ciclo mensual. Referencias: `team_backend/operador.py: observe`, `red.py: discover/classify`, `posicionamiento.py`, `knowledge/memory.py`.
+- **Criterios de aceptación:**
+  1. **Dado** el inicio del mes y contexto vigente de Gustavo, **cuando** investiga, **entonces** el dossier identifica las versiones de posicionamiento, memoria y orientación usadas y explica para cada candidato su nicho, audiencia observada, relación con los objetivos y aporte posible de Gustavo, con URLs y fechas.
+  2. **Dado** candidatos alineados, **cuando** los prioriza, **entonces** distingue «Top Voice verificado» de «voz destacada del nicho»; la insignia solo se afirma con fuente fechada. Ordena por encaje y evidencia de audiencia antes que por seguidores, prioriza top voices pertinentes y permite pares o cuentas pequeñas mejor alineadas.
+  3. **Dado** referentes actuales y resultados de OBS-03, **cuando** revisa, **entonces** los cinco main figuran «Protegido: mantener», nunca como bajas o salientes. Los variables reciben «mantener», «proponer baja» o «seguir midiendo», con ventana/muestra/exposición/límites. Un corte vacío o fallo de lectura no justifica baja por rendimiento.
+  4. **Dado** un candidato nuevo sin resultados propios, **cuando** propone el alta, **entonces** la presenta como hipótesis sustentada en su contenido y muestra pública de audiencia, con un experimento propuesto; no le atribuye llegadas inexistentes.
+  5. **Dado** 15 activos y un candidato mejor sustentado, **cuando** presenta el dossier, **entonces** propone una única pareja «sale X · entra Y» cuyo saliente es variable, o deja el candidato en reserva; no ejecuta desde la investigación. Al comenzar con cinco main prioriza altas útiles hasta diez variables, sin obligación de llenar plazas ni cambiar main.
+  6. **Dado** web inaccesible, falta de presupuesto o cero candidatos verificables, **cuando** acaba la revisión, **entonces** guarda «Investigación incompleta» o «Sin nuevas propuestas», las fuentes disponibles y lo pendiente; no inventa resultados ni repite tarjetas al reintentar.
+- **Brechas código/docs:** el contrato del investigador ya habla de descubrimiento amplio, pero `observe` solo lee la lista aprobada; todavía no hay investigación mensual ni acceso web integrado.
+- **Cobertura QA:** pendiente
+
+### OBS-02 · Cinco main protegidos y ventana mensual para diez plazas <a id="obs-02"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** conserva sus cinco referentes principales y revisa los diez lugares variables durante los primeros cinco días; conoce de antemano qué se aplicará si no responde.
+- **Responsable:** `investigador_lider` presenta cambios variables; Gustavo aprueba/rechaza/edita y es el único que puede mover, reemplazar o desproteger un main. Backend valida actor y aplica por decisión humana o por vencimiento autorizado solo para variables. El investigador especialista no aplica cambios. Operación lee la lista resultante.
+- **Cadencia:** lote mensual publicado el día 1; recordatorios días 1 y 4, 09:00 America/Bogota; cierre exclusivo a las 00:00 del día 6, equivalente al final del día 5. No usar UTC ni otra zona configurada para calcular este plazo.
+- **Tu turno:** [TUR-20](tu-turno.md#tur-20), plazo y efecto del silencio explícitos. Aceptar aplica; rechazar impide aplicar; editar permite guardar/aplicar la versión revisada. Pedir ajuste o posponer es respuesta y bloquea aplicación por silencio de esa propuesta. Gustavo gestiona main mediante acción propia en **Personas › Referentes o Tu turno**, fuera del lote automático; nunca recibe una propuesta del agente para modificar su protección.
+- **Datos necesarios y disponibilidad:** `Referent` y CRUD existen (`active`, `created_by`); no hay `protected` ni auditoría de cambios de protección. Faltan lote/versiones, exposición en Tu turno, plazo/recordatorios, decisiones y validación transaccional. El bootstrap debe comprobar exactamente los cinco actuales antes de habilitar automatismo.
+- **Código:** no existe esta compuerta. Referencias: `models.Referent`, `operador.add_referent`, gestión actual [COM-10](comentarios-y-lider.md#com-10).
+- **Modelo propuesto:** `Referent.protected: boolean`, false para nuevos variables; los **cinco actuales** se migran a true con IDs estables. Main significa protegido; la pertenencia no depende del orden de la lista ni del rendimiento. Historial inmutable por cambio: referente/cuenta, operación, `active`/`protected` y ubicación antes/después, actor humano autenticado e ID, fecha/hora, origen Personas o Tu turno, motivo y correlación/versión; reemplazos enlazan saliente/entrante en una transacción. La migración se identifica como migración bajo el mandato de Gustavo, no como un clic suyo. Agentes/jobs no pueden escribir la protección ni suplantar actor enviando un `actor_id`; las credenciales técnicas y el plazo solo autorizan cambios variables. Auditar también intentos denegados.
+- **Capacidad tras una decisión humana:** cinco main iniciales y diez plazas variables, máximo 15. Solo Gustavo puede reordenar/mover, reemplazar, proteger o desproteger desde ambos accesos. Un reemplazo de main transfiere protección al elegido atómicamente. Una desprotección explícita puede dejar menos de cinco main: para mantenerlo activo necesita una plaza variable libre; si no la hay, Gustavo indica qué variable retirar o archiva al saliente. No se fuerza otra baja ni se llena automáticamente una plaza main vacante. Proteger un variable libera su plaza variable y requiere plaza main disponible o reemplazo explícito, con máximo cinco main y diez variables. Estas acciones invalidan propuestas incompatibles pendientes; ninguna permite al agente alterar el conjunto protegido vigente.
+- **Criterios de aceptación:**
+  1. **Dado** el conjunto main protegido vigente, **cuando** cualquier agente, revisión mensual, sustitución automática o vencimiento intenta proponer su baja/swap, moverlo, desactivarlo o cambiar `protected`, **entonces** backend lo rechaza, audita el intento y conserva protección/estado. Ni el orquestador ni Jev pueden convertirlo en variable para sortear la regla; solo una acción explícita autenticada de Gustavo puede cambiarlo.
+  2. **Dado** 14 activos, **cuando** aprueba un alta, **entonces** quedan 15; si dos altas compiten por el último lugar, solo una se aplica y la otra muestra «Ya tienes 15 referentes activos; elige una baja».
+  3. **Dado** una pareja «sale X · entra Y» válida con X variable, **cuando** Gustavo la aprueba o vence sin respuesta, **entonces** baja/alta se aplican juntas, conservando intactos los main vigentes y como máximo diez variables/15 totales. Alta sola y baja sola son tipos distintos; una alta no implica eliminar a otra persona.
+  4. **Dado** una baja variable autorizada, **cuando** se aplica, **entonces** archiva el referente y deja de observar/comentar sus nuevos posts, conservando evidencias/resultados/motivo. No borra contactos ni ejecuta unfollow en LinkedIn.
+  5. **Dado** una propuesta publicada en el lote del día 1 y sin ninguna respuesta, **cuando** llega el día 6 a las 00:00 America/Bogota, **entonces** backend aplica exactamente su versión expuesta, tras validar protección, capacidad, fuentes vigentes y ausencia de pausa. Registra `aplicada_por_plazo` y el mandato de Gustavo, no una aprobación humana inventada; avisa qué cambió y cuántos main/variables quedan.
+  6. **Dado** aprobación, rechazo, edición, petición de ajuste o aplazamiento de Gustavo, **cuando** llega el cierre, **entonces** respeta la decisión de esa propuesta y no interpreta esa respuesta como silencio. «Guardar y aplicar cambios» valida/aplica la versión editada; una edición sin aplicar queda pendiente de decisión y excluida del automatismo. Las demás propuestas sin respuesta siguen su plazo.
+  7. **Dado** una versión cambiada por el equipo después de exponerla, un lote tardío, una lista de partida incompatible o capacidad ya ocupada, **cuando** vence, **entonces** no aplica cambios que Gustavo no pudo revisar en el lote del día 1: señala el conflicto y los deja para decisión explícita o siguiente ventana. No sustituye silenciosamente al saliente ni desplaza main.
+  8. **Dado** una decisión humana concurrente con el cierre o un job repetido, **cuando** guarda/aplica, **entonces** una transacción por propuesta/lote resuelve la versión y estado vigente una sola vez. Una respuesta guardada antes de aplicar prevalece; si ya se aplicó, informa el resultado y ofrece una propuesta de corrección, sin fingir que se rechazó antes.
+  9. **Dado** los días 1 y 4 con pendientes, **cuando** corre el recordatorio, **entonces** registra un aviso deduplicado por mes/día con plazo y efecto de no responder. Al cerrar registra otro con resultados/bloqueos; fuera del horario normal la notificación queda en bandeja y el push espera la ventana. Fallo de registro del lote o del aviso inicial impide tratar una propuesta invisible como revisada.
+  10. **Dado** la activación inicial, **cuando** encuentra exactamente cinco referentes actuales, **entonces** fija sus IDs como main protegidos sin recorte previo y permite hasta diez altas variables. Si la lista ya no coincide con esos cinco, bloquea solo la gestión automática hasta identificar los IDs; no elige los protegidos por popularidad ni por orden.
+  11. **Dado** Gustavo autenticado en Personas › Referentes o Tu turno, **cuando** ejecuta explícitamente mover, reemplazar, proteger o desproteger, **entonces** ve el efecto concreto sobre main/variables y guarda con validación transaccional de capacidad y versión. Registra quién cambió qué, cuándo y desde dónde; conserva evidencias/historial, sin unfollow ni otra escritura LinkedIn. Un agente no puede originar esa propuesta ni aprobarla en su nombre.
+  12. **Dado** una protección cambiada por Gustavo mientras existe un lote pendiente, **cuando** intenta aplicarse ese lote, **entonces** revalida el conjunto vigente y bloquea las propuestas incompatibles, incluida una baja de quien ahora es main. No rellena main vacantes ni revierte la decisión humana por mantener el número inicial de cinco; no reutiliza una aprobación antigua.
+- **Brechas código/docs:** no existen protección main, autorización exclusiva de Gustavo con auditoría, ventana mensual ni aplicación al plazo. El quinto addendum permite vencimiento solo en variables; el sexto reserva a Gustavo la gestión de protegidos. Las demás compuertas no cambian.
+- **Cobertura QA:** pendiente
+
+### OBS-03 · Evidencia de audiencia y encaje por referente <a id="obs-03"></a>
+
+- **Dónde:** backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** muestra qué personas se descubrieron alrededor de cada referente, cuáles interactuaron después con él y cuánto se parecen a la comunidad buscada, indicando lo que no se puede medir.
+- **Responsable:** `analista_barrio_resultados`; `investigador_referentes` mantiene la clasificación y `operador_cuenta` suministra lecturas.
+- **Cadencia:** acumular al recibir datos; corte semanal y al cerrar cada experimento; consolidación mensual para OBS-01.
+- **Tu turno:** ninguna aprobación por lectura o cálculo. Sus conclusiones sustentan propuestas de referentes, experimentos u orientación que sí decide Gustavo.
+- **Datos necesarios y disponibilidad:** `ObservedPost`, `Contact`, `PostMetric`, `AudienceSnapshot` y ejecuciones existen; faltan registro de interacciones por persona y fuente, múltiples procedencias, versiones de clasificación y cruces temporales. Identidades de seguidores/reactores faltan hoy; aplicar la [matriz](#datos-conectores).
+- **Código:** no existe el informe por referente. Referencias: `metricas._commenters`, `red.discover/classify`, `resumen_semanal.stats`, `models.Contact/PostMetric/AudienceSnapshot`.
+- **Criterios de aceptación:**
+  1. **Dado** una persona encontrada en un post de un referente, **cuando** se registra evidencia, **entonces** conserva ids de persona, referente, post e interacción cuando existan, URL, fecha del evento y fecha de observación separadas, fuente y cobertura; no une identidades por nombre ni reconstruye ids mediante cambios de prefijo.
+  2. **Dado** personas descubiertas en audiencias ajenas, **cuando** se calcula el resultado, **entonces** distingue «descubiertas», «con encaje», «nuevas interacciones propias observadas» y «conexiones confirmadas». Solo llama «seguidor identificado» a quien tenga evidencia específica de seguimiento; descubierto o seguido por Gustavo no significa que siga a Gustavo.
+  3. **Dado** tres cortes del mismo post y varios comentarios de una persona, **cuando** cruza los datos, **entonces** cuenta una persona única por cohorte y periodo, conserva las interacciones por separado y no suma repetidamente contadores acumulados. Marca «primera observación», no «fecha de llegada», si no conoce esta última.
+  4. **Dado** una persona vista en dos referentes antes de interactuar con Gustavo, **cuando** informa, **entonces** conserva ambos vínculos como asociación compartida, deduplica el total y no adjudica una conversión exclusiva ni causal. El informe separa origen declarado por la persona, coincidencia observable y origen desconocido.
+  5. **Dado** 12 personas nuevas observadas, 8 clasificadas con evidencia suficiente y 5 con encaje, **cuando** calcula el informe, **entonces** muestra encaje `5/8 = 62,5 %`, cobertura `8/12`, cuatro desconocidas y versión/fecha del criterio; no trata falta de clasificación o confianza insuficiente como desinterés ni extrapola ese porcentaje a todos los seguidores.
+  6. **Dado** solo un aumento agregado de seguidores y contadores de reacciones, **cuando** explica el resultado, **entonces** los muestra sin reparto causal ni identidades inventadas y usa comentaristas, invitaciones y conexiones comprobadas como fallback confirmado por Gustavo. Admite capturas manuales opcionales con fecha/fuente y acceso privado, distinguiendo invitado, conectado y seguidor; ninguna captura es obligatoria ni habilita mensajes privados para el estudio público.
+  7. **Dado** denominador cero, fuente fallida, muestra parcial o periodos incompatibles, **cuando** compara, **entonces** devuelve «Sin datos suficientes» y la cobertura. No convierte ausencia en cero ni una variación temporal en efecto causal.
+- **Brechas código/docs:** el contacto guarda una procedencia inicial y las métricas compactan autores; no existe todavía el historial necesario para atribución observacional ni estudios longitudinales.
+- **Cobertura QA:** pendiente
+
+### OBS-04 · Experimentos de participación con resultado medible <a id="obs-04"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** prueba si concentrar participación útil alrededor de un referente ayuda a encontrar y atraer al público buscado, antes de decidir mantenerlo o reemplazarlo.
+- **Responsable:** `analista_barrio_resultados` diseña y evalúa como especialista; `investigador_lider` reúne ese trabajo y candidatos del investigador en el ciclo mensual; `relaciones_comunidad` dirige la participación de su ciclo de red. El traspaso es un plan/artefacto versionado tras aprobación, no una llamada entre especialistas.
+- **Cadencia:** propuesta mensual; seguimiento semanal; resultado al terminar la ventana y su seguimiento.
+- **Tu turno:** aprobar, ajustar o descartar el plan en [TUR-21](tu-turno.md#tur-21); cualquier cambio posterior de lista requiere además OBS-02. Aprobar un experimento no aprueba sus comentarios por adelantado.
+- **Datos necesarios y disponibilidad:** existen fechas y estados de comentarios, contactos y cortes métricos; faltan planes, asignación de foco y cohortes de OBS-03. Usa el posicionamiento aprobado y la biblioteca; no depende de conseguir identidades de seguidores.
+- **Código:** no existe. Puntos de integración futuros: `autopiloto`, `red`, `operador`, `metricas`, `resumen_semanal`.
+- **Criterios de aceptación:**
+  1. **Dado** un referente activo, **cuando** diseña una prueba, **entonces** congela antes de empezar hipótesis, público y criterio de encaje, fechas, intervención, comparación, métrica principal, denominador, umbral de decisión, cobertura mínima y regla de parada. Guarda un id/versionado y los factores que podrían confundir el resultado.
+  2. **Dado** el plan inicial, **cuando** se presenta, **entonces** usa defaults de 14 días de base, 28 de foco y 7 posteriores, un foco simultáneo, y reserva hasta una oportunidad útil diaria para ese referente, sujeta al cooldown por autor y al plan BAR-15. Se retira el antiguo «dos comentarios por semana» como pauta del equipo: la interacción general es diaria. No fuerza comentarios ni excluye los demás referentes; congela la asignación concreta antes de empezar.
+  3. **Dado** esa prueba, **cuando** mide, **entonces** compara personas únicas con nueva interacción propia observable vinculadas a esa audiencia, su encaje y cobertura, frente a la base de igual tasa por semana y a un referente comparable sin cambio de foco si existe. Registra publicaciones propias, cambios de orientación, otras acciones de red y comentarios realmente ejecutados; las propuestas no publicadas no cuentan como exposición.
+  4. **Dado** el ejemplo de prueba, **cuando** fija su decisión, **entonces** propone como señal favorable al menos 10 personas clasificadas en la intervención, cobertura de clasificación de al menos 70 %, al menos dos nuevas personas con encaje por semana y una tasa mayor que en la base; informa también la proporción de encaje. Con menos muestra, base insuficiente o ejecución parcial concluye «Inconcluso», sin convertir estos umbrales operativos en significancia estadística.
+  5. **Dado** aprobación y fuente operativa, **cuando** comienza, **entonces** Relaciones recibe el foco, mantiene sus guardas y topes, y el analista conserva el plan original. Una pausa de Gustavo, restricción del proveedor o cambio material del público detiene la prueba y marca periodos no comparables.
+  6. **Dado** el cierre, **cuando** evalúa, **entonces** entrega «señal favorable», «sin mejora observada» o «inconcluso», con cifras, fuentes y límites. Recomienda mantener/medir main, nunca retirarlos; posibles cambios variables entran al siguiente lote OBS-02. El resultado por sí solo no ejecuta ni salta la ventana, y la orientación sigue requiriendo aprobación positiva.
+- **Brechas código/docs:** el analista ya escribe recomendaciones semanales, pero no hay experimentos predefinidos ni señales de participación entregadas a Relaciones.
+- **Cobertura QA:** pendiente
+
+## Retiradas
+
+Ninguna.
+
+## Dependencia web (fase 1, implementada)
 
 La dependencia de acceso web ya tiene implementación en [CAP-17/18](captura.md#cap-17) y [EDI-03/07/17](motor-editorial.md#edi-03), con estado `funciona` y CI pendiente. No sustituye la investigación mensual ni activa altas, bajas, cambios de protección o experimentos. Las reglas del catálogo completo de `plan-equipos` siguen siendo la especificación de esas fases.
-
 El futuro orquestador podrá llamar `research(ResearchRequest) -> ResearchResult` con una clave estable por ciclo/paso, una pregunta pública y enlaces acotados. Recibirá hallazgos, citas, fechas, costes y limitaciones. El investigador no llama agentes ni escribe en LinkedIn. Los contratos y límites del dispatcher de ARQ-01–09 se implementarán en fase 3.
-
 Contrato, configuración y entrega a Claude: [acceso web del equipo](../../agentes-linkedin/infra/docs/acceso-web-equipo.md).

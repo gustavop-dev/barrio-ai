@@ -30,6 +30,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-18](#edi-18) | Preparación interrumpida | backend | funciona |
 | [EDI-19](#edi-19) | Modelo configurable por etapa | backend | funciona |
 | [EDI-20](#edi-20) | Dar el siguiente hueco libre a una idea urgente | backend | funciona |
+| [EDI-21](#edi-21) | Agente visual dedicado al post ganador | PWA · app · backend | no implementado |
 
 ---
 
@@ -333,6 +334,28 @@ El flujo de imagen está implementado en el backend; la interfaz queda para fase
 - [IMG-07](imagenes-en-publicaciones.md#img-07) a [IMG-10](imagenes-en-publicaciones.md#img-10): decidir, editar con OpenAI y comprobar las fotos;
 - [IMG-INF-01](imagenes-en-publicaciones.md#img-inf-01) a [IMG-INF-08](imagenes-en-publicaciones.md#img-inf-08): las infografías y los carruseles, con el manual de Gustavo como regla de agente (como la voz, [EDI-16](#edi-16)) y la lista de 10 puntos en el verificador;
 - [IMG-14](imagenes-en-publicaciones.md#img-14): publicar con imagen o carrusel.
+
+### EDI-21 · Agente visual dedicado al post ganador <a id="edi-21"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** un integrante de Editorial se encarga de elegir y preparar la foto, infografía o carrusel de la pieza ganadora, con decisiones visibles y un responsable propio.
+- **Responsable:** nuevo rol especialista `editor_visual` («Editor visual»), dentro de Editorial; `director_editorial` es orquestador y conserva la decisión del ciclo, incluido el medio final. Revisión conserva sus guardas y Operación ejecuta la publicación.
+- **Cadencia:** una preparación por versión ganadora del post, después de seleccionar el texto; si se repara el texto, revisar compatibilidad del visual antes de publicar. También presta preparación visual a EST-03/04 cuando Perfil la solicita.
+- **Tu turno:** los posts conservan autonomía y veto de [IMG-11](imagenes-en-publicaciones.md#img-11); no se añade aprobación por cada imagen. Solo preguntas sobre datos/recursos faltantes que requieran a Gustavo. Foto y mural de perfil sí pasan por la checklist TUR-18.
+- **Datos necesarios y disponibilidad:** texto seleccionado, brief, fuentes, Galería, notas y permiso de edición existen. No existe este rol ni su definición; la producción de medios, opciones de edición, render, revisión visual y publicación están en curso en `feat/imagenes-backend`, especificados en [IMG](imagenes-en-publicaciones.md). El manual de infografías sigue siendo un insumo del flujo IMG.
+- **Código:** no existe el rol. Referencias: `editorial._run/_stage`, `models.GalleryPhoto`, `oficina_views` y `compartido/src/scene`. En implementación se creará `agentes-linkedin/equipos/editorial/editor_visual.json`; esta tarea solo documenta su contrato, no crea ese archivo.
+- **Contrato de definición requerido:** id y nombre estables, grupo Editorial, misión, entradas (versión/hash del post, brief, evidencia, fotos y opciones), entregable (propuesta de formato, motivos, ids de originales/variantes, instrucciones de edición, plantilla/datos, texto alternativo y verificaciones), unidades/reglas visuales, límites de gasto, permisos, errores y binding al runtime. Configuración efectiva y aristas viven en [ARQ-01](arquitectura-agentes.md#arq-01); el JSON de rol es detalle enlazado, no otra fuente de configuración. El visual devuelve su propuesta al director; no llama lectores, verificador ni otros agentes por sí mismo.
+- **Criterios de aceptación:**
+  1. **Dado** un post ganador, **cuando** trabaja el agente visual, **entonces** recibe su versión exacta y propone foto, infografía o carrusel según [IMG-15](imagenes-en-publicaciones.md#img-15), dejando motivo y vínculo al texto; devuelve el resultado al director, quien acepta el medio, pide revisión dentro de sus límites o bloquea antes de encargar su preparación definitiva.
+  2. **Dado** una decisión de usar fotografía para el post, **cuando** selecciona y edita, **entonces** consulta fotos/notas según IMG-04 **excluyendo Perfil y sus derivados** por GAL-08; backend filtra antes del contexto del director/visual y rechaza selección por id, incluida selección manual. Aplica IMG-07/08/16 a las elegibles: «No editar» impide llamar al modelo aunque la nota pida retoques. Conserva original y trazabilidad IMG-09/10.
+  3. **Dado** infografía o carrusel, **cuando** prepara el entregable, **entonces** entrega plantilla y contenido estructurado al renderizador de IMG-INF, con fuentes y texto alternativo; ningún modelo de imagen dibuja las letras o el gráfico completo.
+  4. **Dado** un texto reparado o fuente/permiso cambiado, **cuando** se va a publicar, **entonces** vuelve a comprobar compatibilidad y vigencia del paquete visual; no usa una imagen cuya verificación corresponde a otro contenido. Si no hay una imagen válida, se aplica el bloqueo ya definido por IMG-05.
+  5. **Dado** un trabajo de imagen, **cuando** se consulta su actividad, **entonces** aparece como `editor_visual` dentro de Editorial según [OFI-10](oficina.md#ofi-10), con su definición, estado y entrega. No se atribuye a los copywriters ni se presenta activo por existir solamente el JSON.
+  6. **Dado** Galería vacía, render fallido o presupuesto agotado, **cuando** el rol no puede completar el medio, **entonces** registra el motivo y usa las alternativas/bloqueos del flujo IMG, sin un segundo pipeline ni publicar una pieza sin imagen.
+  7. **Dado** un encargo del orquestador Perfil, **cuando** propone foto/banner, **entonces** usa exclusivamente esa categoría y las notas como instrucciones por función de [GAL-08](galeria.md#gal-08); entrega A/B, banner con micrófono, previews, citas y visión contra 03 según [EST-03/04](estrategia-perfil.md#est-03). Devuelve el resultado a Perfil sin elegir por Gustavo. Ni esos originales ni derivados/notas entran al contexto o selección de posts; ninguna alternativa editorial sustituye una referencia faltante.
+- **Brechas código/docs:** la selección y edición visual se formalizan como rol sobre el flujo IMG en desarrollo; esta ficha no duplica sus endpoints, almacenamiento, modelos, presupuestos ni QA de medios. Revisión y Relaciones conservan su reparto. El aprendizaje de los cinco lectores está en [LEC-03](comunidad-lectores.md#lec-03).
+- **Cobertura QA:** pendiente
 
 ## Retiradas
 
