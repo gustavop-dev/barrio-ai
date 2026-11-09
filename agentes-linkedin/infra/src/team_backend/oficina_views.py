@@ -132,7 +132,7 @@ class Feed(APIView):
 
 # --------------------------------------------------------------------------- office scene
 
-ROLES=['posicionamiento','perfil','investigador_referentes','analista_barrio_resultados','director_editorial','copywriter_a',
+ROLES=['posicionamiento','perfil','investigador_referentes','investigador_lider','analista_barrio_resultados','director_editorial','copywriter_a',
        'copywriter_b','lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par',
        'editor_verificador','relaciones_comunidad','conversaciones_inbox','operador_cuenta']
 # Real work behind each implemented role. Roles without work here are contracts in design.

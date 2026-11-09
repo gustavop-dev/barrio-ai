@@ -87,17 +87,39 @@ class OfficeTests(OperatorBase):
     def test_activity_reflects_real_jobs_only(self):
         self.sign_in()
         roles=self.browser.get('/api/v1/oficina/actividad').json()['roles']
-        self.assertEqual(len(roles),16)
+        self.assertEqual(len(roles),17)
         # Every role with code is implemented: the inbox agent reads the inbox (read_inbox), so it is never «en diseño» (OFI-01.4).
         self.assertEqual([r for r,v in roles.items() if v['status']=='diseno'],[])
         self.assertEqual(roles['conversaciones_inbox']['status'],'en_espera')
         self.assertEqual(roles['lector_par']['status'],'en_espera')  # the readers panel runs in the editorial circuit
         self.assertEqual(roles['investigador_referentes']['status'],'en_espera')
+        self.assertEqual(roles['investigador_lider']['status'],'en_espera')
         job,_=jobs.enqueue_operation(self.gustavo,'observe',{'account':str(self.account.id),'limit':5})
         Job.objects.filter(pk=job.pk).update(state=Job.State.RUNNING,worker=self.worker)
         roles=self.browser.get('/api/v1/oficina/actividad').json()['roles']
         self.assertEqual(roles['investigador_referentes']['status'],'trabajando')
         self.assertEqual(roles['relaciones_comunidad']['status'],'en_espera')
+
+    def test_monthly_jobs_report_queued_running_and_finished_activity(self):
+        self.sign_in()
+        for kind,role,description in [
+            ('review_referents','investigador_lider','Revisando referentes del mes'),
+            ('advance_experiments','investigador_lider','Midiendo el experimento de referentes'),
+            ('community_study','analista_barrio_resultados','Estudiando la comunidad con evidencia pública'),
+        ]:
+            with self.subTest(kind=kind):
+                job=Job.objects.create(owner=self.gustavo,request_hash=kind,agent='operador',task=kind,kind=kind,
+                                       params={'account':str(self.account.id)})
+                activity=self.browser.get('/api/v1/oficina/actividad').json()['roles'][role]
+                self.assertEqual((activity['status'],activity['detail']),('en_espera','Trabajo en cola'))
+                started=timezone.now()
+                Job.objects.filter(pk=job.pk).update(state=Job.State.RUNNING,started_at=started,worker=self.worker)
+                activity=self.browser.get('/api/v1/oficina/actividad').json()['roles'][role]
+                self.assertEqual((activity['status'],activity['detail']),('trabajando',description))
+                self.assertIsNotNone(activity['since'])
+                Job.objects.filter(pk=job.pk).update(state=Job.State.COMPLETE,finished_at=timezone.now(),result_status='ok')
+                activity=self.browser.get('/api/v1/oficina/actividad').json()['roles'][role]
+                self.assertEqual((activity['status'],activity['detail']),('en_espera',f'Último: {description.lower()} (ok)'))
 
     def test_the_inbox_agent_works_while_the_inbox_is_read(self):
         # OFI-01.5: a running read_inbox job puts «Conversaciones e inbox» to work; once done, its last job shows.

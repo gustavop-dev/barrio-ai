@@ -29,8 +29,9 @@ from team_backend.models import (ActionExecution, ActionProposal, ApiCredential,
 from team_backend.seed_referentes_qa import candidate
 
 
-class Fixtures:
-    def fixtures(self):
+class MonthlyDataMixin:
+    # Django reserves `fixtures` for the iterable passed to loaddata in setUpClass.
+    def set_up_monthly_data(self):
         self.now = datetime(2026, 11, 1, 9, tzinfo=refs.TZ)
         self.user = get_user_model().objects.create_user('gustavo', is_superuser=True)
         self.other = get_user_model().objects.create_user('agent', is_superuser=True)
@@ -64,8 +65,8 @@ class Fixtures:
 
 
 @override_settings(REFERENTS_GUSTAVO_USERNAME='gustavo')
-class MonthlyReferentTests(Fixtures, TestCase):
-    def setUp(self): self.fixtures()
+class MonthlyReferentTests(MonthlyDataMixin, TestCase):
+    def setUp(self): self.set_up_monthly_data()
 
     def test_selection_evaluation_rejects_the_incorrect_alternative(self):
         from team_backend import evaluaciones
@@ -283,8 +284,8 @@ class MonthlyReferentTests(Fixtures, TestCase):
 
 
 @override_settings(REFERENTS_GUSTAVO_USERNAME='gustavo')
-class MonthlyResearchAndConcurrencyTests(Fixtures, TransactionTestCase):
-    def setUp(self): self.fixtures()
+class MonthlyResearchAndConcurrencyTests(MonthlyDataMixin, TransactionTestCase):
+    def setUp(self): self.set_up_monthly_data()
 
     def test_duplicate_job_does_not_cancel_an_inflight_review(self):
         self.review.state='preparing';self.review.save()

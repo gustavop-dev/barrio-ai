@@ -177,12 +177,17 @@ class OpportunityAndTurnTests(OperatorBase):
                                                                                    'days_left':4,'expires_at':'2026-11-11T10:00:00+00:00'}):
             turn=self.human.get('/api/v1/tu-turno').json()
         ids={a['id'].split(':')[0] for a in turn['alerts']}
-        self.assertEqual(ids,{'linkedin_expiring','uncertain','machine_paused'})
+        self.assertEqual(ids,{'linkedin_expiring','uncertain','machine_paused','referents_setup'})
         uncertain=next(a for a in turn['alerts'] if a['id'].startswith('uncertain'))
         self.assertTrue(uncertain['critical']);self.assertEqual(uncertain['attempt']['text'],GOOD)
         self.assertEqual([a['body'] for a in uncertain['actions']],[{'outcome':'confirmed'},{'outcome':'failed'}])
-        self.assertEqual((turn['count'],turn['critical'],turn['counts']),(3,True,{'avisos':3,'preguntas':0,'tareas':0,'aprobaciones':0}))
-        self.assertTrue(turn['top']['critical']);self.assertEqual(turn['tasks'],{'perfil':[],'conversaciones':[],'resumen':[]})
+        self.assertEqual((turn['count'],turn['critical'],turn['counts']),(4,True,{'avisos':3,'preguntas':0,'tareas':1,'aprobaciones':0}))
+        setup=next(a for a in turn['alerts'] if a['id']==f'referents_setup:{self.account.id}')
+        self.assertEqual((setup['type'],setup['priority'],setup['agent']),('aviso','importante','investigador_lider'))
+        self.assertFalse(setup['critical'])
+        self.assertEqual(setup['actions'],[{'label':'Gestionar protegidos','href':'/personas?pestana=referentes'}])
+        self.assertTrue(turn['top']['critical'])
+        self.assertEqual(turn['tasks'],{'perfil':[],'conversaciones':[],'resumen':[],'referentes':[setup]})
         expiring=next(a for a in turn['alerts'] if a['id']=='linkedin_expiring')
         self.assertFalse(expiring['critical'])
 
