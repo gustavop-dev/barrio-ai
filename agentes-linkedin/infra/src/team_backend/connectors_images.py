@@ -1,6 +1,6 @@
 """Photo edits only: OpenAI multipart Images API and Claude vision, no automatic retry.
 
-Contract baseline: POST /v1/images/edits (gpt-image-1), image multipart, b64_json and
+Contract baseline: POST /v1/images/edits, image multipart, b64_json and
 usage.input_tokens_details. No SDK dependency. Live schema/prices must be reviewed
 in CI/deployment: implementation was written offline, not verified over the network.
 """
@@ -10,6 +10,7 @@ import io
 import json
 import math
 import os
+import re
 from decimal import Decimal, ROUND_UP
 import httpx
 from PIL import Image, ImageOps
@@ -21,6 +22,10 @@ TRANSPORT=None
 EDIT_URL='https://api.openai.com/v1/images/edits'
 # Configurable without a code change; the server key lists gpt-image-2 (not gpt-image-1).
 EDIT_MODEL=os.environ.get('OPENAI_IMAGE_MODEL','gpt-image-2').strip() or 'gpt-image-2'
+# Unknown models fail closed to opaque output; capability is independent of PNG support.
+MODEL_CAPABILITIES={'gpt-image-1':{'transparent_background':True},
+                    'gpt-image-2':{'transparent_background':False}}
+CHROMA_COLOR='#00B140'
 # Baseline image-model USD/M tokens (review against the live price of OPENAI_IMAGE_MODEL); bounded input 1024 px, 2000 chars, one medium output.
 EDIT_PRICES={'text':Decimal('5'),'image':Decimal('10'),'output':Decimal('40')}
 EDIT_MARGIN=Decimal('1.5')
@@ -34,6 +39,41 @@ EDIT_OUTPUT_TOKENS={
 VISION_MODEL=os.environ.get('ANTHROPIC_VISION_MODEL','claude-sonnet-5-5').strip() or 'claude-sonnet-5-5'
 CHECK_SCHEMA=infografias.obj(ok={'type':'boolean'},reasons=infografias.array(infografias.string()),
     checks=infografias.array(infografias.obj(point={'type':'number'},ok={'type':'boolean'},reason=infografias.string())))
+
+
+def supports_transparency(model=None):
+    return MODEL_CAPABILITIES.get(model or EDIT_MODEL,{}).get('transparent_background',False)
+
+
+def profile_prompt(instruction):
+    background=('Use a transparent background with reliable alpha.' if supports_transparency() else
+        f'Use an opaque, perfectly flat solid chroma green {CHROMA_COLOR} background. '
+        'Uniform lighting; no shadows, gradients, texture or green spill. '
+        'The key color must not appear in the person, clothing, glasses or microphone. '
+        'Do not make the person transparent; the server will remove only the chroma background.')
+    # Keep the background contract inside the limit and in the exact prompt being budgeted.
+    if instruction.endswith(background):instruction=instruction[:-len(background)].rstrip()
+    return instruction[:12000-len(background)-1].rstrip()+'\n'+background
+
+
+def openai_error(response,prompt,key):
+    """Persist only bounded diagnostics, never the response body or echoed private input."""
+    try:
+        body=response.json();error=body.get('error',{}) if isinstance(body,dict) else {}
+    except ValueError:error={}
+    if not isinstance(error,dict) or not error:return {}
+    def clean(value):
+        if not isinstance(value,str):return None
+        for secret in (key,prompt):
+            if secret:value=value.replace(secret,'[redactado]')
+        value=re.sub(r'https?://\S+|[\w.+-]+@[\w.-]+\.[A-Za-z]{2,}|\bsk-[\w-]+', '[redactado]',value)
+        value=re.sub(r'(?<!\w)\+?\d[\d ()-]{6,}\d|[A-Za-z0-9+/=]{80,}', '[redactado]',value)
+        # API errors can quote a rejected prompt fragment, filename or personal field.
+        safe_values={'transparent','opaque','auto','png','background',EDIT_MODEL}
+        value=re.sub(r'''["'“‘«]([^"'“”‘’«»\n]*)["'”’»]''',
+            lambda match:match[0] if match[1] in safe_values else '[redactado]',value)
+        return ' '.join(value.split())[:600]
+    return {field:clean(error.get(field)) for field in ('message','param','code')}
 
 
 def available(provider):
@@ -91,10 +131,12 @@ class ImageConnector:
         data={'model':EDIT_MODEL,'prompt':prompt,'n':'1','size':'1024x1024','quality':'medium'}
         if references:
             # Gustavo's scoped edits override the stricter post correction prompt. Never render typography here.
-            data.update(prompt=instruction[:12000],background='transparent',output_format='png')
+            data.update(prompt=profile_prompt(instruction),output_format='png')
+            if supports_transparency():data['background']='transparent'
             files=[('image[]',(role+'.png',thumbnail(value),'image/png')) for role,value in sorted(references.items())]
             previews=[value[1][1] for value in files]
         amount,estimate=edit_reservation(previews,data['prompt'],data['size'],data['quality'])
+        estimate['request']={k:data[k] for k in ('model','size','quality','output_format','background') if k in data}
         rid=providers.reserve('openai','profile-image-edit' if references else 'image-edit',
                               amount,request_hash=request_id,metadata=estimate)
         try:
@@ -106,8 +148,11 @@ class ImageConnector:
         except httpx.HTTPError:
             providers.settle(rid,'uncertain');raise ValueError('Edición incierta; no se repite y '+fallback) from None
         if response.status_code>=400:
-            providers.settle(rid,'rejected' if response.status_code in (400,401,403,404,413,422,429) else 'uncertain',{'http_status':response.status_code})
-            raise ValueError(f'Edición HTTP {response.status_code}; {fallback}')
+            error=openai_error(response,data['prompt'],key)
+            providers.settle(rid,'rejected' if response.status_code in (400,401,403,404,413,422,429) else 'uncertain',
+                {'http_status':response.status_code,'error':error})
+            detail='; '.join(f'{k}={v}' for k,v in error.items() if v)
+            raise ValueError(f'Edición HTTP {response.status_code}'+('; '+detail if detail else '')+f'; {fallback}')
         cost=None
         try:
             data=response.json();usage=data['usage'];details=usage['input_tokens_details']

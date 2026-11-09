@@ -1,4 +1,6 @@
 # Contexto activo
+Corrección de Perfil tras #90 (2026-11-09), worktree `fix-perfil-chroma`: `gpt-image-2` y modelos desconocidos omiten `background`; se solicita croma opaco #00B140 y Pillow valida/recorta antes de componer A/B/banner. Se conservan máscaras privadas, revisión de identidad contra 03, presupuesto y reservas inciertas. El banner vacío se recupera de su sección y se persiste antes de `render.banner_fit`, sin reescribir la propuesta. Diagnóstico 400 con message/param/code redactados. Tests con fakes añadidos; no ejecutados por instrucción del usuario. Sin red, builds, commit ni push; QA y despliegue pendientes. No existe entorno fleet para validación formal.
+
 Migración Django finalizada el 2026-11-05 (Bogotá). Runtime local instalado en /home/cerrotico/personal/linkedin/agentes-linkedin/infra, http://127.0.0.1:8787, admin /admin/. Docker api/db/worker saludables. Worktree de desarrollo feat/django-backend; baseline anterior 5ed0826. Runtime en rama local/django-validated.
 
 ai_skills_project @23babe0 incorporado; no existe OPS_ROOT ni registro fleet local. No se ejecutó el protocolo formal fleet; sí revisión delegada, pruebas y mediciones locales. PR remoto no aplica: backend sin origin y repo de presets no es destino del producto. No cambios a perfiles globales.

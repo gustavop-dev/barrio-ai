@@ -24,3 +24,6 @@ Perfil y lectura de sus unidades. No activar los trece roles ni nuevas llamadas
 pagadas como parte de la documentación.
 
 - Diseño documental integral de equipos: ver [circuitos](../docs/circuitos-equipo.md), catálogo externo e índice de contratos. Recorrido conceptual y QA documentales separados de futuros tests runtime. Software y conexiones no implementados por instrucción del usuario.
+
+- [x] Corregir assets de Perfil tras #90: capacidades de transparencia, recorte croma validado, diagnóstico 400 y recuperación del banner desde la sección; tests con fakes escritos.
+- [ ] QA de `test_perfil_chroma`, `test_perfil_assets`, `test_perfil` y `test_imagenes` en el entorno autorizado. No ejecutados localmente; sin llamadas pagadas, builds ni despliegue en esta sesión.

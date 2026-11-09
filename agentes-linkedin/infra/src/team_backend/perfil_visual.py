@@ -8,7 +8,7 @@ import json
 import re
 from PIL import Image, ImageCms, ImageColor, ImageDraw, ImageEnhance, ImageOps
 from knowledge import providers
-from . import connectors_images, imagenes, infografias, orquestacion
+from . import connectors_images, imagenes, infografias, orquestacion, perfil_chroma
 from .perfil_marca import (ACCENT, INK, PAPER, BRAND_VERSION, PHOTO_SIZE, BANNER_SIZE, SAFE, COVER, MOBILE,
     TEXT, FIGURE, MAX_LINE_WIDTH, FONT_FAMILY, FONT_PX, LABEL_PX, LABEL_TRACKING_EM, LABEL_Y, LINE_Y, LINE_HEIGHT)
 
@@ -41,7 +41,7 @@ RENDER_RESULT={'type':'object','required':['files','geometry'],'properties':{'fi
 
 
 def prompt(kind,refs,adjustment=''):
-    common=('Edit only this person, with transparent background and reliable alpha; no text, logos, typography or background. '
+    common=('Edit only this person; no text, logos or typography. '
         'Preserve identity, features, face, hair and CLEAR thin rimmed photochromic glasses from reference 03. '
         'Never sunglasses. Smile naturally exactly like reference 01, in EVERY output. No beauty filters. '
         'Reference 01 controls smile and the side-turned pose of B; reference 02 controls body/posture only, not expression; '
@@ -54,12 +54,12 @@ def prompt(kind,refs,adjustment=''):
                 'This is a styled composition, never an event photograph.')
     else:
         recipe=('Head and shoulders, face 55–60% of image height, eyes in upper third, ~8% headroom. '
-                'Keep original square framing with transparent outer background. ')
-        if kind=='A':recipe+=('Grayscale with natural high contrast, identity 03, smile 01. White plain oversized '
+                'Keep original square framing with clear separation from the background. ')
+        if kind=='A':recipe+=('Grayscale person only with natural high contrast, identity 03, smile 01. White plain oversized '
                               'heavyweight cotton T-shirt, loose fit, closed round crew neck; no logos, prints or football jersey.')
         else:recipe+=('Natural photographic color, the relaxed side-turned pose of 01. White plain oversized heavyweight '
                       'cotton T-shirt, loose fit, closed round crew neck; no logos, prints or football jersey. Natural skin, no aquamarine tint.')
-    return common+recipe+'\nReference notes: '+json.dumps({r['role']:r['note'] for r in refs},ensure_ascii=False)+('\nRequested adjustment (only within the identity, smile, clothing, glasses and role constraints above; never draw text/layout): '+adjustment if adjustment else '')
+    return connectors_images.profile_prompt(common+recipe+'\nReference notes: '+json.dumps({r['role']:r['note'] for r in refs},ensure_ascii=False)+('\nRequested adjustment (only within the identity, smile, clothing, glasses and role constraints above; never draw text/layout): '+adjustment if adjustment else ''))
 
 
 def png(image):
@@ -71,13 +71,12 @@ def png(image):
 
 
 def cutout(raw):
+    if isinstance(raw,Image.Image):return perfil_chroma.validate(raw.copy())
     with Image.open(io.BytesIO(raw)) as im:
-        if im.width*im.height>40_000_000 or 'A' not in im.getbands():raise ValueError('Falta una máscara alfa fiable')
+        if im.width*im.height>40_000_000:raise ValueError('Imagen demasiado grande para una máscara fiable')
         image=im.convert('RGBA')
-    alpha=image.getchannel('A')
-    if alpha.getextrema()!=(0,255) or not alpha.getbbox():raise ValueError('Máscara ausente o vacía')
-    if sum(alpha.histogram()[:8])<image.width*image.height*.02:raise ValueError('Recorte sin fondo exterior suficiente')
-    return image
+    if image.getchannel('A').getextrema()==(255,255):return perfil_chroma.cutout(image)
+    return perfil_chroma.validate(image)
 
 
 def portrait(raw,kind):
@@ -190,18 +189,20 @@ def tiny_portrait(raw):
 
 
 def render(edits,copy):
-    files={};geometry={};errors={}
+    files={};geometry={};errors={};masks={}
     for kind,raw in edits.items():
         try:
-            if kind=='banner':files[kind],geometry=banner(raw,copy)
-            else:files[kind]=portrait(raw,kind)
+            person=cutout(raw)
+            mask=io.BytesIO();person.save(mask,format='PNG');masks[kind]=mask.getvalue()
+            if kind=='banner':files[kind],geometry=banner(person,copy)
+            else:files[kind]=portrait(person,kind)
         except (ValueError,OSError) as exc:errors[kind]=str(exc)
     if 'banner' in files:
         for option in ('A','B'):
             if option in files:
                 for viewport in ('mobile','desktop'):
                     files[f'{viewport}_{option}']=preview(files[option],files['banner'],viewport=='mobile')
-    return {'files':files,'geometry':dict(geometry,errors=errors)}
+    return {'files':files,'masks':masks,'geometry':dict(geometry,errors=errors)}
 
 
 def check(images,refs,context):
@@ -236,4 +237,5 @@ def check(images,refs,context):
 def render_tool(edits,copy):
     """The JSON checkpoint holds private storage references, never JSON-encoded image bytes."""
     package=render(edits,copy)
-    return {'files':{kind:orquestacion.pack(raw) for kind,raw in package['files'].items()},'geometry':package['geometry']}
+    return {'files':{kind:orquestacion.pack(raw) for kind,raw in package['files'].items()},
+        'masks':{kind:orquestacion.pack(raw) for kind,raw in package['masks'].items()},'geometry':package['geometry']}

@@ -3,6 +3,7 @@ import copy
 import io
 import os
 import uuid
+import httpx
 from decimal import Decimal
 from unittest.mock import patch
 from django.core.management import call_command
@@ -10,9 +11,10 @@ from django.test import SimpleTestCase
 from django.utils import timezone
 from PIL import Image
 from knowledge import providers
-from team_backend import connectors_images as images, orquestacion, perfil, perfil_assets, preguntas
+from team_backend import connectors_images as images, orquestacion, perfil, perfil_assets, perfil_visual as visual, preguntas
 from team_backend.models import CycleLedger, Job, ProfileProposal, TeamQuestion, UsageEntry
 from team_backend.tests.test_perfil import ProfileBase, FakeProfileImages, brand_draft, brand_reviewer, vision, synthetic
+from team_backend.tests.test_perfil_chroma import keyed_photo
 
 
 def preview(size):
@@ -96,6 +98,83 @@ class ProfileAssetsTests(ProfileBase):
         self.assertEqual(result.state,'partial')
         self.assertEqual(next(s for s in result.sections if s['id']=='banner')['readiness'],'ready')
         self.assertEqual(set(result.assets.values_list('kind',flat=True)),{'A','banner','mobile_A','desktop_A'})
+
+    def test_empty_context_banner_recovers_current_section_before_fit_and_preserves_other_copy(self):
+        proposal=self.blocked_proposal();proposal.context['banner']={}
+        row=next(s for s in proposal.sections if s['id']=='banner')
+        row['copy']='Frase: «Software that holds up.»\nEtiqueta: «FOUNDER, PROJECTAPP»'
+        proposal.save();before=copy.deepcopy(proposal.sections)
+        expected={'lines':['Software that','holds up.'],'highlight':'holds','label':'FOUNDER, PROJECTAPP'}
+        real_fit=visual.banner_fit
+        def fit(copy):
+            saved=ProfileProposal.objects.get(pk=proposal.pk).context['banner']
+            self.assertEqual({k:saved[k] for k in expected},expected)
+            return real_fit(copy)
+        with patch.object(visual,'banner_fit',side_effect=fit), \
+             patch('team_backend.perfil_contenido.draft',side_effect=AssertionError('whole proposal forbidden')), \
+             patch.object(providers,'claude',side_effect=AssertionError('unexpected paid call')):
+            result=self.run_assets(proposal)
+        self.assertEqual(result.state,'ready',result.findings)
+        self.assertEqual({k:result.context['banner'][k] for k in expected},expected)
+        self.assertTrue(result.context['render_evidence'][0]['ok'])
+        self.assertEqual(result.context['render_evidence'][0]['input'],expected)
+        self.assertEqual([s for s in result.sections if s['id'] not in ('photo','banner')],
+                         [s for s in before if s['id'] not in ('photo','banner')])
+
+    def test_bad_chroma_mask_stays_pending_and_never_reaches_vision_or_assets(self):
+        proposal=self.blocked_proposal();checked=[]
+        class Images(FakeProfileImages):
+            def edit_profile(self,refs,prompt,rid):return keyed_photo(hole=True)
+        result=self.run_assets(proposal,image_client=Images(),image_checker=lambda *args:checked.append(args))
+        self.assertEqual(result.state,'partial');self.assertFalse(result.assets.exists());self.assertEqual(checked,[])
+        for row in result.sections:
+            if row['id'] in ('photo','banner'):
+                self.assertEqual(row['readiness'],'blocked')
+                self.assertTrue(any('agujeros grandes' in issue for issue in row['issues']),row['issues'])
+
+    def test_opaque_edits_keep_identity_reference_and_store_private_mattes(self):
+        proposal=self.blocked_proposal();checked=[]
+        class Images(FakeProfileImages):
+            def edit_profile(self,refs,prompt,rid):return keyed_photo()
+        def check(selected,refs,ctx):
+            checked.append(ctx['option']);self.assertIn('03',refs)
+            if ctx['option']=='banner':self.assertIn('02',refs)
+            else:self.assertIn('circle_'+ctx['option']+'_32',selected)
+            return vision(selected,refs,ctx)
+        result=self.run_assets(proposal,image_client=Images(),image_checker=check)
+        self.assertEqual(result.state,'ready');self.assertEqual(checked,['A','B','banner'])
+        for asset in result.assets.filter(kind__in=['A','B','banner']):
+            matte=orquestacion.unpack(asset.provenance['mask'])
+            with Image.open(io.BytesIO(matte)) as im:self.assertEqual(im.getchannel('A').getextrema(),(0,255))
+
+    def test_openai_400_message_param_and_code_reach_ledger_and_pending_reasons(self):
+        proposal=self.blocked_proposal();calls=[]
+        error={'message':'Transparent background is not supported for this model.','param':'background','code':'invalid_value'}
+        def handler(request,**kwargs):calls.append(request);return httpx.Response(400,json={'error':error})
+        with patch.object(httpx.Client,'send',side_effect=handler),patch.object(images,'live',return_value='fake-key'), \
+             patch.dict(os.environ,{'OPENAI_LIMIT_USD':'10'}):
+            result=self.run_assets(proposal,image_client=images.ImageConnector())
+        self.assertEqual(len(calls),3);self.assertFalse(result.assets.exists());self.assertEqual(result.state,'partial')
+        entries=list(UsageEntry.objects.filter(provider='openai',purpose='profile-image-edit'))
+        self.assertEqual(len(entries),3)
+        for entry in entries:
+            self.assertEqual(entry.status,'rejected');self.assertEqual(entry.usage['http_status'],400)
+            self.assertEqual(entry.usage['error'],error)
+        for row in result.sections:
+            if row['id'] in ('photo','banner'):
+                for value in (error['message'],'param=background','code=invalid_value'):
+                    self.assertTrue(any(value in issue for issue in row['issues']),row['issues'])
+
+    def test_completed_legacy_assets_job_does_not_swallow_corrected_request(self):
+        from team_backend import perfil_galeria as gallery
+        proposal=self.blocked_proposal();refs=gallery.references(self.gustavo)
+        old_signature=orquestacion.digest({'references':refs,'brand':perfil_assets.content.BRAND_VERSION})
+        old_id=uuid.uuid5(perfil.NS,f'{proposal.id}:v{proposal.version}:assets:{old_signature}')
+        Job.objects.create(id=old_id,owner=self.gustavo,kind='prepare_profile_assets',state='complete',
+            params={'proposal':str(proposal.id),'version':proposal.version,'references':refs})
+        job=perfil_assets.queue(self.gustavo,proposal.id)
+        self.assertNotEqual(job.pk,old_id);self.assertEqual(job.state,'queued')
+        self.assertEqual(perfil_assets.queue(self.gustavo,proposal.id).pk,job.pk)
 
     def test_current_v5_notes_and_brand_reach_small_review_and_each_edit(self):
         from team_backend import perfil_galeria as gallery
