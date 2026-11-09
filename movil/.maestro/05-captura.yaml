@@ -389,10 +389,12 @@ tags: [captura]
 - assertVisible: '.*Fundé ProjectApp en 2019 en Medellín.*'
 - assertVisible: 'Está en Lo que el equipo sabe de ti · ProjectApp'
 - assertVisible: 'Escuchar'
+# The «lo antes posible» example is also «Usado» and comes first: scroll to the idea's own line.
 - scrollUntilVisible:
     element:
-      text: 'Usado'
+      text: 'Usada en la pieza del .*'
     direction: DOWN
+    centerElement: true
     timeout: 20000
 - assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
 - assertVisible: 'Usada en la pieza del .*'
