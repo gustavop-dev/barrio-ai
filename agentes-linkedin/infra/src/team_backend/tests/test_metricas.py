@@ -169,6 +169,30 @@ class AudienceTests(MetricsBase):
         self.assertEqual(list(baselines.values_list('metadata',flat=True)),
             [{'day':'2026-11-06','used':0},{'day':'2026-11-07','used':0}])
 
+    def test_read_caps_use_the_supplied_clock_and_preserve_each_local_day(self):
+        before=datetime(2026,11,7,4,50,tzinfo=dt_timezone.utc)  # Nov 6 in Bogota
+        after=datetime(2026,11,7,5,10,tzinfo=dt_timezone.utc)   # Nov 7 in Bogota
+        with patch.dict(os.environ,{'METRICS_READ_CAPS':'profile=2','OPERATOR_PROFILE_READ_DAILY_LIMIT':'2'}), \
+             patch('django.utils.timezone.now',return_value=after+timedelta(days=30)):
+            metricas._read(self.account,'profile',now=before)
+            metricas._read(self.account,'profile',now=after)
+            # A later day's reservation cannot replace the earlier baseline or consume its remaining slot.
+            metricas._read(self.account,'profile',now=before+timedelta(minutes=1))
+            self.assertEqual(metricas.reads_today(self.account,'profile',before),2)
+            self.assertEqual(metricas.reads_today(self.account,'profile',after),1)
+            with self.assertRaises(metricas.ReadCapReached):
+                metricas._read(self.account,'profile',now=before+timedelta(minutes=2))
+            with self.assertRaises(operador.ProfileReadCapReached):
+                operador.reserve_profile_read(self.account,'preflight',now=before+timedelta(minutes=2))
+        expected={before,before+timedelta(minutes=1),after}
+        for action in ('metrics.read','operator.profile_read'):
+            rows=AuditEvent.objects.filter(action=action)
+            self.assertEqual(rows.count(),3)
+            self.assertEqual(set(rows.values_list('created_at',flat=True)),expected)
+        baselines=list(AuditEvent.objects.filter(action='operator.profile_baseline').values_list('metadata',flat=True))
+        self.assertEqual({b['day']:b['used'] for b in baselines},{'2026-11-06':0,'2026-11-07':0})
+        self.assertEqual(len(baselines),2)
+
     def _collect_at(self,now):
         """Collect «at» a simulated time. The audit rows of this call get that time too, so the daily read caps count
         the simulated day, not the real date the suite runs on (it failed on 2026-11-09, the test's last day)."""

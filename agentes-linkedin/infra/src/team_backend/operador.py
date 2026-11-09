@@ -165,23 +165,23 @@ def reserve_profile_read(account,purpose,now=None):
     cap=max(0,min(100,int(os.environ.get('OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))
     with transaction.atomic():
         policy_lock()
-        # Use the same clock for the local-day bucket and its durable reservation.
-        daily=AuditEvent.objects.filter(created_at__gte=day,created_at__lt=day+timedelta(days=1))
+        period={'created_at__gte':day,'created_at__lt':day+timedelta(days=1)}
+        # Reuse the original baseline for this day, even if a later day's reservation exists.
         baseline=AuditEvent.objects.filter(action='operator.profile_baseline',target='member',
-            metadata__day=day.date().isoformat()).order_by('-created_at','-id').first()
+            metadata__day=day.date().isoformat()).order_by('created_at','id').first()
         if baseline is None:
             # Preserve reads already charged by the pre-BAR-15 counters on deployment day.
-            legacy=daily.filter(
+            legacy=AuditEvent.objects.filter(
                 Q(action='network.read',metadata__kind='profile')|
                 Q(action='network.read',metadata__kind='execution',metadata__read='profile')|
-                Q(action='metrics.read',metadata__kind='profile')).count()
+                Q(action='metrics.read',metadata__kind='profile'),**period).count()
             AuditEvent.objects.create(action='operator.profile_baseline',target='member',created_at=now,
-                metadata={'day':day.date().isoformat(),'used':legacy})
+                                      metadata={'day':day.date().isoformat(),'used':legacy})
         else:legacy=baseline.metadata['used']
-        used=legacy+daily.filter(action='operator.profile_read').count()
+        used=legacy+AuditEvent.objects.filter(action='operator.profile_read',**period).count()
         if used>=cap:raise ProfileReadCapReached('Tope compartido de lecturas de perfil alcanzado; la operación espera.')
         AuditEvent.objects.create(action='operator.profile_read',target='member',created_at=now,
-            metadata={'account':str(account.id),'purpose':purpose})
+                                  metadata={'account':str(account.id),'purpose':purpose})
 
 def env_paused():
     return os.environ.get('OPERATOR_PAUSED','false').lower()=='true'
@@ -303,7 +303,12 @@ def add_referent(user,account,identifier,reason):
     if not reason.strip():raise ValueError('Explica por qué esta persona es pertinente')
     slug=public_identifier(identifier)
     existing=Referent.objects.filter(account=account,public_identifier=slug).first()
-    if existing:return existing,False
+    if existing:
+        if existing.archived_at:
+            existing.archived_at=None;existing.active=True;existing.reason=reason.strip()
+            existing.save(update_fields=['archived_at','active','reason'])
+            _audit(user,'operator.referent_restored',existing.id)
+        return existing,False
     reserve_profile_read(account,'referent')
     profile=get_connector(account).get_user(slug)
     referent=Referent.objects.create(account=account,public_identifier=slug,provider_user_id=profile['id'],
@@ -861,6 +866,14 @@ def run_job(job):
         facts={'trigger':job.kind},plan=[job.kind])
     try:
         with runtime.session():
+            if job.kind in NETWORK_JOBS:
+                from . import evidencia
+                def evidence_request():
+                    end=timezone.now()
+                    return evidencia.EvidenceRequest(str(job.params['account']),
+                        (end-timedelta(days=90)).isoformat(),end.isoformat(),end.isoformat())
+                request=runtime.snapshot('evidence_request',evidence_request)
+                evidencia.consult(job.owner,request,runtime=runtime)
             result=_run_job(job)
             runtime.finish(result)
             return result
