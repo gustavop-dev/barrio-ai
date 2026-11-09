@@ -7,12 +7,18 @@ name: Referentes mensuales y experimento
 tags: [referentes, turno, experimentos]
 ---
 - runFlow: comun/entrar.yaml
-- tapOn:
-    id: tab-tu-turno
+# Tu turno opens from the top bar (as in 04-tu-turno); there is no bottom tab for it.
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
       text: 'Tu turno, 13 pendientes, 1 urgente'
+    timeout: 30000
+- tapOn:
+    id: top-tu-turno
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: turno-list
     timeout: 30000
 - scrollUntilVisible:
     element:
