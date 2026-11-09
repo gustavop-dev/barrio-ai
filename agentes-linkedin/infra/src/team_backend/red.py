@@ -516,6 +516,8 @@ def classify(user,account,now=None,batch=10):
                             purpose='network-classify',model=classifier_model(),context=context)
     try:results={r['id']:r for r in json.loads(answer['text'])['contacts']}
     except (json.JSONDecodeError,KeyError,TypeError):raise ValueError('El clasificador no devolvió JSON válido.') from None
+    from .orquestacion import ensure_current
+    ensure_current()
     when=timezone.now().isoformat();fits=0;classified=0
     for contact in contacts:
         result=results.get(str(contact.id))

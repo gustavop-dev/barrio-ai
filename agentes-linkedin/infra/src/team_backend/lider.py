@@ -138,6 +138,11 @@ def _questions(proposal,orientation):
     return state,questions,checks
 
 def review(proposal):
+    from .orquestacion import review_gate
+    return review_gate(proposal,lambda:_review(proposal))
+
+
+def _review(proposal):
     """{'decision': 'approve' | 'discard' | 'retry', 'reasons': [...], 'answers': {...}, 'model': ..., 'at': ...}"""
     now=timezone.now()
     orientation=_orientation()

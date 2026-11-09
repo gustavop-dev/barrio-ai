@@ -225,7 +225,7 @@ def answers(final=GOOD_POST,decision='write',verdict='ready_for_execution',findi
     return {
         'director':{'decision':decision,'skip_reason':'' if decision=='write' else 'No genuine material today.','primary_reader':'lector_comprador',
                     'modality':'personal_startups','pillar':'business_to_product','thesis':'Scope features from the decision they support.',
-                    'approach':'LI-05-M001-K02','format':'text_only','reader_value':'A scoping question to reuse.',
+                    'approach':'LI-05-M001-K02','format':'infografia','image':{'kind':'infografia','reason':'Tarjeta disponible sin proveedor','photos':[]},'questions_for_gustavo':[],'ideas_used':[],'research_request':{'needed':False,'public_question':'','public_only':True},'reader_value':'A scoping question to reuse.',
                     'evidence':[{'kind':'general_knowledge','ref':'','note':'Product scoping practice'}],'success_criterion':'Founders reply with their decision.',
                     'avoid':['Inventing cases'],'signals_used':list(signals_used),'citations':['LI-04-M005-K01','LI-99-X'],'rationale':'Pillar fits; no repetition.'},
         'redactor':{'variant_a':variant('decision'),'variant_b':variant('objection'),'citations':['LI-06-M002-K09']},
@@ -233,7 +233,7 @@ def answers(final=GOOD_POST,decision='write',verdict='ready_for_execution',findi
                     ['lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par']],'summary':'A slightly stronger.','citations':[]},
         'seleccion':{'decision':'A','final_text':final,'rationale':'Clearer hook.','claims':claims,'resolved_objections':[],
                      'kept_objections':['Could use an example'],'citations':['LI-06-M002-K09']},
-        'verificador':{'verdict':verdict,'findings':list(findings),'checked_claims':[dict(c,status='general_knowledge') for c in claims],
+        'verificador':{'verdict':verdict,'findings':list(findings),'checked_claims':[{'text':c['text'],'ref':c['ref'],'status':'general_knowledge'} for c in claims],
                        'summary':'Checked.','citations':['LI-06-M002-K09']},
         # R4: by default the repair round returns the same text, so a blocked piece stays blocked without re-verifying.
         'reparacion':{'decision':'repaired','final_text':final,'changes':[],'rationale':'Nothing safe to change.','claims':claims,

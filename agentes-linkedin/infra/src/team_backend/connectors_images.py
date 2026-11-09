@@ -14,7 +14,7 @@ import httpx
 from PIL import Image, ImageOps
 from knowledge import providers
 from knowledge.config import live
-from . import infografias
+from . import infografias, orquestacion
 
 TRANSPORT=None
 EDIT_URL='https://api.openai.com/v1/images/edits'
@@ -51,7 +51,7 @@ class ImageConnector:
                 'all existing text and logos. Never add typography, data, people or objects. '+instruction)[:2000]
         rid=providers.reserve('openai','image-edit',EDIT_RESERVATION,request_hash=request_id)
         try:
-            with httpx.Client(transport=TRANSPORT,timeout=httpx.Timeout(180,connect=10)) as http:
+            with httpx.Client(transport=TRANSPORT,timeout=httpx.Timeout(orquestacion.timeout(180),connect=10)) as http:
                 response=http.post(EDIT_URL,headers={'Authorization':'Bearer '+key},
                     data={'model':EDIT_MODEL,'prompt':prompt,'n':'1','size':'1024x1024','quality':'medium'},
                     files={'image':('photo.png',preview,'image/png')})

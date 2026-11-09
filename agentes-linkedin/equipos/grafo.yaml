@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
-  "graph_version": "3a.1",
-  "scope": "descriptive",
+  "graph_version": "3b.1",
+  "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
     "editorial": "Mesa editorial",
@@ -326,9 +326,9 @@
       "description": "Plan determinista y propuestas RED-01/02/04; grounding y distribución por roles."
     },
     "read_result": {
-      "binding": "team_backend.operador.run_job",
-      "kind": "python_payload",
-      "description": "Resumen determinista retornado por operador.run_job; Job conserva estado, no un campo result."
+      "binding": "team_backend.orquestacion_schemas.READ_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
     },
     "transcript": {
       "binding": "knowledge.providers.assemblyai_transcribe",
@@ -347,8 +347,8 @@
     },
     "image_bytes": {
       "binding": "team_backend.connectors_images.ImageConnector.edit",
-      "kind": "python_payload",
-      "description": "Bytes de imagen, privados; request_id por pieza/foto."
+      "kind": "bytes",
+      "description": "Contrato ejecutable del adapter de fase 3b."
     },
     "veto": {
       "binding": "team_backend.operador.reject",
@@ -359,6 +359,91 @@
       "binding": "team_backend.resumen_semanal.apply",
       "kind": "python_payload",
       "description": "Aplicar o descartar orientación propuesta; decisión humana independiente del veto de publicaciones."
+    },
+    "brief_input": {
+      "binding": "team_backend.orquestacion_schemas.BRIEF_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "writer_input": {
+      "binding": "team_backend.orquestacion_schemas.WRITER_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "panel_input": {
+      "binding": "team_backend.orquestacion_schemas.PANEL_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "selection_input": {
+      "binding": "team_backend.orquestacion_schemas.SELECTION_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "verifier_input": {
+      "binding": "team_backend.orquestacion_schemas.VERIFIER_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "repair_input": {
+      "binding": "team_backend.orquestacion_schemas.REPAIR_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "network_input": {
+      "binding": "team_backend.orquestacion_schemas.NETWORK_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "image_input": {
+      "binding": "team_backend.orquestacion_schemas.IMAGE_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "edit_input": {
+      "binding": "team_backend.orquestacion_schemas.EDIT_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "check_input": {
+      "binding": "team_backend.orquestacion_schemas.CHECK_INPUT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "check_result": {
+      "binding": "team_backend.orquestacion_schemas.CHECK_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "lead_result": {
+      "binding": "team_backend.orquestacion_schemas.LEAD_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "observe_result": {
+      "binding": "team_backend.orquestacion_schemas.OBSERVE_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "discover_result": {
+      "binding": "team_backend.orquestacion_schemas.DISCOVER_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "classify_result": {
+      "binding": "team_backend.orquestacion_schemas.CLASSIFY_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "plan_result": {
+      "binding": "team_backend.orquestacion_schemas.PLAN_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "sync_result": {
+      "binding": "team_backend.orquestacion_schemas.SYNC_RESULT",
+      "kind": "json_schema",
+      "description": "Contrato ejecutable del adapter de fase 3b."
     }
   },
   "nodes": [
@@ -405,7 +490,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "brief_input"
       ],
       "output_schemas": [
         "brief"
@@ -477,7 +563,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "writer_input"
       ],
       "output_schemas": [
         "variants"
@@ -549,7 +636,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "writer_input"
       ],
       "output_schemas": [
         "variants"
@@ -591,7 +679,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "panel_input"
       ],
       "output_schemas": [
         "panel"
@@ -633,7 +722,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "panel_input"
       ],
       "output_schemas": [
         "panel"
@@ -675,7 +765,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "panel_input"
       ],
       "output_schemas": [
         "panel"
@@ -717,7 +808,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "panel_input"
       ],
       "output_schemas": [
         "panel"
@@ -759,7 +851,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "panel_input"
       ],
       "output_schemas": [
         "panel"
@@ -805,7 +898,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "selection_input"
       ],
       "output_schemas": [
         "selection"
@@ -849,7 +943,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "repair_input"
       ],
       "output_schemas": [
         "repair"
@@ -893,7 +988,8 @@
       "model_note": null,
       "budget_ref": "editorial",
       "input_schemas": [
-        "editorial_input"
+        "editorial_input",
+        "verifier_input"
       ],
       "output_schemas": [
         "verification"
@@ -906,36 +1002,6 @@
           "editor_verificador"
         ],
         "stage": "verificador"
-      }
-    },
-    {
-      "id": "workflow_red",
-      "label": "Ciclo de red",
-      "group": "relaciones",
-      "role": "orchestrator",
-      "status": "active",
-      "binding": "team_backend.autopiloto.tick",
-      "description": "El autopiloto coordina subtriggers independientes de red; todavía no hay un manager LLM de Relaciones.",
-      "skills": [
-        "El autopiloto coordina subtriggers independientes de red; todavía no hay un manager LLM de Relaciones"
-      ],
-      "tools": [],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
-      "model": null,
-      "effort": null,
-      "model_note": "Servicio determinista, humano o todavía planificado.",
-      "budget_ref": "red",
-      "input_schemas": [
-        "job"
-      ],
-      "output_schemas": [
-        "read_result"
-      ],
-      "activity": {
-        "job_kinds": [],
-        "event_roles": []
       }
     },
     {
@@ -969,10 +1035,12 @@
       "model_note": "Servicio determinista, humano o todavía planificado.",
       "budget_ref": "lecturas",
       "input_schemas": [
-        "job"
+        "job",
+        "network_input"
       ],
       "output_schemas": [
-        "read_result"
+        "read_result",
+        "observe_result"
       ],
       "activity": {
         "job_kinds": [
@@ -1014,10 +1082,12 @@
       "model_note": "Servicio determinista, humano o todavía planificado.",
       "budget_ref": "lecturas",
       "input_schemas": [
-        "job"
+        "job",
+        "network_input"
       ],
       "output_schemas": [
-        "read_result"
+        "read_result",
+        "discover_result"
       ],
       "activity": {
         "job_kinds": [
@@ -1061,10 +1131,12 @@
       "model_note": null,
       "budget_ref": "red",
       "input_schemas": [
-        "contact"
+        "contact",
+        "network_input"
       ],
       "output_schemas": [
-        "classification"
+        "classification",
+        "classify_result"
       ],
       "activity": {
         "job_kinds": [
@@ -1077,10 +1149,10 @@
       "id": "relaciones_comunidad",
       "label": "Relaciones y comentarios",
       "group": "relaciones",
-      "role": "specialist",
+      "role": "orchestrator",
       "status": "active",
-      "binding": "team_backend.operador.propose_comment",
-      "description": "Propone comentarios tras el prefiltro Jev. Una reescritura si incumple reglas de texto.",
+      "binding": "team_backend.operador.run_job",
+      "description": "Propone comentarios tras el prefiltro Jev. Una reescritura si incumple reglas de texto. Dueño de las instancias de red por subtrigger, con investigadores como herramientas.",
       "skills": [
         "Propone comentarios tras el prefiltro Jev"
       ],
@@ -1106,10 +1178,12 @@
       "model_note": null,
       "budget_ref": "general",
       "input_schemas": [
-        "post"
+        "post",
+        "network_input"
       ],
       "output_schemas": [
-        "comment"
+        "comment",
+        "proposal"
       ],
       "activity": {
         "job_kinds": [
@@ -1155,10 +1229,12 @@
       "model_note": "Servicio determinista, humano o todavía planificado.",
       "budget_ref": "red",
       "input_schemas": [
-        "job"
+        "job",
+        "network_input"
       ],
       "output_schemas": [
-        "network_plan"
+        "network_plan",
+        "plan_result"
       ],
       "activity": {
         "job_kinds": [
@@ -1189,10 +1265,12 @@
       "model_note": "Servicio determinista, humano o todavía planificado.",
       "budget_ref": "lecturas",
       "input_schemas": [
-        "job"
+        "job",
+        "network_input"
       ],
       "output_schemas": [
-        "read_result"
+        "read_result",
+        "sync_result"
       ],
       "activity": {
         "job_kinds": [
@@ -1405,7 +1483,8 @@
       ],
       "output_schemas": [
         "lead",
-        "prefilter"
+        "prefilter",
+        "lead_result"
       ],
       "activity": {
         "job_kinds": [],
@@ -1677,7 +1756,8 @@
       "model_note": null,
       "budget_ref": "imagenes",
       "input_schemas": [
-        "piece"
+        "piece",
+        "image_input"
       ],
       "output_schemas": [
         "image_design"
@@ -1712,7 +1792,8 @@
       "model_note": null,
       "budget_ref": "imagenes",
       "input_schemas": [
-        "photo"
+        "photo",
+        "edit_input"
       ],
       "output_schemas": [
         "image_bytes"
@@ -1747,10 +1828,12 @@
       "model_note": null,
       "budget_ref": "imagenes",
       "input_schemas": [
-        "piece_image"
+        "piece_image",
+        "check_input"
       ],
       "output_schemas": [
-        "image_check"
+        "image_check",
+        "check_result"
       ],
       "activity": {
         "job_kinds": [
@@ -1946,11 +2029,19 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "brief_input",
       "response_schema": "brief",
       "max_calls_per_cycle": 2,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-director"
+          ]
+        }
+      }
     },
     {
       "id": "redactar_a",
@@ -1960,12 +2051,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "writer_input",
       "response_schema": "variants",
       "max_calls_per_cycle": 1,
       "response_required": true,
       "status": "active",
-      "call_group": "redactor"
+      "call_group": "redactor",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-redactor"
+          ]
+        }
+      }
     },
     {
       "id": "redactar_b",
@@ -1975,12 +2074,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "writer_input",
       "response_schema": "variants",
       "max_calls_per_cycle": 1,
       "response_required": true,
       "status": "active",
-      "call_group": "redactor"
+      "call_group": "redactor",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-redactor"
+          ]
+        }
+      }
     },
     {
       "id": "seleccionar",
@@ -1990,11 +2097,19 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "selection_input",
       "response_schema": "selection",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-seleccion"
+          ]
+        }
+      }
     },
     {
       "id": "reparar",
@@ -2004,11 +2119,19 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "repair_input",
       "response_schema": "repair",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-reparacion"
+          ]
+        }
+      }
     },
     {
       "id": "verificar",
@@ -2018,11 +2141,19 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "verifier_input",
       "response_schema": "verification",
       "max_calls_per_cycle": 2,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-verificador"
+          ]
+        }
+      }
     },
     {
       "id": "investigar_pieza",
@@ -2036,7 +2167,14 @@
       "response_schema": "research_result",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-web-research"
+          ]
+        }
+      }
     },
     {
       "id": "disenar",
@@ -2046,11 +2184,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "piece",
+      "request_schema": "image_input",
       "response_schema": "image_design",
       "max_calls_per_cycle": 2,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "result_projection": "text",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "image-design",
+            "image-design-repair"
+          ]
+        }
+      }
     },
     {
       "id": "editar_foto",
@@ -2060,11 +2207,19 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "photo",
+      "request_schema": "edit_input",
       "response_schema": "image_bytes",
       "max_calls_per_cycle": 8,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "openai": [
+            "image-edit"
+          ]
+        }
+      }
     },
     {
       "id": "revisar_imagen",
@@ -2074,11 +2229,18 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "piece_image",
-      "response_schema": "image_check",
+      "request_schema": "check_input",
+      "response_schema": "check_result",
       "max_calls_per_cycle": 8,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "image-check"
+          ]
+        }
+      }
     },
     {
       "id": "leer_lector_comprador",
@@ -2088,12 +2250,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "panel_input",
       "response_schema": "panel",
       "max_calls_per_cycle": 1,
       "response_required": true,
       "status": "active",
-      "call_group": "lectores"
+      "call_group": "lectores",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-lectores"
+          ]
+        }
+      }
     },
     {
       "id": "leer_lector_recomendador",
@@ -2103,12 +2273,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "panel_input",
       "response_schema": "panel",
       "max_calls_per_cycle": 1,
       "response_required": true,
       "status": "active",
-      "call_group": "lectores"
+      "call_group": "lectores",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-lectores"
+          ]
+        }
+      }
     },
     {
       "id": "leer_lector_divulgador",
@@ -2118,12 +2296,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "panel_input",
       "response_schema": "panel",
       "max_calls_per_cycle": 1,
       "response_required": true,
       "status": "active",
-      "call_group": "lectores"
+      "call_group": "lectores",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-lectores"
+          ]
+        }
+      }
     },
     {
       "id": "leer_lector_lider",
@@ -2133,12 +2319,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "panel_input",
       "response_schema": "panel",
       "max_calls_per_cycle": 1,
       "response_required": true,
       "status": "active",
-      "call_group": "lectores"
+      "call_group": "lectores",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-lectores"
+          ]
+        }
+      }
     },
     {
       "id": "leer_lector_par",
@@ -2148,12 +2342,20 @@
         "pieza_diaria"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "editorial_input",
+      "request_schema": "panel_input",
       "response_schema": "panel",
       "max_calls_per_cycle": 1,
       "response_required": true,
       "status": "active",
-      "call_group": "lectores"
+      "call_group": "lectores",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-lectores"
+          ]
+        }
+      }
     },
     {
       "id": "visual_futuro",
@@ -2171,91 +2373,125 @@
     },
     {
       "id": "observar",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "investigador_referentes",
       "cycles": [
         "red"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "job",
-      "response_schema": "read_result",
+      "request_schema": "network_input",
+      "response_schema": "observe_result",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": []
+        }
+      }
     },
     {
       "id": "descubrir",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "descubrimiento_red",
       "cycles": [
         "red"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "job",
-      "response_schema": "read_result",
+      "request_schema": "network_input",
+      "response_schema": "discover_result",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": []
+        }
+      }
     },
     {
       "id": "clasificar",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "clasificador_red",
       "cycles": [
         "red"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "contact",
-      "response_schema": "classification",
+      "request_schema": "network_input",
+      "response_schema": "classify_result",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "network-classify"
+          ]
+        }
+      }
     },
     {
       "id": "comentar",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "relaciones_comunidad",
       "cycles": [
         "red"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "post",
-      "response_schema": "comment",
+      "request_schema": "network_input",
+      "response_schema": "proposal",
       "max_calls_per_cycle": 2,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "propose-comment"
+          ]
+        }
+      }
     },
     {
       "id": "planificar_red",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "plan_red",
       "cycles": [
         "red"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "job",
-      "response_schema": "network_plan",
+      "request_schema": "network_input",
+      "response_schema": "plan_result",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": []
+        }
+      }
     },
     {
       "id": "sincronizar",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "sync_red",
       "cycles": [
         "red"
       ],
       "request_kind": "workflow_step",
-      "request_schema": "job",
-      "response_schema": "read_result",
+      "request_schema": "network_input",
+      "response_schema": "sync_result",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": []
+        }
+      }
     },
     {
       "id": "prefiltro",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "lider_jev",
       "cycles": [
         "red"
@@ -2363,11 +2599,18 @@
       ],
       "request_kind": "gate",
       "request_schema": "proposal",
-      "response_schema": "lead",
-      "max_calls_per_cycle": 1,
+      "response_schema": "lead_result",
+      "max_calls_per_cycle": 5,
       "response_required": true,
       "status": "active",
-      "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior."
+      "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior.",
+      "runtime": {
+        "purposes": {
+          "typesafe": [
+            "lead-review"
+          ]
+        }
+      }
     },
     {
       "id": "pieza_diaria_gate_1",
@@ -2401,20 +2644,24 @@
     },
     {
       "id": "politica_red",
-      "from": "workflow_red",
+      "from": "relaciones_comunidad",
       "to": "lider_jev",
       "cycles": [
         "red"
       ],
       "request_kind": "gate",
       "request_schema": "proposal",
-      "response_schema": "lead",
-      "max_calls_per_cycle": {
-        "setting": "LEAD_MAX_REVIEWS_PER_TICK",
-        "default": 5
-      },
+      "response_schema": "lead_result",
+      "max_calls_per_cycle": 5,
       "response_required": true,
-      "status": "active"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "typesafe": [
+            "lead-review"
+          ]
+        }
+      }
     },
     {
       "id": "red_gate_0",
@@ -2601,14 +2848,16 @@
       ],
       "loops": [
         {
-          "id": "reparacion_actual",
+          "id": "evaluator_optimizer",
           "status": "active",
           "edges": [
+            "redactar_a",
+            "redactar_b",
             "reparar",
             "verificar"
           ],
           "max_rounds": 2,
-          "description": "Primera comprobación más una reparación del director, no de copywriters."
+          "description": "Copywriters A/B agrupados, verificación inicial y una reparación con el binding histórico del director; máximo dos evaluaciones. Sin delegación entre especialistas."
         },
         {
           "id": "imagen_actual",
@@ -2619,13 +2868,6 @@
           ],
           "max_rounds": 2,
           "description": "Un diseño inicial y una corrección."
-        },
-        {
-          "id": "copywriters_optimizer",
-          "status": "planned",
-          "edges": [],
-          "max_rounds": 2,
-          "description": "Copywriters ⇄ verificador, aún no habilitado."
         }
       ],
       "gates": [
@@ -2639,29 +2881,35 @@
           "escrituras"
         ],
         "max_depth": 1,
-        "calls": "Brief hasta 2 con investigación; redactor 1 agrupada; panel 1 agrupada; selección 1; reparación 1; verificador hasta 2; diseño hasta 2; edición/revisión por foto (máx. 8).",
-        "cycle_cost_cap": null,
-        "timeout": "Timeouts de providers y connectors_images; no existe timeout global de ciclo.",
-        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+        "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
+        "max_calls": 40,
+        "max_provider_calls": 40,
+        "cost_cap_usd": 2,
+        "cost_period": "cycle",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 1200,
+        "max_stalls": 2,
+        "max_replans": 1,
+        "daily_cost_cap_usd": 2
       },
       "ledger": {
-        "status": "existing_records_only",
+        "status": "runtime",
         "records": [
+          "CycleLedger",
           "Job",
           "AuditEvent",
           "usage_ledger"
         ],
-        "checkpoint_resume": false,
-        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+        "checkpoint_resume": true,
+        "note": "Resultados confirmados reutilizados; llamadas en vuelo requieren conciliación."
       }
     },
     {
       "id": "red",
       "label": "Red y comentarios",
       "status": "active",
-      "orchestrator": "workflow_red",
+      "orchestrator": "relaciones_comunidad",
       "participants": [
-        "workflow_red",
         "investigador_referentes",
         "descubrimiento_red",
         "clasificador_red",
@@ -2746,19 +2994,26 @@
         ],
         "max_depth": 1,
         "BAR-15": "Lunes a viernes; máximo 20 invitaciones/día; rampa (día/semana) 5/20, 10/50, 20/100; 80 lecturas de perfil/día incluyendo preflight; diversidad de roles y cupos de notas mensuales.",
-        "cycle_cost_cap": null,
-        "timeout": "Límites por operación/proveedor; no timeout global ni contador total de ciclo.",
-        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+        "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
+        "max_calls": 40,
+        "max_provider_calls": 40,
+        "cost_cap_usd": 1,
+        "cost_period": "cycle",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 1200,
+        "max_stalls": 2,
+        "max_replans": 1
       },
       "ledger": {
-        "status": "existing_records_only",
+        "status": "runtime",
         "records": [
+          "CycleLedger",
           "Job",
           "AuditEvent",
           "usage_ledger"
         ],
-        "checkpoint_resume": false,
-        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+        "checkpoint_resume": true,
+        "note": "Resultados confirmados reutilizados; llamadas en vuelo requieren conciliación."
       }
     },
     {
@@ -2992,10 +3247,15 @@
           "proveedor"
         ],
         "max_depth": 1,
-        "calls": 1,
-        "cycle_cost_cap": null,
-        "timeout": "Provider timeout.",
-        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+        "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
+        "max_calls": 40,
+        "max_provider_calls": 40,
+        "cost_cap_usd": 10,
+        "cost_period": "cycle",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 1800,
+        "max_stalls": 2,
+        "max_replans": 1
       },
       "ledger": {
         "status": "existing_records_only",
@@ -3039,10 +3299,15 @@
       "limits": {
         "budget_refs": [],
         "max_depth": 1,
-        "calls": null,
-        "cycle_cost_cap": null,
-        "timeout": null,
-        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+        "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
+        "max_calls": 40,
+        "max_provider_calls": 40,
+        "cost_cap_usd": 5,
+        "cost_period": "month",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 1200,
+        "max_stalls": 2,
+        "max_replans": 1
       },
       "ledger": {
         "status": "planned",
@@ -3075,10 +3340,15 @@
       "limits": {
         "budget_refs": [],
         "max_depth": 1,
-        "calls": null,
-        "cycle_cost_cap": null,
-        "timeout": null,
-        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+        "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
+        "max_calls": 60,
+        "max_provider_calls": 60,
+        "cost_cap_usd": 10,
+        "cost_period": "cycle",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 1800,
+        "max_stalls": 2,
+        "max_replans": 1
       },
       "ledger": {
         "status": "planned",
@@ -3192,6 +3462,22 @@
       "search": 20,
       "profile": 80,
       "sync": 4
+    },
+    "editorial_edges": {
+      "director": "brief",
+      "redactor": "redactar_a",
+      "seleccion": "seleccionar",
+      "reparacion": "reparar",
+      "verificador": "verificar",
+      "lectores": "leer_lector_comprador"
+    },
+    "network_edges": {
+      "observe": "observar",
+      "discover_network": "descubrir",
+      "classify_contacts": "clasificar",
+      "propose_comment": "comentar",
+      "plan_network": "planificar_red",
+      "sync_network": "sincronizar"
     }
   },
   "gates": {
@@ -3213,6 +3499,9 @@
         "Jev si lider.applies; auto/manual conservan las reglas actuales.",
         "Gustavo puede vetar o pausar; no hay espera de aprobación por post.",
         "Operador valida hash aprobado, estado y cuotas justo antes de escribir."
+      ],
+      "runtime_edges": [
+        "pieza_diaria_gate_0"
       ]
     },
     "comentario": {
@@ -3231,6 +3520,9 @@
         "comment_text_issues y content_issues; el verificador editorial no revisa comentarios.",
         "Jev condicionado por LEAD_ENABLED/capabilities; aprobación manual mantiene permisos.",
         "Veto y pausa de Gustavo; checks del operador antes de escribir."
+      ],
+      "runtime_edges": [
+        "politica_red"
       ]
     },
     "red_social": {
@@ -3252,6 +3544,9 @@
         "network_issues y BAR-15 para RED; INT-02 se crea manualmente.",
         "Jev solo si lider.applies (INT-02 fuera por defecto).",
         "Ruta manual/autónoma, veto y controles de escritura actuales."
+      ],
+      "runtime_edges": [
+        "politica_red"
       ]
     }
   },

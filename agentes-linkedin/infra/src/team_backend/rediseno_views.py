@@ -290,6 +290,8 @@ class TuTurno(APIView):
         from .models import InboxSeen
         preguntas.sync_memory_proposals()
         now=timezone.now();warnings=alerts(now)
+        from .orquestacion import attention_cards
+        warnings+=attention_cards(request.user,_card)
         open_questions=list(TeamQuestion.objects.filter(state='open').order_by('deadline','created_at'))
         pending=[q for q in open_questions if preguntas.is_pending(q,now)]
         later_q=[q for q in open_questions if not preguntas.is_pending(q,now)]

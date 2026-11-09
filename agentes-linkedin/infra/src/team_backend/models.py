@@ -861,3 +861,31 @@ class AppClientError(models.Model):
     app_version=models.CharField(max_length=40,blank=True)
     class Meta:ordering=['-created_at']
     def __str__(self):return f'{self.kind} · {self.name}'
+
+
+class CycleLedger(models.Model):
+    """One durable orchestrator instance; JSON payloads are private workspace data."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    cycle=models.CharField(max_length=60)
+    key=models.CharField(max_length=160)
+    owner=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    job=models.ForeignKey(Job,on_delete=models.PROTECT,null=True,blank=True)
+    orchestrator=models.CharField(max_length=60)
+    graph_version=models.CharField(max_length=40)
+    graph_hash=models.CharField(max_length=64)
+    limits=models.JSONField(default=dict)
+    budget_bucket=models.CharField(max_length=220,db_index=True)
+    task_ledger=models.JSONField(default=dict)
+    progress_ledger=models.JSONField(default=dict)
+    state=models.CharField(max_length=20,default='running',db_index=True)
+    stop_reason=models.CharField(max_length=80,blank=True)
+    needs_attention=models.BooleanField(default=False)
+    lease_token=models.CharField(max_length=32,blank=True)
+    revision=models.PositiveIntegerField(default=0)
+    calls=models.PositiveIntegerField(default=0)
+    active_seconds=models.FloatField(default=0)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['cycle','key'],name='unique_cycle_instance')]
+        ordering=['-updated_at']

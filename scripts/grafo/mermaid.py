@@ -44,12 +44,8 @@ def render(graph):
     lines = ['# Grafo del equipo', '', '<!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->', '',
              f'Versión `{graph["graph_version"]}` · SHA-256 `{graph_hash(graph)}`.', '',
              f'{len(graph["nodes"])} nodos ({active} activos), {len(graph["edges"])} aristas y {len(graph["cycles"])} ciclos.', '',
-             'Inventario descriptivo del runtime actual. Las flechas de pasos y gates pertenecen al workflow determinista; '
-             'no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada, '
-             'y los cinco lectores otra. Los límites son por intento/subtrigger, no nuevos contadores de ciclo.', '',
-             'Los trazos discontinuos están en diseño. No hay task/progress ledger ni reanudación por checkpoint todavía. '
-             'Los schemas que existen como contratos Python o preguntas tipadas se identifican como tales en el registro; '
-             'no se presentan como JSON Schemas ya aplicados.', '', '## Grafo completo', '', diagram(graph['nodes'], graph['edges'])]
+             'Pieza diaria y red ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.', '',
+             'Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Los otros ciclos conservan su estado y contratos descriptivos; referentes y Perfil periódico todavía no se activan.', '', '## Grafo completo', '', diagram(graph['nodes'], graph['edges'])]
     for cycle in graph['cycles']:
         lines += ['', f'## {cycle["label"]}', '', f'Estado: `{cycle["status"]}`. Orquestador: `{cycle["orchestrator"]}`.', '']
         lines += [f'- `{t["kind"] or "planned"}`: {t["cadence"]}' for t in cycle['triggers']]
@@ -62,9 +58,7 @@ def render(graph):
             lines += ['', f'Gate `{gid}` ({", ".join(gate["capabilities"])}): ' + ' → '.join(gate['chain']) + '.']
             lines += [f'- {condition}' for condition in gate['conditions']]
     lines += ['', '## Contratos referenciados', '',
-              'Los nombres siguientes enlazan las definiciones existentes. `python_payload`, `model`, `serializer`, '
-              '`dataclass`, `local_schema` y `typed_questions` conservan su naturaleza; no equivalen a validación '
-              'JSON Schema en runtime. El dispatcher y la normalización de contratos quedan para 3b.', '',
+              'Los nombres siguientes enlazan las definiciones existentes. Las aristas con runtime validan JSON Schema, modelos, dataclasses o bytes según el contrato. Los demás contratos conservan su naturaleza descriptiva hasta que se migre su ciclo.', '',
               '| Nombre | Tipo | Código |', '| --- | --- | --- |']
     for sid, schema in graph['schemas'].items():
         module = '/'.join(schema['binding'].split('.')[:2]) + '.py'

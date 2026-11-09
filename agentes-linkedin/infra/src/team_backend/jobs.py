@@ -114,11 +114,17 @@ def claim(worker):
         return job
 
 def reconcile_interrupted():
-    """Never replay a paid task after losing its worker; preserve its run/ledger."""
+    """Resume confirmed cycle checkpoints; preserve legacy and uncertain tasks."""
     cutoff=timezone.now()-timedelta(seconds=settings.WORKER_STALE_SECONDS)
     with transaction.atomic():
         stale=list(Job.objects.select_for_update(skip_locked=True).filter(state=Job.State.RUNNING,worker__last_seen__lt=cutoff))
         for job in stale:
+            from .orquestacion import recover_job
+            if recover_job(job):
+                job.state=Job.State.QUEUED;job.worker=None;job.finished_at=None;job.error=''
+                job.save(update_fields=['state','worker','finished_at','error'])
+                audit(None,'job.resumed',job.id)
+                continue
             job.state=Job.State.INTERRUPTED;job.finished_at=timezone.now()
             job.error='El trabajador perdió su latido. Revisar la ejecución y el ledger antes de crear otro trabajo.'
             job.save(update_fields=['state','finished_at','error'])

@@ -262,6 +262,8 @@ def research(request:ResearchRequest)->ResearchResult:
     result=ResearchResult(question,'partial' if findings and limitations else ('complete' if findings else 'unavailable'),at,
                           tuple(findings),tuple({s.id:s for s in sources}.values()),tuple(dict.fromkeys(limitations)),usage)
     # An undo may have tombstoned the run during I/O. Never resurrect its result.
+    from .orquestacion import ensure_current
+    ensure_current()
     saved=WebResearchRun.objects.filter(pk=run.pk,state='running').update(state=result.status,result=result.to_dict())
     if saved:oficina_eventos.emit('entrega','investigador_referentes','director_editorial',outcome_text(result.to_dict()))
     return result

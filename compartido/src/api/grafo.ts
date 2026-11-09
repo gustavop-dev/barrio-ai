@@ -47,7 +47,7 @@ export interface TeamGraph {
   graph_version: string;
   graph_hash: string;
   updated_at: string;
-  scope: 'descriptive';
+  scope: 'descriptive' | 'runtime';
   groups: Record<string, string>;
   nodes: GraphNode[];
   edges: GraphEdge[];
