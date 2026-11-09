@@ -98,7 +98,12 @@ export function OficinaScreen() {
         <View style={styles.legend}>
           {(['Trabajando', 'En espera', 'En diseño'] as const).map((text, i) => <View key={text} style={styles.legendItem}><View style={[styles.dot, { backgroundColor: [colors.brand, colors.spriteBlue, colors.line][i] }]} /><T variant="detalle" soft>{text}</T></View>)}
         </View>
-        <T variant="detalle" soft>{live ? `Actividad real · ${timeAgo(activity.data?.updated_at, now)}` : activity.isPending ? 'Leyendo actividad…' : 'Actividad no disponible'}</T>
+        <View style={styles.activityRow}>
+          <T variant="detalle" soft style={styles.activityText}>{live ? `Actividad real · ${timeAgo(activity.data?.updated_at, now)}` : activity.isPending ? 'Leyendo actividad…' : 'Actividad no disponible'}</T>
+          <Button testID="oficina-mapa-equipo" variant="ghost" size="small" accessibilityLabel="Mapa del equipo" onPress={() => router.push('/equipo')}>
+            <T variant="detalle" color={colors.brandDeep}>Mapa del equipo</T>
+          </Button>
+        </View>
         {activity.isError ? <Note tone="error" title="No se pudo leer la actividad." actions={<Button onPress={() => void activity.refetch()}>Reintentar</Button>}>Mientras tanto los personajes quedan quietos: la oficina no simula trabajo.</Note> : null}
         <ErrorRetry error={overview.error} title="No se pudo leer el estado de la máquina." onRetry={() => void overview.refetch()} />
         {feedUnavailable(events.error) ? <Note title="Aún no disponible">El registro de eventos no está disponible. Se muestra la actividad real de cada rol.</Note> : <ErrorRetry error={events.error} title="No se pudieron leer los eventos." onRetry={() => void events.refetch()} />}
@@ -112,8 +117,6 @@ export function OficinaScreen() {
           </Pressable>;
         }} />
       <T variant="detalle" soft style={styles.credit}>Arte: LimeZu — Modern Interiors</T>
-      {/* Keep this after the office content so the team strip stays above the floating bottom bar. */}
-      <Button testID="oficina-mapa-equipo" variant="ghost" onPress={() => router.push('/equipo')}>Mapa del equipo</Button>
     </ScrollView>
     </GestureDetector>
     {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active}>
@@ -124,7 +127,10 @@ export function OficinaScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   paused: { backgroundColor: colors.backdrop },
-  below: { padding: space[4], gap: space[2] },
+  // The 44 dp link shares the activity row; compact padding preserves room for the team strip.
+  below: { paddingHorizontal: space[4], paddingVertical: space[1], gap: space[2] },
+  activityRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
+  activityText: { flex: 1 },
   legend: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
   legendItem: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   dot: { width: 10, height: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.ink },
