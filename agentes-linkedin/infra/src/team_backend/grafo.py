@@ -169,7 +169,8 @@ def validate_graph(graph):
             check(nodes[participant]['status'] == 'planned' or participant in seen, f'ciclo {cid}: nodo no alcanzable {participant}')
         for edge in local:
             if edge['request_kind'] in ('call', 'workflow_step'):
-                check(edge['from'] == owner or edge['id'] in loop_edges, f'arista {edge["id"]}: profundidad > 1 desde {owner}')
+                check(edge['from'] == owner or (edge['id'] in loop_edges and not edge.get('runtime')),
+                      f'arista {edge["id"]}: profundidad > 1 desde {owner}')
             if nodes[edge['from']]['role'] == 'specialist':
                 check(edge['request_kind'] in ('handoff', 'gate'), f'arista {edge["id"]}: especialista invoca agente')
     check(all(n['status'] == 'planned' or n['id'] in reachable for n in nodes.values()), 'nodo activo no alcanzable desde ningún ciclo')
