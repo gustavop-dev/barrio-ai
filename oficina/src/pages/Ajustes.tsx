@@ -19,6 +19,7 @@ export { AJUSTES_SECTIONS } from '../../../compartido/src/logic/ajustes';
 export function Ajustes() {
   return (
     <Page title="Ajustes">
+      <Link to="/equipo">Mapa del equipo</Link>
       <div className="aj-layout">
         <nav className="aj-index desktop-only" aria-label="Secciones de Ajustes">
           <ul>

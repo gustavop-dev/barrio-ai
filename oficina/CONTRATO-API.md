@@ -1055,3 +1055,22 @@ texto escapado, más las limitaciones. No renderizar HTML de fuentes ni tratar s
 mantener la vista habitual. El outcome ya comunica «Investigó… (N fuentes) · …» o el motivo de omisión.
 
 Configuración, prompts y comprobaciones para Claude: `agentes-linkedin/infra/docs/acceso-web-equipo.md`.
+
+## Mapa del equipo (fase 3a)
+
+`GET /api/v1/equipo/grafo` requiere autenticación (sesión PWA o token de dispositivo), `access_knowledge` y
+`operate_linkedin`. No acepta escrituras. Devuelve `schema_version`, `graph_version`, `graph_hash`, `scope: "descriptive"`,
+`updated_at`, `groups`, `nodes`, `edges`, `cycles` y `gates`, derivados de `agentes-linkedin/equipos/grafo.yaml`.
+El hash identifica el registro; `updated_at` fecha la lectura de actividad, no una nueva versión del grafo.
+
+Cada nodo conserva su ficha declarativa y añade `recent_activity`:
+
+- `jobs`: hasta cinco `{id, kind, state, at, stage}` visibles según `jobs.visible_jobs`. No devuelve `task`, `params` ni errores sin sanear.
+- `handoffs`: hasta cinco entregas existentes de `oficina_eventos`, `{id, at, from, to, detail}`. Son el feed compartido de la oficina, no invocaciones entre especialistas ni prueba de que una etapa distinta haya corrido.
+- `records`: hasta cinco registros de investigación o auditoría de revisión/veto, `{id, at, label}`. No incluye preguntas, resultados de research, capturas, memoria ni respuestas privadas de Jev. Las investigaciones conservan la propiedad de captura/pieza salvo permiso `manage_jobs`.
+
+Las etapas editoriales requieren evidencia en `EditorialPiece.usage` o su etapa actual; los pasos de imagen y captura
+también filtran por evidencia guardada. La fecha del job corresponde al trabajo contenedor, no a una llamada individual.
+Una ficha sin atribución tiene listas vacías. Los nodos `planned` nunca muestran actividad simulada. Los tipos compartidos
+y la consulta viven en `compartido/src/api/grafo.ts`; ambos clientes abren `/equipo`, agrupan y filtran por ciclo, y muestran
+misión, curso, actividad y conexiones. El endpoint no importa un dispatcher ni dispara trabajo para dibujar el mapa.

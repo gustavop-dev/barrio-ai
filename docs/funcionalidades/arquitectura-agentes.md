@@ -4,21 +4,23 @@ Decisión acordada con Gustavo: **workflow determinista, un orquestador dueño d
 
 Antecedentes indicados por Gustavo: Anthropic, *Building effective agents* y su sistema de investigación multiagente; Cognition, *Don't build multi-agents* y *Multi-agents: what's actually working*; documentación multiagente de LangGraph; OpenAI Agents SDK, agents-as-tools frente a handoffs; Google ADK, coordinador con `sub_agents`/`AgentTool`; Microsoft Magentic-One, task/progress ledgers. Se recoge la decisión aportada, sin una nueva revisión web en esta tarea. No se elige ni se introduce uno de esos frameworks como dependencia.
 
-Todo este archivo es **no implementado**. Las rutas de registro, schemas, generador y diagrama que aparecen son destinos futuros: esta tarea solo escribe catálogo y plan, no crea código ni un `grafo.yaml` que el runtime aún no pueda ejecutar.
+**Fase 3a implementada:** registro descriptivo, validación estructural y de deriva, diagramas, API de lectura y Mapa del equipo. ARQ-01, ARQ-07, ARQ-08 y ARQ-09 funcionan en este alcance; CI y QA de esta entrega quedan a cargo de Claude. El control de invocaciones en runtime, los nuevos orquestadores/bucles, ledgers y caps por ciclo siguen pendientes de **3b** (ARQ-02–06). ARQ-06 ya tiene su parte estática, pero no se marca completo porque aún falta el rechazo de llamadas no declaradas en runtime.
+
+El registro muestra el código actual: A/B comparten llamada, los cinco lectores comparten llamada, una reparación del director y el fan-out todavía planificado. Los criterios de ejecución declarativa descritos abajo son el destino de 3b; no se anuncian como comportamiento nuevo de 3a.
 
 ## Resumen
 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
-| [ARQ-01](#arq-01) | Registro declarativo único de agentes, llamadas y ciclos | backend | no implementado |
+| [ARQ-01](#arq-01) | Registro declarativo único de agentes, llamadas y ciclos | backend | funciona |
 | [ARQ-02](#arq-02) | Orquestador por ciclo sobre el workflow actual | backend | no implementado |
 | [ARQ-03](#arq-03) | Bucles acotados de revisión e investigación | backend | no implementado |
 | [ARQ-04](#arq-04) | Ledgers persistidos y reanudación desde checkpoint | backend | no implementado |
 | [ARQ-05](#arq-05) | Límites por ciclo, gasto y trazabilidad | PWA · app · backend | no implementado |
 | [ARQ-06](#arq-06) | Validación del grafo y rechazo de llamadas no declaradas | backend | no implementado |
-| [ARQ-07](#arq-07) | Diagramas Mermaid generados y comprobados en CI | documentación · backend | no implementado |
-| [ARQ-08](#arq-08) | Mapa del equipo en PWA y app | PWA · app · backend | no implementado |
-| [ARQ-09](#arq-09) | Añadir un agente con contrato y evaluación | documentación · backend | no implementado |
+| [ARQ-07](#arq-07) | Diagramas Mermaid generados y comprobados en CI | documentación · backend | funciona |
+| [ARQ-08](#arq-08) | Mapa del equipo en PWA y app | PWA · app · backend | funciona |
+| [ARQ-09](#arq-09) | Añadir un agente con contrato y evaluación | documentación · backend | funciona |
 
 ## Lo que existe y la migración inicial <a id="migracion"></a>
 
@@ -54,13 +56,14 @@ El trigger futuro de captura «hazme la propuesta del perfil» se declara con or
 ### ARQ-01 · Registro declarativo único de agentes, llamadas y ciclos <a id="arq-01"></a>
 
 - **Dónde:** backend
-- **Estado:** no implementado
+- **Estado:** funciona
+- **Alcance 3a:** Inventario activo/planned, schemas reales (JSON o contrato Python indicado), presupuesto referenciado y listas curadas contrastadas en tests. No cambia bindings ni llamadas actuales.
 - **Qué hace para Gustavo:** todas las relaciones y responsabilidades del equipo se pueden consultar en un solo lugar y una integración nueva debe declarar cómo encaja.
 - **Responsable:** cada orquestador responde de su ciclo; el workflow determinista valida y hace cumplir el registro. Los agentes no editan su propia definición.
 - **Cadencia:** validación al cambiar el registro y al arrancar; fijar versión/hash al crear una instancia.
 - **Tu turno:** ninguna aprobación por cargar el registro. Cambios de autoridad, orientación, recursos o gasto que requieran a Gustavo siguen sus fichas; una descripción no concede permisos.
 - **Datos necesarios y disponibilidad:** ids/grupos, prompts, schemas y configuración están hoy repartidos entre contratos, Python y escena. Falta registro canónico, resolutor de referencias y manifiesto efectivo versionado.
-- **Código:** no existe. Destino futuro único: `agentes-linkedin/equipos/grafo.yaml`, leído por el backend; schemas versionados en un directorio declarado desde ese archivo. No se crea en esta tarea.
+- **Código:** Registro descriptivo canónico en `agentes-linkedin/equipos/grafo.yaml`, cargado por `team_backend/grafo.py`. El manifiesto ejecutable, dispatcher y autorización por arista quedan para 3b.
 - **Contenido obligatorio del registro:**
 
   | Sección | Campos y significado |
@@ -79,7 +82,8 @@ El trigger futuro de captura «hazme la propuesta del perfil» se declara con or
   4. **Dado** cambio de registro con un ciclo abierto, **cuando** continúa, **entonces** usa su versión fijada o queda detenido para migración explícita del checkpoint; no cambia de modelo, autoridad o estructura a mitad del ciclo sin dejar registro.
   5. **Dado** listas/documentos de rol duplicados, **cuando** se construye el manifiesto, **entonces** la identidad, herramientas, unidades, modelo y presupuesto efectivos proceden del registro; una discrepancia de un contrato secundario falla validación o se genera desde él, no se decide por azar qué copia manda.
 - **Brechas código/docs:** los JSON de equipos son contratos no ejecutables; actualmente el runtime usa prompts y llamadas Python, y la escena mantiene otro mapa. El registro aún no gobierna nada.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** `test_grafo.py` y/o comprobación de diagrama en CI; ejecución de suites pendiente por Claude.
+
 
 ### ARQ-02 · Orquestador por ciclo sobre el workflow actual <a id="arq-02"></a>
 
@@ -186,12 +190,13 @@ La migración muestra las condiciones actuales (`LEAD_ENABLED`, capacidad, modo 
 
 - **Dónde:** backend
 - **Estado:** no implementado
+- **Alcance 3a:** Parte estática implementada en 3a. Pendientes dispatcher, instrumentación de llamadas y enforcement de permisos/caps por ciclo.
 - **Qué hace para Gustavo:** el mapa describe lo que el sistema puede hacer de verdad; un agente nuevo no adquiere accesos o rutas de ejecución por accidente.
 - **Responsable:** workflow/dispatcher determinista; cada orquestador solo solicita operaciones que el registro autoriza.
 - **Cadencia:** validación estática en CI y arranque; validación de petición/respuesta, permisos, gates y límites en cada llamada.
 - **Tu turno:** ninguna aprobación de pruebas. Un rechazo no pide a Gustavo aprobar una llamada oculta; se corrige el contrato o se cierra el ciclo con la limitación.
 - **Datos necesarios y disponibilidad:** schemas Python y pruebas de llamadas de producción existen parcialmente; faltan schema del registro, análisis de alcanzabilidad/rutas, dispatcher y pruebas de ausencia de bypass.
-- **Código:** no existe. Integrar en tests del backend y CI; `evaluaciones.py` verifica comportamiento de roles, pero no sustituye los controles estructurales.
+- **Código:** `team_backend/grafo.py` y `tests/test_grafo.py`: validación estructural, rutas de gates y deriva de listas/kinds/JOB_ROLES. El rechazo de llamadas en runtime queda para 3b.
 - **Criterios de aceptación:**
   1. **Dado** el registro, **cuando** se valida, **entonces** todo nodo es alcanzable desde al menos un ciclo declarado, todo ciclo tiene exactamente un orquestador y referencias existentes, y nodos/aristas/ciclos tienen ids únicos. Los planificados son alcanzables desde ciclos planificados inactivos; nunca quedan activos sin ruta real.
   2. **Dado** una arista entre especialistas, un especialista que llama a un orquestador o una cadena de delegación de profundidad mayor de uno, **cuando** pasa validación o runtime, **entonces** falla. Los bucles solo permiten los pasos enumerados de ARQ-03 bajo el dueño del ciclo; no habilitan una red de pares.
@@ -201,36 +206,40 @@ La migración muestra las condiciones actuales (`LEAD_ENABLED`, capacidad, modo 
   6. **Dado** una petición no declarada en el código o generada por un modelo, **cuando** llega a runtime, **entonces** falla cerrada con id del llamante/destinatario y motivo auditable; no hay fallback a invocación libre. Una respuesta inválida no avanza el ledger ni libera un gate.
   7. **Dado** un cambio de registro, **cuando** corre CI, **entonces** valida también unidades conocidas dentro de 01–06, tools/scopes, modelos/effort, budgets finitos, evaluación mínima por nodo y paridad de diagramas; un fallo impide dar el cambio por integrable.
 - **Brechas código/docs:** ninguna prueba actual hace cumplir este grafo; la migración debe cubrir también rutas manuales y de reintento, no solo el camino feliz del autopiloto.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** `test_grafo.py` y/o comprobación de diagrama en CI; ejecución de suites pendiente por Claude.
+
 
 ### ARQ-07 · Diagramas Mermaid generados y comprobados en CI <a id="arq-07"></a>
 
 - **Dónde:** documentación · backend
-- **Estado:** no implementado
+- **Estado:** funciona
+- **Alcance 3a:** Diagrama completo y uno por ciclo, versión/hash estable, grupos, roles, límites, llamadas agrupadas y nodos planned. El generador documenta los contratos existentes sin simular invocaciones.
 - **Qué hace para Gustavo:** puede entender rápidamente el equipo completo y seguir un ciclo sin reconstruir las relaciones leyendo prompts o código.
 - **Responsable:** generador determinista del registro; los orquestadores son responsables de que sus ciclos estén declarados.
 - **Cadencia:** regenerar cada cambio de grafo/schemas; CI comprueba que lo versionado coincide.
 - **Tu turno:** ninguna aprobación por regenerar el dibujo; el diagrama no habilita decisiones o agentes.
 - **Datos necesarios y disponibilidad:** registro ARQ-01 y schemas; hoy no existen generador ni diagrama derivado único.
-- **Código:** no existe. Destinos futuros: script de generación/verificación, por ejemplo `scripts/generar_grafo_agentes.py`, y `docs/arquitectura/grafo.md`. Ambos quedan para implementación, fuera de las ediciones de esta tarea.
+- **Código:** `scripts/grafo/mermaid.py`, `docs/arquitectura/grafo.md` y paso de comprobación en `.github/workflows/barrio-ai.yml`.
 - **Criterios de aceptación:**
   1. **Dado** un registro válido, **cuando** se genera, **entonces** produce un Mermaid completo y uno por ciclo, con grupos, roles, dirección/tipo de llamadas, leyenda, loops/gates, agentes planificados diferenciados, versión/hash y enlaces a contratos. Distingue solicitud, devolución de resultado y transición del workflow; una devolución no es permiso para llamar en sentido inverso.
   2. **Dado** el mismo registro y schemas, **cuando** se regenera dos veces, **entonces** el resultado es idéntico, sin timestamps volátiles ni orden aleatorio; el archivo señala «Generado, editar el registro».
   3. **Dado** un cambio de registro sin regenerar o una edición manual del diagrama, **cuando** corre el modo de comprobación en CI, **entonces** falla con diff y comando para regenerar. CI se dispara por registro, schemas, generador y documentos pertinentes; el filtro actual que omite `docs/` no deja pasar una deriva silenciosa.
   4. **Dado** registro inválido o vacío, **cuando** intenta generar, **entonces** explica el error y no reemplaza el documento válido previo por uno incompleto presentado como vigente.
 - **Brechas código/docs:** los diagramas futuros serán derivados, no una segunda fuente de decisiones. Esta ficha especifica la generación, no afirma que `docs/arquitectura/grafo.md` ya exista.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** `test_grafo.py` y/o comprobación de diagrama en CI; ejecución de suites pendiente por Claude.
+
 
 ### ARQ-08 · Mapa del equipo en PWA y app <a id="arq-08"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
+- **Alcance 3a:** Lista por grupos/ciclos y ficha con misión, unidades, conexiones y actividad existente. Sin canvas gigante ni acciones de ejecución. No inventa actividad cuando no hay atribución; los ledgers por ciclo aún no existen.
 - **Qué hace para Gustavo:** abre «Mapa del equipo», ve las relaciones por grupo/ciclo y entiende qué hace cada agente, a quién consulta y qué hizo recientemente.
 - **Responsable:** cada orquestador aporta su actividad; la Oficina presenta el mismo manifiesto y las ejecuciones registradas.
 - **Cadencia:** configuración al abrir/cambiar versión; actividad con la cadencia de la Oficina, sin crear trabajo de agentes para dibujar el mapa.
 - **Tu turno:** ninguna aprobación desde el mapa; enlaces a propuestas/bloqueos llevan a Tu turno para decidir allí con su versión vigente.
 - **Datos necesarios y disponibilidad:** escena/paneles/eventos actuales existen; falta vista de grafo, endpoint de manifiesto saneado y enlace a ledgers/actividad persistida por ciclo.
-- **Código:** no existe esta vista. Referencias: `oficina_views.py`, `compartido/src/scene`, paneles PWA/app; ampliar Oficina sin duplicar configuración en cada cliente.
+- **Código:** `GET /api/v1/equipo/grafo`, `compartido/src/api/grafo.ts`, `oficina/src/pages/MapaEquipo.tsx` y `movil/src/equipo/MapaEquipoScreen.tsx`. Ruta `/equipo`, enlazada desde Oficina y Ajustes.
 - **Criterios de aceptación:**
   1. **Dado** la PWA o app con sesión válida, **cuando** abre «Mapa del equipo», **entonces** ve agentes agrupados, roles distinguibles y conexiones permitidas; puede pasar del mapa completo a un ciclo, con leyenda y vista de lista accesible para pantallas pequeñas o lector de pantalla.
   2. **Dado** un agente seleccionado, **cuando** abre su ficha, **entonces** muestra para qué sirve, capacidades, inputs/outputs comprensibles, qué pide a quién y quién lo llama, unidades del curso, modelo/effort y límites efectivos, estado y actividad reciente con fecha/ciclo. La UI prioriza la explicación de trabajo; los nombres técnicos de schemas quedan en detalle ampliable.
@@ -238,18 +247,20 @@ La migración muestra las condiciones actuales (`LEAD_ENABLED`, capacidad, modo 
   4. **Dado** un nodo planificado, sin historial, registro nuevo frente a ciclo antiguo o fallo de conexión, **cuando** se muestra, **entonces** dice «En diseño», «Sin actividad registrada», distingue las versiones o muestra último dato con fecha/error respectivamente; no simula actividad ni mezcla ciclos.
   5. **Dado** el endpoint o panel, **cuando** se inspecciona, **entonces** no expone tokens, prompts con memoria privada, inbox ni detalles personales innecesarios; solo usuarios autorizados ven el mapa y los enlaces respetan permisos del artefacto de destino.
 - **Brechas código/docs:** OFI-04 muestra equipos/roles, no sus conexiones. OFI-10 añadirá el visual a la oficina; ambos consumen el registro en lugar de mantener dos listas de agentes.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** `17-mapa-equipo.yaml` (ARQ-08), Jest y Vitest con fake backend; ejecución pendiente en CI/QA.
+
 
 ### ARQ-09 · Añadir un agente con contrato y evaluación <a id="arq-09"></a>
 
 - **Dónde:** documentación · backend
-- **Estado:** no implementado
+- **Estado:** funciona
+- **Alcance 3a:** La guía de integración está disponible. Activación por dispatcher y pruebas de rechazo runtime se completan en 3b.
 - **Qué hace para Gustavo:** integrar un nuevo especialista tiene pasos claros y su lugar en el equipo se ve desde el primer cambio revisable.
 - **Responsable:** orquestador receptor de la capacidad; quien implementa registra el contrato, adapter y evaluación, sin delegar ese cambio al propio agente.
 - **Cadencia:** cada alta o cambio de responsabilidad/capacidad de un agente.
 - **Tu turno:** solo decisiones de alcance, autoridad o presupuesto que no estén ya autorizadas; no se añade una aprobación humana rutinaria a toda definición técnica.
 - **Datos necesarios y disponibilidad:** contratos, catálogo y harness de evaluaciones existen; faltan guía operativa ligada al registro y comprobaciones automáticas completas.
-- **Código:** no existe el flujo verificable. Se aplicará sobre ARQ-01/06/07 y `evaluaciones.py`; esta guía no crea hoy nodos ejecutables.
+- **Código:** Guía `docs/arquitectura/anadir-agente.md`, enlazada al registro, sus tests, generador, API y evaluación con fakes.
 - **Guía breve / checklist:**
   1. Elegir ciclo y dueño; explicar qué necesidad resuelve y por qué no basta un servicio/herramienta actual. Reservar id estable, grupo y rol; si es especialista, no delega.
   2. Añadir el nodo al registro con descripción de utilidad, capacidades, herramientas mínimas, schemas versionados, lista de unidades curadas o motivo de lista vacía, modelo/effort y presupuesto finito. Conservar el detalle de su definición documental enlazado, sin otra configuración efectiva.
@@ -263,7 +274,7 @@ La migración muestra las condiciones actuales (`LEAD_ENABLED`, capacidad, modo 
   2. **Dado** un especialista completo, **cuando** supera la guía y se regenera, **entonces** aparece en el registro, Mermaid y Mapa del equipo con las mismas conexiones, y una llamada simulada produce el resultado esperado, citas y trazabilidad sin acceso extra.
   3. **Dado** un agente que intenta publicar o llamar a otro especialista, **cuando** se ejecuta su caso negativo, **entonces** falla antes de la operación y conserva evidencia; no se resuelve agregando una arista prohibida para hacer pasar el test.
 - **Brechas código/docs:** hoy se puede describir un rol sin que exista runtime. Esta guía exige coherencia entre definición, llamadas autorizadas, evaluación y lo que se ve.
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** `test_grafo.py` y/o comprobación de diagrama en CI; ejecución de suites pendiente por Claude.
 
 ## Retiradas
 

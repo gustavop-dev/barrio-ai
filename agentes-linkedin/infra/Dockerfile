@@ -2,6 +2,7 @@ FROM python:3.12-slim
 WORKDIR /app
 COPY pyproject.toml uv.lock ./
 COPY src ./src
+COPY --from=equipo grafo.yaml ./equipos/grafo.yaml
 COPY manage.py ./
 RUN pip install --no-cache-dir uv && uv sync --frozen --no-dev && useradd --uid 10001 --create-home app && mkdir staticfiles media && chown app:app staticfiles media
 COPY assets/tiktoken ./assets/tiktoken

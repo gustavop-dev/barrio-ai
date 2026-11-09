@@ -6,7 +6,10 @@ name: barrio-ai
 # `build` stays only as a local fallback (docker compose build).
 x-app: &app
   image: ghcr.io/gustavop-dev/barrio-ai-api:${BARRIO_TAG:-latest}
-  build: ../agentes-linkedin/infra
+  build:
+    context: ../agentes-linkedin/infra
+    additional_contexts:
+      equipo: ../agentes-linkedin/equipos
   env_file: .env
   environment:
     DATABASE_URL: postgresql://knowledge:${POSTGRES_PASSWORD}@db:5432/knowledge
