@@ -3,6 +3,8 @@ import math
 import os
 import uuid
 import time
+import re
+from dataclasses import dataclass
 from functools import lru_cache
 from decimal import Decimal
 import httpx
@@ -26,6 +28,38 @@ def cache_read_multiplier(model):
 DIMENSIONS=1536
 REQUEST_SIZE=128
 
+RESEARCH_PURPOSES=('web-research-capture','editorial-web-research','web-research-tool')
+
+
+@dataclass(frozen=True)
+class WebTools:
+    search_type:str
+    fetch_type:str
+    searches:int
+    fetches:int
+    content_tokens:int
+    search_tokens:int
+    search_price:Decimal
+
+    def definitions(self):
+        if not re.fullmatch(r'web_search_\d{8}',self.search_type) or not re.fullmatch(r'web_fetch_\d{8}',self.fetch_type):
+            raise ValueError('Tipo de herramienta web inválido')
+        if any(type(n) is not int or not 0<=n<=5 for n in (self.searches,self.fetches)):
+            raise ValueError('Límites de herramientas web inválidos')
+        if not 1<=self.content_tokens<=20000 or not 1<=self.search_tokens<=100000:
+            raise ValueError('Reserva de tokens web inválida')
+        if not self.search_price.is_finite() or self.search_price<0:raise ValueError('Tarifa web inválida')
+        tools=[]
+        if self.searches:tools.append({'type':self.search_type,'name':'web_search','max_uses':self.searches})
+        if self.fetches:tools.append({'type':self.fetch_type,'name':'web_fetch','max_uses':self.fetches,
+                                     'max_content_tokens':self.content_tokens,'citations':{'enabled':True}})
+        if not tools:raise ValueError('Herramientas web desactivadas')
+        return tools
+
+    def reserved_input(self,input_tokens):
+        # Every tool turn can replay all accumulated result/input tokens. Reserve before generating.
+        return (input_tokens+256+self.searches*self.search_tokens+self.fetches*self.content_tokens)*(1+self.searches+self.fetches)
+
 def embedding_model():
     model=os.environ.get('EMBEDDING_MODEL','text-embedding-3-small')
     if model not in EMBEDDING_PRICES:raise ValueError('Modelo de embeddings sin tarifa verificada')
@@ -40,12 +74,27 @@ def limit_window_start(provider,now=None):
     local=(now or datetime.now(timezone.utc)).astimezone(ZoneInfo(os.environ.get('OPERATOR_TIMEZONE','America/Bogota')))
     return local.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
 
-def reserve(provider,purpose,amount,request_hash=None):
+def reserve(provider,purpose,amount,request_hash=None,metadata=None):
     amount=Decimal(str(amount));limit=Decimal(os.environ.get(provider.upper()+'_LIMIT_USD','1'))
     if not amount.is_finite() or amount<0 or not limit.is_finite() or limit<0:raise ValueError('Presupuesto inválido')
     rid=str(uuid.uuid4())
     with connect() as c:
         c.execute('SELECT pg_advisory_xact_lock(103502)')
+        if purpose in RESEARCH_PURPOSES:
+            from django.conf import settings
+            from team_backend.operador import period_starts
+            day,_=period_starts()
+            research_limit=Decimal(settings.WEB_RESEARCH_DAILY_USD)
+            if not research_limit.is_finite() or research_limit<0:raise ValueError('Presupuesto web inválido')
+            research_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE purpose=ANY(%s) AND created_at>=%s",(list(RESEARCH_PURPOSES),day)).fetchone()['spent']
+            if research_spent+amount>research_limit:raise ValueError('Presupuesto web diario agotado; incluye reservas pendientes')
+        if purpose.startswith(('editorial-','image-')):
+            from team_backend.operador import period_starts
+            day,_=period_starts()
+            editorial_limit=Decimal(os.environ.get('EDITORIAL_DAILY_LLM_USD','2'))
+            if not editorial_limit.is_finite() or editorial_limit<0:raise ValueError('Presupuesto editorial inválido')
+            editorial_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE (purpose LIKE 'editorial-%%' OR purpose LIKE 'image-%%') AND created_at>=%s",(day,)).fetchone()['spent']
+            if editorial_spent+amount>editorial_limit:raise ValueError('Presupuesto editorial diario agotado; incluye herramientas y reservas')
         if purpose.startswith('image-'):
             from team_backend.operador import period_starts
             day,_=period_starts()
@@ -59,7 +108,7 @@ def reserve(provider,purpose,amount,request_hash=None):
         spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s AND (%s::timestamptz IS NULL OR created_at>=%s)",(provider,since,since)).fetchone()['spent']
         if spent+amount>limit:
             raise ValueError(f'Límite local de {provider} alcanzado'+(' este mes' if since else '')+'; incluye reservas pendientes.')
-        c.execute('INSERT INTO usage_ledger(id,provider,purpose,reserved_usd,status,request_hash) VALUES(%s,%s,%s,%s,%s,%s)',(rid,provider,purpose,amount,'reserved',request_hash))
+        c.execute('INSERT INTO usage_ledger(id,provider,purpose,reserved_usd,status,request_hash,usage) VALUES(%s,%s,%s,%s,%s,%s,%s)',(rid,provider,purpose,amount,'reserved',request_hash,Jsonb(metadata or {})))
     return rid
 
 def validate_token_count(value):
@@ -72,7 +121,7 @@ def settle(rid,status,usage=None,cost=None):
         if cost is None:raise ValueError('Falta el coste de la solicitud completada')
         cost=Decimal(cost)
         if not cost.is_finite() or cost<0:raise ValueError('Coste inválido')
-    with connect() as c:c.execute('UPDATE usage_ledger SET status=%s,usage=%s,actual_usd=%s WHERE id=%s',(status,Jsonb(usage or {}),cost,rid))
+    with connect() as c:c.execute("UPDATE usage_ledger SET status=%s,usage=coalesce(usage,'{}'::jsonb)||%s,actual_usd=%s WHERE id=%s",(status,Jsonb(usage or {}),cost,rid))
 
 def authorize_uncertain_retry(rid,reason):
     """Local operator review only. Possible original spend remains reserved forever
@@ -190,7 +239,8 @@ def system_blocks(system,context=None):
     for block in (blocks[0],blocks[-1]):block['cache_control']={'type':'ephemeral'}
     return blocks
 
-def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
+def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None,
+           web_tools=None,request_hash=None):
     """`model` overrides ANTHROPIC_MODEL for one call (e.g. a cheaper classifier); it must have a verified price.
     `context` is stable text (str or list of str) sent after the instructions and cached with them."""
     import anthropic
@@ -200,6 +250,12 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
     client=anthropic_client(key)
     # Stable instructions and context first so they can be cached; the variable task goes in messages.
     params={'model':model,'system':system_blocks(system,context),'messages':[{'role':'user','content':message}]}
+    if web_tools is not None:
+        if not isinstance(web_tools,WebTools) or purpose not in RESEARCH_PURPOSES:
+            raise ValueError('Herramientas web fuera del contrato de investigación')
+        # Native citations and JSON schema output are not combined. Parse native citation blocks instead.
+        if output_schema:raise ValueError('La investigación usa citas nativas, no JSON generado con fuentes inventadas')
+        params['tools']=web_tools.definitions()
     output_config={}
     if effort:output_config['effort']=effort
     if output_schema:output_config['format']={'type':'json_schema','schema':output_schema}
@@ -210,7 +266,12 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
         raise ValueError('Conteo de Claude no disponible; no se envió la generación.') from None
     ip,op=MODEL_PRICES[model]
     # Worst case: every input token is a cache write.
-    rid=reserve('anthropic',purpose,(Decimal(input_tokens+256)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000)
+    reserved_input=web_tools.reserved_input(input_tokens) if web_tools else input_tokens+256
+    tool_cost=web_tools.search_price*web_tools.searches if web_tools else Decimal(0)
+    metadata={'research':True,'reserved_web_search_requests':web_tools.searches,'reserved_web_fetch_requests':web_tools.fetches,
+              'reserved_input_tokens':reserved_input,'model':model} if web_tools else None
+    rid=reserve('anthropic',purpose,(Decimal(reserved_input)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000+tool_cost,
+                request_hash,metadata=metadata)
     request_id=None
     try:
         with client.messages.stream(max_tokens=max_tokens,**params) as stream:
@@ -232,19 +293,35 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
                 'cache_read_input_tokens':validate_token_count(getattr(usage,'cache_read_input_tokens',None) or 0)}
         cost=(Decimal(tokens['input_tokens'])*ip+Decimal(tokens['cache_creation_input_tokens'])*ip*CACHE_WRITE
               +Decimal(tokens['cache_read_input_tokens'])*ip*cache_read_multiplier(model)+Decimal(tokens['output_tokens'])*op)/1000000
+        content=None
+        if web_tools:
+            content=[block.model_dump(mode='json') for block in message.content]
+            server_usage=getattr(usage,'server_tool_use',None)
+            used_search=any(b.get('type')=='server_tool_use' and b.get('name')=='web_search' for b in content)
+            used_fetch=sum(b.get('type')=='server_tool_use' and b.get('name')=='web_fetch' for b in content)
+            reported_searches=getattr(server_usage,'web_search_requests',None)
+            searches=validate_token_count(0 if reported_searches is None and not used_search else reported_searches)
+            reported_fetches=getattr(server_usage,'web_fetch_requests',None)
+            fetches=validate_token_count(used_fetch if reported_fetches is None else reported_fetches)
+            tokens.update(web_search_requests=searches,web_fetch_requests=fetches)
+            cost+=web_tools.search_price*searches
+            # The SDK retains native server results and citations; callers never reconstruct URLs from prose.
         answer='\n'.join(b.text for b in message.content if b.type=='text')
         stop_reason=message.stop_reason
     except (AttributeError,TypeError,ValueError):
         settle(rid,'uncertain',{'request_id':request_id});raise ValueError('Respuesta Claude inválida; reserva retenida.') from None
     record=dict(tokens,request_id=request_id,stop_reason=stop_reason)
+    if web_tools:record.update(research=True,search_usd=str(web_tools.search_price*tokens['web_search_requests']))
     settle(rid,'complete',record,cost)
     if stop_reason=='refusal':raise ValueError('Claude declinó la solicitud; no se generó contenido.')
     # Thinking counts against max_tokens: a structured answer cut there is incomplete JSON. Say so instead of
     # letting the caller report «invalid JSON» (the spend is already settled above).
     if stop_reason=='max_tokens' and output_schema:
         raise ValueError(f'Claude agotó max_tokens ({max_tokens}) antes de terminar la respuesta; subir el tope de {purpose}.')
-    if not answer:raise ValueError('Respuesta Claude vacía.')
-    return {'text':answer,'usage':record,'estimated_usd':float(cost),'model':model,'stop_reason':stop_reason,'request_id':request_id}
+    if not answer and not web_tools:raise ValueError('Respuesta Claude vacía.')
+    result={'text':answer,'usage':record,'estimated_usd':float(cost),'model':model,'stop_reason':stop_reason,'request_id':request_id}
+    if web_tools:result.update(content=content,ledger_id=rid)
+    return result
 
 # --------------------------------------------------------------------------- TypeSafe (Jev)
 # System One model: typed judgments with calibrated probabilities; it does not generate text.

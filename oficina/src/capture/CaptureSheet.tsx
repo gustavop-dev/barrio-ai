@@ -1,5 +1,7 @@
 // The capture sheet of Captura.dc.html: audio, photos, a note and «Para qué es», sent to the team in
 // one multipart POST. Mounted once by the Layout through CaptureSheetHost.
+import { AIEditControl } from '../components/ui/AIEditControl';
+import type { AIEdit } from '../../../compartido/src/api/imagenes';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -10,6 +12,7 @@ import {
   undoCaptura,
   useCapturas,
   useCreateCaptura,
+  usePreferencias,
   type CaptureOutput,
   type CapturePurpose,
 } from '../api/capturas';
@@ -29,6 +32,7 @@ import './capture.css';
 
 export const PURPOSES: readonly { value: CapturePurpose; label: string }[] = [
   { value: 'post', label: 'Idea para un post' },
+  { value: 'propuesta', label: 'Propuesta de post' },
   { value: 'dato', label: 'Dato sobre mí' },
   { value: 'respuesta', label: 'Responde una pregunta' },
   { value: 'galeria', label: 'Foto para la galería' },
@@ -218,6 +222,10 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: Capture
   const client = useQueryClient();
   const navigate = useNavigate();
   const create = useCreateCaptura();
+  const prefs = usePreferencias();
+  const [aiChoice, setAiChoice] = useState<AIEdit | null>(seed.draft?.ai_edit ?? null);
+  const aiEdit = aiChoice ?? prefs.data?.gallery_ai_edit ?? null;
+  const aiEditToSend = aiEdit ?? undefined;
   const [view, setView] = useState<'form' | 'history'>(seed.view ?? 'form');
   const history = useCapturas();
   const [context, setContext] = useState<CaptureTarget | null>(initialContext);
@@ -365,13 +373,14 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: Capture
     let finalAudio = readyAudio;
     if (audio.kind === 'recording' && audio.recorder.active) finalAudio = await audio.recorder.stop();
     if (finalAudio) setAudio({ kind: 'done', audio: finalAudio });
-    const draft: CaptureDraft = { audio: finalAudio, fotos: fotos.map((f) => f.file), nota, para, publicUse: publicChoice };
+    const draft: CaptureDraft = { audio: finalAudio, fotos: fotos.map((f) => f.file), nota, para, publicUse: publicChoice, ai_edit: aiEditToSend };
     const sentContext = context;
     create.mutate(
       {
         audio: finalAudio ? { blob: finalAudio.blob, filename: audioFilename(finalAudio.mime), durationS: finalAudio.duration } : null,
         fotos: draft.fotos,
         nota,
+        ai_edit: fotos.length ? aiEditToSend : undefined,
         para,
         contexto: context ? { tipo: context.tipo, id: context.id } : null,
         publicUse: context?.tipo === 'pregunta' ? publicChoice : null,
@@ -488,6 +497,11 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: Capture
             ) : null}
             {fotoProblem ? <p className="field-error">{fotoProblem}</p> : null}
           </div>
+
+          {fotos.length ? <div>
+            <AIEditControl testID="capture-ai" value={aiEdit} onChange={setAiChoice} disabled={sending} />
+            {aiEdit === null ? <p className="t-detalle text-suave">{prefs.isPending ? 'Cargando el valor de Ajustes…' : 'Se usará el valor de Ajustes si no eliges una opción.'}</p> : null}
+          </div> : null}
 
           <div className="cap-note">
             <label htmlFor={noteId} className="section-label">

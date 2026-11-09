@@ -1,6 +1,7 @@
 // Labels of the capture history («Lo que enviaste»), shared by the PWA and the native app.
 import { isProcessing, type CaptureOutput } from '../api/capturas';
 import { mmss } from './audio';
+import { CALENDAR_TZ } from './dates';
 import type { Tone } from './tone';
 
 const LOCALE = 'es-CO';
@@ -73,4 +74,18 @@ export function canUndo(capture: CaptureOutput, now: number): boolean {
   if (!capture.can_undo || !capture.undo_until) return false;
   const until = Date.parse(capture.undo_until);
   return Number.isFinite(until) && until > now;
+}
+
+/** This is the team's interpretation and a forecast, never a new urgency input. */
+export function publishAsapLines(capture: Pick<CaptureOutput, 'publish_asap' | 'publish_asap_evidence' | 'publish_asap_expected_slot' | 'publish_asap_reason'>): string[] {
+  if (!capture.publish_asap) return [];
+  const slot = capture.publish_asap_expected_slot ? new Date(capture.publish_asap_expected_slot) : null;
+  const when = slot && Number.isFinite(slot.getTime()) ? new Intl.DateTimeFormat('es-CO', {
+    timeZone: CALENDAR_TZ, weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(slot) : null;
+  return [
+    `Saldrá lo antes posible · ${when ? `fecha prevista: ${when}` : 'fecha por confirmar'}`,
+    ...(capture.publish_asap_reason?.trim() ? [capture.publish_asap_reason] : []),
+    ...(capture.publish_asap_evidence?.trim() ? [`«${capture.publish_asap_evidence}»`] : []),
+  ];
 }

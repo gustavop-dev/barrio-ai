@@ -4,6 +4,10 @@ import { captureForm, isAcceptedPhoto, listGaleria, sameOrigin, savePreferencias
 import { api } from './client';
 
 describe('captureForm', () => {
+  it.each(['no', 'auto', 'si'] as const)('sends only the new ai_edit field (%s)', (ai_edit) => {
+    expect([...captureForm({ nota: 'Una idea', ai_edit }).entries()]).toEqual([['nota', 'Una idea'], ['ai_edit', ai_edit]]);
+  });
+
   it('names every multipart field as the contract does', () => {
     const blob = new Blob(['a'], { type: 'audio/webm' });
     const form = captureForm({
@@ -48,7 +52,7 @@ describe('capturas API', () => {
   it('asks the gallery by filter and patches the preferences', async () => {
     const server = fakeServer({
       'GET /api/v1/galeria': { body: { count: 0, next: null, previous: null, results: [] } },
-      'PATCH /api/v1/ajustes/preferencias': (request) => ({ body: { gallery_ai_edit_default: true, updated_at: null, ...(request.body as object) } }),
+      'PATCH /api/v1/ajustes/preferencias': (request) => ({ body: { gallery_ai_edit: 'auto', updated_at: null, ...(request.body as object) } }),
     });
     await listGaleria('sin_usar');
     expect(server.requests[0]!.search.get('filtro')).toBe('sin_usar');

@@ -664,7 +664,7 @@ class Settings(APIView):
                                    'min_spacing_seconds':int(operador.min_spacing().total_seconds())},
                          'ai_spend':{'today':[
                              {'budget':'general','label':'General (comentarios)','spent_usd':_spend('propose-comment',day),'limit_usd':float(os.environ.get('OPERATOR_DAILY_LLM_USD','1'))},
-                             {'budget':'editorial','label':'Editorial','spent_usd':_spend('editorial-%',day),'limit_usd':float(os.environ.get('EDITORIAL_DAILY_LLM_USD','1'))},
+                             {'budget':'editorial','label':'Editorial (incluye imágenes e investigación de piezas)','spent_usd':float(editorial.spent_today(now)),'limit_usd':float(editorial.daily_budget())},
                              {'budget':'imagenes','label':'Imágenes','spent_usd':float(imagenes.spent_today(now)),'limit_usd':float(os.environ.get('IMAGE_DAILY_USD','1'))},
                              {'budget':'red','label':'Red','spent_usd':_spend('network-%',day),'limit_usd':float(red.daily_budget())}],
                              'month_usd':_spend('%',month),'total_usd':_spend('%'),'limit_usd':float(os.environ.get('ANTHROPIC_LIMIT_USD','1')),

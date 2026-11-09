@@ -3,7 +3,7 @@
 # recording from the sheet); an empty sheet closes at once, one with something in it asks «¿Cerrar sin enviar?»;
 # holding the button records; a note sent to the team shows the toast with «Deshacer», and «Deshacer» brings the draft
 # back in the sheet; sent again, it shows in «Lo que enviaste» with its state, and «Deshacer» there takes it out of the
-# list at once. The two seeded captures («Dato guardado» and «Usado») stay.
+# list at once. The three seeded captures (including the urgent idea) stay.
 # Photos, audio and the error states are in 05-captura-envios; captures tied to a question, a person or a piece in
 # 05-captura-contexto.
 #
