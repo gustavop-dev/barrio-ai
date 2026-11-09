@@ -142,16 +142,21 @@ class ProfileContentTests(SimpleTestCase):
             return httpx.Response(200,json={'data':[{'b64_json':base64.b64encode(output.getvalue()).decode()}],
                 'usage':{'input_tokens_details':{'text_tokens':100,'image_tokens':200},'output_tokens':30}})
         with patch.object(connectors_images,'TRANSPORT',httpx.MockTransport(handler)), \
+                patch.object(connectors_images,'EDIT_MODEL','gpt-image-1'), \
                 patch.object(connectors_images,'live',return_value='fake-key'), \
                 patch.object(providers,'reserve',return_value='fake-ledger') as reserve,patch.object(providers,'settle') as settle:
             result=connectors_images.ImageConnector().edit_profile({role:synthetic() for role in ('01','02','03')},'Only person edits','fake-request')
+            text_tokens=len(connectors_images.profile_prompt('Only person edits').encode())+32
         self.assertEqual(result,output.getvalue());self.assertEqual(len(calls),1)
-        # 3 x (65 + 129 x 4) image tokens, 17 prompt bytes + 32 framing,
+        # 3 x (65 + 129 x 4) image tokens, final prompt bytes + 32 framing,
         # 1056 medium output tokens; EDIT_PRICES x 1.5, rounded up to microdollars.
-        reserve.assert_called_once_with('openai','profile-image-edit',Decimal('0.089873'),request_hash='fake-request',
-            metadata={'estimate':{'text_tokens':49,'image_tokens':1743,'output_tokens':1056,
+        from decimal import ROUND_UP
+        amount=((Decimal(text_tokens)*5+1743*10+1056*40)/1_000_000*Decimal('1.5')).quantize(Decimal('.000001'),rounding=ROUND_UP)
+        reserve.assert_called_once_with('openai','profile-image-edit',amount,request_hash='fake-request',
+            metadata={'estimate':{'text_tokens':text_tokens,'image_tokens':1743,'output_tokens':1056,
                 'dimensions':[[800,800],[800,800],[800,800]],'size':'1024x1024','quality':'medium',
-                'margin':'1.5','minimum_usd':'0.05'}})
+                'margin':'1.5','minimum_usd':'0.05'},'request':{'model':'gpt-image-1','size':'1024x1024',
+                    'quality':'medium','output_format':'png','background':'transparent'}})
         settle.assert_called_once_with('fake-ledger','complete',
             {'input_tokens_details':{'text_tokens':100,'image_tokens':200},'output_tokens':30},Decimal('0.0037'))
 

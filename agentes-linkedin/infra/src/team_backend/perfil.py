@@ -209,7 +209,8 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
             edited=runtime.call('perfil_editar_persona',request,
                 lambda:cached if cached is not None else client.edit_profile(refs,instruction,f'{proposal.id}:{kind}'),
                 key='person:'+orquestacion.digest(request))
-            render_input={'sha256':{kind:imagenes.sha(edited)},'copy':banner if kind=='banner' else {},'brand':content.BRAND_VERSION}
+            render_input={'sha256':{kind:imagenes.sha(edited)},'copy':banner if kind=='banner' else {},
+                'brand':content.BRAND_VERSION,'matte':visual.perfil_chroma.VERSION}
             package=runtime.call('perfil_render',render_input,lambda:visual.render_tool({kind:edited},banner),
                 key='render:'+orquestacion.digest(render_input))
             if kind not in package['files']:
@@ -231,7 +232,8 @@ def assets(proposal,runtime,banner,client=None,checker=None,*,kinds=('A','B','ba
                 raise ValueError('Revisión visual bloqueada o incierta: '+kind)
             if gallery.stale(scoped,proposal.owner):raise ValueError('Referencias cambiadas durante la edición')
             provenance={'references':scoped,'brand_version':content.BRAND_VERSION,'base_prompt':visual.BASE_PROMPT,
-                'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{kind:instruction},'geometry':package['geometry']}
+                'model':imagenes.connector.EDIT_MODEL,'effective_prompts':{kind:instruction},'geometry':package['geometry'],
+                'mask':package.get('masks',{}).get(kind),'matte_version':visual.perfil_chroma.VERSION}
             for name,raw in selected.items():
                 if name in ASSET_KINDS:save_asset(proposal,name,raw,{'ok':True,'options':{kind:review},'sha256':[imagenes.sha(raw)]},provenance)
         except (ValueError,OSError) as exc:errors[kind]=str(exc)

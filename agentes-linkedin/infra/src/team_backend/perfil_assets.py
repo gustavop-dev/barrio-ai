@@ -1,6 +1,7 @@
 """Explicit visual-only continuation; original copy/decisions and $10 bucket survive deploys."""
 import copy
 import json
+import re
 import uuid
 from django.db import transaction
 from knowledge import providers
@@ -33,7 +34,9 @@ def queue(user,pid,*,expected_revision=None):
     if pending(proposal):
         return Job.objects.filter(kind='prepare_profile_assets',params__proposal=str(pid),state__in=['queued','running']).first()
     refs=gallery.references(user)
-    signature=orquestacion.digest({'references':refs,'brand':content.BRAND_VERSION})
+    signature=orquestacion.digest({'references':refs,'brand':content.BRAND_VERSION,
+        'matte':visual.perfil_chroma.VERSION,'model':connectors_images.EDIT_MODEL,
+        'transparent':connectors_images.supports_transparency()})
     jid=uuid.uuid5(perfil.NS,f'{pid}:v{proposal.version}:assets:{signature}')
     existing=Job.objects.filter(pk=jid,owner=user).first()
     if existing:return existing
@@ -62,8 +65,52 @@ def review(context):
     return result
 
 
+def recover_banner(section,previous):
+    """Recover layout from the existing section without rewriting the proposal or its claims."""
+    text=section.get('copy','').strip()
+    if not text:return copy.deepcopy(previous)
+    # Legacy sections sometimes carry label/phrase as prose or Markdown, not JSON.
+    text=re.sub(r'[*`]', '',text)
+    label=section.get('label','').strip()
+    label_pattern=r'\b(?:label|etiqueta)\b\s*(?:[:=]\s*[«“\"]?|[«“\"])([^\n»”\"]+)[»”\"]?'
+    match=re.search(label_pattern,text,re.I)
+    if match:
+        label=match[1].strip()
+        text=text[:match.start()].rstrip(' \n;|—-')+'\n'+text[match.end():].lstrip(' \n;|—-')
+    if not label:
+        notes='\n'.join([section.get('reason','')]+section.get('steps',[]))
+        match=re.search(label_pattern,re.sub(r'[*`]', '',notes),re.I)
+        if match:label=match[1].strip()
+    parts=[s.strip(' \t«»“”\"') for s in text.splitlines()]
+    parts=[s for s in parts if s]
+    if len(parts)>1:
+        label_index=next((i for i in (0,len(parts)-1) if parts[i].isupper()),None)
+        if label_index is not None:
+            standalone_label=parts.pop(label_index);label=label or standalone_label
+    phrase=' '.join(parts)
+    phrase=re.sub(r'^(?:phrase|frase|copy|tagline)\s*:\s*', '',phrase,flags=re.I).strip(' «»“”\"')
+    old_phrase=' '.join(previous.get('lines',[]))
+    if phrase==old_phrase and len(previous.get('lines',[]))==2:
+        result=copy.deepcopy(previous)
+        if label:result['label']=label
+        return result
+    words=phrase.split()
+    if len(words)<2:
+        return {'lines':[phrase] if phrase else [],'highlight':'','label':label,'evidence':list(section.get('evidence',[]))}
+    try:measure=visual.infografias.font(visual.FONT_PX).getlength
+    except OSError:measure=len  # banner_fit reports the missing font without blocking photos.
+    candidates=[[' '.join(words[:i]),' '.join(words[i:])] for i in range(1,len(words))]
+    fitting=[pair for pair in candidates if max(measure(s) for s in pair)<=visual.MAX_LINE_WIDTH]
+    lines=min(fitting or candidates,key=lambda pair:(abs(len(pair[0].split())-len(pair[1].split())),
+        max(measure(s) for s in pair)))
+    # Pick a unique complete word; punctuation stays in the phrase unchanged.
+    highlight=next((word for word in lines[1].split()+lines[0].split()
+        if re.fullmatch(r"[A-Za-z][A-Za-z'-]*[.,!?;:]?",word) and words.count(word)==1),'')
+    return {'lines':lines,'highlight':highlight,'label':label,'evidence':list(section.get('evidence',[]))}
+
+
 def review_context(proposal,refs):
-    """Recover rejected visual copy from its private checkpoint, never invoke a writer."""
+    """Recover visual copy from the current section, then its private checkpoint."""
     data={'sections':[],'banner':copy.deepcopy(proposal.context.get('banner') or {})}
     drafts=[]
     if proposal.cycle_id:
@@ -73,11 +120,12 @@ def review_context(proposal,refs):
                 if any(s['id'] in perfil.SECTION_ASSETS for s in draft.get('sections',[])):
                     drafts.append((call.get('finished_at',call.get('started_at','')),key,draft))
     latest=max(drafts,key=lambda item:item[:2])[2] if drafts else {}
-    if not data['banner']:data['banner']=copy.deepcopy(latest.get('banner') or {})
     original={s['id']:s for s in latest.get('sections',[])}
     for row in proposal.sections:
         if row['id'] not in perfil.SECTION_ASSETS or row.get('superseded_by') or row.get('decision')=='declined':continue
         source=original.get(row['id'],row) if not row.get('copy') else row
+        if row['id']=='banner' and not data['banner'].get('lines'):
+            data['banner']=recover_banner(source,latest.get('banner') or {})
         data['sections'].append({k:copy.deepcopy(source[k]) for k in content.SECTION['properties']})
     ctx=perfil.facts('full')
     ctx.update(section_ids=[s['id'] for s in data['sections']],references=refs,
@@ -90,6 +138,8 @@ def review_context(proposal,refs):
     for row in data['sections']:
         row['evidence']=[e for e in row['evidence'] if not e.startswith(('gallery:','consent:'))]+current_ids
     data=content.prepare_draft(data,ctx)
+    # Save the recovered layout before measuring/reviewing it, even if a later stage fails.
+    perfil._persist(proposal,context=dict(proposal.context,banner=copy.deepcopy(data['banner'])))
     fit=visual.banner_fit(data['banner'])
     ctx['render_evidence']=[fit]
     if 'banner' in ctx['section_ids']:
