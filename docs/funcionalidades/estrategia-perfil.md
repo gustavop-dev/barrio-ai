@@ -46,6 +46,14 @@ Fuente local leída íntegramente: [PerfilLinkedIn.dc.html](../../movil/diseno-m
 | Frase del banner | **La propone Perfil**, desde posicionamiento vigente y unidades de biblioteca, en inglés, dos líneas y dentro de la zona segura. «Software and AI for early-stage startups.» es **solo el fallback** del tablero, no el mensaje elegido de antemano. Incluso el fallback requiere coherencia con hechos/oferta confirmados; no rellena datos ausentes. La etiqueta de prueba «PRODUCT ENGINEER · FOUNDER AT PROJECTAPP» solo se conserva si cargo/empresa están acreditados. |
 | Restricciones | Sin logos de clientes, teléfonos, emails, efectos, marcos ni texto generado por modelo de imagen. Sin tonos aguamarina en la piel del retrato ni filtros de belleza. El recurso se reconoce a tamaño pequeño; no se usa la variante teñida o sin recortar del tablero como entregable final. |
 
+Los valores de ejecución viven en `team_backend/perfil_marca.py` y los consume `perfil_visual`.
+El catálogo de evidencia del redactor y de los revisores de copy y visual de foto/banner incluye
+`marca.tokens`, `marca.fuente`, `marca.banner_layout` y `marca.restricciones_render`, con versión y fuente de Gustavo.
+El presupuesto de cada línea y etiqueta es **470 px**, sin reducir los tamaños del tablero; se reserva espacio para la figura.
+Antes de revisar cada borrador, `perfil_visual.banner(None, banner)` aporta `render.banner_fit` con el texto exacto,
+resultado y geometría medida (o el error). Se recalcula tras corregir el texto; no acredita identidad, una charla,
+ni el comportamiento de LinkedIn real. Estas fuentes de diseño tampoco sustituyen los hechos públicos del copy.
+
 **Referencia descrita, sin imágenes:** Gustavo toma del banner de Diandra Escobar el color de firma memorable, figura recortada presentando con micrófono de mano, título grande, pequeñas burbujas de prueba social y llamada a la comunidad. Se adapta con aguamarina, fondo tinta y copy inglés propio. Solo se conserva esta descripción verbal de la referencia externa, nunca su imagen en Galería, proveedor, adjuntos, artefactos o repositorio.
 
 **Honestidad:** el micrófono **se mantiene por decisión de Gustavo como estilo**, no como afirmación de marca ni prueba de una charla real. Sin un evento/actividad de ponente confirmado en memoria, no escribir «speaker» ni atribuir charlas, escenarios, clientes o resultados. Las pruebas sociales opcionales requieren hecho real, fuente y fecha; si faltan, se omiten. La llamada a la comunidad requiere un destino existente. El Markdown indica «Composición estilizada con micrófono; no documenta una charla o evento real» cuando no existe esa evidencia, para que Gustavo decida al revisar. La excepción a «sin fotos» y los cambios visuales autorizados no dispensan la verificación de afirmaciones.

@@ -5,7 +5,8 @@ import re
 from urllib.parse import urlsplit
 from psycopg import Error as KnowledgeDatabaseError
 from knowledge import retrieval, providers
-from . import guardas, infografias as schema, orquestacion, perfil_galeria as gallery
+from . import guardas, infografias as schema, orquestacion, perfil_galeria as gallery, perfil_marca as brand
+from .perfil_marca import BRAND_VERSION
 
 POSITIONING_PROFILE_UNITS=['LI-01-M006-K02','LI-01-M007-K03','LI-02-V021-K01','LI-02-V003-K03']
 PROFILE_COPY_UNITS=['LI-02-V015-K03','LI-02-V016-K05','LI-02-V019-K01','LI-02-M008-K02','LI-02-M015-K03','LI-02-V010-K03']
@@ -22,7 +23,6 @@ REQUIRED_CITATIONS={'headline':['LI-02-V015-K03'],'about':['LI-02-V016-K05'],'ex
     'services':['LI-02-V016-K05','LI-02-V025-K02'], 'projects':['LI-02-V021-K01','LI-02-V019-K01'],
     'photo':PROFILE_VISUAL_UNITS+['LI-02-V017-K03'],'banner':PROFILE_VISUAL_UNITS+['LI-02-V003-K03']}
 UNREADABLE='No pude leer tu versión actual; compárala tú con esta recomendación nueva.'
-BRAND_VERSION='PerfilLinkedIn-gustavo-addenda-6-v1'
 MICROPHONE_NOTE='Composición estilizada con micrófono; no documenta una charla o evento real.'
 S=schema.string;A=schema.array;O=schema.obj
 CITATION=O(unit_id=S(),reason=S())
@@ -45,6 +45,11 @@ Todo copy público en inglés, listo para pegar, audiencia primero: qué puedo h
 Hechos personales SOLO de public_facts, snapshot propio fechado o recent_pieces publicadas con URL/métricas fechadas; orientación privada no es un hecho ni copy.
 evidence usa SOLO IDs exactos de evidence_catalog, nunca prosa, abreviaturas ni listas dentro de un string.
 Referencias y consentimiento solo acreditan decisiones visuales/autorización, nunca hechos biográficos.
+marca.tokens, marca.fuente, marca.banner_layout y marca.restricciones_render acreditan las decisiones de diseño
+de Gustavo para foto/banner. Cita esos IDs al describir colores, fuente, lienzo y restricciones de render en reason/steps.
+No acreditan cargos, ofertas, eventos ni límites oficiales de LinkedIn. No atribuyas la marca al curso.
+render.banner_fit es el resultado determinista para su input exacto: solo ok=true acredita que ESA frase/etiqueta cabe.
+Si cambias el texto, no afirmes medidas ni ajuste hasta que código vuelva a calcularlo; el revisor recibirá ese resultado.
 snapshot parcial o current=null NO bloquea: entrega una recomendación nueva y Gustavo compara la versión actual.
 Web es opcional: sin fuentes no inventes límites y continúa con biblioteca y hechos propios.
 No inventes cargos, fechas, clientes, resultados, habilidades, enlaces, premios ni charlas. No copies ejemplos del curso.
@@ -61,9 +66,9 @@ missing solo hechos imprescindibles desconocidos después de revisar TODO el con
 sin prefijo de ciclo (perfil.experience.start_date), no duplicar ni preguntar por fallos técnicos, biblioteca o fotos.
 No preguntar por datos ya acreditados bajo otra clave, ni por prueba social opcional: omitirla. El micrófono es estilo.
 Foto siempre A grises y B color, sonrisa de 01, identidad/transitions claras de 03. Banner usa cuerpo 02 y camiseta blanca
-oversized de algodón grueso crew neck en A, B y banner, sonrisa 01, micrófono en banner. Marca: #0FF1CE, #1E1E2B, Ubuntu. No atribuyas marca al curso.
-Propón banner.lines (dos líneas, muy breves, máximo 470px cada una a Ubuntu 56px), una palabra highlight, etiqueta acreditada
-uppercase a 22px que también quepa en 470px (omite cargos secundarios); fuente de cada afirmación en evidence.
+oversized de algodón grueso crew neck en A, B y banner, sonrisa 01, micrófono en banner.
+Propón banner.lines (dos líneas muy breves dentro de marca.restricciones_render), una palabra highlight, etiqueta acreditada
+uppercase al tamaño y anchura de esa fuente (omite cargos secundarios); fuente de cada afirmación en evidence.
 Si recibes previous_draft y findings, corrige esas incidencias conservando las secciones que ya estaban respaldadas.
 Sin prueba de ponencia, no uses speaker.
 El fallback Software and AI for early-stage startups. solo si esa oferta está confirmada; no lo fuerces si no cabe.
@@ -76,6 +81,10 @@ REVIEW_SYSTEM='''Verifica cada sección contra las unidades ORIGINALES y evidenc
 copy inglés listo para pegar, audiencia primero, ningún hecho inventado, ningún dato privado, URLs acreditadas,
 ninguna atribución de eventos a una composición con micrófono. keep necesita fundamento; missing/not_applicable sin
 recomendación necesitan explicación, no citas forzadas. evidence ya usa IDs de evidence_catalog: lee las fuentes asociadas.
+Para foto/banner, marca.* acredita los tokens, fuente, layout y restricciones decididos por Gustavo: verifica reason/steps
+contra sus valores y rechaza colores/fuentes/medidas ajenos a la guía. No son hechos biográficos ni límites de LinkedIn.
+Para afirmar que una frase cabe o citar sus medidas, usa render.banner_fit: ok, input exacto y geometry calculados
+por perfil_visual.banner(None, banner). Un fallo no acredita ajuste; una restricción de anchura no es una medida de la frase.
 No rechaces por current=null, web sin fuentes o datos solicitados mediante placeholders explícitos y preguntas.
 Una sección puede estar lista salvo esos hechos. No exijas copy editable para activity (keep/not_applicable).
 No consideres una id de fuente como prueba: lee su contenido. ok=false ante duda. missing_valid=true SOLO para una
@@ -117,7 +126,7 @@ def positioning(context):
 
 
 def draft(context):return llm(SYSTEM,dict(context,evidence_catalog=evidence_catalog(context)),DRAFT_SCHEMA,'profile-copy')
-def review(context):return llm(REVIEW_SYSTEM,context,REVIEW_SCHEMA,'profile-review')
+def review(context):return llm(REVIEW_SYSTEM,dict(context,evidence_catalog=evidence_catalog(context)),REVIEW_SCHEMA,'profile-review')
 
 
 def pending(sid,reason):
@@ -135,7 +144,7 @@ def evidence_catalog(context):
     result += [{'id':eid,'kind':'snapshot'} for eid in snapshot.get('evidence',[]) if eid not in present]
     result += [dict(p,kind='piece') for p in context.get('recent_pieces',[])]
     result += [dict(s,kind='web') for s in context.get('web',{}).get('sources',[]) if s.get('quoted_text')]
-    return result+gallery.evidence(context.get('references',[]))
+    return result+gallery.evidence(context.get('references',[]))+brand.evidence()+context.get('render_evidence',[])
 
 
 def normalize_evidence(values,context):
