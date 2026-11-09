@@ -500,6 +500,15 @@ def _enrich(account,contacts):
         ready.append(contact)
     return ready
 
+def classification_people(contacts):
+    """One input shape for production and its evaluation mirror; local evidence only."""
+    from .evidencia import contact_context
+    return [{'id':str(c.id),'name':c.display_name,'headline':c.headline[:300],'location':c.location,'network_distance':c.network_distance,
+             'provenance':contact_context(c),
+             'source':c.source,'evidence':{k:v for k,v in c.evidence.items() if k in ('referent','comment','query','invitation_message') and v}}
+            for c in contacts]
+
+
 def classify(user,account,now=None,batch=10):
     """One cheaper-model call for up to `batch` unclassified candidates or received invitations, each with its profile."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
@@ -510,11 +519,8 @@ def classify(user,account,now=None,batch=10):
     contacts=_enrich(account,pending)
     if not contacts:return {'classified':0,'fit':0,'stopped':'Sin perfiles legibles hoy; se clasifican mañana.' if pending else '',**grounding}
     _,private=guardas.blocks()
-    from .evidencia import contact_context, record_classification, CRITERION_VERSION
-    people=[{'id':str(c.id),'name':c.display_name,'headline':c.headline[:300],'location':c.location,'network_distance':c.network_distance,
-             'provenance':contact_context(c),
-             'source':c.source,'evidence':{k:v for k,v in c.evidence.items() if k in ('referent','comment','query','invitation_message') and v}}
-            for c in contacts]
+    from .evidencia import record_classification, CRITERION_VERSION
+    people=classification_people(contacts)
     from . import orientacion
     message=json.dumps({'private_guidance':private,'orientation':orientacion.text(),'people':people,'note_policy':note_policy()},ensure_ascii=False,default=str)
     # Sonnet 5.5 thinks at effort high by default; medium keeps the judgment and the cap leaves room for thinking.
