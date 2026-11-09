@@ -8,7 +8,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, type ReactNode } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { PageHeader, pageContent } from '@/components/ui';
+import { Button, PageHeader, pageContent } from '@/components/ui';
 import { colors, space } from '@/theme/tokens';
 import { AutonomiaSection } from './Autonomia';
 import { CapturaSection } from './Captura';
@@ -70,6 +70,7 @@ export function AjustesScreen() {
         }}
       >
         <PageHeader title="Ajustes" />
+        <Button testID="ajustes-mapa-equipo" variant="ghost" onPress={() => router.push('/equipo')}>Mapa del equipo</Button>
         <Anchor {...anchorProps('maquina')}>
           <MaquinaSection />
         </Anchor>

@@ -4,6 +4,7 @@
 // Tapping a character or a zone opens its panel in a half-height sheet (phone) or the side panel (desktop).
 
 import { nowLine } from '../../../compartido/src/scene/presentation';
+import { Link } from 'react-router-dom';
 export { nowLine, type NowLine } from '../../../compartido/src/scene/presentation';
 import { useCallback, useEffect, useId, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import { useOficinaEventos } from '../api/oficina';
@@ -174,6 +175,7 @@ export function Oficina() {
             </div>
 
             <div className="of-below">
+              <Link to="/equipo">Mapa del equipo</Link>
               <div className="of-legend">
                 <span>
                   <i className="of-dot trabajando" aria-hidden="true" />

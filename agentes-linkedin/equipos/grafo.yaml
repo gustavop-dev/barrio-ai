@@ -1,0 +1,3281 @@
+{
+  "schema_version": 1,
+  "graph_version": "3a.1",
+  "scope": "descriptive",
+  "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
+  "groups": {
+    "editorial": "Mesa editorial",
+    "observatorio": "Observatorio",
+    "relaciones": "Relaciones",
+    "operacion": "Operación",
+    "estrategia": "Estrategia y perfil"
+  },
+  "course_lists": {
+    "operador.COMMENT_UNITS": [
+      "LI-03-M006-K02",
+      "LI-03-V018-K02",
+      "LI-03-V020-K04",
+      "LI-06-M003-K06",
+      "LI-06-M002-K09",
+      "LI-06-M002-K10"
+    ],
+    "operador.REFERENTS_UNITS": [
+      "LI-03-V009-K04",
+      "LI-03-V018-K02",
+      "LI-03-M005-K05",
+      "LI-03-M005-K06",
+      "LI-03-V020-K05"
+    ],
+    "operador.ANALYSIS_UNITS": [
+      "LI-03-M004-K04",
+      "LI-03-V020-K05",
+      "LI-06-V006-K03",
+      "LI-06-V006-K04",
+      "LI-06-V007-K05",
+      "LI-06-V008-K01",
+      "LI-06-V008-K02"
+    ],
+    "operador.NETWORK_UNITS": [
+      "LI-03-M005-K05",
+      "LI-03-M005-K06",
+      "LI-03-V018-K02",
+      "LI-03-V018-K03",
+      "LI-03-V015-K01",
+      "LI-03-V021-K02",
+      "LI-03-V021-K03",
+      "LI-03-M006-K01",
+      "LI-03-M006-K04"
+    ],
+    "operador.INBOX_UNITS": [
+      "LI-03-V019-K03",
+      "LI-03-V019-K04",
+      "LI-03-V020-K01",
+      "LI-06-V006-K04"
+    ],
+    "operador.LEAD_UNITS": [
+      "LI-03-V020-K02",
+      "LI-03-M006-K01",
+      "LI-03-M005-K06",
+      "LI-06-M001-K04",
+      "LI-06-M001-K07"
+    ],
+    "editorial.APPROACH_UNITS": [
+      "LI-05-M001-K01",
+      "LI-05-M001-K02",
+      "LI-05-M001-K03",
+      "LI-05-M001-K04",
+      "LI-05-M001-K05",
+      "LI-05-M001-K06",
+      "LI-05-M002-K01",
+      "LI-05-M002-K02",
+      "LI-05-M002-K03"
+    ],
+    "editorial.LATER_FORMAT_UNITS": [
+      "LI-05-M002-K05",
+      "LI-05-M002-K06",
+      "LI-05-M002-K07",
+      "LI-05-M002-K08",
+      "LI-05-M003-K01",
+      "LI-05-M003-K02",
+      "LI-05-M003-K03"
+    ],
+    "editorial.PILLAR_UNITS": [
+      "LI-04-M005-K01"
+    ],
+    "editorial.CADENCE_UNITS": [
+      "LI-05-V022-K01",
+      "LI-05-V022-K03"
+    ],
+    "editorial.READER_UNITS": [
+      "LI-05-V005-K05",
+      "LI-06-V020-K01"
+    ],
+    "editorial.EDIT_UNITS": [
+      "LI-06-M002-K09",
+      "LI-06-M002-K10",
+      "LI-06-M003-K06"
+    ],
+    "editorial.GUIDE_UNITS": [
+      "LI-06-M001-K01",
+      "LI-06-M001-K02",
+      "LI-06-M001-K03",
+      "LI-06-M001-K04",
+      "LI-06-M001-K05",
+      "LI-06-M001-K06",
+      "LI-06-M001-K07",
+      "LI-06-M001-K08",
+      "LI-06-M001-K09",
+      "LI-06-M001-K10",
+      "LI-06-M001-K11",
+      "LI-06-M001-K12",
+      "LI-06-M001-K13",
+      "LI-06-M001-K14",
+      "LI-06-M001-K15",
+      "LI-06-M001-K16"
+    ],
+    "editorial.TEXT_FORMAT_UNIT": [
+      "LI-05-M002-K04"
+    ]
+  },
+  "budgets": {
+    "editorial": {
+      "source": "team_backend.editorial.daily_budget",
+      "description": "EDITORIAL_DAILY_LLM_USD=2 por día; guardia antes de cada etapa; no es un cap agregado por ciclo."
+    },
+    "general": {
+      "source": "team_backend.autopiloto._propose",
+      "description": "OPERATOR_DAILY_LLM_USD=1 y OPERATOR_DAILY_PROPOSALS=6; presupuestos globales del proveedor además del guard del autopiloto."
+    },
+    "red": {
+      "source": "team_backend.red.daily_budget",
+      "description": "NETWORK_DAILY_LLM_USD; lecturas, rampa y cupos BAR-15 en red.py y operador.py."
+    },
+    "imagenes": {
+      "source": "team_backend.imagenes.daily_budget",
+      "description": "IMAGE_DAILY_USD=1; reservas y estados inciertos en usage_ledger."
+    },
+    "semanal": {
+      "source": "team_backend.resumen_semanal.budget",
+      "description": "WEEKLY_SUMMARY_LLM_USD por semana local; presupuesto independiente."
+    },
+    "research": {
+      "source": "team_backend.research._claim",
+      "description": "WEB_RESEARCH_DAILY_USD=2; WEB_RESEARCH_DAILY_LIMIT=6; una reserva por key; límites de búsqueda/fetch y URLs de settings."
+    },
+    "proveedor": {
+      "source": "knowledge.providers",
+      "description": "Presupuestos y reservas del proveedor en usage_ledger; sin cap dedicado por ciclo."
+    },
+    "lecturas": {
+      "source": "team_backend.operador",
+      "description": "Cupos de lectura por servicio; no consume modelo cuando es determinista."
+    },
+    "escrituras": {
+      "source": "team_backend.operador.limits",
+      "description": "Ventana, pausa, espaciado, topes diarios/semanales por capacidad y BAR-15 antes de escribir."
+    },
+    "ninguno": {
+      "source": "team_backend.jobs",
+      "description": "Paso determinista o humano sin llamada pagada."
+    }
+  },
+  "schemas": {
+    "brief": {
+      "binding": "team_backend.editorial.BRIEF_SCHEMA",
+      "kind": "json_schema",
+      "description": "brief"
+    },
+    "variants": {
+      "binding": "team_backend.editorial.WRITER_SCHEMA",
+      "kind": "json_schema",
+      "description": "variants"
+    },
+    "panel": {
+      "binding": "team_backend.editorial.PANEL_SCHEMA",
+      "kind": "json_schema",
+      "description": "panel"
+    },
+    "selection": {
+      "binding": "team_backend.editorial.SELECTION_SCHEMA",
+      "kind": "json_schema",
+      "description": "selection"
+    },
+    "verification": {
+      "binding": "team_backend.editorial.VERIFIER_SCHEMA",
+      "kind": "json_schema",
+      "description": "verification"
+    },
+    "repair": {
+      "binding": "team_backend.editorial.REPAIR_SCHEMA",
+      "kind": "json_schema",
+      "description": "repair"
+    },
+    "comment": {
+      "binding": "team_backend.operador.COMMENT_SCHEMA",
+      "kind": "json_schema",
+      "description": "comment"
+    },
+    "classification": {
+      "binding": "team_backend.red.CLASSIFY_SCHEMA",
+      "kind": "json_schema",
+      "description": "classification"
+    },
+    "weekly": {
+      "binding": "team_backend.resumen_semanal.SCHEMA",
+      "kind": "json_schema",
+      "description": "weekly"
+    },
+    "image_choice": {
+      "binding": "team_backend.infografias.CHOICE_SCHEMA",
+      "kind": "json_schema",
+      "description": "image_choice"
+    },
+    "image_design": {
+      "binding": "team_backend.infografias.DESIGN_SCHEMA",
+      "kind": "json_schema",
+      "description": "image_design"
+    },
+    "image_check": {
+      "binding": "team_backend.connectors_images.CHECK_SCHEMA",
+      "kind": "json_schema",
+      "description": "image_check"
+    },
+    "research_request": {
+      "binding": "team_backend.research.ResearchRequest",
+      "kind": "dataclass",
+      "description": "research_request"
+    },
+    "research_result": {
+      "binding": "team_backend.research.ResearchResult",
+      "kind": "dataclass",
+      "description": "research_result"
+    },
+    "piece": {
+      "binding": "team_backend.models.EditorialPiece",
+      "kind": "model",
+      "description": "piece"
+    },
+    "proposal": {
+      "binding": "team_backend.models.ActionProposal",
+      "kind": "model",
+      "description": "proposal"
+    },
+    "execution": {
+      "binding": "team_backend.models.ActionExecution",
+      "kind": "model",
+      "description": "execution"
+    },
+    "capture": {
+      "binding": "team_backend.models.Capture",
+      "kind": "model",
+      "description": "capture"
+    },
+    "conversation": {
+      "binding": "team_backend.models.Conversation",
+      "kind": "model",
+      "description": "conversation"
+    },
+    "contact": {
+      "binding": "team_backend.models.Contact",
+      "kind": "model",
+      "description": "contact"
+    },
+    "post": {
+      "binding": "team_backend.models.ObservedPost",
+      "kind": "model",
+      "description": "post"
+    },
+    "job": {
+      "binding": "team_backend.models.Job",
+      "kind": "model",
+      "description": "job"
+    },
+    "metric": {
+      "binding": "team_backend.models.PostMetric",
+      "kind": "model",
+      "description": "metric"
+    },
+    "photo": {
+      "binding": "team_backend.models.GalleryPhoto",
+      "kind": "model",
+      "description": "photo"
+    },
+    "piece_image": {
+      "binding": "team_backend.models.PieceImage",
+      "kind": "model",
+      "description": "piece_image"
+    },
+    "editorial_input": {
+      "binding": "team_backend.editorial._run",
+      "kind": "python_payload",
+      "description": "Diccionarios construidos por _run: memoria, brief, fuentes, variantes y hallazgos según etapa; no hay JSON Schema de entrada en runtime."
+    },
+    "route": {
+      "binding": "team_backend.capturas.classify",
+      "kind": "local_schema",
+      "description": "JSON Schema local: destino, motivo e INTENT_FIELDS; opciones según presencia de fotos."
+    },
+    "intent": {
+      "binding": "team_backend.capture_intent.jev",
+      "kind": "typed_questions",
+      "description": "Preguntas Jev de intención y resultado aplicado a Capture.understanding."
+    },
+    "lead": {
+      "binding": "team_backend.lider.review",
+      "kind": "typed_questions",
+      "description": "Juicios noul, umbrales y decision de ActionProposal.review."
+    },
+    "prefilter": {
+      "binding": "team_backend.lider.comment_worthy",
+      "kind": "typed_questions",
+      "description": "Decisión tipada del prefiltro, antes de pagar un comentario."
+    },
+    "inbox_assessment": {
+      "binding": "team_backend.conversaciones.assess",
+      "kind": "typed_questions",
+      "description": "Conversation.assessment, probabilidades y umbrales; no envía mensajes."
+    },
+    "metrics_result": {
+      "binding": "team_backend.metricas.collect",
+      "kind": "python_payload",
+      "description": "Resultado determinista de collect y sus snapshots, sin JSON Schema formal."
+    },
+    "network_plan": {
+      "binding": "team_backend.red.plan",
+      "kind": "python_payload",
+      "description": "Plan determinista y propuestas RED-01/02/04; grounding y distribución por roles."
+    },
+    "read_result": {
+      "binding": "team_backend.operador.run_job",
+      "kind": "python_payload",
+      "description": "Resumen determinista retornado por operador.run_job; Job conserva estado, no un campo result."
+    },
+    "transcript": {
+      "binding": "knowledge.providers.assemblyai_transcribe",
+      "kind": "python_payload",
+      "description": "text, language, id y audio_duration de AssemblyAI."
+    },
+    "manual_request": {
+      "binding": "team_backend.serializers.RunInput",
+      "kind": "serializer",
+      "description": "Solicitud manual de conocimiento, sin cadencia automática."
+    },
+    "manual_result": {
+      "binding": "knowledge.agents.run",
+      "kind": "python_payload",
+      "description": "Contexto recuperado, propuesta con citas y estado; no es salida ejecutable."
+    },
+    "image_bytes": {
+      "binding": "team_backend.connectors_images.ImageConnector.edit",
+      "kind": "python_payload",
+      "description": "Bytes de imagen, privados; request_id por pieza/foto."
+    },
+    "veto": {
+      "binding": "team_backend.operador.reject",
+      "kind": "python_payload",
+      "description": "Cambio de estado humano; no es una aprobación positiva de cada post."
+    },
+    "orientation_decision": {
+      "binding": "team_backend.resumen_semanal.apply",
+      "kind": "python_payload",
+      "description": "Aplicar o descartar orientación propuesta; decisión humana independiente del veto de publicaciones."
+    }
+  },
+  "nodes": [
+    {
+      "id": "director_editorial",
+      "label": "Director editorial",
+      "group": "editorial",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "team_backend.editorial._run",
+      "description": "El código editorial coordina el brief y la pieza. Consulta herramientas y decide si continuar; el director no publica.",
+      "skills": [
+        "El código editorial coordina el brief y la pieza"
+      ],
+      "tools": [
+        "biblioteca",
+        "memoria",
+        "galeria"
+      ],
+      "course_lists": [
+        "editorial.PILLAR_UNITS",
+        "editorial.CADENCE_UNITS",
+        "editorial.APPROACH_UNITS",
+        "editorial.TEXT_FORMAT_UNIT"
+      ],
+      "course_units": [
+        "LI-04-M005-K01",
+        "LI-05-V022-K01",
+        "LI-05-V022-K03",
+        "LI-05-M001-K01",
+        "LI-05-M001-K02",
+        "LI-05-M001-K03",
+        "LI-05-M001-K04",
+        "LI-05-M001-K05",
+        "LI-05-M001-K06",
+        "LI-05-M002-K01",
+        "LI-05-M002-K02",
+        "LI-05-M002-K03",
+        "LI-05-M002-K04"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "EDITORIAL_MODEL_DIRECTOR → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "brief"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "director_editorial"
+        ],
+        "stage": "director"
+      }
+    },
+    {
+      "id": "copywriter_a",
+      "label": "Copywriter A",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Redacta la variante A. A y B salen de la misma llamada redactor; no son dos ejecuciones independientes.",
+      "skills": [
+        "Redacta la variante A"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.APPROACH_UNITS",
+        "editorial.TEXT_FORMAT_UNIT",
+        "editorial.EDIT_UNITS",
+        "editorial.GUIDE_UNITS"
+      ],
+      "course_units": [
+        "LI-05-M001-K01",
+        "LI-05-M001-K02",
+        "LI-05-M001-K03",
+        "LI-05-M001-K04",
+        "LI-05-M001-K05",
+        "LI-05-M001-K06",
+        "LI-05-M002-K01",
+        "LI-05-M002-K02",
+        "LI-05-M002-K03",
+        "LI-05-M002-K04",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-06-M001-K01",
+        "LI-06-M001-K02",
+        "LI-06-M001-K03",
+        "LI-06-M001-K04",
+        "LI-06-M001-K05",
+        "LI-06-M001-K06",
+        "LI-06-M001-K07",
+        "LI-06-M001-K08",
+        "LI-06-M001-K09",
+        "LI-06-M001-K10",
+        "LI-06-M001-K11",
+        "LI-06-M001-K12",
+        "LI-06-M001-K13",
+        "LI-06-M001-K14",
+        "LI-06-M001-K15",
+        "LI-06-M001-K16"
+      ],
+      "course_note": "El enfoque elegido del brief se antepone a la lista base de redactor; no se cargan los nueve enfoques a la vez.",
+      "model": "EDITORIAL_MODEL_REDACTOR → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "variants"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "copywriter_a"
+        ],
+        "stage": "redactor"
+      }
+    },
+    {
+      "id": "copywriter_b",
+      "label": "Copywriter B",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Redacta la variante B. A y B salen de la misma llamada redactor; no son dos ejecuciones independientes.",
+      "skills": [
+        "Redacta la variante B"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.APPROACH_UNITS",
+        "editorial.TEXT_FORMAT_UNIT",
+        "editorial.EDIT_UNITS",
+        "editorial.GUIDE_UNITS"
+      ],
+      "course_units": [
+        "LI-05-M001-K01",
+        "LI-05-M001-K02",
+        "LI-05-M001-K03",
+        "LI-05-M001-K04",
+        "LI-05-M001-K05",
+        "LI-05-M001-K06",
+        "LI-05-M002-K01",
+        "LI-05-M002-K02",
+        "LI-05-M002-K03",
+        "LI-05-M002-K04",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-06-M001-K01",
+        "LI-06-M001-K02",
+        "LI-06-M001-K03",
+        "LI-06-M001-K04",
+        "LI-06-M001-K05",
+        "LI-06-M001-K06",
+        "LI-06-M001-K07",
+        "LI-06-M001-K08",
+        "LI-06-M001-K09",
+        "LI-06-M001-K10",
+        "LI-06-M001-K11",
+        "LI-06-M001-K12",
+        "LI-06-M001-K13",
+        "LI-06-M001-K14",
+        "LI-06-M001-K15",
+        "LI-06-M001-K16"
+      ],
+      "course_note": "El enfoque elegido del brief se antepone a la lista base de redactor; no se cargan los nueve enfoques a la vez.",
+      "model": "EDITORIAL_MODEL_REDACTOR → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "variants"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "copywriter_b"
+        ],
+        "stage": "redactor"
+      }
+    },
+    {
+      "id": "lector_comprador",
+      "label": "Lector · comprador",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "skills": [
+        "Aporta fortalezas y objeciones desde su perspectiva"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.READER_UNITS"
+      ],
+      "course_units": [
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "EDITORIAL_MODEL_LECTORES → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "panel"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "lector_comprador"
+        ],
+        "stage": "lectores"
+      }
+    },
+    {
+      "id": "lector_recomendador",
+      "label": "Lector · recomendador",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "skills": [
+        "Aporta fortalezas y objeciones desde su perspectiva"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.READER_UNITS"
+      ],
+      "course_units": [
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "EDITORIAL_MODEL_LECTORES → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "panel"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "lector_recomendador"
+        ],
+        "stage": "lectores"
+      }
+    },
+    {
+      "id": "lector_divulgador",
+      "label": "Lector · divulgador",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "skills": [
+        "Aporta fortalezas y objeciones desde su perspectiva"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.READER_UNITS"
+      ],
+      "course_units": [
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "EDITORIAL_MODEL_LECTORES → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "panel"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "lector_divulgador"
+        ],
+        "stage": "lectores"
+      }
+    },
+    {
+      "id": "lector_lider",
+      "label": "Lector · lider",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "skills": [
+        "Aporta fortalezas y objeciones desde su perspectiva"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.READER_UNITS"
+      ],
+      "course_units": [
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "EDITORIAL_MODEL_LECTORES → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "panel"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "lector_lider"
+        ],
+        "stage": "lectores"
+      }
+    },
+    {
+      "id": "lector_par",
+      "label": "Lector · par",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "skills": [
+        "Aporta fortalezas y objeciones desde su perspectiva"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.READER_UNITS"
+      ],
+      "course_units": [
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "EDITORIAL_MODEL_LECTORES → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "panel"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "lector_par"
+        ],
+        "stage": "lectores"
+      }
+    },
+    {
+      "id": "seleccion_editorial",
+      "label": "Selección editorial",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "El director elige A, B, mezcla o descarta; edita el texto final.",
+      "skills": [
+        "El director elige A, B, mezcla o descarta; edita el texto final"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.EDIT_UNITS",
+        "editorial.READER_UNITS"
+      ],
+      "course_units": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-05-V005-K05",
+        "LI-06-V020-K01"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "EDITORIAL_MODEL_SELECCION → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "selection"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [],
+        "stage": "seleccion"
+      }
+    },
+    {
+      "id": "reparacion_editorial",
+      "label": "Reparación editorial",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "El director corrige hallazgos una vez; el resultado vuelve a reglas y verificador.",
+      "skills": [
+        "El director corrige hallazgos una vez; el resultado vuelve a reglas y verificador"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.EDIT_UNITS",
+        "editorial.GUIDE_UNITS"
+      ],
+      "course_units": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-06-M001-K04",
+        "LI-06-M001-K07"
+      ],
+      "course_note": "EDIT_UNITS más K04 y K07 de GUIDE_UNITS, como STAGES.",
+      "model": "EDITORIAL_MODEL_SELECCION → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "repair"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [],
+        "stage": "reparacion"
+      }
+    },
+    {
+      "id": "editor_verificador",
+      "label": "Verificador editorial",
+      "group": "editorial",
+      "role": "gate",
+      "status": "active",
+      "binding": "team_backend.editorial._stage",
+      "description": "Contrasta texto y afirmaciones con fuentes. Bloquea hallazgos materiales y fija el hash del texto.",
+      "skills": [
+        "Contrasta texto y afirmaciones con fuentes"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "editorial.EDIT_UNITS",
+        "editorial.GUIDE_UNITS"
+      ],
+      "course_units": [
+        "LI-06-M002-K09",
+        "LI-06-M002-K10",
+        "LI-06-M003-K06",
+        "LI-06-M001-K04",
+        "LI-06-M001-K07"
+      ],
+      "course_note": "EDIT_UNITS más K04 y K07 de GUIDE_UNITS, como STAGES.",
+      "model": "EDITORIAL_MODEL_VERIFICADOR → ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "high",
+      "model_note": null,
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "editorial_input"
+      ],
+      "output_schemas": [
+        "verification"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "editor_verificador"
+        ],
+        "stage": "verificador"
+      }
+    },
+    {
+      "id": "workflow_red",
+      "label": "Ciclo de red",
+      "group": "relaciones",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "team_backend.autopiloto.tick",
+      "description": "El autopiloto coordina subtriggers independientes de red; todavía no hay un manager LLM de Relaciones.",
+      "skills": [
+        "El autopiloto coordina subtriggers independientes de red; todavía no hay un manager LLM de Relaciones"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "red",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "read_result"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "investigador_referentes",
+      "label": "Observación de referentes",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.operador.observe",
+      "description": "Lee publicaciones de referentes y conserva evidencia. No cambia los referentes.",
+      "skills": [
+        "Lee publicaciones de referentes y conserva evidencia"
+      ],
+      "tools": [
+        "unipile_read",
+        "biblioteca"
+      ],
+      "course_lists": [
+        "operador.REFERENTS_UNITS"
+      ],
+      "course_units": [
+        "LI-03-V009-K04",
+        "LI-03-V018-K02",
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V020-K05"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "lecturas",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "read_result"
+      ],
+      "activity": {
+        "job_kinds": [
+          "observe"
+        ],
+        "event_roles": [
+          "investigador_referentes"
+        ]
+      }
+    },
+    {
+      "id": "descubrimiento_red",
+      "label": "Descubrimiento de personas",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.red.discover",
+      "description": "Busca personas para el barrio con topes de lecturas y evidencia.",
+      "skills": [
+        "Busca personas para el barrio con topes de lecturas y evidencia"
+      ],
+      "tools": [
+        "unipile_read",
+        "biblioteca"
+      ],
+      "course_lists": [
+        "operador.REFERENTS_UNITS"
+      ],
+      "course_units": [
+        "LI-03-V009-K04",
+        "LI-03-V018-K02",
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V020-K05"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "lecturas",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "read_result"
+      ],
+      "activity": {
+        "job_kinds": [
+          "discover_network"
+        ],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "clasificador_red",
+      "label": "Clasificación de personas",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.red.classify",
+      "description": "Clasifica encaje y rol con evidencia del curso; no envía invitaciones.",
+      "skills": [
+        "Clasifica encaje y rol con evidencia del curso; no envía invitaciones"
+      ],
+      "tools": [
+        "unipile_read",
+        "biblioteca"
+      ],
+      "course_lists": [
+        "operador.NETWORK_UNITS"
+      ],
+      "course_units": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V018-K02",
+        "LI-03-V018-K03",
+        "LI-03-V015-K01",
+        "LI-03-V021-K02",
+        "LI-03-V021-K03",
+        "LI-03-M006-K01",
+        "LI-03-M006-K04"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "NETWORK_CLASSIFIER_MODEL (claude-sonnet-5-5)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "red",
+      "input_schemas": [
+        "contact"
+      ],
+      "output_schemas": [
+        "classification"
+      ],
+      "activity": {
+        "job_kinds": [
+          "classify_contacts"
+        ],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "relaciones_comunidad",
+      "label": "Relaciones y comentarios",
+      "group": "relaciones",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.operador.propose_comment",
+      "description": "Propone comentarios tras el prefiltro Jev. Una reescritura si incumple reglas de texto.",
+      "skills": [
+        "Propone comentarios tras el prefiltro Jev"
+      ],
+      "tools": [
+        "unipile_read",
+        "biblioteca",
+        "memoria"
+      ],
+      "course_lists": [
+        "operador.COMMENT_UNITS"
+      ],
+      "course_units": [
+        "LI-03-M006-K02",
+        "LI-03-V018-K02",
+        "LI-03-V020-K04",
+        "LI-06-M003-K06",
+        "LI-06-M002-K09",
+        "LI-06-M002-K10"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "general",
+      "input_schemas": [
+        "post"
+      ],
+      "output_schemas": [
+        "comment"
+      ],
+      "activity": {
+        "job_kinds": [
+          "propose_comment"
+        ],
+        "event_roles": [
+          "relaciones_comunidad"
+        ]
+      }
+    },
+    {
+      "id": "plan_red",
+      "label": "Plan de red",
+      "group": "relaciones",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.red.plan",
+      "description": "Propone seguir, invitar y aceptar. Aplica BAR-15, diversidad por roles, rampa y notas mensuales.",
+      "skills": [
+        "Propone seguir, invitar y aceptar"
+      ],
+      "tools": [
+        "unipile_read",
+        "biblioteca"
+      ],
+      "course_lists": [
+        "operador.NETWORK_UNITS"
+      ],
+      "course_units": [
+        "LI-03-M005-K05",
+        "LI-03-M005-K06",
+        "LI-03-V018-K02",
+        "LI-03-V018-K03",
+        "LI-03-V015-K01",
+        "LI-03-V021-K02",
+        "LI-03-V021-K03",
+        "LI-03-M006-K01",
+        "LI-03-M006-K04"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "red",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "network_plan"
+      ],
+      "activity": {
+        "job_kinds": [
+          "plan_network"
+        ],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "sync_red",
+      "label": "Sincronización de red",
+      "group": "relaciones",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.red.sync",
+      "description": "Lee invitaciones y conexiones y actualiza sus estados; no escribe en LinkedIn.",
+      "skills": [
+        "Lee invitaciones y conexiones y actualiza sus estados; no escribe en LinkedIn"
+      ],
+      "tools": [
+        "unipile_read"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "lecturas",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "read_result"
+      ],
+      "activity": {
+        "job_kinds": [
+          "sync_network"
+        ],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "workflow_inbox",
+      "label": "Ciclo de inbox",
+      "group": "relaciones",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "team_backend.conversaciones.read_inbox",
+      "description": "Lee chats y coordina los juicios acotados por corrida. Solo lleva atención a Tu turno.",
+      "skills": [
+        "Lee chats y coordina los juicios acotados por corrida"
+      ],
+      "tools": [
+        "unipile_read"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "lecturas",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "read_result"
+      ],
+      "activity": {
+        "job_kinds": [
+          "read_inbox"
+        ],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "conversaciones_inbox",
+      "label": "Conversaciones e inbox",
+      "group": "relaciones",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.conversaciones.assess",
+      "description": "Evalúa oportunidad y espera de respuesta. Nunca envía ni marca mensajes como leídos.",
+      "skills": [
+        "Evalúa oportunidad y espera de respuesta"
+      ],
+      "tools": [
+        "biblioteca"
+      ],
+      "course_lists": [
+        "operador.INBOX_UNITS"
+      ],
+      "course_units": [
+        "LI-03-V019-K03",
+        "LI-03-V019-K04",
+        "LI-03-V020-K01",
+        "LI-06-V006-K04"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "TYPESAFE_MODEL (knowledge.providers.typesafe)",
+      "effort": null,
+      "model_note": null,
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "conversation"
+      ],
+      "output_schemas": [
+        "inbox_assessment"
+      ],
+      "activity": {
+        "job_kinds": [
+          "read_inbox"
+        ],
+        "event_roles": [
+          "conversaciones_inbox"
+        ]
+      }
+    },
+    {
+      "id": "metricas",
+      "label": "Métricas",
+      "group": "observatorio",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "team_backend.metricas.collect",
+      "description": "Recoge cortes de posts a 24 h, 72 h y 7 días y audiencia diaria. Entrega datos a la mesa editorial.",
+      "skills": [
+        "Recoge cortes de posts a 24 h, 72 h y 7 días y audiencia diaria"
+      ],
+      "tools": [
+        "unipile_read",
+        "biblioteca"
+      ],
+      "course_lists": [
+        "operador.ANALYSIS_UNITS"
+      ],
+      "course_units": [
+        "LI-03-M004-K04",
+        "LI-03-V020-K05",
+        "LI-06-V006-K03",
+        "LI-06-V006-K04",
+        "LI-06-V007-K05",
+        "LI-06-V008-K01",
+        "LI-06-V008-K02"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "lecturas",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "metrics_result"
+      ],
+      "activity": {
+        "job_kinds": [
+          "collect_metrics"
+        ],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "analista_barrio_resultados",
+      "label": "Analista · resumen semanal",
+      "group": "observatorio",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "team_backend.resumen_semanal.run",
+      "description": "Reúne cifras de la semana y redacta el informe fundamentado. La orientación propuesta requiere decisión de Gustavo.",
+      "skills": [
+        "Reúne cifras de la semana y redacta el informe fundamentado"
+      ],
+      "tools": [
+        "biblioteca",
+        "metricas"
+      ],
+      "course_lists": [
+        "operador.ANALYSIS_UNITS"
+      ],
+      "course_units": [
+        "LI-03-M004-K04",
+        "LI-03-V020-K05",
+        "LI-06-V006-K03",
+        "LI-06-V006-K04",
+        "LI-06-V007-K05",
+        "LI-06-V008-K01",
+        "LI-06-V008-K02"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": "medium",
+      "model_note": null,
+      "budget_ref": "semanal",
+      "input_schemas": [
+        "job"
+      ],
+      "output_schemas": [
+        "weekly"
+      ],
+      "activity": {
+        "job_kinds": [
+          "weekly_summary"
+        ],
+        "event_roles": [
+          "analista_barrio_resultados"
+        ]
+      }
+    },
+    {
+      "id": "lider_jev",
+      "label": "Líder · Jev",
+      "group": "operacion",
+      "role": "gate",
+      "status": "active",
+      "binding": "team_backend.lider.review",
+      "description": "Evalúa propuestas con juicios tipados. Solo se aplica a las capacidades configuradas cuando LEAD_ENABLED está activo; no dirige los ciclos.",
+      "skills": [
+        "Evalúa propuestas con juicios tipados"
+      ],
+      "tools": [
+        "biblioteca",
+        "memoria"
+      ],
+      "course_lists": [
+        "operador.LEAD_UNITS"
+      ],
+      "course_units": [
+        "LI-03-V020-K02",
+        "LI-03-M006-K01",
+        "LI-03-M005-K06",
+        "LI-06-M001-K04",
+        "LI-06-M001-K07"
+      ],
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "model": "TYPESAFE_MODEL (knowledge.providers.typesafe)",
+      "effort": null,
+      "model_note": null,
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "proposal"
+      ],
+      "output_schemas": [
+        "lead",
+        "prefilter"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [],
+        "audit_actions": [
+          "operator.lead_reviewed"
+        ]
+      }
+    },
+    {
+      "id": "gustavo",
+      "label": "Gustavo · veto",
+      "group": "operacion",
+      "role": "gate",
+      "status": "active",
+      "binding": "team_backend.operador.reject",
+      "description": "Puede vetar y pausar. El veto no exige aprobación positiva de cada publicación. La ruta manual conserva sus permisos.",
+      "skills": [
+        "Puede vetar y pausar"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "ninguno",
+      "input_schemas": [
+        "proposal"
+      ],
+      "output_schemas": [
+        "veto",
+        "orientation_decision"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [],
+        "audit_actions": [
+          "operator.rejected"
+        ]
+      }
+    },
+    {
+      "id": "operador_cuenta",
+      "label": "Operador de cuenta",
+      "group": "operacion",
+      "role": "executor",
+      "status": "active",
+      "binding": "team_backend.operador.execute",
+      "description": "Único escritor en LinkedIn. Recomprueba aprobación, hash, pausa, ventana y cupos; concilia resultados inciertos.",
+      "skills": [
+        "Único escritor en LinkedIn"
+      ],
+      "tools": [
+        "linkedin_write",
+        "unipile_read"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "escrituras",
+      "input_schemas": [
+        "proposal"
+      ],
+      "output_schemas": [
+        "execution"
+      ],
+      "activity": {
+        "job_kinds": [
+          "execute_action",
+          "reconcile_action"
+        ],
+        "event_roles": [
+          "operador_cuenta"
+        ]
+      }
+    },
+    {
+      "id": "capturas",
+      "label": "Procesamiento de capturas",
+      "group": "operacion",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "team_backend.capturas.process",
+      "description": "Coordina transcripción, intención, investigación y destino. La escena lo atribuye históricamente al operador de cuenta.",
+      "skills": [
+        "Coordina transcripción, intención, investigación y destino"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "capture"
+      ],
+      "output_schemas": [
+        "capture"
+      ],
+      "activity": {
+        "job_kinds": [
+          "process_capture"
+        ],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "ruteador_capturas",
+      "label": "Destino de capturas",
+      "group": "operacion",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.capturas.classify",
+      "description": "Propone destino e intención para una captura; el código valida y guarda el resultado.",
+      "skills": [
+        "Propone destino e intención para una captura; el código valida y guarda el resultado"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": "capturas.ROUTE_MODEL (claude-sonnet-5-5)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "capture"
+      ],
+      "output_schemas": [
+        "route"
+      ],
+      "activity": {
+        "job_kinds": [
+          "process_capture"
+        ],
+        "event_roles": [],
+        "capture_evidence": "route"
+      }
+    },
+    {
+      "id": "intencion_captura",
+      "label": "Intención de captura · Jev",
+      "group": "operacion",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.capture_intent.jev",
+      "description": "Interpreta peticiones explícitas sin fotos; el contexto elegido conserva el destino.",
+      "skills": [
+        "Interpreta peticiones explícitas sin fotos; el contexto elegido conserva el destino"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": "TYPESAFE_MODEL (knowledge.providers.typesafe)",
+      "effort": null,
+      "model_note": null,
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "capture"
+      ],
+      "output_schemas": [
+        "intent"
+      ],
+      "activity": {
+        "job_kinds": [
+          "process_capture"
+        ],
+        "event_roles": [],
+        "capture_evidence": "intent"
+      }
+    },
+    {
+      "id": "transcripcion",
+      "label": "Transcripción de audio",
+      "group": "operacion",
+      "role": "specialist",
+      "status": "active",
+      "binding": "knowledge.providers.assemblyai_transcribe",
+      "description": "Transcribe el audio una vez. Una interrupción no repite gasto automáticamente.",
+      "skills": [
+        "Transcribe el audio una vez"
+      ],
+      "tools": [
+        "assemblyai"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": "knowledge.providers.ASSEMBLYAI_MODELS (universal-3-5-pro, universal-2)",
+      "effort": null,
+      "model_note": null,
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "capture"
+      ],
+      "output_schemas": [
+        "transcript"
+      ],
+      "activity": {
+        "job_kinds": [
+          "process_capture"
+        ],
+        "event_roles": [],
+        "capture_evidence": "transcript"
+      }
+    },
+    {
+      "id": "investigacion_web",
+      "label": "Investigación web",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.research.research",
+      "description": "Investiga preguntas públicas y enlaces con fuentes y citas. Una reserva por key; sin memoria privada ni llamadas a agentes.",
+      "skills": [
+        "Investiga preguntas públicas y enlaces con fuentes y citas"
+      ],
+      "tools": [
+        "web_search",
+        "web_fetch",
+        "github_public"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": "WEB_RESEARCH_MODEL (claude-sonnet-5-5)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "research",
+      "input_schemas": [
+        "research_request"
+      ],
+      "output_schemas": [
+        "research_result"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [],
+        "research": true
+      }
+    },
+    {
+      "id": "diseno_imagen",
+      "label": "Diseño de infografía y carrusel",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.imagenes.design",
+      "description": "Propone datos para plantillas; el código renderiza. Una corrección como máximo antes de fallback.",
+      "skills": [
+        "Propone datos para plantillas; el código renderiza"
+      ],
+      "tools": [
+        "render_templates"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": "ANTHROPIC_VISION_MODEL (claude-sonnet-5-5)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "imagenes",
+      "input_schemas": [
+        "piece"
+      ],
+      "output_schemas": [
+        "image_design"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [],
+        "piece_evidence": "design"
+      }
+    },
+    {
+      "id": "edicion_foto",
+      "label": "Edición de foto",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.connectors_images.ImageConnector.edit",
+      "description": "Prepara una edición de la foto elegida; se publica el original si la revisión no aprueba la edición.",
+      "skills": [
+        "Prepara una edición de la foto elegida; se publica el original si la revisión no aprueba la edición"
+      ],
+      "tools": [
+        "image_edit"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": "OPENAI_IMAGE_MODEL (gpt-image-2)",
+      "effort": null,
+      "model_note": null,
+      "budget_ref": "imagenes",
+      "input_schemas": [
+        "photo"
+      ],
+      "output_schemas": [
+        "image_bytes"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [],
+        "piece_evidence": "edited"
+      }
+    },
+    {
+      "id": "revision_visual",
+      "label": "Revisión de imagen",
+      "group": "editorial",
+      "role": "gate",
+      "status": "active",
+      "binding": "team_backend.connectors_images.ImageConnector.check",
+      "description": "Revisa contenido visual y vincula el veredicto a los bytes finales. No es el especialista visual futuro EDI-21.",
+      "skills": [
+        "Revisa contenido visual y vincula el veredicto a los bytes finales"
+      ],
+      "tools": [
+        "vision"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": "ANTHROPIC_VISION_MODEL (claude-sonnet-5-5)",
+      "effort": "low",
+      "model_note": null,
+      "budget_ref": "imagenes",
+      "input_schemas": [
+        "piece_image"
+      ],
+      "output_schemas": [
+        "image_check"
+      ],
+      "activity": {
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [],
+        "piece_evidence": "review"
+      }
+    },
+    {
+      "id": "posicionamiento",
+      "label": "Posicionamiento · consulta manual",
+      "group": "estrategia",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "knowledge.agents.run",
+      "description": "Responde consultas manuales con recuperación de unidades del curso. Sin ciclo periódico ni escritura del perfil.",
+      "skills": [
+        "Responde consultas manuales con recuperación de unidades del curso"
+      ],
+      "tools": [
+        "biblioteca_search",
+        "memoria"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Recuperación dinámica knowledge.agents.context; no hay lista curada fija para este rol.",
+      "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": null,
+      "model_note": null,
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "manual_request"
+      ],
+      "output_schemas": [
+        "manual_result"
+      ],
+      "activity": {
+        "job_kinds": [
+          "agent_run"
+        ],
+        "event_roles": [],
+        "agent": "posicionamiento"
+      }
+    },
+    {
+      "id": "perfil",
+      "label": "Perfil · consulta manual",
+      "group": "estrategia",
+      "role": "orchestrator",
+      "status": "active",
+      "binding": "knowledge.agents.run",
+      "description": "Responde consultas manuales con recuperación de unidades del curso. Sin ciclo periódico ni escritura del perfil.",
+      "skills": [
+        "Responde consultas manuales con recuperación de unidades del curso"
+      ],
+      "tools": [
+        "biblioteca_search",
+        "memoria"
+      ],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Recuperación dinámica knowledge.agents.context; no hay lista curada fija para este rol.",
+      "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
+      "effort": null,
+      "model_note": null,
+      "budget_ref": "proveedor",
+      "input_schemas": [
+        "manual_request"
+      ],
+      "output_schemas": [
+        "manual_result"
+      ],
+      "activity": {
+        "job_kinds": [
+          "agent_run"
+        ],
+        "event_roles": [],
+        "agent": "perfil"
+      }
+    },
+    {
+      "id": "editor_visual",
+      "label": "Especialista visual · EDI-21",
+      "group": "editorial",
+      "role": "specialist",
+      "status": "planned",
+      "binding": null,
+      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "skills": [
+        "En diseño"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "ninguno",
+      "input_schemas": [],
+      "output_schemas": [],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "investigador_lider",
+      "label": "Referentes mensuales",
+      "group": "observatorio",
+      "role": "orchestrator",
+      "status": "planned",
+      "binding": null,
+      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "skills": [
+        "En diseño"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "ninguno",
+      "input_schemas": [],
+      "output_schemas": [],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "estudio_comunidad",
+      "label": "Estudio de comunidad",
+      "group": "observatorio",
+      "role": "specialist",
+      "status": "planned",
+      "binding": null,
+      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "skills": [
+        "En diseño"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "ninguno",
+      "input_schemas": [],
+      "output_schemas": [],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": []
+      }
+    },
+    {
+      "id": "ciclo_perfil",
+      "label": "Ciclo periódico de perfil",
+      "group": "estrategia",
+      "role": "orchestrator",
+      "status": "planned",
+      "binding": null,
+      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "skills": [
+        "En diseño"
+      ],
+      "tools": [],
+      "course_lists": [],
+      "course_units": [],
+      "course_note": "Este paso no carga una lista curada del curso.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "ninguno",
+      "input_schemas": [],
+      "output_schemas": [],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": []
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "brief",
+      "from": "director_editorial",
+      "to": "director_editorial",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "brief",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "redactar_a",
+      "from": "director_editorial",
+      "to": "copywriter_a",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "variants",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_group": "redactor"
+    },
+    {
+      "id": "redactar_b",
+      "from": "director_editorial",
+      "to": "copywriter_b",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "variants",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_group": "redactor"
+    },
+    {
+      "id": "seleccionar",
+      "from": "director_editorial",
+      "to": "seleccion_editorial",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "selection",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "reparar",
+      "from": "director_editorial",
+      "to": "reparacion_editorial",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "repair",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "verificar",
+      "from": "director_editorial",
+      "to": "editor_verificador",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "verification",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "investigar_pieza",
+      "from": "director_editorial",
+      "to": "investigacion_web",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "research_request",
+      "response_schema": "research_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "disenar",
+      "from": "director_editorial",
+      "to": "diseno_imagen",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "piece",
+      "response_schema": "image_design",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "editar_foto",
+      "from": "director_editorial",
+      "to": "edicion_foto",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "photo",
+      "response_schema": "image_bytes",
+      "max_calls_per_cycle": 8,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "revisar_imagen",
+      "from": "director_editorial",
+      "to": "revision_visual",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "piece_image",
+      "response_schema": "image_check",
+      "max_calls_per_cycle": 8,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "leer_lector_comprador",
+      "from": "director_editorial",
+      "to": "lector_comprador",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "panel",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_group": "lectores"
+    },
+    {
+      "id": "leer_lector_recomendador",
+      "from": "director_editorial",
+      "to": "lector_recomendador",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "panel",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_group": "lectores"
+    },
+    {
+      "id": "leer_lector_divulgador",
+      "from": "director_editorial",
+      "to": "lector_divulgador",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "panel",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_group": "lectores"
+    },
+    {
+      "id": "leer_lector_lider",
+      "from": "director_editorial",
+      "to": "lector_lider",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "panel",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_group": "lectores"
+    },
+    {
+      "id": "leer_lector_par",
+      "from": "director_editorial",
+      "to": "lector_par",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "editorial_input",
+      "response_schema": "panel",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_group": "lectores"
+    },
+    {
+      "id": "visual_futuro",
+      "from": "director_editorial",
+      "to": "editor_visual",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "piece",
+      "response_schema": "image_choice",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "planned"
+    },
+    {
+      "id": "observar",
+      "from": "workflow_red",
+      "to": "investigador_referentes",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "job",
+      "response_schema": "read_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "descubrir",
+      "from": "workflow_red",
+      "to": "descubrimiento_red",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "job",
+      "response_schema": "read_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "clasificar",
+      "from": "workflow_red",
+      "to": "clasificador_red",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "contact",
+      "response_schema": "classification",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "comentar",
+      "from": "workflow_red",
+      "to": "relaciones_comunidad",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "post",
+      "response_schema": "comment",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "planificar_red",
+      "from": "workflow_red",
+      "to": "plan_red",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "job",
+      "response_schema": "network_plan",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "sincronizar",
+      "from": "workflow_red",
+      "to": "sync_red",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "job",
+      "response_schema": "read_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "prefiltro",
+      "from": "workflow_red",
+      "to": "lider_jev",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "post",
+      "response_schema": "prefilter",
+      "max_calls_per_cycle": 3,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "evaluar_inbox",
+      "from": "workflow_inbox",
+      "to": "conversaciones_inbox",
+      "cycles": [
+        "inbox"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "conversation",
+      "response_schema": "inbox_assessment",
+      "max_calls_per_cycle": {
+        "setting": "INBOX_ASSESS_PER_RUN",
+        "default": 5
+      },
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "orientacion_propuesta",
+      "from": "analista_barrio_resultados",
+      "to": "gustavo",
+      "cycles": [
+        "resumen_semanal"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "weekly",
+      "response_schema": "orientation_decision",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active"
+    },
+    {
+      "id": "rutear",
+      "from": "capturas",
+      "to": "ruteador_capturas",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "capture",
+      "response_schema": "route",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "entender",
+      "from": "capturas",
+      "to": "intencion_captura",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "capture",
+      "response_schema": "intent",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "transcribir",
+      "from": "capturas",
+      "to": "transcripcion",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "capture",
+      "response_schema": "transcript",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "investigar_captura",
+      "from": "capturas",
+      "to": "investigacion_web",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "research_request",
+      "response_schema": "research_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "pieza_diaria_gate_0",
+      "from": "editor_verificador",
+      "to": "lider_jev",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "gate",
+      "request_schema": "proposal",
+      "response_schema": "lead",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior."
+    },
+    {
+      "id": "pieza_diaria_gate_1",
+      "from": "lider_jev",
+      "to": "gustavo",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "gate",
+      "request_schema": "proposal",
+      "response_schema": "veto",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior."
+    },
+    {
+      "id": "pieza_diaria_gate_2",
+      "from": "gustavo",
+      "to": "operador_cuenta",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "gate",
+      "request_schema": "proposal",
+      "response_schema": "execution",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior."
+    },
+    {
+      "id": "politica_red",
+      "from": "workflow_red",
+      "to": "lider_jev",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "gate",
+      "request_schema": "proposal",
+      "response_schema": "lead",
+      "max_calls_per_cycle": {
+        "setting": "LEAD_MAX_REVIEWS_PER_TICK",
+        "default": 5
+      },
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "red_gate_0",
+      "from": "lider_jev",
+      "to": "gustavo",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "gate",
+      "request_schema": "proposal",
+      "response_schema": "veto",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior."
+    },
+    {
+      "id": "red_gate_1",
+      "from": "gustavo",
+      "to": "operador_cuenta",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "gate",
+      "request_schema": "proposal",
+      "response_schema": "execution",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior."
+    },
+    {
+      "id": "entregar_comentario",
+      "from": "relaciones_comunidad",
+      "to": "lider_jev",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "proposal",
+      "response_schema": "lead",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "El workflow recoge la propuesta y aplica su política; el especialista no invoca Jev."
+    },
+    {
+      "id": "entregar_plan",
+      "from": "plan_red",
+      "to": "lider_jev",
+      "cycles": [
+        "red"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "proposal",
+      "response_schema": "lead",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "El workflow recoge la propuesta y aplica su política; el especialista no invoca Jev."
+    },
+    {
+      "id": "captura_editorial",
+      "from": "capturas",
+      "to": "director_editorial",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "capture",
+      "response_schema": "capture",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
+    },
+    {
+      "id": "captura_persona",
+      "from": "capturas",
+      "to": "relaciones_comunidad",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "contact",
+      "response_schema": "contact",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
+    },
+    {
+      "id": "captura_memoria",
+      "from": "capturas",
+      "to": "posicionamiento",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "capture",
+      "response_schema": "capture",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
+    },
+    {
+      "id": "resultados_editorial",
+      "from": "metricas",
+      "to": "director_editorial",
+      "cycles": [
+        "metricas"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "metrics_result",
+      "response_schema": "metrics_result",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
+    },
+    {
+      "id": "resumen_editorial",
+      "from": "analista_barrio_resultados",
+      "to": "director_editorial",
+      "cycles": [
+        "resumen_semanal"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "weekly",
+      "response_schema": "weekly",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
+    }
+  ],
+  "cycles": [
+    {
+      "id": "pieza_diaria",
+      "label": "Pieza diaria",
+      "status": "active",
+      "orchestrator": "director_editorial",
+      "participants": [
+        "director_editorial",
+        "copywriter_a",
+        "copywriter_b",
+        "lector_comprador",
+        "lector_recomendador",
+        "lector_divulgador",
+        "lector_lider",
+        "lector_par",
+        "seleccion_editorial",
+        "reparacion_editorial",
+        "editor_verificador",
+        "diseno_imagen",
+        "edicion_foto",
+        "revision_visual",
+        "editor_visual",
+        "investigacion_web",
+        "lider_jev",
+        "gustavo",
+        "operador_cuenta"
+      ],
+      "triggers": [
+        {
+          "kind": "prepare_piece",
+          "cadence": "Hueco diario según EDITORIAL_POST_TIME; preparación anticipada EDITORIAL_LEAD_HOURS o manual.",
+          "binding": "team_backend.editorial.plan",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "execute_action",
+          "cadence": "Tick 60 s; solo aprobada y a su hora.",
+          "binding": "team_backend.autopiloto._execute",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "reconcile_action",
+          "cadence": "Inciertas/sent tras 10 min; bucket de una hora, hasta 3 por tick.",
+          "binding": "team_backend.autopiloto._reconcile",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [
+        {
+          "id": "reparacion_actual",
+          "status": "active",
+          "edges": [
+            "reparar",
+            "verificar"
+          ],
+          "max_rounds": 2,
+          "description": "Primera comprobación más una reparación del director, no de copywriters."
+        },
+        {
+          "id": "imagen_actual",
+          "status": "active",
+          "edges": [
+            "disenar",
+            "revisar_imagen"
+          ],
+          "max_rounds": 2,
+          "description": "Un diseño inicial y una corrección."
+        },
+        {
+          "id": "copywriters_optimizer",
+          "status": "planned",
+          "edges": [],
+          "max_rounds": 2,
+          "description": "Copywriters ⇄ verificador, aún no habilitado."
+        }
+      ],
+      "gates": [
+        "publicacion"
+      ],
+      "limits": {
+        "budget_refs": [
+          "editorial",
+          "imagenes",
+          "research",
+          "escrituras"
+        ],
+        "max_depth": 1,
+        "calls": "Brief hasta 2 con investigación; redactor 1 agrupada; panel 1 agrupada; selección 1; reparación 1; verificador hasta 2; diseño hasta 2; edición/revisión por foto (máx. 8).",
+        "cycle_cost_cap": null,
+        "timeout": "Timeouts de providers y connectors_images; no existe timeout global de ciclo.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "red",
+      "label": "Red y comentarios",
+      "status": "active",
+      "orchestrator": "workflow_red",
+      "participants": [
+        "workflow_red",
+        "investigador_referentes",
+        "descubrimiento_red",
+        "clasificador_red",
+        "relaciones_comunidad",
+        "plan_red",
+        "sync_red",
+        "lider_jev",
+        "gustavo",
+        "operador_cuenta"
+      ],
+      "triggers": [
+        {
+          "kind": "observe",
+          "cadence": "OPERATOR_OBSERVE_EVERY_MINUTES (180 min).",
+          "binding": "team_backend.autopiloto._observe",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "discover_network",
+          "cadence": "NETWORK_DISCOVER_EVERY_MINUTES (360 min).",
+          "binding": "team_backend.autopiloto._network",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "classify_contacts",
+          "cadence": "NETWORK_CLASSIFY_EVERY_MINUTES (30 min), solo backlog.",
+          "binding": "team_backend.autopiloto._network",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "plan_network",
+          "cadence": "NETWORK_PLAN_EVERY_MINUTES (60 min).",
+          "binding": "team_backend.autopiloto._network",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "sync_network",
+          "cadence": "NETWORK_SYNC_EVERY_MINUTES (360 min).",
+          "binding": "team_backend.autopiloto._network",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "propose_comment",
+          "cadence": "Tick 60 s, hasta un borrador por tick y cupo disponible.",
+          "binding": "team_backend.autopiloto._propose",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "execute_action",
+          "cadence": "Tick 60 s; aprobación y capacidad disponible.",
+          "binding": "team_backend.autopiloto._execute",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "reconcile_action",
+          "cadence": "Hasta 3 por tick; bucket de una hora.",
+          "binding": "team_backend.autopiloto._reconcile",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [
+        {
+          "id": "comentario_actual",
+          "status": "active",
+          "edges": [
+            "comentar"
+          ],
+          "max_rounds": 2,
+          "description": "Un borrador y una reescritura de reglas; no especialistas entre sí."
+        }
+      ],
+      "gates": [
+        "comentario",
+        "red_social"
+      ],
+      "limits": {
+        "budget_refs": [
+          "general",
+          "red",
+          "lecturas",
+          "escrituras"
+        ],
+        "max_depth": 1,
+        "BAR-15": "Lunes a viernes; máximo 20 invitaciones/día; rampa (día/semana) 5/20, 10/50, 20/100; 80 lecturas de perfil/día incluyendo preflight; diversidad de roles y cupos de notas mensuales.",
+        "cycle_cost_cap": null,
+        "timeout": "Límites por operación/proveedor; no timeout global ni contador total de ciclo.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "inbox",
+      "label": "Inbox",
+      "status": "active",
+      "orchestrator": "workflow_inbox",
+      "participants": [
+        "workflow_inbox",
+        "conversaciones_inbox"
+      ],
+      "triggers": [
+        {
+          "kind": "read_inbox",
+          "cadence": "INBOX_EVERY_MINUTES=60, si INBOX_ENABLED.",
+          "binding": "team_backend.autopiloto._inbox",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "lecturas",
+          "proveedor"
+        ],
+        "max_depth": 1,
+        "calls": "INBOX_ASSESS_PER_RUN=5, INBOX_THREADS_PER_RUN=5; topes diarios INBOX_READ_CAPS.",
+        "cycle_cost_cap": null,
+        "timeout": "Provider timeout; sin deadline de ciclo.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "metricas",
+      "label": "Métricas",
+      "status": "active",
+      "orchestrator": "metricas",
+      "participants": [
+        "metricas",
+        "director_editorial"
+      ],
+      "triggers": [
+        {
+          "kind": "collect_metrics",
+          "cadence": "METRICS_EVERY_MINUTES=180 si hay cortes pendientes; audiencia diaria.",
+          "binding": "team_backend.autopiloto._metrics",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "lecturas"
+        ],
+        "max_depth": 1,
+        "calls": "Topes METRICS_READ_CAPS y cortes ya existentes no se repiten.",
+        "cycle_cost_cap": null,
+        "timeout": "Connector timeout.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "resumen_semanal",
+      "label": "Resumen semanal",
+      "status": "active",
+      "orchestrator": "analista_barrio_resultados",
+      "participants": [
+        "analista_barrio_resultados",
+        "gustavo",
+        "director_editorial"
+      ],
+      "triggers": [
+        {
+          "kind": "weekly_summary",
+          "cadence": "Lunes tras WEEKLY_SUMMARY_TIME o solicitud manual; una semana local.",
+          "binding": "team_backend.resumen_semanal.queue",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "semanal"
+        ],
+        "max_depth": 1,
+        "calls": 1,
+        "cycle_cost_cap": null,
+        "timeout": "Provider timeout.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "capturas",
+      "label": "Capturas",
+      "status": "active",
+      "orchestrator": "capturas",
+      "participants": [
+        "capturas",
+        "ruteador_capturas",
+        "intencion_captura",
+        "transcripcion",
+        "investigacion_web",
+        "director_editorial",
+        "relaciones_comunidad",
+        "posicionamiento"
+      ],
+      "triggers": [
+        {
+          "kind": "process_capture",
+          "cadence": "Al recibir captura; sin cadencia del autopiloto.",
+          "binding": "team_backend.capturas.create",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "proveedor",
+          "research"
+        ],
+        "max_depth": 1,
+        "calls": "Transcripción una vez; clasificación o intención; investigación una vez por key.",
+        "cycle_cost_cap": null,
+        "timeout": "Providers; reconciliación de capturas interrumpidas sin replay.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "manual_posicionamiento",
+      "label": "Consulta manual · posicionamiento",
+      "status": "active",
+      "orchestrator": "posicionamiento",
+      "participants": [
+        "posicionamiento"
+      ],
+      "triggers": [
+        {
+          "kind": "agent_run",
+          "cadence": "Manual, agent=posicionamiento",
+          "binding": "knowledge.agents.run",
+          "deduplication": "request_id manual"
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "proveedor"
+        ],
+        "max_depth": 1,
+        "calls": 1,
+        "cycle_cost_cap": null,
+        "timeout": "Provider timeout.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "manual_perfil",
+      "label": "Consulta manual · perfil",
+      "status": "active",
+      "orchestrator": "perfil",
+      "participants": [
+        "perfil"
+      ],
+      "triggers": [
+        {
+          "kind": "agent_run",
+          "cadence": "Manual, agent=perfil",
+          "binding": "knowledge.agents.run",
+          "deduplication": "request_id manual"
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "proveedor"
+        ],
+        "max_depth": 1,
+        "calls": 1,
+        "cycle_cost_cap": null,
+        "timeout": "Provider timeout.",
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "referentes_mensuales",
+      "label": "Referentes mensuales",
+      "status": "planned",
+      "orchestrator": "investigador_lider",
+      "participants": [
+        "investigador_lider",
+        "investigacion_web",
+        "estudio_comunidad"
+      ],
+      "triggers": [
+        {
+          "kind": null,
+          "cadence": "Mensual (perfil también semestral); aún sin activar.",
+          "binding": "planned",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [
+        {
+          "id": "fan_out",
+          "status": "planned",
+          "edges": [],
+          "max_rounds": 1,
+          "description": "Investigación paralela con gather acotado; no existe fan-out en fase 1."
+        }
+      ],
+      "gates": [],
+      "limits": {
+        "budget_refs": [],
+        "max_depth": 1,
+        "calls": null,
+        "cycle_cost_cap": null,
+        "timeout": null,
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "planned",
+        "records": [],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "perfil_periodico",
+      "label": "Perfil periódico",
+      "status": "planned",
+      "orchestrator": "ciclo_perfil",
+      "participants": [
+        "ciclo_perfil",
+        "perfil",
+        "posicionamiento",
+        "editor_visual"
+      ],
+      "triggers": [
+        {
+          "kind": null,
+          "cadence": "Mensual (perfil también semestral); aún sin activar.",
+          "binding": "planned",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [],
+        "max_depth": 1,
+        "calls": null,
+        "cycle_cost_cap": null,
+        "timeout": null,
+        "scope": "Cotas por intento de job/subtrigger; no contador persistido por vida completa del ciclo. Los retries conservan las políticas existentes."
+      },
+      "ledger": {
+        "status": "planned",
+        "records": [],
+        "checkpoint_resume": false,
+        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "comunidad_mensual",
+      "label": "Estudio mensual de comunidad",
+      "status": "planned",
+      "orchestrator": "analista_barrio_resultados",
+      "participants": [
+        "analista_barrio_resultados",
+        "estudio_comunidad"
+      ],
+      "triggers": [
+        {
+          "kind": null,
+          "cadence": "Mensual; todavía sin activar.",
+          "binding": "planned",
+          "deduplication": "planned"
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [],
+        "max_depth": 1,
+        "calls": null,
+        "cycle_cost_cap": null,
+        "timeout": null
+      },
+      "ledger": {
+        "status": "planned",
+        "records": [],
+        "checkpoint_resume": false,
+        "note": "Pendiente de implementar."
+      }
+    }
+  ],
+  "code_bindings": {
+    "job_roles": {
+      "observe": "investigador_referentes",
+      "propose_comment": "relaciones_comunidad",
+      "execute_action": "operador_cuenta",
+      "reconcile_action": "operador_cuenta",
+      "discover_network": "investigador_referentes",
+      "classify_contacts": "investigador_referentes",
+      "plan_network": "relaciones_comunidad",
+      "sync_network": "relaciones_comunidad",
+      "collect_metrics": "analista_barrio_resultados",
+      "process_capture": "operador_cuenta",
+      "weekly_summary": "analista_barrio_resultados",
+      "read_inbox": "conversaciones_inbox"
+    },
+    "stage_roles": {
+      "director": [
+        "director_editorial"
+      ],
+      "redactor": [
+        "copywriter_a",
+        "copywriter_b"
+      ],
+      "lectores": [
+        "lector_comprador",
+        "lector_recomendador",
+        "lector_divulgador",
+        "lector_lider",
+        "lector_par"
+      ],
+      "seleccion": [
+        "director_editorial"
+      ],
+      "verificador": [
+        "editor_verificador"
+      ],
+      "reparacion": [
+        "director_editorial"
+      ]
+    },
+    "autopilot_direct_kinds": [
+      "classify_contacts",
+      "collect_metrics",
+      "discover_network",
+      "observe",
+      "plan_network",
+      "prepare_piece",
+      "propose_comment",
+      "read_inbox",
+      "reconcile_action",
+      "sync_network"
+    ],
+    "network_ramp_stages": [
+      [
+        5,
+        20
+      ],
+      [
+        10,
+        50
+      ],
+      [
+        20,
+        100
+      ]
+    ],
+    "network_read_caps": {
+      "comments": 60,
+      "search": 20,
+      "profile": 80,
+      "sync": 4
+    }
+  },
+  "gates": {
+    "publicacion": {
+      "capabilities": [
+        "CONT-09"
+      ],
+      "cycle": "pieza_diaria",
+      "producer": "director_editorial",
+      "entry": "editor_verificador",
+      "chain": [
+        "editor_verificador",
+        "lider_jev",
+        "gustavo",
+        "operador_cuenta"
+      ],
+      "conditions": [
+        "Reglas y verificador sobre el hash exacto; imagen preparada y manifest validado.",
+        "Jev si lider.applies; auto/manual conservan las reglas actuales.",
+        "Gustavo puede vetar o pausar; no hay espera de aprobación por post.",
+        "Operador valida hash aprobado, estado y cuotas justo antes de escribir."
+      ]
+    },
+    "comentario": {
+      "capabilities": [
+        "INT-03"
+      ],
+      "cycle": "red",
+      "producer": "relaciones_comunidad",
+      "entry": "lider_jev",
+      "chain": [
+        "lider_jev",
+        "gustavo",
+        "operador_cuenta"
+      ],
+      "conditions": [
+        "comment_text_issues y content_issues; el verificador editorial no revisa comentarios.",
+        "Jev condicionado por LEAD_ENABLED/capabilities; aprobación manual mantiene permisos.",
+        "Veto y pausa de Gustavo; checks del operador antes de escribir."
+      ]
+    },
+    "red_social": {
+      "capabilities": [
+        "RED-01",
+        "RED-02",
+        "RED-04",
+        "INT-02"
+      ],
+      "cycle": "red",
+      "producer": "plan_red",
+      "entry": "lider_jev",
+      "chain": [
+        "lider_jev",
+        "gustavo",
+        "operador_cuenta"
+      ],
+      "conditions": [
+        "network_issues y BAR-15 para RED; INT-02 se crea manualmente.",
+        "Jev solo si lider.applies (INT-02 fuera por defecto).",
+        "Ruta manual/autónoma, veto y controles de escritura actuales."
+      ]
+    }
+  },
+  "call_groups": {
+    "redactor": {
+      "binding": "team_backend.editorial._stage",
+      "stage": "redactor",
+      "members": [
+        "copywriter_a",
+        "copywriter_b"
+      ],
+      "max_calls_per_cycle": 1
+    },
+    "lectores": {
+      "binding": "team_backend.editorial._stage",
+      "stage": "lectores",
+      "members": [
+        "lector_comprador",
+        "lector_recomendador",
+        "lector_divulgador",
+        "lector_lider",
+        "lector_par"
+      ],
+      "max_calls_per_cycle": 1
+    }
+  }
+}

@@ -9,6 +9,11 @@
   "ignorar": ["*.md", "**/*.md", "docs/**", "movil/diseno-movimiento/**"],
   "areas": [
     {
+      "rutas": ["movil/src/equipo/**", "movil/src/app/(app)/equipo.tsx", "oficina/src/pages/MapaEquipo*"],
+      "flujos": ["17-*"],
+      "cubre": ["ARQ-08"]
+    },
+    {
       "rutas": ["movil/src/app/login.tsx", "movil/src/entrada/**"],
       "flujos": ["01-*"],
       "cubre": ["ACC-02", "ACC-10"]
@@ -30,7 +35,7 @@
     },
     {
       "rutas": ["movil/src/scene/**", "movil/src/app/(app)/(tabs)/index.tsx"],
-      "flujos": ["01-*", "03-*"],
+      "flujos": ["01-*", "03-*", "17-*"],
       "cubre": ["OFI-*"]
     },
     {
@@ -60,7 +65,7 @@
     },
     {
       "rutas": ["movil/src/ajustes/**", "movil/src/app/(app)/(tabs)/ajustes.tsx"],
-      "flujos": ["11-*", "15-*"],
+      "flujos": ["11-*", "15-*", "17-*"],
       "cubre": ["AJU-*"]
     }
   ]

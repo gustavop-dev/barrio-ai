@@ -16,6 +16,7 @@ import { Personas } from './pages/Personas';
 import { PiezaDetalle } from './pages/PiezaDetalle';
 import { Resultados } from './pages/Resultados';
 import { TuTurno } from './pages/TuTurno';
+import { MapaEquipo } from './pages/MapaEquipo';
 
 /** Old piece URLs (push notifications open /editorial/<id>) go to the piece detail. */
 function PieceRedirect() {
@@ -62,6 +63,7 @@ export function AppRoutes() {
         </Route>
         <Route path="galeria" element={<Galeria />} />
         <Route path="ajustes" element={<Ajustes />} />
+        <Route path="equipo" element={<MapaEquipo />} />
 
         {/* Views of the old office, redirected to where their content lives now. */}
         <Route path="editorial/:pieceId" element={<PieceRedirect />} />

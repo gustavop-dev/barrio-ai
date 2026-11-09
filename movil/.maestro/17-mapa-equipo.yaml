@@ -1,0 +1,99 @@
+# cubre: ARQ-08
+# Read-only graph, real API + seed_qa, no paid providers. Phone: 390 x 844 dp.
+appId: co.projectapp.office
+name: Mapa del equipo
+tags: [equipo, arquitectura]
+---
+- runFlow: comun/entrar.yaml
+- scrollUntilVisible:
+    element:
+      id: oficina-mapa-equipo
+    direction: DOWN
+    timeout: 20000
+- tapOn:
+    id: oficina-mapa-equipo
+- extendedWaitUntil:
+    visible: "Mesa editorial · .*"
+    timeout: 20000
+- assertVisible: Mapa del equipo
+- takeScreenshot: 17-mapa-equipo-01-grupos
+- tapOn: "Mesa editorial · .*"
+- tapOn:
+    id: mapa-agente-director_editorial
+- assertVisible: Director editorial
+- assertVisible: "El código editorial coordina el brief.*"
+- scrollUntilVisible:
+    element:
+      text: "Curso · .* unidades"
+    direction: DOWN
+- tapOn: "Curso · .* unidades"
+- assertVisible: LI-04-M005-K01
+- takeScreenshot: 17-mapa-equipo-02-curso
+- tapOn: "Curso · .* unidades"
+- scrollUntilVisible:
+    element:
+      text: Actividad reciente
+    direction: DOWN
+- assertVisible: Actividad reciente
+- scrollUntilVisible:
+    element:
+      text: "Solicita a: Copywriter A"
+    direction: DOWN
+- tapOn: "Solicita a: Copywriter A"
+- assertVisible: Copywriter A
+- assertVisible: "Redacta la variante A.*"
+- scrollUntilVisible:
+    element:
+      text: "Recibe de: Director editorial"
+    direction: DOWN
+- tapOn: "Recibe de: Director editorial"
+- scrollUntilVisible:
+    element:
+      text: Ver todos los agentes
+    direction: UP
+- tapOn: Ver todos los agentes
+- tapOn: "Mesa editorial · .*"
+- scrollUntilVisible:
+    element:
+      id: mapa-agente-editor_visual
+    direction: DOWN
+- tapOn:
+    id: mapa-agente-editor_visual
+- assertVisible: "Este agente aún no ejecuta trabajo\\."
+- scrollUntilVisible:
+    element:
+      text: "Sin actividad registrada para este agente\\."
+    direction: DOWN
+- takeScreenshot: 17-mapa-equipo-03-en-diseno
+- scrollUntilVisible:
+    element:
+      text: Volver
+    direction: UP
+- tapOn: Volver
+- tapOn:
+    id: top-ajustes
+- extendedWaitUntil:
+    visible:
+      id: ajustes-mapa-equipo
+    timeout: 20000
+- tapOn:
+    id: ajustes-mapa-equipo
+- extendedWaitUntil:
+    visible: "Observatorio · .*"
+    timeout: 20000
+- tapOn: "Observatorio · .*"
+- tapOn:
+    id: mapa-agente-investigador_referentes
+- scrollUntilVisible:
+    element:
+      text: Actividad reciente
+    direction: DOWN
+- assertVisible: "Terminado · .*"
+- takeScreenshot: 17-mapa-equipo-04-actividad
+- scrollUntilVisible:
+    element:
+      text: Volver
+    direction: UP
+- tapOn: Volver
+- assertVisible:
+    id: screen-ajustes

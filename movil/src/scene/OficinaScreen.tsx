@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
+import { router } from 'expo-router';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { runOnUI } from 'react-native-reanimated';
 import { GestureDetector, useNativeGesture } from 'react-native-gesture-handler';
@@ -94,6 +95,7 @@ export function OficinaScreen() {
         <OfficeNarration line={line} revision={snapshot.now?.key ?? 0} reduced={reduced} />
       </View>
       <View style={styles.below}>
+        <Button testID="oficina-mapa-equipo" variant="ghost" onPress={() => router.push('/equipo')}>Mapa del equipo</Button>
         <View style={styles.legend}>
           {(['Trabajando', 'En espera', 'En diseño'] as const).map((text, i) => <View key={text} style={styles.legendItem}><View style={[styles.dot, { backgroundColor: [colors.brand, colors.spriteBlue, colors.line][i] }]} /><T variant="detalle" soft>{text}</T></View>)}
         </View>

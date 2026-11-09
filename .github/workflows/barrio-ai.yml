@@ -6,9 +6,9 @@ name: Barrio AI
 on:
   push:
     branches: [main]
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml', '.github/scripts/**']
+    paths: ['agentes-linkedin/equipos/grafo.yaml', 'scripts/grafo/**', 'docs/arquitectura/**', 'agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml', '.github/scripts/**']
   pull_request:
-    paths: ['agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml', '.github/scripts/**']
+    paths: ['agentes-linkedin/equipos/grafo.yaml', 'scripts/grafo/**', 'docs/arquitectura/**', 'agentes-linkedin/infra/**', 'oficina/**', 'compartido/**', 'movil/**', 'deploy/**', '.dockerignore', '.github/workflows/barrio-ai.yml', '.github/scripts/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -45,6 +45,8 @@ jobs:
       - run: uv sync --frozen --extra test
       - run: uv run python manage.py check
       - run: uv run python manage.py makemigrations --check --dry-run
+      - name: Grafo y diagrama sin deriva
+        run: python3 ../../scripts/grafo/mermaid.py --check
       # Under coverage.py (settings in pyproject.toml: branches on, every module in src/).
       - run: uv run coverage run manage.py test team_backend.tests --noinput
       # Corpus integration tests (pytest) need the private course files: run them locally.
@@ -155,6 +157,8 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: agentes-linkedin/infra
+          build-contexts: |
+            equipo=./agentes-linkedin/equipos
           platforms: linux/amd64
           push: true
           tags: |
