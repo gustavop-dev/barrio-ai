@@ -415,7 +415,7 @@ def _stage(piece,name,payload,unit_ids=None):
     model=stage_model(name)  # C3: only an explicit override is passed; otherwise the provider default applies
     answer=providers.claude(system,message,max_tokens=max_tokens,output_schema=schema,effort=effort,purpose='editorial-'+name,
                             **({'model':model} if model else {}))
-    if not orquestacion.current():oficina_eventos.emit('entrega',role,oficina_eventos.NEXT_ROLE.get(name,''),f'Etapa {name} terminada')
+    oficina_eventos.emit('entrega',role,oficina_eventos.NEXT_ROLE.get(name,''),f'Etapa {name} terminada')
     try:data=json.loads(answer['text'])
     except (json.JSONDecodeError,TypeError):raise ValueError(f'La etapa {name} no devolvió JSON válido.') from None
     if not isinstance(data,dict):raise ValueError(f'La etapa {name} no devolvió un objeto.')
@@ -499,6 +499,7 @@ def prepare(user,slot,origin_job=''):
     if when<=now:raise Conflict('La hora de ese hueco ya pasó.')
     piece=EditorialPiece.objects.filter(origin_job=origin_job).first() if origin_job else None
     if piece is None:
+        _guard()  # Preserve the preflight failure: no piece or cycle is created without a budget.
         try:piece=EditorialPiece.objects.create(account=account,slot_date=slot,scheduled_for=when,created_by=user,origin_job=origin_job)
         except IntegrityError:raise Conflict('Ya hay una pieza abierta para ese día.') from None
         operador._audit(user,'editorial.piece_started',piece.id,slot=slot.isoformat())
@@ -512,7 +513,7 @@ def prepare(user,slot,origin_job=''):
                 runtime.finish(piece)
                 return piece
             result=_run(piece,user,now,origin_job)
-            runtime.finish(result)
+            runtime.finish(result,allow_stopped=result.state==EditorialPiece.State.BLOCKED)
             return result
     except orquestacion.CycleStopped as exc:
         # A second worker must not close the first worker's piece.
@@ -691,7 +692,9 @@ def _repair_round(piece,memory,frozen,text,claims,review,reasons,issues,public,p
     def unrepaired(outcome,note,**extra):
         return dict(record,outcome=outcome,note=note,**extra),text,claims,review,reasons+[f'Ronda de reparación: {note}'],issues
     try:data,model=_call_stage(piece,'reparacion',dict(memory,brief=frozen,text=text,claims=claims,findings=findings,sources=piece.signals))
-    except BudgetStop:return unrepaired('sin_presupuesto','sin presupuesto editorial para repararla hoy')
+    except (BudgetStop,orquestacion.CycleStopped) as exc:
+        if isinstance(exc,orquestacion.CycleStopped) and str(exc)!='cost_cap':raise
+        return unrepaired('sin_presupuesto','sin presupuesto editorial para repararla hoy')
     repaired=(data.get('final_text') or '').strip()
     record.update(decision=data.get('decision'),changes=data.get('changes') or [],rationale=data.get('rationale') or '',model=model)
     if data.get('decision')!='repaired' or not repaired:
@@ -702,6 +705,8 @@ def _repair_round(piece,memory,frozen,text,claims,review,reasons,issues,public,p
     if repaired==text:return unrepaired('sin_cambios','no cambió el texto')
     new_claims=data.get('claims') or []
     try:new_review,new_reasons,new_issues=_check(piece,memory,frozen,repaired,new_claims,public,private)
-    except BudgetStop:return unrepaired('sin_presupuesto','el texto reparado no se pudo verificar: presupuesto agotado',repaired_text=repaired)
+    except (BudgetStop,orquestacion.CycleStopped) as exc:
+        if isinstance(exc,orquestacion.CycleStopped) and str(exc)!='cost_cap':raise
+        return unrepaired('sin_presupuesto','el texto reparado no se pudo verificar: presupuesto agotado',repaired_text=repaired)
     record.update(outcome='bloqueada' if new_reasons else 'reparada',repaired_sha256=_sha(repaired))
     return record,repaired,new_claims,new_review,new_reasons,new_issues

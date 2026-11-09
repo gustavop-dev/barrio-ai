@@ -78,7 +78,7 @@ def recent_activity(graph, user):
             roles = tuple(activity['event_roles'])
             if roles:
                 if roles not in events_cache:
-                    rows = AuditEvent.objects.filter(action='office.event', metadata__tipo='entrega').filter(
+                    rows = AuditEvent.objects.filter(action__in=['office.event','office.orchestration'], metadata__tipo='entrega').filter(
                         Q(metadata__rol__in=roles) | Q(metadata__destino__in=roles)).order_by('-created_at', '-id')[:5]
                     events_cache[roles] = [
                         {'id': str(e.id), 'at': e.created_at, 'from': e.metadata.get('rol', ''),

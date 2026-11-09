@@ -347,9 +347,9 @@ class Runtime:
         if failure:
             self.stop(failure)
             raise CycleStopped(failure)
-        from .oficina_eventos import emit
+        from .oficina_eventos import handoff
         for e in edges:
-            emit('entrega', self.owner, e['to'], 'Solicitud: ' + e['id'])
+            handoff(self.owner, e['to'], cycle=self.id, edge=e['id'], phase='request')
         self.audit('requested', edge=edge_id, call=key)
         context = _active_call.set(dict(call, key=key, runtime=edge['runtime']))
         try:
@@ -396,7 +396,7 @@ class Runtime:
         self.check_cost()
         self.progress({'edge':edge_id,'result':stored})
         for e in edges:
-            emit('entrega', e['to'], self.owner, 'Respuesta: ' + e['id'])
+            handoff(e['to'], self.owner, cycle=self.id, edge=e['id'], phase='response')
         return result
 
     def check_cost(self):
@@ -446,13 +446,23 @@ class Runtime:
             self.stop('stall')
             raise CycleStopped('stall')
 
-    def finish(self, result):
+    def finish(self, result, *, allow_stopped=False):
+        """Checkpoint a terminal workflow result without clearing a runtime stop.
+
+        Editorial repair can close as blocked after a budget stop. It may save
+        that outcome, but it cannot mark the cycle complete or authorize a call.
+        """
         if self.elapsed()>=self.limits['cycle_timeout_s']:
             self.stop('cycle_timeout',business=False)
             raise CycleStopped('cycle_timeout')
         with transaction.atomic():
-            row = self.locked()
-            row.state = 'complete'
+            row = CycleLedger.objects.select_for_update().get(pk=self.id)
+            if row.lease_token != self.token:
+                raise CycleStopped('Resultado de un trabajador obsoleto')
+            if row.state == 'stopped':
+                if not allow_stopped:raise CycleStopped(row.stop_reason)
+            else:
+                row.state = 'complete'
             row.progress_ledger['result'] = pack(result)
             row.save(update_fields=['state', 'progress_ledger', 'updated_at'])
 
@@ -462,7 +472,7 @@ def call(edge, request, operation, *, key=None):
     return runtime.call(edge, request, operation, key=key) if runtime else operation()
 
 
-def provider_metadata(provider, purpose, amount_usd, cursor):
+def provider_metadata(provider, purpose, amount_usd, connection):
     """Called under the usage ledger's global reservation lock, BEFORE INSERT/send."""
     runtime, call = current(), _active_call.get()
     if runtime is None:
@@ -475,28 +485,26 @@ def provider_metadata(provider, purpose, amount_usd, cursor):
     row = CycleLedger.objects.get(pk=runtime.id)
     if row.state == 'stopped' or row.lease_token != runtime.token:
         raise CycleStopped('Trabajador obsoleto')
-    cursor.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
+    used = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
         WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent,
-        count(*) AS calls FROM usage_ledger WHERE usage->>'cycle_id'=%s""", (str(runtime.id),))
-    used = cursor.fetchone()
+        count(*) AS calls FROM usage_ledger WHERE usage->>'cycle_id'=%s""", (str(runtime.id),)).fetchone()
     if used['calls'] >= runtime.limits['max_provider_calls']:
         runtime.stop('provider_calls', business=False)
         raise CycleStopped('provider_calls')
     spent = used['spent']
     if runtime.limits.get('cost_period') == 'month':
-        cursor.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
+        spent = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
             WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent
-            FROM usage_ledger WHERE usage->>'budget_bucket'=%s""", (row.budget_bucket,))
-        spent = cursor.fetchone()['spent']
+            FROM usage_ledger WHERE usage->>'budget_bucket'=%s""", (row.budget_bucket,)).fetchone()['spent']
     if spent + amount_usd > Decimal(str(runtime.limits['cost_cap_usd'])):
         runtime.stop('cost_cap')
         raise CycleStopped('cost_cap')
     if runtime.limits.get('daily_cost_cap_usd') is not None:
         day = timezone.localtime(timezone.now(),ZoneInfo('America/Bogota')).replace(hour=0,minute=0,second=0,microsecond=0)
-        cursor.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
+        daily_spent = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
             WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent
-            FROM usage_ledger WHERE created_at>=%s AND (usage->>'cycle'=%s OR purpose LIKE 'editorial-%%' OR purpose LIKE 'image-%%')""", (day,runtime.cycle['id']))
-        if cursor.fetchone()['spent'] + amount_usd > Decimal(str(runtime.limits['daily_cost_cap_usd'])):
+            FROM usage_ledger WHERE created_at>=%s AND (usage->>'cycle'=%s OR purpose LIKE 'editorial-%%' OR purpose LIKE 'image-%%')""", (day,runtime.cycle['id'])).fetchone()['spent']
+        if daily_spent + amount_usd > Decimal(str(runtime.limits['daily_cost_cap_usd'])):
             runtime.stop('cost_cap')
             raise CycleStopped('cost_cap')
     return {'cycle_id': str(runtime.id), 'cycle': runtime.cycle['id'], 'budget_bucket': row.budget_bucket,

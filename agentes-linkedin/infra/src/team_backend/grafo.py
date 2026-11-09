@@ -140,7 +140,6 @@ def validate_graph(graph):
                       f'ciclo {cid}: límite {key} inválido')
             for edge in edges.values():
                 if cid not in edge['cycles'] or not edge.get('runtime'):continue
-                check(edge['from'] == owner or (edge['request_kind']=='gate' and edge['to']=='lider_jev'), f'arista {edge["id"]}: runtime fuera del orquestador')
                 check(type(edge['max_calls_per_cycle']) is int, f'arista {edge["id"]}: límite runtime sin resolver')
                 check(all(schemas[edge[k]]['kind'] in ('json_schema','model','dataclass','bytes')
                           for k in ('request_schema','response_schema')), f'arista {edge["id"]}: contrato no ejecutable')
@@ -203,6 +202,16 @@ def validate_graph(graph):
         if edge['status'] == 'active' and nodes[edge['to']]['role'] == 'executor':
             check(any(g['cycle'] in edge['cycles'] and g['chain'][-2:] == [edge['from'], edge['to']] for g in gates.values()),
                   f'arista {edge["id"]}: salida ejecutable sin gates')
+    # Validate topology/gates first, then runtime authority. A bypass must be
+    # diagnosed as such even if it also carries an unauthorized runtime binding.
+    for cid, cycle in cycles.items():
+        if cycle['ledger']['status'] != 'runtime':continue
+        for edge in edges.values():
+            if cid not in edge['cycles'] or not edge.get('runtime'):continue
+            declared_gate = (edge['request_kind']=='gate' and edge['to']=='lider_jev'
+                             and any(edge['id'] in gates[g].get('runtime_edges',[]) for g in cycle['gates']))
+            check(edge['from'] == cycle['orchestrator'] or declared_gate,
+                  f'arista {edge["id"]}: runtime fuera del orquestador')
     for name, group in graph.get('call_groups', {}).items():
         members = {e['to'] for e in edges.values() if e.get('call_group') == name}
         check(members == set(group['members']) and _bounded(group['max_calls_per_cycle']), f'llamada agrupada {name}: inconsistente')

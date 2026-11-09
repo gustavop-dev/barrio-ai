@@ -869,7 +869,7 @@ class CycleLedger(models.Model):
     cycle=models.CharField(max_length=60)
     key=models.CharField(max_length=160)
     owner=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
-    job=models.ForeignKey(Job,on_delete=models.PROTECT,null=True,blank=True)
+    job=models.ForeignKey(Job,on_delete=models.SET_NULL,null=True,blank=True)
     orchestrator=models.CharField(max_length=60)
     graph_version=models.CharField(max_length=40)
     graph_hash=models.CharField(max_length=64)

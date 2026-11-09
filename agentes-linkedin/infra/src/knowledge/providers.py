@@ -81,6 +81,10 @@ def reserve(provider,purpose,amount,request_hash=None,metadata=None):
     rid=str(uuid.uuid4())
     with connect() as c:
         c.execute('SELECT pg_advisory_xact_lock(103502)')
+        # An ambiguous request must be reconciled even when its reservation also
+        # exhausted a budget. Keep that diagnostic ahead of all monetary caps.
+        if request_hash and c.execute("SELECT id FROM usage_ledger WHERE provider=%s AND request_hash=%s AND (status='reserved' OR (status='uncertain' AND coalesce(usage->>'retry_authorized','false')!='true')) LIMIT 1",(provider,request_hash)).fetchone():
+            raise ValueError('Existe una solicitud idéntica pendiente o incierta; conciliarla antes de repetir.')
         from .cycle_context import provider_metadata
         metadata=dict(metadata or {},**provider_metadata(provider,purpose,amount,c))
         if purpose in RESEARCH_PURPOSES:
@@ -105,8 +109,6 @@ def reserve(provider,purpose,amount,request_hash=None,metadata=None):
             if not image_limit.is_finite() or image_limit<0:raise ValueError('Presupuesto de imágenes inválido')
             image_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE purpose LIKE 'image-%%' AND created_at>=%s",(day,)).fetchone()['spent']
             if image_spent+amount>image_limit:raise ValueError('Presupuesto de imágenes agotado; incluye reservas pendientes')
-        if request_hash and c.execute("SELECT id FROM usage_ledger WHERE provider=%s AND request_hash=%s AND (status='reserved' OR (status='uncertain' AND coalesce(usage->>'retry_authorized','false')!='true')) LIMIT 1",(provider,request_hash)).fetchone():
-            raise ValueError('Existe una solicitud idéntica pendiente o incierta; conciliarla antes de repetir.')
         since=limit_window_start(provider)
         spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s AND (%s::timestamptz IS NULL OR created_at>=%s)",(provider,since,since)).fetchone()['spent']
         if spent+amount>limit:

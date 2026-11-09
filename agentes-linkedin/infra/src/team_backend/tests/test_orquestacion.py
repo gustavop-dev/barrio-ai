@@ -59,10 +59,43 @@ class DispatcherTests(TransactionTestCase):
         self.assertEqual(row.calls,1)
         self.assertEqual(row.progress_ledger['calls']['seleccionar:1']['state'],'answered')
         self.assertEqual(row.task_ledger['facts'],{'source':'PRIVATE'})
-        events = list(AuditEvent.objects.filter(action='office.event').values_list('metadata',flat=True))
+        events = list(AuditEvent.objects.filter(action='office.orchestration').order_by('created_at','id').values_list('metadata',flat=True))
         self.assertEqual([(e['rol'],e['destino']) for e in events],
                          [('director_editorial','seleccion_editorial'),('seleccion_editorial','director_editorial')])
         self.assertNotIn('PRIVATE',str(events))
+        self.assertEqual([e['phase'] for e in events],['request','response'])
+        self.assertFalse(AuditEvent.objects.filter(action='office.event').exists())
+
+    def test_deleting_a_job_preserves_the_cycle_checkpoint_and_usage(self):
+        run = self.open()
+        with run.session():
+            run.call('seleccionar',REQUEST,lambda:RESULT)
+        before = CycleLedger.objects.get(pk=run.id)
+        UsageEntry.objects.create(id=uuid.uuid4(),created_at=timezone.now(),
+                                  provider='anthropic',purpose='editorial-seleccion',status='uncertain',
+                                  reserved_usd=Decimal('.10'),usage={'cycle_id':str(run.id),'job_id':str(self.job.id)})
+        Job.objects.filter(pk=self.job.pk).delete()
+        row = CycleLedger.objects.get(pk=run.id)
+        self.assertIsNone(row.job_id)
+        self.assertEqual(row.task_ledger,before.task_ledger)
+        self.assertEqual(row.progress_ledger,before.progress_ledger)
+        self.assertEqual(row.calls,before.calls)
+        self.assertEqual(runtime.amount(UsageEntry.objects.filter(usage__cycle_id=str(run.id))),Decimal('.10'))
+
+    def test_a_blocked_result_checkpoint_never_clears_the_stop_or_authorizes_tools(self):
+        run = self.open();fake = Mock()
+        with run.session():
+            run.stop('cost_cap')
+            with self.assertRaisesRegex(runtime.CycleStopped,'cost_cap'):
+                run.finish({'state':'blocked'})
+            run.finish({'state':'blocked'},allow_stopped=True)
+            with self.assertRaisesRegex(runtime.CycleStopped,'cost_cap'):
+                run.call('seleccionar',REQUEST,fake)
+        fake.assert_not_called()
+        row = CycleLedger.objects.get(pk=run.id)
+        self.assertEqual((row.state,row.stop_reason,row.needs_attention),('stopped','cost_cap',True))
+        self.assertEqual(runtime.unpack(row.progress_ledger['result']),{'state':'blocked'})
+        self.notify.assert_called_once()
 
     def test_missing_foreign_and_planned_edges_fail_before_tool(self):
         for edge in ('invented','observar','visual_futuro'):
@@ -206,6 +239,16 @@ class DispatcherTests(TransactionTestCase):
         with run.session(),self.assertRaises(runtime.UndeclaredCall):
             run.call('seleccionar',REQUEST,lambda:providers.reserve('openai','image-edit',Decimal('.01')))
         self.assertFalse(UsageEntry.objects.exists())
+
+    def test_daily_cap_includes_spend_from_outside_this_cycle(self):
+        providers.reserve('anthropic','editorial-director',Decimal('1.90'))
+        run=self.open()
+        with run.session(),self.assertRaisesRegex(runtime.CycleStopped,'cost_cap'):
+            run.call('seleccionar',REQUEST,lambda:providers.reserve('anthropic','editorial-seleccion',Decimal('.20')))
+        self.assertEqual(UsageEntry.objects.count(),1)
+        self.assertEqual(runtime.amount(UsageEntry.objects.all()),Decimal('1.90'))
+        self.assertEqual(CycleLedger.objects.get(pk=run.id).stop_reason,'cost_cap')
+        self.notify.assert_called_once()
 
     def test_registry_change_stops_existing_instance(self):
         self.open(key='pinned')

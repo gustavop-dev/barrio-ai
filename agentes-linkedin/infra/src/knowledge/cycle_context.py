@@ -13,10 +13,10 @@ def current():
     return _current.get()
 
 
-def provider_metadata(provider, purpose, amount, cursor):
+def provider_metadata(provider, purpose, amount, connection):
     if current() is None:return {}
     from team_backend.orquestacion import provider_metadata as reserve
-    return reserve(provider, purpose, amount, cursor)
+    return reserve(provider, purpose, amount, connection)
 
 
 def timeout(default):
