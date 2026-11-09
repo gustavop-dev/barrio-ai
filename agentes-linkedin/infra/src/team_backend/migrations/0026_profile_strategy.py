@@ -15,6 +15,8 @@ class Migration(migrations.Migration):
         migrations.AddField('galleryphoto','profile_version',models.PositiveIntegerField(default=1)),
         migrations.AddField('galleryphoto','profile_consent',models.JSONField(default=dict,blank=True)),
         migrations.AddField('pieceimage','profile_exclusive',models.BooleanField(default=False)),
+        migrations.AlterField('pieceimage','source_photo',models.ForeignKey(to='team_backend.galleryphoto',
+            on_delete=django.db.models.deletion.SET_NULL,null=True,blank=True,related_name='uses')),
         migrations.CreateModel(name='ProfileSchedule',fields=[
             ('id',models.BigAutoField(auto_created=True,primary_key=True,serialize=False,verbose_name='ID')),
             ('anchor',models.DateField()),('full_period',models.CharField(max_length=10,blank=True)),

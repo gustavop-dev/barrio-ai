@@ -774,7 +774,7 @@ class PieceImage(models.Model):
     profile_exclusive=models.BooleanField(default=False)
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     piece=models.ForeignKey(EditorialPiece,on_delete=models.CASCADE,related_name='images')
-    source_photo=models.ForeignKey(GalleryPhoto,on_delete=models.CASCADE,null=True,blank=True,related_name='uses')
+    source_photo=models.ForeignKey(GalleryPhoto,on_delete=models.SET_NULL,null=True,blank=True,related_name='uses')
     position=models.PositiveSmallIntegerField(default=1)
     kind=models.CharField(max_length=16)
     image=models.FileField(upload_to='piezas/imagenes',max_length=200)

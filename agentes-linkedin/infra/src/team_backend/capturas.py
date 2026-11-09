@@ -189,6 +189,9 @@ def delete_photo(user,photo):
     pid,name=photo.id,photo.image.name  # delete() clears the instance's pk
     versions=[p.image.name for p in photo.uses.filter(edited=True)]
     with transaction.atomic():
+        # GAL-05 still removes ordinary post versions. Keep Perfil's exclusion records
+        # after SET_NULL detaches their source; their private files are deleted below.
+        photo.uses.filter(profile_exclusive=False).delete()
         photo.delete()
         _remove_files([name]+versions)
     audit(user,'gallery.deleted',pid)

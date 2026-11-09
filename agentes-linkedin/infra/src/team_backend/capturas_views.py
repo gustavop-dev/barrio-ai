@@ -153,7 +153,9 @@ class Gallery(ListAPIView):
     def post(self,request):
         human_session(request);require(request.user,'approve_actions')
         _limit_body(request,settings.GALLERY_MAX_PHOTOS_PER_REQUEST*settings.GALLERY_PHOTO_MAX_BYTES+1024*1024)
-        serializer=PhotoPatch(data=request.data);serializer.is_valid(raise_exception=True)
+        # DRF maps omitted multipart booleans to False unless partial=True. Preserve
+        # the posts preference and let category=perfil grant its separate scoped consent.
+        serializer=PhotoPatch(data=request.data,partial=True);serializer.is_valid(raise_exception=True)
         photos=capturas.add_photos(request.user,request.FILES.getlist('fotos'),serializer.validated_data)
         now=timezone.now()
         return Response([capturas.photo_payload(p,now) for p in photos],status=201)
@@ -164,7 +166,8 @@ class PhotoDetail(APIView):
         return Response(PhotoOutput(get_or_404(GalleryPhoto,id=pid)).data)
     def patch(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
-        data=valid(PhotoPatch,request);photo=get_or_404(GalleryPhoto,id=pid)
+        serializer=PhotoPatch(data=request.data,partial=True);serializer.is_valid(raise_exception=True)
+        data=serializer.validated_data;photo=get_or_404(GalleryPhoto,id=pid)
         from .perfil_galeria import update
         photo=update(request.user,photo,data)
         return Response(PhotoOutput(photo).data)
