@@ -19,6 +19,7 @@ from .models import ActionExecution, AudienceSnapshot, AuditEvent, Contact, Edit
 from .permissions import require
 
 AGES={'24h':timedelta(hours=24),'72h':timedelta(hours=72),'7d':timedelta(days=7)}
+ANALYSIS_UNITS=operador.ANALYSIS_UNITS
 READ_CAPS={'posts':12,'post':20,'comments':20,'profile':3,'views':3}  # per local day; the autopilot runs ~8 times a day
 SUBSTANTIVE_CHARS=80  # same threshold as a substantive comment in network discovery
 VIEWS_RANGES=(14,28,90,365)  # date_range accepted by List Profile Views
@@ -60,6 +61,9 @@ def _read(account,kind,now=None):
     """Count a read before making it; a spent cap stops the read."""
     cap=read_caps()[kind]
     if reads_today(account,kind,now)>=cap:raise ReadCapReached(f'Tope diario de lecturas de métricas «{kind}» alcanzado ({cap}).')
+    if kind=='profile':
+        try:operador.reserve_profile_read(account,'metrics',now)
+        except operador.ProfileReadCapReached as exc:raise ReadCapReached(str(exc)) from exc
     AuditEvent.objects.create(action='metrics.read',target=str(account.id),metadata={'kind':kind})
 
 # --------------------------------------------------------------------------- what is due
@@ -175,12 +179,16 @@ def collect(user,account,now=None):
     require(user,'operate_linkedin')
     if account.provider not in PROVIDERS:raise ValueError('Las métricas se leen con la cuenta Unipile.')
     now=now or timezone.now();connector=get_connector(account)
-    summary={'captured':0,'pending':0,'refreshed':0,'audience':'no','stopped':''}
+    context,grounding=operador.role_context('analista',ANALYSIS_UNITS,
+        {'ventanas':['LI-06-V008-K01','LI-06-V008-K02'],'limites_de_inferencia':['LI-06-V006-K04','LI-06-V007-K05']})
+    summary={'captured':0,'pending':0,'refreshed':0,'audience':'no','stopped':'',**grounding,'course_context':context,
+             'sales_inferred':False,'identities_inferred':False,'divulgadores_have_value':True,
+             'interpretation_limits':'Contadores observados; sin causalidad, identidades nuevas ni ventas inferidas. Ventanas por edad de publicación; audiencia con su ventana propia.'}
     for step in (collect_posts,collect_audience):
         try:step(account,connector,now,summary)
         except (ReadCapReached,ConnectorError) as exc:
             summary['stopped']='; '.join(filter(None,[summary['stopped'],str(exc)]))
             if getattr(exc,'pause',False):
                 operador.set_account_pause(account,f'Métricas detenidas por el proveedor: {exc}');break
-    operador._audit(user,'metrics.collected',account.id,**summary)
+    operador._audit(user,'metrics.collected',account.id,**{k:v for k,v in summary.items() if k!='course_context'})
     return summary

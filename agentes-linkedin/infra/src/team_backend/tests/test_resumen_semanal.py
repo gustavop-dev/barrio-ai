@@ -27,7 +27,10 @@ def analysis(**overrides):
     data={'titular':'Semana con 3 posts','lo_que_funciono':[{'texto':'El post de IA aplicada llegó a 1.200 impresiones.','cifra':'1200'}],
           'lo_que_no':[],'recomendaciones':[{'texto':'Repetir applied_ai: 3,5 % de interacción.','cifra':'3.5'}],
           'orientacion_propuesta':PROPOSAL,'advertencias':['Pocos datos: 2 posts.'],'validacion':{'ok':True,'descartado':[]}}
-    data.update(overrides);return data
+    data.update(overrides)
+    for field in ('lo_que_funciono','lo_que_no','recomendaciones'):
+        for item in data.get(field,[]):item.setdefault('course_citations',['LI-06-V008-K01','LI-06-V008-K02'])
+    return data
 
 
 def model_answer(**overrides):
@@ -39,7 +42,10 @@ def model_answer(**overrides):
           'recomendaciones':[{'texto':'Repetir el pilar applied_ai: su post tuvo 3,5 % de interacción.','cifra':'interaccion_pct: 3.5'},
                              {'texto':'Publicar con más constancia.','cifra':'ninguna'}],
           'orientacion_propuesta':PROPOSAL,'advertencias':['Pocos datos: 2 posts con corte de 72 h.']}
-    data.update(overrides);return data
+    data.update(overrides)
+    for field in ('lo_que_funciono','lo_que_no','recomendaciones'):
+        for item in data.get(field,[]):item.setdefault('course_citations',['LI-06-V008-K01','LI-06-V008-K02'])
+    return data
 
 
 class SummaryBase(MetricsBase):

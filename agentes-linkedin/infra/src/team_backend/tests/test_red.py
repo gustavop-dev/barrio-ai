@@ -31,10 +31,10 @@ class NetworkBase(OperatorBase):
 
     def classifier(self,verdicts):
         """verdicts: {display_name: (fit, confidence)}"""
-        def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None):
-            data=json.loads(message);self.classifier_calls.append({'purpose':purpose,'model':model,'data':data,'system':system})
+        def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
+            data=json.loads(message);self.classifier_calls.append({'purpose':purpose,'model':model,'data':data,'system':system,'context':context})
             out=[{'id':p['id'],'fit':verdicts[p['name']][0],'role':'comprador','modality':'projectapp','affinity':'desconocida',
-                  'reason':f'Razón para {p["name"]}','confidence':verdicts[p['name']][1]} for p in data['people'] if p['name'] in verdicts]
+                  'reason':f'Razón para {p["name"]}','confidence':verdicts[p['name']][1],'course_citations':['LI-03-M005-K06'], 'invitation_note':'','note_reason':''} for p in data['people'] if p['name'] in verdicts]
             return {'text':json.dumps({'contacts':out}),'model':model,'estimated_usd':0.002,'request_id':'req_net'}
         return patch('knowledge.providers.claude',side_effect=fake)
 

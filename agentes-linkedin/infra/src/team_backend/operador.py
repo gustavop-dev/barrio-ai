@@ -10,9 +10,12 @@ import hashlib
 import json
 import os
 import re
+import random
 import uuid
-from datetime import timedelta
+from psycopg import Error as KnowledgeReadError
+from datetime import datetime, timedelta
 from django.db import IntegrityError, transaction
+from django.db.models import Q
 from django.utils import timezone
 from knowledge import memory, providers, retrieval
 from knowledge.ingest import ENC
@@ -29,6 +32,14 @@ POST_MAX_CHARS=3000  # LinkedIn's limit for a post's text
 STALE_EXECUTION=timedelta(seconds=300)
 # Catalogue grounding for INT-03 (B04, B06, B15): discovery, contributing comments, editing and facts.
 COMMENT_UNITS=['LI-03-M006-K02','LI-03-V018-K02','LI-03-V020-K04','LI-06-M003-K06','LI-06-M002-K09','LI-06-M002-K10']
+REFERENTS_UNITS=['LI-03-V009-K04','LI-03-V018-K02','LI-03-M005-K05','LI-03-M005-K06','LI-03-V020-K05']
+ANALYSIS_UNITS=['LI-03-M004-K04','LI-03-V020-K05','LI-06-V006-K03','LI-06-V006-K04',
+                'LI-06-V007-K05','LI-06-V008-K01','LI-06-V008-K02']
+NETWORK_UNITS=['LI-03-M005-K05','LI-03-M005-K06','LI-03-V018-K02','LI-03-V018-K03','LI-03-V015-K01',
+               'LI-03-V021-K02','LI-03-V021-K03','LI-03-M006-K01','LI-03-M006-K04']
+INBOX_UNITS=['LI-03-V019-K03','LI-03-V019-K04','LI-03-V020-K01','LI-06-V006-K04']
+LEAD_UNITS=['LI-03-V020-K02','LI-03-M006-K01','LI-03-M005-K06','LI-06-M001-K04','LI-06-M001-K07']
+COURSE_VERSION='bib-v1'
 EXECUTION_NAMESPACE=uuid.UUID('6f1d8c0e-6a43-4a8e-9a55-7d1b0c2f4e11')
 
 class OperatorBlocked(Conflict):
@@ -42,7 +53,7 @@ def _audit(actor,action,target,**metadata):
 # --------------------------------------------------------------------------- policy
 
 # Prudent initial caps from reparto-acciones-v1 (not LinkedIn limits), per local day and week.
-DEFAULT_LIMITS={'INT-03':(3,12),'INT-02':(15,60),'CONT-09':(1,7),'RED-01':(10,40),'RED-02':(5,20),'RED-04':(10,40)}
+DEFAULT_LIMITS={'INT-03':(5,25),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)}
 
 def _parse_caps(variable):
     caps={}
@@ -51,10 +62,19 @@ def _parse_caps(variable):
         if value.strip().isdigit():caps[key.strip()]=int(value)
     return caps
 
-def limits():
+def is_weekend(now=None):
+    return (now or timezone.now()).astimezone(local_tz()).weekday()>=5
+
+def limits(now=None):
     """{capability: (daily, weekly)}; OPERATOR_DAILY_LIMITS / OPERATOR_WEEKLY_LIMITS override."""
     daily,weekly=_parse_caps('OPERATOR_DAILY_LIMITS'),_parse_caps('OPERATOR_WEEKLY_LIMITS')
-    return {cap:(daily.get(cap,d),weekly.get(cap,w)) for cap,(d,w) in DEFAULT_LIMITS.items()}
+    caps={cap:(daily.get(cap,d),weekly.get(cap,w)) for cap,(d,w) in DEFAULT_LIMITS.items()}
+    caps['RED-02']=(min(20,caps['RED-02'][0]),min(100,caps['RED-02'][1]))
+    if is_weekend(now):
+        factor=max(0,min(0.5,float(os.environ.get('OPERATOR_WEEKEND_FACTOR','0.5'))))
+        caps={cap:(int(d*factor) if cap!='CONT-09' else d,w) for cap,(d,w) in caps.items()}
+        caps['RED-02']=(0,caps['RED-02'][1])
+    return caps
 
 def local_tz():
     from zoneinfo import ZoneInfo
@@ -78,21 +98,85 @@ def within_window(now=None):
 def min_spacing():
     return timedelta(seconds=int(os.environ.get('OPERATOR_MIN_SPACING_SECONDS','1200')))
 
+def policy_lock():
+    """One member across all connectors. Call inside atomic(), before account/proposal locks."""
+    from .models import OperatorControl
+    OperatorControl.current()
+    return OperatorControl.objects.select_for_update().get(pk=1)
+
+def policy_event(action,target='member'):
+    from .models import AuditEvent
+    return AuditEvent.objects.filter(action=action,target=str(target)).order_by('-created_at','-id').first()
+
+def reserve_spacing(now=None):
+    """Caller holds policy_lock; a restart cannot shorten a reserved random gap."""
+    now=now or timezone.now()
+    low=max(1200,int(min_spacing().total_seconds()))
+    high=max(low,int(os.environ.get('OPERATOR_MAX_SPACING_SECONDS','2400')))
+    seconds=random.SystemRandom().randint(low,high)
+    _audit(None,'operator.schedule','member',next_action_at=(now+timedelta(seconds=seconds)).isoformat(),gap_seconds=seconds)
+
 def spacing_ok(account,now=None):
     # Every connector acts as the same LinkedIn member, so public writes share one spacing. An execution whose
     # pre-check found nothing to write does not count (an execution in flight does: it may be writing).
+    event=policy_event('operator.schedule')
+    if event and datetime.fromisoformat(event.metadata['next_action_at'])>(now or timezone.now()):return False
     last=ActionExecution.objects.filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
     return last is None or last<=(now or timezone.now())-min_spacing()
 
+@transaction.atomic
+def prepare_day_schedule(now=None):
+    """A persisted, varied opening slot; missed activity never earns a burst of catch-up writes."""
+    now=now or timezone.now();policy_lock()
+    local=now.astimezone(local_tz());day=local.date().isoformat()
+    event=policy_event('operator.day_schedule')
+    if event and event.metadata['day']==day:return
+    start=os.environ.get('OPERATOR_WINDOW','07:00-21:00').split('-')[0]
+    hour,minute=map(int,start.split(':'))
+    opened=local.replace(hour=hour,minute=minute,second=0,microsecond=0)
+    delay=random.SystemRandom().randint(0,1200)
+    if event and delay==event.metadata.get('delay'):delay=(delay+1)%1201
+    next_at=max(opened,now)+timedelta(seconds=delay)
+    previous=policy_event('operator.schedule')
+    if previous:next_at=max(next_at,datetime.fromisoformat(previous.metadata['next_action_at']))
+    _audit(None,'operator.day_schedule','member',day=day,delay=delay)
+    _audit(None,'operator.schedule','member',next_action_at=next_at.isoformat(),gap_seconds=delay)
+
 def writes(account,capability):
     """Executions of a capability that wrote (or may have written) on LinkedIn: what the caps count."""
-    return ActionExecution.objects.filter(proposal__account=account,proposal__capability=capability,wrote=True)
+    return ActionExecution.objects.filter(proposal__capability=capability,wrote=True)
 
 def capacity_left(account,capability,now=None):
-    daily,weekly=limits().get(capability,(0,0))
+    daily,weekly=limits(now).get(capability,(0,0))
+    if capability=='RED-02':
+        from .red import ramp_limits
+        rd,rw=ramp_limits(account,now)
+        daily,weekly=min(daily,rd),min(weekly,rw)
     day,week=period_starts(now)
     done=writes(account,capability)
     return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
+
+class ProfileReadCapReached(ValueError):
+    """A required profile read waits; it never disappears from a write's preflight."""
+
+def reserve_profile_read(account,purpose,now=None):
+    from .models import AuditEvent
+    now=now or timezone.now();day,_=period_starts(now)
+    cap=max(0,min(100,int(os.environ.get('OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))
+    with transaction.atomic():
+        policy_lock()
+        baseline=policy_event('operator.profile_baseline')
+        if baseline is None or baseline.metadata['day']!=day.date().isoformat():
+            # Preserve reads already charged by the pre-BAR-15 counters on deployment day.
+            legacy=AuditEvent.objects.filter(
+                Q(action='network.read',metadata__kind='profile')|
+                Q(action='network.read',metadata__kind='execution',metadata__read='profile')|
+                Q(action='metrics.read',metadata__kind='profile'),created_at__gte=day).count()
+            _audit(None,'operator.profile_baseline','member',day=day.date().isoformat(),used=legacy)
+        else:legacy=baseline.metadata['used']
+        used=legacy+AuditEvent.objects.filter(action='operator.profile_read',created_at__gte=day).count()
+        if used>=cap:raise ProfileReadCapReached('Tope compartido de lecturas de perfil alcanzado; la operación espera.')
+        _audit(None,'operator.profile_read','member',account=str(account.id),purpose=purpose)
 
 def env_paused():
     return os.environ.get('OPERATOR_PAUSED','false').lower()=='true'
@@ -151,9 +235,19 @@ def validate_payload(capability,payload):
         if 'media' in payload and not isinstance(payload['media'],dict):raise ValueError('Manifiesto de imágenes inválido')
         return dict(text=text.strip(),**({'media':payload['media']} if 'media' in payload else {}))
     if capability in (ActionProposal.Capability.FOLLOW,ActionProposal.Capability.INVITE):
-        # RED-02 carries no note: the free account only has a handful of notes a month.
-        if set(payload)!={'user_id'} or not USER_ID.fullmatch(str(payload.get('user_id'))):raise ValueError('La acción requiere solo user_id')
-        return {'user_id':payload['user_id']}
+        allowed={'user_id'} if capability==ActionProposal.Capability.FOLLOW else {'user_id','note','note_reason','without_note_fallback'}
+        if set(payload)-allowed or not USER_ID.fullmatch(str(payload.get('user_id'))):raise ValueError('Destinatario o campos inválidos')
+        if 'note' not in payload:
+            if set(payload)!={'user_id'}:raise ValueError('Metadatos de nota sin nota')
+            return {'user_id':payload['user_id']}
+        from .red import note_policy
+        policy=note_policy()
+        note=payload.get('note');reason=payload.get('note_reason')
+        if not isinstance(note,str) or not note.strip() or len(note)>policy['max_chars'] or '\x00' in note:
+            raise ValueError('Nota de invitación inválida para el tier efectivo')
+        if not isinstance(reason,str) or not reason.strip() or payload.get('without_note_fallback') is not True:
+            raise ValueError('La nota requiere razón de encaje y alternativa sin nota explícita')
+        return dict(payload,note=note.strip(),note_reason=reason.strip())
     if capability==ActionProposal.Capability.ACCEPT:
         if set(payload)!={'request_id','user_id'} or not USER_ID.fullmatch(str(payload.get('user_id'))) or not str(payload.get('request_id') or '').strip():
             raise ValueError('Aceptar requiere request_id y user_id')
@@ -205,6 +299,7 @@ def add_referent(user,account,identifier,reason):
     slug=public_identifier(identifier)
     existing=Referent.objects.filter(account=account,public_identifier=slug).first()
     if existing:return existing,False
+    reserve_profile_read(account,'referent')
     profile=get_connector(account).get_user(slug)
     referent=Referent.objects.create(account=account,public_identifier=slug,provider_user_id=profile['id'],
         display_name=profile['display_name'],profile_url=profile['profile_url'],reason=reason.strip(),created_by=user)
@@ -218,13 +313,18 @@ def observe(user,account,referent_ids=None,limit=5):
     connector=get_connector(account)
     referents=Referent.objects.filter(account=account,active=True)
     if referent_ids:referents=referents.filter(id__in=referent_ids)
-    summary={'referents':0,'new_posts':0,'seen_posts':0,'errors':[]}
+    context,grounding=role_context('observatorio',REFERENTS_UNITS,{'seleccion':REFERENTS_UNITS})
+    summary={'referents':0,'new_posts':0,'seen_posts':0,'errors':[],**grounding,'course_context':context,
+             'selection_basis':'audience_and_evidence','popularity_implies_fit':False,'evidence':[]}
     for referent in referents:
         try:
             if not referent.provider_user_id:
+                reserve_profile_read(account,'observation')
                 referent.provider_user_id=connector.get_user(referent.public_identifier)['id']
                 referent.save(update_fields=['provider_user_id'])
             posts=connector.list_user_posts(referent.provider_user_id,limit=limit)
+        except ProfileReadCapReached as exc:
+            summary['errors'].append({'referent':str(referent.id),'error':str(exc)});break
         except ConnectorError as exc:
             summary['errors'].append({'referent':str(referent.id),'error':str(exc)})
             if exc.pause:
@@ -238,8 +338,10 @@ def observe(user,account,referent_ids=None,limit=5):
                 'text':post['text'],'posted_at':post['created_at'],'comments_count':post['comments_counter'],
                 'reactions_count':post['reactions_counter'],'is_repost':post['is_repost']})
             summary['new_posts' if created else 'seen_posts']+=1
+            summary['evidence'].append({'post_id':post['id'],'referent':str(referent.id),'url':post['share_url'],
+                                        'scope':'Observed public post; no inferred audience or causality'})
         referent.last_observed_at=timezone.now();referent.save(update_fields=['last_observed_at'])
-    _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k!='errors'},errors=len(summary['errors']))
+    _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k not in ('errors','course_context')},errors=len(summary['errors']))
     if summary['new_posts']:
         from .notificaciones import avisar
         n=summary['new_posts']
@@ -301,9 +403,14 @@ def approve(user,proposal_id,expected_hash,note=''):
         if proposal.state!=ActionProposal.State.PROPOSED:raise Conflict('La propuesta no está pendiente de aprobación.')
         if not (expected_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('El contenido cambió: revisa la versión actual antes de aprobar.')
+        if proposal.capability=='RED-02' and proposal.payload.get('note'):
+            from . import lider
+            require(user,'use_paid_providers')
+            proposal.review=lider.review(proposal)
+            if not proposal.review.get('note_approved'):raise Conflict('La nota no supera la revisión del líder.')
         proposal.state=ActionProposal.State.APPROVED;proposal.approved_hash=proposal.payload_hash
         proposal.decided_by=user;proposal.decided_at=timezone.now();proposal.decision_note=note
-        proposal.save(update_fields=['state','approved_hash','decided_by','decided_at','decision_note'])
+        proposal.save(update_fields=['state','approved_hash','decided_by','decided_at','decision_note','review'])
         _audit(user,'operator.approved',proposal.id,payload_hash=proposal.payload_hash)
     return enqueue_execution(user,proposal)
 
@@ -401,6 +508,20 @@ def _record_metrics(proposal,post):
         EditorialPiece.objects.filter(pk=proposal.piece_id).update(
             metrics={'impressions':post['impressions'],'observed_at':timezone.now().isoformat(),'source':'unipile'})
 
+@transaction.atomic
+def final_write_gate(execution,proposal,user):
+    """Recheck after slow preflight/upload. The current execution already owns its capacity slot."""
+    policy_lock()
+    issues=[]
+    if globally_paused() or ConnectorAccount.objects.filter(paused=True).exists():issues.append('Cuenta o máquina en pausa')
+    if not within_window():issues.append('Fuera de ventana')
+    if capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
+    if proposal.capability in NETWORK:
+        from . import red
+        issues.extend(red.execution_issues(proposal))
+    if issues:return _finish(execution,'failed',user,error_kind='policy_changed',note='; '.join(issues),wrote=False)
+    return None
+
 def _publish(execution,proposal,connector,user):
     """CONT-09 through the Posts API: one request, never repeated; confirmed by reading back when possible."""
     text=proposal.payload['text'];now=timezone.now
@@ -410,7 +531,10 @@ def _publish(execution,proposal,connector,user):
                        note='Ya existía una publicación propia idéntica; no se publicó otra.')
     from . import imagenes
     media=imagenes.upload(proposal.piece,connector)
+    blocked=final_write_gate(execution,proposal,user)
+    if blocked:return blocked
     created=connector.create_post(text,media=media)
+    execution._write_accepted=True
     execution.external_id=created['id'];execution.external_url=created['url']
     found,readable=_find_own_post(text)
     if found:
@@ -429,7 +553,15 @@ def execute(user,proposal_id):
     """Execute one approved proposal exactly once. Safety gates run before any write."""
     require(user,'execute_actions')
     if globally_paused():raise OperatorBlocked('Operación global pausada (OPERATOR_PAUSED).')
+    # Persist health/pause changes before any gate can roll back the execution reservation.
+    from . import red
+    candidate=ActionProposal.objects.select_related('account').get(id=proposal_id)
+    if candidate.capability=='RED-02':red.review_health(candidate.account)
+    if candidate.capability in NETWORK and not candidate.account.paused and os.environ.get('OPERATOR_EXTERNAL_OUTREACH_ACTIVE','false').lower()=='true':
+        set_account_pause(candidate.account,'Outreach externo concurrente; desactivarlo antes de reanudar.')
+    prepare_day_schedule()
     with transaction.atomic():
+        policy_lock()
         proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
         existing=ActionExecution.objects.filter(proposal=proposal).first()
         if existing:return existing
@@ -437,6 +569,9 @@ def execute(user,proposal_id):
         if not (proposal.approved_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('La versión aprobada no coincide con la propuesta; requiere nueva aprobación.')
         account=ConnectorAccount.objects.select_for_update().get(pk=proposal.account_id)
+        if ConnectorAccount.objects.filter(paused=True).exclude(pk=account.pk).exists():
+            raise OperatorBlocked('Otro conector de la misma cuenta está en pausa.')
+        if globally_paused():raise OperatorBlocked('Operación global pausada.')
         if account.paused:raise OperatorBlocked(f'Cuenta en pausa: {account.paused_reason or "sin motivo registrado"}')
         if proposal.piece_id and proposal.piece.scheduled_for>timezone.now():
             raise OperatorBlocked('Aún no es la hora programada de la pieza; queda aprobada para entonces.')
@@ -444,6 +579,14 @@ def execute(user,proposal_id):
         if not spacing_ok(account):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
         if capacity_left(account,proposal.capability)<=0:
             raise OperatorBlocked(f'Tope diario o semanal de {proposal.capability} alcanzado; queda aprobada para después.')
+        if proposal.capability in NETWORK:
+            from . import red
+            issues=red.execution_issues(proposal)
+            if issues:raise OperatorBlocked('; '.join(issues))
+            # Reserve the preflight before creating an execution. Exhaustion leaves approval retryable.
+            try:reserve_profile_read(account,'preflight')
+            except ProfileReadCapReached as exc:raise OperatorBlocked(str(exc)) from exc
+        reserve_spacing()
         execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
             idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
         proposal.state=ActionProposal.State.EXECUTING;proposal.save(update_fields=['state'])
@@ -473,7 +616,10 @@ def execute(user,proposal_id):
             if already:
                 return _finish(execution,'confirmed',user,external_id=already['id'],external_url=proposal.post.share_url,
                                note='Ya existía un comentario propio idéntico; no se escribió otro.',reconciled_at=timezone.now(),wrote=False)
+            blocked=final_write_gate(execution,proposal,user)
+            if blocked:return blocked
             created=connector.create_comment(post_id,text)
+            execution._write_accepted=True
             execution.external_id=created['id']
             found=_find_own_comment(connector,post_id,text,created['id'])
             return _finish(execution,'confirmed' if found else 'sent',user,external_url=proposal.post.share_url,
@@ -483,7 +629,10 @@ def execute(user,proposal_id):
         # LinkedIn only tells whether we reacted: never stack a second reaction on the same post.
         if connector.get_post(post_id).get('user_reacted'):
             return _finish(execution,'confirmed',user,note='Ya había una reacción propia; no se añadió otra.',reconciled_at=timezone.now(),wrote=False)
+        blocked=final_write_gate(execution,proposal,user)
+        if blocked:return blocked
         connector.add_reaction(post_id,reaction)
+        execution._write_accepted=True
         confirmed=bool(connector.get_post(post_id).get('user_reacted'))
         return _finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=timezone.now() if confirmed else None)
     except ConnectorUncertain as exc:
@@ -491,12 +640,19 @@ def execute(user,proposal_id):
         avisar('uncertain','¿Salió o no?',f'{proposal.get_capability_display()}: el proveedor no confirmó. Resuélvela en Tu turno.')
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
-        if exc.pause:set_account_pause(account,f'Detenida por el proveedor: {exc}',user)
+        from . import red
+        red.provider_failure(account,proposal,exc,user)
+        if getattr(execution,'_write_accepted',False):
+            return _finish(execution,'sent',user,error_kind=exc.kind,http_status=exc.status,note='Enviada; falló lectura de confirmación. '+str(exc),wrote=True)
+        if proposal.payload.get('note'):
+            _audit(user,'network.note_rejected',proposal.id,kind=exc.kind,provider_consumption='not_consumed')
         if proposal.piece_id:
             from .notificaciones import avisar
             avisar('piece_blocked','La pieza no pudo publicarse',str(exc),link=f'/calendario/pieza/{proposal.piece_id}',ref=f'publish_failed:{proposal.id}')
         # A failed read before the write proves nothing was sent; a rejected write was not applied.
-        return _finish(execution,'failed',user,error_kind=exc.kind,http_status=exc.status,note=str(exc),wrote=False if exc.kind=='upload' else execution.wrote)
+        return _finish(execution,'failed',user,error_kind=exc.kind,http_status=exc.status,note=str(exc),wrote=False)
+    except ProfileReadCapReached as exc:
+        return _finish(execution,'sent' if execution.wrote else 'failed',user,error_kind='profile_read_cap',note=str(exc))
 
 def reconcile(user,proposal_id):
     """ADM-05: settle sent/uncertain/stale executions by reading LinkedIn. Never writes."""
@@ -560,7 +716,7 @@ Criterio (catálogo INT-03, fundamentos B04/B06/B15 del curso en el contexto):
   founders o clientes que Gustavo busca.
 - orientation es la dirección vigente que Gustavo le da al equipo. Síguela al elegir qué aportar; igual que
   private_guidance, nunca la cites ni la parafrasees.
-- Escribe en el idioma de la publicación (por defecto inglés) y en la voz de Gustavo descrita al final.
+- Escribe siempre en inglés y en la voz de Gustavo descrita al final.
   2–5 frases, máximo 900 caracteres, sin hashtags y como mucho un emoji si encaja con el tono del hilo.
 - No repitas lo que ya dicen otros comentarios.
 - Si no hay un aporte genuino, responde decision="skip" y explica por qué. Saltar es correcto.
@@ -576,9 +732,12 @@ def course_context(unit_ids=COMMENT_UNITS,token_budget=12000):
     """Whole original units, in priority order, within a token budget; also used by editorial.py."""
     chosen=[];missing=[];tokens=0
     for uid in dict.fromkeys(unit_ids):
+        if not re.fullmatch(r'LI-0[1-6]-[A-Z0-9]+-K\d+',uid):missing.append(uid);continue
         try:row=retrieval.unit(uid)
-        except ValueError:missing.append(uid);continue
-        entry={'unit_id':uid,'original':row['original']}
+        except (ValueError,KnowledgeReadError):missing.append(uid);continue
+        entry={'unit_id':uid,'original':row['original'],
+               'hash':row.get('sha256') or hashlib.sha256(json.dumps(row['original'],sort_keys=True,ensure_ascii=False,default=str).encode()).hexdigest(),
+               'sources':row.get('sources',[]),'relations':row.get('relations',[])}
         n=len(ENC.encode(json.dumps(entry,ensure_ascii=False,default=str)))
         if tokens+n>token_budget:missing.append(uid);continue
         chosen.append(entry);tokens+=n
@@ -587,6 +746,28 @@ def course_context(unit_ids=COMMENT_UNITS,token_budget=12000):
 def course_block(units):
     """Course units as stable system context: the same units in the same order every time, so they stay cached."""
     return 'Unidades del curso (course_units):\n'+json.dumps(units,ensure_ascii=False,default=str)
+
+def role_context(role,unit_ids,criteria=None):
+    """Stable complete source block and a versioned envelope. No retrieval identity impersonation.
+
+    Sources are data, never authorization. Read current active units each time so a retired/changed
+    unit invalidates the provider's prefix cache; historical envelopes retain their content hashes.
+    """
+    units,missing=course_context(unit_ids)
+    loaded=[u['unit_id'] for u in units]
+    sources={key:[uid for uid in ids if uid in loaded] for key,ids in (criteria or {'contexto':unit_ids}).items()}
+    metadata={'course_role':role,'course_citations':loaded,'criterion_sources':sources,
+              'course_version':COURSE_VERSION,'course_hashes':{u['unit_id']:u['hash'] for u in units},
+              'criterion_version':hashlib.sha256(json.dumps(sources,sort_keys=True).encode()).hexdigest(),
+              'orientation_hash':hashlib.sha256(orientacion.text().encode()).hexdigest(),
+              'course_missing':missing,'course_mode':'curated_ids','course_base':list(unit_ids),'course_additional':[],
+              'course_status':'Biblioteca no disponible' if missing or not units else 'disponible'}
+    return course_block(units),metadata
+
+def validate_course_citations(citations,grounding):
+    if not isinstance(citations,list) or not citations or any(uid not in grounding['course_citations'] for uid in citations):
+        raise ValueError('Citas del curso ausentes o no recuperadas para este rol')
+    return list(dict.fromkeys(citations))
 
 def _draft_comment(message,units):
     """One paid draft: instructions, voice and course units go in cached system blocks; the post and its context in the message."""

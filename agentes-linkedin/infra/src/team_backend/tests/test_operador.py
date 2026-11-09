@@ -25,6 +25,13 @@ class OperatorBase(TransactionTestCase):
                                    # The weekly summary depends on the real weekday; test_resumen_semanal turns it on.
                                    'WEEKLY_SUMMARY_ENABLED':'false'})
         env.start();self.addCleanup(env.stop)
+        self.weekend_patch=patch('team_backend.operador.is_weekend',return_value=False)
+        self.weekend_patch.start();self.addCleanup(self.weekend_patch.stop)
+        # Legacy scenarios exercise their own gates; BAR-15 tests restore the real durable scheduler.
+        self.spacing_patch=patch('team_backend.operador.reserve_spacing')
+        self.spacing_patch.start();self.addCleanup(self.spacing_patch.stop)
+        self.day_schedule_patch=patch('team_backend.operador.prepare_day_schedule')
+        self.day_schedule_patch.start();self.addCleanup(self.day_schedule_patch.stop)
         network=patch('httpx.post',side_effect=AssertionError('Network forbidden in operator tests'))
         network.start();self.addCleanup(network.stop)
         FakeConnector.reset();self.addCleanup(FakeConnector.reset)
@@ -33,6 +40,13 @@ class OperatorBase(TransactionTestCase):
             c.execute("INSERT INTO source_files(path,sha256) VALUES('fixture','abc')")
             c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
                 VALUES('LI-03-M006-K02',3,'Comentarios que aportan','{"title":"Opinión, fundamento y apertura"}','abc','fixture','/units/0','{}')''')
+        # Synthetic corpus only; never import private course text into fixtures.
+        role_units=set(operador.REFERENTS_UNITS+operador.ANALYSIS_UNITS+operador.NETWORK_UNITS+operador.INBOX_UNITS+operador.LEAD_UNITS)
+        with db.connect() as c:
+            for uid in role_units:
+                c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
+                    VALUES(%s,%s,%s,'{"title":"Synthetic course fixture","limits_errors":"Do not infer facts or authority"}',
+                    'fixture-hash','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''',(uid,int(uid[3:5]),uid))
         self.gustavo=User.objects.create_user('gustavo-test',password='local-only-password')
         self.grant(self.gustavo,*ALL)
         self.service=User.objects.create_user('service-test')

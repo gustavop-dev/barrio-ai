@@ -23,6 +23,11 @@ class ConnectorError(Exception):
 class ConnectorUncertain(Exception):
     """The write may have reached LinkedIn; its effect is unknown until reconciled."""
 
+class InvitationNoteQuota(ConnectorError):
+    """Only an explicit note-only rejection proving that no invitation was created."""
+    def __init__(self,message,status=None):
+        super().__init__(message,status=status,kind='note_quota')
+
 def public_identifier(value):
     """Accept a public slug or a linkedin.com/in/ URL; never guess from a name."""
     value=(value or '').strip()
@@ -128,6 +133,12 @@ class UnipileConnector:
         try:body=response.json()
         except ValueError:body={}
         kind=body.get('type') or 'http_error';status=response.status_code
+        # Conservative adapter contract. A generic quota/422 never authorizes a second write.
+        # No unverified provider error code is guessed; absent explicit scope/outcome stays an error.
+        if (status in (400,422) and body.get('scope')=='invitation_note' and
+                body.get('reason')=='monthly_limit' and body.get('invitation_created') is False and
+                str(kind).split('/')[-1]!='cannot_resend_yet'):
+            return InvitationNoteQuota(f'Unipile: cuota de notas rechazada sin crear invitación ({kind}).',status)
         # Re-authentication, permission/restriction signals and rate limits stop the account.
         pause=status in (401,403,429) or kind in ('api/account_restricted','provider/invalid_authorization')
         return ConnectorError(f'Unipile: HTTP {status} ({kind}).',status=status,kind=kind,pause=pause)
@@ -193,9 +204,10 @@ class UnipileConnector:
     def follow_user(self,user_id):
         self._write(self._path('users','me','follow',user_id),{});return {'user_id':user_id}
 
-    def send_invitation(self,user_id):
-        # No note: the free account only has a handful of notes a month (reparto v1.1).
-        return _invitation(self._write(self._path('users','me','relation-requests'),{'user_id':user_id}))
+    def send_invitation(self,user_id,note=None):
+        payload={'user_id':user_id}
+        if note:payload['message']=note
+        return _invitation(self._write(self._path('users','me','relation-requests'),payload))
 
     def list_invitations(self,kind,limit=100):
         if kind not in ('sent','received'):raise ConnectorError('Tipo de invitación inválido.',kind='invalid')
@@ -353,10 +365,10 @@ class FakeConnector:
         if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
         return {'user_id':user_id}
 
-    def send_invitation(self,user_id):
+    def send_invitation(self,user_id,note=None):
         mode=self._fail();self.get_profile(user_id)
         rid='inv:'+uuid.uuid4().hex[:10]
-        invitation={'id':rid,'type':'sent','message':'','created_at':datetime.now(timezone.utc).isoformat(),'user':self.state['users'][user_id]}
+        invitation={'id':rid,'type':'sent','message':note or '','created_at':datetime.now(timezone.utc).isoformat(),'user':self.state['users'][user_id]}
         if mode!='uncertain_not_applied':
             self.state['invitations']['sent'][rid]=invitation;self.state['network'][user_id]['relation_request_status']='PENDING'
             self.state['writes']+=1
