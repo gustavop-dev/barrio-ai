@@ -66,6 +66,14 @@ def _clip(text,limit):
 def _outcome(kind,text,link=None,**extra):
     return dict({'kind':kind,'text':text,'link':link},**extra)
 
+
+def _research_outcome(outcome,investigation):
+    from .research import outcome_text
+    if not investigation:return outcome
+    prefix=outcome_text(investigation)
+    if outcome.get('text','').startswith(prefix):return outcome
+    return dict(outcome,text=prefix+' · '+outcome.get('text',''))
+
 # --------------------------------------------------------------------------- files
 
 AUDIO_TYPES={'audio/webm':('webm','.webm'),'video/webm':('webm','.webm'),'audio/ogg':('ogg','.ogg'),'application/ogg':('ogg','.ogg'),
@@ -235,6 +243,7 @@ def create(user,data,audio=None,photos=()):
 ROUTE_SYSTEM='''Eres el operador de cuenta de 0ff1ce, el equipo que lleva el LinkedIn de Gustavo. Gustavo mandó una captura
 (un audio transcrito, una nota y quizá fotos) sin decir para qué es. Decide a dónde va:
 - post: una idea, una anécdota, una opinión o una pregunta que podría convertirse en un post suyo.
+  También una petición de investigar un tema público o leer un enlace para una posible pieza.
 - dato: algo sobre él que el equipo debe saber (preferencias, límites, trayectoria, contexto, una decisión), aunque
   no sea para publicar. Es privado por defecto.
 - galeria: solo si lleva fotos y el texto se limita a describirlas o a pedir que se usen en sus posts.
@@ -369,10 +378,22 @@ def process(capture_id):
                     capture.understanding={'error':str(exc)};capture.save(update_fields=['understanding'])
             else:capture_intent.apply(capture,capture_intent.jev(capture))
         kind,reason,classified=_destination(capture)
+        from . import research, web_sources
+        requested,question=research.capture_question(capture)
+        urls=web_sources.detect_urls(capture.text)
+        if requested or urls:
+            if not Capture.objects.filter(pk=capture.pk,state=Capture.State.PROCESSING).exists():return _current(capture)
+            investigation=research.research(research.ResearchRequest(
+                key=f'capture:{capture.id}',public_question=question,urls=tuple(urls),search=requested,purpose='web-research-capture'))
+            if not Capture.objects.filter(pk=capture.pk,state=Capture.State.PROCESSING).update(investigation=investigation.to_dict()):
+                from .models import WebResearchRun
+                WebResearchRun.objects.filter(pk=f'capture:{capture.id}').update(state='withdrawn',result={})
+                return _current(capture)
         with transaction.atomic():
             locked=Capture.objects.select_for_update().get(pk=capture.pk)
             if locked.state!=Capture.State.PROCESSING:return locked  # undone or stopped meanwhile
             routed,outcome,state,role=ROUTES[kind](locked,user,locked.text)
+            outcome=_research_outcome(outcome,locked.investigation)
             routed=dict(locked.routed_to,kind=kind,**routed)
             if classified:routed.update(classified=True,reason=reason);outcome['reason']=reason
             locked.routed_to=routed;locked.outcome=outcome;locked.state=state;locked.error=''
@@ -437,6 +458,9 @@ def undo(user,capture_id):
             names.extend(p.image.name for p in photo.uses.filter(edited=True))
             photo.delete()
         capture.publish_asap=False;capture.publish_asap_evidence='';capture.publish_asap_expected_slot=None;capture.understanding={}
+        capture.investigation={}
+        from .models import WebResearchRun
+        WebResearchRun.objects.filter(pk=f'capture:{capture.id}').update(state='withdrawn',result={})
         capture.audio=None;capture.note='';capture.transcript='';capture.state=Capture.State.UNDONE;capture.error=''
         capture.outcome=_outcome('deshecha','Deshiciste este envío')
         capture.routed_to=dict(capture.routed_to or {},undone_at=timezone.now().isoformat())
@@ -458,6 +482,7 @@ def ideas_for_director(now=None):
     now=now or timezone.now();expire_ideas(now)
     rows=Capture.objects.filter(state=Capture.State.IDEA,created_at__gte=now-timedelta(days=IDEA_DAYS)).order_by('-publish_asap','publish_asap_expected_slot','-created_at')[:IDEA_LIMIT]
     return [{'id':str(c.id),'text':_clip(c.text,6000),'date':_local(c.created_at).date().isoformat(),
+             'investigation':c.investigation,
              'purpose':c.purpose,'publish_asap':c.publish_asap,'evidence':c.publish_asap_evidence,
              'expected_slot':c.publish_asap_expected_slot.isoformat() if c.publish_asap_expected_slot else None,
              'photos':[{'id':str(p.id),'note':p.note,'ai_edit':p.ai_edit} for p in c.photos.all()]} for c in rows]
@@ -472,6 +497,7 @@ def feedback_for_director(now=None):
     for c in rows:
         piece=pieces.get(c.context_id)
         if piece:out.append({'piece_date':piece.slot_date.isoformat(),'thesis':(piece.brief or {}).get('thesis'),
+                             **({'investigation':c.investigation} if c.investigation else {}),
                              'comment':_clip(c.text,1000),'date':_local(c.created_at).date().isoformat()})
     return out
 
@@ -500,6 +526,7 @@ def piece_comments(piece):
     """`team_comments` of the piece detail: what Gustavo told the team about it."""
     rows=Capture.objects.select_related('created_by').filter(context_type='pieza',context_id=str(piece.id),state=Capture.State.NOTED).order_by('created_at')
     return [{'id':str(c.id),'text':c.text,'note':c.note,'transcript':c.transcript,'has_audio':bool(c.audio),
+             'investigation':c.investigation,
              'audio_url':f'/api/v1/capturas/{c.id}/audio' if c.audio else None,'created_at':c.created_at,
              'by':c.created_by.get_username() if c.created_by else None} for c in rows]
 
@@ -524,7 +551,8 @@ def capture_payload(c,now=None):
             'has_audio':bool(c.audio),'audio_duration_s':c.audio_duration_s,'audio_mime':c.audio_mime or None,
             'audio_url':f'/api/v1/capturas/{c.id}/audio' if c.audio else None,
             'transcript':c.transcript,'transcript_language':c.transcript_language or None,
-            'state':c.state,'state_label':STATE_LABELS.get(c.state,c.state),'outcome':c.outcome or None,
+            'state':c.state,'state_label':STATE_LABELS.get(c.state,c.state),'outcome':_research_outcome(c.outcome,c.investigation) if c.outcome else None,
+            'investigation':c.investigation or None,
             'photos':[{'id':str(p.id),'url':f'/api/v1/galeria/{p.id}/imagen'} for p in c.photos.all()],
             'error':c.error or None,'undo_until':c.created_at+UNDO_WINDOW,
             'can_undo':c.state!=Capture.State.UNDONE and now<=c.created_at+UNDO_WINDOW}

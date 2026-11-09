@@ -80,6 +80,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   3. **Dado** que el brief trae `questions_for_gustavo` con tres preguntas, **cuando** se guarda, **entonces** se crean como mucho dos `TeamQuestion` del `director_editorial`, con plazo igual a `scheduled_for` de la pieza y origen `piece:<id>`, y cada una dispara la push «Director editorial te pregunta».
   4. **Dado** una clave de memoria ya abierta, rechazada, retirada o conocida, **cuando** el director la vuelve a preguntar, **entonces** no se crea una pregunta duplicada.
   5. **Dado** posts de referentes observados en los últimos 7 días, **cuando** el director los usa, **entonces** `signals` de la pieza guarda solo los que el brief lista en `signals_used`.
+  6. **Dado** hechos actuales esenciales ausentes, **cuando** el director pide `research_request`, **entonces** el workflow llama una vez a `research(ResearchRequest)` por pieza, persiste el resultado y lo devuelve al director para cerrar el brief. No envía memoria privada a las herramientas web ni permite una segunda investigación en esa pieza.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -133,6 +134,8 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   1. **Dado** un texto que pasó las reglas, **cuando** corre el verificador, **entonces** `verification` guarda `verdict`, `model_verdict`, `findings`, `checked_claims`, `blocking_reasons` y `text_sha256` igual al SHA-256 del texto final.
   2. **Dado** un hallazgo de gravedad `material` o una afirmación `unsupported`, **cuando** se calcula el veredicto, **entonces** es `blocked` aunque el modelo diga `ready_for_execution`.
   3. **Dado** que el texto cambia después del veredicto, **cuando** la política lo revisa, **entonces** lo descarta con «El veredicto del verificador no corresponde a este texto exacto».
+  4. **Dado** una afirmación `web_source`, **cuando** se verifica, **entonces** exige una fuente guardada con URL, fecha y extracto, y una entrada `supported_source` con texto y ref coincidentes. Una ref inventada bloquea aunque el modelo quiera aprobar. El verificador contrasta también hechos actuales que el redactor omitió o etiquetó como conocimiento general.
+  5. **Dado** fuentes web con instrucciones maliciosas, **cuando** se usan en texto o infografía, **entonces** llegan como datos no confiables; redactor, selección, reparación y verificadores reciben la regla explícita de ignorarlas.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -217,12 +220,13 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** la publicación diaria tiene su propio tope de gasto de IA al día; si se agota, la pieza se detiene y se reintenta al día siguiente.
-- **Código:** `editorial.daily_budget`, `editorial.spent_today`, `editorial._guard`, `editorial.budget_retry`, `EDITORIAL_DAILY_LLM_USD` (1 USD por defecto).
+- **Código:** `editorial.daily_budget`, `editorial.spent_today`, `editorial._guard`, `editorial.budget_retry`, `providers.reserve`, `EDITORIAL_DAILY_LLM_USD`. Default alineado al tope de 2 USD del plan de equipos; comprobar overrides al desplegar.
 - **Criterios de aceptación:**
-  1. **Dado** que lo gastado hoy con propósito `editorial-%` llega a `EDITORIAL_DAILY_LLM_USD`, **cuando** el autopiloto corre, **entonces** no encola preparación.
+  1. **Dado** que lo gastado o reservado hoy en `editorial-%` e `image-%` llega al tope editorial, **cuando** el autopiloto corre, **entonces** no encola preparación. Incluye investigación de la pieza, búsquedas, visión e imágenes de ambos proveedores. El sublímite de imágenes también se aplica; los subtotales no se suman otra vez.
   2. **Dado** que el presupuesto se agota entre dos etapas, **cuando** va a empezar la siguiente, **entonces** la pieza queda `failed` con una nota que empieza por «Presupuesto editorial diario agotado».
   3. **Dado** un hueco cuyos intentos fallaron todos solo por presupuesto, **cuando** llega el día local siguiente, **entonces** el autopiloto lo vuelve a intentar con un trabajo nuevo.
   4. **Dado** el gasto de comentarios (`propose-comment`), **cuando** se calcula el editorial, **entonces** no cuenta (presupuestos separados).
+  5. **Dado** dos solicitudes que compiten por el saldo restante, **cuando** reservan, **entonces** el ledger serializa la comprobación antes de generar. Una reserva incierta sigue contando. Investigación de captura consume el cap web y del proveedor; investigación de pieza consume además el editorial.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -276,6 +280,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   3. **Dado** que esa pieza termina `skipped`, `blocked`, `failed`, descartada o vetada, **cuando** se cierra, **entonces** la idea vuelve a `idea` con «Vuelve a la mesa editorial: la pieza del … no salió (…)».
   4. **Dado** una idea con más de 14 días sin usar, **cuando** se listan las capturas o corre el director, **entonces** pasa a `sin_usar` con «Pasaron 14 días sin que encajara en un brief».
   5. **Dado** comentarios de pieza (capturas con contexto `pieza`) de los últimos 30 días, **cuando** corre el director, **entonces** recibe hasta 10 en `feedback_from_gustavo` con la fecha y la tesis de la pieza.
+  6. **Dado** investigación de una captura, **cuando** se prepara una pieza, **entonces** `research` conserva los resultados ofrecidos al director y `untrusted_web_evidence` los entrega a redacción, selección, reparación y verificador. El detalle de pieza expone esos resultados con sus fuentes; las citas de curso siguen separadas.
 - **Brechas código/docs:** el director recibe fotos, notas y prioridad; ver [IMG-06](imagenes-en-publicaciones.md#img-06).
 - **Cobertura QA:** pendiente
 

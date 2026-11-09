@@ -47,7 +47,7 @@ class PieceDetail(APIView):
         action=editorial.latest_action(piece)
         return Response(dict(summary(piece,action),brief=piece.brief,variants=piece.variants,panel=piece.panel,
             selection=piece.selection,verification=piece.verification,final_text=piece.final_text,citations=piece.citations,
-            signals=piece.signals,usage=piece.usage,metrics=piece.metrics,action_detail=ActionOutput(action).data if action is not None else None,
+            signals=piece.signals,research=piece.research,usage=piece.usage,metrics=piece.metrics,action_detail=ActionOutput(action).data if action is not None else None,
             # APRE-01 (docs/metricas-resultados.md): snapshots at 24 h/72 h/7 d and who commented.
             snapshots=resultados.piece_snapshots(piece),commenters=resultados.piece_commenters(piece),
             # «Comentario para el equipo» sent with the capture button (docs/capturas-galeria.md).

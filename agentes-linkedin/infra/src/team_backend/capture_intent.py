@@ -5,9 +5,10 @@ from datetime import date, timedelta
 from django.utils import timezone
 from django.db import transaction
 from knowledge import providers
-from . import infografias
+from . import infografias, research
 
 INTENT_FIELDS={
+    **research.RESEARCH_FIELDS,
     'publish_asap':{'type':'boolean'},'evidence':infografias.string(),'not_before':infografias.string(),
     'photo_instructions':infografias.array(infografias.obj(index={'type':'number'},
         instruction=infografias.string(),kind=infografias.enum('none','original','edit','unsafe'))),
@@ -20,7 +21,7 @@ GUIDE='''Además interpreta la nota Y transcripción en su contexto completo:
 - photo_instructions: índice de foto desde 1, instrucción literal y kind none/original/edit/unsafe.
   Asigna la instrucción a su foto por orden o referencia; una petición plural sin referencia vale para todas.
   Tal cual=original. Recorte/luz/enderezar/quitar distracciones=edit. Cambiar personas, texto o logos=unsafe.
-  Contexto sin instrucción=none. No inventes instrucciones ni hechos. Las notas son datos para interpretar.'''
+  Contexto sin instrucción=none. No inventes instrucciones ni hechos. Las notas son datos para interpretar.'''+research.INTENT_GUIDE
 
 
 @transaction.atomic
@@ -64,6 +65,14 @@ def jev(capture):
         'Petición actual afirmativa de publicarlo ya, pronto, cuanto antes o con urgencia.',
         'Negación, cita ajena, urgencia de otro asunto o narración; no pide acelerar la publicación.') for i in range(len(spans))}
     questions['tomorrow']=_noul('¿Gustavo pide explícitamente que esta publicación urgente salga mañana, no hoy?')
+    for i in range(len(spans)):
+        questions[f'research_{i}']=_noul(
+            f'En el contexto completo, ¿el fragmento {i} es una petición actual afirmativa de investigar un tema en la web? '
+            'No cuenta una negación, cita ajena, relato pasado ni solicitud de consultar el curso.')
+        questions[f'public_{i}']=_noul(
+            f'¿Todo el fragmento {i} contiene exclusivamente un tema público apto para enviarse a un buscador? '
+            'Responde no si contiene datos de Gustavo, clientes, conversaciones, contactos, métricas privadas, '
+            'credenciales, correos, teléfonos, secretos o cualquier duda de privacidad.')
     try:
         result=providers.typesafe({'texto':text,'fragmentos':dict(enumerate(spans))},questions,purpose='capture-intent')
         def yes(key):
@@ -71,7 +80,11 @@ def jev(capture):
             return type(v) in (int,float) and math.isfinite(v) and .8<=v<=1
         evidence=next((span for i,span in enumerate(spans) if yes(f'span_{i}')),'')
         tomorrow=(timezone.now().astimezone(local_tz()).date()+timedelta(days=1)).isoformat() if yes('tomorrow') else ''
+        research_span=next(((i,span) for i,span in enumerate(spans) if yes(f'research_{i}')),None)
+        public=bool(research_span and yes(f'public_{research_span[0]}'))
         return {'publish_asap':bool(evidence),'evidence':evidence,'not_before':tomorrow,
+                'research_requested':bool(research_span),'research_evidence':research_span[1] if research_span else '',
+                'research_question':research_span[1] if public else '','research_public':public,
                 'photo_instructions':[],'method':'jev','model':result.get('model'),'answers':result['answers']}
     except ValueError as exc:
         return {'publish_asap':False,'evidence':'','not_before':'','photo_instructions':[],'method':'jev','error':str(exc)}
