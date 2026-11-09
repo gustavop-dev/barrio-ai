@@ -207,16 +207,32 @@ class ImageProviderContracts(PublicationBase):
             self.assertIn(b'name="image"',request.content);self.assertIn(connectors_images.EDIT_MODEL.encode(),request.content)
             return httpx.Response(200,json={'data':[{'b64_json':base64.b64encode(raw).decode()}],
                 'usage':{'input_tokens_details':{'text_tokens':100,'image_tokens':200},'output_tokens':30}})
-        env={'LIVE_PROVIDERS':'true','OPENAI_API_KEY':'fake-only','OPENAI_LIMIT_USD':'10','IMAGE_DAILY_USD':'10'}
+        # PublicationBase caps editorial at $1. Images now count there too: leave room for the
+        # settled first edit plus the next $1 reservation so this test actually reaches the timeout.
+        env={'LIVE_PROVIDERS':'true','OPENAI_API_KEY':'fake-only','OPENAI_LIMIT_USD':'10','IMAGE_DAILY_USD':'10',
+             'EDITORIAL_DAILY_LLM_USD':'10'}
         with patch.dict(os.environ,env),patch.object(connectors_images,'TRANSPORT',httpx.MockTransport(handler)):
             self.assertEqual(connectors_images.ImageConnector().edit(raw,'Only light','first'),raw)
         with db.connect() as c:row=c.execute("SELECT * FROM usage_ledger WHERE purpose='image-edit'").fetchone()
         self.assertEqual(row['status'],'complete');self.assertEqual(row['actual_usd'],Decimal('0.0037'))
         def timeout(request):calls.append(request);raise httpx.ReadTimeout('fake',request=request)
         with patch.dict(os.environ,env),patch.object(connectors_images,'TRANSPORT',httpx.MockTransport(timeout)):
-            with self.assertRaises(ValueError):connectors_images.ImageConnector().edit(raw,'Only light','second')
+            with self.assertRaisesRegex(ValueError,'Edición incierta; no se repite'):
+                connectors_images.ImageConnector().edit(raw,'Only light','second')
+            self.assertEqual(len(calls),2)  # one success, one timed-out request; no automatic retry
+            with db.connect() as c:
+                uncertain=c.execute("SELECT * FROM usage_ledger WHERE request_hash='second'").fetchone()
+            self.assertEqual(uncertain['status'],'uncertain')
+            self.assertEqual(uncertain['reserved_usd'],connectors_images.EDIT_RESERVATION)
+            self.assertIsNone(uncertain['actual_usd'])
+            # Re-invoking the same request is also blocked before HTTP, without a new ledger row.
+            with self.assertRaisesRegex(ValueError,'solicitud idéntica pendiente o incierta'):
+                connectors_images.ImageConnector().edit(raw,'Only light','second')
         self.assertEqual(len(calls),2)
-        with db.connect() as c:self.assertEqual(c.execute("SELECT status FROM usage_ledger WHERE request_hash='second'").fetchone()['status'],'uncertain')
+        with db.connect() as c:
+            rows=c.execute("SELECT * FROM usage_ledger WHERE purpose='image-edit' ORDER BY created_at,id").fetchall()
+        self.assertEqual(len(rows),2)
+        self.assertEqual(next(r for r in rows if r['request_hash']=='second'),uncertain)
 
     def test_image_subcap_reserves_both_providers_and_counts_in_editorial_total(self):
         with patch.dict(os.environ,{'IMAGE_DAILY_USD':'0.10','OPENAI_LIMIT_USD':'10','ANTHROPIC_LIMIT_USD':'10'}):
