@@ -92,7 +92,7 @@ Antes de «Generar ahora», la oficina muestra la mediana de los resúmenes ante
 
 `validate()` toma cada número del texto, por ejemplo «840», «1.840», «1,840», «3,5 %» o «0,81 USD».
 - Lo lee como se escribe en español o en inglés: «1.840» puede ser 1840 o 1,84.
-- Lo acepta si coincide, aunque sea redondeado, con algún número de las estadísticas. Cuentan los valores, los números de las claves (como 72 en `72h`), los de los textos y el día, el mes y el año de las fechas.
+- Lo acepta si coincide, aunque sea redondeado, con algún número de las estadísticas. Cuentan los valores de métricas, las fracciones de cobertura, las edades de los cortes (`72h`, `7d`) y el día, el mes y el año de las fechas. Las marcas de tiempo ISO aportan solo su fecha: no sus horas, minutos, segundos, fracciones ni zona horaria. Los identificadores, versiones, huellas, estado al generar y otros metadatos descriptivos no aportan cifras; tampoco se extraen cifras de texto libre ni de claves ajenas a las edades de los cortes.
 
 Qué hace con lo que no encaja:
 - Una entrada de las listas se quita si cita un número que no está o si no cita ninguno, porque cada una debe ir atada a una cifra.

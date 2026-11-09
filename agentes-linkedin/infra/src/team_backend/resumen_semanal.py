@@ -402,10 +402,14 @@ def message(week_start,data):
 # --------------------------------------------------------------------------- number validator
 
 NUMBER=re.compile(r'\d+(?:[.,]\d+)*')
-ISO_DAY=re.compile(r'(\d{4})-(\d{2})-(\d{2})')
-EVIDENCE_IDS={'account','person','provider_user_id','version_id','record_id','execution','evidence',
+ISO_DATE=re.compile(r'(\d{4})-(\d{2})-(\d{2})(?:[Tt ]\d{2}:\d{2}(?::\d{2}(?:[.,]\d+)?)?'
+                    r'(?:[Zz]|[+-]\d{2}(?::?\d{2})?)?)?')
+EVIDENCE_IDS={'id','account','person','referent','provider_user_id','version_id','record_id','execution','evidence',
               'declared_evidence','shared_with','experiment_id','criterion_version','criterion_versions',
               'exposure_without_date'}
+NON_STATISTICAL_FIELDS={'version','schema_version','sample_key','minimum_confidence','al_generar','zona_horaria',
+                        'pilar','modalidad','tesis','primera_linea','source','sources','capability','kind',
+                        'source_url','model','status','reason','motivo','population','basis','meaning','comparison','identity'}
 # The evidence service never certifies causation. Declared origins can be described as declarations.
 CAUSAL_VERBS=re.compile(r'\b(lleg[oó]|llegaron|vino|vinieron|trajo|trajeron|atrajo|atrajeron|capt[oó]|captaron|'
                         r'convirti[oó]|convirtieron|caus[oó]|causaron|gener[oó]|generaron|came|brought|converted|caused|drove)\b',re.I)
@@ -421,18 +425,22 @@ def _readings(token):
     return out or [(float(parts[0]),0)]
 
 def allowed_numbers(value,out=None):
-    """Every number the stats contain: numeric values, numbers in keys (72h, 7d) and in texts, and the parts of dates."""
+    """Metric values, coverage fractions, cut ages and date parts; never clock components, IDs or descriptive metadata."""
     out=set() if out is None else out
     if isinstance(value,bool) or value is None:return out
     if isinstance(value,(int,float,Decimal)):out.add(abs(float(value)))
     elif isinstance(value,str):
-        for day in ISO_DAY.findall(value):out.update(float(n) for n in day)
-        for token in NUMBER.findall(ISO_DAY.sub(' ',value)):out.update(v for v,_ in _readings(token))
+        for day in ISO_DATE.findall(value):out.update(float(n) for n in day)
+        numeric=ISO_DATE.sub(' ',value).strip()
+        if NUMBER.fullmatch(numeric.lstrip('+-')) or re.fullmatch(r'\d+/\d+',numeric):
+            for token in NUMBER.findall(numeric):out.update(v for v,_ in _readings(token))
     elif isinstance(value,dict):
         for key,item in value.items():
-            if key in EVIDENCE_IDS or (key=='referents' and isinstance(item,(list,tuple)) and all(isinstance(v,str) for v in item)):
+            if (key in EVIDENCE_IDS or key in NON_STATISTICAL_FIELDS or str(key).endswith(('_id','_ids'))
+                    or (key=='referents' and isinstance(item,(list,tuple)) and all(isinstance(v,str) for v in item))):
                 continue
-            allowed_numbers(str(key),out);allowed_numbers(item,out)
+            if key in editorial.RESULT_AGES:out.update(float(n) for n in NUMBER.findall(key))
+            allowed_numbers(item,out)
     elif isinstance(value,(list,tuple)):
         for item in value:allowed_numbers(item,out)
     return out

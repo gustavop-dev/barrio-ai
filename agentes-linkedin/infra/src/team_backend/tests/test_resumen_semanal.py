@@ -306,6 +306,37 @@ class ValidatorTests(SummaryBase):
         self.assertEqual(resumen_semanal._readings('1.840'),[(1840.0,0),(1.84,3)])
         self.assertEqual(resumen_semanal._readings('1.234,5'),[(1234.5,1)])
 
+    def test_iso_timestamps_allow_dates_but_not_clock_components(self):
+        for stamp in ('2026-10-26T07:37:38.123456+05:45','2026-10-26T07:38:37.123456+05:45',
+                      '2026-10-26T07:37:38.123456Z',
+                      '2026-10-26 07:37:38,123456-0545','2026-10-26T07:37:38','2026-10-26T07:37+05:45',
+                      '2026-10-26'):
+            with self.subTest(stamp=stamp):
+                allowed=resumen_semanal.allowed_numbers({'window':{'as_of':stamp}})
+                self.assertEqual(allowed,{2026,10,26})
+                self.assertEqual(resumen_semanal.unknown_numbers('26 de octubre de 2026',allowed),[])
+                self.assertEqual(resumen_semanal.unknown_numbers('El alcance cayó un 37 %.',allowed),['37'])
+
+    def test_metadata_does_not_supply_figures_but_metrics_and_coverage_do(self):
+        for metadata in ({'schema_version':37},{'version':37},{'referent':'00000037-0000-0000-0000-000000000000'},
+                         {'sample_key':'37'+'a'*62},{'id':37},{'record_id':37},{'provider_user_id':'37'},
+                         {'criterion_versions':['criterion-37']},{'referents':['37']},
+                         {'al_generar':{'cuentas_en_pausa':37}},{'minimum_confidence':0.37},
+                         {'tesis':'37'},{'primera_linea':'Crecimos un 37 %.'},
+                         {'source':'37'},{'limits':['Comentarios: hasta 37, sin paginación.']},
+                         {'INT-37':2}):
+            with self.subTest(metadata=metadata):
+                allowed=resumen_semanal.allowed_numbers({'coverage':{'fit':5},**metadata})
+                self.assertIn(5,allowed)
+                self.assertEqual(resumen_semanal.unknown_numbers('37 % y 0,37 USD',allowed),['37','0,37'])
+        data={'semana':{'publicaciones':{'cortes':{'72h':{'medidos':2},'7d':{'medidos':1}}}},
+              'comparacion':{'alcance':{'diferencia':-37,'variacion_pct':-12.5}},'gasto':'0,81',
+              'evidencia_compartida':[{'coverage':{'classification_coverage':'4/6','fit_pct':66.67},
+                                      'aggregates':{'reactions':{'value':840,'coverage':'8/9'}}}]}
+        allowed=resumen_semanal.allowed_numbers(data)
+        self.assertEqual(allowed,{72,7,2,1,37,12.5,0.81,4,6,66.67,840,8,9})
+        self.assertEqual(resumen_semanal.unknown_numbers('37 %; 12,5 puntos; 840 reacciones; cobertura 4/6',allowed),[])
+
     def test_claims_with_invented_or_no_numbers_are_dropped_and_recorded(self):
         raw={'titular':'Semana con 3 posts y 840 impresiones de mediana',
              'lo_que_funciono':[{'texto':'La mediana fue de 840 impresiones.','cifra':'semana.mediana: 840'},
@@ -343,6 +374,20 @@ class ValidatorTests(SummaryBase):
 
 
 class RunTests(SummaryBase):
+    def test_clock_at_37_does_not_validate_an_invented_percentage(self):
+        now=self.after().replace(hour=7,minute=37,second=37,microsecond=123456)
+        with patch('team_backend.resumen_semanal.timezone.now',return_value=now):
+            self.week_fixture()
+            job=self.run_job()
+        self.assertEqual(job.state,'complete')
+        summary=WeeklySummary.objects.get()
+        self.assertEqual(summary.stats['evidencia_compartida'][0]['window']['as_of'],now.isoformat())
+        self.assertNotIn(37,resumen_semanal.allowed_numbers(summary.stats))
+        self.assertEqual([i['texto'] for i in summary.analysis['lo_que_no']],
+                         ['Solo 1 de 2 invitaciones resueltas acabó en conexión.'])
+        self.assertIn({'campo':'lo_que_no','texto':'El alcance cayó un 37 % frente a la semana anterior.',
+                       'cifras_no_encontradas':['37'],'sin_cifra':False},summary.analysis['validacion']['descartado'])
+
     def test_one_paid_call_writes_a_validated_summary_with_its_notice_and_scene_event(self):
         first=self.week_fixture()
         orientacion.update(self.gustavo,'Más founders técnicos, menos alcance.')
