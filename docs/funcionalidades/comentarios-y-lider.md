@@ -20,6 +20,7 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
 | [COM-08](#com-08) | Reacciones (INT-02) | backend | parcial |
 | [COM-09](#com-09) | Proponer un comentario a mano para un post | backend | parcial |
 | [COM-10](#com-10) | Gestionar referentes | PWA · app · backend | funciona |
+| [COM-11](#com-11) | Relaciones usa la evidencia de referentes y de su audiencia | backend | no implementado |
 
 ---
 
@@ -158,7 +159,26 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
   2. **Dado** un referente, **cuando** lo desactiva con `PATCH {active: false, reason}`, **entonces** deja de observarse y sus posts dejan de ser candidatos a comentario.
   3. **Dado** un referente, **cuando** lo quita, **entonces** la API responde 204 y desaparece de la lista.
   4. **Dado** la lista, **cuando** se carga, **entonces** cada referente muestra `contacts_count` (personas del barrio salidas de sus posts).
-- **Brechas código/docs:** ver [PRS-12](personas-oportunidades.md#prs-12) para lo que muestra cada interfaz.
+- **Brechas código/docs:** ver [PRS-12](personas-oportunidades.md#prs-12) para lo que muestra cada interfaz. La evolución [OBS-02](observatorio-referentes.md#obs-02), **no implementada**, añade `protected`, gestión exclusiva de Gustavo desde Personas › Referentes o Tu turno y auditoría de sus cambios; el CRUD actual no tiene esas guardas.
+- **Cobertura QA:** pendiente
+
+### COM-11 · Relaciones usa la evidencia de referentes y de su audiencia <a id="com-11"></a>
+
+- **Dónde:** backend
+- **Estado:** no implementado
+- **Qué hace para Gustavo:** la participación en posts de referentes se apoya en la conversación y en lo aprendido de su audiencia, manteniendo el trabajo de Relaciones.
+- **Responsable:** `relaciones_comunidad`; `investigador_referentes` aporta investigación y `analista_barrio_resultados` señales de participación.
+- **Cadencia:** oportunidades de comentario **cada día**, según ritmo/caps y agenda [BAR-15](red.md#bar-15), con evidencia semanal y foco experimental si lo hay; calidad y cooldown por autor prevalecen.
+- **Tu turno:** ninguna aprobación rutinaria adicional de comentarios; los cambios de referentes y experimentos siguen TUR-20/21 y las acciones conservan su política actual.
+- **Datos necesarios y disponibilidad:** ya existen posts observados de referentes activos, lectura de hasta 10 comentarios al redactar, unidades de comentarios y personas descubiertas por BAR-01. Faltan paquetes OBS, asociaciones de BAR-14 y foco experimental; no hay lista de todos los seguidores de los referentes.
+- **Código:** no existe la entrega ampliada de señales. Referencias: `operador.observe/propose_comment`, `autopiloto` (selección), `red.discover`, `lider.comment_worthy`.
+- **Criterios de aceptación:**
+  1. **Dado** un post de referente activo, **cuando** Relaciones propone comentar, **entonces** recibe el texto y URL, comentarios accesibles, por qué interesa ese referente y señales pertinentes de OBS-03/04, y redacta una aportación situada sin inventar el hilo que no pudo leer.
+  2. **Dado** participantes de ese referente presentes en el barrio, **cuando** usa su contexto, **entonces** toma procedencia/encaje de BAR-14 para entender problemas y argumentos, sin insertar datos privados, mencionar personas para atraerlas ni inferir que son seguidores de Gustavo.
+  3. **Dado** falta de dossier o señales, **cuando** hay un post legible, **entonces** puede seguir el flujo actual con la evidencia disponible y explicitar el alcance; si no puede verificar el contenido base, no redacta un comentario que finja haberlo leído.
+  4. **Dado** cualquier comentario o foco, **cuando** pasa a ejecución, **entonces** conserva guardas, líder, enfriamiento y Operación, con caps/agenda BAR-15; las reacciones pertenecen a ese ritmo y no autorizan envíos de inbox.
+  5. **Dado** la actividad diaria, **cuando** redacta/verifica un comentario, **entonces** lo entrega en inglés, con aporte situado y fundamento del curso; no publica elogio vacío, pitch ni repetición para alcanzar 100 interacciones. La falta de aporte se informa y no se compensa con ráfagas.
+- **Brechas código/docs:** comentar referentes y descubrir personas entre sus comentaristas **ya existe** (COM-01/03 y BAR-01). Lo nuevo es entregar y trazar investigación, audiencia y experimentos. Revisión conserva EDI-06/07/08; uso acotado del curso por el líder en [BIB-05](biblioteca-equipos.md#bib-05).
 - **Cobertura QA:** pendiente
 
 ## Retiradas

@@ -289,6 +289,12 @@ Las fotos que Gustavo manda con la captura son la materia prima del flujo de ima
 - [IMG-02](imagenes-en-publicaciones.md#img-02): «Para qué es» gana la opción «Propuesta de post», y el clasificador puede elegirla cuando Gustavo no elige nada;
 - [IMG-03](imagenes-en-publicaciones.md#img-03): las fotos llegan siempre a la Galería con su nota, sea cual sea el destino de la captura (implementado para todos los destinos).
 
+## Biblioteca y fase web prevista
+
+Por el addendum de Gustavo, Capturas **no necesita consultar el curso**; [BIB-06](biblioteca-equipos.md#bib-06) se retira sin reutilizar su ID. Editorial o Perfil emplean su biblioteca habitual cuando trabajan con una idea recibida. La fase web ya prevista aporta `web_search`, `web_fetch` y enlaces en capturas; no se duplica aquí ni habilita llamadas entre especialistas fuera del [grafo](arquitectura-agentes.md).
+
+[EST-05](estrategia-perfil.md#est-05), **no implementado**, define el ruteo de «hazme la propuesta del perfil» en texto o voz al ciclo completo de Perfil, con deduplicación, progreso y paquete final enlazado. Una foto adjunta solo se vuelve elegible para foto/banner cuando Gustavo la asigna a la categoría «Perfil» de [GAL-08](galeria.md#gal-08), al subir o después. El ruteador no consulta biblioteca ni elige fotos fuera de esa categoría.
+
 ## Retiradas
 
 Ninguna.
