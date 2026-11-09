@@ -5,7 +5,8 @@ import { useRef } from 'react';
 import { ScrollView, StyleSheet, View, type ScrollViewInstance } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { Button, ErrorRetry, Fold, PageHeader, Select, T, pageContent } from '@/components/ui';
+import { Button, ErrorRetry, Fold, PageHeader, T, pageContent } from '@/components/ui';
+import { Select } from '@/components/ui/Select';
 import { colors, space } from '@/theme/tokens';
 
 export function MapaEquipoScreen() {
@@ -28,7 +29,7 @@ export function MapaEquipoScreen() {
     <ErrorRetry error={query.error} title="No se pudo cargar el mapa" onRetry={() => void query.refetch()} />
     {graph && !query.isError ? <>
       <Select label="Ver ciclo" value={ciclo} options={[{ value: '', label: 'Todo el equipo' }, ...graph.cycles.map((cycle) => ({ value: cycle.id, label: cycle.label + (cycle.status === 'planned' ? ' · En diseño' : '') }))]}
-        onChange={(id) => { router.setParams({ ciclo: id, agente: '' }); scroll.current?.scrollTo({ y: 0, animated: false }); }} />
+        onChange={(id: string) => { router.setParams({ ciclo: id, agente: '' }); scroll.current?.scrollTo({ y: 0, animated: false }); }} />
       {!graph.nodes.length ? <T>El mapa todavía no tiene agentes.</T> : selected ? <>
         <Button variant="ghost" onPress={() => select()}>Ver todos los agentes</Button>
         <AgentDetail node={selected} graph={graph} select={select} cycleId={ciclo} />

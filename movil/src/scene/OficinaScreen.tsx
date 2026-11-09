@@ -95,7 +95,6 @@ export function OficinaScreen() {
         <OfficeNarration line={line} revision={snapshot.now?.key ?? 0} reduced={reduced} />
       </View>
       <View style={styles.below}>
-        <Button testID="oficina-mapa-equipo" variant="ghost" onPress={() => router.push('/equipo')}>Mapa del equipo</Button>
         <View style={styles.legend}>
           {(['Trabajando', 'En espera', 'En diseño'] as const).map((text, i) => <View key={text} style={styles.legendItem}><View style={[styles.dot, { backgroundColor: [colors.brand, colors.spriteBlue, colors.line][i] }]} /><T variant="detalle" soft>{text}</T></View>)}
         </View>
@@ -113,6 +112,8 @@ export function OficinaScreen() {
           </Pressable>;
         }} />
       <T variant="detalle" soft style={styles.credit}>Arte: LimeZu — Modern Interiors</T>
+      {/* Keep this after the office content so the team strip stays above the floating bottom bar. */}
+      <Button testID="oficina-mapa-equipo" variant="ghost" onPress={() => router.push('/equipo')}>Mapa del equipo</Button>
     </ScrollView>
     </GestureDetector>
     {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active}>
