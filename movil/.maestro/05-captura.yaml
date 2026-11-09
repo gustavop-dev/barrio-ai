@@ -399,7 +399,17 @@ tags: [captura]
 - assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
 - assertVisible: 'Usada en la pieza del .*'
 - takeScreenshot: 05-captura-14-historial-semilla
-- tapOn: 'Volver a la captura'
+# The history was scrolled down to the idea: bring «Volver a la captura» back before tapping it, and retry the pair in
+# case the history redraws while the sheet refreshes.
+- retry:
+    maxRetries: 2
+    commands:
+      - scrollUntilVisible:
+          element:
+            text: 'Volver a la captura'
+          direction: UP
+          timeout: 20000
+      - tapOn: 'Volver a la captura'
 - extendedWaitUntil:
     visible:
       id: capture-grabar
