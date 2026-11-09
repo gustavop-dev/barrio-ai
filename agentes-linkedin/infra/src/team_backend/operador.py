@@ -936,6 +936,10 @@ def _run_job(job):
             r=conversaciones.read_inbox(user,ConnectorAccount.objects.get(id=params['account']))
             oficina_eventos.job_done(job.kind,r)
             return 'complete',f"chats:{r['chats']} leidos:{r['read']} te tocan:{r['flagged']}"[:30],r['stopped']
+        if job.kind=='community_study':
+            from . import comunidad
+            study=comunidad.run(user,params['study'],job)
+            return 'complete',study.state,''
         if job.kind=='weekly_summary':
             from datetime import date
             from . import resumen_semanal

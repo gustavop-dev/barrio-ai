@@ -227,6 +227,8 @@ def tick(user,now=None):
     from .connectors_linkedin import check_tokens
     report['linkedin_token']=check_tokens(now)  # expiry alerts reach Gustavo even with the machine stopped
     if operador.check_env_pause():report['env_paused_alert']=1  # the server stop pushes once per stop
+    from . import comunidad
+    comunidad.maintain(now)  # retention also runs when collection/the machine is paused
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
     ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')))
     # Own pieces are prepared ahead of time: their TTL runs from the scheduled hour, not from creation.
@@ -248,6 +250,8 @@ def tick(user,now=None):
     try:report['plan']=_editorial(user,now)
     except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
     for account in ConnectorAccount.objects.filter(paused=False):
+        try:report['community_study']=report.get('community_study',0)+comunidad.schedule(user,account,now)
+        except Exception as exc:report['community_error']=type(exc).__name__
         report['observe']+=_observe(user,account,now)
         report['propose']+=_propose(user,account,now)
         report['network']=report.get('network',0)+_network(user,account,now)

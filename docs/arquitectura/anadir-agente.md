@@ -15,4 +15,4 @@ En esta entrega no se ejecutan suites locales. Claude debe correr CI y QA con fa
 
 El backend requiere el mismo registro en producción. Docker lo copia desde el contexto nombrado `equipo` a `/app/equipos/grafo.yaml`; `barrio-ai.yml` y `deploy/compose.prod.yaml` declaran ese contexto. No hay segunda copia mantenida en código ni fallback a un grafo vacío. Claude debe verificar ese empaquetado al construir la imagen en CI.
 
-Los nodos futuros iniciales son el especialista visual EDI-21, el investigador líder del ciclo mensual de referentes, el estudio de comunidad y el ciclo periódico de perfil. Las consultas manuales actuales de perfil siguen siendo independientes del ciclo periódico planificado.
+Permanecen futuros el especialista visual EDI-21, el investigador líder del ciclo mensual de referentes y el ciclo periódico de perfil. Fase 6 activa el estudio de comunidad bajo el director: servicio público determinista, analista como especialista, contratos y límites ARQ-05; véase `comunidad.py` y LEC-01–03. Las consultas manuales actuales de perfil siguen siendo independientes del ciclo periódico planificado.

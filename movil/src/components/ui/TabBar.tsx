@@ -4,7 +4,7 @@ import { colors, shell, space } from '@/theme/tokens';
 import { T } from './Text';
 
 /** Underlined tabs inside a view (ui.css .tabbar): «Pendiente · Lo que el equipo sabe de ti». */
-export function TabBar<V extends string>({ label, tabs, value, onChange }: { label: string; tabs: readonly { value: V; label: string }[]; value: V; onChange: (value: V) => void }) {
+export function TabBar<V extends string>({ label, tabs, value, onChange, testIDPrefix }: { label: string; tabs: readonly { value: V; label: string }[]; value: V; onChange: (value: V) => void; testIDPrefix?: string }) {
   return (
     <View style={styles.bar} accessibilityRole="tablist" accessibilityLabel={label}>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
@@ -13,6 +13,7 @@ export function TabBar<V extends string>({ label, tabs, value, onChange }: { lab
           return (
             <Pressable
               key={tab.value}
+              testID={testIDPrefix ? `${testIDPrefix}-${tab.value}` : undefined}
               accessibilityRole="tab"
               accessibilityState={{ selected }}
               onPress={() => {

@@ -648,7 +648,8 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
     outputs,measured=typical_outputs()
     report={'modo':'ejecucion' if execute else 'ensayo','desde':run.since.date().isoformat(),'generado':run.now.isoformat(),
             'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{},'curso':course_preview(),
-            'evidencia':dict(EVIDENCE_CASE,status='pendiente de evaluación con fakes en test_evidencia')}
+            'evidencia':dict(EVIDENCE_CASE,status='pendiente de evaluación con fakes en test_evidencia'),
+            'comunidad':dict(COMMUNITY_CASE,status='pendiente de evaluación con fakes en test_comunidad')}
     chosen={}
     for agent in agents:
         found=CASES[agent](run);cases=found[:limit];chosen[agent]=cases
@@ -691,6 +692,19 @@ EVIDENCE_CASE={
     'expected':{'fit_pct':62.5,'classification_coverage':'8/12','unknown':4,'causal_claim':False},
     'incorrect':{'fit_pct':41.67,'classification_coverage':'12/12','unknown':0,'causal_claim':True},
 }
+
+COMMUNITY_CASE={
+    'id':'LEC-01-03-comunidad', 'units':operador.ANALYSIS_UNITS,
+    'sources':['PersonEvidence','public_profile','public_comment'],
+    'input':{'own_people':6,'potential':9,'private_messages':1,'segment_size':4,'study_age_days':46},
+    'expected':{'sample_size':6,'private_used':False,'small_group_examples':False,'reader_status':'Sin estudio vigente'},
+    'incorrect':{'sample_size':15,'private_used':True,'small_group_examples':True,'reader_status':'Estudio parcial'},
+}
+
+
+def grade_community_case(result):
+    errors=[key for key,value in COMMUNITY_CASE['expected'].items() if result.get(key)!=value]
+    return {'case':COMMUNITY_CASE['id'],'passed':not errors,'errors':errors}
 
 
 def grade_evidence_case(result):

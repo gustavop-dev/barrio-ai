@@ -26,6 +26,7 @@ import {
   verifierSummary,
 } from '../../lib/editorial';
 import { excerpt, formatUsd } from '../../lib/format';
+import { communityEffects, communityTrace } from '../../../../compartido/src/logic/comunidad';
 
 function Fold({ title, children }: { title: string; children: ReactNode }) {
   return (
@@ -158,6 +159,7 @@ function PanelFold({ piece, finished }: { piece: PieceDetail; finished: boolean 
         <>
           <p className="t-detalle text-suave">Cinco perspectivas simuladas: son hipótesis sobre comprensión y utilidad, no métricas.</p>
           {panel.summary ? <p>{panel.summary}</p> : null}
+          <p>{communityTrace(panel)}</p>
           <ul className="pz-readers">
             {readers.map((reader, index) => {
               const badge = readerBadge(reader);
@@ -165,6 +167,7 @@ function PanelFold({ piece, finished }: { piece: PieceDetail; finished: boolean 
                 <li key={`${reader.reader}-${index}`} className="pz-reader">
                   <div className="pz-reader-text">
                     <p>{readerLabel(reader.reader)}</p>
+                    {communityEffects(reader).map((line, i) => <p key={i}>{line}</p>)}
                     {[assessmentLine('A', reader.variant_a), assessmentLine('B', reader.variant_b)].filter(Boolean).map((line) => (
                       <p key={line} className="t-detalle text-suave">
                         {line}
