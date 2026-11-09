@@ -1,0 +1,85 @@
+# cubre: LEC-01, LEC-02, LEC-03
+# seed_qa supplies six synthetic public sources. No provider calls or study refresh.
+appId: co.projectapp.office
+name: Comunidad y lectores
+tags: [personas, comunidad]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-personas
+- extendedWaitUntil:
+    visible: Barrio
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: personas-comunidad
+    direction: RIGHT
+    timeout: 10000
+- tapOn:
+    id: personas-comunidad
+- extendedWaitUntil:
+    visible:
+      id: community-study
+    timeout: 20000
+- extendedWaitUntil:
+    visible: Estudio parcial
+    timeout: 20000
+- assertVisible: Estudio de comunidad
+- assertVisible: "Periodo .* · Versión 1 · 6 personas"
+- takeScreenshot: 18-comunidad-01-resumen
+- scrollUntilVisible:
+    element:
+      text: medición del resultado
+    direction: DOWN
+    centerElement: true
+- assertVisible: "Observado en la muestra · 6 personas · .*"
+- scrollUntilVisible:
+    element:
+      id: community-sources
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: community-sources
+- scrollUntilVisible:
+    element:
+      id: community-withdraw-0
+    direction: DOWN
+    centerElement: true
+- assertVisible: "How do you measure delivery cost?"
+- takeScreenshot: 18-comunidad-02-fuente-publica
+- tapOn:
+    id: community-withdraw-0
+- scrollUntilVisible:
+    element:
+      id: community-status
+    direction: UP
+    centerElement: true
+- extendedWaitUntil:
+    visible: Sin estudio vigente
+    timeout: 20000
+- takeScreenshot: 18-comunidad-03-retirada
+# A failed read offers retry and keeps the current account.
+- runScript:
+    file: comun/qa-fallo.js
+    env:
+      RUTA: '^/api/v1/comunidad$'
+      METODO: GET
+      EFECTO: '500'
+      VECES: '-1'
+- scrollUntilVisible:
+    element:
+      id: community-account
+    direction: UP
+- tapOn:
+    id: community-account
+- tapOn: "API oficial.*"
+- extendedWaitUntil:
+    visible: Reintentar
+    timeout: 20000
+- runScript: comun/qa-fallos-limpiar.js
+- tapOn: Reintentar
+- extendedWaitUntil:
+    visible: Sin estudio vigente
+    timeout: 20000
+- assertNotVisible: "How do you measure delivery cost?"
+- takeScreenshot: 18-comunidad-04-sin-estudio

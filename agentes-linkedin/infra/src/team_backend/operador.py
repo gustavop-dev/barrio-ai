@@ -165,18 +165,23 @@ def reserve_profile_read(account,purpose,now=None):
     cap=max(0,min(100,int(os.environ.get('OPERATOR_PROFILE_READ_DAILY_LIMIT','80'))))
     with transaction.atomic():
         policy_lock()
-        baseline=policy_event('operator.profile_baseline')
-        if baseline is None or baseline.metadata['day']!=day.date().isoformat():
+        period={'created_at__gte':day,'created_at__lt':day+timedelta(days=1)}
+        # Reuse the original baseline for this day, even if a later day's reservation exists.
+        baseline=AuditEvent.objects.filter(action='operator.profile_baseline',target='member',
+            metadata__day=day.date().isoformat()).order_by('created_at','id').first()
+        if baseline is None:
             # Preserve reads already charged by the pre-BAR-15 counters on deployment day.
             legacy=AuditEvent.objects.filter(
                 Q(action='network.read',metadata__kind='profile')|
                 Q(action='network.read',metadata__kind='execution',metadata__read='profile')|
-                Q(action='metrics.read',metadata__kind='profile'),created_at__gte=day).count()
-            _audit(None,'operator.profile_baseline','member',day=day.date().isoformat(),used=legacy)
+                Q(action='metrics.read',metadata__kind='profile'),**period).count()
+            AuditEvent.objects.create(action='operator.profile_baseline',target='member',created_at=now,
+                                      metadata={'day':day.date().isoformat(),'used':legacy})
         else:legacy=baseline.metadata['used']
-        used=legacy+AuditEvent.objects.filter(action='operator.profile_read',created_at__gte=day).count()
+        used=legacy+AuditEvent.objects.filter(action='operator.profile_read',**period).count()
         if used>=cap:raise ProfileReadCapReached('Tope compartido de lecturas de perfil alcanzado; la operación espera.')
-        _audit(None,'operator.profile_read','member',account=str(account.id),purpose=purpose)
+        AuditEvent.objects.create(action='operator.profile_read',target='member',created_at=now,
+                                  metadata={'account':str(account.id),'purpose':purpose})
 
 def env_paused():
     return os.environ.get('OPERATOR_PAUSED','false').lower()=='true'
@@ -982,6 +987,10 @@ def _run_job(job):
             r=conversaciones.read_inbox(user,ConnectorAccount.objects.get(id=params['account']))
             oficina_eventos.job_done(job.kind,r)
             return 'complete',f"chats:{r['chats']} leidos:{r['read']} te tocan:{r['flagged']}"[:30],r['stopped']
+        if job.kind=='community_study':
+            from . import comunidad
+            study=comunidad.run(user,params['study'],job)
+            return 'complete',study.state,''
         if job.kind=='weekly_summary':
             from datetime import date
             from . import resumen_semanal

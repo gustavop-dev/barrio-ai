@@ -1,4 +1,4 @@
-"""Phase 5. Claude must reconcile the number with the parallel phase migration."""
+"""Phase 5 referents, sequenced after phase 6's community study migration."""
 import uuid
 from django.conf import settings
 from django.db import migrations, models
@@ -23,12 +23,12 @@ def protect_current(apps, schema_editor):
         if ready:
             Referent.objects.using(db).filter(pk__in=ids).update(protected=True)
         Audit.objects.using(db).create(action='referents.bootstrap', target=str(account.pk), metadata={
-            'source': '0024_referentes_monthly', 'initialized': ready, 'main_ids': ids if ready else [],
+            'source': '0025_referentes_monthly', 'initialized': ready, 'main_ids': ids if ready else [],
             'observed_count': len(ids), 'before': {'protected': False}, 'after': {'protected': ready}})
 
 
 class Migration(migrations.Migration):
-    dependencies = [('team_backend', '0023_shared_evidence'), migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
+    dependencies = [('team_backend', '0024_community_study'), migrations.swappable_dependency(settings.AUTH_USER_MODEL)]
     operations = [
         migrations.AddField('referent', 'protected', models.BooleanField(default=False)),
         migrations.AddField('referent', 'position', models.PositiveIntegerField(default=0)),

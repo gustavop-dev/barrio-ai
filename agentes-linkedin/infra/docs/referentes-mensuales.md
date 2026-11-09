@@ -14,7 +14,7 @@ Implementación en `feat/fase5-referentes`, sobre fases 3b/4. Solo se editaron a
 
 ## Migración y configuración
 
-**Nueva: `0024_referentes_monthly.py`, depende de `0023_shared_evidence`. Claude debe reconciliar el número con la fase paralela antes de fusionar.** No se editaron migraciones anteriores. Añade protección/posición/revisión, control por cuenta, lote, cambios, avisos, experimento y vínculo/versionado del foco en `ActionProposal`.
+**Nueva: `0025_referentes_monthly.py`, depende de `0024_community_study`, que depende de `0023_shared_evidence`. Numeración conciliada con fase 6.** No se editaron migraciones anteriores. Añade protección/posición/revisión, control por cuenta, lote, cambios, avisos, experimento y vínculo/versionado del foco en `ActionProposal`.
 
 La migración registra exactamente los cinco referentes actuales **no archivados**, sin descartar antes los inactivos ni elegir por orden/popularidad. Los protege y audita con actor de migración. Si no hay exactamente cinco, conserva la lista y bloquea la gestión automática. Omite conectores oficiales dedicados a publicación. No borra evidencia, ledger ni presupuesto.
 
@@ -24,7 +24,7 @@ Los presupuestos de proveedores y los topes web de fase 1 pueden detener una rev
 
 ## Verificaciones que debe ejecutar Claude
 
-1. Reconciliar migraciones y ejecutar checks de Django/migraciones y suites backend, con PostgreSQL temporal y proveedores/conectores falsos. Incluir `test_referentes_mensuales`, `test_grafo`, `test_orquestacion`, `test_evidencia`, `test_operador`, `test_autopiloto`, `test_evaluaciones`, `test_rediseno`, `test_seed_qa` y regresiones de fase 4. No se ejecutaron aquí.
+1. Verificar la cadena `0023_shared_evidence` → `0024_community_study` → `0025_referentes_monthly` y ejecutar checks de Django/migraciones y suites backend, con PostgreSQL temporal y proveedores/conectores falsos. Incluir `test_referentes_mensuales`, `test_comunidad`, `test_grafo`, `test_orquestacion`, `test_evidencia`, `test_operador`, `test_autopiloto`, `test_evaluaciones`, `test_rediseno`, `test_seed_qa` y regresiones de fase 4. No se ejecutaron aquí.
 2. Comprobar migración con cinco, con inactivos, con lista distinta y con conector oficial; permisos de sesión/dispositivo/servicio y usuario técnico; auditoría, restauración y reemplazo. Verificar límite de 10 variables/15 activos por todas las rutas CRUD.
 3. Con reloj falso: último día, día 1, día 4 antes/después de las 09:00, día 5 23:59 y día 6 00:00 Bogotá; reintento, fallo del aviso, lote tardío, lista/protección cambiada, rechazo concurrente con cierre y atomicidad del swap. Verificar que no se etiqueta la aplicación por plazo como aprobación humana.
 4. Verificar fan-out real con fakes y tres conexiones DB, gather antes de liberar lease, un intento por rama, fuentes/insignia verificadas, biblioteca ausente, cap y reservas compartidas, y cambio de bucket en medianoche Bogotá. Confirmar grafo empaquetado y `python3 scripts/grafo/mermaid.py --check` en CI.
@@ -45,7 +45,7 @@ Inventario completo respecto de la base del worktree, incluyendo archivos nuevos
 - [agentes-linkedin/infra/src/team_backend/experimentos.py](../../../agentes-linkedin/infra/src/team_backend/experimentos.py)
 - [agentes-linkedin/infra/src/team_backend/jobs.py](../../../agentes-linkedin/infra/src/team_backend/jobs.py)
 - [agentes-linkedin/infra/src/team_backend/management/commands/seed_qa.py](../../../agentes-linkedin/infra/src/team_backend/management/commands/seed_qa.py)
-- [agentes-linkedin/infra/src/team_backend/migrations/0024_referentes_monthly.py](../../../agentes-linkedin/infra/src/team_backend/migrations/0024_referentes_monthly.py)
+- [agentes-linkedin/infra/src/team_backend/migrations/0025_referentes_monthly.py](../../../agentes-linkedin/infra/src/team_backend/migrations/0025_referentes_monthly.py)
 - [agentes-linkedin/infra/src/team_backend/models.py](../../../agentes-linkedin/infra/src/team_backend/models.py)
 - [agentes-linkedin/infra/src/team_backend/notificaciones.py](../../../agentes-linkedin/infra/src/team_backend/notificaciones.py)
 - [agentes-linkedin/infra/src/team_backend/oficina_views.py](../../../agentes-linkedin/infra/src/team_backend/oficina_views.py)

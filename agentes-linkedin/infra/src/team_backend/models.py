@@ -1016,6 +1016,56 @@ class ReferentAttribution(models.Model):
         constraints=[models.UniqueConstraint(fields=['referent','key'],name='unique_referent_attribution')]
 
 
+class CommunityStudy(models.Model):
+    """Monthly community artifact. Identifiable sources never enter the reader packet."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
+    period=models.DateField()
+    version=models.PositiveIntegerField(default=1)
+    window_start=models.DateTimeField()
+    window_end=models.DateTimeField()
+    created_at=models.DateTimeField(default=timezone.now)
+    completed_at=models.DateTimeField(null=True,blank=True)
+    expires_at=models.DateTimeField()
+    state=models.CharField(max_length=24,default='building')
+    positioning_version=models.CharField(max_length=100)
+    selection=models.JSONField(default=list)
+    coverage=models.JSONField(default=dict)
+    summary=models.JSONField(default=dict)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','period','version'],name='unique_community_version')]
+
+
+class CommunitySource(models.Model):
+    """Public-only derived layer; retired rows retain just ids, hashes and dates."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    study=models.ForeignKey(CommunityStudy,on_delete=models.CASCADE,related_name='sources')
+    person=models.ForeignKey(EvidencePerson,on_delete=models.PROTECT)
+    key=models.CharField(max_length=64)
+    target=models.CharField(max_length=64)
+    kind=models.CharField(max_length=24)
+    url=models.TextField(blank=True)
+    text=models.TextField(blank=True)
+    event_at=models.DateTimeField(null=True,blank=True)
+    observed_at=models.DateTimeField(default=timezone.now)
+    expires_at=models.DateTimeField()
+    retired_at=models.DateTimeField(null=True,blank=True)
+    analysis=models.JSONField(default=dict)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['study','person','key'],name='unique_community_source')]
+
+
+class CommunityWithdrawal(models.Model):
+    """Non-content tombstone: prevents recollection without touching operational data."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
+    key=models.CharField(max_length=64)
+    created_at=models.DateTimeField(default=timezone.now)
+    reason=models.CharField(max_length=24)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','key'],name='unique_community_withdrawal')]
+
+
 class CycleLedger(models.Model):
     """One durable orchestrator instance; JSON payloads are private workspace data."""
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)

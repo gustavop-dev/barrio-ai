@@ -16,7 +16,7 @@ from rest_framework.test import APIClient
 from team_backend import evidencia as ev, evaluaciones, metricas, operador, orquestacion, red, resumen_semanal
 from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, ConnectorAccount, Contact,
     CycleLedger, EditorialPiece, EvidenceCoverage, EvidencePerson, FitClassification, ObservedPost,
-    PersonEvidence, Referent, ReferentAttribution)
+    PersonEvidence, PostMetric, Referent, ReferentAttribution)
 
 
 class SharedEvidenceTests(TestCase):

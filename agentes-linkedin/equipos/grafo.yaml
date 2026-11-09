@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "5.0",
+  "graph_version": "6.1",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -161,6 +161,10 @@
     "referentes": {
       "source": "team_backend.orquestacion.provider_metadata",
       "description": "5 USD por mes natural America/Bogota, reservas de las tres ramas web y selección, compartido entre cuentas/reintentos. Sin reiniciar ledger."
+    },
+    "comunidad": {
+      "source": "team_backend.orquestacion.Runtime",
+      "description": "ARQ-05: 1 USD por ciclo mensual, 20 llamadas/10 minutos activos; una revisión dentro del mismo ledger, reservas 3b y caps BAR-15 compartidos. Bucket mensual conservador para impedir reinicios mediante otra instancia."
     }
   },
   "schemas": {
@@ -490,6 +494,26 @@
     "experiment_request": {
       "binding": "team_backend.experimentos.EVALUATION_REQUEST",
       "kind": "json_schema"
+    },
+    "community_study": {
+      "kind": "model",
+      "binding": "team_backend.models.CommunityStudy",
+      "description": "LEC-01–03: contrato de comunidad pública."
+    },
+    "community_read": {
+      "kind": "dataclass",
+      "binding": "team_backend.comunidad.PublicRead",
+      "description": "LEC-01–03: contrato de comunidad pública."
+    },
+    "community_read_result": {
+      "kind": "dataclass",
+      "binding": "team_backend.comunidad.ReadResult",
+      "description": "LEC-01–03: contrato de comunidad pública."
+    },
+    "community_analysis": {
+      "kind": "json_schema",
+      "binding": "team_backend.comunidad.ANALYSIS_SCHEMA",
+      "description": "LEC-01–03: contrato de comunidad pública."
     }
   },
   "nodes": [
@@ -537,14 +561,17 @@
       "budget_ref": "editorial",
       "input_schemas": [
         "editorial_input",
-        "brief_input"
+        "brief_input",
+        "community_study"
       ],
       "output_schemas": [
-        "brief"
+        "brief",
+        "community_study"
       ],
       "activity": {
         "job_kinds": [
-          "prepare_piece"
+          "prepare_piece",
+          "community_study"
         ],
         "event_roles": [
           "director_editorial"
@@ -705,7 +732,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores. Recibe la misma versión minimizada de comunidad, cita estudio/hallazgo por variante o marca Sin estudio vigente; conserva hipótesis y contradicciones.",
       "skills": [
         "Aporta fortalezas y objeciones desde su perspectiva"
       ],
@@ -748,7 +775,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores. Recibe la misma versión minimizada de comunidad, cita estudio/hallazgo por variante o marca Sin estudio vigente; conserva hipótesis y contradicciones.",
       "skills": [
         "Aporta fortalezas y objeciones desde su perspectiva"
       ],
@@ -791,7 +818,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores. Recibe la misma versión minimizada de comunidad, cita estudio/hallazgo por variante o marca Sin estudio vigente; conserva hipótesis y contradicciones.",
       "skills": [
         "Aporta fortalezas y objeciones desde su perspectiva"
       ],
@@ -834,7 +861,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores. Recibe la misma versión minimizada de comunidad, cita estudio/hallazgo por variante o marca Sin estudio vigente; conserva hipótesis y contradicciones.",
       "skills": [
         "Aporta fortalezas y objeciones desde su perspectiva"
       ],
@@ -877,7 +904,7 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores.",
+      "description": "Aporta fortalezas y objeciones desde su perspectiva. Los cinco lectores comparten una llamada lectores. Recibe la misma versión minimizada de comunidad, cita estudio/hallazgo por variante o marca Sin estudio vigente; conserva hipótesis y contradicciones.",
       "skills": [
         "Aporta fortalezas y objeciones desde su perspectiva"
       ],
@@ -1450,12 +1477,12 @@
     },
     {
       "id": "analista_barrio_resultados",
-      "label": "Analista · resumen semanal",
+      "label": "Analista · resultados y comunidad",
       "group": "observatorio",
       "role": "orchestrator",
       "status": "active",
       "binding": "team_backend.resumen_semanal.run",
-      "description": "Reúne cifras de la semana y redacta el informe fundamentado. La orientación propuesta requiere decisión de Gustavo.",
+      "description": "Reúne cifras de la semana y redacta el informe fundamentado. La orientación propuesta requiere decisión de Gustavo. En comunidad mensual actúa como especialista del director (comunidad.analyze), sin delegar; clasifica evidencia pública y devuelve patrones minimizados.",
       "skills": [
         "Reúne cifras de la semana y redacta el informe fundamentado"
       ],
@@ -1479,17 +1506,21 @@
       "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
       "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
       "effort": "medium",
-      "model_note": null,
+      "model_note": "Resumen semanal: presupuesto semanal. Estudio mensual: presupuesto comunidad del ciclo del director; mismo modelo/effort y unidades de análisis.",
       "budget_ref": "semanal",
       "input_schemas": [
-        "job"
+        "job",
+        "community_study"
       ],
       "output_schemas": [
-        "weekly"
+        "weekly",
+        "community_study",
+        "community_analysis"
       ],
       "activity": {
         "job_kinds": [
-          "weekly_summary"
+          "weekly_summary",
+          "community_study"
         ],
         "event_roles": [
           "analista_barrio_resultados"
@@ -2037,25 +2068,36 @@
       "label": "Estudio de comunidad",
       "group": "observatorio",
       "role": "specialist",
-      "status": "planned",
-      "binding": null,
-      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "status": "active",
+      "binding": "team_backend.comunidad.read_public",
+      "description": "Servicio determinista del director: lee solo perfiles y comentarios públicos ya vinculados a la muestra de evidencia compartida; tres extractos por persona, sin inbox ni captura privada.",
       "skills": [
-        "En diseño"
+        "Lectura pública acotada",
+        "Minimización y retención"
       ],
-      "tools": [],
+      "tools": [
+        "linkedin_public_read"
+      ],
       "course_lists": [],
       "course_units": [],
       "course_note": "Este paso no carga una lista curada del curso.",
       "model": null,
       "effort": null,
       "model_note": "Servicio determinista, humano o todavía planificado.",
-      "budget_ref": "ninguno",
-      "input_schemas": [],
-      "output_schemas": [],
+      "budget_ref": "lecturas",
+      "input_schemas": [
+        "community_read"
+      ],
+      "output_schemas": [
+        "community_read_result"
+      ],
       "activity": {
-        "job_kinds": [],
-        "event_roles": []
+        "job_kinds": [
+          "community_study"
+        ],
+        "event_roles": [
+          "estudio_comunidad"
+        ]
       }
     },
     {
@@ -2109,13 +2151,17 @@
       "model_note": "Servicio local determinista, sin modelo ni lecturas externas.",
       "budget_ref": "ninguno",
       "input_schemas": [
-        "evidence_request"
+        "evidence_request",
+        "community_study"
       ],
       "output_schemas": [
-        "evidence_result"
+        "evidence_result",
+        "community_study"
       ],
       "activity": {
-        "job_kinds": [],
+        "job_kinds": [
+          "community_study"
+        ],
         "event_roles": []
       }
     },
@@ -2572,7 +2618,8 @@
             "editorial-lectores"
           ]
         }
-      }
+      },
+      "description": "Brief ciego, A/B y referencia a la versión minimizada de comunidad resuelta justo antes del panel; hipótesis si no está vigente."
     },
     {
       "id": "leer_lector_recomendador",
@@ -2595,7 +2642,8 @@
             "editorial-lectores"
           ]
         }
-      }
+      },
+      "description": "Brief ciego, A/B y referencia a la versión minimizada de comunidad resuelta justo antes del panel; hipótesis si no está vigente."
     },
     {
       "id": "leer_lector_divulgador",
@@ -2618,7 +2666,8 @@
             "editorial-lectores"
           ]
         }
-      }
+      },
+      "description": "Brief ciego, A/B y referencia a la versión minimizada de comunidad resuelta justo antes del panel; hipótesis si no está vigente."
     },
     {
       "id": "leer_lector_lider",
@@ -2641,7 +2690,8 @@
             "editorial-lectores"
           ]
         }
-      }
+      },
+      "description": "Brief ciego, A/B y referencia a la versión minimizada de comunidad resuelta justo antes del panel; hipótesis si no está vigente."
     },
     {
       "id": "leer_lector_par",
@@ -2664,7 +2714,8 @@
             "editorial-lectores"
           ]
         }
-      }
+      },
+      "description": "Brief ciego, A/B y referencia a la versión minimizada de comunidad resuelta justo antes del panel; hipótesis si no está vigente."
     },
     {
       "id": "visual_futuro",
@@ -3159,20 +3210,6 @@
       }
     },
     {
-      "id": "evidencia_comunidad_futura",
-      "from": "analista_barrio_resultados",
-      "to": "evidencia_compartida",
-      "cycles": [
-        "comunidad_mensual"
-      ],
-      "request_kind": "call",
-      "request_schema": "evidence_request",
-      "response_schema": "evidence_result",
-      "max_calls_per_cycle": 1,
-      "response_required": true,
-      "status": "planned"
-    },
-    {
       "id": "referentes_producto",
       "from": "investigador_lider",
       "to": "investigador_producto",
@@ -3334,6 +3371,63 @@
       "runtime": {
         "purposes": {}
       }
+    },
+    {
+      "id": "evidencia_comunidad",
+      "from": "director_editorial",
+      "to": "evidencia_compartida",
+      "cycles": [
+        "comunidad_mensual"
+      ],
+      "request_kind": "call",
+      "request_schema": "community_study",
+      "response_schema": "community_study",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "leer_comunidad",
+      "from": "director_editorial",
+      "to": "estudio_comunidad",
+      "cycles": [
+        "comunidad_mensual"
+      ],
+      "request_kind": "call",
+      "request_schema": "community_read",
+      "response_schema": "community_read_result",
+      "max_calls_per_cycle": 16,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      },
+      "call_timeout_s": 120
+    },
+    {
+      "id": "analizar_comunidad",
+      "from": "director_editorial",
+      "to": "analista_barrio_resultados",
+      "cycles": [
+        "comunidad_mensual"
+      ],
+      "request_kind": "call",
+      "request_schema": "community_study",
+      "response_schema": "community_study",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "community-study"
+          ]
+        }
+      },
+      "call_timeout_s": 120
     }
   ],
   "cycles": [
@@ -3917,35 +4011,61 @@
     {
       "id": "comunidad_mensual",
       "label": "Estudio mensual de comunidad",
-      "status": "planned",
-      "orchestrator": "analista_barrio_resultados",
+      "status": "active",
+      "orchestrator": "director_editorial",
       "participants": [
+        "director_editorial",
         "analista_barrio_resultados",
         "estudio_comunidad",
         "evidencia_compartida"
       ],
       "triggers": [
         {
-          "kind": null,
-          "cadence": "Mensual; todavía sin activar.",
-          "binding": "planned",
-          "deduplication": "planned"
+          "kind": "community_study",
+          "cadence": "Mensual tras el corte anterior; 90 días, hasta 50 personas; una revisión adicional como máximo.",
+          "binding": "team_backend.comunidad.schedule",
+          "deduplication": "Cuenta/periodo/versión; mismo CycleLedger por cuenta/periodo y bucket mensual de gasto."
         }
       ],
-      "loops": [],
+      "loops": [
+        {
+          "id": "revision_comunidad",
+          "status": "active",
+          "max_rounds": 2,
+          "edges": [
+            "evidencia_comunidad",
+            "leer_comunidad",
+            "analizar_comunidad"
+          ],
+          "description": "Primera versión y una revisión trazable por refresco o solicitud; conserva fuentes exitosas, presupuesto y contadores. Sin fan-out ni delegación."
+        }
+      ],
       "gates": [],
       "limits": {
-        "budget_refs": [],
+        "budget_refs": [
+          "comunidad",
+          "lecturas"
+        ],
         "max_depth": 1,
-        "calls": null,
-        "cycle_cost_cap": null,
-        "timeout": null
+        "max_calls": 20,
+        "max_provider_calls": 2,
+        "cost_cap_usd": 1,
+        "cost_period": "month",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 600,
+        "max_stalls": 2,
+        "max_replans": 1
       },
       "ledger": {
-        "status": "planned",
-        "records": [],
-        "checkpoint_resume": false,
-        "note": "Pendiente de implementar."
+        "status": "runtime",
+        "records": [
+          "CycleLedger",
+          "CommunityStudy",
+          "CommunitySource",
+          "CommunityWithdrawal"
+        ],
+        "checkpoint_resume": true,
+        "note": "Solo referencias de modelos, hashes y contadores en checkpoints; los extractos viven exclusivamente en la capa con retención."
       }
     },
     {
@@ -3991,7 +4111,7 @@
           "ReferentAttribution"
         ],
         "checkpoint_resume": true,
-        "note": "Consulta determinista y resultado tipado; no inicia los ciclos mensuales de fases 5/6."
+        "note": "Consulta determinista y resultado tipado; el estudio mensual usa su propio ciclo bajo el director."
       }
     },
     {
@@ -4057,7 +4177,8 @@
       "weekly_summary": "analista_barrio_resultados",
       "read_inbox": "conversaciones_inbox",
       "review_referents": "investigador_lider",
-      "advance_experiments": "investigador_lider"
+      "advance_experiments": "investigador_lider",
+      "community_study": "analista_barrio_resultados"
     },
     "stage_roles": {
       "director": [

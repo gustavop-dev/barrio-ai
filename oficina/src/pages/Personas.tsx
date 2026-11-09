@@ -3,18 +3,20 @@ import { EmptyState, Page, TabBar } from '../components/ui';
 import { Barrio } from './personas/Barrio';
 import { Oportunidades } from './personas/Oportunidades';
 import { Referentes } from './personas/Referentes';
+import { Comunidad } from './personas/Comunidad';
 import './personas/personas.css';
 
-type Tab = 'barrio' | 'oportunidades' | 'referentes';
+type Tab = 'barrio' | 'oportunidades' | 'referentes' | 'comunidad';
 
 const TABS: readonly { value: Tab; label: string }[] = [
   { value: 'barrio', label: 'Barrio' },
   { value: 'oportunidades', label: 'Oportunidades' },
   { value: 'referentes', label: 'Referentes' },
+  { value: 'comunidad', label: 'Comunidad' },
 ];
 
 function readTab(value: string | null): Tab {
-  return value === 'oportunidades' || value === 'referentes' ? value : 'barrio';
+  return value === 'oportunidades' || value === 'referentes' || value === 'comunidad' ? value : 'barrio';
 }
 
 /**
@@ -55,6 +57,7 @@ export function Personas() {
           ) : null}
           {tab === 'oportunidades' ? <Oportunidades /> : null}
           {tab === 'referentes' ? <Referentes /> : null}
+          {tab === 'comunidad' ? <Comunidad /> : null}
         </div>
       </Page>
     </div>

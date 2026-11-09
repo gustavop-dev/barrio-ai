@@ -1,6 +1,6 @@
 # Plan de capacidades de los equipos
 
-Diseño documental del 8 de noviembre de 2026 sobre código local `1ba4e43`, consolidado con los **seis addenda de Gustavo**. Actualizado con las implementaciones de 3a, 3b y 4 en sus worktrees. Las capacidades posteriores siguen pendientes. Esta entrega solo edita archivos: sin red, pruebas/builds locales, cambios del servidor, carga de fotos, commit ni push. Curso y tablero leídos localmente; referencias privadas comprobadas por existencia, sin abrir/copiar/subir imágenes.
+Diseño documental del 8 de noviembre de 2026 sobre código local `1ba4e43`, consolidado con los **seis addenda de Gustavo**. Actualizado con las implementaciones de 3a, 3b, 4 y 6 en sus worktrees. Las capacidades posteriores siguen pendientes. Esta entrega solo edita archivos: sin red, pruebas/builds locales, cambios del servidor, carga de fotos, commit ni push. Curso y tablero leídos localmente; referencias privadas comprobadas por existencia, sin abrir/copiar/subir imágenes.
 
 ## Fases y dependencias
 
@@ -11,8 +11,8 @@ Diseño documental del 8 de noviembre de 2026 sobre código local `1ba4e43`, con
 | 3a. Grafo descriptivo y mapa | [ARQ-01, 07–09](funcionalidades/arquitectura-agentes.md), parte estática de ARQ-06 | Después de 2. Implementado: registro del runtime real, validador y tests de deriva, Mermaid, API autenticada, mapa PWA/app y guía. Sin cambio de comportamiento. CI/QA por Claude. |
 | 3b. Orquestación y control por registro | [ARQ-02–06](funcionalidades/arquitectura-agentes.md) y criterios runtime de ARQ-01/09 | Después de 3a, antes de nuevos agentes. Dispatcher, llamadas autorizadas, adaptación de orquestadores y bucles, ledgers/checkpoints, caps agregados y pruebas de paridad implementados para pieza/red; migración 0021. CI/QA por Claude. Nuevos ciclos permanecen planificados. |
 | 4. Evidencia compartida | [OBS-03](funcionalidades/observatorio-referentes.md#obs-03), [BAR-14](funcionalidades/red.md#bar-14) | Implementada: identidades opacas por cuenta, múltiples procedencias, fechas, cobertura, versiones y atribución observacional; servicio tipado con runtime, cortes existentes y archivo histórico. Migración 0023 sobre 0022. OBS-03/BAR-14 `funciona`; CI/QA por Claude. Sin identidades inventadas de seguidores/reactores. |
-| 5. Referentes y experimentos | [OBS](funcionalidades/observatorio-referentes.md), [TUR-20/21](funcionalidades/tu-turno.md#tur-20) | Implementada sobre 1–4: `0024_referentes_monthly`, cinco main protegidos, auditoría y gestión exclusiva de Gustavo; fan-out de tres ramas con ledger y 5 USD/mes; altas/bajas/swaps día 1, recordatorios 1/4 y cierre exclusivo día 6 Bogotá. Experimentos 14/28/7, hasta dos comentarios útiles por semana, aprobación positiva y calidad observada. OBS-01/02/04, TUR-20/21 y COM-11 `funciona`; CI/QA por Claude. |
-| 6. Comunidad y lectores | [LEC-01–03](funcionalidades/comunidad-lectores.md) | Fases 2–4, paralela a 5. Estudio mensual público de hasta 50 personas/90 días; versión minimizada para los cinco lectores, sin inbox. |
+| 5. Referentes y experimentos | [OBS](funcionalidades/observatorio-referentes.md), [TUR-20/21](funcionalidades/tu-turno.md#tur-20) | Implementada sobre 1–4: `0025_referentes_monthly`, cinco main protegidos, auditoría y gestión exclusiva de Gustavo; fan-out de tres ramas con ledger y 5 USD/mes; altas/bajas/swaps día 1, recordatorios 1/4 y cierre exclusivo día 6 Bogotá. Experimentos 14/28/7, hasta dos comentarios útiles por semana, aprobación positiva y calidad observada. OBS-01/02/04, TUR-20/21 y COM-11 `funciona`; CI/QA por Claude. |
+| 6. Comunidad y lectores | [LEC-01–03](funcionalidades/comunidad-lectores.md) | Implementada sobre fases 2–4, paralela a 5. Estudio mensual público hasta 50 personas/90 días, retención/exclusiones, lectores y consulta PWA/app; migración 0024_community_study. LEC-01–03 `funciona`; CI/QA por Claude. |
 | 7. Especialista visual | [EDI-21](funcionalidades/motor-editorial.md#edi-21), [OFI-10](funcionalidades/oficina.md#ofi-10) | Fase 3b y `feat/imagenes-backend`; paralela a 4–6. Registrar rol/aristas/contrato/evaluación; reutilizar IMG/IMG-INF. Visual propone al orquestador; no publica. |
 | 8. Estrategia y perfil | [EST-01–05](funcionalidades/estrategia-perfil.md), [GAL-08](funcionalidades/galeria.md#gal-08), [TUR-18](funcionalidades/tu-turno.md#tur-18) | Fases 1–4 y 7 para assets. Implementar Perfil/exclusión de posts; Claude carga solo 01–03 del directorio privado con sus notas. A/B, banner, previews, Markdown citado y checklist; semestral y bajo demanda, mensual destacados/artículos/actividad. Gustavo aplica manualmente. |
 
@@ -48,10 +48,10 @@ El workflow determinista conserva cadencias, carriles, verificador, líder/Jev, 
 | Brecha | Estado local / alternativa |
 | --- | --- |
 | Seguidores/reactores | Conectores actuales sin identidades de seguidores nuevos ni lista de reactores; estos últimos solo contadores. API oficial conectada publica, no aporta esas identidades. Fallback confirmado arriba; delta agregado no es altas individuales. |
-| Comunidad/atribución | Fase 4 implementa deduplicación, historial, cobertura y asociaciones por referente. Permanecen parciales los comentarios/perfiles y no se reconstruye el histórico perdido; el estudio mensual corresponde a fase 6. Primera observación no es llegada ni causalidad. |
+| Comunidad/atribución | Fase 4 implementa deduplicación, historial, cobertura y asociaciones por referente. Permanecen parciales los comentarios/perfiles y no se reconstruye el histórico perdido; el estudio mensual de fase 6 añade lecturas públicas acotadas y declara el material que falta. Primera observación no es llegada ni causalidad. |
 | Ritmo/env/salud | Defaults actuales siguen 3/12, 15/60, 1/7, 10/40, 5/20, 10/40; faltan rampa, aceptación madura, agenda variable y contador global. `get_profile` no notifica visita. Overrides privados pendientes de comprobación técnica. |
 | Cuenta/notas | Free confirmado por Gustavo; el código ya invita sin nota. Faltan tier, nota opcional, saldo/reservas y clasificación del error específico; no hay cuota restante integrada. Verificar contratos/capacidades al implementar, sin asumir notas ilimitadas tras upgrade. |
-| Referentes | Migración 0024 protege exactamente los cinco actuales no archivados por cuenta y registra sus IDs; lote, recordatorios y aplicación al plazo implementados. Verificar `REFERENTS_GUSTAVO_USERNAME` en la instalación. Si la lista histórica difiere al migrar, detener automatismo y recuperar IDs/evidencia; solo un conflicto factual irresoluble requiere a Gustavo, nunca una elección del agente. |
+| Referentes | Migración 0025 protege exactamente los cinco actuales no archivados por cuenta y registra sus IDs; lote, recordatorios y aplicación al plazo implementados. Verificar `REFERENTS_GUSTAVO_USERNAME` en la instalación. Si la lista histórica difiere al migrar, detener automatismo y recuperar IDs/evidencia; solo un conflicto factual irresoluble requiere a Gustavo, nunca una elección del agente. |
 | Perfil | Referencias presentes localmente; faltan carga privada, aptitud comprobada, snapshot completo, Ubuntu y producción/QA A/B/banner/Markdown/checklist. Aplicado por Gustavo no equivale a comprobado automáticamente. |
 | Biblioteca/grafo/caps | IDs 01/02 en EST y 03/06 en BIB comprobados localmente; falta comprobarlos en base, integrar consumidores/evaluaciones, registro ejecutable, ledgers/reservas y diagrama/mapa. Clase 07 excluida. |
 
@@ -65,7 +65,7 @@ Las identidades se unen únicamente por cuenta e id opaco exacto; un nombre, URL
 
 `ReferentAttribution` conserva versiones del informe con línea base observada, exposición confirmada y fechada, primeras observaciones y asociaciones compartidas. Una ejecución incierta no es exposición; una ejecución confirmada sin fecha queda separada. El origen declarado por una persona se diferencia de coincidencia y desconocimiento, sin afirmar causalidad ni conversiones exclusivas. Quitar un referente archiva y oculta la ficha, conserva sus posts/contactos/evidencias y detiene nuevos barridos; volver a añadirlo recupera el mismo id. `experiment_id` conserva enlaces futuros, pero no aprueba ni ejecuta experimentos.
 
-Migración **`0023_shared_evidence`**, dependiente de **`0022_cycleledger_job_set_null`**: cinco tablas (`EvidencePerson`, `PersonEvidence`, `EvidenceCoverage`, `FitClassification`, `ReferentAttribution`) y `Referent.archived_at`. Es solo de esquema, sin borrar ni reescribir contactos, cortes, memoria o ledgers. La primera consulta incorpora idempotentemente el histórico disponible; no reconstruye clasificaciones sobrescritas ni procedencias perdidas. Los cambios nuevos se registran junto a las lecturas/clasificaciones existentes. Las fases 5/6 permanecen planificadas.
+Migración **`0023_shared_evidence`**, dependiente de **`0022_cycleledger_job_set_null`**: cinco tablas (`EvidencePerson`, `PersonEvidence`, `EvidenceCoverage`, `FitClassification`, `ReferentAttribution`) y `Referent.archived_at`. Es solo de esquema, sin borrar ni reescribir contactos, cortes, memoria o ledgers. La primera consulta incorpora idempotentemente el histórico disponible; no reconstruye clasificaciones sobrescritas ni procedencias perdidas. Los cambios nuevos se registran junto a las lecturas/clasificaciones existentes. La fase 5 permanece planificada en esta rama; la fase 6 se documenta debajo.
 
 Claude debe verificar:
 
@@ -79,3 +79,36 @@ En este worktree solo se editaron archivos y se regeneró el Mermaid con stdlib.
 ## Entrega fase 5
 
 [Implementación, migración, archivos y verificaciones de Claude](../agentes-linkedin/infra/docs/referentes-mensuales.md). QA: **`[qa: 03 04 09-personas 13-referentes 17-mapa-equipo 19-referentes-mensual]`**. No se ejecutaron suites, instalaciones ni builds locales. La cota de dos comentarios por semana se aplica solo al foco experimental; el resto del equipo conserva BAR-15.
+
+## Entrega de fase 6 · comunidad y lectores
+
+Implementados LEC-01–03 en `team_backend/comunidad.py`: ciclo mensual bajo el director, muestra desde evidencia fase 4, lecturas solo públicas, análisis del analista con curso y salida controlada, agregación mínima de cinco personas y motivos declarados/hipótesis/desconocidos. Hasta 50 personas, ventana de 90 días, tres extractos máximos por persona; público potencial separado. Primera versión y una revisión comparten el ledger 3b, 1 USD/20 llamadas/600 s activos/120 s por llamada. Ocho lecturas públicas por versión, sin fan-out; datos limitados producen estudio parcial o sin muestra suficiente. El panel mantiene su llamada agrupada de cinco lectores y recibe el mismo resumen minimizado o «Sin estudio vigente».
+
+La nueva capa retira extractos a 90 días y resúmenes a 180; el panel admite hasta 45 días y posicionamiento compatible. Retiradas/correcciones invalidan dependencias y dejan tombstones mínimos, sin borrar contactos o registros operativos. Personas → Comunidad muestra resumen/cobertura/fuentes restringidas y permite retirar o actualizar. «Cómo se escribió» muestra las referencias por lector/variante. PWA/app comparten API, tipos y texto; app solo TS/TSX, sin requisito nativo.
+
+**Migración:** `0024_community_study` → `0023_shared_evidence`; crea `CommunityStudy`, `CommunitySource`, `CommunityWithdrawal`. Fase 5 continúa la cadena con `0025_referentes_monthly`, dependiente de `0024_community_study`. `grafo.yaml` pasa a `6.1`; los ledgers fijados a otro hash siguen necesitando la conciliación explícita de 3b, sin reiniciar gasto.
+
+**Claude debe verificar:**
+
+- CI con PostgreSQL/fakes: migraciones hacia delante, `makemigrations --check --dry-run`, checks Django; `test_comunidad`, `test_grafo`, `test_orquestacion`, `test_evidencia`, `test_auditoria_editorial`, `test_resumen_semanal`, `test_seed_qa` y suites del worker y del autopiloto en `test_operador`. Revisar la integración con los resultados finales de CI de 3b/4 y fase 5. Al cerrar esta edición, las refs locales mostraban el upstream de fase 4 tres commits por delante; no se hizo fetch, merge ni rebase.
+- Límites exactos 3b, reserva agregada entre revisiones, recuperación sin repetir proveedores, timeout/resultado parcial y permisos del usuario del autopiloto. El tiempo/presupuesto pueden reducir cobertura: no subir caps para ocultarlo. Revalidar precio/modelo ya configurados en despliegue, sin red en este worktree.
+- Deduplicación y muestreo, comentarios breves, conexiones frente a seguidores, falta de fecha, error frente a cero, exclusiones durante análisis, retención de fuente/resumen/explicaciones, ausencia de contenido privado y rechazo de instrucciones dentro de fuentes. No infiere pensamiento desde cargos ni convierte hipótesis en observación.
+- `scripts/grafo/mermaid.py --check`, bindings, registro empaquetado y mapa: director → evidencia/lectura/analista, entrega versionada al panel existente; ninguna delegación del analista ni escritura LinkedIn. Mantener resueltos los checkpoints antiguos al cambiar el hash del registro/contexto.
+- Typecheck/lint y pruebas PWA/app, incluyendo `Comunidad.test.tsx`; sesión y token móvil, carga/error/reintento/vacío, cuentas separadas, retirada/corrección, resumen/cobertura y traza por variante. **`[qa: 03 07-calendario 09-personas 11 17-mapa-equipo 18-comunidad]`**, con `seed_qa`, seis personas sintéticas y sin proveedores reales, a 390 × 844.
+
+En este worktree solo se editaron archivos y se regeneró Mermaid con stdlib. No se ejecutaron tests, builds, instalaciones, red, commit ni push. `funciona` identifica implementación entregada; la validación de CI y QA sigue pendiente.
+
+
+### Archivos de fase 6
+
+- Backend (`agentes-linkedin/infra/src/team_backend/`): `comunidad.py`, `comunidad_views.py`, `models.py`, `migrations/0024_community_study.py`, `autopiloto.py`, `editorial.py`, `evaluaciones.py`, `jobs.py`, `oficina_views.py`, `operador.py`, `orquestacion_schemas.py`, `urls.py`, `management/commands/seed_qa.py`, `tests/test_comunidad.py`.
+- Registro/documentación: `agentes-linkedin/equipos/grafo.yaml`, `scripts/grafo/mermaid.py`, `docs/arquitectura/grafo.md`, `docs/arquitectura/anadir-agente.md`, `docs/funcionalidades/comunidad-lectores.md`, `docs/plan-equipos.md`.
+- Compartido (`compartido/src/`): `api/comunidad.ts`, `api/types.ts`, `fixtures/comunidad.ts`, `logic/comunidad.ts`.
+- PWA (`oficina/src/pages/`): `Personas.tsx`, `personas/Comunidad.tsx`, `personas/Comunidad.test.tsx`, `calendario/ComoSeEscribio.tsx`.
+- App (`movil/src/`): `components/ui/TabBar.tsx`, `personas/PersonasScreen.tsx`, `personas/Comunidad.tsx`, `personas/Comunidad.test.tsx`, `pieza/ComoSeEscribio.tsx`; QA: `movil/.maestro/18-comunidad.yaml`.
+
+## Integración de fases 5 y 6
+
+Se conservan los ciclos `referentes_mensuales`, `experimentos_referentes` y `comunidad_mensual`, sus contratos, límites, jobs, rutas, evaluaciones y semillas. El documento del grafo se genera desde el registro combinado. La cadena de migraciones es `0023_shared_evidence` → `0024_community_study` → `0025_referentes_monthly`.
+
+QA conjunta pendiente de Claude: **`[qa: 03 04 07-calendario 09-personas 11 13-referentes 17-mapa-equipo 18-comunidad 19-referentes-mensual]`**. Verificar ambas semillas, suites con fakes, bindings del grafo, diagrama generado y migraciones en CI. Resolución por edición de archivos, sin tests, builds, red ni escrituras de Git.

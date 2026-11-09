@@ -130,6 +130,7 @@ class Command(BaseCommand):
             if options.get('referentes_mensual'):
                 from team_backend.seed_referentes_qa import seed
                 seed(self.user,self.fake,self.now,uid)
+            self.community()
         self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
 
     # ------------------------------------------------------------------ safety and reset
@@ -178,6 +179,29 @@ class Command(BaseCommand):
                                                   label='LinkedIn de Gustavo (simulado)',status='running',last_checked_at=self.ago(hours=1))
         self.official=ConnectorAccount.objects.create(id=uid('account:official'),provider='linkedin_fake',external_account_id='urn:li:person:qa-gustavo',
                                                       label='API oficial (simulada)',status='OK',last_checked_at=self.ago(hours=1))
+
+    def community(self):
+        """Synthetic public-only study for LEC; no connector/model call or paid job."""
+        from team_backend import comunidad as cm, evidencia as ev, posicionamiento
+        from team_backend.models import CommunityStudy, CommunitySource
+        period, end = cm.month(self.now)
+        study=CommunityStudy.objects.create(id=uid('community:study'),account=self.fake,period=period,
+            window_start=end-timedelta(days=90),window_end=end,created_at=self.now,
+            completed_at=self.now,expires_at=self.now+timedelta(days=180),state='partial',
+            positioning_version=posicionamiento.VERSION,
+            coverage={'sample_size':6,'potential':9,'since':(end-timedelta(days=3)).isoformat(),
+                      'limitations':cm.LIMITATIONS})
+        for i in range(6):
+            person=ev.person(self.fake,f'qa-community-{i}')
+            CommunitySource.objects.create(id=uid(f'community:source:{i}'),study=study,person=person,
+                key=sha(f'qa-public-comment-{i}'),target=sha('qa-public-post'),kind='public_comment',url='',
+                text='How do you measure delivery cost?',event_at=end-timedelta(days=3),
+                observed_at=self.now,expires_at=self.now+timedelta(days=90),
+                analysis={'confidence':'medium','topic':'delivery','need':'measurement','argument':'question',
+                          'evidence':'none','objection':'cost','follow_status':'unknown','follow_reason':'unknown'})
+        study.summary={'findings':cm._findings(study,list(study.sources.all())),
+                       'units':['LI-06-V006-K04'],'unknown_follow_reason':6,'uncertainties':cm.LIMITATIONS}
+        study.save(update_fields=['summary'])
 
     def network(self):
         referents=[('mafe-ruiz-producto','María Fernanda Ruiz','Escribe sobre descubrimiento de producto con equipos pequeños; sus lectores son fundadores.'),

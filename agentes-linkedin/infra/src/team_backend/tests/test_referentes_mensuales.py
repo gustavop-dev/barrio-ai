@@ -199,7 +199,7 @@ class MonthlyReferentTests(Fixtures, TestCase):
     def test_migration_protects_exact_five_or_blocks_without_guessing(self):
         self.control.delete()
         Referent.objects.all().update(protected=False)
-        migrate = import_module('team_backend.migrations.0024_referentes_monthly').protect_current
+        migrate = import_module('team_backend.migrations.0025_referentes_monthly').protect_current
         migrate(apps, SimpleNamespace(connection=SimpleNamespace(alias='default')))
         self.assertEqual(Referent.objects.filter(protected=True).count(), 5)
         self.assertTrue(ReferentControl.objects.get(account=self.account).initialized)

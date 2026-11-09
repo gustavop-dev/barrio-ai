@@ -203,9 +203,7 @@ def comment_request(run,post,revision=None):
 
 def classify_request(run,contacts):
     """red.classify for a batch, with the profile data stored today."""
-    people=[{'id':str(c.id),'name':c.display_name,'headline':c.headline[:300],'location':c.location,'network_distance':c.network_distance,
-             'source':c.source,'evidence':{k:v for k,v in c.evidence.items() if k in ('referent','comment','query','invitation_message') and v}}
-            for c in contacts]
+    people=red.classification_people(contacts)
     message=json.dumps({'private_guidance':run.private,'orientation':run.orientation,'people':people,'note_policy':red.note_policy()},ensure_ascii=False,default=str)
     units,missing=run.context(red.NETWORK_UNITS,12000)
     if missing:raise ValueError('Biblioteca no disponible para clasificar')
@@ -654,7 +652,8 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
     report={'modo':'ejecucion' if execute else 'ensayo','desde':run.since.date().isoformat(),'generado':run.now.isoformat(),
             'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{},'curso':course_preview(),
             'evidencia':dict(EVIDENCE_CASE,status='pendiente de evaluación con fakes en test_evidencia'),
-            'referentes':dict(REFERENTS_CASE,status='pendiente de evaluación con fakes en test_referentes_mensuales')}
+            'referentes':dict(REFERENTS_CASE,status='pendiente de evaluación con fakes en test_referentes_mensuales'),
+            'comunidad':dict(COMMUNITY_CASE,status='pendiente de evaluación con fakes en test_comunidad')}
     chosen={}
     for agent in agents:
         found=CASES[agent](run);cases=found[:limit];chosen[agent]=cases
@@ -697,6 +696,19 @@ EVIDENCE_CASE={
     'expected':{'fit_pct':62.5,'classification_coverage':'8/12','unknown':4,'causal_claim':False},
     'incorrect':{'fit_pct':41.67,'classification_coverage':'12/12','unknown':0,'causal_claim':True},
 }
+
+COMMUNITY_CASE={
+    'id':'LEC-01-03-comunidad', 'units':operador.ANALYSIS_UNITS,
+    'sources':['PersonEvidence','public_profile','public_comment'],
+    'input':{'own_people':6,'potential':9,'private_messages':1,'segment_size':4,'study_age_days':46},
+    'expected':{'sample_size':6,'private_used':False,'small_group_examples':False,'reader_status':'Sin estudio vigente'},
+    'incorrect':{'sample_size':15,'private_used':True,'small_group_examples':True,'reader_status':'Estudio parcial'},
+}
+
+
+def grade_community_case(result):
+    errors=[key for key,value in COMMUNITY_CASE['expected'].items() if result.get(key)!=value]
+    return {'case':COMMUNITY_CASE['id'],'passed':not errors,'errors':errors}
 
 
 REFERENTS_CASE={
