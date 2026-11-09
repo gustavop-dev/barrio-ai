@@ -9,7 +9,7 @@ from django.utils import timezone
 from knowledge import db, memory, providers
 from team_backend import autopiloto, guardas, jobs, operador, preguntas
 from team_backend.connectors import ConnectorError, FakeConnector
-from team_backend.models import ActionExecution, ActionProposal, Contact, Opportunity, Referent, TeamQuestion
+from team_backend.models import ActionExecution, ActionProposal, Contact, Opportunity, ProfileProposal, Referent, TeamQuestion
 from team_backend.tests.test_operador import OperatorBase
 from team_backend.tests.test_publicacion import EditorialBase, answers
 
@@ -173,6 +173,7 @@ class OpportunityAndTurnTests(OperatorBase):
         proposal=operador.create_proposal(self.gustavo,post,'INT-03',{'text':GOOD})
         ActionProposal.objects.filter(pk=proposal.pk).update(state='uncertain')
         operador.set_global_pause(self.gustavo,True,'Revisar el tono')
+        profile=ProfileProposal.objects.create(owner=self.gustavo,key='test:alerts:profile')
         with patch('team_backend.connectors_linkedin.status_payload',return_value={'connected':True,'expiring_soon':True,'expired':False,
                                                                                    'days_left':4,'expires_at':'2026-11-11T10:00:00+00:00'}):
             turn=self.human.get('/api/v1/tu-turno').json()
@@ -181,13 +182,16 @@ class OpportunityAndTurnTests(OperatorBase):
         uncertain=next(a for a in turn['alerts'] if a['id'].startswith('uncertain'))
         self.assertTrue(uncertain['critical']);self.assertEqual(uncertain['attempt']['text'],GOOD)
         self.assertEqual([a['body'] for a in uncertain['actions']],[{'outcome':'confirmed'},{'outcome':'failed'}])
-        self.assertEqual((turn['count'],turn['critical'],turn['counts']),(4,True,{'avisos':3,'preguntas':0,'tareas':1,'aprobaciones':0}))
+        self.assertEqual((turn['count'],turn['critical'],turn['counts']),(5,True,{'avisos':3,'preguntas':0,'tareas':2,'aprobaciones':0}))
         setup=next(a for a in turn['alerts'] if a['id']==f'referents_setup:{self.account.id}')
         self.assertEqual((setup['type'],setup['priority'],setup['agent']),('aviso','importante','investigador_lider'))
         self.assertFalse(setup['critical'])
         self.assertEqual(setup['actions'],[{'label':'Gestionar protegidos','href':'/personas?pestana=referentes'}])
         self.assertTrue(turn['top']['critical'])
-        self.assertEqual(turn['tasks'],{'perfil':[],'conversaciones':[],'resumen':[],'referentes':[setup]})
+        profile_card=next(c for c in turn['items'] if c['id']==f'perfil:{profile.id}')
+        self.assertEqual((profile_card['type'],profile_card['priority'],profile_card['profile_id']),
+                         ('perfil','cuando_puedas',str(profile.id)))
+        self.assertEqual(turn['tasks'],{'perfil':[profile_card],'conversaciones':[],'resumen':[],'referentes':[setup]})
         expiring=next(a for a in turn['alerts'] if a['id']=='linkedin_expiring')
         self.assertFalse(expiring['critical'])
 

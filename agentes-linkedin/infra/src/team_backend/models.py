@@ -745,6 +745,11 @@ class GalleryPhoto(models.Model):
     width=models.PositiveIntegerField(null=True,blank=True)
     height=models.PositiveIntegerField(null=True,blank=True)
     note=models.TextField(blank=True)
+    category=models.CharField(max_length=12,default='posts',choices=[('posts','Posts'),('perfil','Perfil')],db_index=True)
+    profile_edit=models.BooleanField(default=False)
+    profile_role=models.CharField(max_length=2,blank=True,choices=[('','Sin asignar'),('01','Pose y sonrisa'),('02','Cuerpo'),('03','Identidad')])
+    profile_version=models.PositiveIntegerField(default=1)
+    profile_consent=models.JSONField(default=dict,blank=True)
     ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.AUTO)
     instruction=models.TextField(blank=True)
     instruction_kind=models.CharField(max_length=12,blank=True)
@@ -766,9 +771,10 @@ class GalleryPhoto(models.Model):
 
 class PieceImage(models.Model):
     """Frozen image and permission snapshot. Original files stay owned by GalleryPhoto."""
+    profile_exclusive=models.BooleanField(default=False)
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     piece=models.ForeignKey(EditorialPiece,on_delete=models.CASCADE,related_name='images')
-    source_photo=models.ForeignKey(GalleryPhoto,on_delete=models.CASCADE,null=True,blank=True,related_name='uses')
+    source_photo=models.ForeignKey(GalleryPhoto,on_delete=models.SET_NULL,null=True,blank=True,related_name='uses')
     position=models.PositiveSmallIntegerField(default=1)
     kind=models.CharField(max_length=16)
     image=models.FileField(upload_to='piezas/imagenes',max_length=200)
@@ -1092,3 +1098,53 @@ class CycleLedger(models.Model):
     class Meta:
         constraints=[models.UniqueConstraint(fields=['cycle','key'],name='unique_cycle_instance')]
         ordering=['-updated_at']
+
+
+class ProfileSchedule(models.Model):
+    """Calendar anchor is independent of on-demand requests and human application."""
+    owner=models.OneToOneField(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    anchor=models.DateField()
+    full_period=models.CharField(max_length=10,blank=True)
+    monthly_period=models.CharField(max_length=7,blank=True)
+
+
+class ProfileProposal(models.Model):
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    owner=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.PROTECT)
+    key=models.CharField(max_length=160,unique=True)
+    mode=models.CharField(max_length=12,default='full')
+    triggers=models.JSONField(default=list,blank=True)
+    version=models.PositiveIntegerField(default=1)
+    revision=models.PositiveIntegerField(default=1)
+    state=models.CharField(max_length=16,default='queued',db_index=True)
+    sections=models.JSONField(default=list,blank=True)
+    context=models.JSONField(default=dict,blank=True)
+    references=models.JSONField(default=list,blank=True)
+    history=models.JSONField(default=list,blank=True)
+    findings=models.JSONField(default=list,blank=True)
+    download_tickets=models.JSONField(default=dict,blank=True)
+    photo_choice=models.CharField(max_length=1,blank=True)
+    cycle=models.ForeignKey(CycleLedger,on_delete=models.PROTECT,null=True,blank=True)
+    postponed_until=models.DateTimeField(null=True,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:ordering=['-created_at']
+
+
+def profile_asset_path(instance,filename):return _media_name('perfil',filename)
+
+
+class ProfileAsset(models.Model):
+    """Always private, never a GalleryPhoto/PieceImage or a publication candidate."""
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    proposal=models.ForeignKey(ProfileProposal,on_delete=models.CASCADE,related_name='assets')
+    version=models.PositiveIntegerField()
+    kind=models.CharField(max_length=24)
+    image=models.FileField(upload_to=profile_asset_path,max_length=200)
+    sha256=models.CharField(max_length=64)
+    width=models.PositiveIntegerField()
+    height=models.PositiveIntegerField()
+    review=models.JSONField(default=dict,blank=True)
+    provenance=models.JSONField(default=dict,blank=True)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['proposal','version','kind'],name='profile_asset_version_kind')]

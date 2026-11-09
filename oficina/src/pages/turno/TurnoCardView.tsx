@@ -1,3 +1,4 @@
+import { ProfileProposal } from './ProfileProposal';
 import { ReferentDecision } from './ReferentDecision';
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
@@ -404,7 +405,9 @@ export function TurnoCardView({ card, priority, isNew = false, observe }: TurnoC
       <h3 className="turno-title" id={titleId}>
         {cardTitle(card)}
       </h3>
-      {card.referent_change || card.referent_experiment ? (
+      {card.profile_id ? (
+        <ProfileProposal id={card.profile_id} />
+      ) : card.referent_change || card.referent_experiment ? (
         <ReferentDecision card={card} />
       ) : card.question ? (
         <QuestionBody card={card} />

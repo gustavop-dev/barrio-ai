@@ -9,6 +9,11 @@ tags: [referentes, turno, experimentos]
 - runFlow: comun/entrar.yaml
 - tapOn:
     id: tab-tu-turno
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 13 pendientes, 1 urgente'
+    timeout: 30000
 - scrollUntilVisible:
     element:
       text: "sale Carlos Andrés Mejía · entra Nora Investigación"
@@ -25,6 +30,11 @@ tags: [referentes, turno, experimentos]
 - tapOn: "Aprobar sustitución"
 - extendedWaitUntil:
     notVisible: "sale Carlos Andrés Mejía · entra Nora Investigación"
+    timeout: 20000
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 12 pendientes, 1 urgente'
     timeout: 20000
 - scrollUntilVisible:
     element:
@@ -73,6 +83,23 @@ tags: [referentes, turno, experimentos]
     timeout: 20000
 - tapOn: "Detener"
 - takeScreenshot: 19-referentes-04-experimento-detenido
+# The independent profile proposal survives referent decisions and opens its checklist.
+- scrollUntilVisible:
+    element:
+      id: profile-open
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    id: profile-open
+- scrollUntilVisible:
+    element:
+      text: Checklist por sección
+    direction: DOWN
+    timeout: 30000
+- assertVisible: Checklist por sección
+- assertNotVisible: '^Comprobado$'
+- takeScreenshot: 19-referentes-06-perfil-conservado
 - tapOn:
     id: tab-personas
 - tapOn: "Referentes"

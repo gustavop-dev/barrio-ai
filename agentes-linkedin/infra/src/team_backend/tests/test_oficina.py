@@ -87,7 +87,13 @@ class OfficeTests(OperatorBase):
     def test_activity_reflects_real_jobs_only(self):
         self.sign_in()
         roles=self.browser.get('/api/v1/oficina/actividad').json()['roles']
-        self.assertEqual(len(roles),17)
+        self.assertEqual(len(roles),18)
+        self.assertEqual(set(roles),{'posicionamiento','perfil','investigador_referentes','investigador_lider',
+            'analista_barrio_resultados','director_editorial','copywriter_a','copywriter_b','editor_visual',
+            'lector_comprador','lector_recomendador','lector_divulgador','lector_lider','lector_par',
+            'editor_verificador','relaciones_comunidad','conversaciones_inbox','operador_cuenta'})
+        self.assertEqual(roles['perfil']['status'],'en_espera')
+        self.assertEqual(roles['editor_visual']['status'],'en_espera')
         # Every role with code is implemented: the inbox agent reads the inbox (read_inbox), so it is never «en diseño» (OFI-01.4).
         self.assertEqual([r for r,v in roles.items() if v['status']=='diseno'],[])
         self.assertEqual(roles['conversaciones_inbox']['status'],'en_espera')
@@ -106,6 +112,7 @@ class OfficeTests(OperatorBase):
             ('review_referents','investigador_lider','Revisando referentes del mes'),
             ('advance_experiments','investigador_lider','Midiendo el experimento de referentes'),
             ('community_study','analista_barrio_resultados','Estudiando la comunidad con evidencia pública'),
+            ('prepare_profile','perfil','Preparando tu propuesta de perfil'),
         ]:
             with self.subTest(kind=kind):
                 job=Job.objects.create(owner=self.gustavo,request_hash=kind,agent='operador',task=kind,kind=kind,

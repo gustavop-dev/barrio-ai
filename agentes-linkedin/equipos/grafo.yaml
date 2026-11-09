@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.1",
+  "graph_version": "6.2-fase8",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -115,6 +115,30 @@
     ],
     "editorial.TEXT_FORMAT_UNIT": [
       "LI-05-M002-K04"
+    ],
+    "perfil_contenido.POSITIONING_PROFILE_UNITS": [
+      "LI-01-M006-K02",
+      "LI-01-M007-K03",
+      "LI-02-V021-K01",
+      "LI-02-V003-K03"
+    ],
+    "perfil_contenido.PROFILE_COPY_UNITS": [
+      "LI-02-V015-K03",
+      "LI-02-V016-K05",
+      "LI-02-V019-K01",
+      "LI-02-M008-K02",
+      "LI-02-M015-K03",
+      "LI-02-V010-K03"
+    ],
+    "perfil_contenido.PROFILE_MONTHLY_UNITS": [
+      "LI-02-M011-K01",
+      "LI-02-V021-K01"
+    ],
+    "perfil_contenido.PROFILE_VISUAL_UNITS": [
+      "LI-02-V011-K02",
+      "LI-02-V011-K03",
+      "LI-02-V014-K06",
+      "LI-02-V015-K02"
     ]
   },
   "budgets": {
@@ -157,6 +181,10 @@
     "ninguno": {
       "source": "team_backend.jobs",
       "description": "Paso determinista o humano sin llamada pagada."
+    },
+    "perfil": {
+      "source": "team_backend.perfil.run",
+      "description": "10 USD agregados por propuesta y sus dos rondas, con reservas de texto, web, ediciones y visión en CycleLedger; nunca reiniciar al reintentar."
     },
     "referentes": {
       "source": "team_backend.orquestacion.provider_metadata",
@@ -453,6 +481,71 @@
       "kind": "json_schema",
       "description": "Contrato ejecutable del adapter de fase 3b."
     },
+    "visual_request": {
+      "binding": "team_backend.editor_visual.REQUEST_SCHEMA",
+      "kind": "json_schema",
+      "description": "Contrato EDI-21 sobre IMG/IMG-INF; respuesta al director, sin permiso de publicación."
+    },
+    "visual_proposal": {
+      "binding": "team_backend.editor_visual.PROPOSAL_SCHEMA",
+      "kind": "json_schema",
+      "description": "Contrato EDI-21 sobre IMG/IMG-INF; respuesta al director, sin permiso de publicación."
+    },
+    "visual_package": {
+      "binding": "team_backend.editor_visual.PACKAGE_SCHEMA",
+      "kind": "json_schema",
+      "description": "Contrato EDI-21 sobre IMG/IMG-INF; respuesta al director, sin permiso de publicación."
+    },
+    "profile_request": {
+      "binding": "team_backend.perfil_contenido.REQUEST_SCHEMA",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_proposal": {
+      "binding": "team_backend.models.ProfileProposal",
+      "kind": "model",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_library": {
+      "binding": "team_backend.perfil_contenido.LIBRARY_SCHEMA",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_positioning": {
+      "binding": "team_backend.perfil_contenido.POSITION_SCHEMA",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_draft": {
+      "binding": "team_backend.perfil_contenido.DRAFT_SCHEMA",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_review": {
+      "binding": "team_backend.perfil_contenido.REVIEW_SCHEMA",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_read": {
+      "binding": "team_backend.perfil.READ_SCHEMA",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_edit": {
+      "binding": "team_backend.perfil_visual.EDIT_REQUEST",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_render": {
+      "binding": "team_backend.perfil_visual.RENDER_RESULT",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
+    "profile_vision": {
+      "binding": "team_backend.perfil_visual.CHECK_RESULT",
+      "kind": "json_schema",
+      "description": "EST-01–05: contrato privado de Perfil; no autoriza escritura en LinkedIn."
+    },
     "evidence_request": {
       "binding": "team_backend.evidencia.EvidenceRequest",
       "kind": "dataclass",
@@ -562,6 +655,7 @@
       "input_schemas": [
         "editorial_input",
         "brief_input",
+        "profile_proposal",
         "community_study"
       ],
       "output_schemas": [
@@ -1814,85 +1908,13 @@
       }
     },
     {
-      "id": "diseno_imagen",
-      "label": "Diseño de infografía y carrusel",
-      "group": "editorial",
-      "role": "specialist",
-      "status": "active",
-      "binding": "team_backend.imagenes.design",
-      "description": "Propone datos para plantillas; el código renderiza. Una corrección como máximo antes de fallback.",
-      "skills": [
-        "Propone datos para plantillas; el código renderiza"
-      ],
-      "tools": [
-        "render_templates"
-      ],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
-      "model": "ANTHROPIC_VISION_MODEL (claude-sonnet-5-5)",
-      "effort": "low",
-      "model_note": null,
-      "budget_ref": "imagenes",
-      "input_schemas": [
-        "piece",
-        "image_input"
-      ],
-      "output_schemas": [
-        "image_design"
-      ],
-      "activity": {
-        "job_kinds": [
-          "prepare_piece"
-        ],
-        "event_roles": [],
-        "piece_evidence": "design"
-      }
-    },
-    {
-      "id": "edicion_foto",
-      "label": "Edición de foto",
-      "group": "editorial",
-      "role": "specialist",
-      "status": "active",
-      "binding": "team_backend.connectors_images.ImageConnector.edit",
-      "description": "Prepara una edición de la foto elegida; se publica el original si la revisión no aprueba la edición.",
-      "skills": [
-        "Prepara una edición de la foto elegida; se publica el original si la revisión no aprueba la edición"
-      ],
-      "tools": [
-        "image_edit"
-      ],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
-      "model": "OPENAI_IMAGE_MODEL (gpt-image-2)",
-      "effort": null,
-      "model_note": null,
-      "budget_ref": "imagenes",
-      "input_schemas": [
-        "photo",
-        "edit_input"
-      ],
-      "output_schemas": [
-        "image_bytes"
-      ],
-      "activity": {
-        "job_kinds": [
-          "prepare_piece"
-        ],
-        "event_roles": [],
-        "piece_evidence": "edited"
-      }
-    },
-    {
       "id": "revision_visual",
       "label": "Revisión de imagen",
       "group": "editorial",
       "role": "gate",
       "status": "active",
       "binding": "team_backend.connectors_images.ImageConnector.check",
-      "description": "Revisa contenido visual y vincula el veredicto a los bytes finales. No es el especialista visual futuro EDI-21.",
+      "description": "Gate IMG: revisa contenido visual y vincula el veredicto a los bytes finales. El workflow del director lo aplica al trabajo del Editor visual; sin cambios de criterio ni fallback. En Perfil, el adaptador perfil_visual.check exige ocho puntos, identidad 03, sonrisa 01 y gafas claras para A/B y banner; sin fallback de original.",
       "skills": [
         "Revisa contenido visual y vincula el veredicto a los bytes finales"
       ],
@@ -1901,18 +1923,20 @@
       ],
       "course_lists": [],
       "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
+      "course_note": "IMG conserva su regla. Perfil recibe PROFILE_VISUAL_UNITS originales y aplica las decisiones explícitas del tablero/Gustavo.",
       "model": "ANTHROPIC_VISION_MODEL (claude-sonnet-5-5)",
       "effort": "low",
       "model_note": null,
       "budget_ref": "imagenes",
       "input_schemas": [
         "piece_image",
-        "check_input"
+        "check_input",
+        "profile_request"
       ],
       "output_schemas": [
         "image_check",
-        "check_result"
+        "check_result",
+        "profile_vision"
       ],
       "activity": {
         "job_kinds": [
@@ -1924,12 +1948,12 @@
     },
     {
       "id": "posicionamiento",
-      "label": "Posicionamiento · consulta manual",
+      "label": "Posicionamiento",
       "group": "estrategia",
       "role": "orchestrator",
       "status": "active",
       "binding": "knowledge.agents.run",
-      "description": "Responde consultas manuales con recuperación de unidades del curso. Sin ciclo periódico ni escritura del perfil.",
+      "description": "Consultas manuales y herramienta de dirección respaldada para Perfil; no delega desde esta herramienta.",
       "skills": [
         "Responde consultas manuales con recuperación de unidades del curso"
       ],
@@ -1937,18 +1961,27 @@
         "biblioteca_search",
         "memoria"
       ],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Recuperación dinámica knowledge.agents.context; no hay lista curada fija para este rol.",
+      "course_lists": [
+        "perfil_contenido.POSITIONING_PROFILE_UNITS"
+      ],
+      "course_units": [
+        "LI-01-M006-K02",
+        "LI-01-M007-K03",
+        "LI-02-V021-K01",
+        "LI-02-V003-K03"
+      ],
+      "course_note": "Perfil usa POSITIONING_PROFILE_UNITS. Las consultas manuales conservan recuperación dinámica por knowledge.agents.context.",
       "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
       "effort": null,
-      "model_note": null,
+      "model_note": "Consulta manual conservada; perfil_contenido.positioning actúa como herramienta low de perfil_periodico, sin subdelegación.",
       "budget_ref": "proveedor",
       "input_schemas": [
-        "manual_request"
+        "manual_request",
+        "profile_request"
       ],
       "output_schemas": [
-        "manual_result"
+        "manual_result",
+        "profile_positioning"
       ],
       "activity": {
         "job_kinds": [
@@ -1960,65 +1993,126 @@
     },
     {
       "id": "perfil",
-      "label": "Perfil · consulta manual",
+      "label": "Perfil",
       "group": "estrategia",
       "role": "orchestrator",
       "status": "active",
-      "binding": "knowledge.agents.run",
-      "description": "Responde consultas manuales con recuperación de unidades del curso. Sin ciclo periódico ni escritura del perfil.",
+      "binding": "team_backend.perfil.run",
+      "description": "Dueño del ciclo de estrategia-perfil: biblioteca, posicionamiento, evidencia, copy y assets. Entrega Markdown y checklist privados; Gustavo aplica. Conserva consultas manuales.",
       "skills": [
-        "Responde consultas manuales con recuperación de unidades del curso"
+        "Coordina propuesta privada de perfil, con citas y decisiones por sección; preserva presupuesto y evidencia."
       ],
       "tools": [
         "biblioteca_search",
-        "memoria"
+        "memoria",
+        "read_own_profile",
+        "research_tool",
+        "visual_tool"
       ],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Recuperación dinámica knowledge.agents.context; no hay lista curada fija para este rol.",
+      "course_lists": [
+        "perfil_contenido.POSITIONING_PROFILE_UNITS",
+        "perfil_contenido.PROFILE_COPY_UNITS",
+        "perfil_contenido.PROFILE_MONTHLY_UNITS",
+        "perfil_contenido.PROFILE_VISUAL_UNITS"
+      ],
+      "course_units": [
+        "LI-01-M006-K02",
+        "LI-01-M007-K03",
+        "LI-02-V021-K01",
+        "LI-02-V003-K03",
+        "LI-02-V015-K03",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-M008-K02",
+        "LI-02-M015-K03",
+        "LI-02-V010-K03",
+        "LI-02-M011-K01",
+        "LI-02-V011-K02",
+        "LI-02-V011-K03",
+        "LI-02-V014-K06",
+        "LI-02-V015-K02"
+      ],
+      "course_note": "Ciclo: listas EST curadas. Consulta manual: recuperación dinámica sin imponer una lista fija.",
       "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
       "effort": null,
-      "model_note": null,
-      "budget_ref": "proveedor",
+      "model_note": "El dueño determinista coordina herramientas low de perfil_contenido; conserva la consulta manual independiente.",
+      "budget_ref": "perfil",
       "input_schemas": [
-        "manual_request"
+        "manual_request",
+        "profile_request"
       ],
       "output_schemas": [
-        "manual_result"
+        "manual_result",
+        "profile_proposal"
       ],
       "activity": {
         "job_kinds": [
-          "agent_run"
+          "agent_run",
+          "prepare_profile"
         ],
-        "event_roles": [],
+        "event_roles": [
+          "perfil"
+        ],
         "agent": "perfil"
       }
     },
     {
       "id": "editor_visual",
-      "label": "Especialista visual · EDI-21",
+      "label": "Editor visual",
       "group": "editorial",
       "role": "specialist",
-      "status": "planned",
-      "binding": null,
-      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "status": "active",
+      "binding": "team_backend.editor_visual.propose",
+      "description": "Propone foto, infografía o carrusel para el texto ganador exacto y devuelve al director los medios preparados por IMG/IMG-INF. El director decide; conserva revisión visual, verificador, Jev, veto y Operación. Para Perfil prepara persona A/B/banner y render por código bajo autorización GAL-08; devuelve al dueño Perfil.",
       "skills": [
-        "En diseño"
+        "Elige formato y fotos de Galería",
+        "Prepara ediciones conservando originales",
+        "Entrega datos de plantillas, alt y verificaciones por hash"
       ],
-      "tools": [],
-      "course_lists": [],
-      "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
-      "model": null,
-      "effort": null,
-      "model_note": "Servicio determinista, humano o todavía planificado.",
-      "budget_ref": "ninguno",
-      "input_schemas": [],
-      "output_schemas": [],
+      "tools": [
+        "gallery_read",
+        "image_edit",
+        "render_templates",
+        "vision"
+      ],
+      "course_lists": [
+        "perfil_contenido.PROFILE_VISUAL_UNITS"
+      ],
+      "course_units": [
+        "LI-02-V011-K02",
+        "LI-02-V011-K03",
+        "LI-02-V014-K06",
+        "LI-02-V015-K02"
+      ],
+      "course_note": "No carga unidades del curso. Reutiliza la regla versionada de infografías (team_backend/recursos/infografias.html) y el brief fundamentado del director. En Perfil recibe PROFILE_VISUAL_UNITS originales en el contexto validado del orquestador.",
+      "model": "ANTHROPIC_VISION_MODEL (claude-sonnet-5-5); edición: OPENAI_IMAGE_MODEL (gpt-image-2)",
+      "effort": "low",
+      "model_note": "Elección: editorial-visual bajo el cap editorial y agregado. Diseño/edición/revisión: image-* bajo el subpresupuesto IMG existente. Render determinista; conserva el gate de visión.",
+      "budget_ref": "editorial",
+      "input_schemas": [
+        "visual_request",
+        "image_input",
+        "edit_input",
+        "profile_edit",
+        "profile_request"
+      ],
+      "output_schemas": [
+        "visual_proposal",
+        "image_design",
+        "image_bytes",
+        "visual_package",
+        "profile_render"
+      ],
       "activity": {
-        "job_kinds": [],
-        "event_roles": []
-      }
+        "job_kinds": [
+          "prepare_piece"
+        ],
+        "event_roles": [
+          "editor_visual"
+        ],
+        "stage": "visual"
+      },
+      "definition": "equipos/editorial/editor_visual.json"
     },
     {
       "id": "investigador_lider",
@@ -2102,28 +2196,193 @@
     },
     {
       "id": "ciclo_perfil",
-      "label": "Ciclo periódico de perfil",
+      "label": "Perfil · preparación de copy",
       "group": "estrategia",
-      "role": "orchestrator",
-      "status": "planned",
-      "binding": null,
-      "description": "En diseño. No ejecuta trabajo ni amplía permisos en 3a.",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.perfil_contenido.draft",
+      "description": "Perfil · preparación de copy; devuelve datos al orquestador Perfil, sin delegar ni escribir LinkedIn.",
       "skills": [
-        "En diseño"
+        "Perfil · preparación de copy"
+      ],
+      "tools": [],
+      "course_lists": [
+        "perfil_contenido.POSITIONING_PROFILE_UNITS",
+        "perfil_contenido.PROFILE_COPY_UNITS",
+        "perfil_contenido.PROFILE_MONTHLY_UNITS",
+        "perfil_contenido.PROFILE_VISUAL_UNITS"
+      ],
+      "course_units": [
+        "LI-01-M006-K02",
+        "LI-01-M007-K03",
+        "LI-02-V021-K01",
+        "LI-02-V003-K03",
+        "LI-02-V015-K03",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-M008-K02",
+        "LI-02-M015-K03",
+        "LI-02-V010-K03",
+        "LI-02-M011-K01",
+        "LI-02-V011-K02",
+        "LI-02-V011-K03",
+        "LI-02-V014-K06",
+        "LI-02-V015-K02"
+      ],
+      "course_note": "Unidades originales completas en el contexto del ciclo; la falta de una unidad bloquea su recomendación.",
+      "model": "ANTHROPIC_MODEL",
+      "effort": "low",
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "perfil",
+      "input_schemas": [
+        "profile_request"
+      ],
+      "output_schemas": [
+        "profile_draft"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "ciclo_perfil"
+        ]
+      }
+    },
+    {
+      "id": "biblioteca_perfil",
+      "label": "Biblioteca de Perfil",
+      "group": "estrategia",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.perfil_contenido.library",
+      "description": "Biblioteca de Perfil; devuelve datos al orquestador Perfil, sin delegar ni escribir LinkedIn.",
+      "skills": [
+        "Biblioteca de Perfil"
+      ],
+      "tools": [],
+      "course_lists": [
+        "perfil_contenido.POSITIONING_PROFILE_UNITS",
+        "perfil_contenido.PROFILE_COPY_UNITS",
+        "perfil_contenido.PROFILE_MONTHLY_UNITS",
+        "perfil_contenido.PROFILE_VISUAL_UNITS"
+      ],
+      "course_units": [
+        "LI-01-M006-K02",
+        "LI-01-M007-K03",
+        "LI-02-V021-K01",
+        "LI-02-V003-K03",
+        "LI-02-V015-K03",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-M008-K02",
+        "LI-02-M015-K03",
+        "LI-02-V010-K03",
+        "LI-02-M011-K01",
+        "LI-02-V011-K02",
+        "LI-02-V011-K03",
+        "LI-02-V014-K06",
+        "LI-02-V015-K02"
+      ],
+      "course_note": "Unidades originales completas en el contexto del ciclo; la falta de una unidad bloquea su recomendación.",
+      "model": null,
+      "effort": null,
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "perfil",
+      "input_schemas": [
+        "profile_request"
+      ],
+      "output_schemas": [
+        "profile_library"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "biblioteca_perfil"
+        ]
+      }
+    },
+    {
+      "id": "lectura_perfil",
+      "label": "Lectura del perfil propio",
+      "group": "estrategia",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.perfil.read_profile",
+      "description": "Lectura del perfil propio; devuelve datos al orquestador Perfil, sin delegar ni escribir LinkedIn.",
+      "skills": [
+        "Lectura del perfil propio"
       ],
       "tools": [],
       "course_lists": [],
       "course_units": [],
-      "course_note": "Este paso no carga una lista curada del curso.",
+      "course_note": "Unidades originales completas en el contexto del ciclo; la falta de una unidad bloquea su recomendación.",
       "model": null,
       "effort": null,
       "model_note": "Servicio determinista, humano o todavía planificado.",
-      "budget_ref": "ninguno",
-      "input_schemas": [],
-      "output_schemas": [],
+      "budget_ref": "perfil",
+      "input_schemas": [
+        "profile_request"
+      ],
+      "output_schemas": [
+        "profile_read"
+      ],
       "activity": {
         "job_kinds": [],
-        "event_roles": []
+        "event_roles": [
+          "lectura_perfil"
+        ]
+      }
+    },
+    {
+      "id": "revision_perfil",
+      "label": "Revisión de fundamentos del perfil",
+      "group": "estrategia",
+      "role": "specialist",
+      "status": "active",
+      "binding": "team_backend.perfil_contenido.review",
+      "description": "Revisión de fundamentos del perfil; devuelve datos al orquestador Perfil, sin delegar ni escribir LinkedIn.",
+      "skills": [
+        "Revisión de fundamentos del perfil"
+      ],
+      "tools": [],
+      "course_lists": [
+        "perfil_contenido.POSITIONING_PROFILE_UNITS",
+        "perfil_contenido.PROFILE_COPY_UNITS",
+        "perfil_contenido.PROFILE_MONTHLY_UNITS",
+        "perfil_contenido.PROFILE_VISUAL_UNITS"
+      ],
+      "course_units": [
+        "LI-01-M006-K02",
+        "LI-01-M007-K03",
+        "LI-02-V021-K01",
+        "LI-02-V003-K03",
+        "LI-02-V015-K03",
+        "LI-02-V016-K05",
+        "LI-02-V019-K01",
+        "LI-02-M008-K02",
+        "LI-02-M015-K03",
+        "LI-02-V010-K03",
+        "LI-02-M011-K01",
+        "LI-02-V011-K02",
+        "LI-02-V011-K03",
+        "LI-02-V014-K06",
+        "LI-02-V015-K02"
+      ],
+      "course_note": "Unidades originales completas en el contexto del ciclo; la falta de una unidad bloquea su recomendación.",
+      "model": "ANTHROPIC_MODEL",
+      "effort": "low",
+      "model_note": "Servicio determinista, humano o todavía planificado.",
+      "budget_ref": "perfil",
+      "input_schemas": [
+        "profile_request"
+      ],
+      "output_schemas": [
+        "profile_review"
+      ],
+      "activity": {
+        "job_kinds": [],
+        "event_roles": [
+          "revision_perfil"
+        ]
       }
     },
     {
@@ -2534,7 +2793,7 @@
     {
       "id": "disenar",
       "from": "director_editorial",
-      "to": "diseno_imagen",
+      "to": "editor_visual",
       "cycles": [
         "pieza_diaria"
       ],
@@ -2557,7 +2816,7 @@
     {
       "id": "editar_foto",
       "from": "director_editorial",
-      "to": "edicion_foto",
+      "to": "editor_visual",
       "cycles": [
         "pieza_diaria"
       ],
@@ -2718,18 +2977,25 @@
       "description": "Brief ciego, A/B y referencia a la versión minimizada de comunidad resuelta justo antes del panel; hipótesis si no está vigente."
     },
     {
-      "id": "visual_futuro",
+      "id": "proponer_visual",
       "from": "director_editorial",
       "to": "editor_visual",
       "cycles": [
         "pieza_diaria"
       ],
-      "request_kind": "workflow_step",
-      "request_schema": "piece",
-      "response_schema": "image_choice",
+      "request_kind": "call",
+      "request_schema": "visual_request",
+      "response_schema": "visual_proposal",
       "max_calls_per_cycle": 1,
       "response_required": true,
-      "status": "planned"
+      "status": "active",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-visual"
+          ]
+        }
+      }
     },
     {
       "id": "observar",
@@ -3159,6 +3425,239 @@
       "condition": "Artefacto persistido para consumo posterior; no dispara ni subordina otro ciclo."
     },
     {
+      "id": "entregar_visual",
+      "from": "director_editorial",
+      "to": "editor_visual",
+      "cycles": [
+        "pieza_diaria"
+      ],
+      "request_kind": "call",
+      "request_schema": "image_input",
+      "response_schema": "visual_package",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "runtime": {
+        "purposes": {}
+      },
+      "condition": "Recoge el paquete IMG ya preparado. La respuesta vuelve al director; no llama proveedores ni publica."
+    },
+    {
+      "id": "perfil_biblioteca",
+      "from": "perfil",
+      "to": "biblioteca_perfil",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_request",
+      "response_schema": "profile_library",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "perfil_lectura",
+      "from": "perfil",
+      "to": "lectura_perfil",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_request",
+      "response_schema": "profile_read",
+      "max_calls_per_cycle": 8,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "perfil_posicionamiento",
+      "from": "perfil",
+      "to": "posicionamiento",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_request",
+      "response_schema": "profile_positioning",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "profile-positioning"
+          ]
+        }
+      }
+    },
+    {
+      "id": "perfil_copy",
+      "from": "perfil",
+      "to": "ciclo_perfil",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_request",
+      "response_schema": "profile_draft",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "profile-copy"
+          ]
+        }
+      }
+    },
+    {
+      "id": "perfil_revision_copy",
+      "from": "perfil",
+      "to": "revision_perfil",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_request",
+      "response_schema": "profile_review",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "profile-review"
+          ]
+        }
+      }
+    },
+    {
+      "id": "perfil_web",
+      "from": "perfil",
+      "to": "investigacion_web",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "research_request",
+      "response_schema": "research_result",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "web-research-tool"
+          ]
+        }
+      }
+    },
+    {
+      "id": "perfil_editar_persona",
+      "from": "perfil",
+      "to": "editor_visual",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_edit",
+      "response_schema": "image_bytes",
+      "max_calls_per_cycle": 6,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "openai": [
+            "profile-image-edit"
+          ]
+        }
+      }
+    },
+    {
+      "id": "perfil_render",
+      "from": "perfil",
+      "to": "editor_visual",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_request",
+      "response_schema": "profile_render",
+      "max_calls_per_cycle": 2,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {}
+      }
+    },
+    {
+      "id": "perfil_revision_visual",
+      "from": "perfil",
+      "to": "revision_visual",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "call",
+      "request_schema": "profile_request",
+      "response_schema": "profile_vision",
+      "max_calls_per_cycle": 4,
+      "response_required": true,
+      "status": "active",
+      "call_timeout_s": 300,
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "profile-image-check"
+          ]
+        }
+      }
+    },
+    {
+      "id": "captura_perfil",
+      "from": "capturas",
+      "to": "perfil",
+      "cycles": [
+        "capturas"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "capture",
+      "response_schema": "profile_proposal",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active"
+    },
+    {
+      "id": "perfil_orientacion_editorial",
+      "from": "perfil",
+      "to": "director_editorial",
+      "cycles": [
+        "perfil_periodico"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "profile_proposal",
+      "response_schema": "profile_proposal",
+      "response_required": false,
+      "max_calls_per_cycle": 2,
+      "status": "active",
+      "condition": "Artefactos de actividad aceptados: editorial_guidance los incorpora al siguiente brief. Solo datos; no llama otro agente ni cambia el calendario."
+    },
+    {
       "id": "evidencia_red",
       "from": "relaciones_comunidad",
       "to": "evidencia_compartida",
@@ -3448,8 +3947,6 @@
         "seleccion_editorial",
         "reparacion_editorial",
         "editor_verificador",
-        "diseno_imagen",
-        "edicion_foto",
         "revision_visual",
         "editor_visual",
         "investigacion_web",
@@ -3498,7 +3995,7 @@
             "revisar_imagen"
           ],
           "max_rounds": 2,
-          "description": "Un diseño inicial y una corrección."
+          "description": "Editor visual: un diseño inicial y una corrección de IMG-INF, con el mismo gate de visión. La propuesta de formato y la entrega final se piden una vez por versión ganadora."
         }
       ],
       "gates": [
@@ -3784,7 +4281,8 @@
         "investigacion_web",
         "director_editorial",
         "relaciones_comunidad",
-        "posicionamiento"
+        "posicionamiento",
+        "perfil"
       ],
       "triggers": [
         {
@@ -3969,43 +4467,74 @@
     },
     {
       "id": "perfil_periodico",
-      "label": "Perfil periódico",
-      "status": "planned",
-      "orchestrator": "ciclo_perfil",
+      "label": "Estrategia y perfil",
+      "status": "active",
+      "orchestrator": "perfil",
       "participants": [
-        "ciclo_perfil",
         "perfil",
         "posicionamiento",
-        "editor_visual"
+        "ciclo_perfil",
+        "biblioteca_perfil",
+        "lectura_perfil",
+        "revision_perfil",
+        "investigacion_web",
+        "editor_visual",
+        "revision_visual",
+        "director_editorial"
       ],
       "triggers": [
         {
-          "kind": null,
-          "cadence": "Mensual (perfil también semestral); aún sin activar.",
-          "binding": "planned",
-          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+          "kind": "prepare_profile",
+          "cadence": "Primera activación y cada seis meses calendario desde ancla; mensual destacados/artículos/actividad; captura explícita bajo demanda.",
+          "binding": "team_backend.perfil.schedule",
+          "deduplication": "ProfileSchedule y ProfileProposal; periodos y captures se unen sin reiniciar saldo ni ancla."
         }
       ],
-      "loops": [],
+      "loops": [
+        {
+          "id": "perfil_ajuste",
+          "status": "active",
+          "edges": [
+            "perfil_copy",
+            "perfil_revision_copy",
+            "perfil_editar_persona",
+            "perfil_render",
+            "perfil_revision_visual"
+          ],
+          "max_rounds": 2,
+          "description": "Primera propuesta y un ajuste explícito o por hecho respondido, mismo ledger de 10 USD. No se repiten transportes inciertos."
+        }
+      ],
       "gates": [],
       "limits": {
-        "budget_refs": [],
+        "budget_refs": [
+          "perfil",
+          "research",
+          "lecturas"
+        ],
         "max_depth": 1,
         "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
-        "max_calls": 60,
-        "max_provider_calls": 60,
+        "max_calls": 40,
+        "max_provider_calls": 24,
         "cost_cap_usd": 10,
         "cost_period": "cycle",
-        "call_timeout_s": 120,
-        "cycle_timeout_s": 1800,
+        "call_timeout_s": 300,
+        "cycle_timeout_s": 2400,
         "max_stalls": 2,
         "max_replans": 1
       },
       "ledger": {
-        "status": "planned",
-        "records": [],
-        "checkpoint_resume": false,
-        "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+        "status": "runtime",
+        "records": [
+          "CycleLedger",
+          "ProfileProposal",
+          "ProfileAsset",
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": true,
+        "note": "Dos rondas máximas; resultados confirmados reutilizados y llamadas inciertas requieren conciliación."
       }
     },
     {
@@ -4176,6 +4705,7 @@
       "process_capture": "operador_cuenta",
       "weekly_summary": "analista_barrio_resultados",
       "read_inbox": "conversaciones_inbox",
+      "prepare_profile": "perfil",
       "review_referents": "investigador_lider",
       "advance_experiments": "investigador_lider",
       "community_study": "analista_barrio_resultados"
@@ -4203,6 +4733,9 @@
       ],
       "reparacion": [
         "director_editorial"
+      ],
+      "visual": [
+        "editor_visual"
       ]
     },
     "autopilot_direct_kinds": [

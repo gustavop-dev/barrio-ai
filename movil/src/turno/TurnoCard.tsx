@@ -1,3 +1,4 @@
+import { ProfileProposal } from './ProfileProposal';
 import { ReferentDecision } from './ReferentDecision';
 // A Tu turno card (the PWA's TurnoCardView): type, priority, deadline, who asks, title, body by type,
 // actions and «Creada hace X», inside a SwipeableCard (right: the primary action; left: «Más tarde»).
@@ -381,9 +382,11 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
           <T variant="subtitulo" accessibilityRole="header">
             {cardTitle(card)}
           </T>
-          {card.referent_change || card.referent_experiment ? (
-        <ReferentDecision card={card} />
-      ) : card.question ? (
+          {card.profile_id ? (
+            <ProfileProposal id={card.profile_id} />
+          ) : card.referent_change || card.referent_experiment ? (
+            <ReferentDecision card={card} />
+          ) : card.question ? (
             <QuestionBody card={card} resolvedBy={resolvedBy} />
           ) : card.attempt ? (
             <Attempt card={card} />

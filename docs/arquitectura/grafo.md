@@ -2,13 +2,13 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.1` · SHA-256 `0d36331c45a552e1747797ac24070d7fe4d2f0b919cca693ccbbb1b94f1b19cb`.
+Versión `6.2-fase8` · SHA-256 `656a787b31caeeeab84c65461a1861a78d9c591f4835aec6d2979eafd1a04946`.
 
-45 nodos (43 activos), 57 aristas y 13 ciclos.
+46 nodos (46 activos), 69 aristas y 13 ciclos.
 
-Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes y comunidad mensual ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. A/B comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
+Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes, comunidad mensual y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. Las variantes A/B de redacción comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
-Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Referentes activa su fan-out mensual y experimentos; comunidad entrega un estudio público versionado al panel de lectores. Perfil periódico sigue en diseño.
+Los trazos discontinuos siguen en diseño. Los ciclos migrados reutilizan checkpoints confirmados y detienen llamadas inciertas para conciliación. Referentes activa su fan-out mensual y experimentos; comunidad entrega un estudio público versionado al panel de lectores. Perfil entrega propuestas privadas y no escribe LinkedIn.
 
 ## Grafo completo
 
@@ -27,11 +27,8 @@ flowchart TD
     seleccion_editorial["Selección editorial · specialist"]
     reparacion_editorial["Reparación editorial · specialist"]
     editor_verificador["Verificador editorial · gate"]
-    diseno_imagen["Diseño de infografía y carrusel · specialist"]
-    edicion_foto["Edición de foto · specialist"]
     revision_visual["Revisión de imagen · gate"]
-    editor_visual["Especialista visual · EDI-21 · En diseño · specialist"]
-    class editor_visual planned;
+    editor_visual["Editor visual · specialist"]
   end
   subgraph grupo_observatorio["observatorio"]
     investigador_referentes["Observación de referentes · specialist"]
@@ -67,10 +64,12 @@ flowchart TD
     transcripcion["Transcripción de audio · specialist"]
   end
   subgraph grupo_estrategia["estrategia"]
-    posicionamiento["Posicionamiento · consulta manual · orchestrator"]
-    perfil["Perfil · consulta manual · orchestrator"]
-    ciclo_perfil["Ciclo periódico de perfil · En diseño · orchestrator"]
-    class ciclo_perfil planned;
+    posicionamiento["Posicionamiento · orchestrator"]
+    perfil["Perfil · orchestrator"]
+    ciclo_perfil["Perfil · preparación de copy · specialist"]
+    biblioteca_perfil["Biblioteca de Perfil · specialist"]
+    lectura_perfil["Lectura del perfil propio · specialist"]
+    revision_perfil["Revisión de fundamentos del perfil · specialist"]
   end
   director_editorial -->|"brief · workflow_step · ≤2"| director_editorial
   director_editorial -->|"redactar_a · workflow_step · ≤1 · agrupada redactor"| copywriter_a
@@ -79,15 +78,15 @@ flowchart TD
   director_editorial -->|"reparar · workflow_step · ≤1"| reparacion_editorial
   director_editorial -->|"verificar · workflow_step · ≤2"| editor_verificador
   director_editorial -->|"investigar_pieza · workflow_step · ≤1"| investigacion_web
-  director_editorial -->|"disenar · workflow_step · ≤2"| diseno_imagen
-  director_editorial -->|"editar_foto · workflow_step · ≤8"| edicion_foto
+  director_editorial -->|"disenar · workflow_step · ≤2"| editor_visual
+  director_editorial -->|"editar_foto · workflow_step · ≤8"| editor_visual
   director_editorial -->|"revisar_imagen · workflow_step · ≤8"| revision_visual
   director_editorial -->|"leer_lector_comprador · workflow_step · ≤1 · agrupada lectores"| lector_comprador
   director_editorial -->|"leer_lector_recomendador · workflow_step · ≤1 · agrupada lectores"| lector_recomendador
   director_editorial -->|"leer_lector_divulgador · workflow_step · ≤1 · agrupada lectores"| lector_divulgador
   director_editorial -->|"leer_lector_lider · workflow_step · ≤1 · agrupada lectores"| lector_lider
   director_editorial -->|"leer_lector_par · workflow_step · ≤1 · agrupada lectores"| lector_par
-  director_editorial -.->|"visual_futuro · workflow_step · ≤1"| editor_visual
+  director_editorial -->|"proponer_visual · call · ≤1"| editor_visual
   relaciones_comunidad -->|"observar · workflow_step · ≤1"| investigador_referentes
   relaciones_comunidad -->|"descubrir · workflow_step · ≤1"| descubrimiento_red
   relaciones_comunidad -->|"clasificar · workflow_step · ≤1"| clasificador_red
@@ -114,6 +113,18 @@ flowchart TD
   capturas -->|"captura_memoria · handoff · ≤1"| posicionamiento
   metricas -->|"resultados_editorial · handoff · ≤1"| director_editorial
   analista_barrio_resultados -->|"resumen_editorial · handoff · ≤1"| director_editorial
+  director_editorial -->|"entregar_visual · call · ≤1"| editor_visual
+  perfil -->|"perfil_biblioteca · call · ≤2"| biblioteca_perfil
+  perfil -->|"perfil_lectura · call · ≤8"| lectura_perfil
+  perfil -->|"perfil_posicionamiento · call · ≤2"| posicionamiento
+  perfil -->|"perfil_copy · call · ≤2"| ciclo_perfil
+  perfil -->|"perfil_revision_copy · call · ≤2"| revision_perfil
+  perfil -->|"perfil_web · call · ≤1"| investigacion_web
+  perfil -->|"perfil_editar_persona · call · ≤6"| editor_visual
+  perfil -->|"perfil_render · call · ≤2"| editor_visual
+  perfil -->|"perfil_revision_visual · call · ≤4"| revision_visual
+  capturas -->|"captura_perfil · handoff · ≤1"| perfil
+  perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
   relaciones_comunidad -->|"evidencia_red · call · ≤1"| evidencia_compartida
   analista_barrio_resultados -->|"evidencia_analista · call · ≤1"| evidencia_compartida
   investigador_lider -->|"evidencia_referentes · call · ≤1"| evidencia_compartida
@@ -154,11 +165,8 @@ flowchart TD
     seleccion_editorial["Selección editorial · specialist"]
     reparacion_editorial["Reparación editorial · specialist"]
     editor_verificador["Verificador editorial · gate"]
-    diseno_imagen["Diseño de infografía y carrusel · specialist"]
-    edicion_foto["Edición de foto · specialist"]
     revision_visual["Revisión de imagen · gate"]
-    editor_visual["Especialista visual · EDI-21 · En diseño · specialist"]
-    class editor_visual planned;
+    editor_visual["Editor visual · specialist"]
   end
   subgraph grupo_operacion["operacion"]
     lider_jev["Líder · Jev · gate"]
@@ -175,23 +183,24 @@ flowchart TD
   director_editorial -->|"reparar · workflow_step · ≤1"| reparacion_editorial
   director_editorial -->|"verificar · workflow_step · ≤2"| editor_verificador
   director_editorial -->|"investigar_pieza · workflow_step · ≤1"| investigacion_web
-  director_editorial -->|"disenar · workflow_step · ≤2"| diseno_imagen
-  director_editorial -->|"editar_foto · workflow_step · ≤8"| edicion_foto
+  director_editorial -->|"disenar · workflow_step · ≤2"| editor_visual
+  director_editorial -->|"editar_foto · workflow_step · ≤8"| editor_visual
   director_editorial -->|"revisar_imagen · workflow_step · ≤8"| revision_visual
   director_editorial -->|"leer_lector_comprador · workflow_step · ≤1 · agrupada lectores"| lector_comprador
   director_editorial -->|"leer_lector_recomendador · workflow_step · ≤1 · agrupada lectores"| lector_recomendador
   director_editorial -->|"leer_lector_divulgador · workflow_step · ≤1 · agrupada lectores"| lector_divulgador
   director_editorial -->|"leer_lector_lider · workflow_step · ≤1 · agrupada lectores"| lector_lider
   director_editorial -->|"leer_lector_par · workflow_step · ≤1 · agrupada lectores"| lector_par
-  director_editorial -.->|"visual_futuro · workflow_step · ≤1"| editor_visual
+  director_editorial -->|"proponer_visual · call · ≤1"| editor_visual
   editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤5"| lider_jev
   lider_jev -->|"pieza_diaria_gate_1 · gate · ≤1"| gustavo
   gustavo -->|"pieza_diaria_gate_2 · gate · ≤1"| operador_cuenta
+  director_editorial -->|"entregar_visual · call · ≤1"| editor_visual
 ```
 
 Bucle `evaluator_optimizer` (active, máximo 2 rondas): Copywriters A/B agrupados, verificación inicial y una reparación con el binding histórico del director; máximo dos evaluaciones. Sin delegación entre especialistas.
 
-Bucle `imagen_actual` (active, máximo 2 rondas): Un diseño inicial y una corrección.
+Bucle `imagen_actual` (active, máximo 2 rondas): Editor visual: un diseño inicial y una corrección de IMG-INF, con el mismo gate de visión. La propuesta de formato y la entrega final se piden una vez por versión ganadora.
 
 Gate `publicacion` (CONT-09): editor_verificador → lider_jev → gustavo → operador_cuenta.
 - Reglas y verificador sobre el hash exacto; imagen preparada y manifest validado.
@@ -341,7 +350,8 @@ flowchart TD
     investigacion_web["Investigación web · specialist"]
   end
   subgraph grupo_estrategia["estrategia"]
-    posicionamiento["Posicionamiento · consulta manual · orchestrator"]
+    posicionamiento["Posicionamiento · orchestrator"]
+    perfil["Perfil · orchestrator"]
   end
   capturas -->|"rutear · workflow_step · ≤1"| ruteador_capturas
   capturas -->|"entender · workflow_step · ≤1"| intencion_captura
@@ -350,6 +360,7 @@ flowchart TD
   capturas -->|"captura_editorial · handoff · ≤1"| director_editorial
   capturas -->|"captura_persona · handoff · ≤1"| relaciones_comunidad
   capturas -->|"captura_memoria · handoff · ≤1"| posicionamiento
+  capturas -->|"captura_perfil · handoff · ≤1"| perfil
 ```
 
 ## Consulta manual · posicionamiento
@@ -362,7 +373,7 @@ Estado: `active`. Orquestador: `posicionamiento`.
 flowchart TD
   classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
   subgraph grupo_estrategia["estrategia"]
-    posicionamiento["Posicionamiento · consulta manual · orchestrator"]
+    posicionamiento["Posicionamiento · orchestrator"]
   end
 ```
 
@@ -376,7 +387,7 @@ Estado: `active`. Orquestador: `perfil`.
 flowchart TD
   classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
   subgraph grupo_estrategia["estrategia"]
-    perfil["Perfil · consulta manual · orchestrator"]
+    perfil["Perfil · orchestrator"]
   end
 ```
 
@@ -414,26 +425,44 @@ flowchart TD
 
 Bucle `fan_out` (active, máximo 1 rondas): Tres ramas paralelas con contextvars/ledger común y gather de todas antes de liberar lease. Una llamada por rama; no delegan.
 
-## Perfil periódico
+## Estrategia y perfil
 
-Estado: `planned`. Orquestador: `ciclo_perfil`.
+Estado: `active`. Orquestador: `perfil`.
 
-- `planned`: Mensual (perfil también semestral); aún sin activar.
+- `prepare_profile`: Primera activación y cada seis meses calendario desde ancla; mensual destacados/artículos/actividad; captura explícita bajo demanda.
 
 ```mermaid
 flowchart TD
   classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
-  subgraph grupo_estrategia["estrategia"]
-    posicionamiento["Posicionamiento · consulta manual · orchestrator"]
-    perfil["Perfil · consulta manual · orchestrator"]
-    ciclo_perfil["Ciclo periódico de perfil · En diseño · orchestrator"]
-    class ciclo_perfil planned;
-  end
   subgraph grupo_editorial["editorial"]
-    editor_visual["Especialista visual · EDI-21 · En diseño · specialist"]
-    class editor_visual planned;
+    director_editorial["Director editorial · orchestrator"]
+    revision_visual["Revisión de imagen · gate"]
+    editor_visual["Editor visual · specialist"]
   end
+  subgraph grupo_observatorio["observatorio"]
+    investigacion_web["Investigación web · specialist"]
+  end
+  subgraph grupo_estrategia["estrategia"]
+    posicionamiento["Posicionamiento · orchestrator"]
+    perfil["Perfil · orchestrator"]
+    ciclo_perfil["Perfil · preparación de copy · specialist"]
+    biblioteca_perfil["Biblioteca de Perfil · specialist"]
+    lectura_perfil["Lectura del perfil propio · specialist"]
+    revision_perfil["Revisión de fundamentos del perfil · specialist"]
+  end
+  perfil -->|"perfil_biblioteca · call · ≤2"| biblioteca_perfil
+  perfil -->|"perfil_lectura · call · ≤8"| lectura_perfil
+  perfil -->|"perfil_posicionamiento · call · ≤2"| posicionamiento
+  perfil -->|"perfil_copy · call · ≤2"| ciclo_perfil
+  perfil -->|"perfil_revision_copy · call · ≤2"| revision_perfil
+  perfil -->|"perfil_web · call · ≤1"| investigacion_web
+  perfil -->|"perfil_editar_persona · call · ≤6"| editor_visual
+  perfil -->|"perfil_render · call · ≤2"| editor_visual
+  perfil -->|"perfil_revision_visual · call · ≤4"| revision_visual
+  perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
 ```
+
+Bucle `perfil_ajuste` (active, máximo 2 rondas): Primera propuesta y un ajuste explícito o por hecho respondido, mismo ledger de 10 USD. No se repiten transportes inciertos.
 
 ## Estudio mensual de comunidad
 
@@ -556,6 +585,19 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `classify_result` | `json_schema` | [team_backend.orquestacion_schemas.CLASSIFY_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `plan_result` | `json_schema` | [team_backend.orquestacion_schemas.PLAN_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `sync_result` | `json_schema` | [team_backend.orquestacion_schemas.SYNC_RESULT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `visual_request` | `json_schema` | [team_backend.editor_visual.REQUEST_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editor_visual.py) |
+| `visual_proposal` | `json_schema` | [team_backend.editor_visual.PROPOSAL_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editor_visual.py) |
+| `visual_package` | `json_schema` | [team_backend.editor_visual.PACKAGE_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editor_visual.py) |
+| `profile_request` | `json_schema` | [team_backend.perfil_contenido.REQUEST_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_contenido.py) |
+| `profile_proposal` | `model` | [team_backend.models.ProfileProposal](../../agentes-linkedin/infra/src/team_backend/models.py) |
+| `profile_library` | `json_schema` | [team_backend.perfil_contenido.LIBRARY_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_contenido.py) |
+| `profile_positioning` | `json_schema` | [team_backend.perfil_contenido.POSITION_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_contenido.py) |
+| `profile_draft` | `json_schema` | [team_backend.perfil_contenido.DRAFT_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_contenido.py) |
+| `profile_review` | `json_schema` | [team_backend.perfil_contenido.REVIEW_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_contenido.py) |
+| `profile_read` | `json_schema` | [team_backend.perfil.READ_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil.py) |
+| `profile_edit` | `json_schema` | [team_backend.perfil_visual.EDIT_REQUEST](../../agentes-linkedin/infra/src/team_backend/perfil_visual.py) |
+| `profile_render` | `json_schema` | [team_backend.perfil_visual.RENDER_RESULT](../../agentes-linkedin/infra/src/team_backend/perfil_visual.py) |
+| `profile_vision` | `json_schema` | [team_backend.perfil_visual.CHECK_RESULT](../../agentes-linkedin/infra/src/team_backend/perfil_visual.py) |
 | `evidence_request` | `dataclass` | [team_backend.evidencia.EvidenceRequest](../../agentes-linkedin/infra/src/team_backend/evidencia.py) |
 | `evidence_result` | `dataclass` | [team_backend.evidencia.EvidenceResult](../../agentes-linkedin/infra/src/team_backend/evidencia.py) |
 | `referents_request` | `json_schema` | [team_backend.referentes_research.REQUEST_SCHEMA](../../agentes-linkedin/infra/src/team_backend/referentes_research.py) |
@@ -590,7 +632,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `leer_lector_divulgador` | `panel_input` | `panel` |
 | `leer_lector_lider` | `panel_input` | `panel` |
 | `leer_lector_par` | `panel_input` | `panel` |
-| `visual_futuro` | `piece` | `image_choice` |
+| `proponer_visual` | `visual_request` | `visual_proposal` |
 | `observar` | `network_input` | `observe_result` |
 | `descubrir` | `network_input` | `discover_result` |
 | `clasificar` | `network_input` | `classify_result` |
@@ -617,6 +659,18 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `captura_memoria` | `capture` | `capture` |
 | `resultados_editorial` | `metrics_result` | `metrics_result` |
 | `resumen_editorial` | `weekly` | `weekly` |
+| `entregar_visual` | `image_input` | `visual_package` |
+| `perfil_biblioteca` | `profile_request` | `profile_library` |
+| `perfil_lectura` | `profile_request` | `profile_read` |
+| `perfil_posicionamiento` | `profile_request` | `profile_positioning` |
+| `perfil_copy` | `profile_request` | `profile_draft` |
+| `perfil_revision_copy` | `profile_request` | `profile_review` |
+| `perfil_web` | `research_request` | `research_result` |
+| `perfil_editar_persona` | `profile_edit` | `image_bytes` |
+| `perfil_render` | `profile_request` | `profile_render` |
+| `perfil_revision_visual` | `profile_request` | `profile_vision` |
+| `captura_perfil` | `capture` | `profile_proposal` |
+| `perfil_orientacion_editorial` | `profile_proposal` | `profile_proposal` |
 | `evidencia_red` | `evidence_request` | `evidence_result` |
 | `evidencia_analista` | `evidence_request` | `evidence_result` |
 | `evidencia_referentes` | `evidence_request` | `evidence_result` |

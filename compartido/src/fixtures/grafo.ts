@@ -17,11 +17,11 @@ export function graphFixture(): TeamGraph {
           handoffs: [{ id: 'event-1', from: 'director_editorial', to: 'copywriter_a', at: '2026-11-08T11:01:00Z', detail: 'Brief entregado' }] },
       }),
       node('copywriter_a', 'Copywriter A'),
-      node('editor_visual', 'Especialista visual · EDI-21', { status: 'planned' }),
+      node('editor_visual', 'Editor visual'),
     ],
     edges: [
       { id: 'redactar', from: 'director_editorial', to: 'copywriter_a', request_kind: 'workflow_step', request_schema: 'brief', response_schema: 'variants', status: 'active', cycles: ['pieza_diaria'], call_group: 'redactor' },
-      { id: 'visual', from: 'director_editorial', to: 'editor_visual', request_kind: 'workflow_step', request_schema: 'brief', response_schema: 'choice', status: 'planned', cycles: ['pieza_diaria'] },
+      { id: 'proponer_visual', from: 'director_editorial', to: 'editor_visual', request_kind: 'call', request_schema: 'visual_request', response_schema: 'visual_proposal', status: 'active', cycles: ['pieza_diaria'] },
     ],
     cycles: [{ id: 'pieza_diaria', label: 'Pieza diaria', status: 'active', orchestrator: 'director_editorial', participants: ['director_editorial', 'copywriter_a', 'editor_visual'], triggers: [{ kind: 'prepare_piece', cadence: 'Diaria' }] }],
   };

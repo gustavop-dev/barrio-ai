@@ -59,11 +59,11 @@ describe('Galería', () => {
     server();
     renderAt('/galeria', routes);
     expect(screen.getByRole('heading', { name: 'Galería', level: 1 })).toBeInTheDocument();
-    expect(screen.getByText('Fotos para tus posts.')).toBeInTheDocument();
+    expect(screen.getByText('Fotos para tus posts y tu perfil.')).toBeInTheDocument();
     expect(screen.getByText(/El equipo decide cuándo usarlas y si las edita con IA/)).toBeInTheDocument();
     expect(screen.getByLabelText(/Subir fotos/)).toHaveAttribute('multiple');
     const filters = screen.getByRole('group', { name: 'Filtrar fotos' });
-    expect(within(filters).getAllByRole('button').map((b) => b.textContent)).toEqual(['Todas', 'Sin usar', 'Elegidas', 'Publicadas']);
+    expect(within(filters).getAllByRole('button').map((b) => b.textContent)).toEqual(['Perfil', 'Todas', 'Sin usar', 'Elegidas', 'Publicadas']);
     expect(within(filters).getByRole('button', { name: 'Todas' })).toHaveAttribute('aria-pressed', 'true');
 
     const grid = await screen.findByRole('list', { name: 'Fotos' });
@@ -144,4 +144,15 @@ describe('Galería', () => {
     renderAt('/galeria', routes);
     expect(await screen.findByText(/Sube fotos tuyas, de eventos o de tu trabajo/)).toBeInTheDocument();
   });
+});
+
+it('tags an existing photo as Perfil with scoped consent, retaining its post editing setting', async () => {
+  const user = userEvent.setup();
+  const api = server({ 'PATCH /api/v1/galeria/f1': (request) => ({ body: { ...PHOTOS[0], ...(request.body as object) } }) });
+  renderAt('/galeria', routes);
+  await user.click(await screen.findByRole('button', { name: /Foto del 3 nov, nueva/i }));
+  await user.selectOptions(screen.getByRole('combobox', { name: /^Categoría$/ }), 'perfil');
+  expect(screen.getByText(/Estas fotos no se usan en posts/)).toBeInTheDocument();
+  await user.click(screen.getByRole('button', { name: /^Guardar$/ }));
+  await waitFor(() => expect(api.requests.find((r) => r.method === 'PATCH')?.body).toEqual({ category: 'perfil', profile_edit: true }));
 });

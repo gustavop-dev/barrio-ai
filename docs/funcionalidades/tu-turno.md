@@ -26,7 +26,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 | [TUR-15](#tur-15) | Ver lo que el equipo sabe de él | PWA · app · backend | funciona |
 | [TUR-16](#tur-16) | Añadir algo que quiere que sepan | PWA · app · backend | funciona |
 | [TUR-17](#tur-17) | Editar o retirar un dato | PWA · app · backend | funciona |
-| [TUR-18](#tur-18) | Tareas de perfil | PWA · app · backend | no implementado |
+| [TUR-18](#tur-18) | Tareas de perfil | PWA · app · backend | funciona |
 | [TUR-19](#tur-19) | Deslizar una tarjeta | app | funciona |
 | [TUR-20](#tur-20) | Decidir altas, bajas y sustituciones de referentes | PWA · app · backend | funciona |
 | [TUR-21](#tur-21) | Decidir un experimento de participación | PWA · app · backend | funciona |
@@ -285,13 +285,13 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 ### TUR-18 · Tareas de perfil <a id="tur-18"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** recibe el Markdown de cambios, los assets y una checklist sincronizada por sección; revisa el copy listo para pegar y aplica él mismo lo que elige en LinkedIn.
 - **Responsable:** `perfil` coordina las tareas, `posicionamiento` sustenta el mensaje y `editor_visual` prepara foto/mural; Gustavo decide y aplica.
 - **Cadencia:** propuesta completa cada seis meses ([EST-01](estrategia-perfil.md#est-01)); mensual para destacados, artículos y actividad ([EST-02](estrategia-perfil.md#est-02)); bajo demanda desde captura ([EST-05](estrategia-perfil.md#est-05)). Una tarea por sección y versión, agrupada por propuesta.
 - **Tu turno:** «Aceptar propuesta», «Pedir ajuste», «Más tarde» y «No lo haré»; foto exige «Elegir A» o «Elegir B» sin preselección. Banner muestra la nota de composición estilizada para decidirlo aparte. Aceptar no significa aplicar; después, «Hecho, lo apliqué» o «Lo cambié con otro texto». Gustavo puede aceptar/aplicar solo algunas secciones.
-- **Datos necesarios y disponibilidad:** memoria, orientación, biblioteca y marca del tablero existen; faltan paquete estructurado/versionado, estado actual completo del perfil, categoría Perfil, checklist y confirmación por sección. Fotos y assets dependen de GAL-08 y EST-03/04. La relectura automática no está disponible para todas las secciones; no se promete una verificación imposible.
-- **Código:** no existe. `tasks.perfil` llega siempre vacío; el tipo de push `profile_task` existe en el backend, pero Ajustes no ofrece su interruptor hasta que haya evento. Diseño en `DISENO-VISTAS.md` (rama `feat/rediseno-oficina`), sección 2.C1.
+- **Datos necesarios y disponibilidad:** Paquete versionado, assets y checklist implementados. Relectura autorizada del titular; las demás secciones conservan «comprobación automática no disponible». No se promete una lectura completa del perfil.
+- **Código:** `perfil_views.py`, `perfil.cards/markdown`, `rediseno_views.TuTurno`, `compartido/api/perfil.ts` y `ProfileProposal.tsx` en PWA/app; notificación `profile_task` habilitada en Ajustes.
 - **Criterios de aceptación:**
   1. **Dado** una propuesta de perfil, **cuando** abre Tu turno, **entonces** descarga el Markdown y ve por sección texto actual con fuente/fecha o «No pudimos leer tu perfil actual», copy inglés con «Copiar», porqué, IDs del curso por recomendación, evidencia y pasos. El contador usa el límite de LinkedIn verificado al generar (la ficha previa citaba titular 220 y Acerca de 2.600); un límite no comprobado aparece pendiente. **A y B, cada una 800×800 PNG/JPG**, banner 1584×396 PNG y previews móvil/escritorio con cada retrato tienen descarga y comparación privada con referencias de Perfil; todos pertenecen a la versión del documento/checklist.
   2. **Dado** «Hecho, lo apliqué», **cuando** lo pulsa, **entonces** la sección pasa a «Aplicado por Gustavo, pendiente de comprobar». Solo una relectura autorizada que compare el contenido permite «Comprobado»; si la sección no es legible, queda «Aplicado por Gustavo; comprobación automática no disponible», con fecha y evidencia manual opcional. El clic no prueba una escritura en LinkedIn.
@@ -305,8 +305,8 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   10. **Dado** A y B completas y válidas, **cuando** Gustavo pulsa «Elegir A» o «Elegir B», **entonces** registra opción/versión en documento y checklist y conserva ambas descargas. No hay elección automática ni aprobación de foto por aceptar otra sección; si falta una opción la entrega de foto sigue parcial. Elegir retrato no aprueba banner ni publica.
   11. **Dado** el banner con micrófono y ninguna charla confirmada en memoria, **cuando** lo revisa, **entonces** ve junto al copy y en el Markdown que es una composición de estilo, no evidencia de evento real; no aparece «speaker» ni prueba social inventada. Decide aceptar, ajustar o descartar esa propuesta de forma independiente.
   12. **Dado** un hecho imprescindible de perfil no encontrado en memoria ni fuentes legibles, **cuando** Perfil necesita aclararlo, **entonces** Tu turno muestra **una pregunta por hecho faltante** con la sección afectada; no vuelve a preguntar hechos acreditados ni repite el mismo en varias tarjetas. Sin respuesta queda pendiente solo lo dependiente y se omite prueba social sin evidencia. La frase del banner llega propuesta y citada por Perfil; el texto de prueba es solo fallback EST-04, no una pregunta abierta de copy para Gustavo.
-- **Brechas código/docs:** el ciclo de Perfil está diseñado y sin implementar (`mapa-agentes-runtime.md`: perfil «Parcial (a mano)»). Se amplía el ID reservado TUR-18; no se crea una segunda checklist ni se supone que el perfil completo pueda releerse con los conectores actuales.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** CI/QA y activación pendientes de Claude; [guía de verificación](../arquitectura/fase8-verificacion.md). Los assets privados no están en el repo.
+- **Cobertura QA:** `test_perfil.py`, Jest/Vitest y Maestro `18-perfil`; regresiones `04-*`, `10-galeria` y seed. Escrita, sin ejecución local.
 
 ### TUR-19 · Deslizar una tarjeta <a id="tur-19"></a>
 

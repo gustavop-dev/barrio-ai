@@ -15,7 +15,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [tu-turno.md](tu-turno.md) | `TUR` | Tarjetas que solo Gustavo puede resolver, preguntas y «Lo que el equipo sabe de ti» |
 | [notificaciones.md](notificaciones.md) | `NOT` | La bandeja de Notificaciones dentro de la PWA y de la app |
 | [captura.md](captura.md) | `CAP` | El botón de captura: nota, voz, fotos, contexto, «Lo que enviaste» y «Deshacer» |
-| [galeria.md](galeria.md) | `GAL` | Fotos, notas y permiso de edición para posts; futura categoría Perfil para foto y banner |
+| [galeria.md](galeria.md) | `GAL` | Fotos, notas y permiso de edición para posts; categoría Perfil privada para foto y banner |
 | [calendario-piezas.md](calendario-piezas.md) | `CAL` | Calendario (Mes, Semana, Lista), panel del día y detalle de una pieza con su veto |
 | [resultados.md](resultados.md) | `RES` | Indicadores, gráficos y tabla de posts |
 | [personas-oportunidades.md](personas-oportunidades.md) | `PRS` | El barrio, la ficha de una persona, las oportunidades y los referentes |

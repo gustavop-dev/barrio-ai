@@ -1,8 +1,9 @@
+import { PROFILE_CONSENT, PROFILE_ROLES, profilePhotoPatch } from './photo';
 // The sheet of one photo (Galeria.dc.html): big image, state, where it was used, the note,
 // «Edición con IA», Guardar and «Quitar de la galería» (with confirmation).
 import { AIEditControl } from '../../components/ui/AIEditControl';
 import { useId, useState } from 'react';
-import { sameOrigin, useDeleteFoto, useUpdateFoto, type PhotoOutput, type PhotoPatch } from '../../api/capturas';
+import { sameOrigin, useDeleteFoto, useUpdateFoto, type PhotoOutput, type PhotoPatch, type PhotoCategory, type ProfileRole } from '../../api/capturas';
 import { Sheet } from '../../capture/Sheet';
 import { IconCerrar } from '../../components/icons';
 import { Badge, Button, ConfirmModal, ErrorRetry, useToast } from '../../components/ui';
@@ -13,12 +14,15 @@ export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: ()
   const update = useUpdateFoto();
   const remove = useDeleteFoto();
   const noteId = useId();
+  const [category, setCategory] = useState<PhotoCategory>(photo.category ?? 'posts');
+  const [profileEdit, setProfileEdit] = useState(photo.profile_edit ?? false);
+  const [role, setRole] = useState<ProfileRole>(photo.profile_role ?? '');
   const [note, setNote] = useState(photo.note ?? '');
   const [aiEdit, setAiEdit] = useState(photo.ai_edit);
   const [confirming, setConfirming] = useState(false);
   const src = sameOrigin(photo.url);
   const warning = inUseWarning(photo);
-  const patch: PhotoPatch = photoPatch(photo, note, aiEdit);
+  const patch: PhotoPatch = { ...photoPatch(photo, note, aiEdit), ...profilePhotoPatch(photo, category, profileEdit, role) };
   const dirty = Object.keys(patch).length > 0;
 
   const save = () =>
@@ -63,7 +67,23 @@ export function PhotoSheet({ photo, onClose }: { photo: PhotoOutput; onClose: ()
           }}
         >
           <div className="field">
-            <label htmlFor={noteId}>Nota para el equipo (opcional)</label>
+            <label>Categoría
+              <select aria-label="Categoría" value={category} onChange={(e) => { const next = e.target.value as PhotoCategory; setCategory(next); setProfileEdit(next === 'perfil'); }}>
+                <option value="posts">Posts</option><option value="perfil">Perfil</option>
+              </select>
+            </label>
+            {category === 'perfil' ? <>
+              <p>{PROFILE_CONSENT}</p>
+              <label><input type="checkbox" checked={profileEdit} onChange={(e) => setProfileEdit(e.target.checked)} />Autorizar edición para Perfil</label>
+              <label>Función de referencia
+                <select aria-label="Función de referencia" value={role} onChange={(e) => setRole(e.target.value as ProfileRole)}>
+                  {PROFILE_ROLES.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}
+                </select>
+              </label>
+            </> : null}
+          </div>
+          <div className="field">
+            <label htmlFor={noteId}>{category === 'perfil' ? 'Instrucciones para Perfil' : 'Nota para el equipo (opcional)'}</label>
             <textarea id={noteId} rows={3} value={note} placeholder="Por ejemplo: recórtala para que no se lean nombres de clientes." onChange={(event) => setNote(event.target.value)} />
           </div>
           <AIEditControl value={aiEdit} onChange={setAiEdit} disabled={update.isPending} testID="photo-ai" />

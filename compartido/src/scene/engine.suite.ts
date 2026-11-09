@@ -93,6 +93,28 @@ describe('OfficeEngine · library visits', () => {
 });
 
 describe('OfficeEngine · queue', () => {
+  it('replays director and visual handoffs at the editorial table and leaves missing activity still', () => {
+    const e = engine(all('desconocido', { director_editorial: 'trabajando', editor_visual: 'trabajando' }));
+    const said = narrations(e);
+    e.ingest([
+      ev(1, 'entrega', 'director_editorial', { destino: 'editor_visual', detalle: 'Solicitud: proponer_visual' }),
+      ev(2, 'entrega', 'editor_visual', { destino: 'director_editorial', detalle: 'Respuesta: proponer_visual' }),
+    ], NOW);
+    until(e, () => said.length === 2);
+    until(e, () => !e.byId.editor_visual.busy && !e.byId.director_editorial.busy);
+    expect(said).toEqual([
+      'Director editorial entrega a Editor visual: “Solicitud: proponer_visual”',
+      'Editor visual entrega a Director editorial: “Respuesta: proponer_visual”',
+    ]);
+    expect(atHome(e, 'editor_visual')).toBe(true);
+    expect(atHome(e, 'copywriter_a')).toBe(true);
+    expect(e.getSnapshot().feed.some((item) => item.role === 'editor_visual')).toBe(true);
+    const quiet = engine(all('desconocido'));
+    quiet.advance(60_000);
+    expect(atHome(quiet, 'editor_visual')).toBe(true);
+    expect(quiet.getSnapshot().doing.editor_visual).toBe(undefined);
+  });
+
   it('starts plays in order, two at most, a moment apart', () => {
     const e = engine();
     const said = narrations(e);

@@ -19,7 +19,7 @@ from .operador_views import get_or_404, human_session, valid
 from .permissions import require
 
 RANGE=re.compile(r'bytes=(\d*)-(\d*)$')
-GALLERY_FILTERS={'todas':None,'sin_usar':['sin_usar'],'elegidas':['elegida','editada'],'publicadas':['publicada']}
+GALLERY_FILTERS={'todas':None,'sin_usar':['sin_usar'],'elegidas':['elegida','editada'],'publicadas':['publicada'],'perfil':None}
 
 class TooLarge(APIException):
     status_code=413
@@ -89,6 +89,9 @@ class PhotoOutput(serializers.BaseSerializer):
     def to_representation(self,obj):return capturas.photo_payload(obj)
 
 class PhotoPatch(serializers.Serializer):
+    category=serializers.ChoiceField(choices=['posts','perfil'],required=False)
+    profile_edit=serializers.BooleanField(required=False)
+    profile_role=serializers.ChoiceField(choices=['','01','02','03'],required=False)
     ai_edit=serializers.ChoiceField(choices=AIEdit.values,required=False)
     note=serializers.CharField(required=False,allow_blank=True,max_length=2000)
     allow_ai_edit=serializers.BooleanField(required=False)
@@ -143,13 +146,17 @@ class Gallery(ListAPIView):
     def get_queryset(self):
         require(self.request.user,'operate_linkedin')
         key=self.request.query_params.get('filtro') or 'todas'
-        if key not in GALLERY_FILTERS:raise ValidationError({'filtro':'Usa todas, sin_usar, elegidas o publicadas.'})
+        if key not in GALLERY_FILTERS:raise ValidationError({'filtro':'Usa todas, sin_usar, elegidas, publicadas o perfil.'})
         qs=GalleryPhoto.objects.select_related('chosen_piece')
+        if key=='perfil':return qs.filter(category='perfil')
         return qs.filter(state__in=GALLERY_FILTERS[key]) if GALLERY_FILTERS[key] else qs
     def post(self,request):
         human_session(request);require(request.user,'approve_actions')
         _limit_body(request,settings.GALLERY_MAX_PHOTOS_PER_REQUEST*settings.GALLERY_PHOTO_MAX_BYTES+1024*1024)
-        photos=capturas.add_photos(request.user,request.FILES.getlist('fotos'))
+        # DRF maps omitted multipart booleans to False unless partial=True. Preserve
+        # the posts preference and let category=perfil grant its separate scoped consent.
+        serializer=PhotoPatch(data=request.data,partial=True);serializer.is_valid(raise_exception=True)
+        photos=capturas.add_photos(request.user,request.FILES.getlist('fotos'),serializer.validated_data)
         now=timezone.now()
         return Response([capturas.photo_payload(p,now) for p in photos],status=201)
 
@@ -159,15 +166,10 @@ class PhotoDetail(APIView):
         return Response(PhotoOutput(get_or_404(GalleryPhoto,id=pid)).data)
     def patch(self,request,pid):
         human_session(request);require(request.user,'approve_actions')
-        data=valid(PhotoPatch,request);photo=get_or_404(GalleryPhoto,id=pid)
-        if 'ai_edit' in data and 'allow_ai_edit' in data:raise ValidationError('Envía solo ai_edit')
-        for field in ('note','allow_ai_edit','ai_edit'):
-            if field in data:setattr(photo,field,data[field].strip() if field=='note' else data[field])
-        if 'note' in data:
-            # An old interpretation must not outlive Gustavo changing the note.
-            photo.instruction='';photo.instruction_kind=''
-        photo.save(update_fields=['note','ai_edit','instruction','instruction_kind'])
-        audit(request.user,'gallery.updated',photo.id,ai_edit=photo.ai_edit)
+        serializer=PhotoPatch(data=request.data,partial=True);serializer.is_valid(raise_exception=True)
+        data=serializer.validated_data;photo=get_or_404(GalleryPhoto,id=pid)
+        from .perfil_galeria import update
+        photo=update(request.user,photo,data)
         return Response(PhotoOutput(photo).data)
     def delete(self,request,pid):
         human_session(request);require(request.user,'approve_actions')

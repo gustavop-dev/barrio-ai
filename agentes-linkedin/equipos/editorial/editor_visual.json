@@ -1,0 +1,71 @@
+{
+  "version": "1.0",
+  "tipo": "contrato_de_rol",
+  "id": "editor_visual",
+  "nombre": "Editor visual",
+  "grupo": "editorial",
+  "estado": "implementado_pendiente_ci_qa",
+  "runtime": "El registro equipos/grafo.yaml es la única configuración efectiva. Binding: team_backend.editor_visual.propose; coordinación secuencial: editorial._visual; producción: imagenes.py, infografias.py y connectors_images.py.",
+  "proposito": {
+    "mision": "Proponer y preparar el medio que complementa el post ganador exacto: foto, infografía o carrusel.",
+    "resultado_del_que_responde": "Propuesta motivada y paquete visual trazable al texto, fuentes, permisos y bytes finales.",
+    "fuera_de_responsabilidad": [
+      "Elegir el texto ganador",
+      "Aprobar publicación o saltar gates",
+      "Invocar otros agentes",
+      "Escribir en LinkedIn",
+      "Generar fotos inventadas",
+      "Preparar Perfil antes de implementar fase 8/GAL-08"
+    ]
+  },
+  "conocimiento": {
+    "unidades": [],
+    "criterio": "El brief conserva el fundamento del director. Este adapter no carga unidades adicionales ni clase 07.",
+    "reglas": [
+      "infra/src/team_backend/recursos/infografias.html",
+      "../docs/funcionalidades/imagenes-en-publicaciones.md"
+    ]
+  },
+  "entradas": [
+    "Id y hash de la versión final, tras reparación si la hubo",
+    "Brief y elección inicial como sugerencia",
+    "Hechos públicos y fuentes guardadas",
+    "Galería ofrecida y disponible, notas y permiso ai_edit"
+  ],
+  "entregables": {
+    "propuesta": "visual_proposal: hashes de texto/contexto, choice IMG con formato, razón, ids, alt e instrucciones; modo y motivo del fallback.",
+    "paquete": "visual_package: manifest IMG, ids de originales y variantes, motivos, datos/plantillas, alt, revisión y hashes. El director guarda aceptación y medio realmente producido en selection.visual.",
+    "destinatario": "director_editorial. Solo el workflow aplica la propuesta aceptada; el especialista no delega."
+  },
+  "permisos": [
+    "Leer fotos editoriales ofrecidas",
+    "Editar fotos reales respetando No editar y conservando el original",
+    "Entregar datos al renderizador IMG-INF",
+    "Devolver el resultado del gate visual existente"
+  ],
+  "controles": {
+    "presupuesto": "Elección: editorial-visual bajo el cap editorial y agregado de pieza_diaria. Producción: imagenes y reservas image-* existentes. No reduce la reserva de edición ni crea o reinicia saldos.",
+    "rondas": "Una propuesta y una entrega por ciclo; IMG-INF conserva un diseño y una corrección. Límites efectivos en grafo.yaml.",
+    "errores": "Sin selector o ante fallo conocido: elección inicial de IMG. IMG conserva original válido o tarjeta fija y bloqueo si no hay imagen válida. Llamada incierta/cap de ciclo: detener y conciliar, sin repetir.",
+    "vigencia": "La propuesta se acepta solo para el texto/contexto exactos. Antes de publicar se comprueban texto, fuentes, reglas y permisos usados además de los hashes IMG existentes.",
+    "gates": "Verificador, revisión visual, Jev, veto humano y operador_cuenta conservan su autoridad y comportamiento."
+  },
+  "evaluacion": {
+    "archivo": "infra/src/team_backend/tests/test_editor_visual.py",
+    "entrada_sintetica": "Post conceptual sin experiencia atribuida, Galería vacía, sin proveedor; regla IMG-INF versionada.",
+    "esperado": "Propuesta de infografía al director y tarjeta fija válida de IMG, con alt, hash y entrega real; ningún conector de publicación.",
+    "alternativa_incorrecta": "Inventar una foto/cifra, llamar un especialista desde otro, omitir revisión o publicar solo texto.",
+    "variantes": [
+      "Foto No editar",
+      "Edición rechazada por visión",
+      "Carrusel con fuentes",
+      "Contrato inválido",
+      "Texto/fuente/permiso cambiado",
+      "Reanudación sin nueva llamada"
+    ]
+  },
+  "dependencias_pendientes": [
+    "CI y QA en vivo por Claude",
+    "Perfil y exclusión GAL-08 en fase 8; este cambio no activa el ciclo de Perfil"
+  ]
+}

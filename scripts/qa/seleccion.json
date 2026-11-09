@@ -9,6 +9,11 @@
   "ignorar": ["*.md", "**/*.md", "docs/**", "movil/diseno-movimiento/**"],
   "areas": [
     {
+      "rutas": ["oficina/src/pages/turno/ProfileProposal*", "oficina/src/pages/galeria/**"],
+      "flujos": ["18-perfil"],
+      "cubre": ["EST-01", "EST-03", "EST-04", "GAL-08", "TUR-18"]
+    },
+    {
       "rutas": ["movil/src/equipo/**", "movil/src/app/(app)/equipo.tsx", "oficina/src/pages/MapaEquipo*"],
       "flujos": ["17-*"],
       "cubre": ["ARQ-08"]
@@ -20,7 +25,7 @@
     },
     {
       "rutas": ["movil/src/capture/**"],
-      "flujos": ["05-*", "10-*"],
+      "flujos": ["05-*", "10-*", "18-perfil"],
       "cubre": ["CAP-*"]
     },
     {
@@ -40,7 +45,7 @@
     },
     {
       "rutas": ["movil/src/turno/**", "movil/src/app/(app)/(tabs)/tu-turno.tsx"],
-      "flujos": ["04-*", "15-*", "19-*"],
+      "flujos": ["04-*", "15-*", "18-perfil", "19-*"],
       "cubre": ["TUR-*"]
     },
     {
@@ -60,7 +65,7 @@
     },
     {
       "rutas": ["movil/src/galeria/**", "movil/src/app/(app)/(tabs)/galeria.tsx"],
-      "flujos": ["05-*", "10-*"],
+      "flujos": ["05-*", "10-*", "18-perfil"],
       "cubre": ["GAL-*"]
     },
     {

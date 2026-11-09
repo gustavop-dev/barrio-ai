@@ -1,7 +1,13 @@
 import type { TurnoCard } from '../api/types';
 import type { ExperimentPlan } from '../api/referentes';
+export const REFERENTS_SETUP_CARD: TurnoCard = {
+  id: 'referents_setup:account-setup', type: 'aviso', priority: 'importante', state: 'nueva', critical: false, tone: 'warn',
+  agent: 'investigador_lider', agent_label: 'Investigador líder', title: 'Identificar los cinco referentes main',
+  body: 'Identificar los cinco main iniciales.', deadline: null, created_at: null,
+  actions: [{ label: 'Gestionar protegidos', href: '/personas?pestana=referentes' }],
+};
 export const MONTHLY_CARD: TurnoCard = {
-  id: 'referent_change:change-1', type: 'referente', critical: false, tone: 'info', agent: 'investigador_lider', agent_label: 'Investigador líder',
+  id: 'referent_change:change-1', type: 'referente', priority: 'importante', state: 'nueva', critical: false, tone: 'warn', agent: 'investigador_lider', agent_label: 'Investigador líder',
   title: 'sale Alba Variable · entra Nora Investigación', body: 'Si no respondes, se aplicará al terminar el día 5 (America/Bogota).',
   deadline: '2026-11-06T00:00:00-05:00', created_at: '2026-11-01T09:00:00-05:00',
   actions: [{ label: 'Aprobar sustitución', endpoint: '/api/v1/referentes/cambios/change-1/decidir', body: { version: 3, decision: 'approve' }, primary: true }],
@@ -19,3 +25,14 @@ export const EXPERIMENT_PLAN: ExperimentPlan = { base_days: 14, focus_days: 28, 
   hypothesis: 'Atraer personas con encaje', audience: 'Founders', comparison: 'Frente a la base', fit_criterion: 'Necesidad de software',
   positioning_version: 'v1', orientation_version: 'o1', metric: 'Personas únicas con encaje', denominator: 'Personas observadas',
   stop_rule: 'Pausa o cambio material detienen el foco', budget: 'Dentro de BAR-15', limitations: 'Sin causalidad' };
+export const EXPERIMENT_CARD: TurnoCard = {
+  id: 'referent_experiment:experiment-1', type: 'experimento', priority: 'importante', state: 'nueva', critical: false, tone: 'warn',
+  agent: 'investigador_lider', agent_label: 'Investigador líder', title: 'Experimento: Alba Variable', body: EXPERIMENT_PLAN.hypothesis,
+  deadline: null, created_at: null,
+  actions: [{ label: 'Aprobar experimento', endpoint: '/api/v1/referentes/experimentos/experiment-1/decidir',
+    body: { version: 1, decision: 'approve' }, primary: true }],
+  referent_experiment: { id: 'experiment-1', version: 1, state: 'proposed', plan: EXPERIMENT_PLAN,
+    starts_at: '2026-11-10T09:00:00-05:00', focus_at: '2026-11-24T09:00:00-05:00',
+    followup_at: '2026-12-22T09:00:00-05:00', ends_at: '2026-12-29T09:00:00-05:00', can_decide: true,
+    endpoint: '/api/v1/referentes/experimentos/experiment-1/decidir', results: {} },
+};

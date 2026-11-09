@@ -1,6 +1,8 @@
 // Tu turno: groups by priority, Nueva/Vista, «Más tarde», card actions with and without a note,
 // empty, loading and error states, and the swipe actions.
 import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, questionCard, turnoFixture, UNCERTAIN_CARD } from '@compartido/fixtures/turno';
+import { PROFILE_CARD, PROFILE_PROPOSAL } from '@compartido/fixtures/perfil';
+import { EXPERIMENT_CARD, MONTHLY_CARD, REFERENTS_SETUP_CARD } from '@compartido/fixtures/referentes';
 import type { TuTurno } from '@compartido/api/types';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
@@ -22,6 +24,27 @@ async function renderTurno(data: TuTurno = turno(), extra: Record<string, FakeHa
 }
 
 describe('Tu turno', () => {
+  it('keeps referent setup, monthly decisions, experiments and the profile checklist together', async () => {
+    const server = await renderTurno(turnoFixture({ count: 4, items: [REFERENTS_SETUP_CARD, MONTHLY_CARD, EXPERIMENT_CARD, PROFILE_CARD] }), {
+      'GET /api/v1/operador/referents': { body: [] },
+      'GET /api/v1/perfil/profile-qa': { body: PROFILE_PROPOSAL },
+    });
+    expect(await screen.findByText('Identificar los cinco referentes main')).toBeOnTheScreen();
+    expect(screen.getByText('3 importantes · 1 cuando puedas')).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Importante · 3' })).toBeOnTheScreen();
+    expect(screen.getByRole('header', { name: 'Cuando puedas · 1' })).toBeOnTheScreen();
+    expect(screen.getByText('Aprobar sustitución')).toBeOnTheScreen();
+    expect(screen.getByText('Aprobar experimento')).toBeOnTheScreen();
+    expect(screen.getByTestId(`edit-${MONTHLY_CARD.id}`)).toBeOnTheScreen();
+    expect(screen.getByTestId(`edit-${EXPERIMENT_CARD.id}`)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('profile-open'));
+    expect(await screen.findByText('Checklist por sección')).toBeOnTheScreen();
+    expect(screen.getByTestId('profile-section-headline')).toBeOnTheScreen();
+    expect(screen.queryByText(/^Comprobado$/)).toBeNull();
+    expect(server.find('GET', '/api/v1/perfil/profile-qa')).toHaveLength(1);
+    expect(server.requests.filter((r) => r.method === 'POST' && r.path.endsWith('/decidir'))).toEqual([]);
+  });
+
   it('shows a skeleton while loading, then the cards grouped Urgente → Importante → Cuando puedas', async () => {
     await renderTurno();
     expect(screen.getByLabelText('Cargando lo que depende de ti…')).toBeOnTheScreen();

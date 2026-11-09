@@ -153,7 +153,14 @@ export interface CaptureInput {
 export type PhotoDisplayState = 'nueva' | 'sin_usar' | 'elegida' | 'editada' | 'publicada';
 export type PhotoTone = 'info' | 'muted' | 'ok';
 
+export type PhotoCategory = 'posts' | 'perfil';
+export type ProfileRole = '' | '01' | '02' | '03';
+
 export interface PhotoOutput {
+  category?: PhotoCategory;
+  profile_edit?: boolean;
+  profile_role?: ProfileRole;
+  profile_version?: number;
   id: string;
   url: string;
   created_at: string;
@@ -174,9 +181,12 @@ export interface PhotoOutput {
   height: number | null;
 }
 
-export type GaleriaFiltro = 'todas' | 'sin_usar' | 'elegidas' | 'publicadas';
+export type GaleriaFiltro = 'todas' | 'sin_usar' | 'elegidas' | 'publicadas' | 'perfil';
 
 export interface PhotoPatch {
+  category?: PhotoCategory;
+  profile_edit?: boolean;
+  profile_role?: ProfileRole;
   note?: string;
   ai_edit?: AIEdit;
 }
@@ -263,9 +273,10 @@ export const undoCaptura = (captureId: string) => api.delete<CaptureOutput>(`${C
 
 export const listGaleria = (filtro: GaleriaFiltro = 'todas', page = 1) =>
   api.get<Paginated<PhotoOutput> | PhotoOutput[]>(`${GAL}?filtro=${filtro}${page > 1 ? `&page=${page}` : ''}`);
-export function uploadFotos(files: UploadFile[]) {
+export function uploadFotos(files: UploadFile[], category: PhotoCategory = 'posts') {
   const form = new FormData();
   for (const file of files) appendFile(form, 'fotos', file, file.name);
+  if (category === 'perfil') { form.append('category', category); form.append('profile_edit', 'true'); }
   return api.postForm<PhotoOutput[] | Paginated<PhotoOutput>>(GAL, form);
 }
 export const getFoto = (photoId: string) => api.get<PhotoOutput>(`${GAL}/${id(photoId)}`);
@@ -409,23 +420,25 @@ export interface UploadProgress {
 }
 
 /** `onProgress` hears before each request of up to ten photos and once at the end (the native app draws it). */
-export function useUploadFotos({ onProgress }: { onProgress?: (progress: UploadProgress) => void } = {}) {
+export function useUploadFotos({ onProgress, category = 'posts' }: { onProgress?: (progress: UploadProgress) => void; category?: PhotoCategory } = {}) {
   const client = useQueryClient();
   return useMutation({
-    mutationFn: async (files: UploadFile[]) => {
+    mutationFn: async (input: UploadFile[] | { files: UploadFile[]; category: PhotoCategory }) => {
+      const files = Array.isArray(input) ? input : input.files;
+      const selectedCategory = Array.isArray(input) ? category : input.category;
       // Ten parts per request at most, as in a capture.
       const created: PhotoOutput[] = [];
       for (let start = 0; start < files.length; start += CAPTURE_LIMITS.photosPerCapture) {
         const batch = files.slice(start, start + CAPTURE_LIMITS.photosPerCapture);
         onProgress?.({ done: start, sending: batch.length, total: files.length });
-        created.push(...asList(await uploadFotos(batch)));
+        created.push(...asList(await uploadFotos(batch, selectedCategory)));
       }
       onProgress?.({ done: files.length, sending: 0, total: files.length });
       return created;
     },
     // As a capture: offline it fails and offers «Reintentar» instead of pausing silently.
     networkMode: 'always',
-    onSettled: () => reloadInBackground(client, captureKeys.galeriaAll),
+    onSettled: () => reloadInBackground(client, captureKeys.galeriaAll, ['perfil']),
   });
 }
 
@@ -437,13 +450,13 @@ export function useUpdateFoto() {
     onSuccess: (photo) => {
       if (photo && typeof photo === 'object' && typeof photo.id === 'string') replacePhotoInGaleria(client, photo);
     },
-    onSettled: () => reloadInBackground(client, captureKeys.galeriaAll),
+    onSettled: () => reloadInBackground(client, captureKeys.galeriaAll, ['perfil']),
   });
 }
 
 export function useDeleteFoto() {
   const client = useQueryClient();
-  return useMutation({ mutationFn: deleteFoto, onSettled: () => client.invalidateQueries({ queryKey: captureKeys.galeriaAll }) });
+  return useMutation({ mutationFn: deleteFoto, onSettled: () => reloadInBackground(client, captureKeys.galeriaAll, ['perfil']) });
 }
 
 export function usePreferencias() {

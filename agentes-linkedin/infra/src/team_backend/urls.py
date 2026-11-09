@@ -1,3 +1,4 @@
+from . import perfil_views as pv
 from django.urls import path
 from . import views
 from . import operador_views as op
@@ -44,6 +45,9 @@ urlpatterns=[
  path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/summary',rd.Summary.as_view()),
  # Resultados: own-post and audience metrics against the previous period (docs/metricas-resultados.md).
  path('resultados',rs.Resultados.as_view()),
+ path('perfil/<uuid:pid>',pv.Detail.as_view()),path('perfil/<uuid:pid>/decision',pv.Decision.as_view()),
+ path('perfil/<uuid:pid>/documento',pv.Document.as_view()),path('perfil/<uuid:pid>/assets/<uuid:aid>',pv.Asset.as_view()),
+ path('perfil/<uuid:pid>/descarga',pv.DownloadTicket.as_view()),path('perfil/<uuid:pid>/descarga/<str:token>',pv.Download.as_view()),
  path('tu-turno',rv.TuTurno.as_view()),path('tu-turno/vistos',rv.TuTurnoSeen.as_view()),
  path('notificaciones',rv.Notifications.as_view()),path('notificaciones/leer',rv.NotificationsRead.as_view()),path('preguntas',rv.Questions.as_view()),
  path('preguntas/<uuid:qid>/responder',rv.QuestionAnswer.as_view()),path('preguntas/<uuid:qid>/no-compartir',rv.QuestionDecline.as_view()),

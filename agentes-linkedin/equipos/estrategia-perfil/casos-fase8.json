@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "estado": "escrito_no_ejecutado",
+  "harness": "team_backend.tests.test_perfil",
+  "note": "evaluaciones.py mide historial editorial; Perfil nuevo usa suite sintética, sin datos de producción ni proveedores reales.",
+  "cases": [
+    {
+      "id": "audience_first",
+      "input": "Oferta confirmada; LI-01-M006-K02 y LI-02-V015-K03 originales sintéticos.",
+      "expected": "Titular inglés que expresa utilidad, evidencia offer y cita pertinente.",
+      "wrong": "Egoteca, hechos del curso atribuidos a Gustavo o cita ausente.",
+      "tests": [
+        "test_missing_or_unknown_course_citations_block_even_with_positive_reviewer"
+      ]
+    },
+    {
+      "id": "missing_fact",
+      "input": "Cargo confirmado, fecha imprescindible desconocida, resultado comercial no acreditado.",
+      "expected": "Una pregunta de fecha; cargo reutilizado, prueba social omitida; otras secciones independientes.",
+      "wrong": "Inventar fecha/logro o preguntar por biblioteca/fotos.",
+      "tests": [
+        "test_missing_fact_asked_once_across_sections_and_known_fact_not_invented",
+        "test_missing_fact_keeps_only_its_section_pending_and_known_key_is_not_asked"
+      ]
+    },
+    {
+      "id": "profile_assets",
+      "input": "Tres PNG de bloques etiquetados Perfil; LI-02-V011-K02/03, LI-02-V014-K06, LI-02-V015-K02.",
+      "expected": "A/B 800 cuadradas, banner 1584×396, previews, render exacto y ocho puntos + identidad; sin selección automática.",
+      "wrong": "Un solo retrato, letra dibujada por modelo, banner sin persona, gesto de 02 o cristales oscuros.",
+      "tests": [
+        "test_exact_size_colors_grayscale_and_mobile_geometry",
+        "test_full_cycle_has_all_sections_assets_citations_and_no_linkedin_write",
+        "test_vision_requires_all_eight_points_and_identity_despite_positive_overall_verdict"
+      ]
+    },
+    {
+      "id": "private_scope",
+      "input": "Foto antes editorial, marcada Perfil, luego recategorizada/borrada.",
+      "expected": "Derivados excluidos; revisiones/downloads antiguos inválidos; originales deduplicados por hash.",
+      "wrong": "Elegir por id en posts o reutilizar asset después de revocación.",
+      "tests": [
+        "test_category_upload_scoped_consent_and_sticky_editorial_exclusion",
+        "test_a_preexisting_post_derivative_stays_excluded_after_source_changes_and_deletion",
+        "test_revoked_references_block_pending_downloads_and_selection"
+      ]
+    },
+    {
+      "id": "application",
+      "input": "Gustavo acepta/aplica titular; conector fake devuelve mismo texto.",
+      "expected": "Aplicado separado de Comprobado; este exige relectura autorizada coincidente.",
+      "wrong": "Un clic que declare actualización/verificación en LinkedIn.",
+      "tests": [
+        "test_manual_apply_is_not_checked_and_stale_decisions_are_rejected",
+        "test_only_an_exact_authorized_reread_marks_headline_checked"
+      ]
+    },
+    {
+      "id": "durability",
+      "input": "Reintento, captura y ciclo calendario; ajuste de una sección; reserva incierta.",
+      "expected": "Mismo ledger, cap 10 USD, imágenes reaprovechadas, periodos no duplicados, costes preservados.",
+      "wrong": "Nuevo saldo por versión, nueva edición incierta o reset del ancla.",
+      "tests": [
+        "test_partial_adjustment_reuses_images_and_cycle_budget",
+        "test_schedule_and_on_demand_do_not_reset_calendar_anchor",
+        "test_aggregate_cap_keeps_uncertain_reservations_and_never_pays_twice"
+      ]
+    }
+  ]
+}

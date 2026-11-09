@@ -403,7 +403,7 @@ export type PieceStatus =
   | 'expired'
   | 'superseded';
 
-export type EditorialStage = '' | 'director' | 'redactor' | 'lectores' | 'seleccion' | 'verificador';
+export type EditorialStage = '' | 'director' | 'redactor' | 'lectores' | 'seleccion' | 'verificador' | 'visual';
 
 export interface PieceActionRef {
   id: string;
@@ -730,6 +730,7 @@ export type RoleStatus = 'trabajando' | 'en_espera' | 'diseno';
 
 export interface RoleActivity {
   status: RoleStatus;
+  piece_id?: string;
   detail: string;
   since: string | null;
 }
@@ -808,6 +809,7 @@ export interface TurnoApproval {
 }
 
 export interface TurnoCard {
+  profile_id?: string;
   referent_change?: import('./referentes').ReferentChangeCard;
   referent_experiment?: import('./referentes').ReferentExperimentCard;
   /** `linkedin_expired`, `linkedin_expiring`, `uncertain:<id>`, `machine_paused`, `machine_paused_env`, `account_paused:<id>`, `question:<id>`, `approval:<id>`. */

@@ -23,6 +23,7 @@ INBOX_KINDS={
 }
 # Notificaciones kinds: (calendar layer, push by default, label in Ajustes).
 FEED_KINDS={
+    'profile_reviewed':('tuyo',False,'Revisión de perfil sin cambios'),
     'referents_review':('conversaciones',True,'Revisión mensual y experimentos de referentes'),
     'capture_scheduled':('publicaciones',True,'Fecha de una idea urgente'),
     'piece_scheduled':('publicaciones',True,'Pieza lista o programada'),
@@ -43,8 +44,8 @@ FEED_KINDS={
 COMPUTED_KINDS=('invites_expected','machine_paused_env')
 # Notificaciones kinds that still push with high priority: the machine stopped from the server stops everything.
 URGENT_FEED_KINDS=('machine_paused_env',)
-# Kinds nothing can emit yet: no switch in Ajustes until their event exists (profile tasks, TUR-18).
-WITHOUT_EMITTER=('profile_task',)
+# Kinds nothing can emit yet: profile_task now has the EST/TUR-18 emitter.
+WITHOUT_EMITTER=()
 
 def _switches():
     """(off, on): what Gustavo turned off, and what he turned on although its default is off."""

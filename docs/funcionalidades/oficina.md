@@ -1,6 +1,6 @@
 # Oficina (`OFI`)
 
-La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que se mueven solo cuando el backend registra trabajo real. Incluye lo común a todas las vistas: la navegación, el banner de pausa y la franja sin conexión.
+La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que se mueven solo cuando el backend registra trabajo real. Incluye lo común a todas las vistas: la navegación, el banner de pausa y la franja sin conexión.
 
 - **Código:** backend `oficina_views.Actividad` (`ROLES`, `JOB_ROLES`, `DESCRIPTIONS`), `oficina_views.Eventos`, `oficina_eventos.py`, `Overview`; PWA `oficina/src/pages/Oficina.tsx`, `oficina/src/scene/*`, `components/Layout.tsx`; app `movil/src/scene/*`, `movil/src/components/shell/*`; común `compartido/src/scene/*` (motor, plan, roles, actividad, narración, paneles).
 - **Documentación:** secciones «Oficina (escena)» y «Escena de la Oficina: feed de eventos» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md), notas `comportamiento` y `backend` de `movil/diseno-movimiento/canvas.json`, [`movil/MOTION.md`](../../movil/MOTION.md).
@@ -18,7 +18,7 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
 | [OFI-07](#ofi-07) | Banner de máquina o cuenta en pausa | PWA · app · backend | funciona |
 | [OFI-08](#ofi-08) | Franja sin conexión | PWA · app | funciona |
 | [OFI-09](#ofi-09) | Navegación | PWA · app | funciona |
-| [OFI-10](#ofi-10) | Editor visual como integrante de Editorial | PWA · app · backend | no implementado |
+| [OFI-10](#ofi-10) | Editor visual como integrante de Editorial | PWA · app · backend | implementado; CI/QA pendiente |
 
 ---
 
@@ -163,19 +163,19 @@ La pantalla de inicio: la oficina en pixel art con los 16 roles del equipo, que 
 ### OFI-10 · Editor visual como integrante de Editorial <a id="ofi-10"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** implementado; CI y QA en vivo pendientes por Claude.
 - **Qué hace para Gustavo:** ve quién está preparando los medios de cada pieza y puede abrir la misión y actividad de ese agente.
 - **Responsable:** `editor_visual`, coordinado por `director_editorial`.
 - **Cadencia:** con cada cambio de estado/evento del trabajo visual; reutiliza la actualización de actividad de la Oficina.
 - **Tu turno:** ninguna aprobación por mostrar al rol. Sus entregables siguen EDI-21 y, para perfil, TUR-18.
-- **Datos necesarios y disponibilidad:** escena, paneles, trabajos y eventos existen; falta el rol en registro, representación y asignación de trabajos. Su definición futura se especifica en [EDI-21](motor-editorial.md#edi-21).
-- **Código:** no existe esta integración. Referencias: `team_backend/oficina_views.py`, `oficina_eventos.py`, `compartido/src/scene`, paneles de la PWA y app.
+- **Datos necesarios y disponibilidad:** el rol ocupa el cuarto asiento de Editorial y aparece en su tira/panel. La etapa `visual` y el ledger atribuyen actividad real; los eventos del dispatcher muestran solicitudes y respuestas director ⇄ Editor visual. Sin actividad recibida permanece quieto y muestra Sin datos.
+- **Código:** `team_backend/oficina_views.py`, eventos existentes del dispatcher, `compartido/src/logic/roles.ts` y `scene`, paneles PWA/app. «Ver definición y conexiones» abre la ficha del registro. Sprite existente reutilizado; cambios app solo TS/TSX, sin dependencias nativas.
 - **Criterios de aceptación:**
   1. **Dado** el rol registrado, **cuando** abre Editorial en la PWA o app, **entonces** aparece «Editor visual», su misión y definición accesible desde el panel, y se actualiza el número de integrantes sin sustituir a director o copywriters.
   2. **Dado** un trabajo visual real, **cuando** se consulta, **entonces** muestra en cola, trabajando, en espera o bloqueo, con el detalle de la tarea y la pieza/propuesta de perfil asociada; si aún no hay runtime, muestra «En diseño».
   3. **Dado** una decisión/entrega visual, **cuando** llega su evento, **entonces** se atribuye a `editor_visual` y al destinatario real. Sin datos de actividad o con fallo de consulta queda quieto y muestra el aviso existente, sin simular trabajo.
-- **Brechas código/docs:** el flujo IMG no implica por sí solo que exista un personaje y una definición de agente; esta ficha completa su visibilidad.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** falta ejecutar CI/QA; los encargos de Perfil siguen en fase 8.
+- **Cobertura QA:** escritos casos backend de etapa/actividad y entregas, suites compartidas de estado/animación, Jest y Vitest de ficha/tira/mapa, Maestro 03-oficina y 17-mapa-equipo. Selección **`[qa: 03 07 11 16-imagenes 17-mapa-equipo]`**; Claude comprueba la escena a 390 × 844 y los handoffs reales.
 
 ## Mapa declarativo del equipo
 

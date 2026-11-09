@@ -263,6 +263,10 @@ def tick(user,now=None):
         except Exception as exc:report['inbox_error']=type(exc).__name__  # the inbox never stops the rest of the tick
         report['execute']+=_execute(user,account,now)
     report['reconcile']+=_reconcile(user,now)
+    try:
+        from .perfil import schedule
+        report['profile']=schedule(user,now)
+    except Exception as exc:report['profile_error']=type(exc).__name__
     try:report['weekly_summary']=_weekly_summary(user,now)
     except Exception as exc:report['weekly_summary_error']=type(exc).__name__  # the weekly summary never stops the rest
     return report

@@ -2,8 +2,8 @@
 // uploads for his posts; the team decides when to use them and whether to edit them with AI.
 // A virtualized 3-column grid, the filter in the route (`/galeria?filtro=sin_usar`), pull to refresh,
 // the upload with its progress, and the photo sheet with the full-screen viewer.
-import { useGaleria, type GaleriaFiltro, type PhotoOutput } from '@compartido/api/capturas';
-import { FILTERS, isFiltro, photoName, photoTone } from '@compartido/logic/galeria';
+import { useGaleria, type PhotoCategory, type GaleriaFiltro, type PhotoOutput } from '@compartido/api/capturas';
+import { PROFILE_CONSENT, FILTERS, isFiltro, photoName, photoTone } from '@compartido/logic/galeria';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
@@ -72,7 +72,8 @@ export function GaleriaScreen() {
   const [choice, setChoice] = useState<{ link: GaleriaFiltro; value: GaleriaFiltro } | null>(null);
   const filtro = choice && choice.link === linked ? choice.value : linked;
   const galeria = useGaleria(filtro);
-  const upload = useGalleryUpload();
+  const [category, setCategory] = useState<PhotoCategory>('posts');
+  const upload = useGalleryUpload(category);
   const { width } = useWindowDimensions();
   const { bottom } = useContentInsets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -129,7 +130,13 @@ export function GaleriaScreen() {
 
   const header = (
     <View style={styles.header}>
-      <PageHeader title="Galería" subtitle="Fotos para tus posts." />
+      <PageHeader title="Galería" subtitle="Fotos para tus posts y tu perfil." />
+      <T variant="detalle">Categoría al subir</T>
+      <View style={styles.chips}>
+        <FilterChip pressed={category === 'posts'} onPress={() => { if (!upload.pending) setCategory('posts'); }}>Posts</FilterChip>
+        <FilterChip pressed={category === 'perfil'} onPress={() => { if (!upload.pending) setCategory('perfil'); }} testID="upload-category-perfil">Perfil</FilterChip>
+      </View>
+      {category === 'perfil' ? <Note tone="info">{PROFILE_CONSENT}</Note> : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={upload.pending ? 'Subiendo…' : 'Subir fotos'}
@@ -159,6 +166,7 @@ export function GaleriaScreen() {
         style={styles.chipStrip}
         accessibilityRole="toolbar"
         accessibilityLabel="Filtrar fotos"
+        testID="gallery-filters"
       >
         {FILTERS.map((option) => (
           <FilterChip key={option.value} pressed={filtro === option.value} onPress={() => setFiltro(option.value)} testID={`filtro-${option.value}`}>
@@ -185,7 +193,7 @@ export function GaleriaScreen() {
       ) : null}
       {emptyFilter ? (
         <T variant="detalle" soft center style={styles.noMatch}>
-          No hay fotos con este filtro.
+          {filtro === 'perfil' ? 'Añade fotos a Perfil' : 'No hay fotos con este filtro.'}
         </T>
       ) : null}
     </View>

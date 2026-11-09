@@ -21,7 +21,7 @@ tags: [galeria]
 
 # ---------------------------------------------------------------- the grid
 # cubre: GAL-01, GAL-07
-- assertVisible: "Fotos para tus posts\\."
+- assertVisible: "Fotos para tus posts y tu perfil\\."
 - assertVisible:
     id: gallery-upload
     text: Subir fotos
@@ -31,6 +31,10 @@ tags: [galeria]
 - extendedWaitUntil:
     visible: "Foto.*, nueva"
     timeout: 20000
+- scrollUntilVisible:
+    element:
+      text: "Foto.*, publicada.*"
+    direction: DOWN
 - assertVisible: "Foto.*, sin usar"
 - assertVisible: "Foto.*, elegida.*"
 - assertVisible: "Foto.*, publicada.*"
@@ -48,6 +52,10 @@ tags: [galeria]
 
 # ---------------------------------------------------------------- the filters
 # cubre: GAL-01
+- swipe:
+    from:
+      id: gallery-filters
+    direction: LEFT
 - tapOn:
     id: filtro-publicadas
 - extendedWaitUntil:
@@ -86,8 +94,16 @@ tags: [galeria]
     id: filtro-elegidas
     selected: true
 - takeScreenshot: 10-galeria-03-filtro-vacio
+- swipe:
+    from:
+      id: gallery-filters
+    direction: RIGHT
 - tapOn:
     id: filtro-todas
+- scrollUntilVisible:
+    element:
+      text: "Foto.*, publicada.*"
+    direction: DOWN
 - extendedWaitUntil:
     visible: "Foto.*, publicada.*"
     timeout: 15000
@@ -246,7 +262,7 @@ tags: [galeria]
 
 # ---------------------------------------------------------------- the viewer
 # cubre: GAL-06
-# The photo on ink (colors.ink), with «1 de 4», «Cerrar» and its caption in paper white over it.
+# The photo on ink (colors.ink), with «1 de 5», «Cerrar» and its caption in paper white over it.
 - tapOn:
     id: photo-sheet-image
 - extendedWaitUntil:
@@ -255,7 +271,7 @@ tags: [galeria]
     timeout: 15000
 - assertVisible:
     id: photo-viewer-count
-    text: 1 de 4
+    text: 1 de 5
 - assertVisible:
     id: photo-viewer-close
 - assertVisible: "Nueva"
@@ -293,7 +309,7 @@ tags: [galeria]
     duration: 600
 - assertVisible:
     id: photo-viewer-count
-    text: 1 de 4
+    text: 1 de 5
 - takeScreenshot: 10-galeria-09-visor-zoom
 # A second double tap zooms out; then a swipe turns to the next photo.
 - doubleTapOn:
@@ -303,7 +319,7 @@ tags: [galeria]
     while:
       visible:
         id: photo-viewer-count
-        text: 1 de 4
+        text: 1 de 5
     commands:
       - swipe:
           start: "85%, 60%"
@@ -312,7 +328,7 @@ tags: [galeria]
 - extendedWaitUntil:
     visible:
       id: photo-viewer-count
-      text: 2 de 4
+      text: 2 de 5
     timeout: 10000
 - assertVisible: "Sin usar"
 - takeScreenshot: 10-galeria-10-visor-siguiente

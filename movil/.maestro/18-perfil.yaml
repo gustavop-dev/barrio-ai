@@ -1,0 +1,113 @@
+# cubre: GAL-08, TUR-18, EST-01, EST-03, EST-04
+# Real seeded API; generated PNG blocks, no real reference photo or paid provider.
+appId: co.projectapp.office
+name: Perfil privado y checklist manual
+tags: [perfil, galeria, turno]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-galeria
+- extendedWaitUntil:
+    visible:
+      id: screen-galeria
+    timeout: 20000
+- tapOn:
+    id: filtro-sin_usar
+- scrollUntilVisible:
+    element:
+      id: 'photo-.*'
+      index: 0
+    direction: DOWN
+- tapOn:
+    id: 'photo-.*'
+    index: 0
+- extendedWaitUntil:
+    visible:
+      id: photo-sheet
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: photo-category-perfil
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: photo-category-perfil
+- scrollUntilVisible:
+    element:
+      id: photo-save
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: photo-save
+- extendedWaitUntil:
+    notVisible:
+      id: photo-sheet
+    timeout: 10000
+- scrollUntilVisible:
+    element:
+      id: filtro-perfil
+    direction: UP
+- tapOn:
+    id: filtro-perfil
+- takeScreenshot: 18-perfil-01-categoria
+- tapOn:
+    id: top-tu-turno
+- extendedWaitUntil:
+    visible:
+      id: top-tu-turno
+      text: 'Tu turno, 10 pendientes, 1 urgente'
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: Identificar los cinco referentes main
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- assertVisible: Gestionar protegidos
+- scrollUntilVisible:
+    element:
+      id: profile-open
+    direction: DOWN
+    timeout: 30000
+    centerElement: true
+- tapOn:
+    id: profile-open
+- scrollUntilVisible:
+    element:
+      text: Checklist por sección
+    direction: DOWN
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: profile-section-headline
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: profile-section-headline
+- scrollUntilVisible:
+    element:
+      text: '\[LI-02-V015-K03\].*'
+    direction: DOWN
+    centerElement: true
+- assertVisible: '\[LI-02-V015-K03\].*'
+- scrollUntilVisible:
+    element:
+      id: profile-headline-accept
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    id: profile-headline-accept
+- extendedWaitUntil:
+    visible:
+      id: profile-headline-applied
+    timeout: 15000
+- tapOn:
+    id: profile-headline-applied
+- scrollUntilVisible:
+    element:
+      text: 'Aplicado por Gustavo, pendiente de comprobar.*'
+    direction: UP
+    centerElement: true
+- assertVisible: 'Aplicado por Gustavo, pendiente de comprobar.*'
+- assertNotVisible: '^Comprobado$'
+- takeScreenshot: 18-perfil-02-aplicado-no-comprobado

@@ -35,6 +35,22 @@ function server(extra: Record<string, FakeHandler> = {}) {
 beforeEach(() => { route.pathname = '/'; Object.defineProperty(AppState, 'currentState', { configurable: true, value: 'active' }); });
 afterEach(() => { jest.useRealTimers(); });
 
+it('shows the visual editor as the fourth editorial member with real activity and a registry link', async () => {
+  server({ [A]: { body: { ...activity, roles: { ...activity.roles,
+    editor_visual: { status: 'trabajando', detail: 'Preparando foto, infografía o carrusel para la pieza', since: now },
+  } } } });
+  await renderApp(<OficinaScreen />);
+  await screen.findByText('Editor visual: Preparando foto, infografía o carrusel para la pieza');
+  await fireEvent.press(screen.getByTestId('team-chip-editorial'));
+  expect(within(screen.getByTestId('office-panel')).getByText('4 INTEGRANTES · LA MESA LARGA')).toBeOnTheScreen();
+  await fireEvent.press(screen.getByRole('button', { name: 'Editor visual, Trabajando' }));
+  const panel = within(screen.getByTestId('office-panel'));
+  expect(panel.getByText('Propone y prepara la foto, infografía o carrusel de la pieza; el director decide.')).toBeOnTheScreen();
+  expect(panel.getByText('Trabajando · Preparando foto, infografía o carrusel para la pieza')).toBeOnTheScreen();
+  await fireEvent.press(panel.getByRole('button', { name: 'Ver definición y conexiones' }));
+  expect(require('expo-router').router.push).toHaveBeenCalledWith('/equipo?agente=editor_visual');
+});
+
 it('opens with a still scene and loading narration, then real activity and design tags', async () => {
   const api = server();
   const respond = api.fetch.getMockImplementation()!;

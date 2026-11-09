@@ -1,4 +1,4 @@
-# cubre: OFI-01, OFI-02, OFI-03, OFI-04, OFI-06, OFI-07
+# cubre: OFI-01, OFI-02, OFI-03, OFI-04, OFI-06, OFI-07, OFI-10
 # Oficina: a tap on a character of the Skia scene opens its sheet (SnapSheet), with its real state (the inbox agent is
 # not «en diseño») and what it did this session; the sheet is dragged to full and down to close; the team strip opens a
 # team, a member of it, «Ver en el Calendario» and, scrolled sideways, the library; Android back closes the sheet without
@@ -183,6 +183,53 @@ tags: [oficina]
 - assertVisible:
     id: team-chip-estrategia
     selected: false
+
+# cubre: OFI-10 — the fourth editorial member opens its mission and registry definition.
+- repeat:
+    while:
+      notVisible:
+        id: team-chip-editorial
+    times: 4
+    commands:
+      - swipe:
+          from:
+            id: team-strip
+            point: "85%,50%"
+          direction: LEFT
+          duration: 400
+- tapOn:
+    id: team-chip-editorial
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "4 INTEGRANTES · LA MESA LARGA"
+    timeout: 15000
+- swipe:
+    from:
+      text: Altura del panel
+    direction: UP
+    duration: 600
+- scrollUntilVisible:
+    element:
+      text: "Editor visual, .*"
+      above:
+        id: tab-index
+    direction: DOWN
+    centerElement: true
+- tapOn:
+    text: "Editor visual, .*"
+    above:
+      id: tab-index
+- extendedWaitUntil:
+    visible: "AGENTE · MESA EDITORIAL"
+    timeout: 10000
+- assertVisible: "Propone y prepara la foto, infografía o carrusel de la pieza; el director decide\\."
+- assertNotVisible: "Este rol está en diseño\\..*"
+- scrollUntilVisible:
+    element: Ver definición y conexiones
+    direction: DOWN
+- assertVisible: Ver definición y conexiones
+- takeScreenshot: 03-oficina-06c-editor-visual
+- tapOn: Cerrar
 
 # The library is the last chip: swipe the strip sideways (from its right part, away from the raised capture
 # button in the middle of the bottom bar) until it shows, then open it.

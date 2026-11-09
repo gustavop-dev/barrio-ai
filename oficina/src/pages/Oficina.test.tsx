@@ -109,6 +109,21 @@ describe('Oficina · states', () => {
 });
 
 describe('Oficina · panel sheet', () => {
+  it('includes the visual editor, its mission and registry link without inventing activity', async () => {
+    server();
+    const user = userEvent.setup();
+    renderOficina();
+    await screen.findByText(/^Actividad real/);
+    await user.click(screen.getByRole('button', { name: 'Mesa editorial' }));
+    const team = screen.getByRole('dialog', { name: 'Mesa editorial' });
+    expect(within(team).getByText('4 INTEGRANTES · LA MESA LARGA')).toBeInTheDocument();
+    await user.click(within(team).getByRole('button', { name: /Editor visual/ }));
+    const role = screen.getByRole('dialog', { name: 'Editor visual' });
+    expect(within(role).getByText('Propone y prepara la foto, infografía o carrusel de la pieza; el director decide.')).toBeInTheDocument();
+    expect(within(role).getByText('Sin datos de actividad.')).toBeInTheDocument();
+    expect(within(role).getByRole('link', { name: 'Ver definición y conexiones' })).toHaveAttribute('href', '/equipo?agente=editor_visual');
+  });
+
   it('opens a team in a half-height sheet and closes it with «Cerrar»', async () => {
     server();
     const user = userEvent.setup();

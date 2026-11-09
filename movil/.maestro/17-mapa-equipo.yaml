@@ -1,4 +1,4 @@
-# cubre: ARQ-08
+# cubre: ARQ-08, EDI-21, OFI-10
 # Read-only graph, real API + seed_qa, no paid providers. Phone: 390 x 844 dp.
 appId: co.projectapp.office
 name: Mapa del equipo
@@ -100,15 +100,16 @@ tags: [equipo, arquitectura]
 - tapOn:
     id: mapa-agente-editor_visual
 - extendedWaitUntil:
-    visible: "Este agente aún no ejecuta trabajo\\."
+    visible: Editor visual
     timeout: 10000
-- assertVisible: "Este agente aún no ejecuta trabajo\\."
+- assertVisible: Editor visual
+- assertNotVisible: "Este agente aún no ejecuta trabajo\\."
 - scrollUntilVisible:
     element:
-      text: "Sin actividad registrada para este agente\\."
+      text: Actividad reciente
     direction: DOWN
     centerElement: true
-- takeScreenshot: 17-mapa-equipo-03-en-diseno
+- takeScreenshot: 17-mapa-equipo-03-editor-visual
 - scrollUntilVisible:
     element:
       text: Volver

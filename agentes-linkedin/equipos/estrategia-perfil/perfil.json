@@ -1,5 +1,5 @@
 {
-  "status": "diseño_con_conocimiento_asignado_no_ejecutable",
+  "status": "implementado_fase8_ci_pendiente",
   "knowledge": "base-clase-01.json",
   "memory": "memoria-compartida.json",
   "load_policy": "Leer reglas comunes y propias; recuperar unidades y evidencia por ID cuando la tarea lo requiera. No cargar todo el curso en cada petición.",
@@ -7,7 +7,7 @@
   "permissions": {
     "publish_to_linkedin": false,
     "send_messages": false,
-    "paid_requests": false,
+    "paid_requests": true,
     "modify_confirmed_user_facts_without_approval": false
   },
   "missing_information": "Preguntar solo lo que afecte la decisión actual. No completar huecos con estereotipos ni atribuir al usuario ejemplos del curso.",
@@ -31,27 +31,26 @@
     "F05"
   ],
   "workflow": [
-    "Leer el brief de Posicionamiento y registrar su versión y estado de aprobación.",
-    "Cuando el usuario aporte su perfil, diagnosticar claridad de audiencia, problema, transformación y respaldo.",
-    "Devolver dudas estratégicas al agente de Posicionamiento; no inventar una oferta para mejorar una frase.",
-    "Proponer alternativas de titular y mensaje del Acerca de, explicando qué necesidad y evidencia sostiene cada una.",
-    "Indicar el mensaje que deberían apoyar banner, experiencia y destacados sin atribuir a la clase 01 reglas técnicas que no enseña.",
-    "Revisar ambigüedad, coherencia, voz propia y promesas; presentar cambios al usuario.",
-    "Antes de declarar el perfil completamente optimizado, incorporar el conocimiento pertinente de la clase 02."
+    "Recuperar unidades originales y evidencia propia antes de proponer.",
+    "Coordinar herramientas declaradas sin delegación entre especialistas; máximo dos rondas y 10 USD por propuesta.",
+    "Entregar copy inglés por sección con citas, audiencia/utilidad, pasos y preguntas individuales solo sobre hechos imprescindibles desconocidos.",
+    "Producir A/B y banner desde referencias Perfil autorizadas; render por código, ocho puntos e identidad por visión.",
+    "Presentar paquete versionado en Tu turno; conservar elección, decisión, aplicación manual y comprobación separadas."
   ],
   "outputs": [
-    "diagnostico_de_claridad",
-    "alternativas_de_titular",
-    "estructura_del_mensaje",
-    "respaldo_profesional_pertinente",
-    "preguntas_para_posicionamiento",
-    "pendientes_de_clase_02"
+    "markdown_citado",
+    "secciones_versionadas",
+    "foto_A",
+    "foto_B",
+    "banner",
+    "previews_mobile_desktop",
+    "preguntas_por_hecho",
+    "checklist_manual"
   ],
   "done_when": [
-    "El visitante puede reconocer a quién se ayuda y qué cambio se ofrece.",
-    "Titular y mensaje concuerdan con el brief recibido.",
-    "Experiencia y resultados tienen respaldo del usuario.",
-    "Se informa el alcance estratégico de clase 01 y lo pendiente para una optimización completa."
+    "Todas las secciones tienen fundamento y copia aplicable o una causa explícita de pendiente.",
+    "A/B y banner solo se ofrecen listos después de render y visión vinculados a sus hashes.",
+    "El usuario decide por sección; el sistema no afirma aplicación ni comprobación automática inexistente."
   ],
   "owns": [
     "traducción del posicionamiento a mensaje de perfil",
@@ -62,5 +61,13 @@
     "inventar experiencia o testimonios",
     "publicar cambios en LinkedIn",
     "certificar conversión o optimización técnica completa con clase 01"
-  ]
+  ],
+  "runtime": {
+    "cycle": "perfil_periodico",
+    "binding": "team_backend.perfil.run",
+    "registry": "../grafo.yaml",
+    "evaluation": "../../infra/src/team_backend/tests/test_perfil.py",
+    "writes_linkedin": false,
+    "budget": "Solo dentro del ledger agregado de perfil_periodico; 10 USD por propuesta."
+  }
 }

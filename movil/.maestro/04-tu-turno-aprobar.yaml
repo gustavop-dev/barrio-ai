@@ -19,7 +19,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 8 pendientes, 1 urgente'
+      text: 'Tu turno, 10 pendientes, 1 urgente'
     timeout: 30000
 - tapOn:
     id: top-tu-turno
@@ -61,7 +61,7 @@ tags: [turno]
 - extendedWaitUntil:
     visible:
       id: top-tu-turno
-      text: 'Tu turno, 7 pendientes, 1 urgente'
+      text: 'Tu turno, 9 pendientes, 1 urgente'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:

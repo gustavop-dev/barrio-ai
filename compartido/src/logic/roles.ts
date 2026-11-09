@@ -1,6 +1,6 @@
 // Teams, roles and their places in the office. Coordinates are logical pixels of the vertical
 // plan (192×336, see plan.ts); the canvas draws them at an integer scale (2× = 384×672).
-// The 16 role ids are the backend's (`/api/v1/oficina/actividad`); the librarian is a 17th
+// The 17 role ids are the backend's (`/api/v1/oficina/actividad`); the librarian is an 18th
 // character, a service with no activity row of its own.
 
 export type Point = readonly [number, number];
@@ -15,6 +15,7 @@ export const ROLE_IDS = [
   'director_editorial',
   'copywriter_a',
   'copywriter_b',
+  'editor_visual',
   'lector_comprador',
   'lector_recomendador',
   'lector_divulgador',
@@ -28,7 +29,7 @@ export const ROLE_IDS = [
 
 export type RoleId = (typeof ROLE_IDS)[number];
 export const LIBRARIAN_ID = 'bibliotecario';
-/** Every character in the scene: the 16 roles plus the librarian. */
+/** Every character in the scene: the 17 roles plus the librarian. */
 export type CharacterId = RoleId | typeof LIBRARIAN_ID;
 
 export type TeamId = 'estrategia' | 'observatorio' | 'editorial' | 'barrio' | 'revision' | 'relaciones' | 'operacion';
@@ -105,7 +106,8 @@ export const ROLES: readonly AgentRole[] = [
   // Editorial table.
   { id: 'director_editorial', name: 'Director editorial', short: 'Director editorial', purpose: 'Coordina ideas y selecciona propuestas.', team: 'editorial', sprite: 4, home: [26, 208], facing: 3, chair: 'back', monitor: null, via: [[CX, A2], [26, A2], [26, 208]] },
   { id: 'copywriter_a', name: 'Copywriter A', short: 'Copywriter A', purpose: 'Una primera manera de contar la idea.', team: 'editorial', sprite: 5, home: [58, 208], facing: 3, chair: 'back', monitor: null, via: [[CX, A2], [58, A2], [58, 208]] },
-  { id: 'copywriter_b', name: 'Copywriter B', short: 'Copywriter B', purpose: 'Una alternativa independiente.', team: 'editorial', sprite: 6, home: [42, 248], facing: 1, chair: 'north', monitor: null, via: [[CX, A3], [42, A3], [42, 248]] },
+  { id: 'copywriter_b', name: 'Copywriter B', short: 'Copywriter B', purpose: 'Una alternativa independiente.', team: 'editorial', sprite: 6, home: [26, 248], facing: 1, chair: 'north', monitor: null, via: [[CX, A3], [26, A3], [26, 248]] },
+  { id: 'editor_visual', name: 'Editor visual', short: 'Editor visual', purpose: 'Propone y prepara la foto, infografía o carrusel de la pieza; el director decide.', team: 'editorial', sprite: 8, home: [58, 248], facing: 1, chair: 'north', monitor: null, via: [[CX, A3], [58, A3], [58, 248]] },
   // The barrio: five simulated readers on the sofa and the poufs.
   { id: 'lector_comprador', name: 'Lector comprador', short: 'Lector comprador', purpose: 'Relevancia del problema y de la ayuda.', team: 'barrio', sprite: 7, home: [80, 286], facing: 3, chair: null, monitor: null, via: [[CX, A3], [124, A3], [124, 294], [80, 294], [80, 286]] },
   { id: 'lector_recomendador', name: 'Lector recomendador', short: 'Lector recomendador', purpose: 'A quién y cuándo recomendarte.', team: 'barrio', sprite: 8, home: [96, 286], facing: 3, chair: null, monitor: null, via: [[CX, A3], [124, A3], [124, 294], [96, 294], [96, 286]] },
@@ -121,7 +123,7 @@ export const ROLES: readonly AgentRole[] = [
   { id: 'operador_cuenta', name: 'Operador de cuenta', short: 'Operación', purpose: 'Observa a los referentes, ejecuta lo aprobado y concilia el resultado en la cuenta de LinkedIn.', team: 'operacion', sprite: 4, home: [CX, 58], facing: 3, chair: null, monitor: null, via: [[CX, 58]], service: true },
 ];
 
-/** Character 17: person9 recoloured (grey hair, glasses, aquamarine jacket), behind the library counter. */
+/** Librarian: person9 recoloured (grey hair, glasses, aquamarine jacket), behind the library counter. */
 export const LIBRARIAN: Role = {
   id: LIBRARIAN_ID,
   name: 'Bibliotecario',

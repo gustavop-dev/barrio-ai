@@ -2,17 +2,17 @@
 
 Propuestas que Gustavo aplica por su cuenta en LinkedIn. `perfil` coordina el ciclo; `posicionamiento` aporta dirección y `editor_visual` prepara recursos. La **biblioteca es el insumo principal**: la pauta de Daniela es «qué puedo hacer por otros», no una «egoteca». La trayectoria y las pruebas respaldan una utilidad para el público. Memoria, orientación, resultados y web aportan evidencia del caso; no sustituyen el fundamento del curso.
 
-Los [contratos del equipo](../../agentes-linkedin/equipos/estrategia-perfil/) y `knowledge/agents.py` permiten consultas manuales de biblioteca. No hay ciclo semestral/mensual, lectura completa del perfil ni propuestas conectadas a Tu turno. El equipo **no edita LinkedIn**, aunque el proveedor documente operaciones de perfil. Este diseño incorpora los seis addenda de Gustavo y la marca del tablero; todas sus capacidades siguen **no implementado**.
+El ciclo `perfil_periodico` está implementado en fase 8: dueño Perfil, especialistas como herramientas y presupuesto agregado de 10 USD mediante 3b. Las consultas manuales de biblioteca siguen disponibles. El equipo **no edita LinkedIn**; entrega un paquete privado versionado para aplicación manual. Se conservan los seis addenda y la marca del tablero. **CI, QA, despliegue y carga privada pendientes de Claude**; «funciona» describe la implementación, no una ejecución realizada en este worktree. Véase [verificación de fase 8](../arquitectura/fase8-verificacion.md).
 
 ## Resumen
 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
-| [EST-01](#est-01) | Propuesta completa de perfil cada seis meses | PWA · app · backend | no implementado |
-| [EST-02](#est-02) | Revisión mensual de destacados, artículos y actividad | PWA · app · backend | no implementado |
-| [EST-03](#est-03) | Dos opciones de foto de perfil para elegir | PWA · app · backend | no implementado |
-| [EST-04](#est-04) | Banner de marca con foto recortada y render por código | PWA · app · backend | no implementado |
-| [EST-05](#est-05) | Pedir la propuesta del perfil desde una captura | PWA · app · backend | no implementado |
+| [EST-01](#est-01) | Propuesta completa de perfil cada seis meses | PWA · app · backend | funciona |
+| [EST-02](#est-02) | Revisión mensual de destacados, artículos y actividad | PWA · app · backend | funciona |
+| [EST-03](#est-03) | Dos opciones de foto de perfil para elegir | PWA · app · backend | funciona |
+| [EST-04](#est-04) | Banner de marca con foto recortada y render por código | PWA · app · backend | funciona |
+| [EST-05](#est-05) | Pedir la propuesta del perfil desde una captura | PWA · app · backend | funciona |
 
 ## Fundamento por sección <a id="unidades-perfil"></a>
 
@@ -97,14 +97,14 @@ Además: comparación por visión de **A, B y figura del banner contra 03**, usa
 ### EST-01 · Propuesta completa de perfil cada seis meses <a id="est-01"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** recibe assets, un documento Markdown con los cambios exactos y una checklist para aplicar su perfil por secciones.
 - **Responsable:** `perfil` es el único orquestador; llama a `posicionamiento`, analista/investigador y visual mediante aristas declaradas. Los especialistas devuelven resultados; Perfil decide la propuesta y conserva el contexto ([ARQ-02](arquitectura-agentes.md#arq-02)).
 - **Cadencia:** primera propuesta al habilitar el ciclo y cada seis meses calendario desde esa fecha, en `OPERATOR_TIMEZONE`; también bajo demanda mediante EST-05. Reintentos y aplicación tardía no duplican el periodo.
 - **Tu turno:** checklist [TUR-18](tu-turno.md#tur-18), con documento, assets y previews; elección explícita entre A y B, y decisión sobre el banner con su nota de composición estilizada. Gustavo aprueba, ajusta, descarta y aplica manualmente por sección; audiencia/oferta nuevas son decisiones pendientes.
-- **Datos necesarios y disponibilidad:** biblioteca, consultas manuales y marca existen. Referencias 01–03 disponibles localmente fuera del repo, pendientes de carga privada por Claude cuando exista GAL-08 y de comprobar aptitud; no se usan directamente fuera de ese flujo. Memoria, orientación y resultados aportan hechos, pero perfil completo, trayectoria o enlaces pueden faltar. No existen categoría Perfil, dossier ni ciclo automático.
+- **Datos necesarios y disponibilidad:** biblioteca, consultas manuales y marca existen. Referencias 01–03 disponibles localmente fuera del repo, pendientes de carga privada por Claude después del despliegue de GAL-08 y de comprobar aptitud; no se usan directamente fuera de ese flujo. Memoria, orientación y resultados aportan hechos, pero perfil completo, trayectoria o enlaces pueden faltar. Categoría, dossier y ciclo implementados; la lectura completa del perfil sigue sin estar disponible.
 - **Dependencias:** web previsto, [BIB-01](biblioteca-equipos.md#bib-01), grafo ARQ, GAL-08 y `feat/imagenes-backend` para assets. Web verifica datos públicos/restricciones vigentes; no busca fotos sustitutas ni expone memoria privada.
-- **Código:** no existe este ciclo. Referencias: `knowledge/retrieval.py: AGENTS/search/unit`, `knowledge/agents.py`, `team_backend/posicionamiento.py`, `connectors._profile` (perfil reducido), `rediseno_views` (`tasks.perfil` vacío).
+- **Código:** `team_backend/perfil.py`, `perfil_contenido.py`, `perfil_views.py`; `ProfileProposal`, `ProfileSchedule`, `ProfileAsset`; grafo `perfil_periodico` y job `prepare_profile`.
 - **Contrato de entrega:** un paquete privado/versionado con id de ciclo, versión de marca, fuentes y fecha, `propuesta-perfil.md`, **foto A y foto B, cada una 800×800 PNG/JPG**, banner 1584×396 PNG, previews móvil/escritorio del banner con cada retrato y checklist enlazada. Cada asset referencia originales/versiones/roles de GAL-08, edición/modelo/prompt, render y revisión. Documento y checklist registran A/B sin selección automática, la opción que Gustavo elija y la nota de honestidad del micrófono. Todo corresponde a la misma versión; fuentes, notas e imágenes privadas no se incrustan en copy público ni se guardan en el repo.
 - **Datos faltantes, default vinculante:** consultar primero memoria confirmada, perfil/fuentes accesibles y lectura web autorizada. Reutilizar hechos acreditados; conservar u omitir lo no necesario. Solo si un hecho imprescindible sigue ausente o contradictorio, preguntar en Tu turno **una pregunta por cada hecho faltante**, identificando sección y por qué hace falta, sin pedir otra vez datos que ya puede leer. Deduplicar por hecho entre secciones/ciclos; una respuesta actualiza memoria con procedencia y solo las secciones afectadas. Sin respuesta, dejar esa parte pendiente u omitir la prueba social; continuar lo independiente. No convertir una falta técnica de biblioteca o acceso en un cuestionario para Gustavo ni inventar cargos, fechas, logros, clientes o enlaces.
 - **Criterios de aceptación:**
@@ -118,38 +118,38 @@ Además: comparación por visión de **A, B y figura del banner contra 03**, usa
   8. **Dado** un banner con micrófono sin charla confirmada en memoria, **cuando** verifica la propuesta, **entonces** el copy no dice «speaker» ni atribuye eventos, clientes o resultados; el Markdown identifica la composición como estilo sin evidencia de una charla real y deja la decisión del banner a Gustavo, independiente de elegir A o B.
   9. **Dado** el cap de **10 USD por ciclo de Perfil** confirmado por Gustavo, **cuando** reserva o liquida costes de texto, visión, A/B, banner y herramientas, **entonces** se detiene y avisa al alcanzar el cap o antes de excederlo según ARQ-05. Conserva avances y referencias; reintentar/ajustar la misma propuesta no reinicia el saldo ni elimina una opción para declarar completo el paquete.
   10. **Dado** cargo confirmado en memoria, fecha de inicio ausente y un resultado comercial no verificable, **cuando** prepara experiencia y banner, **entonces** reutiliza el cargo sin preguntar, crea solo una pregunta sobre la fecha si es imprescindible y omite el resultado de la prueba social. No agrupa varios hechos en una pregunta ni bloquea el resto del paquete; responder la fecha no aprueba ni aplica el perfil.
-- **Brechas código/docs:** las consultas de biblioteca no producen este paquete ni checklist. El tablero define marca y previews de diseño, no una implementación de edición/exportación.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** implementación escrita; CI y QA pendientes. Activación, referencias privadas y comprobación en LinkedIn real según la guía de fase 8. No se han generado assets reales en este worktree.
+- **Cobertura QA:** Backend `test_perfil.py`, Vitest/Jest `ProfileProposal` y lógica compartida; Maestro `18-perfil` (apertura y checklist; assets sintéticos). Escrita, no ejecutada localmente.
 
 ### EST-02 · Revisión mensual de destacados, artículos y actividad <a id="est-02"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** mantiene vigentes las piezas que demuestran utilidad para su audiencia, con cambios concretos listos para aplicar.
 - **Responsable:** `perfil`, con evidencia del analista y artefactos del director editorial; sin llamadas entre especialistas.
 - **Cadencia:** una propuesta mensual; si coincide con la revisión completa, integrar los cambios sin duplicar tareas. No regenera foto/banner cada mes por defecto.
 - **Tu turno:** Markdown mensual y checklist TUR-18 para destacados, artículos y actividad. «Sin cambios recomendados» es informativo y no crea tareas vacías.
 - **Datos necesarios y disponibilidad:** existen piezas, métricas y resumen semanal; no hay inventario completo de destacados/artículos ni toda la actividad. Consultar biblioteca primero, URLs accesibles y aportes fechados de Gustavo; likes no sustituyen encaje.
-- **Código:** no existe. Referencias: `editorial.py`, `metricas.py`, `resumen_semanal.py`, `knowledge/agents.py`.
+- **Código:** `perfil.schedule`, `perfil.facts` (publicaciones ejecutadas, enlaces y métricas fechadas), `PROFILE_MONTHLY_UNITS`; solo destacados/artículos/actividad, sin ediciones de persona.
 - **Criterios de aceptación:**
   1. **Dado** un nuevo mes, **cuando** revisa, **entonces** propone conservar, añadir, retirar o reordenar destacados con enlaces/títulos/descripciones listos para pegar en inglés, citas por recomendación de PROFILE_MONTHLY_UNITS y evidencia de audiencia/vigencia/resultados; sin cambios útiles, explica ese resultado con fundamento.
   2. **Dado** un artículo a crear o actualizar, **cuando** lo propone, **entonces** el Markdown entrega título y copy completo de la creación o cambio, objetivo, unidades/evidencia y pasos manuales. Sin evidencia suficiente queda idea pendiente, no artículo listo ni publicación programada.
   3. **Dado** actividad reciente, **cuando** recomienda, **entonces** distingue acciones manuales posibles de sugerencias para publicaciones futuras, entregadas al director como artefactos. No promete editar la sección automática de actividad ni cambia el calendario al aprobar esta revisión.
   4. **Dado** una tarea pendiente o revisión completa coincidente, **cuando** genera, **entonces** compara versiones, conserva lo aplicado y reúne o sustituye visiblemente lo pendiente; no reutiliza una aprobación sobre otro texto.
   5. **Dado** una fuente inaccesible o falta de unidad, **cuando** comprueba, **entonces** marca enlace/fundamento pendiente, busca evidencia alternativa accesible y no presenta la recomendación como verificada. Aplica el default de EST-01: solo pregunta en Tu turno por hechos imprescindibles que no encontró, una pregunta por hecho; una biblioteca no disponible se reintenta como bloqueo técnico.
-- **Brechas código/docs:** las recomendaciones semanales actuales no equivalen a propuestas mensuales de perfil.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** implementación escrita; CI y QA pendientes. Activación, referencias privadas y comprobación en LinkedIn real según la guía de fase 8. No se han generado assets reales en este worktree.
+- **Cobertura QA:** Backend `test_perfil.py`: cadencia mensual y exclusión de imágenes. Escrita, no ejecutada localmente.
 
 ### EST-03 · Dos opciones de foto de perfil para elegir <a id="est-03"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** recibe siempre dos retratos: A según el manual en grises y B en color con la pose, ropa y gafas acordadas. Gustavo elige cuál aplicar.
 - **Responsable:** `perfil` encarga y presenta ambas propuestas con fundamento; `editor_visual` prepara edición/composición y devuelve resultados; código y visión comprueban; Gustavo elige A/B.
 - **Cadencia:** con cada propuesta completa semestral o bajo demanda EST-05. Subir o etiquetar una foto no dispara edición ni gasto por sí solo.
 - **Tu turno:** A y B lado a lado, referencias privadas por función, motivo/unidades, ocho puntos por opción, visión contra 03, preview circular/a 32 px y descarga de ambas; «Elegir A», «Elegir B» o pedir ajustes. Nada queda elegido por defecto; aplicación manual por TUR-18.
-- **Datos necesarios y disponibilidad:** originales privados y notas de Galería existen; las referencias 01 y 03 están en el directorio privado, sin verificar aún su calidad ni cargarlas al servidor. Falta [GAL-08](galeria.md#gal-08). Marca/prompt/decisiones ya entregados; edición OpenAI, conservación y revisión reutilizan `feat/imagenes-backend`.
-- **Código:** no existe esta producción. Referencias: `models.GalleryPhoto`, `capturas.photo_payload`, [IMG-07–10](imagenes-en-publicaciones.md#img-07); `OPENAI_IMAGE_MODEL` es la configuración del flujo previsto.
+- **Datos necesarios y disponibilidad:** originales privados y notas de Galería existen; las referencias 01 y 03 están en el directorio privado, sin verificar aún su calidad ni cargarlas al servidor. [GAL-08](galeria.md#gal-08) implementada; faltan la carga privada y revisión de aptitud en servidor. Marca/prompt/decisiones ya entregados; edición OpenAI, conservación y revisión reutilizan `feat/imagenes-backend`.
+- **Código:** `perfil_galeria.py`, `perfil.assets`, `connectors_images.ImageConnector.edit_profile`, `perfil_visual.portrait/check`; almacenamiento privado y revisión por hash.
 - **Criterios de aceptación:**
   1. **Dado** cualquier ciclo que proponga la foto de perfil, **cuando** entrega la sección completa, **entonces** ofrece **dos archivos y opciones distintas A/B**, ambos validados, y espera la elección explícita de Gustavo. Puede explicar diferencias sin seleccionar, descartar una opción ni sustituirla por una recomendación textual. La revisión mensual sin propuesta de foto no dispara estas ediciones.
   2. **Dado** las referencias privadas cargadas en Perfil, **cuando** prepara las entradas, **entonces** usa 01 para pose de B y sonrisa de ambas, y 03 para identidad/gafas claras, con ids/versiones y sus notas como instrucciones; A parte de una toma apta de esa misma categoría. No usa fotos de posts, web, tablero ni la imagen de Diandra.
@@ -161,19 +161,19 @@ Además: comparación por visión de **A, B y figura del banner contra 03**, usa
   8. **Dado** categoría vacía, 01/03 ausente o retirada, permiso revocado, edición fallida o presupuesto insuficiente, **cuando** intenta completar, **entonces** informa el bloqueo y conserva avances/revisiones. No declara completa la sección con una sola opción, no entrega el original sin tratar como resultado final, ni toma fotos de otra categoría; pide solo el insumo o ajuste necesario.
   9. **Dado** A y B válidas, **cuando** Gustavo elige una en TUR-18, **entonces** registra id/versión de la opción y actualiza documento/checklist/previews seleccionados, conservando ambas descargas. El banner mantiene su camiseta/gafas/estilo acordados aunque elija A; elegir retrato no aprueba el banner ni escribe LinkedIn.
   10. **Dado** cambio de referencia, nota, permiso o tratamiento después de aprobar, **cuando** regenera, **entonces** crea una versión pendiente con nueva revisión, invalida la elección/aprobación afectada y no declara cambios en LinkedIn.
-- **Brechas código/docs:** IMG prepara medios de posts; se reutilizan sus primitivas con la autorización específica de GAL-08 y receta de perfil. No se replica almacenamiento, editor, gasto o proveedor.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** implementación escrita; CI y QA pendientes. Activación, referencias privadas y comprobación en LinkedIn real según la guía de fase 8. No se han generado assets reales en este worktree.
+- **Cobertura QA:** Backend `test_perfil.py`, Vitest/Jest `ProfileProposal` y lógica compartida; Maestro `18-perfil` (apertura y checklist; assets sintéticos). Escrita, no ejecutada localmente.
 
 ### EST-04 · Banner de marca con foto recortada y render por código <a id="est-04"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** recibe un banner de tinta con su figura de cintura arriba presentando con micrófono, marca reconocible y mensaje inglés honesto sobre lo que hace por su audiencia.
 - **Responsable:** `perfil` decide el mensaje/propuesta con el curso; visual prepara recorte y composición; código dibuja diseño/texto. No hay llamadas entre especialistas.
 - **Cadencia:** propuesta completa semestral o bajo demanda EST-05; un cambio de marca solicitado genera versión nueva.
 - **Tu turno:** copy, motivo/citas, pruebas sociales, comparación privada con 01/02/03, banner descargable, previews con A/B y nota del Markdown que distingue composición estilizada de evento real; Gustavo decide por TUR-18.
-- **Datos necesarios y disponibilidad:** [marca](#marca), estilo verbal y referencias 01/02/03 existen localmente; faltan carga privada en Perfil, comprobación de aptitud, plantilla y producción. No se ha confirmado una charla en memoria en esta tarea; no se presume evidencia de ponente ni prueba social.
-- **Código:** no existe el banner. Reutilización futura de [IMG-INF-02](imagenes-en-publicaciones.md#img-inf-02), [IMG-INF-03](imagenes-en-publicaciones.md#img-inf-03) e [IMG-INF-08](imagenes-en-publicaciones.md#img-inf-08) para render/comprobación, y OpenAI image edit de IMG solo para la foto.
+- **Datos necesarios y disponibilidad:** [marca](#marca), estilo verbal y referencias 01/02/03 existen localmente; faltan carga privada en Perfil, comprobación de aptitud y producción real después del despliegue; plantilla implementada. No se ha confirmado una charla en memoria en esta tarea; no se presume evidencia de ponente ni prueba social.
+- **Código:** `perfil_visual.banner/render/preview/check`; Ubuntu del repo, alfa obligatorio, texto/layout por Pillow y dos revisiones de visión. `perfil.assets` conserva referencias, prompts efectivos y resultados.
 - **Criterios de aceptación:**
   1. **Dado** marca y posicionamiento vigentes, **cuando** diseña, **entonces** Perfil propone la frase en inglés desde la utilidad para la audiencia y las unidades PROFILE_VISUAL_UNITS/posicionamiento, con citas y razón en Markdown. Usa «Software and AI for early-stage startups.» únicamente como fallback si no hay una propuesta mejor fundamentada y esa oferta está confirmada; no pide a Gustavo inventar el eslogan. Registra versión de marca/copy y compone por código PNG 1584×396 de tinta con etiqueta mayúscula acreditada, dos líneas inglesas Ubuntu 56 px dentro de la zona segura, una palabra aguamarina, acento 72×4 y patrón 0/1. Si no cabe, acorta la frase manteniendo fundamento y geometría. Ningún modelo de imagen dibuja texto ni el banner completo.
   2. **Dado** 01, 02 y 03 cargadas en Perfil, **cuando** prepara la figura, **entonces** usa **02 para cuerpo/postura y 03 para rostro/pelo**, y OpenAI image edit con el prompt adaptado para representarlo **de cintura arriba presentando con micrófono de mano**. Lleva la misma camiseta blanca oversized de algodón grueso, holgada, cuello crew neck sin logos/estampados, y gafas claras de montura fina de B. **Sonríe en el banner como en 01**, con expresión natural de presentación, aunque la toma corporal 02 no sonría. Las gafas fotocromáticas se muestran claras, nunca oscurecidas. El recorte usa transparencia donde se admita y máscara fiable; nunca la foto externa de Diandra como entrada.
@@ -184,27 +184,27 @@ Además: comparación por visión de **A, B y figura del banner contra 03**, usa
   7. **Dado** cambio de copy, foto o marca después de aprobar, **cuando** se renderiza, **entonces** conserva versiones, invalida la aprobación para la nueva variante y devuelve el paquete sincronizado a Tu turno.
   8. **Dado** el principio de honestidad del verificador, **cuando** contrasta copy y pruebas sociales con memoria/evidencia, **entonces** rechaza eventos, charlas, clientes o resultados no confirmados. Sin actividad real de ponente confirmada no permite «speaker»; el micrófono por sí solo no cuenta como evidencia ni registra una charla en memoria.
   9. **Dado** la composición con micrófono sin charla confirmada, **cuando** entrega el Markdown y Tu turno, **entonces** indica que la imagen es un recurso de estilo y no documenta un evento real, para que Gustavo acepte, pida ajustes o descarte el banner. La autorización de generar ese estilo no equivale a aprobar su aplicación ni a permitir afirmaciones falsas.
-- **Brechas código/docs:** el manual de infografías aporta primitivas; la plantilla de banner usa la marca del tablero con la excepción explícita de Gustavo. Ningún asset final se genera en esta tarea documental.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** implementación escrita; CI y QA pendientes. Activación, referencias privadas y comprobación en LinkedIn real según la guía de fase 8. No se han generado assets reales en este worktree.
+- **Cobertura QA:** Backend `test_perfil.py`, Vitest/Jest `ProfileProposal` y lógica compartida; Maestro `18-perfil` (apertura y checklist; assets sintéticos). Escrita, no ejecutada localmente.
 
 ### EST-05 · Pedir la propuesta del perfil desde una captura <a id="est-05"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** puede decir o escribir «hazme la propuesta del perfil» y recibir el paquete completo sin esperar al semestre.
 - **Responsable:** ruteo de captura/workflow registra el trigger declarado; `perfil` es el único orquestador. Capturas no consulta el curso ni llama especialistas.
 - **Cadencia:** bajo demanda explícita, con límites de ARQ; no reinicia el ancla semestral ni la revisión mensual.
 - **Tu turno:** mismo paquete y checklist TUR-18; si falta algo imprescindible, pregunta concreta dentro de esa propuesta. Solicitar el trabajo no aprueba resultados ni cambios en LinkedIn.
-- **Datos necesarios y disponibilidad:** captura de texto/voz, transcripción, historial y ruteo existen; no existe esta intención ni su trigger/correlación con perfil. Se necesitan biblioteca y fotos de Perfil; una foto adjunta sin categoría no se usa hasta que Gustavo la etiquete.
-- **Código:** no existe esta ruta. Referencias: `capturas.classify`, `jobs`, [CAP](captura.md), grafo/ledgers [ARQ-01](arquitectura-agentes.md#arq-01) y [ARQ-04](arquitectura-agentes.md#arq-04).
+- **Datos necesarios y disponibilidad:** captura de texto/voz, transcripción, historial y ruteo existen; la intención explícita y su trigger/correlación con perfil están implementados. Se necesitan biblioteca y fotos de Perfil; una foto adjunta sin categoría no se usa hasta que Gustavo la etiquete.
+- **Código:** `capturas._destination`, `perfil.capture_request/queue/withdraw_capture`, job `prepare_profile`; trigger `captura_perfil` del grafo y correlación con el mismo ledger.
 - **Criterios de aceptación:**
   1. **Dado** la petición explícita en texto o voz transcrita, **cuando** se procesa, **entonces** el workflow inicia la propuesta completa EST-01 con las dos opciones A/B de EST-03 y el banner EST-04, enlaza captura y `cycle_id` y muestra su progreso/resultado en «Lo que enviaste». No la pierde como una idea editorial.
   2. **Dado** la misma captura reintentada o un ciclo completo equivalente ya en curso, **cuando** se recibe, **entonces** deduplica por captura y reúne la petición en la instancia compatible, conservando presupuesto/checkpoint. Si cambia objetivo o fuentes, registra nueva versión explícita sin ocultar decisiones previas ni gastar de nuevo por un retry.
   3. **Dado** una mención ambigua al perfil, **cuando** se clasifica, **entonces** pide aclarar el alcance antes de generar assets; la frase explícita anterior basta para una propuesta completa, sin otra confirmación de intención.
   4. **Dado** falta de fotos, información, biblioteca o presupuesto, **cuando** trabaja, **entonces** conserva el avance parcial y el bloqueo en el mismo ciclo; no toma fotos de otras categorías, no publica, ni aumenta topes por ser una petición manual.
   5. **Dado** una captura deshecha, **cuando** se procesa la cancelación, **entonces** retira su solicitud y cancela trabajo pendiente si era su único motivo, conserva costes ya incurridos y no revierte aplicación manual ni cancela un ciclo semestral que también la atendía.
-- **Brechas código/docs:** se añade un trigger al ciclo, no otro agente de perfil ni consumo de biblioteca por Capturas (BIB-06 retirada).
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** implementación escrita; CI y QA pendientes. Activación, referencias privadas y comprobación en LinkedIn real según la guía de fase 8. No se han generado assets reales en este worktree.
+- **Cobertura QA:** Backend `test_perfil.py`: intención explícita, ambigüedad, deduplicación y retirada del trigger; regresión Maestro `05-*`. Escrita, no ejecutada localmente.
 
 ## Retiradas
 

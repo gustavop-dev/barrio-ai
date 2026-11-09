@@ -8,17 +8,17 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import override_settings
 from rest_framework.test import APIClient
-from team_backend import editorial
+from team_backend import editorial, perfil_contenido
 from team_backend.management.commands.seed_qa import EXTRA_DEVICE, QA_PASSWORD_DEFAULT, uid
 from team_backend.models import (ActionProposal, Capture, CommunitySource, CommunityStudy, CommunityWithdrawal,
                                  ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Notification, Opportunity,
                                  PostMetric, Referent, ReferentChange, ReferentControl, ReferentExperiment, ReferentNotice,
-                                 ReferentReview, TeamQuestion, WeeklySummary)
+                                 ReferentReview, TeamQuestion, WeeklySummary, ProfileProposal, ProfileAsset, ProfileSchedule)
 from team_backend.tests.test_capturas import MediaMixin
 from team_backend.tests.test_operador import OperatorBase
 
 COUNTED=(ConnectorAccount,Referent,Contact,EditorialPiece,PostMetric,ActionProposal,Opportunity,TeamQuestion,Notification,Capture,GalleryPhoto,WeeklySummary,
-         CommunityStudy,CommunitySource,CommunityWithdrawal,ReferentControl,ReferentReview,ReferentChange,ReferentNotice,ReferentExperiment)
+         CommunityStudy,CommunitySource,CommunityWithdrawal,ReferentControl,ReferentReview,ReferentChange,ReferentNotice,ReferentExperiment,ProfileProposal,ProfileAsset,ProfileSchedule)
 
 class SeedQaTests(MediaMixin,OperatorBase):
     def setUp(self):
@@ -60,7 +60,7 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertTrue(set(Contact.Stage.values)<=set(Contact.objects.values_list('stage',flat=True)))
         self.assertEqual(set(PostMetric.objects.values_list('kind',flat=True)),{'24h','72h','7d'})
         self.assertGreaterEqual(Opportunity.objects.values('stage').distinct().count(),5)
-        self.assertEqual(GalleryPhoto.objects.count(),4)
+        self.assertEqual(GalleryPhoto.objects.count(),5)
         self.assertTrue(all(photo.image.storage.exists(photo.image.name) for photo in GalleryPhoto.objects.all()))
 
         from team_backend.models import Capture, PieceImage
@@ -89,12 +89,26 @@ class SeedQaTests(MediaMixin,OperatorBase):
         response=app.get(detail['image_document_url'])
         self.assertEqual(response.status_code,200)
         self.assertEqual(b''.join(response.streaming_content).count(b'/Alt '),4)
+        profile=ProfileProposal.objects.get(pk=uid('profile:proposal'))
+        self.assertEqual(profile.assets.count(),7)
+        self.assertEqual(GalleryPhoto.objects.filter(category='perfil').count(),1)
+        package=app.get(f'/api/v1/perfil/{profile.id}').json()
+        self.assertEqual(package['photo_choice'],'')
+        self.assertIn('LI-02-M015-K03',package['markdown'])
+        self.assertEqual({s['id'] for s in package['sections']},set(perfil_contenido.SECTIONS))
+        for asset in package['assets']:
+            self.assertEqual(app.get(asset['url']).status_code,200)
+            self.assertIn(APIClient().get(asset['url']).status_code,(401,403))
         turno=app.get('/api/v1/tu-turno').json()
-        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion'})
+        self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion','perfil'})
         # The network block waits for approval by default (OPERATOR_AUTONOMY is empty): Laura's follow and Julián's invitation.
         self.assertEqual(sorted(c['title'] for c in turno['items'] if c['type']=='aprobacion'),
                          ['¿Apruebas invitar a Julián Herrera?','¿Apruebas seguir a Laura Gómez?'])
-        self.assertEqual((turno['count'],turno['urgent_count']),(8,1))
+        self.assertEqual((turno['count'],turno['urgent_count']),(10,1))
+        self.assertEqual(turno['counts'],{'avisos':1,'preguntas':3,'tareas':4,'aprobaciones':2})
+        self.assertEqual([c['id'] for c in turno['tasks']['perfil']],[f'perfil:{profile.id}'])
+        self.assertEqual([c['id'] for c in turno['tasks']['referentes']],[f'referents_setup:{uid("account:unipile")}'])
+        self.assertFalse(ReferentControl.objects.get(account_id=uid('account:unipile')).initialized)
         self.assertTrue(turno['critical']);self.assertEqual(sorted(c['state'] for c in turno['later']),['caducada','pospuesta'])
         queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
         self.assertEqual(sorted(q['capability'] for q in queued if q['awaiting_approval']),['RED-01','RED-02'])
@@ -149,7 +163,9 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual([r['id'] for r in reviews],[str(uid('review:monthly'))])
         self.assertEqual({c['proposal']['kind'] for c in reviews[0]['changes']},{'swap','add','remove'})
         turn=app.get('/api/v1/tu-turno').json()
-        self.assertEqual((turn['count'],turn['urgent_count']),(12,1))
+        self.assertEqual((turn['count'],turn['urgent_count']),(13,1))
+        self.assertEqual(turn['counts'],{'avisos':1,'preguntas':3,'tareas':7,'aprobaciones':2})
+        self.assertEqual([c['id'] for c in turn['tasks']['perfil']],[f'perfil:{uid("profile:proposal")}'])
         self.assertEqual([c['id'] for c in turn['items'] if c['id'].startswith('referents_setup:')],[])
         changes=[c for c in turn['items'] if c['type']=='referente']
         self.assertEqual({c['id'] for c in changes},{f'referent_change:{uid(f"monthly-change:{n}")}' for n in range(3)})
@@ -160,13 +176,19 @@ class SeedQaTests(MediaMixin,OperatorBase):
         community=app.get(f'/api/v1/comunidad?account={account_id}').json()
         self.assertEqual((community['status'],community['study']['id'],len(community['sources'])),
                          ('Estudio parcial',str(uid('community:study')),6))
-        # A referents decision cannot remove the independent study, and reseeding restores both.
+        profile=app.get(f'/api/v1/perfil/{uid("profile:proposal")}').json()
+        # A referents decision preserves the study and profile checklist; reseeding restores all three.
         item=changes[0]
         response=app.post(item['referent_change']['endpoint'],
                           {'version':item['referent_change']['version'],'decision':'reject'},format='json')
         self.assertEqual(response.status_code,200,response.content)
         self.assertEqual(ReferentChange.objects.filter(state='rejected').count(),1)
         self.assertEqual(CommunitySource.objects.count(),6)
+        after=app.get('/api/v1/tu-turno').json()
+        self.assertEqual((after['count'],after['urgent_count']),(12,1))
+        self.assertEqual([c['id'] for c in after['tasks']['perfil']],[f'perfil:{uid("profile:proposal")}'])
+        self.assertEqual(app.get(f'/api/v1/perfil/{uid("profile:proposal")}').json()['sections'],
+                         profile['sections'])
         self.seed(referentes_mensual=True)
         self.assertEqual(self.counts(),first)
         self.assertEqual(ReferentChange.objects.filter(state='pending').count(),3)

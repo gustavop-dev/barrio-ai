@@ -10,12 +10,15 @@ describe('activity mapping', () => {
       updated_at: '2026-11-07T15:00:00Z',
       roles: {
         operador_cuenta: { status: 'trabajando', detail: 'Ejecutando una acción aprobada', since: '2026-11-07T14:59:00Z' },
+        editor_visual: { status: 'trabajando', detail: 'Preparando foto, infografía o carrusel para la pieza', since: '2026-11-07T14:59:00Z' },
         relaciones_comunidad: { status: 'en_espera', detail: '', since: null },
         conversaciones_inbox: { status: 'diseno', detail: 'Contrato diseñado; aún sin implementar', since: null },
       },
     };
     const statuses = statusesFrom(activity);
     expect(statuses.operador_cuenta).toBe('trabajando');
+    expect(statuses.editor_visual).toBe('trabajando');
+    expect(statusesFrom(undefined).editor_visual).toBe('desconocido');
     expect(statuses.relaciones_comunidad).toBe('en_espera');
     expect(statuses.conversaciones_inbox).toBe('diseno');
     // A role the endpoint does not describe is «sin datos», never «en espera».

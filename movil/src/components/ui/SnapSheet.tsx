@@ -16,6 +16,11 @@ import { settleSnap } from './Sheet';
 export interface SnapSheetProps {
   label: string; onClose: () => void; children: ReactNode;
   bottom: number; availableHeight?: number; testID?: string;
+  /**
+   * Size the scroll viewport to the visible snap (Oficina's member rows must stay above the tab bar).
+   * By default, keep the fixed-height, translated viewport and compensating padding used by Calendario.
+   */
+  fitViewportToSnap?: boolean;
   /** Called with the snap the sheet rests on (sheetMotion.snaps), on opening and after every drag or action. */
   onRest?: (snap: number) => void;
   /**
@@ -24,7 +29,7 @@ export interface SnapSheetProps {
    */
   backCloses?: boolean;
 }
-export function SnapSheet({ label, onClose, children, bottom, availableHeight, testID, onRest, backCloses = true }: SnapSheetProps) {
+export function SnapSheet({ label, onClose, children, bottom, availableHeight, testID, onRest, backCloses = true, fitViewportToSnap = false }: SnapSheetProps) {
   const window = useWindowDimensions();
   const room = (availableHeight ?? window.height) - bottom;
   const [half, full] = sheetMotion.snaps;
@@ -34,7 +39,7 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
   const start = useSharedValue(0);
   const from = useSharedValue(0);
   const closing = useSharedValue(false);
-  // The snap it rests on: the content gets the hidden part as bottom padding, so all of it can be reached.
+  // The snap it rests on, also reported to the scene underneath.
   const [resting, setResting] = useState<number>(half);
   const closed = useRef(false);
   const latestClose = useRef(onClose);
@@ -126,8 +131,13 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
       runOnJS(setResting)(target);
     },
   });
-  const animated = useAnimatedStyle(() => ({ transform: [{ translateY: span.value * Math.max(0, 1 - Math.max(0, p.value)) }] }));
-  return <Animated.View testID={testID} accessibilityLabel={label} style={[styles.sheet, { bottom, height: room }, animated]}>
+  // Oficina bounds the viewport so accessibility cannot target member rows underneath the bar.
+  // Calendario keeps its original viewport, translation and padding at both snaps.
+  const animated = useAnimatedStyle(() => ({
+    height: fitViewportToSnap ? span.value * Math.min(1, Math.max(0, p.value)) : room,
+    transform: [{ translateY: fitViewportToSnap ? 0 : span.value * Math.max(0, 1 - Math.max(0, p.value)) }],
+  }));
+  return <Animated.View testID={testID} accessibilityLabel={label} style={[styles.sheet, { bottom }, animated]}>
     <GestureDetector gesture={drag}>
       <View style={styles.grip} accessibilityRole="adjustable" accessibilityLabel="Altura del panel" accessibilityHint="Desliza para ampliar o cerrar"
         accessibilityActions={[{ name: 'increment', label: 'Ampliar' }, { name: 'decrement', label: 'Media pantalla' }]}
@@ -136,7 +146,7 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
       </View>
     </GestureDetector>
     <View style={styles.close}><Button accessibilityLabel="Cerrar" onPress={dismiss}>Cerrar</Button></View>
-    <ScrollView key={label} contentContainerStyle={[styles.content, { paddingBottom: space[6] + room * (1 - resting) }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
+    <ScrollView key={label} contentContainerStyle={[styles.content, { paddingBottom: space[6] + (fitViewportToSnap ? 0 : room * (1 - resting)) }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
   </Animated.View>;
 }
 const styles = StyleSheet.create({

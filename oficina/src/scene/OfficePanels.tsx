@@ -112,11 +112,12 @@ export function RolePanel({ id, data, onTeam, headingId }: { id: CharacterId; da
           <p className="t-detalle text-suave">Nada todavía en esta sesión.</p>
         )}
         {librarian ? null : (
-          <Link to="/calendario" className="of-panel-link">
-            Ver en el Calendario
+          <Link to={id === 'editor_visual' && info?.piece_id ? `/calendario/pieza/${info.piece_id}` : '/calendario'} className="of-panel-link">
+            {id === 'editor_visual' && info?.piece_id ? 'Ver pieza' : 'Ver en el Calendario'}
           </Link>
         )}
       </section>
+      {id === 'editor_visual' ? <Link to="/equipo?agente=editor_visual" className="of-panel-link">Ver definición y conexiones</Link> : null}
       <Button variant="secondary" block onClick={() => onTeam(team)}>
         {librarian ? 'Ver quién la usa · Observatorio' : `Ver su equipo · ${zone}`}
       </Button>

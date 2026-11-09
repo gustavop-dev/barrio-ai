@@ -4,7 +4,7 @@ from datetime import timedelta
 from unittest.mock import patch
 from django.utils import timezone
 from team_backend import autopiloto, connectors_linkedin as li, notificaciones, operador, oportunidades, preguntas
-from team_backend.models import ActionProposal, InboxSeen, Notification, OfficePreference
+from team_backend.models import ActionProposal, InboxSeen, Notification, OfficePreference, ProfileProposal
 from team_backend.tests.test_operador import OperatorBase
 from team_backend.tests.test_publicacion import PublicationBase
 
@@ -61,20 +61,26 @@ class TuTurnoPriorityTests(OperatorBase):
         ActionProposal.objects.filter(pk=proposal.pk).update(state='uncertain')
         soon=preguntas.ask('director_editorial','¿Lideraste una migración?','Para el post de mañana','experiencia.migracion',deadline=timezone.now()+timedelta(hours=20))
         calm=preguntas.ask('perfil','¿Qué modalidad prefieres?','Para el titular','oferta.modalidad')
+        profile=ProfileProposal.objects.create(owner=self.gustavo,key='test:turno:profile',created_at=timezone.now()-timedelta(days=1))
         with patch.dict(os.environ,{'OPERATOR_PAUSED':'true'}):
             turn=self.human.get('/api/v1/tu-turno').json()
         order=[(c['id'].split(':')[0],c['priority'],c['state']) for c in turn['items']]
         self.assertEqual(order,[('uncertain','urgente','nueva'),('question','importante','nueva'),
-                                ('referents_setup','importante','nueva'),('question','cuando_puedas','nueva')])
+                                ('referents_setup','importante','nueva'),('question','cuando_puedas','nueva'),
+                                ('perfil','cuando_puedas','nueva')])
         self.assertNotIn('machine_paused_env',[c['id'] for c in turn['items']])  # a server stop is a Notificación
-        self.assertEqual((turn['count'],turn['urgent_count'],turn['critical'],turn['notifications_unread']),(4,1,True,1))  # setup is a card; only the Observatorio notification is unread
+        self.assertEqual((turn['count'],turn['urgent_count'],turn['critical'],turn['notifications_unread']),(5,1,True,1))  # setup and profile are cards; only Observatorio is unread
+        self.assertEqual(turn['counts'],{'avisos':1,'preguntas':2,'tareas':2,'aprobaciones':0})
+        self.assertEqual([c['id'] for c in turn['tasks']['perfil']],[f'perfil:{profile.id}'])
         self.human.post('/api/v1/tu-turno/vistos',{'ids':[f'question:{calm.id}']},format='json')
         turn=self.human.get('/api/v1/tu-turno').json()
         self.assertEqual(next(c['state'] for c in turn['items'] if c['id']==f'question:{calm.id}'),'vista')
-        self.assertEqual(turn['count'],4)  # seen still counts
+        self.assertEqual(turn['count'],5)  # seen still counts
         self.human.post(f'/api/v1/preguntas/{calm.id}/mas-tarde',{},format='json')
         turn=self.human.get('/api/v1/tu-turno').json()
-        self.assertEqual(turn['count'],3);self.assertEqual(turn['later'][0]['state'],'pospuesta')
+        self.assertEqual(turn['count'],4);self.assertEqual(turn['later'][0]['state'],'pospuesta')
+        self.assertEqual({c['id'] for c in turn['items']},
+                         {f'uncertain:{proposal.id}',f'question:{soon.id}',f'referents_setup:{self.account.id}',f'perfil:{profile.id}'})
         self.assertEqual(self.api.post('/api/v1/tu-turno/vistos',{'ids':['x']},format='json').status_code,403)
         self.assertTrue(InboxSeen.objects.filter(item_id=f'question:{calm.id}').exists())
         self.assertEqual(soon.state,'open')
@@ -146,12 +152,15 @@ class PushEmitterTests(OperatorBase):
         with patch.dict(os.environ,{'OPERATOR_PAUSED':'true'}):self.assertTrue(operador.check_env_pause())  # a new stop pushes again
         self.assertEqual(len(self.push.call_args_list),2)
 
-    def test_profile_task_has_no_switch_until_its_event_exists(self):
-        """Catch a switch for a push that nothing can send (profile tasks are not implemented, TUR-18)."""
-        kinds=[t['kind'] for t in self.human.get('/api/v1/ajustes').json()['push_types']]
-        self.assertNotIn('profile_task',kinds)
+    def test_profile_and_monthly_referents_keep_their_push_switches(self):
+        """The merge must retain both cycles' notification contracts."""
+        kinds={t['kind']:t for t in self.human.get('/api/v1/ajustes').json()['push_types']}
+        self.assertEqual({k:(kinds[k]['goes_to'],kinds[k]['default']) for k in ('profile_task','profile_reviewed','referents_review')},
+                         {'profile_task':('tu_turno',True),'profile_reviewed':('notificaciones',False),
+                          'referents_review':('notificaciones',True)})
         self.assertTrue({'linkedin_expired','machine_paused','machine_paused_env'}<=set(kinds))
-        self.assertEqual(self.human.patch('/api/v1/ajustes/preferencias',{'push_disabled':['profile_task']},format='json').status_code,200)  # still accepted
+        self.assertEqual(self.human.patch('/api/v1/ajustes/preferencias',
+                         {'push_disabled':['profile_task','profile_reviewed','referents_review']},format='json').status_code,200)
 
 
 class ApprovalTests(OperatorBase):

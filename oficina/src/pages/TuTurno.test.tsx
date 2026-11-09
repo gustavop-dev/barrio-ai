@@ -9,6 +9,8 @@ import { fakeServer, SESSION_OK, type Handler, type Reply } from '../test/fakeSe
 import { cardFixture, CONVERSATION_CARD, dayAt, EXPIRING_CARD, factFixture, hoursFromNow, questionCard, questionFixture, turnoFixture as tuTurnoFixture, UNCERTAIN_CARD } from '../test/fixtures/turno';
 import { renderAt } from '../test/render';
 import { TuTurno as TuTurnoPage } from './TuTurno';
+import { PROFILE_CARD, PROFILE_PROPOSAL } from '../../../compartido/src/fixtures/perfil';
+import { EXPERIMENT_CARD, MONTHLY_CARD, REFERENTS_SETUP_CARD } from '../../../compartido/src/fixtures/referentes';
 
 /** The view alone (with the capture spy), so other screens being built do not get in the way. */
 function renderApp(path: string) {
@@ -55,6 +57,30 @@ async function cardTitled(name: string | RegExp) {
 }
 
 describe('Tu turno · Pendiente', () => {
+  it('keeps referent setup, monthly decisions, experiments and the profile checklist together', async () => {
+    const api = server(tuTurnoFixture({ count: 4, items: [REFERENTS_SETUP_CARD, MONTHLY_CARD, EXPERIMENT_CARD, PROFILE_CARD] }), {
+      'GET /api/v1/operador/referents': { body: [] },
+      'GET /api/v1/perfil/profile-qa': { body: PROFILE_PROPOSAL },
+    });
+    const user = userEvent.setup();
+    renderApp('/tu-turno');
+    const setup = await cardTitled(REFERENTS_SETUP_CARD.title);
+    expect(within(setup).getByRole('link', { name: 'Gestionar protegidos' })).toHaveAttribute('href', '/personas?pestana=referentes');
+    expect(screen.getAllByRole('heading', { level: 2 }).map((h) => h.textContent)).toEqual(['Importante · 3', 'Cuando puedas · 1']);
+    const monthly = await cardTitled(MONTHLY_CARD.title);
+    expect(within(monthly).getByRole('button', { name: 'Aprobar sustitución' })).toBeInTheDocument();
+    expect(within(monthly).getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    const experiment = await cardTitled(EXPERIMENT_CARD.title);
+    expect(within(experiment).getByRole('button', { name: 'Aprobar experimento' })).toBeInTheDocument();
+    expect(within(experiment).getByRole('button', { name: 'Editar' })).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Abrir propuesta de perfil' }));
+    expect(await screen.findByLabelText('Checklist por sección')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Descargar Markdown' })).toHaveAttribute('href', '/api/v1/perfil/profile-qa/documento');
+    expect(screen.queryByText(/^Comprobado$/)).not.toBeInTheDocument();
+    expect(api.find('GET', '/api/v1/perfil/profile-qa')).toHaveLength(1);
+    expect(api.requests.filter((r) => r.method === 'POST' && r.path.endsWith('/decidir'))).toEqual([]);
+  });
+
   it('groups the cards Urgente → Importante → Cuando puedas, each with its label and «NUEVA»', async () => {
     server(busyTurno());
     renderApp('/tu-turno');

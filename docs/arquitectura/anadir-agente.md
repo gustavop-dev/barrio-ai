@@ -15,7 +15,7 @@ En esta entrega no se ejecutan suites locales. Claude debe correr CI y QA con fa
 
 El backend requiere el mismo registro en producción. Docker lo copia desde el contexto nombrado `equipo` a `/app/equipos/grafo.yaml`; `barrio-ai.yml` y `deploy/compose.prod.yaml` declaran ese contexto. No hay segunda copia mantenida en código ni fallback a un grafo vacío. Claude debe verificar ese empaquetado al construir la imagen en CI.
 
-Permanecen futuros el especialista visual EDI-21 y el ciclo periódico de perfil. Las consultas manuales actuales de perfil siguen siendo independientes del ciclo periódico planificado.
+EDI-21 ya registra al Editor visual activo para posts, con herramientas de propuesta/diseño/edición/entrega y el gate de visión IMG existente. Fase 8 activa `perfil_periodico`: Perfil es dueño y utiliza biblioteca, posicionamiento, copy, investigación pública, lectura propia y visual como herramientas. Las cuatro listas curadas se contrastan también con `perfil_contenido.py`. Las consultas manuales conservan su ciclo independiente. El ledger de Perfil agrega 10 USD entre versiones y herramientas; no se reinicia al responder preguntas ni pedir ajuste. Casos sintéticos en `test_perfil.py`; ver [fase8-verificacion.md](fase8-verificacion.md).
 
 Fase 5 activa `investigador_lider` y los ciclos `referentes_mensuales`/`experimentos_referentes`. Las ramas `investigador_producto`, `investigador_ia` e `investigador_audiencia` solo usan la herramienta web; `seleccion_referentes` consume curso/contexto; `analista_experimentos` evalúa sin proveedor. `senales_referentes` entrega contexto acotado a Relaciones. El selector no decide main ni escribe en LinkedIn. [Entrega fase 5](../../agentes-linkedin/infra/docs/referentes-mensuales.md).
 

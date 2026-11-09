@@ -11,7 +11,7 @@ from django.contrib.auth.models import Permission
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
-from team_backend import autopiloto, conversaciones, editorial, lider, metricas, oficina_views, operador, red, resumen_semanal
+from team_backend import autopiloto, conversaciones, editorial, lider, metricas, oficina_views, operador, red, resumen_semanal, perfil_contenido
 from team_backend.grafo import GraphError, load_graph, validate_bindings, validate_graph
 from team_backend.jobs import OPERATION_PERMISSIONS
 from team_backend.models import AuditEvent, Capture, ConnectorAccount, DeviceToken, EditorialPiece, Job, WebResearchRun
@@ -28,7 +28,7 @@ class GraphTests(SimpleTestCase):
 
     def test_curated_lists_and_stage_units_match_code(self):
         actual = {f'{module.__name__.split(".")[-1]}.{name}': getattr(module, name)
-                  for module in (operador, editorial) for name in dir(module) if name.endswith('_UNITS')}
+                  for module in (operador, editorial, perfil_contenido) for name in dir(module) if name.endswith('_UNITS')}
         actual['editorial.TEXT_FORMAT_UNIT'] = [editorial.TEXT_FORMAT_UNIT]
         self.assertEqual(self.graph['course_lists'], actual)
         nodes = {n['id']: n for n in self.graph['nodes']}
@@ -82,7 +82,7 @@ class GraphTests(SimpleTestCase):
         self.bad(lambda g: g['nodes'].append(dict(g['nodes'][1], id='orphan')), 'no alcanzable')
         self.bad(lambda g: g['nodes'].append(g['nodes'][0]), 'duplicado')
         self.bad(lambda g: g['edges'][0].update(to='missing'), 'extremo desconocido')
-        self.bad(lambda g: next(e for e in g['edges'] if e['id'] == 'visual_futuro').update(status='active'), 'planned')
+        self.bad(lambda g: next(n for n in g['nodes'] if n['id'] == 'editor_visual').update(status='planned'), 'planned')
 
     def test_specialists_depth_contracts_and_units(self):
         self.bad(lambda g: next(e for e in g['edges'] if e['id'] == 'redactar_a').update(**{'from': 'copywriter_b'}), 'especialista a especialista')

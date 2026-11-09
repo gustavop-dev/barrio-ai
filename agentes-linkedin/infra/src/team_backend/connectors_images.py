@@ -46,22 +46,36 @@ def block(raw):
 
 class ImageConnector:
     def edit(self,raw,instruction,request_id):
+        return self._edit(raw,instruction,request_id)
+
+    def edit_profile(self,references,instruction,request_id):
+        if set(references) not in ({'01','03'},{'01','02','03'}):raise ValueError('Referencias de Perfil incompletas')
+        return self._edit(references['03'],instruction,request_id,references=references)
+
+    def _edit(self,raw,instruction,request_id,references=None):
+        fallback='assets de Perfil pendientes' if references else 'sale el original'
         key=live('openai');preview=thumbnail(raw)
         prompt=('Edit only the requested photographic correction. Preserve identity, faces, bodies, people count, '
                 'all existing text and logos. Never add typography, data, people or objects. '+instruction)[:2000]
-        rid=providers.reserve('openai','image-edit',EDIT_RESERVATION,request_hash=request_id)
+        files={'image':('photo.png',preview,'image/png')}
+        data={'model':EDIT_MODEL,'prompt':prompt,'n':'1','size':'1024x1024','quality':'medium'}
+        if references:
+            # Gustavo's scoped edits override the stricter post correction prompt. Never render typography here.
+            data.update(prompt=instruction[:12000],background='transparent',output_format='png')
+            files=[('image[]',(role+'.png',thumbnail(value),'image/png')) for role,value in sorted(references.items())]
+        rid=providers.reserve('openai','profile-image-edit' if references else 'image-edit',
+                              Decimal('2') if references else EDIT_RESERVATION,request_hash=request_id)
         try:
             with httpx.Client(transport=TRANSPORT,timeout=httpx.Timeout(orquestacion.timeout(180),connect=10)) as http:
                 response=http.post(EDIT_URL,headers={'Authorization':'Bearer '+key},
-                    data={'model':EDIT_MODEL,'prompt':prompt,'n':'1','size':'1024x1024','quality':'medium'},
-                    files={'image':('photo.png',preview,'image/png')})
+                    data=data,files=files)
         except (httpx.ConnectError,httpx.ConnectTimeout):
-            providers.settle(rid,'rejected',{'request_not_sent':True});raise ValueError('Edición no enviada; sale el original') from None
+            providers.settle(rid,'rejected',{'request_not_sent':True});raise ValueError('Edición no enviada; '+fallback) from None
         except httpx.HTTPError:
-            providers.settle(rid,'uncertain');raise ValueError('Edición incierta; no se repite y sale el original') from None
+            providers.settle(rid,'uncertain');raise ValueError('Edición incierta; no se repite y '+fallback) from None
         if response.status_code>=400:
             providers.settle(rid,'rejected' if response.status_code in (400,401,403,404,413,422,429) else 'uncertain',{'http_status':response.status_code})
-            raise ValueError(f'Edición HTTP {response.status_code}; sale el original')
+            raise ValueError(f'Edición HTTP {response.status_code}; {fallback}')
         cost=None
         try:
             data=response.json();usage=data['usage'];details=usage['input_tokens_details']
@@ -75,7 +89,7 @@ class ImageConnector:
         except (KeyError,ValueError,TypeError,IndexError,OSError):
             if cost is not None:
                 providers.settle(rid,'complete',usage,cost)
-                raise ValueError('Archivo editado inválido; coste registrado y sale el original') from None
+                raise ValueError('Archivo editado inválido; coste registrado; '+fallback) from None
             providers.settle(rid,'uncertain');raise ValueError('Respuesta de edición inválida; reserva retenida') from None
         providers.settle(rid,'complete',usage,cost)
         return edited

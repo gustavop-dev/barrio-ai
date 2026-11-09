@@ -30,7 +30,7 @@ from team_backend.authentication import digest
 from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, Capture, ConnectorAccount, Contact,
                                  Conversation, DeviceToken, EditorialPiece, GalleryPhoto, InboxSeen, Job, LinkedInCredential,
                                  Notification, ObservedPost, OfficePreference, OperatorControl, Opportunity, Orientation, PostMetric,
-                                 Referent, TeamQuestion, WeeklySummary, Worker, PieceImage)
+                                 Referent, TeamQuestion, WeeklySummary, Worker, PieceImage, ProfileProposal, ProfileAsset, ProfileSchedule)
 
 QA_USERNAME='qa'
 QA_PASSWORD_DEFAULT='qa-0ff1ce-solo-ci'
@@ -126,10 +126,13 @@ class Command(BaseCommand):
             self.wipe()
             self.accounts();self.network();self.pieces();self.proposals();self.opportunities();self.conversation()
             self.questions();self.facts();self.notifications();self.captures();self.gallery();self.results();self.summaries()
-            self.image_examples();self.spend();self.settings();self.devices();self.office()
+            self.image_examples();self.profile();self.spend();self.settings();self.devices();self.office()
             if options.get('referentes_mensual'):
                 from team_backend.seed_referentes_qa import seed
                 seed(self.user,self.fake,self.now,uid)
+            else:
+                from team_backend.models import ReferentControl
+                ReferentControl.objects.create(account=self.fake,issue='Identificar los cinco main iniciales.')
             self.community()
         self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
 
@@ -151,12 +154,13 @@ class Command(BaseCommand):
 
     def wipe(self):
         """Empty the QA world. Device logins, users, groups and Expo tokens stay."""
+        for asset in ProfileAsset.objects.all():asset.image.delete(save=False)
         for image in PieceImage.objects.filter(source_photo__isnull=True):image.image.delete(save=False)
         for image in PieceImage.objects.filter(edited=True):image.image.delete(save=False)
         for piece in EditorialPiece.objects.exclude(image_document=''):piece.image_document.delete(save=False)
         for photo in GalleryPhoto.objects.all():photo.image.delete(save=False)
         for capture in Capture.objects.exclude(audio=''):capture.audio.delete(save=False)
-        models=[ActionExecution,ActionProposal,PostMetric,PieceImage,GalleryPhoto,Capture,EditorialPiece,Conversation,Opportunity,Contact,
+        models=[ProfileAsset,ProfileProposal,ProfileSchedule,ActionExecution,ActionProposal,PostMetric,PieceImage,GalleryPhoto,Capture,EditorialPiece,Conversation,Opportunity,Contact,
                 ObservedPost,Referent,ConnectorAccount,TeamQuestion,Notification,InboxSeen,WeeklySummary,AudienceSnapshot,Job,Worker,AuditEvent]
         tables=', '.join(connection.ops.quote_name(m._meta.db_table) for m in models)
         with connection.cursor() as cursor:
@@ -680,3 +684,34 @@ class Command(BaseCommand):
         DeviceToken.objects.filter(id=uid('device:pixel7')).delete()
         device=DeviceToken.objects.create(id=uid('device:pixel7'),user=self.user,name=EXTRA_DEVICE,digest=digest('qa-seed-device-pixel7-never-a-real-token'))
         DeviceToken.objects.filter(pk=device.pk).update(created_at=self.ago(days=20),last_used_at=self.ago(days=2))
+
+
+    def profile(self):
+        """EST/GAL/TUR synthetic world: generated blocks, never a photograph of a person."""
+        from team_backend import perfil, perfil_contenido as content, perfil_galeria
+        raw=png(800,800,((15,241,206),(100,100,100),(240,240,240)),8)
+        photo=GalleryPhoto(id=uid('photo:perfil'),created_by=self.user,category='perfil',profile_edit=True,
+            profile_role='03',created_at=self.now-timedelta(days=30),profile_consent={'version':perfil_galeria.CONSENT_VERSION,'scope':'perfil','allowed':True,'actor':self.user.pk},
+            note='QA: imagen sintética de bloques, no es una persona ni una referencia real.',mime='image/png',size_bytes=len(raw),width=800,height=800)
+        photo.image.save('qa-perfil.png',ContentFile(raw),save=False);photo.save()
+        sections=[]
+        for sid in content.SECTIONS:
+            row=content.pending(sid,'Ejemplo sintético de QA; no describe hechos reales.')
+            row.update(citations=[{'unit_id':content.REQUIRED_CITATIONS.get(sid,['LI-02-V010-K03'])[0],
+                'reason':'Aplicar el criterio de utilidad para el visitante.'}],evidence=['qa:synthetic'],
+                audience='Product teams',benefit='Make product decisions easier to understand.',version=1)
+            sections.append(row)
+        headline=next(s for s in sections if s['id']=='headline')
+        headline.update(action='change',copy='Helping product teams turn decisions into useful software',readiness='ready',
+            steps=['Abre la introducción del perfil y pega el titular.'],reason='Expresa utilidad antes que cargo.')
+        for row in sections:
+            if row['id'] in ('photo','banner'):row.update(readiness='ready',action='change',steps=['Descarga el recurso y súbelo manualmente a LinkedIn.'])
+        proposal=ProfileProposal.objects.create(id=uid('profile:proposal'),owner=self.user,key='qa:profile',mode='full',
+            state='partial',sections=sections,references=perfil_galeria.references(self.user),context={'qa':True},created_at=self.now-timedelta(days=2))
+        review={'ok':True,'options':{option:{'ok':True,'identity_03':True,'smile_01':True,'clear_glasses':True,
+            'checks':[{'point':n,'ok':True,'reason':'Simulado en QA con bloques; no verifica una persona.'} for n in range(1,9)]}
+            for option in ('A','B')}}
+        for kind,width,height in [('A',800,800),('B',800,800),('banner',1584,396),('mobile_A',390,312),
+                                  ('mobile_B',390,312),('desktop_A',1000,400),('desktop_B',1000,400)]:
+            image=png(width,height,((15,241,206) if kind in ('A','B') else (30,30,43),(100,100,100),(247,246,240)),8)
+            perfil.save_asset(proposal,kind,image,review,{'qa':True,'references':proposal.references})

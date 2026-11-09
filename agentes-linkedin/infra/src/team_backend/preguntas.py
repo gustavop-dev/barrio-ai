@@ -128,6 +128,9 @@ def answer(user,question_id,text='',public_use=None,accept=False,value=None,free
         item.state=TeamQuestion.State.ANSWERED;item.answer=shown;item.public_use=public;item.memory_version=result['version']
         item.answered_by=user;item.answered_at=timezone.now();item.save()
     audit(user,'team.question_answered',item.id,key=item.memory_key,public=public)
+    if item.agent=='perfil':
+        from .perfil import fact_answered
+        transaction.on_commit(lambda:fact_answered(item.memory_key))
     return item
 
 def undo(user,question_id):

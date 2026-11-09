@@ -16,7 +16,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
 | [GAL-05](#gal-05) | Quitar una foto de la Galería | PWA · app · backend | funciona |
 | [GAL-06](#gal-06) | Ver las fotos a pantalla completa | app | funciona |
 | [GAL-07](#gal-07) | Las fotos son privadas | PWA · app · backend | funciona |
-| [GAL-08](#gal-08) | Categoría Perfil para la foto y el banner | PWA · app · backend | no implementado |
+| [GAL-08](#gal-08) | Categoría Perfil para la foto y el banner | PWA · app · backend | funciona |
 
 ---
 
@@ -142,13 +142,13 @@ La Galería es la fuente del flujo de imagen, implementado en el backend; interf
 ### GAL-08 · Categoría Perfil para la foto y el banner <a id="gal-08"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** no implementado
+- **Estado:** funciona
 - **Qué hace para Gustavo:** reúne sus referencias privadas en «Perfil» para las dos opciones de retrato y el banner; esas fotos y sus derivados quedan excluidos de los posts.
 - **Responsable:** Gustavo sube/etiqueta; Claude realiza la carga inicial 01–03 por su encargo cuando se implemente GAL-08. `perfil` interpreta sus notas como instrucciones y encarga la edición al visual; backend impone uso exclusivo y exclusión editorial.
 - **Cadencia:** categoría asignable al subir o después en el detalle de una foto; consumo semestral o bajo demanda [EST-05](estrategia-perfil.md#est-05). Etiquetar no inicia gasto ni cambia LinkedIn.
 - **Tu turno:** guardar la categoría es una acción explícita de Gustavo, sin tarjeta adicional. Los derivados requieren revisión y aplicación manual en TUR-18.
-- **Datos necesarios y disponibilidad:** originales privados, notas, subida y `allow_ai_edit` existen. Referencias 01–03 presentes en el directorio local privado indicado en [EST](estrategia-perfil.md#referencias-privadas), pendientes de carga al servidor y validación de aptitud; Diandra es referencia externa excluida. No existen categoría Perfil, notas por función ni permiso acotado; se integrarán con IMG-16 y `feat/imagenes-backend`.
-- **Código:** no existe esta categoría. Referencias: `models.GalleryPhoto`, `capturas_views.PhotoDetail`, `capturas.photo_payload`, Galería en PWA y app.
+- **Datos necesarios y disponibilidad:** Categoría y autorización implementadas. Las tres referencias privadas y sus notas deben cargarse tras desplegar; su aptitud no se ha comprobado aquí.
+- **Código:** `GalleryPhoto.category/profile_edit/profile_role/profile_version/profile_consent`, `perfil_galeria.py`, `capturas.add_photos`, PWA/app Galería y PhotoSheet; exclusión en `imagenes.py`, `editor_visual.gallery` e ideas de capturas.
 - **Regla de edición para Perfil:** al elegir/guardar esta categoría la interfaz explica que prepara dos retratos para elegir —A en grises, B en color— y el banner con micrófono, con ropa/gafas y notas autorizadas, conservando identidad. La asignación autoriza estos tratamientos para Perfil sin aprobar resultados. Los addenda cuarto y quinto autorizan la carga y esos usos: 01 pose/sonrisa, 02 cuerpo, 03 identidad; sonrisa de 01 en A, B y banner, y transitions claras como 03, sin gafas de sol. Se conserva original y se registra alcance/fecha/versión; si revoca la edición para Perfil deja de ser elegible. La categoría no permite usar fotos ni derivados en posts, independientemente del permiso general de edición para publicaciones.
 - **Criterios de aceptación:**
   1. **Dado** una subida de una o varias fotos, **cuando** Gustavo elige «Perfil» antes de enviarlas, **entonces** cada foto subida correctamente conserva categoría, original y autorización acotada explicada en ese flujo; aparece etiquetada en PWA y app y se puede filtrar por «Perfil». Una foto cuya categoría no se guardó no queda elegible.
@@ -162,8 +162,8 @@ La Galería es la fuente del flujo de imagen, implementado en el backend; interf
   9. **Dado** las notas de 01–03, **cuando** el agente Perfil prepara el trabajo, **entonces** las recibe como instrucciones privadas con rol/versión, respeta qué referencia manda en pose, cuerpo e identidad y las adjunta al encargo del visual; no las interpreta como ideas para posts. Un conflicto con reglas explícitas de Gustavo se señala antes de producir, sin ignorar una nota ni cambiar identidad.
   10. **Dado** originales de Perfil o derivados de ellos, **cuando** director, visual o selección manual preparan un post, **entonces** backend los excluye del catálogo/contexto editorial y rechaza su selección por id aunque la nota o permiso de edición general permitan editar. Marcar como Perfil una foto previamente seleccionada invalida su uso en posts pendientes y obliga a elegir otra; no cambia posts ya publicados. Derivados heredan uso exclusivo de Perfil y no vuelven al catálogo de posts por perder una etiqueta.
   11. **Dado** el repositorio público y referencias privadas, **cuando** se importa, edita, evalúa o documenta este flujo, **entonces** ninguna foto de referencia, derivado o comparación se copia al repo, se añade a Git, se incrusta como base64/miniatura o se usa como fixture público. Se usan datos sintéticos para tests y almacenamiento privado para originales/artefactos; auditoría guarda ids/metadatos. La referencia externa de Diandra queda fuera de cualquier carga/almacenamiento nuevo y solo se describe verbalmente.
-- **Brechas código/docs:** sustituye la propuesta inicial de una marca de referencia única, manteniendo el ID GAL-08. Añade categoría y autorización de uso específicas, no otra subida/editor/proveedor; IMG para publicaciones conserva su política. Todas estas ampliaciones siguen sin implementar.
-- **Cobertura QA:** pendiente
+- **Brechas código/docs:** CI/QA y activación pendientes de Claude; [guía de verificación](../arquitectura/fase8-verificacion.md). Los assets privados no están en el repo.
+- **Cobertura QA:** `test_perfil.py`, Jest/Vitest y Maestro `18-perfil`; regresiones `04-*`, `10-galeria` y seed. Escrita, sin ejecución local.
 
 ## Retiradas
 
