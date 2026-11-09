@@ -340,7 +340,7 @@ tags: [captura]
     visible:
       id: capture-historial
     timeout: 20000
-# Three seeded captures and the one sent again (the undone one is not listed).
+# Three seeded captures (one is the «lo antes posible» example) and the one sent again (the undone one is not listed).
 - extendedWaitUntil:
     visible: 'Lo que enviaste · 4'
     timeout: 20000
@@ -389,10 +389,12 @@ tags: [captura]
 - assertVisible: '.*Fundé ProjectApp en 2019 en Medellín.*'
 - assertVisible: 'Está en Lo que el equipo sabe de ti · ProjectApp'
 - assertVisible: 'Escuchar'
+# The «lo antes posible» example is also «Usado» and comes first: scroll to the idea's own line.
 - scrollUntilVisible:
     element:
-      text: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
+      text: 'Usada en la pieza del .*'
     direction: DOWN
+    centerElement: true
     timeout: 20000
 - assertVisible: 'Idea: contar cómo elegimos el stack de un MVP en dos días'
 - assertVisible: 'Usada en la pieza del .*'
