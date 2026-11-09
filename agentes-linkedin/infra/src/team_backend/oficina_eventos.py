@@ -23,10 +23,20 @@ def emit(kind,role,target='',detail=''):
     try:AuditEvent.objects.create(action='office.event',target=role[:120],metadata={'tipo':kind,'rol':role,'destino':target,'detalle':(detail or '')[:200]})
     except Exception:pass
 
+def handoff(role,target,*,cycle,edge,phase):
+    """Add dispatcher traffic without replacing the workflow's existing events."""
+    label='Solicitud' if phase=='request' else 'Respuesta'
+    try:
+        AuditEvent.objects.create(action='office.orchestration',target=role[:120],metadata={
+            'tipo':'entrega','rol':role,'destino':target,'detalle':f'{label}: {edge}'[:200],
+            'cycle_id':str(cycle),'edge':edge,'phase':phase})
+    except Exception:pass
+
 def since(moment=None,limit=50):
     moment=moment or timezone.now()-timedelta(minutes=10)
-    rows=AuditEvent.objects.filter(action='office.event',created_at__gt=moment).order_by('created_at')[:limit]
-    return [dict(id=row.id,ts=row.created_at,**{k:row.metadata.get(k,'') for k in ('tipo','rol','destino','detalle')}) for row in rows]
+    rows=AuditEvent.objects.filter(action__in=['office.event','office.orchestration'],created_at__gt=moment).order_by('created_at','id')[:limit]
+    return [dict(id=row.id,ts=row.created_at,**{k:row.metadata.get(k,'') for k in ('tipo','rol','destino','detalle')},
+                 **({'source':'orchestration'} if row.action=='office.orchestration' else {})) for row in rows]
 
 def _count(n,one,many):
     return f'{n} {one if n==1 else many}'

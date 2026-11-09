@@ -10,6 +10,7 @@ from decimal import Decimal
 import httpx
 from psycopg.types.json import Jsonb
 from .config import live
+from .cycle_context import timeout as cycle_timeout, CycleStopped
 from .db import connect
 from .ingest import ENC, digest
 
@@ -80,6 +81,12 @@ def reserve(provider,purpose,amount,request_hash=None,metadata=None):
     rid=str(uuid.uuid4())
     with connect() as c:
         c.execute('SELECT pg_advisory_xact_lock(103502)')
+        # An ambiguous request must be reconciled even when its reservation also
+        # exhausted a budget. Keep that diagnostic ahead of all monetary caps.
+        if request_hash and c.execute("SELECT id FROM usage_ledger WHERE provider=%s AND request_hash=%s AND (status='reserved' OR (status='uncertain' AND coalesce(usage->>'retry_authorized','false')!='true')) LIMIT 1",(provider,request_hash)).fetchone():
+            raise ValueError('Existe una solicitud idéntica pendiente o incierta; conciliarla antes de repetir.')
+        from .cycle_context import provider_metadata
+        metadata=dict(metadata or {},**provider_metadata(provider,purpose,amount,c))
         if purpose in RESEARCH_PURPOSES:
             from django.conf import settings
             from team_backend.operador import period_starts
@@ -91,7 +98,7 @@ def reserve(provider,purpose,amount,request_hash=None,metadata=None):
         if purpose.startswith(('editorial-','image-')):
             from team_backend.operador import period_starts
             day,_=period_starts()
-            editorial_limit=Decimal(os.environ.get('EDITORIAL_DAILY_LLM_USD','2'))
+            editorial_limit=min(Decimal('2'),Decimal(os.environ.get('EDITORIAL_DAILY_LLM_USD','2')))
             if not editorial_limit.is_finite() or editorial_limit<0:raise ValueError('Presupuesto editorial inválido')
             editorial_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE (purpose LIKE 'editorial-%%' OR purpose LIKE 'image-%%') AND created_at>=%s",(day,)).fetchone()['spent']
             if editorial_spent+amount>editorial_limit:raise ValueError('Presupuesto editorial diario agotado; incluye herramientas y reservas')
@@ -102,8 +109,6 @@ def reserve(provider,purpose,amount,request_hash=None,metadata=None):
             if not image_limit.is_finite() or image_limit<0:raise ValueError('Presupuesto de imágenes inválido')
             image_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE purpose LIKE 'image-%%' AND created_at>=%s",(day,)).fetchone()['spent']
             if image_spent+amount>image_limit:raise ValueError('Presupuesto de imágenes agotado; incluye reservas pendientes')
-        if request_hash and c.execute("SELECT id FROM usage_ledger WHERE provider=%s AND request_hash=%s AND (status='reserved' OR (status='uncertain' AND coalesce(usage->>'retry_authorized','false')!='true')) LIMIT 1",(provider,request_hash)).fetchone():
-            raise ValueError('Existe una solicitud idéntica pendiente o incierta; conciliarla antes de repetir.')
         since=limit_window_start(provider)
         spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s AND (%s::timestamptz IS NULL OR created_at>=%s)",(provider,since,since)).fetchone()['spent']
         if spent+amount>limit:
@@ -122,6 +127,8 @@ def settle(rid,status,usage=None,cost=None):
         cost=Decimal(cost)
         if not cost.is_finite() or cost<0:raise ValueError('Coste inválido')
     with connect() as c:c.execute("UPDATE usage_ledger SET status=%s,usage=coalesce(usage,'{}'::jsonb)||%s,actual_usd=%s WHERE id=%s",(status,Jsonb(usage or {}),cost,rid))
+    from .cycle_context import after_settle
+    after_settle()
 
 def authorize_uncertain_retry(rid,reason):
     """Local operator review only. Possible original spend remains reserved forever
@@ -138,9 +145,12 @@ def authorize_uncertain_retry(rid,reason):
     return {'id':str(rid),'retry_authorized':True,'original_reservation_retained_usd':str(row['reserved_usd'])}
 
 def post(url,**kwargs):
+    from .cycle_context import timeout
+    request_timeout=kwargs.get('timeout',120)
     # Connection establishment failures occur before the HTTP request is sent.
     # Never automatically retry a read/write timeout or an HTTP response.
     for attempt in range(3):
+        kwargs['timeout']=timeout(request_timeout)
         try:return httpx.post(url,**kwargs)
         except (httpx.ConnectError,httpx.ConnectTimeout):
             if attempt==2:raise
@@ -248,6 +258,8 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
     max_tokens=max_tokens or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
     if not 1<=max_tokens<=64000:raise ValueError('max_tokens fuera de rango')
     client=anthropic_client(key)
+    from .cycle_context import current, timeout
+    if current():client=client.with_options(timeout=timeout(120))
     # Stable instructions and context first so they can be cached; the variable task goes in messages.
     params={'model':model,'system':system_blocks(system,context),'messages':[{'role':'user','content':message}]}
     if web_tools is not None:
@@ -270,13 +282,20 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
     tool_cost=web_tools.search_price*web_tools.searches if web_tools else Decimal(0)
     metadata={'research':True,'reserved_web_search_requests':web_tools.searches,'reserved_web_fetch_requests':web_tools.fetches,
               'reserved_input_tokens':reserved_input,'model':model} if web_tools else None
+    metadata=dict(metadata or {},model=model,effort=effort)
     rid=reserve('anthropic',purpose,(Decimal(reserved_input)*ip*CACHE_WRITE+Decimal(max_tokens)*op)/1000000+tool_cost,
                 request_hash,metadata=metadata)
     request_id=None
     try:
+        if current():client=client.with_options(timeout=timeout(120))
         with client.messages.stream(max_tokens=max_tokens,**params) as stream:
             request_id=stream.request_id
+            if current():
+                for event in stream:timeout(120)  # Bound total streaming time, even with continuous events.
             message=stream.get_final_message()
+    except CycleStopped:
+        settle(rid,'uncertain',{'request_id':request_id,'cycle_timeout':True})
+        raise
     except anthropic.APIStatusError as exc:
         # Do not expose provider bodies (may contain inputs); do not retry paid calls.
         definite=exc.status_code in (400,401,403,404,413,422,429)
@@ -342,7 +361,7 @@ def typesafe(state,questions,purpose='lead-review'):
     # No tokenizer endpoint: a token is never longer than one character, so characters bound the input.
     rid=reserve('typesafe',purpose,Decimal(len(raw))*price/1000000)
     try:
-        with httpx.Client(transport=TYPESAFE_TRANSPORT,timeout=httpx.Timeout(60.0,connect=10.0)) as http:
+        with httpx.Client(transport=TYPESAFE_TRANSPORT,timeout=httpx.Timeout(cycle_timeout(60.0),connect=10.0)) as http:
             response=http.post(TYPESAFE_URL,content=raw.encode(),headers={'Authorization':'Bearer '+key,'Content-Type':'application/json'})
     except (httpx.ConnectError,httpx.ConnectTimeout):
         settle(rid,'rejected',{'error_type':'connect'});raise ValueError('TypeSafe: no fue posible conectar; no se envió.') from None

@@ -16,6 +16,8 @@ export interface OficinaEvento {
   /** Receiving role for `entrega`; `biblioteca` or `linkedin` otherwise. */
   destino: string;
   detalle: string;
+  /** Additional dispatcher handoff; absent on the existing workflow events. */
+  source?: 'orchestration';
 }
 
 export interface OficinaEventos {

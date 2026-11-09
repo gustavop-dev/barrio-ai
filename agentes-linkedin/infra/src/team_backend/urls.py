@@ -10,8 +10,10 @@ from . import rediseno_views as rv
 from . import capturas_views as cv
 from . import movil_views as mv
 from .grafo_views import EquipoGrafo
+from .orquestacion_views import CycleDecision
 urlpatterns=[
  path('equipo/grafo',EquipoGrafo.as_view()),
+ path('equipo/ciclos/<uuid:cid>/decision',CycleDecision.as_view()),
  path('status',views.Status.as_view()),path('search',views.Search.as_view()),
  path('units',views.Units.as_view()),path('units/<str:uid>',views.UnitDetail.as_view()),
  path('sources/<path:key>',views.SourceDetail.as_view()),

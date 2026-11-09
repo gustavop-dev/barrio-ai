@@ -410,6 +410,8 @@ class GraderTests(EvalBase):
     def test_schema_errors_follow_the_production_schemas(self):
         self.assertEqual(evaluaciones.schema_errors(verdict(),editorial.VERIFIER_SCHEMA),[])
         broken=dict(answers()['verificador'],verdict='maybe',extra=1);broken.pop('summary')
+        # The shared fake follows production; inject the forbidden field here.
+        broken['checked_claims']=[dict(broken['checked_claims'][0],kind='general_knowledge')]
         self.assertEqual(sorted(evaluaciones.schema_errors(broken,editorial.VERIFIER_SCHEMA)),
                          ['$.checked_claims[0].kind: no permitido','$.extra: no permitido','$.summary: falta','$.verdict: valor fuera de la lista'])
 

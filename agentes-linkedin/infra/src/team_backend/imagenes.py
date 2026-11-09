@@ -9,7 +9,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 from knowledge import db, providers
-from . import connectors_images as connector, guardas, infografias
+from . import connectors_images as connector, guardas, infografias, orquestacion
 from .models import GalleryPhoto, PieceImage
 
 
@@ -64,6 +64,19 @@ def edit_decision(photo,choice):
     return '', 'Decisión del equipo: no necesita retoque; ante la duda se conserva el original'
 
 
+def _edit_call(piece,photo,raw,instruction,client):
+    return orquestacion.call('editar_foto',{'piece':str(piece.id),'photo':str(photo.id),
+        'sha256':sha(raw),'instruction':instruction},lambda:client.edit(raw,instruction,f'{piece.id}:{photo.id}'),
+        key=f'edit:{photo.id}')
+
+
+def _check_call(piece,images,context,client,original=None,instruction='',key=None):
+    request={'piece':str(piece.id),'sha256':[sha(raw) for raw in images],
+        'context':orquestacion.plain(context),'original':sha(original) if original else '', 'instruction':instruction}
+    return orquestacion.call('revisar_imagen',request,
+        lambda:client.check(images,context,original=original,instruction=instruction),key=key)
+
+
 def _photo(piece,photo,choice,index,client,public,private):
     raw=read(photo.image)
     with Image.open(io.BytesIO(raw)) as decoded:
@@ -79,11 +92,11 @@ def _photo(piece,photo,choice,index,client,public,private):
     if instruction:
         if isinstance(client,connector.FakeImageConnector) or (connector.available('openai') and connector.available('anthropic')):
             try:
-                candidate=client.edit(raw,instruction,f'{piece.id}:{photo.id}')
+                candidate=_edit_call(piece,photo,raw,instruction,client)
                 # LinkedIn artwork is 1080 square. Verification binds these final bytes, after resizing.
                 with Image.open(io.BytesIO(candidate)) as im:
                     out=io.BytesIO();im.convert('RGB').resize((1080,1080),Image.Resampling.LANCZOS).save(out,format='PNG');candidate=out.getvalue()
-                review=client.check([candidate],{'post':piece.final_text,'public_facts':public},original=raw,instruction=instruction)
+                review=_check_call(piece,[candidate],{'post':piece.final_text,'public_facts':public},client,original=raw,instruction=instruction,key=f'check:{photo.id}')
                 if review['ok'] and review.get('sha256')==[sha(candidate)]:
                     output=candidate;edited=True;mime='image/png';width=height=1080
                 else:reason+='; edición descartada: '+'; '.join(review.get('reasons') or ['comprobación desfavorable'])
@@ -121,9 +134,15 @@ def design(piece,public,private,client):
         # Each correction is a new, bounded stage. A transport failure never triggers a second call.
         payload={'kind':piece.image_kind,'brief':piece.brief,'post':piece.final_text,'public_facts':public,
                  'sources':sources,'findings':failures,'previous_design':piece.image_spec if attempt else None}
-        answer=providers.claude(infografias.with_rule(DESIGN_SYSTEM),json.dumps(payload,ensure_ascii=False,default=str),
-            output_schema=infografias.DESIGN_SCHEMA,max_tokens=5000,model=connector.VISION_MODEL,effort='low',
-            purpose='image-design-repair' if attempt else 'image-design')
+        runtime=orquestacion.current()
+        if runtime:payload=runtime.snapshot(f'image_input:{attempt}',lambda:payload)
+        try:
+            answer=orquestacion.call('disenar',{'piece':str(piece.id),'payload':orquestacion.plain(payload)},
+                lambda:providers.claude(infografias.with_rule(DESIGN_SYSTEM),json.dumps(payload,ensure_ascii=False,default=str),
+                    output_schema=infografias.DESIGN_SCHEMA,max_tokens=5000,model=connector.VISION_MODEL,effort='low',
+                    purpose='image-design-repair' if attempt else 'image-design'),key=f'design:{attempt}')
+        except orquestacion.ContractError as exc:
+            failures=[str(exc)];attempts.append({'stage':'datos','failures':failures});continue
         try:
             data=json.loads(answer['text']);infografias.validate(data,piece.image_kind,public,sources)
             content=json.dumps(data,ensure_ascii=False)
@@ -133,11 +152,12 @@ def design(piece,public,private,client):
             pngs=[infografias.render(s,i+1,len(data['slides']),piece.image_kind=='carrusel') for i,s in enumerate(data['slides'])]
         except (ValueError,TypeError,KeyError) as exc:
             failures=[str(exc)];attempts.append({'stage':'datos','failures':failures});continue
-        review=client.check(pngs,{'post':piece.final_text,'design':data,'public_facts':public,'sources':sources})
+        review=_check_call(piece,pngs,{'post':piece.final_text,'design':data,'public_facts':public,'sources':sources},client,key=f'check:design:{attempt}')
         attempts.append(review)
         piece.image_review={'attempts':attempts};piece.save(update_fields=['image_review'])
         if review['ok'] and review.get('sha256')==[sha(raw) for raw in pngs]:
             for i,(slide,raw) in enumerate(zip(data['slides'],pngs),1):
+                if piece.images.filter(position=i,sha256=sha(raw)).exists():continue
                 row=PieceImage(piece=piece,position=i,kind=piece.image_kind,width=1080,height=1350 if piece.image_kind=='carrusel' else 1080,
                     sha256=sha(raw),alt=slide['alt'],template=slide['template'],data=slide,review=review)
                 row.image.save('lamina.png',ContentFile(raw),save=False);row.save()
@@ -162,8 +182,8 @@ def fallback(piece,reason):
 
 
 def prepare(piece,public=(),private=(),client=None):
-    if piece.images.exists():return
-    if piece.image_review:raise ValueError('La preparación de imágenes ya empezó; no se repite un paso pagado')
+    if piece.images.exists() and piece.image_review.get('ok'):return
+    if piece.image_review and not orquestacion.current():raise ValueError('La preparación de imágenes ya empezó; no se repite un paso pagado')
     piece.image_review={'started':True};piece.save(update_fields=['image_review'])
     client=client or connector.ImageConnector();choice=piece.brief.get('image') or {}
     piece.image_kind=choice.get('kind','infografia');piece.image_reason=choice.get('reason','Tarjeta de marca disponible sin claves')
@@ -175,12 +195,22 @@ def prepare(piece,public=(),private=(),client=None):
             for selection in choice['photos'][:8]:
                 if selection['id'] not in offered or selection['id'] in selected:continue
                 selected.add(selection['id'])
-                # Lock the source through selection/edit so two pieces cannot claim it simultaneously.
+                if piece.images.filter(source_photo_id=selection['id']).exists():continue
+                # Claim the source durably, then release DB locks before any paid call.
                 with transaction.atomic():
-                    photo=GalleryPhoto.objects.select_for_update().filter(id=selection['id'],state__in=['sin_usar','publicada']).first()
-                    if photo is None:continue
-                    try:_photo(piece,photo,selection,piece.images.count()+1,client,public,private)
-                    except (ValueError,OSError,Image.DecompressionBombError):continue
+                    photo=GalleryPhoto.objects.select_for_update().filter(id=selection['id']).first()
+                    if photo is None or (photo.state not in ['sin_usar','publicada'] and photo.chosen_piece_id!=piece.id):continue
+                    previous_state=photo.state if photo.state in ('sin_usar','publicada') else 'sin_usar'
+                    previous_piece=photo.chosen_piece_id if photo.chosen_piece_id!=piece.id else None
+                    previous_day=photo.chosen_for if previous_piece else None
+                    photo.state='elegida';photo.chosen_piece=piece;photo.chosen_for=piece.slot_date
+                    photo.save(update_fields=['state','chosen_piece','chosen_for'])
+                try:_photo(piece,photo,selection,piece.images.count()+1,client,public,private)
+                except (ValueError,OSError,Image.DecompressionBombError):
+                    if not piece.images.filter(source_photo=photo).exists():
+                        GalleryPhoto.objects.filter(pk=photo.pk,chosen_piece=piece).update(
+                            state=previous_state,chosen_piece_id=previous_piece,chosen_for=previous_day)
+                    continue
             if not piece.images.exists():raise ValueError('Las fotos elegidas ya no están disponibles o no son válidas')
             piece.image_review={'ok':True,'sha256':list(piece.images.values_list('sha256',flat=True))}
         elif isinstance(client,connector.FakeImageConnector) or connector.available('anthropic'):

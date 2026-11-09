@@ -11,6 +11,7 @@ from .models import Notification, OfficePreference
 RETENTION=timedelta(days=7)
 # Tu turno kinds: (priority, push by default, label in Ajustes). The card itself is computed, not stored.
 INBOX_KINDS={
+    'cycle_stopped':('importante',True,'Ciclo detenido'),
     'uncertain':('urgente',True,'Acción incierta'),
     'linkedin_expired':('urgente',True,'LinkedIn caducado'),
     'machine_paused':('urgente',True,'Máquina detenida desde la app'),

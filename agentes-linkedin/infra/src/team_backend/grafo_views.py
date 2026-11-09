@@ -7,7 +7,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from .grafo import graph_hash, load_graph
 from .jobs import visible_jobs
-from .models import AuditEvent, Capture, EditorialPiece, WebResearchRun
+from .models import AuditEvent, Capture, EditorialPiece, WebResearchRun, CycleLedger, UsageEntry
+from decimal import Decimal
 from .permissions import require
 
 
@@ -21,6 +22,16 @@ def recent_activity(graph, user):
     result = {}
     jobs_cache, events_cache = {}, {}
     visible = visible_jobs(user)
+    ledgers = CycleLedger.objects.all()
+    if not user.has_perm('team_backend.manage_jobs'):
+        ledgers = ledgers.filter(owner=user)
+    # Bounded once for the entire graph; never expose task facts, request bodies or results.
+    ledger_rows = list(ledgers.order_by('-updated_at').defer('task_ledger')[:50])
+    costs={str(row.id):{'confirmed':Decimal(0),'reserved':Decimal(0)} for row in ledger_rows}
+    for usage in UsageEntry.objects.filter(usage__cycle_id__in=list(costs)):
+        cost=costs[usage.usage['cycle_id']]
+        if usage.status=='complete' and usage.actual_usd is not None:cost['confirmed']+=usage.actual_usd
+        elif usage.status in ('reserved','uncertain','complete'):cost['reserved']+=usage.reserved_usd
     for node in graph['nodes']:
         activity = node['activity']
         jobs, handoffs, records = [], [], []
@@ -67,7 +78,7 @@ def recent_activity(graph, user):
             roles = tuple(activity['event_roles'])
             if roles:
                 if roles not in events_cache:
-                    rows = AuditEvent.objects.filter(action='office.event', metadata__tipo='entrega').filter(
+                    rows = AuditEvent.objects.filter(action__in=['office.event','office.orchestration'], metadata__tipo='entrega').filter(
                         Q(metadata__rol__in=roles) | Q(metadata__destino__in=roles)).order_by('-created_at', '-id')[:5]
                     events_cache[roles] = [
                         {'id': str(e.id), 'at': e.created_at, 'from': e.metadata.get('rol', ''),
@@ -88,6 +99,23 @@ def recent_activity(graph, user):
                                        Q(key__in=keys(EditorialPiece.objects.filter(created_by=user), 'piece:')))
                 records += [{'id': r.key, 'at': r.created_at, 'label': 'Investigación: ' + r.state}
                             for r in rows.only('key', 'created_at', 'state').order_by('-created_at', '-key')[:5]]
+        if node['status'] == 'active':
+            for ledger in ledger_rows:
+                calls = list(ledger.progress_ledger.get('calls', {}).values())
+                own = [c for c in calls if node['id'] in c.get('nodes', [])]
+                if ledger.orchestrator != node['id'] and not own:continue
+                cost=costs[str(ledger.id)];spent=cost['confirmed']+cost['reserved']
+                phase=calls[-1]['edge'] if calls else 'inicio'
+                records.insert(0, {'id': str(ledger.id), 'at': ledger.updated_at,
+                    'label': f'{ledger.cycle}: {ledger.state} · {ledger.calls}/{ledger.limits["max_calls"]} llamadas · '
+                             f'{spent:.2f}/{ledger.limits["cost_cap_usd"]} USD · {phase}'
+                             + (f' · {ledger.stop_reason}' if ledger.stop_reason else ''),
+                    'cycle_id': str(ledger.id), 'state': ledger.state, 'owner': ledger.orchestrator,
+                    'next_step': ledger.progress_ledger.get('next_step', ''),
+                    'calls': ledger.calls, 'max_calls': ledger.limits['max_calls'],
+                    'spent_usd': str(spent), 'confirmed_usd':str(cost['confirmed']), 'reserved_usd':str(cost['reserved']),
+                    'phase':phase, 'cap_usd': ledger.limits['cost_cap_usd']})
+            records = sorted(records, key=lambda r:r['at'], reverse=True)[:5]
         result[node['id']] = {'jobs': jobs, 'handoffs': handoffs, 'records': records}
     return result
 

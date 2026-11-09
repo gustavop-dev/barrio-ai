@@ -1,4 +1,4 @@
-"""Declarative inventory, deliberately NOT a dispatcher (phase 3a).
+"""Registry shared by the phase 3b dispatcher, map and diagram generator.
 
 The registry uses JSON, a strict subset of YAML 1.2. This keeps the standalone
 diagram generator dependency-free and rejects duplicate keys, tags and aliases.
@@ -7,6 +7,7 @@ No Django, corpus, providers or environment secrets are needed to validate it.
 import ast
 import hashlib
 import json
+import math
 import re
 from pathlib import Path
 
@@ -70,7 +71,7 @@ def validate_graph(graph):
             raise GraphError(message)
 
     check(isinstance(graph, dict) and graph.get('schema_version') == 1, 'schema_version inválida')
-    check(graph.get('scope') == 'descriptive', '3a solo admite scope descriptive')
+    check(graph.get('scope') in ('descriptive','runtime'), 'scope inválido')
     nodes = _index(graph.get('nodes'), 'nodos')
     edges = _index(graph.get('edges'), 'aristas')
     cycles = _index(graph.get('cycles'), 'ciclos')
@@ -132,6 +133,17 @@ def validate_graph(graph):
         check(owner in cycle['participants'] and all(p in nodes for p in cycle['participants']), f'ciclo {cid}: participantes inválidos')
         check(cycle.get('triggers') and cycle.get('ledger') and cycle.get('limits'), f'ciclo {cid}: falta trigger/ledger/límites')
         check(cycle['limits'].get('max_depth') == 1, f'ciclo {cid}: profundidad máxima debe ser 1')
+        if cycle['ledger']['status'] == 'runtime':
+            limits = cycle['limits']
+            for key in ('max_calls','max_provider_calls','call_timeout_s','cycle_timeout_s','max_stalls','max_replans','cost_cap_usd'):
+                check(type(limits.get(key)) in (int,float) and math.isfinite(limits[key]) and limits[key] > 0,
+                      f'ciclo {cid}: límite {key} inválido')
+            for edge in edges.values():
+                if cid not in edge['cycles'] or not edge.get('runtime'):continue
+                check(type(edge['max_calls_per_cycle']) is int, f'arista {edge["id"]}: límite runtime sin resolver')
+                check(all(schemas[edge[k]]['kind'] in ('json_schema','model','dataclass','bytes')
+                          for k in ('request_schema','response_schema')), f'arista {edge["id"]}: contrato no ejecutable')
+
         check(all(b in budgets for b in cycle['limits']['budget_refs']), f'ciclo {cid}: presupuesto desconocido')
         check(all(g in gates and gates[g]['cycle'] == cid for g in cycle['gates']), f'ciclo {cid}: gate desconocido')
         local = [e for e in edges.values() if cid in e['cycles'] and e['status'] == 'active']
@@ -190,6 +202,16 @@ def validate_graph(graph):
         if edge['status'] == 'active' and nodes[edge['to']]['role'] == 'executor':
             check(any(g['cycle'] in edge['cycles'] and g['chain'][-2:] == [edge['from'], edge['to']] for g in gates.values()),
                   f'arista {edge["id"]}: salida ejecutable sin gates')
+    # Validate topology/gates first, then runtime authority. A bypass must be
+    # diagnosed as such even if it also carries an unauthorized runtime binding.
+    for cid, cycle in cycles.items():
+        if cycle['ledger']['status'] != 'runtime':continue
+        for edge in edges.values():
+            if cid not in edge['cycles'] or not edge.get('runtime'):continue
+            declared_gate = (edge['request_kind']=='gate' and edge['to']=='lider_jev'
+                             and any(edge['id'] in gates[g].get('runtime_edges',[]) for g in cycle['gates']))
+            check(edge['from'] == cycle['orchestrator'] or declared_gate,
+                  f'arista {edge["id"]}: runtime fuera del orquestador')
     for name, group in graph.get('call_groups', {}).items():
         members = {e['to'] for e in edges.values() if e.get('call_group') == name}
         check(members == set(group['members']) and _bounded(group['max_calls_per_cycle']), f'llamada agrupada {name}: inconsistente')

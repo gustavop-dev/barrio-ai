@@ -15,8 +15,8 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from team_backend import autopiloto, editorial, guardas, lider, operador, posicionamiento, red
-from team_backend.models import ActionExecution, ActionProposal, EditorialPiece, Opportunity, PostMetric
+from team_backend import autopiloto, editorial, guardas, lider, operador, orquestacion, posicionamiento, red
+from team_backend.models import ActionExecution, ActionProposal, CycleLedger, EditorialPiece, Opportunity, PostMetric
 from team_backend.tests.test_publicacion import GOOD_POST, INVENTED, EditorialBase, answers
 
 FIXED=GOOD_POST.replace('Which decision is your product helping someone make this week?',
@@ -181,6 +181,10 @@ class RepairRoundTests(EditorialAuditBase):
             piece=self.plan_with(answers(),verificador=[self.blocked()])
         self.assertNotIn('reparacion',self.purposes())
         self.assertEqual((piece.state,piece.verification['repair']['outcome']),('blocked','sin_presupuesto'))
+        ledger=CycleLedger.objects.get(cycle='pieza_diaria',key=str(piece.id))
+        self.assertEqual((ledger.state,ledger.stop_reason,ledger.needs_attention),('stopped','cost_cap',True))
+        self.assertEqual(orquestacion.unpack(ledger.progress_ledger['result']).pk,piece.pk)
+        self.assertIn('Ronda de reparación: sin presupuesto editorial para repararla hoy',piece.note)
         self.assertFalse(editorial.budget_retry([piece],timezone.now()+timedelta(days=1)))  # a content block is not retried
 
     def test_a_budget_stop_before_the_second_verification_keeps_the_original_text(self):
@@ -191,6 +195,10 @@ class RepairRoundTests(EditorialAuditBase):
         repair=piece.verification['repair']
         self.assertEqual((piece.state,repair['outcome'],repair['repaired_text'],piece.final_text),('blocked','sin_presupuesto',FIXED,GOOD_POST))
         self.assertEqual(piece.verification['text_sha256'],sha(GOOD_POST))
+        ledger=CycleLedger.objects.get(cycle='pieza_diaria',key=str(piece.id))
+        self.assertEqual((ledger.state,ledger.stop_reason),('stopped','cost_cap'))
+        self.assertEqual(orquestacion.unpack(ledger.progress_ledger['result']).pk,piece.pk)
+        self.assertEqual(self.purposes().count('verificador'),1)
 
 
 class DirectorResultsTests(EditorialAuditBase):

@@ -107,6 +107,8 @@ def comment_author_issues(proposal):
 def policy_review(proposal,lead_budget=None):
     """Approve or discard a pending proposal according to the autonomy policy. `lead_budget` ({'left': n, 'deferred': 0},
     from tick) caps the lead's reviews: once spent, a proposal that needs the lead stays pending for a later tick."""
+    from .orquestacion import cycle_issues
+    if cycle_issues(proposal):return proposal
     mode=autonomy(proposal.capability)
     if mode=='approval':return proposal
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)

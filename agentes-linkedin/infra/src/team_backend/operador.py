@@ -363,6 +363,10 @@ def set_account_pause(account,reason,actor=None,notify=True):
 
 def create_proposal(user,post,capability,payload,rationale='',citations=(),risks=(),source='human',origin_job='',model='',previous=None,state=None,piece=None,contact=None):
     require(user,'operate_linkedin')
+    from .orquestacion import current
+    if source=='agent' and not origin_job and current():
+        from .models import CycleLedger
+        origin_job=str(CycleLedger.objects.get(pk=current().id).job_id or '')
     targets=(post is not None,piece is not None,contact is not None)
     expected=(False,False,True) if capability in NETWORK else (False,True,False) if capability==ActionProposal.Capability.PUBLISH else (True,False,False)
     if targets!=expected:
@@ -398,15 +402,22 @@ def revise(user,proposal_id,payload,note=''):
 def approve(user,proposal_id,expected_hash,note=''):
     """Human decision on an exact version. Returns the execution job (enqueued)."""
     require(user,'approve_actions')
+    candidate=ActionProposal.objects.select_related('post','piece','contact').get(id=proposal_id)
+    from .orquestacion import cycle_issues
+    if cycle_issues(candidate):raise OperatorBlocked('; '.join(cycle_issues(candidate)))
+    note_review=None
+    if candidate.state==ActionProposal.State.PROPOSED and expected_hash==candidate.payload_hash==current_hash(candidate) and candidate.capability=='RED-02' and candidate.payload.get('note'):
+        from . import lider
+        require(user,'use_paid_providers')
+        note_review=lider.review(candidate)
     with transaction.atomic():
         proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
         if proposal.state!=ActionProposal.State.PROPOSED:raise Conflict('La propuesta no está pendiente de aprobación.')
         if not (expected_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('El contenido cambió: revisa la versión actual antes de aprobar.')
         if proposal.capability=='RED-02' and proposal.payload.get('note'):
-            from . import lider
             require(user,'use_paid_providers')
-            proposal.review=lider.review(proposal)
+            proposal.review=note_review or {}
             if not proposal.review.get('note_approved'):raise Conflict('La nota no supera la revisión del líder.')
         proposal.state=ActionProposal.State.APPROVED;proposal.approved_hash=proposal.payload_hash
         proposal.decided_by=user;proposal.decided_at=timezone.now();proposal.decision_note=note
@@ -512,7 +523,8 @@ def _record_metrics(proposal,post):
 def final_write_gate(execution,proposal,user):
     """Recheck after slow preflight/upload. The current execution already owns its capacity slot."""
     policy_lock()
-    issues=[]
+    from .orquestacion import cycle_issues
+    issues=cycle_issues(proposal)
     if globally_paused() or ConnectorAccount.objects.filter(paused=True).exists():issues.append('Cuenta o máquina en pausa')
     if not within_window():issues.append('Fuera de ventana')
     if capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
@@ -552,6 +564,8 @@ def _publish(execution,proposal,connector,user):
 def execute(user,proposal_id):
     """Execute one approved proposal exactly once. Safety gates run before any write."""
     require(user,'execute_actions')
+    from .orquestacion import current
+    if current():current().deny('undeclared_execution')
     if globally_paused():raise OperatorBlocked('Operación global pausada (OPERATOR_PAUSED).')
     # Persist health/pause changes before any gate can roll back the execution reservation.
     from . import red
@@ -565,6 +579,8 @@ def execute(user,proposal_id):
         proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
         existing=ActionExecution.objects.filter(proposal=proposal).first()
         if existing:return existing
+        from .orquestacion import cycle_issues
+        if cycle_issues(proposal):raise OperatorBlocked('; '.join(cycle_issues(proposal)))
         if proposal.state!=ActionProposal.State.APPROVED:raise Conflict('Solo se ejecutan propuestas aprobadas.')
         if not (proposal.approved_hash==proposal.payload_hash==current_hash(proposal)):
             raise Conflict('La versión aprobada no coincide con la propuesta; requiere nueva aprobación.')
@@ -834,6 +850,27 @@ def propose_comment(user,post_id,origin_job=''):
 NETWORK_JOBS={'discover_network':'discover','classify_contacts':'classify','plan_network':'plan','sync_network':'sync'}
 
 def run_job(job):
+    from . import orquestacion
+    if job.kind not in ('observe','propose_comment',*NETWORK_JOBS):return _run_job(job)
+    runtime=orquestacion.Runtime.open('red',str(job.id),job.owner,job,
+        facts={'trigger':job.kind},plan=[job.kind])
+    try:
+        with runtime.session():
+            result=_run_job(job)
+            runtime.finish(result)
+            return result
+    except orquestacion.CycleStopped as exc:return 'failed','blocked',str(exc)
+
+
+def _network_tool(job,operation):
+    from . import orquestacion
+    runtime=orquestacion.current()
+    if runtime is None:return operation()
+    edge=runtime.graph['code_bindings']['network_edges'][job.kind]
+    return runtime.call(edge,{'job':str(job.id),'kind':job.kind,'params':job.params},operation)
+
+
+def _run_job(job):
     """Returns (job_state, result_status, safe_error). Known failures carry our own messages. Background jobs that produced
     something tell the office scene (oficina_eventos.job_done)."""
     from . import oficina_eventos
@@ -841,11 +878,11 @@ def run_job(job):
     try:
         if job.kind=='observe':
             account=ConnectorAccount.objects.get(id=params['account'])
-            summary=observe(user,account,params.get('referents'),int(params.get('limit',5)))
+            summary=_network_tool(job,lambda:observe(user,account,params.get('referents'),int(params.get('limit',5))))
             oficina_eventos.job_done(job.kind,summary)
             return 'complete',f'observed:{summary["new_posts"]}+{summary["seen_posts"]}','; '.join(e['error'] for e in summary['errors'])
         if job.kind=='propose_comment':
-            proposal=propose_comment(user,params['post'],origin_job=str(job.id))
+            proposal=_network_tool(job,lambda:propose_comment(user,params['post'],origin_job=str(job.id)))
             return 'complete',proposal.state,''
         if job.kind=='execute_action':
             execution=execute(user,params['proposal'])
@@ -855,7 +892,7 @@ def run_job(job):
         if job.kind in NETWORK_JOBS:
             from . import red
             account=ConnectorAccount.objects.get(id=params['account'])
-            r=getattr(red,NETWORK_JOBS[job.kind])(user,account)
+            r=_network_tool(job,lambda:getattr(red,NETWORK_JOBS[job.kind])(user,account))
             oficina_eventos.job_done(job.kind,r)
             status={'discover_network':lambda:f"nuevos:{r['new']}",'classify_contacts':lambda:f"encajan:{r['fit']}/{r['classified']}",
                     'plan_network':lambda:f"seg:{r['follow']} inv:{r['invite']} acep:{r['accept']}",
