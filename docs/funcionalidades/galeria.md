@@ -1,6 +1,6 @@
 # Galería (`GAL`)
 
-Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un interruptor para prohibir la edición con IA en cada una. El backend ya selecciona, edita y publica las fotos; los controles de tres estados quedan para fase 2 (ver «Imágenes» al final).
+Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el selector «Edición con IA» en cada una. El backend selecciona, edita y publica las fotos; la fase 2 añade los controles de tres estados, con QA pendiente (ver «Imágenes» al final).
 
 - **Código:** backend `capturas_views.Gallery`, `PhotoDetail`, `PhotoImage`, `capturas.add_photos`, `delete_photo`, `photo_payload`, `photo_status`, `photo_used_in`, modelo `GalleryPhoto`; PWA `oficina/src/pages/Galeria.tsx`, `pages/galeria/PhotoSheet.tsx`; app `movil/src/galeria/*` (`GaleriaScreen.tsx`, `PhotoSheet.tsx`, `PhotoViewer.tsx`, `upload.ts`, `UploadProgressCard.tsx`), `movil/src/components/ui/ApiImage.tsx`; común `compartido/src/api/capturas.ts`, `compartido/src/logic/galeria.ts`.
 - **Documentación:** sección «Galería» de [`capturas-galeria.md`](../../agentes-linkedin/infra/docs/capturas-galeria.md) y de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
@@ -12,7 +12,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
 | [GAL-01](#gal-01) | Ver la Galería y filtrar | PWA · app · backend | funciona |
 | [GAL-02](#gal-02) | Subir fotos | PWA · app · backend | parcial |
 | [GAL-03](#gal-03) | Dejar una nota para el equipo en una foto | PWA · app · backend | funciona |
-| [GAL-04](#gal-04) | Prohibir o permitir la edición con IA de una foto | PWA · app · backend | parcial |
+| [GAL-04](#gal-04) | Prohibir o permitir la edición con IA de una foto | PWA · app · backend | funciona |
 | [GAL-05](#gal-05) | Quitar una foto de la Galería | PWA · app · backend | funciona |
 | [GAL-06](#gal-06) | Ver las fotos a pantalla completa | app | funciona |
 | [GAL-07](#gal-07) | Las fotos son privadas | PWA · app · backend | funciona |
@@ -63,7 +63,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
 - **Qué hace para Gustavo:** al tocar una foto escribe una nota («recórtala para que no se lean nombres de clientes») que el equipo verá.
 - **Código:** `PATCH /api/v1/galeria/<id> {note}`; `PhotoSheet.tsx` en las dos interfaces (`photoPatch` envía solo lo que cambió).
 - **Criterios de aceptación:**
-  1. **Dado** una foto, **cuando** la toca, **entonces** se abre la hoja con la imagen, la etiqueta, `used_in.text` o «Todavía sin usar», «Nota para el equipo (opcional)» (con el ejemplo «Por ejemplo: recórtala para que no se lean nombres de clientes.»), el interruptor «El equipo puede editarla con IA», «Guardar» y «Quitar de la galería».
+  1. **Dado** una foto, **cuando** la toca, **entonces** se abre la hoja con la imagen, la etiqueta, `used_in.text` o «Todavía sin usar», «Nota para el equipo (opcional)» (con el ejemplo «Por ejemplo: recórtala para que no se lean nombres de clientes.»), el selector «Edición con IA», «Guardar» y «Quitar de la galería».
   2. **Dado** que escribe una nota, **cuando** pulsa «Guardar», **entonces** se envía solo `note`, aparece «Foto guardada.» y la hoja se cierra.
   3. **Dado** que no cambió nada, **cuando** mira «Guardar», **entonces** está desactivado.
   4. **Dado** una nota de más de 2.000 caracteres, **cuando** se envía, **entonces** la API responde 400.
@@ -74,15 +74,16 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y un inte
 ### GAL-04 · Prohibir o permitir la edición con IA de una foto <a id="gal-04"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** parcial
-- **Qué hace para Gustavo:** en cada foto decide si el equipo puede editarla con IA.
-- **Código:** `PATCH /api/v1/galeria/<id> {allow_ai_edit}`; interruptor «El equipo puede editarla con IA» en `PhotoSheet.tsx` de las dos interfaces. El backend usa `ai_edit`; `allow_ai_edit` permanece como alias de compatibilidad.
+- **Estado:** funciona
+- **Qué hace para Gustavo:** en cada foto elige «No editar», «Que decida el equipo» o «Editar» ([IMG-16](imagenes-en-publicaciones.md#img-16)).
+- **Código:** `PATCH /api/v1/galeria/<id> {ai_edit}`; `PhotoSheet.tsx` y `AIEditControl.tsx` de ambas interfaces; `compartido/src/logic/galeria.ts` calcula solo los campos cambiados.
 - **Criterios de aceptación:**
-  1. **Dado** una foto, **cuando** apaga el interruptor y guarda, **entonces** se envía `{allow_ai_edit: false}`, aparece «Foto guardada.» y la foto vuelve con `allow_ai_edit: false`; queda registrado `gallery.updated` en la auditoría.
-  2. **Dado** una foto nueva, **cuando** se crea, **entonces** el interruptor viene con el valor por defecto de Ajustes ([AJU-09](ajustes.md#aju-09)).
-  3. **Dado** una foto con `allow_ai_edit=false`, **cuando** el equipo prepara un post con ella, **entonces** nunca la edita, aunque la nota pida editar; ver [IMG-07](imagenes-en-publicaciones.md#img-07).
-- **Brechas código/docs:** el backend aplica no/auto/si; la interfaz de tres opciones queda para fase 2.
-- **Cobertura QA:** E2E `10-galeria` (criterio 1: el interruptor apagado y guardado sigue apagado al volver). 2, Jest; 3 no aplica todavía.
+  1. **Dado** una foto, **cuando** cambia la opción y guarda, **entonces** envía solo `ai_edit` (no/auto/si), muestra «Foto guardada.» y conserva la elección al abrirla otra vez.
+  2. **Dado** una foto nueva, **cuando** se crea, **entonces** toma el valor por defecto de Ajustes, salvo elección explícita en captura.
+  3. **Dado** `ai_edit=no`, **cuando** el equipo prepara un post, **entonces** no edita la foto aunque la nota lo pida.
+  4. **Dado** una foto ya usada, **cuando** cambia su opción, **entonces** afecta a usos futuros.
+- **Brechas código/docs:** implementación terminada; validación de fase 2 en CI pendiente.
+- **Cobertura QA:** `10-galeria` (opciones y persistencia), `05-captura-envios` y `11-ajustes`; Jest/Vitest comprueban PATCH parcial. Escritos; ejecución pendiente de Claude.
 
 ### GAL-05 · Quitar una foto de la Galería <a id="gal-05"></a>
 

@@ -16,7 +16,7 @@ function foto(overrides: Partial<PhotoOutput> = {}): PhotoOutput {
     label: 'Sin usar',
     tone: 'muted',
     note: '',
-    allow_ai_edit: true,
+    ai_edit: 'auto',
     used_in: null,
     capture_id: null,
     mime: 'image/jpeg',
@@ -39,7 +39,7 @@ const PHOTOS = [
     note: 'Úsala en el post del domingo',
     used_in: { piece_id: 'p8', date: '2026-11-08', text: 'Elegida para el post del domingo 8' },
   }),
-  foto({ id: 'f3', url: '/api/v1/galeria/f3/imagen', state: 'publicada', display_state: 'publicada', label: 'Publicada · 2 nov', tone: 'ok', allow_ai_edit: false }),
+  foto({ id: 'f3', url: '/api/v1/galeria/f3/imagen', state: 'publicada', display_state: 'publicada', label: 'Publicada · 2 nov', tone: 'ok', ai_edit: 'no' }),
 ];
 
 const page = (results: PhotoOutput[]) => ({ count: results.length, next: null, previous: null, results });
@@ -86,7 +86,7 @@ describe('Galería', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('/galeria?filtro=publicadas');
   });
 
-  it('opens a photo, saves its note and the AI switch', async () => {
+  it.each([['no', 'No editar'], ['si', 'Editar']] as const)('opens a photo, saves its note and AI choice %s', async (value, label) => {
     const api = server({ 'PATCH /api/v1/galeria/f2': (request) => ({ body: { ...PHOTOS[1], ...(request.body as object) } }) });
     const user = userEvent.setup();
     renderAt('/galeria', routes);
@@ -101,13 +101,13 @@ describe('Galería', () => {
     expect(note).toHaveValue('Úsala en el post del domingo');
     await user.clear(note);
     await user.type(note, 'Recórtala sin nombres');
-    const ai = within(sheet).getByRole('switch', { name: 'El equipo puede editarla con IA' });
-    expect(ai).toBeChecked();
+    const ai = within(sheet).getByRole('radio', { name: label });
+    expect(ai).not.toBeChecked();
     await user.click(ai);
     await user.click(save);
 
     expect(await screen.findByText('Foto guardada.')).toBeInTheDocument();
-    expect(api.find('PATCH', '/api/v1/galeria/f2')[0]?.body).toEqual({ note: 'Recórtala sin nombres', allow_ai_edit: false });
+    expect(api.find('PATCH', '/api/v1/galeria/f2')[0]?.body).toEqual({ note: 'Recórtala sin nombres', ai_edit: value });
     expect(screen.queryByRole('dialog', { name: 'Foto' })).not.toBeInTheDocument();
   });
 

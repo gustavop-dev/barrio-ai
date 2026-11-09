@@ -1,3 +1,4 @@
+import type { PieceDetailFull } from './calendario';
 import { api, LOGIN_PATH, SESSION_PATH, TOKEN_PATH } from './client';
 import type {
   Account,
@@ -25,7 +26,6 @@ import type {
   Orientation,
   Overview,
   Paginated,
-  PieceDetail,
   PlanResponse,
   Question,
   QuestionAnswer,
@@ -116,7 +116,7 @@ export function getCalendar(desde = '', dias = 15) {
   params.set('dias', String(dias));
   return api.get<EditorialCalendar>(`${ED}/calendar?${params.toString()}`);
 }
-export const getPiece = (pieceId: string) => api.get<PieceDetail>(`${ED}/pieces/${id(pieceId)}`);
+export const getPiece = (pieceId: string) => api.get<PieceDetailFull>(`${ED}/pieces/${id(pieceId)}`);
 /** Paid: queues the editorial circuit for the next free slot. The same `request_id` never queues twice. */
 export const planPiece = (requestId?: string) => api.post<PlanResponse>(`${ED}/plan`, requestId ? { request_id: requestId } : {});
 

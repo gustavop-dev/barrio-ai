@@ -85,7 +85,8 @@ Para comparar con el diseño, abre las capturas junto a los tableros `movil/dise
 - personas en cada etapa, oportunidades en varias etapas y referentes;
 - todas las tarjetas de Tu turno: «¿Salió o no?», una conversación del inbox, preguntas de texto, de opción y de sí o no, una pospuesta, una caducada, la orientación del analista y dos aprobaciones de red (seguir a Laura, invitar a Julián: la red está en modo `approval` porque `OPERATOR_AUTONOMY` va vacío);
 - notificaciones leídas y sin leer, y «Próximo»;
-- una captura transcrita y una idea usada;
+- una captura transcrita, una idea usada y una captura urgente con evidencia y fecha prevista;
+- foto en `manana`, infografía en `aprobacion` y carrusel de cuatro láminas con PDF y alt en `publicada8`;
 - cuatro fotos generadas en la Galería;
 - unos 100 días de audiencia, trabajos y sincronizaciones de red para Resultados, el resumen semanal y filas de gasto.
 
@@ -102,6 +103,7 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `04-tu-turno-aprobar` | aprobar una acción de red desde su tarjeta de Tu turno y otra desde «En cola» del calendario |
 | `04-tu-turno-mas` | máquina detenida desde Ajustes y reanudada desde Tu turno, «Responder con audio», «Marcar como oportunidad», «No responder», descartar la orientación, responder con una opción y «Deshacer», «No quiero compartir esto» |
 | `04-tu-turno-sabe` | «Lo que el equipo sabe de ti»: añadir, editar (v2) y retirar un dato |
+| `16-imagenes` | detalle con foto y veto, infografía con revisión, carrusel de cuatro láminas por swipe y botones; «Lo antes posible» con previsión, evidencia y condiciones en Lo que enviaste |
 | `05-captura` | desde Galería: abrir la hoja, «Para qué es», grabar desde la hoja, cerrar vacía y con algo («¿Cerrar sin enviar?»), mantener el botón, enviar, «Deshacer» en el aviso (vuelve el borrador), «Lo que enviaste» y «Deshacer» ahí |
 | `05-captura-envios` | una foto del selector de Android y una nota de voz llegan al backend (aviso, Galería, «Lo que enviaste»); sin red (modo avión) y 413: el motivo, el borrador y «Reintentar» |
 | `05-captura-contexto` | «Responder con audio» en Tu turno, «Nota de voz» en una persona y «Comentario para el equipo» con foto en una pieza, con su contexto en «Lo que enviaste» |
@@ -283,3 +285,5 @@ En la primera ejecución hay que comprobar en GitHub:
 4. Que el token efímero de Actions tiene `contents: write` y `pull-requests: write`, y que las reglas del repositorio permiten crear y hacer force-push a `qa-sesion/**`. El controlador solo empuja ese prefijo. Las reglas de ramas protegidas pueden rechazarlo aunque el workflow declare los permisos.
 
 La implementación se preparó sin ejecutar instalaciones, builds ni pruebas locales. La primera ejecución y su revisión se hacen en GitHub.
+
+Fase 2 de imágenes: flujos y pruebas escritos, sin ejecución local. Selección inicial para Claude: `[qa: 05 07 10 11 16]`. `05-captura-envios`, `10-galeria` y `11-ajustes` cubren el selector de tres estados (IMG-16); `16-imagenes` cubre IMG-11 y CAP-16.

@@ -17,6 +17,7 @@ export function Options<V extends string | boolean>({
   onChange,
   disabled,
   horizontal,
+  testID,
 }: {
   legend: string;
   options: readonly Option<V>[];
@@ -24,9 +25,10 @@ export function Options<V extends string | boolean>({
   onChange: (value: V) => void;
   disabled?: boolean;
   horizontal?: boolean;
+  testID?: string;
 }) {
   return (
-    <View accessibilityRole="radiogroup" accessibilityLabel={legend} style={styles.group}>
+    <View accessibilityRole="radiogroup" accessibilityLabel={legend} style={styles.group} testID={testID} collapsable={false}>
       <T variant="etiqueta" soft>
         {legend}
       </T>
@@ -36,6 +38,7 @@ export function Options<V extends string | boolean>({
           return (
             <Pressable
               key={String(option.value)}
+              testID={testID ? `${testID}-${String(option.value)}` : undefined}
               accessibilityRole="radio"
               accessibilityState={{ checked: selected, disabled: Boolean(disabled) }}
               accessibilityLabel={option.hint ? `${option.label}. ${option.hint}` : option.label}

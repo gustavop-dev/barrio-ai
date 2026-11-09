@@ -132,7 +132,7 @@ function server(extra: Record<string, FakeHandler> = {}, { control = {}, status 
     'GET /api/v1/red/summary': { body: RED },
     'GET /api/v1/linkedin/status': { body: status },
     'GET /api/v1/orientacion': { body: AJUSTES.orientation },
-    'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: true, updated_at: null } },
+    'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } },
     'GET /api/v1/auth/dispositivos': { body: DEVICES },
     ...extra,
   });
@@ -326,14 +326,14 @@ describe('Ajustes · LinkedIn oficial', () => {
 
 describe('Ajustes · Captura y galería', () => {
   it('shows the microphone permission and saves the AI-edit default', async () => {
-    const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: false, updated_at: null } } });
+    const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'no', updated_at: null } } });
     await renderAjustes();
     expect(await screen.findByText('Permitido')).toBeOnTheScreen();
-    const ai = screen.getByRole('switch', { name: 'El equipo puede editar mis fotos con IA' });
+    const ai = screen.getByRole('radio', { name: 'No editar' });
     await waitFor(() => expect(ai).toBeEnabled());
     await fireEvent.press(ai);
-    await waitFor(() => expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ gallery_ai_edit_default: false }));
-    expect(await screen.findByText('Las fotos nuevas no se editarán con IA.')).toBeOnTheScreen();
+    await waitFor(() => expect(api.find('PATCH', '/api/v1/ajustes/preferencias')[0]?.body).toEqual({ gallery_ai_edit: 'no' }));
+    expect(await screen.findByText('Edición con IA guardada para las fotos nuevas.')).toBeOnTheScreen();
   });
 
   it('asks for the microphone when it was never asked, and opens the phone settings when it is blocked', async () => {
@@ -362,7 +362,7 @@ describe('Ajustes · Notificaciones', () => {
   });
 
   it('turns the push of one type off and saves every disabled type', async () => {
-    const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: true, updated_at: null } } });
+    const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } } });
     await renderAjustes();
     await fireEvent.press(screen.getByRole('button', { name: 'Por tipo de notificación' }));
     const published = await screen.findByRole('switch', { name: 'Pieza publicada' });
@@ -376,7 +376,7 @@ describe('Ajustes · Notificaciones', () => {
   });
 
   it('turns on the push of a type that is off and saves it as enabled, so the server keeps it', async () => {
-    const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit_default: true, updated_at: null } } });
+    const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } } });
     await renderAjustes();
     await fireEvent.press(screen.getByRole('button', { name: 'Por tipo de notificación' }));
     await fireEvent.press(await screen.findByRole('switch', { name: 'Pregunta nueva' }));

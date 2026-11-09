@@ -270,7 +270,8 @@ tags: [captura]
     id: capture-note
     waitToSettleTimeoutMs: 500
 - inputText: Comentario de QA usa la foto de la pizarra al final
-- tapOn: 'A[ñÑ]adir una imagen'
+# The image heading is above the viewport after the new AI options and the focused note.
+- hideKeyboard
 - takeScreenshot: 05-contexto-07-comentario-con-foto
 - scrollUntilVisible:
     element:

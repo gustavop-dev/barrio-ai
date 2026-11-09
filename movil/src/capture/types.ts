@@ -1,3 +1,4 @@
+import type { AIEdit } from '@compartido/api/imagenes';
 import type { CapturePurpose } from '@compartido/api/capturas';
 
 /** What a capture is attached to; without it the capture goes loose and the team decides. */
@@ -29,6 +30,7 @@ export interface PickedPhoto {
 
 /** A draft given back to the sheet (after «Deshacer», the sent content returns to it). */
 export interface CaptureDraft {
+  ai_edit?: AIEdit;
   audio: RecordedAudio | null;
   fotos: PickedPhoto[];
   nota: string;

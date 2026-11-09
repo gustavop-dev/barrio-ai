@@ -70,10 +70,10 @@ describe('Ajustes', () => {
 
 describe('Galería', () => {
   it('PATCHes only what changed', () => {
-    const photo = { note: 'Recórtala', allow_ai_edit: true };
-    expect(photoPatch(photo, ' Recórtala ', true)).toEqual({});
-    expect(photoPatch(photo, 'Otra', true)).toEqual({ note: 'Otra' });
-    expect(photoPatch(photo, 'Recórtala', false)).toEqual({ allow_ai_edit: false });
+    const photo = { note: 'Recórtala', ai_edit: 'auto' as const };
+    expect(photoPatch(photo, ' Recórtala ', 'auto')).toEqual({});
+    expect(photoPatch(photo, 'Otra', 'auto')).toEqual({ note: 'Otra' });
+    expect(photoPatch(photo, 'Recórtala', 'no')).toEqual({ ai_edit: 'no' });
   });
 
   it('warns where a removed photo is used, and words the upload', () => {

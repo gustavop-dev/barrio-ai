@@ -8,7 +8,7 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from rest_framework.test import APIClient
 from team_backend import editorial
-from team_backend.management.commands.seed_qa import EXTRA_DEVICE, QA_PASSWORD_DEFAULT
+from team_backend.management.commands.seed_qa import EXTRA_DEVICE, QA_PASSWORD_DEFAULT, uid
 from team_backend.models import (ActionProposal, Capture, ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Notification, Opportunity,
                                  PostMetric, Referent, TeamQuestion, WeeklySummary)
 from team_backend.tests.test_capturas import MediaMixin
@@ -62,11 +62,29 @@ class SeedQaTests(MediaMixin,OperatorBase):
         from team_backend.models import Capture, PieceImage
         self.assertTrue(PieceImage.objects.filter(kind='foto',source_photo__isnull=False).exists())
         self.assertTrue(PieceImage.objects.filter(kind='infografia',template='pasos').exists())
+        carousel=EditorialPiece.objects.get(id=uid('piece:publicada8'))
+        self.assertEqual(carousel.image_kind,'carrusel')
+        images=list(carousel.images.order_by('position'))
+        self.assertEqual([image.position for image in images],[1,2,3,4])
+        self.assertEqual([image.template for image in images],['portada','pasos','numero','cierre'])
+        self.assertEqual([image.id for image in images],[uid(f'image:carrusel:{i}') for i in range(1,5)])
+        self.assertTrue(all(image.kind=='carrusel' and image.alt and image.image.storage.exists(image.image.name) for image in images))
+        self.assertTrue(carousel.image_document.storage.exists(carousel.image_document.name))
+        first_carousel_hashes=[image.sha256 for image in images]
         urgent=Capture.objects.get(publish_asap=True)
         self.assertIn('lo antes posible',urgent.note)
         self.assertIsNotNone(urgent.publish_asap_expected_slot)
         self.assertTrue(all(row.alt for row in PieceImage.objects.all()))
         app=self.device()
+        detail=app.get(f'/api/v1/editorial/pieces/{carousel.id}').json()
+        self.assertEqual(detail['image_kind'],'carrusel')
+        self.assertEqual([row['alt'] for row in detail['images']],[image.alt for image in images])
+        for row in detail['images']:
+            self.assertEqual(app.get(row['url']).status_code,200)
+            self.assertIn(APIClient().get(row['url']).status_code,(401,403))
+        response=app.get(detail['image_document_url'])
+        self.assertEqual(response.status_code,200)
+        self.assertEqual(b''.join(response.streaming_content).count(b'/Alt '),4)
         turno=app.get('/api/v1/tu-turno').json()
         self.assertEqual({c['type'] for c in turno['items']},{'aviso','pregunta','conversacion','resumen','aprobacion'})
         # The network block waits for approval by default (OPERATOR_AUTONOMY is empty): Laura's follow and Julián's invitation.
@@ -102,6 +120,7 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual(app.post('/api/v1/notificaciones/leer',{'todas':True},format='json').status_code,200)
         self.seed()
         self.assertEqual(self.counts(),first)
+        self.assertEqual(list(carousel.images.order_by('position').values_list('sha256',flat=True)),first_carousel_hashes)
         self.assertEqual(TeamQuestion.objects.get(question__startswith='¿Cuántos proyectos').state,'open')
         self.assertEqual(Notification.objects.filter(read_at__isnull=True).count(),5)
         self.assertEqual(app.get('/api/v1/tu-turno').status_code,200)

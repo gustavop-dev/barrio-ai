@@ -1,10 +1,12 @@
 // Ajustes › Captura y galería (rev 18): the microphone permission, with a request button, and the
-// default «El equipo puede editar mis fotos con IA» (PATCH /api/v1/ajustes/preferencias).
+// default «Edición con IA» (PATCH /api/v1/ajustes/preferencias).
+import { AIEditControl } from '../../components/ui/AIEditControl';
+import type { AIEdit } from '../../../../compartido/src/api/imagenes';
 import { useState } from 'react';
 import { usePreferencias, useSavePreferencias } from '../../api/capturas';
 import { MicError, requestMic, useMicState, type MicState } from '../../capture/recorder';
 import { Badge, Button, Card, ErrorRetry, Note, Section, errorMessage, useToast, type Tone } from '../../components/ui';
-import { isUnavailable, SwitchRow } from './shared';
+import { isUnavailable } from './shared';
 
 const MIC: Record<MicState, { label: string; tone: Tone }> = {
   granted: { label: 'Permitido', tone: 'ok' },
@@ -60,16 +62,17 @@ function AiEditDefault() {
   const prefs = usePreferencias();
   const save = useSavePreferencias();
   const toast = useToast();
-  const [pending, setPending] = useState<boolean | null>(null);
+  const [pending, setPending] = useState<AIEdit | null>(null);
   const unavailable = isUnavailable(prefs.error);
-  const checked = pending ?? prefs.data?.gallery_ai_edit_default ?? true;
+  const value = pending ?? prefs.data?.gallery_ai_edit ?? 'auto';
 
-  const change = (next: boolean) => {
+  const change = (next: AIEdit) => {
+    if (next === value) return;
     setPending(next);
     save.mutate(
-      { gallery_ai_edit_default: next },
+      { gallery_ai_edit: next },
       {
-        onSuccess: () => toast.show(next ? 'Las fotos nuevas se podrán editar con IA.' : 'Las fotos nuevas no se editarán con IA.'),
+        onSuccess: () => toast.show('Edición con IA guardada para las fotos nuevas.'),
         onError: (error) => toast.show(errorMessage(error), { tone: 'error' }),
         onSettled: () => setPending(null),
       },
@@ -79,7 +82,7 @@ function AiEditDefault() {
   return (
     <>
       <div className="aj-divider" />
-      <SwitchRow label="El equipo puede editar mis fotos con IA" checked={checked} disabled={!prefs.isSuccess || save.isPending} onChange={change} />
+      <AIEditControl testID="default-ai" value={value} disabled={!prefs.isSuccess || save.isPending} onChange={change} />
       <p className="t-detalle text-suave">
         {unavailable ? 'Aún no disponible: el servidor todavía no guarda esta preferencia.' : 'Es el valor por defecto de cada foto nueva; puedes cambiarlo foto por foto en la Galería.'}
       </p>

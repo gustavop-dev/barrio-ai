@@ -7,10 +7,11 @@ import { api } from './client';
 import { asList } from './endpoints';
 import { keys } from './queryClient';
 import type { Ajustes, Paginated } from './types';
+import type { AIEdit, PieceImage } from './imagenes';
 
 // ================================================================ shapes
 
-export type CapturePurpose = 'post' | 'dato' | 'respuesta' | 'galeria';
+export type CapturePurpose = 'post' | 'propuesta' | 'dato' | 'respuesta' | 'galeria';
 export type CaptureContextKind = 'pregunta' | 'persona' | 'pieza';
 
 export type CaptureState =
@@ -33,6 +34,11 @@ export function isProcessing(state: string): boolean {
 }
 
 export interface CaptureOutput {
+  ai_edit?: AIEdit;
+  publish_asap?: boolean;
+  publish_asap_evidence?: string;
+  publish_asap_expected_slot?: string | null;
+  publish_asap_reason?: string;
   id: string;
   created_at: string;
   note: string;
@@ -134,6 +140,7 @@ function appendFile(form: FormData, field: string, file: Blob | NativeFile, file
 
 /** The multipart fields of POST /api/v1/capturas. Everything is optional, but it cannot go empty. */
 export interface CaptureInput {
+  ai_edit?: AIEdit;
   audio?: { blob: Blob | NativeFile; filename: string; durationS: number } | null;
   fotos?: UploadFile[];
   nota?: string;
@@ -155,8 +162,11 @@ export interface PhotoOutput {
   label: string;
   tone: PhotoTone | string;
   note: string;
-  allow_ai_edit: boolean;
-  used_in: { piece_id: string; date: string; text: string } | null;
+  ai_edit: AIEdit;
+  instruction?: string;
+  instruction_kind?: '' | 'none' | 'original' | 'edit' | 'unsafe';
+  versions?: PieceImage[];
+  used_in: { piece_id: string | null; date: string | null; text: string } | null;
   capture_id: string | null;
   mime: string;
   size_bytes: number;
@@ -168,11 +178,11 @@ export type GaleriaFiltro = 'todas' | 'sin_usar' | 'elegidas' | 'publicadas';
 
 export interface PhotoPatch {
   note?: string;
-  allow_ai_edit?: boolean;
+  ai_edit?: AIEdit;
 }
 
 export interface Preferencias {
-  gallery_ai_edit_default: boolean;
+  gallery_ai_edit: AIEdit;
   updated_at: string | null;
   /** Kinds whose push is off (PATCH accepts it; GET may not return it). */
   push_disabled?: string[];
@@ -181,7 +191,7 @@ export interface Preferencias {
 }
 
 export interface PreferenciasPatch {
-  gallery_ai_edit_default?: boolean;
+  gallery_ai_edit?: AIEdit;
   push_disabled?: string[];
   push_enabled?: string[];
 }
@@ -234,6 +244,7 @@ export function captureForm(input: CaptureInput): FormData {
   const nota = (input.nota ?? '').trim();
   if (nota) form.append('nota', nota);
   if (input.para) form.append('para', input.para);
+  if (input.ai_edit) form.append('ai_edit', input.ai_edit);
   if (input.contexto) {
     form.append('contexto_tipo', input.contexto.tipo);
     form.append('contexto_id', input.contexto.id);

@@ -2,6 +2,8 @@
 // in-context entry points (a Tu turno question, a person, a piece) all call openCapture().
 // App.tsx passes openCaptureSheet (capture/store.ts) as `onCapture`; the sheet itself is
 // mounted once by the Layout (CaptureSheetHost). See Captura.dc.html.
+import type { AIEdit } from '../../../compartido/src/api/imagenes';
+import type { CapturePurpose } from '../api/capturas';
 import { createContext, useContext, useMemo, type ReactNode } from 'react';
 import type { RecordedAudio, Recorder } from './recorder';
 
@@ -15,10 +17,11 @@ export interface CaptureTarget {
 
 /** A draft given back to the sheet (after «Deshacer», the sent content returns to it). */
 export interface CaptureDraft {
+  ai_edit?: AIEdit;
   audio: RecordedAudio | null;
   fotos: File[];
   nota: string;
-  para: 'post' | 'dato' | 'respuesta' | 'galeria' | null;
+  para: CapturePurpose | null;
   publicUse: boolean | null;
 }
 

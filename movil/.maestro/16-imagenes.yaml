@@ -1,0 +1,238 @@
+# cubre: IMG-11, CAP-16
+# Real private bytes from seed_qa: photo (manana), infographic (aprobacion), four-slide carousel
+# (publicada8). Deep links open the same Calendario detail used by the calendar cards.
+# Selector coverage: 05-captura-envios, 10-galeria and 11-ajustes (IMG-16).
+appId: co.projectapp.office
+name: Imágenes y publicación prioritaria
+tags: [calendario, captura, imagenes]
+---
+- runFlow: comun/entrar.yaml
+- tapOn:
+    id: tab-galeria
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-galeria
+    timeout: 30000
+
+# Photo: the original chosen for tomorrow, same whole-piece veto.
+- openLink: oficina0ff1ce://calendario/pieza/074c7c81-dfc4-59a1-8fb8-f53d6ed1ba4c
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- assertVisible: Vetar
+- scrollUntilVisible:
+    element:
+      id: piece-image-1
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: Se publica tal cual
+# expo-image exposes its testID on the native wrapper and its alt on the descendant ImageView.
+- assertVisible:
+    text: A workshop scene provided by Gustavo, with people sharing a product demonstration.
+    childOf:
+      id: piece-image-1
+- takeScreenshot: 16-imagenes-01-foto
+- scrollUntilVisible:
+    element:
+      text: Foto de ejemplo para la fase 2
+    direction: DOWN
+    centerElement: true
+- assertNotVisible: Ver original
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# Infographic: actual PNG, alt and checklist, without approving or recalculating the hash.
+- openLink: oficina0ff1ce://calendario/pieza/74a9cae0-2507-5628-8dba-f09a48a4115f
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- assertVisible: Aprobar
+- scrollUntilVisible:
+    element:
+      id: piece-image-1
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- takeScreenshot: 16-imagenes-02-infografia
+- scrollUntilVisible:
+    element:
+      text: 'Plantilla: Pasos'
+    direction: DOWN
+    centerElement: true
+- assertVisible: 'Texto alternativo: Three steps: name the decision, compare the options, and record the reason. Make the decision explicit.'
+- assertVisible: Comprobación aprobada
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# Carousel: four ordered slides using the accessible buttons forward and back.
+- openLink: oficina0ff1ce://calendario/pieza/8c51152c-8ffd-53da-9b94-3664683287e1
+- extendedWaitUntil:
+    visible:
+      id: pieza
+    timeout: 20000
+- assertNotVisible: Vetar
+- scrollUntilVisible:
+    element:
+      id: piece-image-count
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible:
+    id: piece-image-count
+    text: '1/4'
+    childOf:
+      id: piece-images
+- assertVisible:
+    id: piece-image-prev
+    enabled: false
+    childOf:
+      id: piece-images
+- assertVisible:
+    text: "Cover: Make the decision explicit. A small guide to comparing options."
+    childOf:
+      id: piece-image-1
+- assertVisible:
+    text: 'Plantilla: Portada'
+    childOf:
+      id: piece-images
+- takeScreenshot: 16-imagenes-03-portada
+# Centering the controls can leave the image clipped. The image swipe did not advance in QA;
+# use the visible next button and require both the new counter and the corresponding image.
+- tapOn:
+    id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
+- extendedWaitUntil:
+    visible:
+      id: piece-image-count
+      text: '2/4'
+      childOf:
+        id: piece-images
+    timeout: 10000
+- assertVisible:
+    text: "Three steps: name the decision, compare the options, and record the reason."
+    childOf:
+      id: piece-image-2
+- assertVisible:
+    text: 'Plantilla: Pasos'
+    childOf:
+      id: piece-images
+- takeScreenshot: 16-imagenes-04-pasos
+- tapOn:
+    id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
+- extendedWaitUntil:
+    visible:
+      id: piece-image-count
+      text: '3/4'
+      childOf:
+        id: piece-images
+    timeout: 10000
+- assertVisible:
+    text: "Three steps in this guide. Keep a reason with each decision."
+    childOf:
+      id: piece-image-3
+- assertVisible:
+    text: 'Plantilla: Número'
+    childOf:
+      id: piece-images
+- tapOn:
+    id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
+- extendedWaitUntil:
+    visible:
+      id: piece-image-count
+      text: '4/4'
+      childOf:
+        id: piece-images
+    timeout: 10000
+- assertVisible:
+    text: "Closing question: Which decision needs a reason? Start with one question."
+    childOf:
+      id: piece-image-4
+- assertVisible:
+    text: 'Plantilla: Cierre'
+    childOf:
+      id: piece-images
+- assertVisible:
+    id: piece-image-next
+    enabled: false
+    childOf:
+      id: piece-images
+- takeScreenshot: 16-imagenes-05-cierre
+- tapOn:
+    id: piece-image-prev
+    enabled: true
+    childOf:
+      id: piece-images
+- extendedWaitUntil:
+    visible:
+      id: piece-image-count
+      text: '3/4'
+      childOf:
+        id: piece-images
+    timeout: 10000
+- assertVisible:
+    text: "Three steps in this guide. Keep a reason with each decision."
+    childOf:
+      id: piece-image-3
+- assertVisible:
+    text: 'Plantilla: Número'
+    childOf:
+      id: piece-images
+- assertVisible:
+    id: piece-image-next
+    enabled: true
+    childOf:
+      id: piece-images
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: pieza
+    timeout: 15000
+
+# The interpretation in Lo que enviaste, with evidence and the actual forecast, no urgency input.
+- tapOn:
+    id: capture-button
+- extendedWaitUntil:
+    visible:
+      id: capture-historial
+    timeout: 15000
+- tapOn:
+    id: capture-historial
+- scrollUntilVisible:
+    element:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+# Android's es-CO formatter renders 8:30 without a leading zero. Keep the forecast date and
+# the seeded Bogotá time (8:30 or 08:30, never 18:30), with evidence and conditions in this capture.
+- assertVisible:
+    text: '^Saldrá lo antes posible · fecha prevista: .+, 0?8:30$'
+    childOf:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
+- assertVisible:
+    text: '«Publícalo lo antes posible\.»'
+    childOf:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
+- assertVisible:
+    text: 'Primer hueco libre; sujeto a verificación, aprobación y veto\.'
+    childOf:
+      id: capture-asap-27b806f4-14d1-5c0d-bc06-b910d4a7fdcd
+- takeScreenshot: 16-imagenes-06-lo-antes-posible
