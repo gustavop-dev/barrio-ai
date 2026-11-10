@@ -146,7 +146,7 @@ Cómo decidir:
   instruction_kind=edit y no descartes la foto por pedirla; es estilo de su propia imagen, no un hecho inventado.
   En auto sin instrucción edita solo si hay un defecto visible concreto; ante la duda none. Sin instrucción suya no
   alteres personas, texto ni logos. Un proceso en pasos puede llevar carrusel; un dato o una frase, infografia. Galería vacía: infografia.
-- priority_capture es la idea urgente reservada para este hueco, o null. Si existe, desarrolla esa idea e incluye su id
+- priority_capture es la idea de Gustavo reservada para este hueco (ya le avisamos que saldría este día), o null. Si existe, desarrolla esa idea e incluye su id
   en ideas_used. Si no pasa los criterios de calidad, salta el día y explica por qué: urgencia nunca baja la calidad.
 - evidence enumera los apoyos: observed_post (ref = id de la señal), public_fact (ref = key), course_unit
   (ref = ID) o general_knowledge (conocimiento técnico ampliamente aceptado, sin cifras).
@@ -336,6 +336,12 @@ def budget_retry(pieces,now):
     tz=operador.local_tz()
     return max(p.created_at for p in pieces).astimezone(tz).date()<now.astimezone(tz).date()
 
+def idea_retry(pieces):
+    """A day whose only pieces were skipped because the director did not take the idea reserved for it is a free
+    day for the autopilot's own post: the skip was about the idea, not the day."""
+    pieces=list(pieces)
+    return bool(pieces) and all(p.state==EditorialPiece.State.SKIPPED and (p.brief or {}).get('reserved_capture') for p in pieces)
+
 def next_slot(now=None,manual=False):
     """Autopilot: today or tomorrow once the lead time opened and the day has no piece at all (a skip or a
     failure is not retried automatically, except a stop for the daily budget once it renewed). Manual: the
@@ -346,7 +352,7 @@ def next_slot(now=None,manual=False):
         if when<=now or (not manual and now<when-lead_time()):continue
         pieces=EditorialPiece.objects.filter(slot_date=day)
         if manual and pieces.filter(state__in=OPEN_PIECE_STATES).exists():continue
-        if not manual and pieces.exists() and not budget_retry(pieces,now):continue
+        if not manual and pieces.exists() and not budget_retry(pieces,now) and not idea_retry(pieces):continue
         if Job.objects.filter(kind='prepare_piece',state__in=[Job.State.QUEUED,Job.State.RUNNING],params__slot=day.isoformat()).exists():continue
         return day
     return None
@@ -521,7 +527,7 @@ def prepare(user,slot,origin_job=''):
     if account is None:raise ValueError('LinkedIn (API oficial) no está conectado; no se prepara la pieza.')
     from .autopiloto import autonomy
     if not can_publish(account) or operador.globally_paused() or autonomy('CONT-09')=='off':raise Conflict('Publicación detenida antes de preparar.')
-    when=scheduled_for(slot);now=timezone.now()
+    when=urgente.reserved_at(slot) or scheduled_for(slot);now=timezone.now()
     if when<=now:raise Conflict('La hora de ese hueco ya pasó.')
     piece=EditorialPiece.objects.filter(origin_job=origin_job).first() if origin_job else None
     if piece is None:
@@ -562,8 +568,10 @@ def _context(piece,now):
     from . import capturas, resumen_semanal, perfil
     urgente.assign_slots(now)
     ideas=capturas.ideas_for_director(now)
-    ideas=[i for i in ideas if not i['publish_asap'] or (i['expected_slot'] and datetime.fromisoformat(i['expected_slot'])==piece.scheduled_for)]
-    priority=next((i for i in ideas if i['publish_asap']),None)
+    # Each idea of his has its own window: the one reserved for this piece is its priority; ideas reserved for other
+    # days are not offered here.
+    ideas=[i for i in ideas if not i['expected_slot'] or datetime.fromisoformat(i['expected_slot'])==piece.scheduled_for]
+    priority=next((i for i in ideas if i['expected_slot']),None)
     gallery=imagenes.candidates(ideas)
     feedback=capturas.feedback_for_director(now)
     answers=capturas.answer_research_for_director(now)
@@ -605,8 +613,11 @@ def _run(piece,user,now,origin_job):
         brief,_=_call_stage(piece,'director',dict(director_input,provisional_brief=brief,research_completed=True))
     brief['positioning_version']=posicionamiento.VERSION
     brief['gallery_offered']=[p['id'] for p in gallery]
+    if priority:brief['reserved_capture']=priority['id']
     if priority and priority['id'] not in brief.get('ideas_used',[]):
-        brief.update(decision='skip',skip_reason='La idea urgente no pasó el criterio editorial; se mantiene en la mesa')
+        why=brief.get('skip_reason') if brief.get('decision')=='skip' else ''
+        brief.update(decision='skip',skip_reason='La idea reservada no pasó el criterio editorial; se mantiene en la mesa')
+        capturas.decline_reserved(priority['id'],piece,why)
     offered={i['id'] for i in ideas}
     used=[i for i in (brief.get('ideas_used') or []) if isinstance(i,str) and i in offered]
     if used:capturas.mark_used(used,piece)

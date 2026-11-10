@@ -401,10 +401,11 @@ class CaptureWebTests(CaptureBase):
 
 class EditorialWebTests(EditorialBase):
     def test_saved_capture_sources_reach_writers_and_verifier_without_new_research(self):
-        Capture.objects.create(created_by=self.gustavo,state='idea',purpose='post',note='A public release',
-                               investigation=stored_result().to_dict())
+        idea=Capture.objects.create(created_by=self.gustavo,state='idea',purpose='post',note='A public release',
+                                    investigation=stored_result().to_dict())
+        plan=answers();plan['director']['ideas_used']=[str(idea.id)]  # the idea is reserved for this piece
         with patch.object(research,'research',side_effect=AssertionError('do not re-research')):
-            piece=self.plan(answers())
+            piece=self.plan(plan)
         self.assertEqual(piece.state,'ready');self.assertEqual(len(piece.research),1)
         for stage,payload,system in self.calls:
             if stage in ('editorial-redactor','editorial-seleccion','editorial-verificador'):

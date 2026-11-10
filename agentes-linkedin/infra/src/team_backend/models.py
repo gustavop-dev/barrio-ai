@@ -693,6 +693,9 @@ class Capture(models.Model):
     publish_asap_not_before=models.DateField(null=True,blank=True)
     publish_asap_expected_slot=models.DateTimeField(null=True,blank=True)
     publish_asap_reason=models.TextField(blank=True)
+    # The day and hour Gustavo asked for («publícalo mañana a las 10»), from the literal fragment in publish_at_evidence.
+    publish_at=models.DateTimeField(null=True,blank=True)
+    publish_at_evidence=models.TextField(blank=True)
     understanding=models.JSONField(default=dict,blank=True)
     investigation=models.JSONField(default=dict,blank=True)
     context_type=models.CharField(max_length=10,choices=Context.choices,blank=True)
