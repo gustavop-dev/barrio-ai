@@ -257,6 +257,47 @@ class DispatcherTests(TransactionTestCase):
         with self.assertRaises(runtime.CycleStopped):self.open(key='pinned')
         self.assertEqual(CycleLedger.objects.get(key='pinned').stop_reason,'graph_changed')
 
+    def finished(self, key):
+        run=self.open(key=key)
+        with run.session():
+            run.call('seleccionar',REQUEST,lambda:RESULT)
+            run.finish({'state':'ready'})
+        return run
+
+    def test_a_finished_cycle_waiting_at_its_gate_migrates_after_a_deploy(self):
+        """10/11/2026: a deploy stopped the ready 3:30 pm post. Its work was done: only the gate was left."""
+        run=self.finished('ready-post');before=CycleLedger.objects.get(pk=run.id)
+        self.graph['graph_version']='next'
+        with patch('team_backend.orquestacion.context_version',return_value='new-code'):
+            gate=runtime.Runtime.open('pieza_diaria','ready-post',self.user,self.job,at_gate=True)
+            with gate.session():pass
+            runtime.Runtime.open('pieza_diaria','ready-post',self.user,self.job,at_gate=True)  # already current
+        row=CycleLedger.objects.get(pk=run.id)
+        self.assertEqual((row.state,row.stop_reason,row.graph_version),('complete','','next'))
+        self.assertEqual(row.task_ledger['context_version'],'new-code')
+        [migration]=row.task_ledger['migrations']
+        self.assertEqual((migration['reason'],migration['from']['graph_hash'],migration['to']['graph_version']),
+                         ('gate_after_deploy',before.graph_hash,'next'))
+        # The settled work, the budget bucket and the facts stay as they were.
+        self.assertEqual(row.progress_ledger['calls'],before.progress_ledger['calls'])
+        self.assertEqual((row.budget_bucket,row.task_ledger['facts']),(before.budget_bucket,before.task_ledger['facts']))
+        self.assertEqual(AuditEvent.objects.filter(action='cycle.migrated',target=str(run.id)).count(),1)
+
+    def test_a_cycle_still_working_or_unsettled_keeps_stopping_on_a_deploy(self):
+        self.open(key='working')  # running: its plan is not done
+        unsettled=self.finished('unsettled')
+        row=CycleLedger.objects.get(pk=unsettled.id)
+        row.progress_ledger['calls']['seleccionar:1']['state']='pending';row.save()
+        self.finished('reopened')  # finished, but opened again for work instead of for its gate
+        self.graph['graph_version']='next'
+        for key,at_gate in (('working',True),('unsettled',True),('reopened',False)):
+            with self.assertRaisesRegex(runtime.CycleStopped,'migración explícita'):
+                runtime.Runtime.open('pieza_diaria',key,self.user,self.job,at_gate=at_gate)
+            row=CycleLedger.objects.get(key=key)
+            self.assertEqual((row.state,row.stop_reason),('stopped','graph_changed'))
+            self.assertNotIn('migrations',row.task_ledger)
+        self.assertFalse(AuditEvent.objects.filter(action='cycle.migrated').exists())
+
     def test_stale_worker_requeues_only_confirmed_checkpoints(self):
         from team_backend.jobs import reconcile_interrupted
         from django.conf import settings
