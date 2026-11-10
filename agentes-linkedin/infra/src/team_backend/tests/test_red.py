@@ -111,6 +111,24 @@ class StoppedCycleTests(NetworkBase):
                          {str(proposed.id),str(approved.id),str(stale.id)})
         self.assertEqual(AuditEvent.objects.filter(action='operator.expired').count(),3)
 
+    def test_a_deploy_does_not_stop_a_ready_post_at_its_gate(self):
+        """10/11/2026: the 3:30 pm post ended «Ciclo detenido: graph_changed» because a deploy changed the graph while it
+        waited for its hour. A finished cycle now runs its gate under the current graph."""
+        from copy import deepcopy
+        from team_backend.grafo import load_graph
+        proposal=self.piece_action();ledger=self.cycle(piece=proposal.piece)
+        CycleLedger.objects.filter(pk=ledger.pk).update(state='complete')
+        graph=deepcopy(load_graph());graph['graph_version']='next'
+        decision={'decision':'approve','reasons':['Jev aprueba'],'at':timezone.now().isoformat()}
+        with patch('team_backend.orquestacion.load_graph',return_value=graph):
+            self.assertEqual(orquestacion.review_gate(proposal,lambda:decision),decision)
+        ledger.refresh_from_db()
+        self.assertEqual((ledger.state,ledger.stop_reason,ledger.graph_version),('complete','','next'))
+        self.assertEqual(orquestacion.cycle_issues(proposal),[])
+        self.account.paused=True;self.account.save()  # the tick only expires here; it does not execute
+        self.assertEqual(autopiloto.tick(self.bot)['expired'],0)
+        proposal.refresh_from_db();self.assertEqual(proposal.state,'approved')
+
     def test_tick_releases_ideas_of_a_stopped_piece(self):
         """Expiring a stopped editorial cycle must return its ideas to the editorial table."""
         proposal=self.piece_action();self.cycle('graph_changed',proposal.piece)

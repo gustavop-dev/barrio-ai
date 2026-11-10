@@ -183,6 +183,40 @@ def context_version(graph):
     return digest({'sources':sources,'overrides':{key:os.environ.get(key,'') for key in keys}})
 
 
+def _settled(call):
+    """Answered, or a known failure that Runtime.call replays as data; anything else may still be in flight."""
+    return call['state']=='answered' or (call['state']=='failed' and call.get('error_type') in ('ValueError','OSError','ContractError'))
+
+
+def migrate_at_gate(ledger, graph, definition):
+    """Explicit migration of a finished cycle to the current graph, only to run its gate.
+
+    The pin (graph_hash, context_version) keeps a deploy from changing a working plan's schemas, models or policy
+    half way. A cycle that already finished (a ready piece waiting for its hour, an approved network action) has no plan
+    left: only its gate, a fresh Jev review of the final payload, which runs under the current graph. Before this, any
+    deploy that touched the graph or a pinned module stopped every ready post (10/11/2026: the 3:30 pm post never went
+    out). Only a complete cycle, without a worker and with every call settled, migrates; the change is recorded in the
+    task ledger and audited. The budget bucket and the spend already recorded stay as they were."""
+    from .jobs import audit
+    with transaction.atomic():
+        row = CycleLedger.objects.select_for_update().get(pk=ledger.pk)
+        if row.state != 'complete' or row.lease_token or not all(_settled(c) for c in row.progress_ledger['calls'].values()):
+            return False
+        before = {'graph_version': row.graph_version, 'graph_hash': row.graph_hash,
+                  'context_version': row.task_ledger.get('context_version')}
+        after = {'graph_version': graph['graph_version'], 'graph_hash': graph_hash(graph),
+                 'context_version': context_version(graph)}
+        row.task_ledger.setdefault('migrations', []).append(
+            {'reason': 'gate_after_deploy', 'at': timezone.now().isoformat(), 'from': before, 'to': after})
+        row.task_ledger['context_version'] = after['context_version']
+        row.graph_version, row.graph_hash, row.limits = after['graph_version'], after['graph_hash'], definition['limits']
+        row.revision += 1
+        row.save(update_fields=['task_ledger', 'graph_version', 'graph_hash', 'limits', 'revision', 'updated_at'])
+        audit(None, 'cycle.migrated', row.id, cycle=row.cycle, reason='gate_after_deploy',
+              from_graph=before['graph_version'], to_graph=after['graph_version'], graph_hash=after['graph_hash'])
+    return True
+
+
 class Runtime:
     def __init__(self, ledger, graph):
         self.id, self.graph = ledger.pk, graph
@@ -194,7 +228,9 @@ class Runtime:
         self.ordinals = {}
 
     @classmethod
-    def open(cls, cycle, key, user, job=None, facts=None, plan=None, *, budget_parent=None):
+    def open(cls, cycle, key, user, job=None, facts=None, plan=None, *, budget_parent=None, at_gate=False):
+        """`at_gate`: the caller only runs the cycle's gate (review_gate). A finished cycle then survives a deploy that
+        changed the graph or the pinned code (migrate_at_gate); any other open still stops with graph_changed."""
         graph = load_graph()
         definition = next((c for c in graph['cycles'] if c['id'] == cycle), None)
         if not definition or definition['status'] != 'active' or definition['ledger']['status'] != 'runtime':
@@ -226,6 +262,8 @@ class Runtime:
         if ledger.budget_bucket!=bucket and parent_cycle:
             raise UndeclaredCall('El presupuesto padre de la instancia cambió')
         if ledger.graph_hash != graph_hash(graph) or ledger.task_ledger.get('context_version')!=context_version(graph):
+            if at_gate and migrate_at_gate(ledger, graph, definition):
+                return cls(CycleLedger.objects.get(pk=ledger.pk), graph)
             runtime.stop('graph_changed')
             raise CycleStopped('El checkpoint necesita migración explícita del grafo')
         return runtime
@@ -607,7 +645,7 @@ def review_gate(proposal, operation):
     edge = 'pieza_diaria_gate_0' if row.cycle=='pieza_diaria' else 'politica_red'
     attempt = proposal.review.get('error_at','initial') if proposal.review else 'initial'
     try:
-        runtime = Runtime.open(row.cycle,row.key,row.owner,row.job)
+        runtime = Runtime.open(row.cycle,row.key,row.owner,row.job,at_gate=True)
         with runtime.session():
             return runtime.call(edge,proposal,operation,key=f'gate:{proposal.pk}:{proposal.payload_hash}:{attempt}')
     except CycleStopped as exc:
