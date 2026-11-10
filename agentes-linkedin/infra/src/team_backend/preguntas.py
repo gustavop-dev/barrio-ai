@@ -141,12 +141,13 @@ def sync_memory_proposals():
     return created
 
 def _typed_text(item,text,value,free=False):
-    """The memory text for each answer type. Short answers carry the question so the fact reads on its own.
+    """The memory text for each answer type. Every answer carries its question so the fact reads on its own
+    («Se puede compartir» alone does not say what may be shared, nor that «búsquenla» is an order to the team).
     `free`: a spoken or written answer to a typed question (the capture button) is stored as free text."""
     kind=item.answer_type
     if kind=='text' or free:
         if not text:raise ValueError('Escribe la respuesta')
-        return text if kind=='text' else f'{item.question} {text}'
+        return f'{item.question} {text}'
     if kind=='yes_no':
         if value not in YES_NO:raise ValueError('Responde sí o no')
         answer=YES_NO[value]+(f'. {text}' if text else '')

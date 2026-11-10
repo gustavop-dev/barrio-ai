@@ -138,7 +138,8 @@ class CaptureRoutingTests(CaptureBase):
                          ('dato_guardado','Un agente de soporte para un ERP en 2025.','es',40.0))
         self.assertEqual(capture.outcome,{'kind':'dato_guardado','text':'Está en Lo que el equipo sabe de ti · Privado','link':'/tu-turno/sabe'})
         self.assertEqual((q.state,q.public_use,q.answered_by_id),('answered',False,self.gustavo.id))
-        self.assertIn('Un agente de soporte para un ERP en 2025.',[g['guidance']['texto'] for g in memory.confirmed_blocks()[1]])
+        self.assertIn('¿Cuál fue tu primer agente en producción? Un agente de soporte para un ERP en 2025.',
+                      [g['guidance']['texto'] for g in memory.confirmed_blocks()[1]])
         self.assertEqual(self.handoffs(),[('operador_cuenta','director_editorial')])  # handed to the agent that asked
         job=Job.objects.get(kind='process_capture')
         self.assertEqual((job.state,job.result_status),('complete','dato_guardado'))
