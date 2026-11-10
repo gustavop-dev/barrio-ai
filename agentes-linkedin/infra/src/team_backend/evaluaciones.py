@@ -32,7 +32,7 @@ from collections import Counter
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from django.utils import timezone
-from knowledge import db, memory, providers
+from knowledge import db, memory, presupuesto, providers
 from knowledge.config import live
 from knowledge.ingest import ENC
 from . import autopiloto, editorial, guardas, lider, operador, orientacion, red, voz
@@ -365,7 +365,7 @@ class Run:
         self.guard(worst_usd(request,model))
         try:answer=providers.claude(purpose='eval-'+agent,model=model,**request)
         except ValueError as exc:
-            if 'Límite local' in str(exc):raise BudgetStop(str(exc)) from None
+            if str(exc).startswith(presupuesto.STOPS) or 'Límite local' in str(exc):raise BudgetStop(str(exc)) from None
             raise
         self.charge(agent,answer.get('model') or model,answer.get('estimated_usd'))
         try:data=json.loads(answer['text'])
@@ -377,7 +377,7 @@ class Run:
         self.guard(jev_usd(state,questions))
         try:result=providers.typesafe(state,questions,purpose='eval-'+agent)
         except ValueError as exc:
-            if 'Límite local' in str(exc):raise BudgetStop(str(exc)) from None
+            if str(exc).startswith(presupuesto.STOPS) or 'Límite local' in str(exc):raise BudgetStop(str(exc)) from None
             raise
         self.charge(agent,result.get('model') or JEV,result.get('estimated_usd'))
         return result.get('answers') or {}

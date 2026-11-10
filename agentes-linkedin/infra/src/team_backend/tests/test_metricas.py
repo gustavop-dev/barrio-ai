@@ -404,9 +404,10 @@ class ResultadosTests(MetricsBase):
         self.assertEqual([team[k]['value'] for k in ('follows','invites','accepts','pieces_published','pieces_blocked','pieces_vetoed')],[1,0,0,2,0,1])
         self.assertEqual(team['pieces_published']['delta_pct'],100.0)
         spend=team['spend']
-        self.assertEqual(spend['today'],{'general':{'spent':0.05,'budget':1.0},'editorial':{'spent':0.5,'budget':1.0},
-                                         'network':{'spent':0.1,'budget':0.3},'other':{'spent':0.0,'budget':None}})
-        self.assertEqual((spend['month']['total'],spend['accumulated']),({'spent':0.65,'budget':2.0},{'spent':0.85,'budget':2.0}))
+        # No per-area caps: the areas show their spend; the month carries the team's limit (every provider).
+        self.assertEqual(spend['today'],{'general':{'spent':0.05,'budget':None},'editorial':{'spent':0.5,'budget':None},
+                                         'network':{'spent':0.1,'budget':None},'other':{'spent':0.0,'budget':None}})
+        self.assertEqual((spend['month']['total'],spend['accumulated']),({'spent':0.7,'budget':100.0},{'spent':0.85,'budget':2.0}))
         self.assertEqual(spend['other_providers']['openai']['month'],0.05)
 
         # Modality filter: sections 1 and 2 only.
@@ -445,7 +446,7 @@ class ResultadosTests(MetricsBase):
         self.assertEqual(reach['acceptance_rate']['unavailable_reason'],'La red no funcionó en este periodo.')
         self.assertEqual(content['kpis']['median_impressions']['unavailable_reason'],'Sin posts publicados en el periodo.')
         self.assertEqual((reach['roles']['items'],content['chart']['bars'],content['best_post'],content['posts']),(None,[],None,[]))
-        self.assertEqual(team['spend']['today']['general'],{'spent':0.0,'budget':1.0})  # the ledger records every paid call: an observed zero
+        self.assertEqual(team['spend']['today']['general'],{'spent':0.0,'budget':None})  # the ledger records every paid call: an observed zero
 
         # One snapshot gives a total without growth; a machine that ran and did nothing reports a real zero.
         AudienceSnapshot.objects.create(day=self.today(),followers=1000)

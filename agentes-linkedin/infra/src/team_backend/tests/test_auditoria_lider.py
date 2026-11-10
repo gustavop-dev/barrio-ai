@@ -120,8 +120,9 @@ class CommentDraftTests(OperatorBase):
             _,claude=self.propose(draft(GOOD+' #evals'))
         self.assertEqual(claude.call_count,1)  # Gustavo approves by hand: the fixed rules are not applied
         ActionProposal.objects.all().delete()
-        providers.reserve('anthropic','propose-comment','1')  # today's comment budget is spent
-        _,claude=self.propose(draft(GOOD+' #evals'))
+        with patch.dict(os.environ,{'AI_DAILY_FUSE_USD':'1'}):
+            providers.reserve('anthropic','propose-comment','1')  # the team's AI budget for today is spent
+            _,claude=self.propose(draft(GOOD+' #evals'))
         self.assertEqual(claude.call_count,1)
         ActionProposal.objects.all().delete()
         with db.connect() as c:c.execute('TRUNCATE usage_ledger')

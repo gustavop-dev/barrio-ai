@@ -50,8 +50,13 @@ def enabled():
 def classifier_model():
     return setting('NETWORK_CLASSIFIER_MODEL','claude-sonnet-5-5')
 
-def daily_budget():
-    return Decimal(setting('NETWORK_DAILY_LLM_USD','0.3'))
+def _fuse():
+    from knowledge import presupuesto
+    return presupuesto.daily_fuse()
+
+def budget_left(now=None):
+    from knowledge import presupuesto
+    return presupuesto.left(now)
 
 def min_confidence():
     return float(setting('NETWORK_MIN_CONFIDENCE','0.6'))
@@ -512,7 +517,7 @@ def classification_people(contacts):
 def classify(user,account,now=None,batch=10):
     """One cheaper-model call for up to `batch` unclassified candidates or received invitations, each with its profile."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
-    if spent_today(now)>=daily_budget():raise ValueError('Presupuesto diario de la red agotado (NETWORK_DAILY_LLM_USD).')
+    if budget_left(now)<=0:raise ValueError('Presupuesto de IA agotado (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD).')
     pending=list(Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).order_by('discovered_at')[:batch])
     context,grounding=operador.role_context('clasificador',NETWORK_UNITS)
     if grounding['course_missing']:return {'classified':0,'fit':0,'stopped':'Biblioteca no disponible',**grounding}
@@ -959,7 +964,7 @@ def summary(account=None,now=None):
     return {'enabled':enabled(),'stages':stages,'capacity':capacity,'ramp':ramp_state(now),
             'invitation_health':invitation_health(now),'note_policy':dict(note_policy(),local_remaining=note_room(now),blocked=note_blocked()),
             'reads_today':{k:reads.filter(metadata__kind=k).count() for k in READ_KINDS},'read_caps':read_caps(),
-            'llm':{'spent_today':float(spent_today(now)),'daily':float(daily_budget()),'model':classifier_model()},
+            'llm':{'spent_today':float(spent_today(now)),'daily':float(_fuse()),'model':classifier_model()},
             'invites_blocked':{'blocked':blocked,'reason':reason},
             'last_discovery_at':last('network.discovered'),'last_sync_at':last('network.synced')}
 

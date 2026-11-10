@@ -66,7 +66,7 @@ La dirección editorial general en `posicionamiento.py` sigue siendo independien
 | Modelo · effort | `NETWORK_CLASSIFIER_MODEL` (Sonnet 5.5) · medium; `max_tokens` 16.000; ledger `network-classify` |
 | Entradas | Lotes de hasta 10 personas: nombre, titular, ubicación, grado, origen y evidencia (comentario, búsqueda o mensaje de invitación). Además, la orientación privada (`guardas.blocks`) y la orientación de Gustavo |
 | Salidas | `Contact.classification` (encaja, papel, modalidad, afinidad, motivo y confianza). Encaja si el modelo dice que sí y la confianza llega a `NETWORK_MIN_CONFIDENCE` (0,6); si no, la persona pasa a `discarded` |
-| Compuertas | `NETWORK_DAILY_LLM_USD` y los topes de lectura de perfil. Después, `red.network_issues`, que exige su `fit`, y el líder, que solo mira el riesgo |
+| Compuertas | El presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD` y el tope de seguridad diario `AI_DAILY_FUSE_USD`) y los topes de lectura de perfil. Después, `red.network_issues`, que exige su `fit`, y el líder, que solo mira el riesgo |
 | Frente al contrato | Solo clasifica personas descubiertas: los referentes los añade Gustavo (`operador.add_referent`). No hay `search_plan`, `research_packet`, `signal_card` ni INT-07. Desde R2 es el único juez del encaje; sus criterios salen de `posicionamiento.network_criteria`. |
 
 ### analista_barrio_resultados
@@ -93,7 +93,7 @@ La dirección editorial general en `posicionamiento.py` sigue siendo independien
 | Entradas de la selección | El brief congelado, las dos variantes, el panel de lectores y las fuentes |
 | Entradas de la reparación | El brief congelado, el texto, sus afirmaciones, los hallazgos concretos (de las reglas o del verificador) y las fuentes |
 | Salidas | Brief o «skip»; hasta 2 preguntas a Gustavo (`preguntas.ask`); las ideas usadas (`capturas.mark_used`). La selección devuelve A, B, fusión o descarte, el texto final y sus afirmaciones. La reparación devuelve el texto corregido y un cambio por hallazgo, o un descarte |
-| Compuertas | `EDITORIAL_DAILY_LLM_USD` antes de cada etapa. Un «skip» o un descarte cierran la pieza como `skipped`. El autopiloto prepara la pieza `EDITORIAL_LEAD_HOURS` antes de `EDITORIAL_POST_TIME`, un intento por día, si queda cupo de CONT-09 |
+| Compuertas | El presupuesto de IA del equipo antes de cada etapa y el tope de 8 USD por ciclo. Un «skip» o un descarte cierran la pieza como `skipped`. El autopiloto prepara la pieza `EDITORIAL_LEAD_HOURS` antes de `EDITORIAL_POST_TIME`, un intento por día, si queda cupo de CONT-09 y quedan al menos `EDITORIAL_PREPARE_MIN_USD` de presupuesto |
 | Frente al contrato | Sin ACK ni eventos. Hace una sola ronda de reparación (el contrato prevé hasta 2 correctivas), que `EDITORIAL_REPAIR=false` apaga. Pide siempre los cinco lectores, aunque el contrato los elige en el brief. Solo `text_only` y sin calendario ni experimentos. |
 
 ### copywriter_a y copywriter_b
@@ -106,7 +106,7 @@ La dirección editorial general en `posicionamiento.py` sigue siendo independien
 | Modelo · effort | `ANTHROPIC_MODEL` (Opus 5.5) o `EDITORIAL_MODEL_REDACTOR` · medium; `max_tokens` 16.000; ledger `editorial-redactor` |
 | Entradas | Hechos públicos, orientación privada, orientación, el brief congelado, las fuentes y unidades del curso (primero el enfoque elegido, luego formato, edición y la guía de la sesión 6) |
 | Salidas | Dos variantes en inglés, cada una con ángulo, texto, afirmaciones e incertidumbres |
-| Compuertas | Las del circuito: presupuesto diario y las etapas siguientes |
+| Compuertas | Las del circuito: presupuesto de IA y las etapas siguientes |
 | Frente al contrato | B se escribe viendo A en la misma llamada, así que no son borradores independientes. Sin rondas de revisión, `asset_brief` ni `research_request`. |
 
 ### Cinco lectores (comprador, recomendador, divulgador, líder, par)
@@ -145,7 +145,7 @@ La dirección editorial general en `posicionamiento.py` sigue siendo independien
 | Modelo · effort | `ANTHROPIC_MODEL` (Opus 5.5) · medium; `max_tokens` = `ANTHROPIC_MAX_TOKENS` (8.000); ledger `propose-comment` |
 | Entradas | La publicación (autor, texto y URL), hasta 10 comentarios existentes leídos por Unipile, los hechos públicos y la orientación privada de la memoria confirmada (sin la orientación base del brief), la orientación y seis unidades del curso. En la reescritura, además, el borrador anterior y las reglas que incumplió (`revision`) |
 | Salidas | Una propuesta INT-03 con texto, motivo, citas y riesgos, o una propuesta descartada si decide no comentar. El plan de red propone seguir, invitar sin nota tras `NETWORK_INVITE_AFTER_HOURS` o aceptar |
-| Compuertas | Antes de pagar el borrador, Jev decide si la publicación merece comentario (`lider.comment_worthy`, R5). El autopiloto redacta un borrador cada vez, solo si queda cupo tras los comentarios pendientes, dentro de `OPERATOR_DAILY_PROPOSALS` y `OPERATOR_DAILY_LLM_USD` y con enfriamiento por autor. Un borrador que rompe una regla fija de texto (`autopiloto.comment_text_issues`) se reescribe una vez (R4). Luego `autopiloto.content_issues`: 40–900 caracteres, sin pitch, enlaces, correo, teléfono ni hashtags, con citas, sin afirmaciones por verificar, con las guardas y el enfriamiento por autor. Después, el líder. En red, `red.network_issues` y el líder |
+| Compuertas | Antes de pagar el borrador, Jev decide si la publicación merece comentario (`lider.comment_worthy`, R5). El autopiloto redacta un borrador cada vez, solo si queda cupo tras los comentarios pendientes, dentro de `OPERATOR_DAILY_PROPOSALS` y del presupuesto de IA del equipo y con enfriamiento por autor. Un borrador que rompe una regla fija de texto (`autopiloto.comment_text_issues`) se reescribe una vez (R4). Luego `autopiloto.content_issues`: 40–900 caracteres, sin pitch, enlaces, correo, teléfono ni hashtags, con citas, sin afirmaciones por verificar, con las guardas y el enfriamiento por autor. Después, el líder. En red, `red.network_issues` y el líder |
 | Frente al contrato | No propone reacciones (INT-02 solo se crea a mano), mensajes ni notas (RED-05 a RED-08). No lleva `relationship_record` con seguimiento ni recibe `participation_signal` del analista. |
 
 ### conversaciones_inbox

@@ -27,7 +27,7 @@ Los enlaces semilla solo admiten http(s), puertos estándar y DNS público. Se r
 
 `providers.reserve` conserva los límites mensuales del proveedor y reserva el máximo de salida, entrada/cache, búsquedas y una estimación conservadora de tokens de resultados/relecturas. Serializa los caps de investigación y editorial con el mismo lock monetario. La liquidación registra tokens normales/cache, búsquedas, lecturas, coste de búsquedas, request ID y ledger ID. Timeouts o uso ilegible conservan la reserva y las operaciones reservadas; los errores HTTP definitivos se liquidan según el adapter existente.
 
-El cap de investigaciones por día es independiente del monetario; cuenta intentos iniciados, incluso fallidos/interrumpidos/retirados, en el día de `OPERATOR_TIMEZONE`. No se libera por Deshacer. El cap editorial agrega `editorial-%` e `image-%`, incluidos los dos proveedores de imagen. El presupuesto de imágenes conserva su sublímite; la investigación iniciada en captura pertenece al cap web, y la solicitada por el director además al editorial. Las tarjetas de gasto son ámbitos solapados, no partidas sumables.
+El cap de investigaciones por día (`WEB_RESEARCH_DAILY_LIMIT`) no es monetario; cuenta intentos iniciados, incluso fallidos/interrumpidos/retirados, en el día de `OPERATOR_TIMEZONE`. No se libera por Deshacer. Desde el 10/11/2026 no hay caps de dinero por área (web, editorial ni imágenes): la investigación de captura y la que pide el director gastan del presupuesto de IA del equipo (`knowledge/presupuesto.py`). Las tarjetas de gasto son ámbitos solapados, no partidas sumables.
 
 El outcome dice cuántas fuentes leyó o por qué no pudo investigar; la captura se enruta igualmente. Una investigación ejecutada emite `entrega` de `investigador_referentes` a `director_editorial` con un resumen sin consultas, URLs ni contenido privado. Fuentes y uso detallado quedan en las respuestas autenticadas de captura/pieza. Interfaz detallada pendiente, descrita en el contrato.
 
@@ -39,10 +39,10 @@ El outcome dice cuántas fuentes leyó o por qué no pudo investigar; la captura
 | `WEB_RESEARCH_MODEL`, `ANTHROPIC_API_KEY`, `ANTHROPIC_MODEL` | Modelo dedicado y proveedor existente |
 | `WEB_SEARCH_TOOL_TYPE`, `WEB_FETCH_TOOL_TYPE` | Tipos versionados de herramientas |
 | `WEB_SEARCH_MAX_USES`, `WEB_FETCH_MAX_USES`, `WEB_FETCH_MAX_CONTENT_TOKENS`, `WEB_RESEARCH_MAX_TOKENS`, `WEB_RESEARCH_MAX_URLS` | Límites por paso |
-| `WEB_RESEARCH_DAILY_LIMIT`, `WEB_RESEARCH_DAILY_USD` | Cupo diario de intentos y dinero |
+| `WEB_RESEARCH_DAILY_LIMIT` | Cupo diario de intentos (`WEB_RESEARCH_DAILY_USD` ya no se aplica desde el 10/11/2026) |
 | `WEB_SEARCH_USD_PER_REQUEST`, `WEB_SEARCH_RESERVED_TOKENS` | Tarifa y reserva conservadora para resultados de búsqueda |
 | `WEB_GITHUB_MAX_BYTES`, `WEB_GITHUB_README_CHARS`, `WEB_GITHUB_TIMEOUT_S`, `GITHUB_TOKEN` | Lector GitHub; token opcional |
-| `ANTHROPIC_LIMIT_USD`, `ANTHROPIC_LIMIT_WINDOW`, `EDITORIAL_DAILY_LLM_USD`, `IMAGE_DAILY_USD`, `OPERATOR_TIMEZONE` | Límites existentes que también se aplican |
+| `AI_MONTHLY_LIMIT_USD`, `AI_DAILY_FUSE_USD`, `ANTHROPIC_LIMIT_USD` (opcional), `ANTHROPIC_LIMIT_WINDOW`, `OPERATOR_TIMEZONE` | Límites existentes que también se aplican |
 
 No se requieren credenciales de un buscador adicional. No se le pide a Gustavo otra decisión; `GITHUB_TOKEN` es opcional y permanece exclusivamente en el entorno privado.
 
@@ -85,7 +85,7 @@ En CI, con PostgreSQL temporal y proveedores falsos:
 
 Al desplegar:
 
-1. Aplicar la migración antes de reiniciar API/workers. Reconciliar el override editorial con el tope del plan de equipos y revisar los límites web/proveedor; no elevarlos automáticamente para hacer pasar una llamada. Comparar presupuestos solapados sin sumar imágenes dos veces.
+1. Aplicar la migración antes de reiniciar API/workers. Reconciliar el override editorial con el tope del plan de equipos y revisar los límites web/proveedor (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`); no elevarlos automáticamente para hacer pasar una llamada. Comparar presupuestos solapados sin sumar imágenes dos veces.
 2. Verificar en documentación oficial y configuración del proveedor la compatibilidad del modelo con ambos tipos de herramientas, el soporte de conteo/streaming, la tarifa por búsqueda y la forma de usage/citas. Esta tarea no tuvo red; la reserva de resultados es conservadora y debe revisarse frente al uso real.
 3. Comprobar TLS/Host/SNI y salida directa al GitHub público en el entorno desplegado. Si requiere proxy, el cliente directo falla cerrado y usa el fallback; nunca habilitar un proxy no controlado ni omitir validación TLS.
 4. En QA, comprobar primero con fakes que una captura y una pieza exponen fuentes/fecha/limitaciones y el evento de Oficina. Comprobar ausencia de gasto/HTTP con proveedores desactivados, límite agotado, Deshacer concurrente y rechazo de afirmación sin respaldo. Cualquier validación real de herramientas usa el procedimiento de despliegue y presupuesto autorizado; no forma parte de los tests.

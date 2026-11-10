@@ -93,6 +93,7 @@ def _capacity(account,now):
 
 class Overview(APIView):
     def get(self,request):
+        from knowledge import presupuesto
         require(request.user,'operate_linkedin')
         now=timezone.now();day,_=operador.period_starts(now)
         start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
@@ -105,10 +106,10 @@ class Overview(APIView):
                       'min_spacing_seconds':int(operador.min_spacing().total_seconds())},
             'accounts':accounts,
             'today':{'proposals':proposals,'llm_spent_usd':str(autopiloto.llm_spent_today(now)),
-                     'llm_daily_cap_usd':str(Decimal(os.environ.get('OPERATOR_DAILY_LLM_USD','1'))),
+                     'llm_daily_cap_usd':str(presupuesto.daily_fuse()),  # the team's daily safety fuse; no per-area caps
                      'drafts':ActionProposal.objects.filter(source='agent',created_at__gte=day).count(),
                      'drafts_daily_cap':int(os.environ.get('OPERATOR_DAILY_PROPOSALS','6')),
-                     'editorial_llm_spent_usd':str(editorial.spent_today(now)),'editorial_llm_daily_cap_usd':str(editorial.daily_budget())},
+                     'editorial_llm_spent_usd':str(editorial.spent_today(now)),'editorial_llm_daily_cap_usd':str(presupuesto.daily_fuse())},
             'counts':{'referents':Referent.objects.filter(active=True).count(),'posts':ObservedPost.objects.count(),
                       'uncertain':ActionExecution.objects.filter(state='uncertain').count()}})
 

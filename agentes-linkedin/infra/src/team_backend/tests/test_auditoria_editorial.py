@@ -176,8 +176,8 @@ class RepairRoundTests(EditorialAuditBase):
         self.assertEqual((piece.state,piece.note),('blocked','El verificador emitió blocked'))
 
     def test_a_spent_budget_skips_the_repair_and_the_piece_ends_blocked_not_failed(self):
-        spent=lambda now=None:Decimal('5') if 'editorial-verificador' in [c[0] for c in self.calls] else Decimal('0')
-        with patch.object(editorial,'spent_today',side_effect=spent):
+        left=lambda now=None:Decimal('0') if 'editorial-verificador' in [c[0] for c in self.calls] else Decimal('15')
+        with patch.object(editorial,'budget_left',side_effect=left):
             piece=self.plan_with(answers(),verificador=[self.blocked()])
         self.assertNotIn('reparacion',self.purposes())
         self.assertEqual((piece.state,piece.verification['repair']['outcome']),('blocked','sin_presupuesto'))
@@ -189,8 +189,8 @@ class RepairRoundTests(EditorialAuditBase):
 
     def test_a_budget_stop_before_the_second_verification_keeps_the_original_text(self):
         plan=answers();plan['reparacion']=dict(plan['reparacion'],final_text=FIXED)
-        spent=lambda now=None:Decimal('5') if 'editorial-reparacion' in [c[0] for c in self.calls] else Decimal('0')
-        with patch.object(editorial,'spent_today',side_effect=spent):
+        left=lambda now=None:Decimal('0') if 'editorial-reparacion' in [c[0] for c in self.calls] else Decimal('15')
+        with patch.object(editorial,'budget_left',side_effect=left):
             piece=self.plan_with(plan,verificador=[self.blocked()])
         repair=piece.verification['repair']
         self.assertEqual((piece.state,repair['outcome'],repair['repaired_text'],piece.final_text),('blocked','sin_presupuesto',FIXED,GOOD_POST))

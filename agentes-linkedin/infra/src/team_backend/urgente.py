@@ -37,7 +37,8 @@ def free_slot(account,now,reserved=(),not_before=None,exclude_piece=None,at=None
         when=datetime.combine(day,at,tzinfo=operador.local_tz()) if at else editorial.scheduled_for(day)
         if at and not operador.within_window(when):return None
         if when<now+veto_window() or (not_before and day<not_before) or day in taken:continue
-        pieces=EditorialPiece.objects.filter(slot_date=day).exclude(pk=exclude_piece)
+        # A piece stopped only for money does not take its day: the day is free once there is budget again.
+        pieces=EditorialPiece.objects.filter(slot_date=day).exclude(pk=exclude_piece).exclude(editorial.budget_stopped_q())
         if closed_ok:pieces=pieces.exclude(state__in=CLOSED)
         if pieces.exists():continue
         if Job.objects.filter(kind='prepare_piece',state__in=['queued','running'],params__slot=day.isoformat()).exists():continue
@@ -92,6 +93,22 @@ def _eligible(capture):
     return not routed.get('declined_in') and routed.get('intentos',0)<MAX_ATTEMPTS
 
 
+def _count_failed_attempt(capture):
+    """The piece prepared for this idea's reserved window ended without it (blocked or failed, not for money): one
+    attempt, counted once. Without this, the idea moved to the next free day and was prepared again at once, day after
+    day. A piece that used the idea is counted when capturas.release_ideas gives it back."""
+    from . import editorial
+    old=capture.publish_asap_expected_slot
+    if not old:return False
+    routed=dict(capture.routed_to or {});seen=routed.get('intentos_en',[])
+    piece=EditorialPiece.objects.filter(slot_date=_local(old).date(),scheduled_for=old,state__in=('blocked','failed'),
+        created_at__gte=capture.created_at).exclude(editorial.budget_stopped_q()).exclude(id__in=seen).order_by('created_at').first()
+    if piece is None:return False
+    routed.update(intentos=routed.get('intentos',0)+1,intentos_en=seen+[str(piece.id)])
+    capture.routed_to=routed;capture.save(update_fields=['routed_to'])
+    return True
+
+
 def assign_slots(now=None):
     from . import editorial, operador, autopiloto, oficina_eventos
     from .notificaciones import avisar
@@ -115,7 +132,15 @@ def assign_slots(now=None):
         ideas=Capture.objects.select_for_update().filter(state='idea').order_by(
             F('publish_at').asc(nulls_last=True),'-publish_asap','created_at','id')
         for capture in ideas:
-            if not _eligible(capture):continue
+            _count_failed_attempt(capture)
+            if not _eligible(capture):
+                if capture.publish_asap_expected_slot:
+                    # Two attempts did not go out: it stays on the table for the director's daily post, without a date.
+                    capture.publish_asap_expected_slot=None
+                    capture.publish_asap_reason=('Se intentó preparar dos veces y no salió; sigue en la mesa del director '
+                                                 'para un día normal.')
+                    capture.save(update_fields=['publish_asap_expected_slot','publish_asap_reason']);changes.append(capture)
+                continue
             old=capture.publish_asap_expected_slot
             if operador.globally_paused() or not editorial.can_publish(account) or autopiloto.autonomy('CONT-09')=='off':
                 when=None;reason='Publicación en pausa; se asignará el hueco al reanudar'
@@ -138,7 +163,7 @@ def assign_slots(now=None):
                     if (capture.understanding or {}).get('publish_when'):
                         reason='No pude usar el día u hora que pediste (fuera de 07:00–21:00 o de los próximos 14 días). '+reason
                 if not when:reason='Sin hueco disponible en 14 días; tu idea sigue en la mesa'
-                if editorial.spent_today(now)>=editorial.daily_budget():reason+=' Preparación pendiente de presupuesto editorial.'
+                if not editorial.can_afford_preparation(now):reason+=' Preparación pendiente de presupuesto de IA.'
             if when:reserved.append(when)
             if when!=old or reason!=capture.publish_asap_reason:
                 capture.publish_asap_expected_slot=when;capture.publish_asap_reason=reason
@@ -167,7 +192,10 @@ def reserved_at(day):
 
 def next_slot(now=None,manual=False):
     """The day of the earliest reserved idea still without a piece: prepared right away, not EDITORIAL_LEAD_HOURS ahead."""
+    from . import editorial
     now=now or timezone.now();assign_slots(now)
+    # Starting a preparation the budget cannot finish only leaves a stopped piece behind; it waits for budget.
+    if not editorial.can_afford_preparation(now):return None
     for capture in Capture.objects.filter(state='idea',publish_asap_expected_slot__gt=now).order_by('publish_asap_expected_slot'):
         day=_local(capture.publish_asap_expected_slot).date()
         if EditorialPiece.objects.filter(slot_date=day).exclude(state__in=CLOSED).exists():continue

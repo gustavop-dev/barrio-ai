@@ -51,7 +51,7 @@ Si Jev no responde a una revisión, el ciclo deja de llamarlo hasta el siguiente
 
 Si no pasa, el equipo prueba con el siguiente post candidato. Cada veredicto queda en un `AuditEvent` (`operator.comment_prefilter`) con las probabilidades, y el mismo post no se vuelve a preguntar. Se hacen como máximo 3 preguntas por ciclo. Si Jev no responde, se redacta como antes del prefiltro y queda un aviso `comment_prefilter_unavailable` en el log del autopiloto. Funciona cuando `LEAD_ENABLED=true` y se apaga con `COMMENT_PREFILTER=false`. Nunca usa un modelo de lenguaje.
 
-**Coste.** Cada llamada pasa por `knowledge.providers.typesafe`: proveedor `typesafe`, propósito `lead-review` (`comment-prefilter` en el prefiltro), con reserva y liquidación en el ledger y techo `TYPESAFE_LIMIT_USD`. A 0,042 USD por millón de tokens de entrada (la salida es gratis), un juicio de unas 600 tokens cuesta 0,00003 USD.
+**Coste.** Cada llamada pasa por `knowledge.providers.typesafe`: proveedor `typesafe`, propósito `lead-review` (`comment-prefilter` en el prefiltro), con reserva y liquidación en el ledger, dentro del presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD`) y del techo opcional `TYPESAFE_LIMIT_USD` si se fija. A 0,042 USD por millón de tokens de entrada (la salida es gratis), un juicio de unas 600 tokens cuesta 0,00003 USD.
 
 **Contrato de TypeSafe** (consultado el 2026-11-07): `POST https://api.typesafe.ai/v1/systemone` con `{model, state, questions}` y la clave en `Authorization: Bearer`. Devuelve `answers[id] = {type:'noul', noul:p}` y `usage.input_tokens`. Se probó con un caso inventado en español: un comentario genérico con venta dio `aporta`=0,04, `pitch`=0,99 e `idioma`=0,99.
 
@@ -165,7 +165,7 @@ La **vista Lista** (`GET /api/v1/actividad`) trae «Próximo» y todo lo hecho, 
 - el modo de cada capacidad y el estado del líder;
 - la ventana (abierta o cerrada ahora) y el espaciado;
 - topes;
-- el gasto de IA de hoy por presupuesto (general, editorial y red) frente a su tope, más el mes, el total y lo gastado en Jev;
+- el gasto de IA de hoy de todo el equipo frente a su tope de seguridad diario (`AI_DAILY_FUSE_USD`) y el de cada área (general, editorial, imágenes y red) sin tope propio, más el mes frente a `AI_MONTHLY_LIMIT_USD`, el total y lo gastado en Jev;
 - el número de datos confirmados;
 - la orientación.
 
@@ -185,7 +185,7 @@ COMMENT_PREFILTER=true
 COMMENT_PREFILTER_THRESHOLD=0.5
 TYPESAFE_API_KEY=…            # privada; nunca en el repositorio
 TYPESAFE_MODEL=jev-1.14.0
-TYPESAFE_LIMIT_USD=2
+TYPESAFE_LIMIT_USD=             # opcional: techo mensual de Jev dentro del presupuesto de IA del equipo
 ```
 
 Las salvaguardas no cambian:

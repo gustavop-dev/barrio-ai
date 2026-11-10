@@ -67,7 +67,7 @@ Después, en Ajustes → activar notificaciones → «Probar».
 
 En `.env`:
 - `UNIPILE_API_KEY` y `LIVE_LINKEDIN=true`;
-- `ANTHROPIC_LIMIT_USD`, que es un techo acumulado: súbelo al presupuesto acordado;
+- `AI_MONTHLY_LIMIT_USD`, el presupuesto de IA de todo el equipo por mes (100 USD acordados), y `AI_DAILY_FUSE_USD`, su tope de seguridad diario;
 - `OPERATOR_AUTOPILOT=true`.
 
 Luego aplica los cambios y da de alta la cuenta y los referentes:

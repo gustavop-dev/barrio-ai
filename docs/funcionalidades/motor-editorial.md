@@ -22,7 +22,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-10](#edi-10) | Compuerta autónoma de la publicación | backend | funciona |
 | [EDI-11](#edi-11) | Publicar a la hora programada | backend | funciona |
 | [EDI-12](#edi-12) | Resultado incierto y conciliación | backend | funciona |
-| [EDI-13](#edi-13) | Presupuesto editorial diario | backend | funciona |
+| [EDI-13](#edi-13) | Presupuesto de IA de la publicación diaria | backend | funciona |
 | [EDI-14](#edi-14) | Caducidad de una pieza aprobada que no salió | backend | funciona |
 | [EDI-15](#edi-15) | Caducidad del permiso de LinkedIn | backend | funciona |
 | [EDI-16](#edi-16) | Voz de Gustavo y hechos públicos frente a orientación privada | backend | funciona |
@@ -41,8 +41,8 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Qué hace para Gustavo:** cada día, unas horas antes de la hora de publicación, el equipo empieza solo a preparar el post del día siguiente (o de hoy), una sola vez por día.
 - **Código:** `autopiloto._editorial`, `editorial.next_slot`, `editorial.can_publish`, `editorial.scheduled_for`; trabajo `prepare_piece` con id determinista por hueco.
 - **Criterios de aceptación:**
-  1. **Dado** `EDITORIAL_POST_TIME=08:30`, `EDITORIAL_LEAD_HOURS=12`, una cuenta oficial conectada sin pausa, `LIVE_LINKEDIN_OFFICIAL=true` (o la cuenta `linkedin_fake`), CONT-09 distinto de `off`, cupo semanal libre y presupuesto editorial sin agotar, **cuando** el autopiloto corre a las 20:31 hora de `OPERATOR_TIMEZONE` del día anterior, **entonces** encola un trabajo `prepare_piece` para el hueco del día siguiente.
-  2. **Dado** que ese día ya tiene una pieza en cualquier estado (incluida `skipped`, `blocked` o `failed` por otro motivo que el presupuesto), **cuando** el autopiloto vuelve a correr, **entonces** no encola otra preparación para ese día.
+  1. **Dado** `EDITORIAL_POST_TIME=08:30`, `EDITORIAL_LEAD_HOURS=12`, una cuenta oficial conectada sin pausa, `LIVE_LINKEDIN_OFFICIAL=true` (o la cuenta `linkedin_fake`), CONT-09 distinto de `off`, cupo semanal libre y al menos `EDITORIAL_PREPARE_MIN_USD` de presupuesto de IA disponible, **cuando** el autopiloto corre a las 20:31 hora de `OPERATOR_TIMEZONE` del día anterior, **entonces** encola un trabajo `prepare_piece` para el hueco del día siguiente.
+  2. **Dado** que ese día ya tiene una pieza en cualquier estado (incluida `skipped`, `blocked` o `failed` por otro motivo que el dinero), **cuando** el autopiloto vuelve a correr, **entonces** no encola otra preparación para ese día.
   3. **Dado** que no hay cuenta oficial conectada, o está en pausa, o `LIVE_LINKEDIN_OFFICIAL=false` con cuenta real, **cuando** el autopiloto corre, **entonces** no encola nada y no se gasta nada.
   4. **Dado** `OPERATOR_AUTONOMY=…,CONT-09=off`, **cuando** el autopiloto corre, **entonces** no encola nada.
   5. **Dado** que ya hay un `prepare_piece` en cola o corriendo, **cuando** el autopiloto corre, **entonces** no encola un segundo trabajo.
@@ -65,7 +65,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   5. **Dado** que los siete días siguientes ya tienen pieza abierta, **cuando** lo pide, **entonces** recibe 409 «No hay un hueco libre en los próximos siete días.».
   6. **Dado** un usuario sin `use_paid_providers`, **cuando** lo pide, **entonces** recibe 403.
   7. **Dado** que Gustavo pulsa «Preparar la siguiente pieza» en la interfaz, **cuando** aparece la confirmación, **entonces** dice «Tiene coste: cada etapa llama a Claude y gasta del presupuesto editorial…» antes de encolar nada; si cancela, no se envía la petición.
-- **Brechas código/docs:** la confirmación no muestra una cifra de coste, a diferencia de «Generar ahora» del resumen semanal. La interfaz se describe en [CAL-14](calendario-piezas.md#cal-14).
+- **Brechas código/docs:** la confirmación no muestra una cifra de coste, a diferencia de «Generar ahora» del resumen semanal, y sigue diciendo «presupuesto editorial», que desde el 10/11/2026 es el presupuesto general de IA del equipo ([EDI-13](#edi-13)). La interfaz se describe en [CAL-14](calendario-piezas.md#cal-14).
 - **Cobertura QA:** desde la app en `movil/.maestro/07-pieza-veto.yaml` («Preparar la siguiente pieza»: la confirmación con su coste y la preparación en cola, 202) · 2026-11-08 · pasa
 
 ### EDI-03 · El director escribe el brief o salta el día <a id="edi-03"></a>
@@ -151,7 +151,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   3. **Dado** que el texto reparado sigue bloqueado, o la reparación lo descarta o no cambia nada, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos y no hay una segunda ronda.
   4. **Dado** un `blocked` del verificador sin hallazgos concretos, **cuando** termina, **entonces** no hay ronda y la pieza queda `blocked`.
   5. **Dado** `EDITORIAL_REPAIR=false`, **cuando** hay hallazgos, **entonces** la pieza queda `blocked` sin ronda.
-  6. **Dado** que el presupuesto diario se agota durante la ronda, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos originales (no `failed`).
+  6. **Dado** que el presupuesto de IA se agota durante la ronda, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos originales (no `failed`).
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -215,18 +215,18 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
-### EDI-13 · Presupuesto editorial diario <a id="edi-13"></a>
+### EDI-13 · Presupuesto de IA de la publicación diaria <a id="edi-13"></a>
 
 - **Dónde:** backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** la publicación diaria tiene su propio tope de gasto de IA al día; si se agota, la pieza se detiene y se reintenta al día siguiente.
-- **Código:** `editorial.daily_budget`, `editorial.spent_today`, `editorial._guard`, `editorial.budget_retry`, `providers.reserve`, `EDITORIAL_DAILY_LLM_USD`. Default alineado al tope de 2 USD del plan de equipos; comprobar overrides al desplegar.
+- **Qué hace para Gustavo:** la publicación diaria no tiene tope propio: gasta del presupuesto general de IA del equipo (`AI_MONTHLY_LIMIT_USD`, 100 USD al mes, y el tope de seguridad diario `AI_DAILY_FUSE_USD`, 15 USD; ver `knowledge/presupuesto.py`, desde el 10/11/2026). Una preparación no empieza si no queda para terminarla; si el dinero se acaba a medias, la pieza se detiene y el día se reintenta cuando vuelve a haber presupuesto.
+- **Código:** `editorial.budget_left`, `editorial.can_afford_preparation`, `editorial.prepare_min`, `editorial._guard`, `editorial.budget_stopped`, `editorial.budget_retry`, `knowledge/presupuesto.check`, `providers.reserve`, `EDITORIAL_PREPARE_MIN_USD` (3 USD por defecto). El ciclo `pieza_diaria` de `grafo.yaml` tiene además un tope por reservas de 8 USD por ciclo, contra gastos desbocados.
 - **Criterios de aceptación:**
-  1. **Dado** que lo gastado o reservado hoy en `editorial-%` e `image-%` llega al tope editorial, **cuando** el autopiloto corre, **entonces** no encola preparación. Incluye investigación de la pieza, búsquedas, visión e imágenes de ambos proveedores. El sublímite de imágenes también se aplica; los subtotales no se suman otra vez.
-  2. **Dado** que el presupuesto se agota entre dos etapas, **cuando** va a empezar la siguiente, **entonces** la pieza queda `failed` con una nota que empieza por «Presupuesto editorial diario agotado».
-  3. **Dado** un hueco cuyos intentos fallaron todos solo por presupuesto, **cuando** llega el día local siguiente, **entonces** el autopiloto lo vuelve a intentar con un trabajo nuevo.
-  4. **Dado** el gasto de comentarios (`propose-comment`), **cuando** se calcula el editorial, **entonces** no cuenta (presupuestos separados).
-  5. **Dado** dos solicitudes que compiten por el saldo restante, **cuando** reservan, **entonces** el ledger serializa la comprobación antes de generar. Una reserva incierta sigue contando. Investigación de captura consume el cap web y del proveedor; investigación de pieza consume además el editorial.
+  1. **Dado** que queda menos de `EDITORIAL_PREPARE_MIN_USD` (lo menor entre lo que falta del mes y lo que falta hoy bajo el tope de seguridad), **cuando** el autopiloto corre, **entonces** no encola preparación, tampoco la de una idea reservada. Cuenta lo gastado o reservado por todo el equipo: todos los proveedores y áreas, incluidas investigación, búsquedas, visión e imágenes.
+  2. **Dado** que el presupuesto se agota entre dos etapas, **cuando** va a empezar la siguiente, **entonces** la pieza se detiene con una nota que empieza por «Presupuesto de IA agotado» o «Ciclo detenido: cost_cap».
+  3. **Dado** un hueco cuyas piezas se detuvieron todas solo por dinero (`failed` o `blocked` con «Presupuesto de IA agotado», la nota antigua «Presupuesto editorial diario agotado» o «Ciclo detenido: cost_cap»), **cuando** llega el día local siguiente y hay presupuesto, **entonces** el autopiloto lo vuelve a intentar con un trabajo nuevo.
+  4. **Dado** gasto de comentarios, red u otras áreas, **cuando** se calcula lo que queda, **entonces** cuenta: el presupuesto es uno para todo el equipo.
+  5. **Dado** dos solicitudes que compiten por el saldo restante, **cuando** reservan, **entonces** el ledger serializa la comprobación antes de generar. Una reserva incierta sigue contando. La investigación de captura y la de pieza consumen el presupuesto general y, si está fijado, el techo opcional del proveedor (`<PROVEEDOR>_LIMIT_USD`).
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -323,6 +323,9 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   4. **Dado** el hueco de una urgencia, **cuando** decide el director, **entonces** usa esa idea o salta el día con motivo; nunca publica otra idea pasando por encima de la prioridad.
   5. **Dado** pausa, modo off/aprobación, falta de presupuesto o bloqueo de calidad, **cuando** corre el circuito, **entonces** se conservan todas las compuertas, y la urgencia no autoriza publicar.
   6. **Dado** una preparación que consume el plazo de veto, **cuando** termina, **entonces** mueve la pieza a otro hueco y avisa; no publica inmediatamente.
+  7. **Dado** que la pieza del hueco reservado de una idea termina `blocked` o `failed` por algo que no es dinero, **cuando** se reasignan los huecos, **entonces** cuenta un intento (una vez por pieza); con 2 intentos la idea pierde su fecha y sigue en la mesa del director con «Se intentó preparar dos veces y no salió; sigue en la mesa del director para un día normal.».
+  8. **Dado** un día cuyas únicas piezas eran para una idea reservada y no salieron (`skipped`, `blocked` o `failed`), **cuando** el autopiloto busca hueco, **entonces** ese día queda libre para su publicación propia.
+  9. **Dado** un día cuya pieza se detuvo solo por dinero ([EDI-13](#edi-13)), **cuando** se busca hueco para una idea, **entonces** ese día cuenta como libre; la preparación espera a que queden `EDITORIAL_PREPARE_MIN_USD`.
 - **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
 - **Cobertura QA:**
 

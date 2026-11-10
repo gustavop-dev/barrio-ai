@@ -851,7 +851,8 @@ def _fixable_issues(post,data,citations,risks):
 def _within_budget():
     from decimal import Decimal
     from . import autopiloto
-    return autopiloto.llm_spent_today()<Decimal(os.environ.get('OPERATOR_DAILY_LLM_USD','1'))
+    from knowledge import presupuesto
+    return presupuesto.left()>0
 
 def propose_comment(user,post_id,origin_job=''):
     require(user,'operate_linkedin');require(user,'use_paid_providers')

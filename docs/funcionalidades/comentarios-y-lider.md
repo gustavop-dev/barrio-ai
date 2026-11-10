@@ -58,7 +58,7 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
 - **Qué hace para Gustavo:** el equipo escribe un comentario que aporta al post del referente, en su voz, con fundamento del curso.
 - **Código:** `autopiloto._propose`, `operador.propose_comment`, `_draft_comment`, `COMMENT_SYSTEM`.
 - **Criterios de aceptación:**
-  1. **Dado** cupo de INT-03 libre tras los comentarios pendientes, presupuesto `OPERATOR_DAILY_LLM_USD` sin agotar y menos de `OPERATOR_DAILY_PROPOSALS` (6) borradores hoy, **cuando** corre el autopiloto, **entonces** encola un `propose_comment` para el post candidato más reciente (de las últimas `OPERATOR_MAX_POST_AGE_HOURS`, 72 h).
+  1. **Dado** cupo de INT-03 libre tras los comentarios pendientes, presupuesto de IA del equipo sin agotar (`AI_MONTHLY_LIMIT_USD` y el tope de seguridad diario `AI_DAILY_FUSE_USD`) y menos de `OPERATOR_DAILY_PROPOSALS` (6) borradores hoy, **cuando** corre el autopiloto, **entonces** encola un `propose_comment` para el post candidato más reciente (de las últimas `OPERATOR_MAX_POST_AGE_HOURS`, 72 h).
   2. **Dado** un referente que ya tuvo un comentario en las últimas `OPERATOR_AUTHOR_COOLDOWN_HOURS` (48), **cuando** se buscan candidatos, **entonces** sus posts se saltan.
   3. **Dado** un borrador, **cuando** se guarda, **entonces** es una propuesta INT-03 con `payload.text`, `rationale`, `citations` y `risks`; si el redactor decide no comentar, queda descartada.
   4. **Dado** un `propose_comment` ya en cola, **cuando** corre el autopiloto, **entonces** no encola otro (un borrador pagado a la vez).

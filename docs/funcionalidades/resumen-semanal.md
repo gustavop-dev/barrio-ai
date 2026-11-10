@@ -70,11 +70,11 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
 
 - **Dónde:** backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** el resumen tiene su propio tope de gasto por semana y nunca le quita presupuesto a los comentarios ni a la publicación.
+- **Qué hace para Gustavo:** el resumen tiene además un tope pequeño propio por semana, así que un fallo no se repite sin límite. Su gasto cuenta, como el de cualquier área, en el presupuesto general de IA del equipo.
 - **Código:** `resumen_semanal.budget`, `spent_this_week`, `_guard`, `WEEKLY_SUMMARY_LLM_USD` (1 USD).
 - **Criterios de aceptación:**
   1. **Dado** que lo gastado con propósito `weekly-summary` esta semana ISO local llega al tope, **cuando** corre un trabajo, **entonces** falla con «Presupuesto del resumen semanal agotado esta semana (WEEKLY_SUMMARY_LLM_USD); no se gasta más.» sin llamar a Claude.
-  2. **Dado** el gasto del resumen, **cuando** se calculan los presupuestos de comentarios y editorial, **entonces** no cuenta en ellos.
+  2. **Dado** el gasto del resumen, **cuando** se calcula el presupuesto general de IA (`AI_MONTHLY_LIMIT_USD` y el tope de seguridad diario `AI_DAILY_FUSE_USD`), **entonces** cuenta en él; desde el 10/11/2026 no hay presupuestos separados de comentarios ni de la publicación.
 - **Brechas código/docs:** Ajustes › Gasto no muestra el presupuesto del resumen semanal como línea propia (ver [AJU-05](ajustes.md#aju-05)).
 - **Cobertura QA:** pendiente
 

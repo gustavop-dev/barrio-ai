@@ -216,7 +216,10 @@ class OpportunityAndTurnTests(OperatorBase):
         self.assertEqual(self.human.get('/api/v1/actividad?tipo=otra').status_code,404)
         settings=self.human.get('/api/v1/ajustes').json()
         self.assertEqual((settings['autonomy']['INT-03'],settings['autonomy']['RED-02']),('auto','approval'))
-        self.assertEqual([b['budget'] for b in settings['ai_spend']['today']],['general','editorial','imagenes','red'])
+        self.assertEqual([b['budget'] for b in settings['ai_spend']['today']],['equipo','general','editorial','imagenes','red'])
+        # One budget for the team: the safety fuse today and the monthly limit; the areas only show their spend.
+        self.assertEqual([b['limit_usd'] for b in settings['ai_spend']['today']],[15.0,0,0,0,0])
+        self.assertEqual(settings['ai_spend']['limit_usd'],100.0)
         self.assertIn('open_now',settings['window']);self.assertFalse(settings['lead']['enabled'])
 
 

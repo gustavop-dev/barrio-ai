@@ -24,7 +24,7 @@ La sección «Pendiente de confirmar» de la especificación ya dice que no hay 
 | --- | --- |
 | Edición nueva | `auto`; históricos false→no y true→auto |
 | Compatibilidad | Alias booleanos de API temporales; nuevos campos `ai_edit` y `gallery_ai_edit` |
-| Presupuesto de imágenes | 1 USD por día local; suma ambos proveedores, reservas e inciertos; separado de editorial/comentarios |
+| Presupuesto de imágenes | 1 USD por día local; suma ambos proveedores, reservas e inciertos; separado de editorial/comentarios (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`) |
 | Edición | `gpt-image-1`, una salida medium de 1024 cuadrada, escalada a 1080 antes de la comprobación; reserva conservadora de 1 USD |
 | Diseño y visión | `claude-sonnet-4-6`; propósitos `image-design`, `image-design-repair`, `image-check` |
 | Carrusel | 3–8 láminas 1080×1350; portada, interiores y pregunta final |
@@ -38,9 +38,9 @@ La sección «Pendiente de confirmar» de la especificación ya dice que no hay 
 
 Dependencia nueva: `Pillow`. **`uv.lock` queda pendiente de Claude**; el Dockerfile usa instalación congelada, por lo que debe actualizarse antes del build. Ubuntu y su licencia van incluidos; no se necesita instalar una fuente del sistema ni descargarla en producción.
 
-Variables nuevas: `IMAGE_DAILY_USD`, `EDITORIAL_VETO_MINUTES`.
+Variables nuevas: `IMAGE_DAILY_USD` (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`), `EDITORIAL_VETO_MINUTES`.
 
-Variables existentes utilizadas: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY`, `LIVE_PROVIDERS`, `LIVE_LINKEDIN_OFFICIAL`, `OPERATOR_ALLOW_FAKE`, `OPENAI_LIMIT_USD`, `ANTHROPIC_LIMIT_USD`, `EDITORIAL_POST_TIME`, `EDITORIAL_LEAD_HOURS`, `EDITORIAL_DAILY_LLM_USD`, `OPERATOR_TIMEZONE`, `OPERATOR_WINDOW`, `OPERATOR_AUTONOMY`.
+Variables existentes utilizadas: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `TYPESAFE_API_KEY`, `LIVE_PROVIDERS`, `LIVE_LINKEDIN_OFFICIAL`, `OPERATOR_ALLOW_FAKE`, `OPENAI_LIMIT_USD`, `ANTHROPIC_LIMIT_USD`, `EDITORIAL_POST_TIME`, `EDITORIAL_LEAD_HOURS`, `EDITORIAL_DAILY_LLM_USD` (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`), `OPERATOR_TIMEZONE`, `OPERATOR_WINDOW`, `OPERATOR_AUTONOMY`.
 
 Gustavo solo necesita claves con acceso a los modelos si quiere edición/diseños dinámicos; la tarjeta fija no requiere ninguna clave de imagen. No hace falta reconfirmar cada edición permitida. Debe conservar una autorización LinkedIn vigente con `w_member_social`. Los valores de presupuesto/veto pueden cambiarse si prefiere otros; no son bloqueantes para esta entrega.
 
@@ -55,7 +55,7 @@ Rutas de código relativas a `agentes-linkedin/infra/`:
 | Archivo | Cambio |
 | --- | --- |
 | `pyproject.toml` | Pillow y empaquetado de recursos/fuentes/reglas. |
-| `src/knowledge/providers.py` | Reserva atómica del presupuesto diario de imágenes, además del techo del proveedor. |
+| `src/knowledge/providers.py` | Reserva atómica del presupuesto diario de imágenes, además del techo del proveedor (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`). |
 | `src/team_backend/models.py` | AIEdit, intención/evidencia/fecha de captura, campos de imagen de pieza y PieceImage. |
 | `src/team_backend/migrations/0019_imagenes_y_urgencia.py` | Esquema y conversión reversible de booleanos; no modifica los archivos. |
 | `src/team_backend/capture_intent.py` | Comprensión estructurada, Noul, citas literales e instrucciones por foto. |

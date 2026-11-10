@@ -242,7 +242,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   3. **Dado** que confirma, **cuando** la API responde 202, **entonces** ve «Preparación en cola para el <día>. El circuito tarda unos minutos y la pieza aparecerá en el calendario.».
   4. **Dado** un 409 (sin LinkedIn, en pausa o sin hueco), **cuando** vuelve, **entonces** el motivo se ve dentro de la confirmación.
   5. **Dado** dos pulsaciones del mismo intento, **cuando** se envían, **entonces** llevan el mismo `request_id` y solo se encola una preparación.
-- **Brechas código/docs:** la confirmación no da una cifra de coste.
+- **Brechas código/docs:** la confirmación no da una cifra de coste y sigue diciendo «presupuesto editorial», que desde el 10/11/2026 es el presupuesto general de IA del equipo ([EDI-13](motor-editorial.md#edi-13)).
 - **Cobertura QA:** CAL-14.1–3 en `07-pieza-veto.yaml` (con la API del mundo de QA responde 202 y la preparación queda en cola) · CAL-14.4 y 5 sin prueba E2E · 2026-11-08 · pasa
 
 ### CAL-15 · Aprobar una pieza en modo aprobación <a id="cal-15"></a>

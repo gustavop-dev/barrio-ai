@@ -116,7 +116,7 @@ Todo está apagado por defecto: desplegar no cambia nada hasta encender `INBOX_E
 | `INBOX_REPLY_MIN` | `0.6` | Umbral de `espera` |
 | `INBOX_PITCH_MAX` | `0.4` | Por encima, es venta o spam y nunca se propone |
 
-Además, Jev necesita `LIVE_PROVIDERS=true`, `TYPESAFE_API_KEY` y saldo en `TYPESAFE_LIMIT_USD`, las mismas variables que usa el líder. Sin ellas, el inbox se lee pero nada se juzga ni se propone.
+Además, Jev necesita `LIVE_PROVIDERS=true`, `TYPESAFE_API_KEY` y saldo en el presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD`, y `TYPESAFE_LIMIT_USD` si se fija), lo mismo que el líder. Sin ellas, el inbox se lee pero nada se juzga ni se propone.
 
 ## Por comprobar contra la cuenta real
 

@@ -573,6 +573,7 @@ def release_ideas(piece,why):
     released=0
     for capture in Capture.objects.filter(state=Capture.State.USED,routed_to__used_in=str(piece.id)):
         routed=dict(capture.routed_to or {});routed.pop('used_in',None);routed['intentos']=routed.get('intentos',0)+1
+        routed['intentos_en']=routed.get('intentos_en',[])+[str(piece.id)]  # urgente counts each piece once
         capture.publish_asap_expected_slot=None;capture.publish_asap_reason='Vuelve a la mesa: '+why
         capture.state=Capture.State.IDEA;capture.routed_to=routed
         capture.outcome=_outcome('idea',f'Vuelve a la mesa editorial: la pieza del {day_label(piece.slot_date)} no salió ({why})')

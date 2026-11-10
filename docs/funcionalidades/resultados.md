@@ -115,8 +115,8 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
 - **Código:** `resultados.equipo`, `resultados.spend`.
 - **Criterios de aceptación:**
   1. **Dado** actividad del periodo, **cuando** abre la sección, **entonces** ve Comentarios (publicados · con respuesta), Red (seguidos · invitados · aceptados) y Piezas (publicadas · bloqueadas · vetadas).
-  2. **Dado** el gasto, **cuando** se pinta «Gasto de IA», **entonces** ve «$X de $Y hoy» (la suma de los presupuestos diarios) y «$Z este mes»; un dato que falta es «—».
-- **Brechas código/docs:** el texto `definition` de `spend` (en `resultados.py`) y `CONTRATO-API.md` dicen que `ANTHROPIC_LIMIT_USD` es un techo acumulado; desde B5 (`knowledge/providers.limit_window_start`) es mensual por defecto (`ANTHROPIC_LIMIT_WINDOW=total` vuelve al acumulado). Ver [AJU-05](ajustes.md#aju-05).
+  2. **Dado** el gasto, **cuando** se pinta «Gasto de IA», **entonces** ve «$X hoy» (Anthropic por áreas; desde el 10/11/2026 las áreas no tienen tope propio, así que `today.*.budget` llega `null` y no hay «de $Y») y «$Z este mes» (`month.total`: todos los proveedores, frente a `AI_MONTHLY_LIMIT_USD`); un dato que falta es «—».
+- **Brechas código/docs:** la interfaz no muestra `spend.daily_fuse` (el tope de seguridad diario `AI_DAILY_FUSE_USD`) ni el presupuesto del mes de `month.total.budget`; están en Ajustes ([AJU-05](ajustes.md#aju-05)).
 - **Cobertura QA:** RES-07.1 y 2 en `08-resultados.yaml` («— con respuesta», gasto de hoy) · 2026-11-08 · pasa
 
 ### RES-08 · Errores por sección <a id="res-08"></a>

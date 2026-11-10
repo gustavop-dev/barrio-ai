@@ -25,7 +25,7 @@ Gustavo, literal: «todo debe funcionar como una máquina autónoma».
 5. **Topes.** La tabla vigente queda como valores por defecto configurables; ventana de 07:00 a 21:00 en America/Bogota; espaciado fijo de 20 minutos entre escrituras públicas; caducidad de 48 h; no se comentan posts de más de 72 h; notas de invitación automáticas dentro del cupo mensual real.
 6. **Alertas** por webhook configurable y en la oficina; la parada total sigue existiendo, global y por cuenta.
 7. **Visitas al perfil.** Acepta que leer perfiles pueda registrarse como visita visible.
-8. **Presupuesto de modelos.** Tope diario de gasto para el piloto automático, además del techo acumulado existente, que él debe subir para operar.
+8. **Presupuesto de modelos.** Tope diario de gasto para el piloto automático, además del techo acumulado existente, que él debe subir para operar (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`).
 
 ## Quién interviene
 
@@ -187,13 +187,13 @@ Además, por destinatario: una invitación por persona; ningún mensaje automát
 | `OPERATOR_PROPOSAL_TTL_HOURS` | `48` | Una propuesta no ejecutada caduca a las 48 h de crearse; una programación (CONT-08), a las 48 h de su fecha. Si sigue siendo pertinente, se propone de nuevo y repite la verificación |
 | `OPERATOR_MAX_POST_AGE_HOURS` | `72` | No se comentan posts de más de 72 h (INT-03, INT-05); en posts propios (INT-04) el plazo se cuenta desde el comentario al que se responde |
 | `OPERATOR_DAILY_LIMITS` / `OPERATOR_WEEKLY_LIMITS` | La tabla anterior | Topes por tipo |
-| `OPERATOR_DAILY_LLM_USD` | Sin valor: lo fija Gustavo | Tope diario de gasto en modelos del piloto automático |
+| `OPERATOR_DAILY_LLM_USD` | Sin valor: lo fija Gustavo | Tope diario de gasto en modelos del piloto automático (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`) |
 | `OPERATOR_ALERT_WEBHOOK` | Sin valor: lo fija Gustavo | Alertas compatibles con ntfy o Slack |
 | `OPERATOR_PAUSED` | Desactivada | Parada total global |
 
 El espaciado es **fijo**, sirve para evitar ráfagas y **no se aleatoriza ni se imita comportamiento humano** para eludir la detección. Las escrituras privadas (invitaciones y su gestión, mensajes, organización del inbox, seguir, eliminar conexiones, bloquear) se rigen por sus topes.
 
-El tope diario de modelos se suma al techo acumulado existente del piloto de infraestructura (`OPENAI_LIMIT_USD` y `ANTHROPIC_LIMIT_USD`, de 1 USD cada uno en `infra/.env.example`), que Gustavo debe subir para operar. Al alcanzar el tope diario se detienen las llamadas nuevas a modelos hasta el día siguiente y se alerta; como el verificador tampoco puede revisar, no se aprueban textos nuevos. Sin tope diario configurado no hay llamadas pagadas: un límite sin configurar no significa ilimitado. Ningún agente puede cambiar estos valores.
+El tope diario de modelos se suma al techo acumulado existente del piloto de infraestructura (`OPENAI_LIMIT_USD` y `ANTHROPIC_LIMIT_USD`, de 1 USD cada uno en `infra/.env.example`), que Gustavo debe subir para operar. Al alcanzar el tope diario se detienen las llamadas nuevas a modelos hasta el día siguiente y se alerta; como el verificador tampoco puede revisar, no se aprueban textos nuevos. Sin tope diario configurado no hay llamadas pagadas: un límite sin configurar no significa ilimitado. Ningún agente puede cambiar estos valores (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`).
 
 ## Parada total
 
@@ -361,7 +361,7 @@ Cerradas el 6-nov-2026:
 Abiertas:
 
 1. Cupo mensual real de notas de invitación de la cuenta gratuita y si reserva una parte para uso manual.
-2. Valor de `OPERATOR_DAILY_LLM_USD` y subida del techo acumulado (`OPENAI_LIMIT_USD`, `ANTHROPIC_LIMIT_USD`) para operar.
+2. Valor de `OPERATOR_DAILY_LLM_USD` y subida del techo acumulado (`OPENAI_LIMIT_USD`, `ANTHROPIC_LIMIT_USD`) para operar (desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`).
 3. URL de `OPERATOR_ALERT_WEBHOOK`.
 4. Umbral de incidencias acumuladas que pausa la cuenta.
 5. Disponibilidad configurada en D16 para coordinar reuniones; sin ella, CHAT-07 no confirma franjas.

@@ -62,7 +62,7 @@ docker compose -f compose.prod.yaml --env-file .env exec -e EVAL_LIMIT_USD=25 ap
 
 - `--ejecutar` exige `--max-usd`. La corrida se detiene antes de cualquier llamada que, en el peor caso (todo `max_tokens`, como la reserva del proveedor), pudiera superar ese tope, y el informe dice dónde paró.
 - `EVAL_LIMIT_USD` es el presupuesto mensual de las evaluaciones: suma lo gastado en el mes con propósito `eval-*`. Vale 0 por defecto, así que nada se paga hasta fijarlo.
-- Todas las llamadas pasan por `providers.claude` y `providers.typesafe`, con propósito `eval-verificador`, `eval-comentarios`, `eval-clasificador` o `eval-lectores`. Quedan en el ledger y siguen contando para `ANTHROPIC_LIMIT_USD` y `TYPESAFE_LIMIT_USD`, pero no para los presupuestos diarios de producción, que filtran por su propio propósito.
+- Todas las llamadas pasan por `providers.claude` y `providers.typesafe`, con propósito `eval-verificador`, `eval-comentarios`, `eval-clasificador` o `eval-lectores`. Quedan en el ledger y cuentan en el presupuesto de IA de todo el equipo (`AI_MONTHLY_LIMIT_USD` y el tope de seguridad diario `AI_DAILY_FUSE_USD`, 15 USD por defecto, que también las frena), y en `ANTHROPIC_LIMIT_USD` y `TYPESAFE_LIMIT_USD` si están fijados. Lo que gasta una evaluación ya no queda para producción ese mes.
 - `--modelo` (repetible) compara modelos, la palanca C3 de la auditoría. Sin `--modelo` se usa el de producción de cada agente. `--modelo jev` evalúa el clasificador con Jev: la pregunta de riesgo del líder más una de encaje propia (desde R2 el líder ya no pregunta el encaje).
 
 ## Coste esperado

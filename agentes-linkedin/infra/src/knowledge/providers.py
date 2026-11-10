@@ -76,8 +76,10 @@ def limit_window_start(provider,now=None):
     return local.replace(day=1,hour=0,minute=0,second=0,microsecond=0)
 
 def reserve(provider,purpose,amount,request_hash=None,metadata=None):
-    amount=Decimal(str(amount));limit=Decimal(os.environ.get(provider.upper()+'_LIMIT_USD','1'))
-    if not amount.is_finite() or amount<0 or not limit.is_finite() or limit<0:raise ValueError('Presupuesto inválido')
+    # <PROVIDER>_LIMIT_USD is optional: an extra monthly ceiling for one provider inside the team's general budget.
+    raw=os.environ.get(provider.upper()+'_LIMIT_USD','').strip()
+    amount=Decimal(str(amount));limit=Decimal(raw) if raw else None
+    if not amount.is_finite() or amount<0 or (limit is not None and (not limit.is_finite() or limit<0)):raise ValueError('Presupuesto inválido')
     rid=str(uuid.uuid4())
     with connect() as c:
         c.execute('SELECT pg_advisory_xact_lock(103502)')
@@ -87,34 +89,17 @@ def reserve(provider,purpose,amount,request_hash=None,metadata=None):
             raise ValueError('Existe una solicitud idéntica pendiente o incierta; conciliarla antes de repetir.')
         from .cycle_context import provider_metadata
         metadata=dict(metadata or {},**provider_metadata(provider,purpose,amount,c))
-        if purpose in RESEARCH_PURPOSES:
-            from django.conf import settings
-            from team_backend.operador import period_starts
-            day,_=period_starts()
-            research_limit=Decimal(settings.WEB_RESEARCH_DAILY_USD)
-            if not research_limit.is_finite() or research_limit<0:raise ValueError('Presupuesto web inválido')
-            research_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE purpose=ANY(%s) AND created_at>=%s",(list(RESEARCH_PURPOSES),day)).fetchone()['spent']
-            if research_spent+amount>research_limit:raise ValueError('Presupuesto web diario agotado; incluye reservas pendientes')
-        if purpose.startswith(('editorial-','image-')):
-            from team_backend.operador import period_starts
-            day,_=period_starts()
-            editorial_limit=min(Decimal('2'),Decimal(os.environ.get('EDITORIAL_DAILY_LLM_USD','2')))
-            if not editorial_limit.is_finite() or editorial_limit<0:raise ValueError('Presupuesto editorial inválido')
-            editorial_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE (purpose LIKE 'editorial-%%' OR purpose LIKE 'image-%%') AND created_at>=%s",(day,)).fetchone()['spent']
-            if editorial_spent+amount>editorial_limit:raise ValueError('Presupuesto editorial diario agotado; incluye herramientas y reservas')
-        if purpose.startswith('image-'):
-            from team_backend.operador import period_starts
-            day,_=period_starts()
-            image_limit=Decimal(os.environ.get('IMAGE_DAILY_USD','1'))
-            if not image_limit.is_finite() or image_limit<0:raise ValueError('Presupuesto de imágenes inválido')
-            image_spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE purpose LIKE 'image-%%' AND created_at>=%s",(day,)).fetchone()['spent']
-            if image_spent+amount>image_limit:raise ValueError('Presupuesto de imágenes agotado; incluye reservas pendientes')
-        since=limit_window_start(provider)
-        spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s AND (%s::timestamptz IS NULL OR created_at>=%s)",(provider,since,since)).fetchone()['spent']
-        if spent+amount>limit:
-            missing=(spent+amount-limit).quantize(Decimal('0.000001'),rounding=ROUND_UP)
-            raise ValueError(f'Límite local de {provider} alcanzado'+(' este mes' if since else '')+
-                f'; faltan {missing} USD; límite {limit}, gastado {spent} (incluye reservas pendientes); reserva {amount} USD.')
+        # One budget for the whole team (knowledge.presupuesto): monthly limit plus a daily safety fuse, every
+        # provider and purpose together. No per-area daily caps.
+        from . import presupuesto
+        presupuesto.check(c,amount)
+        if limit is not None:
+            since=limit_window_start(provider)
+            spent=c.execute("SELECT coalesce(sum(CASE WHEN status='complete' THEN actual_usd WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent FROM usage_ledger WHERE provider=%s AND (%s::timestamptz IS NULL OR created_at>=%s)",(provider,since,since)).fetchone()['spent']
+            if spent+amount>limit:
+                missing=(spent+amount-limit).quantize(Decimal('0.000001'),rounding=ROUND_UP)
+                raise ValueError(f'Límite local de {provider} alcanzado'+(' este mes' if since else '')+
+                    f'; faltan {missing} USD; límite {limit}, gastado {spent} (incluye reservas pendientes); reserva {amount} USD.')
         c.execute('INSERT INTO usage_ledger(id,provider,purpose,reserved_usd,status,request_hash,usage) VALUES(%s,%s,%s,%s,%s,%s,%s)',(rid,provider,purpose,amount,'reserved',request_hash,Jsonb(metadata or {})))
     return rid
 

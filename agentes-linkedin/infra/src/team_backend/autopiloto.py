@@ -295,7 +295,7 @@ def _editorial(user,now):
     if autonomy('CONT-09')=='off' or _pending('prepare_piece'):return 0
     account=editorial.publishing_account()
     if not editorial.can_publish(account):return 0
-    if editorial.spent_today(now)>=editorial.daily_budget():return 0
+    if not editorial.can_afford_preparation(now):return 0
     from . import urgente
     slot=urgente.next_slot(now) or editorial.next_slot(now)
     if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot) or editorial.scheduled_for(slot))<=0:return 0
@@ -352,7 +352,8 @@ def _prefilter(post):
 def _propose(user,account,now):
     # A paid draft only when a write slot is left after the comments already waiting for one.
     if autonomy('INT-03')=='off' or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
-    if llm_spent_today(now)>=Decimal(setting('OPERATOR_DAILY_LLM_USD','1')):return 0
+    from knowledge import presupuesto
+    if presupuesto.left(now)<=0:return 0
     day,_=operador.period_starts(now)
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
     pending=Job.objects.filter(kind='propose_comment',state__in=[Job.State.QUEUED,Job.State.RUNNING]).count()
@@ -396,7 +397,7 @@ def _network(user,account,now):
         queued+=int(created)
     enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'),red.discovery_room(account)>0)  # B4
     unclassified=Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).exists()
-    enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),unclassified and red.spent_today(now)<red.daily_budget())
+    enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),unclassified and red.budget_left(now)>0)
     enqueue('plan_network',_every('NETWORK_PLAN_EVERY_MINUTES','60'))
     enqueue('sync_network',_every('NETWORK_SYNC_EVERY_MINUTES','360'))
     return queued

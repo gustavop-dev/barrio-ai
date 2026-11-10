@@ -119,7 +119,8 @@ class StoppedCycleTests(NetworkBase):
         self.assertEqual(autopiloto.tick(self.bot)['expired'],1)
         proposal.refresh_from_db();capture.refresh_from_db()
         self.assertEqual((proposal.state,proposal.decision_note),('expired','Ciclo detenido: graph_changed'))
-        self.assertEqual((capture.state,capture.routed_to),('idea',{'intentos':1}))  # an attempt is counted: two failed pieces leave it for the director
+        # An attempt is counted once per piece: two failed pieces leave it for the director.
+        self.assertEqual((capture.state,capture.routed_to),('idea',{'intentos':1,'intentos_en':[str(proposal.piece_id)]}))
         self.assertEqual(capture.publish_asap_reason,'Vuelve a la mesa: Ciclo detenido: graph_changed')
         self.assertEqual(AuditEvent.objects.filter(action='operator.expired',target=str(proposal.id)).count(),1)
 

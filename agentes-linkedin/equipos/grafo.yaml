@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.4-fase8-assets-explanation",
+  "graph_version": "6.5-presupuesto-general",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -4074,13 +4074,12 @@
         "scope": "Contadores persistidos por instancia; reservas y costes del usage ledger. Gates y BAR-15 conservan sus políticas.",
         "max_calls": 40,
         "max_provider_calls": 40,
-        "cost_cap_usd": 2,
+        "cost_cap_usd": 8,
         "cost_period": "cycle",
         "call_timeout_s": 120,
         "cycle_timeout_s": 1200,
         "max_stalls": 2,
-        "max_replans": 1,
-        "daily_cost_cap_usd": 2
+        "max_replans": 1
       },
       "ledger": {
         "status": "runtime",

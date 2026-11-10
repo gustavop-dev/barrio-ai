@@ -69,7 +69,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
   1. **Dado** candidatos sin titular, **cuando** corre la clasificación, **entonces** antes se lee su perfil (una lectura del cupo `profile`); si el cupo se agotó, esa persona espera al día siguiente sin juzgarse.
   2. **Dado** un lote de hasta 10 personas, **cuando** el modelo responde `fit` con confianza ≥ `NETWORK_MIN_CONFIDENCE` (0,6), **entonces** la persona pasa a `fit` con `classification` (`fit`, `role`, `modality`, `affinity`, `reason`, `confidence`, `model`, `classified_at`); si no, pasa a `discarded`.
   3. **Dado** que la afinidad hispanohablante no está declarada en el perfil, **cuando** se clasifica, **entonces** `affinity` vale `desconocida`, nunca se deduce del nombre.
-  4. **Dado** que lo gastado hoy llega a `NETWORK_DAILY_LLM_USD`, **cuando** toca clasificar, **entonces** falla con «Presupuesto diario de la red agotado (NETWORK_DAILY_LLM_USD).».
+  4. **Dado** que se agotó el presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD` o el tope de seguridad diario `AI_DAILY_FUSE_USD`), **cuando** toca clasificar, **entonces** falla con «Presupuesto de IA agotado (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD).» y el autopiloto no encola la clasificación.
   5. **Dado** una respuesta que no es JSON válido, **cuando** se procesa, **entonces** falla con «El clasificador no devolvió JSON válido.» y nadie cambia de etapa.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
@@ -185,7 +185,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
   1. **Dado** contactos en varias etapas, **cuando** se pide el resumen, **entonces** `stages` trae el recuento de `candidate`, `fit`, `discarded`, `followed`, `invited`, `connected`, `closed` e `incoming`, más `opportunity` (personas con una oportunidad abierta) y `conversation: null`.
   2. **Dado** `NETWORK_ENABLED=false`, **cuando** se pide, **entonces** `enabled` vale `false` y el resto de datos guardados sigue llegando.
   3. **Dado** lecturas de hoy, **cuando** se pide, **entonces** `reads_today` las suma por tipo, con `execution` sin tope.
-  4. **Dado** gasto del clasificador, **cuando** se pide, **entonces** `llm` trae `spent_today` y `daily` como números JSON.
+  4. **Dado** gasto del clasificador, **cuando** se pide, **entonces** `llm` trae `spent_today` y `daily` como números JSON; `daily` es el tope de seguridad diario de todo el equipo (`AI_DAILY_FUSE_USD`), no uno propio de la red.
 - **Brechas código/docs:** `stages.conversation` sigue en `null` aunque el inbox ya está implementado ([INB-01](inbox.md#inb-01)); el filtro `stage=conversation` de `/red/contacts` devuelve siempre vacío.
 - **Cobertura QA:** pendiente
 
@@ -285,7 +285,7 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
 | Lecturas de perfiles | Nuevo `OPERATOR_PROFILE_READ_DAILY_LIMIT=80`, techo duro 100 aun con overrides; cuenta lecturas de investigación, preflight, conciliación y futuras visitas entre todos los conectores. `NETWORK_READ_CAPS=comments=60,search=20,profile=80,sync=4` sustituye profile=30, subordinado al contador global; reservar margen para conciliación. Lectura actual no equivale a visita notificada. |
 | Autopiloto y guardas existentes | Verificar `OPERATOR_AUTOPILOT=true`, `NETWORK_ENABLED=true` y modos de `OPERATOR_AUTONOMY` efectivos; auto para participación autorizada, sin saltar verificador/líder/veto ni `OPERATOR_PAUSED`. No levantar pausas o restricciones de cuenta al desplegar. Mantener cooldown por autor y espera de invitación salvo nueva decisión explícita. |
 | Tipo de cuenta y notas, nuevos | `LINKEDIN_ACCOUNT_TIER=free` y `LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT=3`, tope prudente de producto, no cuota garantizada por LinkedIn. [BAR-16](#bar-16) define reservas, límites efectivos y fallback. Un upgrade no sube los techos generales ni salta la rampa. |
-| Gasto | `EDITORIAL_DAILY_LLM_USD=2` y cap total de pieza ARQ-05; referentes 5 USD/mes y Perfil 10 USD por ciclo en registro. `OPERATOR_DAILY_LLM_USD=1` y `NETWORK_DAILY_LLM_USD=0.3` siguen como defaults de comentarios/clasificación, sin subirlos para forzar 100 acciones. |
+| Gasto | Desde el 10/11/2026, un solo presupuesto de IA para todo el equipo (`AI_MONTHLY_LIMIT_USD=100` y el tope de seguridad diario `AI_DAILY_FUSE_USD=15`, `knowledge/presupuesto.py`), sin topes diarios por área. Caps del registro ARQ-05: pieza 8 USD por ciclo, referentes 5 USD/mes y Perfil 10 USD por ciclo. No subirlos para forzar 100 acciones. |
 
 Inventariar únicamente estas claves permitidas del env real sin copiar secretos, reconciliar overrides antiguos con los nuevos techos y actualizar los dos `.env.example` durante implementación. Mostrar efectivos, rampa y discrepancias antes de activar. No basta cambiar DEFAULT_LIMITS si siguen overrides 3/12, 15/60 o 5/20; tampoco se aplica el techo 20/100 saltando el estado inicial 5/20.
 

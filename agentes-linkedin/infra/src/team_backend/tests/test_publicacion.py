@@ -446,16 +446,17 @@ class EditorialCircuitTests(EditorialBase):
         self.assertEqual(operador.reconcile(self.gustavo,proposal.id).state,'confirmed')
         self.assertEqual(self.linkedin.state['writes'],1)
 
-    def test_editorial_budget_is_separate_and_stops_spending(self):
+    def test_a_spent_ai_budget_stops_editorial_spending(self):
         from knowledge import providers as paid
         from team_backend.models import EditorialPiece, Job
-        paid.reserve('anthropic','editorial-director','1')
+        fuse=patch.dict(os.environ,{'AI_DAILY_FUSE_USD':'1'});fuse.start();self.addCleanup(fuse.stop)
+        paid.reserve('anthropic','editorial-director','1')  # the team's daily safety fuse is spent
         with patch.dict(os.environ,{'EDITORIAL_LEAD_HOURS':'24'}),self.claude(answers()) as claude:
             self.assertEqual(autopiloto.tick(self.autobot)['plan'],0)
             self.assertEqual(self.human.post('/api/v1/editorial/plan',{},format='json').status_code,202);self.drain()
         claude.assert_not_called()
         job=Job.objects.get(kind='prepare_piece')
-        self.assertEqual(job.state,'failed');self.assertIn('Presupuesto editorial',job.error)
+        self.assertEqual(job.state,'failed');self.assertIn('Presupuesto de IA',job.error)
         self.assertFalse(EditorialPiece.objects.exists())
         self.assertEqual(autopiloto.llm_spent_today(),0)  # the comments budget is untouched
         overview=self.human.get('/api/v1/operador/overview').json()['today']
