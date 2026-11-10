@@ -433,8 +433,10 @@ def _execute(user,account,now):
     from .orquestacion import cycle_issues
     if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0
     if _pending('execute_action'):return 0
+    due=operador.post_due(now)  # a network action or comment now could push his post past its hour
     for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(account=account,state='approved',execution__isnull=True).order_by('created_at'):
         if cycle_issues(proposal):continue
+        if due and not proposal.piece_id:continue
         if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour
         if operador.capacity_left(account,proposal.capability,now)<=0:continue
         job=operador.enqueue_execution(user,proposal)
