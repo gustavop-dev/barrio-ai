@@ -19,8 +19,11 @@ x-app: &app
     DJANGO_CSRF_TRUSTED_ORIGINS: https://${BARRIO_DOMAIN}
     # Private files of the capture button and the Galería; the image creates it owned by app (uid 10001).
     MEDIA_ROOT: /app/media
+  # Every app service shares the media volume: the autopilot's policy and worker-acciones read the post images
+  # (imagenes.issues and the upload to LinkedIn). Without it they saw «Imagen no disponible» and discarded the piece.
   volumes:
     - ./conocimiento:/workspace:ro
+    - media:/app/media
   restart: unless-stopped
   logging: &logging
     driver: json-file
@@ -48,8 +51,6 @@ services:
   api:
     <<: *app
     command: ["sh", "-c", "python manage.py collectstatic --noinput --verbosity 0 && exec gunicorn linkedin_backend.wsgi:application --bind 0.0.0.0:8787 --workers 2 --timeout 300 --forwarded-allow-ips='*'"]
-    # Lists are not merged with the anchor: repeat the knowledge mount next to the media volume.
-    volumes: ["./conocimiento:/workspace:ro", "media:/app/media"]
     depends_on: {migrate: {condition: service_completed_successfully}}
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8787/health', timeout=5)"]
@@ -60,8 +61,6 @@ services:
     <<: *app
     # General lane: LLM work, network reads, metrics and transcriptions. LinkedIn writes go to worker-acciones.
     command: ["python", "manage.py", "runworker", "--lane", "general"]
-    # The worker reads the audio it transcribes: same media volume as the api.
-    volumes: ["./conocimiento:/workspace:ro", "media:/app/media"]
     depends_on: {api: {condition: service_healthy}}
     healthcheck:
       test: ["CMD", "python", "manage.py", "worker_health", "--lane", "general"]
