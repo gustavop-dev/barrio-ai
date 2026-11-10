@@ -640,6 +640,7 @@ def plan(user,account,now=None):
     It reads nothing from LinkedIn (R1): the pre-check of each execution reads the profile right before writing and
     settles the person's stage when there is nothing to write (already followed, connected, invited, closed...)."""
     from .autopiloto import autonomy
+    from .orquestacion import current, load_graph
     require(user,'operate_linkedin')
     operador.policy_lock()
     now=now or timezone.now()
@@ -655,9 +656,14 @@ def plan(user,account,now=None):
     if grounding['course_missing'] or operador.globally_paused() or account.paused:
         summary['stopped']='Biblioteca no disponible' if grounding['course_missing'] else 'Cuenta pausada'
         operador._audit(user,'network.planned',account.id,**summary);return summary
+    review_limit=next(edge['max_calls_per_cycle'] for edge in load_graph()['edges'] if edge['id']=='politica_red')
+    runtime=current()
+    if runtime and runtime.job_id:
+        review_limit-=ActionProposal.objects.filter(origin_job=runtime.job_id,capability__in=[RED.FOLLOW,RED.INVITE,RED.ACCEPT]).count()
     def room(capability):
         reserved=ActionProposal.objects.filter(capability=capability,state__in=['proposed','approved']).count()
-        return operador.capacity_left(account,capability,now)-reserved
+        return min(operador.capacity_left(account,capability,now)-reserved,
+                   review_limit-sum(summary[kind] for kind in ('follow','invite','accept')))
     def waiting(capability,**filters):
         return (Contact.objects.filter(account=account,**filters).exclude(proposals__state__in=OPEN_ACTION_STATES)
                 .exclude(id__in=_resting(capability,now)))

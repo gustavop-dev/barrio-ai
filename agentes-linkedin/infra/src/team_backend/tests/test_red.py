@@ -5,8 +5,8 @@ from datetime import timedelta
 from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.utils import timezone
-from team_backend import autopiloto, jobs, red
-from team_backend.models import ActionExecution, ActionProposal, Contact, Job
+from team_backend import autopiloto, jobs, operador, orquestacion, red
+from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Capture, Contact, CycleLedger, EditorialPiece, Job
 from team_backend.tests.test_operador import OperatorBase
 
 SUBSTANTIVE='The hard part is not the model, it is deciding which step of the sales workflow you automate first.'
@@ -52,6 +52,119 @@ class NetworkBase(OperatorBase):
         self.drain()
         proposal.refresh_from_db();contact.refresh_from_db()
         return proposal
+
+
+class StoppedCycleTests(NetworkBase):
+    def cycle(self,reason='',piece=None):
+        job=Job.objects.create(owner=self.bot,kind='prepare_piece' if piece else 'plan_network')
+        run=orquestacion.Runtime.open('pieza_diaria' if piece else 'red',str(piece.id if piece else job.id),self.bot,job)
+        if reason:run.stop(reason,business=False)
+        return CycleLedger.objects.get(pk=run.id)
+
+    def action(self,cycle=None,state='proposed'):
+        contact=self.contact(f'person-{Contact.objects.count()}','Persona')
+        return operador.create_proposal(self.bot,None,'RED-01',{'user_id':contact.provider_user_id},contact=contact,
+            origin_job=str(cycle.job_id) if cycle else '',state=state)
+
+    def piece_action(self):
+        now=timezone.now()
+        piece=EditorialPiece.objects.create(account=self.account,slot_date=now.date(),scheduled_for=now-timedelta(minutes=1),state='ready')
+        return operador.create_proposal(self.bot,None,'CONT-09',{'text':'Pieza del día'},piece=piece,state='approved')
+
+    def test_execution_skips_stopped_red_and_queues_younger_daily_piece(self):
+        """A stopped oldest follow must neither retry its failed job nor block a younger CONT-09."""
+        blocked=self.action(self.cycle('edge_limit'),'approved')
+        failed=operador.enqueue_execution(self.bot,blocked)
+        Job.objects.filter(pk=failed.pk).update(state='failed',error='Ciclo detenido: edge_limit')
+        self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()),0)
+        self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()+timedelta(minutes=1)),0)
+        piece=self.piece_action()
+        self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()),1)
+        queued=Job.objects.get(kind='execute_action',state='queued')
+        self.assertEqual(queued.params,{'proposal':str(piece.id)})
+        self.assertEqual(Job.objects.filter(kind='execute_action').count(),2)
+        self.assertEqual(self.fake.state['writes'],0)
+
+    def test_tick_expires_stopped_open_actions_once_and_keeps_other_cycles(self):
+        """Stopped cycles close proposed/approved rows, but cost_cap, live cycles and executions survive."""
+        stopped=self.cycle('edge_limit')
+        proposed=self.action(stopped);approved=self.action(stopped,'approved')
+        rejected=self.action(stopped,'rejected');executed=self.action(stopped,'approved')
+        ActionExecution.objects.create(proposal=executed,idempotency_key=str(executed.id),provider='fake',
+            executed_by=self.bot,state='failed',wrote=False)
+        cost=self.cycle('cost_cap');cost_pending=self.action(cost);cost_approved=self.action(cost,'approved')
+        running=self.action(self.cycle());complete=self.cycle()
+        CycleLedger.objects.filter(pk=complete.pk).update(state='complete')
+        completed=self.action(complete);legacy=self.action()
+        stale=self.action();ActionProposal.objects.filter(pk=stale.pk).update(created_at=timezone.now()-timedelta(hours=49))
+        self.account.paused=True;self.account.save()
+        self.assertEqual(autopiloto.tick(self.bot)['expired'],3)
+        for proposal in (proposed,approved):
+            proposal.refresh_from_db()
+            self.assertEqual((proposal.state,proposal.decision_note),('expired','Ciclo detenido: edge_limit'))
+        for proposal,state in ((rejected,'rejected'),(executed,'approved'),(cost_pending,'proposed'),
+                               (cost_approved,'approved'),(running,'proposed'),(completed,'proposed'),(legacy,'proposed')):
+            proposal.refresh_from_db();self.assertEqual(proposal.state,state)
+        stale.refresh_from_db();self.assertEqual(stale.decision_note,'Caducada sin ejecutar')
+        self.assertEqual(autopiloto.tick(self.bot)['expired'],0)
+        self.assertEqual(set(AuditEvent.objects.filter(action='operator.expired').values_list('target',flat=True)),
+                         {str(proposed.id),str(approved.id),str(stale.id)})
+        self.assertEqual(AuditEvent.objects.filter(action='operator.expired').count(),3)
+
+    def test_tick_releases_ideas_of_a_stopped_piece(self):
+        """Expiring a stopped editorial cycle must return its ideas to the editorial table."""
+        proposal=self.piece_action();self.cycle('graph_changed',proposal.piece)
+        capture=Capture.objects.create(created_by=self.bot,state='usado',routed_to={'used_in':str(proposal.piece_id)})
+        self.account.paused=True;self.account.save()
+        self.assertEqual(autopiloto.tick(self.bot)['expired'],1)
+        proposal.refresh_from_db();capture.refresh_from_db()
+        self.assertEqual((proposal.state,proposal.decision_note),('expired','Ciclo detenido: graph_changed'))
+        self.assertEqual((capture.state,capture.routed_to),('idea',{}))
+        self.assertEqual(capture.publish_asap_reason,'Vuelve a la mesa: Ciclo detenido: graph_changed')
+        self.assertEqual(AuditEvent.objects.filter(action='operator.expired',target=str(proposal.id)).count(),1)
+
+
+class NetworkPlanLimitTests(NetworkBase):
+    def test_ten_follows_are_split_across_cycles_at_the_graph_limit(self):
+        """Ten eligible follows must not create a sixth politica_red review in one cycle."""
+        for i in range(10):self.contact(f'candidate-{i}',f'Candidato {i}')
+        first=self.job('plan_network')
+        limit=next(e['max_calls_per_cycle'] for e in orquestacion.load_graph()['edges'] if e['id']=='politica_red')
+        self.assertEqual(first.state,'complete')
+        self.assertEqual(ActionProposal.objects.filter(origin_job=str(first.id)).count(),limit)
+        self.assertEqual(Contact.objects.filter(proposals__isnull=True,stage='fit').count(),10-limit)
+        second=self.job('plan_network')
+        self.assertEqual(second.state,'complete')
+        self.assertEqual(ActionProposal.objects.filter(origin_job=str(second.id)).count(),10-limit)
+        self.assertEqual(ActionProposal.objects.count(),10)
+
+    def test_follow_invite_and_accept_share_the_loaded_edge_limit(self):
+        """The graph's limit applies to RED-01 + RED-02 + RED-04, not to each independently."""
+        self.contact('follow','Seguir')
+        self.contact('invite','Invitar',stage='followed',followed_hours=49)
+        for i in range(2):
+            contact=self.contact(f'accept-{i}',f'Aceptar {i}',stage='incoming')
+            contact.invitation_id=f'invitation-{i}';contact.save()
+        graph=orquestacion.load_graph()
+        next(e for e in graph['edges'] if e['id']=='politica_red')['max_calls_per_cycle']=3
+        with patch('team_backend.orquestacion.load_graph',return_value=graph):
+            first=red.plan(self.bot,self.account)
+            second=red.plan(self.bot,self.account)
+        self.assertEqual([first[k] for k in ('follow','invite','accept')],[1,1,1])
+        self.assertEqual([second[k] for k in ('follow','invite','accept')],[0,0,1])
+        self.assertEqual(ActionProposal.objects.count(),4)
+
+    def test_planning_again_in_the_same_cycle_does_not_replenish_review_slots(self):
+        """A second plan invocation in the same cycle must count proposals it already created."""
+        for i in range(10):self.contact(f'candidate-{i}',f'Candidato {i}')
+        job=Job.objects.create(owner=self.bot,kind='plan_network')
+        runtime=orquestacion.Runtime.open('red',str(job.id),self.bot,job)
+        limit=next(e['max_calls_per_cycle'] for e in runtime.graph['edges'] if e['id']=='politica_red')
+        with runtime.session():
+            first=red.plan(self.bot,self.account)
+            second=red.plan(self.bot,self.account)
+        self.assertEqual((first['follow'],second['follow']),(limit,0))
+        self.assertEqual(ActionProposal.objects.filter(origin_job=str(job.id)).count(),limit)
 
 
 class DiscoveryAndFollowTests(NetworkBase):
@@ -219,9 +332,11 @@ class CommentRoomTests(NetworkBase):
     def test_network_proposals_do_not_use_up_the_daily_comment_drafts(self):
         for i in range(7):self.contact(f'persona-{i}',f'Persona {i}')
         self.job('plan_network')
-        self.assertEqual(ActionProposal.objects.filter(capability='RED-01').count(),7)
+        # One cycle proposes at most what politica_red can review (5); the daily drafts cap is set to that same number.
+        self.assertEqual(ActionProposal.objects.filter(capability='RED-01').count(),5)
         self.observed()
-        with patch('team_backend.autopiloto.enqueue_operation',wraps=autopiloto.enqueue_operation) as enqueue:
+        with patch.dict(os.environ,{'OPERATOR_DAILY_PROPOSALS':'5'}),\
+             patch('team_backend.autopiloto.enqueue_operation',wraps=autopiloto.enqueue_operation) as enqueue:
             autopiloto.tick(self.bot)
         self.assertIn('propose_comment',[c.args[1] for c in enqueue.call_args_list])
 

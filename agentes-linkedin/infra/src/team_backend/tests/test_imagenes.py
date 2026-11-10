@@ -17,7 +17,7 @@ from django.utils import timezone
 from knowledge import db, providers
 from team_backend import autopiloto, capturas, connectors_images, connectors_linkedin, imagenes, infografias, operador
 from team_backend.connectors import ConnectorError, ConnectorUncertain
-from team_backend.models import EditorialPiece, GalleryPhoto, PieceImage
+from team_backend.models import AuditEvent, Capture, EditorialPiece, GalleryPhoto, PieceImage
 from team_backend.tests.test_publicacion import EditorialBase, PublicationBase, GOOD_POST, answers
 from team_backend.tests.test_capturas import CaptureBase, photo
 
@@ -196,6 +196,68 @@ class ImageWorkflowTests(EditorialBase):
 
 
 def editorial_action(piece):return piece.proposals.get()
+
+
+class PolicyMediaAvailabilityTests(EditorialBase):
+    def proposal(self,document=False,text=GOOD_POST):
+        when=timezone.now()+timedelta(days=EditorialPiece.objects.count()+20)
+        piece=EditorialPiece.objects.create(account=self.official,slot_date=when.date(),scheduled_for=when,state='ready',
+            final_text=text,verification={'verdict':'ready_for_execution','text_sha256':imagenes.sha(text.encode())})
+        imagenes.fallback(piece,'Fixture sin proveedores')
+        if document:
+            raw=b'%PDF-1.7\nfixture'
+            piece.image_kind='carrusel';piece.image_document_sha256=imagenes.sha(raw)
+            piece.image_document.save('fixture.pdf',ContentFile(raw),save=False);piece.save()
+        return operador.create_proposal(self.gustavo,None,'CONT-09',{'text':text},citations=['LI-04-M005-K01'],source='agent',piece=piece)
+
+    def test_unreadable_files_wait_and_a_later_tick_approves_after_recovery(self):
+        """A missing mount must not permanently discard the day or release its captured ideas."""
+        self.account.paused=True;self.account.save();self.official.paused=True;self.official.save()
+        for kind,expected in (('image',['Imagen no disponible']),('document',['Documento no disponible']),
+                              ('both',['Imagen no disponible','Documento no disponible'])):
+            with self.subTest(kind=kind):
+                proposal=self.proposal(document=kind!='image');piece=proposal.piece
+                capture=Capture.objects.create(created_by=self.gustavo,state='usado',routed_to={'used_in':str(piece.id)})
+                missing={piece.images.get().image.name} if kind=='image' else {piece.image_document.name}
+                if kind=='both':missing.add(piece.images.get().image.name)
+                read=imagenes.read
+                def unavailable(field):
+                    if field.name in missing:raise FileNotFoundError('Fixture: volumen no disponible')
+                    return read(field)
+                with patch('team_backend.imagenes.read',side_effect=unavailable):
+                    self.assertEqual(autopiloto.post_issues(proposal),expected)
+                    with self.assertLogs('team_backend.autopilot',level='WARNING') as logs:
+                        autopiloto.tick(self.autobot)
+                proposal.refresh_from_db();capture.refresh_from_db()
+                self.assertEqual((proposal.state,proposal.decision_note,proposal.decided_at,proposal.risks),('proposed','',None,[]))
+                self.assertEqual((capture.state,capture.routed_to),('usado',{'used_in':str(piece.id)}))
+                self.assertIn(str(proposal.id),logs.output[0])
+                self.assertEqual(AuditEvent.objects.filter(action='operator.policy_discarded',target=str(proposal.id)).count(),0)
+                autopiloto.tick(self.autobot);proposal.refresh_from_db()
+                self.assertEqual((proposal.state,proposal.approved_hash),('approved',proposal.payload_hash))
+
+    def test_unreadable_image_with_content_problem_still_discards(self):
+        """A missing image must not hide a content violation or turn it into an endless retry."""
+        proposal=self.proposal(text=GOOD_POST+' Contact me for more.')
+        with patch('team_backend.imagenes.read',side_effect=PermissionError('Fixture: permiso denegado')):
+            autopiloto.policy_review(proposal)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.state,'discarded')
+        self.assertIn('Contiene pitch agresivo o petición de contacto',proposal.risks)
+        self.assertIn('Imagen no disponible',proposal.risks)
+        self.assertEqual(AuditEvent.objects.filter(action='operator.policy_discarded',target=str(proposal.id)).count(),1)
+
+    def test_unreadable_document_with_changed_image_still_discards(self):
+        """Retryable storage errors must not bypass the exact-image integrity gate."""
+        proposal=self.proposal(document=True)
+        def unavailable_or_changed(field):
+            if field.name==proposal.piece.image_document.name:raise OSError('Fixture: volumen no disponible')
+            return b'changed bytes'
+        with patch('team_backend.imagenes.read',side_effect=unavailable_or_changed):
+            autopiloto.policy_review(proposal)
+        proposal.refresh_from_db()
+        self.assertEqual(proposal.state,'discarded')
+        self.assertEqual(proposal.risks,['Los bytes de la imagen cambiaron','Documento no disponible'])
 
 
 class ImageProviderContracts(PublicationBase):
