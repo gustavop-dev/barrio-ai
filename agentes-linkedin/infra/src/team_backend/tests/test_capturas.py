@@ -206,7 +206,8 @@ class CaptureRoutingTests(CaptureBase):
         self.assertEqual(len(listed),2)
         self.assertEqual({(p['note'],p['display_state'],p['label'],p['tone'],p['capture_id'],p['used_in']) for p in listed},
                          {('Úsalas en el post del domingo','nueva','Nueva','info',gallery['id'],None)})
-        self.assertEqual(self.handoffs(),[('operador_cuenta','director_editorial')]*2)
+        # The idea is also given its window on arrival (director → Gustavo), besides the two handoffs to the director.
+        self.assertEqual(self.handoffs(),[('director_editorial','operador_cuenta')]+[('operador_cuenta','director_editorial')]*2)
 
     def test_photos_of_any_capture_reach_the_gallery(self):
         contact=Contact.objects.create(account=self.account,provider_user_id='ACoeva',display_name='Eva',source='manual',stage='fit')

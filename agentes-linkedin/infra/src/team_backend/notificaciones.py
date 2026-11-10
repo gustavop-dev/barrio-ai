@@ -25,7 +25,7 @@ INBOX_KINDS={
 FEED_KINDS={
     'profile_reviewed':('tuyo',False,'Revisión de perfil sin cambios'),
     'referents_review':('conversaciones',True,'Revisión mensual y experimentos de referentes'),
-    'capture_scheduled':('publicaciones',True,'Fecha de una idea urgente'),
+    'capture_scheduled':('publicaciones',True,'Fecha de una idea tuya'),
     'piece_scheduled':('publicaciones',True,'Pieza lista o programada'),
     'piece_published':('publicaciones',True,'Pieza publicada'),
     'piece_blocked':('sistema',True,'Pieza bloqueada por el verificador'),

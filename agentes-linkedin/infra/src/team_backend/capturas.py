@@ -426,7 +426,7 @@ def process(capture_id):
             if classified:routed.update(classified=True,reason=reason);outcome['reason']=reason
             locked.routed_to=routed;locked.outcome=outcome;locked.state=state;locked.error=''
             locked.save(update_fields=['routed_to','outcome','state','error'])
-        if locked.publish_asap and locked.state==Capture.State.IDEA:
+        if locked.state==Capture.State.IDEA:
             from . import urgente
             urgente.assign_slots()
             locked.refresh_from_db()
@@ -491,6 +491,7 @@ def undo(user,capture_id):
             names.extend(p.image.name for p in photo.uses.filter(edited=True))
             photo.delete()
         capture.publish_asap=False;capture.publish_asap_evidence='';capture.publish_asap_expected_slot=None;capture.understanding={}
+        capture.publish_at=None;capture.publish_at_evidence=''
         capture.investigation={}
         from .models import WebResearchRun
         WebResearchRun.objects.filter(pk=f'capture:{capture.id}').update(state='withdrawn',result={})
@@ -541,6 +542,19 @@ def mark_used(ids,piece):
         capture.routed_to=dict(capture.routed_to or {},used_in=str(piece.id))
         capture.save(update_fields=['state','outcome','routed_to'])
 
+def decline_reserved(capture_id,piece,why=''):
+    """The director did not take the idea reserved for this piece: it stays on the table for later briefs, without a
+    window of its own (it is not prepared again automatically), and Gustavo is told."""
+    from .notificaciones import avisar
+    capture=Capture.objects.filter(id=capture_id,state=Capture.State.IDEA).first()
+    if capture is None:return
+    text=f'El director no la usó para el {day_label(piece.slot_date)}'+(f': {why}' if why else '')+'. Sigue en la mesa editorial.'
+    capture.routed_to=dict(capture.routed_to or {},declined_in=str(piece.id))
+    capture.publish_asap_expected_slot=None;capture.publish_asap_reason=text[:2000]
+    capture.outcome=_outcome('idea',text[:500])
+    capture.save(update_fields=['routed_to','publish_asap_expected_slot','publish_asap_reason','outcome'])
+    avisar('capture_scheduled','Tu idea no salió en su fecha',text[:300],link=f'/calendario/pieza/{piece.id}',ref=f'capture_declined:{capture.id}:{piece.id}')
+
 def release_ideas(piece,why):
     """The piece that used Gustavo's ideas did not go out (skipped, blocked, failed, discarded or vetoed): they go back
     to the editorial table, with their 14 days counted from when he sent them."""
@@ -548,7 +562,7 @@ def release_ideas(piece,why):
     imagenes.release(piece)
     released=0
     for capture in Capture.objects.filter(state=Capture.State.USED,routed_to__used_in=str(piece.id)):
-        routed=dict(capture.routed_to or {});routed.pop('used_in',None)
+        routed=dict(capture.routed_to or {});routed.pop('used_in',None);routed['intentos']=routed.get('intentos',0)+1
         capture.publish_asap_expected_slot=None;capture.publish_asap_reason='Vuelve a la mesa: '+why
         capture.state=Capture.State.IDEA;capture.routed_to=routed
         capture.outcome=_outcome('idea',f'Vuelve a la mesa editorial: la pieza del {day_label(piece.slot_date)} no salió ({why})')
@@ -577,7 +591,7 @@ def capture_payload(c,now=None):
     if decided and (c.understanding or {}).get('destino') in Capture.Purpose.values:decided=c.understanding['destino']
     return {'id':str(c.id),'created_at':c.created_at,'note':c.note,'purpose':c.purpose or None,
             'ai_edit':c.ai_edit,'publish_asap':c.publish_asap,'publish_asap_evidence':c.publish_asap_evidence,
-            'publish_asap_expected_slot':c.publish_asap_expected_slot,'publish_asap_reason':c.publish_asap_reason,
+            'publish_asap_expected_slot':c.publish_asap_expected_slot,'publish_asap_reason':c.publish_asap_reason,'publish_at':c.publish_at,
             'purpose_label':Capture.Purpose(c.purpose).label if c.purpose else None,
             'team_decided':{'purpose':decided,'label':Capture.Purpose(decided).label,'reason':routed.get('reason','')} if decided else None,
             'context':{'tipo':c.context_type,'id':c.context_id,'label':context_label(c.context_type,target)} if c.context_type else None,

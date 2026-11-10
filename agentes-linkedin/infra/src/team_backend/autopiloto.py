@@ -282,7 +282,7 @@ def _editorial(user,now):
     if editorial.spent_today(now)>=editorial.daily_budget():return 0
     from . import urgente
     slot=urgente.next_slot(now) or editorial.next_slot(now)
-    if slot is None or operador.capacity_left(account,'CONT-09',editorial.scheduled_for(slot))<=0:return 0
+    if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot) or editorial.scheduled_for(slot))<=0:return 0
     attempt=EditorialPiece.objects.filter(slot_date=slot).count()  # a renewed-budget retry gets its own job id
     _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},
                                 request_id=_job_id('piece',slot) if not attempt else _job_id('piece',slot,attempt))

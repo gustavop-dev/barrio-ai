@@ -1,13 +1,13 @@
 """Natural-language priority uses the existing structured call or one Jev Noul call, never keywords alone."""
 import json
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from unittest.mock import patch
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
-from django.test import TransactionTestCase
+from django.test import SimpleTestCase, TransactionTestCase
 from django.utils import timezone
-from team_backend import autopiloto, capture_intent, capturas, editorial, operador, urgente
+from team_backend import autopiloto, capture_intent, capturas, cuando, editorial, operador, urgente
 from team_backend.models import Capture, EditorialPiece, Job, Notification
 from team_backend.tests.test_publicacion import EditorialBase, answers
 from team_backend.tests.test_capturas import CaptureBase, audio
@@ -73,7 +73,77 @@ class PriorityTests(EditorialBase):
         self.assertEqual(c.publish_asap_expected_slot,piece.scheduled_for)
 
 
+class IdeaScheduleTests(EditorialBase):
+    """Each idea of Gustavo gets its window on arrival and is prepared right away; his day/hour wins."""
+    def idea(self,note='Una idea sobre decisiones de producto.',**fields):
+        return Capture.objects.create(created_by=self.gustavo,purpose='post',note=note,state='idea',**fields)
+
+    def test_an_idea_without_date_queues_behind_scheduled_posts_and_is_prepared_right_away(self):
+        now=timezone.now();tz=operador.local_tz();first=urgente.free_slot(self.official,now).astimezone(tz).date()
+        for i in range(3):  # the next three days already have a post
+            day=first+timedelta(days=i)
+            EditorialPiece.objects.create(account=self.official,slot_date=day,scheduled_for=editorial.scheduled_for(day),state='ready')
+        c=self.idea();urgente.assign_slots(now);c.refresh_from_db()
+        fourth=first+timedelta(days=3)
+        self.assertEqual(c.publish_asap_expected_slot,editorial.scheduled_for(fourth))
+        self.assertIn('El equipo empieza a prepararla ya',c.publish_asap_reason)
+        self.assertEqual(Notification.objects.get(kind='capture_scheduled').title,'Tu idea ya tiene fecha')
+        # Four days ahead is far outside EDITORIAL_LEAD_HOURS: the idea is prepared now anyway.
+        self.assertEqual(autopiloto._editorial(self.autobot,now),1)
+        self.assertEqual(Job.objects.get(kind='prepare_piece').params['slot'],fourth.isoformat())
+
+    def test_a_requested_day_and_hour_wins_over_the_teams_own_post_which_moves_to_the_next_free_day(self):
+        now=timezone.now();tz=operador.local_tz();tomorrow=now.astimezone(tz).date()+timedelta(days=1)
+        team=EditorialPiece.objects.create(account=self.official,slot_date=tomorrow,scheduled_for=editorial.scheduled_for(tomorrow),state='ready')
+        asked=datetime.combine(tomorrow,time(10,0),tzinfo=tz)
+        c=self.idea('Publícalo mañana a las 10.',publish_at=asked,publish_at_evidence='Publícalo mañana a las 10.')
+        urgente.assign_slots(now);c.refresh_from_db();team.refresh_from_db()
+        self.assertEqual(c.publish_asap_expected_slot,asked);self.assertGreater(team.slot_date,tomorrow)
+        self.assertEqual(urgente.reserved_at(tomorrow),asked)
+        self.assertTrue(Notification.objects.filter(kind='capture_scheduled',title='Movimos un post para darle tu hora').exists())
+        plan=answers();plan['director']['ideas_used']=[str(c.id)];piece=self.plan(plan)
+        self.assertEqual((piece.slot_date,piece.scheduled_for),(tomorrow,asked))
+        self.assertEqual(self.calls[0][1]['priority_capture']['id'],str(c.id))
+
+    def test_an_idea_the_director_does_not_take_stays_on_the_table_without_being_retried(self):
+        c=self.idea();urgente.assign_slots();c.refresh_from_db()
+        day=c.publish_asap_expected_slot.astimezone(operador.local_tz()).date()
+        piece=self.plan(answers())  # the director does not list the idea in ideas_used
+        self.assertEqual((piece.state,piece.slot_date),('skipped',day))
+        c.refresh_from_db();self.assertEqual((c.state,c.publish_asap_expected_slot,c.routed_to['declined_in']),('idea',None,str(piece.id)))
+        self.assertIsNone(urgente.next_slot());c.refresh_from_db();self.assertIsNone(c.publish_asap_expected_slot)
+        self.assertTrue(editorial.idea_retry(EditorialPiece.objects.filter(slot_date=day)))  # the day stays open for the daily post
+        self.assertTrue(Notification.objects.filter(title='Tu idea no salió en su fecha').exists())
+
+
+class WhenTests(SimpleTestCase):
+    def test_spanish_days_and_hours(self):
+        today=date(2026,11,10)  # a Tuesday
+        cases={'Publícalo mañana a las 10':(date(2026,11,11),time(10,0)),
+               'que salga el jueves a las 3 de la tarde':(date(2026,11,12),time(15,0)),
+               'pasado mañana a las 9 de la mañana':(date(2026,11,12),time(9,0)),
+               'el 14 de noviembre a las 10:30':(date(2026,11,14),time(10,30)),
+               'mañana por la mañana':(date(2026,11,11),None),
+               'a las 6 y media':(None,time(18,30)),
+               'el martes al mediodía':(date(2026,11,17),time(12,0)),
+               'publícalo a las ocho de la noche':(None,time(20,0)),
+               'Una idea sobre decisiones de producto':(None,None)}
+        for text,expected in cases.items():
+            with self.subTest(text=text):self.assertEqual(cuando.parse(text,today),expected)
+
+
 class CaptureIntentTests(CaptureBase):
+    def test_a_requested_day_and_hour_comes_only_from_a_literal_fragment(self):
+        tz=operador.local_tz();tomorrow=timezone.now().astimezone(tz).date()+timedelta(days=1)
+        def jev(state,questions,purpose):
+            return {'answers':{'when_1':{'noul':.99}},'model':'fake'}
+        with patch('knowledge.providers.typesafe',side_effect=jev):
+            body=self.send(para='post',nota='Una idea sobre decisiones. Publícalo mañana a las 10.');self.drain()
+        c=self.capture(body)
+        self.assertEqual((c.publish_at,c.publish_at_evidence),(datetime.combine(tomorrow,time(10,0),tzinfo=tz),'Publícalo mañana a las 10.'))
+        capture_intent.apply(c,{'publish_asap':False,'evidence':'','not_before':'','publish_when':'el viernes a las 9','photo_instructions':[]})
+        self.assertIsNone(c.publish_at)  # not literal in what he sent
+
     def test_transcript_and_note_share_structured_understanding_call(self):
         response={'destino':'post','motivo':'Idea para publicar','publish_asap':True,'evidence':'sácalo mañana',
                   'not_before':'','photo_instructions':[]}

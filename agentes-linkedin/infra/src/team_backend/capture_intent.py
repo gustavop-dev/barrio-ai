@@ -10,6 +10,7 @@ from . import infografias, research
 INTENT_FIELDS={
     **research.RESEARCH_FIELDS,
     'publish_asap':{'type':'boolean'},'evidence':infografias.string(),'not_before':infografias.string(),
+    'publish_when':infografias.string(),
     'photo_instructions':infografias.array(infografias.obj(index={'type':'number'},
         instruction=infografias.string(),kind=infografias.enum('none','original','edit','unsafe'))),
 }
@@ -18,6 +19,9 @@ GUIDE='''Además interpreta la nota Y transcripción en su contexto completo:
   nunca por una cita ajena, una negación (no lo publiques aún), una fecha narrada o la urgencia del tema.
 - evidence es una cita literal del texto que prueba esa intención; vacía si no la hay.
 - not_before es fecha ISO si pide una fecha mínima (mañana se resuelve con local_date), o cadena vacía.
+- publish_when: cita literal del fragmento donde Gustavo pide un día u hora concretos para publicar ESTA idea
+  («publícalo mañana a las 10», «que salga el jueves a las 3 de la tarde»); vacía si no la hay. No cuenta una
+  fecha narrada ni la de un evento: solo cuándo quiere que salga el post.
 - photo_instructions: índice de foto desde 1, instrucción literal y kind none/original/edit/unsafe.
   Asigna la instrucción a su foto por orden o referencia; una petición plural sin referencia vale para todas.
   Tal cual=original. Cualquier edición que Gustavo pida de su foto=edit: luz, recorte, enderezar, quitar distracciones,
@@ -43,8 +47,9 @@ def apply(capture,data):
         today=timezone.now().astimezone(local_tz()).date()
         if earliest and not today<=earliest<=today+timedelta(days=14):earliest=None
     capture.publish_asap_not_before=earliest
+    capture.publish_at,capture.publish_at_evidence=requested_at(text,data.get('publish_when'))
     capture.understanding=data
-    capture.save(update_fields=['publish_asap','publish_asap_evidence','publish_asap_not_before','understanding'])
+    capture.save(update_fields=['publish_asap','publish_asap_evidence','publish_asap_not_before','publish_at','publish_at_evidence','understanding'])
     photos=list(capture.photos.order_by('created_at','id'))
     for item in data.get('photo_instructions',[]):
         if not isinstance(item,dict):continue
@@ -55,6 +60,20 @@ def apply(capture,data):
         photo=photos[index-1];photo.instruction=instruction[:2000];photo.instruction_kind=kind
         photo.save(update_fields=['instruction','instruction_kind'])
 
+
+def requested_at(text,fragment):
+    """(datetime, evidence) of the day/hour Gustavo asked for, or (None, ''). The fragment must be literal; a day
+    without hour takes the daily post hour, an hour without day the next time it comes (with the veto notice)."""
+    from . import cuando, editorial, operador, urgente
+    if not isinstance(fragment,str) or not fragment.strip() or fragment not in text:return None,''
+    now=timezone.now();tz=operador.local_tz();today=now.astimezone(tz).date()
+    day,hour=cuando.parse(fragment,today)
+    if day is None and hour is None:return None,''
+    from datetime import datetime
+    when=datetime.combine(day or today,hour or editorial.post_time(),tzinfo=tz)
+    if day is None and when<now+urgente.veto_window():when+=timedelta(days=1)
+    if not now<=when<=now+timedelta(days=14):return None,''
+    return when,fragment
 
 def jev(capture):
     from .lider import _noul
@@ -69,6 +88,9 @@ def jev(capture):
         'Negación, cita ajena, urgencia de otro asunto o narración; no pide acelerar la publicación.') for i in range(len(spans))}
     questions['tomorrow']=_noul('¿Gustavo pide explícitamente que esta publicación urgente salga mañana, no hoy?')
     for i in range(len(spans)):
+        questions[f'when_{i}']=_noul(
+            f'En el contexto completo, ¿el fragmento {i} pide que este post se publique un día u hora concretos '
+            '(por ejemplo «publícalo mañana a las 10» o «que salga el jueves»)? No cuenta una fecha narrada ni de un evento.')
         questions[f'research_{i}']=_noul(
             f'En el contexto completo, ¿el fragmento {i} es una petición actual afirmativa de investigar un tema en la web? '
             'No cuenta una negación, cita ajena, relato pasado ni solicitud de consultar el curso.')
@@ -84,8 +106,9 @@ def jev(capture):
         evidence=next((span for i,span in enumerate(spans) if yes(f'span_{i}')),'')
         tomorrow=(timezone.now().astimezone(local_tz()).date()+timedelta(days=1)).isoformat() if yes('tomorrow') else ''
         research_span=next(((i,span) for i,span in enumerate(spans) if yes(f'research_{i}')),None)
+        when=next((span for i,span in enumerate(spans) if yes(f'when_{i}')),'')
         public=bool(research_span and yes(f'public_{research_span[0]}'))
-        return {'publish_asap':bool(evidence),'evidence':evidence,'not_before':tomorrow,
+        return {'publish_asap':bool(evidence),'evidence':evidence,'not_before':tomorrow,'publish_when':when,
                 'research_requested':bool(research_span),'research_evidence':research_span[1] if research_span else '',
                 'research_question':research_span[1] if public else '','research_public':public,
                 'photo_instructions':[],'method':'jev','model':result.get('model'),'answers':result['answers']}
