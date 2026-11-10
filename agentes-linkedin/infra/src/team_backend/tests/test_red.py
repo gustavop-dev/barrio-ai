@@ -125,6 +125,49 @@ class StoppedCycleTests(NetworkBase):
         self.assertEqual(AuditEvent.objects.filter(action='operator.expired',target=str(proposal.id)).count(),1)
 
 
+class PostOnTimeTests(NetworkBase):
+    """Every write reserves a random gap of up to 40 min: a follow started just before his post would push it late."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'OPERATOR_MIN_SPACING_SECONDS':'1200','OPERATOR_MAX_SPACING_SECONDS':'2400'})
+        env.start();self.addCleanup(env.stop)
+
+    def follow(self):
+        contact=self.contact(f'person-{Contact.objects.count()}','Persona')
+        proposal=operador.create_proposal(self.bot,None,'RED-01',{'user_id':contact.provider_user_id},contact=contact,state='approved')
+        ActionProposal.objects.filter(pk=proposal.pk).update(approved_hash=proposal.payload_hash)
+        return proposal
+
+    def post(self,minutes):
+        when=timezone.now()+timedelta(minutes=minutes)
+        piece=EditorialPiece.objects.create(account=self.account,slot_date=when.date(),scheduled_for=when,state='ready')
+        return operador.create_proposal(self.bot,None,'CONT-09',{'text':'Pieza del día'},piece=piece,state='approved')
+
+    def test_a_follow_waits_while_his_post_is_inside_the_spacing_gap(self):
+        follow=self.follow();post=self.post(30)
+        self.assertEqual(operador.post_due().id,post.id)
+        self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()),0)
+        self.assertFalse(Job.objects.filter(kind='execute_action').exists())  # no failed job retried every tick
+        with self.assertRaisesMessage(operador.OperatorBlocked,'sale primero'):operador.execute(self.bot,follow.id)
+        follow.refresh_from_db();self.assertEqual(follow.state,'approved')
+
+    def test_his_post_goes_first_at_its_hour_and_the_follow_after(self):
+        follow=self.follow();post=self.post(-1)
+        self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()),1)
+        self.assertEqual(Job.objects.get(kind='execute_action',state='queued').params['proposal'],str(post.id))
+        ActionProposal.objects.filter(pk=post.pk).update(state='executing')  # the post is out
+        self.assertIsNone(operador.post_due())
+        Job.objects.filter(kind='execute_action').update(state='complete')
+        self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()),1)
+        self.assertEqual(Job.objects.get(kind='execute_action',state='queued').params['proposal'],str(follow.id))
+
+    def test_a_post_beyond_the_gap_does_not_hold_the_network(self):
+        follow=self.follow();self.post(45)
+        self.assertIsNone(operador.post_due())
+        self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()),1)
+        self.assertEqual(Job.objects.get(kind='execute_action',state='queued').params['proposal'],str(follow.id))
+
+
 class NetworkPlanLimitTests(NetworkBase):
     def test_ten_follows_are_split_across_cycles_at_the_graph_limit(self):
         """Ten eligible follows must not create a sixth politica_red review in one cycle."""

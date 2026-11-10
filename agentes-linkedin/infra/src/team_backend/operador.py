@@ -112,13 +112,30 @@ def policy_event(action,target='member'):
     from .models import AuditEvent
     return AuditEvent.objects.filter(action=action,target=str(target)).order_by('-created_at','-id').first()
 
+def spacing_range():
+    low=max(1200,int(min_spacing().total_seconds()))
+    return low,max(low,int(os.environ.get('OPERATOR_MAX_SPACING_SECONDS','2400')))
+
 def reserve_spacing(now=None):
     """Caller holds policy_lock; a restart cannot shorten a reserved random gap."""
     now=now or timezone.now()
-    low=max(1200,int(min_spacing().total_seconds()))
-    high=max(low,int(os.environ.get('OPERATOR_MAX_SPACING_SECONDS','2400')))
+    low,high=spacing_range()
     seconds=random.SystemRandom().randint(low,high)
     _audit(None,'operator.schedule','member',next_action_at=(now+timedelta(seconds=seconds)).isoformat(),gap_seconds=seconds)
+
+def post_due(now=None):
+    """The own post that any other write started now could push past its hour, or None. Every write reserves a
+    random gap of up to OPERATOR_MAX_SPACING_SECONDS, so inside that gap before a post's hour (and while it is due)
+    only the post writes. Spacing is per member, so this looks at every connector."""
+    from .models import ActionProposal
+    from .orquestacion import cycle_issues
+    now=now or timezone.now();_,high=spacing_range()
+    rows=ActionProposal.objects.select_related('piece').filter(piece__isnull=False,piece__state='ready',execution__isnull=True,
+        state__in=[ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED],
+        piece__scheduled_for__gt=now-timedelta(hours=2),piece__scheduled_for__lte=now+timedelta(seconds=high)).order_by('piece__scheduled_for')
+    for proposal in rows:
+        if not cycle_issues(proposal) and capacity_left(proposal.account,proposal.capability,proposal.piece.scheduled_for)>0:return proposal
+    return None
 
 def spacing_ok(account,now=None):
     # Every connector acts as the same LinkedIn member, so public writes share one spacing. An execution whose
@@ -631,6 +648,8 @@ def execute(user,proposal_id):
             raise OperatorBlocked('Aún no es la hora programada de la pieza; queda aprobada para entonces.')
         if not within_window():raise OperatorBlocked('Fuera de la ventana horaria de actividad; queda aprobada para después.')
         if not spacing_ok(account):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
+        due=None if proposal.piece_id else post_due()
+        if due:raise OperatorBlocked(f'El post de las {due.piece.scheduled_for.astimezone(local_tz()):%H:%M} sale primero; esta acción queda aprobada para después.')
         if capacity_left(account,proposal.capability)<=0:
             raise OperatorBlocked(f'Tope diario o semanal de {proposal.capability} alcanzado; queda aprobada para después.')
         if proposal.capability in NETWORK:
