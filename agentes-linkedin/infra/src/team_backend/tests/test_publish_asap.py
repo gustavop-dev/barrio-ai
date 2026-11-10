@@ -2,6 +2,7 @@
 import json
 import os
 from datetime import date, datetime, time, timedelta
+from decimal import Decimal
 from unittest.mock import patch
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
@@ -40,7 +41,7 @@ class PriorityTests(EditorialBase):
 
     def test_budget_and_approval_gates_still_apply(self):
         c=self.idea()
-        with patch.dict(os.environ,{'EDITORIAL_DAILY_LLM_USD':'0'}):
+        with patch.dict(os.environ,{'AI_DAILY_FUSE_USD':'0'}):
             urgente.assign_slots();c.refresh_from_db();self.assertIn('presupuesto',c.publish_asap_reason)
             self.assertEqual(autopiloto._editorial(self.autobot,timezone.now()),0)
         with patch.dict(os.environ,{'OPERATOR_AUTONOMY':'CONT-09=off'}):
@@ -114,6 +115,35 @@ class IdeaScheduleTests(EditorialBase):
         self.assertIsNone(urgente.next_slot());c.refresh_from_db();self.assertIsNone(c.publish_asap_expected_slot)
         self.assertTrue(editorial.idea_retry(EditorialPiece.objects.filter(slot_date=day)))  # the day stays open for the daily post
         self.assertTrue(Notification.objects.filter(title='Tu idea no salió en su fecha').exists())
+
+    def test_a_failed_preparation_counts_one_attempt_and_two_leave_the_idea_without_a_date(self):
+        """10/11: the piece of an idea was blocked and the idea jumped to the next day and was prepared again at once,
+        day after day, until the 14-day horizon was full."""
+        now=timezone.now();tz=operador.local_tz()
+        c=self.idea();urgente.assign_slots(now);c.refresh_from_db();first=c.publish_asap_expected_slot
+        blocked=EditorialPiece.objects.create(account=self.official,slot_date=first.astimezone(tz).date(),scheduled_for=first,
+            state='blocked',note='El verificador emitió blocked; Hallazgo material',brief={'reserved_capture':str(c.id)})
+        urgente.assign_slots(now);c.refresh_from_db();second=c.publish_asap_expected_slot
+        self.assertEqual(c.routed_to['intentos'],1);self.assertGreater(second,first)
+        self.assertTrue(editorial.idea_retry([blocked]))  # that day stays free for the autopilot's own post
+        urgente.assign_slots(now);c.refresh_from_db();self.assertEqual(c.routed_to['intentos'],1)  # counted once
+        EditorialPiece.objects.create(account=self.official,slot_date=second.astimezone(tz).date(),scheduled_for=second,
+            state='failed',note='Preparación fallida')
+        urgente.assign_slots(now);c.refresh_from_db()
+        self.assertEqual((c.routed_to['intentos'],c.publish_asap_expected_slot),(2,None))
+        self.assertIn('dos veces',c.publish_asap_reason)
+        self.assertIsNone(urgente.next_slot(now))
+
+    def test_a_day_stopped_only_for_budget_stays_free_and_nothing_starts_without_budget(self):
+        now=timezone.now();tz=operador.local_tz()
+        c=self.idea();urgente.assign_slots(now);c.refresh_from_db();first=c.publish_asap_expected_slot;day=first.astimezone(tz).date()
+        stopped=EditorialPiece.objects.create(account=self.official,slot_date=day,scheduled_for=first,state='blocked',note='Ciclo detenido: cost_cap')
+        urgente.assign_slots(now);c.refresh_from_db()
+        self.assertEqual((c.publish_asap_expected_slot,c.routed_to.get('intentos',0)),(first,0))  # same day, no attempt spent
+        self.assertTrue(editorial.budget_retry([stopped],now+timedelta(days=1)))
+        with patch.object(editorial,'budget_left',return_value=Decimal('2')):  # less than a whole preparation
+            self.assertIsNone(urgente.next_slot(now));self.assertEqual(autopiloto._editorial(self.autobot,now),0)
+        self.assertEqual(urgente.next_slot(now),day)
 
 
 class WhenTests(SimpleTestCase):

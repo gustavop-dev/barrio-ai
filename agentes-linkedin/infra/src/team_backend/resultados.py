@@ -363,7 +363,8 @@ def spend(now):
         rows=c.execute(f'''SELECT provider,purpose,coalesce(sum({COST}) FILTER (WHERE created_at>=%s),0) AS today,
             coalesce(sum({COST}) FILTER (WHERE created_at>=%s),0) AS month,coalesce(sum({COST}),0) AS total
             FROM usage_ledger GROUP BY provider,purpose''',(day,month)).fetchall()
-    budgets={'general':Decimal(os.environ.get('OPERATOR_DAILY_LLM_USD','1')),'editorial':editorial.daily_budget(),'network':red.daily_budget()}
+    from knowledge import presupuesto
+    budgets=('general','editorial','network')  # areas show their spend; the only limits are the team's (presupuesto)
     sums={};providers={}
     for r in rows:
         if r['provider']=='anthropic':
@@ -372,18 +373,23 @@ def spend(now):
         entry=providers.setdefault(r['provider'],{'today':Decimal(0),'month':Decimal(0),'total':Decimal(0)})
         for key in ('today','month','total'):entry[key]+=r[key]
     def spent(bucket,key):return _num(sums.get(bucket,{}).get(key,Decimal(0)))
-    def limit(provider):return _num(Decimal(os.environ.get(provider.upper()+'_LIMIT_USD','1')))
+    def limit(provider):
+        raw=os.environ.get(provider.upper()+'_LIMIT_USD','').strip()
+        return _num(Decimal(raw)) if raw else None
     anthropic=providers.get('anthropic',{'today':Decimal(0),'month':Decimal(0),'total':Decimal(0)})
-    return {'today':{b:{'spent':spent(b,'today'),'budget':_num(budgets[b])} for b in budgets}|{'other':{'spent':spent('other','today'),'budget':None}},
+    month_all=sum((v['month'] for v in providers.values()),Decimal(0))
+    return {'today':{b:{'spent':spent(b,'today'),'budget':None} for b in budgets}|{'other':{'spent':spent('other','today'),'budget':None}},
             'month':{b:{'spent':spent(b,'month'),'budget':None} for b in (*budgets,'other')}
-                    |{'total':{'spent':_num(anthropic['month']),'budget':limit('anthropic')}},
+                    |{'total':{'spent':_num(month_all),'budget':_num(presupuesto.monthly_limit())}},
             'accumulated':{'spent':_num(anthropic['total']),'budget':limit('anthropic')},
             'other_providers':{p:{'today':_num(v['today']),'month':_num(v['month']),'accumulated':_num(v['total']),'budget':limit(p)}
                                for p,v in sorted(providers.items()) if p!='anthropic'},
             'month_start':month.date(),
-            'definition':'Gasto de Anthropic por presupuesto diario: general (comentarios, OPERATOR_DAILY_LLM_USD), editorial '
-                         '(EDITORIAL_DAILY_LLM_USD) y red (NETWORK_DAILY_LLM_USD). ANTHROPIC_LIMIT_USD es un techo acumulado sobre todo '
-                         'el ledger (accumulated), no mensual; month.total lo usa como referencia.'}
+            'daily_fuse':_num(presupuesto.daily_fuse()),
+            'definition':'Un solo presupuesto de IA para todo el equipo: AI_MONTHLY_LIMIT_USD al mes (month.total: todos los '
+                         'proveedores) y AI_DAILY_FUSE_USD, un tope de seguridad diario contra gastos desbocados. Las áreas '
+                         '(general, editorial, red) muestran su gasto de Anthropic sin tope propio; <PROVEEDOR>_LIMIT_USD es un techo '
+                         'mensual opcional de un proveedor.'}
 
 def equipo(current,previous,now,coverage):
     def confirmed(capability):

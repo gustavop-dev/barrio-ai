@@ -29,15 +29,15 @@ GET `/api/v1/operador/overview`:
                   "capacity": { "INT-03": { "daily": 3, "weekly": 12, "daily_used": 1, "weekly_used": 4, "left": 2 },
                                 "INT-02": { "…": "…" }, "CONT-09": { "daily": 1, "weekly": 7, "…": "…" } } } ],
   "today": { "proposals": { "proposed": 0, "approved": 1, "discarded": 2, "confirmed": 1, "…": 0 },
-             "llm_spent_usd": "0.42", "llm_daily_cap_usd": "1", "drafts": 3, "drafts_daily_cap": 6,
-             "editorial_llm_spent_usd": "0.43", "editorial_llm_daily_cap_usd": "1" },
+             "llm_spent_usd": "0.42", "llm_daily_cap_usd": "15", "drafts": 3, "drafts_daily_cap": 6,
+             "editorial_llm_spent_usd": "0.43", "editorial_llm_daily_cap_usd": "15" },
   "counts": { "referents": 7, "posts": 31, "uncertain": 0 }
 }
 ```
 
 POST `/api/v1/operador/control` con `{ paused: bool, reason: string }`. Es la parada total de la máquina y requiere sesión humana. Responde con el objeto `control`. Si `OPERATOR_PAUSED=true` está en el entorno, la parada no se puede levantar desde la app: responde 409 con su explicación.
 
-`editorial_llm_*` es el presupuesto propio de la publicación diaria (`EDITORIAL_DAILY_LLM_USD`), separado del de comentarios. La PWA solo lo muestra si llega; el overview no trae la próxima pieza, que se lee del calendario editorial.
+`llm_spent_usd` y `editorial_llm_spent_usd` son lo gastado hoy en comentarios y en la publicación diaria. Ninguna de las dos tiene tope propio: desde el 10/11/2026 hay un solo presupuesto de IA para todo el equipo (`knowledge/presupuesto.py`), y `llm_daily_cap_usd` y `editorial_llm_daily_cap_usd` traen su tope de seguridad diario (`AI_DAILY_FUSE_USD`, 15 USD por defecto). La PWA solo muestra `editorial_llm_*` si llega; el overview no trae la próxima pieza, que se lee del calendario editorial.
 
 GET `/api/v1/operador/feed?limit=50` devuelve los eventos recientes de `operator.*` y `job.*`, en orden descendente:
 `[ { id, action, target, created_at, actor: "username|null", metadata: {…} } ]`
@@ -221,18 +221,18 @@ GET `/api/v1/red/summary` (permiso `operate_linkedin`):
                 "RED-02": { "…": "…" }, "RED-04": { "…": "…" } },
   "reads_today": { "comments": 4, "search": 1, "profile": 7, "sync": 1, "execution": 6 },
   "read_caps": { "comments": 60, "search": 20, "profile": 30, "sync": 4 },
-  "llm": { "spent_today": 0.04, "daily": 0.3, "model": "…" },
+  "llm": { "spent_today": 0.04, "daily": 15, "model": "…" },
   "invites_blocked": { "blocked": false, "reason": "" },
   "last_discovery_at": "ISO|null", "last_sync_at": "ISO|null" }
 ```
 
 - `mode` es el modo de autonomía de la capacidad: `auto`, `approval` u `off` (la PWA muestra «Modo auto», «Modo aprobación» o «Modo apagado»).
-- `llm` llega en números JSON, no en cadenas decimales como el gasto del overview.
+- `llm` llega en números JSON, no en cadenas decimales como el gasto del overview. `daily` es el tope de seguridad diario de todo el equipo (`AI_DAILY_FUSE_USD`): la red no tiene tope propio.
 - `invites_blocked.blocked=true` significa que LinkedIn rechazó invitaciones por límite en los últimos 7 días y que las invitaciones están en pausa. La PWA lo avisa siempre, con `reason`.
 - `enabled=false` significa que el bloque está apagado (`NETWORK_ENABLED=false`). La PWA lo avisa y sigue mostrando lo guardado.
 - `reads_today.execution` cuenta las lecturas de las ejecuciones de red: la comprobación previa, la relectura y la conciliación. No tiene tope (no aparece en `read_caps`), porque ninguna escritura sale sin su comprobación previa.
 
-La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente a su presupuesto y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
+La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente al tope de seguridad diario del equipo y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
 
 ### Trabajos y roles (escena de la oficina)
 
@@ -310,10 +310,10 @@ GET `/api/v1/resultados?dias=7|28|90&modalidad=todo|personal_startups|projectapp
                              "reactions", "comments", "reposts", "engagement_pct", "cut", "commenters_by_role": { "<rol>": n } | null }] },
   "equipo": { "comments_published": KPI, "comments_replied": KPI, "follows": KPI, "invites": KPI, "accepts": KPI,
               "pieces_published": KPI, "pieces_blocked": KPI, "pieces_vetoed": KPI,
-              "spend": { "today": { "general|editorial|network": { "spent", "budget" }, "other": { "spent", "budget": null } },
+              "spend": { "today": { "general|editorial|network|other": { "spent", "budget": null } },
                          "month": { "general|editorial|network|other": { "spent", "budget": null }, "total": { "spent", "budget" } },
                          "accumulated": { "spent", "budget" }, "other_providers": { "<proveedor>": { "today", "month", "accumulated", "budget" } },
-                         "month_start", "definition" } } }
+                         "daily_fuse", "month_start", "definition" } } }
 ```
 
 Cada `KPI` tiene la forma `{ value, previous, delta, delta_pct, comparable, series: [{ date, value }] | null, definition, formula | null, unavailable_reason | null }`, y algunas fichas añaden campos:
@@ -329,7 +329,7 @@ Reglas para la PWA:
   - `delta_pct` está en % con un decimal y es `null` si el valor anterior es 0.
   - En las fichas en %, `delta` va en puntos porcentuales.
 - **Contenido.** Se compara a la misma edad: `cut` vale `7d`, o `24h` mientras ningún post del periodo cumpla 7 días. En `chart.bars`, `fallback: true` marca un post que aún no cumple 7 días y se pinta con sus impresiones a 24 h.
-- **Gasto.** `spend` llega en números JSON. `ANTHROPIC_LIMIT_USD` (el `budget` de `month.total` y de `accumulated`) es un techo **acumulado** sobre todo el ledger, no mensual.
+- **Gasto.** `spend` llega en números JSON. Hay un solo presupuesto de IA para todo el equipo: `month.total` suma todos los proveedores del mes y su `budget` es `AI_MONTHLY_LIMIT_USD`; `daily_fuse` es el tope de seguridad diario (`AI_DAILY_FUSE_USD`). Las áreas de `today` y `month` (Anthropic) solo traen su gasto, con `budget: null`. El `budget` de `accumulated` y de `other_providers.*` es el techo opcional del proveedor (`<PROVEEDOR>_LIMIT_USD`, mensual salvo `<PROVEEDOR>_LIMIT_WINDOW=total`) o `null` si no está fijado.
 - **Oportunidades.** Mientras `negocio.disponible` sea `false`, la sección 1 muestra un único bloque con `motivo` y la ficha de inbound.
 
 **Detalle de una pieza.** `GET /api/v1/editorial/pieces/<id>` añade dos campos:
@@ -534,10 +534,13 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
   "lead": { "enabled": true, "capabilities": ["INT-03","CONT-09","RED-01","RED-02","RED-04"], "model": "jev-1.14.0" },
   "limits": { "INT-03": { "daily": 3, "weekly": 12 } },
   "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota", "open_now": true, "min_spacing_seconds": 1200 },
-  "ai_spend": { "today": [{ "budget": "general | editorial | red", "label": "General (comentarios)", "spent_usd": 0.13, "limit_usd": 0.6 }],
-                "month_usd": 4.2, "total_usd": 9.8, "limit_usd": 50, "lead_month_usd": 0.01 },
+  "ai_spend": { "today": [{ "budget": "equipo", "label": "Todo el equipo hoy (tope de seguridad)", "spent_usd": 1.9, "limit_usd": 15 },
+                          { "budget": "general | editorial | imagenes | red", "label": "General (comentarios)", "spent_usd": 0.13, "limit_usd": 0 }],
+                "month_usd": 4.2, "total_usd": 9.8, "limit_usd": 100, "lead_month_usd": 0.01 },
   "facts_count": 12, "orientation": { "text": "…", "updated_at": "iso", "updated_by": "gustavo" } }
 ```
+
+`ai_spend` refleja el presupuesto único de IA del equipo (`knowledge/presupuesto.py`). La primera línea de `today` es todo el equipo frente al tope de seguridad diario (`AI_DAILY_FUSE_USD`). Las de las áreas (General (comentarios), Editorial, Imágenes y Red) solo traen su gasto, con `limit_usd: 0`, porque no tienen tope propio. `month_usd` suma todos los proveedores del mes y `limit_usd` es `AI_MONTHLY_LIMIT_USD`.
 
 ### Notificaciones push
 
@@ -973,7 +976,7 @@ Backend de fase 1. No cambia la autenticación: sesión humana y CSRF en PWA, to
 | `GET /api/v1/editorial/pieces/<id>/images/<image_id>` | Bytes privados de la imagen publicada o prevista, en su MIME. |
 | `GET /api/v1/editorial/pieces/<id>/document` | PDF privado del carrusel. Cada página lleva `/Alt` en inglés; LinkedIn no ofrece un campo de alt por página en el cuerpo del post. |
 | `GET /api/v1/galeria/<id>/imagen` | Original privado; se conserva el endpoint existente. |
-| `GET /api/v1/ajustes` | Añade a `ai_spend.today` `{budget:"imagenes",label:"Imágenes",spent_usd:number,limit_usd:number}`; ambos proveedores, con reservas pendientes/inciertas. |
+| `GET /api/v1/ajustes` | Añade a `ai_spend.today` `{budget:"imagenes",label:"Imágenes",spent_usd:number,limit_usd:0}`; ambos proveedores, con reservas pendientes/inciertas. Sin tope propio (`limit_usd: 0`): cuenta en el presupuesto general de IA. |
 
 ```ts
 type AIEdit = "no" | "auto" | "si";

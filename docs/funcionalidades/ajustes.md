@@ -92,18 +92,16 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** ve lo gastado hoy en cada presupuesto frente a su tope, lo del mes frente al techo de Anthropic, el total, lo del agente líder y lo de la transcripción.
-- **Código:** `ai_spend` de `GET /api/v1/ajustes` (`rediseno_views._spend`); PWA y app `ajustes/Gasto.tsx`; `compartido/src/logic/ajustes.ts`.
+- **Qué hace para Gustavo:** ve lo gastado hoy por todo el equipo frente al tope de seguridad diario, lo gastado hoy por cada área (sin tope propio), lo del mes frente al presupuesto general de IA, el total, lo del agente líder y lo de la transcripción.
+- **Código:** `ai_spend` de `GET /api/v1/ajustes` (`rediseno_views._spend`, `knowledge/presupuesto.status`); PWA y app `ajustes/Gasto.tsx`; `compartido/src/logic/ajustes.ts`.
 - **Criterios de aceptación:**
-  1. **Dado** gasto de hoy, **cuando** abre «Gasto de IA · hoy», **entonces** ve un medidor «$gastado de $tope» para «General (comentarios)» (`OPERATOR_DAILY_LLM_USD`), «Editorial» (`EDITORIAL_DAILY_LLM_USD`) «Red» (`NETWORK_DAILY_LLM_USD`) e «Imágenes» (`IMAGE_DAILY_USD`, ambos proveedores; presentación nueva pendiente de fase 2).
-  2. **Dado** el gasto del mes, **cuando** se pinta, **entonces** ve «Este mes: $X de $`ANTHROPIC_LIMIT_USD`», «Desde el inicio: $Y», «Agente líder, este mes» (TypeSafe) y «Transcripción de audios, este mes» (AssemblyAI).
-  3. **Dado** un presupuesto con tope 0 o sin dato, **cuando** se pinta, **entonces** ve solo lo gastado o «sin dato».
-  4. **Dado** ningún presupuesto diario configurado, **cuando** se pinta, **entonces** ve «Hoy no hay presupuestos de IA configurados.».
+  1. **Dado** gasto de hoy, **cuando** abre «Gasto de IA · hoy», **entonces** ve primero un medidor «$gastado de $tope» para «Todo el equipo hoy (tope de seguridad)» (`AI_DAILY_FUSE_USD`, 15 USD por defecto: todos los proveedores y áreas, con reservas pendientes) y debajo solo lo gastado en «General (comentarios)», «Editorial (incluye imágenes e investigación de piezas)», «Imágenes» (ambos proveedores) y «Red», que no tienen tope propio (`limit_usd: 0`).
+  2. **Dado** el gasto del mes, **cuando** se pinta, **entonces** ve «Este mes: X de 100,00 USD» (todos los proveedores frente a `AI_MONTHLY_LIMIT_USD`), «Desde el inicio: $Y», «Agente líder, este mes» (TypeSafe) y «Transcripción de audios, este mes» (AssemblyAI).
+  3. **Dado** una línea con tope 0 o sin dato, **cuando** se pinta, **entonces** ve solo lo gastado o «sin dato».
+  4. **Dado** `ai_spend.today` vacío, **cuando** se pinta, **entonces** ve «Hoy no hay presupuestos de IA configurados.». El backend siempre manda al menos la línea del equipo.
   5. **Dado** la carga, un 404 o un error, **cuando** abre la sección, **entonces** ve «Cargando el gasto…», «Aún no disponible» o el error con «Reintentar».
 - **Brechas código/docs:**
-  - `CONTRATO-API.md` (secciones «Resultados» y «Ajustes») y el texto `definition` de `resultados.spend` dicen que `ANTHROPIC_LIMIT_USD` es un techo acumulado. Desde B5, `knowledge/providers.limit_window_start` lo hace mensual por defecto (`ANTHROPIC_LIMIT_WINDOW=total` vuelve al acumulado), así que mostrarlo frente al mes es correcto y la documentación está desfasada.
-  - No hay línea para el presupuesto semanal del resumen (`WEEKLY_SUMMARY_LLM_USD`, [SEM-04](resumen-semanal.md#sem-04)) ni para el clasificador de capturas (`capture-route`); este cuenta solo en el mes.
-  - El presupuesto de imágenes aún no existe ([IMG-13](imagenes-en-publicaciones.md#img-13)).
+  - No hay línea propia para el resumen semanal (`WEEKLY_SUMMARY_LLM_USD`, [SEM-04](resumen-semanal.md#sem-04)) ni para el clasificador de capturas (`capture-route`); ambos cuentan solo en «Todo el equipo hoy» y en el mes.
 - **Cobertura QA:** pendiente
 
 ### AJU-06 · Estado de LinkedIn oficial <a id="aju-06"></a>
@@ -200,7 +198,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 
 ## Imágenes
 
-El backend devuelve la línea Imágenes, con presupuesto propio IMAGE_DAILY_USD y gasto de ambos proveedores; la presentación queda para fase 2: ver [IMG-13](imagenes-en-publicaciones.md#img-13) ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)).
+El backend devuelve la línea Imágenes con el gasto de ambos proveedores, sin tope propio (desde el 10/11/2026 cuenta en el presupuesto general de IA); la presentación queda para fase 2: ver [IMG-13](imagenes-en-publicaciones.md#img-13) ([imagenes-en-publicaciones.md](imagenes-en-publicaciones.md)).
 
 ## Retiradas
 

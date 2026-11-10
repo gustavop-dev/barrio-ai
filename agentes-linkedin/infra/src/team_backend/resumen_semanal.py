@@ -229,6 +229,7 @@ def _bucket(purpose):
     return 'otros'
 
 def spend(w):
+    from knowledge import presupuesto
     """AI spend of the week by budget (as the daily caps count it); the ledger always runs, so 0 is a real zero."""
     with db.connect() as c:
         rows=c.execute(f'''SELECT provider,purpose,coalesce(sum({COST}),0) AS spent FROM usage_ledger
@@ -241,8 +242,7 @@ def spend(w):
     images=sum((r['spent'] for r in rows if (r['purpose'] or '').startswith('image-')),Decimal(0))
     return {'imagenes_usd':_round(images,2),'disponible':True,'total_usd':_round(total,2),'anthropic_por_presupuesto_usd':{k:_round(v,2) for k,v in budgets.items()},
             'otros_proveedores_usd':{k:_round(v,2) for k,v in sorted(others.items())},
-            'topes_diarios_usd':{'general':_round(setting('OPERATOR_DAILY_LLM_USD','1'),2),'editorial':_round(editorial.daily_budget(),2),
-                                 'red':_round(red.daily_budget(),2),'imagenes':_round(setting('IMAGE_DAILY_USD','1'),2)}}
+            'presupuesto_usd':{'mensual':_round(presupuesto.monthly_limit(),2),'tope_diario_seguridad':_round(presupuesto.daily_fuse(),2)}}
 
 def lead(w):
     from . import autopiloto, lider
@@ -264,7 +264,7 @@ def stops(w):
     return {'disponible':True,'eventos':[{'tipo':STOPS[e.action],'fecha':_local(e.created_at).date().isoformat()} for e in events[:20]],
             'piezas_bloqueadas':pieces.filter(state=EditorialPiece.State.BLOCKED).count(),
             'piezas_fallidas':pieces.filter(state=EditorialPiece.State.FAILED).count(),
-            'piezas_sin_presupuesto':pieces.filter(state=EditorialPiece.State.FAILED,note__startswith=editorial.BUDGET_STOP).count(),
+            'piezas_sin_presupuesto':pieces.filter(editorial.budget_stopped_q()).count(),
             'ejecuciones_fallidas':ActionExecution.objects.filter(state='failed',**_between('started_at',w)).count(),
             'ejecuciones_inciertas':ActionExecution.objects.filter(state='uncertain',**_between('started_at',w)).count()}
 

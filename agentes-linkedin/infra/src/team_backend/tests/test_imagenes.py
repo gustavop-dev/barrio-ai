@@ -323,8 +323,8 @@ class ImageProviderContracts(PublicationBase):
         self.assertEqual(len(rows),2)
         self.assertEqual(next(r for r in rows if r['request_hash']=='second'),uncertain)
 
-    def test_image_subcap_reserves_both_providers_and_counts_in_editorial_total(self):
-        with patch.dict(os.environ,{'IMAGE_DAILY_USD':'0.10','OPENAI_LIMIT_USD':'10','ANTHROPIC_LIMIT_USD':'10'}):
+    def test_images_of_both_providers_count_in_the_team_budget_and_the_editorial_total(self):
+        with patch.dict(os.environ,{'AI_DAILY_FUSE_USD':'0.10','OPENAI_LIMIT_USD':'10','ANTHROPIC_LIMIT_USD':'10'}):
             rid=providers.reserve('openai','image-edit',Decimal('.08'))
             with self.assertRaises(ValueError):providers.reserve('anthropic','image-check',Decimal('.03'))
             providers.settle(rid,'complete',{},Decimal('.04'))

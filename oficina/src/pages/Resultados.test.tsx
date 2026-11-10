@@ -185,8 +185,8 @@ describe('Resultados', () => {
     await userEvent.click(section.getByRole('button', { name: 'Definición de Red' }));
     expect(section.getAllByText(/Seguidos: Definición de prueba/)).toHaveLength(1);
     const spend = section.getByText('Gasto de IA').closest('.res-stat') as HTMLElement;
-    expect(spend).toHaveTextContent('3,10 de 5,00 USD hoy');
-    expect(spend).toHaveTextContent('61,20 USD este mes');
+    expect(spend).toHaveTextContent('3,10 USD hoy');
+    expect(spend).toHaveTextContent('61,20 de 100,00 USD este mes');
   });
 
   it('opens the opportunity form from the unavailable block and registers one', async () => {

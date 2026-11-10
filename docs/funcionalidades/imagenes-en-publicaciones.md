@@ -34,7 +34,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 | [IMG-10](#img-10) | Comprobación de la edición con un modelo con visión | backend | funciona |
 | [IMG-11](#img-11) | La imagen en el detalle de la pieza, con veto | PWA · app · backend | funciona |
 | [IMG-12](#img-12) | La Galería marca la foto «usada en la pieza del …» | PWA · app · backend | parcial |
-| [IMG-13](#img-13) | Coste de las imágenes en el ledger, con presupuesto propio | PWA · app · backend | parcial |
+| [IMG-13](#img-13) | Coste de las imágenes en el ledger, dentro del presupuesto general | PWA · app · backend | parcial |
 | [IMG-14](#img-14) | Publicar en LinkedIn con la imagen o el carrusel | backend | funciona |
 | [IMG-INF-01](#img-inf-01) | Las reglas de infografías son una regla de agente | backend | funciona |
 | [IMG-INF-02](#img-inf-02) | El agente elige una plantilla y escribe el contenido como datos | backend | funciona |
@@ -51,8 +51,8 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 
 - No quedan decisiones de producto sin confirmar. Las ediciones que decide el equipo quedan resueltas con la opción de edición de [IMG-16](#img-16) (decisión de Gustavo, 2026-11-08): con «Que decida el equipo» o «Editar», el equipo aplica la edición y la muestra para veto, sin preguntar antes.
 
-- Valores técnicos elegidos: `ai_edit=auto`; `IMAGE_DAILY_USD=1`; `EDITORIAL_VETO_MINUTES=60`; urgencias en orden de llegada y sin desplazar piezas preparadas; búsqueda de hueco hasta 14 días; carrusel de 3–8 láminas. Se conserva la hora y cadencia configuradas.
-- Sin claves, presupuesto de imágenes o revisión visual: foto original si es válida; si no, tarjeta de marca fija sin datos variables. Solo se bloquea si tampoco puede prepararse/servirse esa imagen.
+- Valores técnicos elegidos: `ai_edit=auto`; `IMAGE_DAILY_USD=1` (retirado desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`); `EDITORIAL_VETO_MINUTES=60`; urgencias en orden de llegada y sin desplazar piezas preparadas; búsqueda de hueco hasta 14 días; carrusel de 3–8 láminas. Se conserva la hora y cadencia configuradas.
+- Sin claves, presupuesto de IA o revisión visual: foto original si es válida; si no, tarjeta de marca fija sin datos variables. Solo se bloquea si tampoco puede prepararse/servirse esa imagen.
 - Documento LinkedIn: no tiene campo de alt por página; el PDF lleva `/Alt` por lámina, y la API de la pieza conserva cada alt.
 
 ---
@@ -287,20 +287,20 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Brechas código/docs:** Interfaz y QA de fase 2 pendientes.
 - **Cobertura QA:**
 
-### IMG-13 · Coste de las imágenes en el ledger, con presupuesto propio <a id="img-13"></a>
+### IMG-13 · Coste de las imágenes en el ledger, dentro del presupuesto general <a id="img-13"></a>
 
 - **Dónde:** PWA · app · backend
 - **Estado:** parcial
-- **Qué hace para Gustavo:** cada edición de foto y cada comprobación de imagen queda registrada con su coste, contra un presupuesto de imágenes propio que ve en Ajustes.
-- **Implementación backend:** Presupuesto atómico IMAGE_DAILY_USD entre ambos proveedores, propósitos image-*, línea Imágenes y total semanal.
+- **Qué hace para Gustavo:** cada edición de foto y cada comprobación de imagen queda registrada con su coste, dentro del presupuesto de IA de todo el equipo; en Ajustes ve lo gastado hoy en imágenes.
+- **Implementación backend:** reserva atómica entre ambos proveedores, propósitos image-*, línea Imágenes (solo gasto, `limit_usd: 0`) y total semanal. Desde el 10/11/2026 no hay presupuesto propio (`IMAGE_DAILY_USD` retirado): cuenta en `AI_MONTHLY_LIMIT_USD` y en el tope de seguridad diario `AI_DAILY_FUSE_USD` (`knowledge/presupuesto.py`).
 - **Criterios de aceptación:**
   1. **Dado** una edición con OpenAI, **cuando** se llama, **entonces** antes se reserva su peor caso en el ledger con un propósito propio (por ejemplo `image-edit`, proveedor `openai`) y al terminar se liquida con el coste real.
   2. **Dado** una comprobación con Claude (de una foto editada o de una infografía), **cuando** se llama, **entonces** también pasa por el ledger con su propósito (por ejemplo `image-check`).
   3. **Dado** una infografía o un carrusel, **cuando** se dibuja, **entonces** no hay coste de modelo de imagen: solo cuentan la llamada que escribe su contenido y la comprobación visual.
-  4. **Dado** un presupuesto de imágenes (una variable como `IMAGE_DAILY_USD`), **cuando** lo gastado llega al tope, **entonces** no se hace ninguna edición más en ese periodo y se publica el original.
-  5. **Dado** el gasto de imágenes, **cuando** se calculan los presupuestos editorial y de comentarios, **entonces** no cuenta en ellos.
+  4. **Dado** que se agotó el presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD` o el tope de seguridad diario `AI_DAILY_FUSE_USD`), **cuando** toca editar, **entonces** no se hace ninguna edición más y se publica el original.
+  5. **Dado** el gasto de imágenes, **cuando** se calcula el presupuesto general de IA, **entonces** cuenta en él, como el de cualquier área.
   6. **Dado** un fallo de OpenAI que no se cobra, **cuando** termina, **entonces** la reserva queda `rejected`; un fallo incierto la deja `uncertain` y no se reintenta.
-  7. **Dado** Ajustes › Gasto de IA, en la PWA y en la app, **cuando** lo abre, **entonces** ve una línea «Imágenes» con lo gastado hoy frente a su tope.
+  7. **Dado** Ajustes › Gasto de IA, en la PWA y en la app, **cuando** lo abre, **entonces** ve una línea «Imágenes» con lo gastado hoy, sin tope propio.
   8. **Dado** el resumen semanal, **cuando** se calculan sus cifras, **entonces** `gasto_ia` incluye el gasto de imágenes.
 - **Brechas código/docs:** Interfaz y QA de fase 2 pendientes.
 - **Cobertura QA:**

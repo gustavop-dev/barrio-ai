@@ -264,8 +264,8 @@ class WebLedgerTests(OperatorBase):
 
     def test_reservation_stops_paid_generation_and_uncertain_calls_keep_money(self):
         fake=FakeAnthropic(sdk_answer())
-        with patch.dict(os.environ,LIVE),patch.object(providers,'anthropic_client',return_value=fake),\
-             override_settings(WEB_RESEARCH_DAILY_USD='0'),self.assertRaisesRegex(ValueError,'Presupuesto web'):
+        with patch.dict(os.environ,dict(LIVE,AI_DAILY_FUSE_USD='0')),patch.object(providers,'anthropic_client',return_value=fake),\
+             self.assertRaisesRegex(ValueError,'Tope de seguridad diario de IA'):
             self.generate()
         self.assertEqual([c[0] for c in fake.calls],['count_tokens'])
         timeout=FakeAnthropic(timeout_error())
@@ -284,11 +284,11 @@ class WebLedgerTests(OperatorBase):
             self.generate()
         with db.connect() as c:self.assertEqual(c.execute('SELECT status FROM usage_ledger').fetchone()['status'],'uncertain')
 
-    def test_editorial_total_includes_web_images_and_pending_reservations(self):
-        with patch.dict(os.environ,dict(LIVE,EDITORIAL_DAILY_LLM_USD='1',IMAGE_DAILY_USD='1')):
+    def test_the_team_budget_counts_web_images_and_pending_reservations(self):
+        with patch.dict(os.environ,dict(LIVE,AI_DAILY_FUSE_USD='1')):
             providers.reserve('openai','image-edit',Decimal('.4'))
             providers.reserve('anthropic','editorial-director',Decimal('.5'))
-            with self.assertRaisesRegex(ValueError,'Presupuesto editorial'):
+            with self.assertRaisesRegex(ValueError,'Tope de seguridad diario de IA'):
                 providers.reserve('anthropic','editorial-web-research',Decimal('.2'))
         self.assertEqual(editorial.spent_today(),Decimal('.9'))
 
@@ -307,11 +307,11 @@ class WebLedgerTests(OperatorBase):
             self.generate()
         self.assertEqual([c[0] for c in fake.calls],['count_tokens'])
 
-    def test_parallel_reservations_share_the_web_money_cap(self):
+    def test_parallel_reservations_share_the_team_budget(self):
         def reserve(n):
             try:providers.reserve('anthropic','web-research-tool',Decimal('.6'),f'parallel:{n}');return True
             except ValueError:return False
-        with patch.dict(os.environ,LIVE),override_settings(WEB_RESEARCH_DAILY_USD='1'),ThreadPoolExecutor(max_workers=2) as pool:
+        with patch.dict(os.environ,dict(LIVE,AI_DAILY_FUSE_USD='1')),ThreadPoolExecutor(max_workers=2) as pool:
             self.assertEqual(sum(pool.map(reserve,range(2))),1)
 
 

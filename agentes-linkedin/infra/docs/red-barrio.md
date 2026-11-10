@@ -32,7 +32,7 @@ flowchart LR
    - **Perfil antes de clasificar.** Unipile v2 entrega a quien comenta sin titular: solo nombre e id. Sin titular, el clasificador descartaba a gente valiosa. Por eso, antes de clasificar a alguien sin titular, se lee su perfil (DESC-03), lo que gasta una lectura del cupo `profile`. Quien no puede leerse hoy espera a mañana en lugar de juzgarse a ciegas.
    - **Criterio.** Usa los criterios de barrio por modalidad y la orientación privada del brief. La afinidad hispanohablante se toma solo de lo declarado, nunca del nombre ni de la apariencia.
    - **Resultado.** Una persona encaja si el modelo dice que sí con confianza de al menos `NETWORK_MIN_CONFIDENCE`. Si no, queda `discarded`.
-   - **Presupuesto propio.** El gasto va contra `NETWORK_DAILY_LLM_USD` (por defecto 0,3 USD) con `purpose='network-classify'`.
+   - **Presupuesto.** No tiene tope propio: el gasto (`purpose='network-classify'`) cuenta en el presupuesto de IA de todo el equipo (`AI_MONTHLY_LIMIT_USD` al mes y el tope de seguridad diario `AI_DAILY_FUSE_USD`, ver `knowledge/presupuesto.py`). Sin presupuesto no se clasifica; el resumen de la red da ese tope de seguridad en `llm.daily`.
 3. **Planear** (`plan_network`, cada hora). Convierte a los contactos en propuestas, siempre dentro del cupo de cada capacidad y descontando las propuestas que ya están abiertas.
    - **No lee LinkedIn.** Hasta la auditoría (R1) el plan releía el perfil antes de cada propuesta, y la ejecución lo volvía a leer justo antes de escribir. Ahora solo lo lee la ejecución, que cubre los mismos estados (paso 5).
    - **RED-01 seguir:** a las personas en `fit`.

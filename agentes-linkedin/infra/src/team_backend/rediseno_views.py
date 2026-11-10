@@ -663,7 +663,8 @@ def _spend(purpose_like,since=None,provider='anthropic'):
 class Settings(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
-        now=timezone.now();day,_=operador.period_starts(now)
+        from knowledge import presupuesto
+        now=timezone.now();day,_=operador.period_starts(now);budget=presupuesto.status(now)
         month=now.astimezone(operador.local_tz()).replace(day=1,hour=0,minute=0,second=0,microsecond=0)
         start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
         return Response({'autonomy':{c:autopiloto.autonomy(c) for c in sorted(operador.limits())},
@@ -671,12 +672,15 @@ class Settings(APIView):
                          'limits':{c:{'daily':d,'weekly':w} for c,(d,w) in operador.limits().items()},
                          'window':{'start':start,'end':end,'timezone':str(operador.local_tz()),'open_now':operador.within_window(now),
                                    'min_spacing_seconds':int(operador.min_spacing().total_seconds())},
+                         # One budget for the whole team (knowledge.presupuesto): the month line carries the limit, the
+                         # first line today the daily safety fuse; the areas show what each spent, without a cap of their own.
                          'ai_spend':{'today':[
-                             {'budget':'general','label':'General (comentarios)','spent_usd':_spend('propose-comment',day),'limit_usd':float(os.environ.get('OPERATOR_DAILY_LLM_USD','1'))},
-                             {'budget':'editorial','label':'Editorial (incluye imágenes e investigación de piezas)','spent_usd':float(editorial.spent_today(now)),'limit_usd':float(editorial.daily_budget())},
-                             {'budget':'imagenes','label':'Imágenes','spent_usd':float(imagenes.spent_today(now)),'limit_usd':float(os.environ.get('IMAGE_DAILY_USD','1'))},
-                             {'budget':'red','label':'Red','spent_usd':_spend('network-%',day),'limit_usd':float(red.daily_budget())}],
-                             'month_usd':_spend('%',month),'total_usd':_spend('%'),'limit_usd':float(os.environ.get('ANTHROPIC_LIMIT_USD','1')),
+                             {'budget':'equipo','label':'Todo el equipo hoy (tope de seguridad)','spent_usd':float(budget['today_usd']),'limit_usd':float(budget['daily_fuse_usd'])},
+                             {'budget':'general','label':'General (comentarios)','spent_usd':_spend('propose-comment',day),'limit_usd':0},
+                             {'budget':'editorial','label':'Editorial (incluye imágenes e investigación de piezas)','spent_usd':float(editorial.spent_today(now)),'limit_usd':0},
+                             {'budget':'imagenes','label':'Imágenes','spent_usd':float(imagenes.spent_today(now)),'limit_usd':0},
+                             {'budget':'red','label':'Red','spent_usd':_spend('network-%',day),'limit_usd':0}],
+                             'month_usd':float(budget['month_usd']),'total_usd':_spend('%'),'limit_usd':float(budget['monthly_limit_usd']),
                              'lead_month_usd':_spend('%',month,provider='typesafe'),
                              'transcription_month_usd':_spend('%',month,provider='assemblyai')},
                          'facts_count':len(preguntas.facts()),'push_types':notificaciones.push_types(),

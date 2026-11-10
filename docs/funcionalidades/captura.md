@@ -169,7 +169,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** su nota de voz se convierte en texto que el equipo puede leer y usar.
-- **Código:** `capturas.process`, `providers.assemblyai_transcribe`, propósito `capture-transcribe`, `ASSEMBLYAI_LIMIT_USD`.
+- **Código:** `capturas.process`, `providers.assemblyai_transcribe`, propósito `capture-transcribe`, dentro de `AI_MONTHLY_LIMIT_USD` y del techo opcional `ASSEMBLYAI_LIMIT_USD`.
 - **Criterios de aceptación:**
   1. **Dado** una captura con audio, **cuando** corre `process_capture`, **entonces** pasa a `transcribiendo` («Transcribiendo el audio»), guarda `transcript`, `transcript_language` y la duración real, y pasa a `procesando`.
   2. **Dado** la transcripción, **cuando** se calcula el coste, **entonces** se reserva antes el peor caso según la duración declarada (hasta 30 min) y se liquida con la duración real.

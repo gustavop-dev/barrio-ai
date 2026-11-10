@@ -538,16 +538,19 @@ function sum(values: (number | null | undefined)[]): number {
   return values.reduce<number>((total, value) => total + (typeof value === 'number' ? value : 0), 0);
 }
 
-/** «3,10 de 5,00 USD hoy» and «61,20 USD este mes»; null without the spend block. */
+/** «3,10 USD hoy» and «61,20 de 100,00 USD este mes» (the team's single monthly AI budget); null without the spend
+ * block. An older backend with per-area daily caps still reads «3,10 de 5,00 USD hoy». */
 export function spendSummary(spend: Resultados['equipo']['spend'] | undefined): { today: string; month: string | null } | null {
   if (!spend) return null;
   const today = Object.values(spend.today ?? {});
   const spent = sum(today.map((line) => line.spent));
   const budget = sum(today.map((line) => line.budget));
-  const month = (spend.month as Record<string, { spent: number; budget: number | null }> | undefined)?.total?.spent ?? null;
+  const total = (spend.month as Record<string, { spent: number; budget: number | null }> | undefined)?.total;
+  const month = total?.spent ?? null;
+  const monthly = total?.budget ?? 0;
   return {
     today: budget > 0 ? `${amount(spent)} de ${formatUsd(budget)} hoy` : `${formatUsd(spent)} hoy`,
-    month: month !== null ? `${formatUsd(month)} este mes` : null,
+    month: month === null ? null : monthly > 0 ? `${amount(month)} de ${formatUsd(monthly)} este mes` : `${formatUsd(month)} este mes`,
   };
 }
 

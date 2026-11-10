@@ -278,8 +278,17 @@ STAGES={
 
 # --------------------------------------------------------------------------- configuration and calendar
 
-def daily_budget():
-    return Decimal(os.environ.get('EDITORIAL_DAILY_LLM_USD','2'))
+def budget_left(now=None):
+    """What the team can still spend on AI now (knowledge.presupuesto: monthly limit and daily safety fuse)."""
+    from knowledge import presupuesto
+    return presupuesto.left(now)
+
+def prepare_min():
+    """A full preparation with images reserves about this much: with less left it would stop half way, so it waits."""
+    return Decimal(os.environ.get('EDITORIAL_PREPARE_MIN_USD','3'))
+
+def can_afford_preparation(now=None):
+    return budget_left(now)>=prepare_min()
 
 def stage_model(name):
     """C3: EDITORIAL_MODEL_<STAGE> (e.g. EDITORIAL_MODEL_LECTORES) overrides one stage's model; the repair follows the
@@ -326,21 +335,34 @@ def can_publish(account):
     from .connectors_linkedin import live
     return account is not None and not account.paused and (account.provider=='linkedin_fake' or live())
 
-BUDGET_STOP='Presupuesto editorial diario agotado'
+BUDGET_STOP='Presupuesto de IA agotado'
+# Notes of pieces stopped only for money (older wording included): the day itself is still free to retry.
+from knowledge.presupuesto import STOPS as _LEDGER_STOPS  # a reservation the ledger refused for money
+BUDGET_NOTES=(BUDGET_STOP,'Presupuesto editorial diario agotado','Ciclo detenido: cost_cap',*_LEDGER_STOPS)
+
+def budget_stopped(piece):
+    return piece.state in (EditorialPiece.State.FAILED,EditorialPiece.State.BLOCKED) and piece.note.startswith(BUDGET_NOTES)
+
+def budget_stopped_q():
+    from django.db.models import Q
+    notes=Q()
+    for note in BUDGET_NOTES:notes|=Q(note__startswith=note)
+    return Q(state__in=[EditorialPiece.State.FAILED,EditorialPiece.State.BLOCKED])&notes
 
 def budget_retry(pieces,now):
     """A slot whose every attempt stopped only for the daily budget is tried again once the budget renewed
     (a later local day): running out of budget says nothing about the slot itself."""
     pieces=list(pieces)
-    if not pieces or any(p.state!=EditorialPiece.State.FAILED or not p.note.startswith(BUDGET_STOP) for p in pieces):return False
+    if not pieces or not all(budget_stopped(p) for p in pieces):return False
     tz=operador.local_tz()
     return max(p.created_at for p in pieces).astimezone(tz).date()<now.astimezone(tz).date()
 
 def idea_retry(pieces):
-    """A day whose only pieces were skipped because the director did not take the idea reserved for it is a free
-    day for the autopilot's own post: the skip was about the idea, not the day."""
+    """A day whose only pieces were prepared for an idea of Gustavo reserved for it and did not go out (skipped by the
+    director, blocked or failed) is a free day for the autopilot's own post: it was about the idea, not the day."""
     pieces=list(pieces)
-    return bool(pieces) and all(p.state==EditorialPiece.State.SKIPPED and (p.brief or {}).get('reserved_capture') for p in pieces)
+    closed=(EditorialPiece.State.SKIPPED,EditorialPiece.State.BLOCKED,EditorialPiece.State.FAILED)
+    return bool(pieces) and all(p.state in closed and (p.brief or {}).get('reserved_capture') for p in pieces)
 
 def next_slot(now=None,manual=False):
     """Autopilot: today or tomorrow once the lead time opened and the day has no piece at all (a skip or a
@@ -407,14 +429,14 @@ def _close(piece,state,note):
     return piece
 
 class BudgetStop(ValueError):
-    """The editorial daily budget is spent; nothing more is paid today."""
+    """The team's AI budget (monthly limit or daily safety fuse) is spent; nothing more is paid until it renews."""
 
 def _guard():
-    if spent_today()>=daily_budget():
+    if budget_left()<=0:
         if orquestacion.current():
             orquestacion.current().stop('cost_cap')
             raise orquestacion.CycleStopped('cost_cap')
-        raise BudgetStop(BUDGET_STOP+' (EDITORIAL_DAILY_LLM_USD); no se gasta más hoy.')
+        raise BudgetStop(BUDGET_STOP+' (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD); se reanuda cuando haya presupuesto.')
 
 def _call_stage(piece,name,payload,unit_ids=None):
     runtime=orquestacion.current()

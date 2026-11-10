@@ -107,7 +107,7 @@ La fase 1 de imágenes amplía el brief con `format` foto/infografia/carrusel e 
   - si sigue bloqueado, la pieza termina `blocked`, como antes;
   - si la reparación descarta la pieza o no cambia el texto, termina `blocked` con los motivos originales, sin volver a verificar;
   - un `blocked` del verificador sin hallazgos concretos no tiene nada que reparar y bloquea directamente.
-  La ronda pasa por `_guard()` como cualquier etapa. Si el presupuesto diario se agota durante la ronda, la pieza termina `blocked` con los motivos originales (no `failed`): un defecto de contenido no se reintenta al día siguiente. El registro queda en `verification.repair` (disparador, hallazgos, texto original, primer veredicto, cambios y resultado) y el detalle de la pieza en la PWA lo muestra en «Ronda de reparación». `EDITORIAL_REPAIR=false` apaga la ronda.
+  La ronda pasa por `_guard()` como cualquier etapa. Si el presupuesto de IA se agota durante la ronda, la pieza termina `blocked` con los motivos originales (no `failed`): un defecto de contenido no se reintenta al día siguiente. El registro queda en `verification.repair` (disparador, hallazgos, texto original, primer veredicto, cambios y resultado) y el detalle de la pieza en la PWA lo muestra en «Ronda de reparación». `EDITORIAL_REPAIR=false` apaga la ronda.
 
 ### Memoria: hechos públicos y orientación privada
 
@@ -175,12 +175,13 @@ Si cualquier edición cambia el texto, invalida el veredicto y la política desc
 ## Programación (`autopiloto.tick`)
 
 - **Hueco diario.** La hora es `EDITORIAL_POST_TIME` (08:30 por defecto), en `OPERATOR_TIMEZONE`, y debe caer dentro de `OPERATOR_WINDOW`. La preparación empieza `EDITORIAL_LEAD_HOURS` antes (12 h por defecto). Así hay margen para vetar y llega una push «pieza lista» con la hora de salida.
-- **Las ideas de Gustavo tienen fecha al llegar y se preparan ya** (`urgente.assign_slots`). Sin fecha van al siguiente día libre de la cola; «cuanto antes» toma el primer hueco libre; un día y una hora pedidos («publícalo mañana a las 10», leídos por `cuando.py` del fragmento literal) se respetan, y un post que el equipo preparó por su cuenta ese día pasa al siguiente día libre. Cada idea con fecha se prepara en cuanto la tiene, no `EDITORIAL_LEAD_HOURS` antes. Si el director no toma la idea reservada, la idea vuelve a la mesa sin fecha propia y ese día vuelve al post diario. Tras dos piezas bloqueadas o fallidas, la idea también queda en la mesa. Push «Tu idea ya tiene fecha» con el día y la hora.
-- **Un tope de presupuesto no gasta el día.** Si una preparación se detiene solo porque se agotó `EDITORIAL_DAILY_LLM_USD`, el hueco se vuelve a intentar al día siguiente, cuando el presupuesto se renueva, con un trabajo nuevo. Cualquier otro fallo no se reintenta solo.
+- **Las ideas de Gustavo tienen fecha al llegar y se preparan ya** (`urgente.assign_slots`). Sin fecha van al siguiente día libre de la cola; «cuanto antes» toma el primer hueco libre; un día y una hora pedidos («publícalo mañana a las 10», leídos por `cuando.py` del fragmento literal) se respetan, y un post que el equipo preparó por su cuenta ese día pasa al siguiente día libre. Cada idea con fecha se prepara en cuanto la tiene, no `EDITORIAL_LEAD_HOURS` antes. Si el director no toma la idea reservada, la idea vuelve a la mesa sin fecha propia y ese día vuelve al post diario. Lo mismo vale para un día cuyas únicas piezas eran para la idea y no salieron (saltadas, bloqueadas o fallidas). Cada pieza de su hueco que termina bloqueada o fallida por algo que no es dinero cuenta un intento, una sola vez por pieza; tras dos intentos la idea pierde su fecha y sigue en la mesa del director para un día normal. Push «Tu idea ya tiene fecha» con el día y la hora.
+- **Quedarse sin presupuesto no gasta el día.** Una pieza detenida solo por dinero (`failed` o `blocked` con la nota «Presupuesto de IA agotado», la antigua «Presupuesto editorial diario agotado» o «Ciclo detenido: cost_cap») no ocupa su día: el autopiloto lo vuelve a intentar desde el día local siguiente, cuando hay presupuesto, con un trabajo nuevo, y para una idea de Gustavo ese día sigue libre. Cualquier otro fallo no se reintenta solo.
+- **No se empieza lo que no se puede terminar.** Una preparación, del autopiloto o de una idea, no empieza si del presupuesto de IA quedan menos de `EDITORIAL_PREPARE_MIN_USD` (3 USD por defecto, lo que reserva una pieza con imágenes): se detendría a medias. Espera a que haya presupuesto; la idea lo dice con «Preparación pendiente de presupuesto de IA.».
 - **Una preparación cada vez.** El trabajo `prepare_piece` tiene un id determinista por hueco, así que el autopiloto lo intenta una sola vez por día. Una preparación interrumpida pasa a `failed` sin repetir el gasto.
 - **No se prepara una pieza que no podría salir.** Hace falta una cuenta oficial conectada, sin pausa y con `LIVE_LINKEDIN_OFFICIAL=true`, CONT-09 distinto de `off` y cupo semanal.
 - **Topes.** CONT-09 admite 1 al día y 7 a la semana (`publicaciones` del reparto), configurables en `OPERATOR_DAILY_LIMITS` y `OPERATOR_WEEKLY_LIMITS`. Además, la base de datos impide más de una pieza abierta por día y más de una acción abierta por pieza.
-- **Presupuesto propio.** `EDITORIAL_DAILY_LLM_USD` (1 USD por defecto) suma el gasto de hoy con `purpose LIKE 'editorial-%'`, separado del de comentarios (`OPERATOR_DAILY_LLM_USD`). Se comprueba antes de encolar y antes de cada etapa, y al agotarse la pieza se detiene. El techo acumulado `ANTHROPIC_LIMIT_USD` sigue vigente.
+- **Presupuesto de IA.** La publicación no tiene tope propio: gasta del presupuesto único del equipo (`knowledge/presupuesto.py`), `AI_MONTHLY_LIMIT_USD` (100 USD por mes calendario en `OPERATOR_TIMEZONE`) con el tope de seguridad diario `AI_DAILY_FUSE_USD` (15 USD), que suman todos los proveedores y áreas, incluidas las reservas pendientes o inciertas. Se comprueba antes de encolar (`EDITORIAL_PREPARE_MIN_USD`), antes de cada etapa (`_guard()`) y en cada reserva (`providers.reserve`); al agotarse, la pieza se detiene. El ciclo `pieza_diaria` tiene además un tope de 8 USD por ciclo sobre sus reservas, contra gastos desbocados. `<PROVEEDOR>_LIMIT_USD` es opcional: si se fija, añade un techo mensual a ese proveedor.
 - **Ejecución.** Pasa por `operador.execute()`, que añade una compuerta: no se publica antes de `scheduled_for`. Valen también todas las salvaguardas de siempre: parada global, pausa de cuenta, ventana, espaciado y topes. El espaciado entre escrituras públicas pasa a ser común a todos los conectores, porque todos actúan como el mismo miembro.
 - **Caducidad.** Una pieza aprobada que no sale caduca `OPERATOR_PROPOSAL_TTL_HOURS` después de su hora programada, no de su creación.
 
@@ -194,7 +195,7 @@ Tokens aproximados: unas 62 000 de unidades del curso entre las cinco etapas, un
 | `claude-sonnet-5-5` (2 / 10) | ≈ 0,22–0,26 USD | ≈ 0,06 USD |
 | `claude-haiku-5-5` (0,10 / 0,50) | ≈ 0,01 USD | < 0,01 USD |
 
-Una pieza que necesita la ronda de reparación suma una llamada de reparación y, si cambió el texto, un segundo verificador: unos 0,2–0,3 USD más con opus. Una pieza que las reglas frenan antes del verificador se ahorra ese verificador. Con opus salen unos 13–15 USD al mes con una pieza diaria. Cada etapa reserva primero su peor caso: con opus, unos 0,26 USD como máximo en la del redactor. Las etapas son secuenciales y se liquidan antes de pasar a la siguiente, así que el tope diario de 1 USD cubre una pieza.
+Una pieza que necesita la ronda de reparación suma una llamada de reparación y, si cambió el texto, un segundo verificador: unos 0,2–0,3 USD más con opus. Una pieza que las reglas frenan antes del verificador se ahorra ese verificador. Con opus salen unos 13–15 USD al mes con una pieza diaria. Cada etapa reserva primero su peor caso: con opus, unos 0,26 USD como máximo en la del redactor. Las etapas son secuenciales y se liquidan antes de pasar a la siguiente, así que `EDITORIAL_PREPARE_MIN_USD` (3 USD) cubre una pieza con imágenes y el tope de 8 USD del ciclo solo frena un gasto desbocado.
 
 ## API para la PWA
 
@@ -211,7 +212,7 @@ Una pieza que necesita la ronda de reparación suma una llamada de reparación y
 
 `status` de una pieza: `preparing`, `skipped`, `blocked` o `failed` mientras no exista la acción. Después sigue el ciclo de esta: `awaiting_approval`, `scheduled`, `publishing`, `published`, `uncertain`, `vetoed`, `discarded`, `expired` o `superseded`.
 
-Acciones (`/api/v1/operador/actions…`): `post` puede ser `null`. En ese caso `piece_id` y `scheduled_for` identifican la pieza propia. CONT-09 no se puede crear a mano desde esta ruta. `GET /api/v1/operador/overview` añade `today.editorial_llm_spent_usd` y `today.editorial_llm_daily_cap_usd`. `/oficina/actividad` muestra la etapa en curso con su rol: director, redactores, lectores o verificador.
+Acciones (`/api/v1/operador/actions…`): `post` puede ser `null`. En ese caso `piece_id` y `scheduled_for` identifican la pieza propia. CONT-09 no se puede crear a mano desde esta ruta. `GET /api/v1/operador/overview` añade `today.editorial_llm_spent_usd` y `today.editorial_llm_daily_cap_usd`; este último es el tope de seguridad diario de todo el equipo (`AI_DAILY_FUSE_USD`), no uno propio. `/oficina/actividad` muestra la etapa en curso con su rol: director, redactores, lectores o verificador.
 
 Notificaciones push (y `OPERATOR_ALERT_WEBHOOK`):
 - pieza lista, con la hora y la opción de vetar;
@@ -236,7 +237,9 @@ Notificaciones push (y `OPERATOR_ALERT_WEBHOOK`):
    LIVE_LINKEDIN_OFFICIAL=false   # true cuando quiera que salga la primera pieza
    EDITORIAL_POST_TIME=08:30
    EDITORIAL_LEAD_HOURS=12
-   EDITORIAL_DAILY_LLM_USD=1
+   EDITORIAL_PREPARE_MIN_USD=3      # con menos presupuesto de IA disponible, la preparación espera
+   AI_MONTHLY_LIMIT_USD=100         # presupuesto de IA de todo el equipo por mes
+   AI_DAILY_FUSE_USD=15             # su tope de seguridad diario
    EDITORIAL_REPAIR=true            # ronda de reparación (R4); false la apaga
    # EDITORIAL_MODEL_LECTORES=…     # C3: modelo de una etapa; sin fijar, el de siempre
    OPERATOR_AUTONOMY=INT-03=auto,INT-02=auto,CONT-09=auto

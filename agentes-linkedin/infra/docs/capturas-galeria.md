@@ -97,14 +97,14 @@ El coste de una transcripción ya hecha no se devuelve.
 
 **Activación.** Exige `LIVE_PROVIDERS=true` y `ASSEMBLYAI_API_KEY`. La clave solo llega por el entorno.
 
-**Ledger** (proveedor `assemblyai`, propósito `capture-transcribe`, techo `ASSEMBLYAI_LIMIT_USD`):
+**Ledger** (proveedor `assemblyai`, propósito `capture-transcribe`, dentro del presupuesto de IA del equipo, `AI_MONTHLY_LIMIT_USD`, y del techo opcional `ASSEMBLYAI_LIMIT_USD` si se fija):
 - **Reserva.** Antes de subir nada, reserva el peor caso según la duración que dice el cliente: hasta 30 minutos, o 30 minutos si no la dice, a `ASSEMBLYAI_USD_PER_HOUR` (0,21 USD/h, Universal-3.5 Pro).
 - **Liquidación.** Se liquida con la `audio_duration` real y la tarifa del modelo usado. Universal-2 cuesta 0,15 USD/h.
 - **Fallos sin coste.** Una transcripción en `error` no se cobra, así que queda `rejected`. Lo mismo pasa con una subida fallida o un 4xx al crear.
 - **Fallos inciertos.** Un 5xx o un corte de red al crear, o agotar el tiempo de espera, dejan la reserva `uncertain`: AssemblyAI podría terminarla y cobrarla. No se reintenta. Los mismos bytes no se pueden volver a enviar hasta revisar esa reserva (`authorize_uncertain_retry`).
 - **Ajustes.** `GET /api/v1/ajustes` muestra el gasto del mes en `ai_spend.transcription_month_usd`.
 
-**Cuánto cuesta.** Un audio de 1 minuto cuesta unos 0,0035 USD; con `ASSEMBLYAI_LIMIT_USD=5` caben unas 24 horas de audio.
+**Cuánto cuesta.** Un audio de 1 minuto cuesta unos 0,0035 USD; con 5 USD caben unas 24 horas de audio.
 
 ## Galería
 
@@ -155,7 +155,7 @@ El coste de una transcripción ya hecha no se devuelve.
 
 1. **`.env`:**
    - `ASSEMBLYAI_API_KEY` (la clave del proyecto de AssemblyAI);
-   - `ASSEMBLYAI_LIMIT_USD=5` y `ASSEMBLYAI_USD_PER_HOUR=0.21`;
+   - `ASSEMBLYAI_USD_PER_HOUR=0.21`; `ASSEMBLYAI_LIMIT_USD` es opcional (vacío: solo cuenta el presupuesto general de IA, `AI_MONTHLY_LIMIT_USD`);
    - `MEDIA_ROOT=/app/media` (no cambiarlo: es la ruta del volumen y la imagen la crea con dueño `app`).
 2. **Volumen.** `compose.prod.yaml` monta el volumen con nombre `media` en `/app/media` para `api` y `worker`. El worker lee el audio para transcribirlo, así que ambos deben ver los mismos archivos. Docker inicializa el volumen con el dueño del directorio de la imagen (uid 10001).
 3. **Copias.** `deploy/backup.sh` guarda junto al volcado de la base un `backups/media-<fecha>.tar.gz` y conserva 14 días. Para restaurar:

@@ -57,7 +57,7 @@ Todo va por semana local, del lunes a las 00:00 al lunes siguiente a las 00:00 (
 | `oportunidades` | Creadas por etapa y por modalidad, movidas por etapa de llegada y abiertas al cierre | Aún no había ninguna registrada |
 | `conversaciones` | Lecturas del inbox, mensajes juzgados, conversaciones que le tocaron a Gustavo, cerradas (respondió o sin responder) y respondidas en LinkedIn | El inbox no se leyó (`INBOX_ENABLED` apagado) |
 | `capturas` | Enviadas, por destino y por estado, comentarios sobre piezas e ideas usadas en piezas de la semana | Siempre disponible: 0 es un cero real |
-| `gasto_ia` | Gasto del ledger por presupuesto (general, editorial, red, resumen semanal y otros de Anthropic) y por proveedor (Jev, AssemblyAI…), con los topes diarios | Siempre disponible |
+| `gasto_ia` | Gasto del ledger por área (general, editorial, red, resumen semanal y otros de Anthropic) y por proveedor (Jev, AssemblyAI…), con el presupuesto general de IA en `presupuesto_usd: {mensual, tope_diario_seguridad}` | Siempre disponible |
 | `lider` | Aprobadas y descartadas por capacidad y las tres preguntas que más fallan | `LEAD_ENABLED` apagado |
 | `pausas_y_bloqueos` | Paradas y reanudaciones de la máquina, pausas de cuenta, piezas bloqueadas, fallidas o sin presupuesto, y ejecuciones fallidas o inciertas | Siempre disponible |
 
@@ -79,7 +79,7 @@ Los posts del domingo aún no tienen su corte de 72 h el lunes, y casi ningún p
 | Entrada | Las cifras; el posicionamiento (`posicionamiento.py`: versión, estado y dirección editorial); la orientación vigente; y hasta 10 comentarios de Gustavo (captura con contexto «pieza») sobre piezas de la semana o enviados en ella |
 | Salida | `titular`, `lo_que_funciono[]`, `lo_que_no[]`, `recomendaciones[]` (como mucho 3 cada una, cada entrada `{texto, cifra}`), `orientacion_propuesta` (vacía salvo que los datos respalden un cambio) y `advertencias[]` |
 
-**Presupuesto.** Tiene un tope propio y pequeño, `WEEKLY_SUMMARY_LLM_USD` (1 USD por semana ISO local). No usa el presupuesto general porque ese es el de los comentarios: `OPERATOR_DAILY_LLM_USD` solo cuenta el propósito `propose-comment`. Para meter el resumen ahí habría que cambiar la compuerta de los comentarios y, los lunes, el resumen les quitaría cupo. Con un tope semanal, los dos quedan separados y un fallo no se puede repetir sin límite. Toda llamada pasa además por la reserva del ledger y por `ANTHROPIC_LIMIT_USD`.
+**Presupuesto.** Tiene un tope propio y pequeño, `WEEKLY_SUMMARY_LLM_USD` (1 USD por semana ISO local), para que un fallo no se pueda repetir sin límite. Toda llamada pasa además por la reserva del ledger y por el presupuesto de IA de todo el equipo (`knowledge/presupuesto.py`: `AI_MONTHLY_LIMIT_USD` al mes y el tope de seguridad diario `AI_DAILY_FUSE_USD`), y por `ANTHROPIC_LIMIT_USD` si está fijado.
 
 **Coste esperado.** Unos 8–12k tokens de entrada (las cifras de dos semanas ocupan la mayor parte) y 3–5k de salida, pensamiento incluido:
 - unos 0,10–0,15 USD por semana, es decir, 0,45–0,65 USD al mes;

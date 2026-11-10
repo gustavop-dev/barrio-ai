@@ -241,6 +241,7 @@ class DispatcherTests(TransactionTestCase):
         self.assertFalse(UsageEntry.objects.exists())
 
     def test_daily_cap_includes_spend_from_outside_this_cycle(self):
+        self.cycle()['limits']['daily_cost_cap_usd']=2  # the runtime still honours a cycle's daily cap when declared
         providers.reserve('anthropic','editorial-director',Decimal('1.90'))
         run=self.open()
         with run.session(),self.assertRaisesRegex(runtime.CycleStopped,'cost_cap'):
@@ -320,7 +321,7 @@ class DispatcherTests(TransactionTestCase):
 
     def test_business_caps_and_planned_cycles_cannot_be_enabled_by_invocation(self):
         by_id={c['id']:c for c in self.graph['cycles']}
-        self.assertEqual(by_id['pieza_diaria']['limits']['cost_cap_usd'],2)
+        self.assertEqual(by_id['pieza_diaria']['limits']['cost_cap_usd'],8)
         self.assertEqual(by_id['referentes_mensuales']['limits']['cost_cap_usd'],5)
         self.assertEqual(by_id['referentes_mensuales']['limits']['cost_period'],'month')
         self.assertEqual(by_id['perfil_periodico']['limits']['cost_cap_usd'],10)

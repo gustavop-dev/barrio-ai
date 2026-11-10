@@ -146,12 +146,8 @@ Todas las fichas tienen la misma forma:
    - `comments_published`. `comments_replied` va en `null`, porque aún no se leen las respuestas.
    - `follows`, `invites` y `accepts`: ejecuciones confirmadas.
    - `pieces_published`, `pieces_blocked` y `pieces_vetoed`: por día de la pieza.
-   - `spend`: gasto de Anthropic de hoy por presupuesto diario:
-     - `general` frente a `OPERATOR_DAILY_LLM_USD`;
-     - `editorial` frente a `EDITORIAL_DAILY_LLM_USD`;
-     - `network` frente a `NETWORK_DAILY_LLM_USD`;
-     - `other` para lo demás.
-     El bloque `month` da lo mismo para el mes, y `month.total` lo pone frente a `ANTHROPIC_LIMIT_USD`. `accumulated` da el total del ledger y `other_providers` separa OpenAI y los demás. **Ojo:** `ANTHROPIC_LIMIT_USD` es un techo acumulado sobre todo el ledger (`knowledge.providers.reserve`), no mensual.
+   - `spend`: gasto de Anthropic de hoy por área (`general`, `editorial`, `network` y `other` para lo demás), con `budget: null`: desde el 10/11/2026 las áreas no tienen tope propio y hay un solo presupuesto de IA para todo el equipo (`knowledge/presupuesto.py`).
+     El bloque `month` da lo mismo para el mes; `month.total` suma todos los proveedores del mes frente a `AI_MONTHLY_LIMIT_USD`, y `daily_fuse` es el tope de seguridad diario (`AI_DAILY_FUSE_USD`). `accumulated` da el total de Anthropic en el ledger y `other_providers` separa OpenAI y los demás; su `budget` es el techo opcional del proveedor (`<PROVEEDOR>_LIMIT_USD`, mensual por defecto) o `null` si no está fijado.
 
 ### Ejemplo (recortado)
 
@@ -211,12 +207,12 @@ Todas las fichas tienen la misma forma:
     "follows": { … }, "invites": { … }, "accepts": { … },
     "pieces_published": { "value": 2, … }, "pieces_blocked": { "value": 0, … }, "pieces_vetoed": { "value": 1, … },
     "spend": {
-      "today": { "general": { "spent": 0.05, "budget": 1.0 }, "editorial": { "spent": 0.5, "budget": 1.0 },
-                 "network": { "spent": 0.1, "budget": 0.3 }, "other": { "spent": 0.0, "budget": null } },
-      "month": { "general": { "spent": 0.05, "budget": null }, …, "total": { "spent": 0.65, "budget": 2.0 } },
-      "accumulated": { "spent": 0.85, "budget": 2.0 },
-      "other_providers": { "openai": { "today": 0.05, "month": 0.05, "accumulated": 0.05, "budget": 1.0 } },
-      "month_start": "2026-11-01", "definition": "…"
+      "today": { "general": { "spent": 0.05, "budget": null }, "editorial": { "spent": 0.5, "budget": null },
+                 "network": { "spent": 0.1, "budget": null }, "other": { "spent": 0.0, "budget": null } },
+      "month": { "general": { "spent": 0.05, "budget": null }, …, "total": { "spent": 0.7, "budget": 100.0 } },
+      "accumulated": { "spent": 0.85, "budget": null },
+      "other_providers": { "openai": { "today": 0.05, "month": 0.05, "accumulated": 0.05, "budget": null } },
+      "daily_fuse": 15.0, "month_start": "2026-11-01", "definition": "…"
     }
   }
 }

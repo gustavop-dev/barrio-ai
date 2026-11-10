@@ -16,7 +16,6 @@ from .models import GalleryPhoto, PieceImage
 def sha(raw):return hashlib.sha256(raw).hexdigest()
 def read(file):
     with file.open('rb') as handle:return handle.read()
-def daily_budget():return Decimal(os.environ.get('IMAGE_DAILY_USD','1'))
 def spent_today(now=None):
     from .operador import period_starts
     day,_=period_starts(now)
