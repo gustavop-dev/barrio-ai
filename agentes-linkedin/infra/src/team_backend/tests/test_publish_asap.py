@@ -127,6 +127,11 @@ class WhenTests(SimpleTestCase):
                'a las 6 y media':(None,time(18,30)),
                'el martes al mediodía':(date(2026,11,17),time(12,0)),
                'publícalo a las ocho de la noche':(None,time(20,0)),
+               'publícalo esta mañana a las 11':(date(2026,11,10),time(11,0)),
+               'hoy a las 10am':(date(2026,11,10),time(10,0)),
+               'súbelo esta tarde':(date(2026,11,10),None),
+               'mañana a las 7:15 p.m.':(date(2026,11,11),time(19,15)),
+               'dale 5 a mis contactos':(None,None),
                'Una idea sobre decisiones de producto':(None,None)}
         for text,expected in cases.items():
             with self.subTest(text=text):self.assertEqual(cuando.parse(text,today),expected)

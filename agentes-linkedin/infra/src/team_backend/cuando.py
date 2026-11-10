@@ -16,7 +16,7 @@ HOUR = r'(\d{1,2}|' + '|'.join(NUMBERS) + r')'
 MINUTES = r'(?::(\d{2})|\s+y\s+(media|cuarto))?'
 PERIOD = r'(?:\s*(am|a\.?\s?m\.?|pm|p\.?\s?m\.?|de la manana|de la tarde|de la noche))?'
 AT = re.compile(r'\ba\s+las?\s+' + HOUR + MINUTES + PERIOD + r'\b')
-BARE = re.compile(r'\b(\d{1,2})' + MINUTES + r'\s*(am|a\.?\s?m\.?|pm|p\.?\s?m\.?)')
+BARE = re.compile(r'\b(\d{1,2})' + MINUTES + r'\s*(am|a\.?\s?m\.?|pm|p\.?\s?m\.?)(?![a-z])')  # not «5 a mis»
 
 
 def _plain(text):
@@ -57,11 +57,11 @@ def parse_day(text, today):
     plain = _plain(text)
     if re.search(r'\bpasado\s+manana\b', plain):
         return today + timedelta(days=2)
-    # «mañana» is tomorrow; «de/por/en la mañana» is the morning.
+    # «hoy», «esta mañana/tarde/noche» are today; «mañana» is tomorrow; «de/por/en la mañana» is the morning.
+    if re.search(r'\bhoy\b|\besta\s+(manana|tarde|noche)\b', plain):
+        return today
     if re.search(r'(?<!la )\bmanana\b', plain.replace('pasado manana', '')):
         return today + timedelta(days=1)
-    if re.search(r'\bhoy\b', plain):
-        return today
     match = re.search(r'\b(\d{1,2})\s+de\s+(' + '|'.join(MONTHS) + r')\b', plain)
     if match:
         day, month = int(match.group(1)), MONTHS.index(match.group(2)) + 1
