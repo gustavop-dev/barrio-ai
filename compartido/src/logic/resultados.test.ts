@@ -100,7 +100,11 @@ describe('Resultados rules', () => {
   it('writes the team line and the AI spend', () => {
     expect(teamCount(kpi(1), 'bloqueada', 'bloqueadas')).toBe('1 bloqueada');
     expect(teamCount(kpi(null), 'publicado', 'publicados')).toBeNull();
-    expect(spendSummary(resultadosFixture().equipo.spend)).toEqual({ today: '3,10 de 5,00 USD hoy', month: '61,20 USD este mes' });
+    const spend = resultadosFixture().equipo.spend;
+    expect(spendSummary(spend)).toEqual({ today: '3,10 USD hoy', month: '61,20 de 100,00 USD este mes' });
+    // An older backend with per-area daily caps and no monthly budget.
+    const perArea = { ...spend, today: { general: { spent: 1.2, budget: 1 }, editorial: { spent: 1.9, budget: 4 } }, month: { total: { spent: 61.2, budget: null } } };
+    expect(spendSummary(perArea)).toEqual({ today: '3,10 de 5,00 USD hoy', month: '61,20 USD este mes' });
     expect(spendSummary(undefined)).toBeNull();
   });
 

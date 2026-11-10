@@ -184,8 +184,8 @@ describe('Resultados', () => {
     await fireEvent.press(within(screen.getByTestId('stat-Red')).getByLabelText('Definición de Red'));
     expect(within(await screen.findByTestId('definition-sheet')).getByText('Seguidos: Definición de prueba.')).toBeOnTheScreen();
     const spend = within(screen.getByTestId('stat-Gasto de IA'));
-    expect(spend.getByText('3,10 de 5,00 USD hoy')).toBeOnTheScreen();
-    expect(spend.getByText('61,20 USD este mes')).toBeOnTheScreen();
+    expect(spend.getByText('3,10 USD hoy')).toBeOnTheScreen();
+    expect(spend.getByText('61,20 de 100,00 USD este mes')).toBeOnTheScreen();
   });
 
   it('opens the opportunity form from the unavailable block and registers one', async () => {
