@@ -19,7 +19,7 @@ from django.utils import timezone
 from knowledge import db, memory
 from . import guardas, lider, oficina_eventos, operador, red
 from .jobs import enqueue_operation
-from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, EditorialPiece, Job, ObservedPost
+from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, CycleLedger, EditorialPiece, Job, ObservedPost
 
 logger=logging.getLogger('team_backend.autopilot')
 
@@ -112,6 +112,9 @@ def policy_review(proposal,lead_budget=None):
     mode=autonomy(proposal.capability)
     if mode=='approval':return proposal
     issues=['Capacidad desactivada por configuración'] if mode=='off' else content_issues(proposal)
+    if proposal.capability==ActionProposal.Capability.PUBLISH and issues and set(issues)<={'Imagen no disponible','Documento no disponible'}:
+        logger.warning('Propuesta %s pendiente por archivos no disponibles: %s',proposal.id,'; '.join(issues))
+        return proposal
     verdict=None
     if not issues and lider.applies(proposal):
         # The agente líder replaces the human approval: Jev judges the exact text or person; doubt means no.
@@ -232,6 +235,19 @@ def tick(user,now=None):
     except Exception as exc:report['referents_error']=type(exc).__name__
     comunidad.maintain(now)  # retention also runs when collection/the machine is paused
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
+    stopped={(cycle,key):reason for cycle,key,reason in CycleLedger.objects.filter(state='stopped').exclude(
+        stop_reason='cost_cap').values_list('cycle','key','stop_reason')}
+    for proposal in ActionProposal.objects.select_related('piece').filter(state__in=['proposed','approved'],execution__isnull=True):
+        if not proposal.piece_id and not proposal.origin_job:continue
+        key=('pieza_diaria',str(proposal.piece_id)) if proposal.piece_id else ('red',proposal.origin_job)
+        if key not in stopped:continue
+        proposal.state=ActionProposal.State.EXPIRED;proposal.decision_note='Ciclo detenido: '+stopped[key]
+        proposal.save(update_fields=['state','decision_note'])
+        operador._audit(None,'operator.expired',proposal.id)
+        if proposal.piece_id:
+            from .capturas import release_ideas
+            release_ideas(proposal.piece,proposal.decision_note)
+        report['expired']+=1
     ttl=timedelta(hours=int(setting('OPERATOR_PROPOSAL_TTL_HOURS','48')))
     # Own pieces are prepared ahead of time: their TTL runs from the scheduled hour, not from creation.
     stale=ActionProposal.objects.filter(state__in=['proposed','approved'],execution__isnull=True).filter(
@@ -241,7 +257,7 @@ def tick(user,now=None):
         if proposal.piece_id:
             from .capturas import release_ideas
             release_ideas(proposal.piece,'caducó sin publicar')
-    report['expired']=stale.update(state=ActionProposal.State.EXPIRED,decision_note='Caducada sin ejecutar')
+    report['expired']+=stale.update(state=ActionProposal.State.EXPIRED,decision_note='Caducada sin ejecutar')
     # The lead (Jev, up to 60 s per call) reviews at most LEAD_MAX_REVIEWS_PER_TICK proposals per tick, oldest first; after
     # a plan_network the rest wait for the next ticks instead of blocking this one for minutes.
     lead_budget={'left':lead_reviews_per_tick(),'deferred':0}
@@ -414,9 +430,11 @@ def _weekly_summary(user,now):
     return resumen_semanal.queue(user,now)
 
 def _execute(user,account,now):
+    from .orquestacion import cycle_issues
     if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0
     if _pending('execute_action'):return 0
     for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(account=account,state='approved',execution__isnull=True).order_by('created_at'):
+        if cycle_issues(proposal):continue
         if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour
         if operador.capacity_left(account,proposal.capability,now)<=0:continue
         job=operador.enqueue_execution(user,proposal)

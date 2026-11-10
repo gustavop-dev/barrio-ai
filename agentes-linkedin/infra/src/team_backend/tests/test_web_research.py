@@ -11,8 +11,8 @@ import httpx
 from django.db import close_old_connections, connections
 from django.test import SimpleTestCase, override_settings
 from django.utils import timezone
-from knowledge import db, providers
-from team_backend import capturas, editorial, research, web_sources
+from knowledge import db, memory, providers
+from team_backend import capturas, editorial, preguntas, research, web_sources
 from team_backend.models import AuditEvent, Capture, WebResearchRun
 from team_backend.tests.fakes import FakeAnthropic, timeout_error
 from team_backend.tests.test_capturas import CaptureBase, audio
@@ -316,6 +316,19 @@ class WebLedgerTests(OperatorBase):
 
 
 class CaptureWebTests(CaptureBase):
+    def test_research_asked_in_an_answer_reaches_the_director_and_the_fact_keeps_its_question(self):
+        q=preguntas.ask('director_editorial','¿Qué se puede contar de Office?','Para un post','experiencia.office',True)
+        with patch('knowledge.providers.typesafe',return_value={'answers':{}}),\
+             patch.object(research,'research',return_value=stored_result()) as investigate:
+            body=self.send(nota='Usa RAG, búsquenla en '+URL,contexto_tipo='pregunta',contexto_id=str(q.id));self.drain()
+        capture=self.capture(body);self.assertEqual(capture.state,'dato_guardado')
+        self.assertEqual(investigate.call_args.args[0].urls,(URL,))
+        given=capturas.answer_research_for_director()
+        self.assertEqual([(g['question'],g['investigation']) for g in given],[('¿Qué se puede contar de Office?',capture.investigation)])
+        self.assertIn('¿Qué se puede contar de Office? Usa RAG, búsquenla en '+URL,[f['fact'] for f in memory.confirmed_blocks()[0]])
+        capturas.undo(self.gustavo,capture.id)
+        self.assertEqual(capturas.answer_research_for_director(),[])
+
     def test_url_research_is_saved_visible_and_handed_to_director(self):
         with patch('knowledge.providers.typesafe',return_value={'answers':{}}),\
              patch.object(research,'research',return_value=stored_result()) as investigate:

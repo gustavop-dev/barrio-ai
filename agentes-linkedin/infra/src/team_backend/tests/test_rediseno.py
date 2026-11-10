@@ -123,7 +123,9 @@ class QuestionTests(OperatorBase):
         self.assertIsNotNone(q)
         self.assertIsNone(preguntas.ask('director_editorial','Otra forma de preguntarlo','x','experiencia.primer_agente'))
         self.human.post(f'/api/v1/preguntas/{q.id}/responder',{'text':'Un agente de soporte para un ERP en 2025.','public_use':True},format='json')
-        self.assertIn('Un agente de soporte para un ERP en 2025.',[f['fact'] for f in memory.confirmed_blocks()[0]])
+        # The fact carries its question, so it reads on its own.
+        self.assertIn('¿Cuál fue tu primer agente en producción? Un agente de soporte para un ERP en 2025.',
+                      [f['fact'] for f in memory.confirmed_blocks()[0]])
         self.assertIsNone(preguntas.ask('director_editorial','¿Y tu primer agente?','x','experiencia.primer_agente'))  # already known
         other=preguntas.ask('director_editorial','¿Cuánto cobras?','Para hablar de precios','precios.tarifa')
         self.assertEqual(self.human.post(f'/api/v1/preguntas/{other.id}/no-compartir',{},format='json').json()['state'],'declined')
@@ -133,7 +135,7 @@ class QuestionTests(OperatorBase):
         q=preguntas.ask('posicionamiento','¿Dónde vives?','Para la ubicación del perfil','identidad.ciudad')
         self.human.post(f'/api/v1/preguntas/{q.id}/responder',{'text':'Medellín','public_use':False},format='json')
         facts=self.human.get('/api/v1/memoria/hechos').json()
-        self.assertEqual([(f['key'],f['text'],f['public_use']) for f in facts],[('identidad.ciudad','Medellín',False)])
+        self.assertEqual([(f['key'],f['text'],f['public_use']) for f in facts],[('identidad.ciudad','¿Dónde vives? Medellín',False)])
         facts=self.human.post('/api/v1/memoria/hechos/identidad.ciudad/corregir',{'text':'Bogotá','public_use':True},format='json').json()
         self.assertEqual(facts[0]['text'],'Bogotá')
         self.assertEqual(self.human.post('/api/v1/memoria/hechos/identidad.ciudad/retirar',{'reason':'Privado'},format='json').json(),[])
