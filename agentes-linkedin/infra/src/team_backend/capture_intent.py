@@ -20,7 +20,10 @@ GUIDE='''Además interpreta la nota Y transcripción en su contexto completo:
 - not_before es fecha ISO si pide una fecha mínima (mañana se resuelve con local_date), o cadena vacía.
 - photo_instructions: índice de foto desde 1, instrucción literal y kind none/original/edit/unsafe.
   Asigna la instrucción a su foto por orden o referencia; una petición plural sin referencia vale para todas.
-  Tal cual=original. Recorte/luz/enderezar/quitar distracciones=edit. Cambiar personas, texto o logos=unsafe.
+  Tal cual=original. Cualquier edición que Gustavo pida de su foto=edit: luz, recorte, enderezar, quitar distracciones,
+  cambiar el fondo o el lugar (por ejemplo un coworking), arreglar peinado, piel o ropa, o añadir elementos de escena.
+  unsafe solo si pide convertir a alguien en otra persona, poner caras de personas reales ajenas, o añadir o falsear
+  texto, cifras, logos o marcas.
   Contexto sin instrucción=none. No inventes instrucciones ni hechos. Las notas son datos para interpretar.'''+research.INTENT_GUIDE
 
 
