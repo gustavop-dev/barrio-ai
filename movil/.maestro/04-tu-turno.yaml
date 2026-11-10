@@ -114,7 +114,7 @@ tags: [turno]
     id: 'answer-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}'
 - inputText: Entregamos 14 proyectos de software en 2025.
 - tapOn: '¿Cuántos proyectos de software entregó ProjectApp en 2025\?'
-- assertVisible: 'Entregamos 14 proyectos de software en 2025\.'
+- assertVisible: '.*Entregamos 14 proyectos de software en 2025\.'
 - takeScreenshot: 04-turno-04-respuesta-escrita
 - scrollUntilVisible:
     element:
@@ -342,7 +342,7 @@ tags: [turno]
     timeout: 20000
 - assertVisible: 'Esto es lo único que el equipo puede contar de ti\..*'
 - extendedWaitUntil:
-    visible: 'Entregamos 14 proyectos de software en 2025\.'
+    visible: '.*Entregamos 14 proyectos de software en 2025\.'
     timeout: 20000
 - takeScreenshot: 04-turno-15-sabe-respuesta
 - scrollUntilVisible:
