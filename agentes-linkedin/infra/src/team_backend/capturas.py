@@ -534,6 +534,16 @@ def feedback_for_director(now=None):
                              'comment':_clip(c.text,1000),'date':_local(c.created_at).date().isoformat()})
     return out
 
+def answer_research_for_director(now=None):
+    """`research_from_answers`: web research Gustavo asked for («búsquenla») while answering a team question,
+    last 30 days. The answer itself is memory; without this the findings stayed on the capture."""
+    now=now or timezone.now()
+    rows=(Capture.objects.filter(context_type='pregunta',state=Capture.State.SAVED,created_at__gte=now-timedelta(days=FEEDBACK_DAYS))
+          .exclude(investigation={}).order_by('-created_at')[:FEEDBACK_LIMIT])
+    questions={str(q.id):q.question for q in TeamQuestion.objects.filter(id__in=[c.context_id for c in rows if UUID.fullmatch(c.context_id)])}
+    return [{'question':questions.get(c.context_id,''),'answer':_clip(c.text,1000),'date':_local(c.created_at).date().isoformat(),
+             'investigation':c.investigation} for c in rows]
+
 def mark_used(ids,piece):
     for capture in Capture.objects.filter(id__in=ids,state=Capture.State.IDEA):
         capture.state=Capture.State.USED
