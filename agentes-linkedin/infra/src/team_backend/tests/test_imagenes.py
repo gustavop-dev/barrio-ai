@@ -98,6 +98,7 @@ class ImageWorkflowTests(EditorialBase):
         cases=[('no','recórtala','edit','light',False,'prohibida'),('auto','úsala tal cual','original','light',False,'Gustavo'),
                ('auto','más luz','edit','none',True,'Gustavo'),('auto','','none','none',False,'no necesita'),
                ('auto','','none','light',True,'equipo'),('si','','none','none',True,'pedida'),
+               ('auto','ponme en un coworking y arregla mi pelo','edit','none',True,'Gustavo'),
                ('si','cambia la persona','unsafe','none',False,'no segura')]
         for ai,note,kind,edit,should_edit,reason in cases:
             with self.subTest(ai=ai,note=note,edit=edit):

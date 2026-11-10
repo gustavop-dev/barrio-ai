@@ -138,8 +138,10 @@ Cómo decidir:
   image.reason explica la elección por contexto. Las fotos de una propuesta son preferentes; explica si las descartas.
   gallery trae notas, transcripciones, fecha, uso y permiso; las vistas reducidas llevan su ID. Elige solo IDs ofrecidos.
   image.photos contiene id, reason, alt descriptivo en inglés, edit (none/light/straighten/crop/distractions) y edit_reason, instruction (cita literal de la nota) e instruction_kind (none/original/edit/unsafe).
-  En auto sin instrucción edita solo si hay un defecto visible concreto; ante la duda none. Nunca alteres personas,
-  texto ni logos. Un proceso en pasos puede llevar carrusel; un dato o una frase, infografia. Galería vacía: infografia.
+  Una edición que Gustavo pide en la nota de su foto (fondo o lugar, peinado, ropa, retoques) es válida: cítala con
+  instruction_kind=edit y no descartes la foto por pedirla; es estilo de su propia imagen, no un hecho inventado.
+  En auto sin instrucción edita solo si hay un defecto visible concreto; ante la duda none. Sin instrucción suya no
+  alteres personas, texto ni logos. Un proceso en pasos puede llevar carrusel; un dato o una frase, infografia. Galería vacía: infografia.
 - priority_capture es la idea urgente reservada para este hueco, o null. Si existe, desarrolla esa idea e incluye su id
   en ideas_used. Si no pasa los criterios de calidad, salta el día y explica por qué: urgencia nunca baja la calidad.
 - evidence enumera los apoyos: observed_post (ref = id de la señal), public_fact (ref = key), course_unit
