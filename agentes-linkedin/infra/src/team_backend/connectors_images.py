@@ -88,6 +88,15 @@ def thumbnail(raw,max_size=1024):
         out=io.BytesIO();image.save(out,format='PNG');return out.getvalue()
 
 
+def edit_size(raw):
+    """The provider output that keeps the photo's orientation: a vertical photo is never squashed into a square."""
+    with Image.open(io.BytesIO(raw)) as im:
+        width,height=ImageOps.exif_transpose(im).size
+    if height>width*1.1:return '1024x1536'
+    if width>height*1.1:return '1536x1024'
+    return '1024x1024'
+
+
 def block(raw):
     return {'type':'image','source':{'type':'base64','media_type':'image/png','data':base64.b64encode(thumbnail(raw)).decode()}}
 
@@ -131,13 +140,14 @@ class ImageConnector:
                 'recognizable real people. Requested edit: '+instruction)[:2000]
         files={'image':('photo.png',preview,'image/png')}
         previews=[preview]
-        data={'model':EDIT_MODEL,'prompt':prompt,'n':'1','size':'1024x1024','quality':'medium'}
+        data={'model':EDIT_MODEL,'prompt':prompt,'n':'1','size':'1024x1024' if references else edit_size(preview),'quality':'medium'}
         if references:
             # Gustavo's scoped edits override the stricter post correction prompt. Never render typography here.
             data.update(prompt=profile_prompt(instruction),output_format='png')
             if supports_transparency():data['background']='transparent'
             files=[('image[]',(role+'.png',thumbnail(value),'image/png')) for role,value in sorted(references.items())]
             previews=[value[1][1] for value in files]
+        data_size=data['size']
         amount,estimate=edit_reservation(previews,data['prompt'],data['size'],data['quality'])
         estimate['request']={k:data[k] for k in ('model','size','quality','output_format','background') if k in data}
         rid=providers.reserve('openai','profile-image-edit' if references else 'image-edit',
@@ -164,7 +174,7 @@ class ImageConnector:
             cost=(text*EDIT_PRICES['text']+image*EDIT_PRICES['image']+output*EDIT_PRICES['output'])/1_000_000
             edited=base64.b64decode(data['data'][0]['b64_json'],validate=True)
             with Image.open(io.BytesIO(edited)) as decoded:
-                if decoded.format!='PNG' or decoded.size!=(1024,1024):raise ValueError('Formato inesperado')
+                if decoded.format!='PNG' or decoded.size!=tuple(int(n) for n in data_size.split('x')):raise ValueError('Formato inesperado')
                 decoded.verify()
         except (KeyError,ValueError,TypeError,IndexError,OSError):
             if cost is not None:

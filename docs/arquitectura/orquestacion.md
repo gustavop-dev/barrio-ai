@@ -78,3 +78,7 @@ El log `f3b-ci-79.log` termina con **1 FAIL y 0 ERROR** (557 tests). El único t
 `team_backend/grafo.py` limita la excepción de profundidad por bucle a las aristas sin runtime. Las llamadas ejecutables del bucle deben salir del orquestador, igual que exige el dispatcher. Se conserva el test existente, las dos evaluaciones máximas, la excepción explícita de Jev y la validación de rutas sin bypass. No cambia el registro ni sus diagramas, los workflows, los contratos o las unidades.
 
 Revisión estática solamente, sin ejecutar pruebas, builds, gestores de paquetes ni usar la red, commit o push. Pendiente en CI: repetir `team_backend.tests.test_grafo` y la suite backend para confirmar el resultado.
+
+## Retoque por comentario (`retoque_pieza`)
+
+Un comentario de Gustavo sobre una pieza lista abre su propia instancia (`retoque_pieza`, clave = id de la captura) desde el trabajo `process_capture`, con límites propios (16 llamadas, 4 USD, 1200 s activos). No reabre ni consume los contadores del ciclo `pieza_diaria` de la pieza: solo la nueva versión de la propuesta pasa por su gate `publicacion` (`pieza_diaria_gate_0`, ahora hasta 8 revisiones del líder por pieza). La versión comentada se reemplaza antes de la primera llamada pagada; si el retoque falla, la pieza queda bloqueada y nunca sale la versión anterior. Ver [EDI-22](../funcionalidades/motor-editorial.md#edi-22).

@@ -109,7 +109,10 @@ class RulesBeforeVerifierTests(EditorialAuditBase):
              patch.object(guardas,'invented_experience',wraps=guardas.invented_experience) as invented:
             piece=self.plan_with(answers())
         self.assertEqual(piece.state,'ready')
-        self.assertEqual((leaks.call_count,invented.call_count),(1,1))  # no second pass after the verifier
+        on_text=lambda mock:sum(call.args[0]==piece.final_text for call in mock.call_args_list)
+        self.assertEqual((on_text(leaks),on_text(invented)),(1,1))  # no second pass after the verifier
+        # the visual package's live checks (alts, design data) are other texts, never the post again
+        self.assertGreater(leaks.call_count,1)
 
     def test_the_rules_are_the_policy_rules(self):
         """Same patterns and limits as autopiloto.post_issues: whatever the circuit flags, the policy flags too."""

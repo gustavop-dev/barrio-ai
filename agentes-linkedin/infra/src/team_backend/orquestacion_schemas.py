@@ -24,6 +24,8 @@ PANEL_INPUT = stage('lectores', ('brief', 'drafts'), brief=OBJECT, drafts=obj(('
 SELECTION_INPUT = stage('seleccion', ('brief', 'variants', 'panel'), brief=OBJECT, variants=OBJECT, panel=OBJECT)
 VERIFIER_INPUT = stage('verificador', ('text', 'brief', 'claims'), text=STRING, brief=OBJECT, claims=ARRAY)
 REPAIR_INPUT = stage('reparacion', ('text', 'brief', 'findings'), text=STRING, brief=OBJECT, findings=ARRAY)
+REWORK_INPUT = stage('retoque', ('comment', 'text', 'brief', 'image'), comment=STRING, text=STRING, brief=OBJECT,
+                     image=OBJECT, claims=ARRAY)
 NETWORK_INPUT = obj(('job', 'kind', 'params'), job=STRING, kind=STRING, params=OBJECT)
 READ_RESULT = {'type': 'object', 'properties': {
     'new_posts': INTEGER, 'seen_posts': INTEGER, 'new': INTEGER, 'classified': INTEGER, 'fit': INTEGER,
