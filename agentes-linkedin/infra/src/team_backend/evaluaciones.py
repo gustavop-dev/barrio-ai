@@ -363,7 +363,8 @@ class Run:
 
     def claude(self,agent,request,model):
         self.guard(worst_usd(request,model))
-        try:answer=providers.claude(purpose='eval-'+agent,model=model,**request)
+        # An evaluation measures this model: never let OpenAI answer in its place.
+        try:answer=providers.claude(purpose='eval-'+agent,model=model,fallback=False,**request)
         except ValueError as exc:
             if str(exc).startswith(presupuesto.STOPS) or 'Límite local' in str(exc):raise BudgetStop(str(exc)) from None
             raise

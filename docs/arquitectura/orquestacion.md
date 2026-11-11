@@ -82,3 +82,11 @@ Revisión estática solamente, sin ejecutar pruebas, builds, gestores de paquete
 ## Retoque por comentario (`retoque_pieza`)
 
 Un comentario de Gustavo sobre una pieza lista abre su propia instancia (`retoque_pieza`, clave = id de la captura) desde el trabajo `process_capture`, con límites propios (16 llamadas, 4 USD, 1200 s activos). No reabre ni consume los contadores del ciclo `pieza_diaria` de la pieza: solo la nueva versión de la propuesta pasa por su gate `publicacion` (`pieza_diaria_gate_0`, ahora hasta 8 revisiones del líder por pieza). La versión comentada se reemplaza antes de la primera llamada pagada; si el retoque falla, la pieza queda bloqueada y nunca sale la versión anterior. Ver [EDI-22](../funcionalidades/motor-editorial.md#edi-22).
+
+## Respaldo de OpenAI (ARQ-10)
+
+`providers.claude` sigue siendo la única entrada a los modelos de texto. Si Anthropic rechaza la llamada por cuenta o
+disponibilidad, `openai_text` la repite en la Responses API con el modelo del mismo nivel, en el mismo presupuesto y
+ledger. En el runtime, `provider_metadata` acepta `openai` para los propósitos que la arista declara para `anthropic`, y
+la fila rechazada de Claude (`usage.fallback`) no cuenta en `max_provider_calls`. El grafo no cambia: el respaldo es del
+proveedor, no un agente ni una arista nueva.

@@ -22,6 +22,7 @@ Se conservan las llamadas agrupadas A/B y lectores, los prompts y la reparación
 | [ARQ-07](#arq-07) | Diagramas Mermaid generados y comprobados en CI | documentación · backend | funciona |
 | [ARQ-08](#arq-08) | Mapa del equipo en PWA y app | PWA · app · backend | funciona |
 | [ARQ-09](#arq-09) | Añadir un agente con contrato y evaluación | documentación · backend | funciona |
+| [ARQ-10](#arq-10) | OpenAI responde cuando Claude no puede | backend | funciona |
 
 ## Lo que existe y la migración inicial <a id="migracion"></a>
 
@@ -293,3 +294,14 @@ Ninguna.
 - Oficina: solicitudes y respuestas auténticas; el mapa lee contadores, gasto y motivos del ledger, filtrados por dueño. No entrega payloads, fuentes privadas ni resultados completos.
 
 Claude debe ejecutar migraciones/checks y todas las regresiones con fakes, regenerar Mermaid en CI y comparar, y comprobar recuperación entre checkpoints, reservas concurrentes, ausencia de publicaciones duplicadas y veto/hash/BAR-15. Selección: **`[qa: 03 04 06 07 09 11 16 17-mapa-equipo]`**. Ver también [la entrega técnica](../arquitectura/orquestacion.md).
+
+### ARQ-10 · OpenAI responde cuando Claude no puede <a id="arq-10"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** si la cuenta de Anthropic se queda sin crédito, la clave vence o el servicio está caído o saturado, el equipo sigue trabajando: la misma llamada la responde OpenAI y las piezas no se bloquean por eso. Claude sigue siendo el proveedor principal y vuelve a responder en cuanto puede.
+- **Cuándo cambia:** solo cuando Anthropic rechaza la llamada antes de generar: cuenta (HTTP 401, 402, 403 o un 400 de crédito/facturación) o disponibilidad (404, 429, 5xx, 529, sin conexión). Un error de la propia solicitud (otro 400, 413, 422) se informa como antes y no se tapa con el respaldo.
+- **Modelo:** el del mismo nivel: Opus 5.5 → `gpt-5.5`, Sonnet → `gpt-5.4`, Haiku 5.5 → `gpt-5.4-mini`, con tarifas verificadas (estándar, contexto corto, 10/11/2026) y el razonamiento un paso por debajo del esfuerzo de Claude para caber en los 120 s por llamada. El esquema de salida va estricto: las propiedades opcionales viajan como nulables y se quitan de la respuesta.
+- **Gasto:** el mismo presupuesto general (`knowledge/presupuesto.py`) y el mismo ledger: reserva del peor caso antes de llamar, liquidación con el uso real, sin reintento automático. La fila de OpenAI lleva `fallback_from` y `fallback_reason`; la fila rechazada de Claude lleva `fallback` y no cuenta como llamada del ciclo. Dentro de un ciclo, un propósito declarado para `anthropic` en una arista vale también para `openai`.
+- **Sin respaldo:** la investigación web (sus citas son nativas de Claude; si falla, la investigación queda «no disponible» y la pieza sigue), las evaluaciones de modelos (`fallback=False`: miden el modelo que nombran) y cualquier entorno sin `OPENAI_API_KEY`. `LLM_FALLBACK=off` lo desactiva.
+- **Código:** `knowledge/providers.py` (`claude`, `fallback_reason`, `openai_text`, `openai_schema`, `strip_nulls`), `orquestacion.provider_metadata`, `evaluaciones.Run.claude`. Pruebas: `tests/test_respaldo_openai.py`.
