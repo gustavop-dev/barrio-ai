@@ -37,8 +37,8 @@ team_backend = ["migrations/*.sql", "recursos/*.md", "recursos/*.html", "recurso
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 
-# CI: `coverage run manage.py test team_backend.tests`, then `coverage report` and `coverage xml`.
-# Report-only (no fail_under). Every module under src/ counts, imported by the tests or not.
+# CI reads .coveragerc, which wins over this table: `coverage run manage.py test team_backend.tests --parallel auto`,
+# then `coverage combine`, `coverage report` and `coverage xml`. Report-only (no fail_under).
 [tool.coverage.run]
 branch = true
 source = ["src"]

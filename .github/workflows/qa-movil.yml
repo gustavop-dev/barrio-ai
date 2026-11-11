@@ -4,7 +4,8 @@ name: QA móvil
 # (LIVE_LINKEDIN=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
 # EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 (the runner, as the emulator sees it). See movil/.maestro/README.md.
 #
-# Jobs: plan (paths or explicit selection, split in up to 8 emulators) → apk (native shell by fingerprint + current JS)
+# Jobs: plan (paths or explicit selection, split in up to 10 emulators by the seconds each flow took on main)
+# → apk (native shell by fingerprint + current JS)
 # → flujos (one emulator + backend per shard, in parallel) → qa (one report, catalog coverage,
 # visual regression against main, the PR comment and the verdict).
 # `qa` runs on every PR, so it can be a required check: known documentation-only PRs get a green `qa` in seconds.
@@ -42,6 +43,7 @@ jobs:
     permissions:
       contents: read
       pull-requests: read
+      actions: read  # the measured durations: an artifact of an earlier run on main
     outputs:
       ejecutar: ${{ steps.plan.outputs.ejecutar }}
       matriz: ${{ steps.plan.outputs.matriz }}
@@ -54,8 +56,19 @@ jobs:
           QA_SELECCION: ${{ inputs.flujos }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
           PR: ${{ github.event.pull_request.number }}
-          QA_MAX_SHARDS: '8'
+          QA_MAX_SHARDS: '10'
         run: |
+          # The seconds each flow took on the latest main run that kept them (artifact qa-duraciones), to balance the
+          # emulators; without it, plan.py uses scripts/qa/duraciones.json. Never blocks the plan.
+          mkdir -p "$RUNNER_TEMP/duraciones"
+          for id in $(timeout 60 gh run list -R "$GITHUB_REPOSITORY" --workflow qa-movil.yml --branch main --limit 10 \
+                        --json databaseId,status --jq '.[] | select(.status == "completed") | .databaseId' 2> /dev/null); do
+            if timeout 60 gh run download "$id" -R "$GITHUB_REPOSITORY" -n qa-duraciones -D "$RUNNER_TEMP/duraciones" 2> /dev/null; then
+              export QA_DURACIONES="$RUNNER_TEMP/duraciones/duraciones.json"
+              echo "duraciones: $(python3 -c 'import json,sys; print(json.load(open(sys.argv[1])).get("origen", "?"))' "$QA_DURACIONES" 2> /dev/null)"
+              break
+            fi
+          done
           if [ -n "$PR" ]; then
             # Keep JSON (including previous_filename on renames), and consume every page.
             # A failed/truncated request must select all flows, never silently skip QA.
@@ -194,7 +207,8 @@ jobs:
     if: needs.plan.outputs.ejecutar == 'true'
     runs-on: ubuntu-24.04
     # Setup takes about 5 minutes and each flow is cut at QA_FLOW_TIMEOUT (8 minutes): a hang can't hold the run.
-    timeout-minutes: 35
+    # A failed flow runs once more while the job is under 20 minutes of flows (scripts/qa/correr-maestro.sh).
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matriz) }}
@@ -508,6 +522,19 @@ jobs:
         with:
           name: qa-movil-referencias
           path: nuevas-referencias
+          retention-days: 90
+      # On main, the seconds each passing flow took (over the committed ones) balance the next runs' emulators.
+      - name: Measured durations (main)
+        if: needs.plan.outputs.ejecutar == 'true' && github.ref == 'refs/heads/main'
+        run: |
+          QA_DURACIONES_ORIGEN="main $(git rev-parse --short HEAD), ejecución $GITHUB_RUN_ID" \
+            python3 scripts/qa/duraciones.py actualizar "$QA_OUT" duraciones/duraciones.json
+      - if: needs.plan.outputs.ejecutar == 'true' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        continue-on-error: true
+        with:
+          name: qa-duraciones
+          path: duraciones
           retention-days: 90
       - name: Comment on the PR
         if: needs.plan.outputs.ejecutar == 'true' && github.event_name == 'pull_request'

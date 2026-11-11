@@ -9,8 +9,10 @@ Selection, first match wins:
 Tokens are separated by spaces or commas; a token selects the flows whose name equals it, starts with it or contains it
 (`05`, `05-captura`, `captura`). `todo` or `todos` selects everything.
 
-The selected flows are split into at most QA_MAX_SHARDS jobs, longest first onto the lightest job (by the flow's number
-of lines, a fair proxy of its duration). Inside a job the flows keep their numeric order.
+The selected flows are split into at most QA_MAX_SHARDS jobs, longest first onto the lightest job, by the seconds each
+flow took on main (QA_DURACIONES, the artifact qa-duraciones; scripts/qa/duraciones.json otherwise) plus the seeding
+between flows. A flow without a measure is estimated from its number of lines. Inside a job the flows keep their
+numeric order.
 Writes `ejecutar`, `matriz` (the JSON matrix) and `resumen` to $GITHUB_OUTPUT, or prints them.
 """
 import json
@@ -21,6 +23,7 @@ from pathlib import Path
 from fnmatch import fnmatchcase
 
 from cobertura import flow_covers
+from duraciones import load as load_durations
 
 FLOWS = Path(__file__).resolve().parents[2] / 'movil' / '.maestro'
 TAG = re.compile(r'\[qa:\s*([^\]]*)\]', re.I)
@@ -98,8 +101,20 @@ def automatic(names, changes_file):
         return names, 'todos: no se pudo leer la selección automática'
 
 
-def shards(chosen, limit):
-    weight = {n: len((FLOWS / f'{n}.yaml').read_text().splitlines()) for n in chosen}
+# Between two flows: seed_qa, the failure switch, the screen recording and Maestro's start (seconds).
+OVERHEAD_S = 20
+
+
+def weights(chosen, durations):
+    """Expected seconds of each flow: measured, or its lines at the measured seconds per line."""
+    lines = {n: len((FLOWS / f'{n}.yaml').read_text().splitlines()) for n in available()}
+    known = [n for n in lines if n in durations]
+    rate = sum(durations[n] for n in known) / max(1, sum(lines[n] for n in known)) if known else 1.0
+    return {n: durations.get(n, round(lines.get(n, 1) * rate)) + OVERHEAD_S for n in chosen}
+
+
+def shards(chosen, limit, durations=None):
+    weight = weights(chosen, durations or {})
     count = max(1, min(limit, len(chosen)))
     bins = [[] for _ in range(count)]
     load = [0] * count
@@ -124,7 +139,8 @@ def main():
         chosen, why = automatic(names, os.environ['QA_CHANGED_FILES'])
     else:
         chosen, why = names, 'todos los flujos'
-    jobs = shards(chosen, int(os.environ.get('QA_MAX_SHARDS', '8'))) if chosen else []
+    durations = load_durations(os.environ.get('QA_DURACIONES'))
+    jobs = shards(chosen, int(os.environ.get('QA_MAX_SHARDS', '10')), durations) if chosen else []
     # Skipped jobs still need a valid matrix expression.
     matrix = {'include': jobs or [{'shard': 1, 'flujos': ''}]}
     summary = ' '.join(f'{len(chosen)} flujos en {len(jobs)} emuladores: {why}'.splitlines())
@@ -133,8 +149,11 @@ def main():
         with open(out, 'a') as fh:
             fh.write(f'ejecutar={str(bool(chosen)).lower()}\nmatriz={json.dumps(matrix)}\nresumen={summary}\n')
     print(summary)
+    expected = weights(chosen, durations)
+    print(f"  reparto por duración medida: {sum(1 for n in chosen if n in durations)} de {len(chosen)} flujos con medida")
     for job in jobs:
-        print(f"  emulador {job['shard']}: {job['flujos']}")
+        seconds = sum(expected[n] for n in job['flujos'].split())
+        print(f"  emulador {job['shard']} (~{seconds // 60} min {seconds % 60:02d} s): {job['flujos']}")
 
 
 if __name__ == '__main__':
