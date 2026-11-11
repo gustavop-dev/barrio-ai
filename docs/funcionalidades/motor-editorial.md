@@ -180,10 +180,11 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   2. **Dado** CONT-09 en `approval`, **cuando** corre el autopiloto, **entonces** la propuesta se queda en `proposed` esperando a Gustavo.
   3. **Dado** una propuesta que incumple una regla, **cuando** corre el autopiloto, **entonces** pasa a `discarded` con «Descartada por política autonomia-v1», las ideas usadas vuelven a la mesa y se guarda la Notificación `piece_discarded` «La política no aprobó la pieza del DD/MM» (sin push por defecto).
   4. **Dado** `LEAD_ENABLED=true` y que Jev responde `clara` < 0,6, **cuando** se revisa, **entonces** se descarta con «Descartada por el líder (…)».
+  4b. **Dado** una pieza que salió de lo que pidió Gustavo (usa sus ideas o él la comentó), **cuando** Jev la revisa, **entonces** recibe sus propias palabras en `pedido_de_gustavo` (lo que él contó no cuenta como inventado) y la juzga mucho más suave (`lider.GUSTAVO_THRESHOLDS`: `clara` ≥ 0,3, `pitch` ≤ 0,6, `inventa` ≤ 0,6, `idioma` ≥ 0,5, `orientacion` ≥ 0,2): solo la frena si está bastante seguro de que falla. El veredicto guarda `from_gustavo`. Las reglas deterministas no cambian.
   5. **Dado** que Jev no responde, **cuando** se revisa, **entonces** la propuesta queda en `proposed` y se reintenta tras `LEAD_RETRY_MINUTES`; nunca se aprueba sin juicio.
   6. **Dado** que el `payload_hash` no coincide con el contenido, **cuando** se revisa, **entonces** se descarta con «Hash inconsistente; descartada».
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** criterio 4b en `tests/test_retoque.py` (`SoftLeadTests`); el resto pendiente.
 
 ### EDI-11 · Publicar a la hora programada <a id="edi-11"></a>
 
@@ -371,15 +372,17 @@ El flujo de imagen está implementado en el backend; la interfaz queda para fase
 - **Código:** `retoque.py` (`run`, desde `capturas.process` tras `_route_piece`); etapa `retoque` en `editorial.STAGES` (`REWORK_SCHEMA`, `RETOUCH_SYSTEM`); `imagenes.edit_photo` y `imagenes.design(findings, previous)`; `editor_visual.bind`.
 - **Criterios de aceptación:**
   1. **Dado** un comentario sobre una pieza `ready` con su publicación propuesta o aprobada y sin ejecutar, **cuando** se procesa, **entonces** esa propuesta pasa a `superseded` antes de pagar nada; si ya se estaba ejecutando, el comentario solo se anota.
+  1b. **Dado** una pieza `ready` cuya última versión descartó el líder (o la política), **cuando** llega su comentario, **entonces** también se rehace: esa versión sigue `discarded`, el retoque la reclama (`review.reworked_by`, una sola vez aunque lleguen dos comentarios) y antes de pagar recupera la foto y las ideas que el descarte devolvió a la Galería y a la mesa; si otra pieza ya eligió esa foto, se aplaza. Los motivos del descarte no pasan a la nueva versión: Jev la juzga de nuevo.
   2. **Dado** el comentario, **cuando** decide el director, **entonces** elige `nada` (una opinión), `texto`, `imagen` o `ambos`; ante la duda entre no cambiar y cambiar, cambia.
   3. **Dado** un cambio de texto, **cuando** se aplica, **entonces** el texto nuevo pasa las reglas deterministas y el verificador (con una ronda de reparación); si sigue bloqueado, la pieza no sale.
   4. **Dado** un comentario sobre la foto, **cuando** se aplica, **entonces** se edita desde el original con la instrucción del comentario, conservando su orientación (vertical 1080×1350), con la misma revisión visual y hasta dos intentos; si ninguna pasa, el director ya decidió si el post se sostiene con una infografía o se aplaza.
+  4b. **Dado** una foto ya editada por un comentario anterior, **cuando** llega otro comentario sobre ella, **entonces** el director ve la instrucción aplicada (`image.images[].edit_instruction`, guardada en la revisión de la imagen) y la repite junto al cambio nuevo, porque la edición parte otra vez del original; solo la quita si él lo pide.
   5. **Dado** el paquete rehecho, **cuando** se liga, **entonces** las guardas pasan con los hechos actuales y se crea una nueva versión de la propuesta (`previous` = la comentada) que revisa Jev; nada aquí aprueba ni publica.
   6. **Dado** la hora prevista, **cuando** queda al menos el plazo de veto (`EDITORIAL_VETO_MINUTES`) y está dentro del horario, **entonces** conserva la hora; si no, pasa al siguiente hueco libre y sus ideas se mueven con ella. Una opinión sin cambios conserva cualquier hora futura.
   7. **Dado** que no se puede aplicar (texto bloqueado, edición sin aprobar y «aplazar», sin hueco o un ciclo detenido), **cuando** termina, **entonces** la pieza queda `blocked`, sus ideas y fotos vuelven a la mesa y a la Galería y le llega un aviso; la versión comentada nunca sale.
   8. **Dado** que no quedan revisiones del líder en el ciclo de la pieza o no queda presupuesto de IA (`EDITORIAL_REWORK_MIN_USD`, 1 USD), **cuando** llega el comentario, **entonces** no se retiene la pieza: queda anotado y se le avisa que puede vetarla.
   9. **Dado** cada comentario, **cuando** termina, **entonces** «Lo que enviaste» dice qué cambió y cuándo sale, o por qué se aplazó, y el comentario sigue en «Tus comentarios para el equipo» y en el brief de las próximas piezas ([EDI-17](#edi-17)).
-- **Cobertura QA:** `tests/test_retoque.py` (foto vertical editada a la misma hora, texto verificado y movido por el plazo de veto, opinión sin cambios, edición fallida que aplaza, infografía de reserva, pieza ya publicada, sin revisiones del líder, flujo completo desde la captura) y regresiones de `test_imagenes`, `test_editor_visual`, `test_capturas` y `test_grafo`.
+- **Cobertura QA:** `tests/test_retoque.py` (foto vertical editada a la misma hora, texto verificado y movido por el plazo de veto, opinión sin cambios, edición fallida que aplaza, infografía de reserva, pieza ya publicada, sin revisiones del líder, flujo completo desde la captura, versión descartada por el líder que se rehace y recupera foto e idea, un solo retoque por descarte, foto tomada por otra pieza, edición anterior visible para el siguiente comentario) y regresiones de `test_imagenes`, `test_editor_visual`, `test_capturas` y `test_grafo`.
 
 ## Retiradas
 
