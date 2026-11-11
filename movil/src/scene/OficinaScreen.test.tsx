@@ -87,7 +87,8 @@ it('opens an agent sheet from a scene tap, switches to its team and closes', asy
   expect(within(panel).getByText('Es un servicio de software, no un agente de IA. Solo ejecuta lo que el equipo ya decidió.')).toBeOnTheScreen();
   await fireEvent.press(within(panel).getByText('Ver su equipo · Operación'));
   expect(within(screen.getByTestId('office-panel')).getByText('ESPACIO DEL EQUIPO')).toBeOnTheScreen();
-  await fireEvent.press(screen.getByRole('button', { name: 'Cerrar' }));
+  expect(screen.queryByRole('button', { name: 'Cerrar' })).toBeNull();
+  await fireEvent(within(screen.getByTestId('office-panel')).getByLabelText('Altura del panel'), 'accessibilityAction', { nativeEvent: { actionName: 'dismiss' } });
   await waitFor(() => expect(screen.queryByTestId('office-panel')).toBeNull());
 });
 

@@ -582,8 +582,11 @@ class Calendar(APIView):
             if day in days:days[day]['events'].append(dict({'id':f'{kind}:{extra.get("ref",title)}:{day}','layer':layer,'kind':kind,'at':at,
                                                             'title':title,'state':state,'important':important,'link':link},**extra))
         # Publicaciones
+        rows={}
         for piece in EditorialPiece.objects.filter(slot_date__gte=start,slot_date__lte=end).order_by('created_at'):
-            card=_piece_card(piece);status=card['status']
+            card=_piece_card(piece);rows.setdefault(piece.slot_date,[]).append((piece,card['status'],(piece,card)))
+        for piece,card in [shown for day_rows in rows.values() for shown in editorial.calendar_rows(day_rows,today)]:
+            status=card['status']
             kind={'published':'piece_published','scheduled':'piece_scheduled','preparing':'piece_preparing','skipped':'piece_skipped',
                   'blocked':'piece_blocked','failed':'piece_failed','uncertain':'piece_uncertain','vetoed':'piece_vetoed',
                   'discarded':'piece_discarded','publishing':'piece_publishing','awaiting_approval':'piece_awaiting_approval'}.get(status,f'piece_{status}')

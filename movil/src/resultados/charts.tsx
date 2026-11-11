@@ -25,7 +25,7 @@ import { Children, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import Svg, { Defs, Line, Path, Pattern, Polyline, Rect } from 'react-native-svg';
 import { Icon } from '@/components/icons';
-import { Button, Sheet, T } from '@/components/ui';
+import { Sheet, T } from '@/components/ui';
 import { colors, radius, space } from '@/theme/tokens';
 import { CountUp, GrowBar } from './CountUp';
 
@@ -50,9 +50,6 @@ export function InfoButton({ label, definition, formula }: { label: string; defi
             <T key={line}>{line}</T>
           ))}
           {formula ? <T soft>Fórmula: {formula}</T> : null}
-          <Button block onPress={() => setOpen(false)}>
-            Cerrar
-          </Button>
         </Sheet>
       ) : null}
     </>

@@ -423,6 +423,18 @@ def status(piece,action=None):
     if piece.state!=EditorialPiece.State.READY or action is None:return piece.state
     return ACTION_STATUS.get(action.state,action.state)
 
+# The day's post is still on its way or went out (superseded: a comment of Gustavo is being applied to it).
+LIVE_STATUSES=('preparing','ready','awaiting_approval','scheduled','publishing','published','uncertain','superseded')
+
+def calendar_rows(rows,today):
+    """What the calendar shows of one day's pieces, given oldest first as (piece, status, item): its live piece; without
+    one, only its latest attempt; and nothing for a coming day whose attempts only stopped for the daily budget (the
+    autopilot prepares it again the day before). Older attempts are not the day's post: they stay in their own detail."""
+    live=[item for _,state,item in rows if state in LIVE_STATUSES]
+    if live:return live
+    rest=[item for piece,_,item in rows if not (piece.slot_date>=today and budget_stopped(piece))]
+    return rest[-1:]
+
 def plan(user,request_id=None,audit_request_id=''):
     """POST /editorial/plan: queue the preparation of the next free slot."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')

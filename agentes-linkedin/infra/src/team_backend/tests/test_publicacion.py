@@ -510,3 +510,34 @@ class CommentVoiceTests(PublicationBase):
         self.assertEqual(proposal.state,'discarded')
         self.assertTrue(any('sin hechos públicos confirmados' in r for r in proposal.risks),proposal.risks)
         self.assertEqual(self.fake.state['writes'],0)
+
+
+class CalendarAttemptsTests(EditorialBase):
+    """10/11: days that already had their post ready also showed older blocked attempts («Bloqueada por el verificador»)."""
+
+    def piece(self, day, state, note=''):
+        from team_backend.models import EditorialPiece
+        return EditorialPiece.objects.create(account=self.official, slot_date=day, scheduled_for=editorial.scheduled_for(day),
+                                             state=state, note=note)
+
+    def test_a_day_shows_its_post_not_its_older_attempts_and_a_budget_stop_is_left_to_the_autopilot(self):
+        from team_backend import operador
+        today = timezone.now().astimezone(operador.local_tz()).date()
+        ready_day, blocked_day, budget_day, past = (today + timedelta(days=n) for n in (1, 2, 3, -2))
+        self.piece(ready_day, 'blocked', 'El verificador emitió blocked; Hallazgo material')
+        self.piece(ready_day, 'blocked', 'Ciclo detenido: cost_cap')
+        ready = self.piece(ready_day, 'ready')
+        self.piece(blocked_day, 'blocked', 'El verificador emitió blocked; primer intento')
+        last = self.piece(blocked_day, 'failed', 'Error del proveedor')
+        self.piece(budget_day, 'blocked', 'Ciclo detenido: cost_cap')
+        stopped = self.piece(past, 'blocked', 'Ciclo detenido: cost_cap')
+        calendar = self.human.get('/api/v1/editorial/calendar', {'desde': str(past), 'dias': 7}).json()
+        shown = {d['date']: [p['id'] for p in d['pieces']] for d in calendar['days']}
+        self.assertEqual((shown[str(ready_day)], shown[str(blocked_day)], shown[str(budget_day)], shown[str(past)]),
+                         ([str(ready.id)], [str(last.id)], [], [str(stopped.id)]))
+        body = self.human.get(f'/api/v1/calendario?desde={past}&hasta={budget_day}').json()
+        events = {d['date']: [e['ref'] for e in d['events'] if e['layer'] == 'publicaciones'] for d in body['days']}
+        self.assertEqual((events[str(ready_day)], events[str(blocked_day)], events[str(budget_day)], events[str(past)]),
+                         ([str(ready.id)], [str(last.id)], [], [str(stopped.id)]))
+        # The older attempts still open from their own link.
+        self.assertEqual(self.human.get(f'/api/v1/editorial/pieces/{stopped.id}').status_code, 200)
