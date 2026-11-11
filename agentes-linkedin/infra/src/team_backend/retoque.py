@@ -319,7 +319,7 @@ def _edit_photos(piece, instruction, client, public, capture):
         for n in range(1, PHOTO_ATTEMPTS + 1):
             try:
                 candidate, review, size = imagenes.edit_photo(piece, row.source_photo, raw, instruction, client, public,
-                                                              suffix=f':retoque:{capture.id}:{n}')
+                                                              suffix=f':retoque:{capture.id}:{n}', from_gustavo=True)
             except (ValueError, OSError) as exc:
                 attempts.append(_clip(str(exc), 200))
                 continue

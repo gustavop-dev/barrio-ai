@@ -250,6 +250,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   5. **Dado** un veredicto favorable, **cuando** se guarda, **entonces** va ligado al SHA-256 de la imagen exacta; si la imagen cambia después, deja de valer.
   6. **Dado** que la comprobación falla por un error del proveedor, **cuando** termina, **entonces** se publica el original (nunca una edición sin comprobar).
   7. **Dado** una foto sin editar, **cuando** se prepara la pieza, **entonces** no hace falta esta comprobación.
+  8. **Dado** una edición que pidió Gustavo (su nota en la foto o su comentario en la pieza), **cuando** se comprueba, **entonces** la revisión es tolerante: solo la rechaza si el cambio pedido no se ve, una persona deja de parecer la misma o sale deformada, aparecen texto, cifras, logos o marcas nuevos, o se ven caras o nombres de otras personas que pidió ocultar. Objetos añadidos o quitados, detalles del portátil o de las pantallas redibujados, luz o encuadre no la hacen fallar; quedan anotados en los motivos. Las ediciones que decide el equipo (criterios 2 y 3) siguen con la revisión estricta.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
 - **Cobertura QA:**
 

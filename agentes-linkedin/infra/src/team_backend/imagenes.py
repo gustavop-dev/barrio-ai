@@ -82,21 +82,28 @@ def fit(raw,width,height):
     return out.getvalue()
 
 
-def edit_photo(piece,photo,raw,instruction,client,public,suffix=''):
-    """One edit plus the visual check of its final bytes: (bytes, review, (width, height)). Raises ValueError/OSError."""
+def edit_photo(piece,photo,raw,instruction,client,public,suffix='',from_gustavo=False):
+    """One edit plus the visual check of its final bytes: (bytes, review, (width, height)). Raises ValueError/OSError.
+    `from_gustavo`: he asked for this edit (his note on the photo or his comment), so the check only stops a serious
+    problem (IMG-10); a team edit keeps the strict check."""
     with Image.open(io.BytesIO(raw)) as decoded:size=post_size(*ImageOps.exif_transpose(decoded).size)
     # Verification binds these final bytes, after fitting them to the LinkedIn size of the photo's orientation.
     candidate=fit(_edit_call(piece,photo,raw,instruction,client,suffix),*size)
     review=_check_call(piece,[candidate],{'post':piece.final_text,'public_facts':public},client,original=raw,
-                       instruction=instruction,key=f'check:{photo.id}{suffix}')
+                       instruction=instruction,key=f'check:{photo.id}{suffix}',from_gustavo=from_gustavo)
     return candidate,review,size
 
 
-def _check_call(piece,images,context,client,original=None,instruction='',key=None):
+def _check_call(piece,images,context,client,original=None,instruction='',key=None,from_gustavo=False):
     request={'piece':str(piece.id),'sha256':[sha(raw) for raw in images],
         'context':orquestacion.plain(context),'original':sha(original) if original else '', 'instruction':instruction}
-    return orquestacion.call('revisar_imagen',request,
-        lambda:client.check(images,context,original=original,instruction=instruction),key=key)
+    if not from_gustavo:
+        return orquestacion.call('revisar_imagen',request,
+            lambda:client.check(images,context,original=original,instruction=instruction),key=key)
+    request['from_gustavo']=True  # only then: the requests of team edits keep their earlier shape
+    review=orquestacion.call('revisar_imagen',request,
+        lambda:client.check(images,context,original=original,instruction=instruction,from_gustavo=True),key=key)
+    return dict(review,from_gustavo=True)
 
 
 def can_edit(client):
@@ -119,7 +126,8 @@ def _photo(piece,photo,choice,index,client,public,private):
     if instruction:
         if can_edit(client):
             try:
-                candidate,review,size=edit_photo(piece,photo,raw,instruction,client,public)
+                candidate,review,size=edit_photo(piece,photo,raw,instruction,client,public,
+                                                 from_gustavo=reason.startswith('Instrucción de Gustavo'))
                 if review['ok'] and review.get('sha256')==[sha(candidate)]:
                     output=candidate;edited=True;mime='image/png';width,height=size
                 else:reason+='; edición descartada: '+'; '.join(review.get('reasons') or ['comprobación desfavorable'])

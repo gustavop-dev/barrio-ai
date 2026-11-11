@@ -34,7 +34,8 @@ READ_RESULT = {'type': 'object', 'properties': {
 IMAGE_INPUT = obj(('piece', 'payload'), piece=STRING, payload=OBJECT)
 EDIT_INPUT = obj(('piece', 'photo', 'sha256', 'instruction'), piece=STRING, photo=STRING, sha256=STRING, instruction=STRING)
 CHECK_INPUT = obj(('piece', 'sha256', 'context', 'instruction', 'original'), piece=STRING,
-    sha256={'type': 'array', 'items': STRING}, context=OBJECT, instruction=STRING, original=STRING)
+    sha256={'type': 'array', 'items': STRING}, context=OBJECT, instruction=STRING, original=STRING,
+    from_gustavo={'type': 'boolean'})  # optional: an edit he asked for gets the tolerant check (IMG-10)
 # ImageConnector.check adds hashes and rule metadata after validating the provider's CHECK_SCHEMA.
 CHECK_RESULT = {'type': 'object', 'required': ['ok', 'sha256'], 'properties': {
     'ok': {'type': 'boolean'}, 'sha256': {'type': 'array', 'items': STRING}, 'reasons': ARRAY}}
