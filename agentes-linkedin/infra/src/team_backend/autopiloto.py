@@ -290,8 +290,9 @@ def tick(user,now=None):
 def _editorial(user,now):
     """CONT-07: queue the preparation of the next slot (EDITORIAL_POST_TIME, EDITORIAL_LEAD_HOURS ahead), one at a time,
     within the editorial daily budget and the CONT-09 caps. Each slot gets one automatic attempt at most."""
-    from . import editorial
+    from . import editorial, editor_visual
     editorial.recover_stuck()
+    editor_visual.upgrade_bindings()  # a still valid v1 visual package stops depending on his confirmed facts
     if autonomy('CONT-09')=='off' or _pending('prepare_piece'):return 0
     account=editorial.publishing_account()
     if not editorial.can_publish(account):return 0

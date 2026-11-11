@@ -2,9 +2,9 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.5-presupuesto-general` · SHA-256 `83627daff31e25e1ef3e7370cfe6a70f7cf6dcc62c01d3bbfb78d188394b504a`.
+Versión `6.6-retoque-por-comentario` · SHA-256 `5fb1da002cde07ba6ad0343ba49fee9bfae6cdb2a37c45e2f9d56a304de0a562`.
 
-46 nodos (46 activos), 71 aristas y 14 ciclos.
+46 nodos (46 activos), 72 aristas y 15 ciclos.
 
 Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes, comunidad mensual y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. Las variantes A/B de redacción comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
@@ -76,6 +76,7 @@ flowchart TD
   director_editorial -->|"redactar_b · workflow_step · ≤1 · agrupada redactor"| copywriter_b
   director_editorial -->|"seleccionar · workflow_step · ≤1"| seleccion_editorial
   director_editorial -->|"reparar · workflow_step · ≤1"| reparacion_editorial
+  director_editorial -->|"retocar · workflow_step · ≤1"| reparacion_editorial
   director_editorial -->|"verificar · workflow_step · ≤2"| editor_verificador
   director_editorial -->|"investigar_pieza · workflow_step · ≤1"| investigacion_web
   director_editorial -->|"disenar · workflow_step · ≤2"| editor_visual
@@ -100,7 +101,7 @@ flowchart TD
   capturas -->|"entender · workflow_step · ≤1"| intencion_captura
   capturas -->|"transcribir · workflow_step · ≤1"| transcripcion
   capturas -->|"investigar_captura · workflow_step · ≤1"| investigacion_web
-  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤5"| lider_jev
+  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤8"| lider_jev
   lider_jev -->|"pieza_diaria_gate_1 · gate · ≤1"| gustavo
   gustavo -->|"pieza_diaria_gate_2 · gate · ≤1"| operador_cuenta
   relaciones_comunidad -->|"politica_red · gate · ≤5"| lider_jev
@@ -194,7 +195,7 @@ flowchart TD
   director_editorial -->|"leer_lector_lider · workflow_step · ≤1 · agrupada lectores"| lector_lider
   director_editorial -->|"leer_lector_par · workflow_step · ≤1 · agrupada lectores"| lector_par
   director_editorial -->|"proponer_visual · call · ≤1"| editor_visual
-  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤5"| lider_jev
+  editor_verificador -->|"pieza_diaria_gate_0 · gate · ≤8"| lider_jev
   lider_jev -->|"pieza_diaria_gate_1 · gate · ≤1"| gustavo
   gustavo -->|"pieza_diaria_gate_2 · gate · ≤1"| operador_cuenta
   director_editorial -->|"entregar_visual · call · ≤1"| editor_visual
@@ -209,6 +210,34 @@ Gate `publicacion` (CONT-09): editor_verificador → lider_jev → gustavo → o
 - Jev si lider.applies; auto/manual conservan las reglas actuales.
 - Gustavo puede vetar o pausar; no hay espera de aprobación por post.
 - Operador valida hash aprobado, estado y cuotas justo antes de escribir.
+
+## Retoque por comentario
+
+Estado: `active`. Orquestador: `director_editorial`.
+
+- `process_capture`: Un comentario de Gustavo sobre una pieza lista que aún no salió, en el mismo trabajo que lo enruta.
+
+```mermaid
+flowchart TD
+  classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
+  subgraph grupo_editorial["editorial"]
+    director_editorial["Director editorial · orchestrator"]
+    reparacion_editorial["Reparación editorial · specialist"]
+    editor_verificador["Verificador editorial · gate"]
+    revision_visual["Revisión de imagen · gate"]
+    editor_visual["Editor visual · specialist"]
+  end
+  director_editorial -->|"reparar · workflow_step · ≤1"| reparacion_editorial
+  director_editorial -->|"retocar · workflow_step · ≤1"| reparacion_editorial
+  director_editorial -->|"verificar · workflow_step · ≤2"| editor_verificador
+  director_editorial -->|"disenar · workflow_step · ≤2"| editor_visual
+  director_editorial -->|"editar_foto · workflow_step · ≤8"| editor_visual
+  director_editorial -->|"revisar_imagen · workflow_step · ≤8"| revision_visual
+```
+
+Bucle `retoque_texto` (active, máximo 2 rondas): El director aplica el comentario; el texto nuevo pasa reglas y verificador, con una reparación como en la pieza diaria.
+
+Bucle `retoque_imagen` (active, máximo 2 rondas): La foto se edita desde el original con la instrucción del comentario (dos intentos con la misma revisión visual); si no pasa, infografía o aplazar según decidió el director.
 
 ## Red y comentarios
 
@@ -645,6 +674,8 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `profile_assets_review` | `json_schema` | [team_backend.perfil_assets.REVIEW_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_assets.py) |
 | `profile_explanation_request` | `json_schema` | [team_backend.perfil_assets.REPAIR_REQUEST](../../agentes-linkedin/infra/src/team_backend/perfil_assets.py) |
 | `profile_explanation` | `json_schema` | [team_backend.perfil_assets.REPAIR_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_assets.py) |
+| `rework_input` | `json_schema` | [team_backend.orquestacion_schemas.REWORK_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `rework` | `json_schema` | [team_backend.editorial.REWORK_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editorial.py) |
 
 ## Aristas y contratos
 
@@ -655,6 +686,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `redactar_b` | `writer_input` | `variants` |
 | `seleccionar` | `selection_input` | `selection` |
 | `reparar` | `repair_input` | `repair` |
+| `retocar` | `rework_input` | `rework` |
 | `verificar` | `verifier_input` | `verification` |
 | `investigar_pieza` | `research_request` | `research_result` |
 | `disenar` | `image_input` | `image_design` |

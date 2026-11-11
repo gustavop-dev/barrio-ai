@@ -60,6 +60,76 @@ def context_hash(piece, public, private, photos):
         'research': piece.research, 'sources': piece.signals, 'photos': source_context(photos), 'rule': infografias.version()})
 
 
+def content_hash(piece, photos):
+    """Binding v2: what the package was made from (text, research, sources, photos and their permissions, rule).
+    Gustavo's confirmed facts are not hashed: answering a question must not make every ready piece stale. They are
+    checked live instead (live_issues), with the same guards IMG ran."""
+    return orquestacion.digest({'post': piece.final_text, 'research': piece.research, 'sources': piece.signals,
+        'photos': source_context(photos), 'rule': infografias.version()})
+
+
+def used_photos(piece):
+    ids = {str(row.source_photo_id) for row in piece.images.all() if row.source_photo_id}
+    return [p for p in gallery(piece) if p['id'] in ids], ids
+
+
+def live_issues(piece, public, private):
+    """The package against the CURRENT facts: privacy and invented experience on every alt and on the design data,
+    and an infographic's figures against the public facts and sources it cites."""
+    problems = []
+    for row in piece.images.all():
+        problems += guardas.private_leaks(row.alt, private) + guardas.invented_experience(row.alt, public)
+    if piece.image_spec:
+        content = json.dumps(piece.image_spec, ensure_ascii=False)
+        problems += guardas.private_leaks(content, private) + guardas.invented_experience(content, public)
+        if piece.image_kind in ('infografia', 'carrusel'):
+            try:
+                infografias.validate(piece.image_spec, piece.image_kind, public, research.editorial_sources(piece))
+            except (ValueError, TypeError, KeyError) as exc:
+                problems.append(f'La infografía ya no se sostiene con los hechos actuales: {exc}')
+    return problems
+
+
+def bind(piece, public, private, **extra):
+    """Bind the package to its text and sources (v2). Only after the live checks pass; returns the binding."""
+    problems = live_issues(piece, public, private)
+    if problems:
+        raise ValueError('; '.join(problems))
+    photos, ids = used_photos(piece)
+    previous = piece.image_review.get('visual_binding', {})
+    binding = dict({k: v for k, v in previous.items() if k == 'proposal_sha256'}, version=2,
+        text_sha256=imagenes.sha(piece.final_text.encode()), content_sha256=content_hash(piece, photos),
+        context_sha256=context_hash(piece, public, private, photos), photo_ids=sorted(ids), **extra)
+    piece.image_review = dict(piece.image_review, visual_binding=binding)
+    piece.save(update_fields=['image_review', 'updated_at'])
+    return binding
+
+
+def upgrade_bindings():
+    """A v1 binding that is still valid gets its v2 content hash, so a later answer of Gustavo does not make it stale."""
+    from django.db import transaction
+    from .models import EditorialPiece
+    pending = [p.pk for p in EditorialPiece.objects.filter(state='ready').only('pk', 'image_review')
+               if p.image_review.get('visual_binding') and p.image_review['visual_binding'].get('version') != 2]
+    if not pending:
+        return 0
+    public, private = guardas.blocks()
+    upgraded = 0
+    for pk in pending:
+        with transaction.atomic():
+            piece = EditorialPiece.objects.select_for_update().get(pk=pk)
+            binding = piece.image_review.get('visual_binding') or {}
+            photos, _ = used_photos(piece)
+            if (binding.get('version') == 2 or binding.get('text_sha256') != imagenes.sha(piece.final_text.encode()) or
+                    binding.get('context_sha256') != context_hash(piece, public, private, photos)):
+                continue  # already upgraded, or stale already: a stale one keeps failing closed, as before
+            piece.image_review = dict(piece.image_review, visual_binding=dict(binding, version=2,
+                content_sha256=content_hash(piece, photos)))
+            piece.save(update_fields=['image_review'])
+            upgraded += 1
+    return upgraded
+
+
 def source_context(photos):
     # Gallery usage is context for selection, not a change to the image's source or permission.
     return [{k: v for k, v in photo.items() if k not in ('published_at', 'preferred')} for photo in photos]
@@ -126,8 +196,7 @@ def deliver(piece, public, private, accepted_request):
     if issues:
         raise ValueError('; '.join(issues))
     # Only sources actually used by the package matter from now on (not unused gallery candidates).
-    ids = {str(row.source_photo_id) for row in piece.images.all() if row.source_photo_id}
-    photos = [p for p in gallery(piece) if p['id'] in ids]
+    photos, ids = used_photos(piece)
     expected = [dict(p) for p in accepted_request['gallery'] if p['id'] in ids]
     choices = {p['id']: p for p in piece.selection['visual']['choice']['photos']}
     for photo in expected:
@@ -137,11 +206,9 @@ def deliver(piece, public, private, accepted_request):
             photo.update(instruction=choice['instruction'], instruction_kind=choice['instruction_kind'])
     if source_context(photos) != source_context(expected):
         raise ValueError('Las fotos o sus permisos cambiaron durante la preparación visual')
-    binding = {'text_sha256': imagenes.sha(piece.final_text.encode()),
-               'context_sha256': context_hash(piece, public, private, photos), 'photo_ids': sorted(ids),
-               'proposal_sha256': orquestacion.digest({k: piece.selection['visual'][k] for k in PROPOSAL_SCHEMA['properties']})}
-    piece.image_review = dict(piece.image_review, visual_binding=binding)
-    piece.save(update_fields=['image_review', 'updated_at'])
+    piece.image_review = dict(piece.image_review, visual_binding={
+        'proposal_sha256': orquestacion.digest({k: piece.selection['visual'][k] for k in PROPOSAL_SCHEMA['properties']})})
+    binding = bind(piece, public, private)
     return {**{k: binding[k] for k in ('text_sha256', 'context_sha256')}, 'media': media,
         'images': [imagenes.payload(row) for row in piece.images.all()],
         'design': piece.image_spec, 'review': piece.image_review}
@@ -154,7 +221,12 @@ def freshness_issues(piece):
     public, private = guardas.blocks()
     ids = set(binding.get('photo_ids', []))
     photos = [p for p in gallery(piece) if p['id'] in ids]
-    if (binding.get('text_sha256') != imagenes.sha(piece.final_text.encode()) or
-            binding.get('context_sha256') != context_hash(piece, public, private, photos)):
-        return ['El paquete visual corresponde a otro texto, fuentes o permisos; necesita nueva preparación']
+    stale = ['El paquete visual corresponde a otro texto, fuentes o permisos; necesita nueva preparación']
+    if binding.get('text_sha256') != imagenes.sha(piece.final_text.encode()):
+        return stale
+    if binding.get('version') == 2:
+        # New confirmed facts do not invalidate the package; the guards decide on the current facts.
+        return stale if binding.get('content_sha256') != content_hash(piece, photos) else live_issues(piece, public, private)
+    if binding.get('context_sha256') != context_hash(piece, public, private, photos):
+        return stale
     return []

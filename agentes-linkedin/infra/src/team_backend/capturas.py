@@ -325,6 +325,13 @@ def _route_person(capture,user,text):
 def _route_piece(capture,user,text):
     piece=context_object('pieza',capture.context_id)
     if piece is None:raise ValueError('La pieza ya no existe.')
+    from . import retoque
+    if retoque.eligible(piece):
+        # A ready piece that has not gone out goes back to the team with his comment (retoque.run, same job).
+        return ({'piece':str(piece.id),'rework':'pending'},
+                _outcome('anotado',f'El director está aplicando tu comentario a la pieza del {day_label(piece.slot_date)}; '
+                         'esa versión no se publica',f'/calendario/pieza/{piece.id}'),
+                Capture.State.NOTED,'director_editorial')
     return ({'piece':str(piece.id)},
             _outcome('anotado',f'Quedó como comentario para el equipo en la pieza del {day_label(piece.slot_date)}',f'/calendario/pieza/{piece.id}'),
             Capture.State.NOTED,'director_editorial')
@@ -435,6 +442,9 @@ def process(capture_id):
         avisar('capture_processed',outcome.get('text') or 'Tu envío ya tiene destino','Míralo en «Lo que enviaste».',link='/?enviado=1',
                ref=f'capture:{locked.id}')
         audit(user,'capture.routed',locked.id,kind=kind,classified=classified)
+        if locked.routed_to.get('rework')=='pending':
+            from . import retoque
+            locked=retoque.run(locked)
         return locked
     except (ValueError,APIException) as exc:
         return _fail(capture,str(getattr(exc,'detail',exc)))

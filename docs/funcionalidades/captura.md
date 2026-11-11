@@ -137,12 +137,13 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** desde una pregunta, la ficha de una persona o una pieza, abre la captura ya ligada a eso, y el equipo sabe a qué se refiere.
-- **Código:** `contexto_tipo` y `contexto_id`; backend `capturas._route_question`, `_route_person`, `_route_piece`.
+- **Código:** `contexto_tipo` y `contexto_id`; backend `capturas._route_question`, `_route_person`, `_route_piece` (y `retoque.run` para una pieza lista, en el mismo trabajo `process_capture`).
 - **Criterios de aceptación:**
   1. **Dado** «Responder con audio» en una pregunta, **cuando** se abre la hoja, **entonces** muestra el chip «Responde a <agente>» con la pregunta y el selector «Visibilidad de tu respuesta» con «Si no eliges, se usa la que sugiere la pregunta.».
   2. **Dado** esa captura enviada, **cuando** se procesa, **entonces** la pregunta queda respondida como Gustavo (las preguntas tipadas guardan «{pregunta} {texto}») y la captura termina en «Está en Lo que el equipo sabe de ti · Público» o «· Privado», con enlace a `/tu-turno/sabe`.
   3. **Dado** «Nota de voz» en una persona, **cuando** se procesa, **entonces** se añade una nota a la persona con `source: "captura"` y la captura dice «Quedó en las notas de <nombre>», con enlace a su ficha.
-  4. **Dado** «Comentario para el equipo» en una pieza, **cuando** se procesa, **entonces** aparece en «Tus comentarios para el equipo» de esa pieza y la captura dice «Quedó como comentario para el equipo en la pieza del <día>».
+  4. **Dado** «Comentario para el equipo» en una pieza ya publicada, descartada o sin publicación pendiente, **cuando** se procesa, **entonces** aparece en «Tus comentarios para el equipo» de esa pieza y la captura dice «Quedó como comentario para el equipo en la pieza del <día>».
+  7. **Dado** «Comentario para el equipo» en una pieza lista que aún no salió, **cuando** se procesa, **entonces** esa versión ya no se publica y el equipo la rehace según [EDI-22](motor-editorial.md#edi-22); la captura dice primero «El director está aplicando tu comentario…» y después qué cambió y cuándo sale, o por qué se aplazó.
   5. **Dado** el chip de contexto, **cuando** pulsa «Quitar el contexto», **entonces** la captura se envía sin contexto.
   6. **Dado** un contexto que ya no existe, **cuando** se envía, **entonces** la API responde 400 «El elemento ligado a la captura no existe.».
 - **Brechas código/docs:** en la app, el contexto funciona con texto; con audio o fotos falla ([CAP-04](#cap-04)).

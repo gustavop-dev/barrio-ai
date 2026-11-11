@@ -157,6 +157,7 @@ STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor
                     'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
                     'verificador':'Verificando afirmaciones, voz y privacidad',
                     'reparacion':'Corrigiendo la versión final con los hallazgos',
+                    'retoque':'Aplicando tu comentario a la pieza lista',
                     'visual':'Preparando foto, infografía o carrusel para la pieza'}
 
 def _roles(job,visual_jobs=None):

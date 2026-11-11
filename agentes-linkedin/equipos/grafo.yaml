@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.5-presupuesto-general",
+  "graph_version": "6.6-retoque-por-comentario",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -627,6 +627,16 @@
       "kind": "json_schema",
       "binding": "team_backend.perfil_assets.REPAIR_SCHEMA",
       "description": "Solo reason, benefit y steps; sin cambiar copy, etiqueta ni diseño."
+    },
+    "rework_input": {
+      "binding": "team_backend.orquestacion_schemas.REWORK_INPUT",
+      "kind": "json_schema",
+      "description": "Comentario de Gustavo sobre una pieza lista, con su texto, brief e imagen actuales."
+    },
+    "rework": {
+      "binding": "team_backend.editorial.REWORK_SCHEMA",
+      "kind": "json_schema",
+      "description": "rework"
     }
   },
   "nodes": [
@@ -1106,9 +1116,10 @@
       "role": "specialist",
       "status": "active",
       "binding": "team_backend.editorial._stage",
-      "description": "El director corrige hallazgos una vez; el resultado vuelve a reglas y verificador.",
+      "description": "El director corrige hallazgos una vez y aplica los comentarios de Gustavo sobre una pieza lista; el resultado vuelve a reglas y verificador.",
       "skills": [
-        "El director corrige hallazgos una vez; el resultado vuelve a reglas y verificador"
+        "El director corrige hallazgos una vez; el resultado vuelve a reglas y verificador",
+        "Aplica el comentario de Gustavo sobre una pieza lista: texto, foto o ambos, o lo anota si es una opinión"
       ],
       "tools": [
         "biblioteca"
@@ -1131,10 +1142,12 @@
       "budget_ref": "editorial",
       "input_schemas": [
         "editorial_input",
-        "repair_input"
+        "repair_input",
+        "rework_input"
       ],
       "output_schemas": [
-        "repair"
+        "repair",
+        "rework"
       ],
       "activity": {
         "job_kinds": [
@@ -2751,7 +2764,8 @@
       "from": "director_editorial",
       "to": "reparacion_editorial",
       "cycles": [
-        "pieza_diaria"
+        "pieza_diaria",
+        "retoque_pieza"
       ],
       "request_kind": "workflow_step",
       "request_schema": "repair_input",
@@ -2769,11 +2783,34 @@
       }
     },
     {
+      "id": "retocar",
+      "from": "director_editorial",
+      "to": "reparacion_editorial",
+      "cycles": [
+        "retoque_pieza"
+      ],
+      "request_kind": "workflow_step",
+      "request_schema": "rework_input",
+      "response_schema": "rework",
+      "max_calls_per_cycle": 1,
+      "response_required": true,
+      "status": "active",
+      "result_projection": "stage",
+      "runtime": {
+        "purposes": {
+          "anthropic": [
+            "editorial-retoque"
+          ]
+        }
+      }
+    },
+    {
       "id": "verificar",
       "from": "director_editorial",
       "to": "editor_verificador",
       "cycles": [
-        "pieza_diaria"
+        "pieza_diaria",
+        "retoque_pieza"
       ],
       "request_kind": "workflow_step",
       "request_schema": "verifier_input",
@@ -2816,7 +2853,8 @@
       "from": "director_editorial",
       "to": "editor_visual",
       "cycles": [
-        "pieza_diaria"
+        "pieza_diaria",
+        "retoque_pieza"
       ],
       "request_kind": "workflow_step",
       "request_schema": "image_input",
@@ -2839,7 +2877,8 @@
       "from": "director_editorial",
       "to": "editor_visual",
       "cycles": [
-        "pieza_diaria"
+        "pieza_diaria",
+        "retoque_pieza"
       ],
       "request_kind": "workflow_step",
       "request_schema": "edit_input",
@@ -2861,7 +2900,8 @@
       "from": "director_editorial",
       "to": "revision_visual",
       "cycles": [
-        "pieza_diaria"
+        "pieza_diaria",
+        "retoque_pieza"
       ],
       "request_kind": "workflow_step",
       "request_schema": "check_input",
@@ -3247,7 +3287,7 @@
       "request_kind": "gate",
       "request_schema": "proposal",
       "response_schema": "lead_result",
-      "max_calls_per_cycle": 5,
+      "max_calls_per_cycle": 8,
       "response_required": true,
       "status": "active",
       "condition": "Control del workflow, condicionado por la política; no una llamada del agente anterior.",
@@ -3978,7 +4018,9 @@
       "id": "perfil_reparar_explicacion",
       "from": "perfil",
       "to": "ciclo_perfil",
-      "cycles": ["perfil_assets"],
+      "cycles": [
+        "perfil_assets"
+      ],
       "request_kind": "call",
       "request_schema": "profile_explanation_request",
       "response_schema": "profile_explanation",
@@ -3987,7 +4029,11 @@
       "status": "active",
       "call_timeout_s": 300,
       "runtime": {
-        "purposes": {"anthropic": ["profile-assets-explanation"]}
+        "purposes": {
+          "anthropic": [
+            "profile-assets-explanation"
+          ]
+        }
       }
     }
   ],
@@ -4091,6 +4137,79 @@
         ],
         "checkpoint_resume": true,
         "note": "Resultados confirmados reutilizados; llamadas en vuelo requieren conciliación."
+      }
+    },
+    {
+      "id": "retoque_pieza",
+      "label": "Retoque por comentario",
+      "status": "active",
+      "orchestrator": "director_editorial",
+      "participants": [
+        "director_editorial",
+        "reparacion_editorial",
+        "editor_verificador",
+        "editor_visual",
+        "revision_visual"
+      ],
+      "triggers": [
+        {
+          "kind": "process_capture",
+          "cadence": "Un comentario de Gustavo sobre una pieza lista que aún no salió, en el mismo trabajo que lo enruta.",
+          "binding": "team_backend.retoque.run",
+          "deduplication": "Una instancia por captura (clave = id de la captura); process_capture nunca se repite."
+        }
+      ],
+      "loops": [
+        {
+          "id": "retoque_texto",
+          "status": "active",
+          "edges": [
+            "retocar",
+            "verificar",
+            "reparar"
+          ],
+          "max_rounds": 2,
+          "description": "El director aplica el comentario; el texto nuevo pasa reglas y verificador, con una reparación como en la pieza diaria."
+        },
+        {
+          "id": "retoque_imagen",
+          "status": "active",
+          "edges": [
+            "editar_foto",
+            "revisar_imagen",
+            "disenar"
+          ],
+          "max_rounds": 2,
+          "description": "La foto se edita desde el original con la instrucción del comentario (dos intentos con la misma revisión visual); si no pasa, infografía o aplazar según decidió el director."
+        }
+      ],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "editorial",
+          "imagenes"
+        ],
+        "max_depth": 1,
+        "scope": "Contadores propios de cada retoque; la nueva versión pasa por el gate publicacion del ciclo pieza_diaria (Jev, veto y operador).",
+        "max_calls": 16,
+        "max_provider_calls": 16,
+        "cost_cap_usd": 4,
+        "cost_period": "cycle",
+        "call_timeout_s": 120,
+        "cycle_timeout_s": 1200,
+        "max_stalls": 2,
+        "max_replans": 1
+      },
+      "ledger": {
+        "status": "runtime",
+        "records": [
+          "CycleLedger",
+          "Job",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "La versión comentada se reemplaza antes de pagar; un fallo bloquea la pieza y devuelve sus ideas a la mesa, nunca publica la versión anterior."
       }
     },
     {
@@ -4850,6 +4969,9 @@
       ],
       "visual": [
         "editor_visual"
+      ],
+      "retoque": [
+        "director_editorial"
       ]
     },
     "autopilot_direct_kinds": [
@@ -4890,7 +5012,8 @@
       "seleccion": "seleccionar",
       "reparacion": "reparar",
       "verificador": "verificar",
-      "lectores": "leer_lector_comprador"
+      "lectores": "leer_lector_comprador",
+      "retoque": "retocar"
     },
     "network_edges": {
       "observe": "observar",
