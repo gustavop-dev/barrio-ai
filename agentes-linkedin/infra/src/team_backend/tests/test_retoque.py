@@ -188,6 +188,21 @@ class ReworkTests(ReworkBase):
         self.assertEqual((idea.state, photo.state), ('idea', 'sin_usar'))  # back to the table and the gallery
         self.assertEqual(capture.routed_to['rework']['state'], 'aplazada')
         self.assertIn('revisión visual', piece.note)
+        # IMG-10: he still sees the last rejected edit, with why, to judge it himself; it is not what goes out.
+        row = piece.images.get()
+        self.assertFalse(row.edited)
+        self.assertEqual(row.data['rejected_edit']['reasons'], ['La edición cambió un rostro'])
+        self.assertTrue(row.image.storage.exists(row.data['rejected_edit']['path']))
+
+    def test_an_edit_that_passes_on_its_second_try_forgets_the_rejected_one(self):
+        piece, _ = self.ready()
+        fake = SequenceConnector([False, True])
+        self.rework(self.comment(piece, 'Ponme en un coworking.'),
+                    {'retoque': decision('imagen', 'editar_foto', instruction=INSTRUCTION)}, fake)
+        row = piece.images.get()
+        self.assertTrue(row.edited)
+        self.assertNotIn('rejected_edit', row.data)
+        self.assertIsNone(imagenes.payload(row)['rejected_edit'])
 
     def test_when_the_edit_fails_the_director_can_fall_back_to_an_infographic(self):
         plan = {'retoque': decision('imagen', 'editar_foto', fails='infografia', instruction=INSTRUCTION),

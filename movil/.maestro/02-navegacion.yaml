@@ -55,10 +55,12 @@ onFlowComplete:
 - extendedWaitUntil:
     notVisible: "Sin conexión\\. Mostrando lo último que cargó\\."
     timeout: 45000
-- scrollUntilVisible:
-    element: "Actividad real · .*"
-    direction: DOWN
+# (The «Actividad real · …» line under the scene is gone: the narration and the absent error say it.)
+- extendedWaitUntil:
+    visible:
+      id: office-narration
     timeout: 60000
+- assertNotVisible: "No se pudo leer la actividad\\."
 - takeScreenshot: 02-navegacion-01c-red-de-vuelta
 
 # cubre: ACC-06.3 — opened while the server answers 502 (a deploy) it stays inside (QA failure switch on the session)

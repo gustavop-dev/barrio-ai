@@ -2,6 +2,8 @@
 // tested: which actions ask first, what the toast says, and what a swipe does on each card.
 import type { TurnoAction, TurnoCard, TurnoCardType, TurnoPriority } from '@compartido/api/types';
 import { APPROVED_MESSAGE, vetoConsequence } from '@compartido/logic/events';
+import { messageText } from '@compartido/logic/personas';
+import { extras, longDate } from '@compartido/logic/turno';
 import type { IconName } from '@/components/icons';
 
 export const TYPE_LABEL: Record<TurnoCardType, string> = {
@@ -48,6 +50,49 @@ export function cardTitle(card: TurnoCard): string {
   if (card.question?.question) return card.question.question;
   if (card.attempt && UNCERTAIN_TITLE[card.attempt.capability]) return UNCERTAIN_TITLE[card.attempt.capability]!;
   return card.title;
+}
+
+/** A notice's text: the LinkedIn permission that expires says when; any other notice, its body. */
+export function noticeText(card: TurnoCard): string {
+  const extra = extras(card);
+  if (card.id === 'linkedin_expiring' && extra.expires_at && typeof extra.days_left === 'number') {
+    const days = extra.days_left;
+    return `El permiso para publicar caduca el ${longDate(extra.expires_at)} (${days === 1 ? 'queda 1 día' : `quedan ${days} días`}). LinkedIn no deja renovarlo solo.`;
+  }
+  return card.body ?? '';
+}
+
+/** The last message the other person wrote in a conversation card. */
+export function lastInbound(card: TurnoCard) {
+  return [...(card.conversation?.messages ?? [])].reverse().find((message) => !message.from_me);
+}
+
+/**
+ * What a collapsed card says under its title (Gustavo, 11/11/2026: «solo el título con una mini descripción»): the text
+ * it is about (the message, the comment to approve or check) or its body. Shown in two lines; the rest is under «Ver más».
+ */
+export function cardSummary(card: TurnoCard): string {
+  if (card.conversation) {
+    const last = lastInbound(card);
+    return last ? `“${messageText(last)}”` : (card.body ?? '');
+  }
+  if (card.attempt?.text) return `“${card.attempt.text}”`;
+  if (card.approval?.text) return `“${card.approval.text}”`;
+  if (card.question) return card.question.purpose || card.body || '';
+  return noticeText(card);
+}
+
+/** About two lines of body text on a phone: a shorter summary is already the whole text. */
+export const SUMMARY_FITS = 90;
+
+/**
+ * Whether «Ver más» shows something the collapsed card does not: the details of a referent decision, a check, a
+ * conversation or an approval, or a summary too long for two lines. The profile proposal has its own «Abrir».
+ */
+export function hasDetails(card: TurnoCard): boolean {
+  if (card.profile_id) return cardSummary(card).length > SUMMARY_FITS;
+  if (card.referent_change || card.referent_experiment || card.attempt || card.conversation || card.approval) return true;
+  return cardSummary(card).length > SUMMARY_FITS;
 }
 
 export const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;

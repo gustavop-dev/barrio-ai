@@ -11,20 +11,13 @@ import type { ReactElement } from 'react';
 import { useMemo } from 'react';
 import { FlatList, Pressable, RefreshControl, StyleSheet, View } from 'react-native';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { Badge, Button, Card, EmptyState, ErrorRetry, Section, Skeleton, T, pageContent } from '@/components/ui';
+import { Button, Card, EmptyState, ErrorRetry, Section, Skeleton, T, pageContent } from '@/components/ui';
 import { openLink } from '@/navigation';
 import { colors, shell, space } from '@/theme/tokens';
 import { ActivityRow, NoSalioSwitch, QueuedRow, TypeChips, visibleItems } from './ActivityList';
 import { piecePath } from './go';
+import { PIECE_PREVIEW_LINES, PieceHead, PieceOpener } from './PieceOpener';
 import { PlanNextButton, VetoButton } from './Veto';
-
-function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
-  return (
-    <Pressable accessibilityRole="link" onPress={onPress} style={styles.textLink}>
-      <T color={colors.brandDeep}>{label}</T>
-    </Pressable>
-  );
-}
 
 function UpcomingPieceCard({ piece, today, timeZone, now }: { piece: UpcomingPiece; today: string; timeZone: string; now: number }) {
   const badge = pieceStatus(piece.status);
@@ -32,28 +25,30 @@ function UpcomingPieceCard({ piece, today, timeZone, now }: { piece: UpcomingPie
   const meta = pieceMeta(piece);
   return (
     <Card>
-      <View style={styles.pieceHead}>
-        <Badge tone={badge.tone}>{badge.label}</Badge>
-        <T variant="detalle" soft>
-          {when}
+      <PieceOpener to={piecePath(piece.piece_id)} testID="proxima-pieza">
+        <PieceHead badge={badge} when={when} opens />
+        <T variant="subtitulo" numberOfLines={PIECE_PREVIEW_LINES}>
+          {piece.thesis || 'El equipo prepara la pieza'}
         </T>
-      </View>
-      <T variant="subtitulo">{piece.thesis || 'El equipo prepara la pieza'}</T>
-      {piece.excerpt ? <T soft>{firstLines(piece.excerpt)}</T> : null}
-      {piece.status === 'preparing' ? (
-        <T variant="detalle" soft>
-          {`Etapa: ${stageShort(piece.stage)}`}
-        </T>
-      ) : null}
-      {meta ? (
-        <T variant="detalle" soft>
-          {meta}
-        </T>
-      ) : null}
+        {piece.excerpt ? (
+          <T soft numberOfLines={PIECE_PREVIEW_LINES}>
+            {firstLines(piece.excerpt)}
+          </T>
+        ) : null}
+        {piece.status === 'preparing' ? (
+          <T variant="detalle" soft>
+            {`Etapa: ${stageShort(piece.stage)}`}
+          </T>
+        ) : null}
+        {meta ? (
+          <T variant="detalle" soft numberOfLines={1}>
+            {meta}
+          </T>
+        ) : null}
+      </PieceOpener>
       {piece.vetoable && piece.action ? (
         <VetoButton block accessibilityHint={piece.thesis ?? undefined} target={{ actionId: piece.action.id, kind: 'pieza', when: `a las ${formatTime(piece.scheduled_for, timeZone)}` }} />
       ) : null}
-      <TextLink label="Ver cómo se escribió" onPress={() => openLink(piecePath(piece.piece_id))} />
     </Card>
   );
 }
@@ -98,7 +93,9 @@ export function Proximo({
         <View accessibilityLabel="Después">
           {later.map((piece) => (
             <Pressable key={piece.piece_id} accessibilityRole="link" onPress={() => openLink(piecePath(piece.piece_id))} style={styles.row}>
-              <T color={colors.brandDeep}>{piece.thesis || 'Pieza en preparación'}</T>
+              <T color={colors.brandDeep} numberOfLines={PIECE_PREVIEW_LINES}>
+                {piece.thesis || 'Pieza en preparación'}
+              </T>
               <T variant="detalle" soft>
                 {`${relativeDay(dayOf(piece.scheduled_for, timeZone) ?? piece.slot_date, today)} a las ${formatTime(piece.scheduled_for, timeZone)} · ${pieceStatus(piece.status).label}`}
               </T>
@@ -225,8 +222,6 @@ const styles = StyleSheet.create({
   content: { gap: 0 },
   header: { gap: 20, marginBottom: space[2] },
   filters: { gap: space[3] },
-  pieceHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space[2] },
-  textLink: { minHeight: shell.touch, justifyContent: 'center', alignSelf: 'flex-start' },
   row: { gap: 2, paddingVertical: 10, minHeight: shell.touch, borderTopWidth: 1, borderTopColor: colors.line },
   dayLabel: { marginTop: space[4], marginBottom: space[1] },
   more: { marginTop: space[4] },

@@ -1,6 +1,6 @@
 # cubre: NOT-01, NOT-02, NOT-03, NOT-04, NOT-05
 # Notificaciones: what is coming («Próximo», computed) and what happened in the last 7 days, read and unread.
-# The bell carries a dot while something is unread; the Todas / Sin leer filters; tapping a row marks it read
+# The bell carries a dot while something is unread; the dropdown (Todas, Sin leer and one section); tapping a row marks it read
 # and opens its link in the app (the blocked piece, Andrés Restrepo's card); «Marcar todo como leído» clears
 # the «Nueva» rows and the bell's dot.
 # The seed (seed_qa) gives 5 unread rows, 2 read ones and 2 «Próximo» rows.
@@ -36,9 +36,9 @@ tags: [notificaciones]
 - assertVisible: 'Sale la pieza «Documentar decisiones vale más que documentar tareas»'
 - assertVisible: 'Puedes vetarla en el detalle hasta las .*'
 - assertVisible: 'El equipo invitará a [0-9]+ personas? que encajan'
+# The dropdown starts on «Todas».
 - assertVisible:
-    id: filtro-todas
-    selected: true
+    id: notif-filtro
 - takeScreenshot: 06-notificaciones-02-proximo
 
 # ---------------------------------------------------------------- the last 7 days
@@ -91,13 +91,11 @@ tags: [notificaciones]
 # Only the unread rows: «Próximo» and what was read leave the list.
 - runFlow: comun/notificaciones-arriba.yaml
 - tapOn:
-    id: filtro-sin_leer
-- assertVisible:
-    id: filtro-sin_leer
-    selected: true
-- assertVisible:
-    id: filtro-todas
-    selected: false
+    id: notif-filtro
+- tapOn:
+    text: 'Sin leer'
+    below:
+      id: notif-filtro
 # Today's unread row heads the list once «Sin leer» has answered.
 - extendedWaitUntil:
     visible: 'La pieza de mañana está lista'
@@ -118,15 +116,28 @@ tags: [notificaciones]
     timeout: 20000
 - assertNotVisible: 'Oportunidad con Mauricio Peña: Propuesta'
 - assertNotVisible: 'Se publicó la pieza .*'
+# A section alone: «Próximo» keeps only what is coming.
 - runFlow: comun/notificaciones-arriba.yaml
 - tapOn:
-    id: filtro-todas
+    id: notif-filtro
+- tapOn:
+    text: 'Pr[óÓ]ximo'
+    below:
+      id: notif-filtro
+- extendedWaitUntil:
+    visible: 'Sale la pieza «Documentar decisiones vale más que documentar tareas»'
+    timeout: 20000
+- assertNotVisible: 'Andrés Restrepo aceptó tu invitación'
+- takeScreenshot: 06-notificaciones-05b-seccion-proximo
+- tapOn:
+    id: notif-filtro
+- tapOn:
+    text: 'Todas'
+    below:
+      id: notif-filtro
 - extendedWaitUntil:
     visible: 'Pr[óÓ]ximo'
     timeout: 20000
-- assertVisible:
-    id: filtro-todas
-    selected: true
 
 # ---------------------------------------------------------------- a row opens its link: the blocked piece
 # cubre: NOT-04
@@ -206,7 +217,11 @@ tags: [notificaciones]
 - takeScreenshot: 06-notificaciones-09-todo-leido
 # «Sin leer» is now empty.
 - tapOn:
-    id: filtro-sin_leer
+    id: notif-filtro
+- tapOn:
+    text: 'Sin leer'
+    below:
+      id: notif-filtro
 - extendedWaitUntil:
     visible: 'No hay nada nuevo\. Lo de días anteriores sigue en el Calendario\.'
     timeout: 20000

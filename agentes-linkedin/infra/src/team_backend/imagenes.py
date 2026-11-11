@@ -120,7 +120,7 @@ def _photo(piece,photo,choice,index,client,public,private):
     if not photo.instruction and choice.get('instruction') and choice['instruction'] in photo.note:
         photo.instruction=choice['instruction'];photo.instruction_kind=choice.get('instruction_kind','none')
         photo.save(update_fields=['instruction','instruction_kind'])
-    instruction,reason=edit_decision(photo,choice);edited=False;review={};output=raw;mime=photo.mime
+    instruction,reason=edit_decision(photo,choice);edited=False;review={};output=raw;mime=photo.mime;rejected=None
     if not instruction and photo.ai_edit!='no' and photo.instruction_kind not in ('original','unsafe') and (width,height) not in ((1080,1080),(1080,1350)):
         instruction=SAFE_EDITS['crop'];reason='Decisión del equipo: adaptar el encuadre para LinkedIn'
     if instruction:
@@ -130,7 +130,9 @@ def _photo(piece,photo,choice,index,client,public,private):
                                                  from_gustavo=reason.startswith('Instrucción de Gustavo'))
                 if review['ok'] and review.get('sha256')==[sha(candidate)]:
                     output=candidate;edited=True;mime='image/png';width,height=size
-                else:reason+='; edición descartada: '+'; '.join(review.get('reasons') or ['comprobación desfavorable'])
+                else:
+                    reason+='; edición descartada: '+'; '.join(review.get('reasons') or ['comprobación desfavorable'])
+                    rejected=(candidate,review,size)
             except (ValueError,OSError) as exc:reason+='; '+str(exc)
         else:reason+='; edición no disponible (proveedores o claves); sale el original'
     alt=(choice.get('alt') or '').strip()
@@ -140,6 +142,7 @@ def _photo(piece,photo,choice,index,client,public,private):
                    sha256=sha(output),alt=alt,edited=edited,ai_edit=photo.ai_edit,reason=reason,review=review)
     if edited:row.image.save('edicion.png',ContentFile(output),save=False)
     else:row.image.name=photo.image.name
+    if rejected:keep_rejected(row,*rejected)
     row.save()
     photo.state='editada' if edited else 'elegida';photo.chosen_piece=piece;photo.chosen_for=piece.slot_date
     photo.save(update_fields=['state','chosen_piece','chosen_for'])
@@ -298,11 +301,45 @@ def url(row):
     return f'{path}?v={row.sha256[:16]}' if row.sha256 else path
 
 
+REJECTED='rejected_edit'
+
+
+def keep_rejected(row,candidate,review,size):
+    """IMG-10: an AI edit the visual check rejected stays next to the original, so Gustavo sees it and judges it himself.
+    Only the last one is kept (in the row's data, outside the manifest: it never goes out). The caller saves the row."""
+    storage=row.image.storage;old=(row.data or {}).get(REJECTED) or {}
+    name=storage.save(f'piezas/imagenes/descartadas/{row.id}.png',ContentFile(candidate))
+    if old.get('path') and old['path']!=name:
+        try:storage.delete(old['path'])
+        except OSError:pass
+    reasons=[str(r)[:500] for r in (review.get('reasons') or ['comprobación desfavorable'])][:5]
+    row.data=dict(row.data or {},**{REJECTED:{'path':name,'sha256':sha(candidate),'width':size[0],'height':size[1],
+                                              'reasons':reasons,'at':timezone.now().isoformat()}})
+
+
+def forget_rejected(row):
+    """An accepted edit replaces the rejected one: it is no longer worth showing."""
+    old=(row.data or {}).get(REJECTED)
+    if not old:return
+    if old.get('path'):
+        try:row.image.storage.delete(old['path'])
+        except OSError:pass
+    row.data={k:v for k,v in row.data.items() if k!=REJECTED}
+
+
+def rejected_payload(row):
+    kept=(row.data or {}).get(REJECTED) if row.kind=='foto' else None
+    if not kept or not kept.get('path'):return None
+    return {'url':f'/api/v1/editorial/pieces/{row.piece_id}/images/{row.id}/descartada?v={str(kept.get("sha256",""))[:16]}',
+            'reasons':kept.get('reasons') or [],'at':kept.get('at'),'width':kept.get('width'),'height':kept.get('height')}
+
+
 def payload(row):
     return {'id':str(row.id),'kind':row.kind,'position':row.position,'url':url(row),
             'alt':row.alt,'width':row.width,'height':row.height,'mime':row.mime,'sha256':row.sha256,
             'source_photos':[{'id':str(row.source_photo_id),'url':f'/api/v1/galeria/{row.source_photo_id}/imagen'}] if row.source_photo_id else [],
-            'edited':row.edited,'ai_edit':row.ai_edit,'reason':row.reason,'template':row.template or None,'review':row.review}
+            'edited':row.edited,'ai_edit':row.ai_edit,'reason':row.reason,'template':row.template or None,'review':row.review,
+            'rejected_edit':rejected_payload(row)}
 
 
 def upload(piece,client):

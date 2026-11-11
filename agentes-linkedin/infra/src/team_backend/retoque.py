@@ -346,6 +346,8 @@ def _edit_photos(piece, instruction, client, public, capture):
                 accepted.append((row, candidate, review, size))
                 break
             attempts.append(_clip('; '.join(review.get('reasons') or ['comprobación desfavorable']), 200))
+            imagenes.keep_rejected(row, candidate, review, size)  # IMG-10: he sees the rejected edit and judges it
+            row.save(update_fields=['data'])
         else:
             return attempts  # one photo did not pass: the piece does not go out half edited
     with transaction.atomic():
@@ -357,6 +359,7 @@ def _edit_photos(piece, instruction, client, public, capture):
             row.edited = True
             row.review = dict(review, instruction=instruction)  # the next comment edits the original again: it keeps this
             row.reason = _clip('Comentario de Gustavo: ' + capture.text, 1000)
+            imagenes.forget_rejected(row)
             row.save()
             row.source_photo.state = 'editada'
             row.source_photo.save(update_fields=['state'])

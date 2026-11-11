@@ -235,6 +235,9 @@ describe('Detalle de una pieza', () => {
     server(piece({ status: 'blocked', state: 'blocked', action: null, verification: { verdict: 'blocked', model_verdict: 'ready_for_execution', blocking_reasons: ['Afirma una experiencia que no está en tu memoria confirmada.'] } }));
     await renderPieza();
     expect(await screen.findByText('El verificador bloqueó la pieza')).toBeOnTheScreen();
+    // The reasons are folded under the title: they show only when he opens them.
+    expect(screen.queryByText('Afirma una experiencia que no está en tu memoria confirmada.')).toBeNull();
+    await fireEvent.press(screen.getByText('Por qué se bloqueó'));
     expect(screen.getByText('Afirma una experiencia que no está en tu memoria confirmada.')).toBeOnTheScreen();
     expect(screen.getByText('Iba a salir a las 09:00')).toBeOnTheScreen();
   });
@@ -251,7 +254,10 @@ describe('Detalle de una pieza', () => {
     });
     const api = server(blocked, { 'POST /api/v1/editorial/pieces/p7/desestimar': { status: 202, body: { job: { id: 'job-1' } } } });
     await renderPieza();
-    expect(await screen.findByText('Contiene pitch agresivo o petición de contacto')).toBeOnTheScreen();
+    // The two ways out come first; the reason is one tap away.
+    expect(await screen.findByText('Desestimar el bloqueo')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Por qué se bloqueó'));
+    expect(screen.getByText('Contiene pitch agresivo o petición de contacto')).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByText('Pedir un cambio'));
     expect(captureState()).toEqual({ open: true, context: { tipo: 'pieza', id: 'p7', label: 'Pieza del sábado 7 de noviembre' } });
@@ -483,4 +489,16 @@ it('explains a rejected edit while showing the original that will be published',
   expect(screen.getByText('Comprobación no aprobada')).toBeOnTheScreen();
   expect(screen.queryByText('Editada con IA')).toBeNull();
   expect(screen.queryByText('Ver original')).toBeNull();
+});
+
+it('shows the AI edit the check rejected, with why, next to the original that goes out', async () => {
+  const rejected = { url: '/api/v1/editorial/pieces/p7/images/img-1/descartada?v=abc', reasons: ['La edición cambió un rostro'], width: 1080, height: 1350 };
+  server({ ...PUBLISHED, images: [pieceImage({ reason: 'Instrucción de Gustavo; edición descartada', review: { ok: false, reasons: ['La edición cambió un rostro'] }, rejected_edit: rejected })] });
+  await renderPieza();
+  const block = await screen.findByTestId('piece-image-rejected');
+  expect(within(block).getByText('Edición con IA descartada')).toBeOnTheScreen();
+  expect(within(block).getByText('No se publica')).toBeOnTheScreen();
+  expect(within(block).getByText('• La edición cambió un rostro')).toBeOnTheScreen();
+  expect(JSON.stringify(within(block).getByLabelText(/^Edición con IA descartada\./).props.source)).toContain('/descartada?v=abc');
+  expect(screen.getByText('Se publica tal cual')).toBeOnTheScreen();
 });

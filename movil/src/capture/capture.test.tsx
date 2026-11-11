@@ -17,9 +17,11 @@ import { CaptureButton } from './CaptureButton';
 import { CaptureSheetHost } from './CaptureSheet';
 import { checkPhotos, toPickedPhoto } from './photos';
 import { discardProgress, holdDecision, holdFollow, isTooShort, lockProgress } from './hold';
+import { clipLevels } from './recorder';
 import { DRAFT_KEPT } from './sendError';
 import { closeCaptureSheet, openCaptureSheet, resetCaptureStoreForTests } from './store';
 import type { RecordedAudio } from './types';
+import { barHeight, CLIP_BARS, LIVE_BARS } from './Wave';
 
 const CAPTURE = { id: 'c1', state: 'recibida', state_label: 'Recibida', undo_until: new Date(Date.now() + 120_000).toISOString(), can_undo: true };
 
@@ -320,23 +322,50 @@ describe('capture sheet', () => {
     expect(toastDurations.withUndo).toBe(5000);
   });
 
-  it('a question context shows its chip and sends contexto and the visibility chosen', async () => {
+  it('a question context is the simple sheet (audio, photo, note) and sends contexto with the suggested visibility', async () => {
     const server = capturaServer();
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValueOnce({
+      canceled: false,
+      assets: [{ uri: 'file:///cache/foto.jpg', fileName: 'foto.jpg', mimeType: 'image/jpeg', fileSize: 2048, width: 10, height: 10 }],
+    } as never);
     await renderCapture();
     await act(async () => openCaptureSheet({ tipo: 'pregunta', id: 'q1', label: '¿Aceptas proyectos de 3 meses?' }));
     const sheet = await screen.findByTestId('capture-sheet');
     const chip = within(sheet).getByTestId('capture-context');
     expect(within(chip).getByText('¿Aceptas proyectos de 3 meses?')).toBeOnTheScreen();
+    expect(within(sheet).getByTestId('capture-grabar')).toBeOnTheScreen();
+    expect(within(sheet).getByTestId('capture-camara')).toBeOnTheScreen();
+    for (const gone of ['Para qué es (opcional)', 'Visibilidad de tu respuesta', 'Privado', 'Lo verás en «Lo que enviaste», arriba en esta hoja.']) {
+      expect(within(sheet).queryByText(gone)).toBeNull();
+    }
+    expect(screen.queryByTestId('capture-historial')).toBeNull();
+    await fireEvent.press(within(sheet).getByText('Galería'));
+    expect(await within(sheet).findByLabelText('Foto adjunta 1')).toBeOnTheScreen();
+    expect(within(sheet).queryByTestId('capture-ai')).toBeNull();
     await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Sí, si el equipo es pequeño.');
-    await fireEvent.press(within(sheet).getByText('Privado'));
     await fireEvent.press(within(sheet).getByTestId('capture-send'));
     await waitFor(() => expect(server.find('POST', '/api/v1/capturas')).toHaveLength(1));
-    expect(server.find('POST', '/api/v1/capturas')[0]!.body).toEqual([
+    // No public_use: the question's suggestion applies. No ai_edit choice either: the Ajustes value goes.
+    const body = server.find('POST', '/api/v1/capturas')[0]!.body as [string, unknown][];
+    expect(body.filter(([field]) => field !== 'ai_edit')).toEqual([
+      ['fotos', { uri: 'file:///cache/foto.jpg', name: 'foto.jpg', type: 'image/jpeg' }],
       ['nota', 'Sí, si el equipo es pequeño.'],
       ['contexto_tipo', 'pregunta'],
       ['contexto_id', 'q1'],
-      ['public_use', 'false'],
     ]);
+  });
+
+  it('a loose capture offers no «Propuesta de post» nor «Responde una pregunta»', async () => {
+    capturaServer();
+    await renderCapture();
+    await act(async () => openCaptureSheet());
+    const sheet = await screen.findByTestId('capture-sheet');
+    expect(within(sheet).getByText('Idea para un post')).toBeOnTheScreen();
+    expect(within(sheet).getByText('Dato sobre mí')).toBeOnTheScreen();
+    expect(within(sheet).getByText('Foto para la galería')).toBeOnTheScreen();
+    expect(within(sheet).queryByText('Propuesta de post')).toBeNull();
+    expect(within(sheet).queryByText('Responde una pregunta')).toBeNull();
+    expect(screen.getByTestId('capture-historial')).toBeOnTheScreen();
   });
 
   it('removing the context chip sends the capture loose', async () => {
@@ -637,5 +666,17 @@ describe('IMG-16 / CAP-16 · opciones e intención', () => {
     expect(await screen.findByText(/Saldrá lo antes posible.*lunes.*9.*20:30/)).toBeOnTheScreen();
     expect(screen.getByText('«Publícalo lo antes posible.»')).toBeOnTheScreen();
     expect(screen.getByText('Sujeto a verificación y veto.')).toBeOnTheScreen();
+  });
+});
+
+describe('the wave, like WhatsApp', () => {
+  it('draws thin bars from 3 to 28 px; live keeps LIVE_BARS levels and a finished recording fits into CLIP_BARS', () => {
+    expect([barHeight(0), barHeight(0.5), barHeight(1), barHeight(3), barHeight(Number.NaN)]).toEqual([3, 16, 28, 28, 3]);
+    expect(LIVE_BARS).toBeGreaterThan(CLIP_BARS);
+    // A short recording keeps the levels it has; a long one is drawn with CLIP_BARS (each the loudest of its slice).
+    expect(clipLevels([0.1, 0.5])).toEqual([0.1, 0.5]);
+    const long = clipLevels(Array.from({ length: 900 }, (_, i) => (i === 899 ? 1 : 0.2)));
+    expect(long).toHaveLength(CLIP_BARS);
+    expect(long[CLIP_BARS - 1]).toBe(1);
   });
 });

@@ -32,6 +32,16 @@ export interface PieceImage {
   reason: string;
   template: 'portada' | 'pasos' | 'barras' | 'numero' | 'cierre' | null;
   review: ImageReview;
+  /** IMG-11 criterion 3: the last AI edit the visual check rejected, kept so Gustavo can judge it (never published). */
+  rejected_edit?: RejectedEdit | null;
+}
+
+export interface RejectedEdit {
+  url: string;
+  reasons: string[];
+  at?: string | null;
+  width?: number | null;
+  height?: number | null;
 }
 
 /** Optional for pieces fetched before phase 1 and for a piece still being prepared. */

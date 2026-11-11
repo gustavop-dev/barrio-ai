@@ -65,8 +65,12 @@ describe('Galería', () => {
   it('shows the header, the note, the filters and a grid with each photo’s state, loading the images with the token', async () => {
     const server = await renderGaleria();
     expect(screen.getByText('Fotos para tus posts y tu perfil.')).toBeOnTheScreen();
-    expect(screen.getByText('Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería».')).toBeOnTheScreen();
+    // The how-to hints show once their flag loads (they leave by themselves and can be swiped away: Hint.test.tsx).
+    expect(await screen.findByText('Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería».')).toBeOnTheScreen();
     expect(screen.getByText('El equipo decide cuándo usarlas y si las edita con IA. Tú puedes dejar una nota o prohibir la edición en cada foto.')).toBeOnTheScreen();
+    // The category is chosen inside each photo, not before uploading.
+    expect(screen.queryByText('Categoría al subir')).toBeNull();
+    expect(screen.queryByTestId('upload-category-perfil')).toBeNull();
     for (const label of ['Perfil', 'Todas', 'Sin usar', 'Elegidas', 'Publicadas']) expect(screen.getAllByRole('button', { name: label }).length).toBeGreaterThan(0);
     expect(await screen.findByLabelText('Foto del 3 nov, elegida · jue 12')).toBeOnTheScreen();
     expect(screen.getByText('Publicada · 2 nov')).toBeOnTheScreen();

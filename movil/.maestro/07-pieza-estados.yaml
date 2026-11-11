@@ -145,6 +145,11 @@ tags: [calendario]
     text: "El verificador bloqueó la pieza"
     childOf:
       id: pieza
+# The reasons are folded under the note: one tap opens them.
+- tapOn:
+    text: "Por qué se bloqueó"
+    childOf:
+      id: pieza
 - assertVisible:
     text: "Hallazgo material \\(invented_experience\\).*"
     childOf:
@@ -244,13 +249,8 @@ tags: [calendario]
     centerElement: true
     timeout: 15000
 - takeScreenshot: 07-pieza-estados-06-dia-publicada
-- scrollUntilVisible:
-    element:
-      text: "Ver cómo se escribió"
-    direction: DOWN
-    centerElement: true
-    timeout: 15000
-- tapOn: "Ver cómo se escribió"
+# The whole card opens the piece (no «Ver cómo se escribió» link at its foot).
+- tapOn: "Impresiones a las 72 h: 768"
 - extendedWaitUntil:
     visible:
       text: "Pieza del ${output.hace3Largo}"
@@ -451,13 +451,8 @@ tags: [calendario]
     direction: DOWN
     centerElement: true
     timeout: 20000
-- scrollUntilVisible:
-    element:
-      text: "Ver cómo se escribió"
-    direction: DOWN
-    centerElement: true
-    timeout: 15000
-- tapOn: "Ver cómo se escribió"
+# The whole card opens the piece.
+- tapOn: "Cómo elegimos el stack de un MVP en dos días"
 - extendedWaitUntil:
     visible:
       text: "Pieza del ${output.hace5Largo}"

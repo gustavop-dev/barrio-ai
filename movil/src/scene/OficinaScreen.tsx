@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentRef } from 'react';
-import { router } from 'expo-router';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { runOnUI } from 'react-native-reanimated';
 import { GestureDetector, useNativeGesture } from 'react-native-gesture-handler';
 import { useOfficeQueries, feedUnavailable } from '@compartido/api/oficinaQueries';
@@ -9,14 +8,13 @@ import { statusesFrom, type SceneStatus } from '@compartido/scene/activity';
 import { nowLine } from '@compartido/scene/presentation';
 import { narrateSceneSelection, selectScene } from '@compartido/scene/runtime';
 import { PLAN_HEIGHT, sceneScale } from '@compartido/scene/plan';
-import { CHARACTER_BY_ID, LIBRARIAN_ID, TEAMS, teamById, type CharacterId, type TeamId } from '@compartido/scene/roles';
+import { CHARACTER_BY_ID, LIBRARIAN_ID, teamById, type CharacterId, type TeamId } from '@compartido/scene/roles';
 import type { PanelData } from '@compartido/scene/panels';
-import { timeAgo } from '@compartido/logic/format';
-import { Button, ErrorRetry, Note, SnapSheet, T } from '@/components/ui';
+import { Button, ErrorRetry, Note, SnapSheet } from '@/components/ui';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { useCaptureSheet } from '@/capture/store';
 import { haptic, officeGestures, sheetMotion, useMotion } from '@/theme/motion';
-import { colors, radius, shell, space } from '@/theme/tokens';
+import { colors, shell, space } from '@/theme/tokens';
 import { OfficeCanvas, type ScenePick } from './OfficeCanvas';
 import { RolePanel, TeamPanel } from './OfficePanels';
 import { useOfficeLifecycle } from './useOfficeLifecycle';
@@ -24,7 +22,6 @@ import { useOfficeScene } from './useOfficeScene';
 import { OfficeNarration } from './OfficeNarration';
 
 type Selection = { kind: 'team'; id: TeamId } | { kind: 'role'; id: CharacterId };
-const TEAMS_AND_LIBRARY = [...TEAMS.map((t) => ({ id: t.id, name: t.name })), { id: 'biblioteca' as const, name: 'Biblioteca' }];
 export function OficinaScreen() {
   const active = useOfficeLifecycle();
   const pageScroll = useNativeGesture();
@@ -94,29 +91,13 @@ export function OficinaScreen() {
         {paused ? <View testID="oficina-pausa" pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paused]} /> : null}
         <OfficeNarration line={line} revision={snapshot.now?.key ?? 0} reduced={reduced} />
       </View>
-      <View style={styles.below}>
-        <View style={styles.legend}>
-          {(['Trabajando', 'En espera', 'En diseño'] as const).map((text, i) => <View key={text} style={styles.legendItem}><View style={[styles.dot, { backgroundColor: [colors.brand, colors.spriteBlue, colors.line][i] }]} /><T variant="detalle" soft>{text}</T></View>)}
-        </View>
-        <View style={styles.activityRow}>
-          <T variant="detalle" soft style={styles.activityText}>{live ? `Actividad real · ${timeAgo(activity.data?.updated_at, now)}` : activity.isPending ? 'Leyendo actividad…' : 'Actividad no disponible'}</T>
-          <Button testID="oficina-mapa-equipo" variant="ghost" size="small" accessibilityLabel="Mapa del equipo" onPress={() => router.push('/equipo')}>
-            <T variant="detalle" color={colors.brandDeep}>Mapa del equipo</T>
-          </Button>
-        </View>
+      {/* Only the error notes live under the scene: tapping a zone or its label opens its team (the legend, the team strip,
+          the map link and the art credit are gone). This space is also where the page is pulled down to refresh. */}
+      <View testID="oficina-pie" style={styles.below}>
         {activity.isError ? <Note tone="error" title="No se pudo leer la actividad." actions={<Button onPress={() => void activity.refetch()}>Reintentar</Button>}>Mientras tanto los personajes quedan quietos: la oficina no simula trabajo.</Note> : null}
         <ErrorRetry error={overview.error} title="No se pudo leer el estado de la máquina." onRetry={() => void overview.refetch()} />
         {feedUnavailable(events.error) ? <Note title="Aún no disponible">El registro de eventos no está disponible. Se muestra la actividad real de cada rol.</Note> : <ErrorRetry error={events.error} title="No se pudieron leer los eventos." onRetry={() => void events.refetch()} />}
       </View>
-      <FlatList horizontal data={TEAMS_AND_LIBRARY} keyExtractor={(item) => item.id} accessibilityLabel="Equipos" testID="team-strip" showsHorizontalScrollIndicator={false} contentContainerStyle={styles.teams}
-        renderItem={({ item }) => {
-          const selected = item.id === 'biblioteca' ? selectedRole === LIBRARIAN_ID : selection?.kind === 'team' && selection.id === item.id;
-          return <Pressable accessibilityRole="button" accessibilityLabel={item.name} accessibilityState={{ selected }} testID={`team-chip-${item.id}`} style={[styles.chip, selected && styles.chipOn]}
-            onPress={() => select(item.id === 'biblioteca' ? { kind: 'role', id: LIBRARIAN_ID } : { kind: 'team', id: item.id })}>
-            <T variant="detalle" color={selected ? colors.paper : colors.ink}>{item.name}</T>
-          </Pressable>;
-        }} />
-      <T variant="detalle" soft style={styles.credit}>Arte: LimeZu — Modern Interiors</T>
     </ScrollView>
     </GestureDetector>
     {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active} fitViewportToSnap>
@@ -127,15 +108,6 @@ export function OficinaScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   paused: { backgroundColor: colors.backdrop },
-  // The 44 dp link shares the activity row; compact padding preserves room for the team strip.
-  below: { paddingHorizontal: space[4], paddingVertical: space[1], gap: space[2] },
-  activityRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  activityText: { flex: 1 },
-  legend: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
-  dot: { width: 10, height: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.ink },
-  teams: { gap: space[2], paddingHorizontal: space[4] },
-  chip: { minHeight: 48, paddingHorizontal: space[3], justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.inkSoft, borderRadius: radius.pill },
-  chipOn: { backgroundColor: colors.ink },
-  credit: { padding: space[4] },
+  // Fills what the scene leaves (sceneHeight keeps ~100 dp free): where the page is pulled down to refresh.
+  below: { minHeight: 96, paddingHorizontal: space[4], paddingVertical: space[1], gap: space[2] },
 });

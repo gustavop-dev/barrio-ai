@@ -1,5 +1,7 @@
 // A row of the timeline (the PWA's TimelineItem): layer dot, hour, the sentence, an optional line under
 // it, the state badge when it is not a normal success, the role's portrait, folded content and links.
+// The sentence and the line under it take 2 lines each (with «…») when the whole is one tap away: in the folded
+// content («Ver más» unfolds them too) or in what «Abrir» / LinkedIn opens. Without either, they stay whole.
 import type { Tone } from '@compartido/logic/tone';
 import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -7,6 +9,9 @@ import { Icon } from '@/components/icons';
 import { AgentPortrait, Badge, T } from '@/components/ui';
 import { isHttps, openLink } from '@/navigation';
 import { colors, radius, shell, space } from '@/theme/tokens';
+
+/** Lines of the sentence and of the line under it while their whole is one tap away. */
+export const TIMELINE_LINES = 2;
 
 export interface TimelineItemProps {
   /** Dot colour: the layer's, or tinta-suave for the small items. */
@@ -31,6 +36,7 @@ export interface TimelineItemProps {
 export function TimelineItem({ color, time, title, sub, badge, agent, to, linkLabel = 'Abrir', externalUrl, children, expandLabel = 'Ver más', testID }: TimelineItemProps) {
   const [open, setOpen] = useState(false);
   const external = isHttps(externalUrl) ? externalUrl : null;
+  const lines = !open && (children || to || external) ? TIMELINE_LINES : undefined;
   return (
     <View style={styles.item} testID={testID} collapsable={false}>
       <View style={[styles.dot, { backgroundColor: color }]} />
@@ -40,10 +46,12 @@ export function TimelineItem({ color, time, title, sub, badge, agent, to, linkLa
       <View style={styles.body}>
         <View style={styles.titleRow}>
           {agent ? <AgentPortrait role={agent} size="sm" /> : null}
-          <T style={styles.title}>{title}</T>
+          <T style={styles.title} numberOfLines={lines}>
+            {title}
+          </T>
         </View>
         {sub ? (
-          <T variant="detalle" soft>
+          <T variant="detalle" soft numberOfLines={lines}>
             {sub}
           </T>
         ) : null}

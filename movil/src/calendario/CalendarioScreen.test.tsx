@@ -160,12 +160,16 @@ describe('Calendario · semana', () => {
     await waitFor(() => expect(screen.queryByTestId('hoja-dia')).toBeNull());
   });
 
-  it('opens the piece from the day sheet', async () => {
+  it('opens the piece by tapping its card in the day sheet, which shows a clamped preview', async () => {
     server();
     await renderCalendario();
     await fireEvent.press(await screen.findByTestId('dia-2026-11-07'));
-    const link = await within(sheet()).findByText('Ver cómo se escribió');
-    await fireEvent.press(link);
+    const card = await within(sheet()).findByTestId('pieza-del-dia');
+    expect(card).toHaveProp('accessibilityRole', 'link');
+    expect(within(sheet()).queryByText('Ver cómo se escribió')).toBeNull();
+    // The thesis (and the first lines, when there are) take two lines with «…»: the detail has the rest.
+    expect(within(card).getAllByText(/.+/).filter((text) => text.props.numberOfLines === 2).length).toBeGreaterThan(0);
+    await fireEvent.press(card);
     expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/calendario/pieza/p7', params: {} });
   });
 

@@ -9,6 +9,33 @@ import { Select } from '@/components/ui/Select';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { space } from '@/theme/tokens';
 
+/** What a referent decision rests on (Tu turno shows it under «Ver más»): the change, the occupancy, the evidence and
+ * its limits, or the experiment's plan. */
+export function ReferentDetails({ card }: { card: TurnoCard }) {
+  const change = card.referent_change;
+  const exp = card.referent_experiment;
+  return <View style={{ gap: space[2] }}>
+    {change ? <>
+      <T>{card.body}</T>
+      <T>{change.occupancy.main} main protegidos · {change.occupancy.variables}/10 variables · {change.occupancy.before} → {change.occupancy.after}/15 activos</T>
+      {change.outgoing ? <ExternalLink href={change.outgoing.profile_url}>{`Sale: ${change.outgoing.display_name}`}</ExternalLink> : null}
+      {change.proposal.incoming ? <>
+        <ExternalLink href={change.proposal.incoming.profile_url}>{`Entra: ${change.proposal.incoming.display_name}`}</ExternalLink>
+        <T>{change.proposal.incoming.top_voice ? 'Top Voice verificado con fuente' : 'Top Voice: no verificado · voz del nicho'}</T>
+        <T>Nicho: {change.proposal.incoming.niche}</T><T>Audiencia: {change.proposal.incoming.audience}</T>
+        <T>Aporte: {change.proposal.incoming.contribution}</T><T>Hipótesis por medir; el alta no inicia un experimento.</T>
+      </> : null}
+      <T>{evidenceSummary(change)}</T>
+      <T>Muestra y límites: evidencia observacional parcial; no identifica a todos los seguidores ni demuestra causalidad.</T>
+      {change.limitations.map((line, i) => <T key={i}>{line}</T>)}
+      {change.sources.map(source => <View key={source.id}><ExternalLink href={source.url}>{source.title || source.url}</ExternalLink><T variant="detalle">{source.retrieved_at}</T></View>)}
+      {change.conflict ? <T accessibilityRole="alert">{change.conflict}</T> : null}
+    </> : null}
+    {exp ? experimentLines(exp).map((line, i) => <T key={i}>{line}</T>) : null}
+  </View>;
+}
+
+/** The decision's own buttons, always visible on its card: «Gestionar protegidos» and «Editar» (with its sheet). */
 export function ReferentDecision({ card }: { card: TurnoCard }) {
   const change = card.referent_change;
   const exp = card.referent_experiment;
@@ -30,23 +57,6 @@ export function ReferentDecision({ card }: { card: TurnoCard }) {
     } catch (e) { setError(e instanceof Error ? e : new Error('No se pudo guardar.')); }
   };
   return <View style={{ gap: space[2] }}>
-    {change ? <>
-      <T>{card.body}</T>
-      <T>{change.occupancy.main} main protegidos · {change.occupancy.variables}/10 variables · {change.occupancy.before} → {change.occupancy.after}/15 activos</T>
-      {change.outgoing ? <ExternalLink href={change.outgoing.profile_url}>{`Sale: ${change.outgoing.display_name}`}</ExternalLink> : null}
-      {change.proposal.incoming ? <>
-        <ExternalLink href={change.proposal.incoming.profile_url}>{`Entra: ${change.proposal.incoming.display_name}`}</ExternalLink>
-        <T>{change.proposal.incoming.top_voice ? 'Top Voice verificado con fuente' : 'Top Voice: no verificado · voz del nicho'}</T>
-        <T>Nicho: {change.proposal.incoming.niche}</T><T>Audiencia: {change.proposal.incoming.audience}</T>
-        <T>Aporte: {change.proposal.incoming.contribution}</T><T>Hipótesis por medir; el alta no inicia un experimento.</T>
-      </> : null}
-      <T>{evidenceSummary(change)}</T>
-      <T>Muestra y límites: evidencia observacional parcial; no identifica a todos los seguidores ni demuestra causalidad.</T>
-      {change.limitations.map((line, i) => <T key={i}>{line}</T>)}
-      {change.sources.map(source => <View key={source.id}><ExternalLink href={source.url}>{source.title || source.url}</ExternalLink><T variant="detalle">{source.retrieved_at}</T></View>)}
-      {change.conflict ? <T accessibilityRole="alert">{change.conflict}</T> : null}
-    </> : null}
-    {exp ? experimentLines(exp).map((line, i) => <T key={i}>{line}</T>) : null}
     <Button onPress={() => router.push('/personas?pestana=referentes')}>Gestionar protegidos</Button>
     {(change?.can_decide || exp?.can_decide) ? <Button onPress={() => { setFields(change ? editFields(change) : null); setPlan(exp?.plan); setStart(exp?.starts_at ?? ''); setError(null); run.reset(); setEditing(true); }} testID={`edit-${card.id}`}>Editar</Button> : null}
     {editing ? <Sheet label={change ? 'Editar propuesta de referentes' : 'Revisar experimento'} suspended={run.isPending} onClose={() => setEditing(false)} testID="referent-edit">

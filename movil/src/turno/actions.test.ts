@@ -1,6 +1,7 @@
 import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, questionCard, UNCERTAIN_CARD, cardFixture } from '@compartido/fixtures/turno';
+import type { TurnoCard } from '@compartido/api/types';
 import { APPROVED_MESSAGE } from '@compartido/logic/events';
-import { cardTitle, modalFor, orderedActions, successMessage, swipeIntents, withNote } from './actions';
+import { cardSummary, cardTitle, hasDetails, modalFor, orderedActions, successMessage, SUMMARY_FITS, swipeIntents, withNote } from './actions';
 import { commitSide, dragOffset, pastCommit, revealProgress } from './swipe';
 
 describe('card actions', () => {
@@ -88,5 +89,24 @@ describe('swipe rules (motion.ts gestures.swipe)', () => {
     expect(pastCommit(99, width)).toBe(true);
     expect(revealProgress(0, width)).toBe(0);
     expect(revealProgress(99, width)).toBe(1);
+  });
+});
+
+describe('collapsed cards (title and a two-line summary; the rest under «Ver más»)', () => {
+  it('sums a card up by what it is about: the message, the comment to check, or its body', () => {
+    expect(cardSummary(CONVERSATION_CARD)).toBe('“Hola Gustavo, ¿tienes disponibilidad para un proyecto corto de IA en enero?”');
+    expect(cardSummary(UNCERTAIN_CARD)).toBe('“Scoping from the decision a feature supports is what keeps the first version small.”');
+    expect(cardSummary(APPROVAL_CARD)).toBe('Lidera producto en un marketplace B2B.');
+    expect(cardSummary(questionCard())).toBe('Para el post del jueves sobre arquitectura. Sin un caso real, el post se queda en opinión.');
+    expect(cardSummary(EXPIRING_CARD)).toBe('El permiso para publicar caduca pronto.');
+    expect(cardSummary(cardFixture({ expires_at: '2026-11-20T15:00:00Z', days_left: 1 } as Partial<TurnoCard>))).toMatch(/^El permiso para publicar caduca el .* \(queda 1 día\)\. LinkedIn no deja renovarlo solo\.$/);
+  });
+
+  it('offers «Ver más» only when it shows something new', () => {
+    expect(hasDetails(CONVERSATION_CARD)).toBe(true);
+    expect(hasDetails(UNCERTAIN_CARD)).toBe(true);
+    expect(hasDetails(APPROVAL_CARD)).toBe(true);
+    expect(hasDetails(cardFixture({ id: 'aviso:corto', type: 'aviso', body: 'Corto.' }))).toBe(false);
+    expect(hasDetails(cardFixture({ id: 'aviso:largo', type: 'aviso', body: 'x'.repeat(SUMMARY_FITS + 1) }))).toBe(true);
   });
 });

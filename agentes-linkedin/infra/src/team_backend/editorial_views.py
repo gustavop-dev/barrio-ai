@@ -1,5 +1,6 @@
 """Editorial calendar API for the office PWA (docs/publicacion-diaria.md)."""
 from datetime import date, timedelta
+from django.db.models.fields.files import FieldFile
 from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
@@ -83,6 +84,16 @@ class PieceImageFile(FileView):
         row=PieceImage.objects.filter(piece_id=pid,id=iid).first()
         if row is None:raise NotFound()
         return serve(request,row.image,row.mime)
+
+
+class PieceRejectedImageFile(FileView):
+    """IMG-10: the AI edit the visual check rejected, so Gustavo can see it next to the original."""
+    def get(self,request,pid,iid):
+        require(request.user,'operate_linkedin')
+        row=PieceImage.objects.filter(piece_id=pid,id=iid,kind='foto').first()
+        kept=((row.data or {}).get(imagenes.REJECTED) or {}) if row else {}
+        if not kept.get('path'):raise NotFound()
+        return serve(request,FieldFile(row,PieceImage._meta.get_field('image'),kept['path']),'image/png')
 
 
 class PieceDocument(FileView):

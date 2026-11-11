@@ -2,12 +2,13 @@
 // uploads for his posts; the team decides when to use them and whether to edit them with AI.
 // A virtualized 3-column grid, the filter in the route (`/galeria?filtro=sin_usar`), pull to refresh,
 // the upload with its progress, and the photo sheet with the full-screen viewer.
-import { useGaleria, type PhotoCategory, type GaleriaFiltro, type PhotoOutput } from '@compartido/api/capturas';
-import { PROFILE_CONSENT, FILTERS, isFiltro, photoName, photoTone } from '@compartido/logic/galeria';
+import { useGaleria, type GaleriaFiltro, type PhotoOutput } from '@compartido/api/capturas';
+import { FILTERS, isFiltro, photoName, photoTone } from '@compartido/logic/galeria';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { DismissibleHint } from '@/components/Hint';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Icon } from '@/components/icons';
 import { ApiImage, Button, EmptyState, EmptyText, ErrorRetry, FilterChip, Note, PageHeader, Skeleton, T, pageContent } from '@/components/ui';
@@ -72,8 +73,8 @@ export function GaleriaScreen() {
   const [choice, setChoice] = useState<{ link: GaleriaFiltro; value: GaleriaFiltro } | null>(null);
   const filtro = choice && choice.link === linked ? choice.value : linked;
   const galeria = useGaleria(filtro);
-  const [category, setCategory] = useState<PhotoCategory>('posts');
-  const upload = useGalleryUpload(category);
+  // Uploads go to Posts; the category is changed inside each photo (PhotoSheet), not asked twice.
+  const upload = useGalleryUpload();
   const { width } = useWindowDimensions();
   const { bottom } = useContentInsets();
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -131,12 +132,6 @@ export function GaleriaScreen() {
   const header = (
     <View style={styles.header}>
       <PageHeader title="Galería" subtitle="Fotos para tus posts y tu perfil." />
-      <T variant="detalle">Categoría al subir</T>
-      <View style={styles.chips}>
-        <FilterChip pressed={category === 'posts'} onPress={() => { if (!upload.pending) setCategory('posts'); }}>Posts</FilterChip>
-        <FilterChip pressed={category === 'perfil'} onPress={() => { if (!upload.pending) setCategory('perfil'); }} testID="upload-category-perfil">Perfil</FilterChip>
-      </View>
-      {category === 'perfil' ? <Note tone="info">{PROFILE_CONSENT}</Note> : null}
       <Pressable
         accessibilityRole="button"
         accessibilityLabel={upload.pending ? 'Subiendo…' : 'Subir fotos'}
@@ -149,16 +144,21 @@ export function GaleriaScreen() {
         <Icon name="galeria" size={22} color={upload.pending ? colors.inkSoft : colors.ink} />
         <T color={upload.pending ? colors.inkSoft : colors.ink}>{upload.pending ? 'Subiendo…' : 'Subir fotos'}</T>
       </Pressable>
-      <T variant="detalle" soft>
-        Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería».
-      </T>
+      {/* How-to hints: they leave by themselves and a sideways swipe removes them for good. */}
+      <DismissibleHint persistId="galeria-camara" testID="hint-galeria-camara">
+        <T variant="detalle" soft>
+          Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería».
+        </T>
+      </DismissibleHint>
       {upload.rejected ? (
         <T variant="detalle" color={colors.alert}>
           {upload.rejected}
         </T>
       ) : null}
       {upload.photos.length ? <UploadProgressCard upload={upload} /> : null}
-      <Note tone="info">El equipo decide cuándo usarlas y si las edita con IA. Tú puedes dejar una nota o prohibir la edición en cada foto.</Note>
+      <DismissibleHint persistId="galeria-ia" testID="hint-galeria-ia">
+        <Note tone="info">El equipo decide cuándo usarlas y si las edita con IA. Tú puedes dejar una nota o prohibir la edición en cada foto.</Note>
+      </DismissibleHint>
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}

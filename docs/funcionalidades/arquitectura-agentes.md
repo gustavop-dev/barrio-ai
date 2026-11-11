@@ -20,7 +20,7 @@ Se conservan las llamadas agrupadas A/B y lectores, los prompts y la reparación
 | [ARQ-05](#arq-05) | Límites por ciclo, gasto y trazabilidad | PWA · app · backend | funciona |
 | [ARQ-06](#arq-06) | Validación del grafo y rechazo de llamadas no declaradas | backend | funciona |
 | [ARQ-07](#arq-07) | Diagramas Mermaid generados y comprobados en CI | documentación · backend | funciona |
-| [ARQ-08](#arq-08) | Mapa del equipo en PWA y app | PWA · app · backend | funciona |
+| [ARQ-08](#arq-08) | Mapa del equipo en la PWA (retirado de la app) | PWA · backend | funciona |
 | [ARQ-09](#arq-09) | Añadir un agente con contrato y evaluación | documentación · backend | funciona |
 | [ARQ-10](#arq-10) | OpenAI responde cuando Claude no puede | backend | funciona |
 
@@ -235,7 +235,7 @@ La migración muestra las condiciones actuales (`LEAD_ENABLED`, capacidad, modo 
 
 ### ARQ-08 · Mapa del equipo en PWA y app <a id="arq-08"></a>
 
-- **Dónde:** PWA · app · backend
+- **Dónde:** PWA · backend. Gustavo pidió quitarlo de la app el 11/11/2026: la pantalla, su ruta `/equipo` y sus enlaces (Oficina, Ajustes y la ficha del editor visual) ya no existen allí.
 - **Estado:** funciona
 - **Alcance 3a:** Lista por grupos/ciclos y ficha con misión, unidades, conexiones y actividad existente. Sin canvas gigante ni acciones de ejecución. No inventa actividad cuando no hay atribución; 3b agrega actividad procedente de los ledgers de pieza/red.
 - **Qué hace para Gustavo:** abre «Mapa del equipo», ve las relaciones por grupo/ciclo y entiende qué hace cada agente, a quién consulta y qué hizo recientemente.
@@ -251,7 +251,7 @@ La migración muestra las condiciones actuales (`LEAD_ENABLED`, capacidad, modo 
   4. **Dado** un nodo planificado, sin historial, registro nuevo frente a ciclo antiguo o fallo de conexión, **cuando** se muestra, **entonces** dice «En diseño», «Sin actividad registrada», distingue las versiones o muestra último dato con fecha/error respectivamente; no simula actividad ni mezcla ciclos.
   5. **Dado** el endpoint o panel, **cuando** se inspecciona, **entonces** no expone tokens, prompts con memoria privada, inbox ni detalles personales innecesarios; solo usuarios autorizados ven el mapa y los enlaces respetan permisos del artefacto de destino.
 - **Brechas código/docs:** OFI-04 muestra equipos/roles, no sus conexiones. OFI-10 añadirá el visual a la oficina; ambos consumen el registro en lugar de mantener dos listas de agentes.
-- **Cobertura QA:** `17-mapa-equipo.yaml` (ARQ-08), Jest y Vitest con fake backend; ejecución pendiente en CI/QA.
+- **Cobertura QA:** Vitest con fake backend (PWA). El flujo de la app `17-mapa-equipo.yaml` se retiró con la pantalla.
 
 
 ### ARQ-09 · Añadir un agente con contrato y evaluación <a id="arq-09"></a>
