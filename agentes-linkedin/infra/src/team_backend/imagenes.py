@@ -283,8 +283,15 @@ def published(piece,when=None):
         state='publicada',chosen_piece=piece,chosen_for=piece.slot_date,published_at=when or timezone.now())
 
 
+def url(row):
+    """The file's path, versioned by its content: a rework replaces the bytes of the same row, and the app (expo-image,
+    keyed by path) and the browser (max-age) would keep showing the cached previous image."""
+    path=f'/api/v1/editorial/pieces/{row.piece_id}/images/{row.id}'
+    return f'{path}?v={row.sha256[:16]}' if row.sha256 else path
+
+
 def payload(row):
-    return {'id':str(row.id),'kind':row.kind,'position':row.position,'url':f'/api/v1/editorial/pieces/{row.piece_id}/images/{row.id}',
+    return {'id':str(row.id),'kind':row.kind,'position':row.position,'url':url(row),
             'alt':row.alt,'width':row.width,'height':row.height,'mime':row.mime,'sha256':row.sha256,
             'source_photos':[{'id':str(row.source_photo_id),'url':f'/api/v1/galeria/{row.source_photo_id}/imagen'}] if row.source_photo_id else [],
             'edited':row.edited,'ai_edit':row.ai_edit,'reason':row.reason,'template':row.template or None,'review':row.review}

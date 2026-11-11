@@ -268,6 +268,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   6. **Dado** que ya pasó la hora o la pieza se está publicando, **cuando** abre el detalle, **entonces** no hay botón de veto.
   7. **Dado** que la imagen no carga, **cuando** abre el detalle, **entonces** ve un aviso en su lugar («No se pudo cargar la imagen») con «Reintentar», y el resto del detalle sigue.
   8. **Dado** una pieza en preparación sin imagen todavía, **cuando** abre el detalle, **entonces** ve «La imagen aparece cuando el equipo la prepare».
+  9. **Dado** una imagen rehecha (por un comentario suyo, [EDI-22](motor-editorial.md#edi-22)), **cuando** vuelve a abrir el detalle, **entonces** ve la imagen nueva y no la que guardó antes el teléfono o el navegador: la URL de cada imagen lleva su versión (`?v=` + los primeros 16 caracteres de su sha256, `imagenes.url`), así que cambia con su contenido.
 - **Brechas código/docs:** Implementación de interfaz terminada; CI y QA visual pendientes.
 - **Cobertura QA:** `16-imagenes` (foto, infografía, carrusel de cuatro láminas y alt); `07-pieza-veto` (veto de la pieza completa). Jest/Vitest: original y editada, reintento, revisión, preparación, alt, paginación, hash recibido y fin del veto. Escritos; ejecución pendiente de Claude.
 

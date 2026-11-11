@@ -124,6 +124,21 @@ class ReworkTests(ReworkBase):
         self.assertEqual(retoque.run(capture), capture)  # never twice
         self.assertEqual(piece.proposals.count(), 2)
 
+    def test_the_reworked_image_gets_a_new_url_so_no_client_shows_the_cached_previous_one(self):
+        piece, old = self.ready()
+        row = piece.images.get()
+        before = imagenes.payload(row)['url']
+        self.rework(self.comment(piece, 'Ponme en un coworking.'),
+                    {'retoque': decision('imagen', 'editar_foto', instruction=INSTRUCTION)},
+                    FakeImageConnector(edited=png((1024, 1024), '#dedfd4')))
+        row.refresh_from_db()
+        after = imagenes.payload(row)['url']
+        self.assertNotEqual(before, after)
+        self.assertEqual(after, f'/api/v1/editorial/pieces/{piece.id}/images/{row.id}?v={row.sha256[:16]}')
+        response = self.human.get(after)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(imagenes.sha(b''.join(response.streaming_content)), row.sha256)
+
     def test_a_text_comment_is_verified_again_and_moves_when_the_veto_window_no_longer_fits(self):
         soon = timezone.now() + timedelta(minutes=20)
         piece, old = self.ready(at=soon)
