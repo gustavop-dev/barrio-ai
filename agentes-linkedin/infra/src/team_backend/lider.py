@@ -8,7 +8,10 @@ Order of the gate in autopiloto.policy_review (mode `auto`):
    and the team drafts something else. Gustavo steers through his orientation and the results, not per action.
 
 If Jev is unavailable the proposal stays pending and is retried after LEAD_RETRY_MINUTES; it expires on its TTL.
-Thresholds start conservative and are meant to be tuned with real outcomes."""
+Thresholds start conservative and are meant to be tuned with real outcomes.
+
+A post Gustavo asked for (the piece uses his ideas or he commented it) is judged much more softly: his own words are
+facts Jev may read, and a check only fails when Jev is fairly sure of it (GUSTAVO_THRESHOLDS)."""
 import os
 from datetime import timedelta
 from django.utils import timezone
@@ -54,6 +57,21 @@ CHECKS={
     CAP.ACCEPT:[('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
 }
 ORIENTATION_CHECK=('orientacion','min',0.4,'contradice la orientación de Gustavo')
+# His own request: «min» checks fail only below these (yes clearly unlikely), «max» checks only above (yes clearly likely).
+GUSTAVO_THRESHOLDS={'clara':0.3,'pitch':0.6,'inventa':0.6,'idioma':0.5,'orientacion':0.2}
+GUSTAVO_TEXTS,GUSTAVO_TEXT_CHARS=8,1500
+
+def gustavo_request(proposal):
+    """What Gustavo said for this post (the ideas the piece uses and his comments on it), oldest first; [] when the
+    post is the team's own."""
+    if proposal.capability!=CAP.PUBLISH or not proposal.piece_id:return []
+    from django.db.models import Q
+    from .models import Capture
+    pid=str(proposal.piece_id)
+    rows=Capture.objects.filter(Q(state=Capture.State.USED,routed_to__used_in=pid)|
+                                Q(state=Capture.State.NOTED,context_type='pieza',context_id=pid)).order_by('created_at')
+    texts=[' '.join((c.text or '').split())[:GUSTAVO_TEXT_CHARS] for c in rows]
+    return [t for t in texts if t][-GUSTAVO_TEXTS:]
 
 def enabled():
     return os.environ.get('LEAD_ENABLED','false').lower()=='true'
@@ -92,12 +110,18 @@ def _questions(proposal,orientation):
         kind='text'
     elif capability==CAP.PUBLISH:
         state={'publicacion':proposal.payload['text']}
+        asked=gustavo_request(proposal)
         questions={
             'clara':_noul('¿La `publicacion` desarrolla una sola idea clara que un lector puede entender sin contexto adicional?'),
             'pitch':_noul('¿La `publicacion` vende de forma agresiva, crea urgencia artificial o pide que le escriban o lo contraten?'),
             'inventa':_noul('¿La `publicacion` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
                             'no aparece en `hechos_publicos_de_gustavo`?'),
         }
+        if asked:
+            state['pedido_de_gustavo']=asked
+            questions['inventa']=_noul('¿La `publicacion` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un '
+                                       'resultado que no aparece en `hechos_publicos_de_gustavo` ni en lo que él mismo contó en '
+                                       '`pedido_de_gustavo`?')
         kind='post'
     else:
         # Whether the person fits is judged once, by the classifier, and checked by red.network_issues (audit R2).
@@ -134,6 +158,8 @@ def _questions(proposal,orientation):
         state['orientacion_de_gustavo']=orientation
         questions['orientacion']=_noul('¿Esta acción es coherente con `orientacion_de_gustavo`, o al menos no la contradice?')
         checks.append(ORIENTATION_CHECK)
+    if state.get('pedido_de_gustavo'):
+        checks=[(qid,bound,GUSTAVO_THRESHOLDS.get(qid,threshold),label) for qid,bound,threshold,label in checks]
     ground_questions(state,questions)
     return state,questions,checks
 
@@ -162,7 +188,7 @@ def _review(proposal):
     return {'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
             'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
             'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding,
-            'note_approved':bool(proposal.payload.get('note') and not failed)}
+            'note_approved':bool(proposal.payload.get('note') and not failed),'from_gustavo':bool(state.get('pedido_de_gustavo'))}
 
 # --------------------------------------------------------------------------- R5: comment prefilter
 # Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.

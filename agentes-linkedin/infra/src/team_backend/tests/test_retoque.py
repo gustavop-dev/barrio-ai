@@ -8,8 +8,8 @@ from unittest.mock import patch
 from PIL import Image
 from django.utils import timezone
 
-from team_backend import autopiloto, capturas, connectors_images, editor_visual, editorial, guardas, imagenes, operador
-from team_backend import orquestacion, retoque, urgente
+from team_backend import autopiloto, capturas, connectors_images, editor_visual, editorial, guardas, imagenes, lider
+from team_backend import operador, orquestacion, retoque, urgente
 from team_backend.connectors_images import FakeImageConnector
 from team_backend.models import ActionProposal, Capture, CycleLedger, EditorialPiece, GalleryPhoto
 from team_backend.tests import test_imagenes as image_cases
@@ -39,7 +39,7 @@ class SequenceConnector(FakeImageConnector):
         return super().check(images, context, original, instruction)
 
 
-class ReworkTests(EditorialBase):
+class ReworkBase(EditorialBase):
     photo = image_cases.ImageWorkflowTests.photo
     factory = image_cases.ImageWorkflowTests.piece
 
@@ -89,6 +89,8 @@ class ReworkTests(EditorialBase):
         capture.refresh_from_db()
         return capture
 
+
+class ReworkTests(ReworkBase):
     def test_a_photo_comment_edits_the_original_keeps_its_orientation_and_the_hour(self):
         piece, old = self.ready(size=(900, 1200))
         when = piece.scheduled_for
@@ -236,6 +238,127 @@ class ReworkTests(EditorialBase):
         self.assertEqual(retoque.pending_comments(), [])
         earlier.refresh_from_db()
         self.assertNotIn('rework', earlier.routed_to)
+
+    def discard(self, piece, old):
+        """What autopiloto.policy_review leaves when Jev discards the version: the piece stays ready, its ideas and
+        photos go back to the table and the gallery."""
+        reason = 'Líder: atribuye a Gustavo algo que no está en sus hechos (inventa=0.25)'
+        ActionProposal.objects.filter(pk=old.pk).update(state='discarded', risks=list(old.risks) + [reason],
+                                                        review={'decision': 'discard', 'reasons': [reason]})
+        capturas.release_ideas(piece, 'la política no la aprobó')
+        old.refresh_from_db()
+        return reason
+
+    def test_a_comment_on_a_version_the_lead_discarded_reworks_it_and_takes_back_its_photo_and_idea(self):
+        piece, old = self.ready()
+        idea = Capture.objects.create(created_by=self.gustavo, note='Idea con foto', purpose='post', state='usado',
+                                      routed_to={'used_in': str(piece.id)})
+        photo = piece.images.get().source_photo
+        reason = self.discard(piece, old)
+        idea.refresh_from_db()
+        photo.refresh_from_db()
+        self.assertEqual((idea.state, photo.state, photo.chosen_piece_id), ('idea', 'sin_usar', None))
+        self.assertEqual(retoque.eligible(piece), old)
+        later = Capture.objects.create(created_by=self.gustavo, note='Difumina las caras de la pantalla.', context_type='pieza',
+                                       context_id=str(piece.id), state=Capture.State.NOTED, routed_to={'kind': 'pieza'})
+        self.assertEqual([c.id for c, _, _ in retoque.pending_comments()], [later.id])
+        fake = FakeImageConnector(edited=png((1024, 1024), '#dedfd4'))
+        capture = self.rework(self.comment(piece, 'Difumina las caras de la pantalla.'),
+                              {'retoque': decision('imagen', 'editar_foto', instruction=INSTRUCTION)}, fake)
+        piece.refresh_from_db()
+        old.refresh_from_db()
+        idea.refresh_from_db()
+        photo.refresh_from_db()
+        new = piece.proposals.get(state='proposed')
+        self.assertEqual((old.state, old.review['reworked_by'], new.previous_id), ('discarded', str(capture.id), old.id))
+        self.assertEqual((capture.routed_to['rework']['state'], piece.state), ('rehecha', 'ready'))
+        self.assertEqual((photo.state, photo.chosen_piece_id, photo.chosen_for), ('editada', piece.id, piece.slot_date))
+        self.assertEqual((idea.state, idea.routed_to['used_in'], idea.routed_to['intentos'], idea.routed_to['intentos_en']),
+                         ('usado', str(piece.id), 0, []))
+        self.assertNotIn(reason, new.risks)  # the lead judges the new version afresh
+        self.assertEqual(piece.images.get().review['instruction'], INSTRUCTION)
+        self.assertEqual(retoque.eligible(piece), new)
+
+    def test_a_discarded_version_is_reworked_once_and_a_photo_taken_by_another_piece_postpones_it(self):
+        piece, old = self.ready()
+        self.discard(piece, old)
+        ActionProposal.objects.filter(pk=old.pk).update(review={'reworked_by': 'otro-comentario'})
+        with patch('knowledge.providers.claude', side_effect=AssertionError('No paid call')):
+            capture = self.rework(self.comment(piece, 'Cambia la foto.'), {})
+        self.assertEqual(capture.routed_to['rework']['state'], 'sin_cambios')
+        self.assertIn('ya está rehaciendo', capture.outcome['text'])
+        other, _ = self.ready(days=5)
+        piece, old = self.ready(days=4)
+        self.discard(piece, old)
+        GalleryPhoto.objects.filter(pk=piece.images.get().source_photo_id).update(state='elegida', chosen_piece=other)
+        with patch('knowledge.providers.claude', side_effect=AssertionError('No paid call')):
+            capture = self.rework(self.comment(piece, 'Cambia la foto.'), {})
+        piece.refresh_from_db()
+        self.assertEqual((piece.state, capture.routed_to['rework']['state']), ('blocked', 'aplazada'))
+        self.assertEqual(GalleryPhoto.objects.get(pk=piece.images.get().source_photo_id).chosen_piece_id, other.id)
+
+    def test_the_next_photo_comment_sees_the_edit_his_earlier_comment_asked_for(self):
+        piece, old = self.ready()
+        self.rework(self.comment(piece, 'Ponme en un coworking.'),
+                    {'retoque': decision('imagen', 'editar_foto', instruction=INSTRUCTION)})
+        self.calls = []
+        self.rework(self.comment(piece, 'Difumina las caras de la pantalla.'),
+                    {'retoque': decision('imagen', 'editar_foto', instruction=INSTRUCTION + ' Blur the faces on the screen.')})
+        image = self.calls[0][1]['image']['images'][0]
+        self.assertEqual(image['edit_instruction'], INSTRUCTION)
+        self.assertIn('parte de la foto\n  original', editorial.RETOUCH_SYSTEM)
+
+
+class SoftLeadTests(ReworkBase):
+    """A post Gustavo asked for is judged much more softly by the lead, with his own words as facts."""
+
+    def setUp(self):
+        super().setUp()
+        from team_backend.tests.test_rediseno import JevMock
+        import httpx
+        from knowledge import providers
+        env = patch.dict('os.environ', {'LEAD_ENABLED': 'true', 'LIVE_PROVIDERS': 'true', 'TYPESAFE_API_KEY': 'ts-test-key',
+                                        'TYPESAFE_LIMIT_USD': '1'})
+        env.start()
+        self.addCleanup(env.stop)
+        self.jev = JevMock({'clara': 0.84, 'pitch': 0.03, 'idioma': 0.98, 'inventa': 0.25})
+        transport = patch.object(providers, 'TYPESAFE_TRANSPORT', httpx.MockTransport(self.jev))
+        transport.start()
+        self.addCleanup(transport.stop)
+
+    def proposed(self):
+        piece, old = self.ready()
+        ActionProposal.objects.filter(pk=old.pk).update(state='proposed', approved_hash='')
+        old.refresh_from_db()
+        return piece, old
+
+    def test_the_team_s_own_post_keeps_the_strict_thresholds(self):
+        piece, proposal = self.proposed()
+        verdict = lider.review(proposal)
+        self.assertEqual((verdict['decision'], verdict['from_gustavo']), ('discard', False))
+        self.assertEqual(verdict['thresholds']['inventa'], ['max', 0.2])
+        self.assertNotIn('pedido_de_gustavo', self.jev.requests[-1]['state'])
+
+    def test_his_idea_or_comment_makes_the_lead_soft_and_his_words_are_facts(self):
+        piece, proposal = self.proposed()
+        Capture.objects.create(created_by=self.gustavo, note='Cuento que di una clase de producto por Zoom.', purpose='post',
+                               state='usado', routed_to={'used_in': str(piece.id)})
+        Capture.objects.create(created_by=self.gustavo, note='Edita la foto con un coworking detrás.', context_type='pieza',
+                               context_id=str(piece.id), state=Capture.State.NOTED, routed_to={'kind': 'pieza'})
+        verdict = lider.review(proposal)
+        self.assertEqual((verdict['decision'], verdict['from_gustavo'], verdict['reasons']), ('approve', True, []))
+        self.assertEqual(verdict['thresholds'], {'clara': ['min', 0.3], 'pitch': ['max', 0.6], 'inventa': ['max', 0.6],
+                                                 'idioma': ['min', 0.5]})
+        body = self.jev.requests[-1]
+        self.assertEqual(body['state']['pedido_de_gustavo'],
+                         ['Cuento que di una clase de producto por Zoom.', 'Edita la foto con un coworking detrás.'])
+        self.assertIn('pedido_de_gustavo', body['questions']['inventa']['instructions'])
+        # Soft is not blind: a clear failure still stops it.
+        self.jev.probabilities = dict(self.jev.probabilities, inventa=0.8)
+        proposal.review = {}
+        verdict = lider.review(proposal)
+        self.assertEqual(verdict['decision'], 'discard')
+        self.assertIn('inventa=0.8', verdict['reasons'][0])
 
 
 class BindingV2Tests(EditorialBase):

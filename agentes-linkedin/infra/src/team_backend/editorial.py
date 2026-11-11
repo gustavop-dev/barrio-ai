@@ -283,7 +283,9 @@ el líder antes de salir.
   Sin cambio de texto: final_text vacío, changes y claims vacíos.
 - Con imagen: image_route="editar_foto" para editar la foto de la pieza (image.photos) según su comentario;
   image_instruction es la edición en inglés, concreta y fiel a lo que pidió (fondo o lugar, peinado, ropa, luz,
-  encuadre); conserva su cara e identidad y no pidas texto, cifras, logos ni marcas. image_route="infografia" si
+  encuadre); conserva su cara e identidad y no pidas texto, cifras, logos ni marcas. La edición parte de la foto
+  original: si la imagen actual ya trae una edición pedida antes (image.images[].edit_instruction o reason),
+  image_instruction la repite junto al cambio nuevo, salvo que él pida quitarla. image_route="infografia" si
   pide otra imagen sin foto o la pieza es una infografía; image_instruction resume en inglés qué debe cambiar.
   if_image_fails: "infografia" si el post se sostiene con una infografía cuando la edición no pasa la revisión
   visual; "aplazar" si el post depende de su foto. Sin imagen: image_route="ninguna" e image_instruction vacía.

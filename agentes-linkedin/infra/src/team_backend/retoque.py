@@ -8,6 +8,9 @@ has already decided whether the post stands with an infographic or is postponed.
 proposal goes to the policy gate (Jev) at the same hour when his veto window still fits, otherwise at the next free
 slot. Nothing here approves or publishes; a failure never publishes the old version: the piece is blocked and his
 ideas go back to the editorial table.
+
+A ready piece whose last version the lead (or the policy) discarded is reworked too: his comment is an order, and the
+discard only said that version does not go out. The photos and ideas the discard released are taken back first.
 """
 import os
 from datetime import timedelta
@@ -19,7 +22,7 @@ from django.utils import timezone
 
 from . import capturas, editor_visual, editorial, guardas, imagenes, operador, orientacion, orquestacion, urgente
 from .grafo import load_graph
-from .models import ActionExecution, ActionProposal, Capture, ConnectorAccount, CycleLedger, EditorialPiece, Job
+from .models import ActionExecution, ActionProposal, Capture, ConnectorAccount, CycleLedger, EditorialPiece, GalleryPhoto, Job
 
 CYCLE = 'retoque_pieza'
 GATE_EDGE = 'pieza_diaria_gate_0'
@@ -38,12 +41,22 @@ def open_proposal(piece):
     return piece.proposals.filter(state__in=OPEN, execution__isnull=True).order_by('-created_at').first()
 
 
+def discarded(piece):
+    """The last version of the piece when the lead or the policy discarded it and no rework has claimed it yet."""
+    last = piece.proposals.order_by('-created_at').first()
+    if (last is None or last.state != ActionProposal.State.DISCARDED or (last.review or {}).get('reworked_by')
+            or ActionExecution.objects.filter(proposal=last).exists()):
+        return None
+    return last
+
+
 def eligible(piece, now=None):
-    """The open proposal of a ready piece that has not gone out yet, or None: then the comment is only noted."""
+    """The version his comment reworks on a ready piece that has not gone out yet (its open proposal, or the last one
+    when the lead discarded it), or None: then the comment is only noted."""
     now = now or timezone.now()
     if piece is None or piece.state != EditorialPiece.State.READY or piece.scheduled_for <= now:
         return None
-    return open_proposal(piece)
+    return open_proposal(piece) or discarded(piece)
 
 
 def gate_left(piece):
@@ -93,13 +106,16 @@ def run(capture):
     if gate_left(piece) < 1 or editorial.budget_left() < min_usd():
         why = ('ya no le quedan revisiones del líder en su ciclo' if gate_left(piece) < 1
                else 'no queda presupuesto de IA para rehacerla hoy')
-        _notice('piece_blocked', f'No pude rehacer la pieza del {day}',
-                f'Tu comentario quedó anotado, pero {why}. Si no quieres que salga así, vétala en su detalle.', piece,
-                f'piece_rework:{capture.id}')
-        return _record(capture, 'sin_retoque', f'Quedó anotado, pero {why}. Si no quieres que salga así, vétala.')
+        after = ('Esa versión ya no sale.' if old.state == ActionProposal.State.DISCARDED
+                 else 'Si no quieres que salga así, vétala en su detalle.')
+        _notice('piece_blocked', f'No pude rehacer la pieza del {day}', f'Tu comentario quedó anotado, pero {why}. {after}',
+                piece, f'piece_rework:{capture.id}')
+        return _record(capture, 'sin_retoque', f'Quedó anotado, pero {why}. {after}')
     if not _hold(old, capture):
         return _record(capture, 'sin_cambios', 'La pieza ya se estaba publicando; tu comentario queda para el equipo.')
     try:
+        if old.state == ActionProposal.State.DISCARDED:
+            _revive(piece)
         return _rework(capture, piece, old)
     except Exception as exc:
         reason = str(exc) if isinstance(exc, (ValueError, orquestacion.CycleStopped)) else 'error interno al rehacerla'
@@ -110,10 +126,20 @@ def run(capture):
 
 
 def _hold(old, capture):
-    """The commented version never publishes: supersede it unless it is already being executed."""
+    """The commented version never publishes: supersede it unless it is already being executed. A discarded version
+    already does not publish: the rework only claims it, so a second comment does not start a second rework."""
     with transaction.atomic():
         proposal = ActionProposal.objects.select_for_update().get(pk=old.pk)
-        if proposal.state not in OPEN or ActionExecution.objects.filter(proposal=proposal).exists():
+        if ActionExecution.objects.filter(proposal=proposal).exists():
+            return False
+        if proposal.state == ActionProposal.State.DISCARDED:
+            if (proposal.review or {}).get('reworked_by') or proposal.piece.proposals.filter(created_at__gt=proposal.created_at).exists():
+                return False
+            proposal.review = dict(proposal.review or {}, reworked_by=str(capture.id))
+            proposal.save(update_fields=['review'])
+            operador._audit(None, 'editorial.rework_after_discard', proposal.id, capture=str(capture.id))
+            return True
+        if proposal.state not in OPEN:
             return False
         proposal.state = ActionProposal.State.SUPERSEDED
         proposal.decided_at = timezone.now()
@@ -121,6 +147,30 @@ def _hold(old, capture):
         proposal.save(update_fields=['state', 'decided_at', 'decision_note'])
         operador._audit(None, 'operator.superseded', proposal.id, reason='comment', capture=str(capture.id))
     return True
+
+
+def _revive(piece):
+    """Take back what the discard released (capturas.release_ideas): the piece's photos (when another piece chose or
+    published one meanwhile, the rework fails and the piece is postponed) and the ideas whose last attempt was this
+    piece and that no other piece reserved since."""
+    for row in piece.images.exclude(source_photo=None).select_related('source_photo'):
+        photo = row.source_photo
+        if photo.chosen_piece_id not in (None, piece.id) or photo.state == GalleryPhoto.State.PUBLISHED:
+            raise ValueError('Su foto ya la usa otra pieza')
+        if photo.chosen_piece_id is None:
+            photo.state = GalleryPhoto.State.EDITED if row.edited else GalleryPhoto.State.CHOSEN
+            photo.chosen_piece, photo.chosen_for = piece, piece.slot_date
+            photo.save(update_fields=['state', 'chosen_piece', 'chosen_for'])
+    pid = str(piece.id)
+    for capture in Capture.objects.filter(state=Capture.State.IDEA, publish_asap_expected_slot__isnull=True,
+                                          routed_to__intentos_en__contains=[pid]):
+        routed = dict(capture.routed_to or {})
+        if routed['intentos_en'][-1:] != [pid]:
+            continue
+        routed.update(intentos=max(routed.get('intentos', 1) - 1, 0), intentos_en=routed['intentos_en'][:-1])
+        capture.routed_to = routed
+        capture.save(update_fields=['routed_to'])
+        capturas.mark_used([capture.id], piece)
 
 
 def _fail(capture, piece, reason):
@@ -169,7 +219,8 @@ def _image_context(piece):
     photos = {p['id']: p for p in editor_visual.gallery(piece)}
     rows = list(piece.images.order_by('position'))
     return {'kind': piece.image_kind, 'reason': piece.image_reason,
-            'images': [{'kind': r.kind, 'alt': r.alt, 'edited': r.edited, 'reason': r.reason} for r in rows],
+            'images': [{'kind': r.kind, 'alt': r.alt, 'edited': r.edited, 'reason': r.reason,
+                        'edit_instruction': (r.review or {}).get('instruction', '')} for r in rows],
             'photos': [{'id': str(r.source_photo_id), 'note': photos.get(str(r.source_photo_id), {}).get('note', ''),
                         'ai_edit': r.ai_edit} for r in rows if r.source_photo_id],
             'design': piece.image_spec or None}
@@ -285,7 +336,7 @@ def _edit_photos(piece, instruction, client, public, capture):
             row.width, row.height = size
             row.sha256 = imagenes.sha(candidate)
             row.edited = True
-            row.review = review
+            row.review = dict(review, instruction=instruction)  # the next comment edits the original again: it keeps this
             row.reason = _clip('Comentario de Gustavo: ' + capture.text, 1000)
             row.save()
             row.source_photo.state = 'editada'
@@ -361,7 +412,8 @@ def _propose(capture, piece, old, record):
             Capture.objects.filter(state=Capture.State.USED, routed_to__used_in=str(piece.id)).update(
                 publish_asap_expected_slot=when, publish_asap_reason='Se movió para conservar tu plazo de veto tras rehacerla')
         summary = record['summary'] or record['reason']
-        risks = [r for r in old.risks if not str(r).startswith('Rehecha por un comentario')]
+        dropped = set((old.review or {}).get('reasons') or []) if old.state == ActionProposal.State.DISCARDED else set()
+        risks = [r for r in old.risks if not str(r).startswith(('Rehecha por un comentario', 'Líder:')) and r not in dropped]
         if changed:
             risks.append(_clip('Rehecha por un comentario de Gustavo: ' + summary, 500))
         new = operador.create_proposal(old.created_by, None, 'CONT-09',
