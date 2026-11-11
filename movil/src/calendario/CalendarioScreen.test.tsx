@@ -147,13 +147,16 @@ describe('Calendario · semana', () => {
     expect(grip.props.accessibilityActions).toEqual([
       { name: 'increment', label: 'Ampliar' },
       { name: 'decrement', label: 'Media pantalla' },
+      { name: 'dismiss', label: 'Cerrar' },
     ]);
     // Not modal: another day can be picked with the sheet up.
     await fireEvent.press(screen.getByTestId('dia-2026-11-06'));
     expect(within(sheet()).getByText('Viernes 6 de noviembre')).toBeOnTheScreen();
     expect(within(sheet()).queryByText('Miércoles 4 de noviembre')).toBeNull();
     await waitFor(() => expect(screen.queryByTestId('panel-dia-hoja-saliente', hidden)).toBeNull());
-    await fireEvent.press(within(sheet()).getByLabelText('Cerrar'));
+    // No visible close button: sliding it down, Android back or the grip's accessible «Cerrar» action.
+    expect(within(sheet()).queryByRole('button', { name: 'Cerrar' })).toBeNull();
+    await fireEvent(within(sheet()).getByLabelText('Altura del panel'), 'accessibilityAction', { nativeEvent: { actionName: 'dismiss' } });
     await waitFor(() => expect(screen.queryByTestId('hoja-dia')).toBeNull());
   });
 

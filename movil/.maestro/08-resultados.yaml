@@ -230,10 +230,8 @@ tags: [resultados]
     childOf:
       id: definition-sheet
 - takeScreenshot: 08-resultados-11-definicion-grafico
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: definition-sheet
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: definition-sheet
@@ -351,10 +349,8 @@ tags: [resultados]
     text: "Conversaciones con personas que encajan abiertas en el periodo."
     childOf:
       id: definition-sheet
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: definition-sheet
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: definition-sheet

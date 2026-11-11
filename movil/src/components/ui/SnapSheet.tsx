@@ -2,7 +2,8 @@
 // handle, leaving content scroll native. Its position `p` (a fraction of the room above `bottom`) opens
 // at the half snap on FIRM, follows the handle with a rubber band past the full snap, and on release is
 // projected along its velocity to the nearest snap, or closes («HÁPTICO · LEVE» on each new snap).
-// Accessible expand/collapse actions, Android back and an explicit close. `onRest` tells the screen which
+// Accessible expand/collapse/close actions and Android back; no visible close button (Gustavo, 11/11: sliding it
+// down is obvious). `onRest` tells the screen which
 // snap it rests on (the Oficina pauses its scene while the sheet covers it at full height).
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { BackHandler, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
@@ -10,7 +11,6 @@ import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { cancelAnimation, runOnJS, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { haptic, officeGestures, rubberBand, sheetMotion, spring } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
-import { Button } from './Button';
 import { settleSnap } from './Sheet';
 
 export interface SnapSheetProps {
@@ -140,20 +140,21 @@ export function SnapSheet({ label, onClose, children, bottom, availableHeight, t
   return <Animated.View testID={testID} accessibilityLabel={label} style={[styles.sheet, { bottom }, animated]}>
     <GestureDetector gesture={drag}>
       <View style={styles.grip} accessibilityRole="adjustable" accessibilityLabel="Altura del panel" accessibilityHint="Desliza para ampliar o cerrar"
-        accessibilityActions={[{ name: 'increment', label: 'Ampliar' }, { name: 'decrement', label: 'Media pantalla' }]}
-        onAccessibilityAction={({ nativeEvent }) => go(nativeEvent.actionName === 'increment' ? full : half)}>
+        accessibilityActions={[{ name: 'increment', label: 'Ampliar' }, { name: 'decrement', label: 'Media pantalla' }, { name: 'dismiss', label: 'Cerrar' }]}
+        onAccessibilityAction={({ nativeEvent }) => {
+          if (nativeEvent.actionName === 'dismiss') dismiss();
+          else go(nativeEvent.actionName === 'increment' ? full : half);
+        }}>
         <View style={styles.handle} />
       </View>
     </GestureDetector>
-    <View style={styles.close}><Button accessibilityLabel="Cerrar" onPress={dismiss}>Cerrar</Button></View>
     <ScrollView key={label} contentContainerStyle={[styles.content, { paddingBottom: space[6] + (fitViewportToSnap ? 0 : room * (1 - resting)) }]} keyboardShouldPersistTaps="handled">{children}</ScrollView>
   </Animated.View>;
 }
 const styles = StyleSheet.create({
   sheet: { position: 'absolute', left: 0, right: 0, backgroundColor: colors.surface, borderTopWidth: 1, borderColor: colors.line,
     borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, overflow: 'hidden', elevation: 4 },
-  grip: { height: 56, marginRight: 100, justifyContent: 'center', alignItems: 'center' },
+  grip: { height: 56, justifyContent: 'center', alignItems: 'center' },
   handle: { width: 40, height: 4, backgroundColor: colors.inkSoft, borderRadius: radius.pill },
-  close: { position: 'absolute', top: space[1], right: space[2] },
   content: { padding: space[4], gap: space[3] },
 });

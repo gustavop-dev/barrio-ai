@@ -45,8 +45,20 @@ async function renderResultados(routes: Record<string, FakeHandler> = {}) {
   return server;
 }
 
+/** Fakes only `Date` (timers stay real so the async queries keep working). */
+function useFakeNow(iso: string) {
+  jest.useFakeTimers({
+    now: new Date(iso),
+    doNotFake: ['hrtime', 'nextTick', 'performance', 'queueMicrotask', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
+  });
+}
+
 beforeEach(() => {
   routerState.params = {};
+});
+
+afterEach(() => {
+  jest.useRealTimers();
 });
 
 describe('Resultados', () => {
@@ -111,6 +123,8 @@ describe('Resultados', () => {
   });
 
   it('draws section 1 when there are opportunities: KPIs, funnel, the 60/40 split and the active ones', async () => {
+    // The next step is on 12 nov: «today» is the fixture's data day, so the label is a date and not «mañana».
+    useFakeNow('2026-11-08T15:00:00Z');
     await renderResultados({ 'GET /api/v1/resultados': { body: resultadosFixture({ negocio: negocioOn() }) } });
     const conversations = within(await screen.findByTestId('kpi-Conversaciones pertinentes'));
     expect(conversations.getByText('Disponible cuando conectemos el inbox.')).toBeOnTheScreen();

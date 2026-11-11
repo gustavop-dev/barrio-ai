@@ -65,10 +65,8 @@ tags: [calendario]
       childOf:
         id: hoja-dia
     timeout: 10000
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: hoja-dia
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: hoja-dia
@@ -158,10 +156,8 @@ tags: [calendario]
     childOf:
       id: hoja-dia
 - takeScreenshot: 07-calendario-06-mes-vacio-lejos
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: hoja-dia
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: hoja-dia
@@ -244,10 +240,8 @@ tags: [calendario]
     childOf:
       id: hoja-dia
 - takeScreenshot: 07-calendario-09-hoja-completa
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: hoja-dia
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: hoja-dia
@@ -275,10 +269,8 @@ tags: [calendario]
       childOf:
         id: hoja-dia
     timeout: 10000
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: hoja-dia
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: hoja-dia
@@ -342,10 +334,8 @@ tags: [calendario]
         id: hoja-dia
     timeout: 10000
 - takeScreenshot: 07-calendario-11-hoja-sin-publicacion
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: hoja-dia
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: hoja-dia
@@ -378,10 +368,8 @@ tags: [calendario]
       childOf:
         id: hoja-dia
     timeout: 10000
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: hoja-dia
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: hoja-dia

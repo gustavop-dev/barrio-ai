@@ -43,6 +43,8 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   5. **Dado** un error al cargar, **cuando** falla, **entonces** ve «No se pudo cargar el calendario» con «Reintentar».
   6. **Dado** un rango de más de 93 días o fechas inválidas, **cuando** se pide a la API, **entonces** responde 400.
   7. **Dado** la app, **cuando** abre el Calendario, **entonces** llega desde el icono de la barra superior (no es una pestaña de la barra inferior).
+  8. **Dado** un día con varias piezas (intentos que no salieron y la que sí va), **cuando** se muestra el día (`/calendario` y `/editorial/calendar`), **entonces** solo aparece su pieza viva (en preparación, lista, programada, publicándose, publicada, incierta o rehaciéndose); sin ninguna viva, solo su último intento; y un día próximo que solo se frenó por el presupuesto diario queda vacío porque el piloto lo prepara el día anterior (`editorial.calendar_rows`). Los intentos viejos siguen abriéndose desde su enlace.
+  9. **Dado** la hoja del día (y el panel de la Oficina), **cuando** está abierta, **entonces** no hay botón «Cerrar»: se cierra deslizándola hacia abajo o con atrás de Android; el lector de pantalla tiene la acción «Cerrar» en la manija.
 - **Brechas código/docs:** —
 - **Cobertura QA:** CAL-01.1, 3, 4, 5 y 7 en `movil/.maestro/07-calendario.yaml` y `07-calendario-errores.yaml` (Semana, Mes y Lista, deslizar semanas y meses, mes vacío, error con «Reintentar») · CAL-01.2 y 6 sin prueba E2E · 2026-11-08 · pasa
 

@@ -31,10 +31,11 @@ class Calendar(APIView):
             days=max(1,min(60,int(request.query_params.get('dias','15'))))
         except ValueError:raise ValueError('Parámetros inválidos: desde=AAAA-MM-DD y dias=1..60') from None
         end=start+timedelta(days=days)
-        pieces={}
+        rows={}
         for piece in EditorialPiece.objects.filter(slot_date__gte=start,slot_date__lt=end).prefetch_related('proposals__execution').order_by('created_at'):
             action=max(piece.proposals.all(),key=lambda a:a.created_at,default=None)
-            pieces.setdefault(piece.slot_date,[]).append(summary(piece,action))
+            item=summary(piece,action);rows.setdefault(piece.slot_date,[]).append((piece,item['status'],item))
+        pieces={day:editorial.calendar_rows(day_rows,today) for day,day_rows in rows.items()}
         try:post_time=editorial.post_time().strftime('%H:%M');config_error=None
         except ValueError as exc:post_time=None;config_error=str(exc)
         return Response({'timezone':str(operador.local_tz()),'post_time':post_time,'lead_hours':editorial.lead_time().total_seconds()/3600,

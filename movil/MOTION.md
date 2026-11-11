@@ -170,7 +170,8 @@ enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas 
 El panel del día del Calendario también es un `SnapSheet` (`calendario/CalendarioScreen.tsx`), con los mismos tokens.
 
 `SnapSheet` reutiliza `springs.sheetOpen`, `timings.sheetClose` y `gestures.sheet` para volver a un
-punto de ajuste o cerrar; ofrece ampliar/reducir mediante acciones de accesibilidad y Cerrar.
+punto de ajuste o cerrar; ofrece ampliar, reducir y cerrar mediante acciones de accesibilidad. No muestra un botón «Cerrar»:
+se cierra deslizándolo hacia abajo o con atrás de Android.
 Con movimiento reducido se desactiva el callback de frames, todos vuelven a su puesto y los nuevos
 eventos solo se narran. La ausencia de foco, el segundo plano y la pausa de máquina también paran el
 callback; los observers de Oficina dejan de consultar al perder foco o pasar a segundo plano.
