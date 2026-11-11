@@ -544,7 +544,10 @@ def provider_metadata(provider, purpose, amount_usd, connection):
     runtime, call = current(), _active_call.get()
     if runtime is None:
         return {}
-    if not call or purpose not in call['runtime'].get('purposes', {}).get(provider, []):
+    declared = call['runtime'].get('purposes', {}) if call else {}
+    # OpenAI is Claude's fallback (providers.openai_text): a purpose declared for anthropic is declared for it too.
+    allowed = declared.get(provider, []) + (declared.get('anthropic', []) if provider == 'openai' else [])
+    if not call or purpose not in allowed:
         runtime.deny('undeclared_provider')
     if timezone.now() >= datetime.fromisoformat(call['deadline']):
         runtime.stop('call_timeout', business=False)
@@ -553,9 +556,11 @@ def provider_metadata(provider, purpose, amount_usd, connection):
     budget_bucket = effective_budget_bucket(row)
     if row.state == 'stopped' or row.lease_token != runtime.token:
         raise CycleStopped('Trabajador obsoleto')
+    # A Claude refusal answered by OpenAI is one call, not two: its rejected row carries usage.fallback.
     used = connection.execute("""SELECT coalesce(sum(CASE WHEN status='complete' THEN coalesce(actual_usd,reserved_usd)
         WHEN status IN ('reserved','uncertain') THEN reserved_usd ELSE 0 END),0) AS spent,
-        count(*) AS calls FROM usage_ledger WHERE usage->>'cycle_id'=%s""", (str(runtime.id),)).fetchone()
+        count(*) FILTER (WHERE NOT (status='rejected' AND usage ? 'fallback')) AS calls
+        FROM usage_ledger WHERE usage->>'cycle_id'=%s""", (str(runtime.id),)).fetchone()
     if used['calls'] >= runtime.limits['max_provider_calls']:
         runtime.stop('provider_calls', business=False)
         raise CycleStopped('provider_calls')

@@ -236,12 +236,51 @@ def system_blocks(system,context=None):
     for block in (blocks[0],blocks[-1]):block['cache_control']={'type':'ephemeral'}
     return blocks
 
-def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None,
-           web_tools=None,request_hash=None):
-    """`model` overrides ANTHROPIC_MODEL for one call (e.g. a cheaper classifier); it must have a verified price.
-    `context` is stable text (str or list of str) sent after the instructions and cached with them."""
+class _Fallback(Exception):
+    """Anthropic refused the call before generating anything (account or availability); OpenAI may answer it."""
+    def __init__(self,reason,error):
+        super().__init__(reason);self.reason=reason;self.error=error
+
+
+# Anthropic answers that say nothing about the request itself: the account (credit, key, permission) or the service.
+ACCOUNT_STATUSES={401,402,403}
+AVAILABILITY_STATUSES={404,429,500,502,503,504,529}
+
+
+def fallback_reason(exc):
+    """'cuenta', 'disponibilidad' or None. Only the error type and message are read, never logged or stored."""
     import anthropic
-    key=live('anthropic');model=claude_model(model)
+    if isinstance(exc,anthropic.APIConnectionError) and not isinstance(exc,anthropic.APITimeoutError):return 'conexión'
+    status=getattr(exc,'status_code',None)
+    body=getattr(exc,'body',None);error=body.get('error') if isinstance(body,dict) else None
+    detail=' '.join(str((error or {}).get(k,'')) for k in ('type','message')).lower() if isinstance(error,dict) else ''
+    if status in ACCOUNT_STATUSES or any(w in detail for w in ('billing','credit balance','usage limits')):return 'cuenta'
+    if status in AVAILABILITY_STATUSES:return 'disponibilidad'
+    return None
+
+
+def fallback_enabled():
+    return os.environ.get('LLM_FALLBACK','openai').strip().lower()=='openai'
+
+
+def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None,
+           web_tools=None,request_hash=None,fallback=True):
+    """`model` overrides ANTHROPIC_MODEL for one call (e.g. a cheaper classifier); it must have a verified price.
+    `context` is stable text (str or list of str) sent after the instructions and cached with them.
+    When Anthropic refuses the call for its account or availability, the same call goes to OpenAI (`openai_text`), in
+    the same budget and ledger. Web research (native citations) and `fallback=False` (model evaluations) never do."""
+    model=claude_model(model)
+    try:
+        return _claude(system,message,max_tokens,output_schema,effort,purpose,model,context,web_tools,request_hash,
+                       fallback=fallback and web_tools is None and fallback_enabled())
+    except _Fallback as exc:
+        if not os.environ.get('OPENAI_API_KEY','').strip():raise ValueError(exc.error) from None
+        return openai_text(system,message,max_tokens,output_schema,effort,purpose,model,context,request_hash,exc.reason)
+
+
+def _claude(system,message,max_tokens,output_schema,effort,purpose,model,context,web_tools,request_hash,fallback):
+    import anthropic
+    key=live('anthropic')
     max_tokens=max_tokens or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
     if not 1<=max_tokens<=64000:raise ValueError('max_tokens fuera de rango')
     client=anthropic_client(key)
@@ -261,7 +300,12 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
     if output_config:params['output_config']=output_config
     # Use the provider tokenizer before reserving; counting doesn't generate an answer.
     try:input_tokens=validate_token_count(client.messages.count_tokens(**params).input_tokens)
-    except (anthropic.APIError,AttributeError,TypeError,ValueError):
+    except anthropic.APIError as exc:
+        # Nothing was reserved or generated yet: an account or service failure here can go straight to the fallback.
+        error='Conteo de Claude no disponible; no se envió la generación.'
+        if fallback and fallback_reason(exc):raise _Fallback(fallback_reason(exc),error) from None
+        raise ValueError(error) from None
+    except (AttributeError,TypeError,ValueError):
         raise ValueError('Conteo de Claude no disponible; no se envió la generación.') from None
     ip,op=MODEL_PRICES[model]
     # Worst case: every input token is a cache write.
@@ -284,10 +328,17 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
         settle(rid,'uncertain',{'request_id':request_id,'cycle_timeout':True})
         raise
     except anthropic.APIStatusError as exc:
-        # Do not expose provider bodies (may contain inputs); do not retry paid calls.
-        definite=exc.status_code in (400,401,403,404,413,422,429)
-        settle(rid,'rejected' if definite else 'uncertain',{'http_status':exc.status_code,'request_id':getattr(exc,'request_id',None)})
-        raise ValueError(f'anthropic: HTTP {exc.status_code}. Sin reintento automático.') from None
+        # Do not expose provider bodies (may contain inputs); do not retry paid calls on the same provider.
+        definite=exc.status_code in (400,401,402,403,404,413,422,429)
+        reason=fallback_reason(exc) if fallback else None
+        record={'http_status':exc.status_code,'request_id':getattr(exc,'request_id',None)}
+        # A definite refusal answered by OpenAI is not a call of the cycle (orquestacion counts the fallback once).
+        if reason and definite:record['fallback']='openai'
+        settle(rid,'rejected' if definite else 'uncertain',record)
+        error=f'anthropic: HTTP {exc.status_code}. Sin reintento automático.'
+        # An ambiguous 5xx may have been processed by Anthropic; OpenAI answering it costs at most one extra call.
+        if reason:raise _Fallback(reason,error) from None
+        raise ValueError(error) from None
     except (anthropic.APIError,httpx.HTTPError) as exc:
         # Includes timeouts: the request may have been processed and billed.
         settle(rid,'uncertain',{'error_type':type(exc).__name__,'request_id':request_id})
@@ -328,6 +379,144 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
     result={'text':answer,'usage':record,'estimated_usd':float(cost),'model':model,'stop_reason':stop_reason,'request_id':request_id}
     if web_tools:result.update(content=content,ledger_id=rid)
     return result
+
+# --------------------------------------------------------------------------- OpenAI (fallback of Claude)
+OPENAI_RESPONSES_URL='https://api.openai.com/v1/responses'
+# USD per million tokens: input, cached input, output. Standard tier, short context (up to 272K input tokens), from
+# developers.openai.com/api/docs/pricing, read 2026-11-10. Promotional prices (gpt-5.6-sol) are left out on purpose.
+OPENAI_PRICES={'gpt-5.5':(Decimal('5'),Decimal('0.5'),Decimal('30')),'gpt-5.4':(Decimal('2.5'),Decimal('0.25'),Decimal('15')),
+               'gpt-5.4-mini':(Decimal('0.75'),Decimal('0.075'),Decimal('4.5'))}
+OPENAI_SHORT_CONTEXT=272000
+# Each Claude model falls back to the OpenAI model of its tier.
+FALLBACK_MODELS={'claude-opus-5-5':'gpt-5.5','claude-sonnet-5-5':'gpt-5.4','claude-sonnet-4-6':'gpt-5.4',
+                 'claude-haiku-5-5':'gpt-5.4-mini'}
+# Reasoning one step below Claude's effort keeps a fallback inside the cycle's call timeout (120 s).
+OPENAI_EFFORT={'low':'low','medium':'low','high':'medium','xhigh':'high','max':'high'}
+OPENAI_IMAGE_TOKENS=2000  # reserved per attached image (a 1024 px thumbnail costs less)
+
+
+def openai_model(claude):
+    model=FALLBACK_MODELS.get(claude)
+    if model not in OPENAI_PRICES:raise ValueError('Sin modelo de respaldo con tarifa verificada para '+claude)
+    return model
+
+
+def openai_input(message):
+    """Claude's user content (text or blocks, images as base64) as one Responses API user message."""
+    blocks=[{'type':'text','text':message}] if isinstance(message,str) else list(message)
+    content=[];images=0
+    for block in blocks:
+        source=block.get('source') or {}
+        if block.get('type')=='text':content.append({'type':'input_text','text':block['text']})
+        elif block.get('type')=='image' and source.get('type')=='base64':
+            content.append({'type':'input_image','image_url':f"data:{source['media_type']};base64,{source['data']}"});images+=1
+        else:raise ValueError('El mensaje tiene un bloque sin equivalente en OpenAI')
+    return [{'role':'user','content':content}],images
+
+
+def _nullable(node):
+    node=dict(node)
+    if 'enum' in node:node['enum']=list(node['enum'])+[None]
+    kind=node.get('type')
+    if isinstance(kind,str):node['type']=[kind,'null']
+    elif isinstance(kind,list) and 'null' not in kind:node['type']=kind+['null']
+    elif 'anyOf' in node:node['anyOf']=list(node['anyOf'])+[{'type':'null'}]
+    return node
+
+
+def openai_schema(schema):
+    """(schema, strict). Strict structured outputs need closed objects with every property required: an optional
+    property becomes required and nullable, and `strip_nulls` removes it again from the answer. A schema strict mode
+    cannot express (a free-form object or array) goes as is, non-strict."""
+    def convert(node):
+        if not isinstance(node,dict):return node,True
+        node={k:v for k,v in node.items() if k!='default'};ok=True
+        if node.get('type')=='object' or 'properties' in node:
+            properties=node.get('properties')
+            if not isinstance(properties,dict) or node.get('additionalProperties') is not False:return node,False
+            required=set(node.get('required',[]));converted={}
+            for name,sub in properties.items():
+                sub,sub_ok=convert(sub);ok=ok and sub_ok
+                converted[name]=sub if name in required else _nullable(sub)
+            node.update(properties=converted,required=list(converted),additionalProperties=False)
+        if node.get('type')=='array':
+            if not isinstance(node.get('items'),dict):return node,False
+            node['items'],items_ok=convert(node['items']);ok=ok and items_ok
+        if 'anyOf' in node:
+            options=[convert(option) for option in node['anyOf']]
+            node['anyOf']=[o for o,_ in options];ok=ok and all(k for _,k in options)
+        return node,ok
+    converted,ok=convert(schema)
+    return (converted,True) if ok and converted.get('type')=='object' else (schema,False)
+
+
+def strip_nulls(value,schema):
+    """Drop the nulls strict mode had to put in place of an optional property the model left out."""
+    if isinstance(value,dict) and isinstance(schema,dict) and isinstance(schema.get('properties'),dict):
+        required=set(schema.get('required',[]))
+        return {k:strip_nulls(v,schema['properties'].get(k,{})) for k,v in value.items() if not (v is None and k not in required)}
+    if isinstance(value,list) and isinstance(schema,dict) and isinstance(schema.get('items'),dict):
+        return [strip_nulls(v,schema['items']) for v in value]
+    return value
+
+
+def openai_text(system,message,max_tokens,output_schema,effort,purpose,claude,context,request_hash,reason):
+    """The same call as `claude`, answered by OpenAI's Responses API. Same reservation discipline: estimate the worst
+    case, reserve it in the team budget, settle with the real usage; never retried automatically."""
+    key=live('openai');model=openai_model(claude)
+    max_tokens=max_tokens or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
+    if not 1<=max_tokens<=64000:raise ValueError('max_tokens fuera de rango')
+    extra=[context] if isinstance(context,str) else list(context or [])
+    instructions='\n\n'.join([system]+[text for text in extra if text])
+    input_items,images=openai_input(message)
+    text_in=instructions+''.join(c.get('text','') for c in input_items[0]['content'])
+    # cl100k counts at least as many tokens as OpenAI's o200k for the same text; add a margin and the images.
+    estimate=int(len(ENC.encode(text_in))*1.1)+256+images*OPENAI_IMAGE_TOKENS
+    if estimate>OPENAI_SHORT_CONTEXT:raise ValueError('La solicitud supera el contexto con tarifa verificada de OpenAI.')
+    ip,cp,op=OPENAI_PRICES[model]
+    payload={'model':model,'instructions':instructions,'input':input_items,'max_output_tokens':max_tokens,'store':False,
+             'reasoning':{'effort':OPENAI_EFFORT.get(effort or 'low','low')}}
+    strict=False
+    if output_schema:
+        schema,strict=openai_schema(output_schema)
+        payload['text']={'format':{'type':'json_schema','name':'respuesta','schema':schema,'strict':strict}}
+    rid=reserve('openai',purpose,(Decimal(estimate)*ip+Decimal(max_tokens)*op)/1000000,request_hash,
+                metadata={'model':model,'effort':payload['reasoning']['effort'],'fallback_from':claude,'fallback_reason':reason})
+    data=request('openai',OPENAI_RESPONSES_URL,payload,rid,{'Authorization':'Bearer '+key})
+    try:
+        texts=[];refused=False
+        for item in data.get('output') or []:
+            if item.get('type')!='message':continue
+            for part in item.get('content') or []:
+                if part.get('type')=='output_text':texts.append(part.get('text') or '')
+                elif part.get('type')=='refusal':refused=True
+        usage=data['usage'];total=validate_token_count(usage['input_tokens'])
+        cached=validate_token_count((usage.get('input_tokens_details') or {}).get('cached_tokens') or 0)
+        if cached>total:raise ValueError('Uso inválido')
+        tokens={'input_tokens':total-cached,'output_tokens':validate_token_count(usage['output_tokens']),
+                'cache_creation_input_tokens':0,'cache_read_input_tokens':cached}
+        cost=(Decimal(total-cached)*ip+Decimal(cached)*cp+Decimal(tokens['output_tokens'])*op)/1000000
+        incomplete=(data.get('incomplete_details') or {}).get('reason')
+        stop_reason=('refusal' if refused or incomplete=='content_filter' else 'max_tokens' if incomplete=='max_output_tokens'
+                     else 'end_turn' if data.get('status')=='completed' else str(data.get('status') or 'desconocido'))
+        request_id=str(data.get('id') or '')
+    except (AttributeError,KeyError,TypeError,ValueError):
+        settle(rid,'uncertain');raise ValueError('Respuesta OpenAI inválida; reserva retenida.') from None
+    record=dict(tokens,request_id=request_id,stop_reason=stop_reason,provider='openai',model=model,
+                fallback_from=claude,fallback_reason=reason)
+    settle(rid,'complete',record,cost)
+    answer=''.join(texts)
+    if stop_reason=='refusal':raise ValueError('OpenAI declinó la solicitud; no se generó contenido.')
+    if stop_reason=='max_tokens' and output_schema:
+        raise ValueError(f'OpenAI agotó max_tokens ({max_tokens}) antes de terminar la respuesta; subir el tope de {purpose}.')
+    if stop_reason!='end_turn' and stop_reason!='max_tokens':raise ValueError('OpenAI no completó la respuesta.')
+    if not answer:raise ValueError('Respuesta OpenAI vacía.')
+    if output_schema and strict:
+        try:answer=json.dumps(strip_nulls(json.loads(answer),output_schema),ensure_ascii=False)
+        except json.JSONDecodeError:pass  # the caller reports invalid JSON, as with Claude
+    return {'text':answer,'usage':record,'estimated_usd':float(cost),'model':model,'stop_reason':stop_reason,
+            'request_id':request_id,'provider':'openai','fallback_from':claude,'fallback_reason':reason}
+
 
 # --------------------------------------------------------------------------- TypeSafe (Jev)
 # System One model: typed judgments with calibrated probabilities; it does not generate text.

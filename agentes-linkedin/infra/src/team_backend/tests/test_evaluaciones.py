@@ -36,7 +36,7 @@ def forbidden(*args,**kwargs):
 
 def recorder(calls,answer):
     """A providers.claude double that records each request and answers `answer(purpose, data)`."""
-    def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None):
+    def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',model=None,context=None,fallback=True):
         data=json.loads(message)
         calls.append({'system':system,'data':data,'max_tokens':max_tokens,'output_schema':output_schema,'effort':effort,'purpose':purpose,
                       'model':model,'context':context})
