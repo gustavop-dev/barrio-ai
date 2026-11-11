@@ -55,10 +55,11 @@ onFlowComplete:
 - extendedWaitUntil:
     notVisible: "Sin conexión\\. Mostrando lo último que cargó\\."
     timeout: 45000
-# (The «Actividad real · …» line under the scene is gone: the narration and the absent error say it.)
+# (The «Actividad real · …» line under the scene is gone. The narration box is no proof: with system animations on it
+# retires after a few seconds, and it only shows while something happens. The scene and no read error say it.)
 - extendedWaitUntil:
     visible:
-      id: office-narration
+      id: office-scene
     timeout: 60000
 - assertNotVisible: "No se pudo leer la actividad\\."
 - takeScreenshot: 02-navegacion-01c-red-de-vuelta

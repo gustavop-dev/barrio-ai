@@ -145,9 +145,9 @@ tags: [calendario]
     text: "El verificador bloqueó la pieza"
     childOf:
       id: pieza
-# The reasons are folded under the note: one tap opens them.
+# The reasons are folded under the note: one tap opens them (the label counts them: «Por qué se bloqueó · 2»).
 - tapOn:
-    text: "Por qué se bloqueó"
+    text: "Por qué se bloqueó.*"
     childOf:
       id: pieza
 - assertVisible:

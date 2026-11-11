@@ -1,5 +1,5 @@
 import { Canvas, Group, Picture, Skia, useImage } from '@shopify/react-native-skia';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
 import { GestureDetector, useExclusiveGestures, usePanGesture, usePinchGesture, useSimultaneousGestures, useTapGesture, type NativeGesture } from 'react-native-gesture-handler';
 import Animated, { runOnJS, runOnUI, useAnimatedReaction, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
@@ -39,7 +39,10 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   const pinchStart = useSharedValue(scale);
   const pinching = useSharedValue(false);
   // The zone labels are the way into a team (the team strip under the scene is gone): their boxes in logical pixels,
-  // measured once laid out, take a tap before the characters under them.
+  // measured once laid out, take a tap before the characters under them. The boxes gather on the JS side and each
+  // write carries all of them: the labels lay out in one batch, and a shared value read back on JS between two writes
+  // could still be the old one, so a read-modify-write per label kept only the last label (QA run 43091761036).
+  const measured = useRef<Record<string, readonly [number, number, number, number]>>({});
   const labelBoxes = useSharedValue<Record<string, readonly [number, number, number, number]>>({});
   const [initialMatrix] = useState(() => Skia.Matrix());
   const matrix = useSharedValue(initialMatrix);
@@ -130,7 +133,8 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
             accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={() => onPick({ kind: 'zone', id: label.zone })}
             onLayout={(event) => {
               const { x, y, width: w, height: h } = event.nativeEvent.layout;
-              labelBoxes.value = { ...labelBoxes.value, [label.zone]: [x / scale, y / scale, w / scale, h / scale] };
+              measured.current = { ...measured.current, [label.zone]: [x / scale, y / scale, w / scale, h / scale] };
+              labelBoxes.value = measured.current;
             }}
             style={[styles.label, { left: label.at[0] * scale, top: label.at[1] * scale }]}>{label.text}</T>)}
           {ROLES.filter((r) => statuses[r.id] === 'diseno').map((r) => <T key={r.id} variant="etiqueta" accessible={false} importantForAccessibility="no" style={[styles.label, { left: Math.max(4, Math.min(r.home[0] * scale - 45, PLAN_WIDTH * scale - 98)), top: (r.home[1] - 7) * scale }]}>EN DISEÑO</T>)}
