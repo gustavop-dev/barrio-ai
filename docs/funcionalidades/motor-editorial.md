@@ -32,6 +32,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-20](#edi-20) | Dar el siguiente hueco libre a una idea urgente | backend | funciona |
 | [EDI-21](#edi-21) | Agente visual dedicado al post ganador | PWA · app · backend | parcial |
 | [EDI-22](#edi-22) | Un comentario sobre una pieza lista la rehace | backend | funciona |
+| [EDI-23](#edi-23) | Ante un bloqueo, Gustavo pide un cambio o lo desestima | PWA · app · backend | implementado |
 
 ---
 
@@ -383,6 +384,22 @@ El flujo de imagen está implementado en el backend; la interfaz queda para fase
   8. **Dado** que no quedan revisiones del líder en el ciclo de la pieza o no queda presupuesto de IA (`EDITORIAL_REWORK_MIN_USD`, 1 USD), **cuando** llega el comentario, **entonces** no se retiene la pieza: queda anotado y se le avisa que puede vetarla.
   9. **Dado** cada comentario, **cuando** termina, **entonces** «Lo que enviaste» dice qué cambió y cuándo sale, o por qué se aplazó, y el comentario sigue en «Tus comentarios para el equipo» y en el brief de las próximas piezas ([EDI-17](#edi-17)).
 - **Cobertura QA:** `tests/test_retoque.py` (foto vertical editada a la misma hora, texto verificado y movido por el plazo de veto, opinión sin cambios, edición fallida que aplaza, infografía de reserva, pieza ya publicada, sin revisiones del líder, flujo completo desde la captura, versión descartada por el líder que se rehace y recupera foto e idea, un solo retoque por descarte, foto tomada por otra pieza, edición anterior visible para el siguiente comentario) y regresiones de `test_imagenes`, `test_editor_visual`, `test_capturas` y `test_grafo`.
+
+### EDI-23 · Ante un bloqueo, Gustavo pide un cambio o lo desestima <a id="edi-23"></a>
+
+- **Dónde:** PWA · app · backend
+- **Estado:** implementado
+- **Qué hace para Gustavo:** cuando el verificador (o las reglas), la revisión de la imagen o el líder dejan fuera una pieza, su detalle muestra la razón y dos salidas. «Pedir un cambio» abre el comentario para el equipo: su comentario rehace la pieza. «Desestimar el bloqueo» la manda tal cual en su día y hora, con su aprobación y sin pasar por el líder; si le falta imagen, el equipo la prepara antes. Aún puede vetarla hasta su hora.
+- **Responsable:** Gustavo decide; `director_editorial` rehace la pieza con su comentario ([EDI-22](#edi-22)) y `editor_visual` le prepara la imagen si falta. `operador_cuenta` la publica con la aprobación de Gustavo.
+- **Código:** `rescate.py` (`options`, `override`, `base_for_change`); trabajo `override_piece` (`jobs.py`, `operador._run_job`, disparador en `grafo.yaml`); `POST /api/v1/editorial/pieces/<id>/desestimar` y `rescue`/`override` en el detalle (`editorial_views.py`); `retoque.rescatable` y la ruta de comentarios (`capturas._route_piece`); `autopiloto.post_issues` respeta el desestimado de ese texto exacto. App `movil/src/pieza/Rescue.tsx`, PWA `oficina/src/pages/calendario/Rescue.tsx`, hook `useOverridePiece`.
+- **Criterios de aceptación:**
+  1. **Dado** una pieza `blocked` por el verificador, las reglas o la imagen, o una pieza cuya última versión descartó el líder, **cuando** abre su detalle, **entonces** ve la razón y los botones «Pedir un cambio» y «Desestimar el bloqueo».
+  2. **Dado** una pieza detenida por presupuesto o por un ciclo detenido, **cuando** abre su detalle, **entonces** no hay botones: la rehace el piloto.
+  3. **Dado** que su hora ya pasó o ese día ya tiene otra pieza programada, **cuando** abre su detalle, **entonces** ve por qué no hay salida y no hay botones; el servidor responde 409 si se intenta.
+  4. **Dado** «Desestimar el bloqueo» (con nota opcional), **cuando** termina el trabajo, **entonces** la pieza tiene imagen (el equipo la prepara si faltaba), vuelve a `ready` con las ideas y fotos que el bloqueo había soltado, y su publicación queda aprobada por Gustavo (`decided_by`), sin revisión del líder, en su día y hora.
+  5. **Dado** el desestimado, **cuando** se publica, **entonces** el veredicto del verificador queda registrado y `verification.override` liga su decisión al texto exacto: solo se comprueban la longitud y la imagen. Otro texto no queda cubierto.
+  6. **Dado** «Pedir un cambio» en una pieza bloqueada, **cuando** llega su comentario, **entonces** la pieza se reabre (con imagen si faltaba), el director recibe las razones del bloqueo (`bloqueo`) para resolverlas junto a lo que pide, y la versión nueva pasa por el verificador y por Jev en su modo suave para pedidos de Gustavo. Si vuelve a quedar fuera, puede desestimarla.
+- **Cobertura QA:** `tests/test_retoque.py` (`RescueTests`: desestimar un bloqueo del verificador por la API y el trabajo, desestimar el descarte del líder, sin salida por otro día, hora pasada o presupuesto, comentario que reabre una pieza bloqueada); `PiezaScreen.test.tsx` y `PiezaDetalle.test.tsx` (pedir un cambio, desestimar con nota, sin salida).
 
 ## Retiradas
 

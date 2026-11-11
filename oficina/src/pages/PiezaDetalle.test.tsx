@@ -195,6 +195,41 @@ describe('Detalle de una pieza', () => {
     expect(screen.getByText('Las guardas corrigieron al modelo')).toBeInTheDocument();
   });
 
+  // EDI-23: on a block he sees why and decides.
+  it('on a block he asks for a change with a comment or dismisses it with an optional note', async () => {
+    const blocked = piece({
+      status: 'blocked',
+      state: 'blocked',
+      action: null,
+      images: [],
+      verification: { verdict: 'blocked', blocking_reasons: ['Contiene pitch agresivo o petición de contacto'] } as PieceDetailFull['verification'],
+      rescue: { kind: 'verificador', override: true, change: true, why_not: '' },
+    });
+    const api = server(blocked, { 'POST /api/v1/editorial/pieces/p7/desestimar': { status: 202, body: { job: { id: 'job-1' } } } });
+    const user = userEvent.setup();
+    const { onCapture } = renderCalendario('/calendario/pieza/p7');
+    expect((await screen.findAllByText('Contiene pitch agresivo o petición de contacto'))[0]).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Pedir un cambio' }));
+    expect(onCapture).toHaveBeenCalledWith({ tipo: 'pieza', id: 'p7', label: 'Pieza del sábado 7 de noviembre' });
+
+    await user.click(screen.getByRole('button', { name: 'Desestimar el bloqueo' }));
+    const dialog = screen.getByRole('dialog', { name: 'Desestimar el bloqueo' });
+    expect(within(dialog).getByText(/sin pasar por el líder\. Antes, el equipo le prepara la imagen/)).toBeInTheDocument();
+    await user.type(within(dialog).getByLabelText(/Nota para el equipo/), 'Sale así');
+    await user.click(within(dialog).getByRole('button', { name: 'Desestimar' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/editorial/pieces/p7/desestimar')).toHaveLength(1));
+    expect((api.find('POST', '/api/v1/editorial/pieces/p7/desestimar')[0]!.body as { note: string }).note).toBe('Sale así');
+    expect(await screen.findByText('Bloqueo desestimado: el equipo la deja lista para salir con tu aprobación.')).toBeInTheDocument();
+  });
+
+  it('says why a block has no way out, without its buttons', async () => {
+    server(piece({ status: 'blocked', state: 'blocked', action: null, rescue: { kind: 'lider', override: false, change: false, why_not: 'Su hora ya pasó: ya no se puede publicar ni rehacer.' } }));
+    renderCalendario('/calendario/pieza/p7');
+    expect(await screen.findByText('Su hora ya pasó: ya no se puede publicar ni rehacer.')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Desestimar el bloqueo' })).toBeNull();
+  });
+
   it('shows the repair round when the rules or the verifier asked for one', async () => {
     const repaired = piece({
       verification: {

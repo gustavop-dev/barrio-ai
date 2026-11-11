@@ -22,15 +22,18 @@ import { PreparationTrack } from './PreparationTrack';
 import { Resultado } from './Resultado';
 import { TeamComments } from './TeamComments';
 import { PieceImages } from './PieceImages';
+import { RescueActions } from './Rescue';
 
 /** Blocked, skipped, vetoed, discarded, failed or uncertain: what happened, in the state's tone. */
-function StatusNote({ piece }: { piece: PieceDetailFull }) {
+function StatusNote({ piece, label }: { piece: PieceDetailFull; label: string }) {
   const action = piece.action_detail;
+  // EDI-23: on a block he sees why and decides (ask for a change or dismiss it).
+  const rescue = piece.rescue ? <RescueActions piece={piece} label={label} /> : undefined;
   switch (piece.status) {
     case 'blocked': {
       const reasons = piece.verification?.blocking_reasons?.length ? piece.verification.blocking_reasons : piece.note ? [piece.note] : [];
       return (
-        <Note tone="error" title="El verificador bloqueó la pieza">
+        <Note tone="error" title="El verificador bloqueó la pieza" actions={rescue}>
           {reasons.map((reason, index) => (
             <T key={index} variant="detalle">
               {reason}
@@ -53,7 +56,7 @@ function StatusNote({ piece }: { piece: PieceDetailFull }) {
       );
     case 'discarded':
       return (
-        <Note tone="info" title="La política no aprobó la pieza">
+        <Note tone="info" title="La política no aprobó la pieza" actions={rescue}>
           {action?.decision_note || piece.note || undefined}
         </Note>
       );
@@ -140,7 +143,7 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
         </View>
       </View>
       <ErrorRetry error={query.isError ? query.error : null} onRetry={() => void query.refetch()} title="No se pudo actualizar la pieza" />
-      <StatusNote piece={piece} />
+      <StatusNote piece={piece} label={`Pieza del ${day}`} />
 
       {piece.status === 'published' || piece.snapshots?.length ? <Resultado piece={piece} timeZone={timeZone} now={now} /> : null}
 

@@ -239,6 +239,50 @@ describe('Detalle de una pieza', () => {
     expect(screen.getByText('Iba a salir a las 09:00')).toBeOnTheScreen();
   });
 
+  // EDI-23: on a block he sees why and decides.
+  it('on a block he asks for a change with a comment or dismisses it with an optional note', async () => {
+    const blocked = piece({
+      status: 'blocked',
+      state: 'blocked',
+      action: null,
+      images: [],
+      verification: { verdict: 'blocked', blocking_reasons: ['Contiene pitch agresivo o petición de contacto'] } as PieceDetailFull['verification'],
+      rescue: { kind: 'verificador', override: true, change: true, why_not: '' },
+    });
+    const api = server(blocked, { 'POST /api/v1/editorial/pieces/p7/desestimar': { status: 202, body: { job: { id: 'job-1' } } } });
+    await renderPieza();
+    expect(await screen.findByText('Contiene pitch agresivo o petición de contacto')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByText('Pedir un cambio'));
+    expect(captureState()).toEqual({ open: true, context: { tipo: 'pieza', id: 'p7', label: 'Pieza del sábado 7 de noviembre' } });
+
+    await fireEvent.press(screen.getByText('Desestimar el bloqueo'));
+    const confirm = await screen.findByTestId('confirm-sheet');
+    expect(within(confirm).getByText(/sin pasar por el líder\. Antes, el equipo le prepara la imagen/)).toBeOnTheScreen();
+    await fireEvent.changeText(within(confirm).getByTestId('confirm-note'), 'Sale así');
+    await fireEvent.press(within(confirm).getByText('Desestimar'));
+    await waitFor(() => expect(api.find('POST', '/api/v1/editorial/pieces/p7/desestimar')).toHaveLength(1));
+    const body = api.find('POST', '/api/v1/editorial/pieces/p7/desestimar')[0]!.body as { request_id: string; note: string };
+    expect(body.note).toBe('Sale así');
+    expect(body.request_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(within(await screen.findByTestId('toast')).getByText('Bloqueo desestimado: el equipo la deja lista para salir con tu aprobación.')).toBeOnTheScreen();
+  });
+
+  it('says why a block has no way out, without its buttons', async () => {
+    server(
+      piece({
+        status: 'blocked',
+        state: 'blocked',
+        action: null,
+        rescue: { kind: 'verificador', override: false, change: false, why_not: 'Ese día ya tiene otra pieza programada.' },
+      }),
+    );
+    await renderPieza();
+    expect(await screen.findByText('Ese día ya tiene otra pieza programada.')).toBeOnTheScreen();
+    expect(screen.queryByText('Desestimar el bloqueo')).toBeNull();
+    expect(screen.queryByText('Pedir un cambio')).toBeNull();
+  });
+
   it('sends Gustavo to Tu turno to resolve an uncertain piece', async () => {
     server(piece({ status: 'uncertain', action_detail: { id: 'act-7' } as PieceDetailFull['action_detail'] }));
     await renderPieza();

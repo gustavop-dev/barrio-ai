@@ -69,6 +69,10 @@ def post_issues(proposal):
     public,private=guardas.blocks()
     issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
     verification=proposal.piece.verification if proposal.piece_id else {}
+    if (verification.get('override') or {}).get('text_sha256')==hashlib.sha256(text.encode()).hexdigest():
+        # EDI-23: Gustavo dismissed the block of this exact text: only what LinkedIn needs remains (length, image).
+        from . import imagenes
+        return [i for i in issues if i.startswith('Longitud')]+imagenes.issues(proposal.piece,proposal.payload.get('media'))
     if verification.get('verdict')!='ready_for_execution':issues.append('Sin veredicto ready_for_execution del verificador')
     elif verification.get('text_sha256')!=hashlib.sha256(text.encode()).hexdigest():
         issues.append('El veredicto del verificador no corresponde a este texto exacto')

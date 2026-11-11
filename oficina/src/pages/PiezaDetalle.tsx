@@ -14,16 +14,19 @@ import { Resultado } from './calendario/Resultado';
 import { PieceImages } from './calendario/PieceImages';
 import type { PieceDetailFull, TeamComment } from './calendario/types';
 import { useIsDesktop, useNow } from './calendario/useMedia';
+import { RescueActions } from './calendario/Rescue';
 import { ApproveButton, VetoButton } from './calendario/Veto';
 import './calendario/calendario.css';
 
-function StatusNote({ piece }: { piece: PieceDetailFull }) {
+function StatusNote({ piece, label }: { piece: PieceDetailFull; label: string }) {
   const action = piece.action_detail;
+  // EDI-23: on a block he sees why and decides (ask for a change or dismiss it).
+  const rescue = piece.rescue ? <RescueActions piece={piece} label={label} /> : undefined;
   switch (piece.status) {
     case 'blocked': {
       const reasons = piece.verification?.blocking_reasons?.length ? piece.verification.blocking_reasons : piece.note ? [piece.note] : [];
       return (
-        <Note tone="error" title="El verificador bloqueó la pieza" role={null}>
+        <Note tone="error" title="El verificador bloqueó la pieza" role={null} actions={rescue}>
           {reasons.map((reason, index) => (
             <p key={index}>{reason}</p>
           ))}
@@ -44,7 +47,7 @@ function StatusNote({ piece }: { piece: PieceDetailFull }) {
       );
     case 'discarded':
       return (
-        <Note tone="info" title="La política no aprobó la pieza" role={null}>
+        <Note tone="info" title="La política no aprobó la pieza" role={null} actions={rescue}>
           {action?.decision_note || piece.note || null}
         </Note>
       );
@@ -181,7 +184,7 @@ export function PiezaDetalle() {
     >
       {back}
       <ErrorRetry error={query.isError ? query.error : null} onRetry={() => void query.refetch()} title="No se pudo actualizar la pieza" />
-      <StatusNote piece={piece} />
+      <StatusNote piece={piece} label={`Pieza del ${day}`} />
 
       {piece.status === 'published' || piece.snapshots?.length ? <Resultado piece={piece} timeZone={timeZone} now={now} desktop={desktop} /> : null}
 

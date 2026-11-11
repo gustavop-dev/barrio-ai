@@ -122,6 +122,9 @@ class PostOutput(serializers.ModelSerializer):
 class OptionalRequestInput(serializers.Serializer):
     request_id=serializers.UUIDField(required=False)
 
+class OverrideInput(OptionalRequestInput):
+    note=serializers.CharField(required=False,allow_blank=True,max_length=500)
+
 class ActionInput(serializers.Serializer):
     post=serializers.UUIDField()
     # Own publications (CONT-09) are proposed by the editorial circuit, never on someone else's post.

@@ -4,12 +4,14 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas, editorial, operador, resultados, imagenes
+from . import capturas, editorial, operador, rescate, resultados, imagenes
+from .jobs import enqueue_operation
 from .models import EditorialPiece, PieceImage
 from .capturas_views import FileView, serve
-from .operador_views import valid
+from .operador_views import human_session, valid
 from .permissions import require
-from .serializers import ActionOutput, JobOutput, OptionalRequestInput
+from .serializers import ActionOutput, JobOutput, OptionalRequestInput, OverrideInput
+from .exceptions import Conflict
 
 def summary(piece,action):
     brief=piece.brief or {};execution=getattr(action,'execution',None) if action is not None else None
@@ -53,7 +55,25 @@ class PieceDetail(APIView):
             # «Comentario para el equipo» sent with the capture button (docs/capturas-galeria.md).
             team_comments=capturas.piece_comments(piece),image_kind=piece.image_kind or None,image_reason=piece.image_reason,
             images=[imagenes.payload(row) for row in piece.images.all()],image_review=piece.image_review,
-            image_document_url=f'/api/v1/editorial/pieces/{piece.id}/document' if piece.image_document else None))
+            image_document_url=f'/api/v1/editorial/pieces/{piece.id}/document' if piece.image_document else None,
+            # EDI-23: what he can do about a block («Pedir un cambio», «Desestimar el bloqueo»), or null.
+            rescue=rescate.options(piece),override=(piece.verification or {}).get('override')))
+
+
+class PieceOverride(APIView):
+    """EDI-23 «Desestimar el bloqueo»: the piece goes out with his approval, without the leader. Queues the job that
+    prepares its image if it lacks one and approves it (paid only when the image is missing)."""
+    def post(self,request,pid):
+        human_session(request);data=valid(OverrideInput,request)  # his decision: never a service credential
+        require(request.user,'approve_actions')
+        piece=EditorialPiece.objects.filter(id=pid).first()
+        if not piece:raise NotFound()
+        current=rescate.options(piece)
+        if current is None:raise Conflict('La pieza no está bloqueada.')
+        if current['why_not']:raise Conflict(current['why_not'])
+        job,created=enqueue_operation(request.user,'override_piece',{'piece':str(piece.id),'note':data.get('note','')},
+                                      data.get('request_id'),request.request_id)
+        return Response({'job':JobOutput(job).data},status=202 if created else 200)
 
 
 class PieceImageFile(FileView):
