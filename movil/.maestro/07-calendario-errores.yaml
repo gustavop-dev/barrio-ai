@@ -67,10 +67,8 @@ tags: [calendario]
       childOf:
         id: hoja-dia
     timeout: 20000
-- tapOn:
-    text: "Cerrar"
-    childOf:
-      id: hoja-dia
+# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
+- back
 - extendedWaitUntil:
     notVisible:
       id: hoja-dia

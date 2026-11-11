@@ -174,8 +174,8 @@ tags: [oficina]
     id: tab-index
     selected: true
 
-# «Cerrar» closes it and the chip is no longer selected.
-- tapOn: Cerrar
+# Android back closes it (no visible «Cerrar») and the chip is no longer selected.
+- back
 - extendedWaitUntil:
     notVisible:
       id: office-panel
@@ -229,7 +229,7 @@ tags: [oficina]
     direction: DOWN
 - assertVisible: Ver definición y conexiones
 - takeScreenshot: 03-oficina-06c-editor-visual
-- tapOn: Cerrar
+- back
 
 # The library is the last chip: swipe the strip sideways (from its right part, away from the raised capture
 # button in the middle of the bottom bar) until it shows, then open it.
