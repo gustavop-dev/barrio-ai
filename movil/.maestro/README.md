@@ -6,7 +6,7 @@ Esta carpeta tiene los flujos de [Maestro](https://maestro.dev) que **usan la ap
 
 El workflow tiene cuatro jobs:
 
-1. **`plan`** decide qué flujos corren y los reparte en hasta **8 emuladores en paralelo**, equilibrando el número de líneas como aproximación de la duración. Usa `min(8, flujos seleccionados)` emuladores; `QA_MAX_SHARDS` permite otro límite al invocar el script. En cada emulador los flujos van en orden numérico. `15-ajustes-sesion` cierra la sesión y vuelve a entrar al final, así que los flujos que vengan después en su emulador encuentran la sesión abierta.
+1. **`plan`** decide qué flujos corren y los reparte en hasta **10 emuladores en paralelo**, equilibrando los segundos que tardó cada flujo en `main` (más ~20 s de siembra entre flujos): el más largo va primero al emulador menos cargado. Los segundos salen del artefacto `qa-duraciones` de la última ejecución de `main` que lo guardó, o de `scripts/qa/duraciones.json` si no hay; un flujo sin medida se estima por sus líneas. Usa `min(10, flujos seleccionados)` emuladores; `QA_MAX_SHARDS` permite otro límite al invocar el script. En cada emulador los flujos van en orden numérico. `15-ajustes-sesion` cierra la sesión y vuelve a entrar al final, así que los flujos que vengan después en su emulador encuentran la sesión abierta.
 2. **`apk`** combina un shell nativo release x86_64 con el JS actual. Todos los pasos usan `OFFICE_QA_BUILD=1`, `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, `NODE_ENV=production` y `EXPO_NO_DOTENV=1` (sin cargar `.env` implícitos).
    - **Caché nativa:** después de `npm ci`, exporta con `expo export:embed` y compila el bundle con el Hermes del lockfile. Calcula `@expo/fingerprint` para Android, antes de generar `android/`, con preset estricto, configuración, plugins, lockfile, entorno de QA y los recursos que Metro referencia. Si falta esa huella, hace `expo prebuild` y Gradle `assembleRelease -PreactNativeArchitectures=x86_64`, y guarda el APK nativo con su keystore debug y el inventario de assets.
    - **Cambios de JS/TS:** con la misma huella no hay prebuild ni Gradle. Sustituye `assets/index.android.bundle` y los assets acompañantes de Metro; elimina los que ya no existen. Conserva los recursos Android compilados, elimina las firmas anteriores, hace `zipalign -P 16` y firma con `apksigner` y el keystore debug del shell. La ruta fría usa también este reempaquetado, para comprobarlo desde la primera ejecución.
@@ -15,6 +15,7 @@ El workflow tiene cuatro jobs:
 3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
    - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
    - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada`, `02-navegacion` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
+   - **Un reintento por flujo:** un flujo que falla (no por su tope de tiempo) se vuelve a sembrar y corre **una vez más** en el mismo emulador, mientras el job lleve menos de 20 minutos de flujos (`QA_REINTENTOS`, `QA_REINTENTO_HASTA`). Así un fallo intermitente ya no obliga a repetir el emulador entero. Si pasa al segundo intento, el flujo cuenta como aprobado pero el informe lo marca **«⚠️ pasa al 2.º intento»** con el motivo del primer fallo: lo inestable queda a la vista.
    - **Flujos:** `scripts/qa/correr-maestro.sh` corre sus flujos uno a uno y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
 4. **`qa`** junta los artefactos de todos los emuladores, compara las capturas con la referencia de `main` y cuenta la cobertura del catálogo. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
 
@@ -47,7 +48,7 @@ Se eligió una release con el JS empaquetado, en vez de una build debug, para pr
 
 El objetivo del job `apk` para cambios solo de JS/TS es **2–4 minutos** con el shell nativo en caché; una build nativa sigue costando unos 13–17 minutos. El tiempo total depende además del emulador más lento y de la cola de GitHub; hay que medirlo en CI.
 
-En las primeras ejecuciones, comprobar una ruta fría y después un cambio de JS con la misma huella: prebuild/Gradle deben quedar omitidos en la segunda, la firma y alineación deben pasar, y el emulador debe mostrar el cambio nuevo, las imágenes y las fuentes, iniciar sesión contra `10.0.2.2` y arrancar sin OTA. Verificar también una selección pequeña, `[qa: todos]` con 8 shards y un cambio nativo que invalide la huella. Al actualizar Expo/RN, revisar `assets/index.android.bundle`, las rutas `generated/{assets,res}/react/release`, Hermes y los recursos: el script falla si deja de coincidir el contrato del shell. La implementación se preparó mediante lectura de código; la validación de ejecución se hace únicamente en CI.
+En las primeras ejecuciones, comprobar una ruta fría y después un cambio de JS con la misma huella: prebuild/Gradle deben quedar omitidos en la segunda, la firma y alineación deben pasar, y el emulador debe mostrar el cambio nuevo, las imágenes y las fuentes, iniciar sesión contra `10.0.2.2` y arrancar sin OTA. Verificar también una selección pequeña, `[qa: todos]` con 10 shards y un cambio nativo que invalide la huella. Al actualizar Expo/RN, revisar `assets/index.android.bundle`, las rutas `generated/{assets,res}/react/release`, Hermes y los recursos: el script falla si deja de coincidir el contrato del shell. La implementación se preparó mediante lectura de código; la validación de ejecución se hace únicamente en CI.
 
 ## Revisar una ejecución (personas y agentes revisores)
 
@@ -62,16 +63,17 @@ Descarga el artefacto `qa-movil-<n>` en `qa-descargas/<run id>/`:
 | Ruta | Qué es |
 |---|---|
 | `resumen.md` | flujos que pasan y fallan, si hubo crash, errores de JS, respuestas 5xx o 429 de la API |
-| `informe.html` | el informe navegable: tabla de flujos con el motivo del fallo y, por flujo, sus capturas y su video |
+| `informe.html` | el informe navegable: tabla de flujos con el motivo del fallo (o del primer intento) y, por flujo, sus capturas y su video |
 | `capturas/NN-pantalla-SS-paso.png` | una captura por paso relevante, a 780×1688 (2× los tableros de 390×844) |
 | `capturas/fallos/` | la captura que Maestro toma al fallar un paso, con el nombre del flujo delante |
-| `videos/NN-flujo-parteK.mp4` | la grabación de la pantalla de cada flujo, en partes de menos de 3 minutos |
+| `videos/NN-flujo-parteK.mp4` | la grabación de la pantalla de un flujo **que falló**, en partes de menos de 3 minutos; los intentos que pasan no guardan video (las capturas y la comparación visual los cubren) y el artefacto pesa mucho menos |
+| `…--intento1…` | los archivos del primer intento de un flujo que se repitió: `junit/NN-flujo--intento1.xml`, `maestro/NN-flujo--intento1.log`, su carpeta, su video y sus capturas de fallo |
 | `junit/NN-flujo.xml` | el informe JUnit de Maestro de cada flujo |
 | `maestro/NN-flujo.log`, `maestro/NN-flujo/` | la salida de Maestro y su carpeta de depuración (comandos, jerarquía de la vista al fallar) |
 | `logcat/logcat-errores.txt` | crashes, `FATAL EXCEPTION`, señales nativas, ANR y errores de `ReactNativeJS` |
 | `logcat/logcat-app.txt` | todo lo que escribió el proceso de la app y React Native |
 | `logcat/logcat-completo-N.txt.gz` | el logcat entero de cada emulador, comprimido |
-| `seed-N.log`, `api-N.log`, `flujos-N.txt` | por emulador: la salida de `seed_qa`, el log de gunicorn y lo que tardó cada flujo |
+| `seed-N.log`, `api-N.log`, `flujos-N.txt` | por emulador: la salida de `seed_qa`, el log de gunicorn y, por flujo, «nombre código segundos intentos» |
 
 Para comparar con el diseño, abre las capturas junto a los tableros `movil/diseno-movimiento/tableros/*.dc.html` (390×844) y `movil/MOTION.md`.
 

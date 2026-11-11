@@ -2,9 +2,11 @@
 # Runs inside reactivecircus/android-emulator-runner (.github/workflows/qa-movil.yml): installs the QA APK on the
 # 390x844 dp emulator (the workflow defines it at that size), and runs the Maestro flows of this emulator job (QA_FLOWS, names separated by spaces; all of
 # movil/.maestro when empty) one by one. Before each flow the backend is re-seeded (seed_qa), so a flow never depends
-# on what another one changed. Each flow gets a screen recording, its JUnit report and Maestro's own output; files
-# shared by the job carry its number (QA_SHARD) so several jobs merge into one report. It always exits 0:
-# scripts/qa/informe.py decides pass or fail.
+# on what another one changed. Each flow gets its JUnit report and Maestro's own output; files shared by the job carry
+# its number (QA_SHARD) so several jobs merge into one report. A flow that fails (not by its time cap) runs once more
+# (QA_REINTENTOS) while the job has time left: the first attempt's files keep the suffix «--intento1» and the report
+# says it passed on a retry. The screen recording is kept only for failed attempts, so the artifact stays small.
+# It always exits 0: scripts/qa/informe.py decides pass or fail.
 set -uo pipefail
 
 ROOT=$(cd "$(dirname "$0")/../.." && pwd)
@@ -119,20 +121,22 @@ animations() {
   done
 }
 
-for flow in $selected; do
-  name=$(basename "$flow" .yaml)
+# One attempt of a flow: seed, run it under its cap, keep its screenshots. Sets CODE and SECONDS.
+run_flow() {
+  local flow=$1 name=$2
   log "flujo $name: sembrando el mundo de QA"
-  scenario_seed=()
+  local scenario_seed=()
   [ "$name" = "19-referentes-mensual" ] && scenario_seed=(--referentes-mensual)
   [ "$name" = "18-perfil" ] && scenario_seed=(--perfil-capturas)
   (cd "$INFRA" && uv run python manage.py seed_qa "${scenario_seed[@]}" >> "$OUT/seed-$SHARD.log" 2>&1) || log "seed_qa falló antes de $name"
   # No simulated failure left over from another flow (QA failure switch, team_backend.qa_fallos).
   curl -fsS -X DELETE "${QA_API:-http://127.0.0.1:8787}/api/v1/qa/fallos" > /dev/null 2>&1 || true
-  scale=0
+  local scale=0
   for animated in $ANIMATED; do [ "$animated" = "$name" ] && scale=1; done
   animations "$scale"
   log "flujo $name: animaciones del sistema a $scale"
   record_start "$name"
+  local start end
   start=$(date +%s)
   # A hard cap per flow: a hung flow fails with its screenshot and the job goes on to the next one.
   timeout --kill-after=30 "${QA_FLOW_TIMEOUT:-480}" maestro test "$flow" \
@@ -141,15 +145,17 @@ for flow in $selected; do
     --debug-output "$OUT/maestro/$name/debug" --flatten-debug-output \
     -e QA_USER=qa -e QA_PASSWORD="${QA_PASSWORD:?}" \
     > "$OUT/maestro/$name.log" 2>&1
-  code=$?
+  CODE=$?
   end=$(date +%s)
-  if [ "$code" -eq 124 ] || [ "$code" -eq 137 ]; then
+  SECONDS_TAKEN=$((end - start))
+  if [ "$CODE" -eq 124 ] || [ "$CODE" -eq 137 ]; then
     echo "TIMEOUT: el flujo superó ${QA_FLOW_TIMEOUT:-480} s y se cortó" >> "$OUT/maestro/$name.log"
     adb exec-out screencap -p > "$OUT/capturas/fallos/$name--tiempo-agotado.png" 2> /dev/null || true
   fi
   record_stop "$name"
-  log "flujo $name: código $code en $((end - start)) s"
-  echo "$name $code $((end - start))" >> "$OUT/flujos-$SHARD.txt"
+  # A passing attempt needs no video: the screenshots and the visual comparison cover it.
+  [ "$CODE" -eq 0 ] && rm -f "$OUT/videos/$name-parte"*.mp4
+  log "flujo $name: código $CODE en $SECONDS_TAKEN s"
   # takeScreenshot files are named NN-screen-step; Maestro's failure screenshots go apart, prefixed by the flow.
   while IFS= read -r png; do
     base=$(basename "$png")
@@ -158,6 +164,39 @@ for flow in $selected; do
       *) cp "$png" "$OUT/capturas/fallos/$name--$base" ;;
     esac
   done < <(find "$OUT/maestro/$name" -name '*.png' 2> /dev/null)
+}
+
+# The failed attempt's files step aside (suffix «--intento1»), so the retry writes the flow's own names.
+set_aside() {
+  local name=$1 tag=$2
+  [ -f "$OUT/junit/$name.xml" ] && mv "$OUT/junit/$name.xml" "$OUT/junit/$name--$tag.xml"
+  [ -f "$OUT/maestro/$name.log" ] && mv "$OUT/maestro/$name.log" "$OUT/maestro/$name--$tag.log"
+  [ -d "$OUT/maestro/$name" ] && rm -rf "$OUT/maestro/$name--$tag" && mv "$OUT/maestro/$name" "$OUT/maestro/$name--$tag"
+  for file in "$OUT/videos/$name-parte"*.mp4; do
+    [ -e "$file" ] && mv "$file" "$OUT/videos/$name-$tag-${file##*/$name-}"
+  done
+  for file in "$OUT/capturas/fallos/$name--"*.png; do
+    [ -e "$file" ] && mv "$file" "$OUT/capturas/fallos/$name--$tag--${file##*/$name--}"
+  done
+}
+
+# A retry only while the job has room for it (its timeout is 45 minutes, the setup takes about 5).
+STARTED=$(date +%s)
+RETRIES=${QA_REINTENTOS:-1}
+RETRY_UNTIL=${QA_REINTENTO_HASTA:-1200}
+for flow in $selected; do
+  name=$(basename "$flow" .yaml)
+  run_flow "$flow" "$name"
+  attempts=1
+  while [ "$CODE" -ne 0 ] && [ "$CODE" -ne 124 ] && [ "$CODE" -ne 137 ] && [ "$attempts" -le "$RETRIES" ] \
+        && [ $(($(date +%s) - STARTED)) -lt "$RETRY_UNTIL" ]; do
+    log "flujo $name: falló (código $CODE); se repite una vez"
+    set_aside "$name" "intento$attempts"
+    attempts=$((attempts + 1))
+    run_flow "$flow" "$name"
+  done
+  [ "$attempts" -gt 1 ] && log "flujo $name: intento $attempts, código $CODE"
+  echo "$name $CODE $SECONDS_TAKEN $attempts" >> "$OUT/flujos-$SHARD.txt"
 done
 
 # The app's state at the end, for the record.

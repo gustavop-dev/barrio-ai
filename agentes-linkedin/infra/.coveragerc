@@ -1,6 +1,10 @@
 [run]
 branch = True
 source = team_backend
+# CI runs the tests with --parallel auto: each worker process writes its own .coverage.* file, and `coverage combine`
+# merges them before the report.
+parallel = True
+concurrency = multiprocessing
 omit =
     */tests/*
     */migrations/*

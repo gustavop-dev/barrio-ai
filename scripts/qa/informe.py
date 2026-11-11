@@ -28,28 +28,37 @@ FEATURE = re.compile(r'\b[A-Z]{3}(?:-[A-Z]{3})?-\d{2}\b')
 ERROR_TAGS = {'ReactNativeJS', 'ReactNative', 'AndroidRuntime', 'unknown:ReactNative', 'Expo', 'ExpoModulesCore', 'libc', 'DEBUG', 'CRASH'}
 
 
+def junit_failure(path):
+    """The failure (or error) message of a Maestro JUnit report, '' when it passed or is missing."""
+    message = ''
+    if path.exists():
+        try:
+            root = ET.parse(path).getroot()
+            for case in root.iter('testcase'):
+                for tag in ('failure', 'error'):
+                    node = case.find(tag)
+                    if node is not None:
+                        message = (node.get('message') or node.text or '').strip()
+        except ET.ParseError:
+            pass
+    return message
+
+
 def read_flows(out):
     flows = []
     for path in sorted(out.glob('flujos*.txt')):
         shard = path.stem.partition('-')[2] or '1'
         for line in path.read_text().splitlines():
             parts = line.split()
-            if len(parts) == 3:
-                flows.append({'name': parts[0], 'code': int(parts[1]), 'seconds': int(parts[2]), 'shard': shard})
+            # «name code seconds [attempts]»: a flow that failed runs once more (scripts/qa/correr-maestro.sh).
+            if len(parts) in (3, 4):
+                attempts = int(parts[3]) if len(parts) == 4 else 1
+                flows.append({'name': parts[0], 'code': int(parts[1]), 'seconds': int(parts[2]), 'shard': shard, 'attempts': attempts})
     flows.sort(key=lambda f: f['name'])
     for flow in flows:
-        flow['failure'] = ''
-        junit = out / 'junit' / f"{flow['name']}.xml"
-        if junit.exists():
-            try:
-                root = ET.parse(junit).getroot()
-                for case in root.iter('testcase'):
-                    for tag in ('failure', 'error'):
-                        node = case.find(tag)
-                        if node is not None:
-                            flow['failure'] = (node.get('message') or node.text or '').strip()
-            except ET.ParseError:
-                pass
+        flow['failure'] = junit_failure(out / 'junit' / f"{flow['name']}.xml")
+        # Flaky: it passed on the retry. Its first failure stays in the report, so the flakiness is not hidden.
+        flow['first_failure'] = junit_failure(out / 'junit' / f"{flow['name']}--intento1.xml") if flow['attempts'] > 1 else ''
         if flow['code'] in (124, 137):
             flow['failure'] = f"Tiempo agotado: el flujo superó {os.environ.get('QA_FLOW_TIMEOUT', '480')} s y se cortó"
         if flow['code'] != 0 and not flow['failure']:
@@ -58,8 +67,21 @@ def read_flows(out):
                 lines = [l for l in log.read_text(errors='replace').splitlines() if l.strip()]
                 flow['failure'] = next((l for l in reversed(lines) if 'FAILED' in l or 'Error' in l or 'failed' in l), lines[-1] if lines else '')
         flow['ok'] = flow['code'] == 0
+        flow['flaky'] = flow['ok'] and flow['attempts'] > 1
         flow['covers'] = covered(flow['name'])
     return flows
+
+
+def verdict(flow):
+    if flow['flaky']:
+        return 'pasa al 2.º intento'
+    return 'pasa' if flow['ok'] else 'falla'
+
+
+def reason(flow):
+    if flow['flaky']:
+        return f"1.er intento: {flow['first_failure'] or 'falló'}"
+    return flow['failure']
 
 
 def covered(name):
@@ -130,8 +152,8 @@ def write_html(out, flows, logcat, api):
     fails = sorted(p.name for p in (out / 'capturas' / 'fallos').glob('*.png')) if (out / 'capturas' / 'fallos').exists() else []
     videos = sorted(p.name for p in (out / 'videos').glob('*.mp4')) if (out / 'videos').exists() else []
     rows = ''.join(
-        f"<tr class=\"{'ok' if f['ok'] else 'ko'}\"><td>{html.escape(f['name'])}</td><td>{'pasa' if f['ok'] else 'falla'}</td>"
-        f"<td>{f['seconds']} s</td><td>{html.escape(', '.join(f['covers']))}</td><td><pre>{html.escape(f['failure'])}</pre></td></tr>" for f in flows)
+        f"<tr class=\"{'ok' if f['ok'] else 'ko'}\"><td>{html.escape(f['name'])}</td><td>{verdict(f)}</td>"
+        f"<td>{f['seconds']} s</td><td>{html.escape(', '.join(f['covers']))}</td><td><pre>{html.escape(reason(f))}</pre></td></tr>" for f in flows)
     def gallery(prefix):
         items = [s for s in shots if s.startswith(prefix[:2] + '-')]
         items += [s for s in fails if s.startswith(prefix + '--')]
@@ -190,14 +212,18 @@ def main():
     ok = bool(flows) and passed == len(flows) and not logcat['crash']
     (out / 'resultado.txt').write_text('ok\n' if ok else 'fallo\n')
     total = sum(f['seconds'] for f in flows)
+    flaky = [f['name'] for f in flows if f['flaky']]
     plan = os.environ.get('QA_PLAN', '').strip()
     lines = ['## QA móvil', '', *([f'_{plan}_', ''] if plan else []),
              f"**{passed} de {len(flows)} flujos pasan** · crash: **{'sí' if logcat['crash'] else 'no'}** · "
              f"errores ReactNativeJS: {logcat['js_errors']} · API: {api['5xx']}×5xx, {api['429']}×429 · {total // 60} min de flujos", '',
+             *([f"⚠️ **{len(flaky)} {'pasó' if len(flaky) == 1 else 'pasaron'} al reintento** (inestable): "
+                + ', '.join(f'`{n}`' for n in flaky), ''] if flaky else []),
              '| Flujo | Resultado | Duración | Cubre | Motivo |', '|---|---|---|---|---|']
     for f in flows:
-        reason = f['failure'].replace('\n', ' ').replace('|', '\\|')[:220]
-        lines.append(f"| `{f['name']}` | {'✅ pasa' if f['ok'] else '❌ falla'} | {f['seconds']} s | {', '.join(f['covers'])} | {reason} |")
+        why = reason(f).replace('\n', ' ').replace('|', '\\|')[:220]
+        mark = '⚠️' if f['flaky'] else '✅' if f['ok'] else '❌'
+        lines.append(f"| `{f['name']}` | {mark} {verdict(f)} | {f['seconds']} s | {', '.join(f['covers'])} | {why} |")
     if not flows:
         lines.append('| — | no se ejecutó ningún flujo | — | — | — |')
     try:
