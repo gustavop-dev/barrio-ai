@@ -111,6 +111,9 @@ class ImageWorkflowTests(EditorialBase):
                 if should_edit:
                     self.assertNotEqual(row.image.name,p.image.name);self.assertEqual(p.state,'editada')
                     self.assertEqual(row.review['sha256'],[row.sha256])
+                    # His note asked for the edit: the check is the tolerant one; a team edit keeps the strict one.
+                    self.assertEqual(fake.calls[1][5],reason=='Gustavo')
+                    self.assertEqual(row.review.get('from_gustavo',False),reason=='Gustavo')
 
     def test_disabled_or_missing_keys_use_original_and_rejection_or_error_discards_edit(self):
         for env in ({'LIVE_PROVIDERS':'false'},{'LIVE_PROVIDERS':'true','OPENAI_API_KEY':''}):
@@ -345,6 +348,25 @@ class ImageProviderContracts(PublicationBase):
         self.assertEqual(model.call_args.kwargs['purpose'],'image-check')
         self.assertEqual(sum(b['type']=='image' for b in model.call_args.args[1]),2)
         self.assertIn('more light',model.call_args.args[1][0]['text'])
+        self.assertIn('no hay cambios que la instrucción no pidió',model.call_args.args[0])
+
+    def test_an_edit_gustavo_asked_for_gets_the_tolerant_check(self):
+        original=png();edited=png(color='gray')
+        verdict={'ok':True,'reasons':['Añadió una taza de café y una libreta'],'checks':[]}
+        with patch.dict(os.environ,{'LIVE_PROVIDERS':'true','ANTHROPIC_API_KEY':'fake-only'}),\
+             patch('knowledge.providers.claude',return_value={'text':json.dumps(verdict)}) as model:
+            result=connectors_images.ImageConnector().check([edited],{'post':GOOD_POST},original,'Edit with a coworking space',from_gustavo=True)
+        system=model.call_args.args[0]
+        self.assertIn('sé muy tolerante',system)
+        self.assertIn('objetos añadidos, quitados o movidos',system)
+        self.assertNotIn('no hay cambios que la instrucción no pidió',system)
+        self.assertTrue(result['ok']);self.assertEqual(result['sha256'],[imagenes.sha(edited)])
+        self.assertEqual(sum(b['type']=='image' for b in model.call_args.args[1]),2)
+        # An infographic never takes the tolerant rule, even if the flag arrives.
+        with patch.dict(os.environ,{'LIVE_PROVIDERS':'true','ANTHROPIC_API_KEY':'fake-only'}),\
+             patch('knowledge.providers.claude',return_value={'text':json.dumps(dict(verdict,checks=[{'point':n,'ok':True,'reason':'ok'} for n in range(1,11)]))}) as model:
+            connectors_images.ImageConnector().check([edited],{'post':GOOD_POST},None,'',from_gustavo=True)
+        self.assertNotIn('sé muy tolerante',model.call_args.args[0])
 
     def test_linkedin_image_document_upload_and_multimage_shapes(self):
         cred=self.credential();seen=[]

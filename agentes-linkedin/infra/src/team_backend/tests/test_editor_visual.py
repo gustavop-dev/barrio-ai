@@ -91,6 +91,19 @@ class VisualTests(EditorialBase):
                 self.assertEqual((row.kind, row.sha256, row.alt, row.edited, row.reason),
                     (previous.kind, previous.sha256, previous.alt, previous.edited, previous.reason))
 
+    def test_an_edit_his_note_asks_for_passes_the_tolerant_check_inside_the_cycle(self):
+        # IMG-10 criterion 8: the flag travels in the declared check_input contract (a schema error would deny it).
+        photo = self.photo('auto', 'Edit with a coworking space', 'edit')
+        piece = self.piece(photo=photo)
+        fake = FakeImageConnector(edited=png(color='#dedfd4'))
+        run = self.visual(piece, fake)
+        row = piece.images.get()
+        self.assertTrue(row.edited)
+        self.assertTrue(row.review['from_gustavo'])
+        self.assertEqual([(c[0], c[5]) for c in fake.calls if c[0] == 'check'], [('check', True)])
+        calls = CycleLedger.objects.get(pk=run.id).progress_ledger['calls'].values()
+        self.assertEqual([c['state'] for c in calls if c['edge'] == 'revisar_imagen'], ['answered'])
+
     def test_carousel_reuses_structured_design_render_and_vision_gate(self):
         piece = self.piece(kind='carrusel')
         data = {'slides': [slide('portada'), slide(), slide('cierre')]}

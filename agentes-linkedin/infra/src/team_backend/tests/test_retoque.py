@@ -34,9 +34,9 @@ class SequenceConnector(FakeImageConnector):
         super().__init__()
         self.verdicts = iter(verdicts)
 
-    def check(self, images, context, original=None, instruction=''):
+    def check(self, images, context, original=None, instruction='', from_gustavo=False):
         self.ok = next(self.verdicts)
-        return super().check(images, context, original, instruction)
+        return super().check(images, context, original, instruction, from_gustavo)
 
 
 class ReworkBase(EditorialBase):
@@ -104,11 +104,13 @@ class ReworkTests(ReworkBase):
         self.assertEqual((old.state, new.previous_id, new.version), ('superseded', old.id, old.version + 1))
         self.assertEqual([c[0] for c in fake.calls], ['edit', 'check'])
         self.assertEqual((fake.calls[0][1], fake.calls[0][2]), (original, INSTRUCTION))
+        self.assertTrue(fake.calls[1][5])  # his comment asked for it: the tolerant check (IMG-10, criterion 8)
         row = piece.images.get()
         self.assertTrue(row.edited)
         self.assertEqual((row.width, row.height), (1080, 1350))  # vertical stays vertical, never squashed
         self.assertEqual(Image.open(io.BytesIO(imagenes.read(row.image))).size, (1080, 1350))
         self.assertIn('Comentario de Gustavo', row.reason)
+        self.assertTrue(row.review['from_gustavo'])
         self.assertEqual(GalleryPhoto.objects.get(pk=row.source_photo_id).state, 'editada')
         self.assertEqual(imagenes.read(row.source_photo.image), original)
         self.assertNotEqual(new.payload['media'], old.payload['media'])
