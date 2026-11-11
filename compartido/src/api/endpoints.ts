@@ -119,6 +119,10 @@ export function getCalendar(desde = '', dias = 15) {
 export const getPiece = (pieceId: string) => api.get<PieceDetailFull>(`${ED}/pieces/${id(pieceId)}`);
 /** Paid: queues the editorial circuit for the next free slot. The same `request_id` never queues twice. */
 export const planPiece = (requestId?: string) => api.post<PlanResponse>(`${ED}/plan`, requestId ? { request_id: requestId } : {});
+/** EDI-23 «Desestimar el bloqueo»: queues the job that prepares its image if it lacks one and approves it with his
+ * decision (paid only then). The same `request_id` never queues twice; 409 when the piece no longer allows it. */
+export const overridePiece = (pieceId: string, requestId?: string, note = '') =>
+  api.post<{ job: Job }>(`${ED}/pieces/${id(pieceId)}/desestimar`, requestId ? { request_id: requestId, note } : { note });
 
 // ---------------------------------------------------------------- official LinkedIn
 export const getLinkedInStatus = () => api.get<LinkedInStatus>('/api/v1/linkedin/status');

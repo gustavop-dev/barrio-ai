@@ -102,8 +102,13 @@ describe('Tu turno', () => {
       'POST /api/v1/operador/actions/a-1/reject': { body: {} },
     });
     expect(await screen.findByText('¿Apruebas seguir a Laura Prueba?')).toBeOnTheScreen();
+    // Collapsed: the title, a two-line summary and the buttons; who the person is waits under «Ver más».
+    expect(screen.getByTestId('turno-summary-approval:a-1')).toHaveTextContent('Lidera producto en un marketplace B2B.');
+    expect(screen.queryByText('Head of Product en un marketplace B2B')).toBeNull();
+    await fireEvent.press(screen.getByTestId('turno-more-approval:a-1'));
     expect(screen.getByText('Head of Product en un marketplace B2B')).toBeOnTheScreen();
     expect(screen.getByText('Lidera producto en un marketplace B2B.')).toBeOnTheScreen();
+    expect(screen.getByText('Si no la apruebas, no sale.')).toBeOnTheScreen();
     await fireEvent.press(screen.getByText('Vetar'));
     const sheet = await screen.findByTestId('confirm-sheet');
     expect(within(sheet).getByText('Vetar la acción')).toBeOnTheScreen();
@@ -112,6 +117,24 @@ describe('Tu turno', () => {
     await waitFor(() => expect(server.find('POST', '/api/v1/operador/actions/a-1/approve')[0]?.body).toEqual({ expected_hash: 'a'.repeat(64) }));
     expect(await screen.findByText('Aprobada. Sale cuando lo permitan la ventana y los topes.')).toBeOnTheScreen();
     expect(server.find('POST', '/api/v1/operador/actions/a-1/reject')).toHaveLength(0);
+  });
+
+  it('shows a conversation as its title and her message in two lines; «Ver más» opens why it matters', async () => {
+    await renderTurno();
+    const card = await screen.findByTestId(`turno-card-${CONVERSATION_CARD.id}`);
+    const summary = within(card).getByTestId(`turno-summary-${CONVERSATION_CARD.id}`);
+    expect(summary).toHaveTextContent('“Hola Gustavo, ¿tienes disponibilidad para un proyecto corto de IA en enero?”');
+    expect(summary.props.numberOfLines).toBe(2);
+    expect(within(card).queryByText('Por qué importa')).toBeNull();
+    expect(within(card).getByText('Hecho, respondí')).toBeOnTheScreen();
+    const more = within(card).getByTestId(`turno-more-${CONVERSATION_CARD.id}`);
+    expect(more).toHaveAccessibleName('Ver más');
+    await fireEvent.press(more);
+    expect(within(card).getByText('Por qué importa')).toBeOnTheScreen();
+    expect(within(card).getByText('La app nunca envía mensajes: respondes tú en LinkedIn.')).toBeOnTheScreen();
+    expect(within(card).queryByTestId(`turno-summary-${CONVERSATION_CARD.id}`)).toBeNull();
+    await fireEvent.press(within(card).getByText('Ver menos'));
+    expect(within(card).queryByText('Por qué importa')).toBeNull();
   });
 
   it('asks for a note before resolving an uncertain action and sends it', async () => {

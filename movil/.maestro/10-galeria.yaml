@@ -25,8 +25,18 @@ tags: [galeria]
 - assertVisible:
     id: gallery-upload
     text: Subir fotos
-- assertVisible: "Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería»\\."
-- assertVisible: "El equipo decide cuándo usarlas y si las edita con IA\\. Tú puedes dejar una nota o prohibir la edición en cada foto\\."
+# The how-to hints are temporary: they show for a few seconds (unless swiped away before, which no flow does) and leave
+# by themselves. Nothing asks for the category before uploading: it is chosen inside each photo.
+- runFlow:
+    when:
+      visible: "Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería»\\."
+    commands:
+      - takeScreenshot: 10-galeria-01a-avisos
+- extendedWaitUntil:
+    notVisible: "El equipo decide cuándo usarlas y si las edita con IA\\..*"
+    timeout: 15000
+- assertNotVisible: "Para usar la cámara, toca el botón aguamarina.*"
+- assertNotVisible: "Categoría al subir"
 # Tiles are labelled «Foto del <día>, <estado>»; the newest first.
 - extendedWaitUntil:
     visible: "Foto.*, nueva"

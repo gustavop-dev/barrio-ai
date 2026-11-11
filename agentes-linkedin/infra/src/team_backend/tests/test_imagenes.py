@@ -124,6 +124,22 @@ class ImageWorkflowTests(EditorialBase):
             p=self.photo('si');piece=self.piece(photo=p);imagenes.prepare(piece,client=fake)
             self.assertFalse(piece.images.get().edited);p.refresh_from_db();self.assertEqual(p.state,'elegida')
             self.assertEqual(imagenes.read(piece.images.get().image),imagenes.read(p.image))
+            image=self.human.get(f'/api/v1/editorial/pieces/{piece.id}').json()['images'][0]
+            if fake.error:
+                self.assertIsNone(image['rejected_edit'])  # nothing was edited: nothing to show
+                continue
+            # IMG-10: the edit the check rejected stays visible next to the original, with why; it never goes out.
+            rejected=image['rejected_edit'];self.assertEqual(rejected['reasons'],['La edición cambió un rostro'])
+            response=self.human.get(rejected['url'])
+            self.assertEqual(response.status_code,200);self.assertEqual(response['Content-Type'],'image/png')
+            kept=piece.images.get().data['rejected_edit']
+            self.assertEqual(imagenes.sha(b''.join(response.streaming_content)),kept['sha256']);response.close()
+            self.assertTrue(rejected['url'].endswith(f'?v={kept["sha256"][:16]}'))
+            self.assertNotIn('rejected_edit',json.dumps(imagenes.manifest(piece)))
+            from rest_framework.test import APIClient
+            self.assertIn(APIClient().get(rejected['url']).status_code,(401,403))
+            other=self.piece('infografia')
+            self.assertEqual(self.human.get(f'/api/v1/editorial/pieces/{other.id}/images/{image["id"]}/descartada').status_code,404)
 
     def test_no_gallery_no_keys_falls_back_to_private_brand_card_with_alt(self):
         piece=self.piece('infografia')

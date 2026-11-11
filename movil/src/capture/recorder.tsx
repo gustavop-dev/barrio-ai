@@ -5,7 +5,7 @@
 // Two contexts: the controls and phase (change rarely) and the live meter (every LEVEL_INTERVAL_MS),
 // so only the wave and the timer re-render while recording.
 import { nativeUri } from '@compartido/api/capturas';
-import { MAX_SECONDS, toBars, WAVE_BARS } from '@compartido/logic/audio';
+import { MAX_SECONDS, toBars } from '@compartido/logic/audio';
 import {
   getRecordingPermissionsAsync,
   RecordingPresets,
@@ -17,8 +17,9 @@ import {
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { captureMotion } from '@/theme/motion';
 import type { RecordedAudio } from './types';
+import { CLIP_BARS, LIVE_BARS } from './Wave';
 
-/** How often the meter and the timer refresh while recording: a new wave bar each time (MovCaptura). */
+/** How often the meter and the timer refresh while recording: a new wave bar each time, so the wave moves left (MovCaptura). */
 export const LEVEL_INTERVAL_MS = captureMotion.levelEveryMs;
 const IDLE_INTERVAL_MS = 1000;
 /** Metering arrives in dBFS (-160…0): this floor maps to an empty bar. */
@@ -58,11 +59,16 @@ export interface RecorderApi {
 export interface RecorderLive {
   /** Seconds recorded. */
   elapsed: number;
-  /** The last WAVE_BARS levels (0–1), newest last. */
+  /** The last LIVE_BARS levels (0–1), newest last. */
   levels: number[];
 }
 
-const EMPTY_LEVELS = Array.from({ length: WAVE_BARS }, () => 0);
+const EMPTY_LEVELS = Array.from({ length: LIVE_BARS }, () => 0);
+
+/** A finished recording's wave: its levels down to CLIP_BARS (a short one keeps the ones it has). */
+export function clipLevels(history: number[]): number[] {
+  return history.length <= CLIP_BARS ? [...history] : toBars(history, CLIP_BARS);
+}
 
 const RecorderContext = createContext<RecorderApi | null>(null);
 const LiveContext = createContext<RecorderLive>({ elapsed: 0, levels: EMPTY_LEVELS });
@@ -110,9 +116,9 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (phase !== 'recording' || !status.isRecording) return;
     history.current.push(levelOf(status.metering));
-    const recent = history.current.slice(-WAVE_BARS);
+    const recent = history.current.slice(-LIVE_BARS);
     elapsed.current = status.durationMillis / 1000;
-    setLive({ elapsed: elapsed.current, levels: toBars(recent, WAVE_BARS) });
+    setLive({ elapsed: elapsed.current, levels: toBars(recent, LIVE_BARS) });
   }, [phase, status.isRecording, status.durationMillis, status.metering]);
 
   const finish = useCallback((): Promise<RecordedAudio | null> => {
@@ -132,7 +138,7 @@ export function RecorderProvider({ children }: { children: ReactNode }) {
       setAudioModeAsync({ allowsRecording: false }).catch(() => undefined);
       // expo-audio gives `file:///…/Audio/recording-<uuid>.m4a`; a bare path would not upload.
       const uri = recorder.uri ? nativeUri(recorder.uri) : '';
-      const levels = toBars(history.current, WAVE_BARS);
+      const levels = clipLevels(history.current);
       history.current = [];
       elapsed.current = 0;
       setLive({ elapsed: 0, levels: EMPTY_LEVELS });

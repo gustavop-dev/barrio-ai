@@ -4,7 +4,7 @@ import { editedProposal, editFields, monthlyCountdown, proposalTitle } from '@co
 import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
-import { ReferentDecision } from './ReferentDecision';
+import { ReferentDecision, ReferentDetails } from './ReferentDecision';
 import { ProtectedReferent } from '@/personas/ProtectedReferent';
 
 it('keeps a swap paired and counts the first five Bogotá days across UTC midnight', () => {
@@ -29,7 +29,7 @@ it('shows evidence and saves an edit with the version, keeping errors visible', 
     'GET /api/v1/operador/referents': { body: [{ id: 'variable-1', display_name: 'Alba Variable', reason: 'Synthetic', active: true }] },
     'POST /api/v1/referentes/cambios/change-1/decidir': () => conflict ? { status: 409, body: { detail: 'La propuesta cambió' } } : { body: { state: 'edited', version: 4 } },
   });
-  await renderApp(<ReferentDecision card={MONTHLY_CARD} />);
+  await renderApp(<><ReferentDetails card={MONTHLY_CARD} /><ReferentDecision card={MONTHLY_CARD} /></>);
   expect(screen.getByText(/cobertura 8\/12; encaje 5\/8/)).toBeOnTheScreen();
   expect(screen.getByText(/5 main protegidos/)).toBeOnTheScreen();
   await fireEvent.press(screen.getByText('Editar'));

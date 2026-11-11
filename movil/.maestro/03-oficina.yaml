@@ -1,9 +1,10 @@
 # cubre: OFI-01, OFI-02, OFI-03, OFI-04, OFI-06, OFI-07, OFI-10
 # Oficina: a tap on a character of the Skia scene opens its sheet (SnapSheet), with its real state (the inbox agent is
-# not «en diseño») and what it did this session; the sheet is dragged to full and down to close; the team strip opens a
-# team, a member of it, «Ver en el Calendario» and, scrolled sideways, the library; Android back closes the sheet without
-# leaving the Oficina; the scene survives a drag and a double tap; pull to refresh; the legend; and a machine stopped
-# elsewhere darkens the scene and shows the pause banner, which leads to Ajustes.
+# not «en diseño») and what it did this session; the sheet is dragged to full and down to close; a zone's label opens its
+# team, a member of it, «Ver en el Calendario» and the library; Android back closes the sheet without leaving the Oficina;
+# the scene survives a drag and a double tap; pull to refresh; nothing under the scene but the space to pull (no legend,
+# activity age, team strip, map link or art credit: Gustavo, 11/11); and a machine stopped elsewhere darkens the scene and
+# shows the pause banner, which leads to Ajustes.
 appId: co.projectapp.office
 name: Oficina
 tags: [oficina]
@@ -22,8 +23,9 @@ tags: [oficina]
     selected: true
 - assertVisible: "La oficina en pixel art\\..*"
 - assertVisible:
-    id: team-chip-estrategia
+    id: zone-label-estrategia
     selected: false
+- assertNotVisible: "Mapa del equipo"
 - takeScreenshot: 03-oficina-01-escena
 
 # ---------------------------------------------------------------- a character in the scene
@@ -92,7 +94,7 @@ tags: [oficina]
 
 # ---------------------------------------------------------------- the machine stopped elsewhere
 # cubre: OFI-07.1, OFI-07.5 — the banner «Máquina en pausa · <motivo>» in the views, the scene darkened and still. The
-# team strip and the library run with the machine stopped: the still scene does not redraw, so the emulator's software
+# zone labels and the library run with the machine stopped: the still scene does not redraw, so the emulator's software
 # GPU answers each step in a fraction of a second instead of several seconds (the character above needed it running).
 - runScript:
     file: comun/qa-api.js
@@ -109,10 +111,10 @@ tags: [oficina]
     timeout: 20000
 - takeScreenshot: 03-oficina-04b-maquina-en-pausa
 
-# ---------------------------------------------------------------- the team strip
-# cubre: OFI-04
+# ---------------------------------------------------------------- a zone's label opens its team
+# cubre: OFI-04 — the label sits over the scene (its touch reaches the scene's tap, which hit-tests the labels first)
 - tapOn:
-    id: team-chip-estrategia
+    id: zone-label-estrategia
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
@@ -125,7 +127,7 @@ tags: [oficina]
 - assertVisible: "Encontrar tu posición y hacer que tu perfil la comunique\\."
 - assertVisible: "2 INTEGRANTES · LOS ESCRITORIOS COMPARTIDOS"
 - assertVisible:
-    id: team-chip-estrategia
+    id: zone-label-estrategia
     selected: true
 - takeScreenshot: 03-oficina-05-equipo
 
@@ -174,31 +176,23 @@ tags: [oficina]
     id: tab-index
     selected: true
 
-# Android back closes it (no visible «Cerrar») and the chip is no longer selected.
+# Android back closes it (no visible «Cerrar») and the label is no longer selected.
 - back
 - extendedWaitUntil:
     notVisible:
       id: office-panel
     timeout: 10000
 - assertVisible:
-    id: team-chip-estrategia
+    id: zone-label-estrategia
     selected: false
 
-# cubre: OFI-10 — the fourth editorial member opens its mission and registry definition.
-- repeat:
-    while:
-      notVisible:
-        id: team-chip-editorial
-    times: 4
-    commands:
-      - swipe:
-          from:
-            id: team-strip
-            point: "85%,50%"
-          direction: LEFT
-          duration: 400
+# cubre: OFI-10 — the fourth editorial member opens its mission. Opening a panel pans the scene to its zone and closing it
+# leaves the scene there: a double tap on the wall at the top brings it back, so every label is on screen again.
+- doubleTapOn:
+    id: office-scene
+    point: "50%,2%"
 - tapOn:
-    id: team-chip-editorial
+    id: zone-label-editorial
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible: "4 INTEGRANTES · LA MESA LARGA"
@@ -224,29 +218,21 @@ tags: [oficina]
     timeout: 10000
 - assertVisible: "Propone y prepara la foto, infografía o carrusel de la pieza; el director decide\\."
 - assertNotVisible: "Este rol está en diseño\\..*"
-- scrollUntilVisible:
-    element: Ver definición y conexiones
-    direction: DOWN
-- assertVisible: Ver definición y conexiones
+# The team map is gone: the agent has no link to it.
+- assertNotVisible: Ver definición y conexiones
 - takeScreenshot: 03-oficina-06c-editor-visual
 - back
+- extendedWaitUntil:
+    notVisible:
+      id: office-panel
+    timeout: 10000
 
-# The library is the last chip: swipe the strip sideways (from its right part, away from the raised capture
-# button in the middle of the bottom bar) until it shows, then open it.
-- repeat:
-    while:
-      notVisible:
-        id: team-chip-biblioteca
-    times: 4
-    commands:
-      - swipe:
-          from:
-            id: team-strip
-            point: "85%,50%"
-          direction: LEFT
-          duration: 400
+# The library, from its label, with the scene back in place.
+- doubleTapOn:
+    id: office-scene
+    point: "50%,2%"
 - tapOn:
-    id: team-chip-biblioteca
+    id: zone-label-biblioteca
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
@@ -258,7 +244,7 @@ tags: [oficina]
 - assertVisible: "Bibliotecario"
 - assertVisible: "Es un servicio de software, no un agente de IA: la búsqueda en la base de conocimiento\\..*"
 - assertVisible:
-    id: team-chip-biblioteca
+    id: zone-label-biblioteca
     selected: true
 - takeScreenshot: 03-oficina-07-biblioteca
 
@@ -274,7 +260,7 @@ tags: [oficina]
     id: tab-index
     selected: true
 - assertVisible:
-    id: team-chip-biblioteca
+    id: zone-label-biblioteca
     selected: false
 - takeScreenshot: 03-oficina-08-atras-cierra
 
@@ -298,7 +284,7 @@ tags: [oficina]
 - extendedWaitUntil:
     notVisible: "Máquina en pausa · Pausa de la QA"
     timeout: 60000
-# Back to the Oficina for the gestures and the legend.
+# Back to the Oficina for the gestures and what is under the scene.
 - tapOn:
     id: tab-index
     waitToSettleTimeoutMs: 500
@@ -323,21 +309,21 @@ tags: [oficina]
     id: office-scene
 - assertNotVisible:
     id: office-panel
-# cubre: OFI-06.3 — pulling the page down asks for the activity and the events again
+# cubre: OFI-06.3 — pulling the page down (from the space under the scene) asks for the activity and the events again
 - swipe:
     from:
-      id: team-strip
+      id: oficina-pie
     direction: DOWN
     duration: 600
 - assertVisible:
     id: screen-oficina
 
-# cubre: OFI-01.8 — the legend and the age of the real activity
-- scrollUntilVisible:
-    element: "Actividad real · .*"
-    direction: DOWN
-    timeout: 30000
-- assertVisible: Trabajando
-- assertVisible: En espera
-- assertVisible: En diseño
-- takeScreenshot: 03-oficina-09-leyenda
+# cubre: OFI-01.8 — under the scene there is only that space: no legend, activity age, team strip, map link or art credit
+- assertNotVisible: "Actividad real · .*"
+- assertNotVisible: Trabajando
+- assertNotVisible: En espera
+- assertNotVisible: "Mapa del equipo"
+- assertNotVisible: "Arte: LimeZu.*"
+- assertNotVisible:
+    id: team-strip
+- takeScreenshot: 03-oficina-09-bajo-la-escena

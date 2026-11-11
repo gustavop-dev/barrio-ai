@@ -36,7 +36,7 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que 
   5. **Dado** `INBOX_ENABLED=true` y un trabajo `read_inbox` corriendo, **cuando** se consulta, **entonces** `conversaciones_inbox` está `trabajando`.
   6. **Dado** que la actividad no se puede leer, **cuando** falla, **entonces** ve «No se pudo leer la actividad.» con «Mientras tanto los personajes quedan quietos: la oficina no simula trabajo.» y «Reintentar», y los personajes quedan quietos.
   7. **Dado** que el dibujo de la oficina no carga, **cuando** falla, **entonces** ve «No se pudo cargar el dibujo de la oficina.» (en la PWA, «… Recarga la página.»; en la app, con «Reintentar»).
-  8. **Dado** la leyenda, **cuando** se pinta, **entonces** muestra Trabajando, En espera y En diseño, y «Actividad real · hace X», «Leyendo actividad…» o «Actividad no disponible».
+  8. **Dado** la leyenda, **cuando** se pinta, **entonces** muestra Trabajando, En espera y En diseño, y «Actividad real · hace X», «Leyendo actividad…» o «Actividad no disponible». En la app (11/11/2026, a pedido de Gustavo) bajo la escena ya no hay leyenda, edad de la actividad, tira de equipos, enlace al mapa ni crédito del arte: solo los avisos de error y el espacio para tirar y recargar; el estado de cada rol sigue en su panel.
   9. **Dado** la app en segundo plano o en otra pestaña, **cuando** pasa el tiempo, **entonces** la escena deja de consultar y de animar hasta volver.
   10. **Dado** «reducir movimiento» en el sistema, **cuando** abre la oficina, **entonces** la escena queda quieta.
 - **Brechas código/docs:** `oficina/README.md` describe los botones «Activar ambiente» y «Luz de tarde», que no existen en el código actual.
@@ -80,7 +80,7 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que 
 - **Qué hace para Gustavo:** toca un personaje o una zona y ve qué hace ese rol o ese equipo, su misión y su estado real.
 - **Código:** PWA `scene/OfficePanels.tsx`, `BottomSheet.tsx` (teléfono) o panel lateral (≥ 1.100 px); app `OfficePanels.tsx` en una hoja; `compartido/src/scene/panels.ts`.
 - **Criterios de aceptación:**
-  1. **Dado** la tira «Equipos» (siete equipos más «Biblioteca»), **cuando** toca uno, **entonces** se abre su panel con «ESPACIO DEL EQUIPO», el número, «Nuevo» en Relaciones y Operación, el propósito, «N INTEGRANTES · <lugar>», el recuento («2 trabajando · 1 en espera · 0 en diseño») y sus miembros.
+  1. **Dado** la tira «Equipos» de la PWA (siete equipos más «Biblioteca») o, en la app, el nombre de una zona sobre la escena (botón para el lector de pantalla), **cuando** toca uno, **entonces** se abre su panel con «ESPACIO DEL EQUIPO», el número, «Nuevo» en Relaciones y Operación, el propósito, «N INTEGRANTES · <lugar>», el recuento («2 trabajando · 1 en espera · 0 en diseño») y sus miembros.
   2. **Dado** un personaje, **cuando** lo toca, **entonces** ve «AGENTE» o «SERVICIO» con la zona, la misión, «ESTADO REAL» con el detalle y desde cuándo (o «Sin datos de actividad.»), y para Operación la nota de que es un servicio, no un agente de IA.
   3. **Dado** un rol en diseño, **cuando** abre su panel, **entonces** ve «Este rol está en diseño. Aparece en la oficina, pero todavía no trabaja.».
   4. **Dado** «LO ÚLTIMO QUE HIZO», **cuando** se pinta, **entonces** muestra hasta 3 eventos de esta sesión o «Nada todavía en esta sesión.» (no es historial del servidor).
@@ -169,7 +169,7 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que 
 - **Cadencia:** con cada cambio de estado/evento del trabajo visual; reutiliza la actualización de actividad de la Oficina.
 - **Tu turno:** ninguna aprobación por mostrar al rol. Sus entregables siguen EDI-21 y, para perfil, TUR-18.
 - **Datos necesarios y disponibilidad:** el rol ocupa el cuarto asiento de Editorial y aparece en su tira/panel. La etapa `visual` y el ledger atribuyen actividad real; los eventos del dispatcher muestran solicitudes y respuestas director ⇄ Editor visual. Sin actividad recibida permanece quieto y muestra Sin datos.
-- **Código:** `team_backend/oficina_views.py`, eventos existentes del dispatcher, `compartido/src/logic/roles.ts` y `scene`, paneles PWA/app. «Ver definición y conexiones» abre la ficha del registro. Sprite existente reutilizado; cambios app solo TS/TSX, sin dependencias nativas.
+- **Código:** `team_backend/oficina_views.py`, eventos existentes del dispatcher, `compartido/src/logic/roles.ts` y `scene`, paneles PWA/app. «Ver definición y conexiones» abre la ficha del registro en la PWA (la app retiró el mapa el 11/11/2026). Sprite existente reutilizado; cambios app solo TS/TSX, sin dependencias nativas.
 - **Criterios de aceptación:**
   1. **Dado** el rol registrado, **cuando** abre Editorial en la PWA o app, **entonces** aparece «Editor visual», su misión y definición accesible desde el panel, y se actualiza el número de integrantes sin sustituir a director o copywriters.
   2. **Dado** un trabajo visual real, **cuando** se consulta, **entonces** muestra en cola, trabajando, en espera o bloqueo, con el detalle de la tarea y la pieza/propuesta de perfil asociada; si aún no hay runtime, muestra «En diseño».

@@ -9,9 +9,9 @@ from PIL import Image
 from django.utils import timezone
 
 from team_backend import autopiloto, capturas, connectors_images, editor_visual, editorial, guardas, imagenes, lider
-from team_backend import operador, orquestacion, retoque, urgente
+from team_backend import jobs, operador, orquestacion, rescate, retoque, urgente
 from team_backend.connectors_images import FakeImageConnector
-from team_backend.models import ActionProposal, Capture, CycleLedger, EditorialPiece, GalleryPhoto
+from team_backend.models import ActionProposal, Capture, CycleLedger, EditorialPiece, GalleryPhoto, Job
 from team_backend.tests import test_imagenes as image_cases
 from team_backend.tests.test_imagenes import png, slide
 from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answers
@@ -188,6 +188,21 @@ class ReworkTests(ReworkBase):
         self.assertEqual((idea.state, photo.state), ('idea', 'sin_usar'))  # back to the table and the gallery
         self.assertEqual(capture.routed_to['rework']['state'], 'aplazada')
         self.assertIn('revisión visual', piece.note)
+        # IMG-10: he still sees the last rejected edit, with why, to judge it himself; it is not what goes out.
+        row = piece.images.get()
+        self.assertFalse(row.edited)
+        self.assertEqual(row.data['rejected_edit']['reasons'], ['La edición cambió un rostro'])
+        self.assertTrue(row.image.storage.exists(row.data['rejected_edit']['path']))
+
+    def test_an_edit_that_passes_on_its_second_try_forgets_the_rejected_one(self):
+        piece, _ = self.ready()
+        fake = SequenceConnector([False, True])
+        self.rework(self.comment(piece, 'Ponme en un coworking.'),
+                    {'retoque': decision('imagen', 'editar_foto', instruction=INSTRUCTION)}, fake)
+        row = piece.images.get()
+        self.assertTrue(row.edited)
+        self.assertNotIn('rejected_edit', row.data)
+        self.assertIsNone(imagenes.payload(row)['rejected_edit'])
 
     def test_when_the_edit_fails_the_director_can_fall_back_to_an_infographic(self):
         plan = {'retoque': decision('imagen', 'editar_foto', fails='infografia', instruction=INSTRUCTION),
@@ -449,3 +464,121 @@ class EditSizeTests(EditorialBase):
         self.assertEqual((row.edited, row.width, row.height), (True, 1080, 1350))
         self.assertEqual(Image.open(io.BytesIO(imagenes.read(row.image))).size, (1080, 1350))
         self.assertIsNone(orquestacion.current())
+
+
+PITCH = 'DM me if you want to talk about it.'
+
+
+class RescueTests(ReworkBase):
+    """EDI-23: a blocked piece shows why and offers «Pedir un cambio» and «Desestimar el bloqueo»."""
+    def setUp(self):
+        super().setUp()
+        self.grant(self.gustavo, 'approve_actions', 'execute_actions')
+
+    def blocked(self, days=3, reasons=('Contiene pitch agresivo o petición de contacto',)):
+        """A piece the text verifier blocked, as editorial.prepare leaves it: its text, no image, no proposal."""
+        piece = self.factory(kind='foto', photo=self.photo())
+        day = timezone.now().astimezone(operador.local_tz()).date() + timedelta(days=days)
+        piece.scheduled_for = editorial.scheduled_for(day)
+        piece.slot_date = piece.scheduled_for.astimezone(operador.local_tz()).date()
+        piece.citations = ['LI-06-M002-K09']
+        piece.final_text = GOOD_POST + '\n\n' + PITCH
+        piece.state = EditorialPiece.State.BLOCKED
+        piece.note = '; '.join(reasons)
+        piece.verification = {'verdict': 'blocked', 'blocking_reasons': list(reasons),
+                              'text_sha256': imagenes.sha(piece.final_text.encode())}
+        piece.save()
+        return piece
+
+    def no_vision(self):
+        return patch('team_backend.connectors_images.available', return_value=False)
+
+    def test_dismissing_a_verifier_block_prepares_its_image_and_schedules_it_with_his_approval(self):
+        piece = self.blocked()
+        url = f'/api/v1/editorial/pieces/{piece.id}'
+        self.assertEqual(self.human.get(url).json()['rescue'], {'kind': 'verificador', 'override': True, 'change': True, 'why_not': ''})
+        with self.no_vision(), patch('team_backend.connectors_images.ImageConnector', return_value=FakeImageConnector()), \
+                patch.object(lider, 'review', side_effect=AssertionError('el líder no revisa lo que él desestimó')):
+            response = self.human.post(url + '/desestimar', {'note': 'Sale así'}, format='json')
+            self.assertEqual(response.status_code, 202)
+            job = Job.objects.get(pk=response.json()['job']['id'])
+            self.assertEqual((job.kind, job.params['piece']), ('override_piece', str(piece.id)))
+            jobs.process_one(self.worker)
+        job.refresh_from_db()
+        piece.refresh_from_db()
+        self.assertEqual(job.state, Job.State.COMPLETE)
+        self.assertEqual(piece.state, EditorialPiece.State.READY)
+        self.assertTrue(piece.images.exists())  # every post goes out with an image
+        proposal = piece.proposals.get()
+        self.assertEqual((proposal.state, proposal.decided_by, proposal.source), ('approved', self.gustavo, 'human'))
+        self.assertEqual(proposal.decision_note, 'Gustavo desestimó el bloqueo: Sale así')
+        self.assertTrue(Job.objects.filter(kind='execute_action').exists())
+        # The verifier's verdict stays on record; his override binds this exact text and only LinkedIn's needs remain.
+        self.assertEqual(piece.verification['verdict'], 'blocked')
+        self.assertEqual(piece.verification['override']['text_sha256'], imagenes.sha(piece.final_text.encode()))
+        self.assertEqual(piece.verification['override']['reasons'], ['Contiene pitch agresivo o petición de contacto'])
+        self.assertEqual(autopiloto.post_issues(proposal), [])
+        self.assertEqual(editorial.status(piece, proposal), 'scheduled')
+        detail = self.human.get(url).json()
+        self.assertIsNone(detail['rescue'])
+        self.assertEqual(detail['override']['kind'], 'verificador')
+        # Another text is not covered by his override.
+        piece.verification = dict(piece.verification, override=dict(piece.verification['override'], text_sha256='0' * 64))
+        piece.save()
+        self.assertIn('Contiene pitch agresivo o petición de contacto', autopiloto.post_issues(proposal))
+
+    def test_dismissing_the_leaders_discard_approves_a_new_version_without_the_leader(self):
+        piece, old = self.ready()
+        ActionProposal.objects.filter(pk=old.pk).update(state='discarded', review={'reasons': ['Líder: inventa 0.8']},
+                                                        decision_note='Descartada por el líder')
+        self.assertEqual(rescate.options(piece), {'kind': 'lider', 'override': True, 'change': True, 'why_not': ''})
+        self.assertEqual(rescate.reasons(piece), ['Líder: inventa 0.8'])
+        with patch.object(lider, 'review', side_effect=AssertionError('el líder no revisa lo que él desestimó')):
+            new = rescate.override(self.gustavo, piece.id)
+        old.refresh_from_db()
+        piece.refresh_from_db()
+        self.assertEqual((new.state, new.previous_id, new.version, new.decided_by), ('approved', old.id, old.version + 1, self.gustavo))
+        self.assertEqual(new.payload['text'], old.payload['text'])
+        self.assertEqual(autopiloto.post_issues(new), [])
+        self.assertIsNone(rescate.options(piece))
+        self.assertEqual(piece.verification['override']['kind'], 'lider')
+
+    def test_no_way_out_when_the_day_has_another_piece_its_hour_passed_or_a_budget_stop(self):
+        piece = self.blocked(days=4)
+        self.ready(days=4)
+        self.assertEqual(rescate.options(piece)['why_not'], 'Ese día ya tiene otra pieza programada.')
+        response = self.human.post(f'/api/v1/editorial/pieces/{piece.id}/desestimar', {}, format='json')
+        self.assertEqual(response.status_code, 409)
+        self.assertFalse(Job.objects.filter(kind='override_piece').exists())
+        late = self.blocked(days=5)
+        EditorialPiece.objects.filter(pk=late.pk).update(scheduled_for=timezone.now() - timedelta(minutes=5))
+        late.refresh_from_db()
+        self.assertEqual(rescate.options(late)['why_not'], 'Su hora ya pasó: ya no se puede publicar ni rehacer.')
+        self.assertFalse(retoque.rescatable(late))
+        stopped = self.blocked(days=6, reasons=('Ciclo detenido: cost_cap',))
+        stopped.verification = {}
+        stopped.save()
+        self.assertIsNone(rescate.options(stopped))  # the autopilot redoes it
+        self.assertIsNone(self.human.get(f'/api/v1/editorial/pieces/{stopped.id}').json()['rescue'])
+
+    def test_a_comment_on_a_blocked_piece_reopens_it_and_the_new_version_goes_to_the_leader(self):
+        piece = self.blocked()
+        routed, _outcome, _state, _role = capturas._route_piece(self.comment(piece, 'x'), self.gustavo, 'x')
+        self.assertEqual(routed['rework'], 'pending')
+        capture = self.comment(piece, 'Quita la frase de venta del final.')
+        plan = {'retoque': decision('texto', text=NEW_POST), 'verificador': answers(final=NEW_POST)['verificador']}
+        with self.no_vision():
+            capture = self.rework(capture, plan)
+        piece.refresh_from_db()
+        self.assertEqual(capture.routed_to['rework']['state'], 'rehecha')
+        self.assertEqual(piece.state, EditorialPiece.State.READY)
+        self.assertTrue(piece.images.exists())
+        base = piece.proposals.get(state='discarded')
+        new = piece.proposals.get(state='proposed')  # the autopilot sends it to the leader, soft for his comment
+        self.assertEqual((new.previous_id, new.payload['text']), (base.id, NEW_POST))
+        self.assertFalse(any(str(r).startswith('Bloqueada por') for r in new.risks))
+        self.assertEqual(self.calls[0][0], 'editorial-retoque')
+        self.assertEqual(self.calls[0][1]['bloqueo'], ['Contiene pitch agresivo o petición de contacto'])
+        self.assertEqual(piece.verification['verdict'], 'ready_for_execution')
+        self.assertEqual(autopiloto.post_issues(new), [])
+

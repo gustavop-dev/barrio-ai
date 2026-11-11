@@ -263,7 +263,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Criterios de aceptación:**
   1. **Dado** una pieza con una foto sin editar, **cuando** abre su detalle, **entonces** ve la foto con «Se publica tal cual» y el motivo («Instrucción de Gustavo: úsala tal cual», «Edición prohibida en la foto»…).
   2. **Dado** una pieza con una foto editada, **cuando** abre su detalle, **entonces** ve el original y la versión editada (lado a lado en escritorio, alternables en el teléfono), el motivo de la edición y el veredicto de la comprobación.
-  3. **Dado** una edición descartada por la comprobación, **cuando** abre el detalle, **entonces** ve que sale el original y por qué.
+  3. **Dado** una edición descartada por la comprobación, **cuando** abre el detalle, **entonces** ve que sale el original y por qué, y en la app ve también la edición descartada («Edición con IA descartada») con las razones, para juzgarla él mismo. El servidor guarda solo la última descartada de cada foto (`PieceImage.data.rejected_edit`, fuera del manifiesto: nunca se publica) y la sirve en `GET /api/v1/editorial/pieces/{id}/images/{img}/descartada`; una edición aceptada después la borra.
   4. **Dado** una pieza con infografía o carrusel, **cuando** abre su detalle, **entonces** ve la imagen o cada lámina en orden («1/5», «2/5»…), la plantilla usada, el resultado de la lista de 10 puntos y el texto alternativo de cada una.
   5. **Dado** una pieza programada, **cuando** la veta antes de su hora, **entonces** no sale ni el texto ni la imagen, como hoy.
   6. **Dado** que ya pasó la hora o la pieza se está publicando, **cuando** abre el detalle, **entonces** no hay botón de veto.

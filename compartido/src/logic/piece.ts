@@ -197,3 +197,19 @@ export function pieceUrl(piece: Pick<PieceDetail, 'external_url' | 'metrics' | '
 export function charCount(text: string | null | undefined): number {
   return [...(text ?? '')].length;
 }
+
+/** EDI-23: who blocked the piece, inside a sentence. */
+export const RESCUE_WHO: Record<'verificador' | 'imagen' | 'lider', string> = {
+  verificador: 'el verificador',
+  imagen: 'la revisión de la imagen',
+  lider: 'el líder',
+};
+
+/** The toast after «Desestimar el bloqueo». */
+export const OVERRIDE_DONE = 'Bloqueo desestimado: el equipo la deja lista para salir con tu aprobación.';
+
+/** What «Desestimar el bloqueo» does, for its confirmation. */
+export function overrideConsequence(piece: { images?: readonly unknown[] | null }): string {
+  const image = piece.images?.length ? '' : ' Antes, el equipo le prepara la imagen (tiene un coste pequeño).';
+  return `Sale tal cual en su día y hora, con tu aprobación y sin pasar por el líder.${image} Aún podrás vetarla hasta su hora.`;
+}

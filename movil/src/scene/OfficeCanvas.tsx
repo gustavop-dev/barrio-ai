@@ -1,5 +1,5 @@
 import { Canvas, Group, Picture, Skia, useImage } from '@shopify/react-native-skia';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
 import { GestureDetector, useExclusiveGestures, usePanGesture, usePinchGesture, useSimultaneousGestures, useTapGesture, type NativeGesture } from 'react-native-gesture-handler';
 import Animated, { runOnJS, runOnUI, useAnimatedReaction, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
@@ -15,6 +15,8 @@ import { Decorations, Monitors } from './Decorations';
 import { Sprites } from './Sprites';
 import { roomPicture } from './room';
 import { clampPan, zoomAt } from './viewport';
+
+const ZONE_NAME: Record<ZoneId, string> = { ...Object.fromEntries(TEAMS.map((team) => [team.id, team.name])), biblioteca: LIBRARY.name } as Record<ZoneId, string>;
 
 export type ScenePick = { kind: 'role'; id: CharacterId } | { kind: 'zone'; id: ZoneId };
 export interface OfficeCanvasProps {
@@ -36,6 +38,12 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   const panStart = useSharedValue({ x: 0, y: 0 });
   const pinchStart = useSharedValue(scale);
   const pinching = useSharedValue(false);
+  // The zone labels are the way into a team (the team strip under the scene is gone): their boxes in logical pixels,
+  // measured once laid out, take a tap before the characters under them. The boxes gather on the JS side and each
+  // write carries all of them: the labels lay out in one batch, and a shared value read back on JS between two writes
+  // could still be the old one, so a read-modify-write per label kept only the last label (QA run 43091761036).
+  const measured = useRef<Record<string, readonly [number, number, number, number]>>({});
+  const labelBoxes = useSharedValue<Record<string, readonly [number, number, number, number]>>({});
   const [initialMatrix] = useState(() => Skia.Matrix());
   const matrix = useSharedValue(initialMatrix);
   useAnimatedReaction(() => view.value, (v) => {
@@ -90,6 +98,11 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
       'worklet';
       const v = view.value;
       const x = (event.x - v.x) / v.scale; const y = (event.y - v.y) / v.scale;
+      const boxes = labelBoxes.value;
+      for (const zone of Object.keys(boxes)) {
+        const [bx, by, bw, bh] = boxes[zone]!;
+        if (x >= bx && x < bx + bw && y >= by && y < by + bh) { runOnJS(onPick)({ kind: 'zone', id: zone as ZoneId }); return; }
+      }
       const role = hitScene(scene.value, x, y, officeGestures.touchTarget / v.scale, officeGestures.touchTarget / v.scale);
       if (role) runOnJS(onPick)({ kind: 'role', id: role });
       else { const zone = zoneAt(x, y); if (zone) runOnJS(onPick)({ kind: 'zone', id: zone }); }
@@ -105,7 +118,7 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   return <View style={{ width, height }}>
     <GestureDetector gesture={gesture}>
       <View style={[styles.stage, { width, height }]} testID="office-scene">
-        <Canvas style={StyleSheet.absoluteFill} accessibilityRole="image" accessibilityLabel="La oficina en pixel art. Toca a un personaje para ver su rol o una zona para ver su equipo. Lo mismo está en la tira de equipos, debajo.">
+        <Canvas style={StyleSheet.absoluteFill} accessibilityRole="image" accessibilityLabel="La oficina en pixel art. Toca a un personaje para ver su rol o una zona para ver su equipo. Los nombres de las zonas también abren su equipo.">
           {atlas && room ? <Group matrix={matrix} antiAlias={false}>
             <Picture picture={room} />
             <Monitors atlas={atlas} scene={scene} />
@@ -113,9 +126,18 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
             <Decorations scene={scene} selected={selectedRole} zone={selectedZone} />
           </Group> : null}
         </Canvas>
-        <Animated.View pointerEvents="none" importantForAccessibility="no-hide-descendants" style={[styles.labels, { width: PLAN_WIDTH * scale, height: PLAN_HEIGHT * scale }, labels]}>
-          {ZONE_LABELS.map((label) => <T key={label.zone} variant="etiqueta" maxFontSizeMultiplier={1.3} style={[styles.label, { left: label.at[0] * scale, top: label.at[1] * scale }]}>{label.text}</T>)}
-          {ROLES.filter((r) => statuses[r.id] === 'diseno').map((r) => <T key={r.id} variant="etiqueta" style={[styles.label, { left: Math.max(4, Math.min(r.home[0] * scale - 45, PLAN_WIDTH * scale - 98)), top: (r.home[1] - 7) * scale }]}>EN DISEÑO</T>)}
+        {/* Touches pass through to the scene's tap, which hit-tests the measured labels; a screen reader activates them. */}
+        <Animated.View pointerEvents="none" style={[styles.labels, { width: PLAN_WIDTH * scale, height: PLAN_HEIGHT * scale }, labels]}>
+          {ZONE_LABELS.map((label) => <T key={label.zone} variant="etiqueta" maxFontSizeMultiplier={1.3} testID={`zone-label-${label.zone}`}
+            accessibilityRole="button" accessibilityLabel={ZONE_NAME[label.zone]} accessibilityState={{ selected: selectedZone === label.zone }}
+            accessibilityActions={[{ name: 'activate' }]} onAccessibilityAction={() => onPick({ kind: 'zone', id: label.zone })}
+            onLayout={(event) => {
+              const { x, y, width: w, height: h } = event.nativeEvent.layout;
+              measured.current = { ...measured.current, [label.zone]: [x / scale, y / scale, w / scale, h / scale] };
+              labelBoxes.value = measured.current;
+            }}
+            style={[styles.label, { left: label.at[0] * scale, top: label.at[1] * scale }]}>{label.text}</T>)}
+          {ROLES.filter((r) => statuses[r.id] === 'diseno').map((r) => <T key={r.id} variant="etiqueta" accessible={false} importantForAccessibility="no" style={[styles.label, { left: Math.max(4, Math.min(r.home[0] * scale - 45, PLAN_WIDTH * scale - 98)), top: (r.home[1] - 7) * scale }]}>EN DISEÑO</T>)}
         </Animated.View>
         {!atlas && !error ? <View style={styles.loading}><Skeleton variant="card" count={1} /></View> : null}
       </View>

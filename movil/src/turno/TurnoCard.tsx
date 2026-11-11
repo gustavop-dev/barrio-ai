@@ -1,7 +1,7 @@
 import { ProfileProposal } from './ProfileProposal';
-import { ReferentDecision } from './ReferentDecision';
-// A Tu turno card (the PWA's TurnoCardView): type, priority, deadline, who asks, title, body by type,
-// actions and «Creada hace X», inside a SwipeableCard (right: the primary action; left: «Más tarde»).
+import { ReferentDecision, ReferentDetails } from './ReferentDecision';
+// A Tu turno card (the PWA's TurnoCardView): type, priority, deadline, who asks, title and a two-line summary («Ver más»
+// opens the rest), actions and «Creada hace X», inside a SwipeableCard (right: the primary action; left: «Más tarde»).
 // MovTuTurno: once the backend confirms, the button that resolved it turns into a check and the card
 // goes 0ff1ce-claro, then it leaves the list (exits.ts runs the steps; a swipe skips the check).
 import { usePostponePregunta, useTurnoAction } from '@compartido/api/hooks';
@@ -17,7 +17,7 @@ import { AgentPortrait, Avatar, Badge, Button, Card, ConfirmSheet, ErrorRetry, L
 import { isHttps, openLink } from '@/navigation';
 import { haptic } from '@/theme/motion';
 import { colors, space } from '@/theme/tokens';
-import { cardTitle, modalFor, orderedActions, successMessage, swipeIntents, TYPE_ICON, TYPE_LABEL, typeTone, withNote, type SwipeIntent } from './actions';
+import { cardSummary, cardTitle, hasDetails, lastInbound, modalFor, noticeText, orderedActions, successMessage, swipeIntents, TYPE_ICON, TYPE_LABEL, typeTone, withNote, type SwipeIntent } from './actions';
 import { DoneButton } from './DoneButton';
 import { buttonKey, useTurnoExitsApi, type CardExit } from './exits';
 import { OpportunitySheet } from './OpportunitySheet';
@@ -137,6 +137,8 @@ function CardActions({ card, runner, onOpportunity, resolvedBy }: CardActionsPro
 }
 
 // ---------------------------------------------------------------- bodies
+// Gustavo (11/11/2026): a card says what it is about in a title and two lines; what it rests on is one «Ver más» away.
+// Its buttons (and a question's answer) stay in view, so he decides without opening anything.
 
 function Quote({ children }: { children: string }) {
   return (
@@ -146,34 +148,42 @@ function Quote({ children }: { children: string }) {
   );
 }
 
-function Attempt({ card }: { card: TurnoCardData }) {
+function attemptWhere(card: TurnoCardData): string {
+  const target = card.attempt?.target;
+  return !target ? '' : target.kind === 'post' ? ` en el post de ${target.name}` : target.kind === 'own' ? ' en tu perfil' : target.name ? ` · ${target.name}` : '';
+}
+
+/** «Ver en LinkedIn» of a check: what Gustavo needs to resolve it, so it stays in view. */
+function AttemptLink({ card }: { card: TurnoCardData }) {
+  const url = card.attempt?.url ?? card.attempt?.target?.url;
+  if (!url || !isHttps(url)) return null;
+  return (
+    <Pressable accessibilityRole="link" accessibilityHint="Se abre en el navegador" onPress={() => void Linking.openURL(url)} style={styles.link}>
+      <T color={colors.brandDeep}>Ver en LinkedIn</T>
+      <Icon name="external" size={16} color={colors.brandDeep} />
+    </Pressable>
+  );
+}
+
+function AttemptDetails({ card }: { card: TurnoCardData }) {
   const attempt = card.attempt!;
-  const target = attempt.target;
-  const where = !target ? '' : target.kind === 'post' ? ` en el post de ${target.name}` : target.kind === 'own' ? ' en tu perfil' : target.name ? ` · ${target.name}` : '';
   const when = dayAndTime(attempt.at);
-  const url = attempt.url ?? target?.url;
   return (
     <View style={styles.block}>
       <T variant="detalle" soft>
         {attempt.label}
-        {where}
+        {attemptWhere(card)}
         {when ? ` · ${when}` : ''}
       </T>
       {attempt.text ? <Quote>{attempt.text}</Quote> : null}
       {attempt.reaction ? <T>Reacción: {attempt.reaction}</T> : null}
       {card.body ? <T>{card.body}</T> : null}
-      {url && isHttps(url) ? (
-        <Pressable accessibilityRole="link" accessibilityHint="Se abre en el navegador" onPress={() => void Linking.openURL(url)} style={styles.link}>
-          <T color={colors.brandDeep}>Ver en LinkedIn</T>
-          <Icon name="external" size={16} color={colors.brandDeep} />
-        </Pressable>
-      ) : null}
     </View>
   );
 }
 
 /** What an approval card asks for: the action and its target, the exact text when there is one, and why the team proposes it. */
-function ApprovalBody({ card }: { card: TurnoCardData }) {
+function ApprovalDetails({ card }: { card: TurnoCardData }) {
   const approval = card.approval!;
   const target = approval.target;
   const where = !target ? '' : target.kind === 'post' ? ` en el post de ${target.name}` : target.kind === 'own' ? '' : target.name ? ` · ${target.name}` : '';
@@ -201,34 +211,23 @@ function ApprovalBody({ card }: { card: TurnoCardData }) {
   );
 }
 
-function NoticeBody({ card }: { card: TurnoCardData }) {
+/** «Detenida por qa · 10 nov, 09:12»: a one-line status, in view like the deadline. */
+function NoticeMeta({ card }: { card: TurnoCardData }) {
   const extra = extras(card);
-  if (card.id === 'linkedin_expiring' && extra.expires_at && typeof extra.days_left === 'number') {
-    const days = extra.days_left;
-    return (
-      <T>
-        El permiso para publicar caduca el {longDate(extra.expires_at)} ({days === 1 ? 'queda 1 día' : `quedan ${days} días`}). LinkedIn no deja renovarlo solo.
-      </T>
-    );
-  }
+  if (card.id !== 'machine_paused' || !(extra.stopped_by || card.created_at)) return null;
   return (
-    <>
-      {card.body ? <T>{card.body}</T> : null}
-      {card.id === 'machine_paused' && (extra.stopped_by || card.created_at) ? (
-        <T variant="detalle" soft>
-          Detenida{extra.stopped_by ? ` por ${extra.stopped_by}` : ''}
-          {card.created_at ? ` · ${dayAndTime(card.created_at)}` : ''}
-        </T>
-      ) : null}
-    </>
+    <T variant="detalle" soft>
+      Detenida{extra.stopped_by ? ` por ${extra.stopped_by}` : ''}
+      {card.created_at ? ` · ${dayAndTime(card.created_at)}` : ''}
+    </T>
   );
 }
 
-function ConversationBody({ card }: { card: TurnoCardData }) {
+function ConversationDetails({ card }: { card: TurnoCardData }) {
   const conversation = card.conversation!;
   const person = conversation.person;
   const name = person?.display_name || conversation.attendee_name || 'Esta persona';
-  const last = [...conversation.messages].reverse().find((message) => !message.from_me);
+  const last = lastInbound(card);
   const when = dayAndTime(last?.at);
   return (
     <>
@@ -278,21 +277,36 @@ function ConversationBody({ card }: { card: TurnoCardData }) {
   );
 }
 
-function QuestionBody({ card, resolvedBy }: { card: TurnoCardData; resolvedBy: string | null }) {
-  const question = card.question!;
-  const purpose = question.purpose || card.body;
+/** Everything a card rests on, under «Ver más». */
+function CardDetails({ card }: { card: TurnoCardData }) {
+  if (card.referent_change || card.referent_experiment) return <ReferentDetails card={card} />;
+  if (card.question) {
+    const purpose = card.question.purpose || card.body;
+    return purpose ? (
+      <View style={styles.block}>
+        <T variant="etiqueta" soft>
+          Para qué
+        </T>
+        <T soft>{purpose}</T>
+      </View>
+    ) : null;
+  }
+  if (card.attempt) return <AttemptDetails card={card} />;
+  if (card.conversation) return <ConversationDetails card={card} />;
+  if (card.approval) return <ApprovalDetails card={card} />;
+  const text = noticeText(card);
+  return text ? <T>{text}</T> : null;
+}
+
+/** «Ver más» / «Ver menos». */
+function MoreToggle({ open, onPress, testID }: { open: boolean; onPress: () => void; testID: string }) {
   return (
-    <>
-      {purpose ? (
-        <View style={styles.block}>
-          <T variant="etiqueta" soft>
-            Para qué
-          </T>
-          <T soft>{purpose}</T>
-        </View>
-      ) : null}
-      <QuestionForm question={question} cardId={card.id} resolved={resolvedBy === buttonKey.answer} />
-    </>
+    <Pressable testID={testID} accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={onPress} style={styles.more} hitSlop={4}>
+      <T variant="detalle" color={colors.brandDeep}>
+        {open ? 'Ver menos' : 'Ver más'}
+      </T>
+      <Icon name={open ? 'chevronUp' : 'chevronDown'} size={16} color={colors.brandDeep} />
+    </Pressable>
   );
 }
 
@@ -314,6 +328,9 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
   const exits = useTurnoExitsApi();
   const postpone = usePostponePregunta();
   const [opportunity, setOpportunity] = useState<TurnoOpportunity | null>(null);
+  const [open, setOpen] = useState(false);
+  const summary = cardSummary(card);
+  const more = hasDetails(card);
   const expired = priority === null;
   const deadline = expired ? null : deadlineInfo(card);
   const created = createdText(card.created_at);
@@ -379,25 +396,26 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
             </T>
           ) : null}
           <AgentPortrait role={card.agent} showName name={card.agent_label} />
-          <T variant="subtitulo" accessibilityRole="header">
+          <T variant="subtitulo" accessibilityRole="header" numberOfLines={open ? undefined : 3}>
             {cardTitle(card)}
           </T>
-          {card.profile_id ? (
-            <ProfileProposal id={card.profile_id} />
-          ) : card.referent_change || card.referent_experiment ? (
-            <ReferentDecision card={card} />
-          ) : card.question ? (
-            <QuestionBody card={card} resolvedBy={resolvedBy} />
-          ) : card.attempt ? (
-            <Attempt card={card} />
-          ) : card.conversation ? (
-            <ConversationBody card={card} />
-          ) : card.approval ? (
-            <ApprovalBody card={card} />
+          <NoticeMeta card={card} />
+          {open ? (
+            <CardDetails card={card} />
+          ) : summary ? (
+            <T soft numberOfLines={2} testID={`turno-summary-${card.id}`}>
+              {summary}
+            </T>
+          ) : null}
+          {more ? <MoreToggle open={open} onPress={() => setOpen((value) => !value)} testID={`turno-more-${card.id}`} /> : null}
+          {card.attempt ? <AttemptLink card={card} /> : null}
+          {card.profile_id ? <ProfileProposal id={card.profile_id} /> : null}
+          {card.referent_change || card.referent_experiment ? <ReferentDecision card={card} /> : null}
+          {card.question ? (
+            <QuestionForm question={card.question} cardId={card.id} resolved={resolvedBy === buttonKey.answer} />
           ) : (
-            <NoticeBody card={card} />
+            <CardActions card={card} runner={runner} onOpportunity={setOpportunity} resolvedBy={resolvedBy} />
           )}
-          {card.question ? null : <CardActions card={card} runner={runner} onOpportunity={setOpportunity} resolvedBy={resolvedBy} />}
           {created ? (
             <T variant="detalle" soft>
               {created}
@@ -441,4 +459,5 @@ const styles = StyleSheet.create({
   actions: { gap: space[2] },
   ghosts: { flexDirection: 'row', flexWrap: 'wrap', gap: space[2], justifyContent: 'center' },
   resolved: { backgroundColor: colors.brandLight },
+  more: { flexDirection: 'row', alignItems: 'center', alignSelf: 'flex-start', gap: space[1], minHeight: 44 },
 });

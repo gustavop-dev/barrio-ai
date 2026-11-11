@@ -1,4 +1,4 @@
-import type { PieceMedia, PieceImage } from '@compartido/api/imagenes';
+import type { PieceMedia, PieceImage, RejectedEdit } from '@compartido/api/imagenes';
 import { sameOrigin } from '@compartido/api/capturas';
 import { imageAspect, IMAGE_KIND_LABEL, orderedImages, reviewLines, TEMPLATE_LABEL } from '@compartido/logic/imagenes';
 import { useEffect, useRef, useState } from 'react';
@@ -19,6 +19,33 @@ function ImageFrame({ image, original }: { image: PieceImage; original: boolean 
   return <ApiImage key={attempt} path={path} contentFit="contain" style={[styles.image, { aspectRatio: imageAspect(image) }]}
     accessibilityLabel={original ? `Original de la foto. ${image.alt}` : image.alt}
     testID={original ? 'piece-image-original' : `piece-image-${image.position}`} onError={() => setFailed(true)} />;
+}
+
+/** IMG-11 criterion 3: the AI edit the visual check rejected stays visible, with why, so Gustavo judges it himself. */
+function Rejected({ edit, alt }: { edit: RejectedEdit; alt: string }) {
+  const [failed, setFailed] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+  const ratio = edit.width && edit.height ? edit.width / edit.height : 4 / 5;
+  return (
+    <View testID="piece-image-rejected" collapsable={false} style={styles.rejected}>
+      <View style={styles.labels}>
+        <Badge tone="warn">Edición con IA descartada</Badge>
+        <T variant="detalle" soft>No se publica</T>
+      </View>
+      {failed ? (
+        <Note tone="error" title="No se pudo cargar la imagen" actions={
+          <Button size="small" onPress={() => { setFailed(false); setAttempt((value) => value + 1); }}>Reintentar</Button>
+        } />
+      ) : (
+        <View style={styles.frame}>
+          <ApiImage key={attempt} path={edit.url} contentFit="contain" style={[styles.image, { aspectRatio: ratio }]}
+            accessibilityLabel={`Edición con IA descartada. ${alt}`} onError={() => setFailed(true)} />
+        </View>
+      )}
+      {edit.reasons.length ? <T variant="detalle">Por qué la descartó el verificador:</T> : null}
+      {edit.reasons.map((reason, i) => <T key={i} variant="detalle" soft>{`• ${reason}`}</T>)}
+    </View>
+  );
 }
 
 function Gallery({ images, media }: { images: PieceImage[]; media: PieceMedia }) {
@@ -59,6 +86,7 @@ function Gallery({ images, media }: { images: PieceImage[]; media: PieceMedia })
       {compare ? <Button size="small" onPress={() => setOriginal((value) => !value)} testID="piece-image-compare">
         {original ? 'Ver editada' : 'Ver original'}
       </Button> : null}
+      {current.rejected_edit && sameOrigin(current.rejected_edit.url) ? <Rejected key={current.rejected_edit.url} edit={current.rejected_edit} alt={current.alt} /> : null}
       {current.template ? <T variant="detalle" soft>{`Plantilla: ${TEMPLATE_LABEL[current.template]}`}</T> : null}
       {current.reason || media.image_reason ? <T variant="detalle">{current.reason || media.image_reason}</T> : null}
       <T variant="detalle" soft>{`Texto alternativo: ${current.alt}`}</T>
@@ -82,6 +110,7 @@ const styles = StyleSheet.create({
   content: { gap: space[3] },
   labels: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: space[2] },
   frame: { overflow: 'hidden', borderRadius: radius.md, backgroundColor: colors.line },
+  rejected: { gap: space[2], paddingTop: space[3], borderTopWidth: 1, borderTopColor: colors.line },
   image: { width: '100%', aspectRatio: 4 / 5 },
   controls: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', alignItems: 'center', gap: space[2] },
 });

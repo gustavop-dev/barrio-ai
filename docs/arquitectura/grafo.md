@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.6-retoque-por-comentario` · SHA-256 `5fb1da002cde07ba6ad0343ba49fee9bfae6cdb2a37c45e2f9d56a304de0a562`.
+Versión `6.6-retoque-por-comentario` · SHA-256 `90551f9c0e0323f78b2d7cc65df6d8240210c4ac8f49e43f50ca3978420588cd`.
 
 46 nodos (46 activos), 72 aristas y 15 ciclos.
 
@@ -150,6 +150,7 @@ flowchart TD
 Estado: `active`. Orquestador: `director_editorial`.
 
 - `prepare_piece`: Hueco diario según EDITORIAL_POST_TIME; preparación anticipada EDITORIAL_LEAD_HOURS o manual.
+- `override_piece`: Gustavo desestima el bloqueo de una pieza desde su detalle (EDI-23); sin cadencia del autopiloto.
 - `execute_action`: Tick 60 s; solo aprobada y a su hora.
 - `reconcile_action`: Inciertas/sent tras 10 min; bucket de una hora, hasta 3 por tick.
 

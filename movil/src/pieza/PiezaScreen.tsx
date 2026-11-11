@@ -13,7 +13,7 @@ import { RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useNow } from '@/calendario/useNow';
 import { ApproveButton, VetoButton } from '@/calendario/Veto';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { Badge, Button, Card, ErrorRetry, Note, PageHeader, Section, Skeleton, T, pageContent } from '@/components/ui';
+import { Badge, Button, Card, ErrorRetry, Fold, Note, PageHeader, Section, Skeleton, T, pageContent } from '@/components/ui';
 import { openLink } from '@/navigation';
 import { colors, space } from '@/theme/tokens';
 import { ComoSeEscribio } from './ComoSeEscribio';
@@ -22,20 +22,33 @@ import { PreparationTrack } from './PreparationTrack';
 import { Resultado } from './Resultado';
 import { TeamComments } from './TeamComments';
 import { PieceImages } from './PieceImages';
+import { RescueActions } from './Rescue';
+
+/** Why it was blocked, folded: the long reasons are there only when he opens them. */
+function Reasons({ summary, reasons }: { summary: string; reasons: string[] }) {
+  return (
+    <Fold summary={reasons.length > 1 ? `${summary} · ${reasons.length}` : summary}>
+      {reasons.map((reason, index) => (
+        <T key={index} variant="detalle">
+          {reason}
+        </T>
+      ))}
+    </Fold>
+  );
+}
 
 /** Blocked, skipped, vetoed, discarded, failed or uncertain: what happened, in the state's tone. */
-function StatusNote({ piece }: { piece: PieceDetailFull }) {
+function StatusNote({ piece, label }: { piece: PieceDetailFull; label: string }) {
   const action = piece.action_detail;
+  // EDI-23: on a block he decides first (the buttons go right under the title) and opens the reasons only if he wants.
+  const rescue = piece.rescue ? <RescueActions piece={piece} label={label} /> : null;
   switch (piece.status) {
     case 'blocked': {
       const reasons = piece.verification?.blocking_reasons?.length ? piece.verification.blocking_reasons : piece.note ? [piece.note] : [];
       return (
         <Note tone="error" title="El verificador bloqueó la pieza">
-          {reasons.map((reason, index) => (
-            <T key={index} variant="detalle">
-              {reason}
-            </T>
-          ))}
+          {rescue}
+          {reasons.length ? <Reasons summary="Por qué se bloqueó" reasons={reasons} /> : null}
         </Note>
       );
     }
@@ -54,7 +67,8 @@ function StatusNote({ piece }: { piece: PieceDetailFull }) {
     case 'discarded':
       return (
         <Note tone="info" title="La política no aprobó la pieza">
-          {action?.decision_note || piece.note || undefined}
+          {rescue}
+          {action?.decision_note || piece.note ? <Reasons summary="Por qué no la aprobó" reasons={[action?.decision_note || piece.note]} /> : null}
         </Note>
       );
     case 'failed':
@@ -140,7 +154,7 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
         </View>
       </View>
       <ErrorRetry error={query.isError ? query.error : null} onRetry={() => void query.refetch()} title="No se pudo actualizar la pieza" />
-      <StatusNote piece={piece} />
+      <StatusNote piece={piece} label={`Pieza del ${day}`} />
 
       {piece.status === 'published' || piece.snapshots?.length ? <Resultado piece={piece} timeZone={timeZone} now={now} /> : null}
 

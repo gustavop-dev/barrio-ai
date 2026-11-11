@@ -6,7 +6,7 @@ Esta carpeta tiene los flujos de [Maestro](https://maestro.dev) que **usan la ap
 
 El workflow tiene cuatro jobs:
 
-1. **`plan`** decide qué flujos corren y los reparte en hasta **8 emuladores en paralelo**, equilibrando el número de líneas como aproximación de la duración. Usa `min(8, flujos seleccionados)` emuladores; `QA_MAX_SHARDS` permite otro límite al invocar el script. En cada emulador los flujos van en orden numérico. `15-ajustes-sesion` cierra la sesión y vuelve a entrar al final, así que los flujos que vengan después en su emulador encuentran la sesión abierta.
+1. **`plan`** decide qué flujos corren y los reparte en hasta **10 emuladores en paralelo**, equilibrando los segundos que tardó cada flujo en `main` (más ~20 s de siembra entre flujos): el más largo va primero al emulador menos cargado. Los segundos salen del artefacto `qa-duraciones` de la última ejecución de `main` que lo guardó, o de `scripts/qa/duraciones.json` si no hay; un flujo sin medida se estima por sus líneas. Usa `min(10, flujos seleccionados)` emuladores; `QA_MAX_SHARDS` permite otro límite al invocar el script. En cada emulador los flujos van en orden numérico. `15-ajustes-sesion` cierra la sesión y vuelve a entrar al final, así que los flujos que vengan después en su emulador encuentran la sesión abierta.
 2. **`apk`** combina un shell nativo release x86_64 con el JS actual. Todos los pasos usan `OFFICE_QA_BUILD=1`, `EXPO_PUBLIC_API_URL=http://10.0.2.2:8787`, `NODE_ENV=production` y `EXPO_NO_DOTENV=1` (sin cargar `.env` implícitos).
    - **Caché nativa:** después de `npm ci`, exporta con `expo export:embed` y compila el bundle con el Hermes del lockfile. Calcula `@expo/fingerprint` para Android, antes de generar `android/`, con preset estricto, configuración, plugins, lockfile, entorno de QA y los recursos que Metro referencia. Si falta esa huella, hace `expo prebuild` y Gradle `assembleRelease -PreactNativeArchitectures=x86_64`, y guarda el APK nativo con su keystore debug y el inventario de assets.
    - **Cambios de JS/TS:** con la misma huella no hay prebuild ni Gradle. Sustituye `assets/index.android.bundle` y los assets acompañantes de Metro; elimina los que ya no existen. Conserva los recursos Android compilados, elimina las firmas anteriores, hace `zipalign -P 16` y firma con `apksigner` y el keystore debug del shell. La ruta fría usa también este reempaquetado, para comprobarlo desde la primera ejecución.
@@ -15,6 +15,7 @@ El workflow tiene cuatro jobs:
 3. **`flujos (N)`** es un job por emulador, y cada uno es independiente:
    - **Backend propio:** PostgreSQL con pgvector, `migrate`, `bootstrap_local` y `seed_qa`. Gunicorn sirve la API en `0.0.0.0:8787` con `LIVE_LINKEDIN=false`, `LIVE_PROVIDERS=false` y `OPERATOR_ALLOW_FAKE=true`: conector simulado, sin LinkedIn real ni proveedores de pago.
    - **Emulador:** Android 15 x86_64 con KVM (`reactivecircus/android-emulator-runner`), 3 núcleos y 4 GB. El AVD se define ya con **390×844 dp** (780×1688 px a 320 dpi), el tamaño de los tableros de `diseno-movimiento/`. Las animaciones del sistema solo están activadas en `01-entrada`, `02-navegacion` y `03-oficina` (ver «Animaciones»). Redimensionar un pixel_6 después de arrancar colgaba el lanzador, y a 2× el render por software cuesta la mitad que a 3×. Cada flujo tiene un tope de 8 minutos (`QA_FLOW_TIMEOUT`): si se cuelga, falla con su captura y el emulador sigue con el siguiente.
+   - **Un reintento por flujo:** un flujo que falla (no por su tope de tiempo) se vuelve a sembrar y corre **una vez más** en el mismo emulador, mientras el job lleve menos de 20 minutos de flujos (`QA_REINTENTOS`, `QA_REINTENTO_HASTA`). Así un fallo intermitente ya no obliga a repetir el emulador entero. Si pasa al segundo intento, el flujo cuenta como aprobado pero el informe lo marca **«⚠️ pasa al 2.º intento»** con el motivo del primer fallo: lo inestable queda a la vista.
    - **Flujos:** `scripts/qa/correr-maestro.sh` corre sus flujos uno a uno y **vuelve a sembrar el backend antes de cada uno**. Así un flujo nunca depende de lo que cambió otro, y un fallo apunta a una sola pantalla. La sesión de la app se conserva entre flujos.
 4. **`qa`** junta los artefactos de todos los emuladores, compara las capturas con la referencia de `main` y cuenta la cobertura del catálogo. `scripts/qa/informe.py` escribe el resumen del job, el comentario del PR e `informe.html`. **Falla si falla un flujo o si la app se cae**: es el check que cuenta.
 
@@ -47,7 +48,7 @@ Se eligió una release con el JS empaquetado, en vez de una build debug, para pr
 
 El objetivo del job `apk` para cambios solo de JS/TS es **2–4 minutos** con el shell nativo en caché; una build nativa sigue costando unos 13–17 minutos. El tiempo total depende además del emulador más lento y de la cola de GitHub; hay que medirlo en CI.
 
-En las primeras ejecuciones, comprobar una ruta fría y después un cambio de JS con la misma huella: prebuild/Gradle deben quedar omitidos en la segunda, la firma y alineación deben pasar, y el emulador debe mostrar el cambio nuevo, las imágenes y las fuentes, iniciar sesión contra `10.0.2.2` y arrancar sin OTA. Verificar también una selección pequeña, `[qa: todos]` con 8 shards y un cambio nativo que invalide la huella. Al actualizar Expo/RN, revisar `assets/index.android.bundle`, las rutas `generated/{assets,res}/react/release`, Hermes y los recursos: el script falla si deja de coincidir el contrato del shell. La implementación se preparó mediante lectura de código; la validación de ejecución se hace únicamente en CI.
+En las primeras ejecuciones, comprobar una ruta fría y después un cambio de JS con la misma huella: prebuild/Gradle deben quedar omitidos en la segunda, la firma y alineación deben pasar, y el emulador debe mostrar el cambio nuevo, las imágenes y las fuentes, iniciar sesión contra `10.0.2.2` y arrancar sin OTA. Verificar también una selección pequeña, `[qa: todos]` con 10 shards y un cambio nativo que invalide la huella. Al actualizar Expo/RN, revisar `assets/index.android.bundle`, las rutas `generated/{assets,res}/react/release`, Hermes y los recursos: el script falla si deja de coincidir el contrato del shell. La implementación se preparó mediante lectura de código; la validación de ejecución se hace únicamente en CI.
 
 ## Revisar una ejecución (personas y agentes revisores)
 
@@ -62,16 +63,17 @@ Descarga el artefacto `qa-movil-<n>` en `qa-descargas/<run id>/`:
 | Ruta | Qué es |
 |---|---|
 | `resumen.md` | flujos que pasan y fallan, si hubo crash, errores de JS, respuestas 5xx o 429 de la API |
-| `informe.html` | el informe navegable: tabla de flujos con el motivo del fallo y, por flujo, sus capturas y su video |
+| `informe.html` | el informe navegable: tabla de flujos con el motivo del fallo (o del primer intento) y, por flujo, sus capturas y su video |
 | `capturas/NN-pantalla-SS-paso.png` | una captura por paso relevante, a 780×1688 (2× los tableros de 390×844) |
 | `capturas/fallos/` | la captura que Maestro toma al fallar un paso, con el nombre del flujo delante |
-| `videos/NN-flujo-parteK.mp4` | la grabación de la pantalla de cada flujo, en partes de menos de 3 minutos |
+| `videos/NN-flujo-parteK.mp4` | la grabación de la pantalla de un flujo **que falló**, en partes de menos de 3 minutos; los intentos que pasan no guardan video (las capturas y la comparación visual los cubren) y el artefacto pesa mucho menos |
+| `…--intento1…` | los archivos del primer intento de un flujo que se repitió: `junit/NN-flujo--intento1.xml`, `maestro/NN-flujo--intento1.log`, su carpeta, su video y sus capturas de fallo |
 | `junit/NN-flujo.xml` | el informe JUnit de Maestro de cada flujo |
 | `maestro/NN-flujo.log`, `maestro/NN-flujo/` | la salida de Maestro y su carpeta de depuración (comandos, jerarquía de la vista al fallar) |
 | `logcat/logcat-errores.txt` | crashes, `FATAL EXCEPTION`, señales nativas, ANR y errores de `ReactNativeJS` |
 | `logcat/logcat-app.txt` | todo lo que escribió el proceso de la app y React Native |
 | `logcat/logcat-completo-N.txt.gz` | el logcat entero de cada emulador, comprimido |
-| `seed-N.log`, `api-N.log`, `flujos-N.txt` | por emulador: la salida de `seed_qa`, el log de gunicorn y lo que tardó cada flujo |
+| `seed-N.log`, `api-N.log`, `flujos-N.txt` | por emulador: la salida de `seed_qa`, el log de gunicorn y, por flujo, «nombre código segundos intentos» |
 
 Para comparar con el diseño, abre las capturas junto a los tableros `movil/diseno-movimiento/tableros/*.dc.html` (390×844) y `movil/MOTION.md`.
 
@@ -98,13 +100,12 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 |---|---|
 | `01-entrada` | la pantalla de entrada y «Entrar» desactivado; con el teclado abierto, la contraseña sigue a la vista; sin conexión, el aviso en español; contraseña equivocada; mostrar la contraseña; la correcta, la entrada animada y la Oficina; abrir otra vez sigue dentro; una sesión cerrada desde otro dispositivo vuelve a la entrada |
 | `02-navegacion` | abrir la app sin conexión sigue dentro (la franja, y la red que vuelve); el contador y el punto de arriba; las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial; una ficha cerrada con «‹», con atrás y arrastrando desde el borde; la firma; enlaces `oficina0ff1ce://` a una pestaña y a una pieza |
-| `03-oficina` | tocar un personaje de la escena y ver su hoja con su estado real y lo último que hizo, arrastrarla a altura completa y cerrarla, la tira de equipos, «Ver en el Calendario» y la Biblioteca; arrastre y doble toque en la escena; tirar para recargar; la leyenda; la máquina en pausa (el aviso, la escena oscurecida y Ajustes) |
+| `03-oficina` | tocar un personaje de la escena y ver su hoja con su estado real y lo último que hizo, arrastrarla a altura completa y cerrarla, el nombre de una zona abre su equipo, «Ver en el Calendario» y la Biblioteca; arrastre y doble toque en la escena; tirar para recargar; bajo la escena ya no hay leyenda, tira de equipos, mapa ni crédito; la máquina en pausa (el aviso, la escena oscurecida y Ajustes) |
 | `04-tu-turno` | la lista de arriba abajo una sola vez: «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Ya no es urgente», «Pospuestas», «Hecho recientemente» y «Lo que el equipo sabe de ti» |
 | `04-tu-turno-aprobar` | aprobar una acción de red desde su tarjeta de Tu turno y otra desde «En cola» del calendario |
 | `04-tu-turno-mas` | máquina detenida desde Ajustes y reanudada desde Tu turno, «Responder con audio», «Marcar como oportunidad», «No responder», descartar la orientación, responder con una opción y «Deshacer», «No quiero compartir esto» |
 | `04-tu-turno-sabe` | «Lo que el equipo sabe de ti»: añadir, editar (v2) y retirar un dato |
 | `16-imagenes` | detalle con foto y veto, infografía con revisión, carrusel de cuatro láminas por swipe y botones; «Lo antes posible» con previsión, evidencia y condiciones en Lo que enviaste |
-| `17-mapa-equipo` | mapa desde Oficina y Ajustes, grupos, unidades del curso, conexiones de ida/vuelta, nodos en diseño y actividad real |
 | `18-perfil` | etiquetar una foto como Perfil; abrir propuesta sintética, citas y checklist; aceptar y marcar Aplicado sin declararlo Comprobado |
 | `05-captura` | desde Galería: abrir la hoja, «Para qué es», grabar desde la hoja, cerrar vacía y con algo («¿Cerrar sin enviar?»), mantener el botón, enviar, «Deshacer» en el aviso (vuelve el borrador), «Lo que enviaste» y «Deshacer» ahí |
 | `05-captura-envios` | una foto del selector de Android y una nota de voz llegan al backend (aviso, Galería, «Lo que enviaste»); sin red (modo avión) y 413: el motivo, el borrador y «Reintentar» |
@@ -119,7 +120,7 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo» y la «Modalidad»; los accesos a cada sección; un dato que falta como «—» con su motivo; la definición de un gráfico; tocar una barra, una oportunidad activa y el mejor post |
 | `08-resultados-errores` | con el interruptor de fallos: las cifras y el resumen semanal fallan, «Reintentar»; un periodo sin posts ni oportunidades activas |
 | `09-personas` | Barrio: pestañas, aviso de red apagada, filas, chips de etapa (con «En conversación» sin datos), búsqueda sin resultados y «Quitar filtros», «Más filtros» por rol; la ficha de Laura (recorrido, por qué encaja, de dónde salió, sin conversación, una nota nueva) y «Marcar como oportunidad» |
-| `10-galeria` | la rejilla, los filtros (y uno vacío), la nota y el interruptor de edición con IA (y la foto abierta otra vez enseguida), el visor (zoom, deslizar, cerrar), «Quitar de la galería» y que las fotos son privadas |
+| `10-galeria` | la rejilla, los avisos temporales (se van solos), sin categoría al subir, los filtros (y uno vacío), la nota y el interruptor de edición con IA (y la foto abierta otra vez enseguida), el visor (zoom, deslizar, cerrar), «Quitar de la galería» y que las fotos son privadas |
 | `10-galeria-subir` | «Subir fotos» con el selector de Android, un 413 con «Reintentar» y la Galería vacía |
 | `11-ajustes` | de Máquina a Captura: parada total y reanudar, pausar la cuenta simulada, orientación (descartar y guardar), Autonomía, Gasto, «Conectar LinkedIn» abre la oficina web, micrófono y edición con IA |
 | `12-oportunidades` | el tablero por etapas, mover con el selector y «Deshacer», que el cambio se guarde, «Cerradas sin acuerdo»; nueva oportunidad (obligatorios, «De Personas», fuera de la red, fecha inválida), editar y eliminar |

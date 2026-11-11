@@ -2,6 +2,8 @@
 // nothing of Gustavo, 7 days. PRÓXIMO (computed, never unread) and then one group per day, each row
 // with its calendar layer's dot. Tapping a row marks it read and opens its link in the app; the bell
 // dot follows through Tu turno's `notifications_unread` (useMarkNotificacionesRead keeps it in sync).
+// A row shows two lines of its title and one of its detail: the whole text is in what it opens, or, for a
+// row without a link, unfolds in place on tap. The dropdown shows everything, the unread ones or one section.
 //
 // Motion (MovNotificaciones): a notification that arrives while the screen is open (a refresh, or a
 // push received with the app open) opens its space at the top and drops in, while the list moves down
@@ -10,22 +12,27 @@
 import { useMarkNotificacionesRead, useNotificaciones, type Notificaciones, type NotificationFilter, type NotificationItem } from '@compartido/api/notificaciones';
 import { CALENDAR_LAYERS } from '@compartido/api/types';
 import { isUnavailable } from '@compartido/logic/ajustes';
-import { groupNotifications, isUnread, timeLabel, type NotificationGroup } from '@compartido/logic/notificaciones';
+import {
+  filterNotificationGroups,
+  groupNotifications,
+  isUnread,
+  NOTIFICATION_VIEWS,
+  notificationFilterOf,
+  timeLabel,
+  type NotificationGroup,
+  type NotificationView,
+} from '@compartido/logic/notificaciones';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, RefreshControl, SectionList, StyleSheet, View, type LayoutChangeEvent, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { Badge, Button, Card, ErrorRetry, FilterChip, Skeleton, T, pageContent } from '@/components/ui';
+import { Badge, Button, Card, ErrorRetry, Skeleton, T, pageContent } from '@/components/ui';
+import { Select } from '@/components/ui/Select';
 import { openLink } from '@/navigation';
 import { isInAppPath } from '@/push/routes';
 import { layout, notifLayout, notifMotion, notifTiming, useMotion } from '@/theme/motion';
 import { colors, layers, radius, space } from '@/theme/tokens';
-
-const FILTERS: readonly { value: NotificationFilter; label: string }[] = [
-  { value: 'todas', label: 'Todas' },
-  { value: 'sin_leer', label: 'Sin leer' },
-];
 
 function dotColor(item: NotificationItem): string {
   return (CALENDAR_LAYERS as readonly string[]).includes(item.layer) ? layers[item.layer] : colors.line;
@@ -97,6 +104,9 @@ function Row({ item, upcoming, step, onOpen }: { item: NotificationItem; upcomin
   const shown = unread || fading;
   const time = timeLabel(item, upcoming);
   const goes = isInAppPath(item.link);
+  // Without a link there is nothing to open: the row unfolds its whole text in place.
+  const [expanded, setExpanded] = useState(false);
+  const full = !goes && expanded;
   const label = [time, item.title, item.detail, unread ? 'Nueva' : ''].filter(Boolean).join('. ');
   const content = (
     <>
@@ -108,9 +118,9 @@ function Row({ item, upcoming, step, onOpen }: { item: NotificationItem; upcomin
             {time}
           </T>
         ) : null}
-        <T>{item.title}</T>
+        <T numberOfLines={full ? undefined : 2}>{item.title}</T>
         {item.detail ? (
-          <T variant="detalle" soft>
+          <T variant="detalle" soft numberOfLines={full ? undefined : 1}>
             {item.detail}
           </T>
         ) : null}
@@ -122,20 +132,17 @@ function Row({ item, upcoming, step, onOpen }: { item: NotificationItem; upcomin
       ) : null}
     </>
   );
-  // In-app destinations open; anything else only marks the item read and stays here. A read item without a link is plain text.
-  if (!goes && !shown) {
-    return (
-      <View style={styles.row} accessible accessibilityLabel={label} testID={`notif-${item.id}`}>
-        {content}
-      </View>
-    );
-  }
+  // In-app destinations open; anything else marks the item read, stays here and unfolds its whole text.
   return (
     <Pressable
       accessibilityRole={goes ? 'link' : 'button'}
       accessibilityLabel={label}
-      accessibilityHint={goes ? undefined : 'Marca la notificación como leída'}
-      onPress={() => onOpen(item)}
+      accessibilityHint={goes ? undefined : expanded ? 'Recoge el texto' : 'Muestra el texto completo'}
+      accessibilityState={goes ? undefined : { expanded }}
+      onPress={() => {
+        if (!goes) setExpanded((value) => !value);
+        onOpen(item);
+      }}
       style={({ pressed }) => [styles.row, pressed ? styles.pressed : null]}
       testID={`notif-${item.id}`}
     >
@@ -154,12 +161,14 @@ function InlineLink({ children, onPress }: { children: string; onPress: () => vo
 }
 
 export function NotificacionesScreen() {
-  const [filtro, setFiltro] = useState<NotificationFilter>('todas');
+  const [view, setView] = useState<NotificationView>('todas');
+  const filtro: NotificationFilter = notificationFilterOf(view);
   const query = useNotificaciones(filtro);
   const mark = useMarkNotificacionesRead();
   const { bottom } = useContentInsets();
   const [refreshing, setRefreshing] = useState(false);
-  const groups = useMemo(() => groupNotifications(query.data, filtro), [query.data, filtro]);
+  const groups = useMemo(() => filterNotificationGroups(groupNotifications(query.data, filtro), view), [query.data, filtro, view]);
+  const viewLabel = NOTIFICATION_VIEWS.find((option) => option.value === view)?.label ?? '';
   const unread = query.data?.unread ?? 0;
   const sections = useMemo(() => groups.map((group) => ({ ...group, data: group.items })), [groups]);
   const arrived = useArrivals(query.data, filtro);
@@ -201,12 +210,8 @@ export function NotificacionesScreen() {
         </T>
       </View>
       <View style={styles.bar}>
-        <View style={styles.filters} accessibilityRole="toolbar" accessibilityLabel="Filtrar">
-          {FILTERS.map((option) => (
-            <FilterChip key={option.value} pressed={filtro === option.value} onPress={() => setFiltro(option.value)} testID={`filtro-${option.value}`}>
-              {option.label}
-            </FilterChip>
-          ))}
+        <View style={styles.filters}>
+          <Select label="Mostrar" hideLabel accessibilityLabel="Filtrar notificaciones" value={view} options={NOTIFICATION_VIEWS} onChange={setView} testID="notif-filtro" />
         </View>
         <Button variant="ghost" size="small" disabled={!query.data || unread <= 0 || mark.isPending} onPress={readAll} testID="notif-marcar-todo">
           Marcar todo como leído
@@ -231,7 +236,7 @@ export function NotificacionesScreen() {
     <View style={styles.footer}>
       {query.data && !groups.length ? (
         <T soft center style={styles.empty}>
-          No hay nada nuevo. Lo de días anteriores sigue en el Calendario.
+          {view === 'todas' || view === 'sin_leer' ? 'No hay nada nuevo. Lo de días anteriores sigue en el Calendario.' : `Nada en «${viewLabel}».`}
         </T>
       ) : null}
       <T variant="detalle" soft>
@@ -278,8 +283,9 @@ const styles = StyleSheet.create({
   header: { gap: space[4], marginBottom: space[2] },
   title: { gap: space[1] },
   inline: { textDecorationLine: 'underline' },
-  bar: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  filters: { flex: 1, flexDirection: 'row', flexWrap: 'wrap', gap: space[2] },
+  // The dropdown unfolds under its box; the button stays at the top of the row.
+  bar: { flexDirection: 'row', alignItems: 'flex-start', gap: space[2] },
+  filters: { flex: 1, minWidth: 0 },
   group: { marginTop: space[4], marginBottom: space[1] },
   // An arriving row clips while its space opens; it spans the row's overhang so its sides are not cut.
   arriving: { overflow: 'hidden', marginHorizontal: -space[3], paddingHorizontal: space[3] },

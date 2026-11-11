@@ -326,8 +326,9 @@ def _route_piece(capture,user,text):
     piece=context_object('pieza',capture.context_id)
     if piece is None:raise ValueError('La pieza ya no existe.')
     from . import retoque
-    if retoque.eligible(piece):
-        # A ready piece that has not gone out goes back to the team with his comment (retoque.run, same job).
+    if retoque.eligible(piece) or retoque.rescatable(piece):
+        # A ready piece that has not gone out goes back to the team with his comment (retoque.run, same job); a blocked
+        # one he can still change is reopened first (EDI-23).
         return ({'piece':str(piece.id),'rework':'pending'},
                 _outcome('anotado',f'El director está aplicando tu comentario a la pieza del {day_label(piece.slot_date)}; '
                          'esa versión no se publica',f'/calendario/pieza/{piece.id}'),

@@ -1,17 +1,17 @@
 // Ajustes › Lo que el equipo sabe de ti (a link to the Sabe tab of Tu turno, with `facts_count`) and
 // Sesión y Acerca de: who is signed in, «Cerrar sesión» (unregisters the push and revokes this
-// device's token), the app version (expo-constants) and the art credit.
+// device's token), and the app version (expo-constants).
 import { useAjustes } from '@compartido/api/hooks';
-import { ART_CREDIT, ART_CREDIT_URL, factsLabel } from '@compartido/logic/ajustes';
+import { factsLabel } from '@compartido/logic/ajustes';
 import Constants from 'expo-constants';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { API_URL } from '@/api/config';
 import { useSession } from '@/auth/session';
 import { Icon } from '@/components/icons';
 import { Button, Card, ConfirmSheet, KeyValue, Section, T } from '@/components/ui';
-import { colors, radius, shell, space } from '@/theme/tokens';
+import { colors, radius, space } from '@/theme/tokens';
 
 /** The version of app.json, as the build carries it. */
 export function appVersion(): string {
@@ -58,14 +58,6 @@ export function SesionSection() {
       </Card>
       <Card>
         <KeyValue label="Versión">{`app ${appVersion()}`}</KeyValue>
-        <View style={styles.credit}>
-          <T variant="detalle" soft style={styles.creditText}>
-            {ART_CREDIT}
-          </T>
-          <Pressable accessibilityRole="link" accessibilityLabel="LimeZu en itch.io" onPress={() => void Linking.openURL(ART_CREDIT_URL)} style={styles.creditLink}>
-            <Icon name="external" size={20} color={colors.brandDeep} />
-          </Pressable>
-        </View>
       </Card>
       {leaving ? (
         <ConfirmSheet
@@ -98,7 +90,4 @@ const styles = StyleSheet.create({
   },
   linkPressed: { backgroundColor: colors.paper },
   linkText: { flex: 1, gap: 2 },
-  credit: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  creditText: { flex: 1 },
-  creditLink: { width: shell.touch + 4, height: shell.touch + 4, alignItems: 'center', justifyContent: 'center' },
 });

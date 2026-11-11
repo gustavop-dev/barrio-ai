@@ -47,12 +47,14 @@ jobs:
       - run: uv run python manage.py makemigrations --check --dry-run
       - name: Grafo y diagrama sin deriva
         run: python3 ../../scripts/grafo/mermaid.py --check
-      # Under coverage.py (settings in pyproject.toml: branches on, every module in src/).
-      - run: uv run coverage run manage.py test team_backend.tests --noinput
+      # Under coverage.py (.coveragerc: branches on, team_backend), one worker per CPU: each worker gets its own clone
+      # of the test database and writes its own coverage file, combined below. tblib carries a worker's traceback back.
+      - run: uv run --with 'tblib>=3,<4' coverage run manage.py test team_backend.tests --noinput --parallel auto
       # Corpus integration tests (pytest) need the private course files: run them locally.
       - name: Cobertura
         if: ${{ !cancelled() }}
         run: |
+          uv run coverage combine -q || true
           [ -f .coverage ] || exit 0
           uv run coverage report
           uv run coverage xml -q

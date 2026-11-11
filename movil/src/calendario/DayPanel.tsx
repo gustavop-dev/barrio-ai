@@ -32,6 +32,7 @@ import { openLink } from '@/navigation';
 import { colors, layers as LAYER_COLOR, radius, shell, space } from '@/theme/tokens';
 import { DayActivity, QueuedRow } from './ActivityList';
 import { piecePath } from './go';
+import { PIECE_PREVIEW_LINES, PieceHead, PieceOpener } from './PieceOpener';
 import { TimelineItem } from './TimelineItem';
 import { PlanNextButton, VetoButton } from './Veto';
 
@@ -100,7 +101,7 @@ function TextLink({ label, onPress }: { label: string; onPress: () => void }) {
   );
 }
 
-/** The day's piece: state, hour, thesis, three first lines, result, Vetar and «Ver cómo se escribió». */
+/** The day's piece: state, hour, thesis and first lines (clamped), result and Vetar. Tapping it opens the piece. */
 function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today: string; timeZone: string; now: number }) {
   const pieceId = pieceIdFromLink(event.link) ?? '';
   const query = usePiece(pieceId);
@@ -123,7 +124,7 @@ function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today
     const reason = event.skip_reason || piece?.brief?.skip_reason || piece?.note;
     return (
       <Gap>
-        <T soft>{`Sin publicación.${reason ? ` El director decidió no publicar: ${reason}` : ''}`}</T>
+        <T soft numberOfLines={3}>{`Sin publicación.${reason ? ` El director decidió no publicar: ${reason}` : ''}`}</T>
         {to ? <TextLink label="Ver cómo se decidió" onPress={() => openLink(to)} /> : null}
       </Gap>
     );
@@ -137,27 +138,27 @@ function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today
   const when = pieceWhen(status, piece?.scheduled_for ?? event.at, { today, timeZone, now, published: piece ? publishedAt(piece) : null });
   return (
     <Card>
-      <View style={styles.pieceHead}>
-        <Badge tone={badge.tone}>{badge.label}</Badge>
-        {when ? (
-          <T variant="detalle" soft>
-            {when}
+      <PieceOpener to={to} testID="pieza-del-dia">
+        <PieceHead badge={badge} when={when} opens={Boolean(to)} />
+        <T variant="subtitulo" numberOfLines={PIECE_PREVIEW_LINES}>
+          {thesis ?? 'El equipo prepara la pieza del día'}
+        </T>
+        {lines ? (
+          <T soft numberOfLines={PIECE_PREVIEW_LINES}>
+            {lines}
           </T>
         ) : null}
-      </View>
-      <T variant="subtitulo">{thesis ?? 'El equipo prepara la pieza del día'}</T>
-      {lines ? <T soft>{lines}</T> : null}
-      {meta ? (
-        <T variant="detalle" soft>
-          {meta}
-        </T>
-      ) : null}
-      {result ? <T variant="detalle">{result}</T> : null}
+        {meta ? (
+          <T variant="detalle" soft numberOfLines={1}>
+            {meta}
+          </T>
+        ) : null}
+        {result ? <T variant="detalle">{result}</T> : null}
+      </PieceOpener>
       {query.isPending && pieceId ? <Skeleton variant="row" label="Cargando la pieza…" /> : null}
       {piece?.action && vetoable(piece.action) ? (
         <VetoButton block accessibilityHint={thesis ?? undefined} target={{ actionId: piece.action.id, kind: 'pieza', when: `a las ${formatTime(piece.scheduled_for, timeZone)}` }} />
       ) : null}
-      {to ? <TextLink label="Ver cómo se escribió" onPress={() => openLink(to)} /> : null}
     </Card>
   );
 }
@@ -371,7 +372,6 @@ const styles = StyleSheet.create({
   block: { gap: space[2] },
   gap: { gap: space[2], paddingVertical: space[3], paddingHorizontal: space[4], borderWidth: 1, borderStyle: 'dashed', borderColor: colors.inkSoft, borderRadius: radius.md },
   textLink: { minHeight: shell.touch, justifyContent: 'center', alignSelf: 'flex-start' },
-  pieceHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: space[2] },
   summary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },
   summaryItem: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 6 },
   summaryPart: { minHeight: 32, justifyContent: 'center' },

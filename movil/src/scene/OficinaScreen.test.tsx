@@ -32,23 +32,35 @@ const A = 'GET /api/v1/oficina/actividad', E = 'GET /api/v1/oficina/eventos', O 
 function server(extra: Record<string, FakeHandler> = {}) {
   return fakeServer({ [A]: { body: activity }, [E]: { body: { events: [], now } }, [O]: { body: { control: { paused: false } } }, ...extra });
 }
+// The zone labels are the way into a team: touches reach the scene's tap; a screen reader activates the label.
+const openZone = (name: string) => fireEvent(screen.getByRole('button', { name }), 'accessibilityAction', { nativeEvent: { actionName: 'activate' } });
 beforeEach(() => { route.pathname = '/'; Object.defineProperty(AppState, 'currentState', { configurable: true, value: 'active' }); });
 afterEach(() => { jest.useRealTimers(); });
 
-it('shows the visual editor as the fourth editorial member with real activity and a registry link', async () => {
+it('shows the visual editor as the fourth editorial member with real activity, from the zone label', async () => {
   server({ [A]: { body: { ...activity, roles: { ...activity.roles,
     editor_visual: { status: 'trabajando', detail: 'Preparando foto, infografía o carrusel para la pieza', since: now },
   } } } });
   await renderApp(<OficinaScreen />);
   await screen.findByText('Editor visual: Preparando foto, infografía o carrusel para la pieza');
-  await fireEvent.press(screen.getByTestId('team-chip-editorial'));
+  expect(screen.getByRole('button', { name: 'Mesa editorial' })).not.toBeSelected();
+  await openZone('Mesa editorial');
   expect(within(screen.getByTestId('office-panel')).getByText('4 INTEGRANTES · LA MESA LARGA')).toBeOnTheScreen();
+  expect(screen.getByRole('button', { name: 'Mesa editorial' })).toBeSelected();
   await fireEvent.press(screen.getByRole('button', { name: 'Editor visual, Trabajando' }));
   const panel = within(screen.getByTestId('office-panel'));
   expect(panel.getByText('Propone y prepara la foto, infografía o carrusel de la pieza; el director decide.')).toBeOnTheScreen();
   expect(panel.getByText('Trabajando · Preparando foto, infografía o carrusel para la pieza')).toBeOnTheScreen();
-  await fireEvent.press(panel.getByRole('button', { name: 'Ver definición y conexiones' }));
-  expect(require('expo-router').router.push).toHaveBeenCalledWith('/equipo?agente=editor_visual');
+  // The team map is gone: no link to it from the agent.
+  expect(panel.queryByText('Ver definición y conexiones')).toBeNull();
+});
+
+it('keeps only the scene and its error notes: no legend, activity age, team strip, map link or art credit', async () => {
+  server(); await renderApp(<OficinaScreen />); await screen.findByText('Operación: Ejecutando comentario aprobado');
+  for (const gone of ['Trabajando', 'En espera', 'En diseño', 'Mapa del equipo', 'Arte: LimeZu — Modern Interiors']) expect(screen.queryByText(gone)).toBeNull();
+  expect(screen.queryByText(/^Actividad real/)).toBeNull();
+  expect(screen.queryByTestId('team-strip')).toBeNull();
+  expect(screen.getByTestId('oficina-pie')).toBeOnTheScreen();
 });
 
 it('opens with a still scene and loading narration, then real activity and design tags', async () => {
@@ -70,7 +82,7 @@ it('keeps unknown roles without data on activity errors and recovers with retry'
   const api = server({ [A]: { status: 503 } }); await renderApp(<OficinaScreen />);
   await screen.findByText('No se pudo leer la actividad.');
   expect(screen.getByText('Mientras tanto los personajes quedan quietos: la oficina no simula trabajo.')).toBeOnTheScreen();
-  await fireEvent.press(screen.getByRole('button', { name: 'Operación' }));
+  await openZone('Operación');
   expect(within(screen.getByTestId('office-panel')).getByText('Sin datos')).toBeOnTheScreen();
   api.on(A, { body: activity }); await fireEvent.press(screen.getByRole('button', { name: 'Reintentar' }));
   expect(await screen.findByText('Operación: Ejecutando comentario aprobado')).toBeOnTheScreen();
@@ -121,7 +133,7 @@ it('narrates events once, advances the cursor and retains history after empty pa
   expect(api.find('GET', '/api/v1/oficina/eventos')[1]!.path).toContain(`desde=${encodeURIComponent(now)}`);
   await act(async () => { await client.refetchQueries({ queryKey: oficinaEventosKey }); });
   expect(api.find('GET', '/api/v1/oficina/eventos')[2]!.path).toContain(`desde=${encodeURIComponent(now)}`);
-  await fireEvent.press(screen.getByRole('button', { name: 'Mesa editorial' }));
+  await openZone('Mesa editorial');
   await fireEvent.press(within(screen.getByTestId('office-panel')).getByRole('button', { name: /Copywriter A/ }));
   expect(within(screen.getByTestId('office-panel')).getAllByText('Copywriter A va a la biblioteca: “clase 03”')).toHaveLength(1);
 });
@@ -136,7 +148,7 @@ it('retries a feed failure and handles the library service panel', async () => {
   await screen.findByText('No se pudieron leer los eventos.'); api.on(E, { body: events });
   await fireEvent.press(screen.getByRole('button', { name: 'Reintentar' }));
   await screen.findByText('Copywriter A va a la biblioteca: “clase 03”');
-  await fireEvent.press(screen.getByRole('button', { name: 'Biblioteca' }));
+  await openZone('Biblioteca');
   expect(within(screen.getByTestId('office-panel')).getByText('SERVICIO · BIBLIOTECA')).toBeOnTheScreen();
   expect(within(screen.getByTestId('office-panel')).queryByText('Ver en el Calendario')).toBeNull();
   await fireEvent.press(screen.getByText('Ver quién la usa · Observatorio'));

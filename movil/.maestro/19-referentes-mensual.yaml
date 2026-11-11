@@ -50,6 +50,17 @@ tags: [referentes, turno, experimentos]
     speed: 20
     timeout: 60000
     centerElement: true
+# The card starts collapsed: «Ver más» opens the occupancy, the people and the evidence.
+- scrollUntilVisible:
+    element:
+      id: 'turno-more-referent_change:9b9b9c51-0132-5566-927d-c5346beea860'
+    direction: DOWN
+    speed: 20
+    timeout: 60000
+    centerElement: true
+- tapOn:
+    id: 'turno-more-referent_change:9b9b9c51-0132-5566-927d-c5346beea860'
+    waitToSettleTimeoutMs: 300
 - scrollUntilVisible:
     element:
       text: "5 main protegidos.*"

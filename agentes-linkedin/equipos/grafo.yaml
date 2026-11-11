@@ -4070,6 +4070,12 @@
           "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
         },
         {
+          "kind": "override_piece",
+          "cadence": "Gustavo desestima el bloqueo de una pieza desde su detalle (EDI-23); sin cadencia del autopiloto.",
+          "binding": "team_backend.rescate.override",
+          "deduplication": "request_id del cliente; el trabajo vuelve a comprobar que la pieza siga bloqueada."
+        },
+        {
           "kind": "execute_action",
           "cadence": "Tick 60 s; solo aprobada y a su hora.",
           "binding": "team_backend.autopiloto._execute",

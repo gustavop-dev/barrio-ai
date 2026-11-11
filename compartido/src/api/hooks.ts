@@ -36,6 +36,7 @@ import {
   listPreguntas,
   listReferents,
   markResumenVisto,
+  overridePiece,
   planPiece,
   postponePregunta,
   approveAction,
@@ -350,6 +351,15 @@ export function useApproveAction() {
   return useMutation({
     mutationFn: ({ actionId, expectedHash, note = '' }: { actionId: string; expectedHash: string; note?: string }) => approveAction(actionId, expectedHash, note),
     onSettled: () => invalidate(client, keys.editorialAll, keys.calendarioAll, keys.actividadAll, keys.actionsAll, keys.redAll, keys.tuTurno),
+  });
+}
+
+/** EDI-23 «Desestimar el bloqueo» on a blocked piece; one `requestId` per intent so a retry never queues twice. */
+export function useOverridePiece(pieceId: string) {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, note = '' }: { requestId?: string; note?: string }) => overridePiece(pieceId, requestId, note),
+    onSettled: () => invalidate(client, keys.piece(pieceId), keys.editorialAll, keys.calendarioAll, keys.tuTurno),
   });
 }
 

@@ -167,9 +167,7 @@ tags: [calendario]
     direction: DOWN
 - extendedWaitUntil:
     visible:
-      text: "Ver cómo se escribió"
-      childOf:
-        id: calendario-lista
+      id: proxima-pieza
     timeout: 30000
 
 # ---------------------------------------------------------------- the piece fails
@@ -181,9 +179,7 @@ tags: [calendario]
       EFECTO: '500'
       VECES: '-1'
 - tapOn:
-    text: "Ver cómo se escribió"
-    childOf:
-      id: calendario-lista
+    id: proxima-pieza
 - extendedWaitUntil:
     visible:
       text: "No se pudo cargar la pieza"

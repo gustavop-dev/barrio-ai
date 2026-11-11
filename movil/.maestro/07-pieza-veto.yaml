@@ -24,16 +24,13 @@ tags: [calendario]
     timeout: 30000
 - tapOn:
     text: "Lista"
+# The next piece's card opens it with a tap anywhere on its text.
 - extendedWaitUntil:
     visible:
-      text: "Ver cómo se escribió"
-      childOf:
-        id: calendario-lista
+      id: proxima-pieza
     timeout: 20000
 - tapOn:
-    text: "Ver cómo se escribió"
-    childOf:
-      id: calendario-lista
+    id: proxima-pieza
 
 # ---------------------------------------------------------------- header and veto card
 # cubre: CAL-06, CAL-12

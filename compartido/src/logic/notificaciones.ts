@@ -59,3 +59,35 @@ export function timeLabel(item: NotificationItem, upcoming: boolean, now: number
   if (at(item) < now) return capitalize(`desde ${dayAndTime(item.at, now)}`);
   return `${day} ${clock(item.at)}`;
 }
+
+/** What the dropdown of Notificaciones shows: everything, the unread ones (the API's filter) or one section. */
+export type NotificationView = NotificationFilter | 'proximo' | 'hoy' | 'ayer' | 'anteriores';
+type NotificationSection = Exclude<NotificationView, NotificationFilter>;
+
+export const NOTIFICATION_VIEWS: readonly { value: NotificationView; label: string }[] = [
+  { value: 'todas', label: 'Todas' },
+  { value: 'sin_leer', label: 'Sin leer' },
+  { value: 'proximo', label: 'Próximo' },
+  { value: 'hoy', label: 'Hoy' },
+  { value: 'ayer', label: 'Ayer' },
+  { value: 'anteriores', label: 'Anteriores' },
+];
+
+/** What the API is asked for: only «Sin leer» filters on the server; the sections filter what came back. */
+export function notificationFilterOf(view: NotificationView): NotificationFilter {
+  return view === 'sin_leer' ? 'sin_leer' : 'todas';
+}
+
+/** The section of a group: Próximo, Hoy (today or a later date), Ayer, or Anteriores (older days and items without a date). */
+export function notificationSection(group: NotificationGroup): NotificationSection {
+  if (group.upcoming) return 'proximo';
+  const offset = Number(group.key);
+  if (!Number.isFinite(offset)) return 'anteriores';
+  return offset >= 0 ? 'hoy' : offset === -1 ? 'ayer' : 'anteriores';
+}
+
+/** The groups the chosen view shows: all of them for Todas and Sin leer, only its section's otherwise. */
+export function filterNotificationGroups(groups: NotificationGroup[], view: NotificationView): NotificationGroup[] {
+  if (view === 'todas' || view === 'sin_leer') return groups;
+  return groups.filter((group) => notificationSection(group) === view);
+}

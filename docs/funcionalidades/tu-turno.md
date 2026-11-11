@@ -49,6 +49,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   7. **Dado** un aviso informativo (invitaciones limitadas, pieza bloqueada, presupuesto agotado), **cuando** abre Tu turno, **entonces** no aparece: está en Personas, Calendario o Ajustes.
   8. **Dado** el enlace `/tu-turno#turno-<id>`, **cuando** carga, **entonces** la vista baja hasta esa tarjeta.
   9. **Dado** que la máquina se detuvo desde el servidor (`OPERATOR_PAUSED`), **cuando** abre Tu turno, **entonces** no hay tarjeta: aparece en Notificaciones › Próximo ([NOT-03](notificaciones.md#not-03)).
+  10. **Dado** una tarjeta en la app, **cuando** se pinta, **entonces** sale recogida: tipo, prioridad, plazo, agente, el título en 3 líneas y una descripción de 2 líneas con «…», con sus botones siempre a la vista (aprobar, responder, vetar…). Lo largo (citas, «Por qué importa», «Último mensaje», «Para qué», detalles de la aprobación y de los referentes) se abre con «Ver más» (`movil/src/turno/TurnoCard.tsx`, `actions.cardSummary`).
 - **Brechas código/docs:** el contrato documenta `top` «para la tarjeta de la Oficina»; ninguna interfaz lo usa (el diseño rev 18 quitó lo que había sobre la escena).
 - **Cobertura QA:** E2E `04-tu-turno` (criterios 1, 3 y 9: grupos, orden y contador con las 8 tarjetas del mundo de QA) y `04-tu-turno-estados` (4 vacío y 6 «No se pudo actualizar» con el interruptor de fallos). El 2 (orden por plazo) y el 7 son del backend; el 5 (esqueleto) y el 8 (ancla), de Jest.
 

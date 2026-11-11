@@ -16,6 +16,7 @@ import { AppState, StyleSheet, View, useWindowDimensions } from 'react-native';
 import { GestureDetector, useExclusiveGestures, usePanGesture, useTapGesture } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { DismissibleHint } from '@/components/Hint';
 import { Icon } from '@/components/icons';
 import { T, useToast } from '@/components/ui';
 import { captureMotion, durations, gestures, haptic, spring, springWith, timingWith } from '@/theme/motion';
@@ -130,13 +131,6 @@ export function CaptureButton() {
   const toast = useToast();
   const recorder = useRecorder();
   const used = useCaptureUsed();
-  // The first-use hint covers what is behind it: it goes away by itself (and for good after the first use).
-  const [hintUp, setHintUp] = useState(true);
-  useEffect(() => {
-    if (used) return;
-    const timer = setTimeout(() => setHintUp(false), captureMotion.hintMs);
-    return () => clearTimeout(timer);
-  }, [used]);
   const sheet = useCaptureSheet();
   const sentCount = useCaptureSentCount();
   const insets = useSafeAreaInsets();
@@ -352,12 +346,14 @@ export function CaptureButton() {
 
   return (
     <View style={styles.slot} onLayout={(event) => setSlot({ x: event.nativeEvent.layout.x, width: event.nativeEvent.layout.width })}>
-      {!used && !holding && hintUp ? (
-        <View style={styles.hint} pointerEvents="none">
+      {/* The first-use hint covers what is behind it: it leaves by itself, a sideways swipe removes it for good (as the
+          first use does), and it never takes the button's touches (it sits above it). */}
+      {!used && !holding ? (
+        <DismissibleHint style={styles.hint} visibleMs={captureMotion.hintMs} onDismiss={markCaptureUsed} testID="capture-hint">
           <T variant="detalle" color={colors.paper} center>
             Mantén oprimido para grabar. Toca para foto o nota.
           </T>
-        </View>
+        </DismissibleHint>
       ) : null}
       <HoldOverlay
         values={{ phase, dy, dx, bar, lockOn, shut, trashOn, drop, canceling }}

@@ -1,6 +1,6 @@
 // Notificaciones: PRÓXIMO and the days, the layer dot and «Nueva», marking read on open (and the bell
-// dot following), opening the link in the app, «Marcar todo como leído», the Sin leer filter, pull to
-// refresh, and the empty, unavailable and error states.
+// dot following), opening the link in the app, «Marcar todo como leído», the dropdown (Sin leer and the
+// sections), the clamped rows that unfold without a link, pull to refresh, and the empty, unavailable and error states.
 import type { Notificaciones } from '@compartido/api/notificaciones';
 import { keys } from '@compartido/api/queryClient';
 import type { TuTurno } from '@compartido/api/types';
@@ -23,6 +23,12 @@ function server(data: Notificaciones | ((filtro: string) => Notificaciones), ext
 }
 
 const row = (title: string) => screen.getByText(title).parent!.parent! as ReturnType<typeof screen.getByText>;
+
+/** Opens the dropdown and picks a view. */
+async function choose(label: string) {
+  await fireEvent.press(screen.getByTestId('notif-filtro'));
+  await fireEvent.press(screen.getByRole('radio', { name: label }));
+}
 
 describe('Notificaciones', () => {
   it('groups what is coming and the last days, with the layer dot, time, detail and «Nueva»', async () => {
@@ -116,12 +122,60 @@ describe('Notificaciones', () => {
     const api = server((filtro) => (filtro === 'sin_leer' ? notificacionesFixture({ items: [notificationFixture({ id: 'n-hoy' })] }) : notificacionesFixture()));
     await renderApp(<NotificacionesScreen />);
     await screen.findByText('Próximo');
-    await fireEvent.press(screen.getByTestId('filtro-sin_leer'));
-    expect(screen.getByTestId('filtro-sin_leer')).toBeSelected();
+    await choose('Sin leer');
+    expect(screen.getByTestId('notif-filtro')).toHaveAccessibilityValue({ text: 'Sin leer' });
     await waitFor(() => expect(api.requests.some((r) => r.path === '/api/v1/notificaciones?filtro=sin_leer')).toBe(true));
     expect(await screen.findByText('Publicaste «Scope features from the decision they support.»')).toBeOnTheScreen();
     expect(screen.queryByText('Próximo')).toBeNull();
     expect(screen.queryByText('El verificador bloqueó la pieza del viernes')).toBeNull();
+  });
+
+  it('shows one section from the dropdown, asking the server for everything', async () => {
+    const api = server(notificacionesFixture());
+    await renderApp(<NotificacionesScreen />);
+    await screen.findByText('Próximo');
+    await choose('Ayer');
+    expect(screen.getByTestId('notif-filtro')).toHaveAccessibilityValue({ text: 'Ayer' });
+    expect(await screen.findByTestId('notif-n-ayer')).toBeOnTheScreen();
+    expect(screen.queryByText('Próximo')).toBeNull();
+    expect(screen.queryByTestId('notif-n-hoy')).toBeNull();
+    expect(screen.queryByTestId('notif-n-antes')).toBeNull();
+    expect(api.requests.some((r) => r.path === '/api/v1/notificaciones?filtro=sin_leer')).toBe(false);
+    await choose('Próximo');
+    expect(await screen.findByTestId('notif-piece_scheduled:p2')).toBeOnTheScreen();
+    expect(screen.queryByTestId('notif-n-ayer')).toBeNull();
+    await choose('Anteriores');
+    expect(await screen.findByTestId('notif-n-antes')).toBeOnTheScreen();
+    expect(screen.queryByTestId('notif-piece_scheduled:p2')).toBeNull();
+  });
+
+  it('says a section is empty', async () => {
+    server(notificacionesFixture({ items: [] }));
+    await renderApp(<NotificacionesScreen />);
+    await screen.findByText('Próximo');
+    await choose('Hoy');
+    expect(await screen.findByText('Nada en «Hoy».')).toBeOnTheScreen();
+  });
+
+  it('shows two lines of the title and one of the detail; a row without a link unfolds its whole text', async () => {
+    const api = server(
+      notificacionesFixture({
+        upcoming: [],
+        items: [notificationFixture({ id: 'n-largo', link: '', title: 'Un aviso largo sin enlace', detail: 'Con un detalle que también es largo.' })],
+      }),
+    );
+    await renderApp(<NotificacionesScreen />);
+    const title = await screen.findByText('Un aviso largo sin enlace');
+    expect(title).toHaveProp('numberOfLines', 2);
+    expect(screen.getByText('Con un detalle que también es largo.')).toHaveProp('numberOfLines', 1);
+    const rowButton = screen.getByTestId('notif-n-largo');
+    expect(rowButton).toBeCollapsed();
+    await fireEvent.press(rowButton);
+    expect(screen.getByText('Un aviso largo sin enlace')).not.toHaveProp('numberOfLines');
+    expect(screen.getByText('Con un detalle que también es largo.')).not.toHaveProp('numberOfLines');
+    expect(screen.getByTestId('notif-n-largo')).toBeExpanded();
+    await waitFor(() => expect(api.find('POST', '/api/v1/notificaciones/leer')[0]?.body).toEqual({ ids: ['n-largo'] }));
+    expect(router.push).not.toHaveBeenCalled();
   });
 
   it('refreshes when pulled down', async () => {

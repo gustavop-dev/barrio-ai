@@ -147,7 +147,7 @@ tags: [turno]
     direction: DOWN
     speed: 20
     timeout: 60000
-# The card is tall: centre its «Hecho, respondí»; her message sits just above it.
+# Collapsed, the card shows her message in two lines above its buttons; «Ver más» opens why it matters and the rest.
 - scrollUntilVisible:
     element:
       text: 'Hecho, respondí'
@@ -156,7 +156,17 @@ tags: [turno]
     timeout: 60000
     centerElement: true
 - assertVisible: '.*Estamos armando la plataforma de nuestra cooperativa.*'
-- assertVisible: 'La app nunca envía mensajes: respondes tú en LinkedIn\.'
+- assertNotVisible: 'La app nunca envía mensajes: respondes tú en LinkedIn\.'
+- tapOn:
+    id: 'turno-more-conversation:.*'
+    waitToSettleTimeoutMs: 300
+- scrollUntilVisible:
+    element:
+      text: 'La app nunca envía mensajes: respondes tú en LinkedIn\.'
+    direction: DOWN
+    speed: 20
+    timeout: 30000
+    centerElement: true
 - assertVisible: 'No responder'
 - takeScreenshot: 04-turno-06-conversacion
 # The card's title is above the screen now: swipe on her message, inside the same card.

@@ -1,5 +1,7 @@
 // The capture sheet of Captura.dc.html: audio, photos, a note and «Para qué es», sent to the team in
 // one multipart POST /api/v1/capturas, with a 5 s «Deshacer». Mounted once by the app layout.
+// Opened with a context (answering a Tu turno question, a comment on a piece, a note on a person) it is the simple
+// sheet: the context, audio, a photo and the note. Visibility and the photo's AI edit take their defaults.
 //
 // It moves as in MovCaptura:
 // - opened by the capture button, the button turns into the sheet's audio element (the recording ball,
@@ -45,7 +47,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { localPart, reportError, type LocalPart } from '@/api/errorReport';
 import { keys } from '@/api/queryClient';
 import { Icon } from '@/components/icons';
-import { Button, ConfirmSheet, FilterChip, Note, Options, Sheet, T, errorMessage, useToast } from '@/components/ui';
+import { Button, ConfirmSheet, FilterChip, Note, Sheet, T, errorMessage, useToast } from '@/components/ui';
 import { Field } from '@/components/ui/Field';
 import { useSheetFrame, type SheetFrame, type SheetHandle } from '@/components/ui/Sheet';
 import { captureMotion, captureTimeline, curves, durations, haptic, springWith, timelineWith, timingWith, useMotion } from '@/theme/motion';
@@ -62,9 +64,7 @@ import { Wave } from './Wave';
 
 export const PURPOSES: readonly { value: CapturePurpose; label: string }[] = [
   { value: 'post', label: 'Idea para un post' },
-  { value: 'propuesta', label: 'Propuesta de post' },
   { value: 'dato', label: 'Dato sobre mí' },
-  { value: 'respuesta', label: 'Responde una pregunta' },
   { value: 'galeria', label: 'Foto para la galería' },
 ];
 
@@ -523,7 +523,7 @@ function AudioDone({ audio, stage, onRemove }: { audio: RecordedAudio; stage: St
           <Icon name={playing ? 'pausa' : 'play'} size={ELEMENT.done.icon} color={colors.onBrand} />
         </Pressable>
       </Animated.View>
-      <Wave levels={audio.levels} />
+      <Wave levels={audio.levels} mode="clip" />
       <T variant="detalle" style={styles.tabular}>
         {mmss(audio.duration)}
       </T>
@@ -664,7 +664,8 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
   const [fotoProblem, setFotoProblem] = useState<string | null>(null);
   const [nota, setNota] = useState(seed.draft?.nota ?? '');
   const [para, setPara] = useState<CapturePurpose | null>(seed.draft?.para ?? null);
-  const [publicChoice, setPublicChoice] = useState<boolean | null>(seed.draft?.publicUse ?? null);
+  // The sheet asks no visibility: null lets the question's suggestion apply (a draft keeps what it had).
+  const [publicChoice] = useState<boolean | null>(seed.draft?.publicUse ?? null);
   const [confirmClose, setConfirmClose] = useState(false);
   const [sending, setSending] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -694,15 +695,16 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
     return () => pending.forEach(clearTimeout);
   }, []);
 
-  // The question behind «Responder con audio»: who asks and which visibility it suggests.
+  // With a context it is the simple sheet: no «Para qué es», visibility, AI edit or «Lo que enviaste».
+  const simple = context !== null;
+
+  // The question behind «Responder con audio»: who asks.
   const questions = useQuery({
     queryKey: keys.preguntas('open'),
     queryFn: async () => asList(await listPreguntas('open')),
     enabled: context?.tipo === 'pregunta',
   });
   const question = context?.tipo === 'pregunta' ? questions.data?.find((q) => q.id === context.id) : undefined;
-  const suggestedPublic = typeof question?.suggested_public === 'boolean' ? question.suggested_public : null;
-  const publicUse = publicChoice ?? suggestedPublic;
 
   // A live recording never outlives the sheet: closing it, sending or leaving stops the microphone.
   const discardOnLeave = recorder.discard;
@@ -720,7 +722,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
   const recording = audio.kind === 'recording' && recorder.phase !== 'idle';
   const readyAudio = audio.kind === 'done' ? audio.audio : autoStopped;
   const noteTooLong = nota.length > CAPTURE_LIMITS.noteChars;
-  const galleryWithoutPhotos = para === 'galeria' && fotos.length === 0;
+  const galleryWithoutPhotos = !simple && para === 'galeria' && fotos.length === 0;
   const empty = !recording && !readyAudio && fotos.length === 0 && !nota.trim();
   const cannotSend = empty || noteTooLong || galleryWithoutPhotos;
   const showRecording = audio.kind === 'recording' && !autoStopped && !recordingFailed;
@@ -854,7 +856,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
         fotos: fotos.map(({ uri, name, type }) => ({ uri, name, type })),
         nota,
         ai_edit: fotos.length ? aiEditToSend : undefined,
-        para,
+        para: simple ? null : para,
         contexto: context ? { tipo: context.tipo, id: context.id } : null,
         publicUse: context?.tipo === 'pregunta' ? publicChoice : null,
       },
@@ -878,11 +880,13 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
       <T variant="subtitulo" accessibilityRole="header" style={styles.headTitle}>
         Para el equipo
       </T>
-      <Pressable accessibilityRole="button" onPress={() => setView('history')} style={styles.histLink} testID="capture-historial">
-        <T variant="detalle" color={colors.brandDeep}>
-          Lo que enviaste{history.count !== null ? ` · ${history.count}` : ''}
-        </T>
-      </Pressable>
+      {simple ? null : (
+        <Pressable accessibilityRole="button" onPress={() => setView('history')} style={styles.histLink} testID="capture-historial">
+          <T variant="detalle" color={colors.brandDeep}>
+            Lo que enviaste{history.count !== null ? ` · ${history.count}` : ''}
+          </T>
+        </Pressable>
+      )}
       <Pressable accessibilityRole="button" accessibilityLabel="Cerrar sin enviar" onPress={close} style={styles.iconButton} testID="capture-cerrar">
         <Icon name="cerrar" size={22} color={colors.inkSoft} />
       </Pressable>
@@ -1006,7 +1010,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
               ) : null}
             </View>
 
-            {fotos.length ? <View style={styles.block}>
+            {fotos.length && !simple ? <View style={styles.block}>
               <AIEditControl testID="capture-ai" value={aiEdit} onChange={setAiChoice} disabled={sending} />
               {aiEdit === null ? <T variant="detalle" soft>{prefs.isPending ? 'Cargando el valor de Ajustes…' : 'Se usará el valor de Ajustes si no eliges una opción.'}</T> : null}
             </View> : null}
@@ -1021,26 +1025,7 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
               testID="capture-note"
             />
 
-            {context?.tipo === 'pregunta' ? (
-              <View style={styles.block}>
-                <Options
-                  legend="Visibilidad de tu respuesta"
-                  value={publicUse}
-                  onChange={setPublicChoice}
-                  options={[
-                    { value: true, label: 'Público', hint: 'El equipo puede mencionarlo en posts y comentarios.' },
-                    { value: false, label: 'Privado', hint: 'Solo orienta decisiones; nunca aparece en un texto público.' },
-                  ]}
-                />
-                {suggestedPublic === null && publicChoice === null ? (
-                  <T variant="detalle" soft>
-                    Si no eliges, se usa la que sugiere la pregunta.
-                  </T>
-                ) : null}
-              </View>
-            ) : null}
-
-            <View style={styles.block}>
+            {simple ? null : <View style={styles.block}>
               <T variant="etiqueta" soft>
                 Para qué es (opcional)
               </T>
@@ -1064,15 +1049,17 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
                   Para «Foto para la galería» adjunta al menos una foto.
                 </T>
               ) : null}
-            </View>
+            </View>}
 
             {create.error && !sending ? <SendError error={create.error} onRetry={() => void send()} /> : null}
             <Button variant="primary" block disabled={cannotSend} loading={sending || leaving} loadingLabel="Enviando…" onPress={() => void send()} testID="capture-send">
               Guardar y enviar al equipo
             </Button>
-            <T variant="detalle" soft center>
-              Lo verás en «Lo que enviaste», arriba en esta hoja.
-            </T>
+            {simple ? null : (
+              <T variant="detalle" soft center>
+                Lo verás en «Lo que enviaste», arriba en esta hoja.
+              </T>
+            )}
           </>
         )}
       </Sheet>

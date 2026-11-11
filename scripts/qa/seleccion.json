@@ -14,11 +14,6 @@
       "cubre": ["EST-01", "EST-03", "EST-04", "GAL-08", "TUR-18"]
     },
     {
-      "rutas": ["movil/src/equipo/**", "movil/src/app/(app)/equipo.tsx", "oficina/src/pages/MapaEquipo*"],
-      "flujos": ["17-*"],
-      "cubre": ["ARQ-08"]
-    },
-    {
       "rutas": ["movil/src/app/login.tsx", "movil/src/entrada/**"],
       "flujos": ["01-*"],
       "cubre": ["ACC-02", "ACC-10"]
@@ -40,7 +35,7 @@
     },
     {
       "rutas": ["movil/src/scene/**", "movil/src/app/(app)/(tabs)/index.tsx"],
-      "flujos": ["01-*", "03-*", "17-*"],
+      "flujos": ["01-*", "03-*"],
       "cubre": ["OFI-*"]
     },
     {
@@ -70,7 +65,7 @@
     },
     {
       "rutas": ["movil/src/ajustes/**", "movil/src/app/(app)/(tabs)/ajustes.tsx"],
-      "flujos": ["11-*", "15-*", "17-*"],
+      "flujos": ["11-*", "15-*"],
       "cubre": ["AJU-*"]
     }
   ]

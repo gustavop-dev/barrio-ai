@@ -425,13 +425,12 @@ describe('Ajustes · Sabe y sesión', () => {
     expect(router.navigate).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { tab: 'sabe' } });
   });
 
-  it('logs out after confirming, and shows the version and the art credit', async () => {
+  it('logs out after confirming, and shows the version without the art credit or the team map (their rights are ours)', async () => {
     const api = server({ 'POST /api/v1/auth/token/revocar': { status: 204 } });
     await renderAjustes();
     expect(screen.getByLabelText('Versión: app 0.1.0')).toBeOnTheScreen();
-    const openURL = jest.spyOn(Linking, 'openURL').mockResolvedValue(undefined);
-    await fireEvent.press(screen.getByRole('link', { name: 'LimeZu en itch.io' }));
-    expect(openURL).toHaveBeenCalledWith('https://limezu.itch.io/moderninteriors');
+    expect(screen.queryByText(/LimeZu/)).toBeNull();
+    expect(screen.queryByText('Mapa del equipo')).toBeNull();
     await fireEvent.press(screen.getByTestId('logout'));
     await fireEvent.press(within(await screen.findByTestId('confirm-sheet')).getByRole('button', { name: 'Cerrar sesión' }));
     await waitFor(() => expect(api.find('POST', '/api/v1/auth/token/revocar')).toHaveLength(1));

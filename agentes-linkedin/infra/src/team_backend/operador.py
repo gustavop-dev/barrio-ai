@@ -1011,6 +1011,10 @@ def _run_job(job):
             from .editorial import prepare
             piece=prepare(user,date.fromisoformat(params['slot']),origin_job=str(job.id))
             return ('failed' if piece.state=='failed' else 'complete'),piece.state,piece.note if piece.state=='failed' else ''
+        if job.kind=='override_piece':
+            from . import rescate
+            rescate.override(user,params['piece'],params.get('note',''))
+            return 'complete','desestimada',''
         if job.kind=='process_capture':
             from . import capturas
             capture=capturas.process(params['capture'])

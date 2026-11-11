@@ -39,7 +39,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Código:** PWA `capture/CaptureButton.tsx` (móvil) y el botón «Capturar» de la barra lateral (escritorio); app `movil/src/capture/CaptureButton.tsx`.
 - **Criterios de aceptación:**
   1. **Dado** el botón aguamarina en el centro de la barra inferior, **cuando** lo toca (menos de 220 ms), **entonces** se abre la hoja «Para el equipo» con «Grabar un audio», «Añadir una imagen» («Tomar foto», «Galería»), «Nota para el equipo (opcional)», «Para qué es (opcional)» y «Guardar y enviar al equipo».
-  2. **Dado** que nunca usó el botón, **cuando** ve la barra, **entonces** aparece la pista «Mantén oprimido para grabar. Toca para foto o nota.»; tras el primer uso no vuelve a salir.
+  2. **Dado** que nunca usó el botón, **cuando** ve la barra, **entonces** aparece la pista «Mantén oprimido para grabar. Toca para foto o nota.»; tras el primer uso no vuelve a salir. En la app la pista se va sola a los 4 s y se quita deslizándola de lado; si la desliza, no vuelve (`movil/src/components/Hint.tsx`).
   3. **Dado** la PWA en escritorio, **cuando** pulsa «Capturar» en la barra lateral, **entonces** se abre la misma hoja (en escritorio no hay mantener para grabar).
   4. **Dado** una vista de detalle en la app (pieza o persona), **cuando** se muestra, **entonces** la barra inferior y el botón de captura no aparecen.
 - **Brechas código/docs:** —
@@ -139,7 +139,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Qué hace para Gustavo:** desde una pregunta, la ficha de una persona o una pieza, abre la captura ya ligada a eso, y el equipo sabe a qué se refiere.
 - **Código:** `contexto_tipo` y `contexto_id`; backend `capturas._route_question`, `_route_person`, `_route_piece` (y `retoque.run` para una pieza lista, en el mismo trabajo `process_capture`).
 - **Criterios de aceptación:**
-  1. **Dado** «Responder con audio» en una pregunta, **cuando** se abre la hoja, **entonces** muestra el chip «Responde a <agente>» con la pregunta y el selector «Visibilidad de tu respuesta» con «Si no eliges, se usa la que sugiere la pregunta.».
+  1. **Dado** «Responder con audio» en una pregunta, **cuando** se abre la hoja, **entonces** muestra el chip «Responde a <agente>» con la pregunta. En la PWA trae además el selector «Visibilidad de tu respuesta» con «Si no eliges, se usa la que sugiere la pregunta.». En la app la hoja con contexto (pregunta, persona o pieza) es la sencilla: el chip, «Grabar un audio», «Añadir una imagen» y la nota; sin «Para qué es», visibilidad, «Edición con IA» ni «Lo que enviaste». La respuesta toma la visibilidad que sugiere la pregunta y la foto, el valor de Ajustes.
   2. **Dado** esa captura enviada, **cuando** se procesa, **entonces** la pregunta queda respondida como Gustavo (las preguntas tipadas guardan «{pregunta} {texto}») y la captura termina en «Está en Lo que el equipo sabe de ti · Público» o «· Privado», con enlace a `/tu-turno/sabe`.
   3. **Dado** «Nota de voz» en una persona, **cuando** se procesa, **entonces** se añade una nota a la persona con `source: "captura"` y la captura dice «Quedó en las notas de <nombre>», con enlace a su ficha.
   4. **Dado** «Comentario para el equipo» en una pieza ya publicada, descartada o sin publicación pendiente, **cuando** se procesa, **entonces** aparece en «Tus comentarios para el equipo» de esa pieza y la captura dice «Quedó como comentario para el equipo en la pieza del <día>».
@@ -147,14 +147,14 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   5. **Dado** el chip de contexto, **cuando** pulsa «Quitar el contexto», **entonces** la captura se envía sin contexto.
   6. **Dado** un contexto que ya no existe, **cuando** se envía, **entonces** la API responde 400 «El elemento ligado a la captura no existe.».
 - **Brechas código/docs:** en la app, el contexto funciona con texto; con audio o fotos falla ([CAP-04](#cap-04)).
-- **Cobertura QA:** E2E `05-captura-contexto` (criterios 1 y 4 a la vista: el chip de cada contexto, la visibilidad de la respuesta, y las tres capturas en «Lo que enviaste» con su contexto). Lo que hace el equipo con ellas (2, 3, 4) necesita el trabajador, que no corre en CI: pruebas del backend.
+- **Cobertura QA:** E2E `05-captura-contexto` (criterios 1 y 4 a la vista: el chip de cada contexto, la hoja sencilla sin visibilidad ni «Para qué es», y las tres capturas en «Lo que enviaste» con su contexto, abierto tras quitar el contexto). Lo que hace el equipo con ellas (2, 3, 4) necesita el trabajador, que no corre en CI: pruebas del backend.
 
 ### CAP-08 · «Para qué es», o lo decide el equipo <a id="cap-08"></a>
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** puede decir para qué es lo que manda; si no lo dice, el equipo lo clasifica y le explica por qué.
-- **Código:** campo `para`; backend `capturas._destination`, `classify` (Sonnet, propósito `capture-route`), `ROUTES`.
+- **Código:** campo `para`; backend `capturas._destination`, `classify` (Sonnet, propósito `capture-route`), `ROUTES`. La app ofrece «Idea para un post», «Dato sobre mí» y «Foto para la galería». «Propuesta de post» es lo mismo que una idea, y una pregunta se responde desde Tu turno. La PWA y la API conservan los cinco valores.
 - **Criterios de aceptación:**
   1. **Dado** «Idea para un post», **cuando** se procesa, **entonces** la captura queda «En la mesa editorial» con «Mesa editorial lo tendrá en cuenta» y llega al director ([EDI-17](motor-editorial.md#edi-17)).
   2. **Dado** «Dato sobre mí» o «Responde una pregunta» sin pregunta ligada, **cuando** se procesa, **entonces** se guarda un dato privado `nota.captura-<id>` y la captura dice «Está en Lo que el equipo sabe de ti · Privado».

@@ -89,7 +89,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 - **Qué hace para Gustavo:** en la Lista ve la próxima pieza (con su etapa, tesis y primeras líneas) y las acciones que esperan su turno, con la hora estimada, y puede vetarlas.
 - **Código:** `upcoming` de `GET /api/v1/actividad` (`rediseno_views.upcoming`, `next_execution_time`); PWA `calendario/ListView.tsx`; app `ListView.tsx`.
 - **Criterios de aceptación:**
-  1. **Dado** una pieza en preparación o lista en los próximos días, **cuando** abre la Lista, **entonces** «Próximo» muestra la primera con su estado, la hora, la tesis (o «El equipo prepara la pieza»), las tres primeras líneas, «Etapa: …», «Vetar» si se puede y «Ver cómo se escribió».
+  1. **Dado** una pieza en preparación o lista en los próximos días, **cuando** abre la Lista, **entonces** «Próximo» muestra la primera con su estado, la hora, la tesis (o «El equipo prepara la pieza»), las tres primeras líneas, «Etapa: …», «Vetar» si se puede y «Ver cómo se escribió». En la app la tarjeta entera abre la pieza (sin ese enlace) y la tesis y las primeras líneas se recortan a dos líneas con «…».
   2. **Dado** acciones aprobadas sin ejecutar (comentarios, acciones de red), **cuando** abre la Lista, **entonces** aparecen en «En cola» con su hora estimada de salida (según la ventana y el espaciado) y «Vetar».
   3. **Dado** que no hay pieza programada, **cuando** abre la Lista, **entonces** ve «No hay pieza programada para los próximos días.» y «Preparar la siguiente pieza» ([CAL-14](#cal-14)).
   4. **Dado** una pieza ya publicada, fallida o incierta, **cuando** se calcula «Próximo», **entonces** no aparece.

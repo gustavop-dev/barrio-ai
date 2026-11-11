@@ -558,8 +558,8 @@ export const sheetMotion = {
 
 /** MovCaptura: the capture button, its hold overlay and the capture sheet. */
 export const captureMotion = {
-  /** The first-use hint («Mantén oprimido para grabar…») goes away by itself after this long, on each launch until the first use (ms). */
-  hintMs: 8000,
+  /** Usage hints (the first-use «Mantén oprimido para grabar…» and the Galería ones) leave by themselves after this long, on each visit until swiped away or used (ms). */
+  hintMs: 4000,
   /** The button grows to this scale while holding (72 px over 60), on `springs.captureGrow` (SOFT). */
   holdScale: 1.2,
   /** The button follows 60 % of the finger up and left (`dy · 0.6`); it goes back on `springs.captureFollow` (FIRM). */

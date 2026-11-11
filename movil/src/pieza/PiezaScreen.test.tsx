@@ -235,8 +235,58 @@ describe('Detalle de una pieza', () => {
     server(piece({ status: 'blocked', state: 'blocked', action: null, verification: { verdict: 'blocked', model_verdict: 'ready_for_execution', blocking_reasons: ['Afirma una experiencia que no está en tu memoria confirmada.'] } }));
     await renderPieza();
     expect(await screen.findByText('El verificador bloqueó la pieza')).toBeOnTheScreen();
+    // The reasons are folded under the title: they show only when he opens them.
+    expect(screen.queryByText('Afirma una experiencia que no está en tu memoria confirmada.')).toBeNull();
+    await fireEvent.press(screen.getByText('Por qué se bloqueó'));
     expect(screen.getByText('Afirma una experiencia que no está en tu memoria confirmada.')).toBeOnTheScreen();
     expect(screen.getByText('Iba a salir a las 09:00')).toBeOnTheScreen();
+  });
+
+  // EDI-23: on a block he sees why and decides.
+  it('on a block he asks for a change with a comment or dismisses it with an optional note', async () => {
+    const blocked = piece({
+      status: 'blocked',
+      state: 'blocked',
+      action: null,
+      images: [],
+      verification: { verdict: 'blocked', blocking_reasons: ['Contiene pitch agresivo o petición de contacto'] } as PieceDetailFull['verification'],
+      rescue: { kind: 'verificador', override: true, change: true, why_not: '' },
+    });
+    const api = server(blocked, { 'POST /api/v1/editorial/pieces/p7/desestimar': { status: 202, body: { job: { id: 'job-1' } } } });
+    await renderPieza();
+    // The two ways out come first; the reason is one tap away.
+    expect(await screen.findByText('Desestimar el bloqueo')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Por qué se bloqueó'));
+    expect(screen.getByText('Contiene pitch agresivo o petición de contacto')).toBeOnTheScreen();
+
+    await fireEvent.press(screen.getByText('Pedir un cambio'));
+    expect(captureState()).toEqual({ open: true, context: { tipo: 'pieza', id: 'p7', label: 'Pieza del sábado 7 de noviembre' } });
+
+    await fireEvent.press(screen.getByText('Desestimar el bloqueo'));
+    const confirm = await screen.findByTestId('confirm-sheet');
+    expect(within(confirm).getByText(/sin pasar por el líder\. Antes, el equipo le prepara la imagen/)).toBeOnTheScreen();
+    await fireEvent.changeText(within(confirm).getByTestId('confirm-note'), 'Sale así');
+    await fireEvent.press(within(confirm).getByText('Desestimar'));
+    await waitFor(() => expect(api.find('POST', '/api/v1/editorial/pieces/p7/desestimar')).toHaveLength(1));
+    const body = api.find('POST', '/api/v1/editorial/pieces/p7/desestimar')[0]!.body as { request_id: string; note: string };
+    expect(body.note).toBe('Sale así');
+    expect(body.request_id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+    expect(within(await screen.findByTestId('toast')).getByText('Bloqueo desestimado: el equipo la deja lista para salir con tu aprobación.')).toBeOnTheScreen();
+  });
+
+  it('says why a block has no way out, without its buttons', async () => {
+    server(
+      piece({
+        status: 'blocked',
+        state: 'blocked',
+        action: null,
+        rescue: { kind: 'verificador', override: false, change: false, why_not: 'Ese día ya tiene otra pieza programada.' },
+      }),
+    );
+    await renderPieza();
+    expect(await screen.findByText('Ese día ya tiene otra pieza programada.')).toBeOnTheScreen();
+    expect(screen.queryByText('Desestimar el bloqueo')).toBeNull();
+    expect(screen.queryByText('Pedir un cambio')).toBeNull();
   });
 
   it('sends Gustavo to Tu turno to resolve an uncertain piece', async () => {
@@ -439,4 +489,16 @@ it('explains a rejected edit while showing the original that will be published',
   expect(screen.getByText('Comprobación no aprobada')).toBeOnTheScreen();
   expect(screen.queryByText('Editada con IA')).toBeNull();
   expect(screen.queryByText('Ver original')).toBeNull();
+});
+
+it('shows the AI edit the check rejected, with why, next to the original that goes out', async () => {
+  const rejected = { url: '/api/v1/editorial/pieces/p7/images/img-1/descartada?v=abc', reasons: ['La edición cambió un rostro'], width: 1080, height: 1350 };
+  server({ ...PUBLISHED, images: [pieceImage({ reason: 'Instrucción de Gustavo; edición descartada', review: { ok: false, reasons: ['La edición cambió un rostro'] }, rejected_edit: rejected })] });
+  await renderPieza();
+  const block = await screen.findByTestId('piece-image-rejected');
+  expect(within(block).getByText('Edición con IA descartada')).toBeOnTheScreen();
+  expect(within(block).getByText('No se publica')).toBeOnTheScreen();
+  expect(within(block).getByText('• La edición cambió un rostro')).toBeOnTheScreen();
+  expect(JSON.stringify(within(block).getByLabelText(/^Edición con IA descartada\./).props.source)).toContain('/descartada?v=abc');
+  expect(screen.getByText('Se publica tal cual')).toBeOnTheScreen();
 });

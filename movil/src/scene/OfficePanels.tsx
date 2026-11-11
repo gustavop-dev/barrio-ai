@@ -1,5 +1,4 @@
 import { Pressable, StyleSheet, View } from 'react-native';
-import { router } from 'expo-router';
 import { STATUS_LABEL, STATUS_TONE, roleActivity, summarize, summaryText } from '@compartido/scene/activity';
 import { detailOf, SERVICE_NOTE, type PanelData } from '@compartido/scene/panels';
 import { CHARACTER_BY_ID, LIBRARIAN_ID, rolesOfTeam, teamById, zoneName, type CharacterId, type TeamId } from '@compartido/scene/roles';
@@ -45,7 +44,6 @@ export function RolePanel({ id, data, onTeam }: { id: CharacterId; data: PanelDa
     <T accessibilityRole="header" variant="etiqueta" soft>LO ÚLTIMO QUE HIZO</T>
     {recent.length ? recent.map((entry) => <View key={entry.key} style={styles.recent}><T>{entry.text}</T><T variant="detalle" soft>{timeAgo(new Date(entry.at).toISOString(), data.now)}</T></View>) : <T variant="detalle" soft>Nada todavía en esta sesión.</T>}
     {!librarian ? <Button onPress={() => openLink(id === 'editor_visual' && info?.piece_id ? `/calendario/pieza/${info.piece_id}` : '/calendario')}>{id === 'editor_visual' && info?.piece_id ? 'Ver pieza' : 'Ver en el Calendario'}</Button> : null}
-    {id === 'editor_visual' ? <Button onPress={() => router.push('/equipo?agente=editor_visual')}>Ver definición y conexiones</Button> : null}
     <Button block onPress={() => onTeam(librarian ? 'observatorio' : role.team as TeamId)}>{librarian ? 'Ver quién la usa · Observatorio' : `Ver su equipo · ${zone}`}</Button>
   </>;
 }

@@ -59,6 +59,13 @@ def eligible(piece, now=None):
     return open_proposal(piece) or discarded(piece)
 
 
+def rescatable(piece, now=None):
+    """A blocked piece his comment can still change (EDI-23, «Pedir un cambio»): the rework reopens it first."""
+    from . import rescate
+    current = rescate.options(piece, now)
+    return bool(current and current['change'] and current['kind'] != 'lider')
+
+
 def gate_left(piece):
     """Leader reviews left in the piece's own cycle: each new version needs one."""
     row = CycleLedger.objects.filter(cycle='pieza_diaria', key=str(piece.id)).first()
@@ -98,7 +105,8 @@ def run(capture):
     if capture.state != Capture.State.NOTED or (capture.routed_to or {}).get('rework') != 'pending':
         return capture
     old = eligible(piece)
-    if old is None:
+    blocked = old is None and rescatable(piece)
+    if old is None and not blocked:
         busy = piece is not None and piece.state == EditorialPiece.State.READY and piece.scheduled_for > timezone.now()
         return _record(capture, 'sin_cambios', 'El equipo ya está rehaciendo esta pieza; tu comentario queda para el equipo.' if busy
                        else 'La pieza ya no estaba pendiente de publicar; queda como comentario para el equipo.')
@@ -106,11 +114,20 @@ def run(capture):
     if gate_left(piece) < 1 or editorial.budget_left() < min_usd():
         why = ('ya no le quedan revisiones del líder en su ciclo' if gate_left(piece) < 1
                else 'no queda presupuesto de IA para rehacerla hoy')
-        after = ('Esa versión ya no sale.' if old.state == ActionProposal.State.DISCARDED
+        after = ('Sigue bloqueada: puedes desestimar el bloqueo en su detalle.' if blocked
+                 else 'Esa versión ya no sale.' if old.state == ActionProposal.State.DISCARDED
                  else 'Si no quieres que salga así, vétala en su detalle.')
         _notice('piece_blocked', f'No pude rehacer la pieza del {day}', f'Tu comentario quedó anotado, pero {why}. {after}',
                 piece, f'piece_rework:{capture.id}')
         return _record(capture, 'sin_retoque', f'Quedó anotado, pero {why}. {after}')
+    if blocked:
+        from . import rescate
+        try:
+            old = rescate.base_for_change(piece, capture)
+        except ValueError as exc:
+            return _record(capture, 'sin_retoque', f'No pude reabrirla ({_clip(str(exc), 200)}). Sigue bloqueada: '
+                           'puedes desestimar el bloqueo en su detalle.')
+        piece.refresh_from_db()
     if not _hold(old, capture):
         return _record(capture, 'sin_cambios', 'La pieza ya se estaba publicando; tu comentario queda para el equipo.')
     try:
@@ -247,8 +264,10 @@ def _apply(capture, piece, old):
     memory = {'public_facts': public, 'private_guidance': private, 'orientation': orientacion.text()}
     frozen = {k: piece.brief.get(k) for k in FROZEN}
     claims = piece.verification.get('claims') or piece.selection.get('claims') or []
+    blocked = (piece.verification or {}).get('verdict') == 'blocked'
+    extra = {'bloqueo': piece.verification.get('blocking_reasons') or []} if blocked else {}
     decision, model = editorial._call_stage(piece, 'retoque', dict(memory, comment=capture.text, text=piece.final_text,
-        brief=frozen, claims=claims, image=_image_context(piece), sources=piece.signals))
+        brief=frozen, claims=claims, image=_image_context(piece), sources=piece.signals, **extra))
     kind = decision.get('decision')
     record = {'capture': str(capture.id), 'decision': kind, 'reason': decision.get('reason', ''),
               'changes': decision.get('changes') or [], 'summary': decision.get('summary_for_gustavo', ''), 'model': model,
@@ -327,6 +346,8 @@ def _edit_photos(piece, instruction, client, public, capture):
                 accepted.append((row, candidate, review, size))
                 break
             attempts.append(_clip('; '.join(review.get('reasons') or ['comprobación desfavorable']), 200))
+            imagenes.keep_rejected(row, candidate, review, size)  # IMG-10: he sees the rejected edit and judges it
+            row.save(update_fields=['data'])
         else:
             return attempts  # one photo did not pass: the piece does not go out half edited
     with transaction.atomic():
@@ -338,6 +359,7 @@ def _edit_photos(piece, instruction, client, public, capture):
             row.edited = True
             row.review = dict(review, instruction=instruction)  # the next comment edits the original again: it keeps this
             row.reason = _clip('Comentario de Gustavo: ' + capture.text, 1000)
+            imagenes.forget_rejected(row)
             row.save()
             row.source_photo.state = 'editada'
             row.source_photo.save(update_fields=['state'])
@@ -413,7 +435,8 @@ def _propose(capture, piece, old, record):
                 publish_asap_expected_slot=when, publish_asap_reason='Se movió para conservar tu plazo de veto tras rehacerla')
         summary = record['summary'] or record['reason']
         dropped = set((old.review or {}).get('reasons') or []) if old.state == ActionProposal.State.DISCARDED else set()
-        risks = [r for r in old.risks if not str(r).startswith(('Rehecha por un comentario', 'Líder:')) and r not in dropped]
+        risks = [r for r in old.risks if not str(r).startswith(('Rehecha por un comentario', 'Líder:', 'Bloqueada por'))
+                 and r not in dropped]
         if changed:
             risks.append(_clip('Rehecha por un comentario de Gustavo: ' + summary, 500))
         new = operador.create_proposal(old.created_by, None, 'CONT-09',
