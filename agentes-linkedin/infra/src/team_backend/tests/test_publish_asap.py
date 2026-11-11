@@ -99,7 +99,9 @@ class IdeaScheduleTests(EditorialBase):
         asked=datetime.combine(tomorrow,time(10,0),tzinfo=tz)
         c=self.idea('Publícalo mañana a las 10.',publish_at=asked,publish_at_evidence='Publícalo mañana a las 10.')
         urgente.assign_slots(now);c.refresh_from_db();team.refresh_from_db()
-        self.assertEqual(c.publish_asap_expected_slot,asked);self.assertGreater(team.slot_date,tomorrow)
+        # The team's post moves to the next free slot: after midnight that can be today at the usual hour, before tomorrow.
+        self.assertEqual(c.publish_asap_expected_slot,asked);self.assertNotEqual(team.slot_date,tomorrow)
+        self.assertGreater(team.scheduled_for,now)
         self.assertEqual(urgente.reserved_at(tomorrow),asked)
         self.assertTrue(Notification.objects.filter(kind='capture_scheduled',title='Movimos un post para darle tu hora').exists())
         plan=answers();plan['director']['ideas_used']=[str(c.id)];piece=self.plan(plan)
