@@ -51,7 +51,7 @@ class LeadTests(LeadBase):
         self.assertEqual(proposal.review['answers']['aporta'],0.92);self.assertFalse(proposal.review['with_orientation'])
         body=self.jev.requests[0]
         self.assertEqual(body['model'],'jev-1.14.0')
-        self.assertEqual(set(body['questions']),{'aporta','pitch','inventa','respeto','idioma'})
+        self.assertEqual(set(body['questions']),{'aporta','pitch','inventa','respeto'})  # language: a fixed rule (idioma.py)
         self.assertEqual(body['state']['comentario'],GOOD);self.assertEqual(body['state']['hechos_publicos_de_gustavo'],[])
         with db.connect() as c:
             row=c.execute("SELECT status,actual_usd,purpose FROM usage_ledger WHERE provider='typesafe'").fetchone()

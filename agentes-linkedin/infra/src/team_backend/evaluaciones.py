@@ -202,6 +202,8 @@ def comment_request(run,post,revision=None):
     from . import experimentos
     inputs['referent_evidence']=experimentos.signals(post)
     inputs['comment_language']=operador.COMMENT_LANGUAGE
+    # What production would have shown then: his comments before this post was observed, never the one on this post.
+    inputs['recent_own_comments']=operador.recent_own_comments(post.account,before=post.observed_at,exclude_post=post)
     if revision:inputs['revision']=revision
     return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
             'output_schema':operador.COMMENT_SCHEMA,'effort':'medium','context':operador.course_block(units)},units
@@ -525,13 +527,13 @@ def run_verifier(run,cases,model,results):
                 'reglas':rules,'reparacion':repair,'esquema':schema_errors(first,editorial.VERIFIER_SCHEMA)[:5] if first else []}
     _each(cases,results,one)
 
-def _comment_rules(data,units):
+def _comment_rules(data,units,post):
     """The comment text and the rules a redraft can fix (autopiloto.comment_text_issues); the author cooldown is
     scheduling, not content, and is left out. None when the agent chose to skip."""
     text=(data.get('comment') or '').strip()
     if data.get('decision')!='comment' or not text:return None,[]
     known={u['unit_id'] for u in units}
-    draft=ActionProposal(capability=ActionProposal.Capability.COMMENT,payload={'text':text},source='agent',
+    draft=ActionProposal(capability=ActionProposal.Capability.COMMENT,post=post,payload={'text':text},source='agent',
                          citations=[c for c in data.get('citations',[]) if c in known],
                          risks=list(data.get('risks',[]))+[f'Afirmación por verificar: {c}' for c in data.get('claims_needing_evidence',[])])
     try:
@@ -545,13 +547,13 @@ def run_comments(run,cases,model,results):
         request,units=comment_request(run,post)
         data=run.claude('comentarios',request,model)
         out={'original':case['label'],'esperado':case['expected'],'esquema':schema_errors(data,operador.COMMENT_SCHEMA)[:5],'reescrito':False}
-        text,issues=_comment_rules(data,units)
+        text,issues=_comment_rules(data,units,post)
         if text and issues:
             # operador.propose_comment: one redraft naming the fixed rules the first draft broke.
             revision={'previous_comment':data['comment'],'rule_violations':issues,'claims_needing_evidence':list(data.get('claims_needing_evidence',[]))}
             data=run.claude('comentarios',comment_request(run,post,revision)[0],model)
             out.update(reescrito=True,reglas_primer_borrador=issues)
-            text,issues=_comment_rules(data,units)
+            text,issues=_comment_rules(data,units,post)
         if not text:return dict(out,nuevo='saltado',reglas=[],lider=None)
         lead=None
         if run.lead:

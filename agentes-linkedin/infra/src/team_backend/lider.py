@@ -47,13 +47,12 @@ def _noul(instructions,true=None,false=None):
 # (question id, minimum or maximum probability of «yes», label shown when it fails)
 CHECKS={
     'text':[('aporta','min',0.7,'no aporta una idea concreta'),('pitch','max',0.2,'suena a venta o pide contacto'),
-            ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso'),
-            ('idioma','min',0.7,'no está en inglés ni en el español de la publicación')],
+            ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso')],
+    # The language of comments and replies is a fixed rule (idioma.py): Jev misjudged «same language» on English texts.
     # INT-04: a reply on his own post answers what that person said and follows the post and the thread.
     'reply':[('responde','min',0.7,'no responde a lo que dijo la persona'),('hilo','min',0.6,'no sigue la línea del post y del hilo'),
              ('pitch','max',0.2,'suena a venta o propone conectar fuera de lugar'),
-             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso'),
-             ('idioma','min',0.7,'no está en el idioma del comentario')],
+             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso')],
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
     # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues; the lead weighs risk.
@@ -112,8 +111,6 @@ def _questions(proposal,orientation):
             'inventa':_noul('¿El `comentario` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿El `comentario` es respetuoso con el autor y con las demás personas, sin sarcasmo, burla ni ataque?'),
-            # Spanish is right when the post is in Spanish (Gustavo, 2026-11-12); the lead does not see the other comments.
-            'idioma':_noul('¿El `comentario` está escrito en inglés, o en español cuando la `publicacion` está en español?'),
         }
         kind='text'
     elif capability==CAP.REPLY:
@@ -137,7 +134,6 @@ def _questions(proposal,orientation):
             'inventa':_noul('¿La `respuesta` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿La `respuesta` es respetuosa con la persona y con las demás, sin sarcasmo, burla ni condescendencia?'),
-            'idioma':_noul('¿La `respuesta` está escrita en el mismo idioma que el texto de `comentario`?'),
         }
         kind='reply'
     elif capability==CAP.PUBLISH:
