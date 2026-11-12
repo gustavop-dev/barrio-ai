@@ -237,7 +237,7 @@ def system_blocks(system,context=None):
     return blocks
 
 class _Fallback(Exception):
-    """Anthropic refused the call before generating anything (account or availability); OpenAI may answer it."""
+    """Anthropic refused or dropped the call (account, availability or a connection cut); OpenAI may answer it."""
     def __init__(self,reason,error):
         super().__init__(reason);self.reason=reason;self.error=error
 
@@ -267,8 +267,8 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
            web_tools=None,request_hash=None,fallback=True):
     """`model` overrides ANTHROPIC_MODEL for one call (e.g. a cheaper classifier); it must have a verified price.
     `context` is stable text (str or list of str) sent after the instructions and cached with them.
-    When Anthropic refuses the call for its account or availability, the same call goes to OpenAI (`openai_text`), in
-    the same budget and ledger. Web research (native citations) and `fallback=False` (model evaluations) never do."""
+    When Anthropic refuses the call for its account or availability, or the connection drops (a timeout or a stream cut
+    mid-answer), the same call goes to OpenAI (`openai_text`), in the same budget and ledger. Web research (native citations) and `fallback=False` (model evaluations) never do."""
     model=claude_model(model)
     try:
         return _claude(system,message,max_tokens,output_schema,effort,purpose,model,context,web_tools,request_hash,
@@ -280,6 +280,7 @@ def claude(system,message,max_tokens=None,output_schema=None,effort=None,purpose
 
 def _claude(system,message,max_tokens,output_schema,effort,purpose,model,context,web_tools,request_hash,fallback):
     import anthropic
+    import httpx2  # the Anthropic SDK's transport: a stream cut mid-answer raises its errors, not httpx's
     key=live('anthropic')
     max_tokens=max_tokens or int(os.environ.get('ANTHROPIC_MAX_TOKENS','8000'))
     if not 1<=max_tokens<=64000:raise ValueError('max_tokens fuera de rango')
@@ -339,10 +340,13 @@ def _claude(system,message,max_tokens,output_schema,effort,purpose,model,context
         # An ambiguous 5xx may have been processed by Anthropic; OpenAI answering it costs at most one extra call.
         if reason:raise _Fallback(reason,error) from None
         raise ValueError(error) from None
-    except (anthropic.APIError,httpx.HTTPError) as exc:
-        # Includes timeouts: the request may have been processed and billed.
+    except (anthropic.APIError,httpx.HTTPError,httpx2.HTTPError) as exc:
+        # Includes timeouts and a stream cut mid-answer: the request may have been processed and billed.
         settle(rid,'uncertain',{'error_type':type(exc).__name__,'request_id':request_id})
-        raise ValueError('anthropic: respuesta incierta. Reserva retenida; revisar antes de repetir.') from None
+        error='anthropic: respuesta incierta. Reserva retenida; revisar antes de repetir.'
+        # Like an ambiguous 5xx: the Claude reserve stays uncertain and OpenAI answering costs at most one extra call.
+        if fallback:raise _Fallback('conexion',error) from None
+        raise ValueError(error) from None
     try:
         usage=message.usage
         tokens={'input_tokens':validate_token_count(usage.input_tokens),'output_tokens':validate_token_count(usage.output_tokens),

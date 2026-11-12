@@ -435,6 +435,7 @@ class CourseGroundingTests(NetworkBase):
         state,questions,checks=lider._questions(ActionProposal(capability='INT-03',post=post,payload={'text':'Great post! Buy now.'}),'')
         self.assertIn('LI-03-M006-K01',questions['pitch']['instructions'])
         self.assertIn('inglés',questions['idioma']['instructions'])
+        self.assertIn('español cuando la `publicacion` está en español',questions['idioma']['instructions'])  # Gustavo, 2026-11-12
         self.assertIn(('pitch','max',0.2,'suena a venta o pide contacto'),checks)
 
     def test_classifier_puts_course_in_stable_context_and_validates_citations(self):

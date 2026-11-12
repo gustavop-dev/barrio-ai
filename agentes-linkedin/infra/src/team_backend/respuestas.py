@@ -41,7 +41,7 @@ READ_CAPS={'posts':6,'comments':30,'threads':40,'people_posts':6}  # per local d
 MAX_TURNS=2  # public replies per person and thread
 MAX_DRAFTS=3  # paid drafts per comment: the first, one after Gustavo's answer, one retry after a provider failure
 REACTION='linkedin_like'
-REPLY_UNITS=operador.REPLY_UNITS  # B06/B14/B15, loaded whole from the library for every draft; no draft without them
+REPLY_UNITS=operador.REPLY_UNITS  # B06/B14/B15, loaded whole for every draft unless the catalog's «responder» core is active
 AGENT='relaciones_comunidad'
 OPEN=['proposed','approved','executing','sent','uncertain']
 WROTE=['confirmed','sent','uncertain']
@@ -509,7 +509,9 @@ def propose(user,comment_id,origin_job=''):
     if row.proposals.filter(state__in=OPEN).exists():raise Conflict('Ya hay una respuesta abierta para este comentario.')
     from knowledge import presupuesto
     if presupuesto.left(now)<=0:raise ValueError('Presupuesto de IA agotado (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD).')
-    units,missing,omitted=operador.course_context(REPLY_UNITS)
+    from . import catalogo
+    unit_ids,origin=catalogo.units_for('responder',REPLY_UNITS)  # the active catalog's core, else the fixed list
+    units,missing,omitted=operador.course_context(unit_ids)
     if missing or not units:raise ValueError('Biblioteca no disponible para fundamentar la respuesta.')
     # Every paid attempt counts (MAX_DRAFTS), also one that fails: a comment whose drafts keep failing stops being retried.
     row.decision=dict(row.decision or {},attempts=int((row.decision or {}).get('attempts',0))+1,drafted_at=now.isoformat())
@@ -530,7 +532,8 @@ def propose(user,comment_id,origin_job=''):
     if omitted:risks.append('Unidades omitidas por presupuesto de contexto: '+', '.join(omitted))
     decision=data.get('decision');common={'turn':inputs['turn'],'closing':closing,'model':answer['model'],'rationale':(data.get('rationale') or '')[:500],
                                           'language':(data.get('language') or '')[:10]}
-    _audit(user,'replies.drafted',row.id,decision=decision,turn=inputs['turn'],closing=closing,model=answer['model'])
+    _audit(user,'replies.drafted',row.id,decision=decision,turn=inputs['turn'],closing=closing,model=answer['model'],
+           course_source=origin,course_citations=[u['unit_id'] for u in units])
     if decision=='reply' and plain(data.get('reply')):
         opener=plain(data.get('dm_opener'))[:800] if closing else ''
         proposal=operador.create_proposal(user,None,REPLY,{'text':data['reply'].strip()},rationale=data.get('rationale',''),citations=citations,

@@ -21,6 +21,8 @@ class Command(BaseCommand):
         parser.add_argument('--ejecutar',action='store_true',help='Llamadas pagadas (requiere --max-usd y EVAL_LIMIT_USD)')
         parser.add_argument('--max-usd',type=_usd,help='Tope de gasto de esta corrida: se detiene antes de una llamada que pueda superarlo')
         parser.add_argument('--sin-lider',action='store_true',help='Comentarios: solo reglas deterministas, sin las preguntas del líder (Jev)')
+        parser.add_argument('--catalogo',help='Comentarios: unidades del curso a medir. Una versión del catálogo (en sombra, sin '
+                            'activarla) o «fijas» (las listas del código). Por defecto, las que carga producción.')
         parser.add_argument('--json',action='store_true',help='Imprime el informe en JSON')
         parser.add_argument('--salida',help='Además, escribe el informe JSON en esta ruta (dentro del servidor)')
 
@@ -29,7 +31,7 @@ class Command(BaseCommand):
         if o['ejecutar'] and o['max_usd'] is None:raise CommandError('--ejecutar requiere --max-usd.')
         try:
             report=evaluaciones.evaluate(agents,since=o['desde'],limit=o['limite'],models=o['modelo'],execute=o['ejecutar'],
-                                         max_usd=o['max_usd'],lead=not o['sin_lider'])
+                                         max_usd=o['max_usd'],lead=not o['sin_lider'],catalog=o['catalogo'])
         except ValueError as exc:raise CommandError(str(exc)) from None
         data=json.dumps(report,ensure_ascii=False,indent=2,default=str)
         self.stdout.write(data if o['json'] else evaluaciones.render(report))

@@ -7,7 +7,9 @@ Per agent, the case and the known outcome it is graded against:
                 or discarded by the policy. The selection's text goes through the production gate again (deterministic
                 rules, verifier, one repair round, rules and verifier once more) and its verdict is compared with the fate.
 - comentarios   posts that got an agent draft, with the fate of that draft. The new draft (with its one rules redraft,
-                as in production) is graded by the deterministic rules plus the lead's questions (Jev).
+                as in production) is graded by the deterministic rules plus the lead's questions (Jev). `catalog` picks
+                the course units: production's (the active catalog core or the fixed list), «fijas» or a catalog
+                version measured in shadow before it is activated (catalogo.py).
 - clasificador  classified contacts with a later signal: Gustavo discarded or vetoed them, or the lead discarded an
                 action for riesgo (no fit); the person accepted the invitation or commented on an own post (fit).
 - lectores      ablation: the selection is re-run with and without the stored panel, and the difference is
@@ -35,12 +37,13 @@ from django.utils import timezone
 from knowledge import db, memory, presupuesto, providers
 from knowledge.config import live
 from knowledge.ingest import ENC
-from . import autopiloto, editorial, guardas, lider, operador, orientacion, red, voz
-from .models import ActionProposal, AuditEvent, Contact, EditorialPiece, PostMetric
+from . import autopiloto, catalogo, editorial, guardas, lider, operador, orientacion, red, voz
+from .models import ActionProposal, AuditEvent, Contact, EditorialPiece, LibraryCatalog, PostMetric
 
 GO_LIVE=date(2026,11,6)  # the machine went live in production
 TARGET=(20,30)
 AGENTS=('verificador','comentarios','clasificador','lectores','director')
+FIXED='fijas'  # evaluar --catalogo fijas: the fixed lists in code, whatever catalog is active
 JEV='jev'  # --modelo jev: the classifier judged by Jev (audit C3): the lead's risk question plus a fit question
 TOKEN_FACTOR=1.2  # Claude's tokenizer counts ~15–20% more than cl100k (audit, «Costos»)
 # Typical output tokens (thinking included) when the ledger has no history for the production purpose.
@@ -191,14 +194,14 @@ def selection_request(run,piece,panel=True):
 def comment_request(run,post,revision=None):
     """operador._draft_comment without reading LinkedIn (existing_comments stays empty): instructions, voice and course
     units in cached system blocks; `revision` makes it the redraft after a rule violation."""
-    units,missing,_=run.context(operador.COMMENT_UNITS)
+    units,missing,_=run.context(run.units('comentar',operador.COMMENT_UNITS)[0])
     if missing:raise ValueError('Biblioteca no disponible para fundamentar el comentario.')
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     inputs={'post':{'author':post.author_name,'text':post.text,'url':post.share_url},'existing_comments':[],
             'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation}
     from . import experimentos
     inputs['referent_evidence']=experimentos.signals(post)
-    inputs['comment_language']='English; useful contribution, never an empty compliment or pitch.'
+    inputs['comment_language']=operador.COMMENT_LANGUAGE
     if revision:inputs['revision']=revision
     return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
             'output_schema':operador.COMMENT_SCHEMA,'effort':'medium','context':operador.course_block(units)},units
@@ -327,8 +330,8 @@ def _money(value):
 # --------------------------------------------------------------------------- run: context, caps and paid calls
 
 class Run:
-    def __init__(self,since,limit=TARGET[1],execute=False,max_usd=None,lead=True,now=None):
-        self.now=now or timezone.now();self.started=timezone.now()
+    def __init__(self,since,limit=TARGET[1],execute=False,max_usd=None,lead=True,now=None,catalog=None):
+        self.now=now or timezone.now();self.started=timezone.now();self.catalog=catalog
         self.since=datetime.combine(since or GO_LIVE,time(),tzinfo=operador.local_tz())
         self.limit=limit;self.execute=execute;self.max_usd=max_usd;self.lead=lead
         self.spent=Decimal(0);self.spend={};self.stopped='';self._units={}
@@ -341,6 +344,15 @@ class Run:
 
     def editorial_memory(self):
         return {'public_facts':self.public,'private_guidance':self.private,'orientation':self.orientation}
+
+    def units(self,shelf,fallback):
+        """(unit IDs, origin) as production would load them, or as `catalog` asks: «fijas» or a version in shadow."""
+        if self.catalog==FIXED:return list(fallback),'lista_fija'
+        if self.catalog:
+            ids=catalogo.core(shelf,self.catalog)
+            if not ids:raise ValueError(f'El catálogo {self.catalog} no tiene núcleo para {shelf}.')
+            return ids,f'catalogo:{self.catalog}'
+        return catalogo.units_for(shelf,fallback)
 
     def context(self,unit_ids,budget=operador.COURSE_TOKEN_BUDGET):
         key=(tuple(unit_ids),budget)
@@ -642,15 +654,17 @@ def _check_execution(agents,models,max_usd,lead):
     if any(m!=JEV for m in (models or ['claude'])) and paid:live('anthropic')
     if ('comentarios' in paid and lead) or ('clasificador' in paid and JEV in models):live('typesafe')
 
-def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,max_usd=None,lead=True,now=None):
+def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,max_usd=None,lead=True,now=None,catalog=None):
     """The report of one run. Without `execute` nothing is paid: cases, gap to the target and estimated costs."""
     agents=list(agents);models=list(models)
+    if catalog not in (None,FIXED) and not LibraryCatalog.objects.filter(version=catalog).exists():
+        raise ValueError(f'No hay catálogo {catalog}: usa una versión cargada (manage.py catalogo estado) o «{FIXED}».')
     unknown=set(agents)-set(AGENTS)
     if unknown:raise ValueError('Agentes desconocidos: '+', '.join(sorted(unknown)))
     if limit<1:raise ValueError('--limite debe ser al menos 1.')
     _check_models(models)
     if execute:_check_execution(agents,models,max_usd,lead)
-    run=Run(since,limit,execute,max_usd,lead,now)
+    run=Run(since,limit,execute,max_usd,lead,now,catalog)
     outputs,measured=typical_outputs()
     report={'modo':'ejecucion' if execute else 'ensayo','desde':run.since.date().isoformat(),'generado':run.now.isoformat(),
             'objetivo':list(TARGET),'salida_tipica':{'tokens':outputs,'medida_en_llamadas':measured},'agentes':{},'curso':course_preview(),
@@ -665,6 +679,7 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
                'faltan':{'para_20':max(0,TARGET[0]-len(found)),'para_30':max(0,TARGET[1]-len(found))},
                'ids':[{'id':c['id'],'etiqueta':c['label']} for c in cases]}
         if agent in ('verificador','clasificador'):entry['linea_base']=rate(c['baseline']==c['expected'] for c in found)
+        if agent=='comentarios':entry['unidades']=dict(zip(('ids','origen'),run.units('comentar',operador.COMMENT_UNITS)))
         if agent=='director':entry['descripcion']=describe_director(found,run)
         else:
             entry['modelo_produccion']=production_model(agent)
@@ -827,6 +842,7 @@ def render(report):
     for agent,entry in report['agentes'].items():
         out.append(f'{agent} · calificación {entry["calificacion"]}')
         out.append(f'  Casos: {entry["casos"]} ({_labels(entry["por_etiqueta"])}) · {_gap(entry)} · se usan {entry["usados"]}')
+        if 'unidades' in entry:out.append(f'  Unidades del curso: {entry["unidades"]["origen"]} ({len(entry["unidades"]["ids"])}: {", ".join(entry["unidades"]["ids"])})')
         if 'linea_base' in entry:out.append(f'  Línea base (lo que decidió en su día frente al desenlace): {_pct(entry["linea_base"])}')
         if 'error_estimacion' in entry:out.append(f'  Sin estimación de coste: {entry["error_estimacion"]}')
         if 'coste_estimado' in entry:

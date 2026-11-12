@@ -22,6 +22,8 @@ El historial empieza el 6 de noviembre de 2026, cuando la máquina entró en pro
 | lectores | Piezas con variantes, panel y selección guardados | Ablación: la selección se repite con el panel guardado y sin panel. La diferencia se compara con el ruido entre corridas (con panel frente a la selección guardada) | Cambio de decisión, ruido, similitud de textos y reglas violadas. El veredicto dice si el panel cambia la selección más que el ruido; con menos de 20 casos es solo orientativo |
 | director | Días con pieza escrita o saltada | Descriptivo: no hay un desenlace correcto conocido, así que no se llama al modelo ni hay juez | Días, saltos, mezcla de pilares y modalidades, destino de lo escrito y métricas (24 h, 72 h, 7 días) por pilar y modalidad cuando existen |
 
+En comentarios, `--catalogo` elige las unidades del curso que recibe el borrador: por defecto, las que carga producción (el núcleo del catálogo activo para «comentar» o, si no hay, la lista fija); `--catalogo fijas` fuerza la lista fija, y `--catalogo <versión>` mide una versión cargada en sombra, sin activarla. El informe dice qué unidades usó. Ver [catálogo de la biblioteca](catalogo-biblioteca.md).
+
 Las calificaciones son deterministas: tasas de acuerdo, validez del esquema y violaciones de las guardas. Las preguntas del líder en los comentarios son la compuerta de producción, no un juez externo. `--sin-lider` las quita. No hay un juez de modelo; si se añade, irá detrás de su propia bandera.
 
 Las respuestas inválidas no se ocultan: el esquema se valida aparte, y un caso que falla queda como error con su motivo.
