@@ -193,7 +193,7 @@ class OpportunityAndTurnTests(OperatorBase):
         profile_card=next(c for c in turn['items'] if c['id']==f'perfil:{profile.id}')
         self.assertEqual((profile_card['type'],profile_card['priority'],profile_card['profile_id']),
                          ('perfil','cuando_puedas',str(profile.id)))
-        self.assertEqual(turn['tasks'],{'perfil':[profile_card],'conversaciones':[],'resumen':[],'referentes':[setup]})
+        self.assertEqual(turn['tasks'],{'perfil':[profile_card],'conversaciones':[],'mensajes':[],'resumen':[],'referentes':[setup]})
         expiring=next(a for a in turn['alerts'] if a['id']=='linkedin_expiring')
         self.assertFalse(expiring['critical'])
 

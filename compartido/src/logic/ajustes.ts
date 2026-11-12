@@ -80,11 +80,12 @@ export function orientationUpdated(orientation: Pick<Orientation, 'updated_at' |
 
 // ---------------------------------------------------------------- Autonomía y límites
 
-export const CAPABILITY_ORDER = ['INT-03', 'INT-02', 'CONT-09', 'RED-01', 'RED-02', 'RED-04'] as const;
+export const CAPABILITY_ORDER = ['INT-03', 'INT-04', 'INT-02', 'CONT-09', 'RED-01', 'RED-02', 'RED-04'] as const;
 
 /** Names of DISENO-VISTAS 6.2 (mode table). */
 export const MODE_NAME: Record<string, string> = {
   'INT-03': 'Comentarios',
+  'INT-04': 'Respuestas en tus posts',
   'INT-02': 'Reacciones',
   'CONT-09': 'Publicación diaria',
   'RED-01': 'Seguir',
@@ -95,6 +96,7 @@ export const MODE_NAME: Record<string, string> = {
 /** Names of the cap meters. */
 export const CAP_NAME: Record<string, string> = {
   'INT-03': 'Comentarios',
+  'INT-04': 'Respuestas en tus posts',
   'INT-02': 'Reacciones',
   'CONT-09': 'Publicaciones',
   'RED-01': 'Seguir',

@@ -139,6 +139,14 @@
       "LI-02-V011-K03",
       "LI-02-V014-K06",
       "LI-02-V015-K02"
+    ],
+    "operador.REPLY_UNITS": [
+      "LI-03-M006-K02",
+      "LI-05-V005-K05",
+      "LI-06-V020-K01",
+      "LI-06-M003-K06",
+      "LI-06-M002-K09",
+      "LI-06-M002-K10"
     ]
   },
   "budgets": {
@@ -1352,9 +1360,10 @@
       "role": "orchestrator",
       "status": "active",
       "binding": "team_backend.operador.run_job",
-      "description": "Propone comentarios tras el prefiltro Jev. Una reescritura si incumple reglas de texto. Dueño de las instancias de red por subtrigger, con investigadores como herramientas.",
+      "description": "Propone comentarios tras el prefiltro Jev y responde los comentarios en los posts propios (INT-04) con el contexto del post, el hilo y quien comenta. Una reescritura si incumple reglas de texto. Dueño de las instancias de red por subtrigger, con investigadores como herramientas.",
       "skills": [
-        "Propone comentarios tras el prefiltro Jev"
+        "Propone comentarios tras el prefiltro Jev",
+        "Responde comentarios en los posts propios siguiendo el hilo"
       ],
       "tools": [
         "unipile_read",
@@ -1363,7 +1372,8 @@
         "evidencia_compartida"
       ],
       "course_lists": [
-        "operador.COMMENT_UNITS"
+        "operador.COMMENT_UNITS",
+        "operador.REPLY_UNITS"
       ],
       "course_units": [
         "LI-03-M006-K02",
@@ -1373,7 +1383,7 @@
         "LI-06-M002-K09",
         "LI-06-M002-K10"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Comentarios en posts ajenos: COMMENT_UNITS; respuestas en posts propios (INT-04): REPLY_UNITS.",
       "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
       "effort": "medium",
       "model_note": null,
@@ -1388,7 +1398,9 @@
       ],
       "activity": {
         "job_kinds": [
-          "propose_comment"
+          "propose_comment",
+          "read_own_comments",
+          "propose_reply"
         ],
         "event_roles": [
           "relaciones_comunidad"
@@ -4274,6 +4286,18 @@
           "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
         },
         {
+          "kind": "read_own_comments",
+          "cadence": "REPLIES_FRESH_EVERY_MINUTES (120 min) en las primeras 72 h de cada post propio; REPLIES_LATE_EVERY_MINUTES (720 min) hasta el día 7.",
+          "binding": "team_backend.autopiloto._replies",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "propose_reply",
+          "cadence": "Tick 60 s, un borrador pagado a la vez por comentario pendiente y cupo INT-04.",
+          "binding": "team_backend.autopiloto._replies",
+          "deduplication": "IDs deterministas del job por comentario; una propuesta abierta por comentario (one_open_action_per_comment)."
+        },
+        {
           "kind": "execute_action",
           "cadence": "Tick 60 s; aprobación y capacidad disponible.",
           "binding": "team_backend.autopiloto._execute",
@@ -4933,6 +4957,8 @@
     "job_roles": {
       "observe": "investigador_referentes",
       "propose_comment": "relaciones_comunidad",
+      "read_own_comments": "relaciones_comunidad",
+      "propose_reply": "relaciones_comunidad",
       "execute_action": "operador_cuenta",
       "reconcile_action": "operador_cuenta",
       "discover_network": "investigador_referentes",
@@ -4988,7 +5014,9 @@
       "plan_network",
       "prepare_piece",
       "propose_comment",
+      "propose_reply",
       "read_inbox",
+      "read_own_comments",
       "reconcile_action",
       "sync_network"
     ],
@@ -5056,7 +5084,8 @@
     },
     "comentario": {
       "capabilities": [
-        "INT-03"
+        "INT-03",
+        "INT-04"
       ],
       "cycle": "red",
       "producer": "relaciones_comunidad",
@@ -5067,7 +5096,7 @@
         "operador_cuenta"
       ],
       "conditions": [
-        "comment_text_issues y content_issues; el verificador editorial no revisa comentarios.",
+        "comment_text_issues y content_issues (INT-03); reply_text_issues y target_issues (INT-04); el verificador editorial no revisa comentarios.",
         "Jev condicionado por LEAD_ENABLED/capabilities; aprobación manual mantiene permisos.",
         "Veto y pausa de Gustavo; checks del operador antes de escribir."
       ],

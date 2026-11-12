@@ -12,8 +12,10 @@ import { ApproveButton, VetoButton } from './Veto';
 export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: string }) {
   const layer = itemLayer(item);
   const link = itemLink(item);
-  const excerptText = item.target?.post_excerpt;
-  const expandable = (item.capability === 'INT-03' || item.capability === 'INT-02') && Boolean(excerptText || item.text || item.rationale);
+  // A reply on his own post shows the comment it answers; a comment or reaction elsewhere, the post.
+  const excerptText = item.target?.kind === 'comment' ? item.target.comment_excerpt : item.target?.post_excerpt;
+  const writes = item.capability === 'INT-03' || item.capability === 'INT-04';
+  const expandable = (writes || item.capability === 'INT-02') && Boolean(excerptText || item.text || item.rationale);
   return (
     <TimelineItem
       layer={layer ?? undefined}
@@ -26,12 +28,12 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
       to={link?.to}
       linkLabel={link?.label}
       externalUrl={item.url}
-      expandLabel={item.capability === 'INT-03' ? 'Ver el comentario' : 'Ver el post'}
+      expandLabel={item.capability === 'INT-04' ? 'Ver la respuesta' : item.capability === 'INT-03' ? 'Ver el comentario' : 'Ver el post'}
     >
       {expandable ? (
         <>
           {excerptText ? <p className="cal-excerpt">{excerptText}</p> : null}
-          {item.capability === 'INT-03' && item.text ? <p className="cal-comment">{item.text}</p> : null}
+          {writes && item.text ? <p className="cal-comment">{item.text}</p> : null}
           {item.rationale ? (
             <details className="cal-why">
               <summary>Por qué</summary>

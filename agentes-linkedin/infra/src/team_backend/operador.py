@@ -21,7 +21,7 @@ from knowledge import memory, providers, retrieval
 from knowledge.ingest import ENC
 from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, get_connector, public_identifier, same_text
 from .exceptions import Conflict
-from .models import (OPEN_ACTION_STATES, ActionExecution, ActionProposal, ConnectorAccount, ObservedPost, Referent)
+from .models import (OPEN_ACTION_STATES, ActionExecution, ActionProposal, ConnectorAccount, ObservedPost, PostComment, Referent)
 from .permissions import require
 from . import orientacion, voz
 
@@ -37,6 +37,8 @@ ANALYSIS_UNITS=['LI-03-M004-K04','LI-03-V020-K05','LI-06-V006-K03','LI-06-V006-K
                 'LI-06-V007-K05','LI-06-V008-K01','LI-06-V008-K02']
 NETWORK_UNITS=['LI-03-M005-K05','LI-03-M005-K06','LI-03-V018-K02','LI-03-V018-K03','LI-03-V015-K01',
                'LI-03-V021-K02','LI-03-V021-K03','LI-03-M006-K01','LI-03-M006-K04']
+# INT-04 (catalog: B06 comments that add, B14 the reader's perspective, B15 editing, voice and facts).
+REPLY_UNITS=['LI-03-M006-K02','LI-05-V005-K05','LI-06-V020-K01','LI-06-M003-K06','LI-06-M002-K09','LI-06-M002-K10']
 INBOX_UNITS=['LI-03-V019-K03','LI-03-V019-K04','LI-03-V020-K01','LI-06-V006-K04']
 LEAD_UNITS=['LI-03-V020-K02','LI-03-M006-K01','LI-03-M005-K06','LI-06-M001-K04','LI-06-M001-K07']
 COURSE_VERSION='bib-v1'
@@ -57,7 +59,7 @@ def _audit(actor,action,target,**metadata):
 # --------------------------------------------------------------------------- policy
 
 # Prudent initial caps from reparto-acciones-v1 (not LinkedIn limits), per local day and week.
-DEFAULT_LIMITS={'INT-03':(5,25),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)}
+DEFAULT_LIMITS={'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)}
 
 def _parse_caps(variable):
     caps={}
@@ -246,7 +248,7 @@ def set_global_pause(user,paused,reason=''):
 
 def validate_payload(capability,payload):
     if not isinstance(payload,dict):raise ValueError('La acción requiere un objeto')
-    if capability==ActionProposal.Capability.COMMENT:
+    if capability in (ActionProposal.Capability.COMMENT,ActionProposal.Capability.REPLY):
         text=payload.get('text')
         if set(payload)!={'text'} or not isinstance(text,str) or not text.strip():raise ValueError('El comentario requiere texto')
         if len(text)>COMMENT_MAX_CHARS or '\x00' in text:raise ValueError(f'El comentario supera {COMMENT_MAX_CHARS} caracteres o contiene NUL')
@@ -285,13 +287,14 @@ def payload_hash(account_id,capability,target,payload):
                    sort_keys=True,ensure_ascii=False)
     return hashlib.sha256(raw.encode()).hexdigest()
 
-def target_of(post=None,piece=None,contact=None):
+def target_of(post=None,piece=None,contact=None,comment=None):
+    if comment is not None:return f'comment:{comment.provider_comment_id}'
     if post is not None:return post.provider_post_id
     if contact is not None:return f'user:{contact.provider_user_id}'
     return f'piece:{piece.id}'
 
 def current_hash(proposal):
-    return payload_hash(proposal.account_id,proposal.capability,target_of(proposal.post,proposal.piece,proposal.contact),proposal.payload)
+    return payload_hash(proposal.account_id,proposal.capability,target_of(proposal.post,proposal.piece,proposal.contact,proposal.comment),proposal.payload)
 
 # --------------------------------------------------------------------------- accounts and observation
 
@@ -411,25 +414,28 @@ def set_account_pause(account,reason,actor=None,notify=True):
 
 # --------------------------------------------------------------------------- proposals
 
-def create_proposal(user,post,capability,payload,rationale='',citations=(),risks=(),source='human',origin_job='',model='',previous=None,state=None,piece=None,contact=None):
+def create_proposal(user,post,capability,payload,rationale='',citations=(),risks=(),source='human',origin_job='',model='',previous=None,state=None,piece=None,contact=None,comment=None):
     require(user,'operate_linkedin')
     from .orquestacion import current
     if source=='agent' and not origin_job and current():
         from .models import CycleLedger
         origin_job=str(CycleLedger.objects.get(pk=current().id).job_id or '')
-    targets=(post is not None,piece is not None,contact is not None)
-    expected=(False,False,True) if capability in NETWORK else (False,True,False) if capability==ActionProposal.Capability.PUBLISH else (True,False,False)
+    targets=(post is not None,piece is not None,contact is not None,comment is not None)
+    on_comment=capability==ActionProposal.Capability.REPLY or (capability==ActionProposal.Capability.REACT and comment is not None)
+    expected=((False,False,False,True) if on_comment else (False,False,True,False) if capability in NETWORK else
+              (False,True,False,False) if capability==ActionProposal.Capability.PUBLISH else (True,False,False,False))
     if targets!=expected:
-        raise ValueError('CONT-09 se propone sobre una pieza propia; RED-* sobre una persona; INT-* sobre una publicación observada')
+        raise ValueError('CONT-09 se propone sobre una pieza propia; RED-* sobre una persona; INT-04 sobre un comentario de tu post; '
+                         'INT-* sobre una publicación observada')
     if piece and 'media' not in payload:
         from .imagenes import manifest
         payload=dict(payload,media=manifest(piece))
     payload=validate_payload(capability,payload) if state!=ActionProposal.State.DISCARDED else payload
-    account_id=(post or piece or contact).account_id
-    digest=payload_hash(account_id,capability,target_of(post,piece,contact),payload)
+    account_id=(post or piece or contact or comment).account_id
+    digest=payload_hash(account_id,capability,target_of(post,piece,contact,comment),payload)
     try:
         with transaction.atomic():
-            proposal=ActionProposal.objects.create(account_id=account_id,post=post,piece=piece,contact=contact,capability=capability,payload=payload,
+            proposal=ActionProposal.objects.create(account_id=account_id,post=post,piece=piece,contact=contact,comment=comment,capability=capability,payload=payload,
                 payload_hash=digest,rationale=rationale,citations=list(citations),risks=list(risks),source=source,
                 origin_job=origin_job,model=model,created_by=user,previous=previous,version=(previous.version+1 if previous else 1),
                 state=state or ActionProposal.State.PROPOSED)
@@ -442,12 +448,12 @@ def revise(user,proposal_id,payload,note=''):
     """Editing a proposal creates a new version; any earlier approval no longer applies."""
     require(user,'operate_linkedin')
     with transaction.atomic():
-        old=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
+        old=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact','comment').get(id=proposal_id)
         if old.state not in (ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED):
             raise Conflict('Solo se revisan propuestas aún no ejecutadas.')
         old.state=ActionProposal.State.SUPERSEDED;old.decision_note=note;old.save(update_fields=['state','decision_note'])
         return create_proposal(user,old.post,old.capability,payload,rationale=old.rationale,citations=old.citations,
-                               risks=old.risks,source='human',previous=old,piece=old.piece,contact=old.contact)
+                               risks=old.risks,source='human',previous=old,piece=old.piece,contact=old.contact,comment=old.comment)
 
 def approve(user,proposal_id,expected_hash,note=''):
     """Human decision on an exact version. Returns the execution job (enqueued)."""
@@ -526,6 +532,9 @@ def _finish(execution,state,actor,**fields):
     if state=='confirmed' and proposal.contact_id:
         from . import red
         red.on_confirmed(proposal,execution)
+    if state=='confirmed' and proposal.comment_id:
+        from . import respuestas
+        respuestas.on_confirmed(proposal,execution)
     if state in ('sent','confirmed') and proposal.piece_id and execution.wrote:
         from .imagenes import published
         published(proposal.piece,execution.started_at)
@@ -533,10 +542,11 @@ def _finish(execution,state,actor,**fields):
         # A publication LinkedIn refused (or never sent): the ideas behind it are not spent.
         from . import capturas
         capturas.release_ideas(proposal.piece,'LinkedIn no la publicó')
-    if state=='confirmed' and proposal.capability in (ActionProposal.Capability.PUBLISH,ActionProposal.Capability.COMMENT):
+    if state=='confirmed' and proposal.capability in (ActionProposal.Capability.PUBLISH,ActionProposal.Capability.COMMENT,ActionProposal.Capability.REPLY):
         from . import oficina_eventos
         oficina_eventos.emit('publicacion','operador_cuenta','linkedin',
-                             'Publicación propia' if proposal.capability==ActionProposal.Capability.PUBLISH else 'Comentario publicado')
+                             {ActionProposal.Capability.PUBLISH:'Publicación propia',ActionProposal.Capability.COMMENT:'Comentario publicado'}
+                             .get(proposal.capability,'Respuesta en tu post'))
     _audit(actor,'operator.execution_'+state,execution.proposal_id,external_id=execution.external_id,
            error_kind=execution.error_kind,http_status=execution.http_status)
     return execution
@@ -583,6 +593,9 @@ def final_write_gate(execution,proposal,user):
     if proposal.capability in NETWORK:
         from . import red
         issues.extend(red.execution_issues(proposal))
+    if proposal.comment_id:
+        from . import respuestas
+        issues.extend(respuestas.execution_issues(proposal))
     if issues:return _finish(execution,'failed',user,error_kind='policy_changed',note='; '.join(issues),wrote=False)
     return None
 
@@ -628,7 +641,7 @@ def execute(user,proposal_id):
     prepare_day_schedule()
     with transaction.atomic():
         policy_lock()
-        proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact').get(id=proposal_id)
+        proposal=ActionProposal.objects.select_for_update(of=('self',)).select_related('post','piece','contact','comment').get(id=proposal_id)
         existing=ActionExecution.objects.filter(proposal=proposal).first()
         if existing:return existing
         from .orquestacion import cycle_issues
@@ -659,6 +672,10 @@ def execute(user,proposal_id):
             # Reserve the preflight before creating an execution. Exhaustion leaves approval retryable.
             try:reserve_profile_read(account,'preflight')
             except ProfileReadCapReached as exc:raise OperatorBlocked(str(exc)) from exc
+        if proposal.comment_id:
+            from . import respuestas
+            issues=respuestas.execution_issues(proposal)
+            if issues:raise OperatorBlocked('; '.join(issues))
         reserve_spacing()
         execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
             idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
@@ -682,6 +699,9 @@ def execute(user,proposal_id):
         if proposal.capability in NETWORK:
             from . import red
             return red.execute_action(execution,proposal,connector,user)
+        if proposal.comment_id:
+            from . import respuestas
+            return respuestas.execute_action(execution,proposal,connector,user)
         if proposal.capability==ActionProposal.Capability.COMMENT:
             text=proposal.payload['text']
             # Protect against duplicates written manually or by an earlier unknown attempt.
@@ -730,7 +750,7 @@ def execute(user,proposal_id):
 def reconcile(user,proposal_id):
     """ADM-05: settle sent/uncertain/stale executions by reading LinkedIn. Never writes."""
     require(user,'operate_linkedin')
-    proposal=ActionProposal.objects.select_related('post','piece','contact','account').get(id=proposal_id)
+    proposal=ActionProposal.objects.select_related('post','piece','contact','comment','account').get(id=proposal_id)
     execution=ActionExecution.objects.filter(proposal=proposal).first()
     if not execution:raise Conflict('La propuesta no tiene ejecución que conciliar.')
     stale=execution.state=='executing' and execution.started_at<timezone.now()-STALE_EXECUTION
@@ -748,6 +768,9 @@ def reconcile(user,proposal_id):
     if proposal.capability in NETWORK:
         from . import red
         return red.reconcile_action(execution,proposal,connector,user,stale)
+    if proposal.comment_id:
+        from . import respuestas
+        return respuestas.reconcile_action(execution,proposal,connector,user,stale)
     post_id=proposal.post.provider_post_id
     if proposal.capability==ActionProposal.Capability.COMMENT:
         found=_find_own_comment(connector,post_id,proposal.payload['text'],execution.external_id or None)
@@ -992,6 +1015,15 @@ def _run_job(job):
         if job.kind=='propose_comment':
             proposal=_network_tool(job,lambda:propose_comment(user,params['post'],origin_job=str(job.id)))
             return 'complete',proposal.state,''
+        if job.kind=='read_own_comments':
+            from . import respuestas
+            r=respuestas.read(user,ConnectorAccount.objects.get(id=params['account']),origin_job=str(job.id))
+            oficina_eventos.job_done(job.kind,r)
+            return 'complete',f"nuevos:{r['new']} borradores:{r['to_draft']}"[:30],r['stopped']
+        if job.kind=='propose_reply':
+            from . import respuestas
+            r=respuestas.propose(user,params['comment'],origin_job=str(job.id))
+            return 'complete',r['decision'][:30],''
         if job.kind=='execute_action':
             execution=execute(user,params['proposal'])
             return ('complete' if execution.state!='failed' else 'failed'),execution.state,execution.note
@@ -1042,5 +1074,5 @@ def _run_job(job):
         return 'failed','failed','Tipo de trabajo desconocido.'
     except OperatorBlocked as exc:return 'failed','blocked',str(exc)
     except (Conflict,ValueError,ConnectorError) as exc:return 'failed','failed',str(getattr(exc,'detail',exc))
-    except (ConnectorAccount.DoesNotExist,ObservedPost.DoesNotExist,ActionProposal.DoesNotExist,KeyError):
+    except (ConnectorAccount.DoesNotExist,ObservedPost.DoesNotExist,ActionProposal.DoesNotExist,PostComment.DoesNotExist,KeyError):
         return 'failed','failed','Referencia inexistente en los parámetros del trabajo.'

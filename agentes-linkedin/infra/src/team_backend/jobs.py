@@ -51,6 +51,8 @@ OPERATION_PERMISSIONS={
     'advance_experiments':['operate_linkedin'],
     'observe':['operate_linkedin'],
     'propose_comment':['operate_linkedin','run_agents','use_paid_providers'],
+    'read_own_comments':['operate_linkedin'],
+    'propose_reply':['operate_linkedin','run_agents','use_paid_providers'],
     'execute_action':['execute_actions'],
     'reconcile_action':['operate_linkedin'],
     'prepare_piece':['operate_linkedin','run_agents','use_paid_providers'],
@@ -67,7 +69,7 @@ OPERATION_PERMISSIONS={
     'prepare_profile_assets':['operate_linkedin','run_agents','use_paid_providers'],
     'community_study':['operate_linkedin','run_agents','use_paid_providers'],
 }
-PAID_OPERATIONS=('propose_comment','prepare_piece','override_piece','classify_contacts','process_capture','read_inbox','weekly_summary','review_referents','community_study','prepare_profile','prepare_profile_assets')
+PAID_OPERATIONS=('propose_comment','propose_reply','prepare_piece','override_piece','classify_contacts','process_capture','read_inbox','weekly_summary','review_referents','community_study','prepare_profile','prepare_profile_assets')
 
 def enqueue_operation(user,kind,params,request_id=None,audit_request_id=''):
     """Queue an account-operator step with the same idempotency rules as agent runs."""

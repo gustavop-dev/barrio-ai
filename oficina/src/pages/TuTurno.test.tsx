@@ -6,7 +6,7 @@ import type { MemoryFact, TuTurno } from '../api/types';
 import { CaptureProvider } from '../capture/CaptureContext';
 import { turnoAnchor } from '../components/Layout';
 import { fakeServer, SESSION_OK, type Handler, type Reply } from '../test/fakeServer';
-import { cardFixture, CONVERSATION_CARD, dayAt, EXPIRING_CARD, factFixture, hoursFromNow, questionCard, questionFixture, turnoFixture as tuTurnoFixture, UNCERTAIN_CARD } from '../test/fixtures/turno';
+import { cardFixture, CONVERSATION_CARD, dayAt, EXPIRING_CARD, factFixture, hoursFromNow, MESSAGE_CARD, questionCard, questionFixture, turnoFixture as tuTurnoFixture, UNCERTAIN_CARD } from '../test/fixtures/turno';
 import { renderAt } from '../test/render';
 import { TuTurno as TuTurnoPage } from './TuTurno';
 import { PROFILE_CARD, PROFILE_PROPOSAL } from '../../../compartido/src/fixtures/perfil';
@@ -149,6 +149,24 @@ describe('Tu turno · Pendiente', () => {
     expect(api.find('POST', '/api/v1/operador/actions/a1/resolve')[0]!.body).toEqual({ outcome: 'confirmed', note: 'Aparece en el post' });
     expect(await screen.findByText('Anotado: se aplicó')).toBeInTheDocument();
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('shows a suggested message to copy and send himself from LinkedIn, and «Hecho, le escribí» closes it', async () => {
+    const api = server(busyTurno({ items: [MESSAGE_CARD], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [], mensajes: [MESSAGE_CARD] } }), {
+      'POST /api/v1/respuestas/pc-1/mensaje': { body: {} },
+    });
+    renderApp('/tu-turno');
+    const card = await cardTitled('Marta Ejemplo aceptó tu invitación');
+    const view = within(card);
+    expect(view.getAllByText('Mensaje sugerido').length).toBeGreaterThan(0);
+    expect(view.getByRole('link', { name: 'Marta Ejemplo' })).toHaveAttribute('href', '/personas/c-9');
+    expect(view.getByText('Lo que comentó en tu post')).toBeInTheDocument();
+    expect(view.getByText('Lo que le respondió el equipo')).toBeInTheDocument();
+    expect(view.getByTestId('suggested-message')).toHaveTextContent(MESSAGE_CARD.message!.text);
+    expect(view.getByRole('button', { name: 'Copiar' })).toBeInTheDocument();
+    expect(view.getByText('La app nunca envía mensajes: lo envías tú desde LinkedIn.')).toBeInTheDocument();
+    await userEvent.click(view.getByRole('button', { name: 'Hecho, le escribí' }));
+    await waitFor(() => expect(api.find('POST', '/api/v1/respuestas/pc-1/mensaje')[0]?.body).toEqual({ how: 'enviado' }));
   });
 
   it('shows a conversation that is his turn, opens the opportunity form prefilled and closes it with an optional reason', async () => {

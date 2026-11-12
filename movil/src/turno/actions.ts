@@ -13,6 +13,7 @@ export const TYPE_LABEL: Record<TurnoCardType, string> = {
   pregunta: 'Pregunta',
   perfil: 'Perfil',
   conversacion: 'Conversación',
+  mensaje: 'Mensaje sugerido',
   resumen: 'Resumen semanal',
   aprobacion: 'Aprobación',
 };
@@ -24,6 +25,7 @@ export const TYPE_ICON: Record<TurnoCardType, IconName> = {
   pregunta: 'pregunta',
   perfil: 'perfil',
   conversacion: 'conversacion',
+  mensaje: 'conversacion',
   resumen: 'resultados',
   aprobacion: 'check',
 };
@@ -39,6 +41,7 @@ export function typeTone(card: TurnoCard, priority: TurnoPriority | null): 'suav
 /** «Comprueba si salió tu comentario» for an uncertain action; the backend's title otherwise. */
 const UNCERTAIN_TITLE: Record<string, string> = {
   'INT-03': 'Comprueba si salió tu comentario',
+  'INT-04': 'Comprueba si salió tu respuesta',
   'INT-02': 'Comprueba si salió tu reacción',
   'CONT-09': 'Comprueba si salió tu publicación',
   'RED-01': 'Comprueba si se aplicó el seguimiento',
@@ -76,6 +79,7 @@ export function cardSummary(card: TurnoCard): string {
     const last = lastInbound(card);
     return last ? `“${messageText(last)}”` : (card.body ?? '');
   }
+  if (card.message) return `“${card.message.text}”`;
   if (card.attempt?.text) return `“${card.attempt.text}”`;
   if (card.approval?.text) return `“${card.approval.text}”`;
   if (card.question) return card.question.purpose || card.body || '';
@@ -91,19 +95,22 @@ export const SUMMARY_FITS = 90;
  */
 export function hasDetails(card: TurnoCard): boolean {
   if (card.profile_id) return cardSummary(card).length > SUMMARY_FITS;
-  if (card.referent_change || card.referent_experiment || card.attempt || card.conversation || card.approval) return true;
+  if (card.referent_change || card.referent_experiment || card.attempt || card.conversation || card.message || card.approval) return true;
   return cardSummary(card).length > SUMMARY_FITS;
 }
 
 export const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;
 export const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsWith('/resolve'));
 export const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
+/** «Hecho, le escribí» / «No escribirle» on a suggested message (INT-04): the team never sends it. */
+export const isMessageClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/respuestas/') && action.endpoint.endsWith('/mensaje'));
 export const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
 export const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
 
 export function successMessage(action: TurnoAction): string {
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
+  if (isMessageClose(action)) return action.body?.how === 'no' ? 'Anotado: no le escribirás' : 'Anotado: le escribiste';
   if (isApprove(action)) return APPROVED_MESSAGE;
   if (isReject(action)) return 'Vetada';
   if (isMachineResume(action)) return 'Máquina reanudada';
@@ -147,7 +154,11 @@ export function modalFor(action: TurnoAction, card?: TurnoCard): ModalSpec | nul
   if (action.note_optional) {
     return {
       title: action.label,
-      text: isConversationClose(action) ? 'La tarjeta sale de Tu turno hasta que te vuelva a escribir. Nadie le responde por ti.' : null,
+      text: isConversationClose(action)
+        ? 'La tarjeta sale de Tu turno hasta que te vuelva a escribir. Nadie le responde por ti.'
+        : isMessageClose(action)
+          ? 'La tarjeta sale de Tu turno. Nadie le escribe por ti.'
+          : null,
       note: 'optional',
       noteLabel: 'Motivo',
     };

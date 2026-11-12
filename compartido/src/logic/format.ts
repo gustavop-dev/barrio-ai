@@ -41,6 +41,7 @@ export function prettyValue(value: unknown): string {
 
 export const CAPABILITY_LABEL: Record<string, string> = {
   'INT-03': 'Comentario',
+  'INT-04': 'Respuesta en tu post',
   'INT-02': 'Reacción',
   'CONT-09': 'Publicación propia',
   'RED-01': 'Seguir',
@@ -198,6 +199,8 @@ export function contactSourceLabel(source: string, evidence: { referent?: string
   switch (source) {
     case 'commenter':
       return evidence?.referent ? `Comentó en un post de ${evidence.referent}` : 'Comentó en un post de un referente';
+    case 'own_post':
+      return 'Comentó en tu post';
     case 'search':
       return evidence?.query ? `Búsqueda: ${evidence.query}` : 'Búsqueda';
     case 'incoming':
@@ -233,6 +236,10 @@ export const CONTACT_EVENT_LABEL: Record<string, string> = {
   rejected: 'Acción vetada',
   incoming: 'Te invitó',
   note: 'Nota',
+  commented: 'Comentó en tu post',
+  replied: 'El equipo le respondió',
+  reacted: 'Reaccionaste a su comentario',
+  dm: 'Mensaje privado',
 };
 
 /** Autonomy mode of a capability, read as «Modo auto», «Modo aprobación», «Modo apagado». */

@@ -11,6 +11,7 @@ import { ComoSeEscribio } from './calendario/ComoSeEscribio';
 import { CALENDAR_TZ, longDay, todayIn } from './calendario/dates';
 import { finalTextNote, isOnItsWay, pieceLeaves, pieceWhen, pieceVetoable, preparationStages, publishedAt, stageShort } from './calendario/piece';
 import { Resultado } from './calendario/Resultado';
+import { PostComments } from './calendario/PostComments';
 import { PieceImages } from './calendario/PieceImages';
 import type { PieceDetailFull, TeamComment } from './calendario/types';
 import { useIsDesktop, useNow } from './calendario/useMedia';
@@ -188,6 +189,7 @@ export function PiezaDetalle() {
       <StatusNote piece={piece} label={`Pieza del ${day}`} />
 
       {piece.status === 'published' || piece.snapshots?.length ? <Resultado piece={piece} timeZone={timeZone} now={now} desktop={desktop} /> : null}
+      <PostComments comments={piece.comments} now={now} />
 
       {canVeto && piece.status === 'awaiting_approval' && piece.action?.payload_hash ? (
         <Section label="Aprobación" id="veto">

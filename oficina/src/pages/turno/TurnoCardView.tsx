@@ -7,7 +7,7 @@ import type { TurnoAction, TurnoCard, TurnoCardType, TurnoOpportunity, TurnoPrio
 import { turnoAnchor } from '../../components/Layout';
 import { APPROVED_MESSAGE } from '../calendario/events';
 import { IconAviso, IconCheck, IconConversacion, IconPerfil, IconPregunta, IconResultados } from '../../components/icons';
-import { AgentPortrait, Avatar, Badge, Button, ButtonLink, ConfirmModal, ErrorRetry, ExternalLink, isHttps, LabelChip, useToast } from '../../components/ui';
+import { AgentPortrait, Avatar, Badge, Button, ButtonLink, ConfirmModal, CopyButton, ErrorRetry, ExternalLink, isHttps, LabelChip, useToast } from '../../components/ui';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '../../lib/format';
 import { messageText } from '../personas/ConversationBlock';
 import { OportunidadForm } from '../personas/OportunidadForm';
@@ -22,6 +22,7 @@ const TYPE_LABEL: Record<TurnoCardType, string> = {
   pregunta: 'Pregunta',
   perfil: 'Perfil',
   conversacion: 'Conversación',
+  mensaje: 'Mensaje sugerido',
   resumen: 'Resumen semanal',
   aprobacion: 'Aprobación',
 };
@@ -33,6 +34,7 @@ const TYPE_ICON: Record<TurnoCardType, typeof IconAviso> = {
   pregunta: IconPregunta,
   perfil: IconPerfil,
   conversacion: IconConversacion,
+  mensaje: IconConversacion,
   resumen: IconResultados,
   aprobacion: IconCheck,
 };
@@ -48,6 +50,7 @@ function typeTone(card: TurnoCard, priority: TurnoPriority | null): string {
 /** «Comprueba si salió tu comentario» for an uncertain action; the backend's title otherwise. */
 const UNCERTAIN_TITLE: Record<string, string> = {
   'INT-03': 'Comprueba si salió tu comentario',
+  'INT-04': 'Comprueba si salió tu respuesta',
   'INT-02': 'Comprueba si salió tu reacción',
   'CONT-09': 'Comprueba si salió tu publicación',
   'RED-01': 'Comprueba si se aplicó el seguimiento',
@@ -68,12 +71,14 @@ const isInApp = (href: string) => href.startsWith('/') && !href.startsWith('//')
 const isMachineResume = (action: TurnoAction) => action.endpoint === '/api/v1/operador/control' && action.body?.paused === false;
 const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsWith('/resolve'));
 const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
+const isMessageClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/respuestas/') && action.endpoint.endsWith('/mensaje'));
 const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
 const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
 
 function successMessage(action: TurnoAction): string {
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
+  if (isMessageClose(action)) return action.body?.how === 'no' ? 'Anotado: no le escribirás' : 'Anotado: le escribiste';
   if (isApprove(action)) return APPROVED_MESSAGE;
   if (isReject(action)) return 'Vetada';
   if (isMachineResume(action)) return 'Máquina reanudada';
@@ -115,7 +120,11 @@ function modalFor(action: TurnoAction): ModalSpec | null {
   if (action.note_optional) {
     return {
       title: action.label,
-      text: isConversationClose(action) ? 'La tarjeta sale de Tu turno hasta que te vuelva a escribir. Nadie le responde por ti.' : null,
+      text: isConversationClose(action)
+        ? 'La tarjeta sale de Tu turno hasta que te vuelva a escribir. Nadie le responde por ti.'
+        : isMessageClose(action)
+          ? 'La tarjeta sale de Tu turno. Nadie le escribe por ti.'
+          : null,
       note: 'optional',
       noteLabel: 'Motivo',
     };
@@ -337,6 +346,47 @@ function ConversationBody({ card }: { card: TurnoCard }) {
   );
 }
 
+/** «Mensaje sugerido»: someone who conversed with the team on his post is now a connection. The team drafts a first
+ * private message; Gustavo copies it and sends it himself from LinkedIn. */
+function MessageBody({ card }: { card: TurnoCard }) {
+  const message = card.message!;
+  const person = message.person;
+  return (
+    <>
+      <div className="turno-person">
+        <Avatar name={person.display_name} size={40} />
+        <div className="turno-person-text">
+          <Link to={`/personas/${person.id}`}>{person.display_name}</Link>
+          {person.headline ? <p className="turno-meta">{person.headline}</p> : null}
+          {person.role ? (
+            <span className="turno-chips">
+              <LabelChip tone="info">{labelOf(CONTACT_ROLE_LABEL, person.role)}</LabelChip>
+            </span>
+          ) : null}
+        </div>
+      </div>
+      <div className="turno-block">
+        <p className="turno-label">Lo que comentó en tu post</p>
+        <blockquote className="quote">“{message.comment}”</blockquote>
+      </div>
+      {message.reply ? (
+        <div className="turno-block">
+          <p className="turno-label">Lo que le respondió el equipo</p>
+          <blockquote className="quote">“{message.reply}”</blockquote>
+        </div>
+      ) : null}
+      <div className="turno-block">
+        <p className="turno-label">Mensaje sugerido</p>
+        <p className="turno-body" data-testid="suggested-message">
+          {message.text}
+        </p>
+        <CopyButton text={message.text} data-testid="copy-suggested-message" />
+      </div>
+      <p className="turno-meta">La app nunca envía mensajes: lo envías tú desde LinkedIn.</p>
+    </>
+  );
+}
+
 function QuestionBody({ card }: { card: TurnoCard }) {
   const question = card.question!;
   const purpose = question.purpose || card.body;
@@ -415,6 +465,8 @@ export function TurnoCardView({ card, priority, isNew = false, observe }: TurnoC
         <Attempt card={card} />
       ) : card.conversation ? (
         <ConversationBody card={card} />
+      ) : card.message ? (
+        <MessageBody card={card} />
       ) : (
         <NoticeBody card={card} />
       )}
