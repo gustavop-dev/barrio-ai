@@ -246,9 +246,9 @@ class StatsTests(SummaryBase):
                                          'saltado_por_el_redactor':1,'vetado_por_gustavo':1},
             'lider':{'aprobados':1,'descartados':1},'posts_saltados_por_el_prefiltro':1})
         health={'rate':None,'mature':0,'accepted':0,'unknown':None,'reason':'Sin corte de salud guardado para esta ventana'}
-        rhythm={'weekly_target':50,'confirmed_social':{'INT-03':1,'INT-02':0,'RED-01':0,'RED-02':0,'RED-04':0},
+        rhythm={'weekly_target':50,'confirmed_social':{'INT-03':1,'INT-04':0,'INT-02':0,'RED-01':0,'RED-02':0,'RED-04':0},
             'own_pieces':3,'research_results':0,'unique_people':0,'useful_total':1,'deficit':49,
-            'limits':{'INT-03':(5,25),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)},
+            'limits':{'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)},
             'reason':'Objetivo gradual, no cuota. Faltantes dependen de encaje, material, presupuesto, salud y ventana; no se rellena.',
             'invitation_health':health,'source':'confirmed_executions_and_research_results'}
         # Contact history still reports network moves; the rhythm counts confirmed executions only.

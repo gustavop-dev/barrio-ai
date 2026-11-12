@@ -66,7 +66,7 @@ class ParticipationTests(NetworkBase):
         return people
 
     def test_defaults_weekends_and_invitation_hard_ceilings(self):
-        self.assertEqual(operador.limits(self.now),{'INT-03':(5,25),'INT-02':(20,100),'CONT-09':(1,7),
+        self.assertEqual(operador.limits(self.now),{'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),
             'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)})
         saturday=self.now+timedelta(days=5)
         self.assertEqual(operador.limits(saturday)['INT-03'],(2,25))
