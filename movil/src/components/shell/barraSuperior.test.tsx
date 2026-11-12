@@ -265,13 +265,14 @@ describe('the top bar on the real shell', () => {
     // The Oficina underneath ended 30 % to the left.
     expect(appliedFrame(screen.getByTestId('pantalla-index', { includeHiddenElements: true })).translateX).toBeCloseTo(-parallax, 0);
 
-    // First frame of the way back: the Oficina comes from 30 % to the left, from transparent.
+    // First frame of the way back: the Oficina comes from 30 % to the left, opaque: Tu turno is drawn over it (the tabs
+    // draw in the navigator's order) and uncovers it as it leaves.
     await act(async () => {
       router.back();
     });
     const returning = appliedFrame(screen.getByTestId('pantalla-index'));
     expect(returning.translateX).toBeCloseTo(-parallax, 0);
-    expect(returning.opacity).toBeCloseTo(0, 2);
+    expect(returning.opacity).toBeCloseTo(1, 2);
     await advance(TAB_MS);
     expectShown('index');
     // Tu turno left through the right edge.
