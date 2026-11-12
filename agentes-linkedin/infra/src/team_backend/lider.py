@@ -26,7 +26,7 @@ from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one 
 CRITERIA_DEL_BARRIO=_lead_criteria()
 LEAD_UNITS=operador.LEAD_UNITS
 CRITERION_SOURCES={
-    'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
+    'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
     'riesgo':['LI-03-M005-K06'],'tema':['LI-03-M005-K06'],
 }
@@ -49,6 +49,11 @@ CHECKS={
     'text':[('aporta','min',0.7,'no aporta una idea concreta'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso'),
             ('idioma','min',0.7,'no está en inglés')],
+    # INT-04: a reply on his own post answers what that person said and follows the post and the thread.
+    'reply':[('responde','min',0.7,'no responde a lo que dijo la persona'),('hilo','min',0.6,'no sigue la línea del post y del hilo'),
+             ('pitch','max',0.2,'suena a venta o propone conectar fuera de lugar'),
+             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso'),
+             ('idioma','min',0.7,'no está en el idioma del comentario')],
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
     # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues; the lead weighs risk.
@@ -77,7 +82,9 @@ def enabled():
     return os.environ.get('LEAD_ENABLED','false').lower()=='true'
 
 def capabilities():
-    return [c.strip() for c in os.environ.get('LEAD_CAPABILITIES',DEFAULT_CAPABILITIES).split(',') if c.strip()]
+    """INT-04 is always reviewed: Gustavo made its replies autonomous with the lead as their gate (12/11/2026)."""
+    listed=[c.strip() for c in os.environ.get('LEAD_CAPABILITIES',DEFAULT_CAPABILITIES).split(',') if c.strip()]
+    return listed+([CAP.REPLY.value] if CAP.REPLY.value not in listed else [])
 
 def applies(proposal):
     return enabled() and proposal.capability in capabilities()
@@ -108,6 +115,30 @@ def _questions(proposal,orientation):
             'idioma':_noul('¿El `comentario` está escrito en inglés?'),
         }
         kind='text'
+    elif capability==CAP.REPLY:
+        row=proposal.comment;piece=row.piece;decision=row.decision or {}
+        from .respuestas import _thread, _who
+        closing=bool(decision.get('closing'))
+        state={'publicacion':{'tesis':(piece.brief or {}).get('thesis') or '','texto':piece.final_text[:3000]},
+               'hilo':[{'quien':_who(r),'texto':r.text[:600]} for r in _thread(row).order_by('commented_at')[:12]],
+               'comentario':{'autor':row.author_name,'titular':(row.contact.headline[:300] if row.contact_id else ''),'texto':row.text[:1500]},
+               'respuesta':proposal.payload['text'],'turno':decision.get('turn',1)}
+        questions={
+            'responde':_noul('¿La `respuesta` responde a lo concreto que dijo la persona en `comentario` (su pregunta, su objeción o su '
+                             'aporte), en vez de un agradecimiento o una frase que serviría para cualquier comentario?',
+                             'Retoma lo que la persona dijo y le contesta o le suma algo','Es genérica, solo agradece o ignora lo que dijo'),
+            'hilo':_noul('¿La `respuesta` sigue la línea de la `publicacion` y del `hilo`, sin contradecir la tesis, cambiar de tema ni '
+                         'repetir lo que ya se dijo en el hilo?'),
+            'pitch':_noul('¿La `respuesta` vende, ofrece servicios, promociona la empresa de Gustavo, pide una reunión o una llamada'+
+                          (', o invita a seguir por privado?' if not closing else
+                           '? Proponer al final conectar o seguir la conversación por privado porque la conversación está interesante '
+                           'no cuenta como venta.')),
+            'inventa':_noul('¿La `respuesta` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
+                            'no aparece en `hechos_publicos_de_gustavo`?'),
+            'respeto':_noul('¿La `respuesta` es respetuosa con la persona y con las demás, sin sarcasmo, burla ni condescendencia?'),
+            'idioma':_noul('¿La `respuesta` está escrita en el mismo idioma que el texto de `comentario`?'),
+        }
+        kind='reply'
     elif capability==CAP.PUBLISH:
         state={'publicacion':proposal.payload['text']}
         asked=gustavo_request(proposal)
@@ -137,7 +168,7 @@ def _questions(proposal,orientation):
                            'cuenta falsa o alguien sin relación con producto, software, startups o negocio?'),
         }
         kind=capability
-    if kind in ('text','post'):
+    if kind in ('text','post','reply'):
         public,_=memory.confirmed_blocks()
         state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
     checks=list(CHECKS[kind])

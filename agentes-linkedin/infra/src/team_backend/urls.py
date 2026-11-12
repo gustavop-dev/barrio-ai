@@ -87,6 +87,8 @@ urlpatterns=[
  path('operador/actions/<uuid:pid>/resolve',op.ActionResolve.as_view()),
  # Inbox (docs/conversaciones-inbox.md): read-only; Gustavo closes the Tu turno card of a conversation.
  path('conversaciones/<uuid:cid>/cerrar',rv.ConversationClose.as_view()),
+ # INT-04 (docs/funcionalidades/respuestas.md): Gustavo closes the «Mensaje sugerido» card; the team never sends it.
+ path('respuestas/<uuid:cid>/mensaje',rv.SuggestedMessageClose.as_view()),
  # Weekly results summary of analista_barrio_resultados (docs/resumen-semanal.md).
  path('resultados/resumen-semanal',rs.WeeklySummaries.as_view()),path('resultados/resumen-semanal/generar',rs.WeeklySummaryGenerate.as_view()),
  path('resultados/resumen-semanal/<uuid:sid>',rs.WeeklySummaryDetail.as_view()),

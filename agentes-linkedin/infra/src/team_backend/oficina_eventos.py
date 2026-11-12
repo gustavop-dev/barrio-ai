@@ -55,12 +55,15 @@ def job_done(kind,result):
     elif kind=='read_inbox' and (r.get('flagged') or r.get('read')):
         detail=_count(r['flagged'],'conversación te toca','conversaciones te tocan') if r.get('flagged') else _count(r['read'],'conversación leída','conversaciones leídas')
         emit('entrega','conversaciones_inbox','',detail)
+    elif kind=='read_own_comments' and r.get('new'):
+        emit('entrega','relaciones_comunidad','',_count(r['new'],'comentario nuevo en tus posts','comentarios nuevos en tus posts'))
     elif kind=='collect_metrics' and (r.get('captured') or r.get('audience')=='creada'):
         parts=[_count(r['captured'],'corte','cortes')] if r.get('captured') else []
         detail=f"Métricas de {parts[0]} y la audiencia del día" if parts and r.get('audience')=='creada' else (f'Métricas de {parts[0]}' if parts else 'La audiencia del día')
         emit('entrega','analista_barrio_resultados','director_editorial',detail)
 
 LEAD_DRAFTERS={'INT-03':('relaciones_comunidad','Comentario aprobado por el líder','Comentario descartado por el líder'),
+               'INT-04':('relaciones_comunidad','Respuesta aprobada por el líder','Respuesta descartada por el líder'),
                'CONT-09':('director_editorial','Pieza aprobada por el líder','Pieza descartada por el líder')}
 NETWORK_DRAFT=('relaciones_comunidad','Acción de red aprobada por el líder','Acción de red descartada por el líder')
 

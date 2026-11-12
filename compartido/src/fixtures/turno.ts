@@ -300,3 +300,36 @@ export const CONVERSATION_CARD: TurnoCard = cardFixture({
     },
   },
 });
+
+/** INT-04: someone who conversed with the team on his post is now a connection; the team drafted a first message. */
+export const MESSAGE_CARD: TurnoCard = cardFixture({
+  id: 'dm:pc-1',
+  type: 'mensaje',
+  tone: 'info',
+  priority: 'importante',
+  state: 'nueva',
+  agent: 'relaciones_comunidad',
+  agent_label: 'Relaciones y comunidad',
+  title: 'Marta Ejemplo aceptó tu invitación',
+  body: 'Venían hablando de «Most feature requests arrive as a solution» en tu post. El equipo te dejó un primer mensaje; lo envías tú desde LinkedIn.',
+  created_at: hoursFromNow(-1),
+  actions: [
+    { label: 'Abrir su perfil', href: 'https://www.linkedin.com/in/marta-ejemplo', primary: true },
+    { label: 'Hecho, le escribí', endpoint: '/api/v1/respuestas/pc-1/mensaje', body: { how: 'enviado' } },
+    { label: 'No escribirle', endpoint: '/api/v1/respuestas/pc-1/mensaje', body: { how: 'no' }, note_optional: true },
+  ],
+  message: {
+    text: 'Marta, gracias por seguir la conversación del post. ¿Cómo lo están resolviendo en tu equipo hoy?',
+    comment: 'We ask customers for the problem first, but they still bring a feature list.',
+    reply: 'That list is still useful: we read it as symptoms and ask what broke the week before.',
+    piece_id: 'p7',
+    topic: 'Most feature requests arrive as a solution',
+    person: {
+      id: 'c-9',
+      display_name: 'Marta Ejemplo',
+      headline: 'Head of Product @ Ejemplo SaaS',
+      profile_url: 'https://www.linkedin.com/in/marta-ejemplo',
+      role: 'par',
+    },
+  },
+});

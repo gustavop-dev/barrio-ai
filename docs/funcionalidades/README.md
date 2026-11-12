@@ -24,6 +24,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [observatorio-referentes.md](observatorio-referentes.md) | `OBS` | Evidencia compartida OBS-03 disponible; investigación mensual y experimentos en siguientes fases |
 | [red.md](red.md) | `BAR` | Descubrir, clasificar, seguir, invitar y aceptar personas del barrio |
 | [comentarios-y-lider.md](comentarios-y-lider.md) | `COM` | Comentarios en posts de referentes y el agente líder que aprueba o descarta |
+| [respuestas.md](respuestas.md) | `RSP` | Respuestas solas a quien comenta en los posts propios (INT-04) y el «Mensaje sugerido» |
 | [inbox.md](inbox.md) | `INB` | Lectura del inbox de LinkedIn y conversaciones que le tocan a Gustavo |
 | [resumen-semanal.md](resumen-semanal.md) | `SEM` | El resumen de la semana del analista y su orientación propuesta |
 | [notificaciones-push.md](notificaciones-push.md) | `PUS` | Web Push de la PWA, push nativa de la app y sus interruptores |

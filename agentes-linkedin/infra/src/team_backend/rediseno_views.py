@@ -19,16 +19,16 @@ from .permissions import require
 from . import expo
 from .movil_views import devices_payload
 
-LABELS={'INT-03':'Comentario','INT-02':'Reacción','CONT-09':'Publicación','RED-01':'Seguimiento','RED-02':'Invitación sin nota',
-        'RED-04':'Invitación aceptada'}
-TYPES={'publicaciones':['CONT-09'],'comentarios':['INT-03'],'reacciones':['INT-02'],'red':['RED-01','RED-02','RED-04'],
+LABELS={'INT-03':'Comentario','INT-04':'Respuesta en tu post','INT-02':'Reacción','CONT-09':'Publicación','RED-01':'Seguimiento',
+        'RED-02':'Invitación sin nota','RED-04':'Invitación aceptada'}
+TYPES={'publicaciones':['CONT-09'],'comentarios':['INT-03','INT-04'],'respuestas':['INT-04'],'reacciones':['INT-02'],'red':['RED-01','RED-02','RED-04'],
        'seguimientos':['RED-01'],'invitaciones':['RED-02'],'aceptaciones':['RED-04']}
-ACTOR={'INT-03':'relaciones_comunidad','INT-02':'relaciones_comunidad','CONT-09':'director_editorial','RED-01':'relaciones_comunidad',
-       'RED-02':'relaciones_comunidad','RED-04':'relaciones_comunidad'}
+ACTOR={'INT-03':'relaciones_comunidad','INT-04':'relaciones_comunidad','INT-02':'relaciones_comunidad','CONT-09':'director_editorial',
+       'RED-01':'relaciones_comunidad','RED-02':'relaciones_comunidad','RED-04':'relaciones_comunidad'}
 STATE_LABELS={'confirmed':None,'executing':'En curso','sent':'En curso','uncertain':'Incierta','failed':'Fallida',
               'rejected':'Vetada por ti','discarded':'Descartada por la política','expired':'Caducada','superseded':'Sustituida'}
 NOT_DONE=('rejected','discarded','expired','superseded')
-COUNT_KEYS={'INT-03':'comments','INT-02':'reactions','RED-01':'follows','RED-02':'invites','RED-04':'accepts'}
+COUNT_KEYS={'INT-03':'comments','INT-04':'replies','INT-02':'reactions','RED-01':'follows','RED-02':'invites','RED-04':'accepts'}
 
 def local_day(value):
     return value.astimezone(operador.local_tz()).date() if value else None
@@ -146,7 +146,7 @@ def alerts(now=None):
                          [{'label':'Reconectar LinkedIn','href':'/api/v1/linkedin/oauth/start','primary':True}],deadline=status.get('expires_at'),
                          priority='importante' if days is not None and days<=3 else 'cuando_puedas',
                          expires_at=status.get('expires_at'),days_left=days))
-    for p in ActionProposal.objects.select_related('post','contact','execution').filter(state='uncertain').order_by('created_at'):
+    for p in ActionProposal.objects.select_related('post','contact','execution','comment__piece').filter(state='uncertain').order_by('created_at'):
         execution=getattr(p,'execution',None) if hasattr(p,'execution') else None
         target=_target(p)
         out.append(_card(f'uncertain:{p.id}','aviso','¿Salió o no?','El proveedor no confirmó si se aplicó. Comprueba en LinkedIn.',
@@ -204,14 +204,20 @@ def _summary_card(summary):
                           'titular':analysis.get('titular')})
 
 APPROVAL_TITLE={'RED-01':'¿Apruebas seguir a {name}?','RED-02':'¿Apruebas invitar a {name}?','RED-04':'¿Apruebas aceptar la invitación de {name}?',
-                'INT-03':'¿Apruebas el comentario en el post de {name}?','INT-02':'¿Apruebas la reacción al post de {name}?'}
+                'INT-03':'¿Apruebas el comentario en el post de {name}?','INT-02':'¿Apruebas la reacción al post de {name}?',
+                'INT-04':'¿Apruebas la respuesta a {name} en tu post?','INT-02:comment':'¿Apruebas la reacción al comentario de {name}?'}
 APPROVAL_SENTENCE={'RED-01':'Seguir a {name}','RED-02':'Invitar a {name} (sin nota)','RED-04':'Aceptar la invitación de {name}',
-                   'INT-03':'Comentario en el post de {name}','INT-02':'Reacción al post de {name}'}
+                   'INT-03':'Comentario en el post de {name}','INT-02':'Reacción al post de {name}',
+                   'INT-04':'Respuesta a {name} en tu post','INT-02:comment':'Reacción al comentario de {name} en tu post'}
+
+def approval_key(p):
+    """A reaction to a comment on his own post reads differently from a reaction to someone else's post."""
+    return f'{p.capability}:comment' if p.comment_id and p.capability=='INT-02' else p.capability
 
 def awaiting_approval():
     """Proposals that wait for Gustavo: still `proposed`, never executed, of a capability in `approval` mode (the policy
     leaves them alone, autopiloto.policy_review). Each is a Tu turno card and a row of the calendar's «En cola»."""
-    rows=ActionProposal.objects.select_related('post','piece','contact').filter(state='proposed',execution__isnull=True).order_by('created_at')
+    rows=ActionProposal.objects.select_related('post','piece','contact','comment__piece').filter(state='proposed',execution__isnull=True).order_by('created_at')
     return [p for p in rows if autopiloto.autonomy(p.capability)=='approval']
 
 def approval_expiry(p):
@@ -221,14 +227,14 @@ def approval_expiry(p):
 
 def approval_sentence(p):
     if p.capability=='CONT-09':return f'La pieza del {p.piece.slot_date:%d/%m}' if p.piece_id else 'Una publicación'
-    return APPROVAL_SENTENCE.get(p.capability,LABELS.get(p.capability,p.capability)+' · {name}').format(name=_target(p)['name'] or 'una persona')
+    return APPROVAL_SENTENCE.get(approval_key(p),LABELS.get(p.capability,p.capability)+' · {name}').format(name=_target(p)['name'] or 'una persona')
 
 def _approval_card(p):
     """«¿Apruebas seguir a Laura Gómez?» (importante): Aprobar sends the exact version (`expected_hash`); Vetar asks for
     a note and, on a network action, discards the person for good. A piece links to its detail, a person to her card."""
     target=_target(p)
     title=(f'¿Apruebas la pieza del {p.piece.slot_date:%d/%m}?' if p.piece_id else '¿Apruebas la publicación?') if p.capability=='CONT-09' else \
-        APPROVAL_TITLE.get(p.capability,'¿Apruebas esta acción?').format(name=target['name'] or 'esta persona')
+        APPROVAL_TITLE.get(approval_key(p),'¿Apruebas esta acción?').format(name=target['name'] or 'esta persona')
     actions=[{'label':'Aprobar','endpoint':f'/api/v1/operador/actions/{p.id}/approve','body':{'expected_hash':p.payload_hash},'primary':True},
              {'label':'Vetar','endpoint':f'/api/v1/operador/actions/{p.id}/reject','note_required':True}]
     if p.piece_id:actions.append({'label':'Ver la pieza','href':f'/calendario/pieza/{p.piece_id}'})
@@ -305,11 +311,13 @@ class TuTurno(APIView):
         monthly_cards=referent_cards(request.user,_card,now)
         monthly_later=[c for c in monthly_cards if c.get('state_override')=='pospuesta']
         monthly_cards=[c for c in monthly_cards if c.get('state_override')!='pospuesta']
-        tasks={'perfil':profile,'conversaciones':conversation_cards,'resumen':summary_cards,'referentes':monthly_cards}
+        from . import respuestas
+        message_cards=respuestas.cards(_card,now)
+        tasks={'perfil':profile,'conversaciones':conversation_cards,'mensajes':message_cards,'resumen':summary_cards,'referentes':monthly_cards}
         approval_cards=[_approval_card(p) for p in awaiting_approval()]
         question_cards=[_question_card(q,now) for q in pending]
         later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)+monthly_later
-        cards=warnings+question_cards+conversation_cards+summary_cards+approval_cards+profile+monthly_cards
+        cards=warnings+question_cards+conversation_cards+message_cards+summary_cards+approval_cards+profile+monthly_cards
         seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]
@@ -319,7 +327,7 @@ class TuTurno(APIView):
                                    'aprobaciones':len(approval_cards)},
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
-                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved(),
+                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved(),
                          'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
 
 class TuTurnoSeen(APIView):
@@ -346,6 +354,21 @@ class ConversationClose(APIView):
         get_or_404(Conversation,id=cid)
         conversation=conversaciones.close(request.user,cid,data['how'],note)
         return Response(conversaciones.payload(conversation))
+
+class SuggestedMessageClose(APIView):
+    """POST /api/v1/respuestas/<id>/mensaje {how: enviado | no, note?}: Gustavo closes the «Mensaje sugerido» card. The team
+    never sends it (INB-08): he sends it himself from LinkedIn and says so here."""
+    def post(self,request,cid):
+        human_session(request)
+        from . import respuestas
+        from .models import PostComment
+        data=request.data if isinstance(request.data,dict) else {}
+        note=data.get('note') or ''
+        if data.get('how') not in respuestas.CLOSE_HOW or not isinstance(note,str) or len(note)>1000:
+            raise ValidationError('how debe ser enviado o no; note, un texto de hasta 1000 caracteres')
+        get_or_404(PostComment,id=cid)
+        row=respuestas.close_dm(request.user,cid,data['how'],note)
+        return Response({'id':str(row.id),'closed':row.decision.get('dm_closed')})
 
 class Notifications(APIView):
     """GET /api/v1/notificaciones?filtro=todas|sin_leer: what is coming or happened, 7 days, with its read state."""
@@ -379,7 +402,7 @@ def _resolved_alerts(days=7):
     for event in AuditEvent.objects.filter(created_at__gte=since,action__in=['operator.execution_confirmed','operator.execution_failed','linkedin.connected',
                                                                         'operator.machine_resumed','operator.approved']).order_by('-created_at')[:50]:
         if event.action=='operator.approved':
-            proposal=ActionProposal.objects.select_related('post','piece','contact').filter(id=event.target).first()
+            proposal=ActionProposal.objects.select_related('post','piece','contact','comment__piece').filter(id=event.target).first()
             if proposal:out.append({'kind':'alert','id':f'approval:{event.target}','title':approval_sentence(proposal),'at':event.created_at,'how':'Aprobada'})
         elif event.action.startswith('operator.execution_'):
             execution=ActionExecution.objects.filter(proposal_id=event.target,note__startswith='Resolución humana').first()
@@ -491,6 +514,11 @@ def _target(p):
                 'role':(c.classification or {}).get('role')}
     if p.post_id:
         return {'kind':'post','name':p.post.author_name,'headline':'','url':p.post.share_url,'post_excerpt':(p.post.text or '')[:280]}
+    if p.comment_id:
+        from .respuestas import share_url
+        c=p.comment
+        return {'kind':'comment','name':c.author_name,'headline':'','url':share_url(c.piece),'comment_excerpt':(c.text or '')[:280],
+                'contact_id':str(c.contact_id) if c.contact_id else None,'piece_id':str(c.piece_id)}
     return {'kind':'own','name':'Tu perfil','headline':'','url':''}
 
 def _decided_by(p):
@@ -541,7 +569,7 @@ def upcoming(now=None):
     # What waits for Gustavo's approval comes first, with the exact version to approve and when it stops waiting.
     waiting=[dict(item(p),expected_at=None,awaiting_approval=True,payload_hash=p.payload_hash,expires_at=approval_expiry(p))
              for p in awaiting_approval() if not p.piece_id][:50]
-    queued=[dict(item(p),expected_at=expected,awaiting_approval=False) for p in ActionProposal.objects.select_related('post','piece','contact')
+    queued=[dict(item(p),expected_at=expected,awaiting_approval=False) for p in ActionProposal.objects.select_related('post','piece','contact','comment__piece')
             .filter(state='approved',execution__isnull=True,piece__isnull=True).order_by('created_at')[:50]]
     return {'pieces':pieces,'queued':waiting+queued}
 
@@ -549,7 +577,7 @@ class Activity(APIView):
     """Calendario → vista Lista: «Próximo» and every day with everything that happened, newest first."""
     def get(self,request):
         require(request.user,'operate_linkedin')
-        qs=ActionProposal.objects.select_related('post','piece','contact','execution')
+        qs=ActionProposal.objects.select_related('post','piece','contact','execution','comment__piece')
         kind=request.query_params.get('tipo')
         if kind and kind!='todo':
             if kind not in TYPES:raise NotFound('Tipo desconocido')
@@ -575,7 +603,7 @@ class Calendar(APIView):
     def get(self,request):
         require(request.user,'operate_linkedin')
         start,end,today=parse_range(request.query_params)
-        days={start+timedelta(days=i):{'counts':{'comments':0,'reactions':0,'follows':0,'invites':0,'accepts':0,'connections_fit':0},'events':[]}
+        days={start+timedelta(days=i):{'counts':{'comments':0,'replies':0,'reactions':0,'follows':0,'invites':0,'accepts':0,'connections_fit':0},'events':[]}
               for i in range((end-start).days+1)}
         lo,hi=day_bounds(start)[0],day_bounds(end)[1]
         def add(day,layer,kind,title,at=None,state=None,important=True,link=None,**extra):
@@ -593,7 +621,7 @@ class Calendar(APIView):
             add(piece.slot_date,'publicaciones',kind,card['thesis'] or 'Publicación del día',at=piece.scheduled_for,state=status,
                 link=f'/calendario/pieza/{piece.id}',ref=str(piece.id),impressions=card['impressions'],skip_reason=card['skip_reason'])
         # Executed actions: counts, plus the important ones (accepts, uncertain or failed)
-        for p in ActionProposal.objects.select_related('post','contact','execution').filter(execution__started_at__gte=lo,execution__started_at__lt=hi):
+        for p in ActionProposal.objects.select_related('post','contact','execution','comment__piece').filter(execution__started_at__gte=lo,execution__started_at__lt=hi):
             day=local_day(p.execution.finished_at or p.execution.started_at)
             if p.state=='confirmed' and p.capability in COUNT_KEYS and day in days:days[day]['counts'][COUNT_KEYS[p.capability]]+=1
             if p.state in ('uncertain','failed'):

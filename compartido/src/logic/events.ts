@@ -293,8 +293,11 @@ export function itemSentence(item: ActivityItem): string {
   switch (item.capability) {
     case 'INT-03':
       return name ? `Comentaste en el post de ${name}` : 'Comentaste en un post';
+    case 'INT-04':
+      return `Respondiste a ${name || 'un comentario'} en tu post`;
     case 'INT-02': {
       const reaction = reactionLabel(item.reaction);
+      if (item.target?.kind === 'comment') return `Reaccionaste${reaction ? ` ${reaction}` : ''} al comentario${name ? ` de ${name}` : ''} en tu post`;
       return `Reaccionaste${reaction ? ` ${reaction}` : ''} al post${name ? ` de ${name}` : ''}`;
     }
     case 'CONT-09': {
@@ -333,6 +336,7 @@ export function itemLink(item: ActivityItem): { to: string; label: string } | nu
   if (item.state === 'uncertain') return { to: `/tu-turno#${turnoAnchor(`uncertain:${item.id}`)}`, label: 'Resuélvela en Tu turno' };
   if (item.capability === 'CONT-09' && item.piece_id) return { to: `/calendario/pieza/${encodeURIComponent(item.piece_id)}`, label: 'Ver la pieza' };
   if (item.target?.kind === 'person' && item.target.contact_id) return { to: `/personas/${encodeURIComponent(item.target.contact_id)}`, label: 'Ver ficha' };
+  if (item.target?.kind === 'comment' && item.target.piece_id) return { to: `/calendario/pieza/${encodeURIComponent(item.target.piece_id)}`, label: 'Ver el post' };
   return null;
 }
 
@@ -364,8 +368,11 @@ export function queuedSentence(item: ActivityItem): string {
   switch (item.capability) {
     case 'INT-03':
       return name ? `Comentario en el post de ${name}` : 'Comentario en un post';
+    case 'INT-04':
+      return `Respuesta a ${name || 'un comentario'} en tu post`;
     case 'INT-02': {
       const reaction = reactionLabel(item.reaction);
+      if (item.target?.kind === 'comment') return `Reacción${reaction ? ` ${reaction}` : ''} al comentario${name ? ` de ${name}` : ''} en tu post`;
       return `Reacción${reaction ? ` ${reaction}` : ''} al post${name ? ` de ${name}` : ''}`;
     }
     case 'RED-01':

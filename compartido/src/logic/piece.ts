@@ -1,8 +1,9 @@
 // Shared wording for a piece: when it goes out, what it achieved and its editorial facts.
-import type { PieceCommenter, PieceDetail, PieceSnapshot } from '../api/types';
+import type { PieceComment, PieceComments, PieceCommenter, PieceCommentStatus, PieceDetail, PieceSnapshot } from '../api/types';
 import { dayOf, longDay, relativeDay, relativeDayInSentence, timeLeft } from './dates';
 import { label, MODALITY_LABEL, PILLAR_LABEL, readerLabel, STAGE_LABEL, vetoable } from './editorial';
 import { CONTACT_ROLE_LABEL, formatNumber, formatPct, formatTime } from './format';
+import type { Tone } from './tone';
 
 /** IMG-11: the veto covers the whole frozen piece, until its effective publication time. */
 export function pieceVetoable(piece: Pick<PieceDetail, 'action' | 'scheduled_for'>, now: number): boolean {
@@ -219,4 +220,39 @@ export const OVERRIDE_DONE = 'Bloqueo desestimado: el equipo la deja lista para 
 export function overrideConsequence(piece: { images?: readonly unknown[] | null }): string {
   const image = piece.images?.length ? '' : ' Antes, el equipo le prepara la imagen (tiene un coste pequeño).';
   return `Sale tal cual en su día y hora, con tu aprobación y sin pasar por el líder.${image} Aún podrás vetarla hasta su hora.`;
+}
+
+// ---------------------------------------------------------------- comments on the post (INT-04)
+
+/** Colour of what the team did with a comment: answered or reacted ok, a question to Gustavo warn, waiting info. */
+export const COMMENT_STATUS_TONE: Record<PieceCommentStatus, Tone> = {
+  tuyo: 'info',
+  equipo: 'ok',
+  pendiente: 'muted',
+  en_camino: 'info',
+  respondido: 'ok',
+  reaccion: 'ok',
+  pregunta: 'warn',
+  sin_respuesta: 'muted',
+};
+
+/** «3 comentarios · el equipo respondió 2»: the count of other people's comments and how many the team answered. */
+export function commentsSummary(comments: PieceComments): string {
+  const people = comments.count;
+  if (!people) return 'Nadie ha comentado todavía.';
+  const all: PieceComment[] = comments.threads.flatMap((thread) => [thread.comment, ...thread.answers]);
+  const answered = all.filter((comment) => comment.status === 'respondido').length;
+  const reacted = all.filter((comment) => comment.status === 'reaccion').length;
+  const parts = [`${people} ${people === 1 ? 'comentario' : 'comentarios'}`];
+  if (answered) parts.push(`el equipo respondió ${answered}`);
+  if (reacted) parts.push(`reaccionó a ${reacted}`);
+  return parts.join(' · ');
+}
+
+/** The team's answer still on its way (LinkedIn does not show it yet), as a line under the comment. */
+export function pendingReplyLabel(comment: PieceComment): string | null {
+  const reply = comment.reply;
+  if (!reply) return null;
+  if (reply.reaction) return 'El equipo reaccionó a este comentario';
+  return reply.text ? 'Respuesta del equipo' : null;
 }

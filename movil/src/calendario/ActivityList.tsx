@@ -25,8 +25,10 @@ import { ApproveButton, VetoButton } from './Veto';
 export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: string }) {
   const layer = itemLayer(item);
   const link = itemLink(item);
-  const excerptText = item.target?.post_excerpt;
-  const expandable = (item.capability === 'INT-03' || item.capability === 'INT-02') && Boolean(excerptText || item.text || item.rationale);
+  // A reply on his own post shows the comment it answers; a comment or reaction elsewhere, the post.
+  const excerptText = item.target?.kind === 'comment' ? item.target.comment_excerpt : item.target?.post_excerpt;
+  const writes = item.capability === 'INT-03' || item.capability === 'INT-04';
+  const expandable = (writes || item.capability === 'INT-02') && Boolean(excerptText || item.text || item.rationale);
   return (
     <TimelineItem
       testID={`actividad-${item.id}`}
@@ -39,7 +41,7 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
       to={link?.to}
       linkLabel={link?.label}
       externalUrl={item.url}
-      expandLabel={item.capability === 'INT-03' ? 'Ver el comentario' : 'Ver el post'}
+      expandLabel={item.capability === 'INT-04' ? 'Ver la respuesta' : item.capability === 'INT-03' ? 'Ver el comentario' : 'Ver el post'}
     >
       {expandable ? (
         <>
@@ -48,7 +50,7 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
               {excerptText}
             </T>
           ) : null}
-          {item.capability === 'INT-03' && item.text ? <T>{item.text}</T> : null}
+          {writes && item.text ? <T>{item.text}</T> : null}
           {item.rationale ? (
             <Fold summary="Por qué">
               <T variant="detalle">{item.rationale}</T>

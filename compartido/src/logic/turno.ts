@@ -78,6 +78,7 @@ export function activeCards(data: TuTurno, now: number = Date.now()): TurnoCard[
     ...(data.questions ?? []),
     ...(data.tasks?.perfil ?? []),
     ...(data.tasks?.conversaciones ?? []),
+    ...(data.tasks?.mensajes ?? []),
     ...(data.tasks?.resumen ?? []),
     ...(data.tasks?.referentes ?? []),
   ];
@@ -240,6 +241,7 @@ export function doneTodaySentence(done: Partial<DoneToday> | null | undefined): 
   const n = (key: keyof DoneToday) => (typeof done[key] === 'number' ? done[key]! : 0);
   if (n('posts')) parts.push(`publicó ${n('posts')} ${n('posts') === 1 ? 'post' : 'posts'}`);
   if (n('comments')) parts.push(`comentó en ${n('comments')}`);
+  if (n('replies')) parts.push(`respondió ${n('replies')} ${n('replies') === 1 ? 'comentario' : 'comentarios'} en tus posts`);
   if (n('reactions')) parts.push(`reaccionó a ${n('reactions')}`);
   if (n('follows')) parts.push(`siguió a ${n('follows')} ${n('follows') === 1 ? 'persona' : 'personas'}`);
   if (n('invites')) parts.push(`invitó a ${n('invites')} ${n('invites') === 1 ? 'persona' : 'personas'}`);

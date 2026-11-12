@@ -14,7 +14,7 @@ import uuid
 from collections import Counter
 from datetime import timedelta
 from decimal import Decimal
-from django.db.models import Q
+from django.db.models import Case, Q, When
 from django.utils import timezone
 from knowledge import db, memory
 from . import guardas, lider, oficina_eventos, operador, red
@@ -44,8 +44,9 @@ def setting(name,default):
     return os.environ.get(name,default)
 
 # Capabilities that existed when Gustavo chose the autonomous machine default to auto; any newer capability
-# (the network block RED-*) waits for human approval until OPERATOR_AUTONOMY lists it.
-AUTO_BY_DEFAULT=('INT-03','INT-02','CONT-09')
+# (the network block RED-*) waits for human approval until OPERATOR_AUTONOMY lists it. INT-04 (replies on his own posts)
+# is autonomous from the start by his decision (12/11/2026), with the lead as its gate.
+AUTO_BY_DEFAULT=('INT-03','INT-04','INT-02','CONT-09')
 
 def autonomy(capability):
     """OPERATOR_AUTONOMY='INT-03=auto,RED-01=approval'; modes auto | approval | off."""
@@ -86,6 +87,9 @@ def content_issues(proposal):
     """Deterministic gate replacing per-piece human approval. Returns reasons to discard."""
     if proposal.capability==ActionProposal.Capability.PUBLISH:return post_issues(proposal)
     if proposal.contact_id:return red.network_issues(proposal)
+    if proposal.comment_id:
+        from . import respuestas
+        return respuestas.content_issues(proposal)
     if proposal.capability!=ActionProposal.Capability.COMMENT:return []
     return comment_text_issues(proposal)+comment_author_issues(proposal)
 
@@ -182,7 +186,7 @@ def lead_reviews_per_tick():
 # --------------------------------------------------------------------------- the lead's silent inaction
 
 _silence_checked_at=None  # in-process throttle; the alert itself is deduplicated durably by Notification.ref
-ACTIVITY_TYPE={'INT-03':'comentarios','INT-02':'reacciones','CONT-09':'publicaciones'}
+ACTIVITY_TYPE={'INT-03':'comentarios','INT-04':'comentarios','INT-02':'reacciones','CONT-09':'publicaciones'}
 
 def _lead_silence_due(now):
     global _silence_checked_at
@@ -281,6 +285,8 @@ def tick(user,now=None):
         except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
         try:report['inbox']=report.get('inbox',0)+_inbox(user,account,now)
         except Exception as exc:report['inbox_error']=type(exc).__name__  # the inbox never stops the rest of the tick
+        try:report['replies']=report.get('replies',0)+_replies(user,account,now)
+        except Exception as exc:report['replies_error']=type(exc).__name__  # replies never stop the rest of the tick
         report['execute']+=_execute(user,account,now)
     report['reconcile']+=_reconcile(user,now)
     try:
@@ -429,6 +435,25 @@ def _inbox(user,account,now):
     _,created=enqueue_operation(user,'read_inbox',{'account':str(account.id)},request_id=_job_id('inbox',account.id,bucket))
     return int(created)
 
+def _replies(user,account,now):
+    """INT-04: read the comments on his recent own posts when one is due (respuestas.cadence), then one paid draft at a
+    time for the oldest comment waiting for one, while the INT-04 caps leave a slot after the replies already waiting."""
+    from . import respuestas
+    from knowledge import presupuesto
+    if not respuestas.enabled() or account.provider not in respuestas.PROVIDERS:return 0
+    queued=0
+    if respuestas.reading_due(account,now) and not _pending('read_own_comments',account=str(account.id)):
+        bucket=int(now.timestamp()//1800)
+        _,created=enqueue_operation(user,'read_own_comments',{'account':str(account.id)},request_id=_job_id('replies',account.id,bucket))
+        queued+=int(created)
+    if _pending('read_own_comments') or _pending('propose_reply'):return queued
+    if operador.capacity_left(account,'INT-04',now)-respuestas.open_replies(account)<=0 or presupuesto.left(now)<=0:return queued
+    row=respuestas.next_to_draft(account,now)
+    if row is None:return queued
+    attempt=int((row.decision or {}).get('attempts',0))
+    _,created=enqueue_operation(user,'propose_reply',{'comment':str(row.id)},request_id=_job_id('reply',row.id,attempt))
+    return queued+int(created)
+
 def _weekly_summary(user,now):
     """analista_barrio_resultados: on Monday after WEEKLY_SUMMARY_TIME, queue the summary of the week that just ended
     (resumen_semanal.queue: one per week, deterministic job id). Off with WEEKLY_SUMMARY_ENABLED=false."""
@@ -440,7 +465,9 @@ def _execute(user,account,now):
     if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0
     if _pending('execute_action'):return 0
     due=operador.post_due(now)  # a network action or comment now could push his post past its hour
-    for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(account=account,state='approved',execution__isnull=True).order_by('created_at'):
+    # A reply on his own post goes first: the person who commented is waiting, and its window counts from the comment.
+    first=Case(When(capability=ActionProposal.Capability.REPLY,then=0),default=1)
+    for proposal in ActionProposal.objects.select_related('post','piece','contact','comment').filter(account=account,state='approved',execution__isnull=True).order_by(first,'created_at'):
         if cycle_issues(proposal):continue
         if due and not proposal.piece_id:continue
         if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour

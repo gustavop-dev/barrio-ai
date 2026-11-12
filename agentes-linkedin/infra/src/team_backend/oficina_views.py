@@ -139,6 +139,7 @@ ROLES=['posicionamiento','perfil','investigador_referentes','investigador_lider'
        'editor_verificador','relaciones_comunidad','conversaciones_inbox','operador_cuenta']
 # Real work behind each implemented role. Roles without work here are contracts in design.
 JOB_ROLES={'prepare_profile_assets':'perfil','prepare_profile':'perfil','review_referents':'investigador_lider','advance_experiments':'investigador_lider','observe':'investigador_referentes','propose_comment':'relaciones_comunidad',
+           'read_own_comments':'relaciones_comunidad','propose_reply':'relaciones_comunidad',
            'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta',
            'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
            'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad',
@@ -146,6 +147,7 @@ JOB_ROLES={'prepare_profile_assets':'perfil','prepare_profile':'perfil','review_
            'weekly_summary':'analista_barrio_resultados','read_inbox':'conversaciones_inbox',
            'community_study':'analista_barrio_resultados'}
 DESCRIPTIONS={'prepare_profile_assets':'Preparando tus fotos y banner','prepare_profile':'Preparando tu propuesta de perfil','review_referents':'Revisando referentes del mes','advance_experiments':'Midiendo el experimento de referentes','observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
+              'read_own_comments':'Leyendo los comentarios de tus posts','propose_reply':'Redactando una respuesta en tu post',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
               'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día',
               'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',

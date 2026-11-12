@@ -121,6 +121,70 @@ describe('Detalle de una pieza', () => {
     expect(screen.getByText('Los comentarios aún no se han leído.')).toBeOnTheScreen();
   });
 
+  it('shows the conversation on the post: each comment, what the team did, and its replies', async () => {
+    server(
+      piece({
+        comments: {
+          count: 2,
+          read_at: '2026-11-07T18:00:00Z',
+          threads: [
+            {
+              id: 'pc-1',
+              comment: {
+                id: 'pc-1',
+                author: { name: 'Marta Ejemplo', profile_url: null, contact_id: 'c-9', headline: 'Head of Product', role: 'par' },
+                text: 'We ask customers for the problem first.',
+                at: '2026-11-07T15:00:00Z',
+                own: false,
+                status: 'respondido',
+                status_label: 'Respondido',
+                reply: null,
+                turn: 1,
+              },
+              answers: [
+                {
+                  id: 'pc-2',
+                  author: { name: 'Gustavo', profile_url: null, contact_id: null, headline: '', role: null },
+                  text: 'That list is still useful: we read it as symptoms.',
+                  at: '2026-11-07T16:00:00Z',
+                  own: true,
+                  status: 'equipo',
+                  status_label: 'Del equipo',
+                  reply: null,
+                  turn: null,
+                },
+              ],
+            },
+            {
+              id: 'pc-3',
+              comment: {
+                id: 'pc-3',
+                author: { name: 'Beto Prueba', profile_url: null, contact_id: null, headline: '', role: null },
+                text: 'Great post!',
+                at: '2026-11-07T17:00:00Z',
+                own: false,
+                status: 'reaccion',
+                status_label: 'Reacción',
+                reply: { text: null, reaction: 'linkedin_like', state: 'confirmed' },
+                turn: null,
+              },
+              answers: [],
+            },
+          ],
+        },
+      }),
+    );
+    await renderPieza();
+    expect(await screen.findByText('Conversación en el post')).toBeOnTheScreen();
+    expect(screen.getByText(/^2 comentarios · el equipo respondió 1 · reaccionó a 1/)).toBeOnTheScreen();
+    const first = screen.getByTestId('comentario-pc-1');
+    expect(within(first).getByText('Respondido')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('comentario-pc-2')).getByText('Tú')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('comentario-pc-3')).getByText('El equipo reaccionó a este comentario')).toBeOnTheScreen();
+    await fireEvent.press(within(first).getByText('Marta Ejemplo'));
+    expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/personas/[id]', params: { id: 'c-9' } });
+  });
+
   it('copies the final text and counts its characters', async () => {
     server(PUBLISHED);
     await renderPieza();

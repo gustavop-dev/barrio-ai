@@ -155,10 +155,11 @@ export interface Execution {
 }
 
 /**
- * INT-03 comment and INT-02 reaction on someone else's post; CONT-09 own publication; RED-01 follow,
- * RED-02 connection invitation without a note and RED-04 accepting a received invitation (network block).
+ * INT-03 comment and INT-02 reaction on someone else's post (or, INT-02, on a comment on his own post); INT-04 reply
+ * to a comment on his own post; CONT-09 own publication; RED-01 follow, RED-02 connection invitation without a note
+ * and RED-04 accepting a received invitation (network block).
  */
-export const CAPABILITIES = ['INT-03', 'INT-02', 'CONT-09', 'RED-01', 'RED-02', 'RED-04'] as const;
+export const CAPABILITIES = ['INT-03', 'INT-04', 'INT-02', 'CONT-09', 'RED-01', 'RED-02', 'RED-04'] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
 export const NETWORK_CAPABILITIES = ['RED-01', 'RED-02', 'RED-04'] as const;
@@ -200,7 +201,7 @@ export type ContactStage = 'candidate' | 'fit' | 'discarded' | 'followed' | 'inv
 /** Funnel order, used by the filter chips. */
 export const CONTACT_STAGES: readonly ContactStage[] = ['candidate', 'fit', 'followed', 'invited', 'connected', 'incoming', 'closed', 'discarded'];
 
-export type ContactSource = 'commenter' | 'search' | 'incoming' | 'manual';
+export type ContactSource = 'commenter' | 'own_post' | 'search' | 'incoming' | 'manual';
 
 export type NetworkDistance = 'FIRST_DEGREE' | 'SECOND_DEGREE' | 'THIRD_DEGREE' | 'OUT_OF_NETWORK' | '';
 
@@ -614,6 +615,39 @@ export interface PieceCommenter {
   fit: boolean | null;
 }
 
+/** What the team did with one comment on the published piece (INT-04). */
+export type PieceCommentStatus =
+  | 'tuyo' // Gustavo wrote it
+  | 'equipo' // the team's answer, as LinkedIn shows it
+  | 'pendiente' // read; the team is deciding
+  | 'en_camino' // drafted and approved; it goes out on the next write turn
+  | 'respondido'
+  | 'reaccion'
+  | 'pregunta' // the team asked Gustavo a fact in Tu turno to answer it
+  | 'sin_respuesta';
+
+export interface PieceComment {
+  id: string;
+  author: { name: string; profile_url: string | null; contact_id: string | null; headline: string; role: string | null };
+  text: string;
+  at: string | null;
+  own: boolean;
+  status: PieceCommentStatus;
+  status_label: string;
+  /** The team's answer while LinkedIn does not show it yet as a comment in the thread. */
+  reply: { text: string | null; reaction: string | null; state: string } | null;
+  /** 1 or 2: the public reply this comment gets (never a third). */
+  turn: number | null;
+}
+
+/** The comments of a published piece by thread, each with what the team did (INT-04). */
+export interface PieceComments {
+  threads: { id: string; comment: PieceComment; answers: PieceComment[] }[];
+  /** Comments by other people. */
+  count: number;
+  read_at: string | null;
+}
+
 export interface PieceDetail extends PieceSummary {
   brief: Brief;
   variants: Variants;
@@ -631,6 +665,8 @@ export interface PieceDetail extends PieceSummary {
   snapshots?: PieceSnapshot[];
   /** Who commented; null when the comments were never read. */
   commenters?: PieceCommenter[] | null;
+  /** The comments and the team's replies (INT-04); null when the team never read them. */
+  comments?: PieceComments | null;
 }
 
 export interface PlanResponse {
@@ -744,8 +780,18 @@ export interface Activity {
 
 // ---------------------------------------------------------------- Tu turno
 
-/** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados). */
-export type TurnoCardType = 'aviso' | 'pregunta' | 'perfil' | 'conversacion' | 'resumen' | 'aprobacion' | 'referente' | 'experimento';
+/** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados).
+ *  `mensaje`: someone who conversed on his post is now a connection; a drafted first message he sends himself (INT-04). */
+export type TurnoCardType =
+  | 'aviso'
+  | 'pregunta'
+  | 'perfil'
+  | 'conversacion'
+  | 'mensaje'
+  | 'resumen'
+  | 'aprobacion'
+  | 'referente'
+  | 'experimento';
 export type TurnoTone = 'bad' | 'warn' | 'info' | 'ok' | 'muted';
 
 /** A card action: either a POST (`endpoint` + `body`, plus `note` when `note_required`) or a full navigation (`href`). */
@@ -782,13 +828,25 @@ export interface TurnoPerson {
   modality: string | null;
 }
 
+/** The «Mensaje sugerido» of a `mensaje` card: the team never sends it (INB-08); Gustavo copies it and sends it himself. */
+export interface TurnoMessage {
+  text: string;
+  /** What the person commented, and the team's last public reply to them. */
+  comment: string;
+  reply: string;
+  piece_id: string;
+  /** The thesis of the post they talked about. */
+  topic: string;
+  person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
+}
+
 /** What an `uncertain` action tried to do. */
 export interface TurnoAttempt {
   capability: Capability | string;
   label: string;
   text: string | null;
   reaction: string | null;
-  target: { kind: 'post' | 'person' | 'own'; name: string; url: string | null } | null;
+  target: { kind: 'post' | 'person' | 'own' | 'comment'; name: string; url: string | null } | null;
   at: string | null;
   url: string | null;
 }
@@ -831,6 +889,8 @@ export interface TurnoCard {
   question?: Question | null;
   /** Only on conversation cards. */
   conversation?: (Conversation & { person: TurnoPerson | null }) | null;
+  /** Only on `mensaje` cards. */
+  message?: TurnoMessage | null;
   /** Only on approval cards. */
   approval?: TurnoApproval | null;
   /** rev 18 priority group (being added to the backend). */
@@ -854,6 +914,8 @@ export interface TurnoRecent {
 export interface DoneToday {
   posts: number;
   comments: number;
+  /** INT-04 replies to comments on his own posts (older backends omit it). */
+  replies?: number;
   reactions: number;
   follows: number;
   invites: number;
@@ -873,7 +935,13 @@ export interface TuTurno {
   questions: TurnoCard[];
   /** Postponed or expired questions (muted tone). */
   later: TurnoCard[];
-  tasks: { perfil: TurnoCard[]; conversaciones: TurnoCard[]; resumen?: TurnoCard[]; referentes?: TurnoCard[] };
+  tasks: {
+    perfil: TurnoCard[];
+    conversaciones: TurnoCard[];
+    mensajes?: TurnoCard[];
+    resumen?: TurnoCard[];
+    referentes?: TurnoCard[];
+  };
   recent: TurnoRecent[];
   summary: { done_today: DoneToday; next_piece: { id: string; scheduled_for: string } | null };
   /** Unread items in Notificaciones, for the bell dot (being added to the backend). */
@@ -1011,6 +1079,8 @@ export interface CalendarEvent {
 
 export interface CalendarDayCounts {
   comments: number;
+  /** INT-04 replies to comments on his own posts (older backends omit it). */
+  replies?: number;
   reactions: number;
   follows: number;
   invites: number;
@@ -1050,11 +1120,14 @@ export interface ActividadFilters {
 }
 
 export interface ActivityTarget {
-  kind: 'post' | 'person' | 'own';
+  /** `comment`: a comment on his own post (INT-04 reply, INT-02 reaction to the comment). */
+  kind: 'post' | 'person' | 'own' | 'comment';
   name: string;
   headline?: string | null;
   url?: string | null;
   post_excerpt?: string | null;
+  comment_excerpt?: string | null;
+  piece_id?: string | null;
   contact_id?: string | null;
   role?: string | null;
 }

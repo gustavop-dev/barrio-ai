@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.6-retoque-por-comentario` · SHA-256 `90551f9c0e0323f78b2d7cc65df6d8240210c4ac8f49e43f50ca3978420588cd`.
+Versión `6.6-retoque-por-comentario` · SHA-256 `0f25bc831b975ca15fe89ba545d518608aa71a543a14c962dcebaa071ab33a54`.
 
 46 nodos (46 activos), 72 aristas y 15 ciclos.
 
@@ -250,6 +250,8 @@ Estado: `active`. Orquestador: `relaciones_comunidad`.
 - `plan_network`: NETWORK_PLAN_EVERY_MINUTES (60 min).
 - `sync_network`: NETWORK_SYNC_EVERY_MINUTES (360 min).
 - `propose_comment`: Tick 60 s, hasta un borrador por tick y cupo disponible.
+- `read_own_comments`: REPLIES_FRESH_EVERY_MINUTES (120 min) en las primeras 72 h de cada post propio; REPLIES_LATE_EVERY_MINUTES (720 min) hasta el día 7.
+- `propose_reply`: Tick 60 s, un borrador pagado a la vez por comentario pendiente y cupo INT-04.
 - `execute_action`: Tick 60 s; aprobación y capacidad disponible.
 - `reconcile_action`: Hasta 3 por tick; bucket de una hora.
 
@@ -291,8 +293,8 @@ flowchart TD
 
 Bucle `comentario_actual` (active, máximo 2 rondas): Un borrador y una reescritura de reglas; no especialistas entre sí.
 
-Gate `comentario` (INT-03): lider_jev → gustavo → operador_cuenta.
-- comment_text_issues y content_issues; el verificador editorial no revisa comentarios.
+Gate `comentario` (INT-03, INT-04): lider_jev → gustavo → operador_cuenta.
+- comment_text_issues y content_issues (INT-03); reply_text_issues y target_issues (INT-04); el verificador editorial no revisa comentarios.
 - Jev condicionado por LEAD_ENABLED/capabilities; aprobación manual mantiene permisos.
 - Veto y pausa de Gustavo; checks del operador antes de escribir.
 

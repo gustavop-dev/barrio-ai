@@ -13,7 +13,7 @@ import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { Icon } from '@/components/icons';
-import { AgentPortrait, Avatar, Badge, Button, Card, ConfirmSheet, ErrorRetry, LabelChip, T, useToast, type ButtonVariant } from '@/components/ui';
+import { AgentPortrait, Avatar, Badge, Button, Card, ConfirmSheet, CopyButton, ErrorRetry, LabelChip, T, useToast, type ButtonVariant } from '@/components/ui';
 import { isHttps, openLink } from '@/navigation';
 import { haptic } from '@/theme/motion';
 import { colors, space } from '@/theme/tokens';
@@ -277,6 +277,64 @@ function ConversationDetails({ card }: { card: TurnoCardData }) {
   );
 }
 
+/** «Mensaje sugerido» (INT-04): who, what they talked about on his post, and the drafted first message to copy. */
+function MessageDetails({ card }: { card: TurnoCardData }) {
+  const message = card.message!;
+  const person = message.person;
+  return (
+    <>
+      <View style={styles.person}>
+        <Avatar name={person.display_name} />
+        <View style={styles.personText}>
+          <Pressable accessibilityRole="link" onPress={() => router.push({ pathname: '/personas/[id]', params: { id: person.id } })}>
+            <T color={colors.brandDeep}>{person.display_name}</T>
+          </Pressable>
+          {person.headline ? (
+            <T variant="detalle" soft>
+              {person.headline}
+            </T>
+          ) : null}
+          {person.role ? (
+            <View style={styles.chips}>
+              <LabelChip tone="info">{labelOf(CONTACT_ROLE_LABEL, person.role)}</LabelChip>
+            </View>
+          ) : null}
+        </View>
+      </View>
+      <View style={styles.block}>
+        <T variant="etiqueta" soft>
+          Lo que comentó en tu post
+        </T>
+        <Quote>{message.comment}</Quote>
+        {message.reply ? (
+          <>
+            <T variant="etiqueta" soft>
+              Lo que le respondió el equipo
+            </T>
+            <Quote>{message.reply}</Quote>
+          </>
+        ) : null}
+      </View>
+      <View style={styles.block}>
+        <T variant="etiqueta" soft>
+          Mensaje sugerido
+        </T>
+        <View style={styles.quote}>
+          <T selectable testID="suggested-message">
+            {message.text}
+          </T>
+        </View>
+        <View style={styles.chips}>
+          <CopyButton text={message.text} testID="copy-suggested-message" />
+        </View>
+      </View>
+      <T variant="detalle" soft>
+        La app nunca envía mensajes: lo envías tú desde LinkedIn.
+      </T>
+    </>
+  );
+}
+
 /** Everything a card rests on, under «Ver más». */
 function CardDetails({ card }: { card: TurnoCardData }) {
   if (card.referent_change || card.referent_experiment) return <ReferentDetails card={card} />;
@@ -293,6 +351,7 @@ function CardDetails({ card }: { card: TurnoCardData }) {
   }
   if (card.attempt) return <AttemptDetails card={card} />;
   if (card.conversation) return <ConversationDetails card={card} />;
+  if (card.message) return <MessageDetails card={card} />;
   if (card.approval) return <ApprovalDetails card={card} />;
   const text = noticeText(card);
   return text ? <T>{text}</T> : null;

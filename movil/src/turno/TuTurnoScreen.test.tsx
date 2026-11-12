@@ -1,6 +1,6 @@
 // Tu turno: groups by priority, Nueva/Vista, «Más tarde», card actions with and without a note,
 // empty, loading and error states, and the swipe actions.
-import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, questionCard, turnoFixture, UNCERTAIN_CARD } from '@compartido/fixtures/turno';
+import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, MESSAGE_CARD, questionCard, turnoFixture, UNCERTAIN_CARD } from '@compartido/fixtures/turno';
 import { PROFILE_CARD, PROFILE_PROPOSAL } from '@compartido/fixtures/perfil';
 import { EXPERIMENT_CARD, MONTHLY_CARD, REFERENTS_SETUP_CARD } from '@compartido/fixtures/referentes';
 import type { TuTurno } from '@compartido/api/types';
@@ -135,6 +135,21 @@ describe('Tu turno', () => {
     expect(within(card).queryByTestId(`turno-summary-${CONVERSATION_CARD.id}`)).toBeNull();
     await fireEvent.press(within(card).getByText('Ver menos'));
     expect(within(card).queryByText('Por qué importa')).toBeNull();
+  });
+
+  it('shows a suggested message to copy and send himself, and «Hecho, le escribí» closes it', async () => {
+    const server = await renderTurno(turnoFixture({ count: 1, items: [MESSAGE_CARD] }), { 'POST /api/v1/respuestas/pc-1/mensaje': { body: {} } });
+    const card = await screen.findByTestId(`turno-card-${MESSAGE_CARD.id}`);
+    expect(within(card).getByText('Mensaje sugerido')).toBeOnTheScreen();
+    expect(within(card).getByText('Marta Ejemplo aceptó tu invitación')).toBeOnTheScreen();
+    await fireEvent.press(within(card).getByTestId(`turno-more-${MESSAGE_CARD.id}`));
+    expect(within(card).getByText('Lo que comentó en tu post')).toBeOnTheScreen();
+    expect(within(card).getByText('Lo que le respondió el equipo')).toBeOnTheScreen();
+    expect(within(card).getByTestId('suggested-message')).toHaveTextContent(MESSAGE_CARD.message!.text);
+    expect(within(card).getByTestId('copy-suggested-message')).toBeOnTheScreen();
+    expect(within(card).getByText('La app nunca envía mensajes: lo envías tú desde LinkedIn.')).toBeOnTheScreen();
+    await fireEvent.press(within(card).getByText('Hecho, le escribí'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/respuestas/pc-1/mensaje')[0]?.body).toEqual({ how: 'enviado' }));
   });
 
   it('asks for a note before resolving an uncertain action and sends it', async () => {

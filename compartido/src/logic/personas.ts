@@ -43,6 +43,7 @@ export const MODALITY_SHORT: Record<string, string> = {
 
 export const SOURCE_FILTER: Record<string, string> = {
   commenter: 'Comentó en un post',
+  own_post: 'Comentó en tu post',
   search: 'Búsqueda',
   incoming: 'Te invitó',
   manual: 'Añadido a mano',

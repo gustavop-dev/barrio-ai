@@ -90,7 +90,9 @@ def _profile_views(data):
 
 def _comment(data):
     return {'id':str(data['id']),'text':data.get('text') or '','created_at':_when(data.get('created_at')),
-            'is_sender':bool(data.get('is_sender')),'thread_id':data.get('thread_id'),'author':_user(data.get('author'))}
+            'is_sender':bool(data.get('is_sender')),'thread_id':data.get('thread_id'),'author':_user(data.get('author')),
+            # Unipile v2 «List all Post's Comments» (consulted 2026-11-12): how many answers a top-level comment has.
+            'reply_counter':_count(data.get('reply_counter'))}
 
 def _chat(data):
     """List all Chats (v2): a 1to1 chat names the other member in user_id; last_message is a MessagePreview or a Message."""
@@ -188,6 +190,21 @@ class UnipileConnector:
 
     def create_comment(self,post_id,text):return _comment(self._write(self._path('posts',post_id,'comments'),{'text':text}))
 
+    # -- INT-04, comments on own posts (Unipile v2 «List all Comment's Replies», «Reply to a comment» and comment
+    # reactions, consulted 2026-11-12). The answers of a comment form its thread; LinkedIn keeps one level, so the team
+    # always writes on the top-level comment. No method name says «reply»: the inbox guarantee (INB-08) forbids it.
+    def list_comment_thread(self,post_id,comment_id,limit=50):
+        data=self._read(self._path('posts',post_id,'comments',comment_id,'replies'),{'limit':limit})
+        return [_comment(c) for c in data.get('data',[])]
+
+    def comment_in_thread(self,post_id,comment_id,text):
+        return _comment(self._write(self._path('posts',post_id,'comments',comment_id),{'text':text}))
+
+    def react_to_comment(self,post_id,comment_id,reaction):
+        if reaction not in REACTIONS:raise ConnectorError('Reacción no admitida.',kind='invalid')
+        self._write(self._path('posts',post_id,'comments',comment_id,'reactions'),{'reaction':reaction})
+        return {'reaction':reaction}
+
     def add_reaction(self,post_id,reaction):
         if reaction not in REACTIONS:raise ConnectorError('Reacción no admitida.',kind='invalid')
         self._write(self._path('posts',post_id,'reactions'),{'reaction':reaction})
@@ -248,7 +265,8 @@ class FakeConnector:
             raise ConnectorError('Conector simulado desactivado (OPERATOR_ALLOW_FAKE).',kind='disabled')
         self.account_id=account_id
         self.state=self.store.setdefault(account_id,{'status':'running','is_locked':False,'users':{},'posts':{},'comments':{},'reactions':{},'fail_next':None,'writes':0,
-                                                     'network':{},'invitations':{'sent':{},'received':{}},'search':{},'chats':{}})
+                                                     'network':{},'invitations':{'sent':{},'received':{}},'search':{},'chats':{},
+                                                     'threads':{},'comment_reactions':{}})
 
     @classmethod
     def reset(cls):cls.store.clear()
@@ -318,7 +336,42 @@ class FakeConnector:
         if post_id not in self.state['posts']:raise ConnectorError('Simulado: post no encontrado.',status=404,kind='provider/resource_not_found')
         return _post(self.state['posts'][post_id])
 
-    def list_comments(self,post_id,limit=50):return [_comment(c) for c in reversed(self.state['comments'].get(post_id,[]))][:limit]
+    def list_comments(self,post_id,limit=50):
+        rows=[dict(c,reply_counter=len(self.state['threads'].get(c['id'],[]))) for c in self.state['comments'].get(post_id,[])]
+        return [_comment(c) for c in reversed(rows)][:limit]
+
+    def comment_on_own_post(self,post_id,user_id,text,thread=None,at=None):
+        """Someone comments on an own post (or answers in the thread of `thread`), as Unipile shows it: no headline."""
+        user=self.state['users'][user_id]
+        author={k:user[k] for k in ('id','display_name','profile_url','public_identifier','type') if k in user}
+        comment={'id':'comment:'+uuid.uuid4().hex[:12],'text':text,'is_sender':False,'author':author,
+                 'created_at':(at or datetime.now(timezone.utc)).isoformat()}
+        if thread:self.state['threads'].setdefault(thread,[]).append(dict(comment,thread_id=thread))
+        else:self.state['comments'][post_id].append(comment)
+        return comment['id']
+
+    def list_comment_thread(self,post_id,comment_id,limit=50):
+        self._read_fail();self.get_post(post_id)
+        return [_comment(c) for c in reversed(self.state['threads'].get(comment_id,[]))][:limit]
+
+    def comment_in_thread(self,post_id,comment_id,text):
+        mode=self._fail();self.get_post(post_id)
+        if not any(c['id']==comment_id for c in self.state['comments'].get(post_id,[])):
+            raise ConnectorError('Simulado: comentario no encontrado.',status=404,kind='provider/resource_not_found')
+        comment={'id':'comment:'+uuid.uuid4().hex[:12],'text':text,'created_at':datetime.now(timezone.utc).isoformat(),
+                 'is_sender':True,'thread_id':comment_id,'author':{'id':'me','display_name':'Cuenta conectada'}}
+        if mode!='uncertain_not_applied':
+            self.state['threads'].setdefault(comment_id,[]).append(comment);self.state['writes']+=1
+        if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
+        return _comment(comment)
+
+    def react_to_comment(self,post_id,comment_id,reaction):
+        if reaction not in REACTIONS:raise ConnectorError('Reacción no admitida.',kind='invalid')
+        mode=self._fail();self.get_post(post_id)
+        if mode!='uncertain_not_applied':
+            self.state['comment_reactions'][comment_id]=reaction;self.state['writes']+=1
+        if mode in ('uncertain_applied','uncertain_not_applied'):raise ConnectorUncertain('Simulado: timeout tras enviar.')
+        return {'reaction':reaction}
 
     def create_comment(self,post_id,text):
         mode=self._fail();self.get_post(post_id)

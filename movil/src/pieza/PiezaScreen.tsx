@@ -19,6 +19,7 @@ import { colors, space } from '@/theme/tokens';
 import { ComoSeEscribio } from './ComoSeEscribio';
 import { FinalText } from './FinalText';
 import { PreparationTrack } from './PreparationTrack';
+import { PostComments } from './PostComments';
 import { Resultado } from './Resultado';
 import { TeamComments } from './TeamComments';
 import { PieceImages } from './PieceImages';
@@ -157,6 +158,7 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
       <StatusNote piece={piece} label={`Pieza del ${day}`} />
 
       {piece.status === 'published' || piece.snapshots?.length ? <Resultado piece={piece} timeZone={timeZone} now={now} /> : null}
+      <PostComments comments={piece.comments} now={now} />
 
       {canVeto && piece.action && piece.status === 'awaiting_approval' && piece.action.payload_hash ? (
         <Section label="Aprobación">

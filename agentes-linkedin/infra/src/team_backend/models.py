@@ -279,6 +279,7 @@ class Contact(models.Model):
         INCOMING='incoming','Invitación recibida pendiente'
     class Source(models.TextChoices):
         COMMENTER='commenter','Comentó en un post de un referente'
+        OWN_POST='own_post','Comentó en tu post'
         SEARCH='search','Búsqueda'
         INCOMING='incoming','Invitación recibida'
         MANUAL='manual','Añadido a mano'
@@ -385,6 +386,48 @@ class PostMetric(models.Model):
         constraints=[models.UniqueConstraint(fields=['piece','kind'],name='one_post_metric_per_age')]
     def __str__(self):return f'{self.piece_id} · {self.kind}'
 
+class PostComment(models.Model):
+    """INT-04 (respuestas.py): a comment on one of Gustavo's own posts (a published piece), read through Unipile. His own
+    replies are kept too (own=True), so the team sees the whole thread before answering and never answers twice. The
+    text of other people is third-party data: shown and judged as data, never followed as instructions."""
+    class State(models.TextChoices):
+        NEW='new','Leído; el equipo decide qué hacer'
+        REPLY='reply','El equipo responde en el hilo'
+        REACT='react','Basta una reacción'
+        ASKED='asked','El equipo le preguntó un dato a Gustavo'
+        IGNORED='ignored','Sin respuesta: spam, autopromoción, ofensivo o sin relación'
+        CLOSED='closed','Sin respuesta: ya respondida, plazo vencido o hilo cerrado'
+        OWN='own','Respuesta de Gustavo'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='post_comments')
+    piece=models.ForeignKey(EditorialPiece,on_delete=models.CASCADE,related_name='post_comments')
+    provider_post_id=models.CharField(max_length=200)  # opaque Unipile id of the own post
+    provider_comment_id=models.CharField(max_length=200)
+    # The top-level comment this one replies to ('' for a top-level comment): LinkedIn threads have one level.
+    thread_id=models.CharField(max_length=200,blank=True,db_index=True)
+    author_provider_id=models.CharField(max_length=200,blank=True)
+    author_name=models.CharField(max_length=200,blank=True)
+    author_public_identifier=models.CharField(max_length=100,blank=True)
+    author_profile_url=models.TextField(blank=True)
+    author_kind=models.CharField(max_length=20,blank=True)  # individual | organization, as Unipile says
+    text=models.TextField(blank=True)
+    commented_at=models.DateTimeField(null=True,blank=True)
+    own=models.BooleanField(default=False)
+    reply_count=models.IntegerField(null=True,blank=True)
+    contact=models.ForeignKey(Contact,on_delete=models.SET_NULL,null=True,blank=True,related_name='post_comments')
+    state=models.CharField(max_length=12,choices=State.choices,default=State.NEW,db_index=True)
+    # What the team decided and why: {reason, turn, closing, by, model, at, question, dm_opener, dm_closed, ...}.
+    decision=models.JSONField(default=dict,blank=True)
+    observed_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['commented_at','observed_at']
+        constraints=[models.UniqueConstraint(fields=['account','provider_comment_id'],name='unique_post_comment')]
+    @property
+    def thread_key(self):
+        return self.thread_id or self.provider_comment_id
+    def __str__(self):return f'{self.author_name}: {self.text[:60]}'
+
 class AudienceSnapshot(models.Model):
     """APRE-01: Gustavo's own audience once per local day (OPERATOR_TIMEZONE), read through Unipile.
     Cumulative counters: net growth is the difference between two snapshots. Null means no data, never zero."""
@@ -404,7 +447,8 @@ class ActionProposal(models.Model):
     referent_experiment_version=models.PositiveIntegerField(null=True,blank=True)
     class Capability(models.TextChoices):
         COMMENT='INT-03','Comentar en una publicación ajena'
-        REACT='INT-02','Reaccionar a una publicación'
+        REPLY='INT-04','Responder un comentario en una publicación propia'
+        REACT='INT-02','Reaccionar a una publicación o a un comentario'
         PUBLISH='CONT-09','Publicar una pieza propia'
         FOLLOW='RED-01','Seguir a una persona'
         INVITE='RED-02','Invitar a conectar sin nota'
@@ -428,6 +472,8 @@ class ActionProposal(models.Model):
     piece=models.ForeignKey(EditorialPiece,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
     # Network actions (RED-*) target a person instead of a post or a piece.
     contact=models.ForeignKey(Contact,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
+    # INT-04 replies (and INT-02 reactions to a comment) target a comment on an own post.
+    comment=models.ForeignKey(PostComment,on_delete=models.PROTECT,related_name='proposals',null=True,blank=True)
     capability=models.CharField(max_length=10,choices=Capability.choices)
     payload=models.JSONField()
     payload_hash=models.CharField(max_length=64)
@@ -457,8 +503,10 @@ class ActionProposal(models.Model):
                                              name='one_open_action_per_piece'),
                      models.UniqueConstraint(fields=['contact','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
                                              name='one_open_action_per_contact'),
-                     models.CheckConstraint(condition=models.Q(post__isnull=False)|models.Q(piece__isnull=False)|models.Q(contact__isnull=False),
-                                            name='action_has_target')]
+                     models.UniqueConstraint(fields=['comment','capability'],condition=models.Q(state__in=OPEN_ACTION_STATES),
+                                             name='one_open_action_per_comment'),
+                     models.CheckConstraint(condition=models.Q(post__isnull=False)|models.Q(piece__isnull=False)|models.Q(contact__isnull=False)
+                                            |models.Q(comment__isnull=False),name='action_has_target')]
     def __str__(self):return f'{self.capability} v{self.version} · {self.get_state_display()}'
 
 class ActionExecution(models.Model):

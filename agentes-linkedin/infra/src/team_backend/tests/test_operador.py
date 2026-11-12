@@ -23,7 +23,9 @@ class OperatorBase(TransactionTestCase):
                                    'OPERATOR_WINDOW':'00:00-24:00','OPERATOR_MIN_SPACING_SECONDS':'0','OPERATOR_AUTONOMY':'',
                                    'OPERATOR_ALERT_WEBHOOK':'','OPERATOR_DAILY_LLM_USD':'1','OPERATOR_DAILY_PROPOSALS':'6',
                                    # The weekly summary depends on the real weekday; test_resumen_semanal turns it on.
-                                   'WEEKLY_SUMMARY_ENABLED':'false'})
+                                   'WEEKLY_SUMMARY_ENABLED':'false',
+                                   # INT-04 reads the comments of every confirmed own post; test_respuestas turns it on.
+                                   'REPLIES_ENABLED':'false'})
         env.start();self.addCleanup(env.stop)
         self.weekend_patch=patch('team_backend.operador.is_weekend',return_value=False)
         self.weekend_patch.start();self.addCleanup(self.weekend_patch.stop)

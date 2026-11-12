@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import capturas, editorial, operador, rescate, resultados, imagenes
+from . import capturas, editorial, operador, rescate, respuestas, resultados, imagenes
 from .jobs import enqueue_operation
 from .models import EditorialPiece, PieceImage
 from .capturas_views import FileView, serve
@@ -53,7 +53,7 @@ class PieceDetail(APIView):
             selection=piece.selection,verification=piece.verification,final_text=piece.final_text,citations=piece.citations,
             signals=piece.signals,research=piece.research,usage=piece.usage,metrics=piece.metrics,action_detail=ActionOutput(action).data if action is not None else None,
             # APRE-01 (docs/metricas-resultados.md): snapshots at 24 h/72 h/7 d and who commented.
-            snapshots=resultados.piece_snapshots(piece),commenters=resultados.piece_commenters(piece),
+            snapshots=resultados.piece_snapshots(piece),commenters=resultados.piece_commenters(piece),comments=respuestas.piece_payload(piece),
             # «Comentario para el equipo» sent with the capture button (docs/capturas-galeria.md).
             team_comments=capturas.piece_comments(piece),image_kind=piece.image_kind or None,image_reason=piece.image_reason,
             images=[imagenes.payload(row) for row in piece.images.all()],image_review=piece.image_review,
