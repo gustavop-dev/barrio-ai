@@ -531,25 +531,28 @@ function night(s: SceneState): boolean {
 }
 
 /** A free spot, weighted: a partner waiting makes a pair more likely, a party fills the dance floor. */
+// A top-level worklet, not a closure inside pickSpot: a worklet nested in another one is rebuilt (with a new Error for
+// its stack) on every call, every tick.
+function spotWeight(s: SceneState, a: Actor, id: RestId, party: boolean): number {
+  'worklet';
+  if (s.occupied[id] !== undefined) return 0;
+  const spot = REST_SPOTS[id];
+  let w = 1;
+  if (spot.partner && s.occupied[spot.partner] !== undefined) w *= 3;
+  if (party) w *= spot.pastime === 'baila' || spot.pastime === 'charla' || spot.pastime === 'canta' ? 6 : 0.5;
+  if (a.pastime === spot.pastime) w *= 0.2;
+  return w;
+}
+
 function pickSpot(s: SceneState, a: Actor): RestId | null {
   'worklet';
   const party = s.partyUntil > s.clock;
   let total = 0;
-  const weight = (id: RestId) => {
-    'worklet';
-    if (s.occupied[id] !== undefined) return 0;
-    const spot = REST_SPOTS[id];
-    let w = 1;
-    if (spot.partner && s.occupied[spot.partner] !== undefined) w *= 3;
-    if (party) w *= spot.pastime === 'baila' || spot.pastime === 'charla' || spot.pastime === 'canta' ? 6 : 0.5;
-    if (a.pastime === spot.pastime) w *= 0.2;
-    return w;
-  };
-  for (const id of REST_IDS) total += weight(id);
+  for (const id of REST_IDS) total += spotWeight(s, a, id, party);
   if (total <= 0) return null;
   let r = rand(s) * total;
   for (const id of REST_IDS) {
-    r -= weight(id);
+    r -= spotWeight(s, a, id, party);
     if (r < 0 && s.occupied[id] === undefined) return id;
   }
   return null;

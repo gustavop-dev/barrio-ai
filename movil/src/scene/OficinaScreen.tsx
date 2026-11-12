@@ -46,11 +46,13 @@ export function OficinaScreen() {
   }, [active]);
   const window = useWindowDimensions();
   const insets = useContentInsets();
+  // The content insets keep room for the microphone button over the tab bar; the scene goes under it, down to the bar.
+  const tabBar = insets.bottom - space[10];
   const [height, setHeight] = useState(window.height - shell.topBarHeight);
   // The plan fills the screen's width (Gustavo, 11/11: only a vertical scroll, no side margins or sideways pan) and the
   // scene fills the screen down to the tab bar (it never ends in a blank strip); the plan scrolls up and down inside it.
   const scale = window.width / PLAN_WIDTH;
-  const sceneHeight = Math.min(PLAN_HEIGHT * scale, Math.max(240, height - insets.bottom));
+  const sceneHeight = Math.min(PLAN_HEIGHT * scale, Math.max(240, height - tabBar));
   // With the first real activity the camera opens where the agents are: the office if someone works, the game room
   // (where the free ones rest) otherwise. Decided once; moving the scene keeps the person's own view.
   const [focus, setFocus] = useState<SceneFocus | null>(null);
@@ -92,9 +94,9 @@ export function OficinaScreen() {
   };
   return <View testID="screen-oficina" style={styles.root} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
     <GestureDetector gesture={pageScroll}>
-    <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: insets.bottom }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} />}>
+    <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: tabBar }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} />}>
       <View>
-        <OfficeCanvas scrollGesture={pageScroll} scene={scene} width={window.width} height={sceneHeight} visibleHeight={selection ? Math.min(sceneHeight, (height - insets.bottom + space[10]) * (1 - officeGestures.sheetHalf)) : sceneHeight} scale={scale} selectedRole={selectedRole} selectedZone={selectedZone} statuses={statuses} onPick={onPick} focus={focus} onPullRefresh={() => void refresh()} />
+        <OfficeCanvas scrollGesture={pageScroll} scene={scene} width={window.width} height={sceneHeight} visibleHeight={selection ? Math.min(sceneHeight, (height - tabBar) * (1 - officeGestures.sheetHalf)) : sceneHeight} scale={scale} selectedRole={selectedRole} selectedZone={selectedZone} statuses={statuses} onPick={onPick} focus={focus} onPullRefresh={() => void refresh()} />
         {paused ? <View testID="oficina-pausa" pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paused]} /> : null}
         <OfficeNarration line={line} revision={snapshot.now?.key ?? 0} reduced={reduced} />
         {/* Only the error notes, over the bottom of the scene: tapping a zone or its label opens its team (the legend, the
@@ -107,7 +109,7 @@ export function OficinaScreen() {
       </View>
     </ScrollView>
     </GestureDetector>
-    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active} fitViewportToSnap>
+    {selection ? <SnapSheet label={label} testID="office-panel" bottom={tabBar} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active} fitViewportToSnap>
       {selection.kind === 'team' ? <TeamPanel team={selection.id} data={data} onRole={(id) => select({ kind: 'role', id })} /> : <RolePanel id={selection.id} data={data} onTeam={(id) => select({ kind: 'team', id })} />}
     </SnapSheet> : null}
   </View>;
@@ -115,5 +117,6 @@ export function OficinaScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   paused: { backgroundColor: colors.backdrop },
-  notes: { position: 'absolute', left: space[4], right: space[4], bottom: space[2], gap: space[2] },
+  // Above the microphone button, which floats over the bottom of the scene.
+  notes: { position: 'absolute', left: space[4], right: space[4], bottom: space[10] + space[2], gap: space[2] },
 });

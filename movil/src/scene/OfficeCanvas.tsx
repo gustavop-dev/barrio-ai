@@ -66,10 +66,24 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   useAnimatedReaction(() => ({ x: view.value.x, y: view.value.y + pull.value, scale: view.value.scale }), (v) => {
     matrix.modify((m) => m.identity().translate(Math.round(v.x * density) / density, Math.round(v.y * density) / density).scale(v.scale));
   });
+  // A new size (a banner over the scene, the panel opening or closing, a rotation). Before the person moves the scene it
+  // rests on its focus. Afterwards it keeps their place, only clamped to the new bounds: the pause banner no longer sends
+  // the camera back to the game room, and a closed panel leaves no blank under the plan (QA run 43125990840).
   useEffect(() => {
     const at = focusRef.current;
-    runOnUI(() => { view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: restingY(at, height, PLAN_HEIGHT * scale), scale }); })();
-  }, [width, height, scale, view]);
+    runOnUI(() => {
+      if (!touched.get()) {
+        view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: restingY(at, visibleHeight, PLAN_HEIGHT * scale), scale });
+        return;
+      }
+      view.modify((v) => {
+        v.scale = Math.max(v.scale, scale);
+        v.x = clampPan(v.x, width, PLAN_WIDTH * v.scale);
+        v.y = clampPan(v.y, visibleHeight, PLAN_HEIGHT * v.scale);
+        return v;
+      });
+    })();
+  }, [width, visibleHeight, scale, view, touched]);
   useEffect(() => {
     if (!focus) return;
     runOnUI(() => {
