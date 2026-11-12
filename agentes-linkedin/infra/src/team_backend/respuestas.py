@@ -705,7 +705,7 @@ def close_dm(user,comment_id,how,note_text=''):
     require(user,'approve_actions')
     if how not in CLOSE_HOW:raise ValueError('how debe ser enviado o no')
     with transaction.atomic():
-        row=PostComment.objects.select_for_update().select_related('contact').get(id=comment_id)
+        row=PostComment.objects.select_for_update(of=('self',)).select_related('contact').get(id=comment_id)
         if 'dm_opener' not in (row.decision or {}):raise Conflict('Este comentario no tiene un mensaje sugerido.')
         if 'dm_closed' in row.decision:return row
         row.decision=dict(row.decision,dm_closed={'how':how,'at':timezone.now().isoformat(),'note':(note_text or '')[:1000]})
