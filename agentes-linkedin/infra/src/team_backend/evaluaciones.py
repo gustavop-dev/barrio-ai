@@ -201,7 +201,7 @@ def comment_request(run,post,revision=None):
             'public_facts':run.comment_facts,'private_guidance':run.comment_guidance,'orientation':run.orientation}
     from . import experimentos
     inputs['referent_evidence']=experimentos.signals(post)
-    inputs['comment_language']='English; useful contribution, never an empty compliment or pitch.'
+    inputs['comment_language']=operador.COMMENT_LANGUAGE
     if revision:inputs['revision']=revision
     return {'system':voz.with_voice(operador.COMMENT_SYSTEM),'message':json.dumps(inputs,ensure_ascii=False,default=str),'max_tokens':None,
             'output_schema':operador.COMMENT_SCHEMA,'effort':'medium','context':operador.course_block(units)},units

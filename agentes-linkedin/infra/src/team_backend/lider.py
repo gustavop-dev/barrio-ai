@@ -48,7 +48,7 @@ def _noul(instructions,true=None,false=None):
 CHECKS={
     'text':[('aporta','min',0.7,'no aporta una idea concreta'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso'),
-            ('idioma','min',0.7,'no está en inglés')],
+            ('idioma','min',0.7,'no está en inglés ni en el español de la publicación')],
     # INT-04: a reply on his own post answers what that person said and follows the post and the thread.
     'reply':[('responde','min',0.7,'no responde a lo que dijo la persona'),('hilo','min',0.6,'no sigue la línea del post y del hilo'),
              ('pitch','max',0.2,'suena a venta o propone conectar fuera de lugar'),
@@ -112,7 +112,8 @@ def _questions(proposal,orientation):
             'inventa':_noul('¿El `comentario` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿El `comentario` es respetuoso con el autor y con las demás personas, sin sarcasmo, burla ni ataque?'),
-            'idioma':_noul('¿El `comentario` está escrito en inglés?'),
+            # Spanish is right when the post is in Spanish (Gustavo, 2026-11-12); the lead does not see the other comments.
+            'idioma':_noul('¿El `comentario` está escrito en inglés, o en español cuando la `publicacion` está en español?'),
         }
         kind='text'
     elif capability==CAP.REPLY:

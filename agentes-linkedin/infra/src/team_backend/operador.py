@@ -792,6 +792,8 @@ def resolve_uncertain(user,proposal_id,outcome,note):
 
 # --------------------------------------------------------------------------- agent proposal (INT-01/INT-03)
 
+# Gustavo, 2026-11-12: «cuando el post o la conversación está en español, responder en español».
+COMMENT_LANGUAGE='Spanish if the post or its conversation is in Spanish, otherwise English; useful contribution, never an empty compliment or pitch.'
 COMMENT_SCHEMA={'type':'object','additionalProperties':False,
     'required':['decision','language','comment','rationale','citations','claims_needing_evidence','risks'],
     'properties':{'decision':{'type':'string','enum':['comment','skip']},'language':{'type':'string'},
@@ -812,7 +814,8 @@ Criterio (catálogo INT-03, fundamentos B04/B06/B15 del curso en el contexto):
   founders o clientes que Gustavo busca.
 - orientation es la dirección vigente que Gustavo le da al equipo. Síguela al elegir qué aportar; igual que
   private_guidance, nunca la cites ni la parafrasees.
-- Escribe siempre en inglés y en la voz de Gustavo descrita al final.
+- Idioma (decisión de Gustavo): en español si la publicación o su conversación (existing_comments) están en español; si
+  no, en inglés. Pon su código en language (en, es). Escribe en la voz de Gustavo descrita al final.
   2–5 frases, máximo 900 caracteres, sin hashtags y como mucho un emoji si encaja con el tono del hilo.
 - No repitas lo que ya dicen otros comentarios.
 - Si no hay un aporte genuino, responde decision="skip" y explica por qué. Saltar es correcto.
@@ -919,7 +922,7 @@ def propose_comment(user,post_id,origin_job=''):
     runtime=orquestacion.current()
     inputs['referent_evidence']=(runtime.snapshot('referent_signals',lambda:experimentos.signals(post))
                                 if runtime else experimentos.signals(post))
-    inputs['comment_language']='English; useful contribution, never an empty compliment or pitch.'
+    inputs['comment_language']=COMMENT_LANGUAGE
     from . import oficina_eventos
     oficina_eventos.emit('consulta_biblioteca','relaciones_comunidad','biblioteca','Fundamentos del curso para un comentario')
     answer,data,citations,risks=_draft_comment(json.dumps(inputs,ensure_ascii=False,default=str),units)
