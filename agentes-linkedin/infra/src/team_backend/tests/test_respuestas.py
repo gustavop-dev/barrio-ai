@@ -68,7 +68,7 @@ class RepliesBase(NetworkBase):
             jobs.enqueue_operation(self.bot,'propose_reply',{'comment':str(row.id)},request_id=uuid.uuid4());self.drain()
         return claude
 
-    def run(self,proposal):
+    def execute_proposal(self,proposal):
         """The autonomous gate (rules, no lead in tests) and the operator."""
         proposal=autopiloto.policy_review(ActionProposal.objects.get(pk=proposal.pk))
         self.assertEqual(proposal.state,'approved',proposal.risks)
@@ -109,7 +109,7 @@ class ReadingTests(RepliesBase):
         self.assertEqual((reaction.capability,reaction.payload),('INT-02',{'reaction':'linkedin_like'}))
         self.assertEqual(stale.state,'closed')
         self.assertIn('72 h',stale.decision['reason'])
-        execution=self.run(reaction)
+        execution=self.execute_proposal(reaction)
         self.assertEqual(execution.state,'confirmed')
         self.assertEqual(self.fake.state['comment_reactions'],{congrats.provider_comment_id:'linkedin_like'})
 
@@ -147,7 +147,7 @@ class ReplyTests(RepliesBase):
         self.assertEqual((message['turn'],message['closing_allowed']),(1,False))
         proposal=ActionProposal.objects.get(capability='INT-04')
         self.assertEqual((proposal.comment_id,proposal.payload,proposal.citations),(row.id,{'text':REPLY},[UNIT]))
-        execution=self.run(proposal)
+        execution=self.execute_proposal(proposal)
         self.assertEqual(execution.state,'confirmed')
         own=self.fake.state['threads'][row.provider_comment_id]
         self.assertEqual([c['text'] for c in own],[REPLY])
@@ -183,7 +183,7 @@ class ReplyTests(RepliesBase):
         self.propose(row,draft())
         proposal=ActionProposal.objects.get(capability='INT-04')
         self.fake.comment_in_thread(pid,root,REPLY);writes=self.fake.state['writes']
-        execution=self.run(proposal)
+        execution=self.execute_proposal(proposal)
         self.assertEqual((execution.state,execution.wrote),('confirmed',False))
         self.assertEqual(self.fake.state['writes'],writes)
 
@@ -205,7 +205,7 @@ class ReplyTests(RepliesBase):
         maria=self.person()
         root=self.fake.comment_on_own_post(pid,maria['id'],QUESTION,at=timezone.now()-timedelta(minutes=20))
         self.read();first=PostComment.objects.get()
-        self.propose(first,draft());self.run(ActionProposal.objects.get(capability='INT-04'))
+        self.propose(first,draft());self.execute_proposal(ActionProposal.objects.get(capability='INT-04'))
         Contact.objects.filter(pk=first.contact_id).update(classification={'fit':True,'role':'comprador','confidence':0.9})
         self.fake.comment_on_own_post(pid,maria['id'],FOLLOW_UP,thread=root,at=timezone.now()+timedelta(seconds=5))
         self.rescan()
@@ -217,7 +217,7 @@ class ReplyTests(RepliesBase):
         self.assertEqual((message['turn'],message['closing_allowed'],message['already_connected']),(2,True,False))
         self.assertEqual([t['text'] for t in message['thread']][:2],[QUESTION,REPLY])
         proposal=ActionProposal.objects.get(capability='INT-04',comment=second)
-        self.assertEqual(self.run(proposal).state,'confirmed')
+        self.assertEqual(self.execute_proposal(proposal).state,'confirmed')
         self.assertEqual([c['text'] for c in self.fake.state['threads'][root] if c['is_sender']],[REPLY,CLOSING])
         contact=Contact.objects.get(pk=first.contact_id)
         self.assertTrue(contact.evidence['conversed'])
@@ -248,7 +248,7 @@ class ReplyTests(RepliesBase):
         maria=self.person()
         root=self.fake.comment_on_own_post(pid,maria['id'],QUESTION,at=timezone.now()-timedelta(minutes=20))
         self.read();first=PostComment.objects.get()
-        self.propose(first,draft());self.run(ActionProposal.objects.get(capability='INT-04'))
+        self.propose(first,draft());self.execute_proposal(ActionProposal.objects.get(capability='INT-04'))
         self.fake.comment_on_own_post(pid,maria['id'],FOLLOW_UP,thread=root,at=timezone.now()+timedelta(seconds=5))
         self.rescan()
         second=PostComment.objects.get(text=FOLLOW_UP)
@@ -263,7 +263,7 @@ class ReplyTests(RepliesBase):
         maria=self.person()
         root=self.fake.comment_on_own_post(pid,maria['id'],QUESTION,at=timezone.now()-timedelta(minutes=20))
         self.read();first=PostComment.objects.get()
-        self.propose(first,draft());self.run(ActionProposal.objects.get(capability='INT-04'))
+        self.propose(first,draft());self.execute_proposal(ActionProposal.objects.get(capability='INT-04'))
         self.fake.comment_on_own_post(pid,maria['id'],'Makes sense, thanks!',thread=root,at=timezone.now()+timedelta(seconds=5))
         self.rescan()
         thanks=PostComment.objects.get(text='Makes sense, thanks!')
