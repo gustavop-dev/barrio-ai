@@ -70,9 +70,11 @@ tags: [galeria]
     file: comun/elegir-foto.yaml
     env:
       CAPTURA: 10-subir-04-selector-otra-vez
+# A 413 says why (backlog #27): the photos are too big, not a generic failure.
 - extendedWaitUntil:
-    visible: "No se pudieron subir todas las fotos"
+    visible: "Hay fotos demasiado grandes"
     timeout: 30000
+- assertVisible: "Cada foto puede pesar hasta 10 MB.*"
 - assertVisible: "0 de 1 foto subida"
 - assertVisible: "Descartar las que faltan"
 - assertNotVisible: ".*(fetch failed|Network request failed|Unsupported FormDataPart|Request failed).*"
@@ -80,7 +82,7 @@ tags: [galeria]
 - tapOn:
     text: "Reintentar"
     below:
-      text: "No se pudieron subir todas las fotos"
+      text: "Hay fotos demasiado grandes"
 - extendedWaitUntil:
     visible: "Foto subida\\. El equipo la verá en su próxima ronda\\."
     timeout: 45000

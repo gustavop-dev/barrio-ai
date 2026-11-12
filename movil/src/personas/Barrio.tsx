@@ -151,16 +151,20 @@ export function Barrio({ header, filters, onFilters }: { header: ReactNode; filt
   }, [text, q]);
 
   // The chosen stage chip comes fully into view (backlog #17: «Te invitó» stayed half off the right edge). It grows by
-  // its check when chosen, so the strip waits for that animation and leaves room for the check.
+  // its check when chosen, so the strip waits for that animation and leaves room for the check. Back to «Todas», the
+  // first chip, the strip goes back to its start.
   const { reduced } = useMotion();
   const strip = useRef<ComponentRef<typeof ScrollView>>(null);
   const boxes = useRef(new Map<string, { x: number; width: number }>());
   const shown = useRef({ x: 0, width: 0 });
   useEffect(() => {
-    if (!stage) return;
     const timer = setTimeout(() => {
-      const box = boxes.current.get(stage);
       const { x: left, width } = shown.current;
+      if (!stage) {
+        if (left > 0) strip.current?.scrollTo({ x: 0, animated: !reduced });
+        return;
+      }
+      const box = boxes.current.get(stage);
       if (!box || !width) return;
       const end = box.x + box.width + CHECK_ROOM;
       if (box.x < left) strip.current?.scrollTo({ x: Math.max(0, box.x - space[4]), animated: !reduced });

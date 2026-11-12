@@ -330,7 +330,7 @@ tags: [calendario]
     id: copiar
     childOf:
       id: pieza
-- assertVisible: "Se publica tal cual, en inglés."
+- assertVisible: "Se publicó tal cual, en inglés."
 - back
 - extendedWaitUntil:
     notVisible:
