@@ -28,7 +28,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import memory, providers
-from . import operador, orientacion, voz
+from . import idioma, operador, orientacion, voz
 from .connectors import ConnectorError, get_connector, same_text
 from .exceptions import Conflict
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, PostComment, TeamQuestion
@@ -576,6 +576,9 @@ def reply_text_issues(proposal):
     if CONNECT.search(text) and not closing:issues.append('Propone conectar o hablar por privado fuera del cierre del segundo turno')
     if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
+    if proposal.source=='agent' and proposal.comment_id:
+        expected=idioma.mismatch(text,proposal.comment.text)  # the reply goes in the language of the comment
+        if expected:issues.append(f'No está en el idioma del comentario ({expected})')
     from . import guardas
     public,private=guardas.blocks()
     return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)

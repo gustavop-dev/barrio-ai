@@ -17,7 +17,7 @@ from decimal import Decimal
 from django.db.models import Case, Q, When
 from django.utils import timezone
 from knowledge import db, memory
-from . import guardas, lider, oficina_eventos, operador, red
+from . import guardas, idioma, lider, oficina_eventos, operador, red
 from .jobs import enqueue_operation
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, CycleLedger, EditorialPiece, Job, ObservedPost
 
@@ -102,6 +102,8 @@ def comment_text_issues(proposal):
         if pattern.search(text):issues.append(reason)
     if any(str(r).startswith('Afirmación por verificar') for r in proposal.risks):issues.append('Incluye afirmaciones sin evidencia')
     if proposal.source=='agent' and not proposal.citations:issues.append('Sin fundamento citado del curso')
+    if proposal.source=='agent' and proposal.post_id and idioma.english_on_spanish(text,proposal.post.text):
+        issues.append('Está en inglés y la publicación está en español')  # Gustavo, 2026-11-12
     public,private=guardas.blocks()
     return issues+guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
 
