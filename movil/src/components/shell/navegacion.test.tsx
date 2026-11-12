@@ -179,6 +179,10 @@ describe('tab content and the top-bar push (MovNavegacion)', () => {
     expect(tabMove('index', 'tu-turno')).toBe('push');
     expect(tabMove('tu-turno', 'calendario')).toBe('push');
     expect(tabMove('ajustes', 'galeria')).toBe('pop');
+    // An earlier top-bar screen is drawn under the one it replaces: it comes back with the pop, never pushed under it.
+    expect(tabMove('notificaciones', 'tu-turno')).toBe('pop');
+    expect(tabMove('ajustes', 'calendario')).toBe('pop');
+    expect(tabMove('tu-turno', 'notificaciones')).toBe('push');
     expect(tabMove(null, 'index')).toBe('fade');
   });
 

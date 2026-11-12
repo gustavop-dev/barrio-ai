@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { lastActivity, stageCount, totalCount } from '../../../../compartido/src/logic/barrio';
+import { agree, isFeminineName } from '../../../../compartido/src/logic/genero';
 import { asList } from '../../api/endpoints';
 import { useRedSummary } from '../../api/hooks';
 import type { Contact, ContactStage, RedSummary } from '../../api/types';
@@ -44,7 +45,7 @@ function PersonRow({ contact, search, selected }: { contact: Contact; search: st
         <span className="person-row-body">
           <span className="person-row-top">
             <span className="person-row-name">{contact.display_name || contact.public_identifier || 'Sin nombre'}</span>
-            <Badge tone={stage.tone}>{stage.label}</Badge>
+            <Badge tone={stage.tone}>{agree(stage.label, isFeminineName(contact.display_name))}</Badge>
           </span>
           {contact.headline ? <span className="person-row-headline">{contact.headline}</span> : null}
           <span className="person-row-chips">

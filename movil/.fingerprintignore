@@ -1,0 +1,3 @@
+# google-services.json comes from the EAS secret GOOGLE_SERVICES_JSON (see app.config.js); only builds see it. The
+# fingerprint leaves it out so builds and `eas update` (which never sees secrets) agree on the runtime version.
+google-services.json

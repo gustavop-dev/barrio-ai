@@ -162,7 +162,8 @@ describe('Galería', () => {
     });
     await screen.findByLabelText('Foto del 3 nov, nueva');
     await fireEvent.press(screen.getByTestId('gallery-upload'));
-    expect(await screen.findByText('La foto supera 10 MB.')).toBeOnTheScreen();
+    expect(await screen.findByText('Hay fotos demasiado grandes')).toBeOnTheScreen(); // backlog #27
+    expect(screen.getByText('Cada foto puede pesar hasta 10 MB. Descarta las que faltan o elige fotos más livianas.')).toBeOnTheScreen();
     expect(screen.getByText('10 de 12 fotos subidas')).toBeOnTheScreen();
     expect(screen.getByTestId('upload-9-subida')).toBeOnTheScreen();
     await fireEvent.press(screen.getByText('Reintentar'));

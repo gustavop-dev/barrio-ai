@@ -2,6 +2,7 @@
 // with Cerrado and Descartado as alternative ends (DISENO-VISTAS, Personas, ficha 2). Shared by the PWA
 // (its StageTrack) and the native app.
 import type { Contact, ContactEvent } from '../api/types';
+import { agree, isFeminineName } from './genero';
 import { shortDate } from './personas';
 
 export type StageState = 'done' | 'current' | 'pending' | 'alt';
@@ -31,8 +32,9 @@ interface Step {
   detail?: string | null;
 }
 
-/** The steps of the track for a contact; the last reached one is «current». */
+/** The steps of the track for a contact; the last reached one is «current». Labels agree with the person («Seguida»). */
 export function journey(contact: Contact): Stage[] {
+  const feminine = isFeminineName(contact.display_name);
   const stage = contact.stage;
   const incoming = contact.source === 'incoming' || stage === 'incoming';
   const connected = stage === 'connected' || Boolean(contact.connected_at);
@@ -53,12 +55,12 @@ export function journey(contact: Contact): Stage[] {
     const reached = steps.filter((step) => step.reached);
     const end: Stage = {
       key: stage,
-      label: stage === 'discarded' ? 'Descartado' : 'Cerrado',
+      label: agree(stage === 'discarded' ? 'Descartado' : 'Cerrado', feminine),
       date: shortDate(eventDate(contact, stage)) || null,
       detail: stage === 'closed' ? 'Invitación ignorada o retirada' : null,
       state: 'alt',
     };
-    return [...reached.map((step): Stage => ({ key: step.key, label: step.label, date: shortDate(step.date) || null, state: 'done' })), end];
+    return [...reached.map((step): Stage => ({ key: step.key, label: agree(step.label, feminine), date: shortDate(step.date) || null, state: 'done' })), end];
   }
 
   // A conversation read from the inbox, or an opportunity (which implies there was one).
@@ -70,7 +72,7 @@ export function journey(contact: Contact): Stage[] {
   const last = steps.map((step) => step.reached).lastIndexOf(true);
   return steps.map((step, index) => ({
     key: step.key,
-    label: step.label,
+    label: agree(step.label, feminine),
     date: step.reached ? shortDate(step.date) || null : null,
     detail: step.detail ?? null,
     state: index === last ? 'current' : step.reached ? 'done' : 'pending',

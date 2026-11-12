@@ -221,7 +221,7 @@ tags: [calendario, captura, imagenes]
     direction: DOWN
     centerElement: true
     timeout: 20000
-# Android's es-CO formatter renders 8:30 without a leading zero. Keep the forecast date and
+# Hermes used to render 8:30 without a leading zero (padHour now adds it). Keep the forecast date and
 # the seeded Bogotá time (8:30 or 08:30, never 18:30), with evidence and conditions in this capture.
 - assertVisible:
     text: '^Saldrá lo antes posible · fecha prevista: .+, 0?8:30$'

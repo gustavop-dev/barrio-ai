@@ -77,7 +77,16 @@ El build tarda unos 10 a 15 minutos. Al terminar, EAS da un enlace y un QR para 
 
 Los dos perfiles compilan solo para `arm64-v8a`, la arquitectura de casi todos los Android actuales (`ORG_GRADLE_PROJECT_reactNativeArchitectures` en `eas.json`). Con las cuatro arquitecturas por defecto, el compilador de C++ de Skia se quedaba sin memoria en la máquina gratuita de EAS («Killed» en la fase Run gradlew).
 
-Un APK nuevo se instala encima del anterior, sin perder la sesión. Solo hace falta cuando cambia algo nativo: los cambios de JavaScript llegan solos como actualización OTA (sección siguiente). Las notificaciones push en el APK necesitan además las credenciales de FCM (Firebase), que se cargan en EAS con `npx eas-cli@latest credentials`.
+Un APK nuevo se instala encima del anterior, sin perder la sesión. Solo hace falta cuando cambia algo nativo: los cambios de JavaScript llegan solos como actualización OTA (sección siguiente). Las notificaciones push en el APK necesitan Firebase (sección siguiente).
+
+### Firebase para las notificaciones push
+
+Sin Firebase, Expo no le da al APK su token de push y el servidor no tiene a dónde enviar las notificaciones ([PUS-07](../docs/funcionalidades/notificaciones-push.md#pus-07)). Hacen falta dos archivos del proyecto de Firebase (app Android `co.projectapp.office`), y ninguno va al repositorio, que es público:
+
+1. **`google-services.json`.** Se sube en expo.dev como variable de entorno de tipo archivo, con nombre `GOOGLE_SERVICES_JSON` y visibilidad *Secret*, en los entornos `preview` y `production`. `app.config.js` la copia durante el build a `movil/google-services.json` (ignorado por git) y pone `android.googleServicesFile`. Sin la variable, la configuración no cambia.
+2. **La cuenta de servicio de FCM (V1).** Se sube en expo.dev, en Credentials → Android → `co.projectapp.office` → FCM V1 service account key. Expo la usa para entregar las push que el servidor manda por su servicio.
+
+`movil/.fingerprintignore` deja fuera `google-services.json`. Así el fingerprint de un build con Firebase es el mismo que el de uno sin Firebase: `eas update` no ve las variables secretas, y sin esa exclusión las OTA dejarían de llegar al APK con Firebase. Con los dos archivos cargados basta un build nuevo (`--profile preview`), y desde ahí la app pide permiso y registra el token sola.
 
 ## Actualizaciones OTA (sin reinstalar el APK)
 

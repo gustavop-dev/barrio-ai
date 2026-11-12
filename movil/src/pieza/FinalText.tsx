@@ -1,8 +1,8 @@
 // «Texto final» (Pieza.dc.html): the text as it goes out, its length, «Copiar» (the shared CopyButton) and
-// «Se publica tal cual, en inglés».
+// «Se publica tal cual, en inglés» (or «Se publicó…» once it went out; nothing when it will not go out).
 import type { PieceDetail } from '@compartido/api/types';
 import { formatNumber } from '@compartido/logic/format';
-import { charCount } from '@compartido/logic/piece';
+import { charCount, finalTextNote } from '@compartido/logic/piece';
 import { StyleSheet, View } from 'react-native';
 import { Card, CopyButton, Section, T } from '@/components/ui';
 import { space } from '@/theme/tokens';
@@ -18,6 +18,7 @@ export function FinalText({ piece }: { piece: PieceDetail }) {
     );
   }
   const lines = text.split('\n').filter((line) => line.trim());
+  const note = finalTextNote(piece.status);
   return (
     <Section label="Texto final">
       <Card>
@@ -32,9 +33,11 @@ export function FinalText({ piece }: { piece: PieceDetail }) {
           <T variant="detalle" soft>{`${formatNumber(charCount(text), 0)} caracteres`}</T>
           <CopyButton text={text} testID="copiar" />
         </View>
-        <T variant="detalle" soft>
-          Se publica tal cual, en inglés.
-        </T>
+        {note ? (
+          <T variant="detalle" soft>
+            {note}
+          </T>
+        ) : null}
       </Card>
     </Section>
   );

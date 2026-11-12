@@ -41,3 +41,7 @@ backups/
 /Recursos visuales/
 /agentes-linkedin/ai_skills_project/
 .DS_Store
+
+# Firebase for the app: copied from the EAS secret GOOGLE_SERVICES_JSON at build time (movil/app.config.js). Not in
+# movil/.gitignore, which is part of the native fingerprint.
+movil/google-services.json

@@ -66,6 +66,7 @@ describe('Resultados', () => {
     await renderResultados();
     expect(screen.getByText('Resultados')).toBeOnTheScreen();
     expect(screen.getByLabelText('Periodo')).toBeOnTheScreen();
+    expect(screen.getByText('Periodo')).toBeOnTheScreen(); // a visible label, as the board shows (backlog #16)
     expect(screen.getByRole('tab', { name: '28 días' })).toBeSelected();
     expect(screen.getByRole('button', { name: 'Modalidad' })).toHaveAccessibilityValue({ text: 'Todo' });
     expect(await screen.findByText(/Periodo en curso: datos hasta .*14:20\. Todo se compara con los 28 días anteriores\./)).toBeOnTheScreen();

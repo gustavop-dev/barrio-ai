@@ -4,18 +4,21 @@ import { asList } from '@compartido/api/endpoints';
 import { useRedSummary } from '@compartido/api/hooks';
 import { useContactPages } from '@compartido/api/personas';
 import type { Contact, ContactStage, RedSummary } from '@compartido/api/types';
+import { agree, isFeminineName } from '@compartido/logic/genero';
 import { displayName, moreFiltersLabel, noResultsTitle, rowMeta, stageCount, totalCount, type BarrioFilters } from '@compartido/logic/barrio';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '@compartido/logic/format';
 import { FUNNEL_ASIDE, FUNNEL_MAIN, MODALITY_SHORT, personStage, SOURCE_FILTER, type PersonStage } from '@compartido/logic/personas';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useEffect, useRef, useState, type ComponentRef, type ReactNode } from 'react';
+import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View, type LayoutChangeEvent } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { Icon } from '@/components/icons';
 import { useFlightSource } from '@/components/shell/flight';
 import { useContentInsets } from '@/components/shell/useContentInsets';
 import { Avatar, Badge, Button, EmptyState, EmptyText, ErrorRetry, FilterChip, LabelChip, Note, Sheet, Skeleton, T, initials, pageContent } from '@/components/ui';
 import { Select } from '@/components/ui/Select';
+import { CHECK_ROOM } from '@/components/ui/Chip';
+import { durations, useMotion } from '@/theme/motion';
 import { colors, fonts, radius, space } from '@/theme/tokens';
 
 /** The search box writes ?q= after this pause (the PWA's 300 ms). */
@@ -74,7 +77,7 @@ function PersonRow({ contact }: { contact: Contact }) {
               <T numberOfLines={2}>{displayName(contact)}</T>
             </Animated.View>
           </View>
-          <Badge tone={stage.tone}>{stage.label}</Badge>
+          <Badge tone={stage.tone}>{agree(stage.label, isFeminineName(contact.display_name))}</Badge>
         </View>
         {contact.headline ? (
           <T variant="detalle" soft numberOfLines={1}>
@@ -147,6 +150,29 @@ export function Barrio({ header, filters, onFilters }: { header: ReactNode; filt
     return () => clearTimeout(timer);
   }, [text, q]);
 
+  // The chosen stage chip comes fully into view (backlog #17: «Te invitó» stayed half off the right edge). It grows by
+  // its check when chosen, so the strip waits for that animation and leaves room for the check.
+  const { reduced } = useMotion();
+  const strip = useRef<ComponentRef<typeof ScrollView>>(null);
+  const boxes = useRef(new Map<string, { x: number; width: number }>());
+  const shown = useRef({ x: 0, width: 0 });
+  useEffect(() => {
+    if (!stage) return;
+    const timer = setTimeout(() => {
+      const box = boxes.current.get(stage);
+      const { x: left, width } = shown.current;
+      if (!box || !width) return;
+      const end = box.x + box.width + CHECK_ROOM;
+      if (box.x < left) strip.current?.scrollTo({ x: Math.max(0, box.x - space[4]), animated: !reduced });
+      else if (end > left + width) strip.current?.scrollTo({ x: end - width + space[4], animated: !reduced });
+    }, durations.fast);
+    return () => clearTimeout(timer);
+  }, [stage, reduced]);
+  const measured = (key: string) => (event: LayoutChangeEvent) => {
+    const { x, width } = event.nativeEvent.layout;
+    boxes.current.set(key, { x, width });
+  };
+
   const people = (list.data?.pages ?? []).flatMap((page) => asList(page));
   const extra = [role, modality, source].filter(Boolean).length;
   const anyFilter = Boolean(stage || q || extra);
@@ -170,9 +196,11 @@ export function Barrio({ header, filters, onFilters }: { header: ReactNode; filt
     const meta = personStage(key);
     if (key === 'conversation' && summary.data && count === null) return <UnavailableChip key={key} label={meta.label} />;
     return (
-      <FilterChip key={key} pressed={stage === key} onPress={() => onFilters({ stage: stage === key ? '' : key })}>
-        {`${meta.label}${count !== undefined && count !== null ? ` · ${count}` : ''}`}
-      </FilterChip>
+      <View key={key} onLayout={measured(key)}>
+        <FilterChip pressed={stage === key} onPress={() => onFilters({ stage: stage === key ? '' : key })}>
+          {`${meta.label}${count !== undefined && count !== null ? ` · ${count}` : ''}`}
+        </FilterChip>
+      </View>
     );
   };
   const total = totalCount(summary.data);
@@ -181,7 +209,21 @@ export function Barrio({ header, filters, onFilters }: { header: ReactNode; filt
     <View style={styles.header}>
       {header}
       <NetworkWarnings summary={summary.data} />
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.strip} accessibilityLabel="Filtrar por etapa" testID="stage-chips">
+      <ScrollView
+        ref={strip}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.strip}
+        accessibilityLabel="Filtrar por etapa"
+        testID="stage-chips"
+        onLayout={(event) => {
+          shown.current.width = event.nativeEvent.layout.width;
+        }}
+        onScroll={(event) => {
+          shown.current.x = event.nativeEvent.contentOffset.x;
+        }}
+        scrollEventThrottle={16}
+      >
         <FilterChip pressed={!stage} onPress={() => onFilters({ stage: '' })}>
           {`Todas${total !== undefined ? ` · ${total}` : ''}`}
         </FilterChip>

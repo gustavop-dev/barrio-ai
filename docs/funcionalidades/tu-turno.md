@@ -184,9 +184,9 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
 - **Criterios de aceptación:**
   1. **Dado** una pregunta abierta, **cuando** pulsa «Responder con audio», **entonces** se abre la hoja de captura con el chip «Responde a <agente>» y la pregunta.
   2. **Dado** el envío con texto o audio, **cuando** el equipo lo procesa, **entonces** la pregunta queda respondida con la visibilidad elegida (o la sugerida) y la captura termina en `dato_guardado` con «Está en Lo que el equipo sabe de ti · Público/Privado».
-  3. **Dado** que la pregunta se cerró antes de enviar, **cuando** se envía, **entonces** la API responde 409 «Esa pregunta ya no está abierta.».
-- **Brechas código/docs:** en la app, enviar con audio falla hoy ([CAP-04](captura.md#cap-04)).
-- **Cobertura QA:** E2E `04-tu-turno-mas` (criterio 1: la hoja de captura con «Responde a …» y la pregunta) y `05-captura-contexto` (1 y el envío con audio que llega al backend). El 2 necesita el worker; el 3, backend.
+  3. **Dado** que la pregunta se cerró antes de enviar o mientras se transcribía el audio, **cuando** el equipo lo procesa, **entonces** lo que dijo no se pierde: queda como dato privado en «Lo que el equipo sabe de ti» y la captura dice «La pregunta ya estaba cerrada: tu respuesta quedó en Lo que el equipo sabe de ti · Privado».
+- **Brechas código/docs:** —
+- **Cobertura QA:** E2E `04-tu-turno-mas` (criterio 1: la hoja de captura con «Responde a …» y la pregunta) y `05-captura-contexto` (1 y el envío con audio que llega al backend). El 2 necesita el worker; el 3 lo cubren las pruebas del backend (`test_capturas`).
 
 ### TUR-11 · «Más tarde» y las pospuestas <a id="tur-11"></a>
 

@@ -135,7 +135,7 @@ export function ResultadosScreen() {
       <PageHeader title="Resultados" />
       <ResumenSemanal />
       <View style={styles.controls}>
-        <Segmented label="Periodo" testID="res-periodo" value={String(dias)} options={PERIOD_OPTIONS} onChange={(value) => setParams({ dias: value === '28' ? '' : value })} />
+        <Segmented label="Periodo" showLabel testID="res-periodo" value={String(dias)} options={PERIOD_OPTIONS} onChange={(value) => setParams({ dias: value === '28' ? '' : value })} />
         <View style={styles.selects}>
           <View style={styles.select}>
             <Select label="Modalidad" value={modalidad} options={RESULTADOS_MODALITIES} onChange={(value) => setParams({ modalidad: value === 'todo' ? '' : value })} testID="res-modalidad" />

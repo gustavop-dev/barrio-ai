@@ -66,16 +66,16 @@ describe('Persona', () => {
     expect(await screen.findByText('Lucía Ficticia')).toBeOnTheScreen();
     expect(screen.getByText('Cofundadora @ Huerta Labs (pre-seed)')).toBeOnTheScreen();
     expect(screen.getByText('Medellín, Colombia · 1.er grado · Lo sigues')).toBeOnTheScreen();
-    expect(within(screen.getByTestId('persona-head')).getByText('Conectado')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('persona-head')).getByText('Conectada')).toBeOnTheScreen(); // agrees with Lucía (backlog #18)
     await fireEvent.press(screen.getByTestId('persona-name'));
     expect(open).toHaveBeenLastCalledWith('https://www.linkedin.com/in/persona-c-1');
     await fireEvent.press(screen.getAllByText('Abrir en LinkedIn')[0]!);
     expect(open).toHaveBeenLastCalledWith('https://www.linkedin.com/in/persona-c-1');
 
     const track = within(screen.getByLabelText('Recorrido de Lucía Ficticia'));
-    expect(track.getByLabelText('Descubierto, hecho, 21 oct')).toBeOnTheScreen();
-    expect(track.getByLabelText('Seguido, hecho, 22 oct')).toBeOnTheScreen();
-    expect(track.getByLabelText('Conectado, ahora, 26 oct')).toBeSelected();
+    expect(track.getByLabelText('Descubierta, hecho, 21 oct')).toBeOnTheScreen();
+    expect(track.getByLabelText('Seguida, hecho, 22 oct')).toBeOnTheScreen();
+    expect(track.getByLabelText('Conectada, ahora, 26 oct')).toBeSelected();
     expect(track.getByLabelText('En conversación, pendiente')).toBeOnTheScreen();
     expect(track.getByLabelText('Oportunidad, pendiente')).toBeOnTheScreen();
 
@@ -94,7 +94,7 @@ describe('Persona', () => {
     expect(screen.getByText('Tu nota · 6 nov')).toBeOnTheScreen();
 
     const history = within(screen.getByTestId('history'));
-    expect(history.getAllByTestId(/^history-/).map((row) => within(row).getAllByText(/.+/)[0]!.props.children)).toEqual(['Conectado', 'Invitado', 'Seguido', 'Descubierto']);
+    expect(history.getAllByTestId(/^history-/).map((row) => within(row).getAllByText(/.+/)[0]!.props.children)).toEqual(['Conectada', 'Invitada', 'Seguida', 'Descubierta']);
 
     // Connected people cannot be discarded (the API answers 409); an opportunity can still be marked.
     expect(screen.queryByText('Descartar')).toBeNull();
@@ -249,16 +249,16 @@ describe('Persona', () => {
   it('builds the journey of an incoming invitation and of a discarded person', () => {
     const incoming = journey(contactFixture('c-1', { source: 'incoming', stage: 'incoming' }));
     expect(incoming.map((s) => [s.label, s.state])).toEqual([
-      ['Descubierto', 'done'],
+      ['Descubierta', 'done'],
       ['Te invitó', 'current'],
-      ['Conectado', 'pending'],
+      ['Conectada', 'pending'],
       ['En conversación', 'pending'],
       ['Oportunidad', 'pending'],
     ]);
     const discarded = journey(contactFixture('c-1', { stage: 'discarded', history: [{ at: '2026-10-25T15:00:00Z', event: 'discarded', detail: 'No encaja' }] }));
     expect(discarded.map((s) => [s.label, s.state, s.date])).toEqual([
-      ['Descubierto', 'done', '21 oct'],
-      ['Descartado', 'alt', '25 oct'],
+      ['Descubierta', 'done', '21 oct'],
+      ['Descartada', 'alt', '25 oct'],
     ]);
   });
 });

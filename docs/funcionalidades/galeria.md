@@ -35,7 +35,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   6. **Dado** un filtro sin resultados, **cuando** lo elige, **entonces** ve «No hay fotos con este filtro.».
   7. **Dado** la carga en curso, **cuando** abre la vista, **entonces** ve «Cargando la galería…»; si falla, ve el error con «Reintentar».
   8. **Dado** un filtro desconocido, **cuando** se pide a la API, **entonces** responde 400 «Usa todas, sin_usar, elegidas o publicadas.».
-- **Brechas código/docs:** las etiquetas «Elegida», «Editada con IA» y «Publicada» existen en la API pero nada las alcanza todavía ([IMG-12](imagenes-en-publicaciones.md#img-12)). En la app, una foto que no carga se queda gris, sin aviso.
+- **Brechas código/docs:** en la app, una foto que no carga se queda gris, sin aviso. Las etiquetas «Elegida», «Editada con IA» y «Publicada» y la línea «Usada en la pieza del …» salen del flujo de imágenes ([IMG-12](imagenes-en-publicaciones.md#img-12)).
 - **Cobertura QA:** E2E `10-galeria` (criterios 1, 2, 3: los textos, «Nueva» y «Sin usar», los cuatro filtros; 6, un filtro vacío con el interruptor de fallos) y `10-galeria-subir` (5, la Galería vacía con el interruptor de fallos). 4, 7 y 8: Jest y backend.
 
 ### GAL-02 · Subir fotos <a id="gal-02"></a>

@@ -76,7 +76,7 @@ describe('Personas · Barrio', () => {
     expect(within(first).getByText('Oportunidad')).toBeInTheDocument();
     expect(within(first).getByText('Comprador')).toBeInTheDocument();
     expect(within(first).getByText('ProjectApp')).toBeInTheDocument();
-    expect(within(first).getByText('Comentó en un post de Elena Prueba · Seguido hace 2 días')).toBeInTheDocument();
+    expect(within(first).getByText('Comentó en un post de Elena Prueba · Seguida hace 2 días')).toBeInTheDocument();
     expect(within(first).getByText('Te toca')).toBeInTheDocument();
 
     const second = list.getByRole('link', { name: /Diego Supuesto/ });

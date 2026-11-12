@@ -146,7 +146,7 @@ Las brechas de cada función van en su ficha. Estas afectan a varias.
 
 **Fallos que comparten causa:**
 - **`expo/fetch` en la app.** Expo SDK 58 sustituye el `fetch` global por `expo/fetch` (`EXPO_PUBLIC_USE_RN_FETCH` no está definido en el repositorio). Eso explica tres fallos a la vez:
-  - las subidas con audio o fotos no salen del teléfono (`Unsupported FormDataPart implementation`): [CAP-04](captura.md#cap-04), [CAP-05](captura.md#cap-05), [GAL-02](galeria.md#gal-02), [CAL-11](calendario-piezas.md#cal-11), [PRS-05](personas-oportunidades.md#prs-05), [TUR-10](tu-turno.md#tur-10);
+  - las subidas con audio o fotos no salían del teléfono (`Unsupported FormDataPart implementation`): [CAP-04](captura.md#cap-04), [CAP-05](captura.md#cap-05), [GAL-02](galeria.md#gal-02), [CAL-11](calendario-piezas.md#cal-11), [PRS-05](personas-oportunidades.md#prs-05), [TUR-10](tu-turno.md#tur-10). **Arreglado** en el PR #51: la app sube los archivos con su propio multipart (`movil/src/api/multipart.ts`);
   - los errores de red salían en inglés (`fetch failed: …`): [APP-08](app-movil-instalacion.md#app-08), [ACC-02](acceso.md#acc-02), [CAP-06](captura.md#cap-06). **Arreglado** en el PR #52: el transporte de la app convierte el `FetchError` en un `NetworkError` (un `TypeError`);
   - abrir la app sin conexión, o con el servidor dando un 5xx, cerraba la sesión: [ACC-06](acceso.md#acc-06). **Arreglado** en el PR #52: solo un 401 o `authenticated:false` cierran la sesión al arrancar.
 
@@ -156,7 +156,7 @@ Las brechas de cada función van en su ficha. Estas afectan a varias.
 **Documentos desfasados:**
 - **Pantallas que ya no existen.** `CONTRATO-API.md` sigue describiendo `/acciones`, `/red` y `/maquina` como pantallas vivas; la PWA las redirige ([CAL-16](calendario-piezas.md#cal-16)).
 - **Diseño original fuera de `main`.** `oficina/PLAN-REDISENO.md` y `oficina/DISENO-VISTAS.md`, que citan `CONTRATO-API.md`, `rediseno-backend.md` y varios docstrings, solo existen en la rama `feat/rediseno-oficina`. `FUNCIONES-NUEVAS.md`, que citan `capturas.py` y `docs/capturas-galeria.md`, no existe en ninguna rama.
-- **`movil/README.md`.** Dice que Oficina, Resultados, Personas y la ficha de una persona salen «En construcción», que Skia no está instalado y que no hay proyecto ni builds de EAS, y manda usar un perfil `development` que `eas.json` no tiene. El código ya tiene esas pantallas, Skia, perfiles `preview` y `production` y el `projectId` de EAS. El README tampoco menciona que las push en el APK necesitan `android.googleServicesFile` ([PUS-07](notificaciones-push.md#pus-07)).
+- **`movil/README.md`.** Dice que Oficina, Resultados, Personas y la ficha de una persona salen «En construcción», que Skia no está instalado y que no hay proyecto ni builds de EAS, y manda usar un perfil `development` que `eas.json` no tiene. El código ya tiene esas pantallas, Skia, perfiles `preview` y `production` y el `projectId` de EAS.
 - **`oficina/README.md` describe la PWA de antes del rediseño.** Nombra páginas que ya no existen como tales (Máquina, Acciones, Contenido, Referentes, Red, Conocimiento, Memoria), un `scene/simulation.ts` que no está en el código y los botones «Activar ambiente» y «Luz de tarde». Las rutas actuales son Oficina, Tu turno, Notificaciones, Calendario, Resultados, Personas, Galería y Ajustes.
 - **La fase de imagen.** `capturas-galeria.md`, `publicacion-diaria.md` y `CONTRATO-API.md` la anuncian, pero ningún código la implementa: ver [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md). El tablero de reglas de infografías solo está en el canvas de Gustavo, no en el repositorio.
 - **CI y documentación.** El filtro de rutas de `.github/workflows/barrio-ai.yml` no incluye `docs/`, así que un PR que solo cambia este catálogo no dispara CI.
@@ -166,7 +166,6 @@ Las brechas de cada función van en su ficha. Estas afectan a varias.
 Todo el catálogo sale de leer el código; no se ejecutó nada. Quedan sin comprobar en un dispositivo o en el servidor:
 - que la app falle exactamente con `Unsupported FormDataPart implementation` en el teléfono (deducido del código instalado de `expo@58.0.23`);
 - que abrir la app sin conexión cierre la sesión;
-- que la push del APK falle por la falta de `googleServicesFile`;
 - si el reproductor de audio de la app envía la cabecera `Authorization` en Android;
 - el manifiesto final de Android (`CAMERA`, `POST_NOTIFICATIONS`);
 - la conexión de LinkedIn desde la app de principio a fin;

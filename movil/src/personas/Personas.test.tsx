@@ -65,7 +65,7 @@ describe('Personas · Barrio', () => {
     expect(first.getByText('Oportunidad')).toBeOnTheScreen();
     expect(first.getByText('Comprador')).toBeOnTheScreen();
     expect(first.getByText('ProjectApp')).toBeOnTheScreen();
-    expect(first.getByText('Comentó en un post de Elena Prueba · Seguido hace 2 días')).toBeOnTheScreen();
+    expect(first.getByText('Comentó en un post de Elena Prueba · Seguida hace 2 días')).toBeOnTheScreen();
     expect(first.getByText('Te toca')).toBeOnTheScreen();
 
     const second = within(screen.getByTestId('person-c-2'));

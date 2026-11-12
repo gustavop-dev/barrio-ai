@@ -2,7 +2,8 @@
 
 With one gesture Gustavo sends the team a voice note, photos and a note. The job `process_capture` transcribes the
 audio with AssemblyAI and routes the text (the note plus the transcript):
-- context pregunta  -> answers that TeamQuestion (confirmed memory, with the visibility he chose);
+- context pregunta  -> answers that TeamQuestion (confirmed memory, with the visibility he chose); if it closed
+                       before the answer arrived, a private fact, so what he said is never lost;
 - context persona   -> a note on the contact;
 - context pieza     -> a comment for the team on the piece (piece detail `team_comments`, director feedback);
 - purpose dato      -> a private confirmed fact `nota.captura-<id>`;
@@ -39,6 +40,7 @@ WEEKDAYS=['lunes','martes','miércoles','jueves','viernes','sábado','domingo']
 WEEKDAYS_SHORT=['lun','mar','mié','jue','vie','sáb','dom']
 MONTHS=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic']
 SAVED_TEXT='Está en Lo que el equipo sabe de ti · {}'
+CLOSED_QUESTION_TEXT='La pregunta ya estaba cerrada: tu respuesta quedó en Lo que el equipo sabe de ti · Privado'
 UUID=re.compile(r'[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}')
 
 # --------------------------------------------------------------------------- dates and labels
@@ -236,7 +238,6 @@ def create(user,data,audio=None,photos=()):
     if kind:
         target=context_object(kind,ident)
         if target is None:raise ValueError('El elemento ligado a la captura no existe.')
-        if kind=='pregunta' and target.state!=TeamQuestion.State.OPEN:raise Conflict('Esa pregunta ya no está abierta.')
         ident=str(target.id)
     if kind=='pregunta' or purpose in ('dato','respuesta'):require(user,'confirm_memory')
     audio_mime,audio_ext=check_audio(audio) if audio is not None else ('','')
@@ -304,9 +305,17 @@ def _destination(capture):
 
 def _route_question(capture,user,text):
     question=context_object('pregunta',capture.context_id)
-    if question is None:raise ValueError('La pregunta ya no existe.')
-    item=preguntas.answer(user,question.id,_clip(text,preguntas.MAX_ANSWER),capture.public_use,free=True)
+    item=None
+    if question is not None and question.state==TeamQuestion.State.OPEN:
+        try:item=preguntas.answer(user,question.id,_clip(text,preguntas.MAX_ANSWER),capture.public_use,free=True)
+        except Conflict:item=None  # answered, declined or expired while the audio was being transcribed
     from .oficina_views import ROLES
+    if item is None:
+        # The question closed before the answer arrived. What he said is kept as a private fact, never lost.
+        routed,_,state,role=_route_fact(capture,user,text,question)
+        if question is not None and question.agent in ROLES:role=question.agent
+        return (dict(routed,closed_question=str(question.id) if question else capture.context_id),
+                _outcome('dato_guardado',CLOSED_QUESTION_TEXT,'/tu-turno/sabe'),state,role)
     role=item.agent if item.agent in ROLES else 'posicionamiento'
     return ({'question':str(item.id),'memory_key':item.memory_key,'memory_version':item.memory_version},
             _outcome('dato_guardado',SAVED_TEXT.format('Público' if item.public_use else 'Privado'),'/tu-turno/sabe'),
@@ -337,10 +346,11 @@ def _route_piece(capture,user,text):
             _outcome('anotado',f'Quedó como comentario para el equipo en la pieza del {day_label(piece.slot_date)}',f'/calendario/pieza/{piece.id}'),
             Capture.State.NOTED,'director_editorial')
 
-def _route_fact(capture,user,text):
+def _route_fact(capture,user,text,question=None):
     require(user,'confirm_memory')
     key=f'nota.captura-{capture.id.hex[:10]}'
-    value={'texto':_clip(text,preguntas.MAX_ANSWER),'uso_publico':False,'tema':'Lo enviaste con el botón de captura'}
+    topic=f'Respuesta a «{question.question[:200]}», que ya estaba cerrada' if question is not None else 'Lo enviaste con el botón de captura'
+    value={'texto':_clip(text,preguntas.MAX_ANSWER),'uso_publico':False,'tema':topic}
     result=memory.set_fact(key,value,f'user:{user.pk}',f'Gustavo lo envió con el botón de captura ({capture.id})')
     audit(user,'memory.added',key,public=False,source='captura')
     return ({'memory_key':key,'memory_version':result['version']},
@@ -473,11 +483,11 @@ def _revert(capture,user):
         withdraw_capture(capture)
     elif kind=='perfil_aclaracion':
         TeamQuestion.objects.filter(pk=routed.get('question'),state=TeamQuestion.State.OPEN).update(state=TeamQuestion.State.DECLINED)
-    elif kind=='pregunta':
+    elif kind=='pregunta' and routed.get('question'):
         try:preguntas.undo(user,routed['question'])
         except (Conflict,PermissionDenied,TeamQuestion.DoesNotExist):
             if routed.get('memory_key'):_tombstone(routed['memory_key'],user,capture)
-    elif kind=='dato' and routed.get('memory_key'):_tombstone(routed['memory_key'],user,capture)
+    elif kind in ('dato','pregunta') and routed.get('memory_key'):_tombstone(routed['memory_key'],user,capture)  # incl. a closed question's
     elif kind=='persona':
         contact=Contact.objects.select_for_update().filter(id=routed.get('contact')).first()
         if contact:

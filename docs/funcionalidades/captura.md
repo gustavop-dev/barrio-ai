@@ -125,7 +125,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   2. **Dado** el mismo fallo, **cuando** vuelve el error, **entonces** Gustavo ve un mensaje en español sin tener que desplazarse (un aviso fijo junto al botón de enviar o un toast), además de la vibración en la app.
   3. **Dado** que el teléfono no tiene conexión, **cuando** envía, **entonces** el mensaje es «No hay conexión con el servidor. Comprueba tu red.».
   4. **Dado** una respuesta 413, **cuando** vuelve, **entonces** ve «El envío es demasiado grande» con «El audio puede pesar hasta 25 MB y cada foto hasta 10 MB. Quita alguna foto o graba un audio más corto.».
-  5. **Dado** una respuesta 409 porque la pregunta ya se cerró, **cuando** vuelve, **entonces** ve «No se puede ahora» con «Esa pregunta ya no está abierta.».
+  5. **Dado** una respuesta 409 (por ejemplo, el contexto ya no admite el envío), **cuando** vuelve, **entonces** ve «No se puede ahora» con su `detail`. Una respuesta a una pregunta ya cerrada no da 409: se guarda como dato privado ([TUR-10](tu-turno.md#tur-10)).
   6. **Dado** cualquier otro error de la API, **cuando** vuelve, **entonces** ve su `detail` en español.
   7. **Dado** el mensaje de error, **cuando** se muestra, **entonces** ofrece reintentar el mismo envío con un toque, sin rehacer nada.
   8. **Dado** cualquier fallo, **cuando** se muestra, **entonces** nunca aparece texto técnico en inglés (`Unsupported FormDataPart implementation`, `fetch failed: …`).

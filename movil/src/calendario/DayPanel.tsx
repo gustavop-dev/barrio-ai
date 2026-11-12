@@ -163,7 +163,8 @@ function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today
   );
 }
 
-/** «1 post · 6 comentarios…»: each part opens «Ver todo lo del día» filtered by its type. */
+/** «1 post · 6 comentarios…»: each part opens «Ver todo lo del día» filtered by its type. The «·» closes the part before
+ * it, so a wrapped line never starts with one (backlog #15). */
 function Summary({ day, onPick }: { day: CalendarioDay | undefined; onPick: (tipo: ActividadTipo) => void }) {
   const parts = summaryParts(day);
   if (!parts.length) return <T soft>Sin actividad registrada.</T>;
@@ -171,16 +172,16 @@ function Summary({ day, onPick }: { day: CalendarioDay | undefined; onPick: (tip
     <View style={styles.summary}>
       {parts.map((part, index) => (
         <View key={part.key} style={styles.summaryItem}>
-          {index ? (
-            <T soft importantForAccessibility="no">
-              ·
-            </T>
-          ) : null}
           <Pressable accessibilityRole="button" onPress={() => onPick(part.tipo)} style={styles.summaryPart} hitSlop={{ top: 8, bottom: 8 }}>
             <T soft style={styles.underline}>
               {part.text}
             </T>
           </Pressable>
+          {index < parts.length - 1 ? (
+            <T soft importantForAccessibility="no">
+              ·
+            </T>
+          ) : null}
         </View>
       ))}
     </View>

@@ -20,6 +20,7 @@ import {
   suggestedModality,
 } from '@compartido/logic/barrio';
 import { CONTACT_AFFINITY_LABEL, CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, contactSourceLabel, labelOf } from '@compartido/logic/format';
+import { agree, isFeminineName } from '@compartido/logic/genero';
 import { journey } from '@compartido/logic/journey';
 import { daysInStage, DISCARDABLE, longDate, messageWhen, personStage, shortDate } from '@compartido/logic/personas';
 import { router } from 'expo-router';
@@ -293,6 +294,7 @@ function Notes({ contact, name, editor }: { contact: Contact; name: string; edit
 
 function History({ contact }: { contact: Contact }) {
   const entries = sortHistory(contact.history ?? []);
+  const feminine = isFeminineName(contact.display_name);
   if (!entries.length)
     return (
       <T variant="detalle" soft testID="history-empty">
@@ -304,7 +306,7 @@ function History({ contact }: { contact: Contact }) {
       {entries.map((entry, index) => (
         <View key={`${entry.at}-${index}`} style={styles.event} testID={`history-${index}`}>
           <View style={styles.grow}>
-            <T>{eventLabel(entry)}</T>
+            <T>{eventLabel(entry, feminine)}</T>
             {entry.detail ? (
               <T variant="detalle" soft>
                 {entry.detail}
@@ -435,7 +437,7 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
             <View style={styles.top}>
               <FlightAvatar contactId={contactId} name={name} />
               <BlockIn step={0}>
-                <Badge tone={stage.tone}>{stage.label}</Badge>
+                <Badge tone={stage.tone}>{agree(stage.label, isFeminineName(person.display_name))}</Badge>
               </BlockIn>
             </View>
             {profile ? (

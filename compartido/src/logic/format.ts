@@ -87,6 +87,14 @@ export function shiftDay(date: string, days: number): string {
   return value.toISOString().slice(0, 10);
 }
 
+/**
+ * «08:30», never «8:30»: Hermes (the app's JavaScript engine on Android) ignores `hour: '2-digit'`, so a lone digit
+ * before «:mm» gets its zero here (backlog #12). Browsers already pad it; the result is the same everywhere.
+ */
+export function padHour(text: string): string {
+  return text.replace(/(^|[^\d])(\d):(\d{2})/, '$10$2:$3');
+}
+
 /** Hour of an instant in the machine's time zone (falls back to the device's). */
 export function formatTime(iso: string | null | undefined, timeZone?: string): string {
   if (!iso) return '—';
@@ -94,9 +102,9 @@ export function formatTime(iso: string | null | undefined, timeZone?: string): s
   if (Number.isNaN(date.getTime())) return '—';
   const options: Intl.DateTimeFormatOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
   try {
-    return date.toLocaleTimeString(LOCALE, timeZone ? { ...options, timeZone } : options);
+    return padHour(date.toLocaleTimeString(LOCALE, timeZone ? { ...options, timeZone } : options));
   } catch {
-    return date.toLocaleTimeString(LOCALE, options);
+    return padHour(date.toLocaleTimeString(LOCALE, options));
   }
 }
 

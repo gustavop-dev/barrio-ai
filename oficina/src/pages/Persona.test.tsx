@@ -56,15 +56,15 @@ describe('Persona', () => {
     const [open] = view.getAllByRole('link', { name: 'Abrir en LinkedIn' });
     expect(open).toHaveAttribute('href', 'https://www.linkedin.com/in/persona-c-1');
     expect(open).toHaveAttribute('rel', 'noopener noreferrer');
-    expect(view.getByText('Conectado', { selector: '.badge' })).toBeInTheDocument();
+    expect(view.getByText('Conectada', { selector: '.badge' })).toBeInTheDocument(); // agrees with Lucía (backlog #18)
 
     const track = within(view.getByRole('list', { name: 'Recorrido de Lucía Ficticia' }));
     const steps = track.getAllByRole('listitem');
     expect(steps.map((step) => step.querySelector('.stage-label')?.firstChild?.textContent)).toEqual([
-      'Descubierto',
-      'Seguido',
-      'Invitado',
-      'Conectado',
+      'Descubierta',
+      'Seguida',
+      'Invitada',
+      'Conectada',
       'En conversación',
       'Oportunidad',
     ]);
@@ -256,9 +256,9 @@ describe('Persona', () => {
   it('builds the journey of an incoming invitation and of a discarded person', () => {
     const incoming = journey(contactFixture('c-1', { source: 'incoming', stage: 'incoming' }));
     expect(incoming.map((s) => [s.label, s.state])).toEqual([
-      ['Descubierto', 'done'],
+      ['Descubierta', 'done'],
       ['Te invitó', 'current'],
-      ['Conectado', 'pending'],
+      ['Conectada', 'pending'],
       ['En conversación', 'pending'],
       ['Oportunidad', 'pending'],
     ]);
@@ -266,8 +266,10 @@ describe('Persona', () => {
       contactFixture('c-1', { stage: 'discarded', history: [{ at: '2026-10-25T15:00:00Z', event: 'discarded', detail: 'No encaja' }] }),
     );
     expect(discarded.map((s) => [s.label, s.state, s.date])).toEqual([
-      ['Descubierto', 'done', '21 oct'],
-      ['Descartado', 'alt', '25 oct'],
+      ['Descubierta', 'done', '21 oct'],
+      ['Descartada', 'alt', '25 oct'],
     ]);
+    // A man's name keeps the masculine forms.
+    expect(journey(contactFixture('c-2', { display_name: 'Pedro Salazar', stage: 'followed' })).map((s) => s.label).slice(0, 2)).toEqual(['Descubierto', 'Seguido']);
   });
 });

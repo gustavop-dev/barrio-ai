@@ -173,7 +173,8 @@ La escena llena la pantalla: la recarga se hace tirando hacia abajo desde arriba
 | `officeGestures.panDistance` / `tapDistance` | 8 / 10 dp | Activación del desplazamiento y tolerancia de toque. |
 | `officeGestures.tapDurationMs` / `doubleTapMs` | 250 / 280 ms | Duración máxima de toque e intervalo de doble toque. |
 | `officeGestures.touchTarget` | 48 dp | Área mínima al tocar personajes en el canvas. |
-| `officeGestures.pullRefresh`, `rubberBand`, `springs.snapBack` | 64 dp, 0,35, FIRM | Tirar hacia abajo desde arriba de la escena: el plano cede un 35 % bajo el dedo, recarga al soltar pasado 64 dp y vuelve con `snapBack`. |
+| `officeGestures.pullRefresh`, `rubberBand`, `springs.snapBack` | 64 dp, 0,35, FIRM | Pasado cualquiera de los dos extremos del plano, este cede un 35 % bajo el dedo y vuelve con `snapBack` al soltar. Tirando hacia abajo desde arriba de la escena, además recarga al soltar pasado 64 dp. |
+| `officeGestures.flingDeceleration` / `flingBounce` | 0,998 / 0,6 | Al soltar el plano con velocidad sigue deslizándose como un scroll (`withDecay`), frena y rebota en los extremos. Un toque lo detiene sin elegir nada. De lado solo con zoom (`scene/OfficeCanvas.tsx`). |
 | `officeGestures.sheetActivation` | 8 dp | Inicio del arrastre del asa de `SnapSheet`. |
 | `officeGestures.sheetHalf` / `sheetFull` | 0.5 / 0.88 | Puntos de ajuste de `SnapSheet`, sobre el espacio disponible. |
 | `haptics.officePick` | selección | Selección de un personaje, zona o equipo. |
@@ -291,7 +292,7 @@ Grupos propios en `motion.ts`: `navSprings`, `navTimings`, `navValues`, `navGest
 | `navSprings.tabIcon` / `navValues.tabIconFrom` | SOFT · 0.92 | El icono de la pestaña nueva salta a 0.92 y vuelve a 1 (`BottomBar.tsx`). |
 | `navTimings.tabIn` / `navValues.tabRise` | 180 (fast) · enter · 8 pt | El contenido de la pestaña nueva aparece y sube 8 pt; la barra superior queda quieta (`components/shell/tabTransitions.ts`, en `app/(app)/(tabs)/_layout.tsx`). |
 | `navTimings.tabOut` | 108 (60 % de fast) · exit | El contenido de la pestaña anterior se desvanece. |
-| `navSprings.push` | FIRM | El push: una pantalla de detalle (pieza, persona) entra desde la derecha y vuelve con «‹», el botón atrás de Android o cualquier navegación que la quite (`components/shell/DetailScreen.tsx`, `components/shell/push.ts`). También abre las pantallas de los iconos de arriba (`tabTransitions.ts`). |
+| `navSprings.push` | FIRM | El push: una pantalla de detalle (pieza, persona) entra desde la derecha y vuelve con «‹», el botón atrás de Android o cualquier navegación que la quite (`components/shell/DetailScreen.tsx`, `components/shell/push.ts`). También abre las pantallas de los iconos de arriba (`tabTransitions.ts`). Entre dos de ellas, ir a una anterior en el orden Tu turno, Notificaciones, Calendario, Ajustes es la vuelta: la de arriba sale por la derecha y destapa la otra. Las pestañas se dibujan en ese orden, no la enfocada encima. |
 | `navValues.pushParallax` / `pushDim` | 0.3 · 0.08 | La pantalla de debajo se mueve a la izquierda el 30 % del ancho y se oscurece con tinta al 8 % (`push.ts`, `(tabs)/_layout.tsx`). Con movimiento reducido solo se oscurece. |
 | `navGestures.edgeWidth` | 24 pt | Franja del borde izquierdo de un detalle (bajo la barra superior) que lo arrastra hacia atrás (`DetailScreen.tsx`). |
 | `navGestures.grabFrom` | 0.5 | La franja solo agarra un detalle que está al menos a medio entrar. |

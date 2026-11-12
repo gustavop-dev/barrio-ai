@@ -1,6 +1,7 @@
 // The upload under way: «Subiendo 10 de 23 fotos…», a bar that moves as each request of up to ten
 // photos gets in, and a thumbnail per photo marked as waiting, on its way or uploaded. On a failure,
 // «Reintentar» sends only what did not get in.
+import { ApiError } from '@compartido/api/client';
 import type { PickedPhoto } from '@/capture/types';
 import { useEffect } from 'react';
 import { ActivityIndicator, Image, ScrollView, StyleSheet, View } from 'react-native';
@@ -10,6 +11,9 @@ import { Button, Card, ErrorRetry, T } from '@/components/ui';
 import { timing } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 import type { GalleryUpload } from './upload';
+
+/** The capture sheet's explanation of a 413 (capture/sendError.ts), for photos only. */
+const TOO_BIG = 'Cada foto puede pesar hasta 10 MB. Descarta las que faltan o elige fotos más livianas.';
 
 type PhotoState = 'esperando' | 'subiendo' | 'subida';
 
@@ -77,7 +81,12 @@ export function UploadProgressCard({ upload }: { upload: GalleryUpload }) {
       </ScrollView>
       {error && !pending ? (
         <>
-          <ErrorRetry error={error} title="No se pudieron subir todas las fotos" onRetry={upload.retry} />
+          {/* A 413 says why, as the capture sheet does (backlog #27): one from the proxy carries no readable detail. */}
+          {error instanceof ApiError && error.status === 413 ? (
+            <ErrorRetry error={error} title="Hay fotos demasiado grandes" message={TOO_BIG} onRetry={upload.retry} />
+          ) : (
+            <ErrorRetry error={error} title="No se pudieron subir todas las fotos" onRetry={upload.retry} />
+          )}
           <Button size="small" variant="ghost" quiet onPress={upload.dismiss}>
             Descartar las que faltan
           </Button>

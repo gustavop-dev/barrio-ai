@@ -61,14 +61,14 @@ Cómo entra Gustavo en la PWA (sesión de Django con cookie y CSRF) y en la app 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** si alguien prueba contraseñas, la entrada se bloquea un rato.
-- **Código:** `oficina_views.check_login` (10 fallos por IP y usuario en 15 minutos, contador compartido por `/auth/login` y `/auth/token`).
+- **Código:** `oficina_views.check_login` (10 fallos por IP y usuario en 15 minutos, contador compartido por `/auth/login` y `/auth/token`, guardado en la caché de la base de datos para que todos los procesos de gunicorn vean el mismo).
 - **Criterios de aceptación:**
   1. **Dado** 10 fallos seguidos del mismo usuario desde la misma IP, **cuando** intenta otra vez, **entonces** la API responde 429 «Demasiados intentos; espera unos minutos.» y la interfaz muestra «Demasiados intentos. Espera unos minutos.» con el botón bloqueado 60 s.
   2. **Dado** 10 fallos en la PWA, **cuando** intenta entrar desde la app con el mismo usuario y la misma IP, **entonces** también recibe 429 (el contador es compartido).
   3. **Dado** un acierto, **cuando** entra, **entonces** el contador vuelve a cero.
   4. **Dado** que pasan 15 minutos desde el último fallo, **cuando** intenta, **entonces** ya no está bloqueado.
 - **Brechas código/docs:** —
-- **Cobertura QA:** sin prueba E2E: el contador vive en la caché en memoria de cada worker de gunicorn (3 en la QA), así que 10 fallos no bloquean de forma determinista; lo cubren las pruebas del backend (`test_oficina`) · 2026-11-08
+- **Cobertura QA:** sin prueba E2E: diez intentos fallidos dejarían bloqueado al usuario de QA para los demás flujos; lo cubren las pruebas del backend (`test_oficina`) · 2026-11-11
 
 ### ACC-04 · Volver a donde estaba después de entrar <a id="acc-04"></a>
 

@@ -3,7 +3,8 @@
 import type { PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
 import type { Ajustes, Overview, RedSummary } from '../api/types';
-import { capLines, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
+import { padHour } from './format';
+import { capLines, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, monthAlert, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
 import { inUseWarning, isFiltro, photoPatch, rejectedMessage, uploadedMessage } from './galeria';
 import { linkedinReconnected, linkedinReturnMessage } from './linkedin';
 
@@ -58,6 +59,23 @@ describe('Ajustes', () => {
       { label: 'Este mes', text: 'sin dato' },
       { label: 'Desde el inicio', text: '98,00 USD' },
     ]);
+  });
+
+  it('pads a lone hour digit, as Hermes does not (backlog #12)', () => {
+    expect(padHour('8:30')).toBe('08:30');
+    expect(padHour('Hoy, 8:05')).toBe('Hoy, 08:05');
+    expect(padHour('jueves, 12 de noviembre, 9:00')).toBe('jueves, 12 de noviembre, 09:00');
+    expect(padHour('18:30')).toBe('18:30');
+    expect(padHour('08:30')).toBe('08:30');
+  });
+
+  it('flags the month near or over its limit (backlog #19)', () => {
+    const month = (month_usd: number | null, limit_usd: number | null) => ({ today: [], month_usd, total_usd: 0, limit_usd, lead_month_usd: null });
+    expect(monthAlert(month(61, 120))).toBeNull();
+    expect(monthAlert(month(85, 100))).toEqual({ tone: 'warn', text: 'Cerca del límite del mes' });
+    expect(monthAlert(month(1.04, 1))).toEqual({ tone: 'bad', text: 'Límite del mes alcanzado' });
+    expect(monthAlert(month(null, 100))).toBeNull();
+    expect(monthAlert(month(50, null))).toBeNull();
   });
 
   it('lists every push kind switched off', () => {
