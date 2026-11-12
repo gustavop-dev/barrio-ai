@@ -904,11 +904,13 @@ def propose_comment(user,post_id,origin_job=''):
     if not experimentos.eligible(post):raise ValueError('Cupo del foco experimental agotado.')
     if ActionProposal.objects.filter(post=post,capability='INT-03',state__in=OPEN_ACTION_STATES+['confirmed']).exists():
         raise Conflict('Ya hay un comentario abierto o publicado en esta publicación; no se genera otro.')
-    units,missing,omitted=course_context()
+    from . import catalogo
+    unit_ids,origin=catalogo.units_for('comentar',COMMENT_UNITS)  # the active catalog's core, else the fixed list
+    units,missing,omitted=course_context(unit_ids)
     if missing:raise ValueError('Biblioteca no disponible para fundamentar el comentario.')
     if not units:raise ValueError('Sin unidades del curso para fundamentar el comentario.')
     _audit(user,'operator.comment_grounded',post.id,course_missing=missing,course_omitted=omitted,
-           course_citations=[u['unit_id'] for u in units])
+           course_citations=[u['unit_id'] for u in units],course_source=origin)
     try:others=[{'author':c['author']['display_name'],'text':c['text'][:600]} for c in get_connector(post.account).list_comments(post.provider_post_id,limit=10)]
     except ConnectorError:others=[]
     public_facts,private_guidance=memory.confirmed_blocks()

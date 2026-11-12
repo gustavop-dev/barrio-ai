@@ -1206,3 +1206,44 @@ class ProfileAsset(models.Model):
     provenance=models.JSONField(default=dict,blank=True)
     class Meta:
         constraints=[models.UniqueConstraint(fields=['proposal','version','kind'],name='profile_asset_version_kind')]
+
+
+# ---------------------------------------------------------------------------
+# Library catalog (catalogo.py): course units by shelf and tier, versioned. The content is private course structure:
+# it arrives through `manage.py catalogo cargar` from a private file, never from this public repository.
+
+class LibraryCatalog(models.Model):
+    version=models.CharField(max_length=40,primary_key=True)
+    method=models.TextField(blank=True)
+    sha256=models.CharField(max_length=64)
+    loaded_at=models.DateTimeField(default=timezone.now)
+    class Meta:ordering=['-loaded_at']
+
+
+class CatalogEntry(models.Model):
+    """One unit in one shelf of a catalog version. It points at the unit and never changes it."""
+    class Tier(models.TextChoices):
+        CORE='nucleo','Núcleo: se carga en cada llamada'
+        CONSULT='consulta','Consulta: se busca cuando la tarea lo pide'
+        REFERENCE='referencia','Referencia: se guarda, no se carga'
+    catalog=models.ForeignKey(LibraryCatalog,on_delete=models.CASCADE,related_name='entries')
+    unit_id=models.CharField(max_length=40)
+    shelf=models.CharField(max_length=20)
+    home=models.BooleanField(default=False)
+    tier=models.CharField(max_length=10,choices=Tier.choices)
+    core_rank=models.PositiveSmallIntegerField(null=True,blank=True)
+    score=models.FloatField(null=True,blank=True)
+    reason=models.CharField(max_length=10,blank=True)
+    duplicate_of=models.CharField(max_length=40,blank=True)
+    class Meta:
+        ordering=['catalog','shelf','core_rank','unit_id']
+        constraints=[models.UniqueConstraint(fields=['catalog','unit_id','shelf'],name='catalog_entry_unit_shelf')]
+        indexes=[models.Index(fields=['catalog','shelf','tier'],name='catalog_entry_shelf_tier')]
+
+
+class ActiveShelf(models.Model):
+    """The catalog version an agent's shelf loads its core from. No row: the agent keeps its fixed list in code."""
+    shelf=models.CharField(max_length=20,primary_key=True)
+    catalog=models.ForeignKey(LibraryCatalog,on_delete=models.PROTECT,related_name='active_shelves')
+    activated_at=models.DateTimeField(default=timezone.now)
+    class Meta:ordering=['shelf']

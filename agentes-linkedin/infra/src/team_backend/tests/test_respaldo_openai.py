@@ -1,4 +1,5 @@
-"""OpenAI answers a Claude call that Anthropic refused for its account or availability (providers.claude → openai_text).
+"""OpenAI answers a Claude call that Anthropic refused for its account or availability, or that a connection cut left
+without an answer (providers.claude → openai_text).
 No network: the Anthropic SDK is faked and httpx.post is patched."""
 import json
 import os
@@ -18,7 +19,7 @@ from knowledge import providers
 from team_backend import orquestacion as runtime
 from team_backend.grafo import load_graph
 from team_backend.models import Job, UsageEntry
-from team_backend.tests.fakes import FakeAnthropic, message, status_error
+from team_backend.tests.fakes import FakeAnthropic, message, status_error, timeout_error
 from team_backend.tests.test_orquestacion import REQUEST, RESULT
 
 ENV = {'LIVE_PROVIDERS': 'true', 'ANTHROPIC_API_KEY': 'test-only', 'OPENAI_API_KEY': 'test-only',
@@ -114,6 +115,25 @@ class FallbackTests(TransactionTestCase):
         with self.assertRaisesRegex(ValueError, 'anthropic: HTTP 400'):
             self.call(FakeAnthropic(outcome=anthropic_error(400, 'invalid_request_error', 'messages: field required')))
         self.assertEqual(set(self.rows()), {('anthropic', 'rejected')})
+
+    def test_a_stream_cut_or_a_timeout_keeps_claude_uncertain_and_openai_answers(self):
+        # anthropic streams over httpx2: a connection closed mid-answer arrives as its RemoteProtocolError.
+        for cut in (httpx2.RemoteProtocolError('peer closed connection without sending complete message body'), timeout_error()):
+            UsageEntry.objects.all().delete()
+            result, sent = self.call(FakeAnthropic(outcome=cut), openai=response('Respaldo'))
+            self.assertEqual((result['provider'], result['text'], result['fallback_reason']), ('openai', 'Respaldo', 'conexion'))
+            self.assertEqual(len(sent), 1)
+            rows = self.rows()
+            self.assertEqual(set(rows), {('anthropic', 'uncertain'), ('openai', 'complete')})
+            self.assertEqual(rows[('anthropic', 'uncertain')].usage.get('error_type'), type(cut).__name__)
+            self.assertIsNone(rows[('anthropic', 'uncertain')].usage.get('fallback'))  # it may have been processed and billed
+
+    def test_without_the_fallback_a_stream_cut_keeps_its_reserve_as_uncertain_and_raises_a_handled_error(self):
+        cut = httpx2.RemoteProtocolError('peer closed connection without sending complete message body')
+        with patch.dict(os.environ, {'LLM_FALLBACK': 'off'}), self.assertRaisesRegex(ValueError, 'anthropic: respuesta incierta'):
+            self.call(FakeAnthropic(outcome=cut))
+        self.assertEqual(set(self.rows()), {('anthropic', 'uncertain')})
+        self.assertEqual(self.rows()[('anthropic', 'uncertain')].usage.get('error_type'), 'RemoteProtocolError')
 
     def test_evaluations_disabled_fallback_and_a_missing_openai_key_keep_the_claude_error(self):
         with self.assertRaisesRegex(ValueError, 'anthropic: HTTP 400'):

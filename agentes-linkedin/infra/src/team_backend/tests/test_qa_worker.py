@@ -111,10 +111,11 @@ class WorkerQATests(TransactionTestCase):
         self.assertEqual(self.ledger(), [])
 
     def test_provider_failure_retains_uncertain_cost_and_never_requeues(self):
-        """An ambiguous HTTP failure must preserve its reserve without an automatic second execution."""
+        """An ambiguous HTTP failure must preserve its reserve without an automatic second execution.
+        With the OpenAI fallback on, OpenAI answers it instead (test_respaldo_openai); here it is off."""
         job, _ = jobs.enqueue(self.user, dict(self.task, execute=True))
         worker = Worker.objects.create()
-        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true'}), self.simulated_claude(timeout_error()):
+        with patch.dict(os.environ, {'LIVE_PROVIDERS': 'true', 'LLM_FALLBACK': 'off'}), self.simulated_claude(timeout_error()):
             jobs.process_one(worker)
             again = jobs.process_one(worker)
         job.refresh_from_db()
