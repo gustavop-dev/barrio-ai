@@ -1,10 +1,12 @@
 import type { TestAPI } from './testAPI';
 import type { SceneStatus, StatusMap } from './activity';
-import { AMBIENT_EVERY, OfficeEngine } from './engine';
+import { atWork } from './art';
+import { OfficeEngine } from './engine';
 import type { OfficeEvent } from './events';
 import { SCENE_MOTION as M } from './motion';
-import { sceneBracketLength, sceneHop, selectScene } from './runtime';
-import { ROLES, ROLE_IDS, type CharacterId, type RoleId } from './roles';
+import { REST_IDS } from './plan';
+import { sceneBracketLength, sceneHop, selectScene, startSceneParty } from './runtime';
+import { ROLES, ROLE_IDS, type CharacterId } from './roles';
 
 const BASE = Date.parse('2026-11-07T15:00:00Z');
 const at = (s: number) => new Date(BASE + s * 1000).toISOString();
@@ -265,40 +267,157 @@ describe('OfficeEngine · paused machine and stillness', () => {
   });
 });
 
-describe('OfficeEngine · idle behaviour', () => {
-  const awayIds = (e: OfficeEngine) => e.actors.filter((a) => a.away || a.bubble).map((a) => a.id);
+describe('OfficeEngine · the game room', () => {
+  const free = (e: OfficeEngine) => e.actors.filter((a) => !a.role.service);
 
-  it('never moves anyone without an event when nobody is «en espera»', () => {
-    for (const statuses of [all('trabajando'), all('diseno'), {}]) {
+  it('keeps everyone at its seat with every light on while the activity is unknown', () => {
+    for (const statuses of [{}, all('desconocido')]) {
       const e = engine(statuses);
-      for (let t = 0; t < AMBIENT_EVERY * 4; t += 500) {
+      e.advance(20_000);
+      expect(e.actors.filter((a) => a.away || a.spot).map((a) => a.id)).toEqual([]);
+      expect(Object.values(e.state.light).every((level) => level === 1)).toBe(true);
+    }
+  });
+
+  it('never moves anyone without an event while everyone works or is in design', () => {
+    for (const statuses of [all('trabajando'), all('diseno')]) {
+      const e = engine(statuses);
+      for (let t = 0; t < 40_000; t += 500) {
         e.advance(500);
-        expect(awayIds(e)).toEqual([]);
+        expect(e.actors.filter((a) => a.away || a.bubble).map((a) => a.id)).toEqual([]);
       }
     }
   });
 
-  it('lets only roles «en espera» go for a coffee or chat, never services', () => {
-    const waiting: RoleId[] = ['posicionamiento', 'perfil', 'operador_cuenta'];
-    const e = engine(all('trabajando', Object.fromEntries(waiting.map((id) => [id, 'en_espera']))));
-    const moved = new Set<string>();
-    for (let t = 0; t < AMBIENT_EVERY * 5; t += 250) {
-      e.advance(250);
-      for (const id of awayIds(e)) moved.add(id);
+  it('opens with every free agent already at a pastime of its own, the services at their posts and the office dark', () => {
+    const e = engine(all('en_espera'));
+    e.step(16);
+    const spots = free(e).map((a) => a.spot).filter((spot) => spot !== null);
+    expect(spots).toHaveLength(Math.min(free(e).length, REST_IDS.length));
+    expect(new Set(spots).size).toBe(spots.length);
+    for (const a of free(e)) if (a.spot) {
+      expect(e.state.occupied[a.spot], a.id).toBe(a.id);
+      expect(a.pastime, a.id).not.toBeNull();
     }
-    expect(moved.size).toBeGreaterThan(0);
-    for (const id of moved) expect(['posicionamiento', 'perfil']).toContain(id);
+    expect(atHome(e, 'bibliotecario')).toBe(true);
+    expect(atHome(e, 'operador_cuenta')).toBe(true);
+    e.advance(3_000);
+    expect(e.state.light.juegos).toBe(1);
+    for (const zone of ['operacion', 'observatorio', 'estrategia', 'editorial', 'revision', 'barrio', 'pasillo'] as const) expect(e.state.light[zone], zone).toBe(0);
   });
 
-  it('keeps idle walks out of the way while events play', () => {
+  it('changes pastimes: there are more spots than agents, so even with the whole team resting they move around', () => {
+    expect(REST_IDS.length).toBeGreaterThan(free(engine()).length);
     const e = engine(all('en_espera'));
-    for (let i = 0; i < 12; i++) e.ingest([ev(100 + i, 'entrega', 'operador_cuenta', { destino: 'director_editorial', ts: at(100 + i) })], at(100 + i));
-    const extra = new Set<string>();
-    for (let t = 0; t < 30_000; t += 250) {
-      e.advance(250);
-      for (const a of e.actors) if (a.away && a.id !== 'operador_cuenta') extra.add(a.id);
+    e.step(16);
+    const first = new Map(e.actors.map((a) => [a.id, a.spot]));
+    e.advance(90_000);
+    const moved = free(e).filter((a) => a.spot !== first.get(a.id));
+    expect(moved.length).toBeGreaterThan(free(e).length / 2);
+  });
+
+  it('calls the director to the desk for a capture, lights Editorial, and lets the director rest again after it', () => {
+    const e = engine(all('en_espera')), d = e.byId.director_editorial;
+    e.step(16);
+    expect(d.spot).not.toBeNull();
+    e.receiveCapture();
+    // Called away from a pastime, the director hurries.
+    until(e, () => d.hurry);
+    expect(d.spot).toBeNull();
+    until(e, () => atHome(e, 'director_editorial'));
+    // Operación waits at Editorial until the director sits, then hands the capture over.
+    until(e, () => d.bubble?.icon === 'charla');
+    until(e, () => e.state.light.editorial === 1);
+    until(e, () => !e.state.captureActive);
+    expect(atHome(e, 'operador_cuenta')).toBe(true);
+    until(e, () => d.spot !== null, 90_000);
+  });
+
+  it('sends a resting agent with a delivery to its desk first, screen on, then to its colleague, called to its seat', () => {
+    const e = engine(all('en_espera')), p = e.byId.perfil, q = e.byId.posicionamiento;
+    e.step(16);
+    expect(p.spot).not.toBeNull();
+    e.ingest([ev(1, 'entrega', 'perfil', { destino: 'posicionamiento' })], NOW);
+    expect(p.spot).toBeNull();
+    expect(p.busy).toBe(true);
+    expect(p.hurry).toBe(true);
+    until(e, () => atHome(e, 'perfil'));
+    expect(atWork(e.state, p.index)).toBe(true);
+    until(e, () => q.bubble?.icon === 'charla');
+    expect(atHome(e, 'posicionamiento')).toBe(true);
+    until(e, () => !p.busy);
+    until(e, () => p.spot !== null && q.spot !== null, 90_000);
+  });
+
+  it('walks an agent whose state turns «trabajando» to its seat, and back to a pastime when it waits again', () => {
+    const e = engine(all('en_espera')), c = e.byId.copywriter_a;
+    e.step(16);
+    expect(c.spot).not.toBeNull();
+    e.setStatuses(all('en_espera', { copywriter_a: 'trabajando' }));
+    until(e, () => atHome(e, 'copywriter_a'));
+    until(e, () => e.state.light.editorial === 1);
+    expect(atWork(e.state, c.index)).toBe(true);
+    e.setStatuses(all('en_espera'));
+    until(e, () => c.spot !== null && c.pastime !== null && c.path === null);
+  });
+
+  it('lets the resting agents talk: every one says something and a partner answers', () => {
+    const e = engine(all('en_espera'));
+    const waiting = new Map<string, string>();
+    const talkers = new Set<string>();
+    let answers = 0;
+    for (let t = 0; t < 60_000; t += 16) {
+      e.step(16);
+      for (const a of e.actors) {
+        if (a.reply) waiting.set(a.id, a.reply);
+        if (!a.bubble) continue;
+        talkers.add(a.id);
+        if (waiting.get(a.id) === a.bubble.icon) { answers++; waiting.delete(a.id); }
+      }
     }
-    expect([...extra]).toEqual([]);
+    for (const a of free(e)) expect(talkers.has(a.id), a.id).toBe(true);
+    expect(talkers.has('bibliotecario')).toBe(false);
+    expect(answers).toBeGreaterThan(0);
+  });
+
+  it('dozes off at night: «zzz» only between 22:00 and 6:00 on the phone', () => {
+    const icons = (hour: number) => {
+      const e = new OfficeEngine({ wallClock: () => new Date(2026, 10, 7, hour, 30).getTime() });
+      e.setStatuses(all('en_espera'));
+      const seen = new Set<string>();
+      for (let t = 0; t < 30_000; t += 100) {
+        e.advance(100);
+        for (const a of e.actors) if (a.bubble) seen.add(a.bubble.icon);
+      }
+      return seen;
+    };
+    expect(icons(23).has('zzz')).toBe(true);
+    expect(icons(15).has('zzz')).toBe(false);
+  });
+
+  it('throws a party: someone joins the dance floor, the chat or the microphone', () => {
+    const e = engine(all('en_espera'));
+    e.step(16);
+    const party = (a: OfficeEngine['actors'][number]) => a.pastime === 'baila' || a.pastime === 'charla' || a.pastime === 'canta';
+    const before = new Set(e.actors.filter(party).map((a) => a.id));
+    startSceneParty(e.state);
+    const joined = new Set<string>();
+    for (let t = 0; t < 25_000; t += 100) {
+      e.advance(100);
+      for (const a of e.actors) if (party(a) && !a.path && !before.has(a.id)) joined.add(a.id);
+    }
+    expect(e.state.partyUntil).toBeGreaterThan(e.clock);
+    expect(joined.size).toBeGreaterThan(0);
+  });
+
+  it('with reduced motion sets the free agents at the rest spots in a fixed order, the lights already set', () => {
+    const e = engine(all('en_espera'));
+    e.setStill(true);
+    free(e).forEach((a, i) => expect(a.spot, a.id).toBe(REST_IDS[i] ?? null));
+    expect(atHome(e, 'operador_cuenta')).toBe(true);
+    expect(e.activeTasks).toBe(0);
+    expect(e.state.light.juegos).toBe(1);
+    expect(e.state.light.editorial).toBe(0);
   });
 });
 

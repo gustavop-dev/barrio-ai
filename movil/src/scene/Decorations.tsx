@@ -1,94 +1,82 @@
-import { Group, ImageShader, Picture, Rect, Skia, type SkImage, type SkPicture } from '@shopify/react-native-skia';
+import { Picture, Skia, type SkCanvas } from '@shopify/react-native-skia';
 import { useMemo, useState } from 'react';
-import { useAnimatedReaction, useDerivedValue, useSharedValue, type SharedValue } from 'react-native-reanimated';
-import type { BubbleIcon } from '@compartido/scene/model';
-import { sceneBracketLength, sceneStatus, type SceneState } from '@compartido/scene/runtime';
+import { useDerivedValue, type SharedValue } from 'react-native-reanimated';
+import { paintFloor, paintLights, type Pen, type ScenePalette } from '@compartido/scene/art';
+import { PLAN_HEIGHT, PLAN_WIDTH } from '@compartido/scene/plan';
+import { sceneBracketLength, type SceneState } from '@compartido/scene/runtime';
 import { CHARACTERS, LIBRARY, TEAMS, type CharacterId, type ZoneId } from '@compartido/scene/roles';
-import { ATLAS } from '@compartido/scene/atlas';
 import { officeMotion } from '@/theme/motion';
-import { colors, officeRoom } from '@/theme/tokens';
-import { bubblePicture, mailPicture, pointerPicture, zonePicture } from './decorations';
+import { colors } from '@/theme/tokens';
+import { mailPicture, pointerPicture, zonePicture } from './decorations';
 
-export type BubblePictures = Record<BubbleIcon, SkPicture>;
-export function useDecorations() {
-  const [pictures] = useState(() => ({
-    libro: bubblePicture('libro'), hoja: bubblePicture('hoja'), cafe: bubblePicture('cafe'), listo: bubblePicture('listo'),
-    pregunta: bubblePicture('pregunta'), busca: bubblePicture('busca'), charla: bubblePicture('charla'),
-  }));
-  const [chatter] = useState(() => [pictures.charla, bubblePicture('charla', 1), bubblePicture('charla', 2)]);
-  const [pointer] = useState(pointerPicture);
-  return { pictures, chatter, pointer };
-}
-function ActorMarks({ index, scene, pictures, chatter, pointer, selected }: {
-  index: number; scene: SharedValue<SceneState>; pictures: BubblePictures; chatter: SkPicture[]; pointer: SkPicture; selected: CharacterId | null;
-}) {
-  const [initialMatrix] = useState(() => Skia.Matrix());
-  const matrix = useSharedValue(initialMatrix);
-  useAnimatedReaction(() => scene.value, (s) => {
-    const a = s.actors[index]!;
-    matrix.modify((m) => m.identity().translate(Math.round(a.x), Math.round(a.y)));
-  });
-  const light = useDerivedValue(() => {
-    const s = scene.value; const a = s.actors[index]!;
-    return !s.paused && !s.frozen && !a.away && sceneStatus(s, a.id) === 'trabajando' ? 1 : 0;
-  });
-  const lightColor = useDerivedValue(() => scene.value.still || Math.floor(scene.value.clock / scene.value.motion.lightMs + index) % 3 !== 0 ? colors.brand : colors.brandDeep);
-  const bubbleVisible = useDerivedValue(() => scene.value.actors[index]!.bubble ? 1 : 0);
-  const bubble = useDerivedValue(() => {
-    const s = scene.value; const kind = s.actors[index]!.bubble?.icon;
-    if (kind === 'charla') return chatter[s.still ? 0 : Math.floor(s.clock / s.motion.bubbleFrameMs) % 3]!;
-    return pictures[kind ?? 'libro'];
-  });
-  const pointerY = useDerivedValue<number>(() => scene.value.actors[index]!.bubble ? -58 : -46);
-  const pointerMatrix = usePointerMatrix(pointerY);
-  return <Group matrix={matrix}>
-    <Group opacity={light}>
-      <Rect x={5} y={-31} width={4} height={4} color={colors.ink} />
-      <Rect x={6} y={-30} width={2} height={2} color={lightColor} />
-    </Group>
-    <Group transform={[{ translateY: -42 }]} opacity={bubbleVisible}><Picture picture={bubble} /></Group>
-    {selected === CHARACTERS[index]!.id ? <Group origin={{ x: 0, y: 0 }}><Picture picture={pointer} matrix={pointerMatrix} /></Group> : null}
-  </Group>;
-}
-// Always called by its own component (a selected pointer may mount/unmount independently).
-function usePointerMatrix(y: SharedValue<number>) {
-  return useDerivedValue(() => Skia.Matrix().translate(0, y.value));
+const PALETTE: ScenePalette = {
+  tinta: colors.ink, tintaSuave: colors.inkSoft, papel: colors.paper, ofc: colors.brand, hondo: colors.brandDeep, claro: colors.brandLight, postit: colors.postIt,
+};
+
+/** The shared art's pen over a Skia canvas being recorded on the UI thread. Only rectangles: the lights draw no sprites. */
+function lightPen(canvas: SkCanvas): Pen {
+  'worklet';
+  const paint = Skia.Paint();
+  paint.setAntiAlias(false);
+  return {
+    rect: (x, y, w, h, color, alpha = 1) => {
+      if (alpha <= 0) return;
+      paint.setColor(Skia.Color(color));
+      paint.setAlphaf(Math.min(1, alpha));
+      canvas.drawRect(Skia.XYWHRect(x, y, w, h), paint);
+    },
+    sprite: () => {},
+  };
 }
 
-function Monitor({ index, scene, atlas }: { index: number; scene: SharedValue<SceneState>; atlas: SkImage }) {
-  const [x, y] = CHARACTERS[index]!.monitor!;
-  const r = ATLAS.monitorFront!;
-  const lit = useDerivedValue(() => {
-    const s = scene.value; const a = s.actors[index]!;
-    return !s.paused && !s.frozen && !a.away && sceneStatus(s, a.id) === 'trabajando' ? 1 : 0;
+/**
+ * The dance floor, under the people. Recorded again each frame the scene changes, on the UI thread: the scene's own
+ * clock decides what is lit, so nothing here goes through React.
+ */
+export function SceneFloor({ scene }: { scene: SharedValue<SceneState> }) {
+  const picture = useDerivedValue(() => {
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, PLAN_WIDTH, PLAN_HEIGHT));
+    paintFloor(lightPen(canvas), scene.value);
+    return recorder.finishRecordingAsPicture();
   });
-  return <Group transform={[{ translateX: x }, { translateY: y }]}>
-    <Rect x={0} y={0} width={r[2]} height={r[3]}>
-      <ImageShader image={atlas} tx="clamp" ty="clamp" transform={[{ translateX: -r[0] }, { translateY: -r[1] }]} sampling={{ filter: 0, mipmap: 0 }} />
-    </Rect>
-    <Rect x={2} y={2} width={25} height={12} color={officeRoom.screenOff} />
-    <Rect x={3} y={3} width={23} height={1} color={officeRoom.screenOffLine} />
-    <Group opacity={lit}>
-      <Rect x={2} y={2} width={25} height={12} color={colors.brandLight} />
-      <Rect x={2} y={2} width={25} height={2} color={colors.brand} />
-      <Rect x={4} y={6} width={13} height={1} color={colors.brandDeep} />
-      <Rect x={4} y={9} width={17} height={1} color={officeRoom.screenLine} />
-      <Rect x={4} y={12} width={9} height={1} color={officeRoom.screenLine} />
-    </Group>
-  </Group>;
+  return <Picture picture={picture} />;
 }
-export function Monitors({ scene, atlas }: { scene: SharedValue<SceneState>; atlas: SkImage }) {
-  return CHARACTERS.map((a, index) => a.monitor ? <Monitor key={a.id} index={index} scene={scene} atlas={atlas} /> : null);
+
+/**
+ * Over the people: the dark of the empty zones, the screens in use, the game room's lights, the working lights and the
+ * speech bubbles (only while an actor has one: a bubble is never left drawn with its opacity at zero).
+ */
+export function SceneLights({ scene }: { scene: SharedValue<SceneState> }) {
+  const picture = useDerivedValue(() => {
+    const recorder = Skia.PictureRecorder();
+    const canvas = recorder.beginRecording(Skia.XYWHRect(0, 0, PLAN_WIDTH, PLAN_HEIGHT));
+    paintLights(lightPen(canvas), scene.value, PALETTE);
+    return recorder.finishRecordingAsPicture();
+  });
+  return <Picture picture={picture} />;
 }
+
 export function Decorations({ scene, selected, zone }: { scene: SharedValue<SceneState>; selected: CharacterId | null; zone: ZoneId | null }) {
-  const pictures = useDecorations();
   const box = zone === 'biblioteca' ? LIBRARY.box : TEAMS.find((t) => t.id === zone)?.box;
+  const index = selected ? CHARACTERS.findIndex((c) => c.id === selected) : -1;
   return <>
-    {CHARACTERS.map((a, index) => <ActorMarks key={a.id} index={index} scene={scene} selected={selected} {...pictures} />)}
     <CaptureMail scene={scene} />
     {box ? <ZoneBrackets key={zone} scene={scene} box={box} /> : null}
+    {index >= 0 ? <SelectedPointer key={selected} scene={scene} index={index} /> : null}
   </>;
 }
+
+// Its own component, mounted with the selection, so its derived matrix never belongs to the previous character.
+function SelectedPointer({ scene, index }: { scene: SharedValue<SceneState>; index: number }) {
+  const [picture] = useState(pointerPicture);
+  const matrix = useDerivedValue(() => {
+    const a = scene.value.actors[index]!;
+    return Skia.Matrix().translate(Math.round(a.x), Math.round(a.y - 46 - (a.bubble ? 12 : 0)));
+  });
+  return <Picture picture={picture} matrix={matrix} />;
+}
+
 // Its own component, mounted with the zone: a derived value created in the parent still held the previous
 // (empty) brackets when the zone appeared, and <Picture> received undefined and crashed the scene.
 function ZoneBrackets({ scene, box }: { scene: SharedValue<SceneState>; box: readonly number[] }) {
@@ -97,13 +85,15 @@ function ZoneBrackets({ scene, box }: { scene: SharedValue<SceneState>; box: rea
   return <Picture picture={picture} />;
 }
 
+// Hidden by moving it far off the plan, not by a zero opacity: the old bubbles, hidden with opacity 0, stayed on
+// screen on Android.
+const OFF_PLAN = -10000;
 function CaptureMail({ scene }: { scene: SharedValue<SceneState> }) {
   const [picture] = useState(mailPicture);
-  const [initialMatrix] = useState(() => Skia.Matrix());
-  const matrix = useSharedValue(initialMatrix);
-  useAnimatedReaction(() => scene.value, (s) => {
-    if (s.mail) matrix.modify((m) => m.identity().translate(Math.round(s.mail!.x), Math.round(s.mail!.y)));
+  const matrix = useDerivedValue(() => {
+    const s = scene.value;
+    const mail = s.mail && !s.still ? s.mail : null;
+    return Skia.Matrix().translate(mail ? Math.round(mail.x) : OFF_PLAN, mail ? Math.round(mail.y) : OFF_PLAN);
   });
-  const opacity = useDerivedValue(() => scene.value.mail && !scene.value.still ? 1 : 0);
-  return <Group opacity={opacity} matrix={matrix}><Picture picture={picture} /></Group>;
+  return <Picture picture={picture} matrix={matrix} />;
 }

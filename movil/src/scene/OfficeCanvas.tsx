@@ -2,16 +2,16 @@ import { Canvas, Group, Picture, Skia, useImage } from '@shopify/react-native-sk
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
 import { GestureDetector, useExclusiveGestures, usePanGesture, usePinchGesture, useSimultaneousGestures, useTapGesture, type NativeGesture } from 'react-native-gesture-handler';
-import Animated, { runOnJS, runOnUI, useAnimatedReaction, useAnimatedStyle, useSharedValue, type SharedValue } from 'react-native-reanimated';
+import Animated, { runOnJS, runOnUI, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
 import { PLAN_HEIGHT, PLAN_WIDTH, ZONE_LABELS, zoneAt } from '@compartido/scene/plan';
 import { actorById, hitScene, type SceneState } from '@compartido/scene/runtime';
 import { LIBRARY, ROLES, TEAMS, type CharacterId, type ZoneId } from '@compartido/scene/roles';
 import type { StatusMap } from '@compartido/scene/activity';
 import { Button, Note, Skeleton, T } from '@/components/ui';
-import { officeGestures } from '@/theme/motion';
+import { officeGestures, rubberBand, spring } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
 import ATLAS_IMAGE from '../../assets/brand/sprites-atlas.png';
-import { Decorations, Monitors } from './Decorations';
+import { Decorations, SceneFloor, SceneLights } from './Decorations';
 import { Sprites } from './Sprites';
 import { roomPicture } from './room';
 import { clampPan, zoomAt } from './viewport';
@@ -19,25 +19,42 @@ import { clampPan, zoomAt } from './viewport';
 const ZONE_NAME: Record<ZoneId, string> = { ...Object.fromEntries(TEAMS.map((team) => [team.id, team.name])), biblioteca: LIBRARY.name } as Record<ZoneId, string>;
 
 export type ScenePick = { kind: 'role'; id: CharacterId } | { kind: 'zone'; id: ZoneId };
+/** Where the camera opens: the top of the office, or the game room at the bottom when nobody works. */
+export type SceneFocus = 'arriba' | 'sala';
 export interface OfficeCanvasProps {
   scene: SharedValue<SceneState>; width: number; height: number; scale: number;
   selectedRole: CharacterId | null; selectedZone: ZoneId | null;
   scrollGesture?: NativeGesture; visibleHeight?: number; statuses: StatusMap; onPick: (pick: ScenePick) => void;
+  /** Applied while the person has not moved the scene yet; a later change never takes the camera from them. */
+  focus?: SceneFocus | null;
+  /** The scene fills the screen, so the pull to refresh starts on it: a drag down from the top of the plan. */
+  onPullRefresh?: () => void;
+}
+function restingY(focus: SceneFocus | null | undefined, height: number, content: number) {
+  'worklet';
+  return focus === 'sala' ? clampPan(height - content, height, content) : clampPan(0, height, content);
 }
 /** A retry remounts only the atlas loader, not the simulation or its cursor. */
 export function OfficeCanvas(props: OfficeCanvasProps) {
   const [attempt, setAttempt] = useState(0);
   return <LoadedCanvas key={attempt} {...props} retry={() => setAttempt((n) => n + 1)} />;
 }
-function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone, scrollGesture, visibleHeight = height, statuses, onPick, retry }: OfficeCanvasProps & { retry: () => void }) {
+function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone, scrollGesture, visibleHeight = height, statuses, onPick, focus, onPullRefresh, retry }: OfficeCanvasProps & { retry: () => void }) {
   const [error, setError] = useState<Error | null>(null);
   const atlas = useImage(ATLAS_IMAGE, setError);
   const room = useMemo(() => atlas ? roomPicture(atlas) : null, [atlas]);
   const density = PixelRatio.get();
-  const view = useSharedValue({ x: (width - PLAN_WIDTH * scale) / 2, y: 0, scale });
-  const panStart = useSharedValue({ x: 0, y: 0 });
+  const view = useSharedValue({ x: (width - PLAN_WIDTH * scale) / 2, y: restingY(focus, height, PLAN_HEIGHT * scale), scale });
+  const panStart = useSharedValue({ x: 0, y: 0, top: false });
   const pinchStart = useSharedValue(scale);
   const pinching = useSharedValue(false);
+  // Once the person pans, zooms, taps or picks, the opening focus no longer moves the camera.
+  const touched = useSharedValue(false);
+  // How far the plan follows a pull down from its top (rubber band); it springs back on release.
+  const pull = useSharedValue(0);
+  const [springBack] = useState(() => spring('snapBack'));
+  const focusRef = useRef(focus);
+  useEffect(() => { focusRef.current = focus; }, [focus]);
   // The zone labels are the way into a team (the team strip under the scene is gone): their boxes in logical pixels,
   // measured once laid out, take a tap before the characters under them. The boxes gather on the JS side and each
   // write carries all of them: the labels lay out in one batch, and a shared value read back on JS between two writes
@@ -46,15 +63,24 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   const labelBoxes = useSharedValue<Record<string, readonly [number, number, number, number]>>({});
   const [initialMatrix] = useState(() => Skia.Matrix());
   const matrix = useSharedValue(initialMatrix);
-  useAnimatedReaction(() => view.value, (v) => {
+  useAnimatedReaction(() => ({ x: view.value.x, y: view.value.y + pull.value, scale: view.value.scale }), (v) => {
     matrix.modify((m) => m.identity().translate(Math.round(v.x * density) / density, Math.round(v.y * density) / density).scale(v.scale));
   });
   useEffect(() => {
-    runOnUI(() => { view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: 0, scale }); })();
+    const at = focusRef.current;
+    runOnUI(() => { view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: restingY(at, height, PLAN_HEIGHT * scale), scale }); })();
   }, [width, height, scale, view]);
+  useEffect(() => {
+    if (!focus) return;
+    runOnUI(() => {
+      if (touched.get()) return;
+      view.modify((v) => { v.y = restingY(focus, height, PLAN_HEIGHT * v.scale); return v; });
+    })();
+  }, [focus, height, touched, view]);
   useEffect(() => {
     if (!selectedRole && !selectedZone) return;
     runOnUI(() => {
+      touched.set(true);
       const actor = selectedRole ? actorById(scene.value, selectedRole) : null;
       const box = selectedZone === 'biblioteca' ? LIBRARY.box : TEAMS.find((t) => t.id === selectedZone)?.box;
       const x = actor ? actor.x : box ? box[0] + box[2] / 2 : PLAN_WIDTH / 2;
@@ -65,10 +91,15 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
         return v;
       });
     })();
-  }, [selectedRole, selectedZone, visibleHeight, width, scene, view]);
+  }, [selectedRole, selectedZone, visibleHeight, width, scene, view, touched]);
   const pan = usePanGesture({
     block: scrollGesture, testID: 'office-pan', minDistance: officeGestures.panDistance, maxPointers: 1,
-    onActivate: () => { 'worklet'; panStart.value.x = view.value.x; panStart.value.y = view.value.y; },
+    onActivate: () => {
+      'worklet';
+      touched.set(true);
+      panStart.value.x = view.value.x; panStart.value.y = view.value.y;
+      panStart.value.top = view.value.y >= clampPan(0, visibleHeight, PLAN_HEIGHT * view.value.scale) - 0.5;
+    },
     onUpdate: (event) => {
       'worklet';
       if (pinching.value) return;
@@ -77,11 +108,18 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
         v.y = clampPan(panStart.value.y + event.translationY, visibleHeight, PLAN_HEIGHT * v.scale);
         return v;
       });
+      pull.set(onPullRefresh && panStart.value.top ? rubberBand(Math.max(0, event.translationY), 0) : 0);
     },
+    onDeactivate: (event) => {
+      'worklet';
+      const pulled = panStart.value.top && !pinching.value && event.translationY >= officeGestures.pullRefresh && event.translationY > Math.abs(event.translationX);
+      if (onPullRefresh && pulled && !event.canceled) runOnJS(onPullRefresh)();
+    },
+    onFinalize: () => { 'worklet'; pull.set(withSpring(0, springBack)); },
   });
   const pinch = usePinchGesture({
     block: scrollGesture, testID: 'office-pinch',
-    onActivate: () => { 'worklet'; pinchStart.value = view.value.scale; pinching.value = true; },
+    onActivate: () => { 'worklet'; touched.set(true); pinchStart.value = view.value.scale; pinching.value = true; },
     onUpdate: (event) => {
       'worklet';
       view.modify((v) => { zoomAt(v, pinchStart.value * event.scale, event.focalX, event.focalY, width, visibleHeight, scale, density); return v; });
@@ -90,12 +128,14 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   });
   const reset = useTapGesture({
     testID: 'office-reset', numberOfTaps: 2, maxDelay: officeGestures.doubleTapMs, maxDistance: officeGestures.tapDistance, maxDuration: officeGestures.tapDurationMs,
-    onActivate: () => { 'worklet'; view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: 0, scale }); },
+    // Back to the opening size, at the top of the office.
+    onActivate: () => { 'worklet'; touched.set(true); view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: clampPan(0, visibleHeight, PLAN_HEIGHT * scale), scale }); },
   });
   const tap = useTapGesture({
     testID: 'office-tap', maxDistance: officeGestures.tapDistance, maxDuration: officeGestures.tapDurationMs,
     onActivate: (event) => {
       'worklet';
+      touched.set(true);
       const v = view.value;
       const x = (event.x - v.x) / v.scale; const y = (event.y - v.y) / v.scale;
       const boxes = labelBoxes.value;
@@ -112,7 +152,7 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   const gesture = useSimultaneousGestures(pan, pinch, taps);
   // Labels follow gestures only; walking never changes this view or invokes React.
   const labels = useAnimatedStyle(() => ({ transform: [
-    { translateX: Math.round(view.value.x * density) / density }, { translateY: Math.round(view.value.y * density) / density },
+    { translateX: Math.round(view.value.x * density) / density }, { translateY: Math.round((view.value.y + pull.value) * density) / density },
     { scale: view.value.scale / scale },
   ] }));
   return <View style={{ width, height }}>
@@ -121,8 +161,9 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
         <Canvas style={StyleSheet.absoluteFill} accessibilityRole="image" accessibilityLabel="La oficina en pixel art. Toca a un personaje para ver su rol o una zona para ver su equipo. Los nombres de las zonas también abren su equipo.">
           {atlas && room ? <Group matrix={matrix} antiAlias={false}>
             <Picture picture={room} />
-            <Monitors atlas={atlas} scene={scene} />
+            <SceneFloor scene={scene} />
             <Sprites atlas={atlas} scene={scene} />
+            <SceneLights scene={scene} />
             <Decorations scene={scene} selected={selectedRole} zone={selectedZone} />
           </Group> : null}
         </Canvas>

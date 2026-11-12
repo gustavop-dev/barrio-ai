@@ -1,6 +1,9 @@
 import type { QueueOptions } from './events';
+import type { Pastime, RestId } from './plan';
 import type { CharacterId, Direction, Point, Role } from './roles';
-export type BubbleIcon = 'libro' | 'hoja' | 'cafe' | 'listo' | 'pregunta' | 'busca' | 'charla';
+/** Work icons (the first seven) and the emotes of the agents at rest. */
+export type BubbleIcon = 'libro' | 'hoja' | 'cafe' | 'listo' | 'pregunta' | 'busca' | 'charla'
+  | 'corazon' | 'nota' | 'exclama' | 'risa' | 'estrella' | 'zzz' | 'idea' | 'juego' | 'gota' | 'pizza';
 
 export interface Actor {
   id: CharacterId;
@@ -23,6 +26,19 @@ export interface Actor {
   busy: boolean;
   /** What it is doing because of an event («Consultando la biblioteca: “clase 03”»). */
   doing: string | null;
+  /** The rest spot it holds while it rests (walking there or at it); null at its seat or on an errand. */
+  spot: RestId | null;
+  /** What it does at that spot, once there. */
+  pastime: Pastime | null;
+  /** Scene clock until which it stays at its seat: after its own work, or called by a colleague. */
+  duty: number;
+  /** At its seat: when it leaves to rest (-1 not decided). At rest: when it changes pastime. */
+  restAt: number;
+  /** When it next says something at rest, and the reply it owes a partner. */
+  emoteAt: number;
+  reply: BubbleIcon | null;
+  /** Walks faster: called to its seat, or on its way to an event. */
+  hurry: boolean;
 }
 
 /** The «now» line: the last thing narrated. */

@@ -117,25 +117,3 @@ export type Tone = 'ok' | 'warn' | 'bad' | 'muted' | 'info';
 
 export const theme = { colors, layers, space, radius, shell, fonts, type } as const;
 export type Theme = typeof theme;
-
-// Pixel-art room palette, kept identical to the PWA artwork.
-export const officeRoom = {
-  outside: '#4b5655',
-  plaster: '#eee5cc',
-  plasterLight: '#fff5dd',
-  wainscot: '#9ba998',
-  skirting: '#667b70',
-  wall: '#536b61',
-  wallLight: '#b9c5ae',
-  base: '#526c61',
-  kitchenEdge: '#aa987f',
-  screenOff: '#33403f',
-  screenOffLine: '#3f4e4c',
-  screenLine: '#7fd9c9',
-  white: '#ffffff',
-  book: '#a54e35',
-  bookSpine: '#7a3624',
-  coffee: '#8a6552',
-  steam: '#b9b5ad',
-};
-

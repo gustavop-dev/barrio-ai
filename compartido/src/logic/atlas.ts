@@ -1,10 +1,10 @@
-// Coordinates in sprites-atlas.png (512×1460), from the design's atlas map. Each app serves the image
+// Coordinates in sprites-atlas.png (512×1500), from the design's atlas map. Each app serves the image
 // itself (the PWA at /brand/sprites-atlas.png, the native app from its assets).
 // Character sheets p0–p12 are the LimeZu people of the scene; p13 is the librarian (person9 recoloured).
 import { ROLE_BY_ID, type RoleId } from './roles';
 
 export const ATLAS_WIDTH = 512;
-export const ATLAS_HEIGHT = 1460;
+export const ATLAS_HEIGHT = 1500;
 
 /** Top-left of each 16×32 portrait frame. */
 const PORTRAIT: readonly (readonly [number, number])[] = [

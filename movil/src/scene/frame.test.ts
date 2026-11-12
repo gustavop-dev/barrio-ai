@@ -51,6 +51,17 @@ it('clamps pan, keeps the pinch focal point stable and snaps to whole physical p
   zoomAt(v, 200, 100, 200, 384, 500, 2, 2); expect(v.scale).toBe(6);
   expect(clampPan(-900, 384, 500)).toBe(-116); expect(clampPan(90, 384, 500)).toBe(0);
 });
+it('keeps the opening scale that fills the width, and never zooms out below it', () => {
+  const base = 390 / 192, v = { x: 0, y: 0, scale: base };
+  zoomAt(v, base * 1.01, 195, 300, 390, 700, base, 2);
+  expect(v.scale).toBe(base);
+  expect(v.x).toBe(0);
+  zoomAt(v, base * 0.5, 195, 300, 390, 700, base, 2);
+  expect(v.scale).toBe(base);
+  zoomAt(v, base * 2, 195, 300, 390, 700, base, 2);
+  expect(v.scale).toBe(4);
+  expect(clampPan(-10, 390, 192 * base)).toBe(0);
+});
 it('opens the home path and legacy knowledge redirect in Oficina', () => {
   expect(routeForUrl('/')).toEqual({ pathname: '/', params: {} });
   expect(routeForUrl('/conocimiento')).toEqual({ pathname: '/', params: {} });

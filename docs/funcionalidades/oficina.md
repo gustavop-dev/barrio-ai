@@ -1,6 +1,6 @@
 # Oficina (`OFI`)
 
-La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que se mueven solo cuando el backend registra trabajo real. Incluye lo común a todas las vistas: la navegación, el banner de pausa y la franja sin conexión.
+La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo. Van a su puesto solo cuando el backend registra trabajo real; mientras esperan, descansan en la sala de juegos, la cocina o la biblioteca, con la oficina a oscuras. Incluye lo común a todas las vistas: la navegación, el banner de pausa y la franja sin conexión.
 
 - **Código:** backend `oficina_views.Actividad` (`ROLES`, `JOB_ROLES`, `DESCRIPTIONS`), `oficina_views.Eventos`, `oficina_eventos.py`, `Overview`; PWA `oficina/src/pages/Oficina.tsx`, `oficina/src/scene/*`, `components/Layout.tsx`; app `movil/src/scene/*`, `movil/src/components/shell/*`; común `compartido/src/scene/*` (motor, plan, roles, actividad, narración, paneles).
 - **Documentación:** secciones «Oficina (escena)» y «Escena de la Oficina: feed de eventos» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md), notas `comportamiento` y `backend` de `movil/diseno-movimiento/canvas.json`, [`movil/MOTION.md`](../../movil/MOTION.md).
@@ -26,7 +26,7 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que 
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** abre 0ff1ce y ve a su equipo trabajando, sin simulaciones: si nadie trabaja, nadie se mueve.
+- **Qué hace para Gustavo:** abre 0ff1ce y ve a su equipo. Los que trabajan están en su puesto, con su zona iluminada y la pantalla encendida. Los que esperan descansan en la sala de juegos, bajo El Barrio. El trabajo que se ve es real; el descanso es decorativo (pedido de Gustavo, 11/11/2026: «solo por placer visual»).
 - **Código:** `GET /api/v1/oficina/actividad` (cada 15 s), `GET /api/v1/operador/overview` (cada 30 s); PWA `OfficeCanvas.tsx` (canvas); app `OfficeCanvas.tsx` (Skia), `useOfficeScene.ts`, `useOfficeLifecycle.ts`.
 - **Criterios de aceptación:**
   1. **Dado** un trabajo `prepare_piece` corriendo en la etapa `redactor`, **cuando** se consulta la actividad, **entonces** `copywriter_a` y `copywriter_b` están `trabajando` con «Redactando dos variantes en inglés» y su hora de inicio, y en la escena trabajan en su puesto.
@@ -36,11 +36,15 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que 
   5. **Dado** `INBOX_ENABLED=true` y un trabajo `read_inbox` corriendo, **cuando** se consulta, **entonces** `conversaciones_inbox` está `trabajando`.
   6. **Dado** que la actividad no se puede leer, **cuando** falla, **entonces** ve «No se pudo leer la actividad.» con «Mientras tanto los personajes quedan quietos: la oficina no simula trabajo.» y «Reintentar», y los personajes quedan quietos.
   7. **Dado** que el dibujo de la oficina no carga, **cuando** falla, **entonces** ve «No se pudo cargar el dibujo de la oficina.» (en la PWA, «… Recarga la página.»; en la app, con «Reintentar»).
-  8. **Dado** la leyenda, **cuando** se pinta, **entonces** muestra Trabajando, En espera y En diseño, y «Actividad real · hace X», «Leyendo actividad…» o «Actividad no disponible». En la app (11/11/2026, a pedido de Gustavo) bajo la escena ya no hay leyenda, edad de la actividad, tira de equipos, enlace al mapa ni crédito del arte: solo los avisos de error y el espacio para tirar y recargar; el estado de cada rol sigue en su panel.
+  8. **Dado** la leyenda, **cuando** se pinta, **entonces** muestra Trabajando, En espera y En diseño, y «Actividad real · hace X», «Leyendo actividad…» o «Actividad no disponible». En la app (11/11/2026, a pedido de Gustavo) no hay leyenda, edad de la actividad, tira de equipos, enlace al mapa ni crédito del arte: la escena ocupa todo el ancho y llena la pantalla hasta la barra de abajo (solo se desplaza hacia arriba y abajo), y encima solo aparecen los avisos de error; el estado de cada rol sigue en su panel.
   9. **Dado** la app en segundo plano o en otra pestaña, **cuando** pasa el tiempo, **entonces** la escena deja de consultar y de animar hasta volver.
-  10. **Dado** «reducir movimiento» en el sistema, **cuando** abre la oficina, **entonces** la escena queda quieta.
+  10. **Dado** «reducir movimiento» en el sistema, **cuando** abre la oficina, **entonces** la escena queda quieta: cada rol en su puesto o en un lugar de descanso fijo, con las luces ya puestas.
+  11. **Dado** los roles en espera, **cuando** abre la oficina, **entonces** los agentes libres ya están descansando. Juegan consola, arcade o billar, tocan la batería, cantan, bailan o conversan en la sala de juegos; toman café o comen en la cocina; o leen en la biblioteca. Las zonas sin nadie quedan a oscuras con las pantallas apagadas. Si nadie trabaja, la app abre la cámara en la sala de juegos. Bibliotecario y Operación son servicios y no dejan su puesto.
+  12. **Dado** un rol que pasa a `trabajando`, una captura (llaman al director) o una entrega (va quien entrega y llaman a quien recibe), **cuando** ocurre, **entonces** caminan rápido a su puesto, su zona se ilumina y su pantalla se enciende. Al terminar se quedan 15 s (30 s si los llamaron) y vuelven a descansar.
+  13. **Dado** agentes descansando, **cuando** pasa el tiempo, **entonces** cambian de juego cada 16 a 42 s (hay más lugares que agentes), se hablan con emojis y su pareja les contesta. De vez en cuando arman una fiesta con la pista encendida, y entre las 22:00 y las 6:00 del teléfono se quedan dormidos («zzz»).
+  14. **Dado** que la actividad aún no se conoce, **cuando** abre la oficina, **entonces** todos siguen en su puesto con las luces encendidas.
 - **Brechas código/docs:** `oficina/README.md` describe los botones «Activar ambiente» y «Luz de tarde», que no existen en el código actual.
-- **Cobertura QA:** OFI-01.4, OFI-01.5 (el agente de inbox en espera, con su último read_inbox) y OFI-01.8 en `movil/.maestro/03-oficina.yaml` · OFI-01.1–3 y 5 en `team_backend/tests/test_oficina.py` · OFI-01.6, 7, 9 y 10 sin prueba E2E · 2026-11-08 · pasa
+- **Cobertura QA:** OFI-01.4, OFI-01.5 (el agente de inbox en espera, con su último read_inbox, abierto desde su equipo), OFI-01.8 y la sala de juegos de OFI-01.11 (captura) en `movil/.maestro/03-oficina.yaml` · OFI-01.1–3 y 5 en `team_backend/tests/test_oficina.py` · OFI-01.10–14 en `compartido/src/scene/engine.suite.ts` y `plan.suite.ts`; el dibujo compilado para el hilo de la interfaz en `movil/src/scene/runtime.worklet.test.ts` · OFI-01.6, 7 y 9 sin prueba E2E · 2026-11-11 · pendiente de CI
 
 ### OFI-02 · Estado de cada personaje <a id="ofi-02"></a>
 
@@ -49,8 +53,8 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que 
 - **Qué hace para Gustavo:** cada personaje muestra si trabaja, espera, está en diseño o no hay datos.
 - **Código:** `compartido/src/scene/activity.ts`, `engine.ts`, `runtime.ts`.
 - **Criterios de aceptación:**
-  1. **Dado** un rol `trabajando`, **cuando** se pinta, **entonces** está en su puesto con el monitor encendido.
-  2. **Dado** un rol `en_espera`, **cuando** pasa el tiempo, **entonces** puede dar paseos ambientales («Por un café»); solo estos se mueven sin trabajo.
+  1. **Dado** un rol `trabajando`, **cuando** se pinta, **entonces** está en su puesto, con la zona iluminada y el monitor encendido.
+  2. **Dado** un rol `en_espera`, **cuando** pasa el tiempo, **entonces** descansa ([OFI-01.11](#ofi-01)) y, al tocarlo, la línea dice «<rol> · Descansa · <lo que hace>» («Juega en la consola», «Baila en la pista»…); los servicios se quedan en su puesto.
   3. **Dado** un rol `diseno`, **cuando** se pinta, **entonces** está atenuado, quieto y con la etiqueta «EN DISEÑO».
   4. **Dado** un rol sin dato, **cuando** se pinta, **entonces** está quieto y sin luz.
 - **Brechas código/docs:** —
@@ -107,15 +111,15 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo, que 
 
 - **Dónde:** app
 - **Estado:** funciona
-- **Qué hace para Gustavo:** en el teléfono mueve la oficina, hace zoom y recarga tirando hacia abajo.
-- **Código:** `movil/src/scene/OfficeCanvas.tsx:61-99`, `viewport.ts`, tokens de `theme/motion.ts`.
+- **Qué hace para Gustavo:** en el teléfono mueve la oficina, hace zoom y recarga tirando hacia abajo desde arriba de la escena.
+- **Código:** `movil/src/scene/OfficeCanvas.tsx` (`usePanGesture`, `usePinchGesture`, `useTapGesture`), `viewport.ts`, tokens de `theme/motion.ts`.
 - **Criterios de aceptación:**
   1. **Dado** la escena, **cuando** arrastra (8 pt como mínimo), **entonces** la oficina se desplaza.
-  2. **Dado** la escena, **cuando** pellizca, **entonces** hace zoom entre 1× y 3×; un doble toque vuelve al inicio.
-  3. **Dado** la pantalla, **cuando** tira hacia abajo, **entonces** se vuelven a pedir la actividad y los eventos.
+  2. **Dado** la escena, **cuando** pellizca, **entonces** hace zoom entre 1× y 3×; un doble toque vuelve al inicio, arriba de la oficina.
+  3. **Dado** la escena en su parte de arriba, **cuando** tira hacia abajo más de 64 pt y suelta, **entonces** la escena cede un poco bajo el dedo y se vuelven a pedir la actividad y los eventos.
   4. **Dado** un toque en un personaje, **cuando** lo hace, **entonces** vibra levemente y se abre su panel.
 - **Brechas código/docs:** —
-- **Cobertura QA:** OFI-06.1, 3 y 4 y el doble toque de OFI-06.2 en `movil/.maestro/03-oficina.yaml` (arrastre, doble toque y tirar para recargar, sin cierres) · el pellizco de OFI-06.2 no se puede hacer en Maestro (un solo dedo) · 2026-11-08 · pasa
+- **Cobertura QA:** OFI-06.1, 3 y 4 y el doble toque de OFI-06.2 en `movil/.maestro/03-oficina.yaml` (arrastre, doble toque y tirar para recargar desde arriba de la escena, sin cierres) · el pellizco de OFI-06.2 no se puede hacer en Maestro (un solo dedo) · 2026-11-11 · pendiente de CI
 
 ### OFI-07 · Banner de máquina o cuenta en pausa <a id="ofi-07"></a>
 

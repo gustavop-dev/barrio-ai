@@ -6,10 +6,14 @@ export function clampPan(value: number, viewport: number, content: number): numb
   'worklet';
   return content <= viewport ? Math.round((viewport - content) / 2) : Math.max(viewport - content, Math.min(0, value));
 }
-/** Integer physical-pixel scale, also during pinch: no blurred fractional zoom levels. */
+/**
+ * The opening scale fills the screen's width, whatever fraction of a pixel that takes; zoomed in, the pinch snaps to whole
+ * physical pixels (no blurred in-between levels) and never goes below the opening scale.
+ */
 export function zoomAt(view: Viewport, requested: number, fx: number, fy: number, width: number, height: number, base: number, density: number) {
   'worklet';
-  const scale = Math.round(Math.max(base * officeGestures.minZoom, Math.min(base * officeGestures.maxZoom, requested)) * density) / density;
+  const snapped = Math.round(Math.max(base * officeGestures.minZoom, Math.min(base * officeGestures.maxZoom, requested)) * density) / density;
+  const scale = snapped <= base ? base : snapped;
   const ratio = scale / view.scale;
   view.x = clampPan(fx - (fx - view.x) * ratio, width, PLAN_WIDTH * scale);
   view.y = clampPan(fy - (fy - view.y) * ratio, height, PLAN_HEIGHT * scale);

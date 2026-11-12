@@ -140,29 +140,40 @@ Estas vistas reutilizan tokens que ya existían, sin valores nuevos:
 
 El motor compartido recibe `officeMotion` desde este módulo. Sus valores iniciales proceden de
 `compartido/src/scene/motion.ts` para conservar la coreografía de la PWA; cualquier ajuste nativo se
-sobrescribe en `officeMotion`, sin editar la pantalla ni el motor. El zoom se ajusta a píxeles físicos
-enteros y el doble toque vuelve inmediatamente al encuadre inicial, sin escalas intermedias borrosas.
+sobrescribe en `officeMotion`, sin editar la pantalla ni el motor. El plano ocupa todo el ancho de la pantalla
+(escala inicial = ancho ÷ 192, sin márgenes ni desplazamiento lateral) y solo se desplaza hacia arriba y abajo. Al
+pellizcar, el zoom se ajusta a píxeles físicos enteros, nunca por debajo de esa escala, y el doble toque vuelve
+inmediatamente al encuadre inicial, arriba de la oficina, sin escalas intermedias borrosas.
+La escena llena la pantalla: la recarga se hace tirando hacia abajo desde arriba del plano.
 
 | Token | Valor | Dónde se usa |
 |---|---|---|
 | `timings.officeNowIn` / `officeNowOut`, `officeLayout.nowIn/nowOut` | 180 (fast) enter / 120 exit | Entrada y salida del texto de la narración flotante (MovOficina) en `scene/OfficeNarration.tsx`. |
 | `officeMotion.walkSpeed` | 40 px lógicos/s | Caminatas del motor compartido (`scene/runtime.ts`). |
 | `officeMotion.startGap` / `summaryHold` | 1800 / 2600 ms | Espaciado de eventos y resúmenes. |
-| `officeMotion.ambientFirst` / `ambientEvery` | 9000 / 11000 ms | Café y charla (MovOficina) únicamente para roles en espera. |
 | `officeMotion.fadeMs` | 500 ms | Operación sale y vuelve por la puerta. |
 | `officeMotion.questionMs` / `bookMs` / `readMs` | 1800 / 2200 / 1600 ms | Consulta de biblioteca. |
 | `officeMotion.searchMs` / `librarianBookMs` / `handBookMs` | 1400 / 1200 / 900 ms | Búsqueda y entrega del bibliotecario. |
 | `officeMotion.sheetMs` / `handSheetMs` / `conversationMs` / `deliveryMs` | 2200 / 900 / 1800 / 1500 ms | Entrega entre equipos. |
 | `officeMotion.outsideMs` / `doneMs` / `returnMs` | 1300 / 2000 / 800 ms | Publicación ejecutada. |
-| `officeMotion.coffeeMs` / `chatMs` / `chatReplyMs` | 2600 / 2000 / 2200 ms | Pausas de café y conversación. |
+| `officeMotion.lifeTickMs` | 250 ms | Cada cuánto el motor decide quién va a su puesto, quién sale a descansar y quién cambia de juego. |
+| `officeMotion.restLeaveMinMs` / `restLeaveMaxMs` | 1200 / 6000 ms | Pausa, distinta para cada uno, antes de que un agente libre deje su puesto. |
+| `officeMotion.stayMinMs` / `stayMaxMs` | 16000 / 42000 ms | Tiempo en un mismo juego antes de cambiar. |
+| `officeMotion.emoteGapMinMs` / `emoteGapMaxMs` / `emoteMs` / `replyMs` | 3500 / 9000 / 1900 / 900 ms | Emojis de los que descansan; la pareja contesta a los 900 ms. |
+| `officeMotion.dutyMs` / `callMs` / `workMs` / `awaitSeatMs` | 15000 / 30000 / 2200 / 16000 ms | Tiempo en el puesto tras terminar o tras ser llamado, el trabajo en el escritorio antes de una entrega y la espera máxima a que el que recibe se siente. |
+| `officeMotion.hurryFactor` | 1,6 | Quien va a su puesto desde la sala de juegos camina así de rápido. |
+| `officeMotion.lightFadeMs` | 900 ms | Las zonas se iluminan o se apagan en este tiempo. |
+| `officeMotion.partyMs` / `partyFirstMs` / `partyGapMinMs` / `partyGapMaxMs` | 30000 / 60000 / 180000 / 420000 ms | Duración de una fiesta, la primera y la separación entre fiestas. |
+| `officeMotion.danceStepMs` / `discoMs` / `bulbMs` / `screenFrameMs` | 380 / 420 / 600 / 160 ms | Paso de baile, pista de colores, guirnalda de luces y pantallas de la consola y los arcades. |
 | `officeMotion.runFrameMs` / `idleFrameMs` | 110 / 220 ms | Fotogramas del atlas en `scene/sprites.ts`. |
-| `officeMotion.lightMs` / `bubbleFrameMs` | 700 / 300 ms | Luces de actividad y bocadillos en `scene/Decorations.tsx`. |
+| `officeMotion.lightMs` / `bubbleFrameMs` | 700 / 300 ms | Luces de actividad y bocadillos: el dibujo compartido `compartido/src/scene/art.ts`, grabado en cada frame en `scene/Decorations.tsx`. |
 | `officeFrames.stepMs` / `maxDeltaMs` | 16 / 60 ms | Paso fijo y límite de recuperación tras un frame lento. |
 | `officeFrames.reportFrames` / `slowFrameMs` | 300 / 1000÷60 ms | Diagnóstico de desarrollo: delta medio/máximo, frames sobre presupuesto y coste medio del motor. |
 | `officeGestures.minZoom` / `maxZoom` | 1 / 3 | Límites relativos a la escala inicial. |
 | `officeGestures.panDistance` / `tapDistance` | 8 / 10 dp | Activación del desplazamiento y tolerancia de toque. |
 | `officeGestures.tapDurationMs` / `doubleTapMs` | 250 / 280 ms | Duración máxima de toque e intervalo de doble toque. |
 | `officeGestures.touchTarget` | 48 dp | Área mínima al tocar personajes en el canvas. |
+| `officeGestures.pullRefresh`, `rubberBand`, `springs.snapBack` | 64 dp, 0,35, FIRM | Tirar hacia abajo desde arriba de la escena: el plano cede un 35 % bajo el dedo, recarga al soltar pasado 64 dp y vuelve con `snapBack`. |
 | `officeGestures.sheetActivation` | 8 dp | Inicio del arrastre del asa de `SnapSheet`. |
 | `officeGestures.sheetHalf` / `sheetFull` | 0.5 / 0.88 | Puntos de ajuste de `SnapSheet`, sobre el espacio disponible. |
 | `haptics.officePick` | selección | Selección de un personaje, zona o equipo. |
@@ -172,8 +183,8 @@ El panel del día del Calendario también es un `SnapSheet` (`calendario/Calenda
 `SnapSheet` reutiliza `springs.sheetOpen`, `timings.sheetClose` y `gestures.sheet` para volver a un
 punto de ajuste o cerrar; ofrece ampliar, reducir y cerrar mediante acciones de accesibilidad. No muestra un botón «Cerrar»:
 se cierra deslizándolo hacia abajo o con atrás de Android.
-Con movimiento reducido se desactiva el callback de frames, todos vuelven a su puesto y los nuevos
-eventos solo se narran. La ausencia de foco, el segundo plano y la pausa de máquina también paran el
+Con movimiento reducido se desactiva el callback de frames, cada uno queda en su puesto o en un lugar de
+descanso fijo (en orden, con las luces ya puestas) y los nuevos eventos solo se narran. La ausencia de foco, el segundo plano y la pausa de máquina también paran el
 callback; los observers de Oficina dejan de consultar al perder foco o pasar a segundo plano.
 
 Para medir en un teléfono: `cd movil && npm start -- --offline`, abrir Oficina en Expo Go con una
@@ -225,7 +236,7 @@ Una notificación nueva puede llegar de dos formas:
 ### MovOficina · selección, captura y narración
 
 Fuente: [`MovOficina.dc.html`](diseno-movimiento/tableros/MovOficina.dc.html), script completo,
-`person`, `brackets`, `receiveCapture`, `ambient` y `caption`. `officeMotion` entrega los valores al
+`person`, `brackets`, `receiveCapture` y `caption` (el `ambient` del tablero lo reemplaza la sala de juegos). `officeMotion` entrega los valores al
 intérprete compartido; `compartido/src/scene/motion.ts` conserva los mismos valores por defecto para
 la PWA. No se reproduce el ciclo editorial de demostración: las tareas siguen viniendo de eventos
 reales y la captura se confirma mediante el éxito de la mutación existente `createCaptura`.

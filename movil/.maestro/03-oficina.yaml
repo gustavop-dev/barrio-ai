@@ -1,10 +1,11 @@
 # cubre: OFI-01, OFI-02, OFI-03, OFI-04, OFI-06, OFI-07, OFI-10
-# Oficina: a tap on a character of the Skia scene opens its sheet (SnapSheet), with its real state (the inbox agent is
-# not «en diseño») and what it did this session; the sheet is dragged to full and down to close; a zone's label opens its
+# Oficina: the scene fills the screen, with the game room under El Barrio where the free agents rest (Gustavo, 11/11); a
+# tap on a character of the Skia scene opens its sheet (SnapSheet); the inbox agent, from its team, shows its real state
+# (not «en diseño») and what it did this session; the sheet is dragged to full and down to close; a zone's label opens its
 # team, a member of it, «Ver en el Calendario» and the library; Android back closes the sheet without leaving the Oficina;
-# the scene survives a drag and a double tap; pull to refresh; nothing under the scene but the space to pull (no legend,
-# activity age, team strip, map link or art credit: Gustavo, 11/11); and a machine stopped elsewhere darkens the scene and
-# shows the pause banner, which leads to Ajustes.
+# the scene survives a drag and a double tap; pull down from its top to refresh; nothing over the scene but the error
+# notes (no legend, activity age, team strip, map link or art credit: Gustavo, 11/11); and a machine stopped elsewhere
+# darkens the scene and shows the pause banner, which leads to Ajustes.
 appId: co.projectapp.office
 name: Oficina
 tags: [oficina]
@@ -22,29 +23,75 @@ tags: [oficina]
     id: tab-index
     selected: true
 - assertVisible: "La oficina en pixel art\\..*"
+- assertNotVisible: "Mapa del equipo"
+
+# cubre: OFI-01.11, OFI-06.1 — the free agents rest in the game room under El Barrio; with nobody working the camera opens
+# there, and a drag up brings it into view in any case.
+- swipe:
+    from:
+      id: office-scene
+    direction: UP
+    duration: 600
+- takeScreenshot: 03-oficina-01-sala-de-juegos
+# The double tap goes to the wall at the top of the screen: back to the top of the office, every label on screen.
+- doubleTapOn:
+    id: office-scene
+    point: "50%,2%"
 - assertVisible:
     id: zone-label-estrategia
     selected: false
-- assertNotVisible: "Mapa del equipo"
-- takeScreenshot: 03-oficina-01-escena
+- takeScreenshot: 03-oficina-01b-escena
 
 # ---------------------------------------------------------------- a character in the scene
-# cubre: OFI-02, OFI-06
+# cubre: OFI-02, OFI-04.2, OFI-06.4
 # The canvas has no views per character, so the tap goes to a point of `office-scene` (absolute px inside the
-# element, Maestro's element-relative point). On the 390 dp screen at 2x (320 dpi) the plan (192x336 logical px) is drawn
-# at 2x, centred: 3 dp of margin, no vertical offset while nothing is selected or panned. The target is
-# «Conversaciones e inbox», seated at logical (170, 100): hitScene takes x 158..182, y 72..102 (a 24 dp touch
-# target at 2x). It never walks (no backend event moves it and it is not one of the roles that go for coffee),
-# and the tap at logical (175, 80) stays out of the boxes of Relaciones (146, 100) and of a visitor standing at
-# the Relaciones spot (158, 110). Logical (175, 80) -> dp (3 + 350, 160) -> px (706, 320).
+# element, Maestro's element-relative point). On the 390 dp screen at 2x (320 dpi) the plan (192x452 logical px) fills
+# the width: 390 / 192 = 2.03125 dp per logical px, no margin, no vertical offset at the top of the office (the double tap
+# above). The target is Operación, a service that never leaves its post for the game room, standing at logical (96, 58):
+# hitScene takes x 84..108, y 30..60 (a 48 dp touch target), above its zone label (79, 64). No seeded event moves it
+# (old events are only narrated). Logical (96, 45) -> dp (195, 91.4) -> px (390, 183).
 - tapOn:
     id: office-scene
-    point: "706,320"
+    point: "390,183"
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
       id: office-panel
     timeout: 15000
+- extendedWaitUntil:
+    visible: "SERVICIO · OPERACIÓN"
+    timeout: 10000
+- assertVisible: "Operador de cuenta"
+- assertVisible: "MISIÓN"
+- takeScreenshot: 03-oficina-02-ficha-operacion
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: office-panel
+    timeout: 10000
+
+# The inbox agent rests in the game room like the rest of its team: it opens from the Relaciones label, as a member.
+- tapOn:
+    id: zone-label-relaciones
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible: "ESPACIO DEL EQUIPO"
+    timeout: 15000
+- swipe:
+    from:
+      text: Altura del panel
+    direction: UP
+    duration: 600
+- extendedWaitUntil:
+    visible:
+      text: "Conversaciones e inbox, .*"
+      above:
+        id: tab-index
+    timeout: 10000
+- tapOn:
+    text: "Conversaciones e inbox, .*"
+    above:
+      id: tab-index
 - extendedWaitUntil:
     visible: "MISIÓN"
     timeout: 10000
@@ -57,7 +104,7 @@ tags: [oficina]
 - assertNotVisible: "Este rol está en diseño\\..*"
 - assertVisible: "En espera · Último: leyendo el inbox de linkedin .*"
 - assertVisible: Altura del panel
-- takeScreenshot: 03-oficina-02-ficha-personaje
+- takeScreenshot: 03-oficina-02b-ficha-inbox
 
 # Drag the handle up: the sheet goes from the half snap to the full one. At half, «Ver en el Calendario» sits
 # below the top of the bottom bar (or off screen); at full it is well above it.
@@ -299,9 +346,9 @@ tags: [oficina]
 - swipe:
     from:
       id: office-scene
-    direction: LEFT
+    direction: UP
     duration: 600
-# The double tap goes to the wall at the top of the plan, away from every character and zone.
+# The double tap goes to the wall at the top of the screen: the office back at its top.
 - doubleTapOn:
     id: office-scene
     point: "50%,2%"
@@ -309,16 +356,19 @@ tags: [oficina]
     id: office-scene
 - assertNotVisible:
     id: office-panel
-# cubre: OFI-06.3 — pulling the page down (from the space under the scene) asks for the activity and the events again
+# cubre: OFI-06.3 — the scene fills the screen: pulling it down from the top of the office asks for the activity and the
+# events again (the plan gives a little under the finger and springs back)
 - swipe:
     from:
-      id: oficina-pie
+      id: office-scene
     direction: DOWN
     duration: 600
 - assertVisible:
     id: screen-oficina
+- assertNotVisible:
+    id: office-panel
 
-# cubre: OFI-01.8 — under the scene there is only that space: no legend, activity age, team strip, map link or art credit
+# cubre: OFI-01.8 — over the scene only the error notes: no legend, activity age, team strip, map link or art credit
 - assertNotVisible: "Actividad real · .*"
 - assertNotVisible: Trabajando
 - assertNotVisible: En espera

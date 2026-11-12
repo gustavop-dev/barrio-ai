@@ -364,7 +364,6 @@ export const layout = {
 /** MovOficina: shared interpreter values, in logical pixels and milliseconds. */
 export const officeMotion = {
   ...SCENE_MOTION,
-  ambientEvery: 11000,
   hopPx: 2, hopSettlePx: 1, hopStepMs: 90, hopEndMs: durations.fast,
   bracketPx: 7, bracketMs: 120,
   mailX: 98, mailStartY: -6, mailLandingY: 68, mailAcceleration: 0.9, mailStepMs: 16,
@@ -377,6 +376,8 @@ export const officeFrames = { stepMs: 16, maxDeltaMs: 60, reportFrames: 300, slo
 export const officeGestures = {
   minZoom: 1, maxZoom: 3, panDistance: 8, tapDistance: 10, tapDurationMs: 250, doubleTapMs: 280,
   touchTarget: 48, sheetActivation: 8, sheetHalf: 0.5, sheetFull: 0.88,
+  /** A drag down from the top of the scene past this distance (dp) refreshes the Oficina on release. */
+  pullRefresh: 64,
 } as const;
 export const officeLayout = {
   /** MovOficina: text layers overlap; the new one starts at 60 ms. */

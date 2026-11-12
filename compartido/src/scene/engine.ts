@@ -9,7 +9,6 @@ export type * from './model';
 export const WALK_SPEED = SCENE_MOTION.walkSpeed;
 export const MAX_PLAYS = 2;
 export const START_GAP = SCENE_MOTION.startGap;
-export const AMBIENT_EVERY = SCENE_MOTION.ambientEvery;
 
 export class OfficeEngine {
   readonly state;
