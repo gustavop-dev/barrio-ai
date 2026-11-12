@@ -378,6 +378,10 @@ export const officeGestures = {
   touchTarget: 48, sheetActivation: 8, sheetHalf: 0.5, sheetFull: 0.88,
   /** A drag down from the top of the scene past this distance (dp) refreshes the Oficina on release. */
   pullRefresh: 64,
+  /** The plan let go with some speed glides on and slows down by this factor per millisecond (withDecay), like a scroll. */
+  flingDeceleration: 0.998,
+  /** How far a glide that reaches an end of the plan runs past it before it bounces back (withDecay's rubber band). */
+  flingBounce: 0.6,
 } as const;
 export const officeLayout = {
   /** MovOficina: text layers overlap; the new one starts at 60 ms. */

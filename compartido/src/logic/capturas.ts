@@ -1,6 +1,7 @@
 // Labels of the capture history («Lo que enviaste»), shared by the PWA and the native app.
 import { isProcessing, type CaptureOutput } from '../api/capturas';
 import { mmss } from './audio';
+import { padHour } from './format';
 import { CALENDAR_TZ } from './dates';
 import type { Tone } from './tone';
 
@@ -22,7 +23,7 @@ export function whenLabel(iso: string | null | undefined, now: Date = new Date()
   if (!iso) return '—';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '—';
-  const time = date.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false });
+  const time = padHour(date.toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false }));
   if (sameDay(date, now)) return `Hoy, ${time}`;
   const yesterday = new Date(now);
   yesterday.setDate(now.getDate() - 1);
@@ -80,9 +81,9 @@ export function canUndo(capture: CaptureOutput, now: number): boolean {
 export function publishAsapLines(capture: Pick<CaptureOutput, 'publish_asap' | 'publish_asap_evidence' | 'publish_asap_expected_slot' | 'publish_asap_reason'>): string[] {
   if (!capture.publish_asap) return [];
   const slot = capture.publish_asap_expected_slot ? new Date(capture.publish_asap_expected_slot) : null;
-  const when = slot && Number.isFinite(slot.getTime()) ? new Intl.DateTimeFormat('es-CO', {
+  const when = slot && Number.isFinite(slot.getTime()) ? padHour(new Intl.DateTimeFormat('es-CO', {
     timeZone: CALENDAR_TZ, weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit', hour12: false,
-  }).format(slot) : null;
+  }).format(slot)) : null;
   return [
     `Saldrá lo antes posible · ${when ? `fecha prevista: ${when}` : 'fecha por confirmar'}`,
     ...(capture.publish_asap_reason?.trim() ? [capture.publish_asap_reason] : []),

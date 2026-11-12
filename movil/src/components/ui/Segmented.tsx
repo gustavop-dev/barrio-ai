@@ -25,12 +25,15 @@ export function Segmented<V extends string>({
   value,
   onChange,
   testID,
+  showLabel = false,
 }: {
   label: string;
   options: readonly { value: V; label: string }[];
   value: V;
   onChange: (value: V) => void;
   testID?: string;
+  /** Shows the label above the track, as Select does (Resultados' «Periodo»). The Calendario's views go without it. */
+  showLabel?: boolean;
 }) {
   const index = Math.max(0, options.findIndex((option) => option.value === value));
   const [width, setWidth] = useState(0);
@@ -43,7 +46,7 @@ export function Segmented<V extends string>({
 
   const optionWidth = width ? (width - PAD * 2 - GAP * (options.length - 1)) / options.length : 0;
 
-  return (
+  const track = (
     <View
       style={styles.track}
       accessibilityRole="tablist"
@@ -75,9 +78,17 @@ export function Segmented<V extends string>({
       })}
     </View>
   );
+  if (!showLabel) return track;
+  return (
+    <View style={styles.field}>
+      <T variant="detalle">{label}</T>
+      {track}
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
+  field: { gap: space[1] },
   track: { flexDirection: 'row', gap: GAP, padding: PAD, backgroundColor: colors.line, borderRadius: radius.md },
   indicator: { position: 'absolute', top: PAD, bottom: PAD, left: PAD, borderRadius: radius.sm, backgroundColor: colors.surface },
   option: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm },

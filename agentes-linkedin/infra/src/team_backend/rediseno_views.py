@@ -13,7 +13,7 @@ from rest_framework.views import APIView
 from knowledge import db
 from . import autopiloto, editorial, imagenes, lider, notificaciones, operador, oportunidades, orientacion, preguntas, red
 from .models import (ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, EditorialPiece, Opportunity,
-                     OperatorControl, TeamQuestion)
+                     OPEN_ACTION_STATES, OperatorControl, TeamQuestion)
 from .operador_views import get_or_404, human_session, valid
 from .permissions import require
 from . import expo
@@ -613,7 +613,9 @@ class Calendar(APIView):
         for c in Contact.objects.filter(source='incoming',discovered_at__gte=lo,discovered_at__lt=hi):
             add(local_day(c.discovered_at),'red','invitation_received',f'{c.display_name} te invitó',at=c.discovered_at,link=f'/personas/{c.id}',ref=str(c.id))
         expected={}
-        for c in Contact.objects.filter(stage='followed',followed_at__isnull=False):
+        # An invitation already proposed, approved or on its way is no longer a forecast (backlog #8).
+        invited=ActionProposal.objects.filter(capability='RED-02',state__in=OPEN_ACTION_STATES).values('contact_id')
+        for c in Contact.objects.filter(stage='followed',followed_at__isnull=False).exclude(id__in=invited):
             due=max(local_day(c.followed_at+red.invite_after()),today)
             expected.setdefault(due,[]).append({'id':str(c.id),'name':c.display_name})
         for day,people in expected.items():
@@ -624,7 +626,7 @@ class Calendar(APIView):
         for o in Opportunity.objects.select_related('contact').filter(next_action_at__gte=lo,next_action_at__lt=hi).exclude(stage__in=oportunidades.CLOSED):
             name=o.contact.display_name if o.contact else o.person_name
             add(local_day(o.next_action_at),'tuyo','meeting' if o.stage=='reunion' else 'opportunity_next',f'{o.next_action or "Siguiente paso"} · {name}',
-                at=o.next_action_at,link=f'/personas/{o.contact_id}' if o.contact_id else '/personas?tab=oportunidades',ref=str(o.id))
+                at=o.next_action_at,link=f'/personas/{o.contact_id}' if o.contact_id else '/personas?pestana=oportunidades',ref=str(o.id))
         for q in TeamQuestion.objects.filter(state__in=['answered','declined'],answered_at__gte=lo,answered_at__lt=hi):
             add(local_day(q.answered_at),'tuyo','resolved',q.question,at=q.answered_at,state=q.state,important=False,link='/tu-turno/sabe',ref=str(q.id))
         from . import connectors_linkedin as li

@@ -9,7 +9,7 @@ import { pieceStatus } from '../lib/editorial';
 import { formatNumber, formatTime, timeAgo } from '../lib/format';
 import { ComoSeEscribio } from './calendario/ComoSeEscribio';
 import { CALENDAR_TZ, longDay, todayIn } from './calendario/dates';
-import { isOnItsWay, pieceLeaves, pieceWhen, pieceVetoable, preparationStages, publishedAt, stageShort } from './calendario/piece';
+import { finalTextNote, isOnItsWay, pieceLeaves, pieceWhen, pieceVetoable, preparationStages, publishedAt, stageShort } from './calendario/piece';
 import { Resultado } from './calendario/Resultado';
 import { PieceImages } from './calendario/PieceImages';
 import type { PieceDetailFull, TeamComment } from './calendario/types';
@@ -84,6 +84,7 @@ function FinalText({ piece }: { piece: PieceDetailFull }) {
     );
   }
   const lines = text.split('\n').filter((line) => line.trim());
+  const note = finalTextNote(piece.status);
   return (
     <Section label="Texto final" id="texto">
       <Card>
@@ -96,7 +97,7 @@ function FinalText({ piece }: { piece: PieceDetailFull }) {
           <p className="t-detalle text-suave">{formatNumber(charCount(text), 0)} caracteres</p>
           <CopyButton text={text} size="small" />
         </div>
-        <p className="t-detalle text-suave">Se publica tal cual, en inglés.</p>
+        {note ? <p className="t-detalle text-suave">{note}</p> : null}
       </Card>
     </Section>
   );
@@ -166,7 +167,7 @@ export function PiezaDetalle() {
   const hour = formatTime(piece.scheduled_for, timeZone);
   const comments = piece.team_comments ?? [];
   const captureButton = (
-    <Button variant="secondary" block icon={<IconMicrofono size={20} />} onClick={() => openCapture({ tipo: 'pieza', id: piece.id, label: `Pieza del ${day}` })}>
+    <Button variant="secondary" block icon={<IconMicrofono size={20} />} onClick={() => openCapture({ tipo: 'pieza', id: piece.id, label: piece.brief?.thesis?.trim() || `Pieza del ${day}` })}>
       Comentario para el equipo
     </Button>
   );

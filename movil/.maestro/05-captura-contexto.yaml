@@ -262,7 +262,8 @@ tags: [captura]
 - assertVisible:
     id: capture-context
 - assertVisible: 'Comentario sobre la pieza'
-- assertVisible: 'Pieza del .*'
+# The chip names the piece by its thesis (CAL-11.1).
+- assertVisible: 'Qué aprendí cobrando por mi primer proyecto'
 - tapOn:
     id: capture-galeria
     waitToSettleTimeoutMs: 500

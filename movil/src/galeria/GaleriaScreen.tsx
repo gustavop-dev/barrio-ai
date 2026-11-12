@@ -5,6 +5,7 @@
 import { useGaleria, type GaleriaFiltro, type PhotoOutput } from '@compartido/api/capturas';
 import { FILTERS, isFiltro, photoName, photoTone } from '@compartido/logic/galeria';
 import { router, useLocalSearchParams } from 'expo-router';
+import { setStatusBarStyle } from 'expo-status-bar';
 import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -107,11 +108,18 @@ export function GaleriaScreen() {
     setDirty(false);
   }, []);
 
+  // Light status bar icons over the viewer's tinta (backlog #26). They are set before it opens: an Android Modal copies
+  // the activity's status bar appearance when it is shown, so a change made from inside it would come too late.
   const openViewer = () => {
     const index = current ? items.findIndex((photo) => photo.id === current.id) : -1;
+    setStatusBarStyle('light');
     setViewed(null);
     setViewerAt(index >= 0 ? index : 0);
   };
+  const viewerOpen = viewerAt !== null;
+  useEffect(() => {
+    if (viewerOpen) return () => setStatusBarStyle('dark');
+  }, [viewerOpen]);
 
   /** Back from the viewer: the sheet follows the photo on screen, unless the open one has unsaved changes. */
   const closeViewer = () => {

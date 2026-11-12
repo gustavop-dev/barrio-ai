@@ -13,7 +13,7 @@ El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conec
 | [PRS-02](#prs-02) | Buscar y filtrar personas | PWA · app · backend | funciona |
 | [PRS-03](#prs-03) | Ficha de una persona | PWA · app · backend | funciona |
 | [PRS-04](#prs-04) | La conversación en la ficha | PWA · app · backend | funciona |
-| [PRS-05](#prs-05) | Notas sobre una persona, escritas o de voz | PWA · app · backend | con fallo conocido |
+| [PRS-05](#prs-05) | Notas sobre una persona, escritas o de voz | PWA · app · backend | funciona |
 | [PRS-06](#prs-06) | Descartar a una persona | PWA · app · backend | funciona |
 | [PRS-07](#prs-07) | Tablero de oportunidades | PWA · app · backend | con fallo conocido |
 | [PRS-08](#prs-08) | Registrar, editar y eliminar una oportunidad | PWA · app · backend | funciona |
@@ -93,14 +93,13 @@ El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conec
 ### PRS-05 · Notas sobre una persona, escritas o de voz <a id="prs-05"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** apunta lo que sabe de una persona, escribiendo o con una nota de voz.
 - **Código:** `POST /api/v1/red/contacts/<id>/notas {text}`; «Nota de voz» abre la captura con contexto `persona` ([CAP-07](captura.md#cap-07)).
-- **El fallo:** en la app, una nota de voz no llega ([CAP-04](captura.md#cap-04)). La nota escrita funciona.
 - **Criterios de aceptación:**
   1. **Dado** «Añadir nota», **cuando** escribe y pulsa «Guardar nota», **entonces** la API responde 201, aparece «Nota guardada» y la nota sale como «Tu nota · <fecha>».
   2. **Dado** una nota vacía, **cuando** intenta guardar, **entonces** no se envía.
-  3. **Dado** «Nota de voz», **cuando** graba y envía, **entonces** al procesarse aparece en las notas con la transcripción y `source: "captura"`. **Hoy falla en la app.**
+  3. **Dado** «Nota de voz», **cuando** graba y envía, **entonces** al procesarse aparece en las notas con la transcripción y `source: "captura"`.
   4. **Dado** ninguna nota, **cuando** abre la ficha, **entonces** ve «Aún no hay notas sobre esta persona.».
   5. **Dado** un usuario sin `approve_actions` o un token de servicio, **cuando** intenta añadir una nota, **entonces** recibe 403.
 - **Brechas código/docs:** en la app, si la sesión se restaura sin usuario (ver [ACC-06](acceso.md#acc-06)), sus propias notas se etiquetan «Nota de <usuario>» en vez de «Tu nota».
@@ -127,7 +126,7 @@ El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conec
 - **Estado:** con fallo conocido
 - **Qué hace para Gustavo:** ve sus oportunidades por etapa y las mueve arrastrando o eligiendo la etapa, con «Deshacer».
 - **Código:** `GET /api/v1/oportunidades?page_size=100`, `PATCH /api/v1/oportunidades/<id> {stage}`; PWA `personas/Oportunidades.tsx`; app `personas/Oportunidades.tsx`, `drag.ts`.
-- **El fallo:** el tablero pide una sola página de 100 y no pide más, así que con más de 100 oportunidades las demás no aparecen y no se avisa. Además, el evento del calendario de una oportunidad sin persona enlaza a `/personas?tab=oportunidades` y las dos interfaces solo entienden `?pestana=`, así que abre Barrio.
+- **El fallo:** el tablero pide una sola página de 100 y no pide más, así que con más de 100 oportunidades las demás no aparecen y no se avisa.
 - **Criterios de aceptación:**
   1. **Dado** oportunidades, **cuando** abre la pestaña Oportunidades, **entonces** las ve agrupadas por etapa (Conversación, Necesidad identificada, Cualificada, Reunión, Propuesta, Acuerdo), cada una con nombre (enlazado si es un contacto), empresa, modalidad, «Siguiente acción», «N días en la etapa», un selector de etapa y «Editar»; las cerradas sin acuerdo van en un pliegue.
   2. **Dado** una oportunidad, **cuando** la arrastra a otra columna (o mantiene pulsado y la suelta en la app, o cambia el selector), **entonces** se mueve al momento, se envía el `PATCH`, aparece «Movida a «<etapa>»» con «Deshacer» y el historial guarda «<antes> → <después>».
@@ -135,8 +134,8 @@ El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conec
   4. **Dado** «Deshacer», **cuando** lo pulsa, **entonces** vuelve a la etapa anterior; si ese envío falla, la tarjeta vuelve a la etapa a la que se movió y se ve «No se pudo deshacer: sigue en «<etapa>»».
   5. **Dado** ninguna oportunidad, **cuando** abre la pestaña, **entonces** ve «Aún no hay oportunidades» con «Regístrala cuando una conversación tenga una necesidad real. Así Resultados empieza a medir el negocio.».
   6. **Dado** 120 oportunidades, **cuando** abre el tablero, **entonces** ve las 120. **Hoy falla:** ve 100.
-  7. **Dado** el evento del calendario de una oportunidad sin persona, **cuando** lo abre, **entonces** llega a la pestaña Oportunidades. **Hoy falla.**
-- **Brechas código/docs:** la notificación de la misma oportunidad enlaza a `/personas?pestana=oportunidades` (correcto) y el calendario a `?tab=` (`rediseno_views.Calendar`). En la app no se puede arrastrar a «Cerrada sin acuerdo» (sí con el selector).
+  7. **Dado** el evento del calendario de una oportunidad sin persona, **cuando** lo abre, **entonces** llega a la pestaña Oportunidades (`/personas?pestana=oportunidades`, como la notificación).
+- **Brechas código/docs:** en la app no se puede arrastrar a «Cerrada sin acuerdo» (sí con el selector).
 - **Cobertura QA:** pendiente
 
 ### PRS-08 · Registrar, editar y eliminar una oportunidad <a id="prs-08"></a>

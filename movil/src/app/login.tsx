@@ -18,6 +18,7 @@
 // 42493813776, 42492749737). The only scroll is back to the top, which is always in range.
 import { ApiError } from '@compartido/api/client';
 import { Redirect, router, useFocusEffect, useNavigation } from 'expo-router';
+import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useRef, useState, type ComponentRef } from 'react';
 import { BackHandler, Image, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle } from 'react-native-reanimated';
@@ -131,6 +132,8 @@ export default function Login() {
 
   return (
     <Animated.View style={[styles.screen, screenStyle]} pointerEvents={running ? 'none' : 'auto'} testID="login">
+      {/* Lifted, the bottom of the tinta hero sits under the status bar: light icons there (backlog #25). */}
+      <StatusBar style={lifted ? 'light' : 'dark'} />
       <KeyboardAvoidingView style={styles.fill} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView
           ref={scrollRef}

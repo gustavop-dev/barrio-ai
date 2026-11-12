@@ -1,15 +1,16 @@
 // Ajustes › Gasto de IA: today's line per budget, then the month against its limit, the total, the
 // lead agent and transcription (GET /api/v1/ajustes `ai_spend`). Never «sin dato» as 0.
 import { useAjustes } from '@compartido/api/hooks';
-import { isUnavailable, spendLine, spendRows } from '@compartido/logic/ajustes';
+import { isUnavailable, monthAlert, spendLine, spendRows } from '@compartido/logic/ajustes';
 import { StyleSheet, View } from 'react-native';
-import { Card, ErrorRetry, KeyValue, Meter, Section, Skeleton, T } from '@/components/ui';
+import { Badge, Card, ErrorRetry, KeyValue, Meter, Section, Skeleton, T } from '@/components/ui';
 import { space } from '@/theme/tokens';
 import { Unavailable } from './parts';
 
 export function GastoSection() {
   const ajustes = useAjustes();
   const spend = ajustes.data?.ai_spend;
+  const alert = spend ? monthAlert(spend) : null;
   return (
     <Section label="Gasto de IA · hoy">
       {ajustes.isPending ? <Skeleton variant="card" label="Cargando el gasto…" /> : null}
@@ -44,6 +45,12 @@ export function GastoSection() {
                 {row.text}
               </KeyValue>
             ))}
+            {/* Near or over the monthly limit, in the Meter's tones (backlog #19). */}
+            {alert ? (
+              <View style={styles.alert} testID="gasto-mes-alerta">
+                <Badge tone={alert.tone}>{alert.text}</Badge>
+              </View>
+            ) : null}
           </View>
         </Card>
       ) : null}
@@ -51,4 +58,4 @@ export function GastoSection() {
   );
 }
 
-const styles = StyleSheet.create({ meters: { gap: space[3] }, rows: { gap: 6 } });
+const styles = StyleSheet.create({ meters: { gap: space[3] }, rows: { gap: 6 }, alert: { alignItems: 'flex-end' } });

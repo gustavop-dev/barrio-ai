@@ -3,6 +3,8 @@
 // (http://10.0.2.2:8787, the host as the Android emulator sees it), and release builds block cleartext traffic;
 // it must also never ask Expo's update server for an OTA at launch. EAS profiles never set the variable, so the
 // APK and the AAB keep Android's default (HTTPS only), their updates and the same native fingerprint.
+const fs = require('fs');
+const path = require('path');
 const { withAndroidManifest } = require('expo/config-plugins');
 
 /** QA build only: allow cleartext HTTP in the release manifest (the debug manifest already does). */
@@ -39,7 +41,23 @@ function withQaDevMenu(config) {
   });
 }
 
-module.exports = ({ config }) => {
+/**
+ * Firebase for Android push (PUS-07). Expo needs google-services.json in the build to hand out the phone's push token.
+ * The repository is public, so the file lives in EAS as the secret file variable GOOGLE_SERVICES_JSON (environments
+ * preview and production) and only an EAS build sees it. It is copied to a fixed, git-ignored path that
+ * .fingerprintignore leaves out, so builds with and without it share the runtime fingerprint: `eas update` never sees
+ * secret variables, and the APKs already installed keep receiving OTAs. Without the variable nothing changes.
+ */
+function withFirebase(config) {
+  const source = process.env.GOOGLE_SERVICES_JSON;
+  if (!source || !fs.existsSync(source)) return config;
+  const target = path.join(__dirname, 'google-services.json');
+  if (path.resolve(source) !== target) fs.copyFileSync(source, target);
+  return { ...config, android: { ...config.android, googleServicesFile: './google-services.json' } };
+}
+
+module.exports = ({ config: base }) => {
+  const config = withFirebase(base);
   if (process.env.OFFICE_QA_BUILD !== '1') return config;
   // The emulator runs the JS bundled in the APK: no OTA check against u.expo.dev.
   return withQaDevMenu(withQaCleartext({ ...config, updates: { ...config.updates, enabled: false } }));

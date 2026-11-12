@@ -186,7 +186,8 @@ export function PiezaScreen({ pieceId }: { pieceId: string }) {
 
       <PieceImages piece={piece} />
       <FinalText piece={piece} />
-      <TeamComments pieceId={piece.id} label={`Pieza del ${day}`} comments={piece.team_comments ?? []} now={now} />
+      {/* The capture chip names the piece by its thesis, as CAL-11 asks (backlog #14). */}
+      <TeamComments pieceId={piece.id} label={piece.brief?.thesis?.trim() || `Pieza del ${day}`} comments={piece.team_comments ?? []} now={now} />
       <ComoSeEscribio piece={piece} />
     </ScrollView>
   );

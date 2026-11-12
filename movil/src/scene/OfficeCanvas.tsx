@@ -1,8 +1,8 @@
 import { Canvas, Group, Picture, Skia, useImage } from '@shopify/react-native-skia';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PixelRatio, StyleSheet, View } from 'react-native';
 import { GestureDetector, useExclusiveGestures, usePanGesture, usePinchGesture, useSimultaneousGestures, useTapGesture, type NativeGesture } from 'react-native-gesture-handler';
-import Animated, { runOnJS, runOnUI, useAnimatedReaction, useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
+import Animated, { cancelAnimation, runOnJS, runOnUI, useAnimatedReaction, useAnimatedStyle, useSharedValue, withDecay, withSpring, type SharedValue } from 'react-native-reanimated';
 import { PLAN_HEIGHT, PLAN_WIDTH, ZONE_LABELS, zoneAt } from '@compartido/scene/plan';
 import { actorById, hitScene, type SceneState } from '@compartido/scene/runtime';
 import { LIBRARY, ROLES, TEAMS, type CharacterId, type ZoneId } from '@compartido/scene/roles';
@@ -53,6 +53,25 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   // How far the plan follows a pull down from its top (rubber band); it springs back on release.
   const pull = useSharedValue(0);
   const [springBack] = useState(() => spring('snapBack'));
+  // Let go with some speed, the plan glides on like a scroll: it slows down and bounces at the plan's ends (Gustavo, 11/11:
+  // it stopped dead under the finger and felt rigid). The glide runs on two numbers of its own, copied into the view while
+  // it lasts. Any touch on the scene and any other move of the camera stop it.
+  const glideX = useSharedValue(0);
+  const glideY = useSharedValue(0);
+  const gliding = useSharedValue(false);
+  // A touch that stops a glide only stops it, as in a scroll: it does not pick what is under the finger.
+  const caught = useSharedValue(false);
+  useAnimatedReaction(() => (gliding.get() ? { x: glideX.get(), y: glideY.get() } : null), (glide) => {
+    if (glide) view.modify((v) => { v.x = glide.x; v.y = glide.y; return v; });
+  });
+  /** Stops a glide in course; true when there was one. */
+  const stopGlide = useCallback(() => {
+    'worklet';
+    if (!gliding.get()) return false;
+    cancelAnimation(glideX); cancelAnimation(glideY);
+    gliding.set(false);
+    return true;
+  }, [glideX, glideY, gliding]);
   const focusRef = useRef(focus);
   useEffect(() => { focusRef.current = focus; }, [focus]);
   // The zone labels are the way into a team (the team strip under the scene is gone): their boxes in logical pixels,
@@ -72,6 +91,7 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   useEffect(() => {
     const at = focusRef.current;
     runOnUI(() => {
+      stopGlide();
       if (!touched.get()) {
         view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: restingY(at, visibleHeight, PLAN_HEIGHT * scale), scale });
         return;
@@ -83,7 +103,7 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
         return v;
       });
     })();
-  }, [width, visibleHeight, scale, view, touched]);
+  }, [width, visibleHeight, scale, view, touched, stopGlide]);
   useEffect(() => {
     if (!focus) return;
     runOnUI(() => {
@@ -94,6 +114,7 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   useEffect(() => {
     if (!selectedRole && !selectedZone) return;
     runOnUI(() => {
+      stopGlide();
       touched.set(true);
       const actor = selectedRole ? actorById(scene.value, selectedRole) : null;
       const box = selectedZone === 'biblioteca' ? LIBRARY.box : TEAMS.find((t) => t.id === selectedZone)?.box;
@@ -105,9 +126,10 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
         return v;
       });
     })();
-  }, [selectedRole, selectedZone, visibleHeight, width, scene, view, touched]);
+  }, [selectedRole, selectedZone, visibleHeight, width, scene, view, touched, stopGlide]);
   const pan = usePanGesture({
     block: scrollGesture, testID: 'office-pan', minDistance: officeGestures.panDistance, maxPointers: 1,
+    onBegin: () => { 'worklet'; caught.set(stopGlide()); },
     onActivate: () => {
       'worklet';
       touched.set(true);
@@ -117,23 +139,41 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
     onUpdate: (event) => {
       'worklet';
       if (pinching.value) return;
+      const y = panStart.value.y + event.translationY;
       view.modify((v) => {
         v.x = clampPan(panStart.value.x + event.translationX, width, PLAN_WIDTH * v.scale);
-        v.y = clampPan(panStart.value.y + event.translationY, visibleHeight, PLAN_HEIGHT * v.scale);
+        v.y = clampPan(y, visibleHeight, PLAN_HEIGHT * v.scale);
         return v;
       });
-      pull.set(onPullRefresh && panStart.value.top ? rubberBand(Math.max(0, event.translationY), 0) : 0);
+      // Past either end the plan gives under the finger, as a scroll does; from the top it is also the pull to refresh.
+      const past = y - view.value.y;
+      pull.set(Math.sign(past) * rubberBand(Math.abs(past), 0));
     },
     onDeactivate: (event) => {
       'worklet';
       const pulled = panStart.value.top && !pinching.value && event.translationY >= officeGestures.pullRefresh && event.translationY > Math.abs(event.translationX);
       if (onPullRefresh && pulled && !event.canceled) runOnJS(onPullRefresh)();
+      // Let go past an end, the plan only springs back (onFinalize); inside it, it glides on.
+      if (event.canceled || pinching.value || pull.get() !== 0) return;
+      const v = view.value;
+      const planWidth = PLAN_WIDTH * v.scale; const planHeight = PLAN_HEIGHT * v.scale;
+      const decay = (velocity: number, viewport: number, content: number) => {
+        'worklet';
+        return withDecay({
+          velocity, deceleration: officeGestures.flingDeceleration, rubberBandEffect: true, rubberBandFactor: officeGestures.flingBounce,
+          clamp: [clampPan(-Infinity, viewport, content), clampPan(Infinity, viewport, content)],
+        });
+      };
+      glideX.set(v.x); glideY.set(v.y); gliding.set(true);
+      // Sideways only when zoomed in: at the opening size the plan fills the width and never moves sideways.
+      if (planWidth > width) glideX.set(decay(event.velocityX, width, planWidth));
+      if (planHeight > visibleHeight) glideY.set(decay(event.velocityY, visibleHeight, planHeight));
     },
     onFinalize: () => { 'worklet'; pull.set(withSpring(0, springBack)); },
   });
   const pinch = usePinchGesture({
     block: scrollGesture, testID: 'office-pinch',
-    onActivate: () => { 'worklet'; touched.set(true); pinchStart.value = view.value.scale; pinching.value = true; },
+    onActivate: () => { 'worklet'; stopGlide(); touched.set(true); pinchStart.value = view.value.scale; pinching.value = true; },
     onUpdate: (event) => {
       'worklet';
       view.modify((v) => { zoomAt(v, pinchStart.value * event.scale, event.focalX, event.focalY, width, visibleHeight, scale, density); return v; });
@@ -143,12 +183,13 @@ function LoadedCanvas({ scene, width, height, scale, selectedRole, selectedZone,
   const reset = useTapGesture({
     testID: 'office-reset', numberOfTaps: 2, maxDelay: officeGestures.doubleTapMs, maxDistance: officeGestures.tapDistance, maxDuration: officeGestures.tapDurationMs,
     // Back to the opening size, at the top of the office.
-    onActivate: () => { 'worklet'; touched.set(true); view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: clampPan(0, visibleHeight, PLAN_HEIGHT * scale), scale }); },
+    onActivate: () => { 'worklet'; stopGlide(); touched.set(true); view.set({ x: (width - PLAN_WIDTH * scale) / 2, y: clampPan(0, visibleHeight, PLAN_HEIGHT * scale), scale }); },
   });
   const tap = useTapGesture({
     testID: 'office-tap', maxDistance: officeGestures.tapDistance, maxDuration: officeGestures.tapDurationMs,
     onActivate: (event) => {
       'worklet';
+      if (caught.get()) return;
       touched.set(true);
       const v = view.value;
       const x = (event.x - v.x) / v.scale; const y = (event.y - v.y) / v.scale;

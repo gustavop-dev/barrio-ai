@@ -8,7 +8,20 @@ export { errorMessage, isConflict };
  * Error with retry: title, the backend detail and «Reintentar». A 409 shows «No se puede ahora» in the
  * warn tone. Renders nothing without an error, so it can sit in place.
  */
-export function ErrorRetry({ error, onRetry, title, retryLabel = 'Reintentar' }: { error: unknown; onRetry?: () => void; title?: string; retryLabel?: string }) {
+export function ErrorRetry({
+  error,
+  onRetry,
+  title,
+  message,
+  retryLabel = 'Reintentar',
+}: {
+  error: unknown;
+  onRetry?: () => void;
+  title?: string;
+  /** Replaces the error's own text when the screen can explain it better (a 413 in the Galería). */
+  message?: string;
+  retryLabel?: string;
+}) {
   if (!error) return null;
   const conflict = isConflict(error);
   return (
@@ -23,7 +36,7 @@ export function ErrorRetry({ error, onRetry, title, retryLabel = 'Reintentar' }:
         ) : undefined
       }
     >
-      {errorMessage(error)}
+      {message ?? errorMessage(error)}
     </Note>
   );
 }

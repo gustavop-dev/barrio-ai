@@ -34,6 +34,9 @@ STATIC_ROOT=BASE_DIR/'staticfiles'
 STORAGES={'default':{'BACKEND':'django.core.files.storage.FileSystemStorage'},
  'staticfiles':{'BACKEND':'whitenoise.storage.CompressedManifestStaticFilesStorage'}}
 DEFAULT_AUTO_FIELD='django.db.models.BigAutoField'
+# Every gunicorn process must see the same login lockout counter (oficina_views.check_login, ACC-03): the cache lives in
+# the database, not in each process's memory. Migration 0028 creates the table.
+CACHES={'default':{'BACKEND':'django.core.cache.backends.db.DatabaseCache','LOCATION':'django_cache','OPTIONS':{'MAX_ENTRIES':10000}}}
 # Captures and the Galería (docs/capturas-galeria.md): private files, served only by authenticated views.
 # There is deliberately no MEDIA_URL route: nothing under MEDIA_ROOT is ever public.
 MEDIA_ROOT=Path(os.environ.get('MEDIA_ROOT') or BASE_DIR/'media')

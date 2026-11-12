@@ -73,7 +73,7 @@ describe('Detalle de una pieza', () => {
     expect(within(text).getByText('Most feature requests arrive as a solution.')).toBeInTheDocument();
     expect(within(text).getByText('178 caracteres')).toBeInTheDocument();
     expect(within(text).getByRole('button', { name: 'Copiar' })).toBeInTheDocument();
-    expect(within(text).getByText('Se publica tal cual, en inglés.')).toBeInTheDocument();
+    expect(within(text).getByText('Se publicó tal cual, en inglés.')).toBeInTheDocument(); // backlog #13: it already went out
   });
 
   it('says the comments were never read and shows the last reading when there are no cuts yet', async () => {
@@ -142,7 +142,7 @@ describe('Detalle de una pieza', () => {
     expect(comments.querySelector('audio')).toHaveAttribute('src', '/api/v1/capturas/cap-1/audio');
 
     await user.click(within(comments).getByRole('button', { name: 'Comentario para el equipo' }));
-    expect(onCapture).toHaveBeenCalledWith({ tipo: 'pieza', id: 'p7', label: 'Pieza del sábado 7 de noviembre' });
+    expect(onCapture).toHaveBeenCalledWith({ tipo: 'pieza', id: 'p7', label: 'Scope features from the decision they support.' });
   });
 
   it('folds «Cómo se escribió» and shows the variants as tabs on mobile', async () => {

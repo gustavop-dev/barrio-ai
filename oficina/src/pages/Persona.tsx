@@ -29,7 +29,6 @@ import {
   actionStateLabel,
   capabilityLabel,
   CONTACT_AFFINITY_LABEL,
-  CONTACT_EVENT_LABEL,
   CONTACT_MODALITY_LABEL,
   CONTACT_ROLE_LABEL,
   contactSourceLabel,
@@ -37,7 +36,8 @@ import {
   labelOf,
   networkDistanceLabel,
 } from '../lib/format';
-import { displayName, suggestedModality } from '../../../compartido/src/logic/barrio';
+import { displayName, eventLabel, suggestedModality } from '../../../compartido/src/logic/barrio';
+import { agree, isFeminineName } from '../../../compartido/src/logic/genero';
 import { journey } from './personas/journey';
 import {
   ATTRIBUTION_LABEL,
@@ -247,7 +247,7 @@ function Notes({ contact }: { contact: Contact }) {
   );
 }
 
-function History({ entries }: { entries: ContactHistoryEntry[] }) {
+function History({ entries, feminine }: { entries: ContactHistoryEntry[]; feminine: boolean }) {
   const ordered = [...entries].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   if (!ordered.length) return <p className="persona-meta">Sin eventos todavía.</p>;
   return (
@@ -255,7 +255,7 @@ function History({ entries }: { entries: ContactHistoryEntry[] }) {
       {ordered.map((entry, index) => (
         <li key={`${entry.at}-${index}`}>
           <div className="persona-history-body">
-            <p className="persona-text">{CONTACT_EVENT_LABEL[entry.event] ?? entry.event}</p>
+            <p className="persona-text">{eventLabel(entry, feminine)}</p>
             {entry.detail ? <p className="persona-meta">{entry.detail}</p> : null}
           </div>
           <p className="persona-meta">
@@ -329,7 +329,7 @@ export function Persona() {
       <header className="persona-head">
         <div className="persona-top">
           <Avatar name={name} size={48} />
-          <Badge tone={stage.tone}>{stage.label}</Badge>
+          <Badge tone={stage.tone}>{agree(stage.label, isFeminineName(person.display_name))}</Badge>
         </div>
         <h2 id="persona-nombre" className="persona-name">
           {isHttps(person.profile_url) ? (
@@ -395,7 +395,7 @@ export function Persona() {
       <Notes contact={person} />
 
       <Section label="Historial completo">
-        <History entries={person.history ?? []} />
+        <History entries={person.history ?? []} feminine={isFeminineName(person.display_name)} />
       </Section>
 
       {form ? (

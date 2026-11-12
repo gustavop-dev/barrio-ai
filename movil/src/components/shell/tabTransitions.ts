@@ -3,6 +3,12 @@
 // the top bar (Tu turno, Notificaciones, Calendario, Ajustes) open with the push instead: they slide
 // in from the right with the `push` spring while the screen underneath moves left by 30 %.
 //
+// The scenes are drawn in the navigator's order, whatever the focus: react-native-screens stacks the screens of its
+// container in that order and drops their zIndex (Screen.tsx), so the focused tab is not brought to the front. A push
+// works only when the new screen comes later in the order than the one it covers. Between two top-bar screens, going to
+// an earlier one is therefore the way back: the old screen, drawn on top, slides off to the right and uncovers the new one.
+// As a push it slid left over the new one and stayed there, covering it, until the spring settled (Gustavo, 11/11).
+//
 // These are options of the JS tabs navigator, whose scenes animate with React Native's Animated on
 // the native driver (UI thread). Each scene animates with its own spec, so the screen that leaves
 // and the one that enters get different ones. With reduced motion nothing animates.
@@ -20,13 +26,19 @@ import { BEZIER, navSprings, navTimings, navValues } from '@/theme/motion';
 /** Routes of the top bar: they open with the push. */
 export const TOP_BAR_ROUTES: readonly string[] = ['tu-turno', 'notificaciones', 'calendario', 'ajustes'];
 
+/** The tabs in the navigator's order: the order they are drawn in, and the side a scene slides from. */
+export const TAB_ORDER = ['index', 'resultados', 'personas', 'galeria', 'tu-turno', 'notificaciones', 'calendario', 'ajustes'] as const;
+
 export type TabMove = 'fade' | 'push' | 'pop';
 
-/** The kind of change from the screen that was shown to the one shown now. */
-export function tabMove(previous: string | null, current: string): TabMove {
-  if (TOP_BAR_ROUTES.includes(current)) return 'push';
-  if (previous && TOP_BAR_ROUTES.includes(previous)) return 'pop';
-  return 'fade';
+/**
+ * The kind of change from the screen that was shown to the one shown now. A top-bar screen earlier in the order than
+ * the top-bar screen it replaces is drawn under it, so it comes back with the pop (see the note at the top).
+ */
+export function tabMove(previous: string | null, current: string, order: readonly string[] = TAB_ORDER): TabMove {
+  const fromTopBar = previous !== null && TOP_BAR_ROUTES.includes(previous);
+  if (TOP_BAR_ROUTES.includes(current)) return fromTopBar && order.indexOf(current) < order.indexOf(previous) ? 'pop' : 'push';
+  return fromTopBar ? 'pop' : 'fade';
 }
 
 /** A tab's part in the change: the screen arriving, the one leaving, or one not involved. */
@@ -102,18 +114,16 @@ export function tabSceneOptions(move: TabMove, role: TabRole, side: 1 | -1, widt
       sceneStyleInterpolator: ({ current }) => scene(current.progress, { opacity: away(current.progress, side).interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }),
     };
   }
-  // The push and its way back: the top-bar screen moves by the whole width, the other by 30 %.
+  // The push and its way back: the screen on top moves by the whole width, the one under it by 30 %. The push brings a
+  // screen later in the order (drawn on top) and the pop uncovers an earlier one, so the screen that slides is always
+  // the one drawn on top and the one under it is uncovered as it moves back.
   const slides = (move === 'push') === (role === 'enter');
   return {
     transitionSpec: pushSpec,
     sceneStyleInterpolator: ({ current }) => {
       const a = away(current.progress, side);
       if (slides) return scene(current.progress, { x: a.interpolate({ inputRange: [0, 1], outputRange: [0, width] }) });
-      const x = a.interpolate({ inputRange: [0, 1], outputRange: [0, -navValues.pushParallax * width] });
-      // The tabs draw the focused scene on top, so a screen coming back from under the top-bar screen
-      // cannot be revealed by it: it fades in as it moves back.
-      if (role === 'enter') return scene(current.progress, { opacity: a.interpolate({ inputRange: [0, 1], outputRange: [1, 0], extrapolate: 'clamp' }), x });
-      return scene(current.progress, { x });
+      return scene(current.progress, { x: a.interpolate({ inputRange: [0, 1], outputRange: [0, -navValues.pushParallax * width] }) });
     },
   };
 }

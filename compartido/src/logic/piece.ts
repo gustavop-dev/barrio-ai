@@ -52,6 +52,13 @@ export function isOnItsWay(status: string): boolean {
   return ON_ITS_WAY.has(status);
 }
 
+/** The line under «Texto final»: it goes out as written, it went out as written, or nothing once it will not go out. */
+export function finalTextNote(status: string): string | null {
+  if (status === 'published') return 'Se publicó tal cual, en inglés.';
+  if (status === 'uncertain' || status === 'skipped' || DID_NOT.has(status)) return null;
+  return 'Se publica tal cual, en inglés.';
+}
+
 /** When it actually went out (execution end), falling back to its scheduled hour. */
 export function publishedAt(piece: Pick<PieceDetail, 'scheduled_for' | 'action_detail'>): string {
   return piece.action_detail?.execution?.finished_at || piece.action_detail?.execution?.started_at || piece.scheduled_for;

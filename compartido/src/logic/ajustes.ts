@@ -192,6 +192,15 @@ export function spendLine(line: AjustesSpend): { label: string; used: number; ma
   return { label: line.label, text: knownAmount(line.spent_usd) ? formatUsd(line.spent_usd) : 'sin dato' };
 }
 
+/** The month against its limit, with the Meter's thresholds: «warn» from 80 %, «bad» at or over it; null below or without a limit. */
+export function monthAlert(spend: Ajustes['ai_spend']): { tone: 'warn' | 'bad'; text: string } | null {
+  if (!knownAmount(spend.month_usd) || !knownAmount(spend.limit_usd) || spend.limit_usd <= 0) return null;
+  const fraction = spend.month_usd / spend.limit_usd;
+  if (fraction >= 1) return { tone: 'bad', text: 'Límite del mes alcanzado' };
+  if (fraction >= 0.8) return { tone: 'warn', text: 'Cerca del límite del mes' };
+  return null;
+}
+
 /** The rows under the meters: this month (against its limit), since the start, the lead agent and transcription. */
 export function spendRows(spend: Ajustes['ai_spend']): { label: string; text: string }[] {
   const month = knownAmount(spend.month_usd)

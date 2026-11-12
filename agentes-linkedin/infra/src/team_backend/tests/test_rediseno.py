@@ -317,6 +317,19 @@ class PersonasAndCalendarTests(OperatorBase):
         self.assertEqual(next(e for e in deadline_day['events'] if e['kind']=='deadline')['link'],'/tu-turno')
         expected=[e for d in body['days'] for e in d['events'] if e['kind']=='invite_expected']
         self.assertEqual(expected[0]['people'][0]['name'],'Ana Founder');self.assertFalse(expected[0]['important'])
+        # Backlog #8: someone whose invitation is already approved leaves the forecast.
+        camila=Contact.objects.create(account=self.account,provider_user_id='ACocamila',display_name='Camila Ortiz',source='commenter',
+                                      stage='followed',followed_at=timezone.now()-timedelta(days=3))
+        forecast=lambda:[p['name'] for d in self.human.get(f'/api/v1/calendario?desde={today}&hasta={today+timedelta(days=3)}').json()['days']
+                         for e in d['events'] if e['kind']=='invite_expected' for p in e['people']]
+        self.assertIn('Camila Ortiz',forecast())
+        ActionProposal.objects.create(account=self.account,contact=camila,capability='RED-02',payload={},payload_hash='x',state='approved')
+        self.assertNotIn('Camila Ortiz',forecast());self.assertIn('Ana Founder',forecast())
+        # PRS-07: an opportunity without a contact opens the Oportunidades tab, which both interfaces read from ?pestana=.
+        Opportunity.objects.create(person_name='Laura Gómez',modality='projectapp',next_action='Llamada',next_action_at=timezone.now()+timedelta(hours=3))
+        events=[e for d in self.human.get(f'/api/v1/calendario?desde={today}&hasta={today+timedelta(days=3)}').json()['days']
+                for e in d['events'] if e['kind']=='opportunity_next' and 'Laura Gómez' in e['title']]
+        self.assertEqual([e['link'] for e in events],['/personas?pestana=oportunidades'])
         self.assertEqual(self.human.get('/api/v1/calendario?desde=2026-01-01&hasta=2026-12-31').status_code,400)
 
 

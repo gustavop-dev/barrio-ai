@@ -33,7 +33,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 | [IMG-09](#img-09) | Editar con la API de imágenes de OpenAI sin perder el original | backend | funciona |
 | [IMG-10](#img-10) | Comprobación de la edición con un modelo con visión | backend | funciona |
 | [IMG-11](#img-11) | La imagen en el detalle de la pieza, con veto | PWA · app · backend | funciona |
-| [IMG-12](#img-12) | La Galería marca la foto «usada en la pieza del …» | PWA · app · backend | parcial |
+| [IMG-12](#img-12) | La Galería marca la foto «usada en la pieza del …» | PWA · app · backend | funciona |
 | [IMG-13](#img-13) | Coste de las imágenes en el ledger, dentro del presupuesto general | PWA · app · backend | parcial |
 | [IMG-14](#img-14) | Publicar en LinkedIn con la imagen o el carrusel | backend | funciona |
 | [IMG-INF-01](#img-inf-01) | Las reglas de infografías son una regla de agente | backend | funciona |
@@ -276,7 +276,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 ### IMG-12 · La Galería marca la foto «usada en la pieza del …» <a id="img-12"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** parcial
+- **Estado:** funciona
 - **Qué hace para Gustavo:** en la Galería ve qué fotos usó el equipo, en qué pieza y si las editó.
 - **Implementación backend:** Estados elegida/editada/publicada, `used_in` y `versions`; se libera al cerrar sin publicar.
 - **Criterios de aceptación:**

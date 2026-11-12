@@ -18,12 +18,9 @@ import Animated, { useAnimatedStyle } from 'react-native-reanimated';
 import { BottomBar } from '@/components/shell/BottomBar';
 import { TopBar } from '@/components/shell/TopBar';
 import { baseFrame, pushProgress, registerLayer, stackLevel, stackOf } from '@/components/shell/push';
-import { focusedChild, sceneRole, tabMove, tabSceneOptions, useFocusMemory } from '@/components/shell/tabTransitions';
+import { TAB_ORDER, focusedChild, sceneRole, tabMove, tabSceneOptions, useFocusMemory } from '@/components/shell/tabTransitions';
 import { useMotion } from '@/theme/motion';
 import { colors } from '@/theme/tokens';
-
-/** The tabs in the navigator's order (the side a scene slides from depends on it). */
-const ORDER = ['index', 'resultados', 'personas', 'galeria', 'tu-turno', 'notificaciones', 'calendario', 'ajustes'] as const;
 
 export default function TabsLayout() {
   const navigation = useNavigation();
@@ -45,11 +42,11 @@ export default function TabsLayout() {
   const dim = useAnimatedStyle(() => ({ opacity: baseFrame(covered.value, width, reduced).dim }), [covered, width, reduced]);
 
   const screenOptions = ({ route: tab }: { route: { name: string } }): TabsScreenOptions => {
-    const { role, side } = sceneRole(focus, tab.name, ORDER);
+    const { role, side } = sceneRole(focus, tab.name, TAB_ORDER);
     return {
       headerShown: false,
       sceneStyle: { backgroundColor: colors.paper },
-      ...tabSceneOptions(tabMove(focus.previous, focus.current ?? tab.name), role, side, width, reduced),
+      ...tabSceneOptions(tabMove(focus.previous, focus.current ?? tab.name, TAB_ORDER), role, side, width, reduced),
     };
   };
 
@@ -58,6 +55,7 @@ export default function TabsLayout() {
       <View ref={root} collapsable={false} pointerEvents="none" style={styles.fill} />
       <TopBar />
       <View style={styles.scenes}>
+        {/* The screens are declared in TAB_ORDER, the order they are drawn in (tabTransitions.ts). */}
         <Tabs backBehavior="history" tabBar={(props) => <BottomBar {...props} />} screenOptions={screenOptions}>
           <Tabs.Screen name="index" options={{ title: 'Oficina' }} />
           <Tabs.Screen name="resultados" options={{ title: 'Resultados' }} />

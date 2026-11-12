@@ -3,6 +3,7 @@ import { monthlyCountdown } from './referentes';
 // they can be tested without rendering. The backend sends `priority`, `state` and `items`; until it
 // does, the same rules are derived here from `critical`, `tone`, `deadline` and the question flags.
 import type { DoneToday, MemoryFact, TuTurno, TurnoCard, TurnoPriority, TurnoState } from '../api/types';
+import { padHour } from './format';
 
 const LOCALE = 'es-CO';
 const HOUR = 3_600_000;
@@ -132,7 +133,7 @@ export function dayOffset(iso: string | null | undefined, now: number = Date.now
 export function clock(iso: string | null | undefined): string {
   const value = time(iso);
   if (value === null) return '';
-  return new Date(value).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false });
+  return padHour(new Date(value).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', hour12: false }));
 }
 
 function weekday(value: number): string {

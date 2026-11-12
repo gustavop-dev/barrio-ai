@@ -8,7 +8,7 @@ import { T } from './Text';
 
 /** The check's room: the 16 px icon and the space before the label. */
 const CHECK_ICON = 16;
-const CHECK_ROOM = CHECK_ICON + 6;
+export const CHECK_ROOM = CHECK_ICON + 6;
 
 /**
  * ui.css .chip-filter.solid: a toggle chip, tinta when pressed. MovMicro: chosen, it fills with ink at

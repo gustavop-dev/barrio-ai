@@ -16,6 +16,7 @@ import type {
   Referent,
 } from '../api/types';
 import { actionStateLabel, capabilityLabel, CONTACT_EVENT_LABEL, contactSourceLabel, excerpt, networkDistanceLabel, timeAgo } from './format';
+import { agree, isFeminineName } from './genero';
 import {
   ATTRIBUTION_LABEL,
   BOARD_STAGES,
@@ -52,10 +53,10 @@ export function totalCount(summary: RedSummary | undefined): number | undefined 
   return CONTACT_STAGE_KEYS.reduce((sum, stage) => sum + (summary.stages[stage] ?? 0), 0);
 }
 
-/** «Seguido hace 2 días», from the last event (or the last update). */
+/** «Seguido hace 2 días» («Seguida» for a woman), from the last event (or the last update). */
 export function lastActivity(contact: Contact): string {
   const event = contact.last_event ?? contact.history?.[contact.history.length - 1] ?? null;
-  if (event) return `${CONTACT_EVENT_LABEL[event.event] ?? event.event} ${timeAgo(event.at)}`;
+  if (event) return `${agree(CONTACT_EVENT_LABEL[event.event] ?? event.event, isFeminineName(contact.display_name))} ${timeAgo(event.at)}`;
   return `Actualizado ${timeAgo(contact.updated_at)}`;
 }
 
@@ -162,8 +163,9 @@ export function sortHistory(entries: readonly ContactHistoryEntry[]): ContactHis
   return [...entries].sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
 }
 
-export function eventLabel(entry: ContactHistoryEntry): string {
-  return CONTACT_EVENT_LABEL[entry.event] ?? entry.event;
+/** «Seguido», or «Seguida» on a woman's card. */
+export function eventLabel(entry: ContactHistoryEntry, feminine = false): string {
+  return agree(CONTACT_EVENT_LABEL[entry.event] ?? entry.event, feminine);
 }
 
 function asPercent(value: number | undefined): string | null {

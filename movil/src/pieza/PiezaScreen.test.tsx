@@ -104,7 +104,7 @@ describe('Detalle de una pieza', () => {
     expect(open).toHaveBeenCalledWith('https://www.linkedin.com/feed/update/urn:li:share:7/');
 
     expect(screen.getByText('Most feature requests arrive as a solution.')).toBeOnTheScreen();
-    expect(screen.getByText('Se publica tal cual, en inglés.')).toBeOnTheScreen();
+    expect(screen.getByText('Se publicó tal cual, en inglés.')).toBeOnTheScreen(); // backlog #13: it already went out
     expect(screen.queryByText('Veto')).toBeNull();
   });
 
@@ -160,7 +160,7 @@ describe('Detalle de una pieza', () => {
     expect(screen.getByText('Escuchar')).toBeOnTheScreen();
 
     await fireEvent.press(screen.getByText('Comentario para el equipo'));
-    expect(captureState()).toEqual({ open: true, context: { tipo: 'pieza', id: 'p7', label: 'Pieza del sábado 7 de noviembre' } });
+    expect(captureState()).toEqual({ open: true, context: { tipo: 'pieza', id: 'p7', label: 'Scope features from the decision they support.' } });
   });
 
   it('keeps every fold of «Cómo se escribió» closed, and shows the variants as tabs you can swipe', async () => {

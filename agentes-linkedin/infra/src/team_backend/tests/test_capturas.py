@@ -150,8 +150,30 @@ class CaptureRoutingTests(CaptureBase):
         body=self.send(nota='Sí, pero solo remotos.',contexto_tipo='pregunta',contexto_id=str(q.id),para='respuesta');self.drain()
         self.assertEqual(self.capture(body).outcome['text'],'Está en Lo que el equipo sabe de ti · Público')  # the question's suggestion
         self.assertEqual([f['fact'] for f in memory.confirmed_blocks()[0]],['¿Aceptas proyectos de 3 meses? Sí, pero solo remotos.'])
-        closed=self.human.post('/api/v1/capturas',{'nota':'Otra','contexto_tipo':'pregunta','contexto_id':str(q.id)},format='multipart')
-        self.assertEqual(closed.status_code,409)
+        # Backlog #7: an answer to a question that is no longer open is kept as a private fact, not rejected.
+        late=self.send(nota='Otra',contexto_tipo='pregunta',contexto_id=str(q.id));self.drain()
+        capture=self.capture(late)
+        self.assertEqual((capture.state,capture.outcome['text']),('dato_guardado',capturas.CLOSED_QUESTION_TEXT))
+        self.assertEqual(capture.routed_to['closed_question'],str(q.id))
+        self.assertEqual([f['fact'] for f in memory.confirmed_blocks()[0]],['¿Aceptas proyectos de 3 meses? Sí, pero solo remotos.'])
+        self.assertIn('Otra',[g['guidance']['texto'] for g in memory.confirmed_blocks()[1]])
+
+    def test_a_voice_answer_whose_question_closes_during_transcription_is_kept_and_undo_removes_it(self):
+        q=preguntas.ask('director_editorial','¿Qué temas de IA te interesan?','Para la agenda','temas.ia')
+        with self.transcriber('Arquitecturas de IA, RAG y embeddings.'):
+            body=self.send(audio=audio(),audio_duration_s='30',contexto_tipo='pregunta',contexto_id=str(q.id))
+            preguntas.answer(self.gustavo,q.id,'Agentes')  # answered by text before the job ran
+            self.drain()
+        capture=self.capture(body);q.refresh_from_db()
+        self.assertEqual((capture.state,capture.outcome['text']),('dato_guardado',capturas.CLOSED_QUESTION_TEXT))
+        self.assertEqual(q.answer,'¿Qué temas de IA te interesan? Agentes')  # the earlier answer is untouched
+        saved=memory.confirmed_blocks()[1]
+        self.assertIn('Arquitecturas de IA, RAG y embeddings.',[g['guidance']['texto'] for g in saved])
+        self.assertIn('Respuesta a «¿Qué temas de IA te interesan?», que ya estaba cerrada',[g['guidance'].get('tema') for g in saved])
+        self.assertEqual(self.handoffs()[-1],('operador_cuenta','director_editorial'))
+        self.assertEqual(self.human.delete(f'/api/v1/capturas/{body["id"]}').status_code,200)
+        q.refresh_from_db();self.assertEqual(q.state,'answered')  # the earlier answer stays
+        self.assertNotIn('Arquitecturas de IA, RAG y embeddings.',[g['guidance'].get('texto') for g in memory.confirmed_blocks()[1]])
 
     def test_voice_note_about_a_person_lands_in_their_notes_and_undo_removes_it(self):
         contact=Contact.objects.create(account=self.account,provider_user_id='ACoana',display_name='Ana Founder',source='manual',stage='fit')

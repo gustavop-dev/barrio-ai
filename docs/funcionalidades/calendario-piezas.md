@@ -19,7 +19,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 | [CAL-08](#cal-08) | Texto final y «Copiar» | PWA · app · backend | funciona |
 | [CAL-09](#cal-09) | «Cómo se escribió» | PWA · app · backend | funciona |
 | [CAL-10](#cal-10) | Pieza en preparación | PWA · app · backend | funciona |
-| [CAL-11](#cal-11) | Comentario para el equipo sobre una pieza | PWA · app · backend | con fallo conocido |
+| [CAL-11](#cal-11) | Comentario para el equipo sobre una pieza | PWA · app · backend | funciona |
 | [CAL-12](#cal-12) | Vetar una pieza | PWA · app · backend | funciona |
 | [CAL-13](#cal-13) | Vetar una acción en cola | PWA · app · backend | funciona |
 | [CAL-14](#cal-14) | «Preparar la siguiente pieza» | PWA · app · backend | funciona |
@@ -190,17 +190,16 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 ### CAL-11 · Comentario para el equipo sobre una pieza <a id="cal-11"></a>
 
 - **Dónde:** PWA · app · backend
-- **Estado:** con fallo conocido
+- **Estado:** funciona
 - **Qué hace para Gustavo:** desde la pieza le dice algo al equipo, por escrito o con la voz, y lo ve en «Tus comentarios para el equipo»; el director lo tiene en cuenta en las piezas siguientes.
 - **Código:** «Comentario para el equipo» abre la captura con contexto `pieza` ([CAP-07](captura.md#cap-07)); `team_comments` del detalle (`capturas.piece_comments`); PWA `PiezaDetalle.tsx`; app `pieza/TeamComments.tsx`.
-- **El fallo:** en la app, un comentario con nota de voz no llega ([CAP-04](captura.md#cap-04)). Con texto funciona.
 - **Criterios de aceptación:**
   1. **Dado** una pieza, **cuando** pulsa «Comentario para el equipo», **entonces** se abre la captura con el chip «Comentario sobre la pieza» y su tesis.
   2. **Dado** el comentario enviado y procesado, **cuando** abre el detalle, **entonces** aparece en «Tus comentarios para el equipo» con la nota o la transcripción, «hace X» y «Escuchar» si tiene audio.
-  3. **Dado** un comentario de voz en la app, **cuando** lo envía, **entonces** llega igual que uno escrito. **Hoy falla.**
+  3. **Dado** un comentario de voz en la app, **cuando** lo envía, **entonces** llega igual que uno escrito.
   4. **Dado** comentarios de los últimos 30 días, **cuando** corre el director, **entonces** los recibe en `feedback_from_gustavo` ([EDI-17](motor-editorial.md#edi-17)).
 - **Brechas código/docs:** un comentario solo aparece cuando el backend lo marca `anotado`; mientras se procesa, el detalle no lo muestra como pendiente.
-- **Cobertura QA:** CAL-11.1 en `07-pieza-veto.yaml` (abre la captura con «Comentario sobre la pieza») · el envío es de `05-captura-*.yaml` · 2026-11-08 · pasa
+- **Cobertura QA:** CAL-11.1 en `07-pieza-veto.yaml` (abre la captura con «Comentario sobre la pieza») y `05-captura-contexto.yaml` (el chip con la tesis) · el envío es de `05-captura-*.yaml` · 2026-11-11
 
 ### CAL-12 · Vetar una pieza <a id="cal-12"></a>
 

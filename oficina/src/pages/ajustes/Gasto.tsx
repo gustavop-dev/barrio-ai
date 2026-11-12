@@ -1,12 +1,13 @@
 // Ajustes › Gasto de IA: today's line per budget, then the month and the total (GET /api/v1/ajustes).
-import { spendLine, spendRows } from '../../../../compartido/src/logic/ajustes';
+import { monthAlert, spendLine, spendRows } from '../../../../compartido/src/logic/ajustes';
 import { useAjustes } from '../../api/hooks';
-import { Card, ErrorRetry, Meter, Section, Skeleton } from '../../components/ui';
+import { Badge, Card, ErrorRetry, Meter, Section, Skeleton } from '../../components/ui';
 import { isUnavailable, Row, Unavailable } from './shared';
 
 export function GastoSection() {
   const ajustes = useAjustes();
   const spend = ajustes.data?.ai_spend;
+  const alert = spend ? monthAlert(spend) : null;
   return (
     <Section label="Gasto de IA · hoy" id="gasto">
       {ajustes.isPending ? <Skeleton variant="card" label="Cargando el gasto…" /> : null}
@@ -35,6 +36,7 @@ export function GastoSection() {
                 {row.text}
               </Row>
             ))}
+            {alert ? <Badge tone={alert.tone}>{alert.text}</Badge> : null}
           </div>
         </Card>
       ) : null}
