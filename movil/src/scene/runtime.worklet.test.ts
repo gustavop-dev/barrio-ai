@@ -4,10 +4,13 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { runInNewContext } from 'node:vm';
 import { OfficeEngine } from '@compartido/scene/engine';
+import { DEFAULT_PALETTE } from '@compartido/scene/art';
+import type * as Art from '@compartido/scene/art';
 import type * as Runtime from '@compartido/scene/runtime';
+import { ROLE_IDS } from '@compartido/scene/roles';
 
 type Worklet = ((...args: unknown[]) => unknown) & { __initData?: { code: string }; __closure?: unknown[] };
-function loadCompiledRuntime() {
+function loadCompiled(file: string) {
   const babel = require('@babel/core');
   const modules = new Map<string, { exports: Record<string, unknown> }>();
   const load = (path: string): Record<string, unknown> => {
@@ -19,8 +22,9 @@ function loadCompiledRuntime() {
     runInNewContext(code, { module, exports: module.exports, global: { Error }, require: (name: string) => load(resolve(dirname(path), `${name}.ts`)) });
     return module.exports;
   };
-  return load(resolve(__dirname, '../../../compartido/src/scene/runtime.ts')) as unknown as typeof Runtime;
+  return load(resolve(__dirname, '../../../compartido/src/scene', file));
 }
+const loadCompiledRuntime = () => loadCompiled('runtime.ts') as unknown as typeof Runtime;
 function uiClone<T>(input: T, memo = new Map<unknown, unknown>()): T {
   if (input === null || typeof input !== 'object' && typeof input !== 'function') return input;
   if (memo.has(input)) return memo.get(input) as T;
@@ -68,4 +72,28 @@ it('compiles receipt, selection and reduced-motion choreography without JS runti
   expect(s.tasks).toHaveLength(0);
   expect(hop(s, 'operador_cuenta')).toBe(0);
   expect(brackets(s)).toBe(7);
+});
+
+it('draws the people and the lights from the compiled shared art on the UI runtime, with no JS function captured', () => {
+  const runtime = loadCompiledRuntime();
+  const art = loadCompiled('art.ts') as unknown as typeof Art;
+  const create = uiClone(runtime.createScene), step = uiClone(runtime.stepScene), party = uiClone(runtime.startSceneParty);
+  const lights = uiClone(art.paintLights), floor = uiClone(art.paintFloor), frame = uiClone(art.actorFrame), front = uiClone(art.frontProp);
+  const s = create();
+  s.statuses = Object.fromEntries(ROLE_IDS.map((id) => [id, 'en_espera' as const]));
+  for (let i = 0; i < 300; i++) step(s, 16);
+  party(s);
+  for (let i = 0; i < 300; i++) step(s, 16);
+  expect(s.actors.filter((a) => a.spot).length).toBeGreaterThan(10);
+  const rects: string[] = [];
+  const pen = { rect: (_x: number, _y: number, _w: number, _h: number, color: string) => { rects.push(color); }, sprite: () => {} };
+  floor(pen, s);
+  lights(pen, s, DEFAULT_PALETTE);
+  expect(rects.length).toBeGreaterThan(0);
+  const out = { sx: 0, sy: 0, x: 0, y: 0, alpha: 0 };
+  for (const a of s.actors) {
+    frame(s, a, out);
+    expect(Number.isFinite(out.sx) && Number.isFinite(out.x)).toBe(true);
+    front(a);
+  }
 });

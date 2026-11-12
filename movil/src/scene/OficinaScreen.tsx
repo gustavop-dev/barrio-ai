@@ -7,7 +7,7 @@ import { REFRESH } from '@compartido/api/hooks';
 import { statusesFrom, type SceneStatus } from '@compartido/scene/activity';
 import { nowLine } from '@compartido/scene/presentation';
 import { narrateSceneSelection, selectScene } from '@compartido/scene/runtime';
-import { PLAN_HEIGHT, sceneScale } from '@compartido/scene/plan';
+import { PLAN_HEIGHT, PLAN_WIDTH } from '@compartido/scene/plan';
 import { CHARACTER_BY_ID, LIBRARIAN_ID, teamById, type CharacterId, type TeamId } from '@compartido/scene/roles';
 import type { PanelData } from '@compartido/scene/panels';
 import { Button, ErrorRetry, Note, SnapSheet } from '@/components/ui';
@@ -15,7 +15,7 @@ import { useContentInsets } from '@/components/shell/useContentInsets';
 import { useCaptureSheet } from '@/capture/store';
 import { haptic, officeGestures, sheetMotion, useMotion } from '@/theme/motion';
 import { colors, shell, space } from '@/theme/tokens';
-import { OfficeCanvas, type ScenePick } from './OfficeCanvas';
+import { OfficeCanvas, type SceneFocus, type ScenePick } from './OfficeCanvas';
 import { RolePanel, TeamPanel } from './OfficePanels';
 import { useOfficeLifecycle } from './useOfficeLifecycle';
 import { useOfficeScene } from './useOfficeScene';
@@ -46,9 +46,17 @@ export function OficinaScreen() {
   }, [active]);
   const window = useWindowDimensions();
   const insets = useContentInsets();
+  // The content insets keep room for the microphone button over the tab bar; the scene goes under it, down to the bar.
+  const tabBar = insets.bottom - space[10];
   const [height, setHeight] = useState(window.height - shell.topBarHeight);
-  const scale = Math.round(sceneScale(window.width, height - insets.bottom) * window.scale) / window.scale;
-  const sceneHeight = Math.min(PLAN_HEIGHT * scale, Math.max(240, height - insets.bottom - 100));
+  // The plan fills the screen's width (Gustavo, 11/11: only a vertical scroll, no side margins or sideways pan) and the
+  // scene fills the screen down to the tab bar (it never ends in a blank strip); the plan scrolls up and down inside it.
+  const scale = window.width / PLAN_WIDTH;
+  const sceneHeight = Math.min(PLAN_HEIGHT * scale, Math.max(240, height - tabBar));
+  // With the first real activity the camera opens where the agents are: the office if someone works, the game room
+  // (where the free ones rest) otherwise. Decided once; moving the scene keeps the person's own view.
+  const [focus, setFocus] = useState<SceneFocus | null>(null);
+  if (focus === null && live) setFocus(Object.values(statuses).some((s) => s === 'trabajando') ? 'arriba' : 'sala');
   const scroll = useRef<ComponentRef<typeof ScrollView>>(null);
   const select = useCallback((next: Selection) => {
     haptic('officePick'); scroll.current?.scrollTo({ y: 0, animated: !reduced }); setSelection(next);
@@ -77,30 +85,31 @@ export function OficinaScreen() {
   const selectedZone = selection?.kind === 'team' ? selection.id : selectedRole ? CHARACTER_BY_ID[selectedRole].team : null;
   const label = selection ? selection.kind === 'team' ? teamById(selection.id).name : CHARACTER_BY_ID[selection.id].name : '';
   const [refreshing, setRefreshing] = useState(false);
+  // The pull on the scene and the page's own pull may both fire for one drag: one refresh at a time.
   const refresh = async () => {
-    if (!active) return;
+    if (!active || refreshing) return;
     setRefreshing(true);
     try { await Promise.all([activity.refetch(), overview.refetch(), events.refetch()]); }
     finally { setRefreshing(false); }
   };
   return <View testID="screen-oficina" style={styles.root} onLayout={(e) => setHeight(e.nativeEvent.layout.height)}>
     <GestureDetector gesture={pageScroll}>
-    <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: insets.bottom }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} />}>
+    <ScrollView ref={scroll} contentContainerStyle={{ paddingBottom: tabBar }} refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => void refresh()} tintColor={colors.brandDeep} />}>
       <View>
-        <OfficeCanvas scrollGesture={pageScroll} scene={scene} width={window.width} height={sceneHeight} visibleHeight={selection ? Math.min(sceneHeight, (height - insets.bottom + space[10]) * (1 - officeGestures.sheetHalf)) : sceneHeight} scale={scale} selectedRole={selectedRole} selectedZone={selectedZone} statuses={statuses} onPick={onPick} />
+        <OfficeCanvas scrollGesture={pageScroll} scene={scene} width={window.width} height={sceneHeight} visibleHeight={selection ? Math.min(sceneHeight, (height - tabBar) * (1 - officeGestures.sheetHalf)) : sceneHeight} scale={scale} selectedRole={selectedRole} selectedZone={selectedZone} statuses={statuses} onPick={onPick} focus={focus} onPullRefresh={() => void refresh()} />
         {paused ? <View testID="oficina-pausa" pointerEvents="none" style={[StyleSheet.absoluteFill, styles.paused]} /> : null}
         <OfficeNarration line={line} revision={snapshot.now?.key ?? 0} reduced={reduced} />
-      </View>
-      {/* Only the error notes live under the scene: tapping a zone or its label opens its team (the legend, the team strip,
-          the map link and the art credit are gone). This space is also where the page is pulled down to refresh. */}
-      <View testID="oficina-pie" style={styles.below}>
+        {/* Only the error notes, over the bottom of the scene: tapping a zone or its label opens its team (the legend, the
+            team strip, the map link and the art credit are gone). The page refreshes with a pull down from the top. */}
+        <View testID="oficina-pie" pointerEvents="box-none" style={styles.notes}>
         {activity.isError ? <Note tone="error" title="No se pudo leer la actividad." actions={<Button onPress={() => void activity.refetch()}>Reintentar</Button>}>Mientras tanto los personajes quedan quietos: la oficina no simula trabajo.</Note> : null}
         <ErrorRetry error={overview.error} title="No se pudo leer el estado de la máquina." onRetry={() => void overview.refetch()} />
         {feedUnavailable(events.error) ? <Note title="Aún no disponible">El registro de eventos no está disponible. Se muestra la actividad real de cada rol.</Note> : <ErrorRetry error={events.error} title="No se pudieron leer los eventos." onRetry={() => void events.refetch()} />}
+        </View>
       </View>
     </ScrollView>
     </GestureDetector>
-    {selection ? <SnapSheet label={label} testID="office-panel" bottom={insets.bottom - space[10]} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active} fitViewportToSnap>
+    {selection ? <SnapSheet label={label} testID="office-panel" bottom={tabBar} availableHeight={height} onClose={clearSelection} onRest={setPanelSnap} backCloses={active} fitViewportToSnap>
       {selection.kind === 'team' ? <TeamPanel team={selection.id} data={data} onRole={(id) => select({ kind: 'role', id })} /> : <RolePanel id={selection.id} data={data} onTeam={(id) => select({ kind: 'team', id })} />}
     </SnapSheet> : null}
   </View>;
@@ -108,6 +117,6 @@ export function OficinaScreen() {
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: colors.paper },
   paused: { backgroundColor: colors.backdrop },
-  // Fills what the scene leaves (sceneHeight keeps ~100 dp free): where the page is pulled down to refresh.
-  below: { minHeight: 96, paddingHorizontal: space[4], paddingVertical: space[1], gap: space[2] },
+  // Above the microphone button, which floats over the bottom of the scene.
+  notes: { position: 'absolute', left: space[4], right: space[4], bottom: space[10] + space[2], gap: space[2] },
 });

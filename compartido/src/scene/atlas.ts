@@ -26,5 +26,9 @@ export const ATLAS: Readonly<Record<string, Rect>> = {
   table: [290, 1393, 32, 37], door: [323, 1393, 16, 28], palm: [340, 1393, 23, 31], floor: [364, 1393, 32, 32],
   tile: [397, 1393, 32, 32], laptop: [430, 1393, 16, 16], monitor: [447, 1393, 32, 32], chairBack: [480, 1393, 14, 22],
   chairNorth: [0, 1440, 22, 19], chairNorthGold: [23, 1440, 22, 19], monitorFront: [46, 1440, 29, 20],
+  // The game room (Sala de juegos), appended by scripts/oficina/atlas_sala_de_juegos.py.
+  tvConsole: [0, 1461, 60, 34], speaker: [61, 1461, 32, 37], cueRack: [94, 1461, 13, 33], arcades: [108, 1461, 33, 39],
+  poolTable: [142, 1461, 48, 38], drums: [191, 1461, 43, 31], pouf: [235, 1461, 20, 24], mic: [256, 1461, 13, 27],
+  guitar: [270, 1461, 15, 31], armchair: [286, 1461, 19, 27],
 };
 

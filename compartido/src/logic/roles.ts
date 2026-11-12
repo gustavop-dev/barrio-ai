@@ -1,5 +1,5 @@
 // Teams, roles and their places in the office. Coordinates are logical pixels of the vertical
-// plan (192×336, see plan.ts); the canvas draws them at an integer scale (2× = 384×672).
+// plan (192×452 with the game room, see plan.ts); the canvas draws them at an integer scale (2× = 384×904).
 // The 17 role ids are the backend's (`/api/v1/oficina/actividad`); the librarian is an 18th
 // character, a service with no activity row of its own.
 

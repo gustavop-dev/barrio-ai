@@ -5,7 +5,7 @@ import * as Haptics from 'expo-haptics';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import { REFRESH } from '@compartido/api/hooks';
 import { oficinaEventosKey } from '@compartido/api/oficina';
-import { PLAN_WIDTH, sceneScale } from '@compartido/scene/plan';
+import { PLAN_WIDTH } from '@compartido/scene/plan';
 import { renderApp } from '@/test/render';
 import { fakeServer, type FakeHandler } from '@/test/server';
 import '@/api/transport';
@@ -89,8 +89,9 @@ it('keeps unknown roles without data on activity errors and recovers with retry'
 });
 it('opens an agent sheet from a scene tap, switches to its team and closes', async () => {
   server(); await renderApp(<OficinaScreen />); await screen.findByText('Operación: Ejecutando comentario aprobado');
-  const w = Dimensions.get('window').width, scale = sceneScale(w, Dimensions.get('window').height - 160);
-  const x = (w - PLAN_WIDTH * scale) / 2 + 96 * scale;
+  // The plan fills the width: logical x = screen x / (width / 192).
+  const w = Dimensions.get('window').width, scale = w / PLAN_WIDTH;
+  const x = 96 * scale;
   await act(async () => fireGestureHandler(getByGestureTestId('office-tap'), [{ state: State.ACTIVE, x, y: 44 * scale }]));
   const panel = await screen.findByTestId('office-panel');
   expect(Haptics.selectionAsync).toHaveBeenCalledTimes(1);
@@ -194,12 +195,30 @@ it('pinches and pans, resets with double tap, and dismisses the selected panel b
     ]);
     fireGestureHandler(getByGestureTestId('office-reset'), [{ state: State.ACTIVE, x: 100, y: 100 }]);
   });
-  const w = Dimensions.get('window').width, scale = sceneScale(w, Dimensions.get('window').height - 160);
-  await act(async () => fireGestureHandler(getByGestureTestId('office-tap'), [{ state: State.ACTIVE, x: (w - PLAN_WIDTH * scale) / 2 + 42 * scale, y: 70 * scale }]));
+  const scale = Dimensions.get('window').width / PLAN_WIDTH;
+  await act(async () => fireGestureHandler(getByGestureTestId('office-tap'), [{ state: State.ACTIVE, x: 42 * scale, y: 70 * scale }]));
   expect(within(await screen.findByTestId('office-panel')).getByText('SERVICIO · BIBLIOTECA')).toBeOnTheScreen();
   await act(async () => fireGestureHandler(getByGestureTestId('snap-sheet-drag'), [
     { state: State.BEGAN, translationY: 0 }, { state: State.ACTIVE, translationY: 0 },
     { state: State.ACTIVE, translationY: 300 }, { state: State.END, translationY: 300, velocityY: 1500 },
   ]));
   await waitFor(() => expect(screen.queryByTestId('office-panel')).toBeNull());
+});
+
+it('refreshes when the scene is pulled down from its top past the threshold, not on a short drag', async () => {
+  const api = server(); await renderApp(<OficinaScreen />); await screen.findByText('Operación: Ejecutando comentario aprobado');
+  const count = (path: string) => api.find('GET', path).length;
+  const pull = (translationY: number) => act(async () => fireGestureHandler(getByGestureTestId('office-pan'), [
+    { state: State.BEGAN, translationX: 0, translationY: 0 },
+    { state: State.ACTIVE, translationX: 0, translationY: 0 },
+    { state: State.ACTIVE, translationX: 0, translationY },
+    { state: State.END, translationX: 0, translationY },
+  ]));
+  const activityBefore = count('/api/v1/oficina/actividad'), overviewBefore = count('/api/v1/operador/overview');
+  await pull(30);
+  expect(count('/api/v1/oficina/actividad')).toBe(activityBefore);
+  await pull(120);
+  await waitFor(() => expect(count('/api/v1/oficina/actividad')).toBe(activityBefore + 1));
+  expect(count('/api/v1/operador/overview')).toBe(overviewBefore + 1);
+  expect(screen.queryByTestId('office-panel')).toBeNull();
 });
