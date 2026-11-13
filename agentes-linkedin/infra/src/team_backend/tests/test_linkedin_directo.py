@@ -664,8 +664,12 @@ class DirectoConnectorTests(SimpleTestCase):
 
     def test_the_same_methods_and_arguments_as_unipile(self):
         def methods(cls):return {n:str(inspect.signature(f)) for n,f in inspect.getmembers(cls,inspect.isfunction) if not n.startswith('_')}
-        self.assertEqual(methods(DirectoConnector),methods(UnipileConnector))
-        self.assertEqual(len(methods(DirectoConnector)),21)
+        own=methods(DirectoConnector)
+        # One read more, only here: the creator analytics; callers check hasattr (test_analitica.py).
+        self.assertEqual(own.pop('analytics'),'(self, start, end, order=None)')
+        self.assertFalse(hasattr(UnipileConnector,'analytics'))
+        self.assertEqual(own,methods(UnipileConnector))
+        self.assertEqual(len(own),21)
         self.assertEqual(DirectoConnector.provider,'directo')
 
     def test_no_way_to_send_a_message(self):

@@ -1,5 +1,6 @@
 """LinkedIn without Unipile (docs/plan-linkedin-directo.md): the provider `directo`, with exactly UnipileConnector's
 methods, arguments and answers, so operador, autopiloto, respuestas, red, metricas and conversaciones do not change.
+One read more, only here: `analytics`, the account's creator analytics (team_backend/analitica.py).
 
 LinkedIn itself (routes, parsing, the write allowlist) lives in the linkedin_directo package; every call is made from
 inside the account's logged-in page by the navegador service (contract: docs/navegador-contrato.md). This module only
@@ -65,3 +66,6 @@ class DirectoConnector:
     # Inbox: reads only, like UnipileConnector. Nothing here sends, marks as read or edits a message.
     def list_chats(self,limit=20,inbox='CLASSIC_PRIMARY'):return self._do('list_chats',limit,inbox)
     def list_chat_messages(self,chat_id,limit=10):return self._do('list_chat_messages',chat_id,limit)
+    # Only here: the account's creator analytics (linkedin_directo.analitica.Workbook). Unipile has no such read, so
+    # callers check `hasattr(connector,'analytics')` (analitica.py) instead of a stub on the other providers.
+    def analytics(self,start,end,order=None):return self._do('analytics',start,end,order)

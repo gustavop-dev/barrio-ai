@@ -1,5 +1,6 @@
 """The 21 operations Barrio asks of LinkedIn, made directly (ported from spikes/linkedin-directo/directo.py), with the
-same arguments and answers as team_backend.connectors.UnipileConnector.
+same arguments and answers as team_backend.connectors.UnipileConnector, plus `analytics` (the account's own creator
+analytics, analitica.py), which Unipile does not have.
 
 Every call goes through `_send`: the allowlist first (permitidas.check), then the Transport, then check_answer. Some
 operations need more than one call (shown per method); a write never makes a read after sending, so a failure after
@@ -7,9 +8,10 @@ the write can never be mistaken for one before it. Reads that need the account's
 client. Ids are described in lectura.py and docs/navegador-contrato.md."""
 import json
 import re
+from datetime import date, datetime
 from urllib.parse import quote
 
-from . import lectura, permitidas, rutas
+from . import analitica, lectura, permitidas, rutas
 from .errores import LinkedInError, NoteQuota
 from .transporte import Request, check_answer
 
@@ -157,6 +159,22 @@ class Cliente:
         card = self._get(rutas.top_card(me['public_id']), operation='own_audience')
         relation = self._read(lectura.relation, card, me['public_id'])
         return {'followers': relation['followers'], 'connections': relation['connections']}
+
+    def analytics(self, start, end, order=None):
+        """The account's creator analytics for [start, end] (UTC days, both included) as an analitica.Workbook (one
+        call): the export dialog's answer already carries the whole workbook. Opening the dialog changes nothing.
+        `order` ('dmy' or 'mdy') is the account's date order, needed only when the workbook's dates are ambiguous."""
+        try:
+            first, last = (d.date() if isinstance(d, datetime) else d if isinstance(d, date) else date.fromisoformat(str(d))
+                           for d in (start, end))
+        except ValueError:
+            raise invalid('Rango de fechas') from None
+        if first > last or (last - first).days + 1 > permitidas.ANALYTICS_DAYS:
+            raise invalid('Rango de fechas')
+        body = rutas.analytics_export(first.isoformat(), last.isoformat())
+        stream = self._send(Request('POST', rutas.navigation(rutas.ANALYTICS_SCREEN), 'sdui', body,
+                                    operation='analytics'))
+        return analitica.read(stream, first, last, order)
 
     def profile_views(self, days=14):
         """LinkedIn's summary of profile views counts its own window (VIEWS_DAYS); any other window is not available

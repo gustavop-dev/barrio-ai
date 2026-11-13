@@ -137,7 +137,13 @@ llamar. Si no pasa, contesta 422 y no envía nada.
   - la página de un post (`/feed/update/urn:li:activity:<n>/`) y la búsqueda de personas
     (`/search/results/people/?…`);
   - dos lecturas de la interfaz del servidor para los filtros de búsqueda: la barra de filtros y el autocompletado de
-    ubicación.
+    ubicación;
+  - la exportación de la analítica de creador: `POST /flagship-web/rsc-action/actions/navigation` con la pantalla
+    `…creatoranalytics.AggregateAnalyticsExportModal`, sin marcar como escritura. El cuerpo tiene que ser exactamente
+    el que arma `rutas.analytics_export`, con solo `startDate` y `endDate`: dos fechas ISO en orden y como mucho 366
+    días. La misma ruta abre otras pantallas, así que cualquier otra pantalla o cuerpo no sale. Se envía desde la
+    página de inicio, la que el servicio ya tiene abierta: no hace falta abrir la página de analítica (comprobado con
+    la cuenta de pruebas el 2026-11-13). Detalle en [metricas-resultados.md](metricas-resultados.md#analítica-de-linkedin-cuenta-directo).
 - **Escrituras:** solo cinco, cada una con su cuerpo revisado:
   - reaccionar a un post o a un comentario;
   - seguir a un miembro (solo `FOLLOW_ACTIVE`);

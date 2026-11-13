@@ -1,10 +1,12 @@
 """What may leave, decided before anything is sent. The client checks every Request here and the navegador service
 must run the same check before it calls LinkedIn.
 
-Reads: any Voyager GET, the two pages the client reads (a post and the people search) and the two server-driven UI
-reads of the search filters. Writes: only the five the connector makes, each with its payload checked, because the same
-route or sduiid also undoes, withdraws, ignores or unfollows. A write sent as a read, or anything else, is refused."""
+Reads: any Voyager GET, the two pages the client reads (a post and the people search), the two server-driven UI
+reads of the search filters and one server-driven UI screen, the analytics export dialog, with its body checked whole
+(only two dates). Writes: only the five the connector makes, each with its payload checked, because the same route or
+sduiid also undoes, withdraws, ignores or unfollows. A write sent as a read, or anything else, is refused."""
 import re
+from datetime import date
 from urllib.parse import parse_qs, urlsplit
 
 from . import rutas
@@ -17,6 +19,10 @@ REACTION_TYPES = {f'ReactionType_{kind}' for kind in rutas.REACTIONS.values()}
 ACCEPT = re.compile(re.escape(rutas.VOYAGER) + r'/relationships/invitations/(\d{1,25})\?action=accept')
 PROFILE_URN = re.compile(r'urn:li:fsd_profile:[A-Za-z0-9_\-]{2,100}')
 DIGITS = re.compile(r'\d{1,25}')
+# Screens opened as dialogs. Only the analytics export: opening it draws the dialog and changes nothing.
+SCREENS = (rutas.ANALYTICS_SCREEN,)
+ISO_DAY = re.compile(r'\d{4}-\d{2}-\d{2}')
+ANALYTICS_DAYS = 366  # longest range asked in one export, both ends included (LinkedIn's own longest preset is 365)
 
 
 def refuse(why):
@@ -55,6 +61,8 @@ def sdui(request):
     ids = parse_qs(parts.query).get('sduiid') or []
     sduiid = ids[0] if len(ids) == 1 else ''
     body = request.body if isinstance(request.body, dict) else {}
+    if kind == 'navigation':
+        return screen(request, sduiid, body)
     if request.method != 'POST' or kind not in ('server-request', 'component') or request.path != rutas.sdui(sduiid, kind):
         refuse('ruta de la UI del servidor mal formada')
     if sduiid in SDUI_READS:
@@ -72,6 +80,25 @@ def sdui(request):
         follow(payload)
     else:
         comment(body, payload)
+
+
+def screen(request, sduiid, body):
+    """The analytics export dialog, a read: the exact route, the exact body and two ISO dates in order, at most
+    ANALYTICS_DAYS apart. Anything more in the body is refused: the same route opens other screens."""
+    if request.method != 'POST' or request.write or sduiid not in SCREENS or request.path != rutas.navigation(sduiid):
+        refuse('pantalla de la UI del servidor fuera de la lista')
+    args = body.get('clientArguments') if isinstance(body.get('clientArguments'), dict) else {}
+    payload = args.get('payload') if isinstance(args.get('payload'), dict) else {}
+    expected = rutas.analytics_export(payload.get('startDate'), payload.get('endDate'))
+    if body != expected or set(payload) != {'startDate', 'endDate'}:
+        refuse('exportación de analítica con un cuerpo fuera de la lista')
+    try:
+        start, end = (date.fromisoformat(payload[k]) for k in ('startDate', 'endDate')
+                      if isinstance(payload[k], str) and ISO_DAY.fullmatch(payload[k]))
+    except ValueError:
+        refuse('exportación de analítica sin dos fechas ISO')
+    if not start <= end or (end - start).days + 1 > ANALYTICS_DAYS:
+        refuse(f'exportación de analítica con un rango invertido o de más de {ANALYTICS_DAYS} días')
 
 
 def follow(payload):

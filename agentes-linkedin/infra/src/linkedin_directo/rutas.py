@@ -46,6 +46,9 @@ GEO_TYPEAHEAD = 'com.linkedin.sdui.search.filters.requests.FiltersLocationTypeah
 SNIPPETS = 'com.linkedin.sdui.requests.search.batchClassicSnippetRequest'
 POST_SCREEN = 'com.linkedin.sdui.flagshipnav.feed.UpdateDetail'
 SEARCH_SCREEN = 'com.linkedin.sdui.flagshipnav.search.SearchResultsPeople'
+# The creator analytics «Export» dialog: opening it only draws the dialog (no side effect) and its answer already
+# carries the whole workbook for the dates asked (analitica.py). Seen from /analytics/creator/content/ on 2026-11-13.
+ANALYTICS_SCREEN = 'com.linkedin.sdui.flagshipnav.creatoranalytics.AggregateAnalyticsExportModal'
 
 # Barrio's reaction names (connectors.REACTIONS) -> LinkedIn's. Only LIKE was tried on 2026-11-13.
 REACTIONS = {'linkedin_like': 'LIKE', 'linkedin_celebrate': 'PRAISE', 'linkedin_support': 'APPRECIATION',
@@ -99,6 +102,18 @@ def top_card(public_id):
 def sdui(sduiid, kind='server-request'):
     component = f'componentId={quote(sduiid, safe="")}&' if kind == 'component' else ''
     return f'{SDUI}{kind}?{component}sduiid={quote(sduiid, safe="")}'
+
+
+def navigation(screen):
+    """A server-driven UI screen opened as a dialog: the screen is named twice, as the web app does."""
+    return f'{SDUI}navigation?screenId={quote(screen, safe="")}&sduiid={quote(screen, safe="")}'
+
+
+def analytics_export(start, end):
+    """The body of the analytics export dialog for [start, end] (ISO dates, both included)."""
+    return {'clientArguments': {'$type': RA, 'requestedStateKeys': [], 'payload': {'startDate': start, 'endDate': end},
+                                'requestMetadata': META, 'states': [], 'screenId': ANALYTICS_SCREEN,
+                                'knownTemplateIds': []}, 'isModal': True}
 
 
 def post_page(activity_id):

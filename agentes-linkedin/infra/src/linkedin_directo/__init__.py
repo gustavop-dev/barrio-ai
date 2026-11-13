@@ -5,6 +5,7 @@ and no browser import, so the backend's connector and the navegador service (pha
 - permitidas: the allowlist every call passes before leaving (writes with their payload checked).
 - transporte: Request, Answer, the Transport interface and how an answer is judged.
 - lectura: answers read into the connector's shapes.
+- analitica: the creator analytics workbook (the export dialog's answer) read into typed rows.
 - cliente: the 21 operations (Cliente), with UnipileConnector's arguments and answers.
 - servicio: ServiceTransport, the backend's HTTP client of the navegador service (imports httpx; not loaded here).
 """
