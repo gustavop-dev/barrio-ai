@@ -567,7 +567,8 @@ class ApiTests(TestCase):
         connector=patch('team_backend.analitica.get_connector',side_effect=AssertionError('sin LinkedIn al leer'))
         connector.start();self.addCleanup(connector.stop)
         self.account=ConnectorAccount.objects.create(provider='directo',external_account_id='cuenta-prueba',label='Cuenta directa de prueba')
-        reader=User.objects.create_user('lectora-prueba');grant(reader,'operate_linkedin')
+        # Like every Resultados endpoint: the API's default access_knowledge plus operate_linkedin.
+        reader=User.objects.create_user('lectora-prueba');grant(reader,'access_knowledge','operate_linkedin')
         self.api=APIClient();self.api.force_login(reader)
 
     def days(self,first,last,impressions,engagements,new):
