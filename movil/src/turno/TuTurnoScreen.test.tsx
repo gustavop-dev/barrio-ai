@@ -161,7 +161,7 @@ describe('Tu turno', () => {
     expect(within(card).getByText('Tu post, mientras decides')).toBeOnTheScreen();
     expect(within(card).getByTestId('day-request-piece')).toHaveTextContent(/How do founders decide/);
     expect(within(card).getByTestId('day-request-other-p-friday')).toHaveTextContent(/Cycles between agents/);
-    expect(within(card).getByText('lo publiques mañana a las 12 del día, del mediodía')).toBeOnTheScreen();
+    expect(within(card).getByText('“lo publiques mañana a las 12 del día, del mediodía”')).toBeOnTheScreen();
     await fireEvent.press(within(card).getByText('Sí, el viernes 13/11 a las 12:00'));
     await waitFor(() => expect(server.find('POST', '/api/v1/capturas/cap-1/fecha')[0]?.body).toEqual({ decision: 'mismo_dia' }));
   });
