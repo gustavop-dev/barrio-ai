@@ -178,12 +178,19 @@ def relation(card, public_id):
     """What the profile top card says about a person: distance, a pending invitation, whether the account follows
     them, connections and followers. The MemberRelationship union is `self`, `*connection` (first degree: a reference
     to a Connection, seen right after accepting) or `noConnection` with `memberDistance` (DISTANCE_2, DISTANCE_3,
-    OUT_OF_NETWORK) and, when one is pending, its invitation."""
+    OUT_OF_NETWORK) and, when one is pending, its invitation.
+    The card carries other people too (the account itself, someone in a highlight), each with its own FollowingState,
+    and the account's own card has no publicIdentifier on its Profile: the person is the card's first element, and
+    their relationship is the one whose urn ends with their profile id."""
     included = [e for e in card.get('included') or [] if isinstance(e, dict)]
-    profile = next((e for e in included if public_id and e.get('publicIdentifier') == public_id), {})
-    union = next((e.get('memberRelationship') or {} for e in included
-                  if str(e.get('$type', '')).endswith('MemberRelationship')), {})
-    union = union if isinstance(union, dict) else {}
+    by = index(card)
+    first = next((by[ref] for ref in elements(card) if isinstance(ref, str) and ref in by), {})
+    profile = first if 'Profile' in str(first.get('$type', '')) else \
+        next((e for e in included if public_id and e.get('publicIdentifier') == public_id), {})
+    fsd = tail(profile.get('entityUrn'))
+    links = [e for e in included if str(e.get('$type', '')).endswith('MemberRelationship')]
+    link = next((e for e in links if fsd and str(e.get('entityUrn', '')).endswith(fsd)), links[0] if links else {})
+    union = link.get('memberRelationship') if isinstance(link.get('memberRelationship'), dict) else {}
     far = union.get('noConnection') if isinstance(union.get('noConnection'), dict) else {}
     near = union.get('*connection') or union.get('connection')
     distance = 'SELF' if union.get('self') is not None else 'DISTANCE_1' if near else far.get('memberDistance')

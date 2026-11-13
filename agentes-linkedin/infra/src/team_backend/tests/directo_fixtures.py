@@ -72,21 +72,48 @@ def full_profile(person,headline='Producto e IA aplicada (ficticio)',place='Ciud
          'summary':'Texto de prueba sobre producto.','geoLocation':{'*geo':'urn:li:fsd_geo:900001'}},
         {'$type':'com.linkedin.voyager.dash.common.Geo','entityUrn':'urn:li:fsd_geo:900001','defaultLocalizedName':place}]}
 
-def top_card(person,relationship=None,following=False,followers=120,connections=80):
-    """The profile top card: Profile, its MemberRelationship union and its FollowingState."""
+def following_state(urn,following,followers):
+    return {'$type':'com.linkedin.voyager.dash.feed.FollowingState','entityUrn':f'urn:li:fsd_followingState:{urn}',
+            'following':following,'followerCount':followers,'preDashFollowingInfoUrn':f'urn:li:fs_followingInfo:{urn}'}
+
+def top_card(person,relationship=None,following=False,followers=120,connections=80,own=False):
+    """The profile top card as the test account's read of 2026-11-13 came: the person is the first element, and the
+    card also carries another Profile and FollowingStates of hashtags, listed before the person's own. Another person's
+    card has one MemberRelationship union whose unused branches come as null; the account's own card has none, and its
+    Profile has no publicIdentifier."""
     fsd,public=person[0],person[1]
-    state=f'urn:li:fsd_followingState:urn:li:fsd_profile:{fsd}'
-    return {'data':{'data':{'identityDashProfilesByMemberIdentity':{'*elements':[f'urn:li:fsd_profile:{fsd}']}}},'included':[
-        {'$type':'com.linkedin.voyager.dash.identity.profile.Profile','entityUrn':f'urn:li:fsd_profile:{fsd}','publicIdentifier':public,
-         '*followingState':state,'connections':{'paging':{'total':connections}},'*memberRelationship':f'urn:li:fsd_memberRelationship:{fsd}'},
-        {'$type':'com.linkedin.voyager.dash.relationships.MemberRelationship','entityUrn':f'urn:li:fsd_memberRelationship:{fsd}',
-         'memberRelationship':relationship if relationship is not None else {'noConnection':{'memberDistance':'DISTANCE_2'}}},
-        {'$type':'com.linkedin.voyager.dash.feed.FollowingState','entityUrn':state,'following':following,'followerCount':followers}]}
+    other=LUIS[0] if person is not LUIS else ANA[0]
+    profile={'$type':'com.linkedin.voyager.dash.identity.profile.Profile','entityUrn':f'urn:li:fsd_profile:{fsd}',
+             '*followingState':f'urn:li:fsd_followingState:urn:li:fsd_profile:{fsd}','*edgeSetting':f'urn:li:fsd_edgeSetting:{fsd}',
+             'connections':{'paging':{'count':1,'start':0,'total':connections},'*elements':[f'urn:li:fsd_connection:{other}']}}
+    if not own:profile['publicIdentifier']=public
+    union=relationship if relationship is not None else {'self':None,'connection':None,'noConnection':{
+        'memberDistance':'DISTANCE_2','$type':'com.linkedin.voyager.dash.relationships.NoConnection','invitation':{'invitation':None,
+            'noInvitation':{'$type':'com.linkedin.voyager.dash.relationships.invitation.NoInvitation','invitationRelationshipForm':None,
+                            '*inviterResolutionResult':f'urn:li:fsd_profile:{OWN[0]}','*targetInviteeResolutionResult':f'urn:li:fsd_profile:{fsd}'}}}}
+    included=[following_state('urn:li:fsd_hashtag:(temaficticio,urn:li:activity:-)',True,5000),
+              {'$type':'com.linkedin.voyager.dash.identity.profile.Profile','entityUrn':f'urn:li:fsd_profile:{other}'},
+              following_state(f'urn:li:fsd_profile:{fsd}',following,followers),profile]
+    if own:included.append({'$type':'com.linkedin.voyager.dash.relationships.Connection','entityUrn':f'urn:li:fsd_connection:{other}'})
+    else:included.append({'$type':'com.linkedin.voyager.dash.relationships.MemberRelationship',
+                          'entityUrn':f'urn:li:fsd_memberRelationship:{fsd}','memberRelationship':union})
+    return {'data':{'data':{'identityDashProfilesByMemberIdentity':{'$type':'com.linkedin.restli.common.CollectionResponse',
+        '*elements':[f'urn:li:fsd_profile:{fsd}']}}},'included':included}
 
 def profile_views(n):
-    return {'data':{'*elements':['urn:li:fs_wvmpCard:1']},'included':[{'$type':'com.linkedin.voyager.identity.me.Card',
-        'entityUrn':'urn:li:fs_wvmpCard:1','value':{'com.linkedin.voyager.identity.me.wvmpOverview.WvmpViewersCard':{
-            'insightCards':[{'value':{'com.linkedin.voyager.identity.me.wvmpOverview.WvmpSummaryInsightCard':{'numViews':n}}}]}}}]}
+    """The viewers summary: one WvmpCard whose summary insight counts the views of LinkedIn's own window; the viewer
+    cards next to it carry other counters (numViewers) that are not it."""
+    me='com.linkedin.voyager.identity.me'
+    viewer={'$type':f'{me}.Card','entityUrn':'urn:li:fs_card:urn:li:profileViewer:(anonymous,1900000)','objectUrn':'urn:li:profileViewer:(anonymous,1900000)',
+            'value':{'$type':f'{me}.WvmpAnonymousProfileViewCard','viewedAt':ms(POSTED),'numViewers':3},'trackingId':'seguimiento-ficticio','setting':None}
+    summary={'$type':f'{me}.wvmpOverview.WvmpSummaryInsightCard','numViews':n,'timeFrame':'LAST_90_DAYS',
+             'wvmpMetadata':{'$type':f'{me}.WvmpMetadata','timeRange':{'$type':'com.linkedin.common.TimeRange','end':ms(POSTED)}},
+             '*cards':[viewer['entityUrn']]}
+    card={'$type':f'{me}.wvmpOverview.WvmpCard','entityUrn':'urn:li:fs_wvmpCard:tarjetaFicticia','trackingId':'seguimiento-ficticio',
+          'value':{'$type':f'{me}.wvmpOverview.WvmpViewersCard','insightCards':[{'$type':f'{me}.wvmpOverview.WvmpInsightCard',
+              'objectUrn':'urn:li:wvmp:summary','trackingId':'seguimiento-ficticio','value':summary}]}}
+    return {'data':{'$type':'com.linkedin.restli.common.CollectionResponse','entityUrn':'urn:li:collectionResponse:respuestaFicticia',
+        'paging':{'count':10,'start':0,'total':1,'links':[]},'*elements':[card['entityUrn']]},'included':[viewer,card]}
 
 # --------------------------------------------------------------------------- posts and comments
 

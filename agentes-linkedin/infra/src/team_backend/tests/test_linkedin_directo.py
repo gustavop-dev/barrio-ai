@@ -128,6 +128,7 @@ class AccountAndProfileTests(SimpleTestCase):
         c,_=connector(PROFILES,card(ANA,relationship=pending))
         p=c.get_profile('ana-ficticia')
         self.assertEqual((p['network_distance'],p['relation_request_status'],p['invitation_id']),('THIRD_DEGREE','PENDING','7000009'))
+        self.assertFalse(p['is_following'])  # the hashtag the card lists first is followed; Ana is not
         c,_=connector(PROFILES,card(ANA,relationship={'*connection':'urn:li:fsd_connection:1'}))
         self.assertEqual(c.get_profile(ANA[0])['network_distance'],'FIRST_DEGREE')
 
@@ -138,7 +139,7 @@ class AccountAndProfileTests(SimpleTestCase):
         self.assertEqual(len(t.sent),2)
 
     def test_own_audience_and_profile_views(self):
-        c,t=connector(ME,card(OWN,relationship={'self':{}},followers=321,connections=210),
+        c,t=connector(ME,card(OWN,own=True,followers=321,connections=210),
                       ('GET',r'^/voyager/api/identity/wvmpCards$',ok(F.profile_views(37))))
         audience=c.own_audience()
         self.assertEqual(audience,{'followers':321,'connections':210});self.assertEqual(set(audience),set(connectors._audience({})))
