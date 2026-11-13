@@ -246,7 +246,8 @@ class LeadReviewCapTests(LeadBase):
         out=[];start=timezone.now()-timedelta(hours=1)
         for i in range(n):
             contact=Contact.objects.create(account=self.account,provider_user_id=f'ACoperson-{uuid.uuid4().hex[:12]}',display_name=f'Persona {i}',
-                headline='Founder @ Tiny',source='manual',stage='fit',classification={'fit':fit,'role':'comprador','reason':'r','confidence':0.9})
+                headline='Founder @ Tiny',location='Austin, Texas',source='manual',stage='fit',
+                classification={'fit':fit,'role':'comprador','reason':'r','confidence':0.9,'region':'us'})  # a buyer in the USA (BAR-17)
             proposal=operador.create_proposal(self.gustavo,None,'RED-01',{'user_id':contact.provider_user_id},source='agent',contact=contact)
             ActionProposal.objects.filter(pk=proposal.pk).update(created_at=start+timedelta(minutes=i))
             out.append(proposal)
