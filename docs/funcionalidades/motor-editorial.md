@@ -33,6 +33,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-21](#edi-21) | Agente visual dedicado al post ganador | PWA · app · backend | parcial |
 | [EDI-22](#edi-22) | Un comentario sobre una pieza lista la rehace | backend | funciona |
 | [EDI-23](#edi-23) | Ante un bloqueo, Gustavo pide un cambio o lo desestima | PWA · app · backend | implementado |
+| [EDI-24](#edi-24) | Pedir un día que ya tiene post: Tu turno pregunta antes de publicar dos | app · backend | implementado |
 
 ---
 
@@ -400,6 +401,25 @@ El flujo de imagen está implementado en el backend; la interfaz queda para fase
   5. **Dado** el desestimado, **cuando** se publica, **entonces** el veredicto del verificador queda registrado y `verification.override` liga su decisión al texto exacto: solo se comprueban la longitud y la imagen. Otro texto no queda cubierto.
   6. **Dado** «Pedir un cambio» en una pieza bloqueada, **cuando** llega su comentario, **entonces** la pieza se reabre (con imagen si faltaba), el director recibe las razones del bloqueo (`bloqueo`) para resolverlas junto a lo que pide, y la versión nueva pasa por el verificador y por Jev en su modo suave para pedidos de Gustavo. Si vuelve a quedar fuera, puede desestimarla.
 - **Cobertura QA:** `tests/test_retoque.py` (`RescueTests`: desestimar un bloqueo del verificador por la API y el trabajo, desestimar el descarte del líder, sin salida por otro día, hora pasada o presupuesto, comentario que reabre una pieza bloqueada); `PiezaScreen.test.tsx` y `PiezaDetalle.test.tsx` (pedir un cambio, desestimar con nota, sin salida).
+
+### EDI-24 · Pedir un día que ya tiene post: Tu turno pregunta antes de publicar dos <a id="edi-24"></a>
+
+- **Dónde:** app · backend (la PWA solo reconoce el tipo de tarjeta)
+- **Estado:** implementado
+- **Qué hace para Gustavo:** la regla sigue siendo un post al día, pero un día y una hora que él pide pasan por encima de ella si él lo autoriza. Cuando pide, por ejemplo, «publícalo mañana al mediodía» y ese día ya sale un post de otra idea suya, su post se prepara de inmediato para el siguiente día libre a su hora y Tu turno le pregunta: «¿Seguro que lo quieres el viernes 13/11 a las 12:00?». «Sí» lo pasa a ese día como segundo post; «Dejarlo el lunes…» lo deja en el siguiente día libre.
+- **Origen:** 12/11/2026, un audio pidió un post para el viernes al mediodía y salió programado para el lunes sin preguntar, porque el viernes ya tenía un post de otra idea suya.
+- **Código:** `urgente._requested`, `_askable`, `day_requests`, `tick_day_requests`, `cards`, `confirm_day`, `recently_resolved`; `Capture.day_request`, `EditorialPiece.second_of_day` (migración `0032`); `operador.capped` y `capacity_left`; `POST /api/v1/capturas/<id>/fecha` (`capturas_views.CaptureDay`); tarjeta `fecha` en `GET /api/v1/tu-turno` (`tasks.fechas`); push `day_request`. App `movil/src/turno/TurnoCard.tsx` (`DayRequestDetails`), `actions.ts`; calendario `movil/src/calendario/DayPanel.tsx` (`piecesOfDay`).
+- **Criterios de aceptación:**
+  1. **Dado** una idea con día y hora pedidos cuyo día solo tiene un post que el equipo preparó por su cuenta, **cuando** se asignan los huecos, **entonces** su idea toma esa hora y el post del equipo se corre al siguiente día libre, sin preguntar ([EDI-20](#edi-20)): ese día sigue teniendo un post.
+  2. **Dado** que ese día ya tiene un post de otra idea suya (o otra idea suya lo reservó), **cuando** se asignan los huecos, **entonces** la idea va al siguiente día libre a su hora, `day_request.state` queda `pending` y el motivo dice que Tu turno le preguntará.
+  3. **Dado** que su post está listo, **cuando** abre Tu turno, **entonces** ve la tarjeta `fecha` con el post que ya sale ese día, el suyo y dónde espera, y sus palabras; el push `day_request` sale una sola vez.
+  4. **Dado** «Sí, el … a las …», **cuando** responde, **entonces** su post pasa a ese día y hora como `second_of_day`, fuera de los topes de CONT-09 (ni cuenta ni lo frena el tope diario o semanal), y el otro post no se mueve. Nunca hay un tercer post ese día.
+  5. **Dado** «Dejarlo el …», **cuando** responde, **entonces** se queda en el siguiente día libre y la tarjeta desaparece.
+  6. **Dado** que no responde antes de su hora menos el plazo de veto (`EDITORIAL_VETO_MINUTES`), **cuando** corre el piloto, **entonces** la pregunta caduca y el post se queda en el siguiente día libre.
+  7. **Dado** la tarjeta, **cuando** desliza, **entonces** no pasa nada: autorizar un segundo post es un toque en su botón.
+  8. **Dado** un día con dos posts, **cuando** abre el calendario de la app, **entonces** el panel del día muestra los dos («Publicaciones del día»).
+  9. Los dos posts del día se separan como cualquier escritura (20 a 40 minutos como mínimo); no hay otra separación mínima.
+- **Cobertura QA:** `tests/test_publish_asap.py` (`IdeaScheduleTests`: pregunta y «sí» con segundo post fuera de topes, «no» y caducidad, el post del equipo se corre sin preguntar); `TuTurnoScreen.test.tsx` y `actions.test.ts` (tarjeta, detalles, respuesta, sin deslizar).
 
 ## Retiradas
 

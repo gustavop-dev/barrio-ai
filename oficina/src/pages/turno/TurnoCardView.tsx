@@ -6,7 +6,7 @@ import { useTurnoAction } from '../../api/hooks';
 import type { TurnoAction, TurnoCard, TurnoCardType, TurnoOpportunity, TurnoPriority } from '../../api/types';
 import { turnoAnchor } from '../../components/Layout';
 import { APPROVED_MESSAGE } from '../calendario/events';
-import { IconAviso, IconCheck, IconConversacion, IconPerfil, IconPregunta, IconResultados } from '../../components/icons';
+import { IconAviso, IconCalendario, IconCheck, IconConversacion, IconPerfil, IconPregunta, IconResultados } from '../../components/icons';
 import { AgentPortrait, Avatar, Badge, Button, ButtonLink, ConfirmModal, CopyButton, ErrorRetry, ExternalLink, isHttps, LabelChip, useToast } from '../../components/ui';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '../../lib/format';
 import { messageText } from '../personas/ConversationBlock';
@@ -23,6 +23,7 @@ const TYPE_LABEL: Record<TurnoCardType, string> = {
   perfil: 'Perfil',
   conversacion: 'Conversación',
   mensaje: 'Mensaje sugerido',
+  fecha: 'Fecha pedida',
   resumen: 'Resumen semanal',
   aprobacion: 'Aprobación',
 };
@@ -35,6 +36,7 @@ const TYPE_ICON: Record<TurnoCardType, typeof IconAviso> = {
   perfil: IconPerfil,
   conversacion: IconConversacion,
   mensaje: IconConversacion,
+  fecha: IconCalendario,
   resumen: IconResultados,
   aprobacion: IconCheck,
 };

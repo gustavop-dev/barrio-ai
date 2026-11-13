@@ -68,6 +68,7 @@ urlpatterns=[
  # Capture button and Galería (docs/capturas-galeria.md): private files, authenticated streaming only.
  path('capturas',cv.Captures.as_view()),path('capturas/<uuid:cid>',cv.CaptureDetail.as_view()),
  path('capturas/<uuid:cid>/audio',cv.CaptureAudio.as_view()),
+ path('capturas/<uuid:cid>/fecha',cv.CaptureDay.as_view()),
  path('galeria',cv.Gallery.as_view()),path('galeria/<uuid:pid>',cv.PhotoDetail.as_view()),
  path('galeria/<uuid:pid>/imagen',cv.PhotoImage.as_view()),path('ajustes/preferencias',cv.Preferences.as_view()),
  path('operador/accounts',op.Accounts.as_view()),

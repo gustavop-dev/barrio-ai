@@ -30,7 +30,7 @@ export interface PieceImage {
   edited: boolean;
   ai_edit: AIEdit;
   reason: string;
-  template: 'portada' | 'pasos' | 'barras' | 'numero' | 'cierre' | null;
+  template: 'portada' | 'pasos' | 'barras' | 'numero' | 'cierre' | 'preguntas' | null;
   review: ImageReview;
   /** IMG-11 criterion 3: the last AI edit the visual check rejected, kept so Gustavo can judge it (never published). */
   rejected_edit?: RejectedEdit | null;

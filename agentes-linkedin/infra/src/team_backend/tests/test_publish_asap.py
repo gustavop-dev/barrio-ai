@@ -4,12 +4,12 @@ import os
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from unittest.mock import patch
-from django.db import connection
+from django.db import IntegrityError, connection, transaction
 from django.db.migrations.executor import MigrationExecutor
 from django.test import SimpleTestCase, TransactionTestCase
 from django.utils import timezone
 from team_backend import autopiloto, capture_intent, capturas, cuando, editorial, operador, urgente
-from team_backend.models import Capture, EditorialPiece, Job, Notification
+from team_backend.models import ActionExecution, Capture, EditorialPiece, Job, Notification
 from team_backend.tests.test_publicacion import EditorialBase, answers
 from team_backend.tests.test_capturas import CaptureBase, audio
 
@@ -102,11 +102,68 @@ class IdeaScheduleTests(EditorialBase):
         # The team's post moves to the next free slot: after midnight that can be today at the usual hour, before tomorrow.
         self.assertEqual(c.publish_asap_expected_slot,asked);self.assertNotEqual(team.slot_date,tomorrow)
         self.assertGreater(team.scheduled_for,now)
+        self.assertEqual(c.day_request,{})  # still one post that day: nothing to authorize
         self.assertEqual(urgente.reserved_at(tomorrow),asked)
         self.assertTrue(Notification.objects.filter(kind='capture_scheduled',title='Movimos un post para darle tu hora').exists())
         plan=answers();plan['director']['ideas_used']=[str(c.id)];piece=self.plan(plan)
         self.assertEqual((piece.slot_date,piece.scheduled_for),(tomorrow,asked))
         self.assertEqual(self.calls[0][1]['priority_capture']['id'],str(c.id))
+
+    def day_with_his_post(self):
+        """Tomorrow already has a post from another idea of his (it never moves), and he asks for tomorrow at noon."""
+        now=timezone.now();tz=operador.local_tz();tomorrow=now.astimezone(tz).date()+timedelta(days=1)
+        his=EditorialPiece.objects.create(account=self.official,slot_date=tomorrow,scheduled_for=editorial.scheduled_for(tomorrow),
+            state='ready',brief={'reserved_capture':'otra-idea','thesis':'Los ciclos entre agentes son la decisión difícil'})
+        asked=datetime.combine(tomorrow,time(12,0),tzinfo=tz)
+        c=self.idea('Publícalo mañana al mediodía.',publish_at=asked,publish_at_evidence='mañana al mediodía')
+        urgente.assign_slots(now);c.refresh_from_db()
+        plan=answers();plan['director']['ideas_used']=[str(c.id)];piece=self.plan(plan)
+        c.refresh_from_db()
+        return now,tomorrow,asked,his,c,piece
+
+    def test_a_requested_day_that_already_has_his_post_asks_in_tu_turno_and_yes_makes_it_that_days_second_post(self):
+        """Gustavo, 12/11/2026: «publícalo mañana a mediodía» went to Monday because Friday already had a post from another
+        idea of his, without asking. Now his post is prepared for the next free day and Tu turno asks; a yes authorizes a
+        second post that day, outside the CONT-09 caps."""
+        now,tomorrow,asked,his,c,piece=self.day_with_his_post();tz=operador.local_tz()
+        self.assertEqual((piece.state,c.state,c.day_request['state']),('ready','usado','pending'))
+        self.assertGreater(piece.scheduled_for,asked);self.assertEqual(piece.scheduled_for.astimezone(tz).time(),time(12,0))
+        self.assertIn('Tu turno te pregunta',c.publish_asap_reason)
+        self.assertEqual(urgente.day_requests(now),[(c,piece,[his])])
+        self.assertEqual(urgente.tick_day_requests(now),1);self.assertEqual(urgente.tick_day_requests(now),0)  # one push
+        [card]=self.human.get('/api/v1/tu-turno').json()['tasks']['fechas']
+        self.assertEqual((card['type'],card['day_request']['piece']['id']),('fecha',str(piece.id)))
+        self.assertIn('Los ciclos entre agentes',card['body']);self.assertIn('serían dos posts',card['body'])
+        self.assertEqual([a['body'] for a in card['actions'] if 'body' in a],[{'decision':'mismo_dia'},{'decision':'siguiente'}])
+        response=self.human.post(f'/api/v1/capturas/{c.id}/fecha',{'decision':'mismo_dia'},format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        piece.refresh_from_db();his.refresh_from_db();c.refresh_from_db()
+        self.assertEqual((piece.slot_date,piece.scheduled_for,piece.second_of_day),(tomorrow,asked,True))
+        self.assertEqual((his.scheduled_for,his.second_of_day,c.publish_asap_expected_slot),(editorial.scheduled_for(tomorrow),False,asked))
+        self.assertEqual(self.human.get('/api/v1/tu-turno').json()['tasks']['fechas'],[])
+        self.assertEqual(self.human.post(f'/api/v1/capturas/{c.id}/fecha',{'decision':'siguiente'},format='json').status_code,409)
+        # Two posts that day at most.
+        with self.assertRaises(IntegrityError),transaction.atomic():
+            EditorialPiece.objects.create(account=self.official,slot_date=tomorrow,scheduled_for=asked,state='preparing',second_of_day=True)
+        # Outside the caps: the second post neither counts for CONT-09 nor waits for it.
+        proposal=piece.proposals.get();self.assertFalse(operador.capped(proposal))
+        before=operador.capacity_left(self.official,'CONT-09')
+        ActionExecution.objects.create(proposal=proposal,idempotency_key='second-of-day',provider='fake',state='confirmed',executed_by=self.gustavo)
+        self.assertEqual(operador.capacity_left(self.official,'CONT-09'),before)
+
+    def test_keeping_the_next_free_day_or_not_answering_keeps_one_post_that_day(self):
+        now,tomorrow,asked,his,c,piece=self.day_with_his_post();slot=piece.scheduled_for
+        self.assertEqual(self.human.post(f'/api/v1/capturas/{c.id}/fecha',{'decision':'otra'},format='json').status_code,400)
+        response=self.human.post(f'/api/v1/capturas/{c.id}/fecha',{'decision':'siguiente'},format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        c.refresh_from_db();piece.refresh_from_db()
+        self.assertEqual((c.day_request['state'],piece.scheduled_for,piece.second_of_day),('next_free',slot,False))
+        self.assertEqual(urgente.day_requests(now),[])
+        # Without an answer, the question expires once his hour is inside the veto period; the post keeps its day.
+        Capture.objects.filter(pk=c.pk).update(day_request={'state':'pending','asked':asked.isoformat()})
+        urgente.tick_day_requests(asked-timedelta(minutes=30));c.refresh_from_db();piece.refresh_from_db()
+        self.assertEqual((c.day_request['state'],piece.scheduled_for),('expired',slot))
+        self.assertEqual(urgente.recently_resolved()[0]['how'],'Sin respuesta: siguiente día libre')
 
     def test_an_idea_the_director_does_not_take_stays_on_the_table_without_being_retried(self):
         c=self.idea();urgente.assign_slots();c.refresh_from_db()

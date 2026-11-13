@@ -824,13 +824,15 @@ export interface Activity {
 // ---------------------------------------------------------------- Tu turno
 
 /** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados).
- *  `mensaje`: someone who conversed on his post is now a connection; a drafted first message he sends himself (INT-04). */
+ *  `mensaje`: someone who conversed on his post is now a connection; a drafted first message he sends himself (INT-04).
+ *  `fecha`: he asked for a day that already had a post; a second post that day goes out only if he authorizes it. */
 export type TurnoCardType =
   | 'aviso'
   | 'pregunta'
   | 'perfil'
   | 'conversacion'
   | 'mensaje'
+  | 'fecha'
   | 'resumen'
   | 'aprobacion'
   | 'referente'
@@ -881,6 +883,26 @@ export interface TurnoMessage {
   /** The thesis of the post they talked about. */
   topic: string;
   person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
+}
+
+/** A post of the `fecha` card: his own (`piece`) or one already on the day he asked for (`others`). */
+export interface TurnoDayPost {
+  id: string;
+  thesis: string;
+  scheduled_for: string;
+}
+
+/**
+ * The `fecha` card (`day_request:<capture>`): the day and hour he asked for already had a post, so his post waits on the
+ * next free day. `POST /api/v1/capturas/<capture>/fecha {decision: mismo_dia | siguiente}`.
+ */
+export interface TurnoDayRequest {
+  capture_id: string;
+  /** The day and hour he asked for, and the words he used. */
+  asked_at: string;
+  evidence: string;
+  piece: TurnoDayPost;
+  others: TurnoDayPost[];
 }
 
 /** What an `uncertain` action tried to do. */
@@ -934,6 +956,8 @@ export interface TurnoCard {
   conversation?: (Conversation & { person: TurnoPerson | null }) | null;
   /** Only on `mensaje` cards. */
   message?: TurnoMessage | null;
+  /** Only on `fecha` cards. */
+  day_request?: TurnoDayRequest | null;
   /** Only on approval cards. */
   approval?: TurnoApproval | null;
   /** rev 18 priority group (being added to the backend). */
@@ -982,6 +1006,8 @@ export interface TuTurno {
     perfil: TurnoCard[];
     conversaciones: TurnoCard[];
     mensajes?: TurnoCard[];
+    /** A day he asked for that already had a post (older backends omit it). */
+    fechas?: TurnoCard[];
     resumen?: TurnoCard[];
     referentes?: TurnoCard[];
   };

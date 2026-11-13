@@ -16,7 +16,7 @@ import {
   importantEvents,
   leadText,
   pieceIdFromLink,
-  pieceOfDay,
+  piecesOfDay,
   summaryParts,
   type DayKind,
 } from '@compartido/logic/events';
@@ -244,7 +244,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
   }
 
   const tuyo = visible.has('tuyo') ? chronological((day?.events ?? []).filter((event) => event.layer === 'tuyo')) : [];
-  const piece = pieceOfDay(day);
+  const pieces = piecesOfDay(day);
   const queued = kind === 'pasado' ? [] : (upcoming?.queued ?? []).filter((item) => (dayOf(item.expected_at, timeZone) ?? today) === date);
   const expected = kind === 'pasado' ? [] : (day?.events ?? []).filter((event) => event.kind === 'invite_expected');
   const important = chronological(importantEvents(day, visible));
@@ -294,9 +294,13 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
         </Block>
       ) : null}
 
-      <Block label="Publicación del día" testID="bloque-publicacion">
-        {piece ? (
-          <DayPiece key={piece.id} event={piece} today={today} timeZone={timeZone} now={now} />
+      <Block label={pieces.length > 1 ? 'Publicaciones del día' : 'Publicación del día'} testID="bloque-publicacion">
+        {pieces.length ? (
+          <View style={styles.pieces}>
+            {pieces.map((piece) => (
+              <DayPiece key={piece.id} event={piece} today={today} timeZone={timeZone} now={now} />
+            ))}
+          </View>
         ) : (
           <Gap>
             <T soft>{kind === 'pasado' ? 'Sin publicación.' : `Hueco libre. El equipo prepara cada pieza ${leadText(leadHours)} antes de su hora.`}</T>
@@ -371,6 +375,7 @@ const styles = StyleSheet.create({
   heading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space[2] },
   headingText: { flexShrink: 1 },
   block: { gap: space[2] },
+  pieces: { gap: space[3] },
   gap: { gap: space[2], paddingVertical: space[3], paddingHorizontal: space[4], borderWidth: 1, borderStyle: 'dashed', borderColor: colors.inkSoft, borderRadius: radius.md },
   textLink: { minHeight: shell.touch, justifyContent: 'center', alignSelf: 'flex-start' },
   summary: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' },

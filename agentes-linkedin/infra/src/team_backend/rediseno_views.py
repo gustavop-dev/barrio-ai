@@ -311,13 +311,15 @@ class TuTurno(APIView):
         monthly_cards=referent_cards(request.user,_card,now)
         monthly_later=[c for c in monthly_cards if c.get('state_override')=='pospuesta']
         monthly_cards=[c for c in monthly_cards if c.get('state_override')!='pospuesta']
-        from . import respuestas
+        from . import respuestas, urgente
         message_cards=respuestas.cards(_card,now)
-        tasks={'perfil':profile,'conversaciones':conversation_cards,'mensajes':message_cards,'resumen':summary_cards,'referentes':monthly_cards}
+        day_cards=urgente.cards(_card,now)
+        tasks={'perfil':profile,'conversaciones':conversation_cards,'mensajes':message_cards,'fechas':day_cards,'resumen':summary_cards,
+               'referentes':monthly_cards}
         approval_cards=[_approval_card(p) for p in awaiting_approval()]
         question_cards=[_question_card(q,now) for q in pending]
         later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)+monthly_later
-        cards=warnings+question_cards+conversation_cards+message_cards+summary_cards+approval_cards+profile+monthly_cards
+        cards=warnings+question_cards+conversation_cards+message_cards+day_cards+summary_cards+approval_cards+profile+monthly_cards
         seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]
@@ -327,7 +329,8 @@ class TuTurno(APIView):
                                    'aprobaciones':len(approval_cards)},
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
-                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved(),
+                         'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved()
+                                   +urgente.recently_resolved(),
                          'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
 
 class TuTurnoSeen(APIView):

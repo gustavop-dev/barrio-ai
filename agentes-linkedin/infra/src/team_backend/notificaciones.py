@@ -19,6 +19,7 @@ INBOX_KINDS={
     'account_paused':('importante',True,'Cuenta en pausa'),
     'conversation':('importante',True,'Conversación que te toca'),
     'dm_ready':('importante',True,'Mensaje sugerido para alguien que conversó contigo'),
+    'day_request':('importante',True,'Pediste un día que ya tiene post'),
     'question':('cuando_puedas',True,'Pregunta nueva del equipo'),
     'profile_task':('cuando_puedas',True,'Tarea de perfil nueva'),
 }

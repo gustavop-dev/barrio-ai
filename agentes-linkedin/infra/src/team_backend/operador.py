@@ -171,7 +171,7 @@ def post_due(now=None):
         state__in=[ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED],
         piece__scheduled_for__gt=now-timedelta(hours=2),piece__scheduled_for__lte=now+timedelta(seconds=high)).order_by('piece__scheduled_for')
     for proposal in rows:
-        if not cycle_issues(proposal) and capacity_left(proposal.account,proposal.capability,proposal.piece.scheduled_for)>0:return proposal
+        if not cycle_issues(proposal) and (not capped(proposal) or capacity_left(proposal.account,proposal.capability,proposal.piece.scheduled_for)>0):return proposal
     return None
 
 def spacing_ok(account,now=None,capability=None):
@@ -217,7 +217,13 @@ def capacity_left(account,capability,now=None):
         if len(rounds)>1 and network_batch(now)==0:daily=(daily+1)//2
     day,week=period_starts(now)
     done=writes(account,capability)
+    if capability=='CONT-09':done=done.exclude(proposal__piece__second_of_day=True)  # outside the caps: see capped()
     return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
+
+def capped(proposal):
+    """Whether the daily/weekly caps apply. A second post of the day that Gustavo authorized for the hour he asked for
+    (urgente.confirm_day) does not count for them and is not held by them."""
+    return not (proposal.piece_id and proposal.piece.second_of_day)
 
 class ProfileReadCapReached(ValueError):
     """A required profile read waits; it never disappears from a write's preflight."""
@@ -629,7 +635,7 @@ def final_write_gate(execution,proposal,user):
     issues.extend(experimentos.execution_issues(proposal))
     if globally_paused() or ConnectorAccount.objects.filter(paused=True).exists():issues.append('Cuenta o máquina en pausa')
     if not within_window():issues.append('Fuera de ventana')
-    if capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
+    if capped(proposal) and capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
     if proposal.capability in NETWORK:
         from . import red
         issues.extend(red.execution_issues(proposal))
@@ -705,7 +711,7 @@ def execute(user,proposal_id):
         if not spacing_ok(account,capability=proposal.capability):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
         due=None if proposal.piece_id else post_due()
         if due:raise OperatorBlocked(f'El post de las {due.piece.scheduled_for.astimezone(local_tz()):%H:%M} sale primero; esta acción queda aprobada para después.')
-        if capacity_left(account,proposal.capability)<=0:
+        if capped(proposal) and capacity_left(account,proposal.capability)<=0:
             raise OperatorBlocked(f'Tope diario o semanal de {proposal.capability} alcanzado; queda aprobada para después.')
         if proposal.capability in NETWORK:
             from . import red

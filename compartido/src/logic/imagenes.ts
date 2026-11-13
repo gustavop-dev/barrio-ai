@@ -10,7 +10,7 @@ export const IMAGE_KIND_LABEL: Record<ImageKind, string> = {
   foto: 'Foto', infografia: 'Infografía', carrusel: 'Carrusel', tarjeta: 'Tarjeta de marca',
 };
 export const TEMPLATE_LABEL: Record<NonNullable<PieceImage['template']>, string> = {
-  portada: 'Portada', pasos: 'Pasos', barras: 'Barras', numero: 'Número', cierre: 'Cierre',
+  portada: 'Portada', pasos: 'Pasos', barras: 'Barras', numero: 'Número', cierre: 'Cierre', preguntas: 'Preguntas',
 };
 
 export function orderedImages(images: readonly PieceImage[] = []): PieceImage[] {

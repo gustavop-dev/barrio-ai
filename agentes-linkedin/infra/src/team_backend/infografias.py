@@ -40,7 +40,7 @@ def array(items):return {'type':'array','items':items}
 def enum(*values):return {'type':'string','enum':list(values)}
 
 SOURCE=obj(ref=string(),label=string(),date=string(),estimate={'type':'boolean'})
-SLIDE=obj(template=enum('portada','pasos','barras','numero','cierre'),label=string(),title=string(),subtitle=string(),
+SLIDE=obj(template=enum('portada','pasos','barras','numero','cierre','preguntas'),label=string(),title=string(),subtitle=string(),
           body=string(),number=string(),unit=string(),steps=array(string()),
           bars=array(obj(label=string(),value={'type':'number'},focus={'type':'boolean'})),
           source=SOURCE,alt=string(),highlight=string())
@@ -62,6 +62,17 @@ def schema_check(value,schema,path='respuesta'):
         for key,item in value.items():schema_check(item,schema['properties'][key],path+'.'+key)
     if kind=='array':
         for item in value:schema_check(item,schema['items'],path+'[]')
+
+
+# «preguntas»: 2–4 questions for the audience in `steps`, as bullets; the text after the «?» is an optional short answer.
+QUESTIONS=(2,4)
+LIST_MARK=re.compile(r'^\s*(?:\d+\s*[.):-]|[-•*·]|[A-Za-z]\))\s*')
+
+
+def question_parts(item):
+    """(question, answer) of a «preguntas» item: up to the first «?», then the optional short answer."""
+    question,mark,answer=item.partition('?')
+    return (question.strip()+mark,answer.strip(' -–—:\n'))
 
 
 def source_refs(public,sources):
@@ -93,7 +104,15 @@ def validate(design,kind,public=(),sources=()):
             if title[1:]!=title[1:].lower():raise ValueError('Portada en minúsculas salvo primera letra')
             if slide['highlight'] not in title.split() or len(slide['highlight'].split())!=1:raise ValueError('Una palabra de acento en la portada')
         if template=='pasos' and not 3<=len(slide['steps'])<=5:raise ValueError('De 3 a 5 pasos')
-        if template!='pasos' and slide['steps']:raise ValueError('Pasos fuera de su plantilla')
+        if template=='preguntas':
+            low,high=QUESTIONS
+            if not low<=len(slide['steps'])<=high:raise ValueError(f'De {low} a {high} preguntas en steps')
+            for item in slide['steps']:
+                if LIST_MARK.match(item):raise ValueError('Preguntas sin numerar ni viñetas en el texto: la plantilla las dibuja')
+                question,answer=question_parts(item)
+                if not question.endswith('?') or len(question)<4:raise ValueError('Cada elemento de preguntas empieza por una pregunta que termina en «?»')
+                if '?' in answer:raise ValueError('Una pregunta por elemento; la respuesta corta va después del «?»')
+        if template not in ('pasos','preguntas') and slide['steps']:raise ValueError('Pasos o preguntas fuera de su plantilla')
         if template=='barras':
             if not 1<=len(slide['bars'])<=5 or sum(b['focus'] for b in slide['bars'])!=1:raise ValueError('De 1 a 5 barras, un foco')
             if any(b['value']<0 for b in slide['bars']) or max(b['value'] for b in slide['bars'])<=0:raise ValueError('Barras desde cero, valores positivos')
@@ -102,10 +121,15 @@ def validate(design,kind,public=(),sources=()):
         if template=='numero':
             if not re.fullmatch(r'\d{1,4}',slide['number']) or not slide['unit'].strip():raise ValueError('Cifra redondeada con unidad')
         elif slide['number'] or slide['unit']:raise ValueError('Cifra fuera de su plantilla')
-        factual=template in ('numero','barras') or bool(re.search(r'\d',' '.join(texts[:-2])))
+        digits=re.findall(r'\S*\d\S*',' '.join(texts[:-2]))
+        factual=template in ('numero','barras') or bool(digits)
         if factual or source['ref']:
             if source['ref'] not in source_refs(public,sources) or not source['label'] or not source['date']:
-                raise ValueError('Dato sin fuente pública identificable y fecha')
+                # Say what made it a figure, so the one correction can fix it instead of repeating the same design.
+                why=(f'la plantilla {template} siempre muestra un dato' if template in ('numero','barras')
+                     else 'hay cifras en el texto: '+', '.join(f'«{d}»' for d in digits[:3]) if digits else 'cita una fuente')
+                raise ValueError(f'Dato sin fuente pública identificable y fecha ({why}). Sin una fuente de public_facts o '
+                                 'sources, quita las cifras; para preguntas a la audiencia usa la plantilla preguntas, sin numerarlas')
         if source['estimate'] and 'estimate' not in source['label'].lower():raise ValueError('La estimación debe decir estimate')
     return design
 
@@ -169,6 +193,13 @@ def render(slide,position=1,total=1,carousel=False):
         for n,step in enumerate(slide['steps'],1):
             text(str(n),96,y,36,48,width=128,color=accent)
             y=text(step,248,y,36,48,width=736)+24
+    elif template=='preguntas':
+        # Bullets, never numbers: the questions carry no data. The short answer goes under its question, in grey.
+        for item in slide['steps']:
+            question,answer=question_parts(item)
+            draw.ellipse((96,y+11,114,y+29),fill=accent);occupied.append((96,y+11,114,y+29))
+            y=text(question,152,y,36,48,width=832)
+            y=text(answer,152,y+8,32,44,width=832,color=muted)+32
     elif template=='barras':
         bars=sorted(slide['bars'],key=lambda b:b['value'],reverse=True);maximum=max(b['value'] for b in bars)
         for bar in bars:

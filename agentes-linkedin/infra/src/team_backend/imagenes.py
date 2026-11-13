@@ -149,9 +149,12 @@ def _photo(piece,photo,choice,index,client,public,private):
     return row
 
 
-DESIGN_SYSTEM='''Eres el diseñador editorial. Devuelve únicamente datos para las cuatro plantillas del manual,
+DESIGN_SYSTEM='''Eres el diseñador editorial. Devuelve únicamente datos para las plantillas del manual,
 no imágenes. Una infografía tiene una lámina; un carrusel tiene portada, interiores y cierre con pregunta (3–8).
-El código dibuja todo. Plantillas: portada, pasos, barras, numero, cierre. Campos no usados: cadena o lista vacía.
+El código dibuja todo. Plantillas: portada, pasos, barras, numero, cierre, preguntas. Campos no usados: cadena o lista vacía.
+preguntas: de 2 a 4 preguntas para la audiencia en steps, sin numerar ni viñetas (el código dibuja las viñetas); cada
+elemento es «pregunta?» o «pregunta? respuesta corta». Úsala cuando el brief, Gustavo o el post pidan preguntas (o
+preguntas y respuestas rápidas) o el post remita a las preguntas de la imagen; nunca metas preguntas en numero.
 source.ref debe ser una key de public_facts o un id de sources, nunca una idea sin confirmar. Un dato lleva label
 y date; source.estimate exige la palabra estimate en label. Sin datos usa source vacío y estimate=false.
 Todo texto público en inglés. Alt describe el dato y su conclusión. No atribuyas a Gustavo experiencias sin

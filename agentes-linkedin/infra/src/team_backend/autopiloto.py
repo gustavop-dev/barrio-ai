@@ -297,6 +297,10 @@ def tick(user,now=None):
         from .perfil import schedule
         report['profile']=schedule(user,now)
     except Exception as exc:report['profile_error']=type(exc).__name__
+    try:
+        from . import urgente
+        report['day_requests']=urgente.tick_day_requests(now)
+    except Exception as exc:report['day_requests_error']=type(exc).__name__  # never stops the rest of the tick
     try:report['weekly_summary']=_weekly_summary(user,now)
     except Exception as exc:report['weekly_summary_error']=type(exc).__name__  # the weekly summary never stops the rest
     return report
@@ -481,7 +485,7 @@ def _execute(user,account,now):
         if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour
         if rounds and not proposal.piece_id and operador.batch_issue(proposal.capability,now):continue
         if rounds and not operador.spacing_ok(account,now,proposal.capability):continue
-        if operador.capacity_left(account,proposal.capability,now)<=0:continue
+        if operador.capped(proposal) and operador.capacity_left(account,proposal.capability,now)<=0:continue
         job=operador.enqueue_execution(user,proposal)
         return int(job.state==Job.State.QUEUED)
     return 0

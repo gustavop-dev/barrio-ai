@@ -14,6 +14,7 @@ export const TYPE_LABEL: Record<TurnoCardType, string> = {
   perfil: 'Perfil',
   conversacion: 'Conversación',
   mensaje: 'Mensaje sugerido',
+  fecha: 'Fecha pedida',
   resumen: 'Resumen semanal',
   aprobacion: 'Aprobación',
 };
@@ -26,6 +27,7 @@ export const TYPE_ICON: Record<TurnoCardType, IconName> = {
   perfil: 'perfil',
   conversacion: 'conversacion',
   mensaje: 'conversacion',
+  fecha: 'calendario',
   resumen: 'resultados',
   aprobacion: 'check',
 };
@@ -80,6 +82,7 @@ export function cardSummary(card: TurnoCard): string {
     return last ? `“${messageText(last)}”` : (card.body ?? '');
   }
   if (card.message) return `“${card.message.text}”`;
+  if (card.day_request) return card.body ?? '';
   if (card.attempt?.text) return `“${card.attempt.text}”`;
   if (card.approval?.text) return `“${card.approval.text}”`;
   if (card.question) return card.question.purpose || card.body || '';
@@ -95,7 +98,7 @@ export const SUMMARY_FITS = 90;
  */
 export function hasDetails(card: TurnoCard): boolean {
   if (card.profile_id) return cardSummary(card).length > SUMMARY_FITS;
-  if (card.referent_change || card.referent_experiment || card.attempt || card.conversation || card.message || card.approval) return true;
+  if (card.referent_change || card.referent_experiment || card.attempt || card.conversation || card.message || card.approval || card.day_request) return true;
   return cardSummary(card).length > SUMMARY_FITS;
 }
 
@@ -104,6 +107,8 @@ export const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsW
 export const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
 /** «Hecho, le escribí» / «No escribirle» on a suggested message (INT-04): the team never sends it. */
 export const isMessageClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/respuestas/') && action.endpoint.endsWith('/mensaje'));
+/** «Sí, el viernes 13…» / «Dejarlo el lunes 16» on a day he asked for that already had a post. */
+export const isDayDecision = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/capturas/') && action.endpoint.endsWith('/fecha'));
 export const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
 export const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
 
@@ -111,6 +116,7 @@ export function successMessage(action: TurnoAction): string {
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
   if (isMessageClose(action)) return action.body?.how === 'no' ? 'Anotado: no le escribirás' : 'Anotado: le escribiste';
+  if (isDayDecision(action)) return action.body?.decision === 'mismo_dia' ? 'Listo: sale el día que pediste' : 'Se queda en el siguiente día libre';
   if (isApprove(action)) return APPROVED_MESSAGE;
   if (isReject(action)) return 'Vetada';
   if (isMachineResume(action)) return 'Máquina reanudada';
@@ -208,6 +214,8 @@ export function swipeIntents(card: TurnoCard, expired = false): SwipeIntents {
   if (card.question) {
     return { right: null, left: card.question.state === 'open' || !card.question.state ? { kind: 'postpone', questionId: card.question.id, label: 'Más tarde' } : null };
   }
+  // A second post that day is a decision he takes with a tap on its button, never with a swipe.
+  if (card.day_request) return { right: null, left: null };
   const runnable = orderedActions(card.actions ?? []).find((action) => action.endpoint && !action.href && !action.opportunity) ?? null;
   return { right: runnable ? { kind: 'run', action: runnable, label: runnable.label } : null, left: null };
 }

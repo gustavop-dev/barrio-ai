@@ -34,6 +34,8 @@ def slide(template='pasos'):
     if template=='barras':value.update(bars=[{'label':'First','value':6,'focus':True},{'label':'Second','value':3,'focus':False}],
                                       source={'ref':'fact','label':'Public record','date':'2026','estimate':False})
     if template=='cierre':value.update(title='Which decision needs a clearer reason?')
+    if template=='preguntas':value.update(title='Hold on, or pivot?',steps=['What signal told you to hold on?',
+                                                                         'What told you to pivot? Usage, mostly.'])
     return value
 
 
@@ -56,6 +58,27 @@ class RendererTests(SimpleTestCase):
         self.assertGreaterEqual(infografias.contrast(infografias.DEEP,infografias.PAPER),4.5)
         self.assertIn('"columnas": 6',infografias.rule());self.assertIn('Revisión antes de publicar',infografias.rule())
         self.assertIn(infografias.version(),infografias.with_rule('Diseña'))
+
+    def test_questions_template_draws_bullets_with_short_answers_and_needs_no_source(self):
+        # Gustavo, 12/11/2026: he asked for an infographic with questions; the designer put them in «numero» («3
+        # questions»), which is always a figure, and it fell back to the brand card twice.
+        data={'slides':[slide('preguntas')]};infografias.validate(data,'infografia')
+        self.assertEqual(infografias.question_parts(data['slides'][0]['steps'][1]),('What told you to pivot?','Usage, mostly.'))
+        im=Image.open(io.BytesIO(infografias.render(data['slides'][0])))
+        self.assertEqual(im.size,(1080,1080));self.assertEqual(im.getpixel((95,95)),(247,246,240))
+        infografias.validate({'slides':[slide('portada'),slide('preguntas'),slide('cierre')]},'carrusel')
+        for steps in (['What told you to pivot?'],['One?','Two?','Three?','Four?','Five?'],['1. What told you to pivot?','2. And to hold?'],
+                      ['- What told you to pivot?','- And to hold?'],['A statement, not a question','And to hold?'],
+                      ['What told you to pivot? And to hold?','Why?'],['Was it after 18 months?','Why?']):
+            with self.subTest(steps=steps),self.assertRaises(ValueError):
+                infografias.validate({'slides':[dict(slide('preguntas'),steps=steps)]},'infografia')
+        with self.assertRaisesMessage(ValueError,'Pasos o preguntas fuera de su plantilla'):
+            infografias.validate({'slides':[dict(slide('portada'),steps=['What told you to pivot?','And to hold?'])]},'infografia')
+        # The first design of 12/11: the questions inside «numero». The error now names the template to use.
+        old=dict(slide('numero'),title='Hold on, or pivot?',body='What signal told you to hold?',
+                 source={'ref':'','label':'','date':'','estimate':False})
+        with self.assertRaisesMessage(ValueError,'usa la plantilla preguntas'):infografias.validate({'slides':[old]},'infografia')
+        self.assertIn('Preguntas',infografias.rule())
 
     def test_carousel_has_cover_closing_numbering_and_tagged_alt_in_pdf(self):
         data={'slides':[slide('portada'),slide(),slide('cierre')]};infografias.validate(data,'carrusel')
