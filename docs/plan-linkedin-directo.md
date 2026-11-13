@@ -78,8 +78,8 @@ anteriores al 10/10/2025.
    pasa por nuestro código ni se guarda.
 4. **Dónde corre el navegador** (por decidir, ver abajo): en el servidor con una IP residencial fija por cuenta, o
    en un equipo del usuario.
-5. **Analítica.** Una importación diaria de los últimos 14 días (los días recientes aún cambian) y una carga
-   inicial de 365 días. Se guarda por día y por post; la app muestra 7, 14, 28, 90, 365 días y rango personalizado
+5. **Analítica.** Una importación diaria de los últimos 14 días (los días recientes aún cambian), seguida de los
+   rangos exactos de 7, 28, 90 y 365 días que terminan ayer, y una carga inicial de 365 días. Se guarda por día y por post; la app muestra 7, 14, 28, 90, 365 días y rango personalizado
    desde nuestros datos, sin volver a pedirle nada a LinkedIn. El backend está hecho (fase 3a): modelos, importación,
    comandos y `GET /api/v1/resultados/analitica`; detalle en
    [`metricas-resultados.md`](../agentes-linkedin/infra/docs/metricas-resultados.md#analítica-de-linkedin-cuenta-directo).

@@ -6,8 +6,10 @@ demographics per capture day), AnalyticsRange (what only holds for the exact ran
 demographics) and AnalyticsImport (one row per export asked, ok or not). Only reads LinkedIn.
 - import_range: one range, upserted. LinkedIn's errors land in the AnalyticsImport row; one that stops the account
   (login, checkpoint, 401/403/429/999, the service's stop) also pauses it, as the other directo reads do.
-- run: the daily job (import_analytics), the last ANALYTICS_DAILY_DAYS complete days, queued by the autopilot once per
-  UTC day after ANALYTICS_DAILY_AFTER (daily_due).
+- run: the daily job (import_analytics), queued by the autopilot once per UTC day after ANALYTICS_DAILY_AFTER
+  (daily_due): the last ANALYTICS_DAILY_DAYS complete days (the refresh of the recent days), then each exact range of
+  ANALYTICS_DAILY_RANGES ending yesterday (the app's presets), one export each, stopping at the first failure; those
+  ranges at most once per UTC day.
 - backfill: back to the earliest day LinkedIn gives, in chunks of ANALYTICS_CHUNK_DAYS, newest first.
 
 Read side: overview() is GET /api/v1/resultados/analitica, from stored data only; LinkedIn is never called at request
@@ -47,6 +49,16 @@ def earliest():
 def daily_days():
     """Days refreshed by the daily import (recent days still move); 0 turns the daily import off."""
     return max(0,min(ANALYTICS_DAYS,int(setting('ANALYTICS_DAILY_DAYS','14'))))
+
+def daily_ranges():
+    """The exact ranges (days ending yesterday) the daily job also imports after its refresh, in order: members reached,
+    LinkedIn's top lists and the content demographics only hold for an exact range, so the app's presets need their own
+    export. Empty (or 0) turns them off; the refresh's own length is not asked twice."""
+    out=[]
+    for part in setting('ANALYTICS_DAILY_RANGES','7,14,28,90,365').split(','):
+        days=int(part) if part.strip() else 0
+        if days>0:out.append(min(ANALYTICS_DAYS,days))
+    return [days for days in dict.fromkeys(out) if days!=daily_days()]
 
 def daily_after():
     hour,_,minute=setting('ANALYTICS_DAILY_AFTER','01:30').partition(':')
@@ -169,11 +181,28 @@ def daily_due(account,now=None):
     return not AnalyticsImport.objects.filter(account=account,trigger=AnalyticsImport.Trigger.DAILY,started_at__gte=midnight).exists()
 
 def run(user,account,now=None):
-    """import_analytics job: the last daily_days() complete days."""
+    """import_analytics job: the last daily_days() complete days (the refresh that upserts the recent days), then each
+    daily_ranges() range ending yesterday, one after the other, each with its own AnalyticsImport. Stops at the first
+    failure: an account LinkedIn stopped is not asked again. The ranges go at most once per UTC day: one already tried
+    today (a job run twice, or resumed) is not asked again, and none after a failure of the day."""
     require(user,'operate_linkedin')
-    start,end=last_days(max(1,daily_days()),now)
+    # The batch's days come from one moment; each import keeps its own start time (overview orders them by it).
+    moment=now or timezone.now()
+    start,end=last_days(max(1,daily_days()),moment)
     log=import_range(account,start,end,AnalyticsImport.Trigger.DAILY,now)
-    return {'state':log.state,'days':(log.rows or {}).get('days',0),'error':log.error}
+    result={'state':log.state,'days':(log.rows or {}).get('days',0),'ranges':0,'error':log.error}
+    if log.state!=AnalyticsImport.State.OK:return result
+    midnight=datetime.combine(utc_today(moment),time(0),tzinfo=UTC)
+    today=AnalyticsImport.objects.filter(account=account,trigger=AnalyticsImport.Trigger.DAILY,started_at__gte=midnight).exclude(pk=log.pk)
+    if today.filter(state=AnalyticsImport.State.ERROR).exists():return result
+    tried=set(today.values_list('start','end'))
+    for days in daily_ranges():
+        start,end=last_days(days,moment)
+        if (start,end) in tried:continue
+        log=import_range(account,start,end,AnalyticsImport.Trigger.DAILY,now)
+        if log.state!=AnalyticsImport.State.OK:return {**result,'state':log.state,'error':log.error}
+        result['ranges']+=1
+    return result
 
 def backfill(account,start=None,chunk=None,now=None):
     """From yesterday back to `start` (the earliest day LinkedIn gives), `chunk` days per export, newest first. Stops at

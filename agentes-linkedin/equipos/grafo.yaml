@@ -4416,7 +4416,7 @@
         },
         {
           "kind": "import_analytics",
-          "cadence": "Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días; solo cuentas «directo» con el servicio navegador configurado.",
+          "cadence": "Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días y después los rangos exactos de ANALYTICS_DAILY_RANGES=7,14,28,90,365 (una vez al día, para en el primer fallo); solo cuentas «directo» con el servicio navegador configurado.",
           "binding": "team_backend.autopiloto._analytics",
           "deduplication": "ID determinista por cuenta y día UTC; _pending impide duplicar; un intento al día aunque falle."
         }

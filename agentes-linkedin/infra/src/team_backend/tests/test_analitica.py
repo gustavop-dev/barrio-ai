@@ -33,7 +33,8 @@ NOW=datetime(2026,11,13,12,tzinfo=UTC)
 EXPORT='^'+re.escape(rutas.navigation(rutas.ANALYTICS_SCREEN))+'$'
 SERVICE={'LIVE_LINKEDIN_DIRECTO':'true','NAVEGADOR_URL':'http://navegador.interno:8080','NAVEGADOR_TOKEN':'token-ficticio',
          'ANALYTICS_EARLIEST':'','ANALYTICS_DAILY_DAYS':'14','ANALYTICS_DAILY_AFTER':'01:30','ANALYTICS_CHUNK_DAYS':'365',
-         'ANALYTICS_DATE_ORDER':'','OPERATOR_PAUSED':'false'}
+         'ANALYTICS_DAILY_RANGES':'','ANALYTICS_DATE_ORDER':'','OPERATOR_PAUSED':'false'}
+PRESETS=(7,14,28,90,365)
 
 def answer(text,status=200):
     """The dialog's answer as the page gets it: a component stream served as octet-stream."""
@@ -457,6 +458,76 @@ class DailyJobTests(ImportBase):
         jobs.process_one(worker);failed.refresh_from_db()
         self.assertEqual(failed.state,'failed');self.assertIn('429',failed.error)
         self.account.refresh_from_db();self.assertTrue(self.account.paused)
+
+    def ranges(self,days):
+        yesterday=NOW.date()-timedelta(days=1)
+        return [(yesterday-timedelta(days=d-1),yesterday) for d in days]
+
+    def test_the_job_then_imports_each_preset_range_in_order(self):
+        """Catch a preset of the app without its exact range: after the 14-day refresh, every range of
+        ANALYTICS_DAILY_RANGES ending yesterday, in order, each its own row; the refresh's length is not asked twice, and
+        members reached then exist for every preset."""
+        bot=User.objects.create_user('autopiloto-prueba');grant(bot,'operate_linkedin')
+        with patch.dict(os.environ,{'ANALYTICS_DAILY_RANGES':'7,14,28,90,365'}):
+            self.assertEqual(analitica.daily_ranges(),[7,28,90,365])
+            result=analitica.run(bot,self.account,NOW)
+        self.assertEqual(result,{'state':'ok','days':14,'ranges':4,'error':''})
+        order=self.ranges((14,7,28,90,365))
+        self.assertEqual([asked(r) for r in self.transport.sent],order)
+        self.assertEqual(list(AnalyticsImport.objects.order_by('id').values_list('start','end','trigger','state')),
+                         [(*r,'diaria','ok') for r in order])
+        self.assertEqual(set(AnalyticsRange.objects.values_list('start','end')),set(order))
+        for days in PRESETS:
+            with self.subTest(days=days):
+                reached=analitica.overview(periodo=f'{days}d',now=NOW)['totales']['members_reached']
+                self.assertEqual((reached['value'],reached['unavailable_reason']),(777,None))
+
+    def test_the_batch_stops_at_the_first_failure(self):
+        """Catch a batch that keeps asking LinkedIn after a failure: the 28-day export fails, so 90 and 365 are not asked."""
+        bot=User.objects.create_user('autopiloto-prueba');grant(bot,'operate_linkedin')
+        calls=[]
+        def third_fails(request):
+            calls.append(asked(request))
+            return Answer(500,'') if len(calls)==3 else answer(A.stream(A.workbook(*asked(request))))
+        self.reply=third_fails
+        with patch.dict(os.environ,{'ANALYTICS_DAILY_RANGES':'7,28,90,365'}):result=analitica.run(bot,self.account,NOW)
+        self.assertEqual((result['state'],result['days'],result['ranges']),('error',14,1))
+        self.assertTrue(result['error'])
+        self.assertEqual(calls,self.ranges((14,7,28)))
+        self.assertEqual(list(AnalyticsImport.objects.order_by('id').values_list('state',flat=True)),['ok','ok','error'])
+        self.account.refresh_from_db();self.assertFalse(self.account.paused)
+
+    def test_the_ranges_go_at_most_once_per_utc_day(self):
+        """Catch a job run twice the same day (or resumed) asking LinkedIn for the long ranges again: the refresh runs, a
+        range tried today is skipped, none follows a failure of the day, and the next day asks them again."""
+        bot=User.objects.create_user('autopiloto-prueba');grant(bot,'operate_linkedin')
+        sent=lambda:[asked(r) for r in self.transport.sent]
+        with patch.dict(os.environ,{'ANALYTICS_DAILY_RANGES':'7,28'}):
+            self.assertEqual(analitica.run(bot,self.account,NOW)['ranges'],2)
+            self.assertFalse(analitica.daily_due(self.account,NOW))
+            self.assertEqual(analitica.run(bot,self.account,NOW+timedelta(hours=5)),{'state':'ok','days':14,'ranges':0,'error':''})
+            self.assertEqual(sent(),self.ranges((14,7,28,14)))
+            # A batch cut short before its last range resumes with only what is left.
+            AnalyticsImport.objects.filter(start=self.ranges((28,))[0][0]).delete()
+            self.assertEqual(analitica.run(bot,self.account,NOW+timedelta(hours=6))['ranges'],1)
+            self.assertEqual(sent()[-2:],self.ranges((14,28)))
+            # A failure of the day: no range again that day.
+            AnalyticsImport.objects.filter(start=self.ranges((7,))[0][0]).update(state='error',error='LinkedIn respondió 500.')
+            self.assertEqual(analitica.run(bot,self.account,NOW+timedelta(hours=7))['ranges'],0)
+            self.assertEqual(len(sent()),7)
+            self.assertEqual(analitica.run(bot,self.account,NOW+timedelta(days=1))['ranges'],2)  # the next day
+            self.assertEqual(len(sent()),10)
+
+    def test_without_ranges_only_the_refresh(self):
+        """Catch the ranges ignoring their switch: empty or 0 leaves the 14-day refresh alone."""
+        bot=User.objects.create_user('autopiloto-prueba');grant(bot,'operate_linkedin')
+        for value in ('','0',' , '):
+            with self.subTest(value=value),patch.dict(os.environ,{'ANALYTICS_DAILY_RANGES':value}):
+                self.assertEqual(analitica.daily_ranges(),[])
+        self.assertEqual(analitica.run(bot,self.account,NOW),{'state':'ok','days':14,'ranges':0,'error':''})
+        self.assertEqual([asked(r) for r in self.transport.sent],self.ranges((14,)))
+        with patch.dict(os.environ,{'ANALYTICS_DAILY_RANGES':'90,400,90','ANALYTICS_DAILY_DAYS':'7'}):
+            self.assertEqual(analitica.daily_ranges(),[90,366])  # deduplicated, at most one export's length
 
 
 class AutopilotAnalyticsTests(MetricsBase):

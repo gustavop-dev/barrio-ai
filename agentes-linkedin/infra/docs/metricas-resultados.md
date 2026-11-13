@@ -272,7 +272,12 @@ Una publicación se une a su pieza editorial por cualquiera de los ids que guard
 
 ### Importación
 
-- **Diaria** (trabajo `import_analytics`). El autopiloto la pone en cola una vez por día UTC, desde las 01:30 UTC. Solo para cuentas `directo` sin pausa y con el servicio configurado (`LIVE_LINKEDIN_DIRECTO`, `NAVEGADOR_URL` y `NAVEGADOR_TOKEN`). Trae los últimos 14 días completos, que terminan ayer, porque los días recientes todavía cambian. Hay un intento al día aunque falle; el del día siguiente cubre el hueco.
+- **Diaria** (trabajo `import_analytics`). El autopiloto la pone en cola una vez por día UTC, desde las 01:30 UTC. Solo para cuentas `directo` sin pausa y con el servicio configurado (`LIVE_LINKEDIN_DIRECTO`, `NAVEGADOR_URL` y `NAVEGADOR_TOKEN`). Hay un intento al día aunque falle; el del día siguiente cubre el hueco.
+  1. Primero trae los últimos 14 días completos, que terminan ayer (`ANALYTICS_DAILY_DAYS`), porque los días recientes todavía cambian. Es la importación que pone al día los días.
+  2. Después, uno tras otro, los rangos exactos que ofrece la app, también terminados ayer: 7, 28, 90 y 365 días (`ANALYTICS_DAILY_RANGES`; el de 14 ya lo trajo el paso 1). Así cada periodo predefinido tiene sus miembros alcanzados, sus publicaciones principales y su demografía del contenido.
+  - Cada exportación deja su propia fila de importación (`diaria`). El lote para en el primer fallo: si LinkedIn frena, no se le pide nada más.
+  - Los rangos van como mucho una vez por día UTC: si el trabajo corre otra vez ese día, se salta los rangos ya intentados y, después de un fallo del día, no pide ninguno.
+  - Son cinco lecturas al día de los topes del servicio, en vez de una.
 - **A mano:** `manage.py analitica importar --cuenta <id o nombre> (--desde AAAA-MM-DD --hasta AAAA-MM-DD | --dias N)`.
 - **Carga inicial:** `manage.py analitica carga-inicial --cuenta <…> [--desde AAAA-MM-DD] [--trozo N]`. Va de ayer hacia atrás, en trozos de `ANALYTICS_CHUNK_DAYS` días, y para en el primer fallo.
 - **Estado:** `manage.py analitica estado [--cuenta <…>]` muestra las últimas 10 importaciones, sin cifras.
@@ -292,7 +297,7 @@ Una publicación se une a su pieza editorial por cualquiera de los ids que guard
 Reglas:
 - **Totales.** Impresiones, interacciones y seguidores nuevos suman los días con dato. Usan la [ficha de KPI](#ficha-de-kpi) con dos campos más: `days` y `days_with_data`. La tasa de interacción es interacciones / impresiones × 100, con los días que traen los dos datos.
 - **Comparación** con el periodo anterior de la misma duración, solo si los dos periodos tienen todos sus días. Si no, `previous` es `null` y `comparable` es `false`.
-- **Miembros alcanzados.** No se pueden sumar por días. Solo aparecen si se importó justo ese rango (`AnalyticsRange`). La importación diaria es de 14 días, así que de entrada solo `14d` los tiene. Si no, `null` con su motivo.
+- **Miembros alcanzados.** No se pueden sumar por días. Solo aparecen si se importó justo ese rango (`AnalyticsRange`). La importación diaria trae los rangos de los cinco periodos predefinidos, que terminan ayer; un rango propio, o un predefinido cuando las importaciones van atrasadas, no los tiene. Si no, `null` con su motivo.
 - **Publicaciones.** `publicados` son las publicaciones del periodo con sus cifras de toda la vida, tal como LinkedIn las dio la última vez (`as_of`), de más a menos impresiones. Es la elección honesta: la hoja de recientes no depende del rango, y las listas de LinkedIn solo valen para su rango exacto. `top_linkedin` son esas dos listas, solo si se importó justo ese rango.
 - **Seguidores.** El total es el que LinkedIn dio el día de cada importación, no el de una fecha pasada. `seguidores.serie` son esas capturas dentro del periodo.
 - **Demografía.** `audiencia` es la última captura, sea cual sea el periodo. `contenido` es la del rango importado más cercano, con su propio rango y `exacto`.
@@ -338,6 +343,7 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 | Variable | Por defecto | Qué hace |
 | --- | --- | --- |
 | `ANALYTICS_DAILY_DAYS` | 14 | Días de la importación diaria; con 0 queda apagada. |
+| `ANALYTICS_DAILY_RANGES` | 7,14,28,90,365 | Rangos exactos (días que terminan ayer) que la importación diaria trae después, en ese orden; el de `ANALYTICS_DAILY_DAYS` no se repite. Vacío o 0: solo los 14 días. |
 | `ANALYTICS_DAILY_AFTER` | 01:30 | Hora UTC desde la que se pone en cola la importación diaria. |
 | `ANALYTICS_CHUNK_DAYS` | 365 | Días por exportación en la carga inicial (de 1 a 366). |
 | `ANALYTICS_EARLIEST` | 2025-10-10 | Primer día que da LinkedIn. |
@@ -347,7 +353,6 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 
 - **La vista** en la oficina y en la app.
 - **Una sexta hoja sola con datos.** Aún no se vio: se lee como la de audiencia. Los nombres de las hojas quedan en `AnalyticsImport.sheets` para comprobarlo.
-- **Otros rangos exactos.** La diaria solo importa 14 días. Para tener miembros alcanzados y listas de LinkedIn en 7, 28 o 90 días habría que importar también esos rangos.
 - **Unir con la pieza** cuando LinkedIn enlaza un urn distinto del que guardamos.
 
 ## Configuración

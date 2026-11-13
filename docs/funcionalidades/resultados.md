@@ -157,7 +157,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
 - **Qué hace para Gustavo:** cada día el equipo trae de LinkedIn la analítica de su cuenta, la misma de «Exportar»: impresiones e interacciones por día, publicaciones recientes, publicaciones principales, seguidores y demografía. Solo lee.
 - **Código:** `linkedin_directo/analitica.py` (lee el libro), `analitica.import_range`, `run` (trabajo `import_analytics`), `backfill`; `autopiloto._analytics`; comando `manage.py analitica importar|carga-inicial|estado`; modelos `AnalyticsDay`, `AnalyticsPost`, `AnalyticsSnapshot`, `AnalyticsRange`, `AnalyticsImport`. Ver [`metricas-resultados.md`](../../agentes-linkedin/infra/docs/metricas-resultados.md#analítica-de-linkedin-cuenta-directo).
 - **Criterios de aceptación:**
-  1. **Dado** una cuenta `directo` sin pausa y con el servicio navegador configurado, **cuando** el autopiloto corre después de las 01:30 UTC, **entonces** pone en cola un solo `import_analytics` ese día, que trae los 14 días completos que terminan ayer.
+  1. **Dado** una cuenta `directo` sin pausa y con el servicio navegador configurado, **cuando** el autopiloto corre después de las 01:30 UTC, **entonces** pone en cola un solo `import_analytics` ese día, que trae los 14 días completos que terminan ayer y después, uno tras otro, los rangos exactos de 7, 28, 90 y 365 días que terminan ayer (`ANALYTICS_DAILY_RANGES`), cada uno con su propia fila de importación.
   2. **Dado** que ese día ya hubo un intento diario, aunque fallara, **cuando** el autopiloto vuelve a correr, **entonces** no pone otro hasta el día siguiente.
   3. **Dado** un día ya importado, **cuando** otra importación lo cubre, **entonces** se actualiza en su sitio; un guion o un día que falta no borra un valor ya visto.
   4. **Dado** que LinkedIn pide entrar, verificar o responde 401/403/429/999, **cuando** se importa, **entonces** la importación queda con error y la cuenta se pausa con «Analítica detenida por el proveedor: …».
@@ -165,6 +165,8 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   6. **Dado** la máquina o la cuenta en pausa, o una cuenta que no es `directo`, **cuando** se pide una importación, **entonces** no se lee nada.
   7. **Dado** `manage.py analitica carga-inicial`, **cuando** corre, **entonces** va de ayer hacia atrás en trozos (365 días por defecto) hasta el 10/10/2025, y para en el primer fallo.
   8. **Dado** una petición de exportación con otra pantalla, otro cuerpo, fechas que no son ISO, un rango invertido o de más de 366 días, **cuando** se va a enviar, **entonces** la lista permitida la bloquea y no sale nada.
+  9. **Dado** que una exportación del lote diario falla, **cuando** se importa, **entonces** no se pide ningún rango más; y si el trabajo vuelve a correr ese mismo día, trae otra vez los 14 días, pero no repite los rangos ya intentados ni pide ninguno después de un fallo del día.
+  10. **Dado** `ANALYTICS_DAILY_RANGES` vacío o `0`, **cuando** corre la importación diaria, **entonces** solo trae los 14 días.
 - **Brechas código/docs:** la cuenta de prueba no tiene impresiones: aún no se vio un libro con datos de publicaciones ni de demografía, solo su forma.
 - **Cobertura QA:** pruebas de backend en `test_analitica.py` (libros inventados en español e inglés) · sin prueba E2E
 
