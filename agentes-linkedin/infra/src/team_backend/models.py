@@ -452,6 +452,111 @@ class AudienceSnapshot(models.Model):
     class Meta:ordering=['-day']
     def __str__(self):return str(self.day)
 
+# ---------------------------------------------------------------------------
+# Creator analytics of a `directo` account (analitica.py): LinkedIn's own export of the account, imported by day, per
+# post, per capture and per range. Only the account's own figures and aggregate demographics: no third-party person.
+# Null means no data, never zero. Days are UTC, as LinkedIn counts them.
+
+class AnalyticsDay(models.Model):
+    """One UTC day: impressions, engagements and new followers. Every import that covers the day updates it (recent
+    days still move); a value already seen is never replaced by a missing one."""
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='analytics_days')
+    day=models.DateField()
+    impressions=models.IntegerField(null=True,blank=True)
+    engagements=models.IntegerField(null=True,blank=True)
+    new_followers=models.IntegerField(null=True,blank=True)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['account','day']
+        constraints=[models.UniqueConstraint(fields=['account','day'],name='one_analytics_day')]
+
+class AnalyticsPost(models.Model):
+    """Lifetime figures of one own post as the export last showed them (its «latest posts» sheet ignores the range and
+    lists only the latest few). Keyed by the post's urn as LinkedIn links it (activity, share or ugcPost)."""
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='analytics_posts')
+    post_urn=models.CharField(max_length=60)
+    url=models.TextField(blank=True)
+    # The editorial piece, when the urn is one we keep for a CONT-09 publication.
+    piece=models.ForeignKey(EditorialPiece,on_delete=models.SET_NULL,null=True,blank=True,related_name='analytics_posts')
+    published=models.DateField(null=True,blank=True)
+    kind=models.CharField(max_length=60,blank=True)  # LinkedIn's own label, in the account's language
+    impressions=models.IntegerField(null=True,blank=True)
+    network_pct=models.FloatField(null=True,blank=True)
+    outside_pct=models.FloatField(null=True,blank=True)
+    members_reached=models.IntegerField(null=True,blank=True)
+    followers_gained=models.IntegerField(null=True,blank=True)
+    profile_views=models.IntegerField(null=True,blank=True)
+    reactions=models.IntegerField(null=True,blank=True)
+    comments=models.IntegerField(null=True,blank=True)
+    shares=models.IntegerField(null=True,blank=True)
+    saves=models.IntegerField(null=True,blank=True)
+    sends=models.IntegerField(null=True,blank=True)
+    button_clicks=models.IntegerField(null=True,blank=True)
+    first_seen_at=models.DateTimeField(default=timezone.now)
+    last_seen_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['account','-published']
+        constraints=[models.UniqueConstraint(fields=['account','post_urn'],name='one_analytics_post')]
+
+class AnalyticsSnapshot(models.Model):
+    """What the export says about the account TODAY whatever the range asked: the follower total and the audience
+    demographics, once per account and UTC day of capture (the last import of the day wins)."""
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='analytics_snapshots')
+    day=models.DateField()
+    followers=models.IntegerField(null=True,blank=True)
+    # [{group, label, pct, below, value}] as LinkedIn labels them; [] when the sheet came with no rows.
+    audience=models.JSONField(default=list,blank=True)
+    captured_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['account','-day']
+        constraints=[models.UniqueConstraint(fields=['account','day'],name='one_analytics_snapshot')]
+
+class AnalyticsRange(models.Model):
+    """What only holds for the exact range imported: the totals (members reached cannot be added across days), LinkedIn's
+    two top-post lists and the content demographics. The last import of the same range wins."""
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='analytics_ranges')
+    start=models.DateField()
+    end=models.DateField()
+    impressions=models.IntegerField(null=True,blank=True)
+    members_reached=models.IntegerField(null=True,blank=True)
+    # [{post_urn, url, published, value}] in LinkedIn's order.
+    top_by_engagements=models.JSONField(default=list,blank=True)
+    top_by_impressions=models.JSONField(default=list,blank=True)
+    # [{group, label, pct, below, value}]; null when the workbook had no content demographics sheet.
+    content=models.JSONField(null=True,blank=True)
+    captured_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['account','-captured_at']
+        constraints=[models.UniqueConstraint(fields=['account','start','end'],name='one_analytics_range')]
+
+class AnalyticsImport(models.Model):
+    """One export asked of LinkedIn and what came of it. Errors keep the kind and a message that names the sheet and
+    row when the workbook could not be read, never a cell's value."""
+    class State(models.TextChoices):
+        RUNNING='running','En curso'
+        OK='ok','Importada'
+        ERROR='error','Fallida'
+    class Trigger(models.TextChoices):
+        DAILY='diaria','Importación diaria'
+        MANUAL='manual','A mano'
+        BACKFILL='carga_inicial','Carga inicial'
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='analytics_imports')
+    start=models.DateField()
+    end=models.DateField()
+    trigger=models.CharField(max_length=16,choices=Trigger.choices,default=Trigger.MANUAL)
+    state=models.CharField(max_length=10,choices=State.choices,default=State.RUNNING,db_index=True)
+    error_kind=models.CharField(max_length=40,blank=True)
+    error=models.TextField(blank=True)
+    # {days, posts, posts_without_urn, top_by_engagements, top_by_impressions, audience, content}
+    rows=models.JSONField(default=dict,blank=True)
+    # The workbook's sheet names (LinkedIn's labels): a six-sheet workbook says which demographics came.
+    sheets=models.JSONField(default=list,blank=True)
+    started_at=models.DateTimeField(default=timezone.now)
+    finished_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        ordering=['-started_at']
+        indexes=[models.Index(fields=['account','state','started_at'],name='analytics_import_last')]
+
 class ActionProposal(models.Model):
     referent_experiment=models.ForeignKey('ReferentExperiment',on_delete=models.PROTECT,null=True,blank=True)
     referent_experiment_version=models.PositiveIntegerField(null=True,blank=True)

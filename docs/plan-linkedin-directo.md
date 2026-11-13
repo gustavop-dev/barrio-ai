@@ -28,6 +28,7 @@ su conexión, y que además traiga la analítica de la cuenta (impresiones, alca
 | Las 21 operaciones del conector funcionan | Cada escritura se confirmó con una lectura posterior |
 | Iniciar sesión en el navegador automatizado no anula la sesión | Dos sesiones de solo lectura en la cuenta principal, sin incidentes |
 | La analítica completa se obtiene con una petición | La respuesta al diálogo «Exportación» ya trae el libro entero; solo lleva fecha de inicio y de fin |
+| Esa petición también funciona enviada por código | Cuenta de prueba, 13/11/2026: 7, 28 y 365 días desde la página de inicio, sin abrir la de analítica; respuesta en menos de un segundo |
 
 Por dónde va cada cosa hoy:
 
@@ -36,11 +37,12 @@ Por dónde va cada cosa hoy:
 - **Interfaz nueva de la web:** buscar personas, ubicaciones, reaccionar, seguir, comentar, responder y la analítica.
   Ningún proyecto open source la documenta; se sacó observando la propia web.
 
-Analítica (libro de 7 hojas): totales, impresiones e interacciones por día, una fila por post con 15 columnas
-(impresiones, dentro y fuera de la red, miembros alcanzados, seguidores obtenidos, visitas al perfil, reacciones,
-comentarios, compartidos, guardados, envíos), hasta 50 posts principales del rango, nuevos seguidores por día y
-demografía de seguidores y de quienes vieron el contenido. Intervalos: 7, 14, 28, 90, 365 días y personalizado,
-siempre con detalle diario; LinkedIn no da fechas anteriores al 10/10/2025.
+Analítica (libro de 7 hojas; la cuenta de prueba, casi vacía, recibió 6, sin la demografía del contenido): totales,
+impresiones e interacciones por día, una fila por post con 15 columnas (impresiones, dentro y fuera de la red,
+miembros alcanzados, seguidores obtenidos, visitas al perfil, reacciones, comentarios, compartidos, guardados, envíos),
+hasta 50 posts principales del rango, nuevos seguidores por día y demografía de seguidores y de quienes vieron el
+contenido. Intervalos: 7, 14, 28, 90, 365 días y personalizado, siempre con detalle diario; LinkedIn no da fechas
+anteriores al 10/10/2025.
 
 ## Lo que no está demostrado
 
@@ -50,7 +52,8 @@ siempre con detalle diario; LinkedIn no da fechas anteriores al 10/10/2025.
   por esta vía.
 - **El servidor:** todo corrió desde el computador de Gustavo, con su conexión de casa. Desde el servidor (IP de
   centro de datos) no se ha probado nada.
-- **La petición de analítica hecha por código** (se capturó con clics) y los rangos anteriores al límite.
+- **La analítica de una cuenta con actividad por código:** la cuenta de prueba no tiene impresiones, así que no se
+  vieron hojas con datos de publicaciones ni de demografía. Tampoco los rangos anteriores al límite.
 - **Si leer la tarjeta de un perfil cuenta como visita** a ese perfil.
 
 ## Riesgos
@@ -77,7 +80,11 @@ siempre con detalle diario; LinkedIn no da fechas anteriores al 10/10/2025.
    en un equipo del usuario.
 5. **Analítica.** Una importación diaria de los últimos 14 días (los días recientes aún cambian) y una carga
    inicial de 365 días. Se guarda por día y por post; la app muestra 7, 14, 28, 90, 365 días y rango personalizado
-   desde nuestros datos, sin volver a pedirle nada a LinkedIn.
+   desde nuestros datos, sin volver a pedirle nada a LinkedIn. El backend está hecho (fase 3a): modelos, importación,
+   comandos y `GET /api/v1/resultados/analitica`; detalle en
+   [`metricas-resultados.md`](../agentes-linkedin/infra/docs/metricas-resultados.md#analítica-de-linkedin-cuenta-directo).
+   Lo que solo vale para un rango exacto (miembros alcanzados, publicaciones principales, demografía del contenido)
+   se muestra solo para ese rango, o con su propio rango.
 6. **Prueba diaria.** La del spike, llevada al servicio: lecturas de comprobación sobre la cuenta de prueba y aviso
    en la Bandeja cuando algo se rompe.
 
@@ -94,7 +101,7 @@ LinkedIn desde producción.
 | 0 | Decisiones abiertas y el puente con Unipile | — |
 | 1 | Conector `directo` en el backend: las 21 operaciones con la interfaz actual, traducción de respuestas, pruebas con respuestas grabadas sin datos personales | CI; cuenta de prueba desde el computador de Gustavo |
 | 2 | Servicio «navegador»: contenedor, perfiles por cuenta, API interna, protecciones, inicio de sesión, pausa y aviso | Cuenta de prueba en el entorno elegido |
-| 3 | Analítica: importación diaria, carga inicial, modelos y pantalla de Resultados con intervalos | Datos de la cuenta de Gustavo, solo lectura |
+| 3 | Analítica: importación diaria, carga inicial, modelos y pantalla de Resultados con intervalos. 3a, el backend, está hecho; falta la pantalla (3b) | Cuenta de prueba (3a); datos de la cuenta de Gustavo, solo lectura |
 | 4 | Prueba de resistencia: la cuenta de prueba trabajando 1 a 2 semanas a ritmo real, con la prueba diaria | Sin bloqueos ni verificaciones en ese periodo |
 | 5 | Paso de la cuenta de Gustavo: primero lecturas, luego una capacidad de escritura cada vez; Unipile queda de respaldo hasta el final | Una semana estable por capacidad |
 | 6 | Segundo usuario (CTO) y multitenant: alta con inicio de sesión propio, identidad fuera del código | Ver `barrio-multitenant` en la memoria del proyecto |

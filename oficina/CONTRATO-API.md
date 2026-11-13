@@ -340,6 +340,8 @@ Reglas para la PWA:
 
 Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos cada `METRICS_EVERY_MINUTES`. No tiene rol en la escena de la oficina.
 
+**Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo`, servida desde lo importado: nunca llama a LinkedIn. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
+
 
 ## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes
 

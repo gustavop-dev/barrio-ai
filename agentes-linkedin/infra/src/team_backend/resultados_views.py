@@ -1,9 +1,10 @@
 """HTTP API of Resultados for the office (docs/metricas-resultados.md).
 GET /api/v1/resultados?dias=7|28|90&modalidad=todo|personal_startups|projectapp (defaults: 28, todo).
+GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d or ?desde&hasta: LinkedIn's own analytics, stored data only.
 /api/v1/resultados/resumen-semanal…: the weekly summary of analista_barrio_resultados (docs/resumen-semanal.md)."""
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from . import resultados, resumen_semanal
+from . import analitica, resultados, resumen_semanal
 from .models import WeeklySummary
 from .operador_views import get_or_404, human_session, valid
 from .permissions import require
@@ -15,6 +16,14 @@ class Resultados(APIView):
         require(request.user,'operate_linkedin')
         params=request.query_params
         return Response(resultados.build(params.get('dias','28'),params.get('modalidad','todo')))
+
+class Analitica(APIView):
+    """LinkedIn's analytics of the directo account for a preset (default 28d) or a custom range, optional `cuenta`.
+    Read-only and never calls LinkedIn: analitica.overview reads what the imports stored."""
+    def get(self,request):
+        require(request.user,'operate_linkedin')
+        p=request.query_params
+        return Response(analitica.overview(p.get('cuenta'),p.get('periodo'),p.get('desde'),p.get('hasta')))
 
 # --------------------------------------------------------------------------- weekly summary (docs/resumen-semanal.md)
 

@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.6-retoque-por-comentario` · SHA-256 `896a0c3489d9b738b5b9b5d985a64e54b833392ec78ca55dfc439fa3fa768db7`.
+Versión `6.6-retoque-por-comentario` · SHA-256 `3403ff7724e0ef732247b5853b80d41a2aecebb0494ecec748b70c504c12e6f6`.
 
 46 nodos (46 activos), 72 aristas y 15 ciclos.
 
@@ -324,6 +324,7 @@ flowchart TD
 Estado: `active`. Orquestador: `metricas`.
 
 - `collect_metrics`: METRICS_EVERY_MINUTES=180 si hay cortes pendientes; audiencia diaria.
+- `import_analytics`: Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días; solo cuentas «directo» con el servicio navegador configurado.
 
 ```mermaid
 flowchart TD

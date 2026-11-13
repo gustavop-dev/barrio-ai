@@ -1128,6 +1128,10 @@ def _run_job(job):
             r=metricas.collect(user,ConnectorAccount.objects.get(id=params['account']))
             oficina_eventos.job_done(job.kind,r)
             return 'complete',f"cortes:{r['captured']} audiencia:{r['audience']}"[:30],r['stopped']
+        if job.kind=='import_analytics':
+            from . import analitica
+            r=analitica.run(user,ConnectorAccount.objects.get(id=params['account']))
+            return ('complete' if r['state']=='ok' else 'failed'),f"analitica:{r['state']} dias:{r['days']}"[:30],r['error']
         if job.kind=='read_inbox':
             from . import conversaciones
             r=conversaciones.read_inbox(user,ConnectorAccount.objects.get(id=params['account']))

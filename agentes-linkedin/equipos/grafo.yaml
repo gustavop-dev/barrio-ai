@@ -1609,7 +1609,8 @@
       ],
       "activity": {
         "job_kinds": [
-          "collect_metrics"
+          "collect_metrics",
+          "import_analytics"
         ],
         "event_roles": []
       }
@@ -4412,6 +4413,12 @@
           "cadence": "METRICS_EVERY_MINUTES=180 si hay cortes pendientes; audiencia diaria.",
           "binding": "team_backend.autopiloto._metrics",
           "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
+        },
+        {
+          "kind": "import_analytics",
+          "cadence": "Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días; solo cuentas «directo» con el servicio navegador configurado.",
+          "binding": "team_backend.autopiloto._analytics",
+          "deduplication": "ID determinista por cuenta y día UTC; _pending impide duplicar; un intento al día aunque falle."
         }
       ],
       "loops": [],
@@ -4966,6 +4973,7 @@
       "plan_network": "relaciones_comunidad",
       "sync_network": "relaciones_comunidad",
       "collect_metrics": "analista_barrio_resultados",
+      "import_analytics": "analista_barrio_resultados",
       "process_capture": "operador_cuenta",
       "weekly_summary": "analista_barrio_resultados",
       "read_inbox": "conversaciones_inbox",
@@ -5010,6 +5018,7 @@
       "classify_contacts",
       "collect_metrics",
       "discover_network",
+      "import_analytics",
       "observe",
       "plan_network",
       "prepare_piece",
