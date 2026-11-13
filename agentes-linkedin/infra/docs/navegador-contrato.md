@@ -4,8 +4,8 @@ El conector `directo` (`team_backend/connectors_directo.py`) habla con LinkedIn 
 él mismo: le pide cada llamada al servicio «navegador», que la hace desde dentro de la página de LinkedIn de la
 cuenta, con su sesión abierta. El plan completo está en `docs/plan-linkedin-directo.md`.
 
-Este documento fija lo que el backend envía y lo que espera de vuelta. El backend ya lo implementa
-(`linkedin_directo/servicio.py`); el servicio se construye en la fase 2.
+Este documento fija lo que el backend envía y lo que espera de vuelta. El backend lo implementa en
+`linkedin_directo/servicio.py` y el servicio en `agentes-linkedin/navegador` (su README explica cómo correrlo).
 
 ## Reparto del trabajo
 
@@ -59,8 +59,8 @@ Encabezados que pone el servicio según `kind`:
 
 | `kind` | Encabezados |
 | --- | --- |
-| `voyager` | `accept: application/vnd.linkedin.normalized+json+2.1`, `x-restli-protocol-version: 2.0.0`; en un POST además `content-type: application/json; charset=UTF-8` |
-| `sdui` | `content-type: application/json` y los `x-li-*` de la última llamada propia de la página |
+| `voyager` | `accept: application/vnd.linkedin.normalized+json+2.1`, `x-restli-protocol-version: 2.0.0`; en un POST además `content-type: application/json; charset=UTF-8`. También `x-li-lang`, `x-li-track` y `x-li-page-instance` tal como los mandó la propia página en sus llamadas a Voyager al cargar |
+| `sdui` | `content-type: application/json`, y el `accept` y los `x-li-*` de la última acción propia de la página |
 | `page` | `accept: text/html` |
 
 En todos añade el `csrf-token`, que lee dentro de la página. La cookie y el token de LinkedIn no salen nunca del
@@ -75,7 +75,7 @@ Lo que contestó LinkedIn, tal cual:
 ```
 
 `status` es el código HTTP de LinkedIn. Vale `0` si LinkedIn no contestó: tiempo agotado o error de red dentro de
-la página. El backend decide qué significa:
+la página. Una redirección no se sigue: llega con `status` 0 y `redirected: true`. El backend decide qué significa:
 
 - Redirección, 401, 403, 429, 999, una página de login o de verificación, o HTML donde se esperaban datos: la
   cuenta se pausa (`pause=True`).
@@ -91,13 +91,21 @@ no debe llevar datos de LinkedIn.
 | Código | Significado | Lo que hace el backend |
 | --- | --- | --- |
 | 400 | Petición mal formada | Error `contract` |
-| 401, 403 | Token incorrecto | Error `config`; la cuenta se pausa |
+| 401, 403 | Falta el token (401) o no es el del servicio (403) | Error `config`; la cuenta se pausa |
 | 404 | Cuenta desconocida en el servicio | Error `config`; la cuenta se pausa |
-| 409 | Cuenta detenida por el servicio (LinkedIn frenó antes) o `request_id` repetido | Error `stopped`; la cuenta se pausa |
-| 422 | Fuera de la lista permitida o sin tope disponible; no salió nada | Error `refused` |
+| 409 | Cuenta detenida por el servicio (LinkedIn frenó antes), o una escritura con un `request_id` que ya salió o está saliendo y cuya respuesta no quedó guardada | Error `stopped`; la cuenta se pausa |
+| 422 | Fuera de la lista permitida o tope de la hora o del día agotado; no salió nada | Error `refused` |
 | 423 | Sin sesión: alguien tiene que entrar a mano en ese navegador | Error `login`; la cuenta se pausa |
-| 503 | Navegador no listo u ocupado; no salió nada | Error `not_sent` |
-| 504 u otro 5xx | La llamada pudo salir y no se sabe qué pasó | Escritura: incierta. Lectura: error `network` |
+| 503 | Navegador no listo (no abrió, o el perfil lo tiene otro navegador) u ocupado: la llamada no pudo salir en los 35 s siguientes a su llegada; no salió nada | Error `not_sent` |
+| 504 u otro 5xx | La página falló durante la llamada: pudo salir y no se sabe qué pasó | Escritura: incierta. Lectura: error `network` |
+
+El servicio juzga además lo mismo que el backend para detenerse: si una respuesta de LinkedIn trae una señal de
+parada (redirección, 401, 403, 429, 999, login, verificación, HTML donde se esperaban datos), o la página termina
+en una de esas pantallas o pierde la cookie de sesión, devuelve esa respuesta tal cual (200) y deja la cuenta
+detenida en disco. Desde ahí todo recibe 409 hasta que alguien la reanuda (`python -m navegador reanudar <cuenta>`).
+
+`GET {NAVEGADOR_URL}/health` (sin token) contesta `{"status": "ok"}` mientras el servicio está arriba; no abre ningún
+navegador.
 
 Si no se puede conectar con el servicio, la llamada no salió (`not_sent`). Si se cae la conexión ya enviada, una
 escritura queda incierta. El backend espera 75 s como máximo: el servicio pausa de 3 a 7 s antes de cada llamada y le
@@ -108,15 +116,16 @@ da 30 s a LinkedIn.
 `GET {NAVEGADOR_URL}/v1/cuentas/{cuenta}/consultas?prefixes=messengerConversations,…&variables=mailboxUrn`
 
 Los ids de las consultas GraphQL cambian con cada despliegue de LinkedIn. El servicio guarda las llamadas GraphQL
-que hizo la página por sí sola al cargar y devuelve la más reciente cuya operación empiece por uno de los
-`prefixes` y use las mismas `variables`:
+que hizo la página por sí sola al cargar (abre la página de inicio si aún no estaba abierta; eso no cuenta para los
+topes) y devuelve la más reciente cuya operación empiece por uno de los `prefixes` y use las mismas `variables`:
 
 ```json
 {"path": "/voyagerMessagingGraphQL/graphql", "query_id": "messengerConversations.<hash>", "variables": ["mailboxUrn"], "source": "page"}
 ```
 
 `path` va relativo a `/voyager/api`; también se acepta con el prefijo. Si no tiene ninguna, el servicio contesta 404.
-Cualquier fallo aquí solo hace que el backend use el id fijo que trae.
+Cualquier fallo aquí solo hace que el backend use el id fijo que trae. Con la cuenta del 2026-11-13, la página de
+inicio hizo la consulta de conversaciones pero no la de mensajes: la lectura de mensajes usa el id fijo.
 
 ## Lista permitida
 

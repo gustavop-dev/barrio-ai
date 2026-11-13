@@ -123,4 +123,5 @@ la 5, una a dos semanas según cómo responda LinkedIn.
 
 `docs/plan-outbound.md` (el embudo que este conector tiene que servir) · `spikes/linkedin-directo/README.md`
 (estado por operación, cómo correr la prueba y la prueba diaria). · `agentes-linkedin/infra/docs/navegador-contrato.md`
-(contrato entre el backend y el servicio navegador, ids y lista permitida).
+(contrato entre el backend y el servicio navegador, ids y lista permitida). · `agentes-linkedin/navegador/README.md`
+(el servicio navegador: cómo correrlo, entrar a mano y encenderlo en el servidor).

@@ -106,8 +106,39 @@ services:
     depends_on: {api: {condition: service_healthy}}
     restart: unless-stopped
     logging: *logging
+  navegador:
+    # LinkedIn without Unipile (docs/plan-linkedin-directo.md): one Chromium per account that makes every call from
+    # the logged-in page. OFF until the `navegador` profile is named: a plain `up -d` does not start it. Internal network
+    # only: no host port and nothing in the Caddyfile; the backend reaches it at http://navegador:8790 with the token.
+    profiles: ["navegador"]
+    image: ghcr.io/gustavop-dev/barrio-ai-navegador:${BARRIO_TAG:-latest}
+    build:
+      context: ../agentes-linkedin/navegador
+      additional_contexts:
+        directo: ../agentes-linkedin/infra/src/linkedin_directo
+    # A fixed name: Chromium's profile lock names the machine, and a recreated container must still be "this machine".
+    hostname: navegador
+    environment:
+      NAVEGADOR_TOKEN: ${NAVEGADOR_TOKEN:-}
+      NAVEGADOR_LECTURAS_HORA: ${NAVEGADOR_LECTURAS_HORA:-60}
+      NAVEGADOR_LECTURAS_DIA: ${NAVEGADOR_LECTURAS_DIA:-300}
+      NAVEGADOR_ESCRITURAS_HORA: ${NAVEGADOR_ESCRITURAS_HORA:-6}
+      NAVEGADOR_ESCRITURAS_DIA: ${NAVEGADOR_ESCRITURAS_DIA:-30}
+      NAVEGADOR_PAUSA_MIN: ${NAVEGADOR_PAUSA_MIN:-3}
+      NAVEGADOR_PAUSA_MAX: ${NAVEGADOR_PAUSA_MAX:-7}
+    volumes: ["navegador-datos:/datos"]  # browser profiles (sessions), stops, budgets and write records
+    shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8790/health', timeout=5)"]
+      interval: 30s
+      timeout: 6s
+      retries: 3
+    stop_grace_period: 60s  # a call in flight finishes and the browser closes its profile cleanly
+    restart: unless-stopped
+    logging: *logging
 volumes:
   knowledge-db:
   media:
   caddy-data:
   caddy-config:
+  navegador-datos:

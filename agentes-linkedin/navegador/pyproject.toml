@@ -1,0 +1,17 @@
+[project]
+name = "barrio-navegador"
+version = "0.1.0"
+description = "Servicio navegador: un Chromium por cuenta que hace cada llamada a LinkedIn desde la página con sesión abierta"
+requires-python = ">=3.12"
+# linkedin_directo (the routes, the allowlist and how an answer is judged) is NOT a dependency here: it lives in
+# agentes-linkedin/infra/src and is shared with the backend. Locally and in CI it comes from PYTHONPATH=../infra/src;
+# the image copies it from the `directo` build context (see Dockerfile and README).
+dependencies = [
+    "aiohttp>=3.10,<4",
+    "httpx>=0.28,<1",
+    # The version the spike of 2026-11-13 ran with (its Chromium build made the test account's profile).
+    "patchright==1.64.4",
+]
+
+[tool.uv]
+package = false
