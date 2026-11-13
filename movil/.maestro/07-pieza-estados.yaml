@@ -112,10 +112,11 @@ tags: [calendario]
 # The block's «Abrir» opens the piece. The row takes one line: a tap on it unfolds its «Abrir».
 # Scroll down to the link itself: its title can be visible while «Abrir» is behind the Resultados tab.
 # cubre: CAL-06, CAL-09
+# (Maestro resolves `childOf: id: "evento-.*"` to the first event on screen: name the row by what it contains.)
 - tapOn:
-    text: "El verificador bloqueó la pieza"
-    childOf:
-      id: "evento-.*"
+    id: "evento-.*"
+    containsDescendants:
+      - text: "El verificador bloqueó la pieza"
 - scrollUntilVisible:
     element:
       text: "Abrir"

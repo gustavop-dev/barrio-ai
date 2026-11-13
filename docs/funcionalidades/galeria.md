@@ -56,7 +56,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   6. **Dado** cada foto nueva, **cuando** se crea, **entonces** toma `allow_ai_edit` del valor por defecto de Ajustes › Captura y galería ([AJU-09](ajustes.md#aju-09)).
   7. **Dado** que la subida falla, **cuando** vuelve el error, **entonces** se ve en español; nunca un mensaje técnico en inglés.
 - **Brechas código/docs:** en la app la línea de fotos rechazadas no se borra tras una subida correcta posterior.
-- **Cobertura QA:** E2E `18-perfil` (criterios 1 y 7 en la app: una foto elegida en el selector de Android llega al backend como foto de perfil y dice «Foto subida. El equipo la verá en su próxima ronda.»). 2 a 6: Jest (`FotosPerfil.test.tsx`), Vitest y backend.
+- **Cobertura QA:** E2E `18-perfil` (criterios 1 y 7 en la app: una foto elegida en el selector de Android llega al backend como foto de perfil, avisa «Fotos subidas a Perfil.» y aparece en la rejilla como «Sin asignar»). 2 a 6: Jest (`FotosPerfil.test.tsx`), Vitest y backend.
 
 ### GAL-03 · Dejar una nota para el equipo en una foto <a id="gal-03"></a>
 

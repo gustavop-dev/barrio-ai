@@ -204,7 +204,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 - **Criterios de aceptación:**
   1. **Dado** fotos de categoría Perfil, **cuando** abre Ajustes, **entonces** ve «Fotos de perfil» con «Las fotos con las que Perfil prepara tus retratos y el banner. Nunca se usan en posts.» y una rejilla de tres columnas ordenada por función (01 · Pose y sonrisa, 02 · Cuerpo del banner, 03 · Identidad y gafas, y las «Sin asignar» al final), cada foto con su función.
   2. **Dado** ninguna foto de perfil, **cuando** abre la sección, **entonces** ve «Todavía no hay fotos de perfil. Sube una pose con sonrisa, una de cuerpo para el banner y una de identidad.».
-  3. **Dado** «Subir fotos de perfil», **cuando** elige fotos en el teléfono, **entonces** suben como categoría Perfil con permiso para Perfil, con su progreso y «Foto subida. El equipo la verá en su próxima ronda.».
+  3. **Dado** «Subir fotos de perfil», **cuando** elige fotos en el teléfono, **entonces** suben como categoría Perfil con permiso para Perfil, con su progreso y el aviso «Fotos subidas a Perfil.».
   4. **Dado** una foto, **cuando** la toca, **entonces** se abre su hoja: función, permiso, «Instrucciones para Perfil», «Edición con IA», «Guardar» (solo envía lo que cambió) y «Quitar la foto» tras confirmar; la imagen abre el visor a pantalla completa, que recorre las fotos en el orden de la rejilla. La hoja no ofrece cambiar la categoría a «Posts».
 - **Cobertura QA:** Jest `FotosPerfil.test.tsx` (1 a 4) y `AjustesScreen.test.tsx` (`ancla=fotos`); Maestro `18-perfil` (1 y 3).
 

@@ -207,10 +207,10 @@ tags: [calendario]
       id: panel-dia
 - takeScreenshot: 07-calendario-06-mes-vacio-lejos
 # Right twice: this month again (the panel keeps the far day). Today is selected with a tap, so Semana opens on its
-# week.
+# week. Up to the month's title, not just part of the grid (QA run 43358236141: the title stayed above the screen).
 - scrollUntilVisible:
     element:
-      id: pager-mes
+      text: "${output.mesMas2}.*"
     direction: UP
     timeout: 20000
 - swipe:

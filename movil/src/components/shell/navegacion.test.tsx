@@ -73,7 +73,7 @@ describe('push (MovNavegacion)', () => {
   // E2E wave: a piece opened from Tu turno said «‹ Calendario» and went back to Tu turno.
   it('names «‹» after the screen it goes back to', () => {
     const tabs = (focused: string) => ({ key: 'tabs', name: '(tabs)', state: { index: 1, routes: [{ name: 'index' }, { name: focused }] } });
-    expect(backLabel({ routes: [tabs('tu-turno'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Bandeja de entrada');
+    expect(backLabel({ routes: [tabs('tu-turno'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Bandeja');
     expect(backLabel({ routes: [tabs('resultados'), { key: 'detail', name: 'personas/[id]' }] }, 'detail', 'Personas')).toBe('Resultados');
     expect(backLabel({ routes: [tabs('calendario'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Calendario');
     expect(backLabel({ routes: [tabs('personas'), { key: 'p', name: 'personas/[id]' }, { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Persona');

@@ -85,7 +85,7 @@ it('uploads the chosen photos as profile photos Perfil may edit', async () => {
   const server = await renderFotos({ 'POST /api/v1/galeria': { status: 201, body: [photo('n1'), photo('n2')] } });
   await screen.findByTestId('foto-perfil-p1');
   await fireEvent.press(screen.getByTestId('fotos-perfil-subir'));
-  expect(await screen.findByText('2 fotos subidas. El equipo las verá en su próxima ronda.')).toBeOnTheScreen();
+  expect(await screen.findByText('Fotos subidas a Perfil.')).toBeOnTheScreen();
   const parts = server.find('POST', '/api/v1/galeria')[0]!.body as [string, unknown][];
   expect(parts.filter(([name]) => name === 'fotos')).toHaveLength(2);
   expect(parts).toEqual(expect.arrayContaining([['category', 'perfil'], ['profile_edit', 'true']]));

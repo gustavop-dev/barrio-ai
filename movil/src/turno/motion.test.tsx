@@ -9,7 +9,8 @@ import * as Haptics from 'expo-haptics';
 import { State } from 'react-native-gesture-handler';
 import { fireGestureHandler, getByGestureTestId } from 'react-native-gesture-handler/jest-utils';
 import '@/api/transport';
-import { TopBar } from '@/components/shell/TopBar';
+import type { BottomTabBarProps } from 'expo-router/js-tabs';
+import { BottomBar } from '@/components/shell/BottomBar';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
 import { turnoMotion, turnoTimings } from '@/theme/motion';
@@ -33,6 +34,8 @@ function serve(after: TuTurno, post: string, reply: unknown = {}) {
     'GET /api/v1/tu-turno': () => ({ body: done ? after : before() }),
     'POST /api/v1/tu-turno/vistos': { body: { count: 1 } },
     'GET /api/v1/operador/overview': { body: { control: { paused: false }, accounts: [] } },
+    'GET /api/v1/capturas': { body: { count: 0, next: null, previous: null, results: [] } },
+    'GET /api/v1/preguntas': { body: [] },
     [`POST ${post}`]: () => {
       done = true;
       return { body: reply };
@@ -81,13 +84,17 @@ describe('Tu turno · a card resolved with its button (MovTuTurno)', () => {
     expect(header('Cuando puedas · 1')).toBeOnTheScreen();
   });
 
-  it('keeps the top bar badge on the card until it has left, then rolls it and pops it back with SOFT', async () => {
+  // The counter lives on the bottom bar's Bandeja tab since 12/11/2026 (it was the top bar's «Tu turno» access).
+  it('keeps the Bandeja badge on the card until it has left, then rolls it and pops it back with SOFT', async () => {
     serve(turnoFixture({ count: 1, items: [questionCard()] }), '/api/v1/conversaciones/conv-1/cerrar');
+    const routes = ['index', 'resultados', 'personas', 'tu-turno'].map((name) => ({ key: `${name}-k`, name }));
+    const bar = { state: { index: 3, routes }, descriptors: {}, emitter: {}, navigateToTab: jest.fn(), insets: { top: 0, right: 0, bottom: 0, left: 0 } };
     await renderApp(
       <>
-        <TopBar />
+        <BottomBar {...(bar as unknown as BottomTabBarProps)} />
         <TuTurnoScreen />
       </>,
+      { recorder: true },
     );
     await fireEvent.press(await screen.findByText('Hecho, respondí'));
     await screen.findByTestId('turno-done');
