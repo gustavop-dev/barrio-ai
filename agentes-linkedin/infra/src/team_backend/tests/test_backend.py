@@ -43,6 +43,16 @@ class BackendTests(TransactionTestCase):
         for attr in ['_perm_cache','_user_perm_cache','_group_perm_cache']:
             if hasattr(user,attr):delattr(user,attr)
 
+    def test_health_reports_the_deployed_revision(self):
+        """The OTA workflow waits until /health reports a commit that holds the app's backend changes."""
+        anon=APIClient()
+        with patch.dict(os.environ,{'BARRIO_REVISION':'5800ca08e67eb9a8930ad798c84a76931072aca2'}):
+            body=anon.get('/health').json()
+        self.assertEqual(body,{'status':'ok','framework':'django','revision':'5800ca08e67eb9a8930ad798c84a76931072aca2'})
+        with patch.dict(os.environ):
+            os.environ.pop('BARRIO_REVISION',None)
+            self.assertEqual(anon.get('/health').json()['revision'],'')
+
     def test_authentication_matrix_and_revocation(self):
         """Anonymous, unauthorized and revoked credentials must not expose knowledge."""
         anon=APIClient()

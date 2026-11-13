@@ -175,7 +175,8 @@ Cómo se compila e instala la app nativa de 0ff1ce, a qué servidor se conecta, 
   7. **Dado** un cambio nativo (un módulo nativo nuevo, un plugin, un campo nativo de `app.json` o un `script` de `package.json`), **cuando** se publica su actualización, **entonces** tiene otro fingerprint y no llega a los APK anteriores, que siguen funcionando con su propio código.
   8. **Dado** el teléfono sin conexión o EAS caído, **cuando** abre la app, **entonces** arranca enseguida con el código que ya tenía (`checkAutomatically: ON_LOAD`, `fallbackToCacheTimeout: 0`).
   9. **Dado** una actualización mala, **cuando** se ejecuta `npx eas-cli@latest update:rollback` o `update:roll-back-to-embedded --branch preview`, **entonces** en el siguiente arranque los teléfonos vuelven a la actualización anterior o al código del APK.
-  10. **Dado** el repositorio, **cuando** se revisa, **entonces** no contiene el token de Expo ni ningún otro secreto: el workflow lo lee de `secrets.EXPO_TOKEN` y solo lo pasa al paso que publica.
+  10. **Dado** un push a `main` cuya app depende de cambios de backend (`agentes-linkedin/`, sin contar los `.md`) que el servidor aún no corre, **cuando** corre el workflow, **entonces** espera, consultando `https://office.projectapp.co/health` cada minuto, a que el campo `revision` sea ese commit o uno posterior, y entonces publica solo, sin que nadie lo lance a mano. Si en unas 5 horas el despliegue no llega, termina en rojo sin publicar (GitHub avisa por correo) y se publica a mano después de desplegar. Una ejecución manual publica siempre.
+  11. **Dado** el repositorio, **cuando** se revisa, **entonces** no contiene el token de Expo ni ningún otro secreto: el workflow lo lee de `secrets.EXPO_TOKEN` y solo lo pasa al paso que publica.
 - **Brechas código/docs:** la rama `production` no se publica sola: cuando haya builds de producción, se publica a mano (`movil/README.md`, «Actualizaciones OTA»).
 - **Cobertura QA:** pendiente
 

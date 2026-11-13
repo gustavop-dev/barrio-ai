@@ -161,6 +161,8 @@ jobs:
           context: agentes-linkedin/infra
           build-contexts: |
             equipo=./agentes-linkedin/equipos
+          build-args: |
+            BARRIO_REVISION=${{ github.sha }}
           platforms: linux/amd64
           push: true
           tags: |

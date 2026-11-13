@@ -8,9 +8,12 @@ name: Actualización OTA (preview)
 # (types, lint, tests) on this commit first, and `eas update` bundles the app like `expo export`.
 # Without the EXPO_TOKEN secret it skips with a notice and succeeds.
 #
-# A push that also changes the backend (agentes-linkedin/, not docs) does not publish: the app would reach
-# phones before the server it talks to is deployed, and the server would silently ignore the new fields.
-# After the deploy, publish it by hand: `gh workflow run eas-update.yml`. Manual runs always publish.
+# It never publishes before the server it talks to: if any backend change (agentes-linkedin/, not docs)
+# lies between the commit the server runs and this one, the app would reach phones first and the server
+# would silently ignore the new fields. So it asks https://office.projectapp.co/health which commit is
+# deployed (`revision`, set by the images job) and waits, polling every minute, until the deploy lands,
+# then publishes on its own. If the deploy has not landed after ~5 h the run fails (GitHub emails the
+# failure); publish by hand after the deploy: `gh workflow run eas-update.yml`. Manual runs always publish.
 on:
   push:
     branches: [main]
@@ -26,7 +29,8 @@ concurrency:
 jobs:
   publicar:
     runs-on: ubuntu-24.04
-    timeout-minutes: 30
+    # Waiting for the deploy can take hours (the maximum for hosted runners is 360 minutes).
+    timeout-minutes: 340
     steps:
       - id: token
         name: ¿Hay EXPO_TOKEN?
@@ -44,38 +48,61 @@ jobs:
               echo "Falta el secreto \`EXPO_TOKEN\`, así que no se publicó nada. Cómo crearlo: \`movil/README.md\`, «Actualizaciones OTA»."
             } >> "$GITHUB_STEP_SUMMARY"
           fi
-      - id: backend
+      - id: deploy
         if: steps.token.outputs.present == 'true' && github.event_name == 'push'
-        name: ¿El mismo push cambia el backend?
+        name: Esperar a que el servidor tenga los cambios de backend de este commit
         env:
           GH_TOKEN: ${{ github.token }}
-          BEFORE: ${{ github.event.before }}
+          HEALTH_URL: https://office.projectapp.co/health
+          # ~5 h of polling, inside the job timeout.
+          MAX_MINUTES: '300'
         run: |
-          files="$(gh api "repos/$GITHUB_REPOSITORY/compare/$BEFORE...$GITHUB_SHA" --jq '.files[].filename' 2>/dev/null || true)"
-          if printf '%s\n' "$files" | grep -E '^agentes-linkedin/' | grep -qvE '\.md$'; then
-            echo "wait=true" >> "$GITHUB_OUTPUT"
-            echo "::notice title=OTA en espera del despliegue::Este push también cambia el backend. Tras desplegar el servidor: gh workflow run eas-update.yml"
-            {
-              echo "### Actualización OTA en espera del despliegue"
-              echo ""
-              echo "Este push también cambia el backend (\`agentes-linkedin/\`). Publicarla antes del despliegue llevaría a los teléfonos pantallas que el servidor aún no entiende. Tras desplegar: \`gh workflow run eas-update.yml\`."
-            } >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "wait=false" >> "$GITHUB_OUTPUT"
-          fi
-      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
+          # True when the server must be deployed first: a backend file (not docs) changed between the
+          # commit it runs and this one. "behind"/"identical": the server already contains this commit.
+          needs_deploy() {
+            local out
+            out="$(gh api "repos/$GITHUB_REPOSITORY/compare/$1...$GITHUB_SHA" --jq '.status, (.files[]?.filename)' 2>/dev/null)" || return 0
+            case "$(printf '%s\n' "$out" | head -n1)" in behind|identical) return 1 ;; esac
+            printf '%s\n' "$out" | tail -n +2 | grep -E '^agentes-linkedin/' | grep -qvE '\.md$'
+          }
+          waited=0 deployed="" announced=false
+          while :; do
+            deployed="$(curl -fsS --max-time 20 "$HEALTH_URL" 2>/dev/null | jq -r '.revision // empty' 2>/dev/null || true)"
+            if [ -n "$deployed" ] && ! needs_deploy "$deployed"; then
+              echo "El servidor corre ${deployed::7}: ya tiene los cambios de backend de ${GITHUB_SHA::7}."
+              echo "wait=false" >> "$GITHUB_OUTPUT"
+              break
+            fi
+            if [ "$announced" = false ]; then
+              announced=true
+              echo "::notice title=OTA en espera del despliegue::El servidor corre ${deployed:-una versión sin revisión}; este commit trae cambios de backend. Se publica sola cuando el despliegue llegue."
+            fi
+            if [ "$waited" -ge "$MAX_MINUTES" ]; then
+              echo "wait=true" >> "$GITHUB_OUTPUT"
+              echo "::error title=OTA no publicada::El servidor no se desplegó en $MAX_MINUTES minutos (corre ${deployed:-?}). Tras desplegar: gh workflow run eas-update.yml"
+              {
+                echo "### Actualización OTA no publicada"
+                echo ""
+                echo "Este commit trae cambios de backend y el servidor no se desplegó en $MAX_MINUTES minutos (corre \`${deployed:-sin revisión}\`). Publicarla antes llevaría a los teléfonos pantallas que el servidor aún no entiende. Tras desplegar: \`gh workflow run eas-update.yml\`."
+              } >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+            sleep 60
+            waited=$((waited + 1))
+          done
+      - if: steps.token.outputs.present == 'true' && steps.deploy.outputs.wait != 'true'
         uses: actions/checkout@v4
-      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
+      - if: steps.token.outputs.present == 'true' && steps.deploy.outputs.wait != 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '24'
           cache: npm
           cache-dependency-path: movil/package-lock.json
-      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
+      - if: steps.token.outputs.present == 'true' && steps.deploy.outputs.wait != 'true'
         name: Mismas comprobaciones que el job movil de CI
         working-directory: movil
         run: npm ci && npm run typecheck && npm run lint && npm test -- --ci
-      - if: steps.token.outputs.present == 'true' && steps.backend.outputs.wait != 'true'
+      - if: steps.token.outputs.present == 'true' && steps.deploy.outputs.wait != 'true'
         name: Publicar en la rama preview
         working-directory: movil
         env:
