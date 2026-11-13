@@ -39,6 +39,12 @@ class ContactDiscard(APIView):
         human_session(request);data=valid(DiscardInput,request);get_or_404(Contact,id=cid)
         return Response(ContactOutput(red.discard(request.user,cid,data['note'])).data)
 
+class ContactConfirmFit(APIView):
+    """Personas → «Sí, encaja»: Gustavo answers a doubt of the lead about a person the classifier said fits."""
+    def post(self,request,cid):
+        human_session(request);get_or_404(Contact,id=cid)
+        return Response(ContactOutput(red.confirm_fit(request.user,cid)).data)
+
 class ContactNotes(APIView):
     """Personas → Notas: Gustavo's free notes about a person, newest last."""
     def post(self,request,cid):

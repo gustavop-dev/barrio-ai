@@ -428,8 +428,9 @@ def _propose(capture, piece, old, record):
         piece = EditorialPiece.objects.select_for_update().get(pk=piece.pk)
         when, moved = _when(piece, changed, now)
         if moved:
-            piece.scheduled_for, piece.slot_date = when, urgente._local(when).date()
-            piece.save(update_fields=['scheduled_for', 'slot_date', 'updated_at'])
+            # A free window has no other piece: a second post of the day moved there is that day's only post.
+            piece.scheduled_for, piece.slot_date, piece.second_of_day = when, urgente._local(when).date(), False
+            piece.save(update_fields=['scheduled_for', 'slot_date', 'second_of_day', 'updated_at'])
             piece.gallery_photos.update(chosen_for=piece.slot_date)
             Capture.objects.filter(state=Capture.State.USED, routed_to__used_in=str(piece.id)).update(
                 publish_asap_expected_slot=when, publish_asap_reason='Se movió para conservar tu plazo de veto tras rehacerla')

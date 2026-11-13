@@ -61,6 +61,11 @@ export function pieceOfDay(day: CalendarioDay | undefined): CalendarEvent | null
   return day?.events.find(isPieceEvent) ?? null;
 }
 
+/** Every post of the day, by hour: one, or two when Gustavo authorized a second post on a day he asked for. */
+export function piecesOfDay(day: CalendarioDay | undefined): CalendarEvent[] {
+  return chronological((day?.events ?? []).filter(isPieceEvent));
+}
+
 /** Something of Gustavo's still pending that day (the orange «te toca» dot of a month cell). */
 export function hasPendingTuyo(day: CalendarioDay | undefined): boolean {
   return Boolean(day?.events.some((event) => event.layer === 'tuyo' && event.kind !== 'resolved'));

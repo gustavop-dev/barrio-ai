@@ -225,6 +225,45 @@ export interface ContactClassification {
   confidence?: number;
   model?: string;
   classified_at?: string;
+  /** `us`, `latam`, `otro` or '' when the location says nothing (BAR-17). */
+  region?: string;
+  /** A deterministic rule that overrode the model's verdict («Comprador fuera de EE. UU.…»). */
+  rule?: string;
+  /** A buyer waits for the web to show a seed round or later, or paying customers (BAR-17). */
+  stage_check?: ContactStageCheck;
+  /** Gustavo said the person fits after a doubt of the lead: the lead no longer reviews their actions. */
+  confirmed_by_gustavo?: { at: string; by: string };
+}
+
+export interface ContactStageCheck {
+  state: 'pending' | 'ok' | 'failed';
+  attempts?: number;
+  next_at?: string;
+  verdict?: 'semilla_o_mas' | 'presemilla' | 'sin_evidencia';
+  evidence?: string;
+  sources?: string[];
+}
+
+/** What the profile says about the person's reach and moment; a missing key was not given (never zero). */
+export interface ContactSignals {
+  followers?: number;
+  connections?: number;
+  is_creator?: boolean;
+  is_hiring?: boolean;
+  is_open_to_work?: boolean;
+  is_influencer?: boolean;
+  is_premium?: boolean;
+  bio?: string;
+  language?: string;
+  read_at?: string;
+}
+
+/** The lead turned down an action for a person the classifier said fits; it rests until `until` or his «Sí, encaja». */
+export interface ContactLeadDoubt {
+  capability: string;
+  reasons: string[];
+  decided_at: string;
+  until: string;
 }
 
 /** The contact as embedded in a RED-* action. */
@@ -289,6 +328,10 @@ export interface Contact extends ContactBrief {
   last_event?: ContactHistoryEntry | null;
   /** Their latest LinkedIn conversation, read by conversaciones_inbox (null when there is none or the inbox is off). */
   conversation?: Conversation | null;
+  /** BAR-17 (absent on older backends). */
+  signals?: ContactSignals;
+  region?: 'us' | 'latam' | 'otro' | null;
+  lead_doubt?: ContactLeadDoubt | null;
 }
 
 /** A message of a conversation, as read from LinkedIn (third-party text, shown as is, never as markup). */
@@ -781,13 +824,15 @@ export interface Activity {
 // ---------------------------------------------------------------- Tu turno
 
 /** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados).
- *  `mensaje`: someone who conversed on his post is now a connection; a drafted first message he sends himself (INT-04). */
+ *  `mensaje`: someone who conversed on his post is now a connection; a drafted first message he sends himself (INT-04).
+ *  `fecha`: he asked for a day that already had a post; a second post that day goes out only if he authorizes it. */
 export type TurnoCardType =
   | 'aviso'
   | 'pregunta'
   | 'perfil'
   | 'conversacion'
   | 'mensaje'
+  | 'fecha'
   | 'resumen'
   | 'aprobacion'
   | 'referente'
@@ -838,6 +883,26 @@ export interface TurnoMessage {
   /** The thesis of the post they talked about. */
   topic: string;
   person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
+}
+
+/** A post of the `fecha` card: his own (`piece`) or one already on the day he asked for (`others`). */
+export interface TurnoDayPost {
+  id: string;
+  thesis: string;
+  scheduled_for: string;
+}
+
+/**
+ * The `fecha` card (`day_request:<capture>`): the day and hour he asked for already had a post, so his post waits on the
+ * next free day. `POST /api/v1/capturas/<capture>/fecha {decision: mismo_dia | siguiente}`.
+ */
+export interface TurnoDayRequest {
+  capture_id: string;
+  /** The day and hour he asked for, and the words he used. */
+  asked_at: string;
+  evidence: string;
+  piece: TurnoDayPost;
+  others: TurnoDayPost[];
 }
 
 /** What an `uncertain` action tried to do. */
@@ -891,6 +956,8 @@ export interface TurnoCard {
   conversation?: (Conversation & { person: TurnoPerson | null }) | null;
   /** Only on `mensaje` cards. */
   message?: TurnoMessage | null;
+  /** Only on `fecha` cards. */
+  day_request?: TurnoDayRequest | null;
   /** Only on approval cards. */
   approval?: TurnoApproval | null;
   /** rev 18 priority group (being added to the backend). */
@@ -939,6 +1006,8 @@ export interface TuTurno {
     perfil: TurnoCard[];
     conversaciones: TurnoCard[];
     mensajes?: TurnoCard[];
+    /** A day he asked for that already had a post (older backends omit it). */
+    fechas?: TurnoCard[];
     resumen?: TurnoCard[];
     referentes?: TurnoCard[];
   };

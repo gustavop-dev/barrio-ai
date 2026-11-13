@@ -59,7 +59,8 @@ def options(piece, now=None):
     why = ''
     if piece.scheduled_for <= now:
         why = 'Su hora ya pasó: ya no se puede publicar ni rehacer.'
-    elif kind != 'lider' and EditorialPiece.objects.filter(slot_date=piece.slot_date, state__in=OPEN_PIECE_STATES).exclude(pk=piece.pk).exists():
+    elif kind != 'lider' and EditorialPiece.objects.filter(slot_date=piece.slot_date, state__in=OPEN_PIECE_STATES,
+                                                           second_of_day=piece.second_of_day).exclude(pk=piece.pk).exists():
         why = 'Ese día ya tiene otra pieza programada.'
     return {'kind': kind, 'override': not why, 'change': not why, 'why_not': why}
 

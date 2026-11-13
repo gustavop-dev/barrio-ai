@@ -15,7 +15,10 @@ class NetworkBase(OperatorBase):
     def setUp(self):
         super().setUp()
         env=patch.dict(os.environ,{'NETWORK_ENABLED':'true','NETWORK_SCAN_DAYS':'3650','NETWORK_SEARCH_QUERIES':'founder pre-seed',
-                                   'NETWORK_INVITE_AFTER_HOURS':'48','NETWORK_DAILY_LLM_USD':'1','NETWORK_READ_CAPS':''})
+                                   'NETWORK_INVITE_AFTER_HOURS':'48','NETWORK_DAILY_LLM_USD':'1','NETWORK_READ_CAPS':'',
+                                   # The location and stage rules of 12/11/2026 have their own tests (test_red_eeuu).
+                                   'NETWORK_BUYER_REGION':'','NETWORK_STAGE_CHECK':'false','NETWORK_SEARCH_LOCATION':'',
+                                   'NETWORK_BATCHES':''})
         env.start();self.addCleanup(env.stop)
         self.bot,_=User.objects.get_or_create(username='barrio-autopiloto')
         self.grant(self.bot,'access_knowledge','run_agents','use_paid_providers','operate_linkedin','execute_actions')

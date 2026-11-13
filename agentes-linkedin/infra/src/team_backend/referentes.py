@@ -202,10 +202,32 @@ def publish(review, now=None):
     if control.revision != review.expected_revision or not control.initialized:
         review.state = 'conflict'
     review.save()
+    if (review.dossier or {}).get('extraordinaria'):
+        notice(review, 'day1', 'Revisión extraordinaria de referentes',
+            f'Voces con audiencia en EE. UU. para los cupos variables. Decide cada propuesta hasta el '
+            f'{review.deadline.astimezone(TZ):%d/%m}; nada se aplica sin tu decisión.', now)
+        return review
     notice(review, 'day1', 'Revisión mensual de referentes',
         'Decide hasta terminar el día 5, America/Bogota. Sin respuesta se aplican solo las propuestas variables elegibles. '
         + ('Este lote requiere decisión explícita.' if review.state != 'published' else ''), now)
     return review
+
+
+def extraordinary(user, account, now=None):
+    """Gustavo, 12/11/2026: the ten variable slots are empty and his five main voices are local to Colombia («toca
+    buscar más»). A review now, outside the monthly calendar, looks for voices with an audience in the United States.
+    It is a late batch: every proposal needs his explicit decision, within a week."""
+    from .jobs import enqueue_operation
+    now = now or timezone.now()
+    month = month_start(now)
+    if not ReferentControl.objects.filter(account=account, initialized=True).exists():
+        raise ValueError('Primero identifica los cinco main de la cuenta.')
+    if ReferentReview.objects.filter(account=account, month=month).exists():
+        raise Conflict('Ya hay una revisión de referentes este mes; decide esa en Tu turno.')
+    job, _ = enqueue_operation(user, 'review_referents',
+        {'account': str(account.pk), 'month': month.isoformat(), 'extraordinaria': True},
+        request_id=uuid.uuid5(uuid.NAMESPACE_URL, f'referents:{account.pk}:{month}:extraordinaria'))
+    return job
 
 
 def _apply(item, control, user, automatic, now):

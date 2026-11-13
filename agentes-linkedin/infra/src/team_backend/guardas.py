@@ -13,8 +13,8 @@ import unicodedata
 BASELINE_GUIDANCE=[
     {'key':'brief.prioridad','guidance':'Prioridad estratégica 60% oportunidades personales en startups / 40% contratos de '
      'ProjectApp. Orienta la elección de temas y modalidades; no es una cuota de posts ni se menciona.'},
-    {'key':'brief.audiencia','guidance':'Foco inicial: founders de startups tempranas en EE. UU., preferentemente presemilla con '
-     'inversión, con afinidad hispanohablante declarada y abierta a otros founders. Nunca se publica el segmento.'},
+    {'key':'brief.audiencia','guidance':'Foco inicial: founders de startups en EE. UU. con ronda semilla o posterior, o con clientes '
+     'que pagan (Gustavo, 12/11/2026), con afinidad hispanohablante declarada y abierta a otros founders. Nunca se publica el segmento.'},
     {'key':'brief.limites','guidance':'Sin humo, sin temas que Gustavo no domina, sin experiencias, cifras ni clientes inventados. '
      'Remuneraciones, bandas salariales, LLC, cobros y la futura incorporación a Beloz nunca se publican.'},
 ]

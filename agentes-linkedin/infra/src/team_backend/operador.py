@@ -59,7 +59,7 @@ def _audit(actor,action,target,**metadata):
 # --------------------------------------------------------------------------- policy
 
 # Prudent initial caps from reparto-acciones-v1 (not LinkedIn limits), per local day and week.
-DEFAULT_LIMITS={'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)}
+DEFAULT_LIMITS={'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(20,100),'RED-02':(20,100),'RED-04':(10,40)}
 
 def _parse_caps(variable):
     caps={}
@@ -92,14 +92,48 @@ def period_starts(now=None):
     day=local.replace(hour=0,minute=0,second=0,microsecond=0)
     return day,day-timedelta(days=day.weekday())
 
+def _minutes(value):
+    hours,_,mins=value.strip().partition(':');return int(hours)*60+int(mins or 0)
+
 def within_window(now=None):
     """OPERATOR_WINDOW='07:00-21:00' in OPERATOR_TIMEZONE; '00:00-24:00' means always."""
     start,_,end=os.environ.get('OPERATOR_WINDOW','07:00-21:00').partition('-')
-    def minutes(value):
-        hours,_,mins=value.strip().partition(':');return int(hours)*60+int(mins or 0)
     local=(now or timezone.now()).astimezone(local_tz())
     current=local.hour*60+local.minute
-    return minutes(start)<=current<minutes(end)
+    return _minutes(start)<=current<_minutes(end)
+
+def network_batches():
+    """NETWORK_BATCHES='09:00-11:00,15:00-17:00' in OPERATOR_TIMEZONE: the two daily rounds of follows, invitations and
+    acceptances («20 solicitudes diarias, distribuidas en dos tandas y sin ejecutarlas rapidísimamente», LI-03-V014-K03).
+    Inside a round network writes are a few minutes apart and comments wait; outside, network writes wait. Without it
+    every write keeps the common 20–40 minute spacing, which leaves room for about 28 writes a day: too few for 16
+    invitations, their follows and the comments (Gustavo, 12/11/2026)."""
+    rounds=[]
+    for item in filter(None,(x.strip() for x in os.environ.get('NETWORK_BATCHES','').split(','))):
+        start,_,end=item.partition('-')
+        rounds.append((_minutes(start),_minutes(end)))
+    return rounds
+
+def network_batch(now=None):
+    """Index of the network round under way, or None (also when there are no rounds)."""
+    local=(now or timezone.now()).astimezone(local_tz());current=local.hour*60+local.minute
+    return next((i for i,(start,end) in enumerate(network_batches()) if start<=current<end),None)
+
+def batch_issue(capability,now=None):
+    """Why a write waits for (or during) a network round; '' when it may go."""
+    rounds=network_batches()
+    if not rounds:return ''
+    inside=network_batch(now) is not None
+    if capability in NETWORK and not inside:
+        hours=', '.join(f'{a//60:02d}:{a%60:02d}–{b//60:02d}:{b%60:02d}' for a,b in rounds)
+        return f'Las acciones de red salen en dos tandas ({hours}); queda aprobada para la próxima.'
+    if capability=='INT-03' and inside:return 'Durante una tanda de red el comentario espera; queda aprobado para después.'
+    return ''
+
+def batch_spacing():
+    """(low, high) seconds between network writes inside a round; never under two minutes."""
+    low,_,high=os.environ.get('NETWORK_BATCH_SPACING_SECONDS','180-480').partition('-')
+    low=max(120,int(low));return low,max(low,int(high or low))
 
 def min_spacing():
     return timedelta(seconds=int(os.environ.get('OPERATOR_MIN_SPACING_SECONDS','1200')))
@@ -114,14 +148,15 @@ def policy_event(action,target='member'):
     from .models import AuditEvent
     return AuditEvent.objects.filter(action=action,target=str(target)).order_by('-created_at','-id').first()
 
-def spacing_range():
+def spacing_range(capability=None,now=None):
+    if capability in NETWORK and network_batch(now) is not None:return batch_spacing()
     low=max(1200,int(min_spacing().total_seconds()))
     return low,max(low,int(os.environ.get('OPERATOR_MAX_SPACING_SECONDS','2400')))
 
-def reserve_spacing(now=None):
+def reserve_spacing(now=None,capability=None):
     """Caller holds policy_lock; a restart cannot shorten a reserved random gap."""
     now=now or timezone.now()
-    low,high=spacing_range()
+    low,high=spacing_range(capability,now)
     seconds=random.SystemRandom().randint(low,high)
     _audit(None,'operator.schedule','member',next_action_at=(now+timedelta(seconds=seconds)).isoformat(),gap_seconds=seconds)
 
@@ -136,16 +171,18 @@ def post_due(now=None):
         state__in=[ActionProposal.State.PROPOSED,ActionProposal.State.APPROVED],
         piece__scheduled_for__gt=now-timedelta(hours=2),piece__scheduled_for__lte=now+timedelta(seconds=high)).order_by('piece__scheduled_for')
     for proposal in rows:
-        if not cycle_issues(proposal) and capacity_left(proposal.account,proposal.capability,proposal.piece.scheduled_for)>0:return proposal
+        if not cycle_issues(proposal) and (not capped(proposal) or capacity_left(proposal.account,proposal.capability,proposal.piece.scheduled_for)>0):return proposal
     return None
 
-def spacing_ok(account,now=None):
+def spacing_ok(account,now=None,capability=None):
     # Every connector acts as the same LinkedIn member, so public writes share one spacing. An execution whose
-    # pre-check found nothing to write does not count (an execution in flight does: it may be writing).
+    # pre-check found nothing to write does not count (an execution in flight does: it may be writing). Inside a
+    # network round a network write only waits the round's short gap.
     event=policy_event('operator.schedule')
     if event and datetime.fromisoformat(event.metadata['next_action_at'])>(now or timezone.now()):return False
     last=ActionExecution.objects.filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
-    return last is None or last<=(now or timezone.now())-min_spacing()
+    gap=timedelta(seconds=batch_spacing()[0]) if capability in NETWORK and network_batch(now) is not None else min_spacing()
+    return last is None or last<=(now or timezone.now())-gap
 
 @transaction.atomic
 def prepare_day_schedule(now=None):
@@ -175,9 +212,18 @@ def capacity_left(account,capability,now=None):
         from .red import ramp_limits
         rd,rw=ramp_limits(account,now)
         daily,weekly=min(daily,rd),min(weekly,rw)
+        # Two rounds: the first one sends at most half of the day's invitations (LI-03-V014-K03).
+        rounds=network_batches()
+        if len(rounds)>1 and network_batch(now)==0:daily=(daily+1)//2
     day,week=period_starts(now)
     done=writes(account,capability)
+    if capability=='CONT-09':done=done.exclude(proposal__piece__second_of_day=True)  # outside the caps: see capped()
     return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
+
+def capped(proposal):
+    """Whether the daily/weekly caps apply. A second post of the day that Gustavo authorized for the hour he asked for
+    (urgente.confirm_day) does not count for them and is not held by them."""
+    return not (proposal.piece_id and proposal.piece.second_of_day)
 
 class ProfileReadCapReached(ValueError):
     """A required profile read waits; it never disappears from a write's preflight."""
@@ -589,7 +635,7 @@ def final_write_gate(execution,proposal,user):
     issues.extend(experimentos.execution_issues(proposal))
     if globally_paused() or ConnectorAccount.objects.filter(paused=True).exists():issues.append('Cuenta o máquina en pausa')
     if not within_window():issues.append('Fuera de ventana')
-    if capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
+    if capped(proposal) and capacity_left(proposal.account,proposal.capability)<0:issues.append('El cupo efectivo se redujo durante el preflight')
     if proposal.capability in NETWORK:
         from . import red
         issues.extend(red.execution_issues(proposal))
@@ -660,10 +706,12 @@ def execute(user,proposal_id):
         if proposal.piece_id and proposal.piece.scheduled_for>timezone.now():
             raise OperatorBlocked('Aún no es la hora programada de la pieza; queda aprobada para entonces.')
         if not within_window():raise OperatorBlocked('Fuera de la ventana horaria de actividad; queda aprobada para después.')
-        if not spacing_ok(account):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
+        waits=batch_issue(proposal.capability) if not proposal.piece_id else ''
+        if waits:raise OperatorBlocked(waits)
+        if not spacing_ok(account,capability=proposal.capability):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
         due=None if proposal.piece_id else post_due()
         if due:raise OperatorBlocked(f'El post de las {due.piece.scheduled_for.astimezone(local_tz()):%H:%M} sale primero; esta acción queda aprobada para después.')
-        if capacity_left(account,proposal.capability)<=0:
+        if capped(proposal) and capacity_left(account,proposal.capability)<=0:
             raise OperatorBlocked(f'Tope diario o semanal de {proposal.capability} alcanzado; queda aprobada para después.')
         if proposal.capability in NETWORK:
             from . import red
@@ -676,7 +724,7 @@ def execute(user,proposal_id):
             from . import respuestas
             issues=respuestas.execution_issues(proposal)
             if issues:raise OperatorBlocked('; '.join(issues))
-        reserve_spacing()
+        reserve_spacing(capability=proposal.capability)
         execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
             idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
         proposal.state=ActionProposal.State.EXECUTING;proposal.save(update_fields=['state'])

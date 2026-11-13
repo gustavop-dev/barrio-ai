@@ -168,6 +168,8 @@ export const addContactNote = (contactId: string, text: string) => api.post<Cont
 export const getContact = (contactId: string) => api.get<Contact>(`${RED}/contacts/${id(contactId)}`);
 /** Human session and `approve_actions`; the note is mandatory. Also rejects the contact's open action. 409 once invited or later. */
 export const discardContact = (contactId: string, note: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/discard`, { note });
+/** «Sí, encaja»: Gustavo answers a doubt of the lead about a person the classifier said fits (BAR-17). */
+export const confirmContactFit = (contactId: string) => api.post<Contact>(`${RED}/contacts/${id(contactId)}/encaja`, {});
 export const getRedSummary = () => api.get<RedSummary>(`${RED}/summary`);
 
 // ---------------------------------------------------------------- knowledge

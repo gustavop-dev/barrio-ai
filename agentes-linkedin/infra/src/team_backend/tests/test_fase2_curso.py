@@ -31,7 +31,7 @@ class ParticipationTests(NetworkBase):
                     default.start();self.addCleanup(default.stop)
         env=patch.dict(os.environ,{'LINKEDIN_ACCOUNT_TIER':'free','LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT':'3',
             'OPERATOR_PROFILE_READ_DAILY_LIMIT':'80','OPERATOR_INVITE_RAMP_ENABLED':'true',
-            'OPERATOR_INVITE_RAMP_STAGES':'5/20,10/50,20/100','OPERATOR_INVITE_RAMP_MIN_DAYS':'7',
+            'OPERATOR_INVITE_RAMP_STAGES':'8/40,16/80,20/100','OPERATOR_INVITE_RAMP_MIN_DAYS':'7',
             'OPERATOR_WEEKEND_FACTOR':'0.5','OPERATOR_EXTERNAL_OUTREACH_ACTIVE':'false',
             'OPERATOR_INVITE_SAMPLE_MIN':'20','OPERATOR_INVITE_MATURITY_DAYS':'7','OPERATOR_INVITE_COHORT_DAYS':'28'})
         env.start();self.addCleanup(env.stop)
@@ -67,7 +67,7 @@ class ParticipationTests(NetworkBase):
 
     def test_defaults_weekends_and_invitation_hard_ceilings(self):
         self.assertEqual(operador.limits(self.now),{'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),
-            'RED-01':(10,50),'RED-02':(20,100),'RED-04':(10,40)})
+            'RED-01':(20,100),'RED-02':(20,100),'RED-04':(10,40)})
         saturday=self.now+timedelta(days=5)
         self.assertEqual(operador.limits(saturday)['INT-03'],(2,25))
         self.assertEqual(operador.limits(saturday)['CONT-09'],(1,7))
@@ -77,7 +77,7 @@ class ParticipationTests(NetworkBase):
         self.assertEqual(red.invites_blocked(self.now),(False,''))
         with patch.dict(os.environ,{'OPERATOR_DAILY_LIMITS':'RED-02=21','OPERATOR_WEEKLY_LIMITS':'RED-02=101'}):
             self.assertEqual(operador.limits(self.now)['RED-02'],(20,100))
-            self.assertEqual(operador.capacity_left(self.account,'RED-02',self.now),5)
+            self.assertEqual(operador.capacity_left(self.account,'RED-02',self.now),16)  # a new ramp starts at 16/80
 
     def test_approved_invitation_cannot_execute_at_weekend_or_for_blocked_recipient(self):
         p=self.approved()
@@ -128,13 +128,24 @@ class ParticipationTests(NetworkBase):
         self.assertEqual((health['rate'],health['mature'],health['immature'],health['unknown']),(0.5,20,15,2))
 
     def test_ramp_needs_time_and_mature_sample_and_survives_env_change(self):
-        self.assertEqual(red.ramp_limits(self.account,self.now),(5,20))
-        self.assertEqual(red.ramp_limits(self.account,self.now+timedelta(days=8)),(5,20))
-        self.cohort();self.ramp(stage=0,days=8)
-        self.assertEqual(red.ramp_limits(self.account,self.now),(10,50))
+        # Gustavo, 12/11/2026: «al menos unas 15 por día»; the ramp starts at its middle stage.
+        self.assertEqual(red.ramp_limits(self.account,self.now),(16,80))
+        self.assertEqual(red.ramp_limits(self.account,self.now+timedelta(days=8)),(16,80))
+        self.cohort();self.ramp(stage=1,days=8)
+        self.assertEqual(red.ramp_limits(self.account,self.now),(20,100))
         with patch.dict(os.environ,{'OPERATOR_DAILY_LIMITS':'RED-02=100','OPERATOR_INVITE_RAMP_STAGES':'99/999,99/999,99/999'}):
-            self.assertEqual(red.ramp_limits(self.account,self.now),(10,50))
-        self.assertEqual(red.ramp_state(self.now)['stage'],1)
+            self.assertEqual(red.ramp_limits(self.account,self.now),(20,100))
+        with patch.dict(os.environ,{'OPERATOR_INVITE_RAMP_STAGES':'8/40,12/60,20/100'}):
+            self.assertEqual(red.ramp_limits(self.account,self.now),(20,100))
+        self.assertEqual(red.ramp_state(self.now)['stage'],2)
+
+    def test_disabled_ramp_holds_the_start_and_an_override_only_lowers(self):
+        with patch.dict(os.environ,{'OPERATOR_INVITE_RAMP_ENABLED':'false'}):
+            self.cohort();self.ramp(stage=2,days=8)
+            self.assertEqual(red.ramp_limits(self.account,self.now),(16,80))
+        with patch.dict(os.environ,{'OPERATOR_INVITE_RAMP_STAGES':'8/40,12/60,20/100'}):
+            self.ramp(stage=1,days=1)
+            self.assertEqual(red.ramp_limits(self.account,self.now),(12,60))
 
     def test_ten_point_drop_reduces_once_and_below_quarter_pauses(self):
         people=self.cohort(accepted=10);self.ramp(stage=2,rate=0.60)
@@ -173,7 +184,7 @@ class ParticipationTests(NetworkBase):
         for when in (self.now,until-timedelta(seconds=1)):
             self.assertEqual(red.ramp_limits(self.account,when),(0,0))
             self.assertTrue(red.invites_blocked(when)[0])
-        self.assertEqual(red.ramp_limits(self.account,until),(5,20))
+        self.assertEqual(red.ramp_limits(self.account,until),(8,40))  # one stage down from the start
         self.assertEqual(red.invites_blocked(until),(False,''))
         with patch('django.utils.timezone.now',return_value=until),self.assertRaisesRegex(operador.OperatorBlocked,'Cuenta en pausa'):
             operador.execute(self.gustavo,p.id)
@@ -291,7 +302,7 @@ class ParticipationTests(NetworkBase):
             return real(connector,uid)
         with patch.object(type(self.fake),'get_profile',read):result=operador.execute(self.gustavo,p.id)
         self.assertEqual(result.state,'sent');self.assertTrue(result.wrote)
-        self.assertEqual(operador.capacity_left(self.account,'RED-02'),4)
+        self.assertEqual(operador.capacity_left(self.account,'RED-02'),15)
 
     def test_tier_validates_and_upgrade_preserves_notes_and_ramp(self):
         self.assertEqual(red.note_policy()['tier'],'free');self.assertIsNone(red.note_policy()['provider_remaining'])
@@ -303,7 +314,7 @@ class ParticipationTests(NetworkBase):
                                         'capability_source':'local_product_cap'})
         with patch.dict(os.environ,{'LINKEDIN_ACCOUNT_TIER':'premium'}):
             self.assertEqual(red.note_room(),2);self.assertEqual(red.note_policy()['max_chars'],200)
-            self.assertEqual(red.ramp_limits(self.account,self.now),(5,20))
+            self.assertEqual(red.ramp_limits(self.account,self.now),(8,40))
             # Reusing the reservation records the new tier, without consuming another note.
             self.assertTrue(red.reserve_note(p));self.assertTrue(red.reserve_note(p))
             self.assertEqual(red.note_room(),2)
@@ -323,7 +334,7 @@ class ParticipationTests(NetworkBase):
             self.assertNotIsInstance(connector._error(httpx.Response(422,json=body)),InvitationNoteQuota)
         self.assertNotIsInstance(connector._error(httpx.Response(429,json=exact)),InvitationNoteQuota)
 
-    def test_table_does_not_turn_leaders_and_unknown_allies_into_invites(self):
+    def test_table_does_not_turn_leaders_into_invites(self):
         buyer=self.contact('buyer','Buyer',stage='followed',followed_hours=72)
         leader=self.contact('leader','Leader',stage='followed',followed_hours=72)
         other=self.contact('recommender','Recommender',stage='followed',followed_hours=72)
@@ -355,7 +366,7 @@ class ParticipationTests(NetworkBase):
         operador._audit(None,'network.read',self.account.id,kind='execution')
         report=red.weekly_rhythm(self.now+timedelta(seconds=1))
         self.assertEqual(report['useful_total'],2);self.assertEqual(report['research_results'],1)
-        self.assertEqual(report['deficit'],48)
+        self.assertEqual(report['deficit'],98)  # 100 a week at the middle stage
 
 
 class CourseGroundingTests(NetworkBase):

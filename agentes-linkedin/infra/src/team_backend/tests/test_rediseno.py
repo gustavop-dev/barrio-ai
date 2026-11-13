@@ -84,7 +84,8 @@ class LeadTests(LeadBase):
         self.jev.probabilities={'encaja':0.85,'riesgo':0.05}
         person=self.fake.seed_person('founder-ana','Ana Founder',headline='Founder @ Tiny')
         contact=Contact.objects.create(account=self.account,provider_user_id=person['id'],display_name='Ana Founder',headline='Founder @ Tiny',
-            source='manual',stage='fit',classification={'fit':True,'role':'comprador','modality':'projectapp','reason':'r','confidence':0.9})
+            location='Austin, Texas',source='manual',stage='fit',  # a buyer in the USA (BAR-17)
+            classification={'fit':True,'role':'comprador','modality':'projectapp','reason':'r','confidence':0.9,'region':'us'})
         proposal=operador.create_proposal(self.gustavo,None,'RED-01',{'user_id':person['id']},source='agent',contact=contact)
         with patch.dict(os.environ,{'OPERATOR_AUTONOMY':'RED-01=auto'}):autopiloto.policy_review(proposal)
         proposal.refresh_from_db()
@@ -193,7 +194,7 @@ class OpportunityAndTurnTests(OperatorBase):
         profile_card=next(c for c in turn['items'] if c['id']==f'perfil:{profile.id}')
         self.assertEqual((profile_card['type'],profile_card['priority'],profile_card['profile_id']),
                          ('perfil','cuando_puedas',str(profile.id)))
-        self.assertEqual(turn['tasks'],{'perfil':[profile_card],'conversaciones':[],'mensajes':[],'resumen':[],'referentes':[setup]})
+        self.assertEqual(turn['tasks'],{'perfil':[profile_card],'conversaciones':[],'mensajes':[],'fechas':[],'resumen':[],'referentes':[setup]})
         expiring=next(a for a in turn['alerts'] if a['id']=='linkedin_expiring')
         self.assertFalse(expiring['critical'])
 

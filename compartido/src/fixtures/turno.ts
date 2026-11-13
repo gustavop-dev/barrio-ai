@@ -333,3 +333,30 @@ export const MESSAGE_CARD: TurnoCard = cardFixture({
     },
   },
 });
+
+/** He asked for a day that already had a post: his post waits on the next free day until he decides (12/11/2026). */
+export const DAY_REQUEST_CARD: TurnoCard = cardFixture({
+  id: 'day_request:cap-1',
+  type: 'fecha',
+  tone: 'info',
+  priority: 'importante',
+  state: 'nueva',
+  agent: 'director_editorial',
+  agent_label: 'Director editorial',
+  title: '¿Seguro que lo quieres el viernes 13/11 a las 12:00?',
+  body: 'Ese día ya sale «Cycles between agents are the hard decision» a las 08:30: serían dos posts ese día. Mientras decides, el tuyo queda el lunes 16/11 a las 12:00, el siguiente día libre.',
+  deadline: hoursFromNow(20),
+  created_at: hoursFromNow(-1),
+  actions: [
+    { label: 'Sí, el viernes 13/11 a las 12:00', endpoint: '/api/v1/capturas/cap-1/fecha', body: { decision: 'mismo_dia' }, primary: true },
+    { label: 'Dejarlo el lunes 16/11', endpoint: '/api/v1/capturas/cap-1/fecha', body: { decision: 'siguiente' } },
+    { label: 'Ver el post', href: '/calendario/pieza/p-new' },
+  ],
+  day_request: {
+    capture_id: 'cap-1',
+    asked_at: hoursFromNow(21),
+    evidence: 'lo publiques mañana a las 12 del día, del mediodía',
+    piece: { id: 'p-new', thesis: 'How do founders decide how long to fund a business that loses money?', scheduled_for: hoursFromNow(93) },
+    others: [{ id: 'p-friday', thesis: 'Cycles between agents are the hard decision', scheduled_for: hoursFromNow(17) }],
+  },
+});

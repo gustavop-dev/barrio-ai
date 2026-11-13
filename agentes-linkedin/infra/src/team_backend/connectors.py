@@ -47,8 +47,23 @@ def _user(data):
             'display_name':data.get('display_name') or '','profile_url':data.get('profile_url') or '',
             'headline':data.get('headline') or data.get('description') or '','type':data.get('type') or ''}
 
+SIGNAL_FLAGS=('is_creator','is_hiring','is_open_to_work','is_influencer','is_premium')
+
+def _signals(data):
+    """What a profile or a search result says about the person's reach and moment (Gustavo, 12/11/2026: no community
+    or no established business makes a founder irrelevant). Unipile v2 «Get a user profile» returns followers_count,
+    relations_count, bio and language at the top level and the flags in specifics (read on the real account on
+    12/11/2026); «Perform People Search» returns the counts per result. None means not given, never zero."""
+    data=data or {};specifics=data.get('specifics') or {}
+    def count(key):return _count(data[key] if key in data else specifics.get(key))
+    flags={k:bool(specifics.get(k,data.get(k))) for k in SIGNAL_FLAGS if k in specifics or k in data}
+    out={'followers':count('followers_count'),'connections':count('relations_count'),**flags}
+    if isinstance(data.get('bio'),str) and data['bio'].strip():out['bio']=data['bio'].strip()[:800]
+    if isinstance(data.get('language'),str) and data['language']:out['language']=data['language'][:10]
+    return {k:v for k,v in out.items() if v is not None}
+
 def _profile(data):
-    """Network view of a profile (DESC-03): distance, follow and invitation status, restrictions."""
+    """Network view of a profile (DESC-03): distance, follow and invitation status, restrictions, signals."""
     specifics=data.get('specifics') or {}
     request=specifics.get('relation_request') or {}
     return dict(_user(data),location=data.get('location') or '',
@@ -56,7 +71,8 @@ def _profile(data):
                 is_following=bool(data.get('is_following')),
                 relation_request_status=specifics.get('relation_request_status') or '',
                 invitation_id=str(request.get('id') or ''),
-                is_restricted=bool(specifics.get('is_restricted')))
+                is_restricted=bool(specifics.get('is_restricted')),
+                signals=_signals(data))
 
 def _invitation(data):
     return {'id':str(data['id']),'type':data.get('type') or '','created_at':_when(data.get('created_at')),
@@ -213,10 +229,20 @@ class UnipileConnector:
     # -- network (DESC-02/03, RED-01/02/03/04); profile reads do not notify a visit
     def get_profile(self,user_id):return _profile(self._read(self._path('users',user_id)))
 
-    def search_people(self,keywords):
-        data=self._query(self._path('linkedin','search','people'),{'keywords':keywords})
-        return [dict(_user(p),location=p.get('location') or '',network_distance=p.get('network_distance') or '')
+    def search_people(self,keywords,location=None,profile_language=None):
+        """Classic «Perform People Search» (v2, consulted 12/11/2026): `location` takes parameter ids and
+        `profile_language` two-letter codes."""
+        body={'keywords':keywords}
+        if location:body['location']=list(location)
+        if profile_language:body['profile_language']=list(profile_language)
+        data=self._query(self._path('linkedin','search','people'),body)
+        return [dict(_user(p),location=p.get('location') or '',network_distance=p.get('network_distance') or '',signals=_signals(p))
                 for p in data.get('data',[]) if p.get('id')]
+
+    def search_parameters(self,kind,keywords,limit=5):
+        """«List Search Parameters» (v2): ids of a location, company… for the search filters."""
+        data=self._read(self._path('linkedin','search','parameters'),{'type':kind,'keywords':keywords,'limit':str(limit)})
+        return [{'id':str(p['id']),'name':p.get('name') or ''} for p in data.get('data',[]) if p.get('id')]
 
     def follow_user(self,user_id):
         self._write(self._path('users','me','follow',user_id),{});return {'user_id':user_id}
@@ -383,10 +409,13 @@ class FakeConnector:
         return _comment(comment)
 
     # -- network
-    def seed_person(self,public_id,display_name,headline='',distance='SECOND_DEGREE',comment_on=None,comment='',search=None,kind='individual'):
+    def seed_person(self,public_id,display_name,headline='',distance='SECOND_DEGREE',comment_on=None,comment='',search=None,kind='individual',
+                    location='',signals=None):
         """A LinkedIn member who may comment on a seeded post and/or appear in a keyword search."""
         user={'id':'ACo'+public_id,'public_identifier':public_id,'display_name':display_name,'headline':headline,
               'profile_url':'https://www.linkedin.com/in/'+public_id,'type':kind}
+        if location:user['location']=location
+        if signals:user['signals']=dict(signals)
         self.state['users'][public_id]=user;self.state['users'][user['id']]=user
         self.state['network'][user['id']]={'network_distance':distance,'is_following':False,'relation_request_status':''}
         if comment_on:
@@ -408,12 +437,19 @@ class FakeConnector:
         if not user:raise ConnectorError('Simulado: perfil no encontrado.',status=404,kind='provider/resource_not_found')
         net=self.state['network'].setdefault(user['id'],{'network_distance':'THIRD_DEGREE','is_following':False,'relation_request_status':''})
         sent=next((i for i in self.state['invitations']['sent'].values() if i['user']['id']==user['id']),None)
-        return dict(_user(user),location='',network_distance=net['network_distance'],is_following=net['is_following'],
-                    relation_request_status=net['relation_request_status'],invitation_id=sent['id'] if sent else '',is_restricted=False)
+        return dict(_user(user),location=user.get('location',''),network_distance=net['network_distance'],is_following=net['is_following'],
+                    relation_request_status=net['relation_request_status'],invitation_id=sent['id'] if sent else '',is_restricted=False,
+                    signals=dict(user.get('signals',{})))
 
-    def search_people(self,keywords):
-        return [dict(_user(self.state['users'][uid]),location='',network_distance=self.state['network'][uid]['network_distance'])
+    def search_people(self,keywords,location=None,profile_language=None):
+        self.state.setdefault('search_calls',[]).append({'keywords':keywords,'location':location,'profile_language':profile_language})
+        return [dict(_user(self.state['users'][uid]),location=self.state['users'][uid].get('location',''),
+                     network_distance=self.state['network'][uid]['network_distance'],signals=dict(self.state['users'][uid].get('signals',{})))
                 for uid in self.state['search'].get(keywords,[])]
+
+    def search_parameters(self,kind,keywords,limit=5):
+        self.state.setdefault('parameter_calls',[]).append((kind,keywords))
+        return [{'id':'103644278','name':'United States'}] if kind=='LOCATION' and keywords.lower()=='united states' else []
 
     def follow_user(self,user_id):
         mode=self._fail();self.get_profile(user_id)

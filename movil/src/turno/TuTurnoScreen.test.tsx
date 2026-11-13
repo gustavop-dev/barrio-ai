@@ -1,6 +1,6 @@
 // Tu turno: groups by priority, Nueva/Vista, «Más tarde», card actions with and without a note,
 // empty, loading and error states, and the swipe actions.
-import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, MESSAGE_CARD, questionCard, turnoFixture, UNCERTAIN_CARD } from '@compartido/fixtures/turno';
+import { APPROVAL_CARD, CONVERSATION_CARD, DAY_REQUEST_CARD, EXPIRING_CARD, MESSAGE_CARD, questionCard, turnoFixture, UNCERTAIN_CARD } from '@compartido/fixtures/turno';
 import { PROFILE_CARD, PROFILE_PROPOSAL } from '@compartido/fixtures/perfil';
 import { EXPERIMENT_CARD, MONTHLY_CARD, REFERENTS_SETUP_CARD } from '@compartido/fixtures/referentes';
 import type { TuTurno } from '@compartido/api/types';
@@ -150,6 +150,20 @@ describe('Tu turno', () => {
     expect(within(card).getByText('La app nunca envía mensajes: lo envías tú desde LinkedIn.')).toBeOnTheScreen();
     await fireEvent.press(within(card).getByText('Hecho, le escribí'));
     await waitFor(() => expect(server.find('POST', '/api/v1/respuestas/pc-1/mensaje')[0]?.body).toEqual({ how: 'enviado' }));
+  });
+
+  it('asks whether a post goes out on a day that already has one, shows both posts and sends his answer', async () => {
+    const server = await renderTurno(turnoFixture({ count: 1, items: [DAY_REQUEST_CARD] }), { 'POST /api/v1/capturas/cap-1/fecha': { body: {} } });
+    const card = await screen.findByTestId(`turno-card-${DAY_REQUEST_CARD.id}`);
+    expect(within(card).getByText('Fecha pedida')).toBeOnTheScreen();
+    expect(within(card).getByText(DAY_REQUEST_CARD.title)).toBeOnTheScreen();
+    await fireEvent.press(within(card).getByTestId(`turno-more-${DAY_REQUEST_CARD.id}`));
+    expect(within(card).getByText('Tu post, mientras decides')).toBeOnTheScreen();
+    expect(within(card).getByTestId('day-request-piece')).toHaveTextContent(/How do founders decide/);
+    expect(within(card).getByTestId('day-request-other-p-friday')).toHaveTextContent(/Cycles between agents/);
+    expect(within(card).getByText('“lo publiques mañana a las 12 del día, del mediodía”')).toBeOnTheScreen();
+    await fireEvent.press(within(card).getByText('Sí, el viernes 13/11 a las 12:00'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/capturas/cap-1/fecha')[0]?.body).toEqual({ decision: 'mismo_dia' }));
   });
 
   it('asks for a note before resolving an uncertain action and sends it', async () => {

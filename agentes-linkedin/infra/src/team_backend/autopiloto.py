@@ -126,7 +126,8 @@ def policy_review(proposal,lead_budget=None):
         logger.warning('Propuesta %s pendiente por archivos no disponibles: %s',proposal.id,'; '.join(issues))
         return proposal
     verdict=None
-    if not issues and lider.applies(proposal):
+    # Gustavo said this person fits after a doubt of the lead: his word replaces the lead's review for them.
+    if not issues and lider.applies(proposal) and not red.confirmed_by_gustavo(proposal):
         # The agente líder replaces the human approval: Jev judges the exact text or person; doubt means no.
         if lider.waiting_retry(proposal):return proposal
         if lead_budget is not None:
@@ -147,6 +148,7 @@ def policy_review(proposal,lead_budget=None):
         proposal.decision_note=f'Descartada por el líder ({verdict["model"]})' if verdict else f'Descartada por política {POLICY_VERSION}'
         proposal.save(update_fields=['state','risks','decided_at','decision_note','review'])
         operador._audit(None,'operator.policy_discarded',proposal.id,issues=issues)
+        if verdict and verdict['decision']=='discard':red.on_lead_discard(proposal)
         if proposal.piece_id:
             from . import capturas
             capturas.release_ideas(proposal.piece,'la política no la aprobó')
@@ -295,6 +297,10 @@ def tick(user,now=None):
         from .perfil import schedule
         report['profile']=schedule(user,now)
     except Exception as exc:report['profile_error']=type(exc).__name__
+    try:
+        from . import urgente
+        report['day_requests']=urgente.tick_day_requests(now)
+    except Exception as exc:report['day_requests_error']=type(exc).__name__  # never stops the rest of the tick
     try:report['weekly_summary']=_weekly_summary(user,now)
     except Exception as exc:report['weekly_summary_error']=type(exc).__name__  # the weekly summary never stops the rest
     return report
@@ -410,7 +416,8 @@ def _network(user,account,now):
         queued+=int(created)
     enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'),red.discovery_room(account)>0)  # B4
     unclassified=Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).exists()
-    enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),unclassified and red.budget_left(now)>0)
+    enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),
+            (unclassified or red.stage_pending(account,now)) and red.budget_left(now)>0)
     enqueue('plan_network',_every('NETWORK_PLAN_EVERY_MINUTES','60'))
     enqueue('sync_network',_every('NETWORK_SYNC_EVERY_MINUTES','360'))
     return queued
@@ -464,8 +471,11 @@ def _weekly_summary(user,now):
 
 def _execute(user,account,now):
     from .orquestacion import cycle_issues
-    if not operador.within_window(now) or not operador.spacing_ok(account,now):return 0
+    if not operador.within_window(now):return 0
     if _pending('execute_action'):return 0
+    rounds=bool(operador.network_batches())
+    # Without network rounds every write shares one spacing; with them a network write inside its round waits less.
+    if not rounds and not operador.spacing_ok(account,now):return 0
     due=operador.post_due(now)  # a network action or comment now could push his post past its hour
     # A reply on his own post goes first: the person who commented is waiting, and its window counts from the comment.
     first=Case(When(capability=ActionProposal.Capability.REPLY,then=0),default=1)
@@ -473,7 +483,9 @@ def _execute(user,account,now):
         if cycle_issues(proposal):continue
         if due and not proposal.piece_id:continue
         if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour
-        if operador.capacity_left(account,proposal.capability,now)<=0:continue
+        if rounds and not proposal.piece_id and operador.batch_issue(proposal.capability,now):continue
+        if rounds and not operador.spacing_ok(account,now,proposal.capability):continue
+        if operador.capped(proposal) and operador.capacity_left(account,proposal.capability,now)<=0:continue
         job=operador.enqueue_execution(user,proposal)
         return int(job.state==Job.State.QUEUED)
     return 0

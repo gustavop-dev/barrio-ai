@@ -303,6 +303,9 @@ class Contact(models.Model):
     # Gustavo's own notes about the person (Personas): [{id, at, text, by}].
     notes=models.JSONField(default=list,blank=True)
     profile_checked_at=models.DateTimeField(null=True,blank=True)
+    # What the last profile read or search result said about reach and moment (connectors._signals): followers,
+    # connections, bio, is_creator, is_hiring, is_open_to_work… Kept to set thresholds with data, never guessed.
+    signals=models.JSONField(default=dict,blank=True)
     followed_at=models.DateTimeField(null=True,blank=True)
     invited_at=models.DateTimeField(null=True,blank=True)
     connected_at=models.DateTimeField(null=True,blank=True)
@@ -351,13 +354,18 @@ class EditorialPiece(models.Model):
     metrics=models.JSONField(default=dict,blank=True)
     note=models.TextField(blank=True)
     origin_job=models.CharField(max_length=40,blank=True)
+    # One post a day, except a second one Gustavo authorized for the day and hour he asked for (urgente.confirm_day). It
+    # does not count for the CONT-09 caps.
+    second_of_day=models.BooleanField(default=False)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)
     class Meta:
         ordering=['-slot_date','-created_at']
-        constraints=[models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES),
-                                             name='one_open_piece_per_day')]
+        constraints=[models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=False),
+                                             name='one_open_piece_per_day'),
+                     models.UniqueConstraint(fields=['slot_date'],condition=models.Q(state__in=OPEN_PIECE_STATES,second_of_day=True),
+                                             name='one_second_piece_per_day')]
     def __str__(self):return f'{self.slot_date} · {self.get_state_display()}'
 
 class PostMetric(models.Model):
@@ -744,6 +752,9 @@ class Capture(models.Model):
     # The day and hour Gustavo asked for («publícalo mañana a las 10»), from the literal fragment in publish_at_evidence.
     publish_at=models.DateTimeField(null=True,blank=True)
     publish_at_evidence=models.TextField(blank=True)
+    # That day already had a post: {state: pending|same_day|next_free|expired, asked, at, answered_at, notified}.
+    # Pending, Tu turno asks him whether it goes out that day too (a second post) or keeps the next free day.
+    day_request=models.JSONField(default=dict,blank=True)
     understanding=models.JSONField(default=dict,blank=True)
     investigation=models.JSONField(default=dict,blank=True)
     context_type=models.CharField(max_length=10,choices=Context.choices,blank=True)

@@ -353,7 +353,7 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** para una infografía, el agente decide qué plantilla usar y qué dice cada parte; no dibuja nada.
-- **Implementación backend:** `DESIGN_SCHEMA`, validación local estricta y una corrección; cuatro plantillas del tablero más cierre.
+- **Implementación backend:** `DESIGN_SCHEMA`, validación local estricta y una corrección; cuatro plantillas del tablero más cierre y `preguntas`.
 - **Criterios de aceptación:**
   1. **Dado** una pieza con tipo `infografia` o `carrusel`, **cuando** corre el agente, **entonces** devuelve datos estructurados validados con un esquema: la plantilla (portada de carrusel, pasos, barras o número protagonista), el formato, los textos de cada elemento (etiqueta, titular, bajada, cuerpo, cifra con su unidad, pasos, barras con su valor), la fuente de los datos, el texto alternativo y, en un carrusel, las láminas en orden.
   2. **Dado** un titular de más de 8 palabras, una lámina de más de 30 palabras o una imagen única de más de 40, **cuando** se valida, **entonces** se rechaza y el agente lo corrige antes de dibujar.
@@ -362,6 +362,8 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
   5. **Dado** el texto público, **cuando** se valida, **entonces** está en inglés, sin emojis, sin hashtags, sin dobles exclamaciones y con mayúsculas solo en las etiquetas.
   6. **Dado** un titular de portada, **cuando** se valida, **entonces** va en minúsculas salvo la primera letra.
   7. **Dado** una respuesta que no cumple el esquema tras la corrección, **cuando** termina, **entonces** no se dibuja nada y el equipo elige otra imagen o la pieza queda bloqueada con el motivo ([IMG-15](#img-15)).
+  8. **Dado** que Gustavo pide preguntas (o «preguntas y respuestas rápidas») o el post remite a las preguntas de la imagen, **cuando** diseña, **entonces** usa la plantilla `preguntas`: de 2 a 4 preguntas en viñetas, sin numerar, cada una con una respuesta corta opcional después del «?»; sin cifras no necesita fuente. Origen: 12/11/2026, el diseñador puso tres preguntas en la plantilla `numero` («3 questions»), que siempre es un dato, y la pieza salió con la tarjeta de marca.
+  9. **Dado** un rechazo por «Dato sin fuente», **cuando** se pide la corrección, **entonces** el motivo dice qué lo volvió un dato (la plantilla o las cifras del texto) y cómo corregirlo, para que el segundo intento no repita el diseño.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
 - **Cobertura QA:**
 

@@ -8,7 +8,7 @@ import { usePostponePregunta, useTurnoAction } from '@compartido/api/hooks';
 import type { TurnoAction, TurnoCard as TurnoCardData, TurnoOpportunity, TurnoPriority } from '@compartido/api/types';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '@compartido/logic/format';
 import { messageText } from '@compartido/logic/personas';
-import { createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL } from '@compartido/logic/turno';
+import { clock, createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL } from '@compartido/logic/turno';
 import { router } from 'expo-router';
 import { useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
@@ -335,6 +335,54 @@ function MessageDetails({ card }: { card: TurnoCardData }) {
   );
 }
 
+/** A post of a `fecha` card: its thesis (opens the piece) and when it goes out. */
+function DayPost({ post, testID }: { post: { id: string; thesis: string; scheduled_for: string }; testID: string }) {
+  return (
+    <Pressable testID={testID} accessibilityRole="link" onPress={() => openLink(`/calendario/pieza/${post.id}`)}>
+      <T color={colors.brandDeep}>{post.thesis}</T>
+      <T variant="detalle" soft>
+        {`${longDate(post.scheduled_for)}, ${clock(post.scheduled_for)}`}
+      </T>
+    </Pressable>
+  );
+}
+
+/** «¿Seguro que lo quieres ese día?»: his post, where it waits now, and what already goes out on the day he asked for. */
+function DayRequestDetails({ card }: { card: TurnoCardData }) {
+  const request = card.day_request!;
+  return (
+    <>
+      <View style={styles.block}>
+        <T variant="etiqueta" soft>
+          Tu post, mientras decides
+        </T>
+        <DayPost post={request.piece} testID="day-request-piece" />
+      </View>
+      {request.others.length ? (
+        <View style={styles.block}>
+          <T variant="etiqueta" soft>
+            {`Ya sale el ${longDate(request.asked_at)}`}
+          </T>
+          {request.others.map((post) => (
+            <DayPost key={post.id} post={post} testID={`day-request-other-${post.id}`} />
+          ))}
+        </View>
+      ) : null}
+      {request.evidence ? (
+        <View style={styles.block}>
+          <T variant="etiqueta" soft>
+            Lo que pediste
+          </T>
+          <Quote>{request.evidence}</Quote>
+        </View>
+      ) : null}
+      <T variant="detalle" soft>
+        Si no respondes antes de una hora de tu hora, se queda en el siguiente día libre.
+      </T>
+    </>
+  );
+}
+
 /** Everything a card rests on, under «Ver más». */
 function CardDetails({ card }: { card: TurnoCardData }) {
   if (card.referent_change || card.referent_experiment) return <ReferentDetails card={card} />;
@@ -352,6 +400,7 @@ function CardDetails({ card }: { card: TurnoCardData }) {
   if (card.attempt) return <AttemptDetails card={card} />;
   if (card.conversation) return <ConversationDetails card={card} />;
   if (card.message) return <MessageDetails card={card} />;
+  if (card.day_request) return <DayRequestDetails card={card} />;
   if (card.approval) return <ApprovalDetails card={card} />;
   const text = noticeText(card);
   return text ? <T>{text}</T> : null;

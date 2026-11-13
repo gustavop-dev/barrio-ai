@@ -1,4 +1,4 @@
-import { APPROVAL_CARD, CONVERSATION_CARD, EXPIRING_CARD, questionCard, UNCERTAIN_CARD, cardFixture } from '@compartido/fixtures/turno';
+import { APPROVAL_CARD, CONVERSATION_CARD, DAY_REQUEST_CARD, EXPIRING_CARD, questionCard, UNCERTAIN_CARD, cardFixture } from '@compartido/fixtures/turno';
 import type { TurnoCard } from '@compartido/api/types';
 import { APPROVED_MESSAGE } from '@compartido/logic/events';
 import { cardSummary, cardTitle, hasDetails, modalFor, orderedActions, successMessage, SUMMARY_FITS, swipeIntents, withNote } from './actions';
@@ -53,6 +53,14 @@ describe('swipe intents', () => {
     expect(swipeIntents(UNCERTAIN_CARD).right).toMatchObject({ kind: 'run', label: 'Sí, se aplicó' });
     expect(swipeIntents(EXPIRING_CARD).right).toBeNull();
     expect(swipeIntents(cardFixture({ actions: [] }))).toEqual({ right: null, left: null });
+  });
+
+  it('a second post on the day he asked for is a tap on its button, never a swipe', () => {
+    expect(swipeIntents(DAY_REQUEST_CARD)).toEqual({ right: null, left: null });
+    const [same, next] = DAY_REQUEST_CARD.actions;
+    expect(successMessage(same!)).toBe('Listo: sale el día que pediste');
+    expect(successMessage(next!)).toBe('Se queda en el siguiente día libre');
+    expect(hasDetails(DAY_REQUEST_CARD)).toBe(true);
   });
 
   it('left postpones a question («Más tarde»); a question has no «done» swipe', () => {

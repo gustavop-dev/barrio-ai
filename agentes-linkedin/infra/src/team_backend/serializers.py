@@ -164,6 +164,18 @@ class ContactOutput(serializers.ModelSerializer):
     your_turn=serializers.SerializerMethodField()
     last_event=serializers.SerializerMethodField()
     conversation=serializers.SerializerMethodField()
+    region=serializers.SerializerMethodField()
+    lead_doubt=serializers.SerializerMethodField()
+    def get_region(self,obj):
+        from . import ubicacion
+        return ubicacion.region(obj.location)
+    def _lead_doubt(self,obj):
+        if not hasattr(obj,'_lead_doubt_cache'):
+            from . import red
+            obj._lead_doubt_cache=red.lead_doubt(obj) if obj.stage in red.ACTIVE_STAGES else None
+        return obj._lead_doubt_cache
+    def get_lead_doubt(self,obj):
+        return self._lead_doubt(obj)
     def _conversation(self,obj):
         if not hasattr(obj,'_conversation_cache'):
             from . import conversaciones
@@ -203,13 +215,20 @@ class ContactOutput(serializers.ModelSerializer):
         o=self._opportunity(obj);action=self._open_action(obj)
         if self._waiting(obj):return {'owner':'gustavo','text':'Te toca: responder su mensaje','at':None}
         if o:return {'owner':'gustavo','text':f'Oportunidad: {o.get_stage_display()}'+(f' · {o.next_action}' if o.next_action else ''),'at':o.next_action_at}
+        if self._lead_doubt(obj):
+            return {'owner':'gustavo','text':'El líder la frenó aunque encaja: confirma si encaja','at':self._lead_doubt(obj)['until']}
         if action:
             labels={'RED-01':'seguirla','RED-02':'invitarla sin nota','RED-04':'aceptar su invitación'}
             return {'owner':'equipo','text':f'El equipo va a {labels.get(action.capability,action.capability)}','at':None,
                     'action':{'id':str(action.id),'capability':action.capability,'state':action.state}}
         stage=obj.stage
+        check=(obj.classification or {}).get('stage_check') or {}
+        if stage in ('fit','followed') and check.get('state')=='pending':
+            return {'owner':'equipo','text':'El equipo busca en la web si su startup tiene ronda semilla o clientes','at':check.get('next_at')}
         if stage=='candidate':return {'owner':'equipo','text':'El equipo la clasificará','at':None}
         if stage=='fit':return {'owner':'equipo','text':'El equipo la seguirá','at':None}
+        if stage=='followed' and not (obj.classification or {}).get('fit'):
+            return {'owner':None,'text':'La sigues; no se invitará: '+((obj.classification or {}).get('rule') or 'ya no encaja'),'at':None}
         if stage=='followed' and obj.followed_at:
             blocked,reason=red.invites_blocked()
             when=obj.followed_at+red.invite_after()
@@ -228,7 +247,7 @@ class ContactOutput(serializers.ModelSerializer):
         fields=['id','account_id','provider_user_id','public_identifier','display_name','headline','profile_url','location','source',
                 'evidence','network_distance','is_following','stage','display_stage','classification','history','notes','followed_at',
                 'invited_at','connected_at','discovered_at','updated_at','open_action','opportunity','next_step','your_turn','last_event',
-                'conversation']
+                'conversation','signals','region','lead_doubt']
 
 class NoteInput(serializers.Serializer):
     text=serializers.CharField(max_length=4000)

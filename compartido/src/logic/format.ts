@@ -240,6 +240,9 @@ export const CONTACT_EVENT_LABEL: Record<string, string> = {
   replied: 'El equipo le respondió',
   reacted: 'Reaccionaste a su comentario',
   dm: 'Mensaje privado',
+  stage_checked: 'Etapa revisada en la web',
+  stage_check_retry: 'Revisión web pendiente',
+  confirmed_fit: 'Confirmaste que encaja',
 };
 
 /** Autonomy mode of a capability, read as «Modo auto», «Modo aprobación», «Modo apagado». */

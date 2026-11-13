@@ -130,6 +130,19 @@ class CaptureDetail(APIView):
         human_session(request);require(request.user,'approve_actions');get_or_404(Capture,id=cid)
         return Response(CaptureOutput(capturas.undo(request.user,cid)).data)
 
+class CaptureDay(APIView):
+    """POST /api/v1/capturas/<id>/fecha {decision: mismo_dia | siguiente}: the day he asked for already had a post;
+    `mismo_dia` authorizes a second post that day at his hour, `siguiente` keeps the next free day (urgente.confirm_day)."""
+    def post(self,request,cid):
+        human_session(request)
+        from . import urgente
+        data=request.data if isinstance(request.data,dict) else {}
+        if data.get('decision') not in ('mismo_dia','siguiente'):raise ValidationError('decision debe ser mismo_dia o siguiente')
+        get_or_404(Capture,id=cid)
+        capture,piece=urgente.confirm_day(request.user,cid,data['decision'])
+        return Response({'id':str(capture.id),'day_request':capture.day_request,
+                         'piece':{'id':str(piece.id),'scheduled_for':piece.scheduled_for,'second_of_day':piece.second_of_day} if piece else None})
+
 class CaptureAudio(FileView):
     def get(self,request,cid):
         require(request.user,'operate_linkedin')

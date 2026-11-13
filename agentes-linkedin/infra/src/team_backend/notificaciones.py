@@ -19,6 +19,7 @@ INBOX_KINDS={
     'account_paused':('importante',True,'Cuenta en pausa'),
     'conversation':('importante',True,'Conversación que te toca'),
     'dm_ready':('importante',True,'Mensaje sugerido para alguien que conversó contigo'),
+    'day_request':('importante',True,'Pediste un día que ya tiene post'),
     'question':('cuando_puedas',True,'Pregunta nueva del equipo'),
     'profile_task':('cuando_puedas',True,'Tarea de perfil nueva'),
 }
@@ -32,6 +33,7 @@ FEED_KINDS={
     'piece_blocked':('sistema',True,'Pieza bloqueada por el verificador'),
     'piece_discarded':('publicaciones',False,'Pieza descartada por la política'),
     'connection_fit':('red',False,'Conexión nueva que encaja'),
+    'network_doubt':('red',True,'El líder frenó a una persona que encaja'),
     'opportunity':('conversaciones',False,'Oportunidad nueva o que cambia de etapa'),
     'observatory':('conversaciones',False,'Hallazgos del Observatorio'),
     'invites_expected':('red',False,'Invitaciones previstas'),
