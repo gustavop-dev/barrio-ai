@@ -51,7 +51,7 @@ Curvas disponibles: `standard` (bezier 0.2, 0, 0, 1), `enter` (salida cúbica), 
 | `swipeExit` | 180 (fast) · exit | La tarjeta deslizada sale de la pantalla cuando la acción se confirma (`turno/SwipeableCard.tsx`). |
 | `listExit` | 180 (fast) · exit | Una tarjeta sale de la lista y las demás cierran el hueco (`layout.listExit` y `layout.listMove`, en `turno/TuTurnoScreen.tsx`). |
 | `listEnter` | 260 (base) · enter | Las tarjetas y las etiquetas de grupo entran en la lista (`layout.listEnter`). |
-| `fold` | 180 (fast) · standard | Los plegables «Pospuestas», «Hecho recientemente» y «Cómo se ordena»: giro del chevrón y aparición del contenido (`components/ui/Fold.tsx`). También abre la lista de opciones de un selector (`components/ui/Select.tsx`) y las semanas anteriores del resumen (`resultados/ResumenSemanal.tsx`). |
+| `fold` | 180 (fast) · standard | Los plegables «Pospuestas», «Hecho recientemente» y «Cómo se ordena»: giro del chevrón y aparición del contenido (`components/ui/Fold.tsx`). También abre la lista de opciones de un selector (`components/ui/Select.tsx`), las semanas anteriores del resumen (`resultados/ResumenSemanal.tsx`) y las filas de una línea del panel del día del Calendario, que se despliegan al tocarlas (`calendario/TimelineItem.tsx`). |
 | `backdrop` | 180 (fast) · enter | El fondo oscuro de las hojas aparece y desaparece (`components/ui/Sheet.tsx`). |
 | `sheetClose` | 180 (fast) · exit | La hoja baja al cerrarse (`components/ui/Sheet.tsx`). |
 | `toastOut` | 180 (fast) · exit | El aviso inferior se desvanece (`layout.toastOut`). |
@@ -179,7 +179,7 @@ La escena llena la pantalla: la recarga se hace tirando hacia abajo desde arriba
 | `officeGestures.sheetHalf` / `sheetFull` | 0.5 / 0.88 | Puntos de ajuste de `SnapSheet`, sobre el espacio disponible. |
 | `haptics.officePick` | selección | Selección de un personaje, zona o equipo. |
 
-El panel del día del Calendario también es un `SnapSheet` (`calendario/CalendarioScreen.tsx`), con los mismos tokens.
+El Calendario ya no usa `SnapSheet`: tocar un día solo lo selecciona y el panel bajo el calendario cambia en su sitio.
 
 `SnapSheet` reutiliza `springs.sheetOpen`, `timings.sheetClose` y `gestures.sheet` para volver a un
 punto de ajuste o cerrar; ofrece ampliar, reducir y cerrar mediante acciones de accesibilidad. No muestra un botón «Cerrar»:
@@ -297,7 +297,7 @@ Grupos propios en `motion.ts`: `navSprings`, `navTimings`, `navValues`, `navGest
 | `navGestures.edgeWidth` | 24 pt | Franja del borde izquierdo de un detalle (bajo la barra superior) que lo arrastra hacia atrás (`DetailScreen.tsx`). |
 | `navGestures.grabFrom` | 0.5 | La franja solo agarra un detalle que está al menos a medio entrar. |
 | `navGestures.stayOpen` / `velocityProjection` | 0.6 · 0.25 | Al soltar, el progreso se proyecta con la velocidad (`progreso − vx[pt/ms] · 0.25`): por debajo de 0.6 el detalle se va, si no vuelve a su sitio (`push.ts › edgeRelease`). |
-| `navSprings.flight` | FIRM | Personas › Barrio: el retrato y el nombre viajan de la fila a la cabecera de la ficha y de vuelta (`components/shell/flight.tsx`, `personas/Barrio.tsx`, `personas/PersonaScreen.tsx`). |
+| `navSprings.flight` | FIRM | Personas › Conexiones: el retrato y el nombre viajan de la fila a la cabecera de la ficha y de vuelta (`components/shell/flight.tsx`, `personas/Conexiones.tsx`, `personas/PersonaScreen.tsx`). |
 | `navTimings.cardBlock` / `navValues.cardBlockRise` | 180 (fast) · enter · 8 pt | El resto de la ficha entra escalonado en cuatro bloques (`navLayout.cardBlock`, en `PersonaScreen.tsx`). |
 | `navValues.cardBlockDelayMs` / `cardBlockStepMs` | 120 · 30 ms | Retraso del primer bloque y de cada siguiente. |
 | `entrada.leafHalf` / `leafOpen` / `leafStepMs` | 0.5 · 0.125 · 80 ms | Entrada: la hoja de la puerta se pliega sobre su bisagra en dos saltos (`entrada/useEntrada.ts`, `entrada/PixelDoor.tsx`). |
@@ -387,9 +387,9 @@ Los dos tableros de la fase 3 que mueven datos. Los valores del tablero que no s
 
 | Token | Valor | Dónde se usa |
 |---|---|---|
-| `calendarSprings.daySelect` | FIRM (20 · 260 · 1) | Calendario: la selección oscura (`px`, `py`, `pw`, `ph`) se desliza al día tocado y viaja a su celda al cambiar entre Semana y Mes (`calendario/Selection.tsx`). La primera vez, y con movimiento reducido, salta. |
+| `calendarSprings.daySelect` | FIRM (20 · 260 · 1) | Calendario: la selección oscura (`px`, `py`, `pw`, `ph`) se desliza al día tocado y viaja a su celda al cambiar entre Semana y Mes (`calendario/Selection.tsx`). La primera vez, y con movimiento reducido, salta. Una semana o un mes sin el día seleccionado no la dibuja; al volver a la página del día (o al tocar un día en una página que no la tenía) aparece en su sitio sin viajar. |
 | `calendarSprings.segment` | FIRM (20 · 260 · 1) | La superficie del control segmentado (`seg`) se desliza a la opción elegida: Vista en Calendario y Periodo en Resultados (`components/ui/Segmented.tsx`). |
-| `calendarTimings.panelOut` | 120 · exit | Calendario: el panel del día que se va se desvanece y se aparta 12 px hacia el lado contrario (`calendario/DaySwap.tsx`), en línea y en la hoja del día. |
+| `calendarTimings.panelOut` | 120 · exit | Calendario: el panel del día que se va (bajo el calendario) se desvanece y se aparta 12 px hacia el lado contrario (`calendario/DaySwap.tsx`). |
 | `calendarTimings.panelIn` | 180 (fast) · enter | El panel nuevo entra desde el lado hacia el que avanzó la fecha. |
 | `calendarTimings.viewOut` | 120 · exit | La vista que se va, semana o mes, se desvanece debajo de la nueva (`calendario/ViewSwitch.tsx`). |
 | `calendarTimings.viewIn` | 180 (fast) · enter | La semana, o cada fila del mes, aparece (`calendarLayout.weekIn` y `calendarLayout.monthRowIn`, en `calendario/Grids.tsx`). |

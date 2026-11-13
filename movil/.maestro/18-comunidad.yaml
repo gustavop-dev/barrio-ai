@@ -8,13 +8,15 @@ tags: [personas, comunidad]
 - tapOn:
     id: tab-personas
 - extendedWaitUntil:
-    visible: Barrio
+    visible:
+      id: personas-conexiones
     timeout: 20000
-- scrollUntilVisible:
-    element:
-      id: personas-comunidad
-    direction: RIGHT
-    timeout: 10000
+# «Conexiones» is wider than «Barrio» was: «Comunidad» starts off screen, so the tab strip itself is swiped (a swipe
+# in the middle of the screen lands on the search box, QA run 43358236141).
+- swipe:
+    from:
+      id: personas-referentes
+    direction: LEFT
 - tapOn:
     id: personas-comunidad
 - extendedWaitUntil:

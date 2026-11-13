@@ -169,7 +169,7 @@ export function eventSub(event: CalendarEvent): string | null {
     case 'invite_expected':
       return [names(event.people), 'Estimación sujeta a los topes'].filter(Boolean).join(' · ');
     case 'linkedin_expiry':
-      return 'Reconéctalo antes desde Tu turno';
+      return 'Reconéctalo antes desde la Bandeja';
     default: {
       const detail = (event as CalendarEvent & { detail?: string }).detail;
       return detail || null;
@@ -203,7 +203,7 @@ export function isCritical(event: CalendarEvent): boolean {
   return eventBadge(event)?.tone === 'bad';
 }
 
-/** In-app destination; an uncertain action goes straight to its card in Tu turno. */
+/** In-app destination; an uncertain action goes straight to its card in the Bandeja. */
 export function eventLink(event: CalendarEvent): string | null {
   if (event.kind === 'action_uncertain') return `/tu-turno#${turnoAnchor(`uncertain:${eventRef(event)}`)}`;
   return event.link && event.link.startsWith('/') ? event.link : null;
@@ -338,7 +338,7 @@ export function itemSub(item: ActivityItem): string | null {
 
 /** Where the item leads inside the app. */
 export function itemLink(item: ActivityItem): { to: string; label: string } | null {
-  if (item.state === 'uncertain') return { to: `/tu-turno#${turnoAnchor(`uncertain:${item.id}`)}`, label: 'Resuélvela en Tu turno' };
+  if (item.state === 'uncertain') return { to: `/tu-turno#${turnoAnchor(`uncertain:${item.id}`)}`, label: 'Resuélvela en la Bandeja' };
   if (item.capability === 'CONT-09' && item.piece_id) return { to: `/calendario/pieza/${encodeURIComponent(item.piece_id)}`, label: 'Ver la pieza' };
   if (item.target?.kind === 'person' && item.target.contact_id) return { to: `/personas/${encodeURIComponent(item.target.contact_id)}`, label: 'Ver ficha' };
   if (item.target?.kind === 'comment' && item.target.piece_id) return { to: `/calendario/pieza/${encodeURIComponent(item.target.piece_id)}`, label: 'Ver el post' };
@@ -399,7 +399,7 @@ export function queuedWhen(expectedAt: string | null, { today, timeZone, windowO
   return windowOpen === false ? `Saldrá cuando abra la ventana, ${when}` : `Saldrá ${when}, según el espaciado`;
 }
 
-/** The toast after «Aprobar» (Tu turno, «En cola» and the piece). */
+/** The toast after «Aprobar» (the Bandeja, «En cola» and the piece). */
 export const APPROVED_MESSAGE = 'Aprobada. Sale cuando lo permitan la ventana y los topes.';
 
 /** «Espera tu aprobación · caduca mañana a las 14:05»: a queued row that waits for Gustavo. */

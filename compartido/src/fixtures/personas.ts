@@ -5,6 +5,7 @@ export function redSummaryFixture(extra: Partial<RedSummary> = {}): RedSummary {
   return {
     enabled: true,
     stages: { candidate: 12, fit: 9, discarded: 6, followed: 8, invited: 6, connected: 7, closed: 2, incoming: 1, opportunity: 1, conversation: null },
+    connections: { total: 7, roles: { comprador: 3, par: 2, divulgador: 1, sin_etiqueta: 1 } },
     capacity: {},
     reads_today: {},
     read_caps: {},

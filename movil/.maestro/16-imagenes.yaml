@@ -1,18 +1,18 @@
 # cubre: IMG-11, CAP-16
 # Real private bytes from seed_qa: photo (manana), infographic (aprobacion), four-slide carousel
 # (publicada8). Deep links open the same Calendario detail used by the calendar cards.
-# Selector coverage: 05-captura-envios, 10-galeria and 11-ajustes (IMG-16).
+# Selector coverage: 05-captura-envios and 11-ajustes (IMG-16).
 appId: co.projectapp.office
 name: Imágenes y publicación prioritaria
 tags: [calendario, captura, imagenes]
 ---
 - runFlow: comun/entrar.yaml
 - tapOn:
-    id: tab-galeria
+    id: tab-resultados
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
-      id: screen-galeria
+      id: resultados-list
     timeout: 30000
 
 # Photo: the original chosen for tomorrow, same whole-piece veto.

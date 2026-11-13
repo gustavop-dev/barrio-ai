@@ -1,11 +1,11 @@
 # cubre: CAP-04, CAP-05, CAP-06, IMG-16
 # Captura with files, the regression of PR #43 (with expo/fetch as the global fetch, a capture with a photo or an audio
 # never left the phone): a photo picked from the phone's gallery and a voice note recorded by holding the button reach
-# the backend. Each one shows the toast «Enviado al equipo.» and its row in «Lo que enviaste» («1 foto», «Audio 0:0N»);
-# the photo is in the Galería right away. Then the error states: without network, and a 413 from the API. The sheet
-# says why, keeps the draft and sends it again with «Reintentar».
+# the backend. Each one shows the toast «Enviado al equipo.» and its row in «Lo que enviaste» («1 foto», «Audio 0:0N»).
+# Then the error states: without network, and a 413 from the API. The sheet says why, keeps the draft and sends it
+# again with «Reintentar». (The Galería that showed the photo arrive left the app on 12/11/2026.)
 #
-# Used from Galería (a still screen, see 05-captura), which also shows the photo arrive.
+# Used from Resultados (a still screen, see 05-captura).
 # The microphone: the CI emulator runs with -noaudio and records silence; the audio still travels as a real m4a file.
 # The 413 comes from the QA failure switch (team_backend.qa_fallos, comun/qa-fallo.js).
 appId: co.projectapp.office
@@ -17,19 +17,12 @@ onFlowComplete:
 ---
 - runFlow: comun/entrar.yaml
 - tapOn:
-    id: tab-galeria
+    id: tab-resultados
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
-      id: screen-galeria
+      id: resultados-list
     timeout: 30000
-# Four seeded photos; one of them is «Nueva».
-- extendedWaitUntil:
-    visible: 'Foto.*, nueva'
-    timeout: 20000
-- assertNotVisible:
-    text: 'Foto.*, nueva'
-    index: 1
 
 # ---------------------------------------------------------------- a photo from the phone's gallery
 # cubre: CAP-05
@@ -109,13 +102,6 @@ onFlowComplete:
     notVisible:
       id: toast
     timeout: 15000
-# The photo is in the Galería already, as «Nueva» (now two of them).
-- extendedWaitUntil:
-    visible:
-      text: 'Foto.*, nueva'
-      index: 1
-    timeout: 20000
-- takeScreenshot: 05-envios-04-foto-en-la-galeria
 # «Lo que enviaste»: the capture with its photo and its note.
 - tapOn:
     id: capture-button

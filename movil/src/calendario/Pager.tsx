@@ -1,14 +1,15 @@
 // Horizontal paging for the week strip and the month («Deslizar la tira cambia de semana»): the page
 // follows the finger with the previous and next pages beside it, and past gestures.pager.commitFraction
-// (or a flick) it turns with the pageSnap spring; otherwise it springs back. The header arrows animate
-// the same way through the ref, and screen readers get «anterior» and «siguiente» actions.
+// (or a flick) it turns with the pageSnap spring; otherwise it springs back. There are no arrows: screen
+// readers get «Semana anterior» / «Semana siguiente» (or the month's) actions, which turn it the same way.
+// Turning the page moves only the period on screen, never the selected day.
 //
 // Pages are keyed by an absolute index and placed at index × width, so when the parent moves its date
 // the page that slid in keeps its place: nothing jumps between the spring and the new render.
 //
 // The frame's height is MovCalendario's `h`: the parent keeps it (so it carries from the week to the
 // month) and the frame eases to the current page's height, clipping what is still outside it.
-import { useCallback, useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { GestureDetector, usePanGesture } from 'react-native-gesture-handler';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming, type SharedValue } from 'react-native-reanimated';
@@ -19,11 +20,6 @@ import { calendarTiming, gestures, haptic, spring, useMotion } from '@/theme/mot
 const PAGE_SNAP = spring('pageSnap');
 
 export type PageOffset = -1 | 0 | 1;
-
-export interface PagerHandle {
-  /** Turns the page with the same spring as a swipe. */
-  go: (direction: 1 | -1) => void;
-}
 
 /** Whether a released drag turns the page, and which way (1: next, -1: previous). Pure, so it can be tested. */
 export function pageDirection(translationX: number, velocityX: number, width: number): 1 | -1 | 0 {
@@ -37,17 +33,16 @@ export function pageDirection(translationX: number, velocityX: number, width: nu
 
 export interface PagerProps {
   renderPage: (offset: PageOffset) => ReactNode;
-  /** The page turned: move the date by one week or month. */
+  /** The page turned: move the period on screen by one week or month. */
   onShift: (direction: 1 | -1) => void;
   previousLabel: string;
   nextLabel: string;
   testID?: string;
-  ref?: Ref<PagerHandle>;
   /** The frame's height (−1: not measured yet, so the frame takes its page's height at once). */
   height?: SharedValue<number>;
 }
 
-export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, ref, height }: PagerProps) {
+export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, height }: PagerProps) {
   const { reduced } = useMotion();
   const [width, setWidth] = useState(0);
   const [index, setIndex] = useState(0);
@@ -79,6 +74,7 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
     [commit],
   );
 
+  /** Turns the page with the same spring as a swipe (the screen reader's actions). */
   const go = useCallback(
     (direction: 1 | -1) => {
       const target = base.get() + direction * width;
@@ -88,8 +84,6 @@ export function Pager({ renderPage, onShift, previousLabel, nextLabel, testID, r
     },
     [base, offset, width, commit],
   );
-
-  useImperativeHandle(ref, () => ({ go }), [go]);
 
   const pan = usePanGesture({
     testID: testID ? `${testID}-swipe` : undefined,

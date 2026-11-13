@@ -20,6 +20,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 | [AJU-09](#aju-09) | Edición con IA por defecto en las fotos nuevas | PWA · app · backend | funciona |
 | [AJU-10](#aju-10) | Acceso a «Lo que el equipo sabe de ti» | PWA · app · backend | funciona |
 | [AJU-11](#aju-11) | Orden y anclas de Ajustes | PWA · app | funciona |
+| [AJU-12](#aju-12) | Fotos de perfil | app · backend | funciona |
 
 ---
 
@@ -187,12 +188,25 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 - **Qué hace para Gustavo:** encuentra cada sección en el mismo orden, y los enlaces le llevan directo a la sección.
 - **Código:** PWA `Ajustes.tsx`, `compartido/src/logic/ajustes.ts` (anclas); app `ajustes/AjustesScreen.tsx` (`?ancla=`).
 - **Criterios de aceptación:**
-  1. **Dado** Ajustes, **cuando** lo abre, **entonces** las secciones van en este orden: Máquina, Orientación para el equipo, Autonomía y límites, Gasto de IA, LinkedIn oficial, Captura y galería, Notificaciones, Lo que el equipo sabe de ti, Sesión y Acerca de.
-  2. **Dado** el enlace `/ajustes#maquina` en la PWA (o `?ancla=maquina` en la app), **cuando** lo abre, **entonces** baja a esa sección; `ancla=autonomia` abre además el pliegue.
+  1. **Dado** Ajustes, **cuando** lo abre, **entonces** las secciones van en este orden: Máquina, Orientación para el equipo, Autonomía y límites, Gasto de IA, LinkedIn oficial, Captura y galería (en la app, «Captura» seguida de «Fotos de perfil»), Notificaciones, Lo que el equipo sabe de ti, Sesión y Acerca de.
+  2. **Dado** el enlace `/ajustes#maquina` en la PWA (o `?ancla=maquina` en la app), **cuando** lo abre, **entonces** baja a esa sección; `ancla=autonomia` abre además el pliegue. En la app, `ancla=fotos` baja a Fotos de perfil, y un enlace viejo a `/galeria` llega ahí.
   3. **Dado** la PWA en escritorio, **cuando** abre Ajustes, **entonces** ve un índice a la izquierda que salta a cada sección.
   4. **Dado** la app, **cuando** abre Ajustes, **entonces** llega desde el icono de la barra superior.
 - **Brechas código/docs:** la app no tiene «tirar para recargar» en Ajustes.
 - **Cobertura QA:** pendiente
+
+### AJU-12 · Fotos de perfil <a id="aju-12"></a>
+
+- **Dónde:** app · backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** ve y cuida en Ajustes las fotos con las que Perfil prepara sus retratos y el banner, sin una Galería aparte (12/11/2026: «la de galería nunca la uso, solo existe ahí para las fotos de perfil»).
+- **Código:** app `ajustes/FotosPerfil.tsx` (sección `fotos` de `AjustesScreen.tsx`), `fotos/PhotoSheet.tsx`, `fotos/PhotoViewer.tsx`, `fotos/upload.ts`; `GET /api/v1/galeria?filtro=perfil`, `POST /api/v1/galeria` con `category=perfil` y `profile_edit=true`, `PATCH`/`DELETE /api/v1/galeria/<id>`. Ver [GAL-08](galeria.md#gal-08).
+- **Criterios de aceptación:**
+  1. **Dado** fotos de categoría Perfil, **cuando** abre Ajustes, **entonces** ve «Fotos de perfil» con «Las fotos con las que Perfil prepara tus retratos y el banner. Nunca se usan en posts.» y una rejilla de tres columnas ordenada por función (01 · Pose y sonrisa, 02 · Cuerpo del banner, 03 · Identidad y gafas, y las «Sin asignar» al final), cada foto con su función.
+  2. **Dado** ninguna foto de perfil, **cuando** abre la sección, **entonces** ve «Todavía no hay fotos de perfil. Sube una pose con sonrisa, una de cuerpo para el banner y una de identidad.».
+  3. **Dado** «Subir fotos de perfil», **cuando** elige fotos en el teléfono, **entonces** suben como categoría Perfil con permiso para Perfil, con su progreso y el aviso «Fotos subidas a Perfil.».
+  4. **Dado** una foto, **cuando** la toca, **entonces** se abre su hoja: función, permiso, «Instrucciones para Perfil», «Edición con IA», «Guardar» (solo envía lo que cambió) y «Quitar la foto» tras confirmar; la imagen abre el visor a pantalla completa, que recorre las fotos en el orden de la rejilla. La hoja no ofrece cambiar la categoría a «Posts».
+- **Cobertura QA:** Jest `FotosPerfil.test.tsx` (1 a 4) y `AjustesScreen.test.tsx` (`ancla=fotos`); Maestro `18-perfil` (1 y 3).
 
 ---
 

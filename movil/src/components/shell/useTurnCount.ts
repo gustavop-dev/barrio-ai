@@ -30,12 +30,12 @@ export function useTurnCount(): TurnCount {
   };
 }
 
-/** «Tu turno, 6 pendientes, 1 urgente». */
+/** «Bandeja de entrada, 6 pendientes, 1 urgente». */
 export function turnLabel({ count, critical, urgent }: Pick<TurnCount, 'count' | 'critical' | 'urgent'>): string {
-  if (count <= 0) return 'Tu turno';
+  if (count <= 0) return 'Bandeja de entrada';
   const pending = `${count} ${count === 1 ? 'pendiente' : 'pendientes'}`;
   const urgentText = critical ? (urgent > 0 ? `, ${urgent} ${urgent === 1 ? 'urgente' : 'urgentes'}` : ', con algo urgente') : '';
-  return `Tu turno, ${pending}${urgentText}`;
+  return `Bandeja de entrada, ${pending}${urgentText}`;
 }
 
 export function notificationsLabel(unread: number): string {

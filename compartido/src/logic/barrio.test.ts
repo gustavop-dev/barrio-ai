@@ -5,7 +5,6 @@ import {
   leadDoubtText,
   nextActionText,
   nextStepView,
-  noResultsTitle,
   opportunityErrors,
   opportunityInput,
   personMeta,
@@ -72,8 +71,6 @@ describe('Personas rules', () => {
     expect(stageCount(summary, 'opportunity')).toBe(1);
     expect(stageCount(summary, 'fit')).toBe(9);
     expect(stageCount(undefined, 'fit')).toBeUndefined();
-    expect(noResultsTitle({ stage: 'fit', q: '', role: '', modality: '', source: '' })).toBe('Nadie en «Encaja» ahora mismo');
-    expect(noResultsTitle({ stage: 'fit', q: 'luc', role: '', modality: '', source: '' })).toBe('Nadie coincide con estos filtros');
   });
 
   it('adds the followers to the header line and explains a doubt of the lead', () => {

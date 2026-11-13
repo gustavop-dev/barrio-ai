@@ -51,6 +51,12 @@ export function routeForUrl(url: unknown): AppRoute | null {
     pathname = '/personas';
     params.pestana = 'referentes';
   }
+  // The Galería left the app (12/11/2026): its profile photos live in Ajustes › Fotos de perfil.
+  if (pathname === '/galeria') {
+    pathname = '/ajustes';
+    for (const key of Object.keys(params)) delete params[key];
+    params.ancla = 'fotos';
+  }
   // Legacy paths of the machine and the memory, redirected as the PWA does.
   const legacy = LEGACY_AJUSTES[pathname];
   if (legacy) {

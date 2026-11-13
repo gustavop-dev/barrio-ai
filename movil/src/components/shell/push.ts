@@ -52,13 +52,12 @@ export function stackOf(root: unknown, key: string): { routes: readonly { key: s
 /** What «‹» says for each screen it can go back to: the tabs by name, a detail by its kind. */
 const BACK_LABEL: Record<string, string> = {
   index: 'Oficina',
-  'tu-turno': 'Tu turno',
+  'tu-turno': 'Bandeja',
   notificaciones: 'Notificaciones',
   calendario: 'Calendario',
   ajustes: 'Ajustes',
   resultados: 'Resultados',
   personas: 'Personas',
-  galeria: 'Galería',
   'calendario/pieza/[id]': 'Pieza',
   'personas/[id]': 'Persona',
 };

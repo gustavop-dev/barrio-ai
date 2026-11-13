@@ -145,7 +145,7 @@ class Command(BaseCommand):
             with patch('team_backend.alerts.notify'):
                 result=capturas.process(capture.pk)
             if result.state!=Capture.State.NOTED or result.routed_to.get('kind')!='perfil_aclaracion':
-                raise CommandError('La nota ambigua de perfil no produjo una pregunta en Tu turno.')
+                raise CommandError('La nota ambigua de perfil no produjo una pregunta en la Bandeja.')
         self.stdout.write(f'Mundo de QA listo para «{QA_USERNAME}» (hoy {self.today}, {self.tz}).')
 
     # ------------------------------------------------------------------ safety and reset
@@ -265,6 +265,10 @@ class Command(BaseCommand):
              {'fit':True,'role':'comprador','modality':'projectapp','reason':'Te invitó: dirige innovación y busca socios de software.'}),
             ('sofia-martinez','Sofía Martínez','Gerente de una cooperativa de ahorro','connected',{'connected':5},'incoming',
              {'fit':True,'role':'comprador','modality':'projectapp','reason':'Te invitó y encaja: necesita una plataforma para su cooperativa.'}),
+            # Personas › Conexiones: a connection from more than a month ago («Antes») and one without a role («Sin etiqueta»).
+            ('mariana-lopez','Mariana López','Divulgadora de producto y comunidad tech','connected',{'followed':50,'invited':47,'connected':45},'commenter',
+             {'fit':True,'role':'divulgador','modality':'comunidad_autoridad','reason':'Escribe sobre producto para una comunidad grande de founders.'}),
+            ('jorge-castillo','Jorge Castillo','Ingeniero de datos en una cadena de retail','connected',{'connected':20},'incoming',{}),
         ]
         self.people={}
         for i,(handle,name,headline,stage,times,source,classification) in enumerate(people):

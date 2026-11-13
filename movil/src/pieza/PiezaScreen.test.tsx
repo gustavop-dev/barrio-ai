@@ -359,7 +359,7 @@ describe('Detalle de una pieza', () => {
     expect(await screen.findByText('No se sabe si salió')).toBeOnTheScreen();
     // From the piece (a detail over the tabs) it goes back down to the tabs instead of stacking another shell.
     (expoRouter.router.canDismiss as jest.Mock).mockReturnValueOnce(true);
-    await fireEvent.press(screen.getByText('Resuélvela en Tu turno'));
+    await fireEvent.press(screen.getByText('Resuélvela en la Bandeja'));
     expect(expoRouter.router.dismissTo).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-act-7' } });
     expect(expoRouter.router.push).not.toHaveBeenCalled();
   });

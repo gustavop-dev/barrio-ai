@@ -1,13 +1,13 @@
 # cubre: TUR-06, TUR-07, TUR-08, TUR-09, TUR-10, TUR-12, TUR-14, INB-05
-# Tu turno · más acciones: the other ways out of a card, top to bottom. The machine stopped from Ajustes becomes the
-# urgent «Reanuda la máquina» card, resumed from Tu turno with its optional reason; «Responder con audio» opens the
+# Bandeja · más acciones: the other ways out of a card, top to bottom. The machine stopped from Ajustes becomes the
+# urgent «Reanuda la máquina» card, resumed from Bandeja with its optional reason; «Responder con audio» opens the
 # capture sheet answering that question; Sofía's «Marcar como oportunidad» opens the form prefilled and «No
 # responder» asks for an optional reason; the orientation is discarded; the choice question is answered with an
 # option and the answer undone from the toast; the yes/no question is closed with «No quiero compartir esto»; and
 # «Hecho recientemente» says how each one ended.
 # Card testIDs carry the seed's deterministic ids (seed_qa.uid).
 appId: co.projectapp.office
-name: Tu turno · más acciones
+name: Bandeja · más acciones
 tags: [turno]
 ---
 - runFlow: comun/entrar.yaml
@@ -44,7 +44,7 @@ tags: [turno]
     visible: 'Máquina en pausa.*'
     timeout: 20000
 - tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible: 'Reanuda la máquina'
@@ -53,8 +53,8 @@ tags: [turno]
 - assertVisible: 'Detenida por qa · .*'
 - assertVisible: 'Urgente · 2'
 - assertVisible:
-    id: top-tu-turno
-    text: 'Tu turno, 11 pendientes, 2 urgentes'
+    id: tab-tu-turno
+    text: 'Bandeja de entrada, 11 pendientes, 2 urgentes'
 - takeScreenshot: 04-mas-01-maquina-detenida
 - tapOn:
     text: 'Reanudar'
@@ -164,7 +164,7 @@ tags: [turno]
     visible:
       id: confirm-sheet
     timeout: 15000
-- assertVisible: 'La tarjeta sale de Tu turno hasta que te vuelva a escribir\. Nadie le responde por ti\.'
+- assertVisible: 'La tarjeta sale de la Bandeja hasta que te vuelva a escribir\. Nadie le responde por ti\.'
 - takeScreenshot: 04-mas-05-no-responder
 # «No responder» is both the sheet's title and its action; top to bottom, the action is second.
 - tapOn:

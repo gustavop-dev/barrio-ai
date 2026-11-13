@@ -180,13 +180,14 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** ve cuántas personas hay en cada etapa, cuánto cupo queda hoy y si algo está frenado.
+- **Qué hace para Gustavo:** ve cuántas personas hay en cada etapa, cuántas conexiones tiene por etiqueta, cuánto cupo queda hoy y si algo está frenado.
 - **Código:** `GET /api/v1/red/summary` (`red.summary`, `red_views.Summary`). La interfaz está en [PRS-01](personas-oportunidades.md#prs-01).
 - **Criterios de aceptación:**
   1. **Dado** contactos en varias etapas, **cuando** se pide el resumen, **entonces** `stages` trae el recuento de `candidate`, `fit`, `discarded`, `followed`, `invited`, `connected`, `closed` e `incoming`, más `opportunity` (personas con una oportunidad abierta) y `conversation: null`.
-  2. **Dado** `NETWORK_ENABLED=false`, **cuando** se pide, **entonces** `enabled` vale `false` y el resto de datos guardados sigue llegando.
-  3. **Dado** lecturas de hoy, **cuando** se pide, **entonces** `reads_today` las suma por tipo, con `execution` sin tope.
-  4. **Dado** gasto del clasificador, **cuando** se pide, **entonces** `llm` trae `spent_today` y `daily` como números JSON; `daily` es el tope de seguridad diario de todo el equipo (`AI_DAILY_FUSE_USD`), no uno propio de la red.
+  2. **Dado** conexiones con y sin rol del barrio, **cuando** se pide el resumen, **entonces** `connections` trae `{ total, roles }`, con `roles` por `classification.role` y `sin_etiqueta` para quien no tiene: son los chips de Personas › Conexiones ([PRS-01](personas-oportunidades.md#prs-01)).
+  3. **Dado** `NETWORK_ENABLED=false`, **cuando** se pide, **entonces** `enabled` vale `false` y el resto de datos guardados sigue llegando.
+  4. **Dado** lecturas de hoy, **cuando** se pide, **entonces** `reads_today` las suma por tipo, con `execution` sin tope.
+  5. **Dado** gasto del clasificador, **cuando** se pide, **entonces** `llm` trae `spent_today` y `daily` como números JSON; `daily` es el tope de seguridad diario de todo el equipo (`AI_DAILY_FUSE_USD`), no uno propio de la red.
 - **Brechas código/docs:** `stages.conversation` sigue en `null` aunque el inbox ya está implementado ([INB-01](inbox.md#inb-01)); el filtro `stage=conversation` de `/red/contacts` devuelve siempre vacío.
 - **Cobertura QA:** pendiente
 

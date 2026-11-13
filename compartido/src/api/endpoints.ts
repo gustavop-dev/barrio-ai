@@ -157,10 +157,11 @@ function queryString(values: Record<string, string | number | boolean | null | u
 
 /**
  * Paginated, newest `updated_at` first. Empty filters are not sent. `stage=opportunity` lists the people
- * with an open opportunity; `q` searches name and headline.
+ * with an open opportunity; `q` searches name and headline. `vista=conexiones` lists only the connected
+ * people, the most recent connection first.
  */
-export function listContacts({ stage = '', source = '', account = '', q = '', role = '', modality = '', page = 1 }: ContactSearch = {}) {
-  const query = queryString({ stage, source, account, q: q.trim(), role, modality, page: page > 1 ? page : null });
+export function listContacts({ vista = '', stage = '', source = '', account = '', q = '', role = '', modality = '', page = 1 }: ContactSearch = {}) {
+  const query = queryString({ vista, stage, source, account, q: q.trim(), role, modality, page: page > 1 ? page : null });
   return api.get<Paginated<Contact> | Contact[]>(`${RED}/contacts${query}`);
 }
 /** Adds a free note to the person (201, returns the contact). */

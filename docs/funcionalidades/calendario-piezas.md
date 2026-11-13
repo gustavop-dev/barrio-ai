@@ -36,7 +36,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 - **Qué hace para Gustavo:** ve el mes, la semana o una línea de tiempo de lo que pasó y lo que viene, y se mueve entre periodos.
 - **Código:** `GET /api/v1/calendario?desde=&hasta=` (por día local de `America/Bogota`, como mucho 93 días); PWA `Calendario.tsx`, `calendario/Grids.tsx`; app `CalendarioScreen.tsx`, `Grids.tsx`, `Pager.tsx`.
 - **Criterios de aceptación:**
-  1. **Dado** el Calendario, **cuando** lo abre, **entonces** ve la vista Semana por defecto, con el control «Mes» | «Semana» | «Lista», «Hoy» y las flechas de periodo anterior y siguiente; el estado queda en la URL (`?vista=&fecha=&capas=&tipo=&no_salio=`).
+  1. **Dado** el Calendario, **cuando** lo abre, **entonces** ve la vista Semana por defecto, con el control «Mes» | «Semana» | «Lista»; el estado queda en la URL (`?vista=&fecha=&capas=&tipo=&no_salio=`). En la PWA tiene «Hoy» y las flechas de periodo anterior y siguiente; en la app no hay botones «‹ Hoy ›»: la semana o el mes se deslizan, y el lector de pantalla tiene las acciones «Semana anterior» y «Semana siguiente» (o «Mes anterior» y «Mes siguiente»).
   2. **Dado** un teléfono o navegador en otra zona horaria, **cuando** lo abre, **entonces** el subtítulo añade «· Horas de Bogotá».
   3. **Dado** la vista Mes, **cuando** cambia de mes, **entonces** cada día muestra los puntos de las capas con eventos y hoy va marcado; en la app se puede deslizar entre meses y semanas.
   4. **Dado** un mes sin nada, **cuando** lo abre, **entonces** ve «No hay nada registrado en este mes.».
@@ -44,7 +44,8 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   6. **Dado** un rango de más de 93 días o fechas inválidas, **cuando** se pide a la API, **entonces** responde 400.
   7. **Dado** la app, **cuando** abre el Calendario, **entonces** llega desde el icono de la barra superior (no es una pestaña de la barra inferior).
   8. **Dado** un día con varias piezas (intentos que no salieron y la que sí va), **cuando** se muestra el día (`/calendario` y `/editorial/calendar`), **entonces** solo aparece su pieza viva (en preparación, lista, programada, publicándose, publicada, incierta o rehaciéndose); sin ninguna viva, solo su último intento; y un día próximo que solo se frenó por el presupuesto diario queda vacío porque el piloto lo prepara el día anterior (`editorial.calendar_rows`). Los intentos viejos siguen abriéndose desde su enlace.
-  9. **Dado** la hoja del día (y el panel de la Oficina), **cuando** está abierta, **entonces** no hay botón «Cerrar»: se cierra deslizándola hacia abajo o con atrás de Android; el lector de pantalla tiene la acción «Cerrar» en la manija.
+  9. **Dado** el panel de la Oficina, **cuando** está abierto, **entonces** no hay botón «Cerrar»: se cierra deslizándolo hacia abajo o con atrás de Android; el lector de pantalla tiene la acción «Cerrar» en la manija. El Calendario de la app ya no abre una hoja del día ([CAL-03](#cal-03)).
+  10. **Dado** la app, **cuando** desliza la semana o el mes, **entonces** solo cambia el periodo que se ve: el día elegido no se mueve (`fecha` sigue igual), en otra semana o mes ninguna celda aparece elegida, hoy conserva su marca y el panel de abajo sigue mostrando el día elegido, con su encabezado. El día elegido solo cambia al tocar uno. Al pasar de Semana a Mes (o al revés) se abre la semana o el mes del día elegido, y un enlace con `?fecha=` elige ese día y abre su semana.
 - **Brechas código/docs:** —
 - **Cobertura QA:** CAL-01.1, 3, 4, 5 y 7 en `movil/.maestro/07-calendario.yaml` y `07-calendario-errores.yaml` (Semana, Mes y Lista, deslizar semanas y meses, mes vacío, error con «Reintentar») · CAL-01.2 y 6 sin prueba E2E · 2026-11-08 · pasa
 
@@ -67,18 +68,20 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 
 - **Dónde:** PWA · app · backend
 - **Estado:** parcial
-- **Qué hace para Gustavo:** al elegir un día ve su resumen (qué publicó y cuántas interacciones hubo), lo que le tocaba a él, la publicación del día, lo programado y lo importante.
-- **Código:** PWA `calendario/DayPanel.tsx`; app `DayPanel.tsx` (en línea y en una hoja).
+- **Qué hace para Gustavo:** al elegir un día ve la publicación del día, lo importante, lo programado, lo que le tocaba a él y su resumen (qué publicó y cuántas interacciones hubo).
+- **Código:** PWA `calendario/DayPanel.tsx`; app `DayPanel.tsx` (bajo el calendario: ya no hay hoja del día), `TimelineItem.tsx` y `ActivityList.tsx` (filas de una línea que se despliegan).
 - **Lo que falta:** en la PWA, si falla la carga del calendario, el panel del día se pinta como un día vacío («Sin actividad registrada.», «Hueco libre…», «Nada importante en las capas visibles.») junto al error (`Calendario.tsx:65`). La app ya dice «No se pudo cargar este día.» y, si falla la pieza del día, muestra el error con «Reintentar».
 - **Criterios de aceptación:**
-  1. **Dado** hoy o un día pasado, **cuando** lo elige, **entonces** ve el encabezado con «Hoy» o «Pasado» y el resumen («1 post · 6 comentarios · …»); cada cifra abre «Ver todo lo del día» filtrado.
+  1. **Dado** hoy o un día pasado, **cuando** lo elige, **entonces** ve el encabezado con «Hoy» o «Pasado» y el resumen («1 post · 6 comentarios · …»), que en la app va al final del panel; cada cifra abre «Ver todo lo del día» filtrado.
   2. **Dado** un día sin actividad, **cuando** lo elige, **entonces** ve «Sin actividad registrada.».
-  3. **Dado** un plazo de pregunta ese día, **cuando** lo elige, **entonces** «Tu parte» muestra «Plazo: HH:MM» (o «Hecho ✓» si ya respondió) e «Ir a Tu turno».
+  3. **Dado** un plazo de pregunta ese día, **cuando** lo elige, **entonces** «Tu parte» en la PWA, o «De tu Bandeja» en la app, muestra «Plazo: HH:MM» (o «Hecho ✓» si ya respondió) e «Ir a la Bandeja» (la ruta sigue siendo `/tu-turno`). En la app el plazo aparece al desplegar la fila.
   4. **Dado** un día futuro sin pieza, **cuando** lo elige, **entonces** ve «Hueco libre. El equipo prepara cada pieza N h antes de su hora.»; uno pasado sin pieza dice «Sin publicación.».
   5. **Dado** un día a más de 15 días, **cuando** lo elige, **entonces** ve «Todavía no hay nada programado tan lejos.».
   6. **Dado** acciones en cola o invitaciones previstas, **cuando** lo elige, **entonces** «Programado» las muestra, cada acción con «Vetar», y «Invitaciones previstas: N personas».
   7. **Dado** que falla la carga del calendario, **cuando** se muestra el error, **entonces** el panel del día no dice que el día está vacío: muestra que no se pudo cargar. **Hoy falla en la PWA.**
   8. **Dado** que falla la carga de la pieza del día, **cuando** se pinta la tarjeta, **entonces** se ve un error con «Reintentar».
+  9. **Dado** la app, **cuando** toca un día, **entonces** lo elige en su sitio: sin hoja y sin mover la pantalla, el panel bajo el calendario cambia a ese día (entra desde el lado hacia el que avanzó la fecha). El panel va en este orden: «Publicación del día» (o «Publicaciones del día»), «Lo importante del día», «Programado», «De tu Bandeja» y, al final, el resumen con «Ver todo lo del día» plegado.
+  10. **Dado** las filas de «Lo importante del día», «De tu Bandeja» y «Ver todo lo del día» en la app, **cuando** se pintan, **entonces** cada una ocupa una línea con «…» (punto de la capa, hora y frase); al tocarla se despliega en su sitio con el texto completo, la línea de abajo, el estado y sus enlaces («Abrir», «Resuélvela en la Bandeja», «Ver en LinkedIn»), y otro toque la pliega. En «Programado» la frase y la hora de salida van en una línea cada una hasta tocarlas, con «Vetar» (y «Aprobar») siempre a mano.
 - **Brechas código/docs:** —
 - **Cobertura QA:** CAL-03.1–5 y 7–8 en `07-calendario.yaml`, `07-pieza-estados.yaml` y `07-calendario-errores.yaml` (hoja media y completa sin tapar la tira, «Ver todo lo del día» filtrado, «Tu parte», hueco libre, sin publicación, día lejano, panel y pieza del día que fallan) · CAL-03.6 visto en las capturas («Programado» con «Vetar») · 2026-11-08 · pasa
 

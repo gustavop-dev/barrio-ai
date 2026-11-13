@@ -64,7 +64,7 @@ function ThisPhone() {
         <Badge tone={badge.tone}>{badge.label}</Badge>
       </CardHead>
       <T variant="detalle" soft>
-        Te avisan aquí de lo que pide tu acción (Tu turno) y de lo importante que pasa (Notificaciones).
+        Te avisan aquí de lo que pide tu acción (la Bandeja) y de lo importante que pasa (Notificaciones).
       </T>
       {push?.status !== 'registrado' ? (
         <Note tone={note.tone} title={note.title}>
@@ -128,7 +128,7 @@ function PerType() {
       {types?.length ? (
         <>
           <T variant="detalle" soft>
-            Apagar la push de un tipo no lo borra: el aviso sigue llegando a Tu turno o a Notificaciones.
+            Apagar la push de un tipo no lo borra: el aviso sigue llegando a la Bandeja o a Notificaciones.
           </T>
           <View>
             {types.map((type) => (

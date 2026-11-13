@@ -49,7 +49,7 @@ describe('Layout · navegación', () => {
     const [sidebar, bottom] = screen.getAllByRole('navigation', { name: 'Secciones' });
     expect(within(sidebar!).getAllByRole('link').map((a) => a.textContent)).toEqual([
       'Oficina',
-      'Tu turno',
+      'Bandeja de entrada',
       'Notificaciones',
       'Calendario',
       'Resultados',
@@ -69,7 +69,7 @@ describe('Layout · navegación', () => {
   it('hides the Tu turno counter at 0 and the bell dot without unread notifications', async () => {
     server(tuTurnoFixture({ count: 0, notifications_unread: 0 }));
     renderApp('/resultados');
-    const link = await within(await topBarReady()).findByRole('link', { name: 'Tu turno' });
+    const link = await within(await topBarReady()).findByRole('link', { name: 'Bandeja de entrada' });
     expect(link.querySelector('.navcount')).toBeNull();
     expect(within(topBar()).getByRole('link', { name: 'Notificaciones' }).querySelector('.navdot')).toBeNull();
   });
@@ -77,7 +77,7 @@ describe('Layout · navegación', () => {
   it('paints the counter neutral with questions only and puts a dot on the bell', async () => {
     server(tuTurnoFixture({ count: 3, critical: false, questions: [card(), card({ id: 'question:q2' }), card({ id: 'question:q3' })], notifications_unread: 4 }));
     renderApp('/resultados');
-    const link = await within(await topBarReady()).findByRole('link', { name: 'Tu turno, 3 pendientes' });
+    const link = await within(await topBarReady()).findByRole('link', { name: 'Bandeja de entrada, 3 pendientes' });
     const counter = link.querySelector('.navcount');
     expect(counter).toHaveTextContent('3');
     expect(counter).toHaveAttribute('data-tone', 'neutral');
@@ -95,11 +95,11 @@ describe('Layout · navegación', () => {
       }),
     );
     renderApp('/resultados');
-    const link = await within(await topBarReady()).findByRole('link', { name: 'Tu turno, 6 pendientes, 1 urgente' });
+    const link = await within(await topBarReady()).findByRole('link', { name: 'Bandeja de entrada, 6 pendientes, 1 urgente' });
     expect(link.querySelector('.navcount')).toHaveAttribute('data-tone', 'critical');
     // Same counter in the sidebar.
     const [sidebar] = screen.getAllByRole('navigation', { name: 'Secciones' });
-    expect(within(sidebar!).getByRole('link', { name: 'Tu turno, 6 pendientes, 1 urgente' }).querySelector('.navcount')).toHaveTextContent('6');
+    expect(within(sidebar!).getByRole('link', { name: 'Bandeja de entrada, 6 pendientes, 1 urgente' }).querySelector('.navcount')).toHaveTextContent('6');
   });
 
   it('opens the capture from the centre button and from the sidebar', async () => {
@@ -178,8 +178,8 @@ describe('Layout · banners', () => {
 
 describe('turnLabel', () => {
   it('names the count and the urgent items', () => {
-    expect(turnLabel({ count: 0, critical: false, urgent: 0 })).toBe('Tu turno');
-    expect(turnLabel({ count: 1, critical: false, urgent: 0 })).toBe('Tu turno, 1 pendiente');
-    expect(turnLabel({ count: 4, critical: true, urgent: 2 })).toBe('Tu turno, 4 pendientes, 2 urgentes');
+    expect(turnLabel({ count: 0, critical: false, urgent: 0 })).toBe('Bandeja de entrada');
+    expect(turnLabel({ count: 1, critical: false, urgent: 0 })).toBe('Bandeja de entrada, 1 pendiente');
+    expect(turnLabel({ count: 4, critical: true, urgent: 2 })).toBe('Bandeja de entrada, 4 pendientes, 2 urgentes');
   });
 });

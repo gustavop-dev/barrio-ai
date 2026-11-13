@@ -223,7 +223,7 @@ def extraordinary(user, account, now=None):
     if not ReferentControl.objects.filter(account=account, initialized=True).exists():
         raise ValueError('Primero identifica los cinco main de la cuenta.')
     if ReferentReview.objects.filter(account=account, month=month).exists():
-        raise Conflict('Ya hay una revisión de referentes este mes; decide esa en Tu turno.')
+        raise Conflict('Ya hay una revisión de referentes este mes; decide esa en la Bandeja.')
     job, _ = enqueue_operation(user, 'review_referents',
         {'account': str(account.pk), 'month': month.isoformat(), 'extraordinaria': True},
         request_id=uuid.uuid5(uuid.NAMESPACE_URL, f'referents:{account.pk}:{month}:extraordinaria'))

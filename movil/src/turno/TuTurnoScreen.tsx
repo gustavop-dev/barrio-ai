@@ -224,8 +224,8 @@ export function TuTurnoScreen() {
 
   const header = (
     <View style={styles.header}>
-      <PageHeader title="Tu turno" subtitle={summaryOf(rows)} />
-      <TabBar<Tab> label="Tu turno" tabs={TABS} value={tab} onChange={setTab} />
+      <PageHeader title="Bandeja de entrada" subtitle={summaryOf(rows)} />
+      <TabBar<Tab> label="Bandeja de entrada" tabs={TABS} value={tab} onChange={setTab} />
       {tab === 'pendiente' && turno.error && turno.data ? <ErrorRetry error={turno.error} onRetry={() => void turno.refetch()} title="No se pudo actualizar" /> : null}
     </View>
   );

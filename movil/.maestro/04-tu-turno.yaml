@@ -1,9 +1,9 @@
 # cubre: TUR-01, TUR-02, TUR-03, TUR-04, TUR-07, TUR-08, TUR-09, TUR-11, TUR-13, TUR-14, TUR-15, TUR-19, INB-03, INB-04, SEM-08
-# Tu turno: what only Gustavo can resolve, walked top to bottom once, resolving as it goes. The urgent «¿Salió o no?»
+# Bandeja: what only Gustavo can resolve, walked top to bottom once, resolving as it goes. The urgent «¿Salió o no?»
 # card (shown as «Comprueba si salió tu comentario») swiped right asks for its note; the dated question is answered in
 # writing; Sofía's conversation swiped right is done; the choice question swiped left and the yes/no question's «Más
 # tarde» are postponed; the expired question sits under «Ya no es urgente»; «Pospuestas» and «Hecho recientemente»
-# list what happened; the top bar counter follows; and the answer shows up in «Lo que el equipo sabe de ti».
+# list what happened; the bottom bar counter follows; and the answer shows up in «Lo que el equipo sabe de ti».
 # The seed (seed_qa) gives 10 cards: 1 urgente; 5 importantes (the dated question, referents setup, the two network approvals of
 # 04-tu-turno-aprobar and the conversation); 4 cuando puedas (profile, the analyst's orientation, then the choice and yes/no
 # questions, newest first). Plus «¿En qué ciudad vives actualmente?» postponed and «¿Fuiste al meetup…?» expired.
@@ -13,12 +13,12 @@
 # Toasts are not asserted: Maestro finds them on some runs and not on others although they are on screen (the
 # screenshot right after each action shows them); each step asserts what changed in the list instead.
 appId: co.projectapp.office
-name: Tu turno
+name: Bandeja
 tags: [turno]
 ---
 - runFlow: comun/entrar.yaml
 
-# ---------------------------------------------------------------- the top bar counter, then the screen
+# ---------------------------------------------------------------- the bottom bar counter, then the screen
 # cubre: TUR-01, TUR-02
 - extendedWaitUntil:
     visible:
@@ -26,11 +26,11 @@ tags: [turno]
     timeout: 30000
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 10 pendientes, 1 urgente'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 10 pendientes, 1 urgente'
     timeout: 30000
 - tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
@@ -85,8 +85,8 @@ tags: [turno]
     id: confirm-sheet
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 9 pendientes'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 9 pendientes'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
@@ -315,8 +315,8 @@ tags: [turno]
 # Left: the two approvals, referents setup, the analyst's orientation and profile (no longer urgent).
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 5 pendientes'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 5 pendientes'
     timeout: 20000
 
 # ---------------------------------------------------------------- «Hecho recientemente»

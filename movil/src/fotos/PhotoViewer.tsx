@@ -1,4 +1,4 @@
-// The full-screen photo viewer of the Galería: swipe between photos (a paged list), pinch or
+// The full-screen photo viewer (Ajustes › Fotos de perfil): swipe between photos (a paged list), pinch or
 // double-tap to zoom, drag the zoomed photo around, and drag an unzoomed photo up or down to close.
 // Every limit and spring comes from motion.ts (gestures.zoom, gestures.viewer, springs.zoomSettle).
 import type { PhotoOutput } from '@compartido/api/capturas';
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   backdrop: { flex: 1, backgroundColor: colors.ink },
   page: { alignItems: 'center', justifyContent: 'center' },
-  // ApiImage paints colors.line while it loads; over the whole page that hid the ink (QA 10-galeria-07/08).
+  // ApiImage paints colors.line while it loads; over the whole page that hid the ink (QA 10-galeria-07/08, a flow retired with the Galería).
   photo: { backgroundColor: 'transparent' },
   top: { position: 'absolute', top: 0, left: 0, right: 0, paddingHorizontal: space[4], flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   close: { width: shell.touch + 4, height: shell.touch + 4, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.backdrop },

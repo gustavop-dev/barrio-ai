@@ -125,13 +125,12 @@ El inventario de esta entrega se mantiene al final de este documento. Incluye el
 - [movil/.maestro/04-tu-turno-aprobar.yaml](../../movil/.maestro/04-tu-turno-aprobar.yaml)
 - [movil/.maestro/04-tu-turno-mas.yaml](../../movil/.maestro/04-tu-turno-mas.yaml)
 - [movil/.maestro/04-tu-turno.yaml](../../movil/.maestro/04-tu-turno.yaml)
-- [movil/.maestro/10-galeria.yaml](../../movil/.maestro/10-galeria.yaml)
+- `movil/.maestro/10-galeria.yaml` (retirado el 12/11/2026 con la Galería de la app)
 - [movil/.maestro/18-perfil.yaml](../../movil/.maestro/18-perfil.yaml) — nuevo
 - [movil/.maestro/README.md](../../movil/.maestro/README.md)
-- [movil/src/galeria/GaleriaScreen.test.tsx](../../movil/src/galeria/GaleriaScreen.test.tsx)
-- [movil/src/galeria/GaleriaScreen.tsx](../../movil/src/galeria/GaleriaScreen.tsx)
-- [movil/src/galeria/PhotoSheet.tsx](../../movil/src/galeria/PhotoSheet.tsx)
-- [movil/src/galeria/upload.ts](../../movil/src/galeria/upload.ts)
+- `movil/src/galeria/GaleriaScreen.test.tsx` y `GaleriaScreen.tsx` (retirados el 12/11/2026; las fotos de perfil están en [movil/src/ajustes/FotosPerfil.tsx](../../movil/src/ajustes/FotosPerfil.tsx))
+- [movil/src/fotos/PhotoSheet.tsx](../../movil/src/fotos/PhotoSheet.tsx) (antes en `movil/src/galeria/`)
+- [movil/src/fotos/upload.ts](../../movil/src/fotos/upload.ts) (antes en `movil/src/galeria/`)
 - [movil/src/turno/ProfileProposal.test.tsx](../../movil/src/turno/ProfileProposal.test.tsx) — nuevo
 - [movil/src/turno/ProfileProposal.tsx](../../movil/src/turno/ProfileProposal.tsx) — nuevo
 - [movil/src/turno/TurnoCard.tsx](../../movil/src/turno/TurnoCard.tsx)

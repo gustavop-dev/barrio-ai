@@ -1,6 +1,7 @@
 # cubre: ACC-06, OFI-08, OFI-09, APP-03, APP-08
 # Navegación: the shell. Opening the app again keeps the session, also offline (the offline strip, and back online);
-# every bottom-bar tab, the four top-bar accesses with the Tu turno counter and the Notificaciones dot, Android back
+# every bottom-bar tab (the Bandeja de entrada with its counter), the three top-bar accesses with the Notificaciones
+# dot, Android back
 # through the tab history (backBehavior="history": each visit moves the tab to the end of the history, back pops it), a
 # detail screen (the person card) closed with its «‹ Personas», with Android back and with a drag from the left edge,
 # the 0ff1ce signature back to the Oficina, and oficina0ff1ce:// links (a tab and a piece, closed with «‹»).
@@ -25,12 +26,12 @@ onFlowComplete:
     id: tab-index
     selected: true
 - takeScreenshot: 02-navegacion-01-oficina
-# cubre: OFI-09.2 — the top bar keeps Tu turno's counter and the Notificaciones dot in sight
+# cubre: OFI-09.2 — the bars keep the Bandeja's counter (bottom) and the Notificaciones dot (top) in sight
 - assertVisible:
     id: turn-counter
 - assertVisible:
     id: unread-dot
-- assertVisible: "Tu turno, \\d+ pendientes?.*"
+- assertVisible: "Bandeja de entrada, \\d+ pendientes?.*"
 - assertVisible: "Notificaciones, hay novedades"
 
 # cubre: ACC-06.2, OFI-08.1 — opened without a connection it stays inside and says so (it used to log out)
@@ -84,7 +85,7 @@ onFlowComplete:
 - takeScreenshot: 02-navegacion-01d-servidor-502
 - runScript: comun/qa-fallos-limpiar.js
 
-# ---------------------------------------------------------------- bottom bar: Resultados, Personas, Galería, Oficina
+# ---------------------------------------------------------------- bottom bar: Resultados, Personas, Bandeja, Oficina
 # cubre: OFI-09
 - tapOn:
     id: tab-resultados
@@ -122,42 +123,7 @@ onFlowComplete:
 - takeScreenshot: 02-navegacion-03-personas
 
 - tapOn:
-    id: tab-galeria
-    waitToSettleTimeoutMs: 500
-- extendedWaitUntil:
-    visible:
-      id: screen-galeria
-    timeout: 20000
-- extendedWaitUntil:
-    notVisible:
-      id: barrio-list
-    timeout: 10000
-- assertVisible:
-    id: tab-galeria
-    selected: true
-- takeScreenshot: 02-navegacion-04-galeria
-
-- tapOn:
-    id: tab-index
-    waitToSettleTimeoutMs: 500
-- extendedWaitUntil:
-    visible:
-      id: screen-oficina
-    timeout: 20000
-- extendedWaitUntil:
-    notVisible:
-      id: screen-galeria
-    timeout: 10000
-- assertVisible:
-    id: tab-index
-    selected: true
-- takeScreenshot: 02-navegacion-05-oficina-otra-vez
-
-# ---------------------------------------------------------------- top bar: Tu turno, Notificaciones, Calendario, Ajustes
-# cubre: OFI-09 (accesos de arriba)
-# They open with the push; the bottom bar stays and no bottom tab is selected.
-- tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
@@ -165,16 +131,32 @@ onFlowComplete:
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
-      id: screen-oficina
+      id: barrio-list
     timeout: 10000
 - assertVisible:
-    id: top-tu-turno
+    id: tab-tu-turno
     selected: true
+- takeScreenshot: 02-navegacion-04-bandeja
+
+- tapOn:
+    id: tab-index
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: screen-oficina
+    timeout: 20000
+- extendedWaitUntil:
+    notVisible:
+      id: turno-list
+    timeout: 10000
 - assertVisible:
     id: tab-index
-    selected: false
-- takeScreenshot: 02-navegacion-06-tu-turno
+    selected: true
+- takeScreenshot: 02-navegacion-05-oficina-otra-vez
 
+# ---------------------------------------------------------------- top bar: Notificaciones, Calendario, Ajustes
+# cubre: OFI-09 (accesos de arriba)
+# They open with the push; the bottom bar stays and no bottom tab is selected.
 - tapOn:
     id: top-notificaciones
     waitToSettleTimeoutMs: 500
@@ -184,13 +166,16 @@ onFlowComplete:
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
-      id: turno-list
+      id: screen-oficina
     timeout: 10000
 - assertVisible:
     id: top-notificaciones
     selected: true
 - assertVisible:
-    id: top-tu-turno
+    id: tab-index
+    selected: false
+- assertVisible:
+    id: tab-tu-turno
     selected: false
 - takeScreenshot: 02-navegacion-07-notificaciones
 
@@ -228,7 +213,7 @@ onFlowComplete:
 
 # ---------------------------------------------------------------- Android back through the tab history
 # cubre: OFI-09
-# History now: Resultados, Personas, Galería, Oficina, Tu turno, Notificaciones, Calendario, Ajustes.
+# History now: Resultados, Personas, Bandeja, Oficina, Notificaciones, Calendario, Ajustes.
 - back
 - extendedWaitUntil:
     visible:
@@ -259,25 +244,11 @@ onFlowComplete:
 - back
 - extendedWaitUntil:
     visible:
-      id: turno-list
-    timeout: 20000
-- extendedWaitUntil:
-    notVisible:
-      id: screen-notificaciones
-    timeout: 10000
-- assertVisible:
-    id: top-tu-turno
-    selected: true
-- takeScreenshot: 02-navegacion-11-atras-tu-turno
-
-- back
-- extendedWaitUntil:
-    visible:
       id: screen-oficina
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
-      id: turno-list
+      id: screen-notificaciones
     timeout: 10000
 - assertVisible:
     id: tab-index
@@ -287,15 +258,16 @@ onFlowComplete:
 - back
 - extendedWaitUntil:
     visible:
-      id: screen-galeria
+      id: turno-list
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
       id: screen-oficina
     timeout: 10000
 - assertVisible:
-    id: tab-galeria
+    id: tab-tu-turno
     selected: true
+- takeScreenshot: 02-navegacion-11-atras-bandeja
 
 - back
 - extendedWaitUntil:
@@ -304,7 +276,7 @@ onFlowComplete:
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
-      id: screen-galeria
+      id: turno-list
     timeout: 10000
 - assertVisible:
     id: tab-personas
@@ -327,7 +299,8 @@ onFlowComplete:
 
 # ---------------------------------------------------------------- a detail screen and its «‹»
 # The person card is pushed over the tabs (the tabs stay drawn underneath, so the proof it closed is that
-# the card is gone, not that the list is there).
+# the card is gone, not that the list is there). Andrés is one of the seed's connections, the only people the
+# Personas list shows since 12/11/2026.
 - tapOn:
     id: tab-personas
     waitToSettleTimeoutMs: 500
@@ -337,18 +310,18 @@ onFlowComplete:
     timeout: 20000
 - scrollUntilVisible:
     element:
-      text: Pedro Salazar
+      text: Andrés Restrepo
     direction: DOWN
     centerElement: true
     timeout: 30000
-- tapOn: Pedro Salazar
+- tapOn: Andrés Restrepo
 - extendedWaitUntil:
     visible:
       id: persona
     timeout: 20000
 - extendedWaitUntil:
     visible:
-      text: Pedro Salazar
+      text: Andrés Restrepo
       childOf:
         id: persona
     timeout: 20000
@@ -370,7 +343,7 @@ onFlowComplete:
 - takeScreenshot: 02-navegacion-15-ficha-cerrada
 
 # cubre: OFI-09.3 — in the app a detail also goes back with Android back, and with a drag from its left edge
-- tapOn: Pedro Salazar
+- tapOn: Andrés Restrepo
 - extendedWaitUntil:
     visible:
       id: persona
@@ -383,7 +356,7 @@ onFlowComplete:
 - assertVisible:
     id: tab-personas
     selected: true
-- tapOn: Pedro Salazar
+- tapOn: Andrés Restrepo
 - extendedWaitUntil:
     visible:
       id: persona
@@ -421,7 +394,7 @@ onFlowComplete:
       id: turno-list
     timeout: 30000
 - assertVisible:
-    id: top-tu-turno
+    id: tab-tu-turno
     selected: true
 # The piece published 3 days ago (seed_qa: uid('piece:publicada3')).
 - openLink: oficina0ff1ce://calendario/pieza/be144c1c-3ea7-5321-8f21-9c3520bace8f
@@ -429,9 +402,9 @@ onFlowComplete:
     visible:
       id: detail-panel
     timeout: 30000
-# cubre: OFI-09.3 — «‹» names where it goes back to: opened over Tu turno, the piece shows «‹ Tu turno»
+# cubre: OFI-09.3 — «‹» names where it goes back to: opened over the Bandeja, the piece shows «‹ Bandeja»
 - assertVisible:
-    text: Tu turno
+    text: Bandeja
     childOf:
       id: top-volver
 - takeScreenshot: 02-navegacion-17-enlace-pieza
@@ -445,6 +418,6 @@ onFlowComplete:
 - assertVisible:
     id: turno-list
 - assertVisible:
-    id: top-tu-turno
+    id: tab-tu-turno
     selected: true
 - takeScreenshot: 02-navegacion-18-enlace-cerrado

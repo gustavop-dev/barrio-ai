@@ -1,5 +1,5 @@
 # cubre: AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-09, AJU-11, OFI-07, IMG-16
-# Ajustes, opened from the top bar, from Máquina to Captura y galería (Notificaciones, devices, «Lo que el equipo sabe
+# Ajustes, opened from the top bar, from Máquina to Captura (Notificaciones, devices, «Lo que el equipo sabe
 # de ti», the section links and the session are in 15-ajustes-sesion): «Parada total» with its required reason, a
 # first try that fails (failure switch) and a second that stops the machine, the banner and «Reanudar»; pausing and resuming the simulated Unipile account; the orientation («Descartar cambios»,
 # then «Guardar orientación»); Autonomía y límites unfolded; Gasto de IA; LinkedIn oficial and «Conectar LinkedIn»,
@@ -420,11 +420,11 @@ tags: [ajustes]
 - assertVisible: "Sin conectar"
 - takeScreenshot: 11-ajustes-12b-linkedin-al-volver
 
-# ---------------------------------------------------------------- Captura y galería
+# ---------------------------------------------------------------- Captura (the profile photos are a section of their own)
 # cubre: AJU-08, AJU-09
 - scrollUntilVisible:
     element:
-      text: "CAPTURA Y GALERÍA"
+      text: "CAPTURA"
     direction: DOWN
     timeout: 30000
 # The QA install grants every permission (adb install -g).

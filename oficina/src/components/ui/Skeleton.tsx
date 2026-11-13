@@ -1,5 +1,5 @@
 export interface SkeletonProps {
-  /** card (Tu turno), row (list of people or events), kpi (Resultados tile), line (text). */
+  /** card (la Bandeja), row (list of people or events), kpi (Resultados tile), line (text). */
   variant?: 'card' | 'row' | 'kpi' | 'line';
   count?: number;
   /** Announced once to screen readers. */

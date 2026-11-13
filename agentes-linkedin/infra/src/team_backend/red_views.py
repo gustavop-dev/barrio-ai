@@ -19,11 +19,14 @@ class Contacts(ListAPIView):
         params=self.request.query_params
         stage=params.get('stage')
         open_opportunity=Q(opportunities__isnull=False)&~Q(opportunities__stage__in=['acuerdo','sin_acuerdo'])
-        if stage=='opportunity':qs=qs.filter(open_opportunity).distinct()
+        # Personas › Conexiones in the app: only who accepted, the most recent connection first (the stage is ignored).
+        if params.get('vista')=='conexiones':qs=red.connections(qs)
+        elif stage=='opportunity':qs=qs.filter(open_opportunity).distinct()
         elif stage=='conversation':qs=qs.none()  # conversations arrive with the inbox
         elif stage:qs=qs.filter(stage=stage)
         if params.get('source'):qs=qs.filter(source=params['source'])
-        if params.get('role'):qs=qs.filter(classification__role=params['role'])
+        if params.get('role')==red.NO_ROLE:qs=qs.filter(red.without_role())
+        elif params.get('role'):qs=qs.filter(classification__role=params['role'])
         if params.get('modality'):qs=qs.filter(classification__modality=params['modality'])
         if params.get('q'):qs=qs.filter(Q(display_name__icontains=params['q'])|Q(headline__icontains=params['q']))
         account=self.request.query_params.get('account')

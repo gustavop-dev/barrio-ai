@@ -20,7 +20,7 @@
     },
     {
       "rutas": ["movil/src/capture/**"],
-      "flujos": ["05-*", "10-*", "18-perfil"],
+      "flujos": ["05-*", "18-perfil"],
       "cubre": ["CAP-*"]
     },
     {
@@ -59,13 +59,13 @@
       "cubre": ["PRS-*", "BAR-*"]
     },
     {
-      "rutas": ["movil/src/galeria/**", "movil/src/app/(app)/(tabs)/galeria.tsx"],
-      "flujos": ["05-*", "10-*", "18-perfil"],
-      "cubre": ["GAL-*"]
+      "rutas": ["movil/src/fotos/**"],
+      "flujos": ["11-*", "18-perfil"],
+      "cubre": ["GAL-*", "AJU-12"]
     },
     {
       "rutas": ["movil/src/ajustes/**", "movil/src/app/(app)/(tabs)/ajustes.tsx"],
-      "flujos": ["11-*", "15-*"],
+      "flujos": ["11-*", "15-*", "18-perfil"],
       "cubre": ["AJU-*"]
     }
   ]

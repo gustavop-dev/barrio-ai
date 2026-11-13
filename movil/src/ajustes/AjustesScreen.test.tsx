@@ -134,6 +134,7 @@ function server(extra: Record<string, FakeHandler> = {}, { control = {}, status 
     'GET /api/v1/orientacion': { body: AJUSTES.orientation },
     'GET /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'auto', updated_at: null } },
     'GET /api/v1/auth/dispositivos': { body: DEVICES },
+    'GET /api/v1/galeria': { body: { count: 0, next: null, previous: null, results: [] } },
     ...extra,
   });
 }
@@ -324,7 +325,7 @@ describe('Ajustes · LinkedIn oficial', () => {
   });
 });
 
-describe('Ajustes · Captura y galería', () => {
+describe('Ajustes · Captura y fotos de perfil', () => {
   it('shows the microphone permission and saves the AI-edit default', async () => {
     const api = server({ 'PATCH /api/v1/ajustes/preferencias': { body: { gallery_ai_edit: 'no', updated_at: null } } });
     await renderAjustes();
@@ -474,5 +475,14 @@ describe('Ajustes · anchors', () => {
     await renderAjustes();
     await act(async () => layout('maquina', 60));
     expect(scrollTo).toHaveBeenLastCalledWith({ y: 48, animated: true });
+  });
+  it('scrolls to #fotos, where the old Galería links land: the profile photos', async () => {
+    routerState.params = { ancla: 'fotos' };
+    const scrollTo = jest.spyOn(ScrollView.prototype as unknown as { scrollTo: () => void }, 'scrollTo').mockImplementation(() => undefined);
+    server();
+    await renderAjustes();
+    expect(await screen.findByText(/Todavía no hay fotos de perfil/)).toBeOnTheScreen();
+    await act(async () => layout('fotos', 1200));
+    expect(scrollTo).toHaveBeenLastCalledWith({ y: 1188, animated: true });
   });
 });

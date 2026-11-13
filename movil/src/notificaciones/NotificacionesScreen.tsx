@@ -206,7 +206,7 @@ export function NotificacionesScreen() {
         </T>
         <T soft>
           Lo que viene y lo que pasó. Nada de esto necesita que hagas algo; lo que sí, está en{' '}
-          <InlineLink onPress={() => router.navigate('/tu-turno')}>Tu turno</InlineLink>.
+          <InlineLink onPress={() => router.navigate('/tu-turno')}>tu Bandeja</InlineLink>.
         </T>
       </View>
       <View style={styles.bar}>

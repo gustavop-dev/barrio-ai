@@ -225,9 +225,9 @@ export function pushTypesOf(ajustes: Ajustes | undefined): PushType[] | undefine
   return (ajustes as AjustesConPush | undefined)?.push_types;
 }
 
-/** «Va a Tu turno» or «Va a Notificaciones». */
+/** «Va a la Bandeja» or «Va a Notificaciones». */
 export function pushTypeHint(type: Pick<PushType, 'goes_to'>): string | undefined {
-  return type.goes_to === 'tu_turno' ? 'Va a Tu turno' : type.goes_to === 'notificaciones' ? 'Va a Notificaciones' : undefined;
+  return type.goes_to === 'tu_turno' ? 'Va a la Bandeja' : type.goes_to === 'notificaciones' ? 'Va a Notificaciones' : undefined;
 }
 
 /** Every kind switched off, for PATCH /ajustes/preferencias `push_disabled`. */

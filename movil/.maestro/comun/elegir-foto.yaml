@@ -1,4 +1,4 @@
-# Picks the QA picture in Android's photo picker, which «Galería» in the capture sheet and «Subir fotos» in Galería open
+# Picks the QA picture in Android's photo picker, which «Galería» in the capture sheet and «Subir fotos de perfil» in Ajustes open
 # (expo-image-picker with several photos allowed). scripts/qa/correr-maestro.sh puts one of the seeded gallery PNGs in
 # the emulator's Pictures before the flows, so it is the newest (and only) photo: the first cell of the grid.
 # Env: CAPTURA, the name of the screenshot of the picker.

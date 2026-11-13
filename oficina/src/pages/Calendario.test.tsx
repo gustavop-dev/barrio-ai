@@ -54,7 +54,7 @@ describe('Calendario · semana (móvil)', () => {
     // Tu parte
     const tuParte = within(day).getByRole('group', { name: 'Tu parte' });
     expect(within(tuParte).getByText('Responde: ¿En qué idioma van tus textos públicos?')).toBeInTheDocument();
-    expect(within(tuParte).getByRole('link', { name: 'Ir a Tu turno' })).toHaveAttribute('href', '/tu-turno');
+    expect(within(tuParte).getByRole('link', { name: 'Ir a la Bandeja' })).toHaveAttribute('href', '/tu-turno');
 
     // Publicación del día, from the piece detail
     const publication = within(day).getByRole('group', { name: 'Publicación del día' });
@@ -104,7 +104,7 @@ describe('Calendario · semana (móvil)', () => {
     const important = await within(panel()).findByRole('list', { name: 'Lo importante del día' });
     const uncertain = within(important).getByText('Comentario: no se sabe si salió').closest('li')!;
     expect(within(uncertain).getByText('Incierta')).toBeInTheDocument();
-    expect(within(uncertain).getByRole('link', { name: 'Resuélvela en Tu turno' })).toHaveAttribute('href', '/tu-turno#turno-uncertain-prop-9');
+    expect(within(uncertain).getByRole('link', { name: 'Resuélvela en la Bandeja' })).toHaveAttribute('href', '/tu-turno#turno-uncertain-prop-9');
 
     await user.click(screen.getByRole('button', { name: 'Semana siguiente' }));
     expect(location()).toBe('/calendario?fecha=2026-11-13');
@@ -288,7 +288,7 @@ describe('Calendario · lista', () => {
     expect(within(timeline).getByRole('link', { name: 'Ver ficha' })).toHaveAttribute('href', '/personas/c11');
     const uncertain = within(timeline).getByText('Comentaste en el post de Pablo Ficticio').closest('li')!;
     expect(within(uncertain).getByText('Incierta')).toBeInTheDocument();
-    expect(within(uncertain).getByRole('link', { name: 'Resuélvela en Tu turno' })).toHaveAttribute('href', '/tu-turno#turno-uncertain-i-4');
+    expect(within(uncertain).getByRole('link', { name: 'Resuélvela en la Bandeja' })).toHaveAttribute('href', '/tu-turno#turno-uncertain-i-4');
     expect(within(timeline).getByText('Publicaste: AI features should start from a workflow.')).toBeInTheDocument();
     expect(within(timeline).getByRole('link', { name: 'Ver la pieza' })).toHaveAttribute('href', '/calendario/pieza/p5');
   });

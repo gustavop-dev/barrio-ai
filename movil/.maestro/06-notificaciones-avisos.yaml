@@ -30,7 +30,7 @@ tags: [notificaciones]
     direction: DOWN
     centerElement: true
     timeout: 30000
-- assertVisible: 'Te avisan aquí de lo que pide tu acción \(Tu turno\) y de lo importante que pasa \(Notificaciones\)\.'
+- assertVisible: 'Te avisan aquí de lo que pide tu acción \(la Bandeja\) y de lo importante que pasa \(Notificaciones\)\.'
 - assertVisible: 'Teléfonos que reciben avisos.*'
 # The emulator has no Expo token: the reason, and no phone registered.
 - assertVisible: 'Avisos push aún no disponibles'

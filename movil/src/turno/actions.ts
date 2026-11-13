@@ -161,9 +161,9 @@ export function modalFor(action: TurnoAction, card?: TurnoCard): ModalSpec | nul
     return {
       title: action.label,
       text: isConversationClose(action)
-        ? 'La tarjeta sale de Tu turno hasta que te vuelva a escribir. Nadie le responde por ti.'
+        ? 'La tarjeta sale de la Bandeja hasta que te vuelva a escribir. Nadie le responde por ti.'
         : isMessageClose(action)
-          ? 'La tarjeta sale de Tu turno. Nadie le escribe por ti.'
+          ? 'La tarjeta sale de la Bandeja. Nadie le escribe por ti.'
           : null,
       note: 'optional',
       noteLabel: 'Motivo',

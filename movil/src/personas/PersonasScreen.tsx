@@ -1,36 +1,37 @@
-// Personas: Barrio (the people of the network), Oportunidades and Referentes, as tabs. The tab and the Barrio
-// filters live in the route params (?pestana=, ?etapa=&q=&rol=&modalidad=&origen=), as in the PWA, so the
-// links of the old /red and /referentes land on the right place. The person card is its own screen.
+// Personas: Conexiones (the people who accepted, Gustavo's people database), Oportunidades, Referentes and Comunidad,
+// as tabs. The tab and the Conexiones filters live in the route params (?pestana=, ?q=&rol=), as in the PWA, so the
+// links of the old /red and /referentes land on the right place. The old funnel filters (?etapa=, ?modalidad=,
+// ?origen=) of earlier links are ignored: they open Conexiones. The person card is its own screen.
 import { StyleSheet, View } from 'react-native';
 import { useParamState } from '@/components/shell/useParamState';
 import { PageHeader, TabBar } from '@/components/ui';
 import { space } from '@/theme/tokens';
-import { Barrio } from './Barrio';
+import { Conexiones } from './Conexiones';
 import { Oportunidades } from './Oportunidades';
 import { Referentes } from './Referentes';
 import { Comunidad } from './Comunidad';
 
-type Tab = 'barrio' | 'oportunidades' | 'referentes' | 'comunidad';
+type Tab = 'conexiones' | 'oportunidades' | 'referentes' | 'comunidad';
 
 const TABS: readonly { value: Tab; label: string }[] = [
-  { value: 'barrio', label: 'Barrio' },
+  { value: 'conexiones', label: 'Conexiones' },
   { value: 'oportunidades', label: 'Oportunidades' },
   { value: 'referentes', label: 'Referentes' },
   { value: 'comunidad', label: 'Comunidad' },
 ];
 
-export const PERSONAS_PARAMS = ['pestana', 'etapa', 'q', 'rol', 'modalidad', 'origen'] as const;
+export const PERSONAS_PARAMS = ['pestana', 'q', 'rol'] as const;
 
 function readTab(value: string): Tab {
-  return value === 'oportunidades' || value === 'referentes' || value === 'comunidad' ? value : 'barrio';
+  return value === 'oportunidades' || value === 'referentes' || value === 'comunidad' ? value : 'conexiones';
 }
 
 export function PersonasScreen() {
   const [params, setParams] = useParamState(PERSONAS_PARAMS);
   const tab = readTab(params.pestana);
 
-  // Each tab starts clean: the Barrio filters do not apply to the other two.
-  const choose = (next: Tab) => setParams({ pestana: next === 'barrio' ? '' : next, etapa: '', q: '', rol: '', modalidad: '', origen: '' });
+  // Each tab starts clean: the Conexiones filters do not apply to the others.
+  const choose = (next: Tab) => setParams({ pestana: next === 'conexiones' ? '' : next, q: '', rol: '' });
 
   const header = (
     <View style={styles.header}>
@@ -43,17 +44,14 @@ export function PersonasScreen() {
   if (tab === 'referentes') return <Referentes header={header} />;
   if (tab === 'comunidad') return <Comunidad header={header} />;
   return (
-    <Barrio
+    <Conexiones
       header={header}
-      filters={{ stage: params.etapa, q: params.q, role: params.rol, modality: params.modalidad, source: params.origen }}
+      filters={{ q: params.q, role: params.rol }}
       onFilters={(changes) =>
         setParams({
           pestana: '',
-          ...(changes.stage !== undefined ? { etapa: changes.stage } : {}),
           ...(changes.q !== undefined ? { q: changes.q } : {}),
           ...(changes.role !== undefined ? { rol: changes.role } : {}),
-          ...(changes.modality !== undefined ? { modalidad: changes.modality } : {}),
-          ...(changes.source !== undefined ? { origen: changes.source } : {}),
         })
       }
     />

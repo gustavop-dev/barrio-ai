@@ -582,31 +582,30 @@ tags: [calendario]
     visible:
       id: pager-semana
     timeout: 10000
+# The day after tomorrow may be in the next week: a swipe left brings it. Its panel is under the calendar.
 - runFlow:
     when:
       notVisible:
         id: "dia-${output.pasadoManana}"
     commands:
-      - tapOn:
-          id: calendario-siguiente
+      - swipe:
+          from:
+            id: pager-semana
+          direction: LEFT
       - extendedWaitUntil:
           visible:
             id: "dia-${output.pasadoManana}"
           timeout: 10000
 - tapOn:
     id: "dia-${output.pasadoManana}"
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       text: "${output.pasadoMananaTitulo}"
       childOf:
-        id: hoja-dia
-    timeout: 10000
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
-- extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
-    timeout: 10000
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - scrollUntilVisible:
     element:
       text: "Preparar la siguiente pieza"

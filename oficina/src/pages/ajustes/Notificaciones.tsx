@@ -66,7 +66,7 @@ function Device() {
         <p className="t-cuerpo">Este dispositivo</p>
         <Badge tone={badge.tone}>{badge.label}</Badge>
       </div>
-      <p className="t-detalle text-suave">Te avisan aquí de lo que pide tu acción (Tu turno) y de lo importante que pasa (Notificaciones).</p>
+      <p className="t-detalle text-suave">Te avisan aquí de lo que pide tu acción (la Bandeja) y de lo importante que pasa (Notificaciones).</p>
       {support.ios || support.needsInstall ? <IphoneSteps highlight={support.needsInstall} /> : null}
       {!support.supported && !support.needsInstall ? (
         <Note tone="warn" role={null}>
@@ -156,7 +156,7 @@ function PerType() {
         <ErrorRetry error={ajustes.error} onRetry={() => void ajustes.refetch()} />
         {types?.length ? (
           <>
-            <p className="t-detalle text-suave">Apagar la push de un tipo no lo borra: el aviso sigue llegando a Tu turno o a Notificaciones.</p>
+            <p className="t-detalle text-suave">Apagar la push de un tipo no lo borra: el aviso sigue llegando a la Bandeja o a Notificaciones.</p>
             <div className="aj-switches">
               {types.map((type) => (
                 <SwitchRow

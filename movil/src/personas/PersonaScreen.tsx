@@ -111,7 +111,7 @@ function NextStep({ contact }: { contact: Contact }) {
       ) : null}
       {contact.your_turn ? (
         <Button block onPress={() => router.dismissTo('/tu-turno')}>
-          Ir a Tu turno
+          Ir a la Bandeja
         </Button>
       ) : null}
     </Card>

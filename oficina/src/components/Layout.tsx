@@ -31,7 +31,7 @@ interface NavItem {
 }
 
 const OFICINA: NavItem = { to: '/', label: 'Oficina', icon: IconOficina, end: true };
-const TU_TURNO: NavItem = { to: '/tu-turno', label: 'Tu turno', icon: IconTuTurno };
+const TU_TURNO: NavItem = { to: '/tu-turno', label: 'Bandeja de entrada', icon: IconTuTurno };
 const NOTIFICACIONES: NavItem = { to: '/notificaciones', label: 'Notificaciones', icon: IconNotificaciones };
 const CALENDARIO: NavItem = { to: '/calendario', label: 'Calendario', icon: IconCalendario };
 const RESULTADOS: NavItem = { to: '/resultados', label: 'Resultados', icon: IconResultados };
@@ -201,12 +201,12 @@ function useTurnCount(): TurnCount {
   };
 }
 
-/** «Tu turno, 6 pendientes, 1 urgente». */
+/** «Bandeja de entrada, 6 pendientes, 1 urgente». */
 export function turnLabel({ count, critical, urgent }: Pick<TurnCount, 'count' | 'critical' | 'urgent'>): string {
-  if (count <= 0) return 'Tu turno';
+  if (count <= 0) return 'Bandeja de entrada';
   const pending = `${count} ${count === 1 ? 'pendiente' : 'pendientes'}`;
   const urgentText = critical ? (urgent > 0 ? `, ${urgent} ${urgent === 1 ? 'urgente' : 'urgentes'}` : ', con algo urgente') : '';
-  return `Tu turno, ${pending}${urgentText}`;
+  return `Bandeja de entrada, ${pending}${urgentText}`;
 }
 
 function notificationsLabel(unread: number): string {

@@ -76,7 +76,7 @@ export const WEEK_DAYS: CalendarioDay[] = [
     '2026-11-02',
     [
       event({ id: 'piece_published:p2:2026-11-02', layer: 'publicaciones', kind: 'piece_published', at: '2026-11-02T14:00:00Z', title: 'AI features should start from a workflow, not a model.', state: 'published', link: '/calendario/pieza/p2', impressions: 1840 }),
-      event({ id: 'connection_fit:connections:2026-11-02', layer: 'red', kind: 'connection_fit', title: '3 conexiones nuevas', link: '/personas?etapa=connected', people: [{ id: 'c1', name: 'Ana', role: 'comprador' }, { id: 'c2', name: 'Bea', role: 'par' }, { id: 'c3', name: 'Ciro', role: 'divulgador' }] }),
+      event({ id: 'connection_fit:connections:2026-11-02', layer: 'red', kind: 'connection_fit', title: '3 conexiones nuevas', link: '/personas', people: [{ id: 'c1', name: 'Ana', role: 'comprador' }, { id: 'c2', name: 'Bea', role: 'par' }, { id: 'c3', name: 'Ciro', role: 'divulgador' }] }),
     ],
     { comments: 5, reactions: 2, follows: 3, invites: 2, connections_fit: 3 },
   ),

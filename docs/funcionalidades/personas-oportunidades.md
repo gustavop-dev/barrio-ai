@@ -2,14 +2,14 @@
 
 El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conecta), la ficha de cada persona, sus oportunidades de negocio y los referentes que el equipo observa. Lo que hace el equipo por detrás está en [red.md](red.md), [inbox.md](inbox.md) y [comentarios-y-lider.md](comentarios-y-lider.md).
 
-- **Código:** backend `red_views.py` (`Contacts`, `ContactDetail`, `ContactDiscard`, `ContactNotes`, `Summary`), `serializers.ContactOutput`, `rediseno_views.Opportunities`, `OpportunityDetail`, `oportunidades.py`, `operador_views.Referents`, `ReferentDetail`; PWA `oficina/src/pages/Personas.tsx`, `Persona.tsx`, `pages/personas/*`; app `movil/src/personas/*`, `movil/src/app/(app)/personas/[id].tsx`; común `compartido/src/api/personas.ts`, `compartido/src/logic/personas.ts`, `barrio.ts`, `journey.ts`.
+- **Código:** backend `red_views.py` (`Contacts`, `ContactDetail`, `ContactDiscard`, `ContactNotes`, `Summary`), `serializers.ContactOutput`, `rediseno_views.Opportunities`, `OpportunityDetail`, `oportunidades.py`, `operador_views.Referents`, `ReferentDetail`; PWA `oficina/src/pages/Personas.tsx`, `Persona.tsx`, `pages/personas/*`; app `movil/src/personas/*`, `movil/src/app/(app)/personas/[id].tsx`; común `compartido/src/api/personas.ts`, `compartido/src/logic/personas.ts`, `barrio.ts`, `conexiones.ts`, `journey.ts`.
 - **Documentación:** secciones «Red» y «Personas» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md), [`rediseno-backend.md`](../../agentes-linkedin/infra/docs/rediseno-backend.md).
 
 ## Resumen
 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
-| [PRS-01](#prs-01) | Barrio: la lista de personas y sus etapas | PWA · app · backend | funciona |
+| [PRS-01](#prs-01) | Conexiones: las personas que aceptaron, por etiqueta (Barrio en la PWA) | PWA · app · backend | funciona |
 | [PRS-02](#prs-02) | Buscar y filtrar personas | PWA · app · backend | funciona |
 | [PRS-03](#prs-03) | Ficha de una persona | PWA · app · backend | funciona |
 | [PRS-04](#prs-04) | La conversación en la ficha | PWA · app · backend | funciona |
@@ -24,36 +24,37 @@ El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conec
 
 ---
 
-### PRS-01 · Barrio: la lista de personas y sus etapas <a id="prs-01"></a>
+### PRS-01 · Conexiones: las personas que aceptaron, por etiqueta (Barrio en la PWA) <a id="prs-01"></a>
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** ve a las personas de su barrio, en qué etapa está cada una y cuántas hay en cada etapa, con los avisos de la red.
-- **Código:** `GET /api/v1/red/contacts`, `GET /api/v1/red/summary` ([BAR-11](red.md#bar-11)); PWA `personas/Barrio.tsx`; app `personas/Barrio.tsx`.
+- **Qué hace para Gustavo:** en la app, Personas › Conexiones es su base de personas: solo quienes aceptaron la invitación (o cuya invitación aceptó el equipo), agrupadas por cuándo aceptaron y filtrables por su etiqueta del barrio, con los avisos de la red. La cola de los agentes (por clasificar, encaja, seguido, invitado, te invitó, cerrado y descartado) no aparece ahí (pedido de Gustavo, 12/11/2026). La ficha de cualquier persona, conectada o no, sigue abriéndose por su enlace.
+- **Código:** `GET /api/v1/red/contacts?vista=conexiones`, `GET /api/v1/red/summary` (`connections`; [BAR-11](red.md#bar-11)); app `personas/Conexiones.tsx`, común `compartido/src/logic/conexiones.ts`; PWA `personas/Barrio.tsx`.
 - **Criterios de aceptación:**
-  1. **Dado** Personas, **cuando** lo abre, **entonces** ve las pestañas «Barrio», «Oportunidades» y «Referentes» (en la URL, `?pestana=`) y, en Barrio, los chips de etapa con su número: Todas, Por clasificar, Encaja, Seguido, Invitado, Conectado, En conversación, Oportunidad, Te invitó, Cerrado y Descartado.
-  2. **Dado** cada persona, **cuando** se pinta, **entonces** muestra avatar, nombre (o «Sin nombre»), etapa, titular, chips de rol y modalidad (o «Sin clasificar todavía»), origen y última actividad, y «Te toca» si le toca a Gustavo.
-  3. **Dado** un chip de etapa, **cuando** lo elige, **entonces** se filtra (`?etapa=`); «Oportunidad» muestra las personas con una oportunidad abierta.
-  4. **Dado** `red/summary.enabled = false`, **cuando** abre Barrio, **entonces** ve «La red está apagada en el servidor» con «El equipo no descubre ni propone a nadie nuevo. Lo guardado sigue aquí.».
-  5. **Dado** `invites_blocked.blocked = true`, **cuando** abre Barrio, **entonces** ve «Invitaciones en pausa: LinkedIn las limitó», el motivo y «El equipo sigue observando y siguiendo.».
-  6. **Dado** el chip «En conversación» con número `null`, **cuando** se pinta, **entonces** aparece desactivado con «· aún no disponible».
-  7. **Dado** ninguna persona, **cuando** abre Barrio, **entonces** ve «Aún no hay personas» con «El equipo empieza a descubrir cuando lee los comentarios de los referentes.».
-  8. **Dado** la carga o un error, **cuando** abre Barrio, **entonces** ve «Cargando personas…» o el error con «Reintentar» («No se pudo actualizar la lista» si ya había datos).
+  1. **Dado** Personas en la app, **cuando** lo abre, **entonces** ve las pestañas «Conexiones», «Oportunidades», «Referentes» y «Comunidad» (en la URL, `?pestana=`), con Conexiones por defecto.
+  2. **Dado** Conexiones, **cuando** se carga, **entonces** solo lista los contactos en `connected`, la conexión más reciente primero (`connected_at`, o `updated_at` si falta), bajo «Esta semana» (desde el lunes), «Este mes» y «Antes», en días de Bogotá.
+  3. **Dado** cada conexión, **cuando** se pinta, **entonces** muestra avatar, nombre (o «Sin nombre», dos líneas como máximo), su etiqueta («Comprador», «Par»… o «Sin etiqueta»), titular y ubicación en una línea cada uno, «Aceptó el 12/11» (con el año si no es el actual; nada sin `connected_at`) y «Te toca» si le toca a Gustavo; al tocarla abre su ficha.
+  4. **Dado** `red/summary.connections`, **cuando** se pintan los chips, **entonces** ve «Todas · N» y un chip por etiqueta presente, en el orden del barrio («Compradores · 2», «Pares · 1»…, «Sin etiqueta» al final); elegir uno filtra (`?rol=`; `role=sin_etiqueta` para quien no tiene rol) y volver a tocarlo vuelve a «Todas». Las etiquetas salen de la clasificación: no se editan a mano.
+  5. **Dado** `red/summary.enabled = false`, **cuando** abre la lista, **entonces** ve «La red está apagada en el servidor» con «El equipo no descubre ni propone a nadie nuevo. Lo guardado sigue aquí.».
+  6. **Dado** `invites_blocked.blocked = true`, **cuando** abre la lista, **entonces** ve «Invitaciones en pausa: LinkedIn las limitó», el motivo y «El equipo sigue observando y siguiendo.».
+  7. **Dado** ninguna conexión, **cuando** abre Conexiones, **entonces** ve «Todavía no hay conexiones» con «Aquí aparece cada persona cuando acepta la invitación.».
+  8. **Dado** la carga o un error, **cuando** abre Conexiones, **entonces** ve «Cargando conexiones…» o el error con «Reintentar» («No se pudo actualizar la lista» si ya había datos).
   9. **Dado** más de una página, **cuando** pulsa «Cargar más», **entonces** carga la siguiente.
-  10. **Dado** el enlace antiguo `/red` o `/referentes`, **cuando** lo abre, **entonces** llega a Personas (a la pestaña Referentes en el segundo caso).
-- **Brechas código/docs:** si falla `red/summary`, los chips pierden sus números y los avisos desaparecen sin mensaje (las dos interfaces). «En conversación» sigue siempre sin datos aunque el inbox ya lee conversaciones ([BAR-11](red.md#bar-11)).
+  10. **Dado** el enlace antiguo `/red`, `/referentes` o `/personas?etapa=…` (o con `?modalidad=` y `?origen=`), **cuando** lo abre en la app, **entonces** llega a Personas: a Referentes en el segundo caso y a Conexiones, sin esos filtros, en el tercero. Los avisos que apuntaban al embudo («N conexiones nuevas» del calendario) llevan a `/personas`; «El equipo invitará a N personas» ya no enlaza a ninguna lista.
+  11. **Dado** la PWA, **cuando** abre Personas, **entonces** sigue viendo la pestaña «Barrio»: todas las personas con los chips de etapa y su número (Todas, Por clasificar, Encaja, Seguido, Invitado, Conectado, En conversación, Oportunidad, Te invitó, Cerrado y Descartado; «En conversación» desactivado con «· aún no disponible» mientras su número sea `null`) y, en cada fila, etapa, rol, modalidad (o «Sin clasificar todavía»), origen y última actividad.
+- **Brechas código/docs:** la PWA no tiene Conexiones: sigue con Barrio y su embudo. Si falla `red/summary`, los chips pierden sus números y los avisos desaparecen sin mensaje (las dos interfaces). En la PWA, «En conversación» sigue siempre sin datos aunque el inbox ya lee conversaciones ([BAR-11](red.md#bar-11)).
 - **Cobertura QA:** pendiente
 
 ### PRS-02 · Buscar y filtrar personas <a id="prs-02"></a>
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** busca por nombre o titular y filtra por rol del barrio, modalidad y origen.
-- **Código:** parámetros `q`, `role`, `modality`, `source` de `GET /api/v1/red/contacts`.
+- **Qué hace para Gustavo:** busca por nombre o titular y filtra por etiqueta (rol del barrio); en la PWA, también por modalidad y origen.
+- **Código:** parámetros `q`, `role` (`sin_etiqueta` para quien no tiene rol), `modality`, `source` y `vista` de `GET /api/v1/red/contacts`.
 - **Criterios de aceptación:**
-  1. **Dado** «Buscar por nombre», **cuando** escribe «lucía», **entonces** a los 300 ms se filtra por nombre o titular (`?q=`).
-  2. **Dado** «Más filtros», **cuando** elige «Rol del barrio», «Modalidad» u «Origen», **entonces** se filtra y el botón indica cuántos filtros hay activos.
-  3. **Dado** filtros sin resultados, **cuando** se aplican, **entonces** ve «Nadie coincide con estos filtros» (o «Nadie en «<etapa>» ahora mismo» con solo la etapa) y «Quitar filtros».
+  1. **Dado** «Buscar por nombre», **cuando** escribe «lucía», **entonces** a los 300 ms se filtra por nombre o titular (`?q=`), sin perder letras aunque la URL tarde en ponerse al día.
+  2. **Dado** la app, **cuando** elige un chip de etiqueta, **entonces** solo ve esas conexiones ([PRS-01](#prs-01), criterio 4). **Dado** «Más filtros» en la PWA, **cuando** elige «Rol del barrio», «Modalidad» u «Origen», **entonces** se filtra y el botón indica cuántos filtros hay activos.
+  3. **Dado** filtros sin resultados, **cuando** se aplican, **entonces** la app dice «Nadie coincide» y la PWA «Nadie coincide con estos filtros» (o «Nadie en «<etapa>» ahora mismo» con solo la etapa), con «Quitar filtros».
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -65,7 +66,7 @@ El barrio de Gustavo (las personas que el equipo descubre, sigue, invita y conec
 - **Código:** `GET /api/v1/red/contacts/<id>` (`display_stage`, `next_step`, `your_turn`, `classification`, `evidence`, `history`); PWA `Persona.tsx` (al lado de la lista en escritorio); app `personas/PersonaScreen.tsx`, `Journey.tsx`.
 - **Criterios de aceptación:**
   1. **Dado** una persona, **cuando** abre su ficha, **entonces** ve avatar, etapa, nombre enlazado a su perfil, titular, ubicación, grado («1.er grado», «2.º grado»…) y si la sigue, con «Abrir en LinkedIn».
-  2. **Dado** el siguiente paso, **cuando** se pinta, **entonces** dice «Siguiente paso · Te toca» o «· Equipo», el texto (por ejemplo «El equipo la invitará cuando termine la espera»), la fecha y la acción abierta con su estado; con `your_turn`, «Ir a Tu turno».
+  2. **Dado** el siguiente paso, **cuando** se pinta, **entonces** dice «Siguiente paso · Te toca» o «· Equipo», el texto (por ejemplo «El equipo la invitará cuando termine la espera»), la fecha y la acción abierta con su estado; con `your_turn`, «Ir a la Bandeja».
   3. **Dado** el recorrido, **cuando** se pinta, **entonces** muestra Descubierto → (Te invitó | Seguido → Invitado) → Conectado → En conversación → Oportunidad, con la etapa alcanzada, o el final Descartado o Cerrado («Invitación ignorada o retirada»).
   4. **Dado** una clasificación, **cuando** se pinta «Por qué encaja», **entonces** ve rol, modalidad, afinidad, motivo, «Confianza N %» y la fecha; sin clasificar, «Sin clasificar todavía. El equipo la clasificará en el próximo ciclo.»; si no encaja, la etiqueta «No encaja».
   5. **Dado** el origen, **cuando** se pinta «De dónde salió», **entonces** ve «Comentó en un post de <referente>» con el comentario citado y «Ver el post», «Búsqueda: <consulta>», «Te invitó» con el mensaje, o «Añadido a mano».

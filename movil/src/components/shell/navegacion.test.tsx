@@ -1,7 +1,8 @@
 // MovNavegacion: the push of detail screens (thresholds, projection, reduced motion, every way back
 // waiting for the spring), the tab content change and the top-bar push, and the bottom bar's pill and
 // haptic.
-import { act, fireEvent, screen, waitFor } from '@testing-library/react-native';
+import { turnoFixture } from '@compartido/fixtures/turno';
+import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import type { BottomTabBarProps } from 'expo-router/js-tabs';
@@ -12,6 +13,7 @@ import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
 import { durations, FIRM, navGestures, navSprings, navTimings, navValues } from '@/theme/motion';
+import { colors } from '@/theme/tokens';
 import { BottomBar, pillLeft } from './BottomBar';
 import { DetailScreen } from './DetailScreen';
 import { backLabel, baseFrame, canGrab, dragProgress, edgeRelease, panelFrame, stackLevel, stackOf } from './push';
@@ -71,7 +73,7 @@ describe('push (MovNavegacion)', () => {
   // E2E wave: a piece opened from Tu turno said «‹ Calendario» and went back to Tu turno.
   it('names «‹» after the screen it goes back to', () => {
     const tabs = (focused: string) => ({ key: 'tabs', name: '(tabs)', state: { index: 1, routes: [{ name: 'index' }, { name: focused }] } });
-    expect(backLabel({ routes: [tabs('tu-turno'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Tu turno');
+    expect(backLabel({ routes: [tabs('tu-turno'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Bandeja');
     expect(backLabel({ routes: [tabs('resultados'), { key: 'detail', name: 'personas/[id]' }] }, 'detail', 'Personas')).toBe('Resultados');
     expect(backLabel({ routes: [tabs('calendario'), { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Calendario');
     expect(backLabel({ routes: [tabs('personas'), { key: 'p', name: 'personas/[id]' }, { key: 'detail', name: 'calendario/pieza/[id]' }] }, 'detail', 'Calendario')).toBe('Persona');
@@ -176,9 +178,10 @@ describe('DetailScreen', () => {
 describe('tab content and the top-bar push (MovNavegacion)', () => {
   it('tells a tab change from a push into a top-bar screen and the way back', () => {
     expect(tabMove('index', 'resultados')).toBe('fade');
-    expect(tabMove('index', 'tu-turno')).toBe('push');
+    // The Bandeja de entrada (route tu-turno) is a bottom tab since 12/11/2026: it crossfades like the others.
+    expect(tabMove('index', 'tu-turno')).toBe('fade');
     expect(tabMove('tu-turno', 'calendario')).toBe('push');
-    expect(tabMove('ajustes', 'galeria')).toBe('pop');
+    expect(tabMove('ajustes', 'tu-turno')).toBe('pop');
     // An earlier top-bar screen is drawn under the one it replaces: it comes back with the pop, never pushed under it.
     expect(tabMove('notificaciones', 'tu-turno')).toBe('pop');
     expect(tabMove('ajustes', 'calendario')).toBe('pop');
@@ -187,7 +190,7 @@ describe('tab content and the top-bar push (MovNavegacion)', () => {
   });
 
   it('remembers the last two focused tabs and gives each scene its part', () => {
-    const order = ['index', 'resultados', 'personas', 'galeria', 'tu-turno'];
+    const order = ['index', 'resultados', 'personas', 'tu-turno'];
     const start: FocusMemory = { previous: null, current: null };
     const first = nextFocus(start, 'index');
     const memory = nextFocus(first, 'tu-turno');
@@ -197,7 +200,7 @@ describe('tab content and the top-bar push (MovNavegacion)', () => {
     expect(start).toEqual({ previous: null, current: null });
     expect(sceneRole(memory, 'tu-turno', order)).toEqual({ role: 'enter', side: 1 });
     expect(sceneRole(memory, 'index', order)).toEqual({ role: 'leave', side: -1 });
-    expect(sceneRole(memory, 'galeria', order).role).toBe('idle');
+    expect(sceneRole(memory, 'personas', order).role).toBe('idle');
   });
 
   it('knows the new focus in the same render that changes it', async () => {
@@ -226,7 +229,7 @@ describe('tab content and the top-bar push (MovNavegacion)', () => {
           state: {
             index: 1,
             routes: [
-              { key: 'tabs-1', name: '(tabs)', state: { index: 4, routes: ['index', 'resultados', 'personas', 'galeria', 'tu-turno'].map((name) => ({ key: `${name}-1`, name })) } },
+              { key: 'tabs-1', name: '(tabs)', state: { index: 3, routes: ['index', 'resultados', 'personas', 'tu-turno', 'notificaciones'].map((name) => ({ key: `${name}-1`, name })) } },
               { key: 'persona-1', name: 'personas/[id]' },
             ],
           },
@@ -292,10 +295,14 @@ describe('tab content and the top-bar push (MovNavegacion)', () => {
 });
 
 describe('BottomBar (MovNavegacion)', () => {
-  const routes = ['index', 'resultados', 'personas', 'galeria', 'tu-turno'].map((name) => ({ key: `${name}-k`, name }));
+  const routes = ['index', 'resultados', 'personas', 'tu-turno', 'notificaciones'].map((name) => ({ key: `${name}-k`, name }));
 
-  async function renderBar(index: number) {
-    fakeServer({ 'GET /api/v1/capturas': { body: { count: 0, next: null, previous: null, results: [] } }, 'GET /api/v1/preguntas': { body: [] } });
+  async function renderBar(index: number, turno = turnoFixture({ count: 0 })) {
+    fakeServer({
+      'GET /api/v1/capturas': { body: { count: 0, next: null, previous: null, results: [] } },
+      'GET /api/v1/preguntas': { body: [] },
+      'GET /api/v1/tu-turno': { body: turno },
+    });
     const navigateToTab = jest.fn();
     const props = { state: { index, routes }, descriptors: {}, emitter: {}, navigateToTab, insets: { top: 0, right: 0, bottom: 0, left: 0 } };
     const view = await renderApp(<BottomBar {...(props as unknown as BottomTabBarProps)} />, { recorder: true });
@@ -318,6 +325,25 @@ describe('BottomBar (MovNavegacion)', () => {
     expect(pillLeft(351)).toBe(323);
     await renderBar(4);
     expect(screen.getByTestId('tab-pill')).toBeOnTheScreen();
-    for (const label of ['Oficina', 'Resultados', 'Personas', 'Galería']) expect(screen.getByRole('tab', { name: label })).not.toBeSelected();
+    for (const label of ['Oficina', 'Resultados', 'Personas', 'Bandeja de entrada']) expect(screen.getByRole('tab', { name: label })).not.toBeSelected();
+  });
+
+  // Gustavo, 12/11/2026: the Galería left and the Bandeja de entrada (formerly «Tu turno» in the top bar) took its place.
+  it('has the Bandeja in the Galería\'s place, with its counter (alerta when critical) and accessible label', async () => {
+    const { navigateToTab } = await renderBar(0, turnoFixture({ count: 6, critical: true, urgent_count: 1 }));
+    expect(screen.queryByTestId('tab-galeria')).toBeNull();
+    expect(within(screen.getByTestId('tab-tu-turno')).getByText('Bandeja')).toBeOnTheScreen();
+    const counter = await screen.findByTestId('turn-counter');
+    expect(counter).toHaveTextContent('6');
+    expect(counter).toHaveStyle({ backgroundColor: colors.alert });
+    expect(screen.getByRole('tab', { name: 'Bandeja de entrada, 6 pendientes, 1 urgente' })).toBeOnTheScreen();
+    await fireEvent.press(screen.getByTestId('tab-tu-turno'));
+    expect(navigateToTab).toHaveBeenCalledWith('tu-turno-k');
+  });
+
+  it('hides the Bandeja counter at 0', async () => {
+    await renderBar(0, turnoFixture({ count: 0 }));
+    await waitFor(() => expect(screen.getByRole('tab', { name: 'Bandeja de entrada' })).toBeOnTheScreen());
+    expect(screen.queryByTestId('turn-counter')).toBeNull();
   });
 });

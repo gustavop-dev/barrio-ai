@@ -75,7 +75,7 @@ function NextStep({ contact }: { contact: Contact }) {
       ) : null}
       {contact.your_turn ? (
         <ButtonLink to="/tu-turno" block>
-          Ir a Tu turno
+          Ir a la Bandeja
         </ButtonLink>
       ) : null}
     </Card>

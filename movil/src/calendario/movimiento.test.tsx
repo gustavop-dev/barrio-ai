@@ -1,6 +1,6 @@
-// MovCalendario in the app: the selection sliding to the tapped day and travelling into the month, the day
-// panel entering from the side the date moved to, Semana ↔ Mes (the leaving view, the rows entering) and the
-// Vista selection; each with its tokens and its reduced-motion path.
+// MovCalendario in the app: the selection sliding to the tapped day and travelling into the month (and staying off a
+// page without the selected day), the day panel entering from the side the date moved to, Semana ↔ Mes (the leaving
+// view, the rows entering) and the Vista selection; each with its tokens and its reduced-motion path.
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { useState } from 'react';
@@ -16,6 +16,7 @@ import { LeavingView, useViewSwitch } from './ViewSwitch';
 import type { Vista } from '@compartido/logic/events';
 
 const WEEK = ['2026-11-02', '2026-11-03', '2026-11-04', '2026-11-05', '2026-11-06', '2026-11-07', '2026-11-08'];
+const NEXT_WEEK = ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13', '2026-11-14', '2026-11-15'];
 /** Week cells 48 pt wide with the 4 pt gap: day i starts at 52 × i. */
 const STEP = 52;
 
@@ -45,10 +46,12 @@ function translate(element: { props: Record<string, unknown> }): { x: number; y:
   return { x: transform[0]!.translateX!, y: transform[1]!.translateY! };
 }
 
-function Calendar({ vista = 'semana', fecha, reduced = false }: { vista?: 'semana' | 'mes'; fecha: string; reduced?: boolean }) {
+/** `fecha`: the selected day; `page`: a day of the week or month on screen (the selected day's, by default). The
+ * month enters as after a view switch (`enter`), the way the screen draws it. */
+function Calendar({ vista = 'semana', fecha, page = fecha, reduced = false }: { vista?: 'semana' | 'mes'; fecha: string; page?: string; reduced?: boolean }) {
   const pill = usePill(reduced);
-  const props = { fecha, today: '2026-11-07', byDate: new Map(), visible: new Set<never>(), onSelect: () => undefined, pill };
-  return vista === 'mes' ? <MonthDots key="mes" {...props} /> : <WeekStrip key="semana" {...props} />;
+  const props = { fecha: page, selected: fecha, today: '2026-11-07', byDate: new Map(), visible: new Set<never>(), onSelect: () => undefined, pill };
+  return vista === 'mes' ? <MonthDots key="mes" {...props} enter /> : <WeekStrip key="semana" {...props} />;
 }
 
 /** No layout pass under Jest: each week day reports where it sits. */
@@ -109,6 +112,39 @@ describe('MovCalendario · the selection', () => {
     await view.rerender(<Calendar fecha="2026-11-02" reduced />);
     await advance(16);
     expect(translate(screen.getByTestId('seleccion-dia'))).toEqual({ x: 0, y: 0 });
+  });
+
+  it('is not drawn on a week without the selected day, and is back on it at once when that week returns', async () => {
+    const view = await render(<Calendar fecha="2026-11-07" />);
+    await layOutWeek();
+    await advance(16);
+    expect(translate(screen.getByTestId('seleccion-dia'))).toEqual({ x: 5 * STEP, y: 0 });
+
+    // The next week is on screen; the selected day is still the 7th: no cell is selected and there is no piece.
+    await view.rerender(<Calendar fecha="2026-11-07" page="2026-11-14" />);
+    expect(screen.queryByTestId('seleccion-dia')).toBeNull();
+    expect(screen.getByTestId('dia-2026-11-14').props.accessibilityState).toMatchObject({ selected: false });
+
+    await view.rerender(<Calendar fecha="2026-11-07" page="2026-11-07" />);
+    await layOutWeek();
+    await advance(16);
+    // It does not travel from anywhere: it is on the 7th straight away.
+    expect(translate(screen.getByTestId('seleccion-dia'))).toEqual({ x: 5 * STEP, y: 0 });
+    expect(screen.getByTestId('dia-2026-11-07').props.accessibilityState).toMatchObject({ selected: true });
+  });
+
+  it('appears at once on a day tapped on a week that had no selection', async () => {
+    const view = await render(<Calendar fecha="2026-11-07" />);
+    await layOutWeek();
+    await advance(16);
+    await view.rerender(<Calendar fecha="2026-11-07" page="2026-11-14" />);
+    for (const [index, day] of NEXT_WEEK.entries()) {
+      await fireEvent(screen.getByTestId(`dia-${day}`), 'layout', { nativeEvent: { layout: { x: index * STEP, y: 0, width: 48, height: 72 } } });
+    }
+    // Wednesday the 11th is tapped: the piece shows there at once, not sliding from the 7th's place.
+    await view.rerender(<Calendar fecha="2026-11-11" page="2026-11-14" />);
+    await advance(16);
+    expect(translate(screen.getByTestId('seleccion-dia'))).toEqual({ x: 2 * STEP, y: 0 });
   });
 });
 

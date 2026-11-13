@@ -147,7 +147,7 @@ def capture_clarification(capture,user,text):
         key,origin=f'captura:{capture.id}')
     if question is None:question=TeamQuestion.objects.filter(memory_key=key).first()
     return ({'question':str(question.id) if question else None},
-        {'kind':'anotado','text':'Perfil te dejó una pregunta en Tu turno','link':'/tu-turno'},
+        {'kind':'anotado','text':'Perfil te dejó una pregunta en la Bandeja','link':'/tu-turno'},
         Capture.State.NOTED,'perfil')
 
 
@@ -285,7 +285,7 @@ def run(job,*,library=None,positioning=None,drafter=None,reviewer=None,reader=No
     proposal=ProfileProposal.objects.get(pk=job.params['proposal'],owner=job.owner)
     if proposal.state in ('cancelled','superseded','ready','partial') or proposal.version!=job.params['version']:return proposal
     runtime=orquestacion.Runtime.open('perfil_periodico',str(proposal.id),job.owner,job,
-        facts={'proposal':str(proposal.id),'mode':proposal.mode},plan=['biblioteca','lecturas','posicionamiento','copy','revisión','assets','Tu turno'])
+        facts={'proposal':str(proposal.id),'mode':proposal.mode},plan=['biblioteca','lecturas','posicionamiento','copy','revisión','assets','Bandeja'])
     _persist(proposal,state='running',cycle_id=runtime.id)
     try:
         with runtime.session():
@@ -504,7 +504,7 @@ def fact_answered(memory_key):
         if not affected:continue
         with transaction.atomic():
             proposal=ProfileProposal.objects.select_for_update().get(pk=proposal.pk)
-            try:revise(proposal,'Hecho respondido en Tu turno: '+memory_key,affected=affected)
+            try:revise(proposal,'Hecho respondido en la Bandeja: '+memory_key,affected=affected)
             except Conflict:
                 proposal.findings=list(dict.fromkeys(proposal.findings+['Dato recibido; hace falta revisión del ciclo para incorporarlo.']))
                 proposal.save(update_fields=['findings','updated_at'])

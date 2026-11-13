@@ -32,7 +32,7 @@ export function directionOf(from: string, to: string): Direction {
 
 /**
  * Follows the panel's date. A change from one day to another starts a swap; appearing (null → day) or
- * going away (day → null) does not: the sheet that opens or closes already moves.
+ * going away (day → null) does not: coming back from Lista, or leaving for it, changes the whole screen.
  */
 export function useDaySwap(date: string | null, reduced: boolean): DaySwapState {
   const [memory, setMemory] = useState<SwapMemory>({ shown: date, leaving: null, dir: 0 });

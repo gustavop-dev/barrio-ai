@@ -1,4 +1,4 @@
-# Tu turno: scrolls down to the folds at the end of the list («Pospuestas»), so the next search can go up to its target.
+# Bandeja: scrolls down to the folds at the end of the list («Pospuestas»), so the next search can go up to its target.
 # A card that leaves pulls the rest of the list up, and the next target may end above the screen: searching down from
 # there would never find it; from the end, going up always does.
 appId: co.projectapp.office

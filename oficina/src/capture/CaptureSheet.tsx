@@ -45,7 +45,7 @@ const CONTEXT_EYEBROW: Record<CaptureTarget['tipo'], string> = {
 };
 
 const CONTEXT_FALLBACK: Record<CaptureTarget['tipo'], string> = {
-  pregunta: 'Pregunta de Tu turno',
+  pregunta: 'Pregunta de la Bandeja',
   persona: 'Esta persona',
   pieza: 'Esta pieza',
 };

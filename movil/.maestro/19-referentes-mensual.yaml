@@ -15,14 +15,14 @@ name: Referentes mensuales y experimento
 tags: [referentes, turno, experimentos]
 ---
 - runFlow: comun/entrar.yaml
-# Tu turno opens from the top bar (as in 04-tu-turno); there is no bottom tab for it.
+# The Bandeja opens from its bottom tab (as in 04-tu-turno).
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 13 pendientes, 1 urgente'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 13 pendientes, 1 urgente'
     timeout: 30000
 - tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
@@ -91,8 +91,8 @@ tags: [referentes, turno, experimentos]
     timeout: 20000
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 12 pendientes, 1 urgente'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 12 pendientes, 1 urgente'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:
@@ -186,8 +186,8 @@ tags: [referentes, turno, experimentos]
     timeout: 60000
     centerElement: true
 - assertVisible:
-    id: top-tu-turno
-    text: 'Tu turno, 12 pendientes, 1 urgente'
+    id: tab-tu-turno
+    text: 'Bandeja de entrada, 12 pendientes, 1 urgente'
 - takeScreenshot: 19-referentes-03-edicion
 
 - runFlow: comun/turno-arriba.yaml
@@ -236,8 +236,8 @@ tags: [referentes, turno, experimentos]
     timeout: 60000
     centerElement: true
 - assertVisible:
-    id: top-tu-turno
-    text: 'Tu turno, 12 pendientes, 1 urgente'
+    id: tab-tu-turno
+    text: 'Bandeja de entrada, 12 pendientes, 1 urgente'
 - tapOn:
     text: "Detener"
     childOf:
@@ -249,8 +249,8 @@ tags: [referentes, turno, experimentos]
     timeout: 20000
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 11 pendientes, 1 urgente'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 11 pendientes, 1 urgente'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:

@@ -1,5 +1,6 @@
-// Reads and writes of Personas that the shared hooks do not cover: the contact list with «Cargar más»,
-// the whole opportunity board in one page, adding referents and «Observar ahora». Shared by the PWA
+// Reads and writes of Personas that the shared hooks do not cover: the contact list and the connections list
+// (the app's Conexiones) with «Cargar más», the whole opportunity board in one page, adding referents and
+// «Observar ahora». Shared by the PWA
 // (oficina/src/pages/personas/api.ts re-exports it) and the native app.
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from './client';
@@ -16,6 +17,19 @@ export function useContactPages(filters: ContactFilters) {
   return useInfiniteQuery({
     queryKey: [...keys.redAll, 'pages', normalized],
     queryFn: ({ pageParam }) => listContacts({ ...normalized, page: pageParam }),
+    initialPageParam: 1,
+    getNextPageParam: (last, _all, page) => (!Array.isArray(last) && last?.next ? page + 1 : undefined),
+    placeholderData: keepPreviousData,
+    refetchInterval: REFRESH.personas,
+  });
+}
+
+/** Personas › Conexiones: the connected people (`vista=conexiones`), by role and name, 25 per page with «Cargar más». */
+export function useConnectionPages({ q, role }: { q: string; role: string }) {
+  const normalized = { q: q.trim(), role };
+  return useInfiniteQuery({
+    queryKey: [...keys.redAll, 'conexiones', normalized],
+    queryFn: ({ pageParam }) => listContacts({ vista: 'conexiones', ...normalized, page: pageParam }),
     initialPageParam: 1,
     getNextPageParam: (last, _all, page) => (!Array.isArray(last) && last?.next ? page + 1 : undefined),
     placeholderData: keepPreviousData,

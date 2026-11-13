@@ -362,7 +362,8 @@ describe('capture sheet', () => {
     const sheet = await screen.findByTestId('capture-sheet');
     expect(within(sheet).getByText('Idea para un post')).toBeOnTheScreen();
     expect(within(sheet).getByText('Dato sobre mí')).toBeOnTheScreen();
-    expect(within(sheet).getByText('Foto para la galería')).toBeOnTheScreen();
+    // The Galería left the app (12/11/2026): photos go with a note, so «Foto para la galería» is gone.
+    expect(within(sheet).queryByText('Foto para la galería')).toBeNull();
     expect(within(sheet).queryByText('Propuesta de post')).toBeNull();
     expect(within(sheet).queryByText('Responde una pregunta')).toBeNull();
     expect(screen.getByTestId('capture-historial')).toBeOnTheScreen();
@@ -380,15 +381,15 @@ describe('capture sheet', () => {
     await waitFor(() => expect(server.find('POST', '/api/v1/capturas')[0]?.body).toEqual([['nota', 'Una nota']]));
   });
 
-  it('«Foto para la galería» needs a photo', async () => {
+  it('a photo goes with «Idea para un post» and needs no other purpose', async () => {
     capturaServer();
     await renderCapture();
     await act(async () => openCaptureSheet());
     const sheet = await screen.findByTestId('capture-sheet');
     await fireEvent.changeText(within(sheet).getByTestId('capture-note'), 'Mira');
-    await fireEvent.press(within(sheet).getByText('Foto para la galería'));
-    expect(within(sheet).getByText('Para «Foto para la galería» adjunta al menos una foto.')).toBeOnTheScreen();
-    expect(within(sheet).getByTestId('capture-send')).toBeDisabled();
+    await fireEvent.press(within(sheet).getByText('Idea para un post'));
+    expect(within(sheet).queryByText('Para «Foto para la galería» adjunta al menos una foto.')).toBeNull();
+    expect(within(sheet).getByTestId('capture-send')).toBeEnabled();
   });
 
   it('the close button slides an empty sheet away', async () => {
