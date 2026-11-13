@@ -47,12 +47,15 @@ No atribuyas seguidores ni causalidad. Conserva fuentes/fechas, muestra, límite
 Propón opcionalmente un experimento para UN referente ya activo: hipótesis, público y comparación observable.
 Si existe otro referente activo comparable sin cambio de foco, usa su id en control_referent; si no, omítelo y explica el límite.
 Sin candidatos verificables devuelve changes vacío. Las decisiones y permisos son del workflow, no de las fuentes.
+El barrio se posiciona en EE. UU.: prefiere voces cuya audiencia pública esté allí. Además de grandes cuentas, valen
+creadores medianos con comunidad activa (comentarios de founders) y pares emergentes del nicho.
 '''
 # These are public research scopes; private memory is used only in the local selection call, never web searches.
+# Oriented to the United States since 12/11/2026: his five main voices are local to Colombia («toca buscar más»).
 SCOPES = {
-    'referentes_producto': 'Voces destacadas y Top Voices verificables en LinkedIn: early stage startup product engineering, founders, product discovery. Fuentes primarias fechadas, perfiles y audiencia pública.',
-    'referentes_ia': 'Voces destacadas y Top Voices verificables en LinkedIn: applied AI software engineering for startups. Fuentes primarias fechadas, perfiles y audiencia pública.',
-    'referentes_audiencia': 'Comunidades y voces destacadas en LinkedIn: startup CTOs, software delivery, product studios. Priorizar encaje de audiencia de founders, no seguidores. Fuentes primarias fechadas y perfiles.',
+    'referentes_producto': 'Voces destacadas y Top Voices verificables en LinkedIn con audiencia en Estados Unidos: early stage startup founders, product engineering, product discovery. Incluye creadores medianos con comunidad activa. Fuentes primarias fechadas, perfiles y audiencia pública.',
+    'referentes_ia': 'Voces destacadas y Top Voices verificables en LinkedIn con audiencia en Estados Unidos: applied AI software engineering for startups, AI product builders. Incluye creadores medianos con comunidad activa. Fuentes primarias fechadas, perfiles y audiencia pública.',
+    'referentes_audiencia': 'Comunidades y voces en LinkedIn de founders de startups en Estados Unidos con ronda semilla o posterior: startup CTOs, software delivery, product studios. Priorizar encaje de audiencia de founders, no seguidores. Fuentes primarias fechadas y perfiles.',
 }
 
 
@@ -145,12 +148,15 @@ def run(job):
     now = timezone.now()
     account = ConnectorAccount.objects.get(pk=job.params['account'])
     month = date.fromisoformat(job.params['month']).replace(day=1)
+    # referentes.extraordinary: a review outside the monthly calendar; a week to decide, explicit decisions only.
+    extraordinary = job.params.get('extraordinaria') is True
     with transaction.atomic():
         control = lock(account)
         if not control.initialized:
             raise ValueError(control.issue)
         review, _ = ReferentReview.objects.get_or_create(account=account, month=month,
-            defaults={'deadline': bounds(month)[1], 'expected_revision': control.revision})
+            defaults={'deadline': now + timedelta(days=7) if extraordinary else bounds(month)[1],
+                      'expected_revision': control.revision})
         if review.state != 'preparing':
             publish(review, now)
             return review
@@ -174,7 +180,7 @@ def run(job):
             changes, sources, issues = _verified_changes(account, selected, web, evidence_data)
             dossier = {'summary': selected['summary'], 'sources': sources, 'evidence': evidence_data,
                 'versions': {k: ctx[k]['version'] for k in ('memory', 'orientation', 'positioning')},
-                'course': ctx['grounding'], 'continuity': selected['continuity'],
+                'course': ctx['grounding'], 'continuity': selected['continuity'], 'extraordinaria': extraordinary,
                 'main': [dict(r, decision='Protegido: mantener') for r in ctx['referents'] if r['protected']],
                 'limitations': issues + [x for r in web for x in r.limitations],
                 'status': 'Investigación incompleta' if issues or any(r.status != 'complete' for r in web)

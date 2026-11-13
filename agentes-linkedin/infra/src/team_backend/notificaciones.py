@@ -32,6 +32,7 @@ FEED_KINDS={
     'piece_blocked':('sistema',True,'Pieza bloqueada por el verificador'),
     'piece_discarded':('publicaciones',False,'Pieza descartada por la política'),
     'connection_fit':('red',False,'Conexión nueva que encaja'),
+    'network_doubt':('red',True,'El líder frenó a una persona que encaja'),
     'opportunity':('conversaciones',False,'Oportunidad nueva o que cambia de etapa'),
     'observatory':('conversaciones',False,'Hallazgos del Observatorio'),
     'invites_expected':('red',False,'Invitaciones previstas'),

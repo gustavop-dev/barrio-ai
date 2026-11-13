@@ -303,6 +303,9 @@ class Contact(models.Model):
     # Gustavo's own notes about the person (Personas): [{id, at, text, by}].
     notes=models.JSONField(default=list,blank=True)
     profile_checked_at=models.DateTimeField(null=True,blank=True)
+    # What the last profile read or search result said about reach and moment (connectors._signals): followers,
+    # connections, bio, is_creator, is_hiring, is_open_to_work… Kept to set thresholds with data, never guessed.
+    signals=models.JSONField(default=dict,blank=True)
     followed_at=models.DateTimeField(null=True,blank=True)
     invited_at=models.DateTimeField(null=True,blank=True)
     connected_at=models.DateTimeField(null=True,blank=True)

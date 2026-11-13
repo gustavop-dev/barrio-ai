@@ -2,6 +2,7 @@
 // of a conversation, the opportunity form and the referents.
 import { contactFixture, conversationFixture, opportunityFixture, redSummaryFixture, referentFixture } from '../fixtures/personas';
 import {
+  leadDoubtText,
   nextActionText,
   nextStepView,
   noResultsTitle,
@@ -73,6 +74,17 @@ describe('Personas rules', () => {
     expect(stageCount(undefined, 'fit')).toBeUndefined();
     expect(noResultsTitle({ stage: 'fit', q: '', role: '', modality: '', source: '' })).toBe('Nadie en «Encaja» ahora mismo');
     expect(noResultsTitle({ stage: 'fit', q: 'luc', role: '', modality: '', source: '' })).toBe('Nadie coincide con estos filtros');
+  });
+
+  it('adds the followers to the header line and explains a doubt of the lead', () => {
+    expect(personMeta(contactFixture('c-1', { network_distance: '', signals: { followers: 980 } }))).toBe('Medellín, Colombia · 980 seguidores');
+    expect(personMeta(contactFixture('c-1', { network_distance: '', signals: {} }))).toBe('Medellín, Colombia');
+    expect(leadDoubtText(contactFixture('c-1'))).toBeNull();
+    const doubt = { capability: 'RED-01', reasons: [], decided_at: '2026-11-12T15:00:00Z', until: '2026-12-12T15:00:00Z' };
+    expect(leadDoubtText(contactFixture('c-1', { lead_doubt: doubt }))).toBe(
+      'El clasificador dice que encaja, pero el líder frenó el follow. Descansa hasta el 12 dic salvo que confirmes que encaja.',
+    );
+    expect(leadDoubtText(contactFixture('c-1', { lead_doubt: { ...doubt, capability: 'RED-02', reasons: ['Riesgo alto'] } }))).toContain('frenó la invitación (Riesgo alto)');
   });
 
   it('writes the header line and the next step with its owner', () => {

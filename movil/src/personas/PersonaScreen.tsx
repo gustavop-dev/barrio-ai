@@ -1,16 +1,18 @@
 // The person card (/personas/<id>): header with «Abrir en LinkedIn», the next step and who it depends on, the
 // journey with dates, why the person fits and where they came from, the conversation read from the inbox, the
 // opportunity, notes (written or by voice, through the capture sheet) and the whole history. Actions:
-// «Marcar como oportunidad» and «Descartar» (with a mandatory note, only in the stages the API allows).
+// «Marcar como oportunidad» and «Descartar» (with a mandatory note, only in the stages the API allows); when the lead
+// stopped a person the classifier said fits, «Sí, encaja» answers its doubt (BAR-17).
 // The app is drawn edge to edge, so the window no longer shrinks for the keyboard: the card pads itself by it
 // (KeyboardAvoidingView) and scrolls the note being written above it.
 import { ApiError } from '@compartido/api/client';
-import { useAddContactNote, useContact, useDiscardContact, useOportunidades } from '@compartido/api/hooks';
+import { useAddContactNote, useConfirmFit, useContact, useDiscardContact, useOportunidades } from '@compartido/api/hooks';
 import type { Contact, ContactNote, Opportunity } from '@compartido/api/types';
 import {
   confidencePct,
   displayName,
   eventLabel,
+  leadDoubtText,
   nextStepView,
   noteAuthor,
   opportunityFields,
@@ -32,7 +34,7 @@ import { openCaptureSheet } from '@/capture/store';
 import { Icon } from '@/components/icons';
 import { useFlightName, useFlightTarget } from '@/components/shell/flight';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { Avatar, Badge, Button, Card, ConfirmSheet, EmptyState, EmptyText, ErrorRetry, Field, LabelChip, Section, Skeleton, T, pageContent, useToast } from '@/components/ui';
+import { Avatar, Badge, Button, Card, ConfirmSheet, EmptyState, EmptyText, ErrorRetry, Field, LabelChip, Section, Skeleton, T, errorMessage, pageContent, useToast } from '@/components/ui';
 import { ExternalLink } from '@/components/ui/ExternalLink';
 import { isHttps } from '@/navigation';
 import { haptic, navTiming, navValues, useMotion } from '@/theme/motion';
@@ -113,6 +115,45 @@ function NextStep({ contact }: { contact: Contact }) {
         </Button>
       ) : null}
     </Card>
+  );
+}
+
+/** BAR-17: the lead stopped someone the classifier said fits; his «Sí, encaja» lifts the rest and the lead's review. */
+function LeadDoubt({ contact }: { contact: Contact }) {
+  const confirm = useConfirmFit();
+  const toast = useToast();
+  const text = leadDoubtText(contact);
+  if (!text) return null;
+  return (
+    <View testID="lead-doubt">
+      <Card tone="warn">
+        <T variant="etiqueta" soft>
+          El líder dudó · Te toca
+        </T>
+        <T>{text}</T>
+        {confirm.error ? (
+          <T variant="detalle" color={colors.alert}>
+            {errorMessage(confirm.error)}
+          </T>
+        ) : null}
+        <Button
+          block
+          loading={confirm.isPending}
+          loadingLabel="Confirmando…"
+          onPress={() =>
+            confirm.mutate(contact.id, {
+              onSuccess: () => {
+                haptic('actionSuccess');
+                toast.show('Listo: el equipo seguirá con esta persona');
+              },
+              onError: () => haptic('actionError'),
+            })
+          }
+        >
+          Sí, encaja
+        </Button>
+      </Card>
+    </View>
   );
 }
 
@@ -487,7 +528,11 @@ export function PersonaScreen({ contactId }: { contactId: string }) {
 
           {contact.isError ? <ErrorRetry title="No se pudo actualizar la ficha" error={contact.error} onRetry={() => void contact.refetch()} /> : null}
 
-          {nextStepView(person) ? (
+          {person.lead_doubt ? (
+            <BlockIn step={2}>
+              <LeadDoubt contact={person} />
+            </BlockIn>
+          ) : nextStepView(person) ? (
             <BlockIn step={2}>
               <NextStep contact={person} />
             </BlockIn>

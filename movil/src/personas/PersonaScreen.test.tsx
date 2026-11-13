@@ -178,6 +178,27 @@ describe('Persona', () => {
     expect(await screen.findByText('Nota guardada')).toBeOnTheScreen();
   });
 
+  it('answers a doubt of the lead with «Sí, encaja»', async () => {
+    const doubted = contactFixture('c-1', {
+      stage: 'followed',
+      display_stage: 'followed',
+      network_distance: '',
+      signals: { followers: 980 },
+      lead_doubt: { capability: 'RED-02', reasons: ['Riesgo alto'], decided_at: '2026-11-12T15:00:00Z', until: '2026-12-12T15:00:00Z' },
+      next_step: { owner: 'gustavo', text: 'El líder la frenó aunque encaja: confirma si encaja', at: '2026-12-12T15:00:00Z' },
+    });
+    const server = await renderCard(doubted, {
+      'POST /api/v1/red/contacts/c-1/encaja': () => ({ body: { ...doubted, lead_doubt: null } }),
+    });
+    const card = within(await screen.findByTestId('lead-doubt'));
+    expect(card.getByText(/el líder frenó la invitación \(Riesgo alto\)\. Descansa hasta el 12 dic/)).toBeOnTheScreen();
+    expect(screen.getByText('Medellín, Colombia · 980 seguidores')).toBeOnTheScreen();
+    expect(screen.queryByTestId('next-step')).toBeNull(); // the doubt is the next step
+    await fireEvent.press(card.getByRole('button', { name: 'Sí, encaja' }));
+    await waitFor(() => expect(server.find('POST', '/api/v1/red/contacts/c-1/encaja')).toHaveLength(1));
+    expect(await screen.findByText('Listo: el equipo seguirá con esta persona')).toBeOnTheScreen();
+  });
+
   it('discards with a mandatory note, only in the allowed stages', async () => {
     const server = await renderCard(contactFixture('c-1'), {
       'POST /api/v1/red/contacts/c-1/discard': () => ({ body: contactFixture('c-1', { stage: 'discarded', display_stage: 'discarded' }) }),

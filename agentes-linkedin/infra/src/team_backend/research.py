@@ -5,6 +5,7 @@ function directly. Only public questions/URLs enter the tool context, never capt
 """
 import hashlib
 import json
+import os
 import re
 from dataclasses import asdict, dataclass, field
 from decimal import Decimal
@@ -17,6 +18,8 @@ from django.utils import timezone
 from knowledge import providers
 from . import oficina_eventos, web_sources
 from .models import WebResearchRun
+
+STAGE_PREFIX='etapa:'  # red.check_stages: the funding stage of a buyer's startup
 
 Status=Literal['complete','partial','unavailable','skipped','running']
 
@@ -211,9 +214,15 @@ def _claim(request,question):
             if old.result:return None,ResearchResult.from_dict(old.result)
             return None,ResearchResult(question,'running',old.created_at.isoformat(),limitations=('Investigación en curso o interrumpida; no se repite el gasto',))
         day,_=period_starts()
-        count=WebResearchRun.objects.filter(created_at__gte=day).exclude(state='skipped').count()
+        # The network's stage checks of buyers (red.check_stages, keys etapa:) have their own daily allowance and do not
+        # take the editorial research of the day.
+        stage=request.key.startswith(STAGE_PREFIX)
+        runs=WebResearchRun.objects.filter(created_at__gte=day,key__startswith=STAGE_PREFIX) if stage else \
+            WebResearchRun.objects.filter(created_at__gte=day).exclude(key__startswith=STAGE_PREFIX)
+        count=runs.exclude(state='skipped').count()
+        limit=int(os.environ.get('NETWORK_STAGE_CHECKS_PER_DAY','6')) if stage else settings.WEB_RESEARCH_DAILY_LIMIT
         run=WebResearchRun.objects.create(key=request.key,request_hash=digest)
-        if count>=settings.WEB_RESEARCH_DAILY_LIMIT:
+        if count>=limit:
             result=ResearchResult(question,'skipped',run.created_at.isoformat(),limitations=('Límite diario de investigaciones alcanzado',))
             run.state='skipped';run.result=result.to_dict();run.save(update_fields=['state','result'])
             return None,result
@@ -289,7 +298,7 @@ def research(request:ResearchRequest)->ResearchResult:
     saved=WebResearchRun.objects.filter(pk=run.pk,state='running').update(state=result.status,result=result.to_dict())
     from .orquestacion import current
     # Monthly branches already report their real owner/node through the dispatcher.
-    if saved and not (current() and current().cycle['id']=='referentes_mensuales'):
+    if saved and not request.key.startswith(STAGE_PREFIX) and not (current() and current().cycle['id']=='referentes_mensuales'):
         oficina_eventos.emit('entrega','investigador_referentes','director_editorial',outcome_text(result.to_dict()))
     return result
 

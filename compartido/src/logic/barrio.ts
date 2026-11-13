@@ -92,8 +92,27 @@ export function moreFiltersLabel(active: number): string {
 
 /** «Medellín, Colombia · 1.er grado · Lo sigues». */
 export function personMeta(contact: Contact): string {
-  return [contact.location, networkDistanceLabel(contact.network_distance), contact.is_following ? 'Lo sigues' : ''].filter(Boolean).join(' · ');
+  const followers = contact.signals?.followers;
+  return [
+    contact.location,
+    networkDistanceLabel(contact.network_distance),
+    contact.is_following ? 'Lo sigues' : '',
+    typeof followers === 'number' ? `${followers.toLocaleString('es-CO')} ${followers === 1 ? 'seguidor' : 'seguidores'}` : '',
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
+
+/** BAR-17: why the lead stopped a person the classifier said fits, and until when it rests; null without a doubt. */
+export function leadDoubtText(contact: Contact): string | null {
+  const doubt = contact.lead_doubt;
+  if (!doubt) return null;
+  const why = doubt.reasons.length ? ` (${doubt.reasons.join('; ')})` : '';
+  const action = DOUBTED_ACTION[doubt.capability] ?? capabilityLabel(doubt.capability);
+  return `El clasificador dice que encaja, pero el líder frenó ${action}${why}. Descansa hasta el ${shortDate(doubt.until)} salvo que confirmes que encaja.`;
+}
+
+const DOUBTED_ACTION: Record<string, string> = { 'RED-01': 'el follow', 'RED-02': 'la invitación', 'RED-04': 'la aceptación de su invitación' };
 
 /** The modality the team read in their conversation when it looks like business; otherwise their classification's. */
 export function suggestedModality(contact: Contact): string | null | undefined {

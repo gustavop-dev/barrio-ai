@@ -29,6 +29,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 
 | [BAR-15](#bar-15) | Ritmo, rampa, salud y reservas compartidas | backend | funciona |
 | [BAR-16](#bar-16) | Tier y notas excepcionales con alternativa sin nota | backend | funciona |
+| [BAR-17](#bar-17) | Barrio en EE. UU.: más invitaciones, compradores con ronda semilla y dudas del líder para Gustavo | app · backend | funciona |
 
 ---
 
@@ -140,7 +141,7 @@ El equipo descubre personas que encajan con Gustavo, las clasifica, las sigue, l
 - **Qué hace para Gustavo:** la red trabaja dentro de límites conservadores para no arriesgar su cuenta.
 - **Código:** `red.read_caps`, `red._read`, `operador.limits`, `operador.capacity_left`, `operador.spacing_ok`.
 - **Criterios de aceptación:**
-  1. **Dado** los topes por defecto, **cuando** se consulta `GET /api/v1/red/summary`, **entonces** `capacity` muestra RED-01 10/día y 50/semana, RED-02 según etapa (inicialmente 5 y 20), RED-04 10 y 40, y `read_caps` muestra `comments` 60, `search` 20, `profile` 80, `sync` 4. Fin de semana y reservas compartidas siguen BAR-15.
+  1. **Dado** los topes por defecto, **cuando** se consulta `GET /api/v1/red/summary`, **entonces** `capacity` muestra RED-01 20/día y 100/semana, RED-02 según etapa (inicialmente 16 y 80, [BAR-17](#bar-17)), RED-04 10 y 40, y `read_caps` muestra `comments` 60, `search` 20, `profile` 80, `sync` 4. Fin de semana y reservas compartidas siguen BAR-15.
   2. **Dado** que se agotó el cupo de lecturas de perfil, **cuando** toca clasificar, **entonces** se detiene y lo dice en su error; el preflight usa además el contador global compartido y, si este se agota, la escritura espera sin saltarse la comprobación.
   3. **Dado** una escritura de red, un comentario y una publicación, **cuando** se programan, **entonces** comparten el espaciado mínimo común.
 - **Brechas código/docs:** —
@@ -406,3 +407,32 @@ Rampa RED-02: etapa 1 **5/día, 20/semana**, etapa 2 **10/50**, etapa 3 **20/100
   8. **Dado** despliegue o evidencia de outreach externo concurrente, **cuando** se valida la cuenta, **entonces** la configuración visible muestra tier efectivo, cupo local/observado, política sin nota y operador único. El riesgo conocido de lemlist/otra automatización activa bloquea la activación o pausa el outreach, con aviso; no se declara comprobada su ausencia mediante una API que no permite verla.
 - **Validación pendiente:** CI debe ejecutar los fakes y comprobar el contrato real de notas con una fixture redactada del proveedor. Solo el rechazo explícito de nota, con certeza de no creación, habilita fallback. UI y capacidades de perfil/imagen de otras fases no se amplían aquí.
 - **Cobertura QA:** `test_fase2_curso.py` y regresiones de red/operador; ejecución pendiente de CI, no ejecutada localmente.
+
+## Barrio en EE. UU. (12/11/2026)
+
+### BAR-17 · Más invitaciones, compradores con ronda semilla y dudas del líder para Gustavo <a id="bar-17"></a>
+
+- **Dónde:** app · backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** el equipo invita a más personas de la comunidad, primero en EE. UU.; a un comprador solo lo busca si está en EE. UU. y la web muestra que su startup tiene ronda semilla o posterior, o clientes que pagan. Cuando el líder frena a alguien que el clasificador dio por afín, se lo pregunta a Gustavo en vez de volver a intentarlo cada hora.
+- **Decisiones de Gustavo (12/11/2026):** «al menos unas 15 por día porque necesitamos data»; «USA para todos porque la idea es que linkedin nos mande a posicionarnos allá»; «Semilla por delante … los agentes deberían poder validar esto»; la comunidad no son solo compradores («preferiblemente comunidad USA»). El calentamiento con comentarios antes de invitar y el outbound quedan para otro PR.
+- **Código:** `red.py` (`plan`, `diverse_candidates`, `prioritized`, `outbound_rules`, `check_stages`, `_lead_resting`, `confirm_fit`, `on_lead_discard`, `search_location`), `ubicacion.py`, `operador.py` (`network_batches`, `batch_issue`, `spacing_range`, `capacity_left`), `autopiloto.py` (`policy_review`, `_execute`, `_network`), `research.py` (cupo `etapa:`), `referentes.py`/`referentes_research.py` (`extraordinary`), `connectors.py` (`_signals`, `search_people`, `search_parameters`), migración `0031_red_senales_rampa`, `movil/src/personas/PersonaScreen.tsx`.
+- **Ritmo:**
+  - Rampa RED-02 **8/40 → 16/80 → 20/100**, arranca en **16/80**; la primera etapa es solo el paso atrás tras una aceptación débil. La salud no cambia: sube tras siete días con ≥40 % sobre ≥20 invitaciones maduras, baja con <40 % o caída de 10 puntos, pausa bajo 25 %. La migración reubica la etapa vigente: primera o segunda → 16/80, tercera → 20/100.
+  - RED-01 (seguir) **20/día y 100/semana**.
+  - `NETWORK_BATCHES=09:00-11:00,15:00-17:00`: las acciones de red salen en dos tandas, con 3–8 minutos entre escrituras (`NETWORK_BATCH_SPACING_SECONDS`, nunca menos de dos); la primera tanda envía como máximo la mitad de las invitaciones del día; durante una tanda los comentarios esperan; fuera de ellas la red espera. Sin la variable rige el espaciado común de 20–40 minutos.
+- **A quién invita y en qué orden:** todos los papeles salvo los líderes (que se siguen y se comentan), incluidos aliados y pares de búsqueda. El cupo del día se llena así: compradores en EE. UU., resto de la comunidad en EE. UU., comunidad en Latinoamérica, resto; dentro de cada grupo, mayor confianza primero. Las invitaciones se revisan antes que los follows.
+- **Ubicación (`ubicacion.region`):** EE. UU. por país, estado o gran área metropolitana; Latinoamérica por país o gran ciudad; ubicación vacía no se adivina. `NETWORK_BUYER_REGION=us` (vacío apaga la regla): un comprador fuera de EE. UU. no encaja; una invitación recibida conserva el veredicto simple. Los compradores clasificados antes de la regla se barren una vez en el plan.
+- **Etapa del comprador (`NETWORK_STAGE_CHECK=true`):** un comprador afín en EE. UU. espera (`stage_check: pending`) hasta que una búsqueda web con citas muestre ronda semilla o posterior, o clientes que pagan; Sonnet decide solo con esos hallazgos (`semilla_o_mas`, `presemilla`, `sin_evidencia`). Sin hallazgos reintenta al día siguiente, hasta tres intentos. Presemilla o sin evidencia lo saca del barrio con la regla visible. Cupo propio `NETWORK_STAGE_CHECKS_PER_DAY=6` (claves `etapa:`), aparte de la investigación editorial; la pregunta pública solo lleva nombre y titular saneados.
+- **Señales de perfil (`Contact.signals`):** seguidores, conexiones, bio, idioma y marcas de creador, contratando, abierto a trabajo, premium e influencer, leídas de Unipile al descubrir o leer el perfil. El clasificador las recibe con la región; no hay mínimo de seguidores (Gustavo: «lo veremos con la data»).
+- **Búsqueda:** `NETWORK_SEARCH_LOCATION=United States` (id leído una vez con «List Search Parameters» y guardado); `NETWORK_SEARCHES_PER_RUN=2`; una consulta que termina en `[es]` busca perfiles en español.
+- **Dudas del líder:** un descarte del líder deja descansar a esa persona `NETWORK_LEAD_REST_DAYS=30` días para esa acción y crea el aviso `network_doubt` («El líder frenó a una persona que encaja», con enlace a la persona). En la ficha, «Sí, encaja» (`POST /api/v1/red/contacts/<id>/encaja`) guarda `confirmed_by_gustavo`: el líder deja de revisar las acciones de esa persona y el descanso termina.
+- **Referentes:** las búsquedas mensuales piden voces con audiencia en EE. UU., incluidos creadores medianos con comunidad activa. `manage.py operador --usuario <u> referentes-extraordinaria --cuenta <id>` encola una revisión fuera de calendario (una por mes): plazo de siete días y cada propuesta requiere su decisión explícita.
+- **Criterios de aceptación:**
+  1. **Dado** una rampa nueva, **cuando** se consulta el cupo de RED-02, **entonces** es 16/día y 80/semana; un override solo baja etapas.
+  2. **Dado** tandas configuradas, **cuando** se intenta una invitación fuera de ellas, **entonces** espera; dentro de la primera, el cupo es la mitad del día.
+  3. **Dado** un comprador afín en Medellín y otro en Austin, **cuando** se clasifican, **entonces** el primero queda descartado con la regla de ubicación y el segundo espera la verificación web antes de cualquier acción.
+  4. **Dado** un comprador sin ronda visible tras tres días, **cuando** termina el último intento, **entonces** queda descartado con `sin_evidencia` y no se propone.
+  5. **Dado** un descarte del líder, **cuando** vuelve a correr el plan, **entonces** no se propone a esa persona por 30 días; tras «Sí, encaja», se propone y se aprueba sin el líder.
+  6. **Dado** compradores, aliados, pares y un líder en EE. UU. y Latinoamérica, **cuando** se planifica, **entonces** las invitaciones siguen el orden de arriba y el líder solo se sigue.
+- **Cobertura QA:** `tests/test_red_eeuu.py`, `test_fase2_curso.py`, `PersonaScreen.test.tsx`; ejecución en CI, no local.

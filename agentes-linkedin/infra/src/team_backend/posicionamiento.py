@@ -18,9 +18,9 @@ and read by the PWA, and are never renamed:
   An alliance or a community contact is not a business opportunity by itself, so it has no opportunity modality.
 VOCABULARIES is that explicit mapping; to_canonical / to_stored translate between domains."""
 
-VERSION='posicionamiento-v1'
-DATE='2026-11-07'
-STATUS='propuesta interna v1; Gustavo la supervisa'
+VERSION='posicionamiento-v2'
+DATE='2026-11-12'
+STATUS='propuesta interna v2; Gustavo la supervisa'
 
 IDENTITY=('Gustavo es ingeniero de producto con criterio de negocio: convierte necesidades de negocio en software que '
           'funciona, lo evoluciona e integra IA cuando resuelve un problema concreto.')
@@ -34,11 +34,15 @@ PILLARS={
 LIMITS=('humo y promesas; temas que Gustavo no domina; experiencias, clientes, cifras o resultados inventados; pitch '
         'agresivo; datos privados de cualquier persona')
 NOT_WANTED='No buscan vendedores ni reclutadores masivos.'
+# Gustavo, 12/11/2026: «la idea es que linkedin nos mande a posicionarnos allá».
+LOCATION=('el barrio se construye en EE. UU.: los compradores (founders) deben estar allí; el resto de la comunidad va '
+          'primero si está allí y también puede venir de Latinoamérica.')
 
 # Canonical modality -> what it is for Gustavo (editorial) and who belongs to it (neighborhood criteria).
 MODALITIES={
     'personal_startups':{'purpose':'oportunidades de trabajo personal en startups',
-        'neighborhood':'founders técnicos o de negocio de startups tempranas (preferentemente presemilla con inversión), '
+        # Gustavo, 12/11/2026: «Semilla por delante»; presemilla rarely has money to hire.
+        'neighborhood':'founders técnicos o de negocio de startups con ronda semilla o posterior, o con clientes que pagan, '
                        'líderes técnicos y personas que recomiendan talento en startups'},
     'projectapp':{'purpose':'contratos para ProjectApp, el equipo que Gustavo lidera',
         'neighborhood':'founders u operadores que necesitan una entrega externa, un proyecto definido o un equipo continuo'},
@@ -83,8 +87,10 @@ def editorial_direction():
 def network_criteria():
     """Who Gustavo is and the neighborhood criteria per modality, in the classifier's stored vocabulary."""
     lines=[f'- {to_stored("red",key)}: {item["neighborhood"]}.' for key,item in MODALITIES.items()]
-    return '\n'.join([f'{IDENTITY} {PROJECTAPP}','',f'Criterios de barrio por modalidad ({VERSION}):',*lines])
+    return '\n'.join([f'{IDENTITY} {PROJECTAPP}','',f'Criterios de barrio por modalidad ({VERSION}):',*lines,'',
+                      f'Ubicación: {LOCATION}'])
 
 def lead_criteria():
     """One paragraph for the lead agent's `criterios_del_barrio` (Jev reads it as state)."""
-    return f'{IDENTITY} {PROJECTAPP} Su barrio en LinkedIn: '+'; '.join(i['neighborhood'] for i in MODALITIES.values())+f'. {NOT_WANTED}'
+    return (f'{IDENTITY} {PROJECTAPP} Su barrio en LinkedIn: '+'; '.join(i['neighborhood'] for i in MODALITIES.values())+
+            f'. Ubicación: {LOCATION} {NOT_WANTED}')

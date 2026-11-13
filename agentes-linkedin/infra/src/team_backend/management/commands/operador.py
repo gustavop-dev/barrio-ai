@@ -16,6 +16,7 @@ class Command(BaseCommand):
         ref=sub.add_parser('referente');ref.add_argument('--cuenta',required=True);ref.add_argument('--perfil',required=True,help='URL linkedin.com/in/... o identificador público')
         ref.add_argument('--motivo',required=True)
         obs=sub.add_parser('observar');obs.add_argument('--cuenta',required=True);obs.add_argument('--limite',type=int,default=5)
+        sub.add_parser('referentes-extraordinaria',help='Revisión de referentes fuera del calendario mensual (decisión explícita)').add_argument('--cuenta',required=True)
 
     def handle(self,**o):
         user=User.objects.filter(username=o['usuario'],is_active=True).first()
@@ -33,6 +34,10 @@ class Command(BaseCommand):
             elif o['accion']=='referente':
                 referent,created=operador.add_referent(user,account,o['perfil'],o['motivo'])
                 self.stdout.write(('Añadido: ' if created else 'Ya existía: ')+f'{referent.display_name} ({referent.id})')
+            elif o['accion']=='referentes-extraordinaria':
+                from team_backend import referentes
+                job=referentes.extraordinary(user,account)
+                self.stdout.write(f'Revisión extraordinaria en cola: trabajo {job.id}. Las propuestas llegan a Tu turno.')
             elif o['accion']=='observar':
                 job,_=enqueue_operation(user,'observe',{'account':str(account.id),'limit':o['limite'],'referents':[]})
                 self.stdout.write(f'Observación en cola: trabajo {job.id}. El worker la procesará.')

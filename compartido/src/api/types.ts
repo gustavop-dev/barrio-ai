@@ -225,6 +225,45 @@ export interface ContactClassification {
   confidence?: number;
   model?: string;
   classified_at?: string;
+  /** `us`, `latam`, `otro` or '' when the location says nothing (BAR-17). */
+  region?: string;
+  /** A deterministic rule that overrode the model's verdict («Comprador fuera de EE. UU.…»). */
+  rule?: string;
+  /** A buyer waits for the web to show a seed round or later, or paying customers (BAR-17). */
+  stage_check?: ContactStageCheck;
+  /** Gustavo said the person fits after a doubt of the lead: the lead no longer reviews their actions. */
+  confirmed_by_gustavo?: { at: string; by: string };
+}
+
+export interface ContactStageCheck {
+  state: 'pending' | 'ok' | 'failed';
+  attempts?: number;
+  next_at?: string;
+  verdict?: 'semilla_o_mas' | 'presemilla' | 'sin_evidencia';
+  evidence?: string;
+  sources?: string[];
+}
+
+/** What the profile says about the person's reach and moment; a missing key was not given (never zero). */
+export interface ContactSignals {
+  followers?: number;
+  connections?: number;
+  is_creator?: boolean;
+  is_hiring?: boolean;
+  is_open_to_work?: boolean;
+  is_influencer?: boolean;
+  is_premium?: boolean;
+  bio?: string;
+  language?: string;
+  read_at?: string;
+}
+
+/** The lead turned down an action for a person the classifier said fits; it rests until `until` or his «Sí, encaja». */
+export interface ContactLeadDoubt {
+  capability: string;
+  reasons: string[];
+  decided_at: string;
+  until: string;
 }
 
 /** The contact as embedded in a RED-* action. */
@@ -289,6 +328,10 @@ export interface Contact extends ContactBrief {
   last_event?: ContactHistoryEntry | null;
   /** Their latest LinkedIn conversation, read by conversaciones_inbox (null when there is none or the inbox is off). */
   conversation?: Conversation | null;
+  /** BAR-17 (absent on older backends). */
+  signals?: ContactSignals;
+  region?: 'us' | 'latam' | 'otro' | null;
+  lead_doubt?: ContactLeadDoubt | null;
 }
 
 /** A message of a conversation, as read from LinkedIn (third-party text, shown as is, never as markup). */

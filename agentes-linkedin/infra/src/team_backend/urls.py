@@ -42,7 +42,7 @@ urlpatterns=[
  path('linkedin/oauth/start',li.OAuthStart.as_view()),path('linkedin/oauth/callback',li.oauth_callback),
  path('linkedin/status',li.Status.as_view()),
  path('red/contacts',rd.Contacts.as_view()),path('red/contacts/<uuid:cid>',rd.ContactDetail.as_view()),
- path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/summary',rd.Summary.as_view()),
+ path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/contacts/<uuid:cid>/encaja',rd.ContactConfirmFit.as_view()),path('red/summary',rd.Summary.as_view()),
  # Resultados: own-post and audience metrics against the previous period (docs/metricas-resultados.md).
  path('resultados',rs.Resultados.as_view()),
  path('perfil/<uuid:pid>',pv.Detail.as_view()),path('perfil/<uuid:pid>/decision',pv.Decision.as_view()),

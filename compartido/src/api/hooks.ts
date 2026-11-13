@@ -5,6 +5,7 @@ import {
   answerPregunta,
   aplicarResumen,
   asList,
+  confirmContactFit,
   correctHecho,
   createOportunidad,
   declinePregunta,
@@ -295,6 +296,15 @@ export function useDiscardContact() {
   return useMutation({
     mutationFn: ({ contactId, note }: { contactId: string; note: string }) => discardContact(contactId, note),
     onSettled: () => invalidate(client, keys.redAll, keys.actionsAll, keys.calendarioAll),
+  });
+}
+
+/** «Sí, encaja» (BAR-17): the lead stops reviewing this person's actions and the rest after its doubt ends. */
+export function useConfirmFit() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (contactId: string) => confirmContactFit(contactId),
+    onSettled: () => invalidate(client, keys.redAll, keys.actionsAll),
   });
 }
 
