@@ -36,7 +36,7 @@ QA_USERNAME='qa'
 QA_PASSWORD_DEFAULT='qa-0ff1ce-solo-ci'
 NS=uuid.UUID('0ff1ce00-9a5e-4d00-8e00-00000000c1a0')
 EXTRA_DEVICE='Pixel 7 de Gustavo (QA)'
-LIVE_SWITCHES=('LIVE_PROVIDERS','LIVE_LINKEDIN','LIVE_LINKEDIN_OFFICIAL')
+LIVE_SWITCHES=('LIVE_PROVIDERS','LIVE_LINKEDIN','LIVE_LINKEDIN_OFFICIAL','LIVE_LINKEDIN_DIRECTO')
 FAKE_URL='https://linkedin.example'  # never a real LinkedIn address: nothing in the QA world can open linkedin.com
 
 def uid(name):
@@ -155,7 +155,7 @@ class Command(BaseCommand):
             raise CommandError('seed_qa vacía y rehace datos: solo corre en la QA de CI (exporta QA_SEED=permitido).')
         on=[v for v in LIVE_SWITCHES if os.environ.get(v,'false').strip().lower()=='true']
         if on:raise CommandError(f'seed_qa no corre con proveedores o LinkedIn reales activados: {", ".join(on)}.')
-        if ConnectorAccount.objects.filter(provider__in=['unipile','linkedin']).exists() or LinkedInCredential.objects.exists():
+        if ConnectorAccount.objects.filter(provider__in=['unipile','directo','linkedin']).exists() or LinkedInCredential.objects.exists():
             raise CommandError('Esta base tiene una cuenta real de LinkedIn: seed_qa no la toca.')
 
     def qa_user(self):

@@ -62,7 +62,7 @@ Todo se lee con la cuenta Unipile (o su simulada en pruebas). La API oficial de 
 - **Encolado.** El autopiloto (`autopiloto._metrics`) encola `collect_metrics` más o menos cada `METRICS_EVERY_MINUTES` (180 por defecto; con 0 queda apagado).
   - Va de uno en uno, con id determinista por franja y el mismo patrón `_pending` que la red.
   - Solo encola si hay algo pendiente: un corte vencido sin capturar, o la foto de hoy.
-  - Solo corre con la cuenta `unipile` o `fake`.
+  - Solo corre con la cuenta `unipile`, `directo` o `fake`.
 - **Si falla.** Un fallo al encolar nunca detiene el resto del ciclo: el informe del tick lleva `metrics_error`.
 - **Pausas.** Con la parada total no corre, como el resto del ciclo. Tampoco corre con la cuenta pausada.
 - **Permiso.** El trabajo requiere `operate_linkedin`. No gasta en modelos y su `result_status` es corto, por ejemplo `cortes:2 audiencia:creada`.

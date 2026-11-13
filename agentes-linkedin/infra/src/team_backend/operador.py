@@ -605,7 +605,7 @@ def _find_own_comment(connector,post_id,text,comment_id=None):
 
 def _own_posts_reader():
     """Unipile (or its fake) can read Gustavo's own posts; w_member_social cannot. None without one."""
-    for account in ConnectorAccount.objects.filter(provider__in=['unipile','fake']).order_by('created_at'):
+    for account in ConnectorAccount.objects.filter(provider__in=['unipile','fake','directo']).order_by('created_at'):
         try:return get_connector(account)
         except ConnectorError:continue
     return None

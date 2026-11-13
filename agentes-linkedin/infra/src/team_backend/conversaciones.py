@@ -27,7 +27,7 @@ from .models import AuditEvent, Contact, Conversation, Opportunity
 from .permissions import require
 
 READ_CAPS={'chats':24,'messages':60}  # per local day: one list per run at the default hourly clock, a few threads each
-PROVIDERS=('unipile','fake')
+PROVIDERS=('unipile','fake','directo')
 CLOSE_HOW={'respondi':'Respondiste','no_responder':'Sin responder'}
 THREAD=re.compile(r'2-[A-Za-z0-9_=\-]+')  # LinkedIn messaging thread ids (linkedin.com/messaging/thread/<id>/)
 

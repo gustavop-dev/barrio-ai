@@ -406,7 +406,7 @@ def _every(name,default):
 def _network(user,account,now):
     """DESC/RED: queue discovery, classification, planning and sync for the Unipile account, each on its own clock.
     Reads and the cheaper classifier run on their own; follows, invitations and acceptances become proposals."""
-    if not red.enabled() or account.provider not in ('unipile','fake'):return 0
+    if not red.enabled() or account.provider not in ('unipile','fake','directo'):return 0
     queued=0
     def enqueue(kind,every,condition=True):
         nonlocal queued

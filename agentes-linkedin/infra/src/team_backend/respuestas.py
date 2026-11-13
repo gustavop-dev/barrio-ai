@@ -34,7 +34,7 @@ from .exceptions import Conflict
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, PostComment, TeamQuestion
 from .permissions import require
 
-PROVIDERS=('unipile','fake')
+PROVIDERS=('unipile','fake','directo')
 REPLY=ActionProposal.Capability.REPLY
 REACT=ActionProposal.Capability.REACT
 READ_CAPS={'posts':6,'comments':30,'threads':40,'people_posts':6}  # per local day; the autopilot reads about every 30 min

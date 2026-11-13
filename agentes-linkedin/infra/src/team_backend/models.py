@@ -132,6 +132,8 @@ class ConnectorAccount(models.Model):
     class Provider(models.TextChoices):
         UNIPILE='unipile','Unipile v2'
         FAKE='fake','Simulado (pruebas)'
+        # LinkedIn without Unipile, through the navegador service; external_account_id is the account's name there.
+        DIRECTO='directo','LinkedIn directo (navegador)'
         # Official API (Share on LinkedIn): own publications only; external_account_id is the member URN.
         LINKEDIN='linkedin','API oficial de LinkedIn'
         LINKEDIN_FAKE='linkedin_fake','API oficial simulada (pruebas)'

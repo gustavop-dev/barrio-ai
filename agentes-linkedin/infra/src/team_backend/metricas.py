@@ -23,7 +23,7 @@ ANALYSIS_UNITS=operador.ANALYSIS_UNITS
 READ_CAPS={'posts':12,'post':20,'comments':20,'profile':3,'views':3}  # per local day; the autopilot runs ~8 times a day
 SUBSTANTIVE_CHARS=80  # same threshold as a substantive comment in network discovery
 VIEWS_RANGES=(14,28,90,365)  # date_range accepted by List Profile Views
-PROVIDERS=('unipile','fake')
+PROVIDERS=('unipile','fake','directo')
 
 class ReadCapReached(ValueError):
     """The daily read cap of a kind is spent; nothing was read."""

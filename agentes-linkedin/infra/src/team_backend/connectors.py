@@ -535,6 +535,9 @@ class FakeConnector:
 def get_connector(account):
     if account.provider=='unipile':return UnipileConnector(account.external_account_id)
     if account.provider=='fake':return FakeConnector(account.external_account_id)
+    if account.provider=='directo':
+        from .connectors_directo import DirectoConnector
+        return DirectoConnector(account.external_account_id)
     if account.provider in ('linkedin','linkedin_fake'):
         from .connectors_linkedin import connector_for
         return connector_for(account)

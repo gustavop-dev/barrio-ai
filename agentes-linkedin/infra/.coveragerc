@@ -1,6 +1,6 @@
 [run]
 branch = True
-source = team_backend
+source = team_backend, linkedin_directo
 # CI runs the tests with --parallel auto: each worker process writes its own .coverage.* file, and `coverage combine`
 # merges them before the report.
 parallel = True

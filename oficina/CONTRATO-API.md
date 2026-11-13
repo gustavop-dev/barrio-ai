@@ -24,7 +24,7 @@ GET `/api/v1/operador/overview`:
   "autopilot": { "enabled": true, "policy_version": "autonomia-v1" },
   "control": { "paused": false, "reason": "", "source": "db|env|none", "updated_at": "ISO|null", "updated_by": "username|null" },
   "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota", "open_now": true, "min_spacing_seconds": 1200 },
-  "accounts": [ { "id": "uuid", "label": "…", "provider": "unipile|fake|linkedin|linkedin_fake", "status": "running|token_expired|…",
+  "accounts": [ { "id": "uuid", "label": "…", "provider": "unipile|fake|directo|linkedin|linkedin_fake", "status": "running|token_expired|…",
                   "is_locked": false, "paused": false, "paused_reason": "", "last_checked_at": "ISO|null",
                   "capacity": { "INT-03": { "daily": 3, "weekly": 12, "daily_used": 1, "weekly_used": 4, "left": 2 },
                                 "INT-02": { "…": "…" }, "CONT-09": { "daily": 1, "weekly": 7, "…": "…" } } } ],
