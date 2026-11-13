@@ -19,7 +19,8 @@ from .serializers import SearchInput,RunInput,JobOutput,UnitOutput,ProposalInput
 
 def health(request):
     with connection.cursor() as cursor:cursor.execute('SELECT 1')
-    return JsonResponse({'status':'ok','framework':'django'})
+    # `revision`: the commit of the deployed image (empty outside CI images); eas-update.yml waits for it.
+    return JsonResponse({'status':'ok','framework':'django','revision':os.environ.get('BARRIO_REVISION','')})
 
 @ensure_csrf_cookie
 def console(request):

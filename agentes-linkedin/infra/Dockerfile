@@ -10,4 +10,7 @@ ENV TIKTOKEN_CACHE_DIR="/app/assets/tiktoken"
 ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1
 USER app
 RUN python -c "import tiktoken; assert tiktoken.get_encoding('cl100k_base').encode('LinkedIn')"
+# The commit this image was built from (CI passes it); /health shows it so the OTA workflow knows the deploy landed.
+ARG BARRIO_REVISION=""
+ENV BARRIO_REVISION=$BARRIO_REVISION
 CMD ["gunicorn", "linkedin_backend.wsgi:application", "--bind", "0.0.0.0:8787", "--workers", "2", "--timeout", "300", "--access-logfile", "-"]

@@ -107,6 +107,8 @@ Desde el próximo APK, la app trae `expo-updates`. Los cambios de JavaScript lle
 - en cada push a `main` que cambie `movil/` o `compartido/` (salvo los `.md` y `diseno-movimiento/`);
 - a mano, desde Actions › «Actualización OTA (preview)» › Run workflow.
 
+Nunca publica antes que el servidor. Si entre el commit que corre el servidor y el del push hay cambios de backend (`agentes-linkedin/`, sin contar los `.md`), la app llegaría a los teléfonos antes que el servidor que la entiende. Entonces espera: cada minuto consulta `https://office.projectapp.co/health`, cuyo campo `revision` es el commit de la imagen desplegada (el job `images` de CI lo graba como `BARRIO_REVISION`), y publica sola en cuanto el despliegue trae ese commit o uno posterior. Si en unas 5 horas no llega, termina en rojo sin publicar (GitHub avisa por correo); después de desplegar se publica a mano. Una ejecución manual publica siempre, sin esperar.
+
 Antes de publicar repite las comprobaciones del job `movil` de CI (tipos, lint y pruebas) sobre ese commit. Si fallan, no publica nada. Después corre:
 
 ```bash
