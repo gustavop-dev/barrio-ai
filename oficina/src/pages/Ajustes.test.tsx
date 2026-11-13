@@ -403,7 +403,7 @@ describe('Ajustes · Notificaciones', () => {
     const published = await within(section()).findByRole('switch', { name: /Pieza publicada/ });
     expect(published).toBeChecked();
     expect(within(section()).getByRole('switch', { name: /Pregunta nueva/ })).not.toBeChecked();
-    expect(within(section()).getByText('Va a Tu turno')).toBeInTheDocument();
+    expect(within(section()).getByText('Va a la Bandeja')).toBeInTheDocument();
     await user.click(published);
     expect(published).not.toBeChecked();
     await waitFor(() => expect(api.find('PATCH', '/api/v1/ajustes/preferencias')).toHaveLength(1));

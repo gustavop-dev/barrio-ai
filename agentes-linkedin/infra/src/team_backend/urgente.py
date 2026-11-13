@@ -95,7 +95,7 @@ def _requested(account,now,capture,reserved,moves):
             if state!='pending':
                 capture.day_request={'state':'pending','asked':asked.isoformat(),'at':now.isoformat()}
                 capture.save(update_fields=['day_request'])
-            reason+=(' Cuando esté lista, Tu turno te pregunta si sale también el '
+            reason+=(' Cuando esté lista, la Bandeja te pregunta si sale también el '
                      f'{_local(asked):%d/%m a las %H:%M}: serían dos posts ese día.')
     return when,reason
 

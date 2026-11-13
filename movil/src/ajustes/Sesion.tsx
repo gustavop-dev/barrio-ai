@@ -1,4 +1,4 @@
-// Ajustes › Lo que el equipo sabe de ti (a link to the Sabe tab of Tu turno, with `facts_count`) and
+// Ajustes › Lo que el equipo sabe de ti (a link to the Sabe tab of Bandeja de entrada, with `facts_count`) and
 // Sesión y Acerca de: who is signed in, «Cerrar sesión» (unregisters the push and revokes this
 // device's token), and the app version (expo-constants).
 import { useAjustes } from '@compartido/api/hooks';

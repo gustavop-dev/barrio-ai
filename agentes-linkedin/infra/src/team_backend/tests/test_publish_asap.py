@@ -128,7 +128,7 @@ class IdeaScheduleTests(EditorialBase):
         now,tomorrow,asked,his,c,piece=self.day_with_his_post();tz=operador.local_tz()
         self.assertEqual((piece.state,c.state,c.day_request['state']),('ready','usado','pending'))
         self.assertGreater(piece.scheduled_for,asked);self.assertEqual(piece.scheduled_for.astimezone(tz).time(),time(12,0))
-        self.assertIn('Tu turno te pregunta',c.publish_asap_reason)
+        self.assertIn('la Bandeja te pregunta',c.publish_asap_reason)
         self.assertEqual(urgente.day_requests(now),[(c,piece,[his])])
         self.assertEqual(urgente.tick_day_requests(now),1);self.assertEqual(urgente.tick_day_requests(now),0)  # one push
         [card]=self.human.get('/api/v1/tu-turno').json()['tasks']['fechas']

@@ -1,5 +1,6 @@
-// Calendario: the week strip and its panel, swiping weeks, the day sheet, the views, the layers, the
-// veto with «Deshacer», the states (far future, error, empty month, Horas de Bogotá) and Lista.
+// Calendario: the week strip and its panel (its order and its one-line rows that unfold), swiping weeks without
+// moving the selected day, a tap that selects in place (no sheet), no «‹ Hoy ›» buttons, links to a day, the views,
+// the layers, the veto with «Deshacer», the states (far future, error, empty month, Horas de Bogotá) and Lista.
 import type { Actividad, Calendario } from '@compartido/api/types';
 import { actividadFixture, calendarioFixture, NOW, piece, shellOverview, WEEK_DAYS } from '@compartido/fixtures/calendario';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
@@ -10,7 +11,7 @@ import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer, type FakeHandler, type SentRequest } from '@/test/server';
 import * as motion from '@/theme/motion';
-import { CalendarioScreen, sheetTop } from './CalendarioScreen';
+import { CalendarioScreen } from './CalendarioScreen';
 import { cancelVeto, flushVetoes } from './pendingVeto';
 
 const expoRouter = jest.requireMock('expo-router') as {
@@ -46,8 +47,9 @@ async function renderCalendario(params: Record<string, string> = {}) {
 
 const panel = () => screen.getByTestId('panel-dia');
 const hidden = { includeHiddenElements: true };
-const sheet = () => screen.getByTestId('hoja-dia');
 const lastParams = () => expoRouter.router.setParams!.mock.calls.at(-1)?.[0];
+/** The days drawn as selected (only the page on screen has testIDs). */
+const selectedDays = () => screen.getAllByTestId(/^dia-/).filter((cell) => cell.props.accessibilityState?.selected).map((cell) => cell.props.testID);
 
 /** Lays the pager out (no layout pass under Jest), then drags it. */
 async function swipe(testID: string, translationX: number) {
@@ -98,10 +100,38 @@ describe('Calendario · semana', () => {
     expect(within(day).getByText('6 comentarios')).toBeOnTheScreen();
     expect(within(day).getByText('1 conexión nueva que encaja')).toBeOnTheScreen();
 
-    const tuParte = within(day).getByTestId('bloque-tu-parte');
-    expect(within(tuParte).getByText('Responde: ¿En qué idioma van tus textos públicos?')).toBeOnTheScreen();
-    expect(within(tuParte).getByText('Plazo: 17:00')).toBeOnTheScreen();
-    await fireEvent.press(within(tuParte).getByText('Ir a Tu turno'));
+    // No «‹ Hoy ›» in the header: the week turns with a swipe (or the screen reader's actions).
+    expect(screen.queryByTestId('calendario-hoy')).toBeNull();
+    expect(screen.queryByTestId('calendario-anterior')).toBeNull();
+    expect(screen.queryByTestId('calendario-siguiente')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Hoy' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Semana siguiente' })).toBeNull();
+
+    // The publication first, then what matters, what is scheduled, what is Gustavo's and, last, all of the day.
+    expect(within(day).getAllByTestId(/^bloque-/).map((block) => block.props.testID)).toEqual([
+      'bloque-publicacion',
+      'bloque-importante',
+      'bloque-programado',
+      'bloque-bandeja',
+      'bloque-todo',
+    ]);
+    expect(within(within(day).getByTestId('bloque-todo')).getByText('Ver todo lo del día')).toBeOnTheScreen();
+    expect(within(day).queryByText('Nada registrado ese día con este filtro.')).toBeNull();
+
+    // «De tu Bandeja» (it was «Tu parte»): one line until a tap shows the deadline; another tap folds it.
+    const bandeja = within(day).getByTestId('bloque-bandeja');
+    expect(within(bandeja).getByText('De tu Bandeja')).toBeOnTheScreen();
+    expect(within(day).queryByText('Tu parte')).toBeNull();
+    const question = within(bandeja).getByText('Responde: ¿En qué idioma van tus textos públicos?');
+    expect(question.props.numberOfLines).toBe(1);
+    expect(within(bandeja).queryByText('Plazo: 17:00')).toBeNull();
+    await fireEvent.press(question);
+    expect(within(bandeja).getByText('Responde: ¿En qué idioma van tus textos públicos?').props.numberOfLines).toBeUndefined();
+    expect(within(bandeja).getByText('Plazo: 17:00')).toBeOnTheScreen();
+    await fireEvent.press(within(bandeja).getByText('Responde: ¿En qué idioma van tus textos públicos?'));
+    expect(within(bandeja).queryByText('Plazo: 17:00')).toBeNull();
+    expect(within(bandeja).queryByText('Ir a Tu turno')).toBeNull();
+    await fireEvent.press(within(bandeja).getByText('Ir a la Bandeja'));
     expect(expoRouter.router.navigate).toHaveBeenCalledWith({ pathname: '/tu-turno', params: {} });
 
     const publication = within(day).getByTestId('bloque-publicacion');
@@ -127,99 +157,145 @@ describe('Calendario · semana', () => {
     ]);
   });
 
-  it('a tap on a day keeps it in the params and opens its panel in a sheet (half and full)', async () => {
+  it('a tap on a day selects it in place: the panel under the calendar changes, with no sheet', async () => {
     server();
     await renderCalendario();
-    await fireEvent.press(await screen.findByTestId('dia-2026-11-04'));
+    await screen.findByTestId('dia-2026-11-04');
+    expect(selectedDays()).toEqual(['dia-2026-11-07']);
+    await fireEvent.press(screen.getByTestId('dia-2026-11-04'));
     expect(lastParams()).toMatchObject({ fecha: '2026-11-04' });
+    expect(selectedDays()).toEqual(['dia-2026-11-04']);
+    // No day sheet any more: the panel that already sits under the calendar is the day's detail.
+    expect(screen.queryByTestId('hoja-dia')).toBeNull();
+    expect(screen.queryByLabelText('Altura del panel')).toBeNull();
     // The 7th's panel leaves under the 4th's (MovCalendario), out of reach of screen readers, then goes.
     expect(screen.getByTestId('panel-dia-saliente', hidden)).toBeTruthy();
     await waitFor(() => expect(screen.queryByTestId('panel-dia-saliente', hidden)).toBeNull());
-    const day = sheet();
+    const day = panel();
     expect(within(day).getByText('Miércoles 4 de noviembre')).toBeOnTheScreen();
     expect(within(day).getByText('Pasado')).toBeOnTheScreen();
     expect(await within(day).findByText('Sin publicación. El director decidió no publicar: No había material genuino ese día.')).toBeOnTheScreen();
     expect(within(day).queryByTestId('bloque-programado')).toBeNull();
-    // The inline panel follows the selected day too.
-    expect(within(panel()).getByText('Miércoles 4 de noviembre')).toBeOnTheScreen();
-
-    const grip = within(day).getByLabelText('Altura del panel');
-    expect(grip.props.accessibilityActions).toEqual([
-      { name: 'increment', label: 'Ampliar' },
-      { name: 'decrement', label: 'Media pantalla' },
-      { name: 'dismiss', label: 'Cerrar' },
-    ]);
-    // Not modal: another day can be picked with the sheet up.
-    await fireEvent.press(screen.getByTestId('dia-2026-11-06'));
-    expect(within(sheet()).getByText('Viernes 6 de noviembre')).toBeOnTheScreen();
-    expect(within(sheet()).queryByText('Miércoles 4 de noviembre')).toBeNull();
-    await waitFor(() => expect(screen.queryByTestId('panel-dia-hoja-saliente', hidden)).toBeNull());
-    // No visible close button: sliding it down, Android back or the grip's accessible «Cerrar» action.
-    expect(within(sheet()).queryByRole('button', { name: 'Cerrar' })).toBeNull();
-    await fireEvent(within(sheet()).getByLabelText('Altura del panel'), 'accessibilityAction', { nativeEvent: { actionName: 'dismiss' } });
-    await waitFor(() => expect(screen.queryByTestId('hoja-dia')).toBeNull());
+    // Still the same week: tapping never turns it.
+    expect(screen.getByText('2–8 nov 2026')).toBeOnTheScreen();
+    expect(screen.getByTestId('dia-2026-11-04').props.accessibilityHint).toBe('Muestra el día debajo del calendario');
   });
 
-  it('opens the piece by tapping its card in the day sheet, which shows a clamped preview', async () => {
+  it('opens the piece by tapping its card in the day panel, which shows a clamped preview', async () => {
     server();
     await renderCalendario();
-    await fireEvent.press(await screen.findByTestId('dia-2026-11-07'));
-    const card = await within(sheet()).findByTestId('pieza-del-dia');
+    const card = await within(panel()).findByTestId('pieza-del-dia');
     expect(card).toHaveProp('accessibilityRole', 'link');
-    expect(within(sheet()).queryByText('Ver cómo se escribió')).toBeNull();
+    expect(within(panel()).queryByText('Ver cómo se escribió')).toBeNull();
     // The thesis (and the first lines, when there are) take two lines with «…»: the detail has the rest.
     expect(within(card).getAllByText(/.+/).filter((text) => text.props.numberOfLines === 2).length).toBeGreaterThan(0);
     await fireEvent.press(card);
     expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/calendario/pieza/p7', params: {} });
   });
 
-  it('hides the sheet while another screen is on top, and brings it back on the same day', async () => {
-    server();
-    const view = await renderCalendario();
-    await fireEvent.press(await screen.findByTestId('dia-2026-11-05'));
-    expect(screen.getByTestId('hoja-dia')).toBeOnTheScreen();
-    expoRouter.__state.pathname = '/tu-turno';
-    await view.rerender(<CalendarioScreen />);
-    expect(screen.queryByTestId('hoja-dia')).toBeNull();
-    expoRouter.__state.pathname = '/calendario';
-    await view.rerender(<CalendarioScreen />);
-    expect(within(sheet()).getByText('Jueves 5 de noviembre')).toBeOnTheScreen();
-  });
-
-  it('swipes to the next and the previous week with a tick; a short swipe stays', async () => {
+  it('swipes weeks with a tick without moving the selected day; a short swipe stays', async () => {
     const api = server();
     await renderCalendario();
     await screen.findByTestId('dia-2026-11-07');
+    await within(panel()).findByText('6 comentarios');
     await swipe('pager-semana', -320);
-    expect(lastParams()).toMatchObject({ fecha: '2026-11-14' });
     expect(Haptics.selectionAsync).toHaveBeenCalled();
     expect(await screen.findByText('9–15 nov 2026')).toBeOnTheScreen();
     await waitFor(() => expect(api.find('GET', '/api/v1/calendario').some((r) => search(r).get('desde') === '2026-11-09')).toBe(true));
+    // The selection stays on the 7th: nothing goes to the route, no cell of this week is selected and the panel keeps
+    // the 7th (its heading says which day it is).
+    expect(expoRouter.router.setParams).not.toHaveBeenCalled();
+    expect(screen.getByTestId('dia-2026-11-14')).toBeOnTheScreen();
+    expect(selectedDays()).toEqual([]);
+    expect(screen.queryByTestId('seleccion-dia')).toBeNull();
+    expect(within(panel()).getByText('Sábado 7 de noviembre')).toBeOnTheScreen();
+    expect(within(panel()).getByText('6 comentarios')).toBeOnTheScreen();
 
+    // A tap on a day of this week selects it, and the week stays.
+    await fireEvent.press(screen.getByTestId('dia-2026-11-12'));
+    expect(lastParams()).toMatchObject({ fecha: '2026-11-12' });
+    expect(selectedDays()).toEqual(['dia-2026-11-12']);
+    expect(within(panel()).getByText('Jueves 12 de noviembre')).toBeOnTheScreen();
+    expect(screen.getByText('9–15 nov 2026')).toBeOnTheScreen();
+
+    // Back to this week: today keeps its mark («hoy»), the 12th stays selected and its panel stays.
+    const calls = expoRouter.router.setParams!.mock.calls.length;
     await swipe('pager-semana', 320);
     expect(await screen.findByText('2–8 nov 2026')).toBeOnTheScreen();
+    expect(screen.getByTestId('dia-2026-11-07').props.accessibilityLabel).toMatch(/^Sábado 7 de noviembre, hoy/);
+    expect(selectedDays()).toEqual([]);
+    expect(within(panel()).getByText('Jueves 12 de noviembre')).toBeOnTheScreen();
+    expect(expoRouter.router.setParams!.mock.calls.length).toBe(calls);
 
-    const calls = expoRouter.router.setParams!.mock.calls.length;
     await swipe('pager-semana', 40);
+    expect(screen.getByText('2–8 nov 2026')).toBeOnTheScreen();
     expect(expoRouter.router.setParams!.mock.calls.length).toBe(calls);
   });
 
-  it('moves a week with the arrows and comes back with «Hoy»', async () => {
+  it('keeps the screen reader’s «Semana anterior» and «Semana siguiente», which turn only the week', async () => {
+    server();
+    await renderCalendario();
+    await screen.findByTestId('dia-2026-11-07');
+    const pager = screen.getByTestId('pager-semana');
+    expect(pager.props.accessibilityActions).toEqual([
+      { name: 'previous', label: 'Semana anterior' },
+      { name: 'next', label: 'Semana siguiente' },
+    ]);
+    await fireEvent(pager, 'accessibilityAction', { nativeEvent: { actionName: 'next' } });
+    expect(await screen.findByText('9–15 nov 2026')).toBeOnTheScreen();
+    expect(within(panel()).getByText('Sábado 7 de noviembre')).toBeOnTheScreen();
+    await fireEvent(screen.getByTestId('pager-semana'), 'accessibilityAction', { nativeEvent: { actionName: 'previous' } });
+    expect(await screen.findByText('2–8 nov 2026')).toBeOnTheScreen();
+    expect(selectedDays()).toEqual(['dia-2026-11-07']);
+    expect(expoRouter.router.setParams).not.toHaveBeenCalled();
+  });
+
+  it('a link selects its day and shows its week, also when it arrives with another week on screen', async () => {
+    server();
+    const view = await renderCalendario({ fecha: '2026-11-20' });
+    expect(await screen.findByText('16–22 nov 2026')).toBeOnTheScreen();
+    expect(within(panel()).getByText('Viernes 20 de noviembre')).toBeOnTheScreen();
+    await waitFor(() => expect(selectedDays()).toEqual(['dia-2026-11-20']));
+
+    await swipe('pager-semana', 320);
+    expect(await screen.findByText('9–15 nov 2026')).toBeOnTheScreen();
+    expoRouter.__state.params = { fecha: '2026-11-04' };
+    await view.rerender(<CalendarioScreen />);
+    expect(await screen.findByText('2–8 nov 2026')).toBeOnTheScreen();
+    expect(selectedDays()).toEqual(['dia-2026-11-04']);
+    expect(within(panel()).getByText('Miércoles 4 de noviembre')).toBeOnTheScreen();
+  });
+
+  it('folds each event of «Lo importante del día» into one line, and a tap unfolds it with its badge and link', async () => {
     server();
     await renderCalendario({ fecha: '2026-11-06' });
     expect(within(await screen.findByTestId('panel-dia')).getByText('Viernes 6 de noviembre')).toBeOnTheScreen();
     const uncertain = await within(panel()).findByTestId('evento-action_uncertain:prop-9:2026-11-06');
-    expect(within(uncertain).getByText('Comentario: no se sabe si salió')).toBeOnTheScreen();
+    const title = within(uncertain).getByText('Comentario: no se sabe si salió');
+    expect(title.props.numberOfLines).toBe(1);
+    expect(within(uncertain).getByText('18:42')).toBeOnTheScreen();
+    expect(within(uncertain).queryByText('Incierta')).toBeNull();
+    expect(within(uncertain).queryByText('Resuélvela en la Bandeja')).toBeNull();
+    const row = within(uncertain).getByRole('button');
+    expect(row.props.accessibilityState).toMatchObject({ expanded: false });
+
+    await fireEvent.press(title);
+    expect(within(uncertain).getByRole('button').props.accessibilityState).toMatchObject({ expanded: true });
+    expect(within(uncertain).getByText('Comentario: no se sabe si salió').props.numberOfLines).toBeUndefined();
     expect(within(uncertain).getByText('Incierta')).toBeOnTheScreen();
-    await fireEvent.press(within(uncertain).getByText('Resuélvela en Tu turno'));
+    expect(within(uncertain).queryByText('Resuélvela en Tu turno')).toBeNull();
+    await fireEvent.press(within(uncertain).getByText('Resuélvela en la Bandeja'));
     expect(expoRouter.router.navigate).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-prop-9' } });
 
-    await fireEvent.press(screen.getByLabelText('Semana siguiente'));
-    expect(lastParams()).toMatchObject({ fecha: '2026-11-13' });
-    expect(await screen.findByText('9–15 nov 2026')).toBeOnTheScreen();
-    await fireEvent.press(screen.getByLabelText('Hoy'));
-    expect(lastParams()).toEqual({ vista: undefined, fecha: undefined, capas: undefined, tipo: undefined, no_salio: undefined });
-    expect(await screen.findByText('2–8 nov 2026')).toBeOnTheScreen();
+    await fireEvent.press(within(uncertain).getByText('Comentario: no se sabe si salió'));
+    expect(within(uncertain).queryByText('Incierta')).toBeNull();
+    expect(within(uncertain).getByText('Comentario: no se sabe si salió').props.numberOfLines).toBe(1);
+
+    // «Abrir» still opens an ordinary event.
+    const blocked = within(panel()).getByTestId('evento-piece_blocked:p6:2026-11-06');
+    await fireEvent.press(within(blocked).getByRole('button'));
+    await fireEvent.press(within(blocked).getByText('Abrir'));
+    expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/calendario/pieza/p6', params: {} });
   });
 
   it('toggles a layer through the params and hides its events', async () => {
@@ -240,7 +316,7 @@ describe('Calendario · semana', () => {
     await waitFor(() => expect(screen.getByTestId('capa-tuyo').props.accessibilityLabel).toBe('Tuyo · aún no disponible'));
     expect(screen.getByTestId('capa-tuyo').props.accessibilityState).toMatchObject({ disabled: true });
     expect(screen.getByText('Conversaciones · parcial')).toBeOnTheScreen();
-    expect(within(panel()).queryByTestId('bloque-tu-parte')).toBeNull();
+    expect(within(panel()).queryByTestId('bloque-bandeja')).toBeNull();
   });
 
   it('opens «Ver todo lo del día» filtered by the number tapped in the summary', async () => {
@@ -251,7 +327,38 @@ describe('Calendario · semana', () => {
       expect(api.find('GET', '/api/v1/actividad').some((r) => search(r).toString() === 'tipo=comentarios&desde=2026-11-07&hasta=2026-11-07&limit=50')).toBe(true),
     );
     expect(within(panel()).getByRole('button', { name: 'Comentarios' })).toBeSelected();
-    expect(await within(panel()).findByText('Comentaste en el post de Elena Prueba')).toBeOnTheScreen();
+    // Each row of the day's activity takes one line too; a tap shows the post, the comment, «Por qué» and LinkedIn.
+    const row = await within(panel()).findByTestId('actividad-i-1');
+    expect(within(row).getByText('Comentaste en el post de Elena Prueba').props.numberOfLines).toBe(1);
+    expect(within(row).queryByText('Naming the decision first is underrated.')).toBeNull();
+    expect(within(row).queryByText('Ver el comentario')).toBeNull();
+    await fireEvent.press(within(row).getByText('Comentaste en el post de Elena Prueba'));
+    expect(within(row).getByText('How we scope features at Kanoa.')).toBeOnTheScreen();
+    expect(within(row).getByText('Naming the decision first is underrated.')).toBeOnTheScreen();
+    expect(within(row).getByText('Por qué')).toBeOnTheScreen();
+    expect(within(row).getByText('Ver en LinkedIn')).toBeOnTheScreen();
+    await fireEvent.press(within(row).getByText('Comentaste en el post de Elena Prueba'));
+    expect(within(row).queryByText('Naming the decision first is underrated.')).toBeNull();
+  });
+
+  it('folds the texts of «Programado» into one line each, unfolded by a tap, with «Vetar» always at hand', async () => {
+    server();
+    await renderCalendario();
+    const scheduled = await within(panel()).findByTestId('bloque-programado');
+    const row = await within(scheduled).findByTestId('en-cola-q-1');
+    const sentence = within(row).getByText('Comentario en el post de Elena Prueba');
+    expect(sentence.props.numberOfLines).toBe(1);
+    expect(within(row).getByText('Saldrá cuando abra la ventana, hoy a las 12:00').props.numberOfLines).toBe(1);
+    expect(within(row).getByText('Vetar')).toBeOnTheScreen();
+    await fireEvent.press(sentence);
+    expect(within(row).getByText('Comentario en el post de Elena Prueba').props.numberOfLines).toBeUndefined();
+    expect(within(row).getByRole('button', { name: /Comentario en el post de Elena Prueba/ }).props.accessibilityState).toMatchObject({ expanded: true });
+    expect(within(row).getByText('Vetar')).toBeOnTheScreen();
+
+    const expected = within(scheduled).getByTestId('prevista-invite_expected:expected:2026-11-07');
+    expect(within(expected).getByText('Invitaciones previstas: 2 personas').props.numberOfLines).toBe(1);
+    await fireEvent.press(within(expected).getByText('Andrés Ejemplo y Sofía Muestra · Estimación sujeta a los topes'));
+    expect(within(expected).getByText('Andrés Ejemplo y Sofía Muestra · Estimación sujeta a los topes').props.numberOfLines).toBeUndefined();
   });
 
   it('warns that vetoing a network action discards the person', async () => {
@@ -327,15 +434,6 @@ describe('Calendario · semana', () => {
   });
 });
 
-describe('Calendario · hoja del día', () => {
-  // E2E wave, E4 bug 2: at full height the day sheet covered the week strip, so no other day could be tapped.
-  it('starts the sheet under the grid, leaving it at least 55 % of the screen', () => {
-    expect(sheetTop(90, 750)).toBe(98);
-    expect(sheetTop(0, 750)).toBe(8);
-    expect(sheetTop(400, 750)).toBe(337.5);
-  });
-});
-
 describe('Calendario · veto con «Deshacer»', () => {
   it('waits 5 s before vetoing tomorrow’s piece; «Deshacer» cancels it', async () => {
     const api = server({ 'POST /api/v1/operador/actions/act-8/reject': { body: {} } });
@@ -375,13 +473,13 @@ describe('Calendario · veto con «Deshacer»', () => {
     await waitFor(() => expect(api.find('GET', '/api/v1/editorial/pieces/p8').length).toBeGreaterThan(1));
   });
 
-  it('vetoes from the day sheet and says when the veto failed', async () => {
-    // Long enough to see «Vetada» before the failed veto replaces it (the toast can move into the day sheet's window).
+  it('vetoes from the panel of a tapped day and says when the veto failed', async () => {
+    // Long enough to see «Vetada» before the failed veto replaces it.
     jest.replaceProperty(motion.toastDurations as { withUndo: number }, 'withUndo', 300);
     server({ 'POST /api/v1/operador/actions/act-8/reject': { status: 409, body: { detail: 'La acción ya se está ejecutando.' } } });
     await renderCalendario();
     await fireEvent.press(await screen.findByTestId('dia-2026-11-08'));
-    await fireEvent.press(await within(sheet()).findByText('Vetar'));
+    await fireEvent.press(await within(within(panel()).getByTestId('bloque-publicacion')).findByText('Vetar'));
     const confirm = await screen.findByTestId('confirm-sheet');
     await fireEvent.changeText(within(confirm).getByTestId('confirm-note'), 'No');
     await fireEvent.press(within(confirm).getAllByText('Vetar').at(-1)!);
@@ -401,9 +499,24 @@ describe('Calendario · mes', () => {
     await waitFor(() => expect(screen.getByTestId('dia-2026-11-02').props.accessibilityLabel).toBe('Lunes 2 de noviembre, Publicaciones, Red'));
 
     await swipe('pager-mes', -320);
-    expect(lastParams()).toMatchObject({ vista: 'mes', fecha: '2026-12-07' });
     expect(await screen.findByText('Diciembre 2026')).toBeOnTheScreen();
     expect(await screen.findByText('No hay nada registrado en este mes.')).toBeOnTheScreen();
+    // Only the month turned: the selection is still today's, in the route and in the panel.
+    expect(expoRouter.router.setParams).not.toHaveBeenCalled();
+    expect(selectedDays()).toEqual([]);
+    expect(within(panel()).getByText('Sábado 7 de noviembre')).toBeOnTheScreen();
+  });
+
+  it('opens Semana on the selected day’s week, wherever the month was', async () => {
+    server();
+    await renderCalendario({ vista: 'mes' });
+    await screen.findByTestId('dia-2026-11-20');
+    await swipe('pager-mes', -320);
+    expect(await screen.findByText('Diciembre 2026')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Semana'));
+    expect(lastParams()).toMatchObject({ vista: undefined });
+    expect(await screen.findByText('2–8 nov 2026')).toBeOnTheScreen();
+    await waitFor(() => expect(selectedDays()).toEqual(['dia-2026-11-07']));
   });
 
   it('switches view with the segmented control', async () => {
@@ -446,7 +559,7 @@ describe('Calendario · lista', () => {
     expect(within(list).getByText('Head of Product @ Kanoa · Par')).toBeOnTheScreen();
     const uncertain = within(list).getByTestId('actividad-i-4');
     expect(within(uncertain).getByText('Incierta')).toBeOnTheScreen();
-    await fireEvent.press(within(uncertain).getByText('Resuélvela en Tu turno'));
+    await fireEvent.press(within(uncertain).getByText('Resuélvela en la Bandeja'));
     expect(expoRouter.router.navigate).toHaveBeenCalledWith({ pathname: '/tu-turno', params: { ancla: 'turno-uncertain-i-4' } });
     await fireEvent.press(within(list).getByText('Ver la pieza'));
     expect(expoRouter.router.push).toHaveBeenCalledWith({ pathname: '/calendario/pieza/p5', params: {} });

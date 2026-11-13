@@ -58,7 +58,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
 - **Código:** `notificaciones.upcoming` (se calcula en cada consulta; nunca cuenta como no leído).
 - **Criterios de aceptación:**
   1. **Dado** una pieza `ready` con su acción `proposed` o `approved` que sale en las próximas 48 h, **cuando** abre Notificaciones, **entonces** «Próximo» muestra «Sale la pieza «<tesis>»» con «Puedes vetarla en el detalle hasta las HH:MM.» y enlace a `/calendario/pieza/<id>`.
-  2. **Dado** contactos seguidos cuya espera de 48 h termina en las próximas 24 h y las invitaciones sin bloqueo, **cuando** abre Notificaciones, **entonces** ve «El equipo invitará a N personas que encajan» con «Si los topes del día lo permiten.».
+  2. **Dado** contactos seguidos cuya espera de 48 h termina en las próximas 24 h y las invitaciones sin bloqueo, **cuando** abre Notificaciones, **entonces** ve «El equipo invitará a N personas que encajan» con «Si los topes del día lo permiten.», sin enlace: Personas solo lista las conexiones ([PRS-01](personas-oportunidades.md#prs-01)).
   3. **Dado** `OPERATOR_PAUSED=true`, **cuando** abre Notificaciones, **entonces** ve «La máquina está detenida desde el servidor» con «La parada viene de OPERATOR_PAUSED y no se levanta desde la app.» y enlace a `/ajustes#maquina`.
   4. **Dado** los elementos de «Próximo», **cuando** se calcula `unread`, **entonces** no cuentan.
 - **Brechas código/docs:** —

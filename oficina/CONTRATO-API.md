@@ -490,7 +490,8 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
 
 - **`GET /api/v1/red/contacts`.** Además de `stage` y `source`, admite:
   - `stage=opportunity`, que filtra por las personas con una oportunidad abierta;
-  - `q` (nombre o titular), `role` y `modality`.
+  - `q` (nombre o titular), `role` y `modality`; `role=sin_etiqueta` filtra a quienes no tienen rol del barrio;
+  - `vista=conexiones` (Personas › Conexiones en la app): solo las personas en `connected`, la conexión más reciente primero (`connected_at`, o `updated_at` si falta), sin mirar `stage`.
 - **Campos nuevos de `ContactOutput`:**
 
 ```json
@@ -503,7 +504,7 @@ Detalle y semántica en `agentes-linkedin/infra/docs/rediseno-backend.md`. Las e
 ```
 
 - **`POST /api/v1/red/contacts/<id>/notas`** recibe `{ "text" }`, añade una nota y devuelve el contacto (201).
-- **`GET /api/v1/red/summary`.** `stages` añade `opportunity` (número) y `conversation` (`null` hasta que llegue el inbox).
+- **`GET /api/v1/red/summary`.** `stages` añade `opportunity` (número) y `conversation` (`null` hasta que llegue el inbox). `connections` cuenta las conexiones por rol del barrio para los chips de Conexiones: `{ "total": 5, "roles": { "comprador": 2, "par": 1, "divulgador": 1, "sin_etiqueta": 1 } }` (`sin_etiqueta`: sin `classification.role`).
 - **Oportunidades.** `GET /api/v1/oportunidades?stage=&modality=&contact=` devuelve una lista paginada de `OpportunityOutput`:
 
 ```json

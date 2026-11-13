@@ -1,4 +1,4 @@
-// Ajustes › Captura y galería (rev 18): the microphone permission (asked here, or the phone's settings
+// Ajustes › Captura (rev 18; the Galería left the app on 12/11/2026): the microphone permission (asked here, or the phone's settings
 // when it was blocked; checked again when Gustavo comes back from them) and the default
 // «Edición con IA» (PATCH /api/v1/ajustes/preferencias).
 import { AIEditControl } from '@/components/ui/AIEditControl';
@@ -117,7 +117,7 @@ function AiEditDefault() {
     <View style={styles.ai}>
       <AIEditControl testID="default-ai" value={value} disabled={!prefs.isSuccess || save.isPending} onChange={change} />
       <T variant="detalle" soft>
-        {unavailable ? 'Aún no disponible: el servidor todavía no guarda esta preferencia.' : 'Es el valor por defecto de cada foto nueva; puedes cambiarlo foto por foto en la Galería.'}
+        {unavailable ? 'Aún no disponible: el servidor todavía no guarda esta preferencia.' : 'Es el valor por defecto de cada foto nueva que envías con el botón aguamarina.'}
       </T>
       {!unavailable ? <ErrorRetry error={prefs.error} onRetry={() => void prefs.refetch()} /> : null}
     </View>
@@ -126,7 +126,7 @@ function AiEditDefault() {
 
 export function CapturaSection() {
   return (
-    <Section label="Captura y galería">
+    <Section label="Captura">
       <Card>
         <Microphone />
         <AiEditDefault />

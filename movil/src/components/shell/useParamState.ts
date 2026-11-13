@@ -4,7 +4,7 @@
 //
 // The router applies setParams later, in order. While Gustavo types in a search box the screen can ask for
 // ?q=S, then ?q=So, and only afterwards see ?q=S arrive: that is its own earlier change coming back, not a
-// new link, so the local copy (newer) stays. Without this, «Sof» typed in the Barrio search box became «S»
+// new link, so the local copy (newer) stays. Without this, «Sof» typed in the Personas search box became «S»
 // (14-fichas on the emulator, run 42497299487). Once the router reaches one of those changes, the earlier
 // ones are spent: a later link that happens to match one of them is a new link again.
 import { router, useLocalSearchParams } from 'expo-router';

@@ -416,6 +416,8 @@ export interface RedSummary {
   enabled: boolean;
   /** `opportunity` counts open opportunities; `conversation` is null until the inbox arrives. */
   stages: Partial<Record<ContactStage, number>> & { opportunity?: number; conversation?: number | null };
+  /** Personas › Conexiones: the connected people by barrio role (absent on older backends). */
+  connections?: ConnectionCounts;
   capacity: Partial<Record<NetworkCapability, NetworkCapacity>>;
   reads_today: Partial<Record<NetworkRead, number>>;
   read_caps: Partial<Record<NetworkRead, number>>;
@@ -425,6 +427,12 @@ export interface RedSummary {
   invites_blocked: { blocked: boolean; reason: string };
   last_discovery_at: string | null;
   last_sync_at: string | null;
+}
+
+/** `red/summary.connections`: `roles` counts by `classification.role`, `sin_etiqueta` for a connection without one. */
+export interface ConnectionCounts {
+  total: number;
+  roles: Record<string, number>;
 }
 
 // ---------------------------------------------------------------- editorial (daily own publication)
@@ -1261,11 +1269,14 @@ export interface Actividad {
 // ---------------------------------------------------------------- people: filters and opportunities
 
 export interface ContactSearch {
+  /** `conexiones`: only the connected people, the most recent connection first (the stage is ignored). */
+  vista?: 'conexiones' | '';
   stage?: DisplayStage | '';
   source?: string;
   account?: string;
   /** Name or headline. */
   q?: string;
+  /** A barrio role, or `sin_etiqueta` for the people without one. */
   role?: string;
   modality?: string;
   page?: number;

@@ -24,10 +24,10 @@ export function TuTurno() {
   const { groups } = pendingView(turno.data);
 
   return (
-    <Page title="Tu turno" subtitle={groups.length ? prioritySummary(groups) : undefined} width="narrow">
+    <Page title="Bandeja de entrada" subtitle={groups.length ? prioritySummary(groups) : undefined} width="narrow">
       <div className="turno-view">
         <TabBar<Tab>
-          label="Tu turno"
+          label="Bandeja de entrada"
           idPrefix="turno-tab"
           tabs={TABS}
           value={tab}

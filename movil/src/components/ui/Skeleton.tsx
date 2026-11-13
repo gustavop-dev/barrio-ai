@@ -22,7 +22,7 @@ function Bar({ width, height = 14, round, index, clock, still }: { width: `${num
   return <Animated.View style={[{ width, height, borderRadius: round ? radius.pill : radius.sm, backgroundColor: colors.line }, breathing]} />;
 }
 
-/** Loading placeholders: card (Tu turno) or row. */
+/** Loading placeholders: card (la Bandeja) or row. */
 export function Skeleton({ variant = 'card', count = 1, label = 'Cargando…' }: { variant?: 'card' | 'row'; count?: number; label?: string }) {
   const { reduced } = useMotion();
   const clock = useSharedValue(0);

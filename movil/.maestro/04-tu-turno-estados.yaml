@@ -1,10 +1,10 @@
 # cubre: TUR-01, TUR-15, TUR-19
-# Tu turno · estados vacíos y de error, with the QA failure switch (comun/qa-fallo.js, team_backend.qa_fallos):
-# an empty Tu turno says «Nada depende de ti hoy»; a refresh that fails keeps the cards and says «No se pudo
+# Bandeja · estados vacíos y de error, with the QA failure switch (comun/qa-fallo.js, team_backend.qa_fallos):
+# an empty Bandeja says «Nada depende de ti hoy»; a refresh that fails keeps the cards and says «No se pudo
 # actualizar» with «Reintentar»; a swipe the API refuses brings the card back with the server's reason; and «Lo que
 # el equipo sabe de ti» shows its load error with «Reintentar», then its empty state.
 appId: co.projectapp.office
-name: Tu turno · estados
+name: Bandeja · estados
 tags: [turno]
 ---
 - runFlow: comun/entrar.yaml
@@ -19,7 +19,7 @@ tags: [turno]
       METODO: GET
       VECES: '-1'
 - tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:

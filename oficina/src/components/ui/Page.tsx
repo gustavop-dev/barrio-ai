@@ -21,7 +21,7 @@ export interface PageProps {
   subtitle?: ReactNode;
   /** Controls on the right of the title (Hoy, ←, →). */
   actions?: ReactNode;
-  /** narrow: ~760px column (Tu turno, Ajustes); default: 1280px; full: no max width. */
+  /** narrow: ~760px column (Bandeja de entrada, Ajustes); default: 1280px; full: no max width. */
   width?: 'narrow' | 'default' | 'full';
   /** Hides the visual h1 (keeps it for screen readers) when the design has no title. */
   hideTitle?: boolean;

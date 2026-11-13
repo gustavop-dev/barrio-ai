@@ -184,17 +184,17 @@ tags: [personas, oportunidades]
     visible: "Mauricio Peña, Propuesta"
     timeout: 15000
 - takeScreenshot: 12-oportunidades-06-mover-fallido
-# What the server kept: after going to Barrio and back, Valentina is still «Cualificada».
+# What the server kept: after going to Conexiones and back, Valentina is still «Cualificada».
 - extendedWaitUntil:
     notVisible:
       id: toast
     timeout: 15000
 - scrollUntilVisible:
     element:
-      text: "Barrio"
+      text: "Conexiones"
     direction: UP
     timeout: 20000
-- tapOn: "Barrio"
+- tapOn: "Conexiones"
 - extendedWaitUntil:
     visible:
       id: barrio-list
@@ -552,10 +552,10 @@ tags: [personas, oportunidades]
       VECES: '-1'
 - scrollUntilVisible:
     element:
-      text: "Barrio"
+      text: "Conexiones"
     direction: UP
     timeout: 20000
-- tapOn: "Barrio"
+- tapOn: "Conexiones"
 - extendedWaitUntil:
     visible:
       id: barrio-list

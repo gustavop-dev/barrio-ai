@@ -1,6 +1,6 @@
 // How the tab content changes (MovNavegacion `tab`): the old screen fades out in 60 % of TOK.fast
 // (EASE_IN) while the new one fades in and rises 8 points (TOK.fast, EASE_OUT). The four screens of
-// the top bar (Tu turno, Notificaciones, Calendario, Ajustes) open with the push instead: they slide
+// the top bar (Notificaciones, Calendario, Ajustes) open with the push instead: they slide
 // in from the right with the `push` spring while the screen underneath moves left by 30 %.
 //
 // The scenes are drawn in the navigator's order, whatever the focus: react-native-screens stacks the screens of its
@@ -24,10 +24,10 @@ import type { TabsScreenOptions } from 'expo-router/js-tabs';
 import { BEZIER, navSprings, navTimings, navValues } from '@/theme/motion';
 
 /** Routes of the top bar: they open with the push. */
-export const TOP_BAR_ROUTES: readonly string[] = ['tu-turno', 'notificaciones', 'calendario', 'ajustes'];
+export const TOP_BAR_ROUTES: readonly string[] = ['notificaciones', 'calendario', 'ajustes'];
 
 /** The tabs in the navigator's order: the order they are drawn in, and the side a scene slides from. */
-export const TAB_ORDER = ['index', 'resultados', 'personas', 'galeria', 'tu-turno', 'notificaciones', 'calendario', 'ajustes'] as const;
+export const TAB_ORDER = ['index', 'resultados', 'personas', 'tu-turno', 'notificaciones', 'calendario', 'ajustes'] as const;
 
 export type TabMove = 'fade' | 'push' | 'pop';
 

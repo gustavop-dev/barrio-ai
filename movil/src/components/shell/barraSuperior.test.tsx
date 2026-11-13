@@ -1,7 +1,7 @@
 // The top bar on the real shell: the root layout, the login, the (app) stack and the tabs layout with
 // TopBar and BottomBar, on the real Expo Router (the rest of the suite mocks it). Only the screens are
-// minimal. It guards the regression where none of the top-bar destinations opened (Tu turno,
-// Notificaciones, Calendario, Ajustes): pressing an icon must focus its screen and leave its content
+// minimal. It guards the regression where none of the top-bar destinations opened (Notificaciones,
+// Calendario, Ajustes; the Bandeja de entrada moved to the bottom bar on 12/11/2026): pressing an icon must focus its screen and leave its content
 // visible (no opacity 0, not moved off-screen in the applied style), from any tab and from a detail,
 // and back must return. It also checks that the login leaves the tree after signing in.
 //
@@ -59,8 +59,8 @@ jest.mock('@shopify/react-native-skia', () => {
 
 const store = (SecureStore as unknown as { __store: Map<string, string> }).__store;
 const USER = { username: 'gustavo', is_superuser: true, permissions: [] };
-const TOP = ['tu-turno', 'notificaciones', 'calendario', 'ajustes'] as const;
-const BOTTOM = ['index', 'resultados', 'personas', 'galeria'] as const;
+const TOP = ['notificaciones', 'calendario', 'ajustes'] as const;
+const BOTTOM = ['index', 'resultados', 'personas', 'tu-turno'] as const;
 /** A tab change at rest: js-tabs' native-driven animations (ended by the mock below) and its 32 ms tail. */
 const TAB_MS = 250;
 /** Long enough for every Reanimated spring of the shell (the detail push, the entrance) to come to rest. */
@@ -212,7 +212,7 @@ afterEach(() => {
 });
 
 describe('the top bar on the real shell', () => {
-  it('opens Tu turno, Notificaciones, Calendario and Ajustes from every bottom tab, and back returns', async () => {
+  it('opens Notificaciones, Calendario and Ajustes from every bottom tab, and back returns', async () => {
     await renderSignedIn();
     for (const tab of BOTTOM) {
       if (tab !== 'index') await press(`tab-${tab}`);
@@ -231,10 +231,8 @@ describe('the top bar on the real shell', () => {
 
   it('goes from one top-bar screen to another and back through them; a second press stays', async () => {
     await renderSignedIn();
-    await press('top-tu-turno');
-    expectShown('tu-turno');
-    await press('top-tu-turno');
-    expectShown('tu-turno');
+    await press('top-notificaciones');
+    expectShown('notificaciones');
     await press('top-notificaciones');
     expectShown('notificaciones');
     await press('top-ajustes');
@@ -246,8 +244,6 @@ describe('the top bar on the real shell', () => {
     await back();
     expectShown('notificaciones');
     await back();
-    expectShown('tu-turno');
-    await back();
     expectShown('index');
   });
 
@@ -255,17 +251,17 @@ describe('the top bar on the real shell', () => {
     await renderSignedIn();
     const { width } = Dimensions.get('window');
     const parallax = navValues.pushParallax * width;
-    // First frame of the push: Tu turno starts beyond the right edge, opaque (not a fade).
-    await fireEvent.press(screen.getByTestId('top-tu-turno'));
-    const entering = appliedFrame(screen.getByTestId('pantalla-tu-turno'));
+    // First frame of the push: Notificaciones starts beyond the right edge, opaque (not a fade).
+    await fireEvent.press(screen.getByTestId('top-notificaciones'));
+    const entering = appliedFrame(screen.getByTestId('pantalla-notificaciones'));
     expect(entering.translateX).toBeCloseTo(width, 0);
     expect(entering.opacity).toBeCloseTo(1, 2);
     await advance(TAB_MS);
-    expectShown('tu-turno');
+    expectShown('notificaciones');
     // The Oficina underneath ended 30 % to the left.
     expect(appliedFrame(screen.getByTestId('pantalla-index', { includeHiddenElements: true })).translateX).toBeCloseTo(-parallax, 0);
 
-    // First frame of the way back: the Oficina comes from 30 % to the left, opaque: Tu turno is drawn over it (the tabs
+    // First frame of the way back: the Oficina comes from 30 % to the left, opaque: Notificaciones is drawn over it (the tabs
     // draw in the navigator's order) and uncovers it as it leaves.
     await act(async () => {
       router.back();
@@ -275,8 +271,8 @@ describe('the top bar on the real shell', () => {
     expect(returning.opacity).toBeCloseTo(1, 2);
     await advance(TAB_MS);
     expectShown('index');
-    // Tu turno left through the right edge.
-    expect(appliedFrame(screen.getByTestId('pantalla-tu-turno', { includeHiddenElements: true })).translateX).toBeCloseTo(width, 0);
+    // Notificaciones left through the right edge.
+    expect(appliedFrame(screen.getByTestId('pantalla-notificaciones', { includeHiddenElements: true })).translateX).toBeCloseTo(width, 0);
 
     // A bottom tab still crossfades: Resultados starts transparent, in place horizontally.
     await fireEvent.press(screen.getByTestId('tab-resultados'));
@@ -338,21 +334,21 @@ describe('the top bar on the real shell', () => {
     for (const [tab, label] of [
       ['resultados', 'Resultados'],
       ['personas', 'Personas'],
-      ['galeria', 'Galería'],
+      ['tu-turno', 'Bandeja de entrada, 3 pendientes'],
     ] as const) {
       await press(`tab-${tab}`);
       expectShown(tab);
       expect(screen.getByRole('tab', { name: label })).toBeSelected();
     }
-    await press('top-tu-turno');
-    expectShown('tu-turno');
-    for (const label of ['Oficina', 'Resultados', 'Personas', 'Galería']) expect(screen.getByRole('tab', { name: label })).not.toBeSelected();
+    await press('top-notificaciones');
+    expectShown('notificaciones');
+    for (const label of ['Oficina', 'Resultados', 'Personas', 'Bandeja de entrada, 3 pendientes']) expect(screen.getByRole('tab', { name: label })).not.toBeSelected();
     await press('tab-index');
     expectShown('index');
     await back();
-    expectShown('tu-turno');
+    expectShown('notificaciones');
     await back();
-    expectShown('galeria');
+    expectShown('tu-turno');
     await back();
     expectShown('personas');
   });
@@ -378,12 +374,12 @@ describe('the top bar on the real shell', () => {
       router.push('/personas/7');
     });
     await advance(SETTLE_MS);
-    await fireEvent.press(within(screen.getByTestId('detail-panel')).getByTestId('top-tu-turno'));
+    await fireEvent.press(within(screen.getByTestId('detail-panel')).getByTestId('top-notificaciones'));
     // The detail first runs its push back to rest (FIRM) and only then lets the navigation go on: that
     // commit lands when the act() ends, so the tab's own push needs a second act to run.
     await advance(SETTLE_MS);
     await advance(TAB_MS);
-    expectShown('tu-turno');
+    expectShown('notificaciones');
     // The detail went (after its push back), and no second shell was stacked over it.
     expect(screen.queryByTestId('pantalla-persona', { includeHiddenElements: true })).toBeNull();
     expect(screen.getAllByTestId('shell-tabs', { includeHiddenElements: true })).toHaveLength(1);
@@ -449,11 +445,11 @@ describe('login → app', () => {
     expectShown('index');
 
     // The top bar is not under anything: none of its ancestors turns touches off.
-    const icon = screen.getByTestId('top-tu-turno');
+    const icon = screen.getByTestId('top-notificaciones');
     for (let node: TestInstance | null = icon; node; node = node.parent) expect(['none', 'box-only']).not.toContain(node.props.pointerEvents);
 
-    await press('top-tu-turno');
-    expectShown('tu-turno');
+    await press('top-notificaciones');
+    expectShown('notificaciones');
     await back();
     expectShown('index');
   });

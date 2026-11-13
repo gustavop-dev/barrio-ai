@@ -1,7 +1,9 @@
 // The calendar's state lives in the route params, as in the PWA's URL:
 // /calendario?vista=mes|semana|lista&fecha=AAAA-MM-DD&capas=tuyo,publicaciones (plus tipo and no_salio in Lista).
-// Defaults are left out (no `fecha` is today, no `vista` is Semana). A link that arrives while the tab is
-// mounted (a push, a Tu turno card) replaces the state; changes made here go back to the route.
+// `fecha` is the selected day; the screen opens on its week or month, and the period Gustavo swipes to is the
+// screen's own state (period.ts), not a param. Defaults are left out (no `fecha` is today, no `vista` is Semana).
+// A link that arrives while the tab is mounted (a push, a card of the Bandeja) replaces the state; changes made
+// here go back to the route.
 import type { ActividadTipo } from '@compartido/api/types';
 import { isIsoDay } from '@compartido/logic/dates';
 import { DEFAULT_VISTA, isLayer, isTipo, isVista, type Vista } from '@compartido/logic/events';

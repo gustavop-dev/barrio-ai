@@ -93,12 +93,12 @@ describe('Tu turno · a card resolved with its button (MovTuTurno)', () => {
     await screen.findByTestId('turno-done');
     // GET /tu-turno already says 1, but the card is still on the list.
     expect(screen.getByTestId('turn-counter')).toHaveTextContent('2');
-    expect(screen.getByLabelText('Tu turno, 2 pendientes')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Bandeja de entrada, 2 pendientes')).toBeOnTheScreen();
 
     await advance(turnoMotion.doneHoldMs + turnoTimings.collapse.duration);
     const counter = screen.getByTestId('turn-counter');
     expect(counter).toHaveTextContent('1');
-    expect(screen.getByLabelText('Tu turno, 1 pendiente')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Bandeja de entrada, 1 pendiente')).toBeOnTheScreen();
     const scale = () => Number(animatedStyle(screen.getByTestId('turn-counter')).transform?.[0]?.scale ?? 1);
     await advance(16);
     expect(scale()).toBeGreaterThan(1);

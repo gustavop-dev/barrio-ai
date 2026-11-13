@@ -135,7 +135,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   6. **Dado** una foto ya usada en una pieza, **cuando** se cambia su opción, **entonces** solo afecta a usos futuros.
   7. **Dado** lectores de pantalla, **cuando** recorren el control, **entonces** es un grupo de opciones con nombre y la opción elegida anunciada.
 - **Brechas código/docs:** Implementación de interfaz terminada; CI y QA visual pendientes.
-- **Cobertura QA:** `05-captura-envios` (selector y envío), `10-galeria` (tres opciones y persistencia), `11-ajustes` (default y reversión tras error); Jest y Vitest de captura, Galería y Ajustes. Escritos; ejecución pendiente de Claude.
+- **Cobertura QA:** `05-captura-envios` (selector y envío), `11-ajustes` (default y reversión tras error); Jest y Vitest de captura, Galería y Ajustes. Escritos; ejecución pendiente de Claude.
 
 ### IMG-04 · El equipo ve la Galería y elige las fotos de un post <a id="img-04"></a>
 

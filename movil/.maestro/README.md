@@ -84,12 +84,12 @@ Para comparar con el diseño, abre las capturas junto a los tableros `movil/dise
 - las cuentas simuladas;
 - una pieza en cada estado: programada para mañana y vetable, publicada con cortes de 72 h y de 7 días, bloqueada con ronda de reparación, saltada y fallida;
 - comentarios y acciones de red pendientes, y acciones ya hechas para la Lista y el calendario;
-- personas en cada etapa, oportunidades en varias etapas y referentes;
-- todas las tarjetas de Tu turno: «¿Salió o no?», una conversación del inbox, preguntas de texto, de opción y de sí o no, una pospuesta, una caducada, la orientación del analista y dos aprobaciones de red (seguir a Laura, invitar a Julián: la red está en modo `approval` porque `OPERATOR_AUTONOMY` va vacío);
+- personas en cada etapa (cinco conexiones con etiquetas distintas, una de hace más de un mes y otra sin etiqueta), oportunidades en varias etapas y referentes;
+- todas las tarjetas de la Bandeja de entrada (antes «Tu turno»): «¿Salió o no?», una conversación del inbox, preguntas de texto, de opción y de sí o no, una pospuesta, una caducada, la orientación del analista y dos aprobaciones de red (seguir a Laura, invitar a Julián: la red está en modo `approval` porque `OPERATOR_AUTONOMY` va vacío);
 - notificaciones leídas y sin leer, y «Próximo»;
 - una captura transcrita, una idea usada y una captura urgente con evidencia y fecha prevista;
 - foto en `manana`, infografía en `aprobacion` y carrusel de cuatro láminas con PDF y alt en `publicada8`;
-- cuatro fotos generadas en la Galería;
+- cuatro fotos generadas para los posts (la app ya no tiene Galería; la PWA sí) y una foto de perfil sintética (función 03) en Ajustes › Fotos de perfil;
 - unos 100 días de audiencia, trabajos y sincronizaciones de red para Resultados, el resumen semanal y filas de gasto.
 
 Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con los mismos ids y textos. Por eso **se niega a correr** si no está `QA_SEED=permitido`, si hay un interruptor `LIVE_*` activado o si la base tiene una cuenta real de LinkedIn. La prueba `team_backend/tests/test_seed_qa.py` lo cubre en el CI normal.
@@ -99,33 +99,31 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | Flujo | Qué hace |
 |---|---|
 | `01-entrada` | la pantalla de entrada y «Entrar» desactivado; con el teclado abierto, la contraseña sigue a la vista; sin conexión, el aviso en español; contraseña equivocada; mostrar la contraseña; la correcta, la entrada animada y la Oficina; abrir otra vez sigue dentro; una sesión cerrada desde otro dispositivo vuelve a la entrada |
-| `02-navegacion` | abrir la app sin conexión sigue dentro (la franja, y la red que vuelve); el contador y el punto de arriba; las cuatro pestañas de abajo, los cuatro accesos de arriba, el «atrás» de Android por el historial; una ficha cerrada con «‹», con atrás y arrastrando desde el borde; la firma; enlaces `oficina0ff1ce://` a una pestaña y a una pieza |
+| `02-navegacion` | abrir la app sin conexión sigue dentro (la franja, y la red que vuelve); el contador de la Bandeja (abajo) y el punto de Notificaciones (arriba); las cuatro pestañas de abajo (Oficina, Resultados, Personas, Bandeja), los tres accesos de arriba, el «atrás» de Android por el historial; una ficha cerrada con «‹», con atrás y arrastrando desde el borde; la firma; enlaces `oficina0ff1ce://` a una pestaña y a una pieza |
 | `03-oficina` | tocar un personaje de la escena y ver su hoja con su estado real y lo último que hizo, arrastrarla a altura completa y cerrarla, el nombre de una zona abre su equipo, «Ver en el Calendario» y la Biblioteca; arrastre y doble toque en la escena; tirar para recargar; bajo la escena ya no hay leyenda, tira de equipos, mapa ni crédito; la máquina en pausa (el aviso, la escena oscurecida y Ajustes) |
 | `04-tu-turno` | la lista de arriba abajo una sola vez: «¿Salió o no?» con su nota, responder una pregunta, deslizar a la derecha y a la izquierda, «Más tarde», «Ya no es urgente», «Pospuestas», «Hecho recientemente» y «Lo que el equipo sabe de ti» |
-| `04-tu-turno-aprobar` | aprobar una acción de red desde su tarjeta de Tu turno y otra desde «En cola» del calendario |
-| `04-tu-turno-mas` | máquina detenida desde Ajustes y reanudada desde Tu turno, «Responder con audio», «Marcar como oportunidad», «No responder», descartar la orientación, responder con una opción y «Deshacer», «No quiero compartir esto» |
+| `04-tu-turno-aprobar` | aprobar una acción de red desde su tarjeta de la Bandeja y otra desde «En cola» del calendario |
+| `04-tu-turno-mas` | máquina detenida desde Ajustes y reanudada desde la Bandeja, «Responder con audio», «Marcar como oportunidad», «No responder», descartar la orientación, responder con una opción y «Deshacer», «No quiero compartir esto» |
 | `04-tu-turno-sabe` | «Lo que el equipo sabe de ti»: añadir, editar (v2) y retirar un dato |
 | `16-imagenes` | detalle con foto y veto, infografía con revisión, carrusel de cuatro láminas por swipe y botones; «Lo antes posible» con previsión, evidencia y condiciones en Lo que enviaste |
-| `18-perfil` | etiquetar una foto como Perfil; abrir propuesta sintética, citas y checklist; aceptar y marcar Aplicado sin declararlo Comprobado |
-| `05-captura` | desde Galería: abrir la hoja, «Para qué es», grabar desde la hoja, cerrar vacía y con algo («¿Cerrar sin enviar?»), mantener el botón, enviar, «Deshacer» en el aviso (vuelve el borrador), «Lo que enviaste» y «Deshacer» ahí |
-| `05-captura-envios` | una foto del selector de Android y una nota de voz llegan al backend (aviso, Galería, «Lo que enviaste»); sin red (modo avión) y 413: el motivo, el borrador y «Reintentar» |
-| `05-captura-contexto` | «Responder con audio» en Tu turno, «Nota de voz» en una persona y «Comentario para el equipo» con foto en una pieza, con su contexto en «Lo que enviaste» |
+| `18-perfil` | la foto de perfil sembrada y una subida desde Ajustes › Fotos de perfil; abrir propuesta sintética, citas y checklist; aceptar y marcar Aplicado sin declararlo Comprobado |
+| `05-captura` | desde Resultados: abrir la hoja, «Para qué es» (sin «Foto para la galería»), grabar desde la hoja, cerrar vacía y con algo («¿Cerrar sin enviar?»), mantener el botón, enviar, «Deshacer» en el aviso (vuelve el borrador), «Lo que enviaste» y «Deshacer» ahí |
+| `05-captura-envios` | una foto del selector de Android y una nota de voz llegan al backend (aviso, «Lo que enviaste»); sin red (modo avión) y 413: el motivo, el borrador y «Reintentar» |
+| `05-captura-contexto` | «Responder con audio» en la Bandeja, «Nota de voz» en una persona y «Comentario para el equipo» con foto en una pieza, con su contexto en «Lo que enviaste» |
 | `06-notificaciones` | «Próximo», filtros, tocar un aviso y llegar a la pieza o a la persona, «Marcar todo como leído» |
 | `06-notificaciones-avisos` | Ajustes › Notificaciones: «Este dispositivo», «Probar notificación» y encender un tipo de push apagado por defecto, que sigue encendido tras reabrir la app |
 | `06-notificaciones-destinos` | el resumen semanal, la captura procesada y la oportunidad sin contacto abren su destino |
-| `07-calendario` | Semana, Mes y Lista; deslizar semanas y meses; un mes sin nada y un día a más de 15 días; la hoja del día y el panel de un día con reunión, uno sin pieza y el de ayer con «Ver todo lo del día» filtrado; «En cola»: vetar una acción de red (se envía a los 5 s) y una reacción con «Deshacer»; «Lo que pasó» por tipo y con «Mostrar lo que no salió» |
+| `07-calendario` | Semana, Mes y Lista, sin botones «‹ Hoy ›»; deslizar semanas y meses no mueve el día elegido; un mes sin nada y un día a más de 15 días; tocar un día lo elige sin hoja ni scroll, y el panel bajo el calendario cambia: hoy, mañana con su pieza, un día con reunión en «De tu Bandeja» (una línea que se despliega al tocarla), uno sin pieza y el de ayer con «Ver todo lo del día» filtrado; «En cola»: vetar una acción de red (se envía a los 5 s) y una reacción con «Deshacer»; «Lo que pasó» por tipo y con «Mostrar lo que no salió» |
 | `07-pieza-veto` | la pieza de mañana: cabecera, «Copiar», «Comentario para el equipo», vetar y «Deshacer», los pliegues de «Cómo se escribió», el veto que se envía a los 5 s («La vetaste») y «Preparar la siguiente pieza» |
-| `07-pieza-estados` | las piezas pasadas desde su día: bloqueada (y la capa «Red» apagada), publicada con sus cortes y «—», saltada y fallida; la hoja a altura completa deja tocar otro día |
+| `07-pieza-estados` | las piezas pasadas desde el panel de su día: bloqueada (y la capa «Red» apagada; su fila de «Lo importante del día» se despliega para «Abrir»), publicada con sus cortes y «—», saltada y fallida; tocar otro día lo elige sin hoja y la tira se queda donde estaba |
 | `07-calendario-errores` | con el interruptor de fallos: el calendario, la actividad, la pieza y la pieza del día fallan («Reintentar»); un veto rechazado; «Próximo» y «Lo que pasó» vacíos |
 | `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo» y la «Modalidad»; los accesos a cada sección; un dato que falta como «—» con su motivo; la definición de un gráfico; tocar una barra, una oportunidad activa y el mejor post |
 | `08-resultados-errores` | con el interruptor de fallos: las cifras y el resumen semanal fallan, «Reintentar»; un periodo sin posts ni oportunidades activas |
-| `09-personas` | Barrio: pestañas, aviso de red apagada, filas, chips de etapa (con «En conversación» sin datos), búsqueda sin resultados y «Quitar filtros», «Más filtros» por rol; la ficha de Laura (recorrido, por qué encaja, de dónde salió, sin conversación, una nota nueva) y «Marcar como oportunidad» |
-| `10-galeria` | la rejilla, los avisos temporales (se van solos), sin categoría al subir, los filtros (y uno vacío), la nota y el interruptor de edición con IA (y la foto abierta otra vez enseguida), el visor (zoom, deslizar, cerrar), «Quitar de la galería» y que las fotos son privadas |
-| `10-galeria-subir` | «Subir fotos» con el selector de Android, un 413 con «Reintentar» y la Galería vacía |
+| `09-personas` | Conexiones: pestañas, aviso de red apagada, solo quienes aceptaron (filas con su etiqueta, «Aceptó el …», «Te toca» y la sección «Antes»), chips de etiqueta con su número («Sin etiqueta» al final), búsqueda sin resultados y «Quitar filtros»; la ficha de Laura abierta desde su enlace (recorrido, por qué encaja, de dónde salió, sin conversación, una nota nueva) y «Marcar como oportunidad» |
 | `11-ajustes` | de Máquina a Captura: parada total y reanudar, pausar la cuenta simulada, orientación (descartar y guardar), Autonomía, Gasto, «Conectar LinkedIn» abre la oficina web, micrófono y edición con IA |
 | `12-oportunidades` | el tablero por etapas, mover con el selector y «Deshacer», que el cambio se guarde, «Cerradas sin acuerdo»; nueva oportunidad (obligatorios, «De Personas», fuera de la red, fecha inválida), editar y eliminar |
 | `13-referentes` | la lista, «Observar ahora», desactivar con «Deshacer» y reactivar, la validación al añadir, un perfil que LinkedIn no conoce, «Referente añadido», quitar con confirmación y una cuenta sin referentes |
-| `14-fichas` | la conversación de Sofía, la oportunidad y la nota de Andrés, descartar a Pedro con motivo y el enlace a una persona que no existe |
+| `14-fichas` | la conversación de Sofía, la oportunidad y la nota de Andrés, descartar a Pedro (abierto desde su enlace: no es una conexión) con motivo y el enlace a una persona que no existe |
 | `15-ajustes-sesion` | un tipo de aviso apagado y encendido, cerrar la sesión del Pixel 7, «Lo que el equipo sabe de ti», `?ancla=autonomia` y cerrar sesión (vuelve a entrar al final) |
 
 ## Escribir o cambiar un flujo
@@ -289,6 +287,6 @@ En la primera ejecución hay que comprobar en GitHub:
 
 La implementación se preparó sin ejecutar instalaciones, builds ni pruebas locales. La primera ejecución y su revisión se hacen en GitHub.
 
-Fase 2 de imágenes: flujos y pruebas escritos, sin ejecución local. Selección inicial para Claude: `[qa: 05 07 10 11 16]`. `05-captura-envios`, `10-galeria` y `11-ajustes` cubren el selector de tres estados (IMG-16); `16-imagenes` cubre IMG-11 y CAP-16.
+Fase 2 de imágenes: flujos y pruebas escritos, sin ejecución local. Selección inicial para Claude: `[qa: 05 07 10 11 16]` (los flujos `10-*` se retiraron con la Galería de la app el 12/11/2026). `05-captura-envios` y `11-ajustes` cubren el selector de tres estados (IMG-16); `16-imagenes` cubre IMG-11 y CAP-16.
 
 Fase 8: suites y flujo escritos sin ejecución local. Claude verifica `[qa: 03 04 05 07 10 11 16-imagenes 17-mapa-equipo 18-perfil]`; [guía de despliegue y referencias privadas](../../docs/arquitectura/fase8-verificacion.md).

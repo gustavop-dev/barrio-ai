@@ -139,7 +139,7 @@ describe('Persona', () => {
     expect(form.getByRole('button', { name: 'Modalidad' })).toHaveAccessibilityValue({ text: 'ProjectApp' });
   });
 
-  it('shows the next step and who it depends on, with the open action and Tu turno', async () => {
+  it('shows the next step and who it depends on, with the open action and the Bandeja', async () => {
     await renderCard(
       contactFixture('c-1', {
         stage: 'followed',
@@ -153,7 +153,7 @@ describe('Persona', () => {
     expect(next).toHaveAccessibleName(/^Siguiente paso · Te toca\. El equipo la invitará cuando termine la espera\. Para el 7 nov\. Invitación sin nota · Aprobada$/);
     await fireEvent.press(screen.getByText('Ver en el Calendario'));
     expect(router.dismissTo).toHaveBeenLastCalledWith('/calendario');
-    await fireEvent.press(screen.getByText('Ir a Tu turno'));
+    await fireEvent.press(screen.getByText('Ir a la Bandeja'));
     expect(router.dismissTo).toHaveBeenLastCalledWith('/tu-turno');
   });
 

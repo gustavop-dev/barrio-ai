@@ -673,7 +673,7 @@ def on_connected(contact):
         from .notificaciones import avisar
         topic=_topic(row.piece)
         avisar('dm_ready',f'{contact.display_name or row.author_name} y tú ya están conectados',
-               f'Venían hablando de «{topic}» en tu post. Tienes un primer mensaje redactado en Tu turno.')
+               f'Venían hablando de «{topic}» en tu post. Tienes un primer mensaje redactado en la Bandeja.')
         _audit(None,'replies.dm_ready',row.id,contact=str(contact.pk))
 
 def _topic(piece):
@@ -744,7 +744,7 @@ def _status(row,team_texts=()):
     proposal=row.proposals.order_by('-created_at').first()
     reply={'text':proposal.payload.get('text'),'reaction':proposal.payload.get('reaction'),'state':proposal.state} if proposal else None
     decision=row.decision or {}
-    if row.state==PostComment.State.ASKED:return 'pregunta','El equipo te preguntó un dato en Tu turno para responder.',None
+    if row.state==PostComment.State.ASKED:return 'pregunta','El equipo te preguntó un dato en la Bandeja para responder.',None
     if row.state in (PostComment.State.IGNORED,PostComment.State.CLOSED):return 'sin_respuesta',decision.get('reason') or 'Sin respuesta.',None
     if row.state==PostComment.State.NEW:return 'pendiente','El equipo lo está leyendo.',None
     if proposal is None:return 'pendiente','El equipo lo está leyendo.',None

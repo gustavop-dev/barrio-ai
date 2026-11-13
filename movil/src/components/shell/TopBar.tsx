@@ -1,74 +1,37 @@
-// Mobile top bar: the 0ff1ce signature (or «‹ Volver» on detail views) and the four accesses:
-// Tu turno (counter, alerta when critical), Notificaciones (dot), Calendario, Ajustes.
-// Under it, the global pause banner and the offline strip.
+// Mobile top bar: the 0ff1ce signature (or «‹ Volver» on detail views) and three accesses:
+// Notificaciones (dot), Calendario and Ajustes. The Bandeja de entrada (formerly «Tu turno») moved to the
+// bottom bar with its counter (BottomBar, TurnBadge). Under the bar, the global pause banner and the offline strip.
 //
-// Motion (MovTuTurno, MovNotificaciones): the Tu turno counter rolls to its new number and pops
-// (`badge`, SOFT) when it changes; when a notification arrives the bell sways and its dot pops in
-// from nothing (`dot`, SOFT), and the dot closes (FIRM) once everything is read.
+// Motion (MovNotificaciones): when a notification arrives the bell sways and its dot pops in from nothing (`dot`,
+// SOFT), and the dot closes (FIRM) once everything is read.
 import { useOverview } from '@compartido/api/hooks';
 import { turnoAnchor } from '@compartido/logic/turno';
 import NetInfo from '@react-native-community/netinfo';
 import { router, usePathname, type Href } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSequence, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon, type IconName } from '@/components/icons';
 import { T } from '@/components/ui';
 import { reportUnread, useLiveNotifications } from '@/notificaciones/arrival';
-import { notifMotion, notifSpring, notifTiming, turnoMotion, turnoSpring, useMotion } from '@/theme/motion';
+import { notifMotion, notifSpring, notifTiming, useMotion } from '@/theme/motion';
 import { colors, radius, shell, space } from '@/theme/tokens';
-import { RollingNumber } from '@/turno/RollingNumber';
 import FIRMA from '../../../assets/brand/firma-horizontal.png';
-import { notificationsLabel, turnLabel, useTurnCount } from './useTurnCount';
+import { useChange } from './TurnBadge';
+import { notificationsLabel, useTurnCount } from './useTurnCount';
 
 interface Access {
-  path: '/tu-turno' | '/notificaciones' | '/calendario' | '/ajustes';
+  path: '/notificaciones' | '/calendario' | '/ajustes';
   label: string;
   icon: IconName;
 }
 
 export const TOP_NAV: readonly Access[] = [
-  { path: '/tu-turno', label: 'Tu turno', icon: 'tuTurno' },
   { path: '/notificaciones', label: 'Notificaciones', icon: 'notificaciones' },
   { path: '/calendario', label: 'Calendario', icon: 'calendario' },
   { path: '/ajustes', label: 'Ajustes', icon: 'ajustes' },
 ];
-
-/**
- * Calls `onChange` when a value of GET /tu-turno changes. Its first answer is not a change: `onFirst`
- * gets it instead (and the value a top bar finds when it mounts).
- */
-function useChange<V>(value: V, loaded: boolean, onChange: (before: V, now: V) => void, onFirst?: (now: V) => void) {
-  const previous = useRef<{ value: V } | null>(null);
-  const handlers = useRef({ onChange, onFirst });
-  useEffect(() => {
-    handlers.current = { onChange, onFirst };
-  });
-  useEffect(() => {
-    if (!loaded) return;
-    const before = previous.current;
-    previous.current = { value };
-    if (!before) handlers.current.onFirst?.(value);
-    else if (before.value !== value) handlers.current.onChange(before.value, value);
-  }, [value, loaded]);
-}
-
-/** Tu turno's counter (MovTuTurno `badge`): a new number rolls in and the badge pops back from badgePop. */
-function Counter({ count, critical, loaded }: { count: number; critical: boolean; loaded: boolean }) {
-  const scale = useSharedValue(1);
-  useChange(count, loaded, () => {
-    scale.set(turnoMotion.badgePop);
-    scale.set(withSpring(1, turnoSpring('badge')));
-  });
-  const pop = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
-  if (count <= 0) return null;
-  return (
-    <Animated.View style={[styles.counter, critical ? styles.counterCritical : null, pop]} testID="turn-counter">
-      <RollingNumber value={count > 99 ? '99+' : String(count)} variant="etiqueta" color={critical ? colors.onAlert : colors.paper} style={styles.counterText} />
-    </Animated.View>
-  );
-}
 
 /**
  * The bell and its dot (MovNotificaciones). An arrival sways the bell through `bellSway` (each step
@@ -192,7 +155,7 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
         <View style={styles.nav} accessibilityRole="toolbar" accessibilityLabel="Accesos">
           {TOP_NAV.map((item) => {
             const current = pathname === item.path || pathname.startsWith(`${item.path}/`);
-            const label = item.path === '/tu-turno' ? turnLabel(turn) : item.path === '/notificaciones' ? notificationsLabel(turn.unread) : item.label;
+            const label = item.path === '/notificaciones' ? notificationsLabel(turn.unread) : item.label;
             return (
               <Pressable
                 key={item.path}
@@ -208,7 +171,6 @@ export function TopBar({ back }: { back?: { label: string; onPress: () => void }
                 ) : (
                   <Icon name={item.icon} color={current ? colors.ink : colors.inkSoft} />
                 )}
-                {item.path === '/tu-turno' ? <Counter count={turn.count} critical={turn.critical} loaded={turn.loaded} /> : null}
               </Pressable>
             );
           })}
@@ -229,9 +191,6 @@ const styles = StyleSheet.create({
   nav: { flexDirection: 'row', alignItems: 'center' },
   icon: { width: shell.touch, height: shell.touch, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill },
   iconCurrent: { backgroundColor: colors.brandLight },
-  counter: { position: 'absolute', top: 4, right: 2, minWidth: 18, height: 18, paddingHorizontal: 5, borderRadius: radius.pill, backgroundColor: colors.ink, alignItems: 'center', justifyContent: 'center' },
-  counterCritical: { backgroundColor: colors.alert },
-  counterText: { letterSpacing: 0, lineHeight: 18 },
   dot: { position: 'absolute', top: 9, right: 10, width: 9, height: 9, borderRadius: radius.pill, backgroundColor: colors.brand, borderWidth: 1.5, borderColor: colors.ink },
   bell: { transformOrigin: `${notifMotion.bellPivot.x * 100}% ${notifMotion.bellPivot.y * 100}%` },
   pause: { flexDirection: 'row', alignItems: 'center', gap: space[3], paddingVertical: 10, paddingHorizontal: space[4], backgroundColor: colors.surface, borderBottomWidth: 1, borderBottomColor: colors.alert },

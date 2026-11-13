@@ -153,16 +153,16 @@ La pantalla de inicio: la oficina en pixel art con los 17 roles del equipo. Van 
 
 - **Dónde:** PWA · app
 - **Estado:** funciona
-- **Qué hace para Gustavo:** llega a cada vista desde las barras, con el contador de Tu turno y el punto de Notificaciones siempre a la vista.
-- **Código:** PWA `components/Layout.tsx`; app `components/shell/BottomBar.tsx`, `TopBar.tsx`, `movil/src/app/(app)/(tabs)/_layout.tsx`.
+- **Qué hace para Gustavo:** llega a cada vista desde las barras, con el contador de la Bandeja de entrada (antes «Tu turno», renombrada el 12/11/2026) y el punto de Notificaciones siempre a la vista.
+- **Código:** PWA `components/Layout.tsx`; app `components/shell/BottomBar.tsx`, `TopBar.tsx`, `TurnBadge.tsx` (el contador), `tabTransitions.ts`, `movil/src/app/(app)/(tabs)/_layout.tsx`.
 - **Criterios de aceptación:**
-  1. **Dado** la PWA en escritorio, **cuando** la abre, **entonces** la barra lateral tiene «Capturar», Oficina, Tu turno, Notificaciones, Calendario, Resultados, Personas, Galería y Ajustes, y el crédito «Arte: LimeZu · Modern Interiors».
-  2. **Dado** la PWA en el teléfono o la app, **cuando** la abre, **entonces** la barra inferior tiene Oficina, Resultados, el botón de captura, Personas y Galería, y la superior los iconos de Tu turno (con contador), Notificaciones (con punto), Calendario y Ajustes.
-  3. **Dado** una vista de detalle (pieza o persona), **cuando** la abre en el teléfono, **entonces** la barra superior muestra «‹» con el nombre de la vista a la que vuelve («‹ Calendario», «‹ Personas»; en la app, «‹ Tu turno» si la pieza se abrió desde Tu turno); en la app, además, se vuelve deslizando desde el borde o con el botón atrás de Android.
+  1. **Dado** la PWA en escritorio, **cuando** la abre, **entonces** la barra lateral tiene «Capturar», Oficina, Bandeja de entrada, Notificaciones, Calendario, Resultados, Personas, Galería y Ajustes, y el crédito «Arte: LimeZu · Modern Interiors».
+  2. **Dado** la app, **cuando** la abre, **entonces** la barra inferior tiene Oficina, Resultados, el botón de captura, Personas y Bandeja (con su contador, en alerta si hay algo crítico; la Galería salió el 12/11/2026), y la superior los iconos de Notificaciones (con punto), Calendario y Ajustes. En la PWA en el teléfono la barra inferior sigue con Galería y la superior con la Bandeja de entrada (con contador), Notificaciones, Calendario y Ajustes.
+  3. **Dado** una vista de detalle (pieza o persona), **cuando** la abre en el teléfono, **entonces** la barra superior muestra «‹» con el nombre de la vista a la que vuelve («‹ Calendario», «‹ Personas»; en la app, «‹ Bandeja» si la pieza se abrió desde la Bandeja); en la app, además, se vuelve deslizando desde el borde o con el botón atrás de Android.
   4. **Dado** «Saltar al contenido», **cuando** navega con teclado en la PWA, **entonces** es lo primero que recibe el foco.
   5. **Dado** cada vista de la PWA, **cuando** se abre, **entonces** el título de la pestaña es «<Vista> · 0ff1ce».
-- **Brechas código/docs:** el diseño original (`DISENO-VISTAS.md`, rama `feat/rediseno-oficina`) tenía cinco entradas en la barra inferior (Oficina, Tu turno, Calendario, Resultados, Personas); el código actual pone Galería en la barra inferior y Tu turno y Calendario arriba, como el diseño móvil de `movil/diseno-movimiento`.
-- **Cobertura QA:** OFI-09.2–3 en `movil/.maestro/02-navegacion.yaml` (barras, contador y punto, atrás de Android por el historial, una ficha con «‹», atrás y arrastre del borde, «‹ Calendario» en una pieza) · OFI-09.1, 4 y 5 son de la PWA · 2026-11-08 · pasa
+- **Brechas código/docs:** el diseño original (`DISENO-VISTAS.md`, rama `feat/rediseno-oficina`) tenía cinco entradas en la barra inferior (Oficina, Tu turno, Calendario, Resultados, Personas); la app pone desde el 12/11/2026 la Bandeja en la barra inferior (en el sitio de la Galería) y Notificaciones, Calendario y Ajustes arriba; la PWA en el teléfono sigue con Galería abajo y la Bandeja arriba.
+- **Cobertura QA:** OFI-09.2–3 en `movil/.maestro/02-navegacion.yaml` (barras con la Bandeja abajo, contador y punto, atrás de Android por el historial, una ficha con «‹», atrás y arrastre del borde, «‹ Bandeja» en una pieza abierta por enlace) y Jest (`navegacion.test.tsx`, `barraSuperior.test.tsx`) · OFI-09.1, 4 y 5 son de la PWA.
 
 ### OFI-10 · Editor visual como integrante de Editorial <a id="ofi-10"></a>
 

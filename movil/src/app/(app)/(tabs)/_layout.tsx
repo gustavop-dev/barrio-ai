@@ -1,5 +1,5 @@
 // The shell at mobile size: the top bar over every view and the bottom bar with the capture button.
-// Tu turno, Notificaciones, Calendario and Ajustes are tabs without a button of their own (the top
+// Bandeja de entrada, Notificaciones, Calendario and Ajustes are tabs without a button of their own (the top
 // bar opens them); Android back goes through the tab history.
 //
 // Those four are NOT declared with `href: null`. In Expo Router 58, `href: null` on a js-tabs screen
@@ -60,9 +60,8 @@ export default function TabsLayout() {
           <Tabs.Screen name="index" options={{ title: 'Oficina' }} />
           <Tabs.Screen name="resultados" options={{ title: 'Resultados' }} />
           <Tabs.Screen name="personas" options={{ title: 'Personas' }} />
-          <Tabs.Screen name="galeria" options={{ title: 'Galería' }} />
-          {/* The top bar's four: real tabs, without `href: null` (see the note at the top). */}
-          <Tabs.Screen name="tu-turno" options={{ title: 'Tu turno' }} />
+          <Tabs.Screen name="tu-turno" options={{ title: 'Bandeja de entrada' }} />
+          {/* The top bar's three: real tabs, without `href: null` (see the note at the top). */}
           <Tabs.Screen name="notificaciones" options={{ title: 'Notificaciones' }} />
           <Tabs.Screen name="calendario" options={{ title: 'Calendario' }} />
           <Tabs.Screen name="ajustes" options={{ title: 'Ajustes' }} />

@@ -7,7 +7,7 @@
 # Photos, audio and the error states are in 05-captura-envios; captures tied to a question, a person or a piece in
 # 05-captura-contexto.
 #
-# The capture works from every tab. This flow uses it from Galería, a still screen: over the animated Oficina each
+# The capture works from every tab. This flow uses it from Resultados, a still screen: over the animated Oficina each
 # Maestro step can take 20 to 100 s on the CI emulator, and the 5 s toast «Enviado al equipo.» came and went between
 # two of them (QA run 42451843664).
 #
@@ -19,11 +19,11 @@ tags: [captura]
 ---
 - runFlow: comun/entrar.yaml
 - tapOn:
-    id: tab-galeria
+    id: tab-resultados
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
-      id: screen-galeria
+      id: resultados-list
     timeout: 30000
 - extendedWaitUntil:
     visible:
@@ -94,7 +94,8 @@ tags: [captura]
     id: capture-send
     enabled: true
 
-# «Para qué es»: the chip turns on, and a second chip replaces it. «Foto para la galería» needs a photo.
+# «Para qué es»: the chip turns on, and a second chip replaces it. Only two purposes are left (12/11/2026): the
+# Galería and its «Foto para la galería» left the app.
 # cubre: CAP-08
 - tapOn:
     id: capture-para-dato
@@ -102,13 +103,8 @@ tags: [captura]
 - assertVisible:
     id: capture-para-dato
     selected: true
-- tapOn:
+- assertNotVisible:
     id: capture-para-galeria
-    waitToSettleTimeoutMs: 500
-- assertVisible: 'Para «Foto para la galería» adjunta al menos una foto\.'
-- assertVisible:
-    id: capture-send
-    enabled: false
 - tapOn:
     id: capture-para-post
     waitToSettleTimeoutMs: 500
@@ -118,7 +114,6 @@ tags: [captura]
 - assertVisible:
     id: capture-para-dato
     selected: false
-- assertNotVisible: 'Para «Foto para la galería» adjunta al menos una foto\.'
 - takeScreenshot: 05-captura-03-nota-y-para-que
 
 # Recording from the sheet. Whatever the microphone does, the sheet must say it: the recording panel («Grabando»,

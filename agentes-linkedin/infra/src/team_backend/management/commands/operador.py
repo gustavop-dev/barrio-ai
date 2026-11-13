@@ -37,7 +37,7 @@ class Command(BaseCommand):
             elif o['accion']=='referentes-extraordinaria':
                 from team_backend import referentes
                 job=referentes.extraordinary(user,account)
-                self.stdout.write(f'Revisión extraordinaria en cola: trabajo {job.id}. Las propuestas llegan a Tu turno.')
+                self.stdout.write(f'Revisión extraordinaria en cola: trabajo {job.id}. Las propuestas llegan a la Bandeja.')
             elif o['accion']=='observar':
                 job,_=enqueue_operation(user,'observe',{'account':str(account.id),'limit':o['limite'],'referents':[]})
                 self.stdout.write(f'Observación en cola: trabajo {job.id}. El worker la procesará.')

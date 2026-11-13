@@ -1,5 +1,8 @@
-// «Panel del día»: what happened, what is scheduled and what is Gustavo's on the selected day (Hoy,
-// Pasado or Programado). Sections show only when they have something, as in the PWA's DayPanel.
+// «Panel del día»: the selected day (Hoy, Pasado or Programado) under the calendar, top to bottom: its
+// publication, «Lo importante del día», «Programado», «De tu Bandeja» (what was Gustavo's; the Bandeja has its own
+// tab, so it no longer leads here) and, last, the day's summary with «Ver todo lo del día» folded. The rows are
+// compact: one line with «…» that a tap unfolds in place, and another folds again. Sections other than the
+// publication and «Lo importante» show only when they have something, as in the PWA's DayPanel.
 import { usePiece } from '@compartido/api/hooks';
 import type { Actividad, ActividadTipo, CalendarEvent, CalendarLayer, CalendarioDay } from '@compartido/api/types';
 import { dayOf, daysBetween, longDayTitle } from '@compartido/logic/dates';
@@ -30,7 +33,7 @@ import { Badge, Button, Card, EmptyState, EmptyText, ErrorRetry, FoldIn, Skeleto
 import { timing } from '@/theme/motion';
 import { openLink } from '@/navigation';
 import { colors, layers as LAYER_COLOR, radius, shell, space } from '@/theme/tokens';
-import { DayActivity, QueuedRow } from './ActivityList';
+import { DayActivity, OneLine, QueuedRow } from './ActivityList';
 import { piecePath } from './go';
 import { PIECE_PREVIEW_LINES, PieceHead, PieceOpener } from './PieceOpener';
 import { TimelineItem } from './TimelineItem';
@@ -54,8 +57,6 @@ export interface DayPanelProps {
   upcoming: Actividad['upcoming'] | undefined;
   windowOpen: boolean | undefined;
   now: number;
-  /** The day sheet puts the heading in its fixed header instead. */
-  showHeading?: boolean;
   testID?: string;
 }
 
@@ -65,8 +66,8 @@ const KIND_BADGE: Record<DayKind, { label: string; tone: 'ink' | 'muted' | 'info
   programado: { label: 'Programado', tone: 'info' },
 };
 
-/** «Sábado 7 de noviembre» with Hoy, Pasado or Programado. */
-export function DayHeading({ date, today }: { date: string; today: string }) {
+/** «Sábado 7 de noviembre» with Hoy, Pasado or Programado: also says which day it is when another week is on screen. */
+function DayHeading({ date, today }: { date: string; today: string }) {
   const badge = KIND_BADGE[dayKind(date, today)];
   return (
     <View style={styles.heading}>
@@ -80,7 +81,7 @@ export function DayHeading({ date, today }: { date: string; today: string }) {
 
 function Block({ label, children, testID }: { label: string; children: ReactNode; testID?: string }) {
   return (
-    <View style={styles.block} testID={testID} accessibilityLabel={label}>
+    <View style={styles.block} testID={testID} accessibilityLabel={label} collapsable={false}>
       <T variant="etiqueta" soft accessibilityRole="header">
         {label}
       </T>
@@ -206,16 +207,16 @@ function AllOfDay({ open, onToggle, children }: { open: boolean; onToggle: () =>
   );
 }
 
-export function DayPanel({ date, day, today, timeZone, leadHours, visible, loading, failed = false, upcoming, windowOpen, now, showHeading = true, testID = 'panel-dia' }: DayPanelProps) {
+export function DayPanel({ date, day, today, timeZone, leadHours, visible, loading, failed = false, upcoming, windowOpen, now, testID = 'panel-dia' }: DayPanelProps) {
   const [allOpen, setAllOpen] = useState(false);
   const [tipo, setTipo] = useState<ActividadTipo>('todo');
   const [noSalio, setNoSalio] = useState(false);
   const kind = dayKind(date, today);
-  const heading = showHeading ? <DayHeading date={date} today={today} /> : null;
+  const heading = <DayHeading date={date} today={today} />;
 
   if (daysBetween(today, date) > FAR_FUTURE_DAYS) {
     return (
-      <View style={styles.panel} testID={testID}>
+      <View style={styles.panel} testID={testID} collapsable={false}>
         {heading}
         <EmptyState title="Todavía no hay nada programado tan lejos.">
           <EmptyText>{`El equipo prepara cada pieza ${leadText(leadHours)} antes de su hora.`}</EmptyText>
@@ -226,7 +227,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
 
   if (failed && !day) {
     return (
-      <View style={styles.panel} testID={testID}>
+      <View style={styles.panel} testID={testID} collapsable={false}>
         {heading}
         <T soft>No se pudo cargar este día.</T>
       </View>
@@ -235,7 +236,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
 
   if (loading) {
     return (
-      <View style={styles.panel} testID={testID}>
+      <View style={styles.panel} testID={testID} collapsable={false}>
         {heading}
         <Skeleton variant="card" label="Cargando el día…" />
         <Skeleton variant="row" count={2} label="Cargando los eventos…" />
@@ -256,43 +257,8 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
   };
 
   return (
-    <View style={styles.panel} testID={testID}>
+    <View style={styles.panel} testID={testID} collapsable={false}>
       {heading}
-
-      {kind !== 'programado' ? <Summary day={day} onPick={pick} /> : null}
-
-      {tuyo.length ? (
-        <Block label="Tu parte" testID="bloque-tu-parte">
-          <View>
-            {tuyo.map((event) => (
-              <View key={event.id} style={styles.row}>
-                <View style={[styles.bigDot, { backgroundColor: LAYER_COLOR.tuyo }]} />
-                <View style={styles.rowText}>
-                  <T>{event.kind === 'resolved' ? eventSentence(event) : event.title}</T>
-                  {event.at && event.kind !== 'resolved' ? (
-                    <T variant="detalle" soft>
-                      {`Plazo: ${formatTime(event.at, timeZone)}`}
-                    </T>
-                  ) : null}
-                </View>
-                {event.kind === 'resolved' ? (
-                  <View style={styles.done} accessibilityLabel="Hecho">
-                    <T variant="detalle" color={colors.brandDeep}>
-                      Hecho
-                    </T>
-                    <Icon name="check" size={16} color={colors.brandDeep} />
-                  </View>
-                ) : null}
-              </View>
-            ))}
-          </View>
-          {tuyo.some((event) => event.kind !== 'resolved') ? (
-            <Button block onPress={() => openLink('/tu-turno')}>
-              Ir a Tu turno
-            </Button>
-          ) : null}
-        </Block>
-      ) : null}
 
       <Block label={pieces.length > 1 ? 'Publicaciones del día' : 'Publicación del día'} testID="bloque-publicacion">
         {pieces.length ? (
@@ -316,32 +282,13 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
         )}
       </Block>
 
-      {queued.length || expected.length ? (
-        <Block label="Programado" testID="bloque-programado">
-          <View>
-            {queued.map((item) => (
-              <QueuedRow key={item.id} item={item} today={today} timeZone={timeZone} windowOpen={windowOpen} />
-            ))}
-            {expected.map((event) => (
-              <View key={event.id} style={styles.row}>
-                <View style={styles.rowText}>
-                  <T>{`Invitaciones previstas: ${event.people?.length ?? 0} ${event.people?.length === 1 ? 'persona' : 'personas'}`}</T>
-                  <T variant="detalle" soft>
-                    {eventSub(event) ?? ''}
-                  </T>
-                </View>
-              </View>
-            ))}
-          </View>
-        </Block>
-      ) : null}
-
       <Block label="Lo importante del día" testID="bloque-importante">
         {important.length ? (
           <View>
             {important.map((event) => (
               <TimelineItem
                 key={event.id}
+                compact
                 testID={`evento-${event.id}`}
                 color={LAYER_COLOR[event.layer]}
                 time={eventTime(event, timeZone)}
@@ -350,7 +297,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
                 badge={eventBadge(event)}
                 agent={(event as CalendarEvent & { agent?: string }).agent ?? null}
                 to={eventLink(event)}
-                linkLabel={event.kind === 'action_uncertain' ? 'Resuélvela en Tu turno' : 'Abrir'}
+                linkLabel={event.kind === 'action_uncertain' ? 'Resuélvela en la Bandeja' : 'Abrir'}
               />
             ))}
           </View>
@@ -361,10 +308,68 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
         )}
       </Block>
 
+      {queued.length || expected.length ? (
+        <Block label="Programado" testID="bloque-programado">
+          <View>
+            {queued.map((item) => (
+              <QueuedRow key={item.id} item={item} today={today} timeZone={timeZone} windowOpen={windowOpen} compact />
+            ))}
+            {expected.map((event) => (
+              <View key={event.id} style={styles.row} testID={`prevista-${event.id}`} collapsable={false}>
+                <OneLine
+                  style={styles.rowText}
+                  title={`Invitaciones previstas: ${event.people?.length ?? 0} ${event.people?.length === 1 ? 'persona' : 'personas'}`}
+                  sub={eventSub(event)}
+                />
+              </View>
+            ))}
+          </View>
+        </Block>
+      ) : null}
+
+      {tuyo.length ? (
+        <Block label="De tu Bandeja" testID="bloque-bandeja">
+          <View>
+            {tuyo.map((event) => {
+              const resolved = event.kind === 'resolved';
+              return (
+                <TimelineItem
+                  key={event.id}
+                  compact
+                  testID={`bandeja-${event.id}`}
+                  color={LAYER_COLOR.tuyo}
+                  time={eventTime(event, timeZone)}
+                  title={resolved ? eventSentence(event) : event.title}
+                  sub={event.at && !resolved ? `Plazo: ${formatTime(event.at, timeZone)}` : null}
+                  aside={
+                    resolved ? (
+                      <View style={styles.done} accessibilityLabel="Hecho">
+                        <T variant="detalle" color={colors.brandDeep}>
+                          Hecho
+                        </T>
+                        <Icon name="check" size={16} color={colors.brandDeep} />
+                      </View>
+                    ) : null
+                  }
+                />
+              );
+            })}
+          </View>
+          {tuyo.some((event) => event.kind !== 'resolved') ? (
+            <Button block onPress={() => openLink('/tu-turno')}>
+              Ir a la Bandeja
+            </Button>
+          ) : null}
+        </Block>
+      ) : null}
+
       {kind !== 'programado' ? (
-        <AllOfDay open={allOpen} onToggle={() => setAllOpen((value) => !value)}>
-          <DayActivity date={date} tipo={tipo} onTipo={setTipo} noSalio={noSalio} onNoSalio={setNoSalio} timeZone={timeZone} />
-        </AllOfDay>
+        <View style={styles.block} testID="bloque-todo" collapsable={false}>
+          <Summary day={day} onPick={pick} />
+          <AllOfDay open={allOpen} onToggle={() => setAllOpen((value) => !value)}>
+            <DayActivity date={date} tipo={tipo} onTipo={setTipo} noSalio={noSalio} onNoSalio={setNoSalio} timeZone={timeZone} />
+          </AllOfDay>
+        </View>
       ) : null}
     </View>
   );
@@ -382,9 +387,8 @@ const styles = StyleSheet.create({
   summaryItem: { flexDirection: 'row', alignItems: 'center', gap: 6, marginRight: 6 },
   summaryPart: { minHeight: 32, justifyContent: 'center' },
   underline: { textDecorationLine: 'underline' },
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
-  rowText: { flex: 1, gap: 2 },
-  bigDot: { width: 10, height: 10, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.ink },
+  row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: space[1], borderTopWidth: 1, borderTopColor: colors.line },
+  rowText: { flex: 1 },
   done: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   all: { borderTopWidth: 1, borderTopColor: colors.line },
   allSummary: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },

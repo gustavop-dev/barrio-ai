@@ -1,4 +1,4 @@
-// Tu turno, «Lo que el equipo sabe de ti» and Notificaciones sample data, shaped like the backend
+// Bandeja de entrada, «Lo que el equipo sabe de ti» and Notificaciones sample data, shaped like the backend
 // of CONTRATO-API «Rediseño» plus the rev 18 fields (priority, state, items, vistos, notificaciones).
 import type { NotificationItem, Notificaciones } from '../api/notificaciones';
 import type { MemoryFact, Question, TuTurno, TurnoCard } from '../api/types';

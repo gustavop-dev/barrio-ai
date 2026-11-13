@@ -1,15 +1,19 @@
 # cubre: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05, CAL-13, PRS-08, PRS-10
 # Calendario: the views, the day panel and the queue. Semana, Mes and Lista; swiping the week strip and the month turns
-# them and the range under the title follows (a254114: the week swipe used to close the app); a month with nothing and
-# a day more than 15 days away; a tapped day opens its panel in a sheet (half, then full), and the panel under the
-# calendar keeps that day: a future day with Gustavo's meeting and a free slot, a past day without a piece, yesterday's
-# summary opening «Ver todo lo del día» filtered. Lista: «Próximo» with tomorrow's piece, «En cola» with a network
-# action (vetoed: it says the person is discarded for good, and it goes once the 5 s pass) and a reaction (vetoed and
-# undone), «Lo que pasó» filtered by type and with «Mostrar lo que no salió». Last, the veto note says it is required.
+# them and the range under the title follows (a254114: the week swipe used to close the app), but never moves the
+# selected day: its panel stays under the calendar. There are no «‹ Hoy ›» buttons. A month with nothing and a day
+# more than 15 days away; Semana opens on the selected day's week. A tapped day is selected in place (no sheet, the
+# calendar stays where it was) and the panel under the calendar changes to it: today, tomorrow with its piece, a
+# future day with Gustavo's meeting («De tu Bandeja», one line that a tap unfolds) and a free slot, a past day
+# without a piece, yesterday's summary opening «Ver todo lo del día» filtered. Lista: «Próximo» with tomorrow's
+# piece, «En cola» with a network action (vetoed: it says the person is discarded for good, and it goes once the 5 s
+# pass) and a reaction (vetoed and undone), «Lo que pasó» filtered by type and with «Mostrar lo que no salió». Last,
+# the veto note says it is required.
 # The piece detail is in 07-pieza-veto (tomorrow's piece) and 07-pieza-estados (the past ones).
 # Dates come from comun/calendario-fechas.js (Bogotá's today, as the app computes it); the range under the title may end
 # in « · Horas de Bogotá» if the device zone differs, hence the «.*». Text in the «etiqueta» style (badges, section
-# labels) is uppercased on screen, so it is written in capitals here.
+# labels) is uppercased on screen, so it is written in capitals here. Without «Hoy», the flow comes back to today's
+# week with a swipe towards it, only when today is not on screen (the week strip scrolled into view first).
 appId: co.projectapp.office
 name: Calendario
 tags: [calendario]
@@ -33,9 +37,12 @@ tags: [calendario]
 - assertVisible:
     id: "dia-${output.hoy}"
 - assertVisible: "${output.semanaHoy}.*"
-- assertVisible:
+# No «‹ Hoy ›» in the header any more: the week turns with a swipe.
+- assertNotVisible:
+    id: calendario-hoy
+- assertNotVisible:
     id: calendario-anterior
-- assertVisible:
+- assertNotVisible:
     id: calendario-siguiente
 # The layers, with Conversaciones marked as partial.
 - assertVisible:
@@ -55,23 +62,44 @@ tags: [calendario]
     id: "dia-${output.diaSemanaSiguiente}"
 - assertNotVisible:
     id: "dia-${output.hoy}"
+# The selection did not move: the panel under the calendar is still today's.
+- scrollUntilVisible:
+    element:
+      text: "${output.hoyTitulo}"
+      childOf:
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - takeScreenshot: 07-calendario-02-semana-siguiente
-# A day of the week that slid in opens its sheet (its cells used to stay untouchable and hidden from TalkBack).
+# A day of the week that slid in is selected in place (its cells used to stay untouchable and hidden from TalkBack):
+# no sheet opens, the strip stays on screen and the panel under it changes to that day.
+- scrollUntilVisible:
+    element:
+      id: pager-semana
+    direction: UP
+    timeout: 20000
 - tapOn:
     id: "dia-${output.diaSemanaSiguiente}"
-- extendedWaitUntil:
-    visible:
+- assertVisible:
+    id: pager-semana
+- assertVisible: "${output.semanaSiguiente}.*"
+- assertNotVisible:
+    id: hoja-dia
+- scrollUntilVisible:
+    element:
       text: "${output.diaSemanaSiguienteTitulo}"
       childOf:
-        id: hoja-dia
-    timeout: 10000
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
-- extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
-    timeout: 10000
-# Right twice: back to this week, then the previous one.
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+# Right twice: back to this week (the panel keeps next week's day), then the previous one.
+- scrollUntilVisible:
+    element:
+      id: pager-semana
+    direction: UP
+    timeout: 20000
 - swipe:
     from:
       id: pager-semana
@@ -81,6 +109,10 @@ tags: [calendario]
     timeout: 10000
 - assertVisible:
     id: "dia-${output.hoy}"
+- assertVisible:
+    text: "${output.diaSemanaSiguienteTitulo}"
+    childOf:
+      id: panel-dia
 - swipe:
     from:
       id: pager-semana
@@ -91,17 +123,34 @@ tags: [calendario]
 - assertVisible:
     id: "dia-${output.diaSemanaAnterior}"
 - takeScreenshot: 07-calendario-03-semana-anterior
-# «Hoy» brings today's week back.
-- tapOn:
-    id: calendario-hoy
+# Left: today's week again, and today is selected with a tap.
+- swipe:
+    from:
+      id: pager-semana
+    direction: LEFT
 - extendedWaitUntil:
     visible:
       id: "dia-${output.hoy}"
     timeout: 10000
 - assertVisible: "${output.semanaHoy}.*"
+- tapOn:
+    id: "dia-${output.hoy}"
+- scrollUntilVisible:
+    element:
+      text: "${output.hoyTitulo}"
+      childOf:
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 
 # ---------------------------------------------------------------- Mes: the grid, swiped forward, a month with nothing
 # cubre: CAL-01, CAL-03
+- scrollUntilVisible:
+    element:
+      text: "Mes"
+    direction: UP
+    timeout: 20000
 - tapOn:
     text: "Mes"
 - extendedWaitUntil:
@@ -128,7 +177,8 @@ tags: [calendario]
 - assertNotVisible:
     id: "dia-${output.mitadMes}"
 - takeScreenshot: 07-calendario-05-mes-siguiente
-# Two months away: nothing registered, and its days are too far for anything to be scheduled.
+# Two months away: nothing registered, and its days are too far for anything to be scheduled. The tapped day's panel
+# is under the month, with no sheet.
 - swipe:
     from:
       id: pager-mes
@@ -141,62 +191,93 @@ tags: [calendario]
     timeout: 15000
 - tapOn:
     id: "dia-${output.mitadMesMas2}"
-- extendedWaitUntil:
-    visible:
-      id: hoja-dia
-    timeout: 10000
-- extendedWaitUntil:
-    visible:
+- assertNotVisible:
+    id: hoja-dia
+- scrollUntilVisible:
+    element:
       text: "Todavía no hay nada programado tan lejos."
       childOf:
-        id: hoja-dia
-    timeout: 10000
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - assertVisible:
     text: "${output.mitadMesMas2Titulo}"
     childOf:
-      id: hoja-dia
+      id: panel-dia
 - takeScreenshot: 07-calendario-06-mes-vacio-lejos
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
+# Right twice: this month again (the panel keeps the far day). Today is selected with a tap, so Semana opens on its
+# week.
+- scrollUntilVisible:
+    element:
+      id: pager-mes
+    direction: UP
+    timeout: 20000
+- swipe:
+    from:
+      id: pager-mes
+    direction: RIGHT
 - extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
+    visible: "${output.mesSiguiente}.*"
     timeout: 10000
-# «Hoy» brings this month back; then Semana.
-- tapOn:
-    id: calendario-hoy
+- swipe:
+    from:
+      id: pager-mes
+    direction: RIGHT
 - extendedWaitUntil:
     visible: "${output.mesHoy}.*"
     timeout: 10000
-- assertVisible:
-    id: "dia-${output.mitadMes}"
+- scrollUntilVisible:
+    element:
+      text: "${output.mitadMesMas2Titulo}"
+      childOf:
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      text: "Semana"
+    direction: UP
+    timeout: 20000
+- tapOn:
+    id: "dia-${output.hoy}"
 - tapOn:
     text: "Semana"
 - extendedWaitUntil:
     visible:
       id: pager-semana
     timeout: 10000
-
-# ---------------------------------------------------------------- days: the panel opens in a sheet
-# cubre: CAL-03
-# Today: the sheet opens at half height with today's heading and «Hoy»; the week stays visible above it.
-- tapOn:
-    id: "dia-${output.hoy}"
 - extendedWaitUntil:
-    visible:
-      id: hoja-dia
+    visible: "${output.semanaHoy}.*"
     timeout: 10000
 - assertVisible:
-    text: "${output.hoyTitulo}"
-    childOf:
-      id: hoja-dia
+    id: "dia-${output.hoy}"
+
+# ---------------------------------------------------------------- days: the panel under the calendar
+# cubre: CAL-03
+# Today: its heading and «Hoy», the publication first.
+- scrollUntilVisible:
+    element:
+      text: "${output.hoyTitulo}"
+      childOf:
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - assertVisible:
     text: "HOY"
     childOf:
-      id: hoja-dia
-- takeScreenshot: 07-calendario-07-hoja-hoy
-# Tomorrow, with the sheet still open (on Sunday tomorrow is in the next week: that case swipes the strip first; the
-# open sheet keeps the strip on top, so the header's arrows are scrolled away).
+      id: panel-dia
+- assertVisible: "PUBLICACI(ÓN|ONES) DEL DÍA"
+- takeScreenshot: 07-calendario-07-panel-hoy
+# Tomorrow (on Sunday tomorrow is in the next week: that case swipes the strip first): «Programado» and its piece,
+# «Programada».
+- scrollUntilVisible:
+    element:
+      id: pager-semana
+    direction: UP
+    timeout: 20000
 - runFlow:
     when:
       notVisible:
@@ -212,168 +293,202 @@ tags: [calendario]
           timeout: 10000
 - tapOn:
     id: "dia-${output.manana}"
-- extendedWaitUntil:
-    visible:
+- assertNotVisible:
+    id: hoja-dia
+- scrollUntilVisible:
+    element:
       text: "${output.mananaTitulo}"
       childOf:
-        id: hoja-dia
-    timeout: 10000
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - assertVisible:
     text: "PROGRAMADO"
     childOf:
-      id: hoja-dia
-- takeScreenshot: 07-calendario-08-hoja-manana
-# Drag the handle up: the sheet goes to full height (under the week strip) and shows the day's piece, «Programada».
-- swipe:
-    from:
-      text: "Altura del panel"
-    direction: UP
+      id: panel-dia
+- takeScreenshot: 07-calendario-08-panel-manana
 - scrollUntilVisible:
     element:
       text: "Documentar decisiones vale más que documentar tareas"
       childOf:
-        id: hoja-dia
+        id: panel-dia
     direction: DOWN
+    centerElement: true
     timeout: 15000
 - assertVisible:
     text: "PROGRAMADA"
     childOf:
-      id: hoja-dia
-- takeScreenshot: 07-calendario-09-hoja-completa
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
-- extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
-    timeout: 10000
+      id: panel-dia
+- takeScreenshot: 07-calendario-09-panel-manana-pieza
 
-# The day after tomorrow, in the panel under the calendar: Gustavo's meeting («Tu parte», with its hour and «Ir a Tu
-# turno»: the next action of Andrés Restrepo's opportunity, PRS-08 and PRS-10) and a free slot.
+# The day after tomorrow: Gustavo's meeting in «De tu Bandeja» (it was «Tu parte»: the next action of Andrés
+# Restrepo's opportunity, PRS-08 and PRS-10), in one line until a tap shows its hour; «Ir a la Bandeja»; and a free
+# slot.
 # cubre: CAL-03, PRS-08, PRS-10
+- scrollUntilVisible:
+    element:
+      id: pager-semana
+    direction: UP
+    timeout: 20000
 - runFlow:
     when:
       notVisible:
         id: "dia-${output.pasadoManana}"
     commands:
-      - tapOn:
-          id: calendario-siguiente
+      - swipe:
+          from:
+            id: pager-semana
+          direction: LEFT
       - extendedWaitUntil:
           visible:
             id: "dia-${output.pasadoManana}"
           timeout: 10000
 - tapOn:
     id: "dia-${output.pasadoManana}"
-- extendedWaitUntil:
-    visible:
-      text: "${output.pasadoMananaTitulo}"
-      childOf:
-        id: hoja-dia
-    timeout: 10000
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
-- extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
-    timeout: 10000
 - scrollUntilVisible:
     element:
-      text: "Reunión de alcance · Andrés Restrepo"
+      text: "${output.pasadoMananaTitulo}"
+      childOf:
+        id: panel-dia
     direction: DOWN
     centerElement: true
-    timeout: 20000
-- assertVisible: "TU PARTE"
-- assertVisible: "Plazo: 10:00"
-- assertVisible: "Ir a Tu turno"
+    timeout: 15000
 - scrollUntilVisible:
     element:
       text: "Hueco libre\\. El equipo prepara cada pieza .* antes de su hora\\."
     direction: DOWN
     centerElement: true
     timeout: 15000
-- takeScreenshot: 07-calendario-10-panel-pasado-manana
-
-# Four days ago: no piece that day.
+# The meeting may also be in «Lo importante del día», above: look for it inside «De tu Bandeja».
 - scrollUntilVisible:
     element:
-      id: calendario-hoy
-    direction: UP
+      text: "Reunión de alcance · Andrés Restrepo"
+      childOf:
+        id: bloque-bandeja
+    direction: DOWN
+    centerElement: true
     timeout: 20000
+- assertVisible: "DE TU BANDEJA"
+- assertNotVisible: "Plazo: 10:00"
 - tapOn:
-    id: calendario-hoy
+    text: "Reunión de alcance · Andrés Restrepo"
+    childOf:
+      id: bloque-bandeja
 - extendedWaitUntil:
     visible:
-      id: "dia-${output.hoy}"
+      text: "Plazo: 10:00"
+      childOf:
+        id: bloque-bandeja
     timeout: 10000
+- scrollUntilVisible:
+    element:
+      text: "Ir a la Bandeja"
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-calendario-10-panel-pasado-manana
+
+# Four days ago: no piece that day. Back to today's week first (the meeting's day may be in the next one).
+- scrollUntilVisible:
+    element:
+      id: pager-semana
+    direction: UP
+    timeout: 20000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.hoy}"
+    commands:
+      - swipe:
+          from:
+            id: pager-semana
+          direction: RIGHT
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.hoy}"
+          timeout: 10000
 - runFlow:
     when:
       notVisible:
         id: "dia-${output.hace4}"
     commands:
-      - tapOn:
-          id: calendario-anterior
+      - swipe:
+          from:
+            id: pager-semana
+          direction: RIGHT
       - extendedWaitUntil:
           visible:
             id: "dia-${output.hace4}"
           timeout: 10000
 - tapOn:
     id: "dia-${output.hace4}"
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       text: "${output.hace4Titulo}"
       childOf:
-        id: hoja-dia
-    timeout: 10000
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - assertVisible:
     text: "PASADO"
     childOf:
-      id: hoja-dia
-- extendedWaitUntil:
-    visible:
+      id: panel-dia
+- scrollUntilVisible:
+    element:
       text: "Sin publicación."
       childOf:
-        id: hoja-dia
-    timeout: 10000
-- takeScreenshot: 07-calendario-11-hoja-sin-publicacion
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
-- extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
-    timeout: 10000
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
+- takeScreenshot: 07-calendario-11-panel-sin-publicacion
 
-# Yesterday: its summary («N comentarios · N reacciones…»); a figure opens «Ver todo lo del día» filtered by its type,
-# and a type with nothing that day says so.
-- tapOn:
-    id: calendario-hoy
-- extendedWaitUntil:
-    visible:
-      id: "dia-${output.hoy}"
-    timeout: 10000
+# Yesterday: its summary («N comentarios · N reacciones…»), at the end of the panel; a figure opens «Ver todo lo del
+# día» filtered by its type, and a type with nothing that day says so. Back to today's week first (four days ago may be
+# in the previous one).
+- scrollUntilVisible:
+    element:
+      id: pager-semana
+    direction: UP
+    timeout: 20000
+- runFlow:
+    when:
+      notVisible:
+        id: "dia-${output.hoy}"
+    commands:
+      - swipe:
+          from:
+            id: pager-semana
+          direction: LEFT
+      - extendedWaitUntil:
+          visible:
+            id: "dia-${output.hoy}"
+          timeout: 10000
 - runFlow:
     when:
       notVisible:
         id: "dia-${output.ayer}"
     commands:
-      - tapOn:
-          id: calendario-anterior
+      - swipe:
+          from:
+            id: pager-semana
+          direction: RIGHT
       - extendedWaitUntil:
           visible:
             id: "dia-${output.ayer}"
           timeout: 10000
 - tapOn:
     id: "dia-${output.ayer}"
-- extendedWaitUntil:
-    visible:
+- scrollUntilVisible:
+    element:
       text: "${output.ayerTitulo}"
       childOf:
-        id: hoja-dia
-    timeout: 10000
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
-- extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
-    timeout: 10000
+        id: panel-dia
+    direction: DOWN
+    centerElement: true
+    timeout: 15000
 - scrollUntilVisible:
     element:
       text: "\\d+ comentarios?"

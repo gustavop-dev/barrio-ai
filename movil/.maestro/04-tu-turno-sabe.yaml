@@ -1,14 +1,14 @@
 # cubre: TUR-15, TUR-16, TUR-17
-# Tu turno › «Lo que el equipo sabe de ti»: the seed's three confirmed facts with their topic, visibility and origin;
+# Bandeja › «Lo que el equipo sabe de ti»: the seed's three confirmed facts with their topic, visibility and origin;
 # a new one added by hand (Privado by default, «Lo añadiste tú», first on the list); «preferencia.equipos» retired,
 # which takes it off the list; and «ProjectApp» edited into a new version («v2»), which moves it to the top.
 appId: co.projectapp.office
-name: Tu turno · lo que sabe el equipo
+name: Bandeja · lo que sabe el equipo
 tags: [turno]
 ---
 - runFlow: comun/entrar.yaml
 - tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:

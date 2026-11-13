@@ -1,6 +1,6 @@
-// The sheet of one photo (Galeria.dc.html): the big image (tap it for the full-screen viewer), its
-// state, where it was used, the note, «Edición con IA», Guardar (only what changed
-// is PATCHed) and «Quitar de la galería» behind a confirmation.
+// The sheet of one profile photo (Galeria.dc.html; since 12/11/2026 opened from Ajustes › Fotos de perfil): the big
+// image (tap it for the full-screen viewer), its state, Perfil's permission and reference role, the instructions for
+// Perfil, «Edición con IA», Guardar (only what changed is PATCHed) and «Quitar la foto» behind a confirmation.
 import { AIEditControl } from '@/components/ui/AIEditControl';
 import type { AIEdit } from '@compartido/api/imagenes';
 import { useDeleteFoto, useUpdateFoto, type PhotoOutput, type PhotoCategory, type ProfileRole } from '@compartido/api/capturas';
@@ -31,6 +31,8 @@ export function PhotoSheet({
   const toast = useToast();
   const update = useUpdateFoto();
   const remove = useDeleteFoto();
+  // Only Ajustes › Fotos de perfil opens this sheet since the Galería left (12/11/2026): the category is not offered,
+  // since a photo moved to «Posts» would vanish with nowhere left to see it.
   const [category, setCategory] = useState<PhotoCategory>(photo.category ?? 'posts');
   const [profileEdit, setProfileEdit] = useState(photo.profile_edit ?? false);
   const [role, setRole] = useState<ProfileRole>(photo.profile_role ?? '');
@@ -81,7 +83,7 @@ export function PhotoSheet({
       onSuccess: () => {
         setConfirming(false);
         haptic('actionSuccess');
-        toast.show('Foto quitada de la galería.');
+        toast.show('Foto quitada.');
         onClose();
       },
       onError: () => haptic('actionError'),
@@ -107,7 +109,7 @@ export function PhotoSheet({
       >
         <Pressable
           accessibilityRole="imagebutton"
-          accessibilityLabel={photo.note ? `Foto: ${photo.note}` : 'Foto de la galería'}
+          accessibilityLabel={photo.note ? `Foto: ${photo.note}` : 'Foto'}
           accessibilityHint="Abre la foto a pantalla completa: pellizca para acercarla y desliza para ver las demás."
           onPress={onOpenViewer}
           style={styles.big}
@@ -120,11 +122,6 @@ export function PhotoSheet({
           <T variant="detalle" soft style={styles.used}>
             {photo.used_in?.text || 'Todavía sin usar'}
           </T>
-        </View>
-        <T variant="detalle">Categoría</T>
-        <View style={{ flexDirection: 'row', gap: space[2] }}>
-          <FilterChip pressed={category === 'posts'} onPress={() => { setCategory('posts'); setProfileEdit(false); onDirtyChange?.(true); }}>Posts</FilterChip>
-          <FilterChip pressed={category === 'perfil'} testID="photo-category-perfil" onPress={() => { setCategory('perfil'); setProfileEdit(true); onDirtyChange?.(true); }}>Perfil</FilterChip>
         </View>
         {category === 'perfil' ? <>
           <Note tone="info">{PROFILE_CONSENT}</Note>
@@ -153,16 +150,16 @@ export function PhotoSheet({
             remove.reset();
             setConfirming(true);
           }}
-          accessibilityLabel={`Quitar de la galería: ${photoName(photo)}`}
+          accessibilityLabel={`Quitar la foto: ${photoName(photo)}`}
         >
           <T color={colors.alert} center>
-            Quitar de la galería
+            Quitar la foto
           </T>
         </Button>
       </Sheet>
       {confirming ? (
         <ConfirmSheet
-          title="¿Quitar esta foto de la galería?"
+          title="¿Quitar esta foto?"
           tone="danger"
           confirmLabel="Quitar la foto"
           busy={remove.isPending}

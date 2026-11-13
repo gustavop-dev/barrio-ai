@@ -2,14 +2,16 @@
 
 Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el selector «Edición con IA» en cada una. El backend selecciona, edita y publica las fotos; la fase 2 añade los controles de tres estados, con QA pendiente (ver «Imágenes» al final).
 
-- **Código:** backend `capturas_views.Gallery`, `PhotoDetail`, `PhotoImage`, `capturas.add_photos`, `delete_photo`, `photo_payload`, `photo_status`, `photo_used_in`, modelo `GalleryPhoto`; PWA `oficina/src/pages/Galeria.tsx`, `pages/galeria/PhotoSheet.tsx`; app `movil/src/galeria/*` (`GaleriaScreen.tsx`, `PhotoSheet.tsx`, `PhotoViewer.tsx`, `upload.ts`, `UploadProgressCard.tsx`), `movil/src/components/ui/ApiImage.tsx`; común `compartido/src/api/capturas.ts`, `compartido/src/logic/galeria.ts`.
+**En la app ya no hay Galería (12/11/2026).** Gustavo: «la de galería nunca la uso, solo existe ahí para las fotos de perfil»; las fotos de sus posts siempre llegan con una nota por el botón aguamarina ([captura](captura.md)). La pestaña de abajo la ocupa ahora la Bandeja de entrada y las fotos de categoría Perfil viven en **Ajustes › Fotos de perfil** (GAL-08): la rejilla ordenada por función, «Subir fotos de perfil», la hoja de cada foto (función, permiso, instrucciones para Perfil, «Edición con IA», «Quitar la foto») y el visor. Los enlaces viejos a `/galeria` abren Ajustes en esa sección. La PWA conserva su Galería completa. Las fotos de los posts no se borraron: las piezas publicadas o programadas las usan.
+
+- **Código:** backend `capturas_views.Gallery`, `PhotoDetail`, `PhotoImage`, `capturas.add_photos`, `delete_photo`, `photo_payload`, `photo_status`, `photo_used_in`, modelo `GalleryPhoto`; PWA `oficina/src/pages/Galeria.tsx`, `pages/galeria/PhotoSheet.tsx`; app `movil/src/ajustes/FotosPerfil.tsx` y `movil/src/fotos/*` (`PhotoSheet.tsx`, `PhotoViewer.tsx`, `upload.ts`, `UploadProgressCard.tsx`), `movil/src/components/ui/ApiImage.tsx`; común `compartido/src/api/capturas.ts`, `compartido/src/logic/galeria.ts`.
 - **Documentación:** sección «Galería» de [`capturas-galeria.md`](../../agentes-linkedin/infra/docs/capturas-galeria.md) y de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
 
 ## Resumen
 
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
-| [GAL-01](#gal-01) | Ver la Galería y filtrar | PWA · app · backend | funciona |
+| [GAL-01](#gal-01) | Ver la Galería y filtrar | PWA · backend | funciona |
 | [GAL-02](#gal-02) | Subir fotos | PWA · app · backend | parcial |
 | [GAL-03](#gal-03) | Dejar una nota para el equipo en una foto | PWA · app · backend | funciona |
 | [GAL-04](#gal-04) | Prohibir o permitir la edición con IA de una foto | PWA · app · backend | funciona |
@@ -22,10 +24,10 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
 
 ### GAL-01 · Ver la Galería y filtrar <a id="gal-01"></a>
 
-- **Dónde:** PWA · app · backend
+- **Dónde:** PWA · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** ve sus fotos en una rejilla, cada una con su estado, y filtra por las que están sin usar, elegidas o publicadas.
-- **Código:** `GET /api/v1/galeria?filtro=todas|sin_usar|elegidas|publicadas&page=N`; PWA `Galeria.tsx`; app `GaleriaScreen.tsx` (rejilla virtualizada de 3 columnas).
+- **Código:** `GET /api/v1/galeria?filtro=todas|sin_usar|elegidas|publicadas&page=N`; PWA `Galeria.tsx`. La app la retiró el 12/11/2026; solo pide `filtro=perfil` desde Ajustes › Fotos de perfil (GAL-08).
 - **Criterios de aceptación:**
   1. **Dado** fotos subidas, **cuando** abre la Galería, **entonces** ve «Fotos para tus posts.», «Subir fotos», la pista «Para usar la cámara, toca el botón aguamarina y elige «Foto para la galería».», la nota «El equipo decide cuándo usarlas y si las edita con IA. Tú puedes dejar una nota o prohibir la edición en cada foto.» y la rejilla, de la más reciente a la más antigua.
   2. **Dado** una foto subida hace menos de 24 h y sin usar, **cuando** se pinta, **entonces** su etiqueta es «Nueva»; pasadas 24 h, «Sin usar».
@@ -36,14 +38,14 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   7. **Dado** la carga en curso, **cuando** abre la vista, **entonces** ve «Cargando la galería…»; si falla, ve el error con «Reintentar».
   8. **Dado** un filtro desconocido, **cuando** se pide a la API, **entonces** responde 400 «Usa todas, sin_usar, elegidas o publicadas.».
 - **Brechas código/docs:** en la app, una foto que no carga se queda gris, sin aviso. Las etiquetas «Elegida», «Editada con IA» y «Publicada» y la línea «Usada en la pieza del …» salen del flujo de imágenes ([IMG-12](imagenes-en-publicaciones.md#img-12)).
-- **Cobertura QA:** E2E `10-galeria` (criterios 1, 2, 3: los textos, «Nueva» y «Sin usar», los cuatro filtros; 6, un filtro vacío con el interruptor de fallos) y `10-galeria-subir` (5, la Galería vacía con el interruptor de fallos). 4, 7 y 8: Jest y backend.
+- **Cobertura QA:** Vitest de la PWA y backend. Los flujos E2E `10-galeria` y `10-galeria-subir` de la app se retiraron con su Galería (12/11/2026).
 
 ### GAL-02 · Subir fotos <a id="gal-02"></a>
 
 - **Dónde:** PWA · app · backend
 - **Estado:** parcial
 - **Qué hace para Gustavo:** elige fotos de su teléfono o de su ordenador y las sube a la Galería.
-- **Código:** `POST /api/v1/galeria` (multipart, partes `fotos` repetidas, lotes de 10, `capturas.add_photos`); PWA `Galeria.tsx` (botón y arrastrar y soltar); app `upload.ts` (`launchImageLibraryAsync`, partes `{uri, name, type}`), `UploadProgressCard.tsx`.
+- **Código:** `POST /api/v1/galeria` (multipart, partes `fotos` repetidas, lotes de 10, `capturas.add_photos`); PWA `Galeria.tsx` (botón y arrastrar y soltar); app `fotos/upload.ts` (`launchImageLibraryAsync`, partes `{uri, name, type}`) y `UploadProgressCard.tsx`, solo para las fotos de perfil desde Ajustes (`category=perfil`, `profile_edit=true`).
 - **Lo que falta:** en la app funciona desde el PR #43 (las subidas van por `XMLHttpRequest`, `movil/src/api/multipart.ts`). En la PWA falla el criterio 4: tras un segundo lote fallido solo muestra el error, sin decir que el primero sí se guardó.
 - **Criterios de aceptación:**
   1. **Dado** tres fotos JPEG elegidas, **cuando** las sube, **entonces** la API responde 201 con las fotos creadas, aparecen en la rejilla como «Nueva» y se ve «3 fotos subidas. El equipo las verá en su próxima ronda.» (o «Foto subida. …» con una).
@@ -54,7 +56,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   6. **Dado** cada foto nueva, **cuando** se crea, **entonces** toma `allow_ai_edit` del valor por defecto de Ajustes › Captura y galería ([AJU-09](ajustes.md#aju-09)).
   7. **Dado** que la subida falla, **cuando** vuelve el error, **entonces** se ve en español; nunca un mensaje técnico en inglés.
 - **Brechas código/docs:** en la app la línea de fotos rechazadas no se borra tras una subida correcta posterior.
-- **Cobertura QA:** E2E `10-galeria-subir` (criterios 1 y 7: una foto elegida en el selector de Android llega al backend, «Foto subida. El equipo la verá en su próxima ronda.» y la foto en la rejilla como «Nueva»; 4, un 413 con el interruptor de fallos, «0 de 1 foto subida» y «Reintentar»). 2, 3, 5 y 6: Jest y backend.
+- **Cobertura QA:** E2E `18-perfil` (criterios 1 y 7 en la app: una foto elegida en el selector de Android llega al backend como foto de perfil y dice «Foto subida. El equipo la verá en su próxima ronda.»). 2 a 6: Jest (`FotosPerfil.test.tsx`), Vitest y backend.
 
 ### GAL-03 · Dejar una nota para el equipo en una foto <a id="gal-03"></a>
 
@@ -69,7 +71,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   4. **Dado** una nota de más de 2.000 caracteres, **cuando** se envía, **entonces** la API responde 400.
   5. **Dado** un error al guardar, **cuando** vuelve, **entonces** se ve dentro de la hoja y la nota no se pierde.
 - **Brechas código/docs:** el director recibe y usa las notas ([IMG-04](imagenes-en-publicaciones.md#img-04)). En la PWA, la X de la hoja sigue activa mientras guarda y puede cerrarla antes de ver el resultado.
-- **Cobertura QA:** E2E `10-galeria` (criterios 1 a 3; la foto abierta otra vez enseguida, con la Galería recargando despacio por el interruptor de fallos, muestra lo guardado). 4 y 5: backend y Jest.
+- **Cobertura QA:** Jest (`FotosPerfil.test.tsx`: en la app la nota es «Instrucciones para Perfil» y se envía sola), Vitest y backend.
 
 ### GAL-04 · Prohibir o permitir la edición con IA de una foto <a id="gal-04"></a>
 
@@ -83,7 +85,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   3. **Dado** `ai_edit=no`, **cuando** el equipo prepara un post, **entonces** no edita la foto aunque la nota lo pida.
   4. **Dado** una foto ya usada, **cuando** cambia su opción, **entonces** afecta a usos futuros.
 - **Brechas código/docs:** implementación terminada; validación de fase 2 en CI pendiente.
-- **Cobertura QA:** `10-galeria` (opciones y persistencia), `05-captura-envios` y `11-ajustes`; Jest/Vitest comprueban PATCH parcial. Escritos; ejecución pendiente de Claude.
+- **Cobertura QA:** `05-captura-envios` y `11-ajustes`; Jest/Vitest comprueban PATCH parcial.
 
 ### GAL-05 · Quitar una foto de la Galería <a id="gal-05"></a>
 
@@ -98,21 +100,21 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   4. **Dado** un error, **cuando** vuelve, **entonces** se ve dentro de la confirmación.
   5. **Dado** el borrado, **cuando** termina, **entonces** no hay «Deshacer» (comportamiento actual).
 - **Brechas código/docs:** —
-- **Cobertura QA:** E2E `10-galeria` (criterios 1 a 3 y 5: la confirmación, «Cancelar», «Quitar la foto» y la foto fuera de la rejilla; 2, el aviso de la foto elegida). 4: Jest.
+- **Cobertura QA:** Jest (`FotosPerfil.test.tsx`: la confirmación y el DELETE solo después de ella), Vitest y backend.
 
 ### GAL-06 · Ver las fotos a pantalla completa <a id="gal-06"></a>
 
 - **Dónde:** app
 - **Estado:** funciona
 - **Qué hace para Gustavo:** en el teléfono abre una foto a pantalla completa, pasa a la siguiente y hace zoom.
-- **Código:** `movil/src/galeria/PhotoViewer.tsx`.
+- **Código:** `movil/src/fotos/PhotoViewer.tsx`, abierto desde la hoja de una foto de perfil en Ajustes.
 - **Criterios de aceptación:**
   1. **Dado** la hoja de una foto, **cuando** toca la imagen, **entonces** se abre a pantalla completa con «N de M», «Cerrar» y el pie con la etiqueta y `used_in.text`.
   2. **Dado** el visor, **cuando** desliza a un lado, **entonces** pasa a la foto siguiente o anterior.
   3. **Dado** el visor, **cuando** pellizca o toca dos veces, **entonces** hace zoom y puede moverse por la foto.
   4. **Dado** el visor, **cuando** arrastra hacia arriba o abajo sin zoom, **entonces** se cierra.
 - **Brechas código/docs:** la PWA no tiene visor.
-- **Cobertura QA:** E2E `10-galeria` (criterios 1, 2 y 4, y el doble toque del 3: con zoom, deslizar no cambia de foto). El pellizco necesita dos dedos, que Maestro no hace en Android. El fondo de tinta del visor: Jest (`GaleriaScreen.test.tsx`) y la captura `10-galeria-08-visor`.
+- **Cobertura QA:** Jest (`FotosPerfil.test.tsx`: el fondo de tinta, «N de M» y pasar de foto). El E2E `10-galeria` se retiró con la Galería de la app.
 
 ### GAL-07 · Las fotos son privadas <a id="gal-07"></a>
 
@@ -127,7 +129,7 @@ Las fotos que Gustavo sube para sus posts, con una nota para el equipo y el sele
   4. **Dado** la PWA o la app, **cuando** recibe una URL de imagen de otro origen, **entonces** no la carga (la app muestra un recuadro azul con un icono).
   5. **Dado** una rejilla con muchas fotos, **cuando** se cargan, **entonces** estas lecturas no cuentan para el límite de peticiones de la API.
 - **Brechas código/docs:** —
-- **Cobertura QA:** E2E `10-galeria` (criterio 1: la imagen de una foto sin sesión ni token responde 401 o 403; 2, la app muestra las fotos con su token en la rejilla, la hoja y el visor). 3 a 5: backend.
+- **Cobertura QA:** backend (criterios 1 y 3 a 5) y la rejilla de Ajustes › Fotos de perfil en `18-perfil` (2, con su token).
 
 ---
 
@@ -148,7 +150,7 @@ La Galería es la fuente del flujo de imagen, implementado en el backend; interf
 - **Cadencia:** categoría asignable al subir o después en el detalle de una foto; consumo semestral o bajo demanda [EST-05](estrategia-perfil.md#est-05). Etiquetar no inicia gasto ni cambia LinkedIn.
 - **Tu turno:** guardar la categoría es una acción explícita de Gustavo, sin tarjeta adicional. Los derivados requieren revisión y aplicación manual en TUR-18.
 - **Datos necesarios y disponibilidad:** Categoría y autorización implementadas. Las tres referencias privadas y sus notas deben cargarse tras desplegar; su aptitud no se ha comprobado aquí.
-- **Código:** `GalleryPhoto.category/profile_edit/profile_role/profile_version/profile_consent`, `perfil_galeria.py`, `capturas.add_photos`, PWA/app Galería y PhotoSheet; exclusión en `imagenes.py`, `editor_visual.gallery` e ideas de capturas.
+- **Código:** `GalleryPhoto.category/profile_edit/profile_role/profile_version/profile_consent`, `perfil_galeria.py`, `capturas.add_photos`, PWA Galería y PhotoSheet, app Ajustes › Fotos de perfil (`FotosPerfil.tsx`; la hoja ya no ofrece cambiar la categoría: una foto pasada a «Posts» quedaría sin dónde verse); exclusión en `imagenes.py`, `editor_visual.gallery` e ideas de capturas.
 - **Regla de edición para Perfil:** al elegir/guardar esta categoría la interfaz explica que prepara dos retratos para elegir —A en grises, B en color— y el banner con micrófono, con ropa/gafas y notas autorizadas, conservando identidad. La asignación autoriza estos tratamientos para Perfil sin aprobar resultados. Los addenda cuarto y quinto autorizan la carga y esos usos: 01 pose/sonrisa, 02 cuerpo, 03 identidad; sonrisa de 01 en A, B y banner, y transitions claras como 03, sin gafas de sol. Se conserva original y se registra alcance/fecha/versión; si revoca la edición para Perfil deja de ser elegible. La categoría no permite usar fotos ni derivados en posts, independientemente del permiso general de edición para publicaciones.
 - **Criterios de aceptación:**
   1. **Dado** una subida de una o varias fotos, **cuando** Gustavo elige «Perfil» antes de enviarlas, **entonces** cada foto subida correctamente conserva categoría, original y autorización acotada explicada en ese flujo; aparece etiquetada en PWA y app y se puede filtrar por «Perfil». Una foto cuya categoría no se guardó no queda elegible.
@@ -163,7 +165,7 @@ La Galería es la fuente del flujo de imagen, implementado en el backend; interf
   10. **Dado** originales de Perfil o derivados de ellos, **cuando** director, visual o selección manual preparan un post, **entonces** backend los excluye del catálogo/contexto editorial y rechaza su selección por id aunque la nota o permiso de edición general permitan editar. Marcar como Perfil una foto previamente seleccionada invalida su uso en posts pendientes y obliga a elegir otra; no cambia posts ya publicados. Derivados heredan uso exclusivo de Perfil y no vuelven al catálogo de posts por perder una etiqueta.
   11. **Dado** el repositorio público y referencias privadas, **cuando** se importa, edita, evalúa o documenta este flujo, **entonces** ninguna foto de referencia, derivado o comparación se copia al repo, se añade a Git, se incrusta como base64/miniatura o se usa como fixture público. Se usan datos sintéticos para tests y almacenamiento privado para originales/artefactos; auditoría guarda ids/metadatos. La referencia externa de Diandra queda fuera de cualquier carga/almacenamiento nuevo y solo se describe verbalmente.
 - **Brechas código/docs:** CI/QA y activación pendientes de Claude; [guía de verificación](../arquitectura/fase8-verificacion.md). Los assets privados no están en el repo.
-- **Cobertura QA:** `test_perfil.py`, Jest/Vitest y Maestro `18-perfil`; regresiones `04-*`, `10-galeria` y seed. Escrita, sin ejecución local.
+- **Cobertura QA:** `test_perfil.py`, Jest (`FotosPerfil.test.tsx`), Vitest y Maestro `18-perfil` (la foto sembrada con su función y una subida desde Ajustes); regresiones `04-*` y seed.
 
 ## Retiradas
 

@@ -1,5 +1,6 @@
-// Pure rules of the Personas screens (Barrio, the person card, Oportunidades and Referentes), kept apart from
-// the markup so the PWA (oficina/src/pages/personas) and the native app (movil/src/personas) say the same.
+// Pure rules of the Personas screens (the PWA's Barrio, the person card, Oportunidades and Referentes), kept apart
+// from the markup so the PWA (oficina/src/pages/personas) and the native app (movil/src/personas) say the same. The
+// app's Conexiones tab has its own rules in conexiones.ts.
 import type {
   Contact,
   ContactHistoryEntry,
@@ -15,7 +16,7 @@ import type {
   RedSummary,
   Referent,
 } from '../api/types';
-import { actionStateLabel, capabilityLabel, CONTACT_EVENT_LABEL, contactSourceLabel, excerpt, networkDistanceLabel, timeAgo } from './format';
+import { actionStateLabel, capabilityLabel, CONTACT_EVENT_LABEL, excerpt, networkDistanceLabel, timeAgo } from './format';
 import { agree, isFeminineName } from './genero';
 import {
   ATTRIBUTION_LABEL,
@@ -28,7 +29,6 @@ import {
   MODALITY_SHORT,
   OPPORTUNITY_MODALITY_LABEL,
   OPPORTUNITY_STAGE_LABEL,
-  personStage,
   relativeDay,
   shortDate,
   type PersonStage,
@@ -64,30 +64,6 @@ export function displayName(contact: Pick<Contact, 'display_name' | 'public_iden
   return contact.display_name || contact.public_identifier || 'Sin nombre';
 }
 
-/** «Comentó en un post de Elena Prueba · Seguido hace 2 días». */
-export function rowMeta(contact: Contact): string {
-  return `${contactSourceLabel(contact.source, contact.evidence)} · ${lastActivity(contact)}`;
-}
-
-export interface BarrioFilters {
-  stage: string;
-  q: string;
-  role: string;
-  modality: string;
-  source: string;
-}
-
-/** «Nadie en «Encaja» ahora mismo» with only a stage, «Nadie coincide con estos filtros» otherwise. */
-export function noResultsTitle({ stage, q, role, modality, source }: BarrioFilters): string {
-  const extra = [role, modality, source].filter(Boolean).length;
-  return stage && !q && !extra ? `Nadie en «${personStage(stage).label}» ahora mismo` : 'Nadie coincide con estos filtros';
-}
-
-/** «Más filtros: rol, modalidad y origen (3 activos)». */
-export function moreFiltersLabel(active: number): string {
-  return `Más filtros: rol, modalidad y origen${active ? ` (${active} ${active === 1 ? 'activo' : 'activos'})` : ''}`;
-}
-
 // ================================================================ person card
 
 /** «Medellín, Colombia · 1.er grado · Lo sigues». */
@@ -121,7 +97,7 @@ export function suggestedModality(contact: Contact): string | null | undefined {
 }
 
 export interface NextStepView {
-  /** Gustavo's move: warn tone and «Ir a Tu turno». */
+  /** Gustavo's move: warn tone and «Ir a la Bandeja». */
   mine: boolean;
   /** «Siguiente paso · Te toca». */
   label: string;

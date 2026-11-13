@@ -77,7 +77,7 @@ export function Notificaciones() {
       title="Notificaciones"
       subtitle={
         <>
-          Lo que viene y lo que pasó. Nada de esto necesita que hagas algo; lo que sí, está en <Link to="/tu-turno">Tu turno</Link>.
+          Lo que viene y lo que pasó. Nada de esto necesita que hagas algo; lo que sí, está en <Link to="/tu-turno">tu Bandeja</Link>.
         </>
       }
       width="narrow"

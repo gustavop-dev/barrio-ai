@@ -640,7 +640,7 @@ class Calendar(APIView):
         for day,people in connections.items():
             if day in days:days[day]['counts']['connections_fit']=len(people)
             add(day,'red','connection_fit',f'{len(people)} conexiones nuevas' if len(people)>1 else f'{people[0]["name"]} aceptó tu invitación',
-                people=people,link='/personas?etapa=connected',ref='connections')
+                people=people,link='/personas',ref='connections')  # Personas › Conexiones
         for c in Contact.objects.filter(source='incoming',discovered_at__gte=lo,discovered_at__lt=hi):
             add(local_day(c.discovered_at),'red','invitation_received',f'{c.display_name} te invitó',at=c.discovered_at,link=f'/personas/{c.id}',ref=str(c.id))
         expected={}

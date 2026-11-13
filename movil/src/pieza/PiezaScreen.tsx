@@ -86,12 +86,12 @@ function StatusNote({ piece, label }: { piece: PieceDetailFull; label: string })
           actions={
             action ? (
               <Button variant="ghost" onPress={() => openLink(`/tu-turno#${turnoAnchor(`uncertain:${action.id}`)}`)}>
-                Resuélvela en Tu turno
+                Resuélvela en la Bandeja
               </Button>
             ) : undefined
           }
         >
-          Comprueba en LinkedIn si el post está publicado y dilo en Tu turno.
+          Comprueba en LinkedIn si el post está publicado y dilo en la Bandeja.
         </Note>
       );
     default:

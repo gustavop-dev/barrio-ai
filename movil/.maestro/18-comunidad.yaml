@@ -8,7 +8,8 @@ tags: [personas, comunidad]
 - tapOn:
     id: tab-personas
 - extendedWaitUntil:
-    visible: Barrio
+    visible:
+      id: personas-conexiones
     timeout: 20000
 - scrollUntilVisible:
     element:

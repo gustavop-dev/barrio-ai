@@ -5,60 +5,47 @@
 # Natural text/audio requests and completed jobs are covered in test_perfil_capturas.py.
 appId: co.projectapp.office
 name: Perfil privado, aclaración de alcance y checklist manual
-tags: [perfil, galeria, turno]
+tags: [perfil, ajustes, turno]
 ---
 - runFlow: comun/entrar.yaml
+# The profile photos live in Ajustes › Fotos de perfil since the Galería left the app (12/11/2026): the seeded one
+# shows with its role, and «Subir fotos de perfil» adds one from the phone as category «perfil».
 - tapOn:
-    id: tab-galeria
+    id: top-ajustes
+    waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
-      id: screen-galeria
+      id: screen-ajustes
     timeout: 20000
-- tapOn:
-    id: filtro-sin_usar
 - scrollUntilVisible:
     element:
-      id: 'photo-.*'
-      index: 0
+      text: '03 · Identidad y gafas.*'
     direction: DOWN
-- tapOn:
-    id: 'photo-.*'
-    index: 0
-- extendedWaitUntil:
-    visible:
-      id: photo-sheet
-    timeout: 10000
+    centerElement: true
+    timeout: 30000
 - scrollUntilVisible:
     element:
-      id: photo-category-perfil
+      id: fotos-perfil-subir
     direction: DOWN
     centerElement: true
 - tapOn:
-    id: photo-category-perfil
-- scrollUntilVisible:
-    element:
-      id: photo-save
-    direction: DOWN
-    centerElement: true
-- tapOn:
-    id: photo-save
+    id: fotos-perfil-subir
+    waitToSettleTimeoutMs: 500
+- runFlow:
+    file: comun/elegir-foto.yaml
+    env:
+      CAPTURA: 18-perfil-00-selector-de-fotos
 - extendedWaitUntil:
-    notVisible:
-      id: photo-sheet
-    timeout: 10000
-- scrollUntilVisible:
-    element:
-      id: filtro-perfil
-    direction: UP
-- tapOn:
-    id: filtro-perfil
+    visible: "Foto subida\\. El equipo la verá en su próxima ronda\\."
+    timeout: 45000
+- assertNotVisible: ".*(fetch failed|Network request failed|Unsupported FormDataPart).*"
 - takeScreenshot: 18-perfil-01-categoria
 - tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 11 pendientes, 1 urgente'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 11 pendientes, 1 urgente'
     timeout: 30000
 - scrollUntilVisible:
     element:

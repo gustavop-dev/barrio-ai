@@ -5,9 +5,9 @@ import { openLink } from '@/navigation';
 import { routeForUrl } from './routes';
 
 describe('deep links of Galería, Ajustes and Notificaciones', () => {
-  it('maps the gallery and its filter', () => {
-    expect(routeForUrl('/galeria')).toEqual({ pathname: '/galeria', params: {} });
-    expect(routeForUrl('/galeria?filtro=sin_usar')).toEqual({ pathname: '/galeria', params: { filtro: 'sin_usar' } });
+  it('sends the old gallery links to Ajustes › Fotos de perfil (the Galería left the app)', () => {
+    expect(routeForUrl('/galeria')).toEqual({ pathname: '/ajustes', params: { ancla: 'fotos' } });
+    expect(routeForUrl('/galeria?filtro=sin_usar')).toEqual({ pathname: '/ajustes', params: { ancla: 'fotos' } });
   });
 
   it('maps the Ajustes anchors and the OAuth return', () => {
@@ -32,7 +32,7 @@ describe('deep links of Galería, Ajustes and Notificaciones', () => {
     openLink('/ajustes#notificaciones');
     expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/ajustes', params: { ancla: 'notificaciones' } });
     openLink('/galeria?filtro=publicadas');
-    expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/galeria', params: { filtro: 'publicadas' } });
+    expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/ajustes', params: { ancla: 'fotos' } });
     openLink('/memoria');
     expect(router.navigate).toHaveBeenLastCalledWith({ pathname: '/tu-turno', params: { tab: 'sabe' } });
   });

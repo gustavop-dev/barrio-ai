@@ -1,6 +1,7 @@
-// Personas: Barrio (funnel chips, search and the filter sheet, warnings, empty, error and «Cargar más»),
-// Oportunidades (grouped by stage, the drag and the stage selector with «Deshacer», the form), Referentes
-// (the URL check, «Observar ahora», deactivate with «Deshacer», remove) and the deep links of the old views.
+// Personas: Conexiones (only the connections, role chips with counts, grouped by when they accepted, the rows,
+// search, warnings, empty, error, «Cargar más» and old funnel links ignored), Oportunidades (grouped by stage, the drag
+// and the stage selector with «Deshacer», the form), Referentes (the URL check, «Observar ahora», deactivate with
+// «Deshacer», remove) and the deep links of the old views.
 import { accountFixture, contactFixture, opportunityFixture, page, redSummaryFixture, referentFixture } from '@compartido/fixtures/personas';
 import { normalizeProfileUrl } from '@compartido/api/personas';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
@@ -28,78 +29,153 @@ async function renderPersonas(routes: Record<string, FakeHandler>, params: Recor
   return server;
 }
 
-const lucia = contactFixture('c-1', {
-  your_turn: true,
-  display_stage: 'opportunity',
+// Connections only (Gustavo, 12/11/2026): the agents' queue never reaches this list.
+const sofia = contactFixture('c-1', {
+  display_name: 'Sofía Inventada',
+  headline: 'Gerente de una cooperativa de ahorro que abre oficinas en tres ciudades',
+  location: 'Medellín, Colombia',
   stage: 'connected',
-  last_event: { at: new Date(Date.now() - 2 * 86_400_000).toISOString(), event: 'followed', detail: '' },
+  display_stage: 'opportunity',
+  // 10 November, 22:00 in Bogotá.
+  connected_at: '2026-11-11T03:00:00Z',
+  your_turn: true,
 });
-const diego = contactFixture('c-2', {
-  display_name: 'Diego Supuesto',
-  headline: 'Founder @ Rumbo Pagos (seed)',
-  source: 'search',
-  evidence: { query: 'founders pre-seed Colombia' },
+const tomas = contactFixture('c-2', {
+  display_name: 'Tomás Supuesto',
+  headline: 'Fundador de una edtech en etapa semilla',
+  location: '',
+  stage: 'connected',
+  display_stage: 'connected',
+  classification: { fit: true, role: 'par' },
+  connected_at: '2026-11-03T15:00:00Z',
+});
+// Connected before connected_at existed and never labelled.
+const ines = contactFixture('c-3', {
+  display_name: 'Inés Ejemplo',
+  headline: '',
+  location: 'Bogotá, Colombia',
+  stage: 'connected',
+  display_stage: 'connected',
   classification: {},
-  display_stage: 'candidate',
-  stage: 'candidate',
+  connected_at: null,
+  updated_at: '2026-09-20T15:00:00Z',
 });
+const summary = () => ({ body: redSummaryFixture() });
 
 beforeEach(() => {
   routerState.params = {};
 });
 
-describe('Personas · Barrio', () => {
-  it('shows the funnel chips with counts and the rows of people', async () => {
-    await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia, diego]) });
-    expect(screen.getByText('Personas')).toBeOnTheScreen();
-    expect(screen.getByRole('tab', { name: 'Barrio' })).toBeSelected();
-    const chips = within(screen.getByTestId('stage-chips'));
-    expect(await chips.findByRole('button', { name: 'Todas · 51' })).toBeSelected();
-    for (const name of ['Por clasificar · 12', 'Encaja · 9', 'Seguido · 8', 'Invitado · 6', 'Conectado · 7', 'Oportunidad · 1', 'Te invitó · 1', 'Cerrado · 2', 'Descartado · 6']) {
-      expect(chips.getByRole('button', { name })).toBeOnTheScreen();
-    }
-    expect(chips.getByRole('button', { name: 'En conversación · aún no disponible' })).toBeDisabled();
-
-    const first = within(await screen.findByTestId('person-c-1'));
-    expect(first.getByText('Lucía Ficticia')).toBeOnTheScreen();
-    expect(first.getByText('Oportunidad')).toBeOnTheScreen();
-    expect(first.getByText('Comprador')).toBeOnTheScreen();
-    expect(first.getByText('ProjectApp')).toBeOnTheScreen();
-    expect(first.getByText('Comentó en un post de Elena Prueba · Seguida hace 2 días')).toBeOnTheScreen();
-    expect(first.getByText('Te toca')).toBeOnTheScreen();
-
-    const second = within(screen.getByTestId('person-c-2'));
-    expect(second.getByText('Sin clasificar todavía')).toBeOnTheScreen();
-    expect(second.getByText(/Búsqueda: founders pre-seed Colombia/)).toBeOnTheScreen();
-    expect(second.queryByText('Te toca')).toBeNull();
-
-    await fireEvent.press(screen.getByTestId('person-c-1'));
-    expect(router.push).toHaveBeenLastCalledWith({ pathname: '/personas/[id]', params: { id: 'c-1' } });
-  });
-
-  it('filters by stage from a chip, says so when nobody is there, and clears the filters', async () => {
-    const server = await renderPersonas({
-      'GET /api/v1/red/summary': { body: redSummaryFixture() },
-      'GET /api/v1/red/contacts': (request) => (query(request).stage === 'fit' ? page([]) : page([lucia])),
+describe('Personas · Conexiones', () => {
+  describe('on Thursday 12 November 2026', () => {
+    beforeEach(() => {
+      jest.useFakeTimers({
+        now: new Date('2026-11-12T20:00:00Z'),
+        doNotFake: ['hrtime', 'nextTick', 'performance', 'queueMicrotask', 'requestAnimationFrame', 'cancelAnimationFrame', 'requestIdleCallback', 'cancelIdleCallback', 'setImmediate', 'clearImmediate', 'setInterval', 'clearInterval', 'setTimeout', 'clearTimeout'],
+      });
     });
-    await fireEvent.press(await screen.findByRole('button', { name: 'Encaja · 9' }));
-    expect(router.setParams).toHaveBeenLastCalledWith(expect.objectContaining({ etapa: 'fit', pestana: undefined }));
-    expect(await screen.findByText('Nadie en «Encaja» ahora mismo')).toBeOnTheScreen();
-    expect(query(server.find('GET', '/api/v1/red/contacts').at(-1)!).stage).toBe('fit');
-    await fireEvent.press(screen.getByText('Quitar filtros'));
-    expect(await screen.findByTestId('person-c-1')).toBeOnTheScreen();
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('lists only the connections, grouped by when they accepted, each with its role, headline, place and date', async () => {
+      const server = await renderPersonas({ 'GET /api/v1/red/summary': summary(), 'GET /api/v1/red/contacts': page([sofia, tomas, ines]) });
+      expect(screen.getByText('Personas')).toBeOnTheScreen();
+      expect(screen.getByRole('tab', { name: 'Conexiones' })).toBeSelected();
+      expect(screen.queryByRole('tab', { name: 'Barrio' })).toBeNull();
+      await screen.findByTestId('person-c-1');
+      const asked = query(server.find('GET', '/api/v1/red/contacts')[0]!);
+      expect(asked.vista).toBe('conexiones');
+      expect(asked.stage).toBeUndefined();
+
+      // Most recent first, under «Esta semana», «Este mes» and «Antes» (Bogotá days).
+      expect(screen.getAllByText(/^(Esta semana|Este mes|Antes)$/).map((node) => node.props.children)).toEqual(['Esta semana', 'Este mes', 'Antes']);
+      expect(within(screen.getByTestId('barrio-list')).getAllByTestId(/^person-/).map((row) => row.props.testID)).toEqual(['person-c-1', 'person-c-2', 'person-c-3']);
+
+      const first = within(screen.getByTestId('person-c-1'));
+      expect(first.getByText('Sofía Inventada').props.numberOfLines).toBe(2);
+      expect(first.getByText('Comprador')).toBeOnTheScreen();
+      expect(first.getByText('Gerente de una cooperativa de ahorro que abre oficinas en tres ciudades').props.numberOfLines).toBe(1);
+      expect(first.getByText('Medellín, Colombia')).toBeOnTheScreen();
+      expect(first.getByText('Aceptó el 10/11')).toBeOnTheScreen();
+      expect(first.getByText('Te toca')).toBeOnTheScreen();
+      // No funnel stage on a row: everybody here is connected.
+      expect(first.queryByText('Oportunidad')).toBeNull();
+
+      const second = within(screen.getByTestId('person-c-2'));
+      expect(second.getByText('Par')).toBeOnTheScreen();
+      expect(second.getByText('Aceptó el 03/11')).toBeOnTheScreen();
+      expect(second.queryByText('Te toca')).toBeNull();
+
+      const third = within(screen.getByTestId('person-c-3'));
+      expect(third.getByText('Sin etiqueta')).toBeOnTheScreen();
+      expect(third.getByText('Bogotá, Colombia')).toBeOnTheScreen();
+      expect(third.queryByText(/^Aceptó el/)).toBeNull();
+
+      // The funnel chips and the «Más filtros» sheet are gone.
+      expect(screen.queryByTestId('stage-chips')).toBeNull();
+      expect(screen.queryByRole('button', { name: /^Más filtros/ })).toBeNull();
+
+      await fireEvent.press(screen.getByTestId('person-c-1'));
+      expect(router.push).toHaveBeenLastCalledWith({ pathname: '/personas/[id]', params: { id: 'c-1' } });
+    });
   });
 
-  it('opens with the stage of an old /red?etapa= link and asks for it', async () => {
-    const server = await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) }, { etapa: 'opportunity' });
-    expect(await screen.findByRole('button', { name: 'Oportunidad · 1' })).toBeSelected();
-    await waitFor(() => expect(query(server.find('GET', '/api/v1/red/contacts')[0]!).stage).toBe('opportunity'));
+  it('filters by role from a chip with its count, and the chip toggles back to «Todas»', async () => {
+    const server = await renderPersonas({
+      'GET /api/v1/red/summary': summary(),
+      'GET /api/v1/red/contacts': (request) => {
+        const role = query(request).role;
+        return role === 'par' ? page([tomas]) : role === 'sin_etiqueta' ? page([ines]) : page([sofia, tomas, ines]);
+      },
+    });
+    const chips = () => within(screen.getByTestId('role-chips'));
+    expect(await chips().findByRole('button', { name: 'Todas · 7' })).toBeSelected();
+    for (const name of ['Compradores · 3', 'Pares · 2', 'Divulgadores · 1', 'Sin etiqueta · 1']) expect(chips().getByRole('button', { name })).toBeOnTheScreen();
+    await screen.findByTestId('person-c-1');
+
+    await fireEvent.press(chips().getByRole('button', { name: 'Pares · 2' }));
+    expect(router.setParams).toHaveBeenLastCalledWith(expect.objectContaining({ rol: 'par', pestana: undefined }));
+    expect(chips().getByRole('button', { name: 'Pares · 2' })).toBeSelected();
+    await waitFor(() => expect(screen.queryByTestId('person-c-1')).toBeNull());
+    expect(screen.getByTestId('person-c-2')).toBeOnTheScreen();
+    expect(query(server.find('GET', '/api/v1/red/contacts').at(-1)!)).toMatchObject({ vista: 'conexiones', role: 'par' });
+
+    await fireEvent.press(chips().getByRole('button', { name: 'Pares · 2' }));
+    expect(router.setParams).toHaveBeenLastCalledWith(expect.objectContaining({ rol: undefined }));
+    expect(chips().getByRole('button', { name: 'Todas · 7' })).toBeSelected();
+    expect(await screen.findByTestId('person-c-1')).toBeOnTheScreen();
+
+    await fireEvent.press(chips().getByRole('button', { name: 'Sin etiqueta · 1' }));
+    await waitFor(() => expect(query(server.find('GET', '/api/v1/red/contacts').at(-1)!).role).toBe('sin_etiqueta'));
+    await waitFor(() => expect(screen.queryByTestId('person-c-2')).toBeNull());
+    expect(screen.getByTestId('person-c-3')).toBeOnTheScreen();
+  });
+
+  it('opens on the role of a link and ignores the funnel filters of old links (?etapa=, ?modalidad=, ?origen=)', async () => {
+    const server = await renderPersonas(
+      { 'GET /api/v1/red/summary': summary(), 'GET /api/v1/red/contacts': page([sofia]) },
+      { etapa: 'connected', modalidad: 'projectapp', origen: 'search', rol: 'comprador' },
+    );
+    expect(screen.getByRole('tab', { name: 'Conexiones' })).toBeSelected();
+    expect(await screen.findByRole('button', { name: 'Compradores · 3' })).toBeSelected();
+    await screen.findByTestId('person-c-1');
+    const asked = query(server.find('GET', '/api/v1/red/contacts')[0]!);
+    expect(asked).toMatchObject({ vista: 'conexiones', role: 'comprador' });
+    expect([asked.stage, asked.modality, asked.source]).toEqual([undefined, undefined, undefined]);
+  });
+
+  it('an old /personas?etapa=followed link lands on every connection', async () => {
+    const server = await renderPersonas({ 'GET /api/v1/red/summary': summary(), 'GET /api/v1/red/contacts': page([sofia]) }, { etapa: 'followed' });
+    expect(await screen.findByRole('button', { name: 'Todas · 7' })).toBeSelected();
+    expect(await screen.findByTestId('person-c-1')).toBeOnTheScreen();
+    expect(query(server.find('GET', '/api/v1/red/contacts')[0]!)).toEqual({ vista: 'conexiones' });
   });
 
   it('keeps every letter typed in the search box while the URL catches up late (PRS-02)', async () => {
     // Found by 14-fichas on the emulator: «Sof» became «S». The box writes ?q= after its pause; when the router took
     // longer than the next letters to apply ?q=S, that older value came back and replaced what had been typed since.
-    fakeServer({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
+    fakeServer({ 'GET /api/v1/red/summary': summary(), 'GET /api/v1/red/contacts': page([sofia]) });
     const view = await renderApp(<PersonasScreen />);
     await screen.findByTestId('person-c-1');
     const lastQ = () => (jest.mocked(router.setParams).mock.calls.at(-1)?.[0] as { q?: string } | undefined)?.q;
@@ -127,7 +203,7 @@ describe('Personas · Barrio', () => {
   it('keeps a letter typed in the instant the box applies its search (PRS-02)', async () => {
     // The other race of 09 and 14 on the emulator: «zzzqa» became «zzz». The pause ended with «zzz», the box wrote
     // ?q=zzz and a letter arrived in that same instant; the box took its own ?q=zzz for a new link and put it back.
-    await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
+    await renderPersonas({ 'GET /api/v1/red/summary': summary(), 'GET /api/v1/red/contacts': page([sofia]) });
     await screen.findByTestId('person-c-1');
     const box = () => screen.getByTestId('barrio-search');
     // The letter lands while ?q=zzz is being written, before the screen redraws.
@@ -141,34 +217,31 @@ describe('Personas · Barrio', () => {
     expect(box().props.value).toBe('zzzq');
   });
 
-  it('searches by name and filters by role, modality and origin in a sheet', async () => {
-    const server = await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]) });
-    await screen.findByTestId('person-c-1');
-
-    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'luc');
-    await waitFor(() => expect(query(server.find('GET', '/api/v1/red/contacts').at(-1)!).q).toBe('luc'));
-
-    await fireEvent.press(screen.getByRole('button', { name: 'Más filtros: rol, modalidad y origen' }));
-    const sheet = within(await screen.findByTestId('barrio-filters'));
-    await fireEvent.press(sheet.getByRole('button', { name: 'Rol del barrio' }));
-    await fireEvent.press(sheet.getByRole('radio', { name: 'Comprador' }));
-    await fireEvent.press(sheet.getByRole('button', { name: 'Modalidad' }));
-    await fireEvent.press(sheet.getByRole('radio', { name: 'ProjectApp' }));
-    await fireEvent.press(sheet.getByRole('button', { name: 'Origen' }));
-    await fireEvent.press(sheet.getByRole('radio', { name: 'Comentó en un post' }));
-    await waitFor(() => {
-      const last = query(server.find('GET', '/api/v1/red/contacts').at(-1)!);
-      expect([last.q, last.role, last.modality, last.source]).toEqual(['luc', 'comprador', 'projectapp', 'commenter']);
+  it('searches the connections by name, says when nobody matches and clears the filters', async () => {
+    const server = await renderPersonas({
+      'GET /api/v1/red/summary': summary(),
+      'GET /api/v1/red/contacts': (request) => (query(request).q === 'zzz' ? page([]) : query(request).q === 'sof' ? page([sofia]) : page([sofia, tomas])),
     });
-    expect(router.setParams).toHaveBeenLastCalledWith(expect.objectContaining({ q: 'luc', rol: 'comprador', modalidad: 'projectapp', origen: 'commenter' }));
-    await fireEvent.press(sheet.getByText('Ver resultados'));
-    expect(await screen.findByRole('button', { name: 'Más filtros: rol, modalidad y origen (3 activos)' })).toBeOnTheScreen();
+    await screen.findByTestId('person-c-2');
+
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'sof');
+    await waitFor(() => expect(query(server.find('GET', '/api/v1/red/contacts').at(-1)!)).toMatchObject({ vista: 'conexiones', q: 'sof' }));
+    await waitFor(() => expect(screen.queryByTestId('person-c-2')).toBeNull());
+
+    await fireEvent.press(screen.getByRole('button', { name: 'Pares · 2' }));
+    await fireEvent.changeText(screen.getByTestId('barrio-search'), 'zzz');
+    expect(await screen.findByText('Nadie coincide')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Quitar filtros'));
+    expect(router.setParams).toHaveBeenLastCalledWith(expect.objectContaining({ q: undefined, rol: undefined }));
+    expect(await screen.findByTestId('person-c-2')).toBeOnTheScreen();
+    expect(screen.getByTestId('barrio-search').props.value).toBe('');
+    expect(screen.getByRole('button', { name: 'Todas · 7' })).toBeSelected();
   });
 
   it('warns when the network is off and when invitations are paused', async () => {
     await renderPersonas({
       'GET /api/v1/red/summary': { body: redSummaryFixture({ enabled: false, invites_blocked: { blocked: true, reason: 'LinkedIn rechazó invitaciones por límite semanal.' } }) },
-      'GET /api/v1/red/contacts': page([lucia]),
+      'GET /api/v1/red/contacts': page([sofia]),
     });
     expect(await screen.findByText('La red está apagada en el servidor')).toBeOnTheScreen();
     expect(screen.getByText('Invitaciones en pausa: LinkedIn las limitó')).toBeOnTheScreen();
@@ -176,19 +249,24 @@ describe('Personas · Barrio', () => {
     expect(screen.getByText('El equipo sigue observando y siguiendo.')).toBeOnTheScreen();
   });
 
-  it('shows an error with retry, and the empty state', async () => {
-    const server = await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': { status: 500, body: { detail: 'Error del servidor' } } });
+  it('shows an error with retry, and the empty state until somebody accepts', async () => {
+    const server = await renderPersonas({
+      'GET /api/v1/red/summary': { body: redSummaryFixture({ connections: { total: 0, roles: {} } }) },
+      'GET /api/v1/red/contacts': { status: 500, body: { detail: 'Error del servidor' } },
+    });
     expect(await screen.findByText('Error del servidor')).toBeOnTheScreen();
     server.on('GET /api/v1/red/contacts', page([]));
     await fireEvent.press(screen.getByText('Reintentar'));
-    expect(await screen.findByText('Aún no hay personas')).toBeOnTheScreen();
-    expect(screen.getByText('El equipo empieza a descubrir cuando lee los comentarios de los referentes.')).toBeOnTheScreen();
+    expect(await screen.findByText('Todavía no hay conexiones')).toBeOnTheScreen();
+    expect(screen.getByText('Aquí aparece cada persona cuando acepta la invitación.')).toBeOnTheScreen();
+    expect(within(screen.getByTestId('role-chips')).getAllByRole('button')).toHaveLength(1);
+    expect(screen.getByRole('button', { name: 'Todas · 0' })).toBeSelected();
   });
 
-  it('loads more people page by page', async () => {
+  it('loads more connections page by page', async () => {
     const server = await renderPersonas({
-      'GET /api/v1/red/summary': { body: redSummaryFixture() },
-      'GET /api/v1/red/contacts': (request) => (query(request).page === '2' ? page([diego]) : page([lucia], 'http://x/api/v1/red/contacts?page=2')),
+      'GET /api/v1/red/summary': summary(),
+      'GET /api/v1/red/contacts': (request) => (query(request).page === '2' ? page([tomas]) : page([sofia], 'http://x/api/v1/red/contacts?page=2')),
     });
     await fireEvent.press(await screen.findByText('Cargar más'));
     expect(await screen.findByTestId('person-c-2')).toBeOnTheScreen();
@@ -504,9 +582,9 @@ describe('Personas · deep links', () => {
   });
 
   it('switching tabs starts each one clean, as the PWA', async () => {
-    await renderPersonas({ 'GET /api/v1/red/summary': { body: redSummaryFixture() }, 'GET /api/v1/red/contacts': page([lucia]), 'GET /api/v1/oportunidades': page([]) }, { etapa: 'fit' });
+    await renderPersonas({ 'GET /api/v1/red/summary': summary(), 'GET /api/v1/red/contacts': page([sofia]), 'GET /api/v1/oportunidades': page([]) }, { q: 'sof', rol: 'comprador' });
     await fireEvent.press(screen.getByRole('tab', { name: 'Oportunidades' }));
-    expect(router.setParams).toHaveBeenLastCalledWith({ pestana: 'oportunidades', etapa: undefined, q: undefined, rol: undefined, modalidad: undefined, origen: undefined });
+    expect(router.setParams).toHaveBeenLastCalledWith({ pestana: 'oportunidades', q: undefined, rol: undefined });
     expect(await screen.findByText('Aún no hay oportunidades')).toBeOnTheScreen();
   });
 });

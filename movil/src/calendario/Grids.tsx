@@ -1,5 +1,7 @@
 // The calendar at phone size (Calendario.dc.html): the week as a 7-day strip and the month as a compact
-// grid, both with one dot per visible layer with important events. Tapping a day opens it.
+// grid, both with one dot per visible layer with important events. Tapping a day selects it (its panel sits
+// under the calendar). The page shows a period; the selected day may be in another one, and then no cell of
+// this page is selected (today keeps its mark).
 //
 // Motion (MovCalendario): each grid is drawn in three layers so the selection can slide between days: the
 // days' boxes, the dark selection (Selection.tsx) and the days' text on top. When the view switches, the
@@ -17,8 +19,10 @@ import { colors, layers as LAYER_COLOR, radius, space } from '@/theme/tokens';
 import { SelectionPill, useDayRects, type PillHandle } from './Selection';
 
 export interface GridProps {
-  /** The selected day (AAAA-MM-DD); also the page's week or month. */
+  /** A day (AAAA-MM-DD) of the page's week or month. */
   fecha: string;
+  /** The selected day: only a page with its cell shows the selection. */
+  selected: string;
   today: string;
   byDate: ReadonlyMap<string, CalendarioDay>;
   visible: ReadonlySet<CalendarLayer>;
@@ -35,6 +39,7 @@ export interface GridProps {
 
 const WEEK_GAP = space[1];
 const MONTH_GAP = 2;
+const DAY_HINT = 'Muestra el día debajo del calendario';
 
 /** «Sábado 7 de noviembre, hoy, Publicaciones, Red». */
 export function dayLabel(day: string, today: string, layers: CalendarLayer[]): string {
@@ -60,41 +65,41 @@ interface Look {
   color: string;
 }
 
-function look(day: string, { fecha, today, preview, pill }: Pick<GridProps, 'fecha' | 'today' | 'preview' | 'pill'>, outside = false): Look {
-  const selected = day === fecha && !preview;
-  const color = selected ? colors.paper : outside && day !== today ? colors.inkSoft : colors.ink;
-  if (selected && !pill?.placed) return { box: styles.selected, color };
+function look(day: string, { selected, today, preview, pill }: Pick<GridProps, 'selected' | 'today' | 'preview' | 'pill'>, outside = false): Look {
+  const isSelected = day === selected && !preview;
+  const color = isSelected ? colors.paper : outside && day !== today ? colors.inkSoft : colors.ink;
+  if (isSelected && !pill?.placed) return { box: styles.selected, color };
   if (day === today) return { box: styles.today, color };
   if (outside) return { box: styles.outside, color };
   return { box: null, color };
 }
 
 /** The week: initial, number and dots of each day. */
-export function WeekStrip({ fecha, today, byDate, visible, onSelect, loading, preview, pill, enter }: GridProps) {
+export function WeekStrip({ fecha, selected, today, byDate, visible, onSelect, loading, preview, pill, enter }: GridProps) {
   const days = weekDays(fecha);
-  const selection = preview ? undefined : pill;
-  const rects = useDayRects(selection, fecha);
+  const selection = preview || !days.includes(selected) ? undefined : pill;
+  const rects = useDayRects(selection, selected, 0, enter);
   const entering = enter ? calendarLayout.weekIn : undefined;
   return (
     <View style={loading ? styles.loading : null}>
       <Animated.View entering={entering?.()} style={[StyleSheet.absoluteFill, styles.week]} pointerEvents="none">
         {days.map((day) => (
-          <View key={day} style={[styles.weekBox, look(day, { fecha, today, preview, pill }).box]} />
+          <View key={day} style={[styles.weekBox, look(day, { selected, today, preview, pill }).box]} />
         ))}
       </Animated.View>
       {selection ? <SelectionPill pill={selection} /> : null}
       <Animated.View entering={entering?.()} style={styles.week} accessibilityLabel={preview ? undefined : 'Semana'}>
         {days.map((day) => {
           const layers = loading ? [] : dayDots(byDate.get(day), visible);
-          const { color } = look(day, { fecha, today, preview, pill });
+          const { color } = look(day, { selected, today, preview, pill });
           return (
             <Pressable
               key={day}
               testID={preview ? undefined : `dia-${day}`}
               accessibilityRole="button"
               accessibilityLabel={dayLabel(day, today, layers)}
-              accessibilityHint="Abre el detalle del día"
-              accessibilityState={{ selected: day === fecha && !preview }}
+              accessibilityHint={DAY_HINT}
+              accessibilityState={{ selected: day === selected && !preview }}
               onPress={() => onSelect(day)}
               onLayout={rects.onCell(day)}
               style={styles.weekDay}
@@ -113,14 +118,14 @@ export function WeekStrip({ fecha, today, byDate, visible, onSelect, loading, pr
 }
 
 /** The month: a compact grid with only dots (Monday first). */
-export function MonthDots({ fecha, today, byDate, visible, onSelect, loading, preview, pill, enter }: GridProps) {
+export function MonthDots({ fecha, selected, today, byDate, visible, onSelect, loading, preview, pill, enter }: GridProps) {
   const month = monthOf(fecha);
   const days = monthGrid(fecha);
   const weeks = Array.from({ length: days.length / 7 }, (_, row) => days.slice(row * 7, row * 7 + 7));
   // The grid sits under the weekday initials: the selection lives in page coordinates, so it needs the offset.
   const [gridY, setGridY] = useState<number | null>(null);
-  const selection = preview || gridY === null ? undefined : pill;
-  const rects = useDayRects(selection, fecha, gridY ?? 0);
+  const selection = preview || gridY === null || !days.includes(selected) ? undefined : pill;
+  const rects = useDayRects(selection, selected, gridY ?? 0, enter);
   const rowEntering = (row: number) => (enter ? calendarLayout.monthRowIn(row) : undefined);
   return (
     <View style={styles.month}>
@@ -141,7 +146,7 @@ export function MonthDots({ fecha, today, byDate, visible, onSelect, loading, pr
             <Animated.View key={week[0]} entering={rowEntering(row)} style={styles.monthBoxRow}>
               {week.map((day) => {
                 const outside = monthOf(day) !== month;
-                return <View key={day} style={[styles.monthBox, outside ? null : styles.inMonth, look(day, { fecha, today, preview, pill }, outside).box]} />;
+                return <View key={day} style={[styles.monthBox, outside ? null : styles.inMonth, look(day, { selected, today, preview, pill }, outside).box]} />;
               })}
             </Animated.View>
           ))}
@@ -159,15 +164,15 @@ export function MonthDots({ fecha, today, byDate, visible, onSelect, loading, pr
               {week.map((day) => {
                 const outside = monthOf(day) !== month;
                 const layers = loading ? [] : dayDots(byDate.get(day), visible);
-                const { color } = look(day, { fecha, today, preview, pill }, outside);
+                const { color } = look(day, { selected, today, preview, pill }, outside);
                 return (
                   <Pressable
                     key={day}
                     testID={preview ? undefined : `dia-${day}`}
                     accessibilityRole="button"
                     accessibilityLabel={dayLabel(day, today, layers)}
-                    accessibilityHint="Abre el detalle del día"
-                    accessibilityState={{ selected: day === fecha && !preview }}
+                    accessibilityHint={DAY_HINT}
+                    accessibilityState={{ selected: day === selected && !preview }}
                     onPress={() => onSelect(day)}
                     onLayout={rects.onCell(day, row)}
                     style={styles.monthDay}

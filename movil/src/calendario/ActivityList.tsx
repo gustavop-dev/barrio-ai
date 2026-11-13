@@ -1,5 +1,6 @@
 // What the team did (GET /api/v1/actividad): one row per item, the queued actions with Vetar, the
-// type chips and «Mostrar lo que no salió», and «Ver todo lo del día» with «Cargar más».
+// type chips and «Mostrar lo que no salió», and «Ver todo lo del día» with «Cargar más». In the day panel the rows
+// are compact: one line with «…» that a tap unfolds in place (TimelineItem's `compact`, OneLine).
 import { useActividad } from '@compartido/api/hooks';
 import type { ActividadTipo, ActivityItem, CalendarLayer, QueuedItem } from '@compartido/api/types';
 import {
@@ -15,14 +16,41 @@ import {
   TIPOS,
 } from '@compartido/logic/events';
 import { formatTime } from '@compartido/logic/format';
-import { ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, ScrollView, StyleSheet, Switch, View, type StyleProp, type ViewStyle } from 'react-native';
 import { Button, ErrorRetry, FilterChip, Fold, Skeleton, T } from '@/components/ui';
 import { colors, layers, shell, space } from '@/theme/tokens';
 import { TimelineItem } from './TimelineItem';
 import { ApproveButton, VetoButton } from './Veto';
 
-/** One activity item: the post excerpt, the full comment and «Por qué» folded. */
-export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: string }) {
+/**
+ * A row's text, each line in one line with «…»; a tap shows it whole and another folds it again. For rows whose
+ * buttons stay beside or under the text (the queue) and for the expected invitations.
+ */
+export function OneLine({ title, sub, style }: { title: string; sub?: string | null; style?: StyleProp<ViewStyle> }) {
+  const [open, setOpen] = useState(false);
+  const lines = open ? undefined : 1;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityHint={open ? 'Pliega el texto' : 'Muestra el texto completo'}
+      onPress={() => setOpen((value) => !value)}
+      style={[styles.oneLine, style]}
+    >
+      <T numberOfLines={lines}>{title}</T>
+      {sub ? (
+        <T variant="detalle" soft numberOfLines={lines}>
+          {sub}
+        </T>
+      ) : null}
+    </Pressable>
+  );
+}
+
+/** One activity item: the post excerpt, the full comment and «Por qué» folded. Compact (the day panel): one line that a
+ * tap unfolds with all of it. */
+export function ActivityRow({ item, timeZone, compact = false }: { item: ActivityItem; timeZone: string; compact?: boolean }) {
   const layer = itemLayer(item);
   const link = itemLink(item);
   // A reply on his own post shows the comment it answers; a comment or reaction elsewhere, the post.
@@ -41,6 +69,7 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
       to={link?.to}
       linkLabel={link?.label}
       externalUrl={item.url}
+      compact={compact}
       expandLabel={item.capability === 'INT-04' ? 'Ver la respuesta' : item.capability === 'INT-03' ? 'Ver el comentario' : 'Ver el post'}
     >
       {expandable ? (
@@ -63,18 +92,37 @@ export function ActivityRow({ item, timeZone }: { item: ActivityItem; timeZone: 
 }
 
 /** An approved action waiting for the window or the spacing, with its Vetar (a network action discards the person); one
- * that waits for Gustavo's approval (`approval` mode) also has «Aprobar». */
-export function QueuedRow({ item, today, timeZone, windowOpen }: { item: QueuedItem; today: string; timeZone: string; windowOpen: boolean | undefined }) {
+ * that waits for Gustavo's approval (`approval` mode) also has «Aprobar». Compact (the day panel): the sentence and when
+ * it goes out take one line each until a tap on them; the buttons stay. */
+export function QueuedRow({
+  item,
+  today,
+  timeZone,
+  windowOpen,
+  compact = false,
+}: {
+  item: QueuedItem;
+  today: string;
+  timeZone: string;
+  windowOpen: boolean | undefined;
+  compact?: boolean;
+}) {
   const sentence = queuedSentence(item);
   const awaiting = Boolean(item.awaiting_approval && item.payload_hash);
+  const when = awaiting ? awaitingSentence(item.expires_at, { today, timeZone }) : queuedWhen(item.expected_at, { today, timeZone, windowOpen });
+  const textStyle = awaiting ? styles.rowTextStacked : styles.rowText;
   return (
     <View style={awaiting ? styles.rowStacked : styles.row} testID={`en-cola-${item.id}`} collapsable={false}>
-      <View style={awaiting ? styles.rowTextStacked : styles.rowText}>
-        <T>{sentence}</T>
-        <T variant="detalle" soft>
-          {awaiting ? awaitingSentence(item.expires_at, { today, timeZone }) : queuedWhen(item.expected_at, { today, timeZone, windowOpen })}
-        </T>
-      </View>
+      {compact ? (
+        <OneLine title={sentence} sub={when} style={textStyle} />
+      ) : (
+        <View style={textStyle}>
+          <T>{sentence}</T>
+          <T variant="detalle" soft>
+            {when}
+          </T>
+        </View>
+      )}
       {/* Waiting for approval, the two buttons go under the text: beside it they squeezed it into a narrow column. */}
       <View style={styles.rowActions}>
         {awaiting ? <ApproveButton size="small" actionId={item.id} expectedHash={item.payload_hash!} accessibilityHint={sentence} /> : null}
@@ -159,7 +207,7 @@ export function DayActivity({
       {items.length ? (
         <View accessibilityLabel="Todo lo del día">
           {items.map((item) => (
-            <ActivityRow key={item.id} item={item} timeZone={timeZone} />
+            <ActivityRow key={item.id} item={item} timeZone={timeZone} compact />
           ))}
         </View>
       ) : null}
@@ -180,5 +228,6 @@ const styles = StyleSheet.create({
   rowActions: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
   rowStacked: { gap: space[2], paddingVertical: 10, borderTopWidth: 1, borderTopColor: colors.line },
   rowTextStacked: { gap: 2 },
+  oneLine: { gap: 2, minHeight: shell.touch, justifyContent: 'center' },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: space[3], minHeight: shell.touch },
 });

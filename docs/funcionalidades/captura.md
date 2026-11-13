@@ -101,17 +101,17 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Estado:** funciona
 - **Qué hace para Gustavo:** hace una foto o elige varias y las manda; quedan en su Galería y, si hay texto, el equipo decide qué hacer con él.
 - **Código:** app `movil/src/capture/photos.ts` (`launchCameraAsync`, `launchImageLibraryAsync`, partes `{uri, name, type}`); común `appendFile`; backend `capturas.check_photos`, `_save_photos`.
-- **Arreglado:** el mismo fallo de transporte de [CAP-04](#cap-04), corregido en el PR #43; `05-captura-envios` y `10-galeria-subir` lo comprueban en el emulador.
+- **Arreglado:** el mismo fallo de transporte de [CAP-04](#cap-04), corregido en el PR #43; `05-captura-envios` y `18-perfil` (la subida de Ajustes › Fotos de perfil) lo comprueban en el emulador.
 - **Criterios de aceptación:**
   1. **Dado** la app, **cuando** pulsa «Tomar foto», hace la foto y envía, **entonces** sale `POST /api/v1/capturas` con una parte `fotos` (JPEG), la API responde 201 y la foto aparece en la Galería con la etiqueta «Nueva».
   2. **Dado** «Galería» en la hoja, **cuando** elige 3 fotos y envía, **entonces** llegan las 3 como partes `fotos` de la misma captura y «Lo que enviaste» muestra «3 fotos».
   3. **Dado** «Para qué es: Foto para la galería» con una nota, **cuando** envía, **entonces** las fotos quedan en la Galería con esa nota como nota de la foto y la captura termina con «Está en tu Galería».
-  4. **Dado** «Foto para la galería» sin fotos, **cuando** intenta enviar, **entonces** ve «Para «Foto para la galería» adjunta al menos una foto.» y no puede enviar.
+  4. **Dado** «Foto para la galería» sin fotos, **cuando** intenta enviar desde la PWA, **entonces** ve «Para «Foto para la galería» adjunta al menos una foto.» y no puede enviar. La app ya no ofrece ese propósito (12/11/2026): una foto va con «Idea para un post» o sin propósito, y un borrador viejo con `para=galeria` vuelve como idea.
   5. **Dado** una foto HEIC del iPhone o una PNG, **cuando** la envía, **entonces** la API la acepta y la sirve con su tipo real.
   6. **Dado** un archivo que dice ser imagen pero no lo es, **cuando** llega, **entonces** la API responde 400 «Uno de los archivos no es una imagen JPEG, PNG, WebP o HEIC.».
   7. **Dado** que el permiso de cámara está denegado, **cuando** pulsa «Tomar foto», **entonces** ve «La cámara está bloqueada para 0ff1ce: permítela en los ajustes del teléfono, o elige una foto de la galería.».
 - **Brechas código/docs:** en la app, a diferencia del micrófono, no hay botón para abrir los ajustes cuando la cámara está bloqueada.
-- **Cobertura QA:** E2E `05-captura-envios` (criterios 2 y 4: una foto elegida en el selector de Android llega al backend, aparece en la Galería como «Nueva» y en «Lo que enviaste» con «1 foto»; «Foto para la galería» sin fotos, en `05-captura`) y `05-captura-contexto` (comentario con foto en una pieza). El criterio 1 (cámara) no: el emulador arranca sin cámara (`-camera-back none`). 3, 5 y 6 son del backend; 7, de Jest.
+- **Cobertura QA:** E2E `05-captura-envios` (criterios 2 y 4: una foto elegida en el selector de Android llega al backend, y aparece en «Lo que enviaste» con «1 foto»; `05-captura` comprueba que la app ya no ofrece «Foto para la galería») y `05-captura-contexto` (comentario con foto en una pieza). El criterio 1 (cámara) no: el emulador arranca sin cámara (`-camera-back none`). 3, 5 y 6 son del backend; 7, de Jest.
 
 ### CAP-06 · Mensaje claro cuando un envío falla <a id="cap-06"></a>
 
@@ -154,7 +154,7 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** puede decir para qué es lo que manda; si no lo dice, el equipo lo clasifica y le explica por qué.
-- **Código:** campo `para`; backend `capturas._destination`, `classify` (Sonnet, propósito `capture-route`), `ROUTES`. La app ofrece «Idea para un post», «Dato sobre mí» y «Foto para la galería». «Propuesta de post» es lo mismo que una idea, y una pregunta se responde desde Tu turno. La PWA y la API conservan los cinco valores.
+- **Código:** campo `para`; backend `capturas._destination`, `classify` (Sonnet, propósito `capture-route`), `ROUTES`. La app ofrece «Idea para un post» y «Dato sobre mí» (la Galería y su «Foto para la galería» salieron de la app el 12/11/2026). «Propuesta de post» es lo mismo que una idea, y una pregunta se responde desde Tu turno. La PWA y la API conservan los cinco valores.
 - **Criterios de aceptación:**
   1. **Dado** «Idea para un post», **cuando** se procesa, **entonces** la captura queda «En la mesa editorial» con «Mesa editorial lo tendrá en cuenta» y llega al director ([EDI-17](motor-editorial.md#edi-17)).
   2. **Dado** «Dato sobre mí» o «Responde una pregunta» sin pregunta ligada, **cuando** se procesa, **entonces** se guarda un dato privado `nota.captura-<id>` y la captura dice «Está en Lo que el equipo sabe de ti · Privado».

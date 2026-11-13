@@ -1,22 +1,25 @@
 # cubre: PRS-01, PRS-02, PRS-03, PRS-04, PRS-05, PRS-09, PRS-10, BAR-11
-# Personas › Barrio and Laura's card. With the failure switch, the empty Barrio («Aún no hay personas») and a failed
-# load with «Reintentar». The tabs; the network-off warning of the QA server; each row (stage, headline,
-# role and modality chips, «Sin clasificar todavía»); the stage chips (Por clasificar → Pedro Salazar, Encaja → Laura
-# Gómez, Oportunidad → Andrés Restrepo and Valentina Castro, «En conversación · aún no disponible», Te invitó →
-# Natalia Rojas at the end of the strip); the search box («Pedro», a search nobody matches with «Quitar filtros»,
-# «Laura»); «Más filtros» with a role, the active-filter count and «Quitar estos filtros». Laura's card: header,
-# next step, journey, «Por qué encaja», «De dónde salió», no conversation yet, no notes yet, a written note (an empty
-# one cannot be saved) and the history; then «Marcar como oportunidad» registers one and the card shows it.
+# Personas › Conexiones (Gustavo, 12/11/2026: only the people who accepted, by their role) and Laura's card. With the
+# failure switch, the empty Conexiones («Todavía no hay conexiones») and a failed load with «Reintentar». The tabs; the
+# network-off warning of the QA server; the seed's five connections (Andrés, Sofía, Valentina, Jorge, Mariana) and no
+# one from the agents' queue (a search for «Laura», who only fits, finds nobody); each row (role or «Sin etiqueta»,
+# headline, place, «Aceptó el …», «Te toca»); the «Antes» section (Mariana accepted 45 days ago); the role chips with
+# their counts (Compradores → Andrés and Sofía, Sin etiqueta → Jorge at the end of the strip, and back to «Todas»); the
+# search box («Sof», «Laura» with «Quitar filtros»). Laura's card, opened from its link as a notification would (the
+# card opens anybody, connected or not): header, next step, journey, «Por qué encaja», «De dónde salió», no
+# conversation yet, no notes yet, a written note (an empty one cannot be saved) and the history; then «Marcar como
+# oportunidad» registers one and the card shows it.
 # Oportunidades, Referentes and the other cards have their own flows (12-oportunidades, 13-referentes, 14-fichas).
 # Maestro matches text case-insensitively, so badges and section labels (drawn UPPERCASE) match in any case. Rows are
-# found by their testID (person-<id>; the seed's ids are fixed uuid5 values).
+# found by their testID (person-<id>; the seed's ids are fixed uuid5 values). The dates of the seed are relative to
+# today, so only «Antes» (more than a month ago) is a fixed section.
 appId: co.projectapp.office
 name: Personas
 tags: [personas]
 ---
 - runFlow: comun/entrar.yaml
 
-# ---------------------------------------------------------------- Barrio empty, then a failed load and «Reintentar»
+# ---------------------------------------------------------------- Conexiones empty, then a failed load and «Reintentar»
 # cubre: PRS-01
 # The failure switch (comun/qa-fallo.js) empties the list first, then makes it fail.
 - runScript:
@@ -30,9 +33,9 @@ tags: [personas]
     id: tab-personas
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
-    visible: "Aún no hay personas"
+    visible: "Todavía no hay conexiones"
     timeout: 30000
-- assertVisible: "El equipo empieza a descubrir cuando lee los comentarios de los referentes\\."
+- assertVisible: "Aquí aparece cada persona cuando acepta la invitación\\."
 - takeScreenshot: 09-personas-01-vacio
 # A failing load shows the error with «Reintentar», which brings the people back.
 - runScript: comun/qa-fallos-limpiar.js
@@ -44,9 +47,9 @@ tags: [personas]
       EFECTO: '500'
       VECES: '-1'
 - tapOn:
-    text: "Seguido( · \\d+)?"
+    text: "Compradores( · \\d+)?"
     childOf:
-      id: stage-chips
+      id: role-chips
 - extendedWaitUntil:
     visible: "Reintentar"
     timeout: 30000
@@ -54,311 +57,206 @@ tags: [personas]
 - runScript: comun/qa-fallos-limpiar.js
 - tapOn: "Reintentar"
 - extendedWaitUntil:
-    visible: "Julián Herrera"
+    visible: "Andrés Restrepo"
     timeout: 20000
+# The chosen chip again goes back to every connection.
 - tapOn:
-    text: "Seguido( · \\d+)?"
+    text: "Compradores( · \\d+)?"
     childOf:
-      id: stage-chips
+      id: role-chips
 - extendedWaitUntil:
     visible:
       id: barrio-list
     timeout: 30000
 - extendedWaitUntil:
     visible:
-      text: "Todas · \\d+"
+      text: "Todas · 5"
       childOf:
-        id: stage-chips
+        id: role-chips
     timeout: 30000
 - extendedWaitUntil:
     visible:
       id: "person-.*"
     timeout: 30000
 
-# ---------------------------------------------------------------- Barrio: tabs, warnings and rows
+# ---------------------------------------------------------------- Conexiones: tabs, warnings and rows
 # cubre: PRS-01
-- assertVisible: Barrio
+- assertVisible: Conexiones
 - assertVisible: Oportunidades
 - assertVisible: Referentes
+- assertNotVisible: Barrio
 # The QA server runs with the network off (NETWORK_ENABLED unset), and red/summary says so.
 - assertVisible: "La red está apagada en el servidor"
 - assertVisible: "El equipo no descubre ni propone a nadie nuevo\\. Lo guardado sigue aquí\\."
-- takeScreenshot: 09-personas-03-barrio
-# Laura's row (person-<uuid5 of contact:laura-gomez>): stage, headline, role and modality chips, origin and activity.
+- takeScreenshot: 09-personas-03-conexiones
+# Sofía's row (person-<uuid5 of contact:sofia-martinez>): role, headline, place, when she accepted and «Te toca» (her
+# message waits for Gustavo).
 - scrollUntilVisible:
     element:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
+      id: person-4774e211-6ce5-51fc-be4f-462d4c0a5b60
     direction: DOWN
     centerElement: true
     timeout: 30000
 - assertVisible:
-    text: Laura Gómez
+    text: Sofía Martínez
     childOf:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
-- assertVisible:
-    text: Encaja
-    childOf:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
-- assertVisible:
-    text: Head of Product en un marketplace B2B
-    childOf:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
+      id: person-4774e211-6ce5-51fc-be4f-462d4c0a5b60
 - assertVisible:
     text: Comprador
     childOf:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
+      id: person-4774e211-6ce5-51fc-be4f-462d4c0a5b60
 - assertVisible:
-    text: ProjectApp
+    text: Gerente de una cooperativa de ahorro
     childOf:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
+      id: person-4774e211-6ce5-51fc-be4f-462d4c0a5b60
 - assertVisible:
-    text: "Comentó en un post de un referente · .*"
+    text: "Medellín, Colombia"
     childOf:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
-# Pedro (contact:pedro-salazar) has no classification yet. The order of the rows follows their last activity, so the
-# list goes back to the top first and Pedro is looked for from there.
+      id: person-4774e211-6ce5-51fc-be4f-462d4c0a5b60
+- assertVisible:
+    text: "Aceptó el \\d{2}/\\d{2}"
+    childOf:
+      id: person-4774e211-6ce5-51fc-be4f-462d4c0a5b60
+- assertVisible:
+    text: Te toca
+    childOf:
+      id: person-4774e211-6ce5-51fc-be4f-462d4c0a5b60
+- takeScreenshot: 09-personas-04-filas
+# Jorge (contact:jorge-castillo) accepted without a role yet; Mariana (contact:mariana-lopez) accepted 45 days ago, so
+# she is the last one, under «Antes».
 - scrollUntilVisible:
     element:
-      id: stage-chips
-    direction: UP
-    timeout: 30000
-- scrollUntilVisible:
-    element:
-      id: person-5ede725c-3221-5088-8e6d-334ca462e9b0
+      id: person-84b568da-b9d2-5a13-81ff-543e669734a6
     direction: DOWN
     centerElement: true
     timeout: 30000
 - assertVisible:
-    text: Sin clasificar todavía
+    text: Sin etiqueta
     childOf:
-      id: person-5ede725c-3221-5088-8e6d-334ca462e9b0
-- takeScreenshot: 09-personas-04-filas
+      id: person-84b568da-b9d2-5a13-81ff-543e669734a6
+- assertVisible:
+    text: Ingeniero de datos en una cadena de retail
+    childOf:
+      id: person-84b568da-b9d2-5a13-81ff-543e669734a6
 - scrollUntilVisible:
     element:
-      id: stage-chips
+      id: person-104b5e7b-f211-57df-8ba8-78f6e0fff5b9
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible:
+    text: Divulgador
+    childOf:
+      id: person-104b5e7b-f211-57df-8ba8-78f6e0fff5b9
+- assertVisible:
+    id: conexiones-antes
+- assertVisible: "Antes"
+- takeScreenshot: 09-personas-05-antes
+- scrollUntilVisible:
+    element:
+      id: role-chips
     direction: UP
     timeout: 30000
 
-# ---------------------------------------------------------------- Barrio: the stage chips
+# ---------------------------------------------------------------- Conexiones: the role chips
 # cubre: PRS-01, PRS-02
-- tapOn:
-    text: "Por clasificar( · \\d+)?"
-    childOf:
-      id: stage-chips
-- extendedWaitUntil:
-    visible: "Pedro Salazar"
-    timeout: 15000
-- extendedWaitUntil:
-    notVisible: "Laura Gómez"
-    timeout: 10000
-- takeScreenshot: 09-personas-05-por-clasificar
-- tapOn:
-    text: "Encaja( · \\d+)?"
-    childOf:
-      id: stage-chips
-- extendedWaitUntil:
-    visible: "Laura Gómez"
-    timeout: 15000
-- extendedWaitUntil:
-    notVisible: "Pedro Salazar"
-    timeout: 10000
-- takeScreenshot: 09-personas-06-encaja
-# «Oportunidad» lists the people with an open opportunity; «En conversación» has no count yet and is disabled.
-- repeat:
-    times: 6
-    while:
-      notVisible:
-        text: "Oportunidad( · \\d+)?"
-        childOf:
-          id: stage-chips
-    commands:
-      - swipe:
-          from:
-            id: stage-chips
-          direction: LEFT
 - assertVisible:
-    text: "En conversación · aún no disponible"
-    enabled: false
-- tapOn:
-    text: "Oportunidad( · \\d+)?"
+    text: "Todas · 5"
     childOf:
-      id: stage-chips
+      id: role-chips
+- tapOn:
+    text: "Compradores · 2"
+    childOf:
+      id: role-chips
 - extendedWaitUntil:
     visible: "Andrés Restrepo"
     timeout: 15000
-- assertVisible: "Valentina Castro"
-- assertNotVisible: "Laura Gómez"
-- takeScreenshot: 09-personas-07-oportunidad
-# «Te invitó» sits at the end of the strip: swipe it until the chip shows.
-- repeat:
-    times: 6
-    while:
-      notVisible:
-        text: "Te invitó( · \\d+)?"
-        childOf:
-          id: stage-chips
-    commands:
-      - swipe:
-          from:
-            id: stage-chips
-          direction: LEFT
-- tapOn:
-    text: "Te invitó( · \\d+)?"
-    childOf:
-      id: stage-chips
-- extendedWaitUntil:
-    visible: "Natalia Rojas"
-    timeout: 15000
-- extendedWaitUntil:
-    notVisible: "Laura Gómez"
-    timeout: 10000
-- takeScreenshot: 09-personas-08-te-invito
-# Back to «Todas», at the start of the strip.
-- repeat:
-    times: 6
-    while:
-      notVisible:
-        text: "Todas( · \\d+)?"
-        childOf:
-          id: stage-chips
-    commands:
-      - swipe:
-          from:
-            id: stage-chips
-          direction: RIGHT
-- tapOn:
-    text: "Todas( · \\d+)?"
-    childOf:
-      id: stage-chips
-
-# ---------------------------------------------------------------- Barrio: the search box (no stage filter now)
-# cubre: PRS-02
-- tapOn:
-    id: barrio-search
-- inputText: "Pedro"
-- pressKey: Enter
-- extendedWaitUntil:
-    visible: "Pedro Salazar"
-    timeout: 15000
-# Every letter stays in the box (the URL catching up late used to put back an older search).
-- extendedWaitUntil:
-    visible:
-      id: barrio-search
-      text: "Pedro"
-    timeout: 5000
-- extendedWaitUntil:
-    notVisible: "Laura Gómez"
-    timeout: 10000
-- takeScreenshot: 09-personas-09-buscar-pedro
-- tapOn: "Borrar la búsqueda"
-# Nobody matches: the empty state offers «Quitar filtros», which brings everybody back.
-- tapOn:
-    id: barrio-search
-- inputText: "zzzqa"
-- pressKey: Enter
-- extendedWaitUntil:
-    visible: "Nadie coincide con estos filtros"
-    timeout: 15000
-# Every letter stays in the box (the URL catching up late used to put back an older search).
-- extendedWaitUntil:
-    visible:
-      id: barrio-search
-      text: "zzzqa"
-    timeout: 5000
-- takeScreenshot: 09-personas-10-sin-resultados
-- tapOn: "Quitar filtros"
-- extendedWaitUntil:
-    visible:
-      id: "person-.*"
-    timeout: 15000
-- assertNotVisible: "Nadie coincide con estos filtros"
-
-# ---------------------------------------------------------------- Barrio: «Más filtros» (role, modality, origin)
-# cubre: PRS-02
-- tapOn: "Más filtros: rol, modalidad y origen"
-- extendedWaitUntil:
-    visible:
-      id: barrio-filters
-    timeout: 10000
-- tapOn:
-    id: filter-role
-- tapOn:
-    text: Comprador
-    childOf:
-      id: barrio-filters
-- takeScreenshot: 09-personas-11-mas-filtros
-- tapOn:
-    text: Ver resultados
-    childOf:
-      id: barrio-filters
-- extendedWaitUntil:
-    notVisible:
-      id: barrio-filters
-    timeout: 10000
-- extendedWaitUntil:
-    visible: "Más filtros: rol, modalidad y origen \\(1 activo\\)"
-    timeout: 15000
-# Compradores: Laura is one; Julián Herrera (par) and Pedro (unclassified) are not.
-- extendedWaitUntil:
-    visible: "Laura Gómez"
-    timeout: 15000
-- assertNotVisible: "Julián Herrera"
-- assertNotVisible: "Pedro Salazar"
-- takeScreenshot: 09-personas-12-compradores
-# A card opened right after a sheet closed: every block must show, not only the header (its blocks used to fade in with
-# Reanimated `entering`, which after a Modal closes can stay at opacity 0; run 42486187324, 14-fichas). Her row is
-# centred first: near the bottom, a tap lands on the floating capture button.
+# Only two rows now: at the end of the list there is Sofía, and Valentina (a par) is not there.
 - scrollUntilVisible:
     element:
-      id: person-547cd492-cd91-542a-976e-3a1f11029285
+      text: "Sofía Martínez"
     direction: DOWN
     centerElement: true
-    timeout: 20000
-- tapOn:
-    id: person-547cd492-cd91-542a-976e-3a1f11029285
-- extendedWaitUntil:
-    visible:
-      id: persona-name
-    timeout: 20000
-- extendedWaitUntil:
-    visible: "Head of Product en un marketplace B2B"
     timeout: 15000
-- assertVisible: "Marcar como oportunidad"
-- assertVisible:
-    id: next-step
-- takeScreenshot: 09-personas-12b-ficha-tras-hoja
-- back
-- extendedWaitUntil:
-    visible:
-      id: barrio-list
-    timeout: 15000
+- assertNotVisible: "Valentina Castro"
+- takeScreenshot: 09-personas-06-compradores
 - scrollUntilVisible:
     element:
-      text: "Más filtros: rol, modalidad y origen \\(1 activo\\)"
+      id: role-chips
     direction: UP
-    timeout: 20000
-- tapOn: "Más filtros: rol, modalidad y origen \\(1 activo\\)"
+    timeout: 30000
+# «Sin etiqueta» sits at the end of the strip: swipe it until the chip shows.
+- repeat:
+    times: 6
+    while:
+      notVisible:
+        text: "Sin etiqueta · 1"
+        childOf:
+          id: role-chips
+    commands:
+      - swipe:
+          from:
+            id: role-chips
+          direction: LEFT
+- tapOn:
+    text: "Sin etiqueta · 1"
+    childOf:
+      id: role-chips
+- extendedWaitUntil:
+    visible: "Jorge Castillo"
+    timeout: 15000
+- extendedWaitUntil:
+    notVisible: "Andrés Restrepo"
+    timeout: 10000
+- takeScreenshot: 09-personas-07-sin-etiqueta
+# The chosen chip again goes back to «Todas».
+- tapOn:
+    text: "Sin etiqueta · 1"
+    childOf:
+      id: role-chips
+- extendedWaitUntil:
+    visible: "Andrés Restrepo"
+    timeout: 15000
+- repeat:
+    times: 6
+    while:
+      notVisible:
+        text: "Todas · 5"
+        childOf:
+          id: role-chips
+    commands:
+      - swipe:
+          from:
+            id: role-chips
+          direction: RIGHT
+
+# ---------------------------------------------------------------- Conexiones: the search box
+# cubre: PRS-02
+- tapOn:
+    id: barrio-search
+- inputText: "Sof"
+- pressKey: Enter
+- extendedWaitUntil:
+    visible: "Sofía Martínez"
+    timeout: 15000
+# Every letter stays in the box (the URL catching up late used to put back an older search).
 - extendedWaitUntil:
     visible:
-      id: barrio-filters
-    timeout: 10000
-- tapOn:
-    text: Quitar estos filtros
-    childOf:
-      id: barrio-filters
-- tapOn:
-    text: Ver resultados
-    childOf:
-      id: barrio-filters
+      id: barrio-search
+      text: "Sof"
+    timeout: 5000
 - extendedWaitUntil:
-    visible: "Más filtros: rol, modalidad y origen"
-    timeout: 15000
+    notVisible: "Andrés Restrepo"
+    timeout: 10000
+- takeScreenshot: 09-personas-08-buscar-sofia
+- tapOn: "Borrar la búsqueda"
+# Laura only fits (she is the agents' queue, not a connection): nobody matches, and «Quitar filtros» brings everybody back.
 - tapOn:
     id: barrio-search
 - inputText: "Laura"
 - pressKey: Enter
 - extendedWaitUntil:
-    visible: "Laura Gómez"
+    visible: "Nadie coincide"
     timeout: 15000
 # Every letter stays in the box (the URL catching up late used to put back an older search).
 - extendedWaitUntil:
@@ -366,17 +264,23 @@ tags: [personas]
       id: barrio-search
       text: "Laura"
     timeout: 5000
+- takeScreenshot: 09-personas-09-sin-resultados
+- tapOn: "Quitar filtros"
 - extendedWaitUntil:
-    notVisible: "Pedro Salazar"
-    timeout: 10000
+    visible:
+      id: "person-.*"
+    timeout: 15000
+- assertNotVisible: "Nadie coincide"
 
-# ---------------------------------------------------------------- Laura's card
+# ---------------------------------------------------------------- Laura's card, from its link
 # cubre: PRS-03
-- tapOn: "Laura Gómez"
+# A notification or a card links to people who are not connections (the lead's doubt, a new invitation): the card
+# opens any of them by id.
+- openLink: oficina0ff1ce://personas/547cd492-cd91-542a-976e-3a1f11029285
 - extendedWaitUntil:
     visible:
       id: persona
-    timeout: 20000
+    timeout: 30000
 # React Native flattens the header: the name is its own node (persona-name), not a child of persona-head.
 - extendedWaitUntil:
     visible:

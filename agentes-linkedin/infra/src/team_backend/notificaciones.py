@@ -112,7 +112,7 @@ def upcoming(now=None):
     if due and not red.invites_blocked(now)[0]:
         out.append({'id':'invites_expected','kind':'invites_expected','layer':'red',
                     'title':f'El equipo invitará a {len(due)} {"persona" if len(due)==1 else "personas"} que encajan',
-                    'detail':'Si los topes del día lo permiten.','link':'/personas?etapa=followed','at':now+timedelta(hours=24)})
+                    'detail':'Si los topes del día lo permiten.','link':None,'at':now+timedelta(hours=24)})  # Personas lists only connections
     if operador.env_paused():
         out.append({'id':'machine_paused_env','kind':'machine_paused_env','layer':'sistema','title':'La máquina está detenida desde el servidor',
                     'detail':'La parada viene de OPERATOR_PAUSED y no se levanta desde la app.','link':'/ajustes#maquina','at':now})

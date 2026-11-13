@@ -289,7 +289,7 @@ def set_global_pause(user,paused,reason=''):
     _audit(user,'operator.machine_'+('paused' if paused else 'resumed'),'machine',reason=control.reason)
     if paused:
         from .notificaciones import avisar
-        avisar('machine_paused','Máquina detenida',f'{control.reason} Nadie actúa en LinkedIn hasta que la reanudes desde Tu turno.')
+        avisar('machine_paused','Máquina detenida',f'{control.reason} Nadie actúa en LinkedIn hasta que la reanudes desde la Bandeja.')
     return control
 
 def validate_payload(capability,payload):
@@ -778,7 +778,7 @@ def execute(user,proposal_id):
         return _finish(execution,'confirmed' if confirmed else 'sent',user,reconciled_at=timezone.now() if confirmed else None)
     except ConnectorUncertain as exc:
         from .notificaciones import avisar
-        avisar('uncertain','¿Salió o no?',f'{proposal.get_capability_display()}: el proveedor no confirmó. Resuélvela en Tu turno.')
+        avisar('uncertain','¿Salió o no?',f'{proposal.get_capability_display()}: el proveedor no confirmó. Resuélvela en la Bandeja.')
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
         from . import red

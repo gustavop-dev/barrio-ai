@@ -4,8 +4,8 @@
 # could not be loaded instead of drawing an empty day (CAL-03, a known failure). The activity fails: «Próximo» shows
 # the error with «Reintentar»; empty, it says there is no piece on its way and «Lo que pasó» that nothing matches. The
 # piece fails: «No se pudo cargar la pieza» with «Reintentar». A veto the backend refuses says «No se pudo vetar» and
-# the piece keeps its «Vetar». The day's piece fails inside the day sheet: an error, not the bare thesis (CAL-03, a
-# known failure). Every rule is cleared before «Reintentar».
+# the piece keeps its «Vetar». The day's piece fails in the panel of the tapped day, under the calendar: an error, not
+# the bare thesis (CAL-03, a known failure). Every rule is cleared before «Reintentar».
 appId: co.projectapp.office
 name: Calendario · errores y vacíos
 tags: [calendario]
@@ -13,7 +13,7 @@ tags: [calendario]
 - runFlow: comun/entrar.yaml
 - runScript: comun/calendario-fechas.js
 
-# ---------------------------------------------------------------- the day's piece fails in the day sheet
+# ---------------------------------------------------------------- the day's piece fails in the day panel
 # cubre: CAL-03
 - tapOn:
     id: top-calendario
@@ -22,13 +22,16 @@ tags: [calendario]
     visible:
       id: pager-semana
     timeout: 30000
+# Three days ago may be in the previous week: a swipe right brings it.
 - runFlow:
     when:
       notVisible:
         id: "dia-${output.hace3}"
     commands:
-      - tapOn:
-          id: calendario-anterior
+      - swipe:
+          from:
+            id: pager-semana
+          direction: RIGHT
       - extendedWaitUntil:
           visible:
             id: "dia-${output.hace3}"
@@ -41,38 +44,31 @@ tags: [calendario]
       VECES: '-1'
 - tapOn:
     id: "dia-${output.hace3}"
-- extendedWaitUntil:
-    visible:
-      id: hoja-dia
-    timeout: 10000
-- swipe:
-    from:
-      text: "Altura del panel"
-    direction: UP
-- extendedWaitUntil:
-    visible:
+# No sheet: the panel under the calendar is the day's, with its piece first.
+- assertNotVisible:
+    id: hoja-dia
+- scrollUntilVisible:
+    element:
       text: "No se pudo cargar la pieza"
       childOf:
-        id: hoja-dia
+        id: bloque-publicacion
+    direction: DOWN
+    centerElement: true
     timeout: 45000
 - takeScreenshot: 07-calendario-errores-06-pieza-del-dia
 - runScript: comun/qa-fallos-limpiar.js
 - tapOn:
     text: "Reintentar"
     childOf:
-      id: hoja-dia
-- extendedWaitUntil:
-    visible:
+      id: bloque-publicacion
+- scrollUntilVisible:
+    element:
       text: "Impresiones a las 72 h: 768"
       childOf:
-        id: hoja-dia
+        id: bloque-publicacion
+    direction: DOWN
+    centerElement: true
     timeout: 20000
-# No visible «Cerrar»: the sheet closes by sliding down or with Android back.
-- back
-- extendedWaitUntil:
-    notVisible:
-      id: hoja-dia
-    timeout: 10000
 
 # ---------------------------------------------------------------- the calendar fails
 # cubre: CAL-01, CAL-03

@@ -2,6 +2,8 @@
 
 Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas del equipo, conversaciones que le tocan y la orientación que propone el analista. Incluye la pestaña «Lo que el equipo sabe de ti».
 
+**Se llama «Bandeja de entrada» desde el 12/11/2026** (Gustavo: «prefiero llamarla bandeja de entrada a tu turno»). En las frases dice «la Bandeja» o «tu Bandeja»; en la barra inferior de la app, «Bandeja», con su contador, en el sitio de la Galería. El código, la API y las rutas (`/tu-turno`, `TUR-*`) conservan el nombre viejo, y esta ficha lo usa como sinónimo.
+
 - **Código:** backend `rediseno_views.TuTurno`, `alerts`, `_question_card`, `_conversation_card`, `_summary_card`, `TuTurnoSeen`, `preguntas.py`; PWA `oficina/src/pages/TuTurno.tsx`, `pages/turno/*`; app `movil/src/app/(app)/(tabs)/tu-turno.tsx`, `movil/src/turno/*`; lógica común `compartido/src/logic/turno.ts`.
 - **Documentación:** secciones «Tu turno» y «Notificaciones y prioridades de Tu turno (rev 18)» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md), [`rediseno-backend.md`](../../agentes-linkedin/infra/docs/rediseno-backend.md).
 
@@ -307,7 +309,7 @@ Lo que solo Gustavo puede resolver: avisos que rompen algo sin él, preguntas de
   11. **Dado** el banner con micrófono y ninguna charla confirmada en memoria, **cuando** lo revisa, **entonces** ve junto al copy y en el Markdown que es una composición de estilo, no evidencia de evento real; no aparece «speaker» ni prueba social inventada. Decide aceptar, ajustar o descartar esa propuesta de forma independiente.
   12. **Dado** un hecho imprescindible de perfil no encontrado en memoria ni fuentes legibles, **cuando** Perfil necesita aclararlo, **entonces** Tu turno muestra **una pregunta por hecho faltante** con la sección afectada; no vuelve a preguntar hechos acreditados ni repite el mismo en varias tarjetas. Sin respuesta queda pendiente solo lo dependiente y se omite prueba social sin evidencia. La frase del banner llega propuesta y citada por Perfil; el texto de prueba es solo fallback EST-04, no una pregunta abierta de copy para Gustavo.
 - **Brechas código/docs:** CI/QA y activación pendientes de Claude; [guía de verificación](../arquitectura/fase8-verificacion.md). Los assets privados no están en el repo.
-- **Cobertura QA:** `test_perfil.py`, Jest/Vitest y Maestro `18-perfil`; regresiones `04-*`, `10-galeria` y seed. Escrita, sin ejecución local.
+- **Cobertura QA:** `test_perfil.py`, Jest/Vitest y Maestro `18-perfil`; regresiones `04-*` y seed.
 
 ### TUR-19 · Deslizar una tarjeta <a id="tur-19"></a>
 

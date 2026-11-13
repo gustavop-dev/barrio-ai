@@ -34,7 +34,7 @@ describe('Tu turno y Notificaciones en la app', () => {
       'GET /api/v1/tu-turno': { body: turnoFixture({ count: 1, critical: true, items: [{ ...UNCERTAIN_CARD, state: 'vista' }] }) },
     });
     renderApp('/tu-turno#turno-uncertain-a1');
-    expect(await screen.findByRole('heading', { name: 'Tu turno', level: 1 })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Bandeja de entrada', level: 1 })).toBeInTheDocument();
     expect(await screen.findByRole('heading', { name: 'Comprueba si salió tu comentario' })).toBeInTheDocument();
     expect(document.getElementById('turno-uncertain-a1')).not.toBeNull();
   });

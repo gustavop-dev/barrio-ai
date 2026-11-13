@@ -1199,6 +1199,27 @@ def network_issues(proposal):
         issues.append('La invitación no coincide con la registrada')
     return issues
 
+# Personas › Conexiones (12/11/2026): Gustavo's people database is the people who accepted (stage connected), by
+# their barrio role; the agents' queue (candidate … discarded) stays out. A connection without a role filters and
+# counts under NO_ROLE.
+NO_ROLE='sin_etiqueta'
+
+def connections(contacts):
+    """The connected people of `contacts`, the most recent connection first (updated_at when connected_at is missing)."""
+    from django.db.models.functions import Coalesce
+    return contacts.filter(stage=Contact.Stage.CONNECTED).order_by(Coalesce('connected_at','updated_at').desc(),'-updated_at','id')
+
+def without_role():
+    return Q(classification__role__isnull=True)|Q(classification__role=None)|Q(classification__role='')
+
+def connection_roles(contacts):
+    """{total, roles: {role: n}} of the connected people of `contacts`, for the role chips of Conexiones."""
+    roles={}
+    for classification in contacts.filter(stage=Contact.Stage.CONNECTED).values_list('classification',flat=True):
+        role=(classification or {}).get('role') or NO_ROLE
+        roles[role]=roles.get(role,0)+1
+    return {'total':sum(roles.values()),'roles':roles}
+
 def summary(account=None,now=None):
     from .autopiloto import autonomy
     now=now or timezone.now();contacts=Contact.objects.all()
@@ -1218,7 +1239,7 @@ def summary(account=None,now=None):
     blocked,reason=invites_blocked(now)
     def last(action):
         return AuditEvent.objects.filter(action=action).order_by('-created_at').values_list('created_at',flat=True).first()
-    return {'enabled':enabled(),'stages':stages,'capacity':capacity,'ramp':ramp_state(now),
+    return {'enabled':enabled(),'stages':stages,'connections':connection_roles(contacts),'capacity':capacity,'ramp':ramp_state(now),
             'invitation_health':invitation_health(now),'note_policy':dict(note_policy(),local_remaining=note_room(now),blocked=note_blocked()),
             'reads_today':{k:reads.filter(metadata__kind=k).count() for k in READ_KINDS},'read_caps':read_caps(),
             'llm':{'spent_today':float(spent_today(now)),'daily':float(_fuse()),'model':classifier_model()},

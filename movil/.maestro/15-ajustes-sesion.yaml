@@ -1,7 +1,7 @@
 # cubre: AJU-10, AJU-11, PUS-04, ACC-08, ACC-09
 # Ajustes, from Notificaciones to the end: one push type switched off and on again, and back on when saving fails; «Dispositivos con la app» with
 # this phone («Este») and the seeded «Pixel 7 de Gustavo (QA)», signed out from here; «Lo que el equipo sabe de ti»,
-# which opens that tab of Tu turno; a link with ?ancla=autonomia, which scrolls to the section and unfolds it; and
+# which opens that tab of Bandeja; a link with ?ancla=autonomia, which scrolls to the section and unfolds it; and
 # «Cerrar sesión», which lands on the login. The flow signs in again at the end, so the flows after it in the same
 # emulator find the session as they expect. Máquina to Captura y galería are in 11-ajustes.
 appId: co.projectapp.office

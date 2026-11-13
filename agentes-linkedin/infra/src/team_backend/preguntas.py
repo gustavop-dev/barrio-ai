@@ -180,7 +180,7 @@ def answer(user,question_id,text='',public_use=None,accept=False,value=None,free
             stored={'texto':text,'uso_publico':public};shown=text
         else:
             stored={'texto':_typed_text(item,text,value,free),'uso_publico':public};shown=stored['texto']
-        result=memory.set_fact(item.memory_key,stored,f'user:{user.pk}',f'Respuesta de Gustavo en Tu turno a «{item.question[:200]}» ({item.id})')
+        result=memory.set_fact(item.memory_key,stored,f'user:{user.pk}',f'Respuesta de Gustavo en la Bandeja a «{item.question[:200]}» ({item.id})')
         item.state=TeamQuestion.State.ANSWERED;item.answer=shown;item.public_use=public;item.memory_version=result['version']
         item.answered_by=user;item.answered_at=timezone.now();item.save()
     audit(user,'team.question_answered',item.id,key=item.memory_key,public=public)
@@ -255,7 +255,7 @@ def add_fact(user,text,public_use,topic=''):
     key=f'nota.{uuid.uuid4().hex[:10]}'
     value={'texto':text,'uso_publico':bool(public_use)}
     if topic:value['tema']=topic
-    memory.set_fact(key,value,f'user:{user.pk}','Gustavo lo añadió en Tu turno')
+    memory.set_fact(key,value,f'user:{user.pk}','Gustavo lo añadió en la Bandeja')
     audit(user,'memory.added',key,public=bool(public_use))
     return key
 
@@ -268,7 +268,7 @@ def correct(user,key,text,public_use):
     current=next(r['value'] for r in memory.latest(True) if r['key']==key)
     value={'texto':text,'uso_publico':bool(public_use)}
     if isinstance(current,dict) and current.get('tema'):value['tema']=current['tema']
-    memory.set_fact(key,value,f'user:{user.pk}','Corrección de Gustavo en Tu turno')
+    memory.set_fact(key,value,f'user:{user.pk}','Corrección de Gustavo en la Bandeja')
     audit(user,'memory.corrected',key,public=bool(public_use))
 
 def retire(user,key,reason=''):
@@ -276,7 +276,7 @@ def retire(user,key,reason=''):
     require(user,'confirm_memory')
     key=_normal_key(key)
     if key not in known_keys():raise Conflict('Ese dato no está en la memoria confirmada.')
-    memory.set_fact(key,{'retirado':True,'motivo':(reason or '').strip()[:500]},f'user:{user.pk}','Gustavo retiró el dato en Tu turno')
+    memory.set_fact(key,{'retirado':True,'motivo':(reason or '').strip()[:500]},f'user:{user.pk}','Gustavo retiró el dato en la Bandeja')
     audit(user,'memory.retired',key)
 
 def recently_resolved(days=7):

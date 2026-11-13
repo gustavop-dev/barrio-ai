@@ -1,15 +1,15 @@
 # cubre: BAR-13, CAL-15, TUR-02, TUR-14
-# Tu turno · aprobar. The QA backend runs with OPERATOR_AUTONOMY empty, so the network block (RED-01, RED-02, RED-04)
+# Bandeja · aprobar. The QA backend runs with OPERATOR_AUTONOMY empty, so the network block (RED-01, RED-02, RED-04)
 # waits for Gustavo's approval, and the seed's two proposals are Importante cards: «¿Apruebas seguir a Laura Gómez?»
-# and «¿Apruebas invitar a Julián Herrera?». Laura's follow is approved from its card: it leaves Tu turno, the top
-# bar counter drops, «Hecho recientemente» says «Aprobada» and the calendar's «En cola» lists it as approved.
+# and «¿Apruebas invitar a Julián Herrera?». Laura's follow is approved from its card: it leaves the Bandeja, the
+# Bandeja tab counter drops, «Hecho recientemente» says «Aprobada» and the calendar's «En cola» lists it as approved.
 # Julián's invitation is approved from «En cola» in Calendario › Lista. Last, the piece in three days, whose daily post
 # waits in `proposed` (as it does in approval mode), shows «Aprobar» next to «Vetar» in its detail and is approved.
 # Card and row testIDs carry the seed's deterministic ids (seed_qa.uid): action:red01:laura and action:red02:julian.
 # The «Aprobada» toast is not asserted (Maestro misses it on some runs; the screenshots show it): the card leaving, the
 # row changing and the piece's status are.
 appId: co.projectapp.office
-name: Tu turno · aprobar
+name: Bandeja · aprobar
 tags: [turno]
 ---
 - runFlow: comun/entrar.yaml
@@ -18,11 +18,11 @@ tags: [turno]
 # cubre: TUR-02
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 10 pendientes, 1 urgente'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 10 pendientes, 1 urgente'
     timeout: 30000
 - tapOn:
-    id: top-tu-turno
+    id: tab-tu-turno
     waitToSettleTimeoutMs: 500
 - extendedWaitUntil:
     visible:
@@ -60,8 +60,8 @@ tags: [turno]
     timeout: 20000
 - extendedWaitUntil:
     visible:
-      id: top-tu-turno
-      text: 'Tu turno, 9 pendientes, 1 urgente'
+      id: tab-tu-turno
+      text: 'Bandeja de entrada, 9 pendientes, 1 urgente'
     timeout: 20000
 - extendedWaitUntil:
     notVisible:

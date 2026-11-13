@@ -62,10 +62,10 @@ import { closeCaptureSheet, notifyCaptureSent, openCaptureSheet, useCaptureSheet
 import type { CaptureDraft, CaptureOrigin, CaptureSeed, CaptureTarget, MicNoteKind, PickedPhoto, RecordedAudio } from './types';
 import { Wave } from './Wave';
 
+/** «Foto para la galería» left with the Galería (12/11/2026): his post photos go with a note («Idea para un post»). */
 export const PURPOSES: readonly { value: CapturePurpose; label: string }[] = [
   { value: 'post', label: 'Idea para un post' },
   { value: 'dato', label: 'Dato sobre mí' },
-  { value: 'galeria', label: 'Foto para la galería' },
 ];
 
 const CONTEXT_EYEBROW: Record<CaptureTarget['tipo'], string> = {
@@ -75,7 +75,7 @@ const CONTEXT_EYEBROW: Record<CaptureTarget['tipo'], string> = {
 };
 
 const CONTEXT_FALLBACK: Record<CaptureTarget['tipo'], string> = {
-  pregunta: 'Pregunta de Tu turno',
+  pregunta: 'Pregunta de la Bandeja',
   persona: 'Esta persona',
   pieza: 'Esta pieza',
 };
@@ -663,7 +663,8 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
   const [fotos, setFotos] = useState<PickedPhoto[]>(() => seed.draft?.fotos ?? []);
   const [fotoProblem, setFotoProblem] = useState<string | null>(null);
   const [nota, setNota] = useState(seed.draft?.nota ?? '');
-  const [para, setPara] = useState<CapturePurpose | null>(seed.draft?.para ?? null);
+  // A draft kept from before 12/11/2026 may still say «galeria»: it becomes an idea for a post.
+  const [para, setPara] = useState<CapturePurpose | null>(seed.draft?.para === 'galeria' ? 'post' : (seed.draft?.para ?? null));
   // The sheet asks no visibility: null lets the question's suggestion apply (a draft keeps what it had).
   const [publicChoice] = useState<boolean | null>(seed.draft?.publicUse ?? null);
   const [confirmClose, setConfirmClose] = useState(false);
@@ -722,9 +723,8 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
   const recording = audio.kind === 'recording' && recorder.phase !== 'idle';
   const readyAudio = audio.kind === 'done' ? audio.audio : autoStopped;
   const noteTooLong = nota.length > CAPTURE_LIMITS.noteChars;
-  const galleryWithoutPhotos = !simple && para === 'galeria' && fotos.length === 0;
   const empty = !recording && !readyAudio && fotos.length === 0 && !nota.trim();
-  const cannotSend = empty || noteTooLong || galleryWithoutPhotos;
+  const cannotSend = empty || noteTooLong;
   const showRecording = audio.kind === 'recording' && !autoStopped && !recordingFailed;
   const element: AudioKind | null = view !== 'form' ? null : showRecording ? 'rec' : readyAudio ? 'done' : mic || recordingFailed ? null : 'none';
 
@@ -1044,11 +1044,6 @@ export function CaptureSheet({ context: initialContext, seed, onClose }: { conte
               <T variant="detalle" soft>
                 Si no eliges, el equipo lo transcribe y decide.
               </T>
-              {galleryWithoutPhotos ? (
-                <T variant="detalle" color={colors.alert}>
-                  Para «Foto para la galería» adjunta al menos una foto.
-                </T>
-              ) : null}
             </View>}
 
             {create.error && !sending ? <SendError error={create.error} onRetry={() => void send()} /> : null}

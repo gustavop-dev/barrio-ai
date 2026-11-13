@@ -131,7 +131,7 @@ function ImportantItem({ event, timeZone }: { event: CalendarEvent; timeZone: st
       badge={eventBadge(event)}
       agent={(event as CalendarEvent & { agent?: string }).agent ?? null}
       to={eventLink(event)}
-      linkLabel={event.kind === 'action_uncertain' ? 'Resuélvela en Tu turno' : 'Abrir'}
+      linkLabel={event.kind === 'action_uncertain' ? 'Resuélvela en la Bandeja' : 'Abrir'}
     />
   );
 }
@@ -213,7 +213,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
           </ul>
           {tuyo.some((event) => event.kind !== 'resolved') ? (
             <ButtonLink to="/tu-turno" variant="secondary" block>
-              Ir a Tu turno
+              Ir a la Bandeja
             </ButtonLink>
           ) : null}
         </Block>

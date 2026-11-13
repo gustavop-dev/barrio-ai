@@ -154,7 +154,7 @@ describe('Persona', () => {
     expect(next).toHaveTextContent('El equipo la invitará cuando termine la espera');
     expect(next).toHaveTextContent('Invitación sin nota · Aprobada');
     expect(within(next).getByRole('link', { name: 'Ver en el Calendario' })).toHaveAttribute('href', '/calendario');
-    expect(within(next).getByRole('link', { name: 'Ir a Tu turno' })).toHaveAttribute('href', '/tu-turno');
+    expect(within(next).getByRole('link', { name: 'Ir a la Bandeja' })).toHaveAttribute('href', '/tu-turno');
   });
 
   it('adds a note and opens a voice note about the person', async () => {

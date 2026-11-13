@@ -33,7 +33,7 @@ function changed() {
   }
 }
 
-/** The same refresh as useVeto (compartido/api/hooks): the piece, the days, the activity, the network and Tu turno. */
+/** The same refresh as useVeto (compartido/api/hooks): the piece, the days, the activity, the network and the Bandeja. */
 function refresh(client: QueryClient) {
   for (const queryKey of [keys.editorialAll, keys.calendarioAll, keys.actividadAll, keys.actionsAll, keys.redAll, keys.tuTurno]) {
     void client.invalidateQueries({ queryKey });
