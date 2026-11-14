@@ -419,13 +419,15 @@ def observe(user,account,referent_ids=None,limit=5):
     context,grounding=role_context('observatorio',REFERENTS_UNITS,{'seleccion':REFERENTS_UNITS})
     summary={'referents':0,'new_posts':0,'seen_posts':0,'errors':[],**grounding,'course_context':context,
              'selection_basis':'audience_and_evidence','popularity_implies_fit':False,'evidence':[]}
+    from . import modelos_crecimiento
+    observed=[]
     for referent in referents:
         try:
             if not referent.provider_user_id:
                 reserve_profile_read(account,'observation')
                 referent.provider_user_id=connector.get_user(referent.public_identifier)['id']
                 referent.save(update_fields=['provider_user_id'])
-            posts=connector.list_user_posts(referent.provider_user_id,limit=limit)
+            posts=connector.list_user_posts(referent.provider_user_id,limit=modelos_crecimiento.read_limit(referent,limit))
         except ProfileReadCapReached as exc:
             summary['errors'].append({'referent':str(referent.id),'error':str(exc)});break
         except ConnectorError as exc:
@@ -445,6 +447,12 @@ def observe(user,account,referent_ids=None,limit=5):
             summary['evidence'].append({'post_id':post['id'],'referent':str(referent.id),'url':post['share_url'],
                                         'scope':'Observed public post; no inferred audience or causality'})
         referent.last_observed_at=timezone.now();referent.save(update_fields=['last_observed_at'])
+        observed.append(referent.id)
+    # «What worked for them» (modelos_crecimiento): outliers of what was just read. Never fails the observation.
+    try:summary['models']=modelos_crecimiento.after_observe(account,connector,observed)
+    except Exception:
+        import logging
+        logging.getLogger(__name__).exception('growth_models_refresh_failed account=%s',account.id)
     _audit(user,'operator.observed',account.id,**{k:v for k,v in summary.items() if k not in ('errors','course_context')},errors=len(summary['errors']))
     if summary['new_posts']:
         from .notificaciones import avisar
