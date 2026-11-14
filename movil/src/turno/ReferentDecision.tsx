@@ -3,7 +3,7 @@ import { View } from 'react-native';
 import { router } from 'expo-router';
 import { useReferents, useTurnoAction } from '@compartido/api/hooks';
 import type { TurnoCard } from '@compartido/api/types';
-import { editedProposal, editFields, experimentLines, evidenceSummary } from '@compartido/logic/referentes';
+import { editedProposal, editFields, experimentLines, evidenceSummary, industryLines } from '@compartido/logic/referentes';
 import { Button, ErrorRetry, Field, Sheet, T } from '@/components/ui';
 import { Select } from '@/components/ui/Select';
 import { ExternalLink } from '@/components/ui/ExternalLink';
@@ -21,7 +21,9 @@ export function ReferentDetails({ card }: { card: TurnoCard }) {
       {change.outgoing ? <ExternalLink href={change.outgoing.profile_url}>{`Sale: ${change.outgoing.display_name}`}</ExternalLink> : null}
       {change.proposal.incoming ? <>
         <ExternalLink href={change.proposal.incoming.profile_url}>{`Entra: ${change.proposal.incoming.display_name}`}</ExternalLink>
-        <T>{change.proposal.incoming.top_voice ? 'Top Voice verificado con fuente' : 'Top Voice: no verificado · voz del nicho'}</T>
+        {industryLines(change.proposal.incoming).map((line, i) => <T key={`industria-${i}`} testID={`industria-${i}`}>{line}</T>)}
+        <T>{change.proposal.incoming.top_voice ? 'Top Voice verificado con fuente'
+          : `Top Voice: no verificado · ${change.proposal.incoming.industria ? 'referente de industria' : 'voz del nicho'}`}</T>
         <T>Nicho: {change.proposal.incoming.niche}</T><T>Audiencia: {change.proposal.incoming.audience}</T>
         <T>Aporte: {change.proposal.incoming.contribution}</T><T>Hipótesis por medir; el alta no inicia un experimento.</T>
       </> : null}

@@ -1,6 +1,6 @@
 import { fireEvent, screen, waitFor } from '@testing-library/react-native';
-import { MONTHLY_CARD } from '@compartido/fixtures/referentes';
-import { editedProposal, editFields, monthlyCountdown, proposalTitle } from '@compartido/logic/referentes';
+import { INDUSTRY_CARD, MONTHLY_CARD } from '@compartido/fixtures/referentes';
+import { editedProposal, editFields, industryLines, monthlyCountdown, proposalTitle } from '@compartido/logic/referentes';
 import '@/api/transport';
 import { renderApp } from '@/test/render';
 import { fakeServer } from '@/test/server';
@@ -42,6 +42,27 @@ it('shows evidence and saves an edit with the version, keeping errors visible', 
   await waitFor(() => expect(screen.queryByTestId('referent-edit')).toBeNull());
   const writes = server.requests.filter(r => r.method === 'POST');
   expect(writes.at(-1)?.body).toMatchObject({ version: 3, decision: 'edit', proposal: { kind: 'swap', reason: 'Hipótesis revisada' } });
+});
+
+it('shows an industry candidate with every criterion and never counts an unmeasured audience as met', async () => {
+  const card = INDUSTRY_CARD.referent_change!;
+  expect(proposalTitle(card.proposal)).toBe(INDUSTRY_CARD.title);
+  const lines = industryLines(card.proposal.incoming);
+  expect(lines).toHaveLength(9);
+  expect(lines.find(l => l.includes('Su audiencia es el barrio'))).toMatch(/^\? .*Sin medir \(no cuenta como cumplido\)/);
+  expect(lines.at(-1)).toMatch(/nunca se copian sus textos/);
+  expect(industryLines(MONTHLY_CARD.referent_change!.proposal.incoming)).toEqual([]);
+  await renderApp(<ReferentDetails card={INDUSTRY_CARD} />);
+  expect(screen.getByText(/✓ Es grande — Cumple\. 24\.000 seguidores/)).toBeOnTheScreen();
+  expect(screen.getByText(/referente de industria/)).toBeOnTheScreen();
+});
+
+it('drops the industry evaluation when the edit points to another profile', () => {
+  const card = INDUSTRY_CARD.referent_change!;
+  const same = editedProposal(card, { ...editFields(card), reason: 'Mismo perfil' });
+  expect(same.incoming?.industria?.slug).toBe('lia-constructora-test');
+  const other = editedProposal(card, { ...editFields(card), url: 'https://www.linkedin.com/in/otra-persona-test/', source: 'https://example.org/otra' });
+  expect(other.incoming?.industria).toBeUndefined();
 });
 
 it('does not offer protection controls to a different user', async () => {
