@@ -453,16 +453,17 @@ class EditSizeTests(EditorialBase):
         self.assertEqual(imagenes.post_size(1600, 900), (1080, 1080))  # never horizontal (IMG-12)
         self.assertEqual(imagenes.post_size(1080, 1080), (1080, 1080))
 
-    def test_reframing_a_vertical_original_keeps_it_vertical(self):
+    def test_reframing_a_vertical_original_keeps_it_vertical_without_ai(self):
+        # IMG-14: reframing is a centred crop by code (it was an image-model edit plus a check); smaller than 1080 wide,
+        # it keeps its own resolution at 4:5.
         photo = image_cases.ImageWorkflowTests.photo(self, size=(900, 1200))
         piece = image_cases.ImageWorkflowTests.piece(self, photo=photo)
         fake = FakeImageConnector(edited=png((1024, 1536), '#dedfd4'))
         imagenes.prepare(piece, client=fake)
         row = piece.images.get()
-        self.assertEqual([c[0] for c in fake.calls], ['edit', 'check'])
-        self.assertEqual(fake.calls[0][2], imagenes.SAFE_EDITS['crop'])
-        self.assertEqual((row.edited, row.width, row.height), (True, 1080, 1350))
-        self.assertEqual(Image.open(io.BytesIO(imagenes.read(row.image))).size, (1080, 1350))
+        self.assertEqual(fake.calls, [])
+        self.assertEqual((row.edited, row.cropped, row.width, row.height), (False, True, 900, 1125))
+        self.assertEqual(Image.open(io.BytesIO(imagenes.read(row.image))).size, (900, 1125))
         self.assertIsNone(orquestacion.current())
 
 

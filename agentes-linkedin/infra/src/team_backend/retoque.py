@@ -236,7 +236,7 @@ def _image_context(piece):
     photos = {p['id']: p for p in editor_visual.gallery(piece)}
     rows = list(piece.images.order_by('position'))
     return {'kind': piece.image_kind, 'reason': piece.image_reason,
-            'images': [{'kind': r.kind, 'alt': r.alt, 'edited': r.edited, 'reason': r.reason,
+            'images': [{'kind': r.kind, 'alt': r.alt, 'edited': r.edited, 'cropped': r.cropped, 'reason': r.reason,
                         'edit_instruction': (r.review or {}).get('instruction', '')} for r in rows],
             'photos': [{'id': str(r.source_photo_id), 'note': photos.get(str(r.source_photo_id), {}).get('note', ''),
                         'ai_edit': r.ai_edit} for r in rows if r.source_photo_id],
@@ -356,7 +356,8 @@ def _edit_photos(piece, instruction, client, public, capture):
             row.mime = 'image/png'
             row.width, row.height = size
             row.sha256 = imagenes.sha(candidate)
-            row.edited = True
+            row.edited, row.cropped = True, False  # the edit starts from the original: no plain crop is left in it
+            row.data = {k: v for k, v in (row.data or {}).items() if k != 'crop'}
             row.review = dict(review, instruction=instruction)  # the next comment edits the original again: it keeps this
             row.reason = _clip('Comentario de Gustavo: ' + capture.text, 1000)
             imagenes.forget_rejected(row)

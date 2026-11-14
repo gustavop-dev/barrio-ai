@@ -3,6 +3,7 @@ import hashlib
 import io
 import json
 import os
+import re
 from decimal import Decimal
 from PIL import Image, ImageOps
 from django.core.files.base import ContentFile
@@ -45,6 +46,7 @@ def previews(rows):
     return blocks
 
 
+# 'crop' is never sent to the image model: framing is a plain centred crop by code (crop, IMG-14).
 SAFE_EDITS={'light':'Correct exposure only.','straighten':'Straighten the photograph only.',
             'crop':'Improve the framing for LinkedIn without changing the scene, the people or the orientation.',
             'distractions':'Remove distracting background objects only; preserve every person, text and logo.'}
@@ -55,10 +57,12 @@ def edit_decision(photo,choice):
     if photo.ai_edit=='no':return '', 'Edición prohibida en la foto'
     if kind=='unsafe':return '', 'Instrucción no segura para preservar personas, textos y marca; sale el original'
     if photo.ai_edit=='auto' and kind=='original':return '', 'Instrucción de Gustavo: '+instruction
+    if kind=='crop' and instruction:return SAFE_EDITS['crop'],'Instrucción de Gustavo: '+instruction
     if kind=='edit' and instruction:return instruction,'Instrucción de Gustavo: '+instruction
     selected=SAFE_EDITS.get(choice.get('edit'))
     if photo.ai_edit=='si':
-        return selected or SAFE_EDITS['light'],'Edición pedida en la foto: '+(choice.get('edit_reason') or 'corrección mínima de luz')
+        default='encuadre para LinkedIn' if selected==SAFE_EDITS['crop'] else 'corrección mínima de luz'
+        return selected or SAFE_EDITS['light'],'Edición pedida en la foto: '+(choice.get('edit_reason') or default)
     if selected and choice.get('edit_reason'):return selected,'Decisión del equipo: '+choice['edit_reason']
     return '', 'Decisión del equipo: no necesita retoque; ante la duda se conserva el original'
 
@@ -69,17 +73,44 @@ def _edit_call(piece,photo,raw,instruction,client,suffix=''):
         key=f'edit:{photo.id}{suffix}')
 
 
+POST_SIZES=((1080,1080),(1080,1350))
+
+
 def post_size(width,height):
-    """LinkedIn artwork for an edited photo (IMG-12): vertical 1080×1350 (4:5) for a vertical photo, otherwise 1080
-    square; never horizontal. It is cropped to that size (fit), never squashed."""
+    """LinkedIn artwork for a photo (IMG-12): vertical 1080×1350 (4:5) for a vertical photo, otherwise 1080 square;
+    never horizontal. It is cropped to that size, never squashed."""
     return (1080,1350) if height>width*1.1 else (1080,1080)
 
 
 def fit(raw,width,height):
-    """Scale and crop to (width, height) keeping proportions; the crop keeps more of the top, where faces are."""
+    """Scale and crop an edited image to (width, height) keeping proportions, centred like the plain crop."""
     with Image.open(io.BytesIO(raw)) as im:
-        out=io.BytesIO();ImageOps.fit(im.convert('RGB'),(width,height),Image.Resampling.LANCZOS,centering=(0.5,0.35)).save(out,format='PNG')
+        out=io.BytesIO();ImageOps.fit(im.convert('RGB'),(width,height),Image.Resampling.LANCZOS,centering=(0.5,0.5)).save(out,format='PNG')
     return out.getvalue()
+
+
+def fits(raw):
+    """The photo already has LinkedIn's size as stored (and no EXIF turn): it goes out as it is."""
+    with Image.open(io.BytesIO(raw)) as im:
+        return im.size in POST_SIZES and im.getexif().get(0x0112,1)==1
+
+
+def crop(raw):
+    """IMG-14: the photo, upright, cut to LinkedIn's size for its orientation by code: no image model, no new pixels.
+    Centred (Gustavo, 14/11/2026: «centrar y recortar arriba y abajo»): a tall photo keeps its full width and loses the
+    same from top and bottom; a wide one, from both sides. It is scaled down, never up: a photo smaller than the size
+    keeps its own resolution at the size's ratio (LinkedIn scales it on screen; an upscale only blurs it). EXIF is not
+    copied. Returns (bytes, mime, (width, height), record of the crop)."""
+    with Image.open(io.BytesIO(raw)) as source:
+        png=source.format=='PNG';image=ImageOps.exif_transpose(source).convert('RGB')
+    w,h=image.size;tw,th=post_size(w,h)
+    cw,ch=(max(1,round(h*tw/th)),h) if w*th>h*tw else (w,max(1,round(w*th/tw)))
+    box=((w-cw)//2,(h-ch)//2,(w-cw)//2+cw,(h-ch)//2+ch)
+    region=image.crop(box)
+    if cw>tw:region=region.resize((tw,th),Image.Resampling.LANCZOS)
+    out=io.BytesIO();region.save(out,format='PNG' if png else 'JPEG',quality=90)  # PNG ignores quality
+    return out.getvalue(),'image/png' if png else 'image/jpeg',region.size,{
+        'source_sha256':sha(raw),'source_size':[w,h],'box':list(box),'size':list(region.size),'centred':True}
 
 
 def edit_photo(piece,photo,raw,instruction,client,public,suffix='',from_gustavo=False):
@@ -106,6 +137,10 @@ def _check_call(piece,images,context,client,original=None,instruction='',key=Non
     return dict(review,from_gustavo=True)
 
 
+# The connector's own «sale el original»: _photo says once what goes out (the original or the crop).
+KEPT=re.compile(r'(;| y) sale el original$')
+
+
 def can_edit(client):
     return isinstance(client,connector.FakeImageConnector) or (connector.available('openai') and connector.available('anthropic'))
 
@@ -120,27 +155,41 @@ def _photo(piece,photo,choice,index,client,public,private):
     if not photo.instruction and choice.get('instruction') and choice['instruction'] in photo.note:
         photo.instruction=choice['instruction'];photo.instruction_kind=choice.get('instruction_kind','none')
         photo.save(update_fields=['instruction','instruction_kind'])
-    instruction,reason=edit_decision(photo,choice);edited=False;review={};output=raw;mime=photo.mime;rejected=None
-    if not instruction and photo.ai_edit!='no' and photo.instruction_kind not in ('original','unsafe') and (width,height) not in ((1080,1080),(1080,1350)):
-        instruction=SAFE_EDITS['crop'];reason='Decisión del equipo: adaptar el encuadre para LinkedIn'
+    instruction,reason=edit_decision(photo,choice);edited=False;cropped=None;review={};output=raw;mime=photo.mime;rejected=None
+    from_gustavo=reason.startswith('Instrucción de Gustavo')
+    # IMG-14: fitting LinkedIn's size is a centred crop by code, never an image-model edit nor a visual check: phone
+    # photos are 9:16 and a check of the framing must never hold a piece back. «No editar», «úsala tal cual» and an
+    # unsafe note keep the photo as it is.
+    framing=instruction==SAFE_EDITS['crop'];instruction='' if framing else instruction;ready=fits(raw)
+    croppable=photo.ai_edit!='no' and photo.instruction_kind not in ('original','unsafe') and not ready
+    if not instruction and not framing and croppable:reason='Decisión del equipo: adaptar el encuadre para LinkedIn'
     if instruction:
         if can_edit(client):
             try:
-                candidate,review,size=edit_photo(piece,photo,raw,instruction,client,public,
-                                                 from_gustavo=reason.startswith('Instrucción de Gustavo'))
+                candidate,review,size=edit_photo(piece,photo,raw,instruction,client,public,from_gustavo=from_gustavo)
                 if review['ok'] and review.get('sha256')==[sha(candidate)]:
                     output=candidate;edited=True;mime='image/png';width,height=size
                 else:
                     reason+='; edición descartada: '+'; '.join(review.get('reasons') or ['comprobación desfavorable'])
                     rejected=(candidate,review,size)
-            except (ValueError,OSError) as exc:reason+='; '+str(exc)
-        else:reason+='; edición no disponible (proveedores o claves); sale el original'
+            except (ValueError,OSError) as exc:reason+='; '+KEPT.sub('',str(exc))
+        else:reason+='; edición no disponible (proveedores o claves)'
+    if not edited and croppable and not (instruction and from_gustavo):
+        # Framing, or a team edit that did not pass or could not run: the same photo, only cropped. An edit Gustavo
+        # asked for that did not pass keeps its IMG-10 outcome: his original.
+        output,mime,(width,height),cropped=crop(raw);reason+=f'; sale recortada a {width}×{height}, centrada y sin IA'
+    elif instruction and not edited:reason+='; sale el original'
+    elif framing:reason+='; ya tiene el tamaño de LinkedIn: sale tal cual' if ready else '; sale tal cual'
     alt=(choice.get('alt') or '').strip()
     if not alt or len(alt)>1500 or guardas.private_leaks(alt,private) or guardas.invented_experience(alt,public):
         raise ValueError('Foto sin texto alternativo público válido')
     row=PieceImage(piece=piece,source_photo=photo,position=index,kind='foto',mime=mime,width=width,height=height,
-                   sha256=sha(output),alt=alt,edited=edited,ai_edit=photo.ai_edit,reason=reason,review=review)
+                   sha256=sha(output),alt=alt,edited=edited,cropped=bool(cropped),ai_edit=photo.ai_edit,reason=reason,review=review)
     if edited:row.image.save('edicion.png',ContentFile(output),save=False)
+    elif cropped:
+        # Its own file: the manifest binds these exact bytes; data.crop tells how to get them again from the original.
+        row.image.save('recorte.png' if mime=='image/png' else 'recorte.jpg',ContentFile(output),save=False)
+        row.data={'crop':cropped}
     else:row.image.name=photo.image.name
     if rejected:keep_rejected(row,*rejected)
     row.save()
@@ -277,6 +326,8 @@ def issues(piece,expected=None):
         try:
             if sha(read(row.image))!=row.sha256:errors.append('Los bytes de la imagen cambiaron')
         except (ValueError,OSError):errors.append('Imagen no disponible')
+        # Model-made pixels need their verdict. A plain crop (row.cropped) is his own photo cut by code: its exact bytes
+        # are bound above and by the manifest, and no review may hold it back for what the crop leaves out.
         if row.edited or row.kind in ('infografia','carrusel','tarjeta'):
             if not row.review.get('ok') or row.sha256 not in row.review.get('sha256',[]):errors.append('Imagen sin revisión de sus bytes exactos')
     if piece.image_kind=='carrusel':
@@ -341,7 +392,7 @@ def payload(row):
     return {'id':str(row.id),'kind':row.kind,'position':row.position,'url':url(row),
             'alt':row.alt,'width':row.width,'height':row.height,'mime':row.mime,'sha256':row.sha256,
             'source_photos':[{'id':str(row.source_photo_id),'url':f'/api/v1/galeria/{row.source_photo_id}/imagen'}] if row.source_photo_id else [],
-            'edited':row.edited,'ai_edit':row.ai_edit,'reason':row.reason,'template':row.template or None,'review':row.review,
+            'edited':row.edited,'cropped':row.cropped,'ai_edit':row.ai_edit,'reason':row.reason,'template':row.template or None,'review':row.review,
             'rejected_edit':rejected_payload(row)}
 
 

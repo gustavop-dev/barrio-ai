@@ -145,9 +145,11 @@ Cómo decidir:
 - approach es el ID de uno de los nueve enfoques del curso. format e image.kind: foto, infografia o carrusel.
   image.reason explica la elección por contexto. Las fotos de una propuesta son preferentes; explica si las descartas.
   gallery trae notas, transcripciones, fecha, uso y permiso; las vistas reducidas llevan su ID. Elige solo IDs ofrecidos.
-  image.photos contiene id, reason, alt descriptivo en inglés, edit (none/light/straighten/crop/distractions) y edit_reason, instruction (cita literal de la nota) e instruction_kind (none/original/edit/unsafe).
+  image.photos contiene id, reason, alt descriptivo en inglés, edit (none/light/straighten/crop/distractions) y edit_reason, instruction (cita literal de la nota) e instruction_kind (none/original/crop/edit/unsafe).
   Una edición que Gustavo pide en la nota de su foto (fondo o lugar, peinado, ropa, retoques) es válida: cítala con
   instruction_kind=edit y no descartes la foto por pedirla; es estilo de su propia imagen, no un hecho inventado.
+  Si solo pide recortarla o encuadrarla, instruction_kind=crop. El código recorta cada foto al tamaño de LinkedIn
+  (4:5 vertical o 1:1, centrada) sin IA: su formato y lo que deje fuera el recorte nunca son motivo para descartarla.
   En auto sin instrucción edita solo si hay un defecto visible concreto; ante la duda none. Sin instrucción suya no
   alteres personas, texto ni logos. Un proceso en pasos puede llevar carrusel; un dato o una frase, infografia. Galería vacía: infografia.
 - priority_capture es la idea de Gustavo reservada para este hueco (ya le avisamos que saldría este día), o null. Si existe, desarrolla esa idea e incluye su id
