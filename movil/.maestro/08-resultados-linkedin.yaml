@@ -1,0 +1,203 @@
+# cubre: RES-12
+# Resultados › «Analítica de LinkedIn» with the invented «directo» account of seed_qa --analitica (correr-maestro.sh
+# passes the flag to this flow only): 28 días by default with members reached, the daily chart (another figure, a
+# tapped day), followers, a post with its lifetime figures and its piece, LinkedIn's top posts and the audience; then
+# 7 días, and 90 días with its three missing days and without members reached nor top posts (no exact range); then
+# «Personalizado»: a day before the imported ones is refused, ten days in range are shown. Days are UTC
+# (comun/analitica-fechas.js). Text in the «etiqueta» style (section labels) is uppercased on screen.
+appId: co.projectapp.office
+name: Resultados · Analítica de LinkedIn
+tags: [resultados]
+---
+- runFlow: comun/entrar.yaml
+- runScript: comun/analitica-fechas.js
+- tapOn:
+    id: tab-resultados
+    waitToSettleTimeoutMs: 500
+- extendedWaitUntil:
+    visible:
+      id: resultados-list
+    timeout: 30000
+- tapOn:
+    id: res-pestana-linkedin
+- extendedWaitUntil:
+    visible:
+      id: ana-periodo-nota
+    timeout: 30000
+
+# ---------------------------------------------------------------- 28 días: every figure
+- assertVisible: ".* · 28 días \\(UTC\\)\\. Se compara con los 28 días anteriores\\."
+- assertVisible: "Actualizado hace \\d+ h\\."
+- scrollUntilVisible:
+    element:
+      id: kpi-Impresiones
+    direction: DOWN
+    timeout: 20000
+- takeScreenshot: 08-resultados-linkedin-01-28-dias
+- scrollUntilVisible:
+    element:
+      id: "kpi-Miembros alcanzados"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "3[.,]?480"
+- scrollUntilVisible:
+    element:
+      id: ana-grafico
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Impresiones por día .*"
+- tapOn:
+    text: "Interacciones"
+    childOf:
+      id: ana-metrica
+- extendedWaitUntil:
+    visible: "Interacciones por día .*"
+    timeout: 15000
+- tapOn:
+    id: ana-grafico
+- extendedWaitUntil:
+    visible: ".+ de \\d{4}: (\\d+ interacci.+|sin dato)"
+    timeout: 15000
+- takeScreenshot: 08-resultados-linkedin-02-grafico
+# Followers: total, day and growth are read out as one («2.667 seguidores, según LinkedIn el …, suben 84 desde el …»).
+- scrollUntilVisible:
+    element:
+      text: ".* seguidores, según LinkedIn el .*, suben \\d+ desde el .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: ana-post-0
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Desde que se publicó, al .*"
+- assertVisible: "Ver en LinkedIn"
+- takeScreenshot: 08-resultados-linkedin-03-publicaciones
+- scrollUntilVisible:
+    element:
+      text: "Abrir la pieza"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- scrollUntilVisible:
+    element:
+      id: "bars-Principales por impresiones"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "Según LinkedIn, .*"
+- takeScreenshot: 08-resultados-linkedin-04-principales
+- scrollUntilVisible:
+    element:
+      text: "Tus seguidores, según LinkedIn el .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      text: "Quienes vieron tus publicaciones .*"
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- takeScreenshot: 08-resultados-linkedin-05-publico
+
+# ---------------------------------------------------------------- 7 días, then 90 días (partial, no exact range)
+- scrollUntilVisible:
+    element:
+      id: ana-periodo
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn: "7 días"
+- extendedWaitUntil:
+    visible: ".* · 7 días \\(UTC\\)\\. Se compara con los 7 días anteriores\\."
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: "kpi-Miembros alcanzados"
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- extendedWaitUntil:
+    visible: "1[.,]?240"
+    timeout: 15000
+- scrollUntilVisible:
+    element:
+      id: ana-periodo
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn: "90 días"
+- extendedWaitUntil:
+    visible: ".* · 90 días \\(UTC\\)\\. Se compara con los 90 días anteriores\\."
+    timeout: 30000
+- scrollUntilVisible:
+    element:
+      id: ana-cobertura
+    direction: DOWN
+    centerElement: true
+    timeout: 20000
+- assertVisible: "Hay datos de 87 de 90 días: .*"
+- assertVisible: "LinkedIn da los miembros alcanzados solo para un rango completo.*"
+- takeScreenshot: 08-resultados-linkedin-06-90-dias
+- scrollUntilVisible:
+    element:
+      id: ana-top-motivo
+    direction: DOWN
+    centerElement: true
+    timeout: 30000
+- assertVisible: "LinkedIn da sus publicaciones principales solo para el rango que se le pide.*"
+
+# ---------------------------------------------------------------- «Personalizado»
+- scrollUntilVisible:
+    element:
+      id: ana-personalizado
+    direction: UP
+    centerElement: true
+    timeout: 30000
+- tapOn:
+    id: ana-personalizado
+- extendedWaitUntil:
+    visible:
+      id: ana-rango
+    timeout: 15000
+- assertVisible: "Hay datos del .* \\(UTC\\)\\. Como mucho 366 días\\."
+- tapOn:
+    id: ana-desde
+- eraseText: 12
+- inputText: "2020-01-01"
+- hideKeyboard
+- tapOn:
+    text: "Ver este periodo"
+    childOf:
+      id: ana-rango
+- extendedWaitUntil:
+    visible: "Elige un día entre el .*"
+    timeout: 10000
+- takeScreenshot: 08-resultados-linkedin-07-rango-fuera
+- tapOn:
+    id: ana-desde
+- eraseText: 12
+- inputText: ${output.anaDesde}
+- tapOn:
+    id: ana-hasta
+- eraseText: 12
+- inputText: ${output.anaHasta}
+- hideKeyboard
+- assertNotVisible: "Elige un día entre el .*"
+- tapOn:
+    text: "Ver este periodo"
+    childOf:
+      id: ana-rango
+- extendedWaitUntil:
+    notVisible:
+      id: ana-rango
+    timeout: 15000
+- extendedWaitUntil:
+    visible: ".* · 10 días \\(UTC\\)\\. Se compara con los 10 días anteriores\\."
+    timeout: 30000
+- takeScreenshot: 08-resultados-linkedin-08-personalizado

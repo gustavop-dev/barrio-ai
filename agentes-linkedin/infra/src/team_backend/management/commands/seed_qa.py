@@ -2,7 +2,8 @@
 
 It builds a realistic, deterministic office for a CI-only user `qa`: the fake connector accounts, editorial pieces in
 every state, pending proposals, people at every stage, opportunities, referents, every kind of Tu turno card,
-notifications, captures, gallery photos, results history, a weekly summary and spend rows.
+notifications, captures, gallery photos, results history, a weekly summary and spend rows. With --analitica, also a
+«directo» account with LinkedIn's analytics (flow 08-resultados-linkedin).
 
 Idempotent in the strong sense: every run first empties the QA world and builds it again, so each Maestro flow starts
 from the same state whatever the previous one changed. The `qa` user and its device logins survive, so the app stays
@@ -26,8 +27,10 @@ from django.db import connection, transaction
 from django.utils import timezone
 from psycopg.types.json import Jsonb
 from team_backend import operador
+from team_backend.analitica import utc_today
 from team_backend.authentication import digest
-from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, Capture, ConnectorAccount, Contact,
+from team_backend.models import (ActionExecution, ActionProposal, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange, AnalyticsSnapshot,
+                                 AudienceSnapshot, AuditEvent, Capture, ConnectorAccount, Contact,
                                  Conversation, DeviceToken, EditorialPiece, GalleryPhoto, InboxSeen, Job, LinkedInCredential,
                                  Notification, ObservedPost, OfficePreference, OperatorControl, Opportunity, Orientation, PostMetric,
                                  Referent, TeamQuestion, WeeklySummary, Worker, PieceImage, ProfileProposal, ProfileAsset, ProfileSchedule)
@@ -117,6 +120,7 @@ class Command(BaseCommand):
     def add_arguments(self,parser):
         parser.add_argument('--referentes-mensual',action='store_true',help='Escenario OBS/TUR del flujo 19, con cinco main protegidos.')
         parser.add_argument('--perfil-capturas',action='store_true',help='Nota ambigua de perfil procesada como pregunta para el flujo 18-perfil.')
+        parser.add_argument('--analitica',action='store_true',help='Cuenta «directo» con analítica de LinkedIn inventada para el flujo 08-resultados-linkedin.')
 
     def handle(self,**options):
         self.guard()
@@ -128,6 +132,7 @@ class Command(BaseCommand):
             self.accounts();self.network();self.pieces();self.proposals();self.opportunities();self.conversation()
             self.questions();self.facts();self.notifications();self.captures();self.gallery();self.results();self.summaries()
             self.image_examples();self.profile();self.spend();self.settings();self.devices();self.office()
+            if options.get('analitica'):self.analytics()
             if options.get('referentes_mensual'):
                 from team_backend.seed_referentes_qa import seed
                 seed(self.user,self.fake,self.now,uid)
@@ -155,7 +160,9 @@ class Command(BaseCommand):
             raise CommandError('seed_qa vacía y rehace datos: solo corre en la QA de CI (exporta QA_SEED=permitido).')
         on=[v for v in LIVE_SWITCHES if os.environ.get(v,'false').strip().lower()=='true']
         if on:raise CommandError(f'seed_qa no corre con proveedores o LinkedIn reales activados: {", ".join(on)}.')
-        if ConnectorAccount.objects.filter(provider__in=['unipile','directo','linkedin']).exists() or LinkedInCredential.objects.exists():
+        # The QA «directo» account of --analitica (a fixed uuid5 of the QA namespace) is the only one it may find and replace.
+        real=ConnectorAccount.objects.filter(provider__in=['unipile','directo','linkedin']).exclude(id=uid('account:directo'))
+        if real.exists() or LinkedInCredential.objects.exists():
             raise CommandError('Esta base tiene una cuenta real de LinkedIn: seed_qa no la toca.')
 
     def qa_user(self):
@@ -637,6 +644,64 @@ class Command(BaseCommand):
                                kind='prepare_piece',params={'slot':piece.slot_date.isoformat()},state='complete' if piece.state!='failed' else 'failed',
                                created_at=piece.created_at,started_at=piece.created_at,finished_at=piece.created_at+timedelta(minutes=9),
                                result_status=piece.state,error=piece.note if piece.state=='failed' else '')
+
+    def analytics(self):
+        """LinkedIn's analytics of a «directo» account (--analitica): 400 UTC days ending yesterday with a three-day gap
+        about two months back (so 90 and 365 days are partial), the exact 7, 14 and 28-day ranges with members reached,
+        top posts and content demographics, and the 28 days before them (members reached compares there; no 90 or 365
+        range), 120 daily follower captures with today's audience, eight posts (two of them the published pieces) and
+        the imports that brought them, the last about five hours ago. Invented figures only."""
+        account=ConnectorAccount.objects.create(id=uid('account:directo'),provider='directo',external_account_id='qa-directo-gustavo',
+                                                label='LinkedIn directo (simulado)',status='running',last_checked_at=self.ago(hours=1))
+        today=utc_today(self.now);yesterday=today-timedelta(days=1);fetched=self.ago(hours=5)
+        gap={yesterday-timedelta(days=back) for back in (57,58,59)}
+        days=[]
+        for back in range(400):
+            day=yesterday-timedelta(days=back)
+            if day in gap:continue
+            working=60 if day.weekday()<5 else 0
+            days.append(AnalyticsDay(account=account,day=day,impressions=90+(back*37)%110+working,engagements=3+(back*11)%9,
+                                     new_followers=(back*7)%4,updated_at=fetched))
+        AnalyticsDay.objects.bulk_create(days)
+        kinds=['Texto','Imagen','Documento','Video']
+        specs=[('publicada3',self.piece['publicada3'].slot_date),('publicada8',self.piece['publicada8'].slot_date)]+[
+               (None,yesterday-timedelta(days=back)) for back in (1,5,12,19,33,61)]
+        posts=[]
+        for n,(key,published) in enumerate(specs,1):
+            urn=f'urn:li:activity:7{n:018d}';impressions=480+(n*389)%1700;network=55.0+n*2.5
+            posts.append(AnalyticsPost(account=account,post_urn=urn,url=f'{FAKE_URL}/feed/update/{urn}/',piece=self.piece[key] if key else None,
+                                       published=published,kind=kinds[n%4],impressions=impressions,network_pct=network,outside_pct=100-network,
+                                       members_reached=None if n==8 else int(impressions*0.62),followers_gained=n%3,profile_views=4+n*2,
+                                       reactions=12+n*5,comments=1+n%4,shares=n%3,saves=(n*2)%5,sends=n%2,first_seen_at=fetched,last_seen_at=fetched))
+        AnalyticsPost.objects.bulk_create(posts)
+
+        def top(start,end,value):
+            inside=sorted((p for p in posts if start<=p.published<=end),key=value,reverse=True)
+            return [{'post_urn':p.post_urn,'url':p.url,'piece_id':str(p.piece_id) if p.piece_id else None,'published':p.published.isoformat(),
+                     'value':value(p)} for p in inside]
+        def rows(group,items):
+            return [{'group':group,'label':label,'pct':pct,'below':pct<1,'value':None} for label,pct in items]
+        content=(rows('Cargo',[('Fundador',21.0),('Director de tecnología',11.5),('Gerente de producto',7.0),('Consultor',1.0)])+
+                 rows('Sector',[('Desarrollo de software',29.0),('Servicios financieros',8.5),('Educación',4.0)]))
+        reached={7:1240,14:2010,28:3480}
+        for length in (7,14,28):
+            start=yesterday-timedelta(days=length-1)
+            AnalyticsRange.objects.create(account=account,start=start,end=yesterday,impressions=sum(d.impressions for d in days if d.day>=start),
+                                          members_reached=reached[length],top_by_engagements=top(start,yesterday,lambda p:p.reactions+p.comments+p.shares),
+                                          top_by_impressions=top(start,yesterday,lambda p:p.impressions),content=content,captured_at=fetched)
+        AnalyticsRange.objects.create(account=account,start=yesterday-timedelta(days=55),end=yesterday-timedelta(days=28),members_reached=3110,
+                                      captured_at=fetched-timedelta(days=28))
+        audience=(rows('Cargo',[('Fundador',18.5),('Ingeniero de software',12.0),('Gerente de producto',6.5),('Diseñador',1.0)])+
+                  rows('Ubicación',[('Área de Bogotá',41.0),('Área de Medellín',9.5),('Ciudad de México',4.0)])+
+                  rows('Tamaño de la empresa',[('2-10 empleados',24.0),('11-50 empleados',19.5),('51-200 empleados',11.0)]))
+        AnalyticsSnapshot.objects.bulk_create([AnalyticsSnapshot(account=account,day=today-timedelta(days=back),followers=2310+(119-back)*3-(back*5)%4,
+                                                                 audience=audience if back==0 else [],captured_at=fetched-timedelta(days=back))
+                                               for back in range(120)])
+        def imported(start,end,trigger,at):
+            AnalyticsImport.objects.create(account=account,start=start,end=end,trigger=trigger,state='ok',rows={'days':(end-start).days+1},
+                                           started_at=at,finished_at=at+timedelta(minutes=1))
+        imported(yesterday-timedelta(days=399),yesterday-timedelta(days=35),'carga_inicial',self.ago(days=35))
+        for n,length in enumerate((14,7,28)):imported(yesterday-timedelta(days=length-1),yesterday,'diaria',fetched+timedelta(minutes=2*n))
 
     def summaries(self):
         last=self.today-timedelta(days=self.today.weekday()+7)
