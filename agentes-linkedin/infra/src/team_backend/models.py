@@ -1025,7 +1025,8 @@ class PieceImage(models.Model):
     height=models.PositiveIntegerField()
     sha256=models.CharField(max_length=64)
     alt=models.TextField()
-    edited=models.BooleanField(default=False)
+    edited=models.BooleanField(default=False)  # pixels made by the image model (checked by vision, IMG-10)
+    cropped=models.BooleanField(default=False)  # his photo cut to LinkedIn's size by code, no model (IMG-14); data.crop
     ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.NO)
     reason=models.TextField(blank=True)
     template=models.CharField(max_length=20,blank=True)

@@ -47,7 +47,7 @@ SLIDE=obj(template=enum('portada','pasos','barras','numero','cierre','preguntas'
 DESIGN_SCHEMA=obj(slides=array(SLIDE))
 CHOICE_SCHEMA=obj(kind=enum('foto','infografia','carrusel'),reason=string(),
                   photos=array(obj(id=string(),reason=string(),alt=string(),edit=enum('none','light','straighten','crop','distractions'),
-                                   edit_reason=string(),instruction=string(),instruction_kind=enum('none','original','edit','unsafe'))))
+                                   edit_reason=string(),instruction=string(),instruction_kind=enum('none','original','crop','edit','unsafe'))))
 
 
 def schema_check(value,schema,path='respuesta'):

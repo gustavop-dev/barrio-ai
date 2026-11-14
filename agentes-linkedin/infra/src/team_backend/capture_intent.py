@@ -7,12 +7,14 @@ from django.db import transaction
 from knowledge import providers
 from . import infografias, research
 
+# crop: he only asks to crop or frame the photo; the code cuts it, no image model (imagenes.crop, IMG-14).
+PHOTO_KINDS=('none','original','crop','edit','unsafe')
 INTENT_FIELDS={
     **research.RESEARCH_FIELDS,
     'publish_asap':{'type':'boolean'},'evidence':infografias.string(),'not_before':infografias.string(),
     'publish_when':infografias.string(),
     'photo_instructions':infografias.array(infografias.obj(index={'type':'number'},
-        instruction=infografias.string(),kind=infografias.enum('none','original','edit','unsafe'))),
+        instruction=infografias.string(),kind=infografias.enum(*PHOTO_KINDS))),
 }
 GUIDE='''Además interpreta la nota Y transcripción en su contexto completo:
 - publish_asap=true solo cuando Gustavo pide publicar esta idea cuanto antes, ya, pronto o con urgencia;
@@ -22,9 +24,10 @@ GUIDE='''Además interpreta la nota Y transcripción en su contexto completo:
 - publish_when: cita literal del fragmento donde Gustavo pide un día u hora concretos para publicar ESTA idea
   («publícalo mañana a las 10», «que salga el jueves a las 3 de la tarde»); vacía si no la hay. No cuenta una
   fecha narrada ni la de un evento: solo cuándo quiere que salga el post.
-- photo_instructions: índice de foto desde 1, instrucción literal y kind none/original/edit/unsafe.
+- photo_instructions: índice de foto desde 1, instrucción literal y kind none/original/crop/edit/unsafe.
   Asigna la instrucción a su foto por orden o referencia; una petición plural sin referencia vale para todas.
-  Tal cual=original. Cualquier edición que Gustavo pida de su foto=edit: luz, recorte, enderezar, quitar distracciones,
+  Tal cual=original. Si solo pide recortarla o encuadrarla (y nada más)=crop: el código la recorta sin IA.
+  Cualquier otra edición que Gustavo pida de su foto=edit: luz, enderezar, quitar distracciones,
   cambiar el fondo o el lugar (por ejemplo un coworking), arreglar peinado, piel o ropa, o añadir elementos de escena.
   unsafe solo si pide convertir a alguien en otra persona, poner caras de personas reales ajenas, o añadir o falsear
   texto, cifras, logos o marcas.
@@ -55,7 +58,7 @@ def apply(capture,data):
         if not isinstance(item,dict):continue
         index=item.get('index');instruction=item.get('instruction','');kind=item.get('kind')
         if type(index) is not int or not 1<=index<=len(photos):continue
-        if kind not in ('none','original','edit','unsafe') or not isinstance(instruction,str):continue
+        if kind not in PHOTO_KINDS or not isinstance(instruction,str):continue
         if instruction and instruction not in text:continue
         photo=photos[index-1];photo.instruction=instruction[:2000];photo.instruction_kind=kind
         photo.save(update_fields=['instruction','instruction_kind'])

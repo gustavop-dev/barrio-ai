@@ -486,6 +486,21 @@ describe('IMG-11 · imágenes de la pieza', () => {
     expect(screen.queryByText('Vetar')).toBeNull();
   });
 
+  it('marks a plain crop without AI apart from an AI edit and compares it with the original', async () => {
+    const reason = 'Decisión del equipo: adaptar el encuadre para LinkedIn; sale recortada a 1080×1350, centrada y sin IA';
+    server({ ...PUBLISHED, images: [pieceImage({ cropped: true, ai_edit: 'auto', width: 1080, height: 1350, mime: 'image/jpeg', reason })] });
+    await renderPieza();
+    await measureImage();
+    expect(screen.getByText('Recortada, sin IA')).toBeOnTheScreen();
+    expect(screen.queryByText('Editada con IA')).toBeNull();
+    expect(screen.queryByText('Se publica tal cual')).toBeNull();
+    expect(screen.getByText(reason)).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Ver original'));
+    expect(JSON.stringify(screen.getByTestId('piece-image-original').props.source)).toContain('/galeria/f1/imagen');
+    await fireEvent.press(screen.getByText('Ver recortada'));
+    expect(screen.getByTestId('piece-image-1')).toBeOnTheScreen();
+  });
+
   it('shows an infographic, its template, alt and review', async () => {
     server({ ...PUBLISHED, image_kind: 'infografia' as const, images: [pieceImage({ ...CAROUSEL_IMAGES[1]!, kind: 'infografia' })] });
     await renderPieza();

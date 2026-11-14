@@ -186,10 +186,15 @@ def add_photos(user,uploads,metadata=None):
     audit(user,'gallery.uploaded','galeria',photos=len(photos))
     return photos
 
+def _derived(photo):
+    """The photo's own derived files in pieces: AI edits and plain crops (IMG-09: deleting the photo deletes them)."""
+    from django.db.models import Q
+    return photo.uses.filter(Q(edited=True)|Q(cropped=True))
+
 def delete_photo(user,photo):
     require(user,'approve_actions')
     pid,name=photo.id,photo.image.name  # delete() clears the instance's pk
-    versions=[p.image.name for p in photo.uses.filter(edited=True)]
+    versions=[p.image.name for p in _derived(photo)]
     with transaction.atomic():
         # GAL-05 still removes ordinary post versions. Keep Perfil's exclusion records
         # after SET_NULL detaches their source; their private files are deleted below.
@@ -509,7 +514,7 @@ def undo(user,capture_id):
         photos=list(capture.photos.all())
         names=[capture.audio.name if capture.audio else '']+[p.image.name for p in photos]
         for photo in photos:
-            names.extend(p.image.name for p in photo.uses.filter(edited=True))
+            names.extend(p.image.name for p in _derived(photo))
             photo.delete()
         capture.publish_asap=False;capture.publish_asap_evidence='';capture.publish_asap_expected_slot=None;capture.understanding={}
         capture.publish_at=None;capture.publish_at_evidence=''
@@ -675,4 +680,4 @@ def photo_payload(p,now=None):
 
 def _photo_versions(photo):
     from .imagenes import payload
-    return [payload(row) for row in photo.uses.filter(edited=True)]
+    return [payload(row) for row in _derived(photo)]

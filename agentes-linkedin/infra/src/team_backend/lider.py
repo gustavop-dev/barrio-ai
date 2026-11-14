@@ -69,9 +69,13 @@ def gustavo_request(proposal):
     """What Gustavo said for this post (the ideas the piece uses and his comments on it), oldest first; [] when the
     post is the team's own."""
     if proposal.capability!=CAP.PUBLISH or not proposal.piece_id:return []
+    return piece_request(proposal.piece_id)
+
+def piece_request(piece_id):
+    """gustavo_request for a piece that has no proposal yet (editor_visual reads it to honour a format he asks for)."""
     from django.db.models import Q
     from .models import Capture
-    pid=str(proposal.piece_id)
+    pid=str(piece_id)
     rows=Capture.objects.filter(Q(state=Capture.State.USED,routed_to__used_in=pid)|
                                 Q(state=Capture.State.NOTED,context_type='pieza',context_id=pid)).order_by('created_at')
     texts=[' '.join((c.text or '').split())[:GUSTAVO_TEXT_CHARS] for c in rows]

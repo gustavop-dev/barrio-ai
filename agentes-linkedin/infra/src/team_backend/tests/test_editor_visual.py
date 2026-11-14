@@ -192,6 +192,32 @@ class VisualTests(EditorialBase):
         with self.assertRaisesRegex(ValueError, 'otro texto'):
             editor_visual.accept(piece, proposal, public, private)
 
+    def test_the_format_gustavo_asks_for_reaches_the_selector(self):
+        # IMG-15: «hazlo carrusel» in the idea the piece uses (or in his comment on it) reaches editor_visual.
+        from team_backend.models import Capture
+        piece = self.piece(kind='infografia')
+        Capture.objects.create(created_by=self.gustavo, note='Idea: three ways to scope a feature. Hazlo carrusel.',
+                               state=Capture.State.USED, routed_to={'used_in': str(piece.id)})
+        Capture.objects.create(created_by=self.gustavo, note='Que el cierre pregunte por su caso.', context_type='pieza',
+                               context_id=str(piece.id), state=Capture.State.NOTED)
+        Capture.objects.create(created_by=self.gustavo, note='Otra pieza.', state=Capture.State.USED, routed_to={'used_in': 'other'})
+        public, private = guardas.blocks()
+        request = editor_visual.request(piece, public, private)
+        self.assertEqual(request['gustavo_request'], ['Idea: three ways to scope a feature. Hazlo carrusel.',
+                                                      'Que el cierre pregunte por su caso.'])
+        choice = {'kind': 'carrusel', 'reason': 'Gustavo pidió un carrusel', 'photos': []}
+        with patch('team_backend.connectors_images.available', return_value=True), \
+                patch('knowledge.providers.claude', return_value={'text': json.dumps(choice)}) as model:
+            editor_visual.propose(request)
+        self.assertEqual(json.loads(model.call_args.args[1][0]['text'])['gustavo_request'], request['gustavo_request'])
+        self.assertIn('si pide un formato (carrusel, infografía, su foto), ese es el formato', model.call_args.args[0])
+        # The daily circuit sends it through the contract (test_full_editorial_pipeline…); a request snapshotted before
+        # the field existed still validates when its cycle resumes.
+        run = orquestacion.Runtime.open('pieza_diaria', str(piece.id), self.gustavo)
+        old = {k: v for k, v in request.items() if k != 'gustavo_request'}
+        with run.session():
+            self.assertEqual(run.call('proponer_visual', old, lambda: editor_visual.fallback(old, 'synthetic'))['mode'], 'fallback')
+
     def test_unoffered_photos_and_invalid_contract_never_prepare_or_publish(self):
         piece = self.piece(photo=self.photo())
         public, private = guardas.blocks()
