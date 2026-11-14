@@ -1,16 +1,16 @@
 """The weekly GASP strategy (estrategia.py, docs/plan-estrategia-semanal.md): the structure, the paid weekly plan, his
 changes, the audience first, the public founder stories of P and the per-type findings."""
+import hashlib
 import os
 import uuid
 from datetime import date, datetime, time, timedelta
 from decimal import Decimal
-from unittest import skipUnless
 from unittest.mock import patch
 from django.test import SimpleTestCase
 from django.utils import timezone
-from team_backend import editorial, estrategia, operador, research, resumen_semanal, urgente
-from team_backend.models import Capture, EditorialPiece, Job, Notification, WeeklyPlan
-from team_backend.tests.test_publicacion import EditorialBase, answers
+from team_backend import autopiloto, compuertas, editorial, estrategia, lider, operador, research, resumen_semanal, urgente
+from team_backend.models import ActionProposal, Capture, EditorialPiece, Job, Notification, WeeklyPlan
+from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answers
 
 MONDAY=date(2026,11,16)  # a normal week; the next one doubles S
 
@@ -294,8 +294,11 @@ class FindingTests(StrategyBase):
         self.assertEqual(self.codes('P',told,story=dict(self.STORY,source_ref='web:otra')),['unsourced_third_party_story'])
         self.assertEqual(self.codes('P','I almost shut my company down before launch.',story=self.STORY),['first_person_appropriation'])
         self.assertEqual(self.codes('P','Ana Ejemplo once said: «fear is the price of building anything».',story=self.STORY),['fabricated_quote'])
-        self.assertEqual({k for k,v in estrategia.SEVERITY.items() if v=='hard'},
+        # One severity table (compuertas): a founder's story told wrong is hard; how a type is shaped is soft.
+        self.assertEqual({c for c in compuertas.STRATEGY_CODES if compuertas.severity(c)=='dura'},
                          {'unsourced_third_party_story','fabricated_quote','first_person_appropriation'})
+        self.assertEqual({c for c in compuertas.STRATEGY_CODES if compuertas.severity(c)=='blanda'},
+                         {'cta_count','offer_in_growth','offer_in_personal','no_reader_need','repeated_story'})
 
     def test_what_the_brief_decided_is_a_risk_never_a_block(self):
         piece=EditorialPiece(slot_date=self.today,brief={'gasp_type':'A','reader_value':''})
@@ -325,17 +328,66 @@ class FindingTests(StrategyBase):
 
 
 class SalesGateTests(StrategyBase):
-    """TODO(gate_policy): a Sales post may carry ONE invitation to talk, which POST_PITCH and aggressive_pitch still block.
-    These pass once gate_policy(piece) lands (branch feat/compuertas-auditoria-reintento) and are skipped until then."""
-    @skipUnless(hasattr(editorial,'gate_policy'),'gate_policy aún no existe (feat/compuertas-auditoria-reintento)')
-    def test_a_sales_post_with_one_invitation_to_talk_goes_out(self):
-        piece=EditorialPiece(slot_date=self.today,brief={'gasp_type':'S','reader_value':'Una pregunta útil.'})
-        self.assertEqual(estrategia.findings(piece,'Si te pasa con tu MVP, escríbeme.'),[])
-        self.assertIsNotNone(editorial.gate_policy(piece))  # its exact shape is gate_policy's; one CTA must not block S
+    """A Sales post may carry ONE invitation to talk (Gustavo 14/11/2026): the strategy sets the piece's gate policy with
+    its type (estrategia.finalize_brief) and every gate reads it through compuertas.gate_policy."""
+    TEXT=GOOD_POST+' Si te pasa con tu MVP, escríbeme.'
+    PITCH='Contiene pitch agresivo o petición de contacto'
 
-    @skipUnless(hasattr(editorial,'gate_policy'),'gate_policy aún no existe (feat/compuertas-auditoria-reintento)')
+    def brief(self,kind,extra=False,idea_type=None):
+        strategy={'extra':extra,'type':None if extra else kind,'audience_signals':{},'idea_type':idea_type}
+        return estrategia.finalize_brief({'gasp_type':kind,'reader_value':'Una pregunta útil.','gate_policy':{'cta_max':1}},strategy)
+
+    def test_only_a_sales_day_opens_one_invitation_to_talk(self):
+        self.assertEqual({k:self.brief(k)['gate_policy'] for k in estrategia.TYPES},
+                         {'G':{'cta_max':0},'A':{'cta_max':0},'S':{'cta_max':1},'P':{'cta_max':0}})
+        self.assertEqual(self.brief('S',extra=True)['gate_policy'],{'cta_max':0})  # the model's pick on an extra post
+        self.assertEqual(self.brief('S',extra=True,idea_type='S')['gate_policy'],{'cta_max':1})  # his own request was Sales
+        self.assertNotIn('gate_policy',estrategia.finalize_brief({'gate_policy':{'cta_max':1}},None))  # never the model's
+
+    def test_a_sales_post_with_one_invitation_to_talk_passes_every_gate(self):
+        piece=EditorialPiece.objects.create(account=self.official,slot_date=self.today-timedelta(days=60),scheduled_for=timezone.now(),
+            state='ready',final_text=self.TEXT,brief=self.brief('S'),
+            verification={'verdict':'ready_for_execution','text_sha256':hashlib.sha256(self.TEXT.encode()).hexdigest()})
+        policy=compuertas.gate_policy(piece)
+        self.assertEqual(policy,{'cta_max':1})
+        self.assertEqual(estrategia.findings(piece,self.TEXT),[])
+        self.assertNotIn(self.PITCH,compuertas.form_rules(self.TEXT,policy))  # the circuit's rules
+        self.assertEqual(editorial.verifier_payload(piece,{'public_facts':[]},{},self.TEXT,[])['gate_policy'],{'cta_max':1})
+        self.assertEqual(compuertas.severity('aggressive_pitch',policy),'blanda')
+        proposal=ActionProposal(account=self.official,piece=piece,capability='CONT-09',payload={'text':self.TEXT},citations=['x'],source='agent')
+        self.assertNotIn(self.PITCH,autopiloto.post_issues(proposal))  # the final gate
+        with patch.object(lider,'ground_questions'):
+            _,questions,_=lider._questions(proposal,'')
+        self.assertIn('una sola invitación a conversar',questions['pitch']['instructions'])  # the lead
+        # Any other type keeps the default: no contact request at all.
+        piece.brief=self.brief('A');piece.save(update_fields=['brief'])
+        self.assertIn(self.PITCH,autopiloto.post_issues(proposal))
+        with patch.object(lider,'ground_questions'):
+            _,questions,_=lider._questions(proposal,'')
+        self.assertIn('pide que le escriban',questions['pitch']['instructions'])
+
+    def sales_week(self):
+        env=patch.dict(os.environ,{'STRATEGY_WEEK_TEMPLATE':'S,S,S,S,S,S,S','STRATEGY_SALES_DOUBLE_EVERY':'0'})
+        env.start();self.addCleanup(env.stop)
+
     def test_a_sales_post_with_two_invitations_is_repaired_and_else_kept_as_a_risk(self):
-        piece=EditorialPiece(slot_date=self.today,brief={'gasp_type':'S','reader_value':'Una pregunta útil.'})
-        issues=estrategia.findings(piece,'Escríbeme. Also, comment below.')
-        self.assertEqual([estrategia.code(i) for i in issues],['cta_count'])
-        self.assertEqual(estrategia.SEVERITY['cta_count'],'soft')
+        self.sales_week();two=self.TEXT+' Also, comment below.'
+        self.assertEqual([estrategia.code(i) for i in estrategia.findings(EditorialPiece(brief={'gasp_type':'S'}),two)],['cta_count'])
+        piece=self.plan(answers(final=two))  # the repair gives the same text back: the finding stays
+        self.assertEqual((piece.state,piece.brief['gasp_type'],piece.brief['gate_policy']),('ready','S',{'cta_max':1}),piece.note)
+        purposes=[c[0] for c in self.calls]
+        self.assertEqual((purposes.count('editorial-verificador'),purposes.count('editorial-reparacion')),(1,1))
+        self.assertEqual(self.calls[purposes.index('editorial-verificador')][1]['gate_policy'],{'cta_max':1})
+        v=piece.verification
+        self.assertEqual((v['verdict'],v['blocking_reasons'],[o['issue'] for o in v['observations']]),('ready_for_execution',[],['cta_count']))
+        self.assertEqual(v['repair']['findings'][0]['source'],'estrategia')
+        risks=ActionProposal.objects.get(piece=piece).risks
+        self.assertTrue(any(r.startswith('Conservada como observación (cta_count)') for r in risks),risks)
+
+    def test_a_sales_post_whose_repair_drops_the_second_invitation_goes_out_clean(self):
+        self.sales_week();two=self.TEXT+' Also, comment below.'
+        plan=answers(final=two)
+        plan['reparacion']=dict(plan['reparacion'],final_text=self.TEXT,changes=[{'finding':'cta_count','change':'Una sola invitación.'}])
+        piece=self.plan(plan)
+        self.assertEqual((piece.state,piece.final_text,piece.verification['observations']),('ready',self.TEXT,[]),piece.note)
+        self.assertEqual(piece.verification['repair']['resolution'],[{'source':'estrategia','issue':'cta_count','resolved':True}])

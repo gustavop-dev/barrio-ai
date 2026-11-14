@@ -174,11 +174,11 @@ Reglas de mezcla dentro de la semana:
 
 ### Comprobaciones por tipo
 
-Son hallazgos con un código que entran en la ronda de reparación que ya existe. Cómo frena cada código una pieza lo
-decide `gate_policy(piece)`, en otra rama (`feat/compuertas-auditoria-reintento`); aquí se propone su gravedad
-(`estrategia.SEVERITY`).
+Son hallazgos con un código que entran en la ronda de reparación que ya existe. Su gravedad está en la tabla única de
+las compuertas (`compuertas.HARD`/`SOFT`, [`compuertas.md`](../agentes-linkedin/infra/docs/compuertas.md)): los duros
+paran el texto antes del verificador; los blandos pasan por la reparación y, si siguen, salen como observación.
 
-| Código | Cuándo | Gravedad propuesta |
+| Código | Cuándo | Gravedad |
 | --- | --- | --- |
 | `unsourced_third_party_story` | La historia de P no está en una fuente guardada | Dura |
 | `fabricated_quote` | Una cita entre comillas no aparece en las fuentes | Dura |
@@ -188,9 +188,9 @@ decide `gate_policy(piece)`, en otra rama (`feat/compuertas-auditoria-reintento`
 | `no_reader_need` | La pieza no nombra una señal que respalde lo que necesita el lector | Blanda, va como riesgo |
 | `repeated_story` | La historia ya salió en las últimas 12 semanas | Blanda, va como riesgo |
 
-Mientras `gate_policy` no llegue, un hallazgo blando del texto que la reparación no arregla sigue bloqueando, y la
-única llamada a la acción de S sigue chocando con la regla actual contra la venta agresiva (`POST_PITCH`,
-`aggressive_pitch`): hay un `TODO(gate_policy)` en ambos sitios.
+El brief de cada pieza lleva `gate_policy`, que fija el código con el tipo: `{"cta_max": 1}` en venta y `{"cta_max": 0}`
+en los demás. Con él, la única invitación a conversar de S pasa las reglas fijas, el verificador, la compuerta final y
+el líder; la venta dura («book a call», «hire me») y una segunda petición de contacto siguen parando.
 
 ## Qué se construyó
 
@@ -203,8 +203,6 @@ Mientras `gate_policy` no llegue, un hallazgo blando del texto que la reparació
 ## Pendiente
 
 - **CI:** nada de esto se ejecutó en local; las pruebas de backend, Jest y Maestro corren en CI.
-- **`gate_policy`:** que los hallazgos blandos pasen a riesgo y que S pueda llevar su única llamada a la acción. Las
-  pruebas de venta esperan con `skipUnless` a que exista.
 - **Referentes de la industria:** `estrategia.growth_models` es la única entrada de los modelos de G; cuando esté su
   revisión se cambia `observed_outliers` sin tocar el resto.
 

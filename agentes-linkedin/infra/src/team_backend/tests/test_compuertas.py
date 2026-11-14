@@ -48,6 +48,18 @@ class SeverityTests(SimpleTestCase):
         self.assertEqual(compuertas.severity('invented_experience',{'cta_max':1}),'dura')
         with patch.dict(os.environ,{'COMPUERTAS_DURAS':'other'}):self.assertEqual(compuertas.severity('other'),'dura')
 
+    def test_the_strategys_findings_follow_the_one_table_and_never_hide_a_bare_blocked_verdict(self):
+        lines=['cta_count: 2 llamadas a la acción; una venta lleva una sola','fabricated_quote: «x» no aparece en las fuentes']
+        self.assertEqual(compuertas.strategy_split(lines),([lines[1]],[lines[0]]))
+        with patch.dict(os.environ,{'COMPUERTAS_DURAS':'cta_count'}):self.assertEqual(compuertas.strategy_split(lines),(lines,[]))
+        found={'issue':'cta_count','quote':'','detail':'2 llamadas a la acción; una venta lleva una sola'}
+        ready=compuertas.with_code_findings(review(verdict='ready_for_execution'),lines[:1])
+        self.assertEqual(ready['findings'],[dict(found,severity='material',by=compuertas.BY_CODE)])
+        self.assertEqual(compuertas.split(ready,{'cta_max':1}),([],[found]))  # soft: repaired, else an observation
+        self.assertEqual(compuertas.split(compuertas.with_code_findings(review(),lines[:1]))[0],['El verificador emitió blocked'])
+        model=review({'issue':'cta_count','severity':'material','quote':'q','detail':'d'},verdict='ready_for_execution')
+        self.assertEqual(len(compuertas.with_code_findings(model,lines[:1])['findings']),1)  # one the model flagged is not doubled
+
     def test_the_default_policy_forbids_any_contact_request_and_a_post_type_may_allow_one(self):
         dm=GOOD_POST+' DM me if you want the checklist.';sell=GOOD_POST+' Book a call this week.'
         pitch='Contiene pitch agresivo o petición de contacto'
@@ -198,6 +210,23 @@ class SecondAttemptTests(EditorialBase):
             self.assertFalse(compuertas.gate_blocked(piece),fields)
             self.assertIsNone(editorial.next_slot(now),fields)
             piece.delete()
+
+    def test_an_extra_post_he_asked_for_is_never_the_days_attempt_and_never_holds_it(self):
+        """The weekly strategy's extra post (second_of_day) sits next to the daily one: it is not an attempt of the daily
+        post, an open one or its queued job does not hold the daily post, and the daily post still gets exactly one more."""
+        slot,when=self.tomorrow();now=when-timedelta(hours=3)
+        extra=self.blocked(slot,now-timedelta(hours=2),second_of_day=True)
+        self.assertEqual(editorial.next_slot(now),slot)  # only his extra post so far: the daily post is still due
+        first=self.blocked(slot,now-timedelta(hours=1))
+        self.assertEqual(compuertas.attempt_number(first),1)
+        self.assertEqual(editorial.next_slot(now),slot)  # its one second attempt
+        EditorialPiece.objects.filter(pk=extra.pk).update(state='ready')
+        jobs.enqueue_operation(self.gustavo,'prepare_piece',{'slot':slot.isoformat(),'extra':True})
+        self.assertEqual(editorial.next_slot(now),slot)  # an open extra post or its job does not hold the daily one
+        self.blocked(slot,now-timedelta(minutes=30))
+        self.assertIsNone(editorial.next_slot(now))  # two daily attempts: the day ends here
+        with patch.dict(os.environ,{'OPERATOR_AUTOPILOT':'true'}):
+            self.assertFalse(compuertas.retry_left(extra,now))  # an extra post is never retried
 
     def test_the_second_attempt_tells_the_director_why_the_first_stopped(self):
         slot=editorial.next_slot(manual=True)

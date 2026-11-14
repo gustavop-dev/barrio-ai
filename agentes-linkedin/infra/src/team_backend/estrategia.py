@@ -15,8 +15,9 @@
   about his life.
 - The daily post keeps the structure; a post he asks for on a date and hour is an extra one outside it (urgente.py).
 
-Per-type checks are findings with an issue code (SEVERITY) that feed the existing repair round of the circuit; how a
-gate treats each code is gate_policy's decision (feat/compuertas-auditoria-reintento), not this module's."""
+Per-type checks are findings with an issue code that feed the existing repair round of the circuit; how a gate treats
+each code is in the one severity table (compuertas.HARD/SOFT). The brief carries the day's gate_policy (compuertas): one
+conversational call to action on a Sales post, none on the others."""
 import json
 import os
 import re
@@ -28,7 +29,7 @@ from decimal import Decimal
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from knowledge import db, providers
-from . import operador, posicionamiento
+from . import compuertas, operador, posicionamiento
 from .exceptions import Conflict
 from .models import Capture, EditorialPiece, Job, ObservedPost, PostComment, WeeklyPlan
 from .permissions import require
@@ -50,9 +51,6 @@ PAINS=(('miedo_a_fracasar','the fear of failing before or after launching','el m
        ('mala_contratacion','a wrong early hire','una mala contratación'))
 EVIDENCE_KINDS=('referent_outlier','comment_question','owner_capture','results_by_type')
 FORMATS=('foto','infografia','carrusel')
-# Proposed severity of each finding for gate_policy: hard keeps blocking, soft is repaired and else becomes a risk.
-SEVERITY={'unsourced_third_party_story':'hard','fabricated_quote':'hard','first_person_appropriation':'hard',
-          'cta_count':'soft','offer_in_growth':'soft','offer_in_personal':'soft','no_reader_need':'soft','repeated_story':'soft'}
 PLAN_MAX_TOKENS=16000
 TYPICAL_INPUT_TOKENS=15000;TYPICAL_OUTPUT_TOKENS=6000
 # Course units already named by the design (docs/plan-estrategia-semanal.md); a missing one is reported, not fatal.
@@ -169,7 +167,7 @@ def day_type(day):
     return slot['type'] if slot else None
 
 def piece_type(piece):
-    """The GASP type the brief of a piece carries (gate_policy reads it): G, A, S, P or None."""
+    """The GASP type the brief of a piece carries: G, A, S, P or None."""
     value=(piece.brief or {}).get('gasp_type')
     return value if value in TYPES else None
 
@@ -285,7 +283,9 @@ def director_input(piece,ideas,priority,now):
     if not enabled():return None
     signals=audience_signals(now)
     if piece.second_of_day:
-        return {'extra':True,'type':None,'rules':TYPE_RULES,'audience_signals':signals}
+        # The type of his own request, as his capture was classified: only that can open a Sales gate on an extra post.
+        idea=(priority or {}).get('gasp_type')
+        return {'extra':True,'type':None,'rules':TYPE_RULES,'audience_signals':signals,'idea_type':idea if idea in TYPES else None}
     slot=slot_for(piece.slot_date) or {}
     kind=slot.get('type')
     monday=week_start(piece.slot_date)
@@ -301,15 +301,23 @@ def director_input(piece,ideas,priority,now):
         out.update(pain=p,used_stories=used_stories(now),owner_personal_material=personal_material(ideas,priority))
     return out
 
+def type_policy(kind,strategy=None):
+    """compuertas.gate_policy of a piece of this type: a Sales post carries ONE invitation to talk; every other type,
+    none. On an extra post the model picks the type, so only his own request classified as Sales opens it."""
+    sales=kind=='S' and (not (strategy or {}).get('extra') or (strategy or {}).get('idea_type')=='S')
+    return {'cta_max':1 if sales else 0}
+
 def finalize_brief(brief,strategy):
     """The code keeps the day's type and the audience evidence honest; the brief then carries them for the writers,
-    the verifier, the results and gate_policy."""
+    the verifier, the results and the gates (gate_policy is set here, never by the model)."""
+    brief.pop('gate_policy',None)
     if not strategy:return brief
     signals=strategy.get('audience_signals') or {}
     if strategy.get('extra'):
         brief['gasp_type']=brief.get('gasp_type') if brief.get('gasp_type') in TYPES else None
     else:
         brief['gasp_type']=strategy.get('type')
+    brief['gate_policy']=type_policy(brief['gasp_type'],strategy)
     planned=strategy.get('planned') or {}
     evidence=brief.get('audience_evidence')
     if not valid_evidence(evidence,signals):
@@ -326,7 +334,8 @@ def finalize_brief(brief,strategy):
 
 # --------------------------------------------------------------------------- deterministic findings
 
-# A conversation invitation: what a Sales post may carry once (gate_policy decides whether one is allowed).
+# A conversation invitation: what a Sales post may carry once (its gate_policy allows one; compuertas.form_rules still
+# stops a second contact request and any hard selling).
 CTA=re.compile(r'\b(?:dm me|message me|send me a (?:dm|message)|reach out(?: to me)?|let\'s talk|book a call|comment below|'
                r'drop (?:a|your) comment|tell me in the comments|reply (?:below|with)|escr[ií]beme|cont[aá]ctame|com[eé]ntame|'
                r'd[eé]jame (?:un|tu) comentario)\b',re.I)
@@ -373,8 +382,8 @@ def findings(piece,text):
     return out
 
 def notes(piece,now=None):
-    """Soft findings of the brief that a repaired text cannot fix: they travel as risks of the proposal, never block.
-    TODO(gate_policy): once gate_policy(piece) turns unrepaired soft findings into risks, these can join findings()."""
+    """Soft findings of the brief that a repaired text cannot fix (soft in compuertas.SOFT): they travel as risks of the
+    proposal, never block and never cost a repair round."""
     brief=piece.brief or {};kind=brief.get('gasp_type')
     if kind not in TYPES:return []
     out=[]
@@ -389,8 +398,7 @@ def notes(piece,now=None):
 
 def code(issue):
     """The finding code of an issue line («cta_count: …» → cta_count), or None for any other rule."""
-    head=str(issue).split(':',1)[0].strip()
-    return head if head in SEVERITY else None
+    return compuertas.strategy_code(issue)
 
 # --------------------------------------------------------------------------- the weekly plan (one paid call)
 

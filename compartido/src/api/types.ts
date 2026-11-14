@@ -628,7 +628,8 @@ export interface Verification {
   rules?: string[];
   /** R4: the one repair round, when the rules or the verifier found concrete problems. */
   repair?: Repair;
-  /** Soft findings (hook_not_delivered, off_brief, other) that did not stop the piece (docs/compuertas.md). */
+  /** Soft findings (hook_not_delivered, off_brief, other and the GASP type ones such as cta_count) that did not stop the
+   * piece (docs/compuertas.md). */
   observations?: Observation[];
   /** Which attempt of its day this piece was; the second only follows a content gate's block. */
   day_attempt?: { number: number; of: number };
@@ -643,7 +644,8 @@ export interface Observation {
 }
 
 export interface RepairFinding {
-  source: 'reglas' | 'verificador';
+  /** estrategia: a per-type finding of the weekly strategy (cta_count, offer_in_growth…), found by code. */
+  source: 'reglas' | 'verificador' | 'estrategia';
   issue: string;
   quote?: string;
   detail?: string;
@@ -666,7 +668,7 @@ export interface Repair {
   repaired_sha256?: string;
   repaired_text?: string;
   /** After the scoped second review: whether each first finding was resolved. */
-  resolution?: { source: 'reglas' | 'verificador'; issue: string; resolved: boolean }[];
+  resolution?: { source: 'reglas' | 'verificador' | 'estrategia'; issue: string; resolved: boolean }[];
 }
 
 export interface Signal {

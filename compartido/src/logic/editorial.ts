@@ -77,6 +77,15 @@ export const ISSUE_LABEL: Record<string, string> = {
   hook_not_delivered: 'Gancho incumplido',
   off_brief: 'Fuera del brief',
   other: 'Otro',
+  // Per GASP type (docs/plan-estrategia-semanal.md).
+  cta_count: 'Llamadas a la acción de más',
+  offer_in_growth: 'Oferta en un post de crecimiento',
+  offer_in_personal: 'Oferta en un post personal',
+  no_reader_need: 'No dice qué necesita el lector',
+  repeated_story: 'Historia repetida',
+  unsourced_third_party_story: 'Historia ajena sin fuente',
+  fabricated_quote: 'Cita inventada',
+  first_person_appropriation: 'Historia ajena contada como propia',
 };
 
 export const CLAIM_LABEL: Record<string, string> = {

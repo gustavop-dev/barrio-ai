@@ -15,15 +15,27 @@ haber corregido lo que bloqueó».
   (EDITORIAL_DAY_ATTEMPTS=2) when there is time before its hour (EDITORIAL_RETRY_MIN_MINUTES); the director sees why the
   first one stopped. Money stops wait for budget and never count as an attempt; a skip or a failure is not retried.
 - gate_policy(piece) is the one hook for what a post type may do that the default forbids. Without a policy in the
-  brief everything behaves as before (no contact request at all).
+  brief everything behaves as before (no contact request at all). The weekly strategy (estrategia.finalize_brief) sets
+  it with the day's type: one conversational call to action on a Sales post, none on the others.
+- This file is the one severity table, the per-type findings of the strategy (estrategia.findings and notes) included:
+  the hard ones stop the text before the verifier like any rule; the soft ones join the verifier's findings, get the
+  repair round and, if they stay, go out as observations.
 """
 import os
 import re
 from datetime import timedelta
 from .models import EditorialPiece
 
-HARD=('invented_experience','unsourced_figure','private_data','private_guidance_leak','unsupported_claim')
-SOFT=('hook_not_delivered','off_brief','other')
+HARD=('invented_experience','unsourced_figure','private_data','private_guidance_leak','unsupported_claim',
+      # A founder's public story on a Personal post (estrategia.findings): an unsourced story, an invented quote or his
+      # story told as Gustavo's misleads about a real person.
+      'unsourced_third_party_story','fabricated_quote','first_person_appropriation')
+SOFT=('hook_not_delivered','off_brief','other',
+      # What fits a GASP type (estrategia.findings and notes): how a post is shaped, never a safety problem.
+      'cta_count','offer_in_growth','offer_in_personal','no_reader_need','repeated_story')
+# The finding codes of the weekly strategy; an issue line of estrategia reads «code: detail».
+STRATEGY_CODES=('unsourced_third_party_story','fabricated_quote','first_person_appropriation','cta_count','offer_in_growth',
+                'offer_in_personal','no_reader_need','repeated_story')
 # aggressive_pitch is hard unless the piece's policy allows one conversational call to action (then the verifier's
 # finding is soft and the deterministic rule still stops hard selling).
 DEFAULT_POLICY={'cta_max':0}
@@ -60,16 +72,45 @@ def severity(issue,policy=None):
 
 def split(review,policy=None):
     """(hard reasons, soft findings) of one verifier review. The reasons use the wording of editorial._blocking. A bare
-    «blocked» without material findings or unsupported claims is hard: there is nothing concrete to keep as an observation."""
+    «blocked» without material findings or unsupported claims of the model is hard: there is nothing concrete to keep as
+    an observation (the strategy's own findings, added by code, never stand in for the model's)."""
     review=review or {};hard=hard_issues(policy);reasons=[];soft=[]
     material=[f for f in review.get('findings',[]) if f.get('severity')=='material']
     unsupported=[c for c in review.get('checked_claims',[]) if c.get('status')=='unsupported']
-    if review.get('verdict')!='ready_for_execution' and not material and not unsupported:reasons.append(BLOCKED_BARE)
+    own=[f for f in material if f.get('by')!=BY_CODE]
+    if review.get('verdict')!='ready_for_execution' and not own and not unsupported:reasons.append(BLOCKED_BARE)
     for f in material:
         if f.get('issue') in hard:reasons.append(f'Hallazgo material ({f.get("issue")}): {f.get("detail") or f.get("quote")}')
         else:soft.append({'issue':f.get('issue') or 'other','quote':f.get('quote') or '','detail':f.get('detail') or ''})
     reasons+=[f'Afirmación sin respaldo: {c.get("text")}' for c in unsupported]
     return reasons,soft
+
+# --------------------------------------------------------------------------- the strategy's per-type findings
+
+BY_CODE='codigo'  # a finding the code added to a review (estrategia.findings), never the model's
+
+def strategy_code(issue):
+    """The code of a strategy issue line («cta_count: …» → cta_count), or None for any other rule."""
+    head=str(issue).split(':',1)[0].strip()
+    return head if head in STRATEGY_CODES else None
+
+def strategy_split(issues,policy=None):
+    """(hard issue lines, soft issue lines) of estrategia.findings, by this table (COMPUERTAS_DURAS can harden one)."""
+    hard=hard_issues(policy)
+    return ([i for i in issues if strategy_code(i) in hard],[i for i in issues if strategy_code(i) not in hard])
+
+def with_code_findings(review,issues):
+    """The verifier's review plus the soft strategy findings of the same text as material findings marked by code: they
+    get the one repair round and, if they stay, settle as observations. One the model already flagged is not doubled."""
+    if not issues or review is None:return review
+    flagged={f.get('issue') for f in review.get('findings',[]) if f.get('severity')=='material'}
+    extra=[]
+    for line in issues:
+        code=strategy_code(line)
+        if code in flagged:continue
+        flagged.add(code)
+        extra.append({'issue':code,'severity':'material','quote':'','detail':str(line).split(':',1)[1].strip(),'by':BY_CODE})
+    return dict(review,findings=list(review.get('findings',[]))+extra) if extra else review
 
 def observation_risks(observations):
     """What the proposal (and the detail) say about a soft finding that did not stop the piece."""
@@ -83,7 +124,8 @@ def resolution(findings,review,issues):
     open_claims={c.get('text') for c in review.get('checked_claims',[]) if c.get('status')=='unsupported'}
     out=[]
     for f in findings:
-        if f.get('source')=='reglas':still=f.get('detail') in issues
+        # A soft strategy finding that travelled with the rules is still open if the second review carries it.
+        if f.get('source')=='reglas':still=f.get('detail') in issues or (strategy_code(f.get('detail')) or '') in open_issues
         elif f.get('issue')=='unsupported_claim':still=f.get('quote') in open_claims
         else:still=f.get('issue') in open_issues
         out.append({'source':f.get('source'),'issue':f.get('issue'),'resolved':not still})

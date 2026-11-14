@@ -56,6 +56,19 @@ concretos son duros siempre.
 | `hook_not_delivered` | blanda | calidad: la ronda la intenta arreglar; si no, sale como observación |
 | `off_brief` | blanda | calidad |
 | `other` | blanda | solo calidad; el prompt manda los problemas graves a su categoría |
+| `unsourced_third_party_story` | dura | estrategia (P): la historia de un founder no está en una fuente guardada |
+| `fabricated_quote` | dura | estrategia (P): una cita entre comillas que no está literal en la fuente |
+| `first_person_appropriation` | dura | estrategia (P): la historia ajena contada como de Gustavo o sin atribuir |
+| `cta_count` | blanda | estrategia: más de una llamada a la acción en S, o alguna en P |
+| `offer_in_growth`, `offer_in_personal` | blanda | estrategia: ofrece servicios en un post G o P |
+| `no_reader_need`, `repeated_story` | blanda | estrategia: lo decidió el brief; viajan solo como riesgo «Estrategia: …», sin ronda |
+
+Los códigos de la estrategia semanal (`compuertas.STRATEGY_CODES`, `estrategia.findings` y `notes`) están en esta misma
+tabla (`compuertas.HARD`/`SOFT`): no hay otra. El código los busca en el texto exacto antes del verificador
+(`editorial.strategy_issues`): los duros paran el texto como una regla fija y no se paga el verificador; los blandos se
+suman a la revisión del verificador como hallazgos `material` marcados `by: "codigo"` (`compuertas.with_code_findings`),
+pasan por la ronda de reparación (`source: "estrategia"`) y, si siguen, salen como observación. Un `blocked` del modelo
+sin hallazgos propios sigue siendo duro aunque el código haya añadido los suyos.
 
 `COMPUERTAS_DURAS=other,off_brief` vuelve duras más categorías si la auditoría muestra que salen piezas que no deberían.
 Un hallazgo `minor` nunca bloquea (como antes). El prompt del verificador dice ahora que solo un **hecho** sin respaldo es
@@ -100,7 +113,11 @@ que lo paró, o saltar el día. El aviso `piece_blocked` añade «Habrá un segu
 
 ## `gate_policy`: lo que un tipo de post puede permitir
 
-`compuertas.gate_policy(pieza)` lee `brief['gate_policy']`, que pone el tipo de post (nunca el modelo). Hoy solo admite
+`compuertas.gate_policy(pieza)` lee `brief['gate_policy']`, que pone el tipo de post (nunca el modelo):
+`estrategia.finalize_brief` lo fija con el tipo GASP del día, `{"cta_max": 1}` en venta (S) y `{"cta_max": 0}` en los
+demás; en un post extra que Gustavo pidió con fecha, solo si su propia idea se clasificó como venta. Lo leen las reglas
+fijas, el verificador, la compuerta final (`autopiloto.post_issues`) y la pregunta `pitch` del líder para CONT-09, que en
+un post de venta no cuenta una sola invitación a conversar. Hoy solo admite
 `{"cta_max": 0|1}`: con 1, una sola invitación conversacional («DM me», «escríbeme», `autopiloto.POST_CTA`) pasa en las
 reglas fijas y en el verificador; la venta dura («hire me», «book a call», «buy now», `autopiloto.POST_SELL`) sigue
 parando, y dos invitaciones también. Sin política, `{"cta_max": 0}` y todo

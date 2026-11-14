@@ -516,10 +516,10 @@ La semana GASP ([`plan-estrategia-semanal.md`](../plan-estrategia-semanal.md)): 
 ### EDI-30 · El tipo del día en la pieza y sus comprobaciones <a id="edi-30"></a>
 
 - **Dónde:** backend
-- **Estado:** implementado (14/11/2026); cómo frena cada hallazgo depende de `gate_policy`, en otra rama
+- **Estado:** implementado (14/11/2026); cómo frena cada hallazgo está en la tabla única de [EDI-25](#edi-25)
 - **Qué hace para Gustavo:** el director escribe la pieza del día con su tipo como restricción y dice qué necesita el lector. Crecimiento toma como modelo la estructura de un post de referente que funcionó; venta lleva una sola invitación a conversar; personal cuenta, sin material suyo, la historia pública de un founder sobre el dolor de la semana, atribuida y con su fuente. El código comprueba en el texto final lo propio de cada tipo.
 - **Responsable:** `director_editorial` (brief), los redactores y `editor_verificador`; la investigación web de la pieza busca la historia de P.
-- **Código:** `estrategia.director_input`, `finalize_brief`, `story_question`, `used_stories`, `findings`, `notes`, `SEVERITY`, `code`; `editorial._story_research`, `_run` (las notas entran como riesgos «Estrategia: …»), `_check` (los hallazgos entran en las reglas y en la ronda de reparación de [EDI-08](#edi-08)); `TODO(gate_policy)` en `autopiloto.py` y en `VERIFIER_SYSTEM`.
+- **Código:** `estrategia.director_input`, `finalize_brief`, `type_policy`, `story_question`, `used_stories`, `findings`, `notes`, `code`; `compuertas.HARD`, `SOFT`, `STRATEGY_CODES`, `strategy_split`, `with_code_findings`; `editorial._story_research`, `_run` (las notas entran como riesgos «Estrategia: …»), `strategy_issues` y `_check` (los duros son reglas; los blandos se suman a la revisión y van a la ronda de reparación de [EDI-08](#edi-08)); `lider._questions` (la pregunta `pitch` de un post de venta).
 - **Criterios de aceptación:**
   1. **Dado** la estrategia encendida, **cuando** el director escribe el brief, **entonces** lleva `gasp_type` (el del día; el post extra no tiene tipo de día), `reader_need` y `audience_evidence` solo si apunta a una señal ofrecida.
   2. **Dado** un día P sin material suyo y con investigación web disponible, **cuando** se prepara, **entonces** hace una sola investigación cuya pregunta es solo el dolor de la semana; con material suyo no busca nada.
@@ -527,8 +527,10 @@ La semana GASP ([`plan-estrategia-semanal.md`](../plan-estrategia-semanal.md)): 
   4. **Dado** S, G o P, **cuando** se comprueba el texto, **entonces** `cta_count` con más de una llamada a la acción en S o alguna en P, y `offer_in_growth` u `offer_in_personal` si ofrece servicios.
   5. **Dado** una pieza sin señal que respalde lo que necesita el lector (cuando había señales) o una historia que ya salió en 12 semanas, **cuando** queda lista, **entonces** sale con el riesgo `no_reader_need` o `repeated_story`, sin bloquear.
   6. **Dado** la estrategia apagada o una pieza anterior sin tipo, **cuando** se comprueba, **entonces** no hay hallazgos por tipo.
-- **Brechas:** hasta que llegue `gate_policy`, un hallazgo blando que la reparación no arregla sigue bloqueando, y la única llamada a la acción de S choca con `POST_PITCH` y `aggressive_pitch`. Las pruebas de venta (`SalesGateTests`) esperan con `skipUnless` a que exista `editorial.gate_policy`.
-- **Cobertura QA:** `tests/test_estrategia.py` (`PersonalStoryTests`, `FindingTests`, `SalesGateTests`). Pendiente de CI.
+  7. **Dado** un día de venta, **cuando** se fija el brief, **entonces** lleva `gate_policy: {cta_max: 1}` (los demás tipos, `0`; un post extra, solo si su idea era de venta) y una sola invitación a conversar pasa las reglas fijas, el verificador, la compuerta final y el líder; la venta dura y una segunda petición de contacto siguen parando.
+  8. **Dado** un hallazgo blando por tipo (`cta_count`, `offer_in_growth`, `offer_in_personal`), **cuando** la ronda de reparación no lo arregla, **entonces** la pieza sale con él como observación; uno duro (`unsourced_third_party_story`, `fabricated_quote`, `first_person_appropriation`) la bloquea sin pagar el verificador.
+- **Brechas:** —
+- **Cobertura QA:** `tests/test_estrategia.py` (`PersonalStoryTests`, `FindingTests`, `SalesGateTests`); `tests/test_compuertas.py` (`SeverityTests`). Pendiente de CI.
 
 ## Retiradas
 

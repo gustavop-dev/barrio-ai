@@ -504,10 +504,13 @@ def _each(cases,results,one):
         except ValueError as exc:results.append(dict(base,error=str(exc)[:300]))
 
 def _check(run,piece,text,claims,model,second=None):
-    """editorial._check: the rules first, then the verifier only for a text they let through."""
-    issues=editorial.text_rules(text,run.public,run.private,compuertas.gate_policy(piece))
-    if issues:return None,issues,issues
-    review=run.claude('verificador',verifier_request(run,piece,text,claims,second),model)
+    """editorial._check: the rules first (with the strategy's hard findings), then the verifier only for a text they let
+    through, with the strategy's soft findings added to its review as in production."""
+    policy=compuertas.gate_policy(piece)
+    hard,soft=editorial.strategy_issues(piece,text,policy)
+    issues=editorial.text_rules(text,run.public,run.private,policy)+hard
+    if issues:return None,issues+soft,issues+soft
+    review=compuertas.with_code_findings(run.claude('verificador',verifier_request(run,piece,text,claims,second),model),soft)
     return review,editorial._blocking(review),[]
 
 def _settle(piece,review,reasons,issues):
@@ -677,7 +680,7 @@ def replay_case(run,piece):
     """The current deterministic layer (rules, severity, policy) on what was stored for one piece. No model call: the stored
     verifier findings are reused; a text the rules stopped before the verifier ever ran needs a paid replay."""
     v=piece.verification or {};policy=compuertas.gate_policy(piece);fate=piece_fate(piece)
-    rules=editorial.text_rules(piece.final_text,run.public,run.private,policy)
+    rules=editorial.text_rules(piece.final_text,run.public,run.private,policy)+editorial.strategy_issues(piece,piece.final_text,policy)[0]
     now,observations='blocked',[]
     if rules:hard=rules
     elif v.get('model_verdict') is None:hard=None

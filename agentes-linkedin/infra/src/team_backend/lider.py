@@ -143,9 +143,17 @@ def _questions(proposal,orientation):
     elif capability==CAP.PUBLISH:
         state={'publicacion':proposal.payload['text']}
         asked=gustavo_request(proposal)
+        # A Sales post of the weekly strategy may carry ONE invitation to talk (compuertas.gate_policy): the rules and the
+        # verifier already let it through, so the lead must not discard it for exactly that.
+        from . import compuertas
+        sales=compuertas.gate_policy(proposal.piece if proposal.piece_id else None).get('cta_max')
         questions={
             'clara':_noul('¿La `publicacion` desarrolla una sola idea clara que un lector puede entender sin contexto adicional?'),
-            'pitch':_noul('¿La `publicacion` vende de forma agresiva, crea urgencia artificial o pide que le escriban o lo contraten?'),
+            'pitch':_noul('¿La `publicacion` vende de forma agresiva, crea urgencia artificial o pide que le escriban o lo contraten?'
+                          if not sales else
+                          '¿La `publicacion` vende de forma agresiva, crea urgencia artificial, pide que lo contraten o trae más de '
+                          'una invitación a escribirle o a comentar? Es un post de venta: una sola invitación a conversar es lo que '
+                          'debe llevar y no cuenta como venta.'),
             'inventa':_noul('¿La `publicacion` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
                             'no aparece en `hechos_publicos_de_gustavo`?'),
         }
