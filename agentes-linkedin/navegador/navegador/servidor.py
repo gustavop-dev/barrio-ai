@@ -50,13 +50,16 @@ class Service:
 SERVICE = web.AppKey('service', Service)
 
 
-def reason(status, text, code='', retry_after=None):
-    """The service's own answer. A spent budget adds `code: budget` and `retry_after` (seconds, also as the header)."""
+def reason(status, text, code='', retry_after=None, since=None):
+    """The service's own answer. A spent budget adds `code: budget` and `retry_after` (seconds, also as the header);
+    another internet exit, `code: egress` and `since` (when that refusal began)."""
     body, headers = {'reason': text}, {}
     if code:
         body['code'] = code
     if retry_after is not None:
         body['retry_after'], headers['Retry-After'] = retry_after, str(retry_after)
+    if since:
+        body['since'] = since
     return web.json_response(body, status=status, headers=headers)
 
 
@@ -98,7 +101,7 @@ async def calls(request):
         answer = await service.account(name).call(call, request_id, arrived)
     except Refused as exc:
         log.info('cuenta=%s op=%s -> %s %s', name if ACCOUNT.fullmatch(name) else '?', operation, exc.status, exc.reason)
-        return reason(exc.status, exc.reason, exc.code, exc.retry_after)
+        return reason(exc.status, exc.reason, exc.code, exc.retry_after, exc.since)
     return web.json_response({'status': answer.status, 'text': answer.text, 'content_type': answer.content_type,
                               'url': answer.url, 'redirected': answer.redirected})
 
@@ -114,7 +117,7 @@ async def queries(request):
         found = await service.account(name).live_query(prefixes, variables, arrived)
     except Refused as exc:
         log.info('cuenta=%s consultas -> %s %s', name if ACCOUNT.fullmatch(name) else '?', exc.status, exc.reason)
-        return reason(exc.status, exc.reason)
+        return reason(exc.status, exc.reason, exc.code, exc.retry_after, exc.since)
     return web.json_response(found)
 
 

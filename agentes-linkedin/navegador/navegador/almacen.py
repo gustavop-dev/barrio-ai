@@ -7,6 +7,8 @@ forgets nothing that guards LinkedIn:
                  budgets count from it.
 - salida.json    the internet exit the session last went out by: a label (ajustes.Egress.label), never an address or
                  a credential. A different one is refused until an operator accepts it (`salida <cuenta> --aceptar`).
+- salida-rechazada.json  since when that refusal lasts (only a time): the backend tells the owner once per episode. Gone
+                 once the account opens by its exit again or an operator accepts the new one.
 - escrituras/    one file per write's request_id: LinkedIn's answer, or `sending` while it is out (and forever if the
                  process died mid-send). A repeated id gets the stored answer back, never a second send.
 
@@ -97,6 +99,21 @@ class Store:
 
     def set_egress(self, label, now=None):
         write_json(self.root / 'salida.json', {'salida': str(label), 'desde': stamp(now or time.time())})
+        self.egress_matches()
+
+    def egress_refused(self, now):
+        """When the refusal of another exit began: kept from the first refused call, so every refusal of one episode
+        carries the same moment and the backend says it once."""
+        data = read_json(self.root / 'salida-rechazada.json')
+        if isinstance(data, dict) and isinstance(data.get('desde'), str) and data['desde']:
+            return data['desde']
+        since = stamp(now)
+        write_json(self.root / 'salida-rechazada.json', {'desde': since})
+        return since
+
+    def egress_matches(self):
+        """The episode is over: the configured exit is the session's again (accepted, or put back)."""
+        (self.root / 'salida-rechazada.json').unlink(missing_ok=True)
 
     # --- writes by request_id ----------------------------------------------------------------------------------------
     def _write_path(self, request_id):

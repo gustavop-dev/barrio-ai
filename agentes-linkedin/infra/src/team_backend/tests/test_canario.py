@@ -169,6 +169,21 @@ class CanaryTests(CanaryBase):
         self.assertEqual(canario.run(self.account,now=self.at(days=2)).state,'ok')
         self.assertEqual(self.notices().count(),2)
 
+    def test_another_internet_exit_is_told_at_once_and_never_pauses(self):
+        body={'reason':'la salida a internet cambió; no salió nada','code':'egress','since':'2026-11-13T11:00:00+00:00'}
+        refused=DirectoConnector('cuenta-prueba',transport=ServiceTransport(
+            'http://navegador.interno:8080/','token-ficticio','cuenta-prueba',
+            http_transport=httpx.MockTransport(lambda r:httpx.Response(503,json=body))))
+        log=canario.run(self.account,now=self.at(hours=12),connector=refused)
+        self.assertEqual((log.state,log.calls,log.error_kind),('no_corrio',1,'egress'))
+        self.assertIn('python -m navegador salida cuenta-prueba --aceptar',log.error)
+        [notice]=Notification.objects.filter(kind='navegador_salida')
+        self.assertIn('python -m navegador salida cuenta-prueba --aceptar',notice.detail)
+        self.assertFalse(self.notices().exists())  # the canary's own notice still waits for the day's last try
+        canario.run(self.account,now=self.at(hours=13),connector=refused)
+        self.assertEqual(Notification.objects.filter(kind='navegador_salida').count(),1)  # the same episode
+        self.account.refresh_from_db();self.assertFalse(self.account.paused)
+
     def test_only_the_last_runs_stay_and_the_latest_shown_is_a_finished_one(self):
         for n in range(canario.KEEP+3):
             CanaryRun.objects.create(account=self.account,state='ok',started_at=self.at(days=n-40),finished_at=self.at(days=n-40))

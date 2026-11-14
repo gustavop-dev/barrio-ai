@@ -18,7 +18,7 @@ from linkedin_directo import rutas
 
 from navegador import __main__ as cli
 from navegador import ajustes
-from navegador.almacen import IMPORTED, Store
+from navegador.almacen import IMPORTED, Store, stamp
 from navegador.servidor import build
 from tests.falsos import MESSAGING, POST, PROFILE, TOKEN, Browser, Request, Response, World, call, invitation, raw, \
     reaction
@@ -155,12 +155,14 @@ class StatusTests(ServiceCase):
             status, body = await self.post(call())
         self.assertEqual(status, 503)
         self.assertIn('otro navegador', body['reason'])
+        self.assertNotIn('code', body)  # passing: only another internet exit carries a code (egress)
         self.assertEqual(self.browser.launches, 0)
         lock.unlink()
         self.browser.fail_launch = RuntimeError('sin pantalla')
         status, body = await self.post(call())
         self.assertEqual(status, 503)
         self.assertIn('no abrió', body['reason'])
+        self.assertNotIn('code', body)
         self.assertEqual(self.browser.fetches, [])
 
     async def test_504_when_the_page_fails_mid_call_and_that_write_is_never_repeated(self):
@@ -285,10 +287,15 @@ class EgressTests(ServiceCase):
         self.assertEqual((self.store().egress(), self.browser.proxies), ('directo', [None]))
         self.world.settings = replace(self.world.settings, proxy='socks5://127.0.0.1:1080')
         client = await self.start()  # the service again, now with a proxy
+        refused_at = stamp(self.world.clock.now)
         status, body = await self.post(call(), client=client)
         self.assertEqual(status, 503)
         self.assertIn('la salida a internet cambió; no salió nada', body['reason'])
         self.assertIn('salida prueba --aceptar', body['reason'])
+        # Its own code, and since when: every refusal of the episode says the same moment (the backend tells it once).
+        self.assertEqual((body['code'], body['since']), ('egress', refused_at))
+        self.world.clock.now += 3600
+        self.assertEqual((await self.post(call(), client=client))[1]['since'], body['since'])
         self.assertEqual((self.browser.launches, len(self.browser.fetches)), (1, 1))
         self.assertIsNone(self.store().stopped())  # not LinkedIn pushing back: nothing to resume
         with redirect_stdout(io.StringIO()) as out:
@@ -297,12 +304,33 @@ class EgressTests(ServiceCase):
         self.assertIn('DISTINTA', out.getvalue())
         self.assertEqual((await self.post(call(), client=client))[0], 200)
         self.assertEqual(self.browser.proxies[-1], {'server': 'socks5://127.0.0.1:1080'})
+        # A later change is a new episode, with its own moment.
+        self.world.settings = replace(self.world.settings, proxy='')
+        client = await self.start()
+        status, again = await self.post(call(), client=client)
+        self.assertEqual((status, again['code']), (503, 'egress'))
+        self.assertNotEqual(again['since'], body['since'])
+
+    async def test_an_exit_put_back_ends_the_episode(self):
+        self.assertEqual((await self.post(call()))[0], 200)
+        moved = await self.start_with(proxy='socks5://127.0.0.1:1080')
+        first = (await self.post(call(), client=moved))[1]['since']
+        back = await self.start_with(proxy='')  # someone put the old exit back: it opens, and the episode is over
+        self.assertEqual((await self.post(call(), client=back))[0], 200)
+        self.world.clock.now += 60
+        moved = await self.start_with(proxy='socks5://127.0.0.1:1080')
+        self.assertNotEqual((await self.post(call(), client=moved))[1]['since'], first)
+
+    async def start_with(self, **changes):
+        self.world.settings = replace(self.world.settings, **changes)
+        return await self.start()
 
     async def test_a_profile_imported_from_another_machine_waits_for_the_operator(self):
         self.store().set_egress(IMPORTED)  # what `importar` leaves
         status, body = await self.post(call())
         self.assertEqual(status, 503)
         self.assertIn('la sesión se importó de otro equipo', body['reason'])
+        self.assertEqual(body['code'], 'egress')
         self.assertEqual(self.browser.launches, 0)
 
 

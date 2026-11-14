@@ -728,6 +728,9 @@ Reglas de prioridad:
 - `capture_processed` enlaza a `/?enviado=1`, que abre «Lo que enviaste».
 - `linkedin_canary` (capa `sistema`, push activada por defecto) avisa de la prueba diaria de una cuenta `directo`: una
   vez cuando encuentra lecturas rotas o no pudo correr en todo el día, y otra cuando vuelve a pasar. Sin enlace.
+- `navegador_salida` (capa `sistema`, push activada por defecto) avisa de que el servicio navegador no abre una cuenta
+  `directo` porque su salida a internet cambió, con qué hacer en el servidor. Una vez por episodio; no pausa la cuenta.
+  Sin enlace.
 - `lead_silent` (capa `sistema`, push activada por defecto) avisa de que el agente líder lleva 7 días sin aprobar nada en una capacidad. Llega una vez por capacidad y semana, y enlaza a `/calendario?vista=lista&tipo=<tipo>&no_salio=1`.
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
@@ -737,7 +740,7 @@ Reglas de prioridad:
 | Va a | Tipos con push |
 | --- | --- |
 | Tu turno | Todos |
-| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent`, `linkedin_canary` y `weekly_summary` |
+| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent`, `linkedin_canary`, `navegador_salida` y `weekly_summary` |
 
 Quién emite cada tipo sin tarjeta propia: `machine_paused` al detener la máquina desde la app; `linkedin_expired` cuando el autopiloto ve el token caducado (en lugar de `account_paused`); `machine_paused_env` una vez por parada, cuando el autopiloto ve `OPERATOR_PAUSED` (un AuditEvent `operator.env_paused` marca que ya salió; nunca se guarda en el feed: «Próximo» la muestra mientras dura). Los urgentes (`uncertain`, `linkedin_expired`, `machine_paused` y `machine_paused_env`) van con prioridad alta.
 

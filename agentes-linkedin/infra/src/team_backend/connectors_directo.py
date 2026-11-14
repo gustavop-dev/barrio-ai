@@ -16,11 +16,35 @@ import re
 from linkedin_directo import Cliente, LinkedInError, NoteQuota, Uncertain
 from .connectors import ConnectorError, ConnectorUncertain, InvitationNoteQuota
 
-# The navegador service's refusals before the call left (linkedin_directo/servicio.py): its budget, and not sent (503:
-# browser busy or not ready, another internet exit; the service unreachable). connectors.deferred waits for these only.
-DEFERRED_KINDS=('budget','not_sent')
+# The navegador service's refusals before the call left (linkedin_directo/servicio.py): its budget, not sent (503:
+# browser busy or not ready; the service unreachable) and another internet exit (503 `egress`). connectors.deferred
+# waits for these only.
+DEFERRED_KINDS=('budget','not_sent','egress')
 TRANSPORT=None  # tests inject a linkedin_directo Transport; production builds a ServiceTransport from the environment
 ACCOUNT=re.compile(r'[a-z0-9][a-z0-9_\-]{0,62}')
+EGRESS_NOTICE='navegador.egress_refused'
+
+def egress_notice(account_id,since,detail):
+    """The service will not open this account by another internet exit until someone on the server accepts it or puts
+    the old one back: told once per episode (`since`, which the service starts again once the account opens), however
+    many calls it refuses, and never a pause. Nothing reached LinkedIn and the session is intact: a pause would also
+    stop every other account's writes (operador.execute) and need a second step in Barrio after the fix, while the
+    refused calls wait and come back by themselves once the exit is settled (docs/plan-linkedin-directo.md)."""
+    from django.db import transaction
+    from . import operador
+    from .models import AuditEvent,ConnectorAccount
+    from .notificaciones import avisar
+    episode=str(since or '')[:40]
+    try:
+        with transaction.atomic():  # a savepoint: a failure here never spoils the caller's transaction
+            account=ConnectorAccount.objects.filter(provider='directo',external_account_id=account_id).first()
+            if account is None or AuditEvent.objects.filter(action=EGRESS_NOTICE,target=str(account.id),
+                                                            metadata__since=episode).exists():return
+            operador._audit(None,EGRESS_NOTICE,account.id,since=episode)
+    except Exception:return  # a notice never breaks the work that saw it (avisar never raises either)
+    avisar('navegador_salida','LinkedIn directo: el servicio no abre la cuenta por otra salida a internet',
+           f'{account.label}: {detail} Mientras tanto no sale nada a LinkedIn con esta cuenta; lo pendiente espera y '
+           'vuelve a intentarse solo.',ref=f'navegador_salida:{account.id}:{episode}')
 
 def live():
     return os.environ.get('LIVE_LINKEDIN_DIRECTO','false').lower()=='true'
@@ -45,6 +69,7 @@ class DirectoConnector:
         try:return getattr(self.client,name)(*args,**kwargs)
         except NoteQuota as exc:raise InvitationNoteQuota(str(exc),exc.status) from None
         except LinkedInError as exc:
+            if exc.kind=='egress':egress_notice(self.account_id,exc.since,str(exc))
             raise ConnectorError(str(exc),status=exc.status,kind=exc.kind,pause=exc.pause,retry_after=exc.retry_after,
                                  deferrable=exc.kind in DEFERRED_KINDS and not exc.pause) from None
         except Uncertain as exc:raise ConnectorUncertain(str(exc)) from None

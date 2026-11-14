@@ -27,9 +27,10 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
 - **Una sola salida a internet por sesión.** Que una sesión aparezca desde otra IP es lo primero que hace que
   LinkedIn la cierre. El navegador de cada cuenta sale directo o por un proxy (`NAVEGADOR_PROXY`); la cuenta recuerda
   por cuál salió la última vez (solo una etiqueta: `directo` o un resumen del servidor y el puerto, nunca la dirección
-  ni la clave). Si la salida configurada cambia, la cuenta no se abre (`503`, «no salió nada») hasta que alguien lo
-  confirme con `python -m navegador salida <cuenta> --aceptar`. Un perfil importado de otro equipo también espera esa
-  confirmación.
+  ni la clave). Si la salida configurada cambia, la cuenta no se abre (`503` con `code: egress` y desde cuándo,
+  «no salió nada») hasta que alguien lo confirme con `python -m navegador salida <cuenta> --aceptar`. Un perfil
+  importado de otro equipo también espera esa confirmación. El backend avisa de eso una vez en Notificaciones
+  (`navegador_salida`), sin pausar la cuenta: lo pendiente espera y sale solo cuando la salida queda resuelta.
 - **Registro sin datos**: solo método, ruta sin ids, estado y tiempos. Nunca cookies, tokens, cuerpos ni datos de
   otras personas.
 
@@ -42,6 +43,7 @@ cuentas/<cuenta>/perfil/          el perfil de Chromium (la sesión de LinkedIn 
 cuentas/<cuenta>/detenida.json    existe solo si la cuenta está detenida: desde cuándo y por qué
 cuentas/<cuenta>/consumo.json     las llamadas de las últimas 24 h (para los topes)
 cuentas/<cuenta>/salida.json      la etiqueta de la última salida a internet de su sesión
+cuentas/<cuenta>/salida-rechazada.json  desde cuándo rechaza otra salida (solo una hora; se borra al resolverse)
 cuentas/<cuenta>/escrituras/      una ficha por request_id de escritura (7 días)
 canario/                          los informes del canario
 ```

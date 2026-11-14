@@ -45,11 +45,12 @@ TAG = re.compile(r'[A-Za-z][A-Za-z0-9_.]{0,100}')
 
 class Refused(Exception):
     """The service does not make the call: the HTTP status it answers and a short reason, never LinkedIn's data. A spent
-    budget also says so (`code`) and when it has room again (`retry_after`, seconds)."""
+    budget also says so (`code` budget) and when it has room again (`retry_after`, seconds); another internet exit says
+    so too (`code` egress) and since when it is refused (`since`): only an operator clears that one."""
 
-    def __init__(self, status, reason, code='', retry_after=None):
+    def __init__(self, status, reason, code='', retry_after=None, since=None):
         super().__init__(reason)
-        self.status, self.reason, self.code, self.retry_after = status, reason, code, retry_after
+        self.status, self.reason, self.code, self.retry_after, self.since = status, reason, code, retry_after, since
 
 
 def write_kind(request):
@@ -178,7 +179,9 @@ class Account:
             log.warning('cuenta=%s salida distinta de la última (%s, ahora %s): no se abre', self.name, last, label)
             why = 'la sesión se importó de otro equipo' if last == IMPORTED else 'la salida a internet cambió'
             raise Refused(503, f'{why}; no salió nada. Para abrirla por esta salida: python -m navegador salida '
-                               f'{self.name} --aceptar')
+                               f'{self.name} --aceptar', code='egress', since=self.store.egress_refused(self.clock()))
+        else:
+            self.store.egress_matches()
         return label
 
     async def _stop(self, reason):

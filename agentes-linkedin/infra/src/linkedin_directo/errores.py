@@ -7,11 +7,13 @@ class LinkedInError(Exception):
     or the session is gone (401/403/429/999, a redirect, a login or checkpoint page): the account stops until a human
     looks at it. `kind` is short and stable; a LinkedIn error code, when the answer has one, goes in it as
     `linkedin/<code>` so the network's limit rules can read it. kind='budget' is the navegador service's own budget
-    per account, never LinkedIn's: nothing left, and `retry_after` says in how many seconds there is room again."""
+    per account, never LinkedIn's: nothing left, and `retry_after` says in how many seconds there is room again.
+    kind='egress' is the service refusing to open the account by another internet exit: nothing left, and only an
+    operator on the server clears it; `since` is when that refusal began (one moment per episode)."""
 
-    def __init__(self, message, *, kind='error', status=None, pause=False, retry_after=None):
+    def __init__(self, message, *, kind='error', status=None, pause=False, retry_after=None, since=None):
         super().__init__(message)
-        self.kind, self.status, self.pause, self.retry_after = kind, status, pause, retry_after
+        self.kind, self.status, self.pause, self.retry_after, self.since = kind, status, pause, retry_after, since
 
 
 class Uncertain(Exception):
