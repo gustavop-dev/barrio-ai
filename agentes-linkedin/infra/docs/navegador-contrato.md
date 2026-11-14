@@ -211,8 +211,8 @@ llamar. Si no pasa, contesta 422 y no envía nada.
 
 ## Ids que devuelve el conector
 
-Los campos son los mismos que con Unipile. Los ids, solo para las personas: los demás son los de LinkedIn, y los de
-Unipile no tienen por qué serlo (abajo, «Cambiar de proveedor»).
+Los campos son los mismos que con Unipile. Los ids, solo para las personas y los comentarios: los demás son los de
+LinkedIn, y Unipile los envuelve (abajo, «Cambiar de proveedor», cómo se traducen).
 
 | Objeto | Id |
 | --- | --- |
@@ -228,44 +228,98 @@ búsqueda, post). Si no lo tiene, lee el perfil antes.
 
 ## Cambiar de proveedor
 
-`operador cambiar-proveedor` pasa una cuenta de Unipile a directo, o al revés, en la misma fila: sus contactos,
-publicaciones, propuestas e historia siguen con ella (`team_backend/proveedor.py`).
+`operador cambiar-proveedor` pasa una cuenta de Unipile a directo, o al revés, en la misma fila, y en la misma
+transacción traduce los ids que la cuenta guarda: sus contactos, posts observados, propuestas abiertas, bandeja e
+historia siguen con ella, sin filas repetidas ni nada que vuelva a parecer nuevo (`team_backend/proveedor.py`; las dos
+formas de id, en `team_backend/ids_linkedin.py`).
 
 ```bash
+# Antes: pausar la cuenta (o la máquina) y esperar a que acabe la vuelta en curso.
+python manage.py operador --usuario gustavo cambiar-proveedor --cuenta <uuid> --a directo --slug <cuenta> --prueba
 python manage.py operador --usuario gustavo cambiar-proveedor --cuenta <uuid> --a directo --slug <cuenta>
+python manage.py operador --usuario gustavo comprobar --cuenta <uuid>   # y después reanudarla
+# Volver, con los ids originales (también admite --prueba):
 python manage.py operador --usuario gustavo cambiar-proveedor --cuenta <uuid> --volver
 ```
 
-Guarda en la fila el proveedor y el id que tenía (`previous_provider`) y `--volver` los repone (y guarda los de ahora:
-se puede ir y volver). Deja el estado de la cuenta en «sin comprobar» y no pausa nada: después, `comprobar`. Queda
-auditado (`operator.account_provider_switched`). No cambia si: la cuenta ya es de ese proveedor o no es de ninguno de
-los dos; el id no tiene la forma del proveedor (directo: el nombre en el servicio; Unipile: `acc_…`); otra fila ya
-tiene ese proveedor y ese id (la cuenta del rodaje, por ejemplo); hay una acción ejecutándose, enviada sin confirmar o
-incierta (se concilia con el proveedor que la envió); o hay una conexión desde la app en curso.
+**La prueba** (`--prueba`) no escribe nada. Dice, por tabla y campo, cuántos ids se traducen, se restauran (al volver)
+o quedan idénticos y cuántos no se pueden traducir; cuántas claves de evidencia y huellas de propuestas abiertas se
+recalculan y cuántas propuestas caducarían; las fuentes y retiradas del estudio de comunidad; cuántas conversaciones
+quedan marcadas; y cada fila que no se puede traducir, con la forma de su valor (cifras como 9 y letras como x), nunca
+el id. Lo mismo sale al cambiar de verdad, y el resumen queda en la auditoría (`operator.account_provider_switched`).
 
-**Los ids guardados no se traducen.** Cada fila guarda el id que le dio el proveedor de entonces:
+**Formas de los ids.** Las de Unipile, leídas de la base de producción (solo la forma, nunca los valores):
 
-| Qué | Dónde se guarda | ¿Vale con el otro proveedor? |
+| Objeto | Unipile | Directo |
 | --- | --- | --- |
-| Persona | `Contact`, `Referent`, autores de posts y comentarios, `Conversation.attendee_provider_id`, `EvidencePerson`, propuestas de red | Sí, si el id de Unipile es el `ACo…` del perfil, como suponen el código y las pruebas (ninguna captura real lo muestra). |
-| Post | `ObservedPost.provider_post_id`, `PostMetric`, `EditorialPiece.metrics.unipile_post_id`, `PostComment.provider_post_id`, `PersonEvidence.post_id`, `ActionExecution.external_id` | No. Unipile da un base64 de `["activity:<n>"]` (la única forma real en el repo); directo, el número `n`, y rechaza lo demás. |
-| Comentario e hilo | `PostComment.provider_comment_id` y `thread_id`, `ActionExecution.external_id`, `CommunitySource`, `PersonEvidence` | No se sabe: directo usa el número de LinkedIn y rechaza lo demás; la forma real de Unipile no está en el repo. |
-| Invitación | `Contact.invitation_id`, `payload.request_id` de RED-04 | No se sabe. La sincronización reescribe las de los contactos con invitación recibida. |
-| Conversación y mensaje | `Conversation.provider_chat_id`, `messages[].id`, `InboxSeen` | No se sabe. Directo usa el id del hilo (`2-…`) y rechaza lo demás. |
-| Ubicación de búsqueda | `AuditEvent network.search_location` | Probablemente: los dos usan el número de LinkedIn. Directo ignora uno que no lo sea. |
+| Persona | `ACo…`, el id del perfil | El mismo. |
+| Comentario | El número de LinkedIn | El mismo. |
+| Post | Base64 de una lista JSON: `["activity:<n>"]`, `["activity:<n>","ugcPost:<m>"]` o `["activity:<a>","activity:<b>"]` | El número de la actividad. |
+| Invitación | `SENT_<n>` o `RECEIVED_<n>_<secreto>` | `<n>`. |
+| Conversación | `CLASSIC_2-…` | El hilo, `2-…`. |
+| Mensaje | Su id en Unipile | El de LinkedIn. No hay regla entre los dos (abajo, la bandeja). |
 
-Por eso, si la cuenta guarda alguno de esos ids, el cambio se niega y dice cuántos hay de cada uno. Con
-`--aceptar-ids-viejos` cambia igualmente y esas filas quedan como historia. Lo que pasa entonces, de Unipile a directo:
-las publicaciones de los referentes se vuelven a observar como nuevas (filas repetidas, un aviso de posts nuevos, y el
-equipo podría comentar dos veces el mismo post); las propuestas abiertas sobre las filas viejas fallan como no
-válidas; las piezas ya medidas no reciben más métricas y las respuestas a comentarios de la última semana no se leen;
-las conversaciones recientes se vuelven a leer y evaluar (gasto de IA, tarjetas y avisos otra vez). Una cuenta nueva,
-sin nada de eso, cambia sin más.
+Un post con dos actividades es una republicación: los números de actividad crecen con el tiempo (`n >> 22` es la
+fecha) y la republicación es posterior al post que comparte. Directo da a esa fila, en la actividad de una persona, la
+actividad de quien republica: la mayor de las dos. Al revés, un post se escribe con la forma de una actividad; las de
+dos urns, y el secreto de una invitación recibida, solo vuelven desde el original guardado. Cualquier otra forma no se
+traduce: no se adivina nunca.
 
-Para pasar una cuenta con historia hace falta antes traducir esos ids, y no está hecho: los posts de Unipile se
-pueden pasar a directo descodificando el base64 o sacando el `urn:li:activity` de `share_url`, pero solo hay una
-forma real comprobada; para comentarios, invitaciones, conversaciones y mensajes hay que ver antes qué da Unipile de
-verdad. `EditorialPiece.metrics` guarda `source: unipile` y `unipile_post_id` también con directo: es el nombre del
-campo, no el proveedor. La analítica de creador y la prueba diaria son solo de las cuentas directo: al volver a
-Unipile se quedan en la fila, sin leerse.
+**Qué se toca.**
+
+| Campo | Qué guarda | Al cambiar |
+| --- | --- | --- |
+| `ObservedPost.provider_post_id`, `PostComment.provider_post_id`, `PersonEvidence.post_id` | Post | Traducido. |
+| `PostMetric.provider_post_id`, `EditorialPiece.metrics.unipile_post_id` | Post propio | Traducido si la cuenta es la que lee los posts propios (`respuestas.reader_account`). `unipile_post_id` es el nombre del campo, y se lee como id (métricas, respuestas). |
+| `Contact.invitation_id` | Invitación: enviada si el contacto está `invited`, recibida si `incoming` o `discarded` | Traducido. |
+| `PersonEvidence.source_id` (`received:<id>`) | Invitación recibida | Traducido. |
+| `payload.request_id` de RED-04 abiertas | Invitación recibida | Traducido. |
+| `ActionExecution.external_id` de RED-02 | Invitación enviada | Traducido. |
+| `Conversation.provider_chat_id` | Conversación | Traducido. |
+| Autores de `ObservedPost` y `PostComment`, `EvidencePerson`, `Contact` y `Referent` (`provider_user_id`), `Conversation.attendee_provider_id` | Persona | Idéntico (se comprueba la forma). |
+| `PostComment.provider_comment_id` y `thread_id`, `PersonEvidence.interaction_id`, `ActionExecution.external_id` de INT-03 e INT-04 | Comentario | Idéntico (se comprueba la forma). |
+| `PersonEvidence.key`, `payload_hash` y `approved_hash` de las propuestas abiertas, `CommunitySource.target` y `key`, `CommunityWithdrawal.key` | Huellas de ids | Recalculadas. |
+| `Conversation.messages[].id`, `assessment.message_id`, `closed_message_id`, `InboxSeen` | Mensaje | Sin traducir: la marca `Conversation.carry` (abajo). |
+| `AuditEvent` `network.search_location` y `replies.scanned` | Ids que se vuelven a usar | No se usan los de antes del cambio (`ConnectorAccount.switched_at`): se buscan de nuevo. |
+| Otros `AuditEvent`, `ReferentReview.dossier`, `WeeklySummary.stats`, `CycleLedger`, `CommunityStudy.coverage` | Historia | Quedan como estaban, a propósito. |
+| `ActionExecution.external_id` de CONT-09 (`urn:li:share…`), `external_url`, `Contact.evidence.post_url`, `CommunitySource.url`, `metrics.share_url` | Urn de la API oficial y enlaces | No son de un proveedor: quedan. |
+| `EditorialPiece.metrics.source: unipile` | Etiqueta | No es un id: queda. |
+| `AnalyticsPost`, prueba diaria | Solo de directo | Quedan; al volver a Unipile, sin leerse. |
+
+Lo que no es de LinkedIn (ids de filas, `Contact.evidence.post_id`, `Job.params`, la cobertura y la atribución) no
+cambia.
+
+**Lo que queda igual que antes del cambio.**
+
+- Posts y comentarios: la siguiente observación encuentra las mismas filas. Ni filas repetidas, ni aviso de posts
+  nuevos, ni un segundo comentario en el mismo post.
+- Propuestas abiertas: su huella se recalcula con el post o la invitación traducidos. Una aprobación válida sigue
+  válida (el mismo texto sobre el mismo objeto de LinkedIn, con otro nombre) y se ejecuta con el proveedor nuevo. Una
+  RED-04 aún sin aprobar puede pasar una vez más por las comprobaciones de red.
+- Bandeja: los mensajes no se pueden traducir, así que cada conversación queda marcada. En su siguiente lectura, si el
+  último mensaje recibido es el mismo de antes (el mismo texto y la misma hora, con 2 minutos de margen), lo que tenía
+  el id viejo pasa al nuevo: el juicio de Jev, el cierre de Gustavo y la tarjeta vista en Tu turno. Nada se vuelve a
+  juzgar, avisar ni mostrar como nuevo. Un mensaje llegado después se juzga como siempre. La marca se borra en esa
+  lectura.
+- Estudio de comunidad: sus fuentes y retiradas se recalculan desde los pares post y comentario que guarda la cuenta.
+  Una fuente sin rastro se queda (caduca a los 90 días); una retirada sin rastro cuenta como un id sin traducir.
+
+**Volver.** La fila guarda el proveedor y el id externo que tenía (`previous_provider`), y cada id reescrito queda con
+el que reemplazó (`ProviderIdOriginal`). `--volver` pone de nuevo el proveedor anterior y, en cada campo que no cambió
+desde entonces, el valor original exacto; uno que cambió se traduce. Ida y vuelta se repiten sin perder nada. Los
+originales solo se borran con `--olvidar-originales` (auditado: `operator.provider_originals_forgotten`); después, volver
+traduce, y una invitación recibida ya no puede volver a Unipile.
+
+**Cuándo no cambia.**
+
+- La cuenta ya es de ese proveedor o no es de ninguno de los dos, o el id no tiene la forma del proveedor (directo: el
+  nombre en el servicio; Unipile: `acc_…`), o ya lo tiene otra fila (la cuenta del rodaje, por ejemplo).
+- La cuenta no está en pausa (ni la máquina): una vuelta a medias podría guardar ids del proveedor anterior.
+- Hay una acción ejecutándose, enviada sin confirmar o incierta (se concilia con el proveedor que la envió), una
+  conexión desde la app en curso, un trabajo de la cuenta en marcha o un estudio de comunidad armándose.
+- Hay un id que no se puede traducir: una forma desconocida, o uno que chocaría con otra fila de la cuenta una vez
+  traducido. Lo lista y no cambia nada. Solo como salida de emergencia, `--aceptar-ids-viejos` cambia dejando esas
+  filas como estaban, y las propuestas abiertas sobre ellas caducan en vez de ejecutarse con el id del otro proveedor.
+
+Tras el cambio, el estado de la cuenta queda «sin comprobar» y la pausa sigue: `comprobar` y reanudarla.
 

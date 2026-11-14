@@ -86,8 +86,9 @@ Cuando una cuenta se pausa (429, restricción, reautenticación o estado distint
 6. Prueba de aceptación: un comentario aprobado por la política aparece una vez en LinkedIn, con `external_id`, estado `confirmed` y eventos de auditoría.
 
 Pasar una cuenta ya registrada de Unipile a LinkedIn directo, o al revés, sin perder su historia: `operador
-cambiar-proveedor` ([navegador-contrato.md](navegador-contrato.md#cambiar-de-proveedor)). Los ids de posts, comentarios,
-invitaciones y conversaciones guardados con un proveedor no valen con el otro: se niega si la cuenta tiene alguno.
+cambiar-proveedor` ([navegador-contrato.md](navegador-contrato.md#cambiar-de-proveedor)). Con la cuenta en pausa:
+traduce en la misma transacción los ids que guarda (posts, invitaciones, conversaciones), guarda los originales para
+volver y se niega, listándolos, si alguno no se puede traducir. `--prueba` dice antes qué haría.
 
 ## API (`/api/v1/operador/…`)
 
