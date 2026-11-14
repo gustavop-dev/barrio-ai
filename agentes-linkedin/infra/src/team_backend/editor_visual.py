@@ -68,12 +68,23 @@ def context_hash(piece, public, private, photos):
         'research': piece.research, 'sources': piece.signals, 'photos': source_context(photos), 'rule': infografias.version()})
 
 
-def content_hash(piece, photos):
+# Rule versions that bound packages before the binding recorded its own (`rule`). A deploy that rewrote the rule
+# used to make every ready package stale with the same text, sources and photos.
+EARLIER_RULES = ('2703b5b79c2662e354b901c3710c9b457e5b1eb76c08929bcdc6dd3aeb45917d',)
+
+
+def content_hash(piece, photos, rule=None):
     """Binding v2: what the package was made from (text, research, sources, photos and their permissions, rule).
     Gustavo's confirmed facts are not hashed: answering a question must not make every ready piece stale. They are
-    checked live instead (live_issues), with the same guards IMG ran."""
+    checked live instead (live_issues), with the same guards IMG ran. `rule` is the version the package was bound
+    under: a later edit of the rule does not make it stale either; the current rule validates it live."""
     return orquestacion.digest({'post': piece.final_text, 'research': piece.research, 'sources': piece.signals,
-        'photos': source_context(photos), 'rule': infografias.version()})
+        'photos': source_context(photos), 'rule': rule or infografias.version()})
+
+
+def content_matches(binding, piece, photos):
+    rules = [binding['rule']] if binding.get('rule') else [infografias.version(), *EARLIER_RULES]
+    return any(binding.get('content_sha256') == content_hash(piece, photos, rule) for rule in rules)
 
 
 def used_photos(piece):
@@ -107,7 +118,8 @@ def bind(piece, public, private, **extra):
     previous = piece.image_review.get('visual_binding', {})
     binding = dict({k: v for k, v in previous.items() if k == 'proposal_sha256'}, version=2,
         text_sha256=imagenes.sha(piece.final_text.encode()), content_sha256=content_hash(piece, photos),
-        context_sha256=context_hash(piece, public, private, photos), photo_ids=sorted(ids), **extra)
+        context_sha256=context_hash(piece, public, private, photos), photo_ids=sorted(ids),
+        rule=infografias.version(), **extra)
     piece.image_review = dict(piece.image_review, visual_binding=binding)
     piece.save(update_fields=['image_review', 'updated_at'])
     return binding
@@ -132,7 +144,7 @@ def upgrade_bindings():
                     binding.get('context_sha256') != context_hash(piece, public, private, photos)):
                 continue  # already upgraded, or stale already: a stale one keeps failing closed, as before
             piece.image_review = dict(piece.image_review, visual_binding=dict(binding, version=2,
-                content_sha256=content_hash(piece, photos)))
+                content_sha256=content_hash(piece, photos), rule=infografias.version()))
             piece.save(update_fields=['image_review'])
             upgraded += 1
     return upgraded
@@ -237,7 +249,7 @@ def freshness_issues(piece):
         return stale
     if binding.get('version') == 2:
         # New confirmed facts do not invalidate the package; the guards decide on the current facts.
-        return stale if binding.get('content_sha256') != content_hash(piece, photos) else live_issues(piece, public, private)
+        return live_issues(piece, public, private) if content_matches(binding, piece, photos) else stale
     if binding.get('context_sha256') != context_hash(piece, public, private, photos):
         return stale
     return []
