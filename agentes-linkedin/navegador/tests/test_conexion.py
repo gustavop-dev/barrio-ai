@@ -6,18 +6,20 @@ import tempfile
 import unittest
 from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
 
 from aiohttp import ClientSession, WSMsgType
 from aiohttp.test_utils import TestClient, TestServer, unused_port
 
-from navegador import pagina
+from navegador import conexion, pagina
 from navegador.almacen import Store
 from navegador.conexion import HEADER, view_key
-from navegador.servidor import build
+from navegador.servidor import SERVICE, build
 from tests.falsos import TOKEN, Browser, World, call
 
 AUTH = {'Authorization': f'Bearer {TOKEN}'}
 LOGIN = 'https://www.linkedin.com/login'
+WAIT = 5  # real seconds for anything a test waits on: a hang fails here, not in CI's own timeout
 
 
 class Process:
@@ -42,14 +44,20 @@ class LoginCase(unittest.IsolatedAsyncioTestCase):
         self.world = World(Browser(landing=LOGIN), connect=True, view_port=self.view_port, novnc=self.novnc)
         self.addCleanup(self.world.tmp.cleanup)
         self.world.advance = False  # the login's clock moves only when a test moves it
-        self.procs, self.stored = [], None
+        self.procs, self.stored, self.vnc_writers = [], None, set()
 
-        async def vnc(reader, writer):  # stands in for x11vnc: greets, then echoes
-            writer.write(b'RFB 003.008\n')
-            await writer.drain()
-            while data := await reader.read(100):
-                writer.write(b'eco:' + data)
+        async def vnc(reader, writer):  # stands in for x11vnc: greets, then echoes until the bridge goes
+            self.vnc_writers.add(writer)
+            try:
+                writer.write(b'RFB 003.008\n')
                 await writer.drain()
+                while data := await reader.read(100):
+                    writer.write(b'eco:' + data)
+                    await writer.drain()
+            except ConnectionError:
+                pass
+            finally:
+                writer.close()  # its side too: Server.wait_closed (3.12.1+) waits for every connection to go
         self.vnc = await asyncio.start_server(vnc, '127.0.0.1', self.vnc_port)
         self.addAsyncCleanup(self.close_vnc)
         deps = self.world.deps()
@@ -61,7 +69,9 @@ class LoginCase(unittest.IsolatedAsyncioTestCase):
 
     async def close_vnc(self):
         self.vnc.close()
-        await self.vnc.wait_closed()
+        for writer in self.vnc_writers:  # a bridge a failed test left open
+            writer.close()
+        await asyncio.wait_for(self.vnc.wait_closed(), WAIT)
 
     async def spawn(self, *argv):
         self.procs.append(Process(argv))
@@ -177,14 +187,16 @@ class ViewTests(LoginCase):
             async with http.get(f'{url}/vnc.html', headers={HEADER: key}) as answer:
                 self.assertEqual((answer.status, await answer.text()), (200, '<html>novnc</html>'))
             ws = await http.ws_connect(f'{url}/websockify', headers={HEADER: key}, protocols=('binary',))
-            self.assertEqual((await ws.receive()).data, b'RFB 003.008\n')
+            self.assertEqual((await asyncio.wait_for(ws.receive(), WAIT)).data, b'RFB 003.008\n')
             await ws.send_bytes(b'tecla')
-            self.assertEqual((await ws.receive()).data, b'eco:tecla')
+            self.assertEqual((await asyncio.wait_for(ws.receive(), WAIT)).data, b'eco:tecla')
             self.log_in()
-            await self.ended(body['sesion'])
-            self.assertIn((await ws.receive()).type, (WSMsgType.CLOSE, WSMsgType.CLOSING, WSMsgType.CLOSED))
-            with self.assertRaises(OSError):  # the view is gone with the login
-                await http.get(f'{url}/vnc.html', headers={HEADER: key})
+            await self.ended(body['sesion'])  # the end shows only once the view is gone
+            self.assertIn((await asyncio.wait_for(ws.receive(), WAIT)).type,
+                          (WSMsgType.CLOSE, WSMsgType.CLOSING, WSMsgType.CLOSED))
+        async with ClientSession() as fresh:  # no kept-alive connection from before: a new one finds nothing
+            with self.assertRaises(OSError):
+                await fresh.get(f'{url}/vnc.html', headers={HEADER: key})
 
 
 class EndTests(LoginCase):
@@ -232,6 +244,38 @@ class EndTests(LoginCase):
         self.assertIn('RuntimeError', body['motivo'])
         self.assertTrue(all(p.returncode is not None for p in self.procs))
         self.assertFalse(pagina.held(self.store().profile))
+
+    async def test_a_browser_that_never_opens_is_cut_short_and_cleaned_up(self):
+        never = asyncio.Event()
+
+        async def stuck(*args, **kwargs):  # a launch that never returns: the stop has to cut it short
+            await never.wait()
+        connections = self.client.server.app[SERVICE].connections
+        connections.launcher = stuck
+        with patch.object(conexion, 'START_WAIT', 0.2), patch.object(conexion, 'STOP_WAIT', 0.2):
+            status, body = await asyncio.wait_for(self.start(), WAIT)
+        self.assertEqual((status, body['estado']), (201, 'fallida'))
+        self.assertIn('no abrió a tiempo', body['motivo'])
+        self.assertTrue(self.procs and all(p.returncode is not None for p in self.procs))
+        self.assertFalse(pagina.held(self.store().profile))
+        connections.launcher = self.browser.launch
+        status, _ = await self.start()  # the service is free for another one
+        self.assertEqual(status, 201)
+
+    async def test_the_end_shows_only_after_the_teardown(self):
+        _, body = await self.start()
+        login = self.client.server.app[SERVICE].connections.find(body['sesion'])
+        seen = []
+        close = login.ctx.close
+
+        async def slow_close():  # while the browser closes, a poll still sees the login going on
+            seen.append((await self.state(body['sesion']))['estado'])
+            await close()
+        login.ctx.close = slow_close
+        self.log_in()
+        self.assertEqual((await self.ended(body['sesion']))['estado'], 'conectada')
+        self.assertEqual(seen, ['esperando'])
+        self.assert_torn_down()
 
     async def test_a_session_stop_is_cleared_and_any_other_kept(self):
         for reason, session, kept in (('la página está en /login', True, False), ('LinkedIn: HTTP 429 en x', False, True)):

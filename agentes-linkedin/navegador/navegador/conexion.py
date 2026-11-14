@@ -16,7 +16,12 @@ is in docs/navegador-contrato.md; the whole path (backend ticket, Caddy, app) in
   cookies, and the profile on disk must hold the session), vencida (settings.connect_minutes without that), cancelada
   (the backend, or the window closed without a session), fallida (the screen, the view or the browser did not start).
   Then the browser, the view and the screen go, in that order, and the account opens again on its next call, on the
-  service's screen: one more feed load, as after a restart.
+  service's screen: one more feed load, as after a restart. The login shows its end only once all that is done and
+  the session on disk is checked: a poll never sees «conectada» that could still turn into «fallida».
+- Every wait has a deadline in real time (STEP_WAIT, STOP_WAIT, END_WAIT, besides START_WAIT and the login's own),
+  whatever the clock the login measures its minutes with: a stuck browser or view never holds the service, the
+  account or a request forever. Cancelling, the start running out of time and the service stopping all go through
+  Login.stop.
 - Conectada clears a stop that was the session going away (Store.stop session=True): the person just logged in, in that
   very browser. Any other stop (429, 999, a challenge in an answer) stays for an operator: a session that is still
   valid reaches the feed with nobody having looked at anything."""
@@ -47,6 +52,10 @@ VNC_PORT = 5901  # x11vnc, on the container's loopback only
 SIZE = '1366x900x24'  # the service's screen (entrada.sh): LinkedIn sees one screen size before and after the login
 START_WAIT = 45.0  # seconds for the screen, the view and the login page
 TICK = 1.0  # seconds between two looks at the login tab
+STEP_WAIT = 15.0  # real seconds for one step that talks to the browser or the view: a look at the tab, a close
+STOP_WAIT = 10.0  # real seconds a login gets to notice it must end (it looks every TICK) before it is cut short
+END_WAIT = 90.0  # real seconds for its teardown after that, whose steps have their own deadlines: the last resort
+VIEW_SHUTDOWN = 5.0  # seconds aiohttp gives the view's open requests when it goes (its default is 60)
 KEEP = 20  # ended logins kept to answer a late poll
 
 
@@ -72,6 +81,14 @@ async def port_open(port, host='127.0.0.1'):
         return False
     writer.close()
     return True
+
+
+async def step(what, awaitable, seconds=STEP_WAIT):
+    """One step of a teardown, with a deadline in real time: done, failed or out of time, the next one runs."""
+    try:
+        await asyncio.wait_for(awaitable, seconds)
+    except Exception as exc:  # TimeoutError included; never more than the step and the error's type
+        log.warning('conexión desde la app: %s no terminó bien (%s)', what, type(exc).__name__)
 
 
 async def end_process(proc):
@@ -104,6 +121,8 @@ class Login:
         self.ready = asyncio.Event()  # set once the person can log in, or once it ended
         self.ctx = self.holding = self.runner = None
         self.procs, self.sockets, self.task = [], set(), None
+        self.closing = False  # the teardown began: the view lets nobody in, and the task is never cut short
+        self.end_as = None  # how a stop ends it (FAILED when the start ran out of time), else CANCELLED
 
     def left(self):
         """Seconds until the login ends at the latest: when a refused call may come back."""
@@ -117,7 +136,9 @@ class Login:
                 'detenida': bool(stopped), 'parada': (stopped or {}).get('motivo') or ''}
 
     async def run(self):
-        closed = False
+        """The whole login. Its state stays STARTING or WAITING until the teardown is over and the session on disk
+        checked; only then it shows how it ended."""
+        state, reason, closed = None, '', False  # None: cancelled (or cut short) before any other end
         try:
             await self._open()
             if not self.cancelled:
@@ -125,32 +146,55 @@ class Login:
                 self.ready.set()
                 log.info('cuenta=%s conexión desde la app: esperando a que entren en LinkedIn (hasta %s)',
                          self.account.name, stamp(self.deadline))
-                closed = await self._watch()
+                state, reason, closed = await self._watch()
         except Failed as exc:
-            self.state, self.reason = FAILED, str(exc)
+            state, reason = FAILED, str(exc)
+        except asyncio.CancelledError:  # stop() cut it short: whatever was opened still goes
+            asyncio.current_task().uncancel()
         except Exception as exc:  # the browser or a process failed: say what, never more
-            self.state, self.reason = FAILED, f'el navegador de la conexión falló ({type(exc).__name__})'
-        finally:
-            await self._teardown()
-        if self.cancelled and self.state in ACTIVE:
-            self.state, self.reason = CANCELLED, self.cancelled
-        if self.state == CONNECTED or closed:
+            state, reason = FAILED, f'el navegador de la conexión falló ({type(exc).__name__})'
+        await self._teardown()
+        if state == CONNECTED or closed:
             # Chromium writes its cookies when it closes: the profile on disk has the last word.
-            stored = self.owner.stored(self.account.store.profile)
+            try:
+                stored = self.owner.stored(self.account.store.profile)
+            except Exception:  # unreadable: as if it could not tell
+                stored = None
             if stored is False:
-                self.state, self.reason = FAILED, 'no quedó la sesión guardada en el navegador; vuelve a intentarlo'
+                state, reason = FAILED, 'no quedó la sesión guardada en el navegador; vuelve a intentarlo'
             elif closed and stored is None:
-                self.state, self.reason = CANCELLED, 'se cerró la ventana del navegador'
+                state, reason = CANCELLED, 'se cerró la ventana del navegador'
             else:
-                self.state = CONNECTED
-        if self.state == CONNECTED:
-            stopped = self.account.store.stopped()
-            if stopped and stopped.get('sesion'):
-                self.account.store.resume()
-                log.info('cuenta=%s parada por la sesión quitada tras entrar desde la app', self.account.name)
-        self.ended = self.owner.clock()
+                state, reason = CONNECTED, ''
+        if state is None:
+            state, reason = self.end_as or CANCELLED, self.cancelled or 'la conexión se interrumpió'
+        if state == CONNECTED:
+            try:
+                stopped = self.account.store.stopped()
+                if stopped and stopped.get('sesion'):
+                    self.account.store.resume()
+                    log.info('cuenta=%s parada por la sesión quitada tras entrar desde la app', self.account.name)
+            except OSError as exc:
+                log.warning('cuenta=%s no se pudo quitar la parada tras entrar (%s)', self.account.name,
+                            type(exc).__name__)
+        self.state, self.reason, self.ended = state, reason, self.owner.clock()
         self.ready.set()
         log.info('cuenta=%s conexión desde la app: %s', self.account.name, self.state)
+
+    async def stop(self, reason, end_as=None):
+        """End the login and wait for it, in real time: STOP_WAIT seconds for it to notice (the watch looks every TICK,
+        a browser still opening has its own deadlines), then what it is doing is cut short, never its teardown, which
+        gets END_WAIT more. Returns once it ended, or once that last deadline passed."""
+        self.cancelled = self.cancelled or reason
+        self.end_as = self.end_as or end_as
+        if self.task is None or self.task.done():
+            return
+        done, _ = await asyncio.wait({self.task}, timeout=STOP_WAIT)
+        if not done and not self.closing:
+            log.warning('cuenta=%s la conexión desde la app no terminó a tiempo: se corta', self.account.name)
+            self.task.cancel()
+        if not done:
+            await asyncio.wait({self.task}, timeout=END_WAIT)
 
     async def _until(self, check, seconds=10.0):
         for _ in range(int(seconds / 0.25)):
@@ -193,38 +237,42 @@ class Login:
         await tab.goto(pagina.LOGIN, wait_until='domcontentloaded', timeout=pagina.GOTO_TIMEOUT_MS)
 
     async def _watch(self):
-        """Until the feed with a session, the deadline, a cancel or the window closed (returns True for the last)."""
+        """Until the feed with a session, the deadline, a cancel or the window closed: (state, reason, closed), the
+        state None for a cancel or a closed window."""
         while True:
             if self.cancelled:
-                return False
+                return None, '', False
             if self.owner.clock() >= self.deadline:
-                self.state, self.reason = EXPIRED, 'se acabó el tiempo sin entrar en LinkedIn'
-                return False
+                return EXPIRED, 'se acabó el tiempo sin entrar en LinkedIn', False
             if not self.ctx.pages:
-                return True
-            if on_feed(self.ctx.pages[0].url) and await pagina.has_session(self.ctx):
-                self.state = CONNECTED
-                return False
+                return None, '', True
+            if on_feed(self.ctx.pages[0].url) and await asyncio.wait_for(pagina.has_session(self.ctx), STEP_WAIT):
+                return CONNECTED, '', False
             await self.owner.sleep(TICK)
 
     async def _teardown(self):
-        if self.ctx is not None:
-            try:
-                await self.ctx.close()
-            except Exception:  # the window may already be gone
-                pass
-            self.ctx = None
-        pagina.let_go(self.holding)
-        self.holding = None
-        for ws in list(self.sockets):
-            await ws.close()
-        if self.runner is not None:
-            await self.runner.cleanup()
-            self.runner = None
-        for proc in reversed(self.procs):
-            await end_process(proc)
-        self.procs = []
-        self.account.connecting = None
+        """The browser, the view and the screen, in that order, each step with its deadline (step); the profile and the
+        account are let go whatever happens."""
+        self.closing = True
+        try:
+            if self.ctx is not None:
+                await step('cerrar el navegador', self.ctx.close())  # the window may already be gone
+                self.ctx = None
+            pagina.let_go(self.holding)
+            self.holding = None
+            for ws in list(self.sockets):
+                await step('cerrar la vista remota', ws.close())
+            if self.runner is not None:
+                await step('apagar la vista remota', self.runner.cleanup())
+                self.runner = None
+            for proc in reversed(self.procs):
+                await step('terminar un proceso de la pantalla', end_process(proc))
+            self.procs = []
+        finally:
+            if self.holding is not None:
+                pagina.let_go(self.holding)
+                self.holding = None
+            self.account.connecting = None
 
 
 class Connections:
@@ -267,9 +315,7 @@ class Connections:
         try:
             await asyncio.wait_for(login.ready.wait(), START_WAIT)
         except asyncio.TimeoutError:
-            login.cancelled = 'el navegador de la conexión no abrió a tiempo'
-            await login.task
-            login.state = FAILED
+            await login.stop('el navegador de la conexión no abrió a tiempo', end_as=FAILED)
         return login
 
     def find(self, session):
@@ -278,17 +324,15 @@ class Connections:
     async def cancel(self, session):
         login = self.find(session)
         if login is not None and login.state in ACTIVE:
-            login.cancelled = 'cancelada desde Barrio'
-            await login.task
+            await login.stop('cancelada desde Barrio')
         return login
 
     async def close(self):
         if self.current is not None and self.current.state in ACTIVE:
-            self.current.cancelled = 'el servicio se detuvo'
-            await self.current.task
+            await self.current.stop('el servicio se detuvo')
 
     async def serve_view(self, login):
-        runner = web.AppRunner(self.view(login), access_log=None)
+        runner = web.AppRunner(self.view(login), access_log=None, shutdown_timeout=VIEW_SHUTDOWN)
         await runner.setup()
         await web.TCPSite(runner, self.settings.host, self.settings.view_port).start()
         return runner
@@ -299,7 +343,8 @@ class Connections:
 
         @web.middleware
         async def guard(request, handler):
-            if login.state not in ACTIVE or not hmac.compare_digest(request.headers.get(HEADER, '').encode(), key):
+            if (login.closing or login.state not in ACTIVE
+                    or not hmac.compare_digest(request.headers.get(HEADER, '').encode(), key)):
                 return web.Response(status=403, text='sin permiso')
             return await handler(request)
 
@@ -307,8 +352,12 @@ class Connections:
             ws = web.WebSocketResponse(protocols=('binary',), heartbeat=30)
             await ws.prepare(request)
             try:
-                reader, writer = await asyncio.open_connection('127.0.0.1', self.vnc_port)
-            except OSError:
+                reader, writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', self.vnc_port), STEP_WAIT)
+            except (OSError, asyncio.TimeoutError):
+                await ws.close()
+                return ws
+            if login.closing:  # the teardown began while this one was opening: it would miss its close
+                writer.close()
                 await ws.close()
                 return ws
             login.sockets.add(ws)

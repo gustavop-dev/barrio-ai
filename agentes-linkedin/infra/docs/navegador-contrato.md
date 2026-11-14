@@ -152,7 +152,10 @@ llamadas. Diseño completo en el README del servicio, «Conectar desde la app».
 `estado`: `abriendo`, `esperando`, `conectada` (la pestaña llegó al inicio con la cookie de sesión y el perfil en disco
 la guardó), `vencida` (10 min sin eso, `NAVEGADOR_CONEXION_MIN`), `cancelada` o `fallida`. `detenida` dice si la cuenta
 sigue detenida en el servicio tras terminar: una conexión que termina `conectada` quita solo una parada por la sesión
-(página de login o verificación, cookie perdida), nunca un 429, un 999 o un reto en una respuesta.
+(página de login o verificación, cookie perdida), nunca un 429, un 999 o un reto en una respuesta. El estado final
+aparece solo cuando el navegador, la vista y la pantalla ya se cerraron y se miró la sesión en disco: un `conectada`
+no cambia después. Cada espera del servicio tiene un plazo en tiempo real: una conexión que no atiende la cancelación
+en 10 s se corta (su cierre sigue, con plazo por paso), y una que no abrió en 45 s termina `fallida`.
 
 La vista remota escucha en `NAVEGADOR_PUERTO_PANTALLA` (8791, red interna) solo mientras dura la conexión, y cada
 petición necesita `X-Pantalla-Clave` = HMAC-SHA256(token, `pantalla:` + sesión) en hexadecimal; si no, 403. Esa clave
