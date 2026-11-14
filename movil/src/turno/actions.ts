@@ -107,7 +107,7 @@ export const isResolve = (action: TurnoAction) => Boolean(action.endpoint?.endsW
 export const isConversationClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/conversaciones/') && action.endpoint.endsWith('/cerrar'));
 /** «Hecho, le escribí» / «No escribirle» on a suggested message (INT-04): the team never sends it. */
 export const isMessageClose = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/respuestas/') && action.endpoint.endsWith('/mensaje'));
-/** «Sí, el viernes 13…» / «Dejarlo el lunes 16» on a day he asked for that already had a post. */
+/** «Al primer día libre» / «Descartarla» on a date he asked for that cannot be kept. */
 export const isDayDecision = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/capturas/') && action.endpoint.endsWith('/fecha'));
 export const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
 export const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
@@ -116,7 +116,7 @@ export function successMessage(action: TurnoAction): string {
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
   if (isMessageClose(action)) return action.body?.how === 'no' ? 'Anotado: no le escribirás' : 'Anotado: le escribiste';
-  if (isDayDecision(action)) return action.body?.decision === 'mismo_dia' ? 'Listo: sale el día que pediste' : 'Se queda en el siguiente día libre';
+  if (isDayDecision(action)) return action.body?.decision === 'descartar' ? 'Idea descartada' : 'Va al primer día libre';
   if (isApprove(action)) return APPROVED_MESSAGE;
   if (isReject(action)) return 'Vetada';
   if (isMachineResume(action)) return 'Máquina reanudada';

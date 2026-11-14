@@ -2,9 +2,9 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.6-retoque-por-comentario` · SHA-256 `58f9d6dd33edd7d929eeaa13b465dea604de68ed56850ef067aba831c3f8949e`.
+Versión `6.7-plan-semanal` · SHA-256 `a9439c276307c034bb539a16e5f6dd83d8d7fe0ee2e404c5454d7aa25028de94`.
 
-46 nodos (46 activos), 72 aristas y 15 ciclos.
+46 nodos (46 activos), 73 aristas y 16 ciclos.
 
 Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes, comunidad mensual y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. Las variantes A/B de redacción comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
@@ -143,6 +143,7 @@ flowchart TD
   director_editorial -->|"analizar_comunidad · call · ≤2"| analista_barrio_resultados
   perfil -->|"perfil_revision_assets · call · ≤2"| revision_perfil
   perfil -->|"perfil_reparar_explicacion · call · ≤1"| ciclo_perfil
+  director_editorial -->|"plan_a_gustavo · handoff · ≤1"| gustavo
 ```
 
 ## Pieza diaria
@@ -359,6 +360,24 @@ flowchart TD
   end
   analista_barrio_resultados -->|"orientacion_propuesta · handoff · ≤1"| gustavo
   analista_barrio_resultados -->|"resumen_editorial · handoff · ≤1"| director_editorial
+```
+
+## Plan de la semana
+
+Estado: `active`. Orquestador: `director_editorial`.
+
+- `plan_week`: Domingo tras STRATEGY_PLAN_TIME para la semana siguiente, o «Volver a planear» (esta semana o la siguiente).
+
+```mermaid
+flowchart TD
+  classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
+  subgraph grupo_editorial["editorial"]
+    director_editorial["Director editorial · orchestrator"]
+  end
+  subgraph grupo_operacion["operacion"]
+    gustavo["Gustavo · veto · gate"]
+  end
+  director_editorial -->|"plan_a_gustavo · handoff · ≤1"| gustavo
 ```
 
 ## Capturas
@@ -681,6 +700,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `profile_explanation` | `json_schema` | [team_backend.perfil_assets.REPAIR_SCHEMA](../../agentes-linkedin/infra/src/team_backend/perfil_assets.py) |
 | `rework_input` | `json_schema` | [team_backend.orquestacion_schemas.REWORK_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `rework` | `json_schema` | [team_backend.editorial.REWORK_SCHEMA](../../agentes-linkedin/infra/src/team_backend/editorial.py) |
+| `weekly_plan` | `model` | [team_backend.models.WeeklyPlan](../../agentes-linkedin/infra/src/team_backend/models.py) |
 
 ## Aristas y contratos
 
@@ -758,3 +778,4 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `analizar_comunidad` | `community_study` | `community_study` |
 | `perfil_revision_assets` | `profile_assets_request` | `profile_assets_review` |
 | `perfil_reparar_explicacion` | `profile_explanation_request` | `profile_explanation` |
+| `plan_a_gustavo` | `weekly_plan` | `weekly_plan` |

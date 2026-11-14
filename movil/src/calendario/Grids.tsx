@@ -7,7 +7,7 @@
 // days' boxes, the dark selection (Selection.tsx) and the days' text on top. When the view switches, the
 // week fades in, or the month comes in row by row (boxes and text of a row together); the weekday initials
 // of the month are there at once, as in the board.
-import type { CalendarLayer, CalendarioDay } from '@compartido/api/types';
+import type { CalendarGasp, CalendarLayer, CalendarioDay } from '@compartido/api/types';
 import { dayInitial, dayNumber, longDayTitle, monthGrid, monthOf, weekDays, WEEKDAY_INITIALS } from '@compartido/logic/dates';
 import { dayDots, LAYER_LABEL } from '@compartido/logic/events';
 import { useState } from 'react';
@@ -41,10 +41,11 @@ const WEEK_GAP = space[1];
 const MONTH_GAP = 2;
 const DAY_HINT = 'Muestra el día debajo del calendario';
 
-/** «Sábado 7 de noviembre, hoy, Publicaciones, Red». */
-export function dayLabel(day: string, today: string, layers: CalendarLayer[]): string {
+/** «Sábado 7 de noviembre, hoy, post de crecimiento, Publicaciones, Red». */
+export function dayLabel(day: string, today: string, layers: CalendarLayer[], gasp?: CalendarGasp | null): string {
   const parts = [longDayTitle(day)];
   if (day === today) parts.push('hoy');
+  if (gasp) parts.push(`post de ${gasp.label.toLowerCase()}`);
   if (layers.length) parts.push(layers.map((layer) => LAYER_LABEL[layer]).join(', '));
   return parts.join(', ');
 }
@@ -91,13 +92,14 @@ export function WeekStrip({ fecha, selected, today, byDate, visible, onSelect, l
       <Animated.View entering={entering?.()} style={styles.week} accessibilityLabel={preview ? undefined : 'Semana'}>
         {days.map((day) => {
           const layers = loading ? [] : dayDots(byDate.get(day), visible);
+          const gasp = byDate.get(day)?.gasp;
           const { color } = look(day, { selected, today, preview, pill });
           return (
             <Pressable
               key={day}
               testID={preview ? undefined : `dia-${day}`}
               accessibilityRole="button"
-              accessibilityLabel={dayLabel(day, today, layers)}
+              accessibilityLabel={dayLabel(day, today, layers, gasp)}
               accessibilityHint={DAY_HINT}
               accessibilityState={{ selected: day === selected && !preview }}
               onPress={() => onSelect(day)}
@@ -109,6 +111,12 @@ export function WeekStrip({ fecha, selected, today, byDate, visible, onSelect, l
               </T>
               <T color={color}>{String(dayNumber(day))}</T>
               <Dots layers={layers} size={6} />
+              {gasp ? (
+                // The GASP type of the day: one letter, the label is in the accessibility label and the day panel.
+                <T variant="detalle" color={color} style={styles.gasp} testID={preview ? undefined : `tipo-${day}`} importantForAccessibility="no">
+                  {gasp.type}
+                </T>
+              ) : null}
             </Pressable>
           );
         })}
@@ -207,6 +215,7 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   initial: { fontSize: 12, lineHeight: 16 },
+  gasp: { fontSize: 11, lineHeight: 14, letterSpacing: 0.5 },
   selected: { borderColor: colors.ink, backgroundColor: colors.ink },
   today: { borderColor: colors.brandDeep, backgroundColor: colors.surface },
   outside: { backgroundColor: 'transparent' },

@@ -178,6 +178,11 @@ describe('Resultados', () => {
     expect(pillars.getByText('3,4 %')).toBeOnTheScreen();
     expect(pillars.getByLabelText(/Arquitectura y entrega.*sin dato/)).toBeOnTheScreen();
 
+    // GASP (estrategia.py): the same cut per type of post, with its median impressions.
+    const types = within(screen.getByTestId('bars-Interacción media por tipo de post'));
+    expect(types.getByLabelText(/^Autoridad · 1 post · 960 impresiones: 3,4 %/)).toBeOnTheScreen();
+    expect(types.getByLabelText(/^Crecimiento · 2 posts · 1\.400 impresiones: 2,9 %/)).toBeOnTheScreen();
+
     const order = () => screen.getAllByTestId(/^post-p-/).map((card) => card.props.testID);
     expect(order()).toEqual(['post-p-3', 'post-p-2', 'post-p-1']);
     expect(within(screen.getByTestId('post-p-3')).getByText('Aún sin corte')).toBeOnTheScreen();

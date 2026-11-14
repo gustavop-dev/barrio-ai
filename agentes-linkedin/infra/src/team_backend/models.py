@@ -380,8 +380,8 @@ class EditorialPiece(models.Model):
     metrics=models.JSONField(default=dict,blank=True)
     note=models.TextField(blank=True)
     origin_job=models.CharField(max_length=40,blank=True)
-    # One post a day, except a second one Gustavo authorized for the day and hour he asked for (urgente.confirm_day). It
-    # does not count for the CONT-09 caps.
+    # One post a day, except the extra one Gustavo asked for at a day and hour (urgente.py: an order, 14/11/2026). It does
+    # not count for the CONT-09 caps nor for the GASP structure.
     second_of_day=models.BooleanField(default=False)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
     created_at=models.DateTimeField(default=timezone.now)
@@ -932,8 +932,9 @@ class Capture(models.Model):
     # The day and hour Gustavo asked for («publícalo mañana a las 10»), from the literal fragment in publish_at_evidence.
     publish_at=models.DateTimeField(null=True,blank=True)
     publish_at_evidence=models.TextField(blank=True)
-    # That day already had a post: {state: pending|same_day|next_free|expired, asked, at, answered_at, notified}.
-    # Pending, Tu turno asks him whether it goes out that day too (a second post) or keeps the next free day.
+    # The date he asked for cannot be kept (past, inside the veto notice, outside the window, beyond 14 days, unclear or
+    # a day that already has two posts): {state: problem|next_free|discarded|expired, problem, asked, at, answered_at,
+    # notified}. A problem is a Bandeja card at once (urgente.py). Older rows may say pending|same_day (flow before 14/11).
     day_request=models.JSONField(default=dict,blank=True)
     understanding=models.JSONField(default=dict,blank=True)
     investigation=models.JSONField(default=dict,blank=True)
@@ -1129,6 +1130,34 @@ class WeeklySummary(models.Model):
     previous_orientation=models.TextField(blank=True)
     decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     decided_at=models.DateTimeField(null=True,blank=True)
+    origin_job=models.CharField(max_length=40,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:ordering=['-week_start']
+    def __str__(self):return f'{self.week_start} · {self.get_state_display()}'
+
+
+class WeeklyPlan(models.Model):
+    """director_editorial (estrategia.py): the GASP type of each day of one local ISO week and, once planned, its idea
+    with the reader's need and the audience signal behind it. One per week; Gustavo's changes are kept in `history`."""
+    class State(models.TextChoices):
+        TEMPLATE='estructura','Solo la estructura'
+        PLANNED='planeada','Planeada'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    week_start=models.DateField(unique=True)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.TEMPLATE)
+    # One per day, Monday first: {date, type, type_reason, idea, reason, pillar, modality, approach, format, reader,
+    # reader_need, audience_evidence, evidence_ok, pain, state, owner_edited, piece_id}.
+    slots=models.JSONField(default=list,blank=True)
+    summary=models.TextField(blank=True)
+    warnings=models.JSONField(default=list,blank=True)
+    # The audience signals the plan read and used: what the weekly summary reports as what moved the week.
+    signals=models.JSONField(default=dict,blank=True)
+    # Planned ideas displaced by a type change or by an idea of Gustavo: kept for later weeks.
+    kept_ideas=models.JSONField(default=list,blank=True)
+    history=models.JSONField(default=list,blank=True)
+    usage=models.JSONField(default=list,blank=True)
+    cost_usd=models.DecimalField(max_digits=12,decimal_places=6,null=True,blank=True)
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)

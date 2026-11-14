@@ -131,17 +131,20 @@ class CaptureDetail(APIView):
         return Response(CaptureOutput(capturas.undo(request.user,cid)).data)
 
 class CaptureDay(APIView):
-    """POST /api/v1/capturas/<id>/fecha {decision: mismo_dia | siguiente}: the day he asked for already had a post;
-    `mismo_dia` authorizes a second post that day at his hour, `siguiente` keeps the next free day (urgente.confirm_day)."""
+    """POST /api/v1/capturas/<id>/fecha {decision: siguiente | descartar}: the date he asked for cannot be kept (past,
+    inside the veto notice, outside the window, beyond 14 days, unclear or a day with two posts already); `siguiente`
+    publishes the idea on the first free day, `descartar` drops it (urgente.confirm_day). A date that can be kept is
+    never asked about: it goes out that day at that hour."""
     def post(self,request,cid):
         human_session(request)
         from . import urgente
         data=request.data if isinstance(request.data,dict) else {}
-        if data.get('decision') not in ('mismo_dia','siguiente'):raise ValidationError('decision debe ser mismo_dia o siguiente')
+        if data.get('decision') not in ('siguiente','descartar'):raise ValidationError('decision debe ser siguiente o descartar')
         get_or_404(Capture,id=cid)
-        capture,piece=urgente.confirm_day(request.user,cid,data['decision'])
-        return Response({'id':str(capture.id),'day_request':capture.day_request,
-                         'piece':{'id':str(piece.id),'scheduled_for':piece.scheduled_for,'second_of_day':piece.second_of_day} if piece else None})
+        capture,_=urgente.confirm_day(request.user,cid,data['decision'])
+        when=capture.publish_asap_expected_slot
+        return Response({'id':str(capture.id),'day_request':capture.day_request,'state':capture.state,
+                         'expected_slot':when,'reason':capture.publish_asap_reason})
 
 class CaptureAudio(FileView):
     def get(self,request,cid):

@@ -225,8 +225,8 @@ def capacity_left(account,capability,now=None):
     return min(daily-done.filter(started_at__gte=day).count(),weekly-done.filter(started_at__gte=week).count())
 
 def capped(proposal):
-    """Whether the daily/weekly caps apply. A second post of the day that Gustavo authorized for the hour he asked for
-    (urgente.confirm_day) does not count for them and is not held by them."""
+    """Whether the daily/weekly caps apply. The extra post Gustavo asked for at a day and hour (urgente.py) does not count
+    for them and is not held by them."""
     return not (proposal.piece_id and proposal.piece.second_of_day)
 
 class ProfileReadCapReached(ValueError):
@@ -1164,7 +1164,7 @@ def _run_job(job):
         if job.kind=='prepare_piece':
             from datetime import date
             from .editorial import prepare
-            piece=prepare(user,date.fromisoformat(params['slot']),origin_job=str(job.id))
+            piece=prepare(user,date.fromisoformat(params['slot']),origin_job=str(job.id),extra=bool(params.get('extra')))
             return ('failed' if piece.state=='failed' else 'complete'),piece.state,piece.note if piece.state=='failed' else ''
         if job.kind=='override_piece':
             from . import rescate
@@ -1199,6 +1199,11 @@ def _run_job(job):
             from . import comunidad
             study=comunidad.run(user,params['study'],job)
             return 'complete',study.state,''
+        if job.kind=='plan_week':
+            from datetime import date
+            from . import estrategia
+            plan=estrategia.run(user,date.fromisoformat(params['week']),origin_job=str(job.id))
+            return 'complete',f'plan:{plan.week_start}'[:30],''
         if job.kind=='weekly_summary':
             from datetime import date
             from . import resumen_semanal

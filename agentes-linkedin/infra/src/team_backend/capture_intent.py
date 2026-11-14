@@ -1,7 +1,8 @@
 """Capture understanding: extend the existing structured route, otherwise one Jev Noul request."""
 import math
+import os
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from django.utils import timezone
 from django.db import transaction
 from knowledge import providers
@@ -12,7 +13,7 @@ PHOTO_KINDS=('none','original','crop','edit','unsafe')
 INTENT_FIELDS={
     **research.RESEARCH_FIELDS,
     'publish_asap':{'type':'boolean'},'evidence':infografias.string(),'not_before':infografias.string(),
-    'publish_when':infografias.string(),
+    'publish_when':infografias.string(),'gasp_type':infografias.enum('G','A','S','P','ninguno'),
     'photo_instructions':infografias.array(infografias.obj(index={'type':'number'},
         instruction=infografias.string(),kind=infografias.enum(*PHOTO_KINDS))),
 }
@@ -24,6 +25,10 @@ GUIDE='''Además interpreta la nota Y transcripción en su contexto completo:
 - publish_when: cita literal del fragmento donde Gustavo pide un día u hora concretos para publicar ESTA idea
   («publícalo mañana a las 10», «que salga el jueves a las 3 de la tarde»); vacía si no la hay. No cuenta una
   fecha narrada ni la de un evento: solo cuándo quiere que salga el post.
+- gasp_type: el tipo de post que ESTA idea pide claramente, o «ninguno» si no está claro. P si es material personal
+  de Gustavo (algo que vivió, su día, un miedo, un error o un aprendizaje suyo, una foto suya); S si pide ofrecer un
+  servicio suyo o invitar a conversar para trabajar juntos; A si es un marco, un caso o un paso a paso de su
+  especialidad; G si es una observación amplia o una tendencia del sector para gente nueva. Ante la duda, ninguno.
 - photo_instructions: índice de foto desde 1, instrucción literal y kind none/original/crop/edit/unsafe.
   Asigna la instrucción a su foto por orden o referencia; una petición plural sin referencia vale para todas.
   Tal cual=original. Si solo pide recortarla o encuadrarla (y nada más)=crop: el código la recorta sin IA.
@@ -50,9 +55,13 @@ def apply(capture,data):
         today=timezone.now().astimezone(local_tz()).date()
         if earliest and not today<=earliest<=today+timedelta(days=14):earliest=None
     capture.publish_asap_not_before=earliest
-    capture.publish_at,capture.publish_at_evidence=requested_at(text,data.get('publish_when'))
+    when,evidence,problem=requested(text,data.get('publish_when'))
+    capture.publish_at,capture.publish_at_evidence=(None if problem else when),evidence
     capture.understanding=data
     capture.save(update_fields=['publish_asap','publish_asap_evidence','publish_asap_not_before','publish_at','publish_at_evidence','understanding'])
+    if problem:
+        from . import urgente
+        urgente.ask(capture,problem,timezone.now(),asked=when)  # the Bandeja asks him at once, never days later
     photos=list(capture.photos.order_by('created_at','id'))
     for item in data.get('photo_instructions',[]):
         if not isinstance(item,dict):continue
@@ -64,19 +73,42 @@ def apply(capture,data):
         photo.save(update_fields=['instruction','instruction_kind'])
 
 
-def requested_at(text,fragment):
-    """(datetime, evidence) of the day/hour Gustavo asked for, or (None, ''). The fragment must be literal; a day
-    without hour takes the daily post hour, an hour without day the next time it comes (with the veto notice)."""
-    from . import cuando, editorial, operador, urgente
-    if not isinstance(fragment,str) or not fragment.strip() or fragment not in text:return None,''
-    now=timezone.now();tz=operador.local_tz();today=now.astimezone(tz).date()
+def extra_time():
+    """The hour of a post he asked for on a day without saying the hour (EDITORIAL_EXTRA_TIME, 12:00): away from the
+    daily post, which keeps its own hour."""
+    raw=os.environ.get('EDITORIAL_EXTRA_TIME','12:00').strip();hours,_,minutes=raw.partition(':')
+    try:return time(int(hours),int(minutes or 0))
+    except ValueError:raise ValueError('EDITORIAL_EXTRA_TIME inválida: usa HH:MM.') from None
+
+
+def _soonest(now,tz):
+    """Today, as soon as the veto notice and a preparation allow, on a quarter hour."""
+    from . import urgente
+    at=(now+urgente.veto_window()+timedelta(minutes=30)).astimezone(tz)
+    return (at+timedelta(minutes=(15-at.minute%15)%15)).replace(second=0,microsecond=0)
+
+
+def requested(text,fragment,now=None):
+    """(datetime, evidence, problem) of the day/hour Gustavo asked for. The fragment must be literal. A day without hour
+    goes out at extra_time() (today: as soon as the notice allows); an hour without day the next time it comes.
+    `problem` (urgente.PROBLEMS) when it cannot be kept from the words alone: the Bandeja asks him at once."""
+    from . import cuando, operador, urgente
+    if not isinstance(fragment,str) or not fragment.strip() or fragment not in text:return None,'',None
+    now=now or timezone.now();tz=operador.local_tz();today=now.astimezone(tz).date()
     day,hour=cuando.parse(fragment,today)
-    if day is None and hour is None:return None,''
-    from datetime import datetime
-    when=datetime.combine(day or today,hour or editorial.post_time(),tzinfo=tz)
+    if day is None and hour is None:return None,fragment,'ambigua'
+    when=datetime.combine(day or today,hour or extra_time(),tzinfo=tz)
     if day is None and when<now+urgente.veto_window():when+=timedelta(days=1)
-    if not now<=when<=now+timedelta(days=14):return None,''
-    return when,fragment
+    elif hour is None and day==today and when<now+urgente.veto_window()+timedelta(minutes=30):when=_soonest(now,tz)
+    if when<now:return when,fragment,'pasada'
+    if when>now+timedelta(days=14):return when,fragment,'lejana'
+    return when,fragment,None
+
+
+def requested_at(text,fragment):
+    """(datetime, evidence) of a date that can be kept, or (None, '')."""
+    when,evidence,problem=requested(text,fragment)
+    return (None,'') if problem or when is None else (when,evidence)
 
 def jev(capture):
     from .lider import _noul
@@ -90,6 +122,10 @@ def jev(capture):
         'Petición actual afirmativa de publicarlo ya, pronto, cuanto antes o con urgencia.',
         'Negación, cita ajena, urgencia de otro asunto o narración; no pide acelerar la publicación.') for i in range(len(spans))}
     questions['tomorrow']=_noul('¿Gustavo pide explícitamente que esta publicación urgente salga mañana, no hoy?')
+    # The GASP type an idea clearly asks for (urgente: the nearest day of that type). Only the two that matter most.
+    questions['type_personal']=_noul('¿Esta captura es material personal de Gustavo para un post: algo que vivió él, su día, '
+                                     'un miedo, un error o un aprendizaje suyo?')
+    questions['type_sales']=_noul('¿Gustavo pide que este post ofrezca un servicio suyo o invite a conversar para trabajar juntos?')
     for i in range(len(spans)):
         questions[f'when_{i}']=_noul(
             f'En el contexto completo, ¿el fragmento {i} pide que este post se publique un día u hora concretos '
@@ -111,7 +147,8 @@ def jev(capture):
         research_span=next(((i,span) for i,span in enumerate(spans) if yes(f'research_{i}')),None)
         when=next((span for i,span in enumerate(spans) if yes(f'when_{i}')),'')
         public=bool(research_span and yes(f'public_{research_span[0]}'))
-        return {'publish_asap':bool(evidence),'evidence':evidence,'not_before':tomorrow,'publish_when':when,
+        kind='P' if yes('type_personal') else 'S' if yes('type_sales') else 'ninguno'
+        return {'publish_asap':bool(evidence),'evidence':evidence,'not_before':tomorrow,'publish_when':when,'gasp_type':kind,
                 'research_requested':bool(research_span),'research_evidence':research_span[1] if research_span else '',
                 'research_question':research_span[1] if public else '','research_public':public,
                 'photo_instructions':[],'method':'jev','model':result.get('model'),'answers':result['answers']}
