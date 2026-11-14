@@ -154,6 +154,27 @@ class ConnectorAccount(models.Model):
     class Meta:
         constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
     def __str__(self):return f'{self.label} ({self.provider})'
+    @property
+    def switched_at(self):
+        """When the account last changed provider, or None. Ids an audit event kept before then are the other provider's."""
+        from django.utils.dateparse import parse_datetime
+        return parse_datetime((self.previous_provider or {}).get('until') or '')
+
+class ProviderIdOriginal(models.Model):
+    """A stored LinkedIn id as it was before a provider switch rewrote it (proveedor.py), so switching back puts the
+    exact value back even where the translation is not one to one. `provider` is the one the original belongs to;
+    `field` names the column or the JSON path. Kept until `cambiar-proveedor --olvidar-originales`."""
+    id=models.BigAutoField(primary_key=True)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='provider_id_originals')
+    provider=models.CharField(max_length=20)
+    model=models.CharField(max_length=40)
+    object_id=models.CharField(max_length=64)
+    field=models.CharField(max_length=60)
+    original=models.TextField()
+    translated=models.TextField()
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','provider','model','object_id','field'],name='unique_provider_id_original')]
 
 class Referent(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
@@ -1075,6 +1096,9 @@ class Conversation(models.Model):
     assessment=models.JSONField(default=dict,blank=True)
     # Inbound message id at which Gustavo closed the card («Hecho, respondí» / «No responder»); a newer one reopens it.
     closed_message_id=models.CharField(max_length=200,blank=True)
+    # Set by a provider switch (proveedor.py): {from, at}. The next read of the thread brings the same messages with the
+    # other provider's ids; conversaciones.carry moves what the old ids had (judged, closed, seen) onto the new ones.
+    carry=models.JSONField(default=dict,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
     class Meta:

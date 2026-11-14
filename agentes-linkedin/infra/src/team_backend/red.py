@@ -488,7 +488,9 @@ def search_location(account,connector,summary):
     """LinkedIn ids of NETWORK_SEARCH_LOCATION (default «United States»), read once and kept; '' searches everywhere."""
     name=setting('NETWORK_SEARCH_LOCATION','United States').strip()
     if not name:return None
-    event=AuditEvent.objects.filter(action='network.search_location',target=str(account.id),metadata__name=name).order_by('-created_at').first()
+    events=AuditEvent.objects.filter(action='network.search_location',target=str(account.id),metadata__name=name)
+    if account.switched_at:events=events.filter(created_at__gt=account.switched_at)  # the other provider's ids
+    event=events.order_by('-created_at').first()
     if event:return event.metadata['ids'] or None
     try:
         _read(account,'search');found=connector.search_parameters('LOCATION',name)

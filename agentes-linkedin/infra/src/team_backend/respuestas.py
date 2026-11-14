@@ -140,8 +140,9 @@ def _post_id(account,connector,execution,piece,now):
     """The Unipile id of the own post: the one metrics or an earlier scan found, or found once by its exact text. It is
     kept in the scan's audit, never in piece.metrics, which belongs to metricas."""
     from .metricas import _known_id, posts_limit
-    known=_known_id(piece) or (AuditEvent.objects.filter(action='replies.scanned',target=str(piece.id),metadata__has_key='post_id')
-                               .order_by('-created_at').values_list('metadata__post_id',flat=True).first())
+    scans=AuditEvent.objects.filter(action='replies.scanned',target=str(piece.id),metadata__has_key='post_id')
+    if account.switched_at:scans=scans.filter(created_at__gt=account.switched_at)  # the other provider's id
+    known=_known_id(piece) or scans.order_by('-created_at').values_list('metadata__post_id',flat=True).first()
     if known:return known
     _read(account,'posts',now)
     text=execution.proposal.payload.get('text') or piece.final_text
