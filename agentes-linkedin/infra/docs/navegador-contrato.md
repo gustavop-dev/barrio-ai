@@ -113,6 +113,7 @@ de un episodio y empieza de nuevo cuando la cuenta vuelve a abrirse por su salid
 | 422 con `code: budget` | Tope de la cuenta agotado (lecturas o escrituras por hora o por día, o un tipo de escritura por día); no salió nada | Error `budget` con `retry_after`. No pausa la cuenta y no cuenta como límite de LinkedIn: la acción queda aprobada y se reintenta pasado ese tiempo; una lectura espera a la siguiente vuelta |
 | 423 | Sin sesión: alguien tiene que entrar a mano en ese navegador | Error `login`; la cuenta se pausa y el motivo dice qué hacer: `python -m navegador login <cuenta>` y reanudarla en Barrio |
 | 503 | Navegador no listo (no abrió, no tiene pantalla, o el perfil lo tiene otro navegador) u ocupado (la llamada no pudo salir en los 35 s siguientes a su llegada); no salió nada | Error `not_sent`: como `budget`, se reintenta más tarde (30 min si nadie dice otra cosa) |
+| 503 con `code: conexion` | Alguien está entrando a mano en esa cuenta desde la app (ver «Conectar desde la app»); no salió nada. `retry_after` dice cuánto puede durar como mucho | Error `not_sent`: espera y se reintenta, sin pausar la cuenta ni avisar |
 | 503 con `code: egress` | La salida a internet de la cuenta no es la de su última sesión: no la abre hasta que alguien acepte la nueva en el servidor (`python -m navegador salida <cuenta> --aceptar`) o vuelva a poner la de antes; no salió nada | Error `egress`: espera y se reintenta como `not_sent`, sin pausar la cuenta. Avisa en Notificaciones (`navegador_salida`) una sola vez por episodio (su `since`), con qué hacer |
 | 504 u otro 5xx | La página falló durante la llamada: pudo salir y no se sabe qué pasó | Escritura: incierta. Lectura: error `network` |
 
@@ -130,6 +131,32 @@ lee y qué campos debe traer cada respuesta vive en `linkedin_directo/canario.py
 <cuenta>` corre lo mismo a mano. Un 409 o 423 en la prueba pausa la cuenta como en cualquier lectura; un `budget`,
 `not_sent`, `egress` o `network` la deja «sin correr» y se reintenta a la hora (un `egress` además avisa en el acto,
 como en cualquier llamada).
+
+## Conectar desde la app
+
+Para entrar a mano en LinkedIn sin túnel SSH (Ajustes › Máquina, «Conectar LinkedIn»). Apagado salvo
+`NAVEGADOR_CONEXION=true` en el servicio (sin eso, 404). Una conexión a la vez por servicio. Mismo token que las
+llamadas. Diseño completo en el README del servicio, «Conectar desde la app».
+
+| Petición | Respuesta |
+| --- | --- |
+| `POST /v1/cuentas/{cuenta}/conexion` | 201 con el estado (abajo) cuando la pantalla, la vista y la página de entrada están listas (hasta 45 s), o ya terminó si no abrió (`fallida`). 409 `code: conexion` si ya hay otra en curso; 503 `code: egress` si la salida no es la de la última sesión; 503 si la cuenta está ocupada con llamadas |
+| `GET /v1/conexiones/{sesion}` | El estado; 404 si el servicio no la conoce (se reinició) |
+| `DELETE /v1/conexiones/{sesion}` | La cancela y devuelve el estado final |
+
+```json
+{"sesion": "…", "cuenta": "cuenta-prueba", "estado": "esperando", "motivo": "", "inicio": "…", "vence": "…",
+ "fin": null, "detenida": false, "parada": ""}
+```
+
+`estado`: `abriendo`, `esperando`, `conectada` (la pestaña llegó al inicio con la cookie de sesión y el perfil en disco
+la guardó), `vencida` (10 min sin eso, `NAVEGADOR_CONEXION_MIN`), `cancelada` o `fallida`. `detenida` dice si la cuenta
+sigue detenida en el servicio tras terminar: una conexión que termina `conectada` quita solo una parada por la sesión
+(página de login o verificación, cookie perdida), nunca un 429, un 999 o un reto en una respuesta.
+
+La vista remota escucha en `NAVEGADOR_PUERTO_PANTALLA` (8791, red interna) solo mientras dura la conexión, y cada
+petición necesita `X-Pantalla-Clave` = HMAC-SHA256(token, `pantalla:` + sesión) en hexadecimal; si no, 403. Esa clave
+la pone Caddy con lo que le devuelve el backend; nunca la ve el navegador de la persona.
 
 `GET {NAVEGADOR_URL}/health` (sin token) contesta `{"status": "ok"}` mientras el servicio está arriba; no abre ningún
 navegador. Si el navegador (con ventana) no tiene pantalla donde dibujar, contesta `503 {"status": "sin_pantalla"}`: el

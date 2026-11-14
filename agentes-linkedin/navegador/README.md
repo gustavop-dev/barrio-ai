@@ -54,7 +54,8 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
 cuentas/<cuenta>/perfil/          el perfil de Chromium (la sesión de LinkedIn vive aquí)
 cuentas/<cuenta>/perfil-en-uso.lock  tomado (flock) mientras un navegador nuestro tiene abierto el perfil, también
                                   desde otro contenedor; el sistema lo suelta al terminar el proceso
-cuentas/<cuenta>/detenida.json    existe solo si la cuenta está detenida: desde cuándo y por qué
+cuentas/<cuenta>/detenida.json    existe solo si la cuenta está detenida: desde cuándo, por qué y si fue por la sesión
+                                  (`sesion`: login, verificación o cookie perdida; una entrada desde la app la quita)
 cuentas/<cuenta>/consumo.json     las llamadas de las últimas 24 h (para los topes)
 cuentas/<cuenta>/salida.json      la etiqueta de la última salida a internet de su sesión
 cuentas/<cuenta>/salida-rechazada.json  desde cuándo rechaza otra salida (solo una hora; se borra al resolverse)
@@ -120,6 +121,9 @@ mismas paradas. Qué se lee y qué campos debe traer cada respuesta está en `li
 | `NAVEGADOR_PROXY` | vacío (`directo`) | Por dónde sale a internet el navegador de cada cuenta: `esquema://servidor:puerto` con `http`, `https` o `socks5`. Sin usuario ni clave en la dirección |
 | `NAVEGADOR_PROXY_CUENTAS` | vacío | Una salida propia por cuenta: `cuenta=esquema://servidor:puerto` o `cuenta=directo`, separadas por comas |
 | `NAVEGADOR_PROXY_USUARIO`, `NAVEGADOR_PROXY_CLAVE` | vacío | Credenciales del proxy, juntas. Solo con `http` o `https` (Chromium no las admite en `socks5`). Se leen del entorno y no se escriben en disco ni en el registro |
+| `NAVEGADOR_CONEXION` | `false` | Conectar desde la app (abajo). En compose sale de `LINKEDIN_CONEXION_APP` |
+| `NAVEGADOR_CONEXION_MIN` | `10` | Cuánto puede durar como mucho una conexión desde la app (de 2 a 30 min) |
+| `NAVEGADOR_PANTALLA_CONEXION`, `NAVEGADOR_PUERTO_PANTALLA` | `:98`, `8791` | La pantalla propia de esa conexión y el puerto de su vista remota (red interna) |
 | `NAVEGADOR_HEADLESS` | `false` | Sin ventana. No se recomienda, y la imagen no trae ese Chromium: en el servidor la ventana va a una pantalla virtual |
 
 Las horas y los días de los topes son ventanas móviles (las últimas 60 min, las últimas 24 h). `0` en un tope
@@ -298,6 +302,55 @@ y el mismo volumen que `navegador`; ver [En el servidor](#en-el-servidor). Qué 
 criterio para pasar la cuenta real:
 [plan, «Fase 4»](../../docs/plan-linkedin-directo.md#fase-4-rodaje-de-la-cuenta-de-prueba).
 
+## Conectar desde la app
+
+Para entrar a mano en LinkedIn desde el teléfono, sin túnel SSH: Ajustes › Máquina, en la tarjeta de una cuenta
+`directo`, «Conectar LinkedIn» (o «Volver a conectar»). Lo mismo que el `login` por SSH de abajo, pero dentro del
+servicio en marcha (`navegador/conexion.py`), porque la app no puede parar ni arrancar contenedores. Apagado: se
+enciende con `LINKEDIN_CONEXION_APP=true` en `deploy/.env` y `up -d` de `web` y del servicio (backend, servicio y la ruta
+`/conectar/` de Caddy leen la misma variable). La cuenta tiene que existir antes en Barrio (la app no la crea):
+
+```bash
+dc exec api python manage.py operador --usuario gustavo cuenta --proveedor directo --account-id <cuenta> --etiqueta "LinkedIn …"
+```
+
+**Cómo va.** La app pide la conexión al backend; el backend, al servicio. El servicio cierra la página de esa cuenta
+(las llamadas reciben 503 `conexion`: nada sale, el backend reintenta después y no pausa) y abre su navegador, por la
+salida a internet de su sesión, en una pantalla virtual propia (`:98`, del mismo tamaño que la del servicio), con la
+página de entrada de LinkedIn. La app abre en el navegador del teléfono un enlace de un solo uso; la persona ve esa
+pantalla (noVNC) y escribe allí la clave y el código. Cuando la pestaña llega al inicio con la cookie de sesión, el
+servicio cierra ese navegador (Chromium guarda las cookies al cerrar), comprueba la sesión en el perfil y lo apaga todo;
+la cuenta vuelve a abrirse en la pantalla del servicio en su próxima llamada. Si no, se acaba a los 10 minutos.
+
+**Quién llega a qué y cuánto tiempo:**
+
+| Qué | Dónde vive | Quién lo ve |
+| --- | --- | --- |
+| La vista remota (x11vnc + un puente noVNC del servicio) | Solo mientras dura la conexión: x11vnc en el loopback del contenedor, sin clave VNC; el puente en 8791 de la red interna, sin puerto publicado | Caddy, en `/conectar/`, y solo para peticiones que el backend deja pasar |
+| La pantalla de la conexión | `:98`, aparte de la `:99` del servicio | Nadie ve las ventanas de las otras cuentas, que están en la `:99` |
+| El boleto del enlace | En la base, solo su SHA-256; vale 2 min y una vez | La app (en la respuesta de su sesión) y el navegador que lo abre |
+| La cookie de la vista (`barrio_pantalla`) | En la base, solo su SHA-256; HttpOnly, Secure, SameSite=Strict, `Path=/conectar/`, hasta el final de la conexión; un enlace nuevo la reemplaza | El navegador del teléfono |
+| La clave de la vista | En ninguna parte: HMAC-SHA256 del token del servicio y del id de la conexión, calculada por el backend y por el servicio | Caddy la añade a cada petición que pasa al servicio (`forward_auth`); la que mande el navegador se borra antes |
+| La clave y el código de LinkedIn | Los teclea la persona en la página de LinkedIn; pasan como pulsaciones por el puente | Nadie los guarda; nunca van a un log |
+
+La app usa el navegador del sistema (expo-web-browser), no un WebView: sería un módulo nativo nuevo. En el teléfono la
+pantalla se ve escalada (1366 × 900): se puede ampliar con los dedos; con una tableta o un computador es más cómodo.
+
+Al terminar `conectada`, el servicio quita una parada de la cuenta solo si fue por la sesión (página de login o de
+verificación, cookie perdida), y el backend quita la pausa que puso por eso (servicio detenido o sin sesión) si el
+servicio ya no la tiene detenida. Una parada por un 429, un 999 o un reto se queda: una sesión que sigue viva llega al
+inicio sin que nadie haya mirado nada. Nada más corre solo. Se pueden iniciar 4 conexiones por cuenta y hora, una a la
+vez en el servicio; queda auditado quién la inició, la abrió, la canceló y cómo terminó.
+
+Comprobado **[local]** (Docker, red privada, Caddy 2 con este mismo bloque, el backend sustituido por un doble que
+contesta como `allow`, y la página de entrada cambiada por una local: nada fue a LinkedIn): la conexión abre `:98`,
+x11vnc con `-localhost -nopw -nevershared -dontdisconnect` y el puente; sin cookie, con una cookie mala o con la clave
+puesta a mano en la cabecera, Caddy contesta 401; con la cookie, noVNC carga y se conecta por WebSocket a través de
+Caddy («Connected to navegador:98») y muestra la ventana con la página local; las llamadas de la cuenta reciben 503
+`conexion`; al cancelar, x11vnc y `:98` terminan, Caddy contesta 502 y la clave no aparece en `docker logs`; dos
+conexiones seguidas abren y cierran limpias. **[pendiente]** en el servidor: con HTTPS y el backend real, entrar de verdad
+en LinkedIn desde el teléfono y que la sesión quede (`conectada`), y cómo se ve en una pantalla de teléfono.
+
 ## En el servidor
 
 Montado y apagado hasta que se nombra su perfil:
@@ -365,7 +418,9 @@ sesión o detenida, termina el día sin llamar a nada.
 `tests/` corre el servicio entero sobre un navegador falso (sin Chromium y sin LinkedIn): token, códigos de
 respuesta, una llamada a la vez, la pausa mínima, los topes, la lista permitida, los `request_id`, la parada y su
 reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos;
-que un perfil abierto se note desde otro proceso, la pantalla y el cierre por inactividad;
+que un perfil abierto se note desde otro proceso, la pantalla y el cierre por inactividad; la conexión desde la app
+con procesos falsos (una a la vez, la vista solo con su clave y solo mientras dura, sus cuatro finales, qué parada
+quita y que la clave no va al registro);
 y el rodaje con un reloj falso (el plan del día, los topes, nada dos veces, las paradas y el resumen sin datos). Corren en CI (job
 `navegador` de `.github/workflows/barrio-ai.yml`):
 

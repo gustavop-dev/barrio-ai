@@ -43,6 +43,22 @@ servicio paró la cuenta o no tiene sesión: la cuenta queda en pausa y `paused_
 (el servicio no estaba, estaba ocupado o sin cupo; `error` lo dice). `GET /api/v1/operador/accounts` trae el mismo
 campo.
 
+Una cuenta `directo` trae además `connect: { enabled: bool, last: login | null }` (null en las demás): si el servidor
+permite entrar en LinkedIn desde la app (`LINKEDIN_CONEXION_APP`) y la última conexión. Cada conexión
+(`login`) es `{ id, state: "abriendo|esperando|conectada|vencida|cancelada|fallida", reason, still_stopped, started_at,
+expires_at, finished_at }` ([AJU-13](../docs/funcionalidades/ajustes.md#aju-13)):
+- `POST /api/v1/operador/accounts/<id>/conexion` (sesión humana): abre el navegador del servidor en la página de entrada
+  de LinkedIn. 201 `{ login, url }`, con `url` un enlace de un solo uso (2 min) a la vista remota; si ya hay una
+  esperando del mismo usuario, la misma con un enlace nuevo. 404 apagado, 400 otro proveedor, 429 más de 4 por cuenta
+  y hora, 503 `{ detail }` si el servicio no puede (caído, ocupado con otra conexión).
+- `GET /api/v1/operador/conexiones/<id>`: `{ login, url: null }`, preguntando al servicio mientras dura; al terminar
+  `conectada`, levanta la pausa de la cuenta si la puso el servicio (detenida o sin sesión) y ya no la tiene detenida.
+- `POST /api/v1/operador/conexiones/<id>/enlace`: otro enlace para la misma conexión, solo para quien la inició (400
+  si ya terminó). `POST …/<id>/cancelar`: la cancela.
+- `GET /api/v1/linkedin/pantalla/entrar?ticket=` (sin sesión: lo abre el navegador del sistema) canjea el enlace por la
+  cookie de la vista y redirige a `/conectar/`; 410 si ya se usó o venció. `GET /api/v1/linkedin/pantalla/permitir` es
+  solo para Caddy (`forward_auth`).
+
 POST `/api/v1/operador/control` con `{ paused: bool, reason: string }`. Es la parada total de la máquina y requiere sesión humana. Responde con el objeto `control`. Si `OPERATOR_PAUSED=true` está en el entorno, la parada no se puede levantar desde la app: responde 409 con su explicación.
 
 `llm_spent_usd` y `editorial_llm_spent_usd` son lo gastado hoy en comentarios y en la publicación diaria. Ninguna de las dos tiene tope propio: desde el 10/11/2026 hay un solo presupuesto de IA para todo el equipo (`knowledge/presupuesto.py`), y `llm_daily_cap_usd` y `editorial_llm_daily_cap_usd` traen su tope de seguridad diario (`AI_DAILY_FUSE_USD`, 15 USD por defecto). La PWA solo muestra `editorial_llm_*` si llega; el overview no trae la próxima pieza, que se lee del calendario editorial.

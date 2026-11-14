@@ -141,6 +141,11 @@ Hecho y probado con respuestas inventadas y el navegador falso de las pruebas; n
 - **Rodaje de la fase 4** (abajo), con sus paradas, y el servicio más firme para el servidor: la pantalla virtual vuelve
   tras reiniciar el contenedor, y un login en otro contenedor espera a que el servicio suelte el perfil.
 - **Filtro de grado de red** en la búsqueda (`rutas.search_page(network=...)`): escrito, apagado y sin verificar.
+- **Conectar LinkedIn desde la app** ([AJU-13](funcionalidades/ajustes.md#aju-13)), apagado (`LINKEDIN_CONEXION_APP`):
+  el servicio abre el navegador de la cuenta en una pantalla propia y la persona entra desde el teléfono por una vista
+  remota que solo existe mientras dura la conexión, detrás de Caddy y de un enlace de un solo uso. Probado en local con
+  Docker y Caddy, con una página de entrada local en lugar de la de LinkedIn. Diseño de seguridad en el README del
+  servicio ([Conectar desde la app](../agentes-linkedin/navegador/README.md#conectar-desde-la-app)).
 
 Hecho en el servidor: entrar a mano por el túnel y noVNC, y una prueba diaria de 14 de 14 desde su IP (arriba).
 
@@ -148,6 +153,7 @@ Falta:
 
 - El rodaje de la fase 4 en el servidor y, si su IP no aguanta, el túnel de casa.
 - La prueba diaria en la PWA.
+- Conectar desde la app en el servidor: entrar de verdad en LinkedIn desde el teléfono y que la sesión quede.
 
 Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Medido el 13/11/2026: con el navegador de una
 cuenta abierto tras un canario de 16 llamadas, el contenedor del servicio ocupaba cerca de 1 GiB y quedaron unos 1,5 GB
