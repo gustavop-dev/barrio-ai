@@ -18,7 +18,7 @@ from linkedin_directo import rutas
 
 from navegador import __main__ as cli
 from navegador import ajustes
-from navegador.almacen import Store
+from navegador.almacen import IMPORTED, Store
 from navegador.servidor import build
 from tests.falsos import MESSAGING, POST, PROFILE, TOKEN, Browser, Request, Response, World, call, invitation, raw, \
     reaction
@@ -261,6 +261,49 @@ class GuardTests(ServiceCase):
                   'accept': Request('POST', rutas.voyager(rutas.ACCEPT.format('7000001')), 'voyager', {}, True)}
         self.assertEqual({kind: write_kind(request) for kind, request in writes.items()}, {k: k for k in writes})
         self.assertEqual(set(writes), set(ajustes.WRITE_KINDS))
+
+
+class EgressTests(ServiceCase):
+    async def test_the_browser_goes_out_by_the_configured_proxy_and_the_account_keeps_only_a_label(self):
+        self.world.settings = replace(self.world.settings, proxy='http://salida.interna:3128',
+                                      proxy_user='usuario-ficticio', proxy_password='clave-ficticia')
+        client = await self.start()
+        with self.assertLogs('navegador', 'INFO') as logs:
+            self.assertEqual((await self.post(call(), client=client))[0], 200)
+        self.assertEqual(self.browser.proxies, [{'server': 'http://salida.interna:3128', 'username': 'usuario-ficticio',
+                                                 'password': 'clave-ficticia'}])
+        saved = (self.world.data / 'cuentas' / 'prueba' / 'salida.json').read_text()
+        self.assertEqual(json.loads(saved)['salida'], self.world.settings.egress('prueba').label)
+        for secret in ('salida.interna', '3128', 'usuario-ficticio', 'clave-ficticia'):
+            with self.subTest(secret=secret):
+                self.assertNotIn(secret, saved)
+                self.assertNotIn(secret, '\n'.join(logs.output))
+        self.assertNotIn('clave-ficticia', repr(self.world.settings))
+
+    async def test_a_session_never_hops_to_another_exit_until_an_operator_accepts_it(self):
+        self.assertEqual((await self.post(call()))[0], 200)  # the first open goes straight out and is recorded
+        self.assertEqual((self.store().egress(), self.browser.proxies), ('directo', [None]))
+        self.world.settings = replace(self.world.settings, proxy='socks5://127.0.0.1:1080')
+        client = await self.start()  # the service again, now with a proxy
+        status, body = await self.post(call(), client=client)
+        self.assertEqual(status, 503)
+        self.assertIn('la salida a internet cambió; no salió nada', body['reason'])
+        self.assertIn('salida prueba --aceptar', body['reason'])
+        self.assertEqual((self.browser.launches, len(self.browser.fetches)), (1, 1))
+        self.assertIsNone(self.store().stopped())  # not LinkedIn pushing back: nothing to resume
+        with redirect_stdout(io.StringIO()) as out:
+            cli.internet_exit(self.world.settings, 'prueba')
+            cli.internet_exit(self.world.settings, 'prueba', accept=True)
+        self.assertIn('DISTINTA', out.getvalue())
+        self.assertEqual((await self.post(call(), client=client))[0], 200)
+        self.assertEqual(self.browser.proxies[-1], {'server': 'socks5://127.0.0.1:1080'})
+
+    async def test_a_profile_imported_from_another_machine_waits_for_the_operator(self):
+        self.store().set_egress(IMPORTED)  # what `importar` leaves
+        status, body = await self.post(call())
+        self.assertEqual(status, 503)
+        self.assertIn('la sesión se importó de otro equipo', body['reason'])
+        self.assertEqual(self.browser.launches, 0)
 
 
 class RequestIdTests(ServiceCase):

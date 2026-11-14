@@ -5,6 +5,8 @@ forgets nothing that guards LinkedIn:
 - detenida.json  present = the account is stopped (LinkedIn pushed back). Only an operator removes it (`reanudar`).
 - consumo.json   when each call left, over the last 24 h, per budget ('read', 'write' and each kind of write): the
                  budgets count from it.
+- salida.json    the internet exit the session last went out by: a label (ajustes.Egress.label), never an address or
+                 a credential. A different one is refused until an operator accepts it (`salida <cuenta> --aceptar`).
 - escrituras/    one file per write's request_id: LinkedIn's answer, or `sending` while it is out (and forever if the
                  process died mid-send). A repeated id gets the stored answer back, never a second send.
 
@@ -16,6 +18,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 DAY = 86400
+IMPORTED = 'otro-equipo'  # the egress of a profile copied from another machine: unknown, so never this one
 KEEP_WRITES = 7 * DAY
 KEEP_TEXT = 256 * 1024  # a stored answer longer than this is cut: enough for any write's answer
 
@@ -83,6 +86,17 @@ class Store:
             self.usage(kind, now)
             self._usage[kind].append(now)
         write_json(self.root / 'consumo.json', self._usage)
+
+    # --- the internet exit: a session that hops between IPs is LinkedIn's first reason to end it ----------------------
+    def egress(self):
+        """The label the account last went out by; None when it never went out from here; '?' when unreadable."""
+        data = read_json(self.root / 'salida.json')
+        if data is None:
+            return None
+        return data['salida'] if isinstance(data, dict) and isinstance(data.get('salida'), str) else '?'
+
+    def set_egress(self, label, now=None):
+        write_json(self.root / 'salida.json', {'salida': str(label), 'desde': stamp(now or time.time())})
 
     # --- writes by request_id ----------------------------------------------------------------------------------------
     def _write_path(self, request_id):

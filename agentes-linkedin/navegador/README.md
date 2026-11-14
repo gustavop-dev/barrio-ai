@@ -24,6 +24,12 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
   o desaparece la cookie de sesión, la cuenta queda **detenida** (se guarda en disco) y todo recibe `409` hasta
   que alguien la revise y la reanude. Nunca intenta saltarse nada.
 - **Sin sesión**, `423`: alguien tiene que entrar a mano.
+- **Una sola salida a internet por sesión.** Que una sesión aparezca desde otra IP es lo primero que hace que
+  LinkedIn la cierre. El navegador de cada cuenta sale directo o por un proxy (`NAVEGADOR_PROXY`); la cuenta recuerda
+  por cuál salió la última vez (solo una etiqueta: `directo` o un resumen del servidor y el puerto, nunca la dirección
+  ni la clave). Si la salida configurada cambia, la cuenta no se abre (`503`, «no salió nada») hasta que alguien lo
+  confirme con `python -m navegador salida <cuenta> --aceptar`. Un perfil importado de otro equipo también espera esa
+  confirmación.
 - **Registro sin datos**: solo método, ruta sin ids, estado y tiempos. Nunca cookies, tokens, cuerpos ni datos de
   otras personas.
 
@@ -35,6 +41,7 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
 cuentas/<cuenta>/perfil/          el perfil de Chromium (la sesión de LinkedIn vive aquí)
 cuentas/<cuenta>/detenida.json    existe solo si la cuenta está detenida: desde cuándo y por qué
 cuentas/<cuenta>/consumo.json     las llamadas de las últimas 24 h (para los topes)
+cuentas/<cuenta>/salida.json      la etiqueta de la última salida a internet de su sesión
 cuentas/<cuenta>/escrituras/      una ficha por request_id de escritura (7 días)
 canario/                          los informes del canario
 ```
@@ -59,7 +66,8 @@ uv run python -m navegador login prueba        # abre LinkedIn; entras tú y cie
 uv run python -m navegador importar ../../spikes/linkedin-directo/.perfil-prueba prueba
 
 uv run python -m navegador servir              # http://127.0.0.1:8790
-uv run python -m navegador estado              # sesión, parada y consumo de cada cuenta
+uv run python -m navegador estado              # sesión, parada, salida y consumo de cada cuenta
+uv run python -m navegador salida prueba       # su salida a internet; con --aceptar pasa a la configurada
 uv run python -m navegador canario prueba      # la revisión diaria de solo lectura, con el servicio en marcha
 uv run python -m navegador reanudar prueba     # quitar una parada, después de entender por qué ocurrió
 ```
@@ -88,10 +96,29 @@ no reintentar, revisar a mano) o 4 (no corrió).
 | `NAVEGADOR_INVITACIONES_DIA` | `30` | Invitaciones por día (RED-02) |
 | `NAVEGADOR_ACEPTACIONES_DIA` | `15` | Aceptaciones por día (RED-04) |
 | `NAVEGADOR_RECARGA_HORAS` | `6` | Cada cuánto se recarga la página de inicio de una cuenta |
+| `NAVEGADOR_PROXY` | vacío (`directo`) | Por dónde sale a internet el navegador de cada cuenta: `esquema://servidor:puerto` con `http`, `https` o `socks5`. Sin usuario ni clave en la dirección |
+| `NAVEGADOR_PROXY_CUENTAS` | vacío | Una salida propia por cuenta: `cuenta=esquema://servidor:puerto` o `cuenta=directo`, separadas por comas |
+| `NAVEGADOR_PROXY_USUARIO`, `NAVEGADOR_PROXY_CLAVE` | vacío | Credenciales del proxy, juntas. Solo con `http` o `https` (Chromium no las admite en `socks5`). Se leen del entorno y no se escriben en disco ni en el registro |
 | `NAVEGADOR_HEADLESS` | `false` | Sin ventana. No se recomienda, y la imagen no trae ese Chromium: en el servidor la ventana va a una pantalla virtual |
 
 Las horas y los días de los topes son ventanas móviles (las últimas 60 min, las últimas 24 h). `0` en un tope
 cierra ese tipo de llamada.
+
+## Salida a internet
+
+Por qué: LinkedIn liga una sesión a la red desde la que se usa. Una sesión que salta de IP (la casa de alguien un
+día, un centro de datos al siguiente) es la causa más probable de que la anule o pida verificarla. Por eso el
+servicio no cambia de salida por su cuenta:
+
+- La salida se aplica al abrir el navegador de la cuenta: en `servir`, en `login` y, como el canario va por el
+  servicio, también en `canario`.
+- La primera vez que una cuenta se abre, guarda su etiqueta en `salida.json`. `importar` guarda `otro-equipo`: esa
+  sesión salía desde otra máquina.
+- Si la salida configurada no coincide con la guardada, ni el servicio ni `login` la abren. `salida <cuenta>` muestra
+  las dos; `salida <cuenta> --aceptar` guarda la configurada. Hacerlo solo cuando el cambio es a propósito (por
+  ejemplo, al pasar al túnel de casa) y, si se puede, entrar a mano otra vez desde la nueva salida.
+- El plan es salir por un equipo de la casa de Gustavo a través de un túnel (ver `docs/plan-linkedin-directo.md`):
+  `NAVEGADOR_PROXY=socks5://<extremo del túnel en el servidor>:<puerto>`.
 
 ## Topes frente al ritmo real
 
@@ -205,7 +232,7 @@ un túnel SSH, y solo mientras dura el inicio de sesión.
 
 `tests/` corre el servicio entero sobre un navegador falso (sin Chromium y sin LinkedIn): token, códigos de
 respuesta, una llamada a la vez, la pausa mínima, los topes, la lista permitida, los `request_id`, la parada y su
-reanudación, la falta de sesión, las cabeceras y que el registro no guarde secretos. Corren en CI (job
+reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos. Corren en CI (job
 `navegador` de `.github/workflows/barrio-ai.yml`):
 
 ```bash

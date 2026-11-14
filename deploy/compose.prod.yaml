@@ -132,6 +132,11 @@ services:
       NAVEGADOR_ACEPTACIONES_DIA: ${NAVEGADOR_ACEPTACIONES_DIA:-}
       NAVEGADOR_PAUSA_MIN: ${NAVEGADOR_PAUSA_MIN:-3}
       NAVEGADOR_PAUSA_MAX: ${NAVEGADOR_PAUSA_MAX:-7}
+      # Internet exit (empty = straight out); a change of exit is refused until accepted (README «Salida a internet»).
+      NAVEGADOR_PROXY: ${NAVEGADOR_PROXY:-}
+      NAVEGADOR_PROXY_CUENTAS: ${NAVEGADOR_PROXY_CUENTAS:-}
+      NAVEGADOR_PROXY_USUARIO: ${NAVEGADOR_PROXY_USUARIO:-}
+      NAVEGADOR_PROXY_CLAVE: ${NAVEGADOR_PROXY_CLAVE:-}
     volumes: ["navegador-datos:/datos"]  # browser profiles (sessions), stops, budgets and write records
     shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default
     healthcheck:

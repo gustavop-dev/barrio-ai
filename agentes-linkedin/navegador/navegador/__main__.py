@@ -4,7 +4,8 @@
   login <cuenta>               abre el navegador de esa cuenta para entrar A MANO en LinkedIn
   importar <carpeta> <cuenta>  copia un perfil de Chromium que ya tiene sesión como cuenta nueva (el original no se toca)
   reanudar <cuenta>            quita la parada de una cuenta detenida
-  estado [<cuenta>]            perfil, sesión, parada y consumo de cada cuenta
+  estado [<cuenta>]            perfil, sesión, parada, salida y consumo de cada cuenta
+  salida <cuenta> [--aceptar]  la salida a internet de la cuenta; --aceptar la cambia a la configurada
   canario <cuenta>             la revisión diaria, solo lectura, a través del servicio en marcha
 
 Los datos van en NAVEGADOR_DATOS (por defecto ./datos): un perfil de navegador por cuenta y su estado."""
@@ -16,7 +17,7 @@ import sys
 import time
 
 from . import ajustes, pagina
-from .almacen import Store
+from .almacen import IMPORTED, Store
 from .cuenta import WORDS
 
 LOCK_WAIT, LOCK_TRIES = 30, 5  # another browser on the profile: wait 30 s, up to 5 times
@@ -46,13 +47,25 @@ def session_word(profile):
     return {True: 'sí', False: 'no', None: 'no se sabe'}[pagina.stored_session(profile)]
 
 
+def same_egress(settings, store, name):
+    """The profile opens only by the internet exit its session last used, as in the service (cuenta.Account._egress)."""
+    egress, last = settings.egress(name), store.egress()
+    if last is not None and last != egress.label:
+        sys.exit(f'La salida a internet de «{name}» no es la de su última sesión ({last}; ahora {egress.label}): no se '
+                 f'abrió nada. Si el cambio es a propósito: python -m navegador salida {name} --aceptar')
+    return egress, last
+
+
 async def login(settings, name):
     """A visible window on LinkedIn's login page. The person types the password and the verification there: nothing
     passes through this program. Closing the window ends it."""
     store = Store(settings.account_dir(name))
     store.profile.mkdir(parents=True, exist_ok=True, mode=0o700)
+    egress, last = same_egress(settings, store, name)
     wait_free(store.profile)
-    ctx = await pagina.launch(store.profile, headless=False)
+    ctx = await pagina.launch(store.profile, headless=False, proxy=egress.option())
+    if last is None:
+        store.set_egress(egress.label)
     try:
         tab = ctx.pages[0] if ctx.pages else await ctx.new_page()
         await tab.goto(pagina.LOGIN)
@@ -91,8 +104,11 @@ def import_profile(settings, source, name):
     shutil.copytree(source, partial, symlinks=True, ignore=shutil.ignore_patterns(*SKIP))
     os.chmod(partial, 0o700)
     partial.rename(store.profile)
+    store.set_egress(IMPORTED)  # its session went out from another machine: opening it here is a change of exit
     files = sum(len(f) for _, _, f in os.walk(store.profile))
     print(f'Perfil copiado como «{name}» ({files} archivos). Sesión guardada: {session_word(store.profile)}.')
+    print(f'Su sesión salía a internet desde otro equipo. Antes de abrirla aquí: python -m navegador salida {name} '
+          '--aceptar (mejor si sale por la misma conexión que aquel equipo).')
     return 0
 
 
@@ -103,6 +119,21 @@ def resume(settings, name):
     was = store.resume()
     print(f'Reanudada. Estaba detenida desde {was.get("desde") or "?"}: {was.get("motivo") or "?"}' if was
           else 'No estaba detenida.')
+    return 0
+
+
+def internet_exit(settings, name, accept=False):
+    """Show the account's last internet exit and the configured one; --aceptar records the configured one."""
+    store = Store(settings.account_dir(name))
+    if not store.exists():
+        sys.exit('Cuenta desconocida.')
+    label, last = settings.egress(name).label, store.egress()
+    if accept:
+        store.set_egress(label)
+        print(f'Salida de «{name}» aceptada: {label} (antes {last or "ninguna"}). La próxima vez se abre por ella.')
+    else:
+        print(f'{name}: última salida {last or "ninguna"}; configurada {label}'
+              + ('' if last in (None, label) else '. DISTINTA: no se abre hasta aceptarla con --aceptar'))
     return 0
 
 
@@ -121,9 +152,11 @@ def status(settings, name=None):
         used = {k: store.usage(k, now) for k in ('read', 'write', *ajustes.WRITE_KINDS)}
         hour = {k: sum(1 for t in v if now - t < 3600) for k, v in used.items()}
         kinds = ', '.join(f'{WORDS[k]} {len(used[k])}' for k in ajustes.WRITE_KINDS if used[k])
+        last, label = store.egress(), settings.egress(name).label
         print(f'{name}: sesión guardada {session_word(store.profile)}; '
               f'{"en uso por un navegador" if pagina.profile_busy(store.profile) else "sin navegador abierto"}; '
               + (f'DETENIDA desde {stopped.get("desde")}: {stopped.get("motivo")}' if stopped else 'activa')
+              + f'; salida {last or "ninguna"}' + ('' if last in (None, label) else f' (DISTINTA de la configurada, {label})')
               + f'; lecturas {hour["read"]}/h {len(used["read"])}/día, escrituras {hour["write"]}/h '
               f'{len(used["write"])}/día' + (f' ({kinds})' if kinds else ''))
     return 0
@@ -139,6 +172,9 @@ def main(argv=None):
     imported.add_argument('cuenta')
     orders.add_parser('reanudar', help='quitar la parada de una cuenta').add_argument('cuenta')
     orders.add_parser('estado', help='estado de las cuentas').add_argument('cuenta', nargs='?')
+    exit_order = orders.add_parser('salida', help='la salida a internet de una cuenta')
+    exit_order.add_argument('cuenta')
+    exit_order.add_argument('--aceptar', action='store_true', help='usar desde ahora la salida configurada')
     canary = orders.add_parser('canario', help='revisión diaria de solo lectura')
     canary.add_argument('cuenta')
     canary.add_argument('--url', help='dirección del servicio (por defecto NAVEGADOR_URL o 127.0.0.1:NAVEGADOR_PUERTO)')
@@ -160,6 +196,8 @@ def main(argv=None):
         return resume(settings, name)
     if args.orden == 'estado':
         return status(settings, name)
+    if args.orden == 'salida':
+        return internet_exit(settings, name, args.aceptar)
     from .canario import run
     url = args.url or os.environ.get('NAVEGADOR_URL') or f'http://127.0.0.1:{settings.port}'
     return run(url, settings.token, name, settings.data)

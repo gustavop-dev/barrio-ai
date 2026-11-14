@@ -6,7 +6,8 @@
 4. one call at a time per account; a call that cannot reach the page within the deadline does not leave (503);
 5. the budgets, per hour and per day, reads and writes apart, and per day each kind of write: 422 with code `budget`
    and the seconds until the window has room again (retry_after);
-6. the page, opened on the first call and kept open: no session, 423; profile in use or no browser, 503;
+6. the page, opened on the first call and kept open, only by the internet exit the session last used (a different
+   one, 503 until an operator accepts it); no session, 423; profile in use or no browser, 503;
 7. a random pause, then the page checked (on LinkedIn, the session cookie there, no 429/999 on its own calls);
 8. ONE fetch from inside the page, its answer returned as it came. Never a retry, never a redirect followed.
 
@@ -31,7 +32,7 @@ from linkedin_directo.errores import LinkedInError, Uncertain
 from linkedin_directo.transporte import HEADERS, Answer, check_answer
 
 from . import pagina
-from .almacen import Store
+from .almacen import IMPORTED, Store
 
 log = logging.getLogger('navegador')
 HOUR, DAY = 3600, 86400
@@ -166,6 +167,20 @@ class Account:
             raise Refused(422, f'tope de {" y ".join(spent)} agotado; no salió nada', code='budget',
                           retry_after=max(1, math.ceil(wait)))
 
+    def _egress(self):
+        """A session going out by another IP is what LinkedIn ends sessions for: the first open records this account's
+        exit; a different one (or a profile imported from another machine) does not open until an operator accepts
+        it. The label only: never the proxy's address or credentials."""
+        label, last = self.settings.egress(self.name).label, self.store.egress()
+        if last is None:
+            self.store.set_egress(label, self.clock())
+        elif last != label:
+            log.warning('cuenta=%s salida distinta de la última (%s, ahora %s): no se abre', self.name, last, label)
+            why = 'la sesión se importó de otro equipo' if last == IMPORTED else 'la salida a internet cambió'
+            raise Refused(503, f'{why}; no salió nada. Para abrirla por esta salida: python -m navegador salida '
+                               f'{self.name} --aceptar')
+        return label
+
     async def _stop(self, reason):
         self.store.stop(reason, self.clock())
         log.warning('cuenta=%s DETENIDA: %s', self.name, reason)
@@ -187,6 +202,7 @@ class Account:
                 await self.close()
                 page = None
         if page is None:
+            label = self._egress()
             try:
                 self.page = await self.opener(self.store.profile, self.settings)
             except pagina.NoSession:
@@ -199,7 +215,7 @@ class Account:
             except Exception as exc:
                 log.warning('cuenta=%s el navegador no abrió (%s)', self.name, type(exc).__name__)
                 raise Refused(503, f'el navegador no abrió ({type(exc).__name__}); no salió nada') from None
-            log.info('cuenta=%s navegador abierto', self.name)
+            log.info('cuenta=%s navegador abierto (salida %s)', self.name, label)
         return self.page
 
     def _headers(self, request, page):

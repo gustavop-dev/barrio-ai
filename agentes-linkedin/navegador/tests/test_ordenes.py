@@ -1,6 +1,7 @@
 """The settings and the operator's commands: the pause floor and the budgets from the environment, importing a profile
 without touching the original, reading whether a profile holds a session without opening a browser, the status line,
 the log routes without ids, and the canary's own judgment. Nothing here opens a browser or reaches a network."""
+import asyncio
 import io
 import json
 import os
@@ -10,6 +11,7 @@ import tempfile
 import time
 import unittest
 from contextlib import redirect_stdout
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
@@ -19,7 +21,7 @@ from linkedin_directo.servicio import READ_TIMEOUT
 
 from navegador import __main__ as cli
 from navegador import ajustes, pagina
-from navegador.almacen import Store
+from navegador.almacen import IMPORTED, Store
 from navegador.canario import INVITATION, Recorder, verdict
 from navegador.cuenta import route
 from navegador.pagina import stored_session
@@ -72,6 +74,31 @@ class SettingsTests(unittest.TestCase):
             with self.subTest(bad=bad), self.assertRaises(ajustes.ConfigError):
                 ajustes.load({'NAVEGADOR_TOKEN': TOKEN, 'NAVEGADOR_LECTURAS_HORA': bad})
 
+    def test_the_proxy_comes_from_the_environment_and_is_never_repeated(self):
+        loaded = ajustes.load({'NAVEGADOR_TOKEN': TOKEN, 'NAVEGADOR_PROXY': 'http://salida.interna:3128',
+                               'NAVEGADOR_PROXY_CUENTAS': 'otra=https://otra.interna:8443, tercera=directo',
+                               'NAVEGADOR_PROXY_USUARIO': 'usuario-ficticio', 'NAVEGADOR_PROXY_CLAVE': 'clave-ficticia'})
+        self.assertEqual(loaded.egress('prueba').option(), {'server': 'http://salida.interna:3128',
+                                                            'username': 'usuario-ficticio', 'password': 'clave-ficticia'})
+        self.assertEqual(loaded.egress('otra').server, 'https://otra.interna:8443')
+        self.assertEqual((loaded.egress('tercera').option(), loaded.egress('tercera').label), (None, 'directo'))
+        self.assertEqual(ajustes.load({'NAVEGADOR_TOKEN': TOKEN}).egress('prueba').label, 'directo')
+        label = loaded.egress('prueba').label
+        self.assertRegex(label, r'^proxy-[0-9a-f]{12}$')
+        self.assertEqual(label, ajustes.Egress('socks5://SALIDA.interna:3128').label)  # host and port, nothing else
+        self.assertNotEqual(label, loaded.egress('otra').label)
+        for secret in ('usuario-ficticio', 'clave-ficticia'):
+            self.assertNotIn(secret, repr(loaded) + repr(loaded.egress('prueba')))
+        bad = ({'NAVEGADOR_PROXY': 'http://usuario:clave-secreta@salida.interna:3128'},
+               {'NAVEGADOR_PROXY': 'ftp://salida.interna:21'}, {'NAVEGADOR_PROXY': 'http://salida.interna:99999'},
+               {'NAVEGADOR_PROXY': 'http://salida.interna'}, {'NAVEGADOR_PROXY_CUENTAS': 'Mayus=directo'},
+               {'NAVEGADOR_PROXY_USUARIO': 'usuario-ficticio'},
+               {'NAVEGADOR_PROXY': 'socks5://127.0.0.1:1080', 'NAVEGADOR_PROXY_USUARIO': 'u', 'NAVEGADOR_PROXY_CLAVE': 'c'})
+        for env in bad:
+            with self.subTest(env=sorted(env)), self.assertRaises(ajustes.ConfigError) as e:
+                ajustes.load({'NAVEGADOR_TOKEN': TOKEN, **env})
+            self.assertNotIn('clave-secreta', str(e.exception))
+
     def test_only_serving_and_the_canary_need_the_token(self):
         self.assertEqual(ajustes.load({}, need_token=False).token, '')
 
@@ -106,6 +133,19 @@ class ProfileTests(unittest.TestCase):
         self.assertEqual(snapshot(self.source), before)
         with self.assertRaises(SystemExit):  # an account's profile is never overwritten
             cli.import_profile(self.settings, str(self.source), 'prueba')
+        self.assertEqual(Store(self.settings.account_dir('prueba')).egress(), IMPORTED)  # its session went out elsewhere
+        self.assertIn('salida prueba --aceptar', out)
+
+    def test_login_never_opens_a_session_by_another_exit(self):
+        store = Store(self.settings.account_dir('prueba'))
+        store.profile.mkdir(parents=True)
+        store.set_egress('directo')
+        moved = replace(self.settings, proxy='socks5://127.0.0.1:1080')
+        with patch('navegador.pagina.launch') as launch, self.assertRaises(SystemExit) as stop:
+            asyncio.run(cli.login(moved, 'prueba'))
+        launch.assert_not_called()
+        self.assertIn('salida prueba --aceptar', str(stop.exception.code))
+        self.assertEqual(store.egress(), 'directo')
 
     def test_refused_while_a_browser_has_it_open_or_when_it_is_not_a_profile(self):
         (self.source / 'SingletonLock').unlink()

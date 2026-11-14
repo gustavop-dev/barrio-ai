@@ -104,7 +104,7 @@ en el encabezado `Retry-After`):
 | 422 | Fuera de la lista permitida; no salió nada | Error `refused` |
 | 422 con `code: budget` | Tope de la cuenta agotado (lecturas o escrituras por hora o por día, o un tipo de escritura por día); no salió nada | Error `budget` con `retry_after`. No pausa la cuenta y no cuenta como límite de LinkedIn: la acción queda aprobada y se reintenta pasado ese tiempo; una lectura espera a la siguiente vuelta |
 | 423 | Sin sesión: alguien tiene que entrar a mano en ese navegador | Error `login`; la cuenta se pausa |
-| 503 | Navegador no listo (no abrió, o el perfil lo tiene otro navegador) u ocupado: la llamada no pudo salir en los 35 s siguientes a su llegada; no salió nada | Error `not_sent`: como `budget`, se reintenta más tarde (30 min si nadie dice otra cosa) |
+| 503 | Navegador no listo (no abrió, o el perfil lo tiene otro navegador), ocupado (la llamada no pudo salir en los 35 s siguientes a su llegada) o con una salida a internet distinta de la última de su sesión, que alguien tiene que aceptar; no salió nada | Error `not_sent`: como `budget`, se reintenta más tarde (30 min si nadie dice otra cosa) |
 | 504 u otro 5xx | La página falló durante la llamada: pudo salir y no se sabe qué pasó | Escritura: incierta. Lectura: error `network` |
 
 El servicio juzga además lo mismo que el backend para detenerse: si una respuesta de LinkedIn trae una señal de

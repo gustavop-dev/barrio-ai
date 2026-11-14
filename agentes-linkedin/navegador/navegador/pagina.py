@@ -168,13 +168,15 @@ async def stop_driver():
             _driver = None
 
 
-async def launch(profile, headless=False):
-    """A persistent context on `profile`, as the spike opened it. Headed needs a screen: WSL shells often export
-    DISPLAY empty while WSLg listens on :0; the image runs a virtual one (entrada.sh)."""
+async def launch(profile, headless=False, proxy=None):
+    """A persistent context on `profile`, as the spike opened it, going out through `proxy` (ajustes.Egress.option)
+    when given. Headed needs a screen: WSL shells often export DISPLAY empty while WSLg listens on :0; the image runs a
+    virtual one (entrada.sh)."""
     pw = await driver()
     env = {**os.environ, 'DISPLAY': os.environ.get('DISPLAY') or ':0'}
+    options = {'proxy': proxy} if proxy else {}
     return await pw.chromium.launch_persistent_context(str(profile), headless=headless, no_viewport=not headless,
-                                                       env=env)
+                                                       env=env, **options)
 
 
 async def has_session(ctx):
@@ -201,7 +203,8 @@ class Page:
         Stop: LinkedIn sent the feed elsewhere (login, checkpoint...). Busy: another browser holds the profile."""
         if profile_busy(profile):
             raise Busy()
-        ctx = await (launcher or launch)(profile, headless=settings.headless)
+        ctx = await (launcher or launch)(profile, headless=settings.headless,
+                                         proxy=settings.egress(profile.parent.name).option())
         try:
             if not await has_session(ctx):
                 raise NoSession()
