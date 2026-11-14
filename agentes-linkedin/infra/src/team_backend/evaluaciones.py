@@ -18,6 +18,10 @@ Per agent, the case and the known outcome it is graded against:
 Graders are deterministic (agreement rates, schema validity, guard violations); there is no model judge. One
 would need its own explicit flag.
 
+With the verifier, every run (dry or paid) also replays the post gate offline on what each piece stored (its rules,
+the verifier's findings, Gustavo's override or veto): the current rules and severity (compuertas.py) decide again
+without any model call. The paid run re-asks the verifier with the current prompt and the scoped second review.
+
 Dry run by default: case counts, the gap to the target and an ESTIMATED cost per agent and model, without calling
 the API (input tokens approximated locally with tiktoken, output from the ledger history, prices from providers).
 Paid execution needs `execute` and a `max_usd` cap. Every call goes through providers.claude / providers.typesafe
@@ -37,7 +41,7 @@ from django.utils import timezone
 from knowledge import db, memory, presupuesto, providers
 from knowledge.config import live
 from knowledge.ingest import ENC
-from . import autopiloto, catalogo, editorial, guardas, lider, operador, orientacion, red, voz
+from . import autopiloto, catalogo, compuertas, editorial, guardas, lider, operador, orientacion, red, voz
 from .models import ActionProposal, AuditEvent, Contact, EditorialPiece, LibraryCatalog, PostMetric
 
 GO_LIVE=date(2026,11,6)  # the machine went live in production
@@ -180,8 +184,9 @@ def gate_input(piece):
     selection=piece.selection or {}
     return (selection.get('final_text') or piece.final_text or '').strip(),selection.get('claims',[])
 
-def verifier_request(run,piece,text,claims):
-    return stage_request(run,'verificador',dict(run.editorial_memory(),text=text,brief=_frozen(piece.brief),claims=claims,sources=piece.signals))
+def verifier_request(run,piece,text,claims,second=None):
+    """`second` makes it the scoped second review after a repair (editorial._repair_round)."""
+    return stage_request(run,'verificador',editorial.verifier_payload(piece,run.editorial_memory(),_frozen(piece.brief),text,claims,second))
 
 def repair_request(run,piece,text,claims,findings):
     return stage_request(run,'reparacion',dict(run.editorial_memory(),brief=_frozen(piece.brief),text=text,claims=claims,findings=findings,
@@ -446,6 +451,9 @@ def grade_verifier(results):
             'por_desenlace':{label:rate(r['compuerta']==r['esperado'] for r in ok if r['etiqueta']==label) for label in sorted({r['etiqueta'] for r in ok})},
             'paradas_por_reglas':sum(1 for r in ok if r['reglas']),
             'reparaciones':dict(Counter(r['reparacion'] for r in ok if r['reparacion'])),
+            # compuertas.py: what the severity and the second review change against the decision stored at the time
+            'bloqueadas_antes_pasan_ahora':sum(1 for r in ok if r.get('antes')=='blocked' and r['compuerta']=='ready_for_execution'),
+            'pasan_con_observaciones':sum(1 for r in ok if r['compuerta']=='ready_for_execution' and r.get('observaciones')),
             'esquema_valido':rate(not r['esquema'] for r in seen)}
 
 def grade_comments(results):
@@ -495,16 +503,23 @@ def _each(cases,results,one):
         try:results.append(dict(base,**one(case)))
         except ValueError as exc:results.append(dict(base,error=str(exc)[:300]))
 
-def _check(run,piece,text,claims,model):
+def _check(run,piece,text,claims,model,second=None):
     """editorial._check: the rules first, then the verifier only for a text they let through."""
-    issues=editorial.text_rules(text,run.public,run.private)
+    issues=editorial.text_rules(text,run.public,run.private,compuertas.gate_policy(piece))
     if issues:return None,issues,issues
-    review=run.claude('verificador',verifier_request(run,piece,text,claims),model)
+    review=run.claude('verificador',verifier_request(run,piece,text,claims,second),model)
     return review,editorial._blocking(review),[]
 
+def _settle(piece,review,reasons,issues):
+    """editorial.settle without the piece's web research (the eval has no research results): only hard findings block."""
+    if not reasons or review is None or issues:return reasons,[]
+    hard,soft=compuertas.split(review,compuertas.gate_policy(piece))
+    return (reasons,[]) if hard else ([],soft)
+
 def gate(run,piece,model):
-    """The production gate on the selection's text (editorial._check and _repair_round): rules, verifier, one repair
-    with the exact findings, rules and verifier once more. `model` is the verifier's; the repair keeps its own."""
+    """The production gate on the selection's text (editorial._check, _repair_round and settle): rules, verifier, one
+    repair with the exact findings, the rules and the scoped second review, then only hard findings block. `model` is the
+    verifier's; the repair keeps its own. Returns (first review, last review, reasons, rules, repair, observations)."""
     text,claims=gate_input(piece)
     first,reasons,issues=_check(run,piece,text,claims,model)
     review,repair,rules=first,None,issues
@@ -515,15 +530,19 @@ def gate(run,piece,model):
         if data.get('decision')!='repaired' or not repaired:repair='descartada'
         elif repaired==text:repair='sin_cambios'
         else:
-            review,reasons,_=_check(run,piece,repaired,data.get('claims') or [],model)
-            repair='bloqueada' if reasons else 'reparada'
-    return first,review,reasons,rules,repair
+            second={'previous_findings':[{k:f.get(k) for k in ('source','issue','quote','detail')} for f in findings],
+                    'changes':data.get('changes') or []}
+            review,reasons,issues=_check(run,piece,repaired,data.get('claims') or [],model,second)
+            repair='bloqueada' if _settle(piece,review,reasons,issues)[0] else 'reparada'
+    reasons,observations=_settle(piece,review,reasons,issues)
+    return first,review,reasons,rules,repair,observations
 
 def run_verifier(run,cases,model,results):
     def one(case):
-        first,review,reasons,rules,repair=gate(run,case['piece'],model)
+        first,review,reasons,rules,repair,observations=gate(run,case['piece'],model)
         return {'esperado':case['expected'],'compuerta':'blocked' if reasons else 'ready_for_execution',
                 'modelo':first.get('verdict') if first else None,  # the verifier alone on the selection's text, before any repair
+                'antes':case['baseline'],'observaciones':sorted({o['issue'] for o in observations}),
                 'reglas':rules,'reparacion':repair,'esquema':schema_errors(first,editorial.VERIFIER_SCHEMA)[:5] if first else []}
     _each(cases,results,one)
 
@@ -642,6 +661,54 @@ def describe_director(cases,run):
             'desenlace_escritos':dict(Counter(piece_fate(p) or p.state for p in written)),
             'con_metricas':sum(1 for p in written if _latest_metric(p) is not None),'resultados':results}
 
+# --------------------------------------------------------------------------- offline replay of stored gate decisions
+
+def stored_review(verification):
+    """The verifier's last answer as it was stored (editorial._run keeps the model's verdict apart from the final one)."""
+    return {'verdict':verification.get('model_verdict'),'findings':verification.get('findings') or [],
+            'checked_claims':verification.get('checked_claims') or []}
+
+def owner_label(piece,fate):
+    """Gustavo's word on the gate, when he gave one: he dismissed the block (EDI-23) or vetoed what passed."""
+    if (piece.verification or {}).get('override'):return 'desestimo_bloqueo'
+    return 'vetada' if fate=='vetada' else None
+
+def replay_case(run,piece):
+    """The current deterministic layer (rules, severity, policy) on what was stored for one piece. No model call: the stored
+    verifier findings are reused; a text the rules stopped before the verifier ever ran needs a paid replay."""
+    v=piece.verification or {};policy=compuertas.gate_policy(piece);fate=piece_fate(piece)
+    rules=editorial.text_rules(piece.final_text,run.public,run.private,policy)
+    now,observations='blocked',[]
+    if rules:hard=rules
+    elif v.get('model_verdict') is None:hard=None
+    else:
+        hard,observations=compuertas.split(stored_review(v),policy)
+        now='blocked' if hard else 'ready_for_execution'
+    stored=v.get('context')
+    return {'id':str(piece.id),'antes':v.get('verdict'),'ahora':now if hard is not None else None,
+            'desenlace':fate,'gustavo':owner_label(piece,fate),
+            'duras':sorted({compuertas.category(r) for r in (hard or [])}),
+            'observaciones':sorted({o['issue'] for o in observations}),
+            'contexto':'desconocido' if not stored else 'igual' if stored==editorial.context_hashes(run.editorial_memory()) else 'cambiado'}
+
+def replay_gates(run):
+    """«Repetición» of the post gate on stored decisions (Gustavo, 2026-11-14): agreement with what passed, past blocks that
+    the severity now lets through (with their observations) and hard cases that still block. Ids and categories only."""
+    rows=[replay_case(run,p) for p in run.pieces().exclude(final_text='').exclude(verification={})
+          if (p.verification or {}).get('verdict') in ('blocked','ready_for_execution')]
+    rows=rows[:max(run.limit,1)*4]
+    done=[r for r in rows if r['ahora'] is not None]
+    passed=[r for r in done if r['antes']=='ready_for_execution'];blocked=[r for r in done if r['antes']=='blocked']
+    labels=Counter(r['gustavo'] for r in rows if r['gustavo'])
+    return {'casos':len(rows),'sin_repeticion_sin_pagar':len(rows)-len(done),
+            'acuerdo_con_lo_que_paso':rate(r['ahora']==r['antes'] for r in done),
+            'pasaron_y_siguen_pasando':rate(r['ahora']=='ready_for_execution' for r in passed),
+            'bloqueadas_que_ahora_pasan':[{'id':r['id'],'observaciones':r['observaciones']} for r in blocked if r['ahora']=='ready_for_execution'],
+            'duras_que_siguen_bloqueando':rate(r['ahora']=='blocked' for r in blocked if r['duras']),
+            'etiquetas_de_gustavo':{label:{'casos':n,'ahora_pasan':sum(1 for r in done if r['gustavo']==label and r['ahora']=='ready_for_execution')}
+                                    for label,n in labels.items()},
+            'contexto_cambiado':sum(1 for r in rows if r['contexto']=='cambiado'),'filas':rows}
+
 # --------------------------------------------------------------------------- entry point
 
 def _check_models(models):
@@ -691,6 +758,7 @@ def evaluate(agents=AGENTS,since=None,limit=TARGET[1],models=(),execute=False,ma
             costs=[u['estimated_usd'] for c in found for u in (c['piece'].usage or []) if u.get('stage')=='lectores' and u.get('estimated_usd') is not None]
             entry['coste_panel_por_pieza']=mean(costs)
         report['agentes'][agent]=entry
+    if 'verificador' in agents:report['repeticion_compuertas']=replay_gates(run)  # offline: no model call
     report['total_estimado_usd']=_money(sum((Decimal(str(e['coste_estimado'][e['modelo_produccion']]['usd']))
                                              for e in report['agentes'].values() if 'coste_estimado' in e),Decimal(0)))
     if execute:
@@ -868,10 +936,20 @@ def render(report):
                 if key in metrics:out.append(f'    {label}: {_pct(metrics[key])}')
             for key in ('matriz_compuerta','matriz'):
                 if key in metrics:out.append(f'    matriz: {_labels(metrics[key])}')
-            for key in ('paradas_por_reglas','reparaciones','reescritos','mejoras','regresiones','sin_resultado','similitud_con_y_sin_panel','similitud_ruido',
+            for key in ('paradas_por_reglas','reparaciones','bloqueadas_antes_pasan_ahora','pasan_con_observaciones','reescritos','mejoras','regresiones','sin_resultado','similitud_con_y_sin_panel','similitud_ruido',
                         'reglas_violadas_con_panel','reglas_violadas_sin_panel'):
                 if key in metrics:out.append(f'    {key.replace("_"," ")}: {metrics[key]}')
             if 'veredicto' in metrics:out.append(f'    {metrics["veredicto"]}')
+        out.append('')
+    replay=report.get('repeticion_compuertas')
+    if replay:
+        out.append('Repetición de la compuerta del post (sin llamar a modelos: reglas y severidad actuales sobre lo guardado)')
+        out.append(f'  Casos: {replay["casos"]} · sin repetición gratuita (las reglas los pararon antes del verificador): {replay["sin_repeticion_sin_pagar"]}')
+        out.append(f'  Acuerdo con lo que pasó: {_pct(replay["acuerdo_con_lo_que_paso"])} · pasaron y siguen pasando: {_pct(replay["pasaron_y_siguen_pasando"])}')
+        out.append(f'  Bloqueadas que ahora pasan: {len(replay["bloqueadas_que_ahora_pasan"])} · duras que siguen bloqueando: {_pct(replay["duras_que_siguen_bloqueando"])}')
+        for row in replay['bloqueadas_que_ahora_pasan'][:10]:out.append(f'    {row["id"]}: observaciones {", ".join(row["observaciones"]) or "ninguna"}')
+        for label,row in replay['etiquetas_de_gustavo'].items():out.append(f'  Gustavo · {label}: {row["casos"]} (ahora pasan {row["ahora_pasan"]})')
+        if replay['contexto_cambiado']:out.append(f'  Con contexto distinto al de entonces (hechos, guía u orientación): {replay["contexto_cambiado"]}')
         out.append('')
     out.append('Curso BIB-09: '+', '.join(report.get('curso',{}))+' (fixtures; resultados pendientes de CI).')
     out.append(f'Total estimado de una corrida (modelos de producción, casos usados): ${report["total_estimado_usd"]:.4f}')

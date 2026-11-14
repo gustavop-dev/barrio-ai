@@ -45,7 +45,12 @@ Imprime, por agente:
 - los casos encontrados por etiqueta;
 - lo que falta para 20 y para 30;
 - la línea base, cuando la hay;
-- el coste estimado de una corrida con cada modelo de `knowledge/providers.py` (y Jev para el clasificador).
+- el coste estimado de una corrida con cada modelo de `knowledge/providers.py` (y Jev para el clasificador);
+- para el verificador, «Repetición de la compuerta del post»: las reglas y la severidad actuales
+  ([`compuertas.md`](compuertas.md)) aplicadas a los veredictos ya guardados, sin pagar. Dice cuántos casos coinciden
+  con lo que pasó, qué bloqueadas pasarían ahora (con sus observaciones), qué duras siguen bloqueando, las etiquetas de
+  Gustavo y en cuántos cambió el contexto desde entonces. Un caso sin veredicto guardado no se repite. La corrida
+  pagada (`--ejecutar`) hace además la segunda revisión acotada tras la reparación, como producción.
 
 Todo sin llamar a la API. Es una **estimación**:
 

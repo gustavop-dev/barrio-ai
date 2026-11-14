@@ -20,7 +20,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from . import capturas, editor_visual, editorial, guardas, imagenes, operador, orientacion, orquestacion, urgente
+from . import capturas, compuertas, editor_visual, editorial, guardas, imagenes, operador, orientacion, orquestacion, urgente
 from .grafo import load_graph
 from .models import ActionExecution, ActionProposal, Capture, ConnectorAccount, CycleLedger, EditorialPiece, GalleryPhoto, Job
 
@@ -317,12 +317,13 @@ def _rewrite(piece, decision, memory, frozen, public, private, capture):
     if reasons and editorial.repair_enabled() and editorial._findings(review, issues):
         repair, new, claims, review, reasons, issues = editorial._repair_round(
             piece, memory, frozen, new, claims, review, reasons, issues, public, private)
+    reasons, observations = editorial.settle(piece, review, reasons, issues, claims)  # only hard findings stop his change
     if reasons:
         raise ValueError('El texto nuevo no pasó la verificación: ' + '; '.join(reasons)[:400])
     piece.final_text = new
     piece.verification = dict(review or {}, model_verdict=(review or {}).get('verdict'), verdict='ready_for_execution',
         blocking_reasons=[], rules=issues, text_sha256=editorial._sha(new), claims=claims, rework=str(capture.id),
-        **({'repair': repair} if repair else {}))
+        observations=observations, **({'repair': repair} if repair else {}))
     piece.save(update_fields=['final_text', 'verification', 'updated_at'])
     return True
 
@@ -440,8 +441,9 @@ def _propose(capture, piece, old, record):
                 publish_asap_expected_slot=when, publish_asap_reason='Se movió para conservar tu plazo de veto tras rehacerla')
         summary = record['summary'] or record['reason']
         dropped = set((old.review or {}).get('reasons') or []) if old.state == ActionProposal.State.DISCARDED else set()
-        risks = [r for r in old.risks if not str(r).startswith(('Rehecha por un comentario', 'Líder:', 'Bloqueada por'))
-                 and r not in dropped]
+        risks = [r for r in old.risks if not str(r).startswith(('Rehecha por un comentario', 'Líder:', 'Bloqueada por',
+                                                                'Conservada como observación')) and r not in dropped]
+        risks += compuertas.observation_risks((piece.verification or {}).get('observations') or [])
         if changed:
             risks.append(_clip('Rehecha por un comentario de Gustavo: ' + summary, 500))
         new = operador.create_proposal(old.created_by, None, 'CONT-09',

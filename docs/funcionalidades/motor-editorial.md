@@ -2,8 +2,8 @@
 
 El circuito que prepara, verifica y publica la pieza diaria de Gustavo en LinkedIn, sin aprobación humana pieza a pieza. Gustavo supervisa: puede vetar (ver [CAL-12](calendario-piezas.md#cal-12)), pausar la máquina y recibe avisos.
 
-- **Código:** `agentes-linkedin/infra/src/team_backend/editorial.py`, `autopiloto.py` (`_editorial`, `policy_review`, `post_issues`), `operador.py` (`execute`, `_publish`, `reconcile`, `resolve_uncertain`), `connectors_linkedin.py`, `guardas.py`, `voz.py`, `posicionamiento.py`.
-- **Documentación:** [`publicacion-diaria.md`](../../agentes-linkedin/infra/docs/publicacion-diaria.md), [`mapa-agentes-runtime.md`](../../agentes-linkedin/infra/docs/mapa-agentes-runtime.md).
+- **Código:** `agentes-linkedin/infra/src/team_backend/editorial.py`, `autopiloto.py` (`_editorial`, `policy_review`, `post_issues`), `operador.py` (`execute`, `_publish`, `reconcile`, `resolve_uncertain`), `compuertas.py` (severidad, segunda revisión y segundo intento), `auditoria_compuertas.py`, `connectors_linkedin.py`, `guardas.py`, `voz.py`, `posicionamiento.py`.
+- **Documentación:** [`publicacion-diaria.md`](../../agentes-linkedin/infra/docs/publicacion-diaria.md), [`compuertas.md`](../../agentes-linkedin/infra/docs/compuertas.md), [`mapa-agentes-runtime.md`](../../agentes-linkedin/infra/docs/mapa-agentes-runtime.md).
 - **Entorno de prueba:** cuenta `linkedin_fake` con `OPERATOR_ALLOW_FAKE=true` y Claude parcheado, como en `tests/test_publicacion.py`. En producción la publicación real exige `LIVE_LINKEDIN_OFFICIAL=true` y el OAuth de Gustavo; hoy está en `false`.
 
 ## Resumen
@@ -34,6 +34,10 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-22](#edi-22) | Un comentario sobre una pieza lista la rehace | backend | funciona |
 | [EDI-23](#edi-23) | Ante un bloqueo, Gustavo pide un cambio o lo desestima | PWA · app · backend | implementado |
 | [EDI-24](#edi-24) | Pedir un día que ya tiene post: Tu turno pregunta antes de publicar dos | app · backend | implementado |
+| [EDI-25](#edi-25) | Lo grave bloquea; la calidad queda como observación | app · backend | implementado |
+| [EDI-26](#edi-26) | Segunda revisión acotada tras la reparación | backend | implementado |
+| [EDI-27](#edi-27) | Segundo intento de un día que paró una compuerta | app · backend | implementado |
+| [EDI-28](#edi-28) | Auditoría de compuertas y aviso cuando frenan demasiado | backend | implementado |
 
 ---
 
@@ -45,7 +49,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Código:** `autopiloto._editorial`, `editorial.next_slot`, `editorial.can_publish`, `editorial.scheduled_for`; trabajo `prepare_piece` con id determinista por hueco.
 - **Criterios de aceptación:**
   1. **Dado** `EDITORIAL_POST_TIME=08:30`, `EDITORIAL_LEAD_HOURS=12`, una cuenta oficial conectada sin pausa, `LIVE_LINKEDIN_OFFICIAL=true` (o la cuenta `linkedin_fake`), CONT-09 distinto de `off`, cupo semanal libre y al menos `EDITORIAL_PREPARE_MIN_USD` de presupuesto de IA disponible, **cuando** el autopiloto corre a las 20:31 hora de `OPERATOR_TIMEZONE` del día anterior, **entonces** encola un trabajo `prepare_piece` para el hueco del día siguiente.
-  2. **Dado** que ese día ya tiene una pieza en cualquier estado (incluida `skipped`, `blocked` o `failed` por otro motivo que el dinero), **cuando** el autopiloto vuelve a correr, **entonces** no encola otra preparación para ese día.
+  2. **Dado** que ese día ya tiene una pieza en cualquier estado (incluida `skipped`, `blocked` o `failed` por otro motivo que el dinero), **cuando** el autopiloto vuelve a correr, **entonces** no encola otra preparación para ese día, salvo el único segundo intento tras un bloqueo de una compuerta de contenido ([EDI-27](#edi-27)).
   3. **Dado** que no hay cuenta oficial conectada, o está en pausa, o `LIVE_LINKEDIN_OFFICIAL=false` con cuenta real, **cuando** el autopiloto corre, **entonces** no encola nada y no se gasta nada.
   4. **Dado** `OPERATOR_AUTONOMY=…,CONT-09=off`, **cuando** el autopiloto corre, **entonces** no encola nada.
   5. **Dado** que ya hay un `prepare_piece` en cola o corriendo, **cuando** el autopiloto corre, **entonces** no encola un segundo trabajo.
@@ -132,10 +136,10 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** un editor verificador contrasta cada afirmación con los hechos públicos y las fuentes, y su veredicto vale solo para ese texto exacto.
-- **Código:** `editorial._check`, `editorial._blocking`, `VERIFIER_SYSTEM`.
+- **Código:** `editorial._check`, `editorial._blocking`, `editorial.settle`, `editorial.verifier_payload`, `compuertas.split`, `VERIFIER_SYSTEM`.
 - **Criterios de aceptación:**
-  1. **Dado** un texto que pasó las reglas, **cuando** corre el verificador, **entonces** `verification` guarda `verdict`, `model_verdict`, `findings`, `checked_claims`, `blocking_reasons` y `text_sha256` igual al SHA-256 del texto final.
-  2. **Dado** un hallazgo de gravedad `material` o una afirmación `unsupported`, **cuando** se calcula el veredicto, **entonces** es `blocked` aunque el modelo diga `ready_for_execution`.
+  1. **Dado** un texto que pasó las reglas, **cuando** corre el verificador, **entonces** `verification` guarda `verdict`, `model_verdict`, `findings`, `checked_claims`, `blocking_reasons`, `observations`, `day_attempt`, `context` (hashes) y `text_sha256` igual al SHA-256 del texto final.
+  2. **Dado** un hallazgo `material` duro o una afirmación `unsupported`, **cuando** se calcula el veredicto, **entonces** es `blocked` aunque el modelo diga `ready_for_execution`. Un hallazgo `material` blando sigue [EDI-25](#edi-25).
   3. **Dado** que el texto cambia después del veredicto, **cuando** la política lo revisa, **entonces** lo descarta con «El veredicto del verificador no corresponde a este texto exacto».
   4. **Dado** una afirmación `web_source`, **cuando** se verifica, **entonces** exige una fuente guardada con URL, fecha y extracto, y una entrada `supported_source` con texto y ref coincidentes. Una ref inventada bloquea aunque el modelo quiera aprobar. El verificador contrasta también hechos actuales que el redactor omitió o etiquetó como conocimiento general.
   5. **Dado** fuentes web con instrucciones maliciosas, **cuando** se usan en texto o infografía, **entonces** llegan como datos no confiables; redactor, selección, reparación y verificadores reciben la regla explícita de ignorarlas.
@@ -151,10 +155,10 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Criterios de aceptación:**
   1. **Dado** un hallazgo `material` concreto y `EDITORIAL_REPAIR=true`, **cuando** termina el verificador, **entonces** corre la etapa `reparacion` y después se repiten una vez las reglas y el verificador; `verification.repair` guarda `trigger`, `findings`, `original_text`, `first_review`, `changes` y `outcome`.
   2. **Dado** que el texto reparado pasa, **cuando** se crea la propuesta CONT-09, **entonces** lleva el riesgo «Reparada en una ronda: N hallazgo(s) de … corregido(s)».
-  3. **Dado** que el texto reparado sigue bloqueado, o la reparación lo descarta o no cambia nada, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos y no hay una segunda ronda.
+  3. **Dado** que el texto reparado sigue con un hallazgo duro, o la reparación lo descarta o no cambia nada y los hallazgos eran duros, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos y no hay una segunda ronda. Si solo quedan blandos, sale con ellos como observación ([EDI-25](#edi-25)); la verificación tras la ronda es la segunda revisión acotada ([EDI-26](#edi-26)).
   4. **Dado** un `blocked` del verificador sin hallazgos concretos, **cuando** termina, **entonces** no hay ronda y la pieza queda `blocked`.
   5. **Dado** `EDITORIAL_REPAIR=false`, **cuando** hay hallazgos, **entonces** la pieza queda `blocked` sin ronda.
-  6. **Dado** que el presupuesto de IA se agota durante la ronda, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos originales (no `failed`).
+  6. **Dado** que el presupuesto de IA se agota durante la ronda, **cuando** termina, **entonces** la pieza queda `blocked` con los motivos originales si son duros (no `failed`) y ese día puede tener su segundo intento ([EDI-27](#edi-27)); si eran blandos, sale con ellos como observación.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
@@ -165,7 +169,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Qué hace para Gustavo:** si el texto no pasa la verificación, ese día no se publica y le llega un aviso con el motivo.
 - **Código:** `editorial._run` (`avisar('piece_blocked', …)`), `capturas.release_ideas`.
 - **Criterios de aceptación:**
-  1. **Dado** una pieza con veredicto final `blocked`, **cuando** termina el circuito, **entonces** queda en estado `blocked` con los motivos en `note`, no se crea propuesta CONT-09 y se guarda una Notificación `piece_blocked` con el título «El verificador bloqueó la pieza del DD/MM» (o «Las reglas de publicación bloquearon…» si no corrió el verificador), el primer motivo como detalle y el enlace `/calendario/pieza/<id>`.
+  1. **Dado** una pieza con veredicto final `blocked`, **cuando** termina el circuito, **entonces** queda en estado `blocked` con los motivos en `note`, no se crea propuesta CONT-09 y se guarda una Notificación `piece_blocked` con el título «El verificador bloqueó la pieza del DD/MM» (o «Las reglas de publicación bloquearon…» si no corrió el verificador), el primer motivo como detalle (más «Habrá un segundo intento para ese día.» cuando lo habrá, [EDI-27](#edi-27)) y el enlace `/calendario/pieza/<id>`.
   2. **Dado** la push de `piece_blocked` activada (por defecto), **cuando** se bloquea, **entonces** llega una push que abre `/calendario/pieza/<id>`.
   3. **Dado** que la pieza usaba ideas de Gustavo, **cuando** se bloquea, **entonces** esas capturas vuelven a `idea` con «Vuelve a la mesa editorial: la pieza del … no salió (el verificador la bloqueó)».
 - **Brechas código/docs:** —
@@ -421,6 +425,70 @@ El flujo de imagen está implementado en el backend; la interfaz queda para fase
   8. **Dado** un día con dos posts, **cuando** abre el calendario de la app, **entonces** el panel del día muestra los dos («Publicaciones del día»).
   9. Los dos posts del día se separan como cualquier escritura (20 a 40 minutos como mínimo); no hay otra separación mínima.
 - **Cobertura QA:** `tests/test_publish_asap.py` (`IdeaScheduleTests`: pregunta y «sí» con segundo post fuera de topes, «no» y caducidad, el post del equipo se corre sin preguntar); `TuTurnoScreen.test.tsx` y `actions.test.ts` (tarjeta, detalles, respuesta, sin deslizar).
+
+## Compuertas
+
+Gustavo, 14/11/2026: «el verificador es demasiado rígido… si nos bloquea buscar una manera de reintentar… tampoco iteraciones infinitas: al menos que en la segunda revisión ya pase, de haber corregido lo que bloqueó». El inventario, la severidad, la escalera de reintentos y su coste están en [`compuertas.md`](../../agentes-linkedin/infra/docs/compuertas.md). Los comentarios tienen su parte en [COM-12](comentarios-y-lider.md#com-12).
+
+### EDI-25 · Lo grave bloquea; la calidad queda como observación <a id="edi-25"></a>
+
+- **Dónde:** app · backend
+- **Estado:** implementado
+- **Qué hace para Gustavo:** el verificador sigue parando lo que no puede salir (algo inventado, una cifra o un hecho sin respaldo, datos privados, sus prioridades privadas, venta agresiva), pero ya no deja un día sin post por un gancho flojo o una pieza algo fuera del brief: eso se intenta arreglar una vez y, si sigue, sale con la observación anotada en el detalle.
+- **Código:** `compuertas.HARD`, `SOFT`, `split`, `hard_issues` (`COMPUERTAS_DURAS`), `observation_risks`, `gate_policy`, `form_rules`; `editorial.settle`, `editorial.verifier_payload`; `VERIFIER_SYSTEM`. App `movil/src/pieza/ComoSeEscribio.tsx` (bloque del verificador).
+- **Criterios de aceptación:**
+  1. **Dado** un hallazgo `material` de `invented_experience`, `unsourced_figure`, `private_data`, `private_guidance_leak` o `aggressive_pitch`, o una afirmación `unsupported`, **cuando** termina la verificación (con o sin ronda), **entonces** la pieza queda `blocked` como antes.
+  2. **Dado** solo hallazgos `material` de `hook_not_delivered`, `off_brief` u `other`, **cuando** la ronda de reparación no los resuelve (o no puede correr), **entonces** el veredicto final es `ready_for_execution`, `verification.observations` los guarda (`issue`, `quote`, `detail`) y la propuesta CONT-09 lleva el riesgo «Conservada como observación (issue): …».
+  3. **Dado** un `blocked` del modelo sin hallazgos concretos, **cuando** se decide, **entonces** bloquea («El verificador emitió blocked»).
+  4. **Dado** `COMPUERTAS_DURAS=other`, **cuando** aparece un `other` material, **entonces** bloquea.
+  5. **Dado** un brief sin `gate_policy`, **cuando** pasan las reglas y el verificador, **entonces** cualquier petición de contacto frena la pieza, como antes; con `gate_policy: {cta_max: 1}` (lo pone un tipo de post, nunca el modelo), una sola invitación conversacional pasa y la venta dura sigue parando.
+  6. **Dado** una pieza con observaciones, **cuando** Gustavo abre «Cómo se escribió» en la app, **entonces** ve «Conservadas como observación» con cada una.
+- **Brechas código/docs:** las reglas fijas, las fuentes web, la privacidad y la experiencia inventada siguen cubiertas por las pruebas que ya existían, sin cambios.
+- **Cobertura QA:** `tests/test_compuertas.py` (`SeverityTests`, `SecondReviewTests`); `PiezaScreen.test.tsx` (observaciones); escrito, CI pendiente.
+
+### EDI-26 · Segunda revisión acotada tras la reparación <a id="edi-26"></a>
+
+- **Dónde:** backend
+- **Estado:** implementado
+- **Qué hace para Gustavo:** después de corregir, el verificador no vuelve a leer la pieza desde cero buscando cosas nuevas: comprueba que lo que paró quedó resuelto y solo vuelve a parar por algo grave.
+- **Código:** `editorial._repair_round` (`second={'previous_findings', 'changes'}`), `editorial.verifier_payload`, `compuertas.resolution`, `VERIFIER_SYSTEM` (párrafo `second_review`).
+- **Criterios de aceptación:**
+  1. **Dado** una ronda de reparación que cambió el texto, **cuando** se vuelve a verificar, **entonces** la entrada del verificador lleva `second_review` con los hallazgos de la primera revisión (`source`, `issue`, `quote`, `detail`) y los cambios de la reparación; es la misma llamada que ya existía, no una más.
+  2. **Dado** la segunda revisión, **cuando** devuelve hallazgos, **entonces** solo los duros bloquean; `verification.repair.resolution` dice, por hallazgo, si quedó resuelto.
+  3. **Dado** la evaluación pagada del verificador (`evaluar --ejecutar`), **cuando** hay ronda, **entonces** su segunda verificación usa la misma entrada que producción.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `tests/test_compuertas.py` (`SecondReviewTests`); escrito, CI pendiente.
+
+### EDI-27 · Segundo intento de un día que paró una compuerta <a id="edi-27"></a>
+
+- **Dónde:** app · backend
+- **Estado:** implementado
+- **Qué hace para Gustavo:** si las reglas, el verificador o la revisión de la imagen paran la pieza mientras se prepara y queda tiempo, el equipo prepara otra para ese día una sola vez, sabiendo por qué paró la primera. El aviso de bloqueo se lo dice.
+- **Código:** `compuertas.gate_blocked`, `attempt_number`, `retry_left`, `gate_retry`, `previous_attempts`, `day_attempts` (`EDITORIAL_DAY_ATTEMPTS`), `retry_margin` (`EDITORIAL_RETRY_MIN_MINUTES`); `editorial.next_slot`, `editorial._context`, `DIRECTOR_SYSTEM`; `autopiloto._editorial` (id de trabajo por intento). App `movil/src/pieza/ComoSeEscribio.tsx` («Intento N de M»).
+- **Criterios de aceptación:**
+  1. **Dado** `OPERATOR_AUTOPILOT=true`, CONT-09 distinto de `off` y un día cuya última pieza quedó `blocked` por las reglas, el verificador o la imagen, **cuando** el autopiloto corre y faltan al menos `EDITORIAL_RETRY_MIN_MINUTES` (90) para su hora, **entonces** encola otra preparación para ese día; con `EDITORIAL_DAY_ATTEMPTS` (2) piezas así ya no.
+  2. **Dado** un bloqueo por dinero, un ciclo detenido, una preparación interrumpida, un salto del director, un fallo o un retoque de un comentario suyo que no se pudo aplicar, **cuando** corre el autopiloto, **entonces** no cuenta como intento ni da segundo intento por esta vía.
+  3. **Dado** el segundo intento, **cuando** corre el director, **entonces** recibe `previous_attempts` con la tesis, el pilar, el enfoque, las categorías y los motivos del intento bloqueado, para no repetirlo o saltar el día; el primer intento no recibe ese campo.
+  4. **Dado** un bloqueo que deja segundo intento, **cuando** llega el aviso `piece_blocked`, **entonces** termina con «Habrá un segundo intento para ese día.»; sin autopiloto o sin tiempo, no.
+  5. **Dado** una pieza, **cuando** se verifica, **entonces** `verification.day_attempt` guarda `{number, of}` y la app muestra «Intento N de M» desde el segundo.
+- **Brechas código/docs:** un descarte del líder (CONT-09) no da segundo intento: Gustavo lo rescata con [EDI-23](#edi-23).
+- **Cobertura QA:** `tests/test_compuertas.py` (`SecondAttemptTests`); `PiezaScreen.test.tsx` (intento); escrito, CI pendiente.
+
+### EDI-28 · Auditoría de compuertas y aviso cuando frenan demasiado <a id="edi-28"></a>
+
+- **Dónde:** backend
+- **Estado:** implementado
+- **Qué hace para Gustavo:** se puede ver, por compuerta, cuánto entra, cuánto pasa a la primera o tras reintentar, cuánto se para y por qué, qué días no salió post y por qué, y dónde él no estuvo de acuerdo; y le llega un aviso si una compuerta frena demasiado.
+- **Código:** `auditoria_compuertas.audit`, `auditar`, `weekly`, `vigilar`, `render`; `manage.py compuertas auditar`; `resumen_semanal.gates`; `autopiloto.tick` (con la comprobación del silencio del líder); `evaluaciones.replay_gates`.
+- **Criterios de aceptación:**
+  1. **Dado** piezas, propuestas y eventos guardados, **cuando** se ejecuta `python manage.py compuertas auditar --dias 7`, **entonces** imprime por compuerta entraron, a la primera, tras reparar o reintentar, paradas, en espera, tasa, con observaciones, motivos y ejemplos, los días sin post con su causa, los callejones sin salida y el segundo intento; `--json` da lo mismo en JSON. No llama a modelos ni escribe.
+  2. **Dado** el informe, **cuando** se lee, **entonces** solo lleva ids y categorías: ni textos, ni citas, ni nombres.
+  3. **Dado** «Desestimar el bloqueo» de Gustavo o su «Sí, encaja» tras una duda del líder, **cuando** se audita, **entonces** cuenta como «no estuvo de acuerdo» en esa compuerta; un veto de algo que pasó cuenta como «vetó N de las que pasaron».
+  4. **Dado** una compuerta de contenido con tasa de parada ≥ `COMPUERTAS_ALERTA_TASA` y al menos `COMPUERTAS_ALERTA_MIN` decisiones en 7 días, o un día de ayer sin post por una compuerta, **cuando** corre la comprobación, **entonces** llega `gate_alert` una vez por compuerta y semana o por día ([NOT-06](notificaciones.md#not-06)).
+  5. **Dado** el resumen semanal, **cuando** se calcula, **entonces** `compuertas` lleva la vista de la semana sin ids.
+  6. **Dado** `evaluar --agentes verificador` sin `--ejecutar`, **cuando** corre, **entonces** «Repetición de la compuerta del post» aplica las reglas y la severidad actuales a los veredictos guardados, sin pagar.
+- **Brechas código/docs:** —
+- **Cobertura QA:** `tests/test_compuertas.py` (`AuditTests`, `ReplayTests`); escrito, CI pendiente.
 
 ## Retiradas
 

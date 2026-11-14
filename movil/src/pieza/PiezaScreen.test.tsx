@@ -295,6 +295,45 @@ describe('Detalle de una pieza', () => {
     expect(screen.getByText('Most feature requests arrive as a solution. More at https://example.com')).toBeOnTheScreen();
   });
 
+  it('shows what went out as an observation, the second review and the attempt of the day', async () => {
+    server(
+      piece({
+        verification: {
+          verdict: 'ready_for_execution',
+          model_verdict: 'blocked',
+          blocking_reasons: [],
+          rules: [],
+          findings: [{ issue: 'hook_not_delivered', severity: 'material', quote: 'Which decision', detail: 'The close is softer than the hook.' }],
+          observations: [{ issue: 'hook_not_delivered', quote: 'Which decision', detail: 'The close is softer than the hook.' }],
+          day_attempt: { number: 2, of: 2 },
+          repair: {
+            trigger: 'verificador',
+            findings: [{ source: 'verificador', issue: 'hook_not_delivered', quote: 'Which decision', detail: 'The close is softer than the hook.' }],
+            original_text: 'Most feature requests arrive as a solution.',
+            changes: [{ finding: 'hook_not_delivered', change: 'Cerré con la decisión que promete el gancho.' }],
+            outcome: 'reparada',
+            resolution: [{ source: 'verificador', issue: 'hook_not_delivered', resolved: false }],
+          },
+        },
+      }),
+    );
+    await renderPieza();
+    await fireEvent.press(await screen.findByText('Verificador'));
+    expect(screen.getByText('Conservadas como observación')).toBeOnTheScreen();
+    expect(screen.getByText('Gancho incumplido «Which decision» · The close is softer than the hook.')).toBeOnTheScreen();
+    expect(screen.getByText('Intento 2 de 2')).toBeOnTheScreen();
+    await fireEvent.press(screen.getByText('Ronda de reparación'));
+    expect(screen.getByText('0 de 1 resueltos')).toBeOnTheScreen();
+  });
+
+  it('says nothing about observations or attempts when there are none', async () => {
+    server(piece({ verification: { verdict: 'ready_for_execution', model_verdict: 'ready_for_execution', blocking_reasons: [], rules: [], day_attempt: { number: 1, of: 2 } } }));
+    await renderPieza();
+    await fireEvent.press(await screen.findByText('Verificador'));
+    expect(screen.queryByText('Conservadas como observación')).toBeNull();
+    expect(screen.queryByText('Intento del día')).toBeNull();
+  });
+
   it('explains a blocked piece and an uncertain one', async () => {
     server(piece({ status: 'blocked', state: 'blocked', action: null, verification: { verdict: 'blocked', model_verdict: 'ready_for_execution', blocking_reasons: ['Afirma una experiencia que no está en tu memoria confirmada.'] } }));
     await renderPieza();

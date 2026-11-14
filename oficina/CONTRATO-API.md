@@ -130,6 +130,11 @@ GET `/api/v1/editorial/pieces/<id>` devuelve lo mismo que una pieza del calendar
   - `verification.rules: [texto]` son los motivos de las reglas deterministas de CONT-09, que ahora corren antes del verificador (R3). Si no está vacío, el verificador no corrió y `model_verdict`, `findings` y `checked_claims` faltan.
   - `verification.repair` (solo si hubo ronda de reparación, R4): `{ trigger: "reglas|verificador", findings: [{ source: "reglas|verificador", issue, quote, detail }], original_text, original_sha256, first_review: { verdict, findings, checked_claims, summary, blocking_reasons } | null, decision: "repaired|discard", changes: [{ finding, change }], rationale, model, outcome: "reparada|bloqueada|descartada|sin_cambios|sin_presupuesto", note?, repaired_sha256?, repaired_text? }`. `final_text` es entonces el texto reparado (si llegó a verificarse) y `selection.final_text` conserva el de la selección.
   - `stage` puede valer también `reparacion`, y `usage` trae una fila `reparacion` y una segunda `verificador` cuando hubo ronda.
+- Compuertas (campos aditivos; `agentes-linkedin/infra/docs/compuertas.md`):
+  - `verification.observations: [{ issue, quote, detail }]`: hallazgos blandos (`hook_not_delivered`, `off_brief`, `other`) que no pararon la pieza. Con ellos `verdict` puede ser `ready_for_execution` aunque `model_verdict` sea `blocked`. La propuesta CONT-09 los lleva como riesgos «Conservada como observación (issue): …».
+  - `verification.day_attempt: { number, of }`: qué intento del día fue esta pieza (el segundo solo llega tras un bloqueo de una compuerta) y cuántos admite `EDITORIAL_DAY_ATTEMPTS`.
+  - `verification.context: { public_facts, private_guidance, orientation }`: SHA-256 de lo que el veredicto leyó (solo hashes), para que la repetición de `evaluar` distinga un contexto que cambió de una compuerta que cambió.
+  - `verification.repair.resolution: [{ source, issue, resolved }]`: tras la segunda revisión, si cada hallazgo de la primera quedó resuelto.
   - `brief.positioning_version` (por ejemplo `posicionamiento-v1`) dice con qué versión de `team_backend/posicionamiento.py` se escribió la pieza.
 - `final_text`, `citations: [unitId]`, `signals: [{ id, author, why_followed, posted_at, reactions, comments, text }]` (datos de terceros), `usage: [{ stage, model, estimated_usd, request_id, units, missing_units }]` y `action_detail`: la acción CONT-09 completa o `null`.
 
@@ -748,6 +753,10 @@ Reglas de prioridad:
   `directo` porque su salida a internet cambió, con qué hacer en el servidor. Una vez por episodio; no pausa la cuenta.
   Sin enlace.
 - `lead_silent` (capa `sistema`, push activada por defecto) avisa de que el agente líder lleva 7 días sin aprobar nada en una capacidad. Llega una vez por capacidad y semana, y enlaza a `/calendario?vista=lista&tipo=<tipo>&no_salio=1`.
+- `gate_alert` (capa `sistema`, push activada por defecto) avisa de que una compuerta de contenido paró al menos
+  `COMPUERTAS_ALERTA_TASA` (50 %) de al menos `COMPUERTAS_ALERTA_MIN` (4) decisiones en 7 días (una vez por compuerta y
+  semana, enlaza a `/calendario?vista=lista&no_salio=1`), o de que ayer no salió post porque lo paró una compuerta y nadie
+  lo reintentó ni desestimó (una vez por día, enlaza a la pieza). `COMPUERTAS_ALERTAS=false` los apaga.
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
 
@@ -756,7 +765,7 @@ Reglas de prioridad:
 | Va a | Tipos con push |
 | --- | --- |
 | Tu turno | Todos |
-| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent`, `linkedin_canary`, `navegador_salida` y `weekly_summary` |
+| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent`, `gate_alert`, `linkedin_canary`, `navegador_salida` y `weekly_summary` |
 
 Quién emite cada tipo sin tarjeta propia: `machine_paused` al detener la máquina desde la app; `linkedin_expired` cuando el autopiloto ve el token caducado (en lugar de `account_paused`); `machine_paused_env` una vez por parada, cuando el autopiloto ve `OPERATOR_PAUSED` (un AuditEvent `operator.env_paused` marca que ya salió; nunca se guarda en el feed: «Próximo» la muestra mientras dura). Los urgentes (`uncertain`, `linkedin_expired`, `machine_paused` y `machine_paused_env`) van con prioridad alta.
 

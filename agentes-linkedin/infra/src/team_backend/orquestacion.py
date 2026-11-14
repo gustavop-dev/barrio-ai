@@ -174,11 +174,11 @@ def context_version(graph):
     # cannot change a running plan's schemas, model or repair policy invisibly.
     root = Path(__file__).resolve().parents[1]
     modules = {'.'.join(s['binding'].split('.')[:2]) for s in graph['schemas'].values()}
-    modules.update(('knowledge.providers','team_backend.autopiloto','team_backend.orquestacion'))
+    modules.update(('knowledge.providers','team_backend.autopiloto','team_backend.orquestacion','team_backend.compuertas'))
     sources = {name:hashlib.sha256(root.joinpath(*name.split('.')).with_suffix('.py').read_bytes()).hexdigest()
                for name in modules}
     keys = ['ANTHROPIC_MODEL','ANTHROPIC_VISION_MODEL','OPENAI_IMAGE_MODEL','NETWORK_CLASSIFIER_MODEL','EDITORIAL_REPAIR',
-            'LEAD_ENABLED','LEAD_CAPABILITIES']
+            'LEAD_ENABLED','LEAD_CAPABILITIES','COMPUERTAS_DURAS']
     keys += ['EDITORIAL_MODEL_'+stage for stage in ('DIRECTOR','REDACTOR','LECTORES','SELECCION','VERIFICADOR','REPARACION')]
     return digest({'sources':sources,'overrides':{key:os.environ.get(key,'') for key in keys}})
 
