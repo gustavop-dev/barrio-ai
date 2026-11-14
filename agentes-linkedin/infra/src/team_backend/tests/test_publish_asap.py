@@ -77,7 +77,8 @@ class PriorityTests(EditorialBase):
 class IdeaScheduleTests(EditorialBase):
     """Each idea of Gustavo gets its window on arrival and is prepared right away; his day/hour wins."""
     def idea(self,note='Una idea sobre decisiones de producto.',**fields):
-        return Capture.objects.create(created_by=self.gustavo,purpose='post',note=note,state='idea',**fields)
+        fields.setdefault('state','idea')  # a capture of the old flow comes already used
+        return Capture.objects.create(created_by=self.gustavo,purpose='post',note=note,**fields)
 
     def test_an_idea_without_date_queues_behind_scheduled_posts_and_is_prepared_right_away(self):
         now=timezone.now();tz=operador.local_tz();first=urgente.free_slot(self.official,now).astimezone(tz).date()

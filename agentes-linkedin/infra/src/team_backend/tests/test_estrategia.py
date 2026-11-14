@@ -151,7 +151,7 @@ class WeeklyPlanTests(StrategyBase):
         request_id=str(uuid.uuid4())
         response=self.human.post('/api/v1/estrategia/planear',{'semana':self.next_monday.isoformat(),'request_id':request_id},format='json')
         self.assertEqual(response.status_code,202,response.content)
-        self.assertEqual(response.json()['job']['kind'],'plan_week')
+        self.assertEqual(Job.objects.get(pk=response.json()['job']['id']).kind,'plan_week')  # JobOutput has no kind
         self.assertEqual(self.human.post('/api/v1/estrategia/planear',{'semana':self.next_monday.isoformat(),'request_id':request_id},
                                          format='json').status_code,200)  # the same request
         self.assertEqual(self.human.post('/api/v1/estrategia/planear',{'semana':self.next_monday.isoformat()},format='json').status_code,409)
@@ -311,6 +311,7 @@ class FindingTests(StrategyBase):
                                       state='ready',brief={'gasp_type':'P','story':self.STORY})
         piece.brief={'gasp_type':'P','reader_value':'Una pregunta útil.','story':self.STORY}
         self.assertEqual([estrategia.code(n) for n in estrategia.notes(piece)],['repeated_story'])
+        piece.research=[self.SOURCE]  # a story told from its saved source: the repeat is a note, never a finding
         self.assertEqual(estrategia.findings(piece,'Ana Ejemplo almost shut Ejemplo Labs down.'),[])
 
     def test_the_code_keeps_the_type_and_the_audience_evidence_honest(self):
