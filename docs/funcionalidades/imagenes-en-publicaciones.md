@@ -113,13 +113,15 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Criterios de aceptación:**
   1. **Dado** el brief de una pieza, **cuando** se guarda, **entonces** incluye el tipo de imagen elegido (`foto`, `infografia` o `carrusel`) y el motivo, a partir de la tesis, el enfoque, la propuesta de Gustavo si la hay y las fotos disponibles.
   2. **Dado** una propuesta de post de Gustavo con fotos, **cuando** se decide, **entonces** sus fotos son la primera opción, salvo que el equipo explique por qué otra imagen sirve mejor.
-  3. **Dado** un post que explica un proceso o una idea en pasos, **cuando** se decide, **entonces** el equipo puede elegir un carrusel ([IMG-INF-05](#img-inf-05)).
+  3. **Dado** un post que avanza por partes (los pasos de un proceso, una lista de errores, lecciones o señales, un antes y después, un marco con sus piezas o varias opciones comparadas), **cuando** se decide, **entonces** el equipo elige un carrusel ([IMG-INF-05](#img-inf-05)) si su foto no lo cuenta mejor.
   4. **Dado** un post con un dato o una frase protagonista, **cuando** se decide, **entonces** el equipo puede elegir una infografía de imagen única ([IMG-INF-02](#img-inf-02)).
-  5. **Dado** que la Galería está vacía o ninguna foto encaja, **cuando** se decide, **entonces** el equipo elige una infografía o un carrusel; nunca «sin imagen».
+  5. **Dado** que la Galería está vacía o ninguna foto encaja, **cuando** se decide, **entonces** el equipo elige una infografía o un carrusel según cómo avance el texto (antes elegía siempre infografía); nunca «sin imagen».
   6. **Dado** que la foto elegida deja de estar disponible (Gustavo la borra) o no pasa sus comprobaciones, **cuando** se prepara la pieza, **entonces** el equipo cambia a otra foto o a una infografía, y lo registra.
   7. **Dado** que no se puede preparar ninguna imagen válida, **cuando** termina la preparación, **entonces** la pieza queda bloqueada con el motivo y llega el aviso de pieza bloqueada ([EDI-09](motor-editorial.md#edi-09)); no se publica sin imagen.
-- **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+  8. **Dado** que Gustavo pide un formato para el post (en la idea que usa la pieza o en un comentario sobre ella: «hazlo carrusel»), **cuando** se decide, **entonces** ese es el formato: el director lo lee en su idea y `editor_visual` recibe sus palabras en `gustavo_request` (las mismas que lee el líder, `lider.piece_request`).
+  9. **Dado** el historial que recibe el director, **cuando** decide, **entonces** cada pieza reciente dice su formato de imagen (`history[].image`), para no repetir uno por costumbre.
+- **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales. Hasta el 14/11/2026 nunca salió un carrusel. Causas leídas en el código (no se miraron datos de producción): los prompts solo lo proponían para «un proceso en pasos» y elegían infografía con la Galería vacía; `editor_visual` no veía lo que Gustavo pidió; un carrusel con láminas o títulos numerados («3 mistakes») choca con la regla de cifras sin fuente y, tras la corrección, la tarjeta de marca ocupa su lugar y cambia `image_kind`, así que el intento no se ve; y un comentario no podía pedir uno.
+- **Cobertura QA:** criterios 3, 5 y 8 en `test_imagenes.CarouselTests` (`test_a_carousel_the_director_chooses_reaches_linkedin_as_a_document_with_its_cover_title`, `test_the_team_is_told_when_a_carousel_fits_and_not_to_number_its_slides`) y `test_editor_visual.VisualTests.test_the_format_gustavo_asks_for_reaches_the_selector`. Escritas; ejecución pendiente del CI.
 
 ### IMG-16 · Opción «Edición con IA» en la captura, la Galería y Ajustes <a id="img-16"></a>
 
@@ -320,7 +322,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Implementación backend:** `upload_media`: initializeUpload, PUT, AVAILABLE; Posts API content.media/multiImage, documentos PDF; fake registra bytes. Contratos escritos offline: validación externa pendiente.
 - **Criterios de aceptación:**
   1. **Dado** una pieza aprobada con una foto o una infografía de imagen única, **cuando** llega su hora, **entonces** primero se sube la imagen a LinkedIn (registrar la subida y enviar los bytes) y después se crea el post que la referencia en `content.media`, con su texto alternativo, usando el mismo permiso `w_member_social`.
-  2. **Dado** una pieza con carrusel, **cuando** llega su hora, **entonces** se sube como documento de hasta 8 láminas de 1080×1350 y se crea el post que lo referencia.
+  2. **Dado** una pieza con carrusel, **cuando** llega su hora, **entonces** se sube como documento de hasta 8 láminas de 1080×1350 y se crea el post que lo referencia. El título del documento en LinkedIn es el titular de su portada (antes, «Ideas · Gustavo» para todos); va en el manifiesto (`document_title`, solo en carruseles), así que cambiarlo invalida la aprobación como cambiar un byte.
   3. **Dado** la imagen que se publica, **cuando** se prepara, **entonces** tiene formato vertical 1080×1350 o cuadrado 1080×1080; nunca horizontal. Una foto más pequeña que ese tamaño conserva su resolución con esa proporción (nunca se agranda), y una foto que sale tal cual (criterio 5) conserva la suya.
   4. **Dado** una foto que no tiene ese formato (por ejemplo, una 9:16 del teléfono) y que se puede editar, **cuando** se prepara, **entonces** el código la recorta, centrada, sin ningún modelo de imagen ni comprobación visual (decisión de Gustavo, 2026-11-14: «centrar y recortar arriba y abajo»): una foto vertical conserva todo su ancho y pierde lo mismo arriba y abajo hasta 4:5 (1080×1350); una horizontal o cuadrada pierde lo mismo a cada lado hasta 1:1 (1080×1080). Antes se endereza según su EXIF y el resultado no copia sus metadatos. Si además lleva una edición con IA ([IMG-07](#img-07) a [IMG-10](#img-10)), esta se pide al modelo en la orientación de la foto (1024×1536 vertical, 1536×1024 horizontal) y su resultado se recorta igual, centrado, nunca se aplasta.
   5. **Dado** una foto con «No editar», con la nota «úsala tal cual» o con una instrucción no segura, en otro formato, **cuando** se prepara, **entonces** se publica tal cual, sin recortarla.
@@ -416,16 +418,19 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
 
 - **Dónde:** backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** cuando un post explica algo en pasos, sale como carrusel con su portada, una idea por lámina y una pregunta al final.
-- **Implementación backend:** Carrusel de 3–8 láminas: portada, interiores y cierre con pregunta; PDF etiquetado con alt por lámina.
+- **Qué hace para Gustavo:** cuando un post avanza por partes (pasos, errores, lecciones, antes y después) o él lo pide, sale como carrusel con su portada, una idea por lámina y una pregunta al final.
+- **Implementación backend:** Carrusel de 3–8 láminas: portada, interiores y cierre con pregunta; PDF etiquetado con alt por lámina. `imagenes.DESIGN_SYSTEM` le dice al diseñador cómo repartir el post en láminas y que no numere; su respuesta tiene hasta 8.000 tokens (5.000 una infografía). Un comentario puede pedirlo (`image_route="carrusel"`, [EDI-22](motor-editorial.md#edi-22)).
 - **Criterios de aceptación:**
   1. **Dado** un carrusel, **cuando** se valida, **entonces** tiene como mucho 8 láminas de 1080×1350.
   2. **Dado** la primera lámina, **cuando** se dibuja, **entonces** es la portada: fondo tinta, una sola palabra en 0ff1ce, titular de 8 palabras como máximo y bajada; las interiores van en papel.
   3. **Dado** cada lámina, **cuando** se valida, **entonces** responde una sola idea; si hacen falta dos, son dos láminas.
   4. **Dado** la última lámina, **cuando** se valida, **entonces** cierra con una pregunta para la conversación, nunca con un «sígueme».
   5. **Dado** el carrusel, **cuando** se numeran las láminas, **entonces** cada pie dice «n/N».
-- **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+  6. **Dado** el diseño de un carrusel, **cuando** se escribe, **entonces** ni las láminas ni sus títulos llevan cifras para numerarse («1.», «Step 2», «3 mistakes»): el pie ya dice «n/N» y la plantilla `pasos` numera sus pasos; una cifra sin fuente sigue rechazándose ([IMG-INF-04](#img-inf-04)).
+  7. **Dado** un comentario de Gustavo que pide un carrusel sobre una pieza lista con foto o infografía, **cuando** se rehace, **entonces** la imagen pasa a ser un carrusel diseñado con su comentario y la foto vuelve a la Galería.
+  8. **Dado** un carrusel que no pasa el diseño ni la revisión tras la corrección, **cuando** termina, **entonces** sale la tarjeta de marca, como con una infografía (la pieza no se retrasa por intentarlo).
+- **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales. El criterio 8 no prueba antes una infografía: el ciclo diario permite dos llamadas de diseño y las gasta el carrusel.
+- **Cobertura QA:** `test_imagenes.ImageWorkflowTests.test_infographic_and_carousel_use_code_and_one_bounded_repair`; `test_imagenes.CarouselTests` (del brief del director al documento en LinkedIn con el título de su portada; título ligado a la aprobación); `test_retoque.ReworkTests.test_a_comment_asking_for_a_carousel_turns_the_image_into_one`. Escritas; ejecución pendiente del CI.
 
 ### IMG-INF-06 · Revisión con la lista de 10 puntos <a id="img-inf-06"></a>
 
