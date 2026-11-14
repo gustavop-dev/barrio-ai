@@ -1168,6 +1168,12 @@ def _run_job(job):
             from . import analitica
             r=analitica.run(user,ConnectorAccount.objects.get(id=params['account']))
             return ('complete' if r['state']=='ok' else 'failed'),f"analitica:{r['state']} dias:{r['days']}"[:30],r['error']
+        if job.kind=='check_linkedin':
+            from . import canario
+            log=canario.run(ConnectorAccount.objects.get(id=params['account']))
+            if log is None:return 'failed','blocked','Máquina o cuenta en pausa: no se probó LinkedIn.'
+            done=log.state in (canario.CanaryRun.State.OK,canario.CanaryRun.State.BROKEN)  # it judged LinkedIn
+            return ('complete' if done else 'failed'),f'prueba:{log.state} llamadas:{log.calls}'[:30],'' if done else log.error
         if job.kind=='read_inbox':
             from . import conversaciones
             r=conversaciones.read_inbox(user,ConnectorAccount.objects.get(id=params['account']))

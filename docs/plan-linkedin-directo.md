@@ -86,8 +86,16 @@ anteriores al 10/10/2025.
    [`metricas-resultados.md`](../agentes-linkedin/infra/docs/metricas-resultados.md#analítica-de-linkedin-cuenta-directo).
    Lo que solo vale para un rango exacto (miembros alcanzados, publicaciones principales, demografía del contenido)
    se muestra solo para ese rango, o con su propio rango.
-6. **Prueba diaria.** La del spike, llevada al servicio: lecturas de comprobación sobre la cuenta de prueba y aviso
-   en la Bandeja cuando algo se rompe.
+6. **Prueba diaria.** La del spike, llevada al backend (trabajo `check_linkedin`, `team_backend/canario.py`). Una vez
+   al día por cuenta `directo`, desde las 12:00 UTC (`LINKEDIN_CANARY_AFTER`), hace las 14 lecturas del conector (16
+   llamadas) y comprueba que cada respuesta trae los campos que usa Barrio. Va por el servicio como cualquier
+   lectura: gasta sus topes y respeta sus paradas. Guarda por lectura el estado, las filas y los campos que faltan,
+   nunca un valor; quedan las 30 últimas. Si no pudo correr (servicio ocupado, caído o sin cupo), lo intenta otra vez
+   a la hora, hasta 3 veces al día. Avisa en Notificaciones (`linkedin_canary`) una vez cuando algo se rompe o no pudo
+   correr en todo el día, y otra cuando vuelve a pasar. Si el servicio paró la cuenta o no tiene sesión, la pausa en
+   Barrio como una restricción de Unipile, con qué hacer en el motivo, y avisa una sola vez. La última prueba de cada
+   cuenta llega en `canary` de `GET /api/v1/operador/overview` y `/operador/accounts`. A mano:
+   `python -m navegador canario <cuenta>`.
 
 ### Topes frente al ritmo real
 
@@ -102,13 +110,34 @@ Un día completo de producción de una cuenta, sacado del código (13/11/2026; d
 | Referentes cada 3 h (hasta 15) | — | hasta 120 |
 | Bandeja cada hora | — | hasta 132 |
 | Comentarios de los posts propios, métricas, descubrir, sincronizar, borradores y conciliación | — | hasta 245 |
-| Analítica (5 exportaciones) y prueba diaria (17) | — | 22 |
+| Analítica (5 exportaciones) y prueba diaria (16) | — | 21 |
 | **Total**: los perfiles de todo (también clasificar) comparten un tope de 80 al día, 160 llamadas | **90** | **hasta unas 880**; un día normal, unas 650 |
 
 Topes del servicio por cuenta, en ventanas móviles: 150 lecturas por hora y 1000 por día; 15 escrituras por hora y
 100 por día; por día, 30 comentarios y respuestas, 30 reacciones, 30 seguimientos, 30 invitaciones y 15
 aceptaciones. Son una red de seguridad detrás de los topes del operador. Un tope agotado contesta 422 con
 `code: budget`: no pausa la cuenta, no cuenta como límite de LinkedIn y la acción se reintenta cuando hay cupo.
+
+### Hecho y lo que falta (13/11/2026)
+
+Hecho y probado con respuestas inventadas y el navegador falso de las pruebas; nada de esto salió a LinkedIn:
+
+- **Topes por tipo de escritura** en el servicio, con el 422 `budget` de arriba. Una acción que no salió por tope, por
+  servicio ocupado o por la red vuelve a aprobada sin contar en los topes del día ni pausar, y se reintenta pasado
+  el `retry_after` (30 min si no llega). Las lecturas cortadas así se retoman en la siguiente vuelta.
+- **Salida a internet.** Proxy opcional para todas las cuentas (`NAVEGADOR_PROXY`) o por cuenta
+  (`NAVEGADOR_PROXY_CUENTAS`), con usuario y clave solo desde el entorno, nunca en disco ni en el log. El servicio
+  guarda por cuenta una etiqueta sin secretos de la salida de su sesión y no la abre por otra hasta que alguien lo
+  acepta (`python -m navegador salida <cuenta> --aceptar`): una sesión que salta de IP es lo que más verificaciones
+  provoca. Un perfil importado de otro equipo también espera esa aceptación.
+- **Prueba diaria** en el backend, con sus avisos y la pausa (punto 6).
+- **Filtro de grado de red** en la búsqueda (`rutas.search_page(network=...)`): escrito, apagado y sin verificar.
+
+Falta:
+
+- Correrlo contra LinkedIn con la cuenta de prueba (fase 4): los topes frente a lo que LinkedIn tolera, la salida por
+  el túnel de casa y la prueba diaria real.
+- Mostrar la última prueba diaria en Ajustes › Máquina, junto al estado de la cuenta: el backend ya la sirve.
 
 Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Un Chromium por cuenta ocupa del orden de medio
 giga (estimación, sin medir): caben una o dos cuentas; más cuentas piden más máquina o el equipo del usuario.

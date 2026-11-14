@@ -100,10 +100,10 @@ en el encabezado `Retry-After`):
 | 400 | Petición mal formada | Error `contract` |
 | 401, 403 | Falta el token (401) o no es el del servicio (403) | Error `config`; la cuenta se pausa |
 | 404 | Cuenta desconocida en el servicio | Error `config`; la cuenta se pausa |
-| 409 | Cuenta detenida por el servicio (LinkedIn frenó antes), o una escritura con un `request_id` que ya salió o está saliendo y cuya respuesta no quedó guardada | Error `stopped`; la cuenta se pausa |
+| 409 | Cuenta detenida por el servicio (LinkedIn frenó antes), o una escritura con un `request_id` que ya salió o está saliendo y cuya respuesta no quedó guardada | Error `stopped`; la cuenta se pausa y el motivo dice qué hacer: revisarla a mano y reanudarla en el servicio (`python -m navegador reanudar <cuenta>`) y en Barrio |
 | 422 | Fuera de la lista permitida; no salió nada | Error `refused` |
 | 422 con `code: budget` | Tope de la cuenta agotado (lecturas o escrituras por hora o por día, o un tipo de escritura por día); no salió nada | Error `budget` con `retry_after`. No pausa la cuenta y no cuenta como límite de LinkedIn: la acción queda aprobada y se reintenta pasado ese tiempo; una lectura espera a la siguiente vuelta |
-| 423 | Sin sesión: alguien tiene que entrar a mano en ese navegador | Error `login`; la cuenta se pausa |
+| 423 | Sin sesión: alguien tiene que entrar a mano en ese navegador | Error `login`; la cuenta se pausa y el motivo dice qué hacer: `python -m navegador login <cuenta>` y reanudarla en Barrio |
 | 503 | Navegador no listo (no abrió, o el perfil lo tiene otro navegador), ocupado (la llamada no pudo salir en los 35 s siguientes a su llegada) o con una salida a internet distinta de la última de su sesión, que alguien tiene que aceptar; no salió nada | Error `not_sent`: como `budget`, se reintenta más tarde (30 min si nadie dice otra cosa) |
 | 504 u otro 5xx | La página falló durante la llamada: pudo salir y no se sabe qué pasó | Escritura: incierta. Lectura: error `network` |
 
@@ -111,6 +111,15 @@ El servicio juzga además lo mismo que el backend para detenerse: si una respues
 parada (redirección, 401, 403, 429, 999, login, verificación, HTML donde se esperaban datos), o la página termina
 en una de esas pantallas o pierde la cookie de sesión, devuelve esa respuesta tal cual (200) y deja la cuenta
 detenida en disco. Desde ahí todo recibe 409 hasta que alguien la reanuda (`python -m navegador reanudar <cuenta>`).
+
+La pausa avisa una sola vez: los trabajos que ya estaban en cola y chocan con la misma parada solo actualizan el
+motivo.
+
+**Prueba diaria.** El backend no tiene un endpoint aparte para ella: el trabajo `check_linkedin` hace las 14 lecturas
+del conector (16 llamadas) por `/llamadas`, como cualquier otra, así que gasta los topes y se detiene igual. Qué se
+lee y qué campos debe traer cada respuesta vive en `linkedin_directo/canario.py`; `python -m navegador canario
+<cuenta>` corre lo mismo a mano. Un 409 o 423 en la prueba pausa la cuenta como en cualquier lectura; un `budget`,
+`not_sent` o `network` la deja «sin correr» y se reintenta a la hora.
 
 `GET {NAVEGADOR_URL}/health` (sin token) contesta `{"status": "ok"}` mientras el servicio está arriba; no abre ningún
 navegador.

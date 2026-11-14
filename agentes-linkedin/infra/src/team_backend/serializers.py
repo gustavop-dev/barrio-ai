@@ -65,9 +65,17 @@ class AccountInput(serializers.Serializer):
     label=UTF8CharField(max_length=120)
 
 class AccountOutput(serializers.ModelSerializer):
+    # The last daily canary of a directo account (canario.latest); null for other providers or before the first run.
+    canary=serializers.SerializerMethodField()
     class Meta:
         model=ConnectorAccount
-        fields=['id','provider','external_account_id','label','status','is_locked','paused','paused_reason','last_checked_at','created_at']
+        fields=['id','provider','external_account_id','label','status','is_locked','paused','paused_reason','last_checked_at','created_at',
+                'canary']
+    def get_canary(self,account):
+        from .canario import latest
+        out=latest(account);moment=serializers.DateTimeField()
+        if out:out.update({k:out[k] and moment.to_representation(out[k]) for k in ('started_at','finished_at')})
+        return out
 
 class PauseInput(serializers.Serializer):
     paused=serializers.BooleanField()

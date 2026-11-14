@@ -40,6 +40,7 @@ FEED_KINDS={
     'capture_processed':('tuyo',False,'Captura procesada'),
     'machine_paused_env':('sistema',True,'Máquina detenida desde el servidor'),
     'lead_silent':('sistema',True,'El líder no aprueba nada en una capacidad'),
+    'linkedin_canary':('sistema',True,'Prueba diaria de LinkedIn: rota, sin correr o de nuevo bien'),
     'weekly_summary':('tuyo',True,'Resumen de la semana listo'),
 }
 

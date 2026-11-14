@@ -1610,7 +1610,8 @@
       "activity": {
         "job_kinds": [
           "collect_metrics",
-          "import_analytics"
+          "import_analytics",
+          "check_linkedin"
         ],
         "event_roles": []
       }
@@ -4419,6 +4420,12 @@
           "cadence": "Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días y después los rangos exactos de ANALYTICS_DAILY_RANGES=7,14,28,90,365 (una vez al día, para en el primer fallo); solo cuentas «directo» con el servicio navegador configurado.",
           "binding": "team_backend.autopiloto._analytics",
           "deduplication": "ID determinista por cuenta y día UTC; _pending impide duplicar; un intento al día aunque falle."
+        },
+        {
+          "kind": "check_linkedin",
+          "cadence": "Prueba diaria: una vez por día UTC desde LINKEDIN_CANARY_AFTER=12:00, las 14 lecturas del conector (16 llamadas, dentro de los topes del servicio navegador); si no pudo correr, otra vez a la hora, hasta 3 al día; solo cuentas «directo» con el servicio navegador configurado.",
+          "binding": "team_backend.autopiloto._canary",
+          "deduplication": "ID determinista por cuenta, día UTC e intento; _pending impide duplicar; ninguna corrida más ese día cuando una ya juzgó LinkedIn."
         }
       ],
       "loops": [],
@@ -4974,6 +4981,7 @@
       "sync_network": "relaciones_comunidad",
       "collect_metrics": "analista_barrio_resultados",
       "import_analytics": "analista_barrio_resultados",
+      "check_linkedin": "operador_cuenta",
       "process_capture": "operador_cuenta",
       "weekly_summary": "analista_barrio_resultados",
       "read_inbox": "conversaciones_inbox",
@@ -5015,6 +5023,7 @@
       ]
     },
     "autopilot_direct_kinds": [
+      "check_linkedin",
       "classify_contacts",
       "collect_metrics",
       "discover_network",

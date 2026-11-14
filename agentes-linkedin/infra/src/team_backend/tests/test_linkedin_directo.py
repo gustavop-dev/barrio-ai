@@ -755,6 +755,8 @@ class DirectoConnectorTests(SimpleTestCase):
         # One read more, only here: the creator analytics; callers check hasattr (test_analitica.py).
         self.assertEqual(own.pop('analytics'),'(self, start, end, order=None)')
         self.assertFalse(hasattr(UnipileConnector,'analytics'))
+        self.assertEqual(own.pop('canary'),'(self)')  # and the daily canary (test_canario.py)
+        self.assertFalse(hasattr(UnipileConnector,'canary'))
         self.assertEqual(own,methods(UnipileConnector))
         self.assertEqual(len(own),21)
         self.assertEqual(DirectoConnector.provider,'directo')

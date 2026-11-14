@@ -78,7 +78,10 @@ En el backend: `LIVE_LINKEDIN_DIRECTO=true`, `NAVEGADOR_URL=http://127.0.0.1:879
 servicio usando esa cuenta, hay que detenerlo antes.
 
 El canario termina con 0 (todo bien), 2 (algo se rompió: LinkedIn cambió una respuesta), 3 (la cuenta se detuvo:
-no reintentar, revisar a mano) o 4 (no corrió).
+no reintentar, revisar a mano) o 4 (no corrió). Son las mismas 14 lecturas (16 llamadas) que el backend corre solo
+una vez al día por cuenta `directo` (el trabajo `check_linkedin`, la «Prueba diaria» de
+`docs/plan-linkedin-directo.md`); las dos pasan por `/llamadas`, así que gastan los mismos topes y respetan las
+mismas paradas. Qué se lee y qué campos debe traer cada respuesta está en `linkedin_directo/canario.py`.
 
 ## Ajustes
 
@@ -156,7 +159,7 @@ llamadas de cada operación en `linkedin_directo/cliente.py`.
 | Métricas (APRE-01) | cada 3 h, si toca | posts propios, post, comentarios, audiencia, visitas | ~15; tope 66 | `metricas.collect` y sus topes |
 | Comentarios en posts propios | cada 2 h los 3 primeros días del post, luego cada 12 h hasta el día 7 | `/me`, comentarios e hilos | ~45; tope 112 | `respuestas.read` y sus topes |
 | Analítica | una vez al día | 5 exportaciones: 14 días y 7, 28, 90 y 365 | 5 | `analitica.run` |
-| Prueba diaria | una vez al día | 17 | 17 | `linkedin_directo/canario.py` |
+| Prueba diaria | una vez al día; si no pudo correr, otra vez a la hora (hasta 3) | 16 | 16 (hasta 48) | `team_backend/canario.py`, `linkedin_directo/canario.py` |
 | Conciliación | solo escrituras sin confirmar | 1 o 2 | ~10 | `operador.reconcile` |
 
 **Perfiles.** Leer un perfil son 2 llamadas (el perfil y su tarjeta). Las lecturas de perfil de seguir, invitar,
@@ -164,7 +167,7 @@ aceptar, clasificar (`red._enrich`, 10 personas cada 30 min), sincronizar y refe
 perfiles al día (`OPERATOR_PROFILE_READ_DAILY_LIMIT`): como mucho 160 llamadas. Con 20 seguimientos y 20
 invitaciones ese tope ya se llena solo con ellas (4 perfiles por persona).
 
-**Total de un día:** hasta unas **880 lecturas** (204 de las ejecuciones fuera de perfiles, 514 de los trabajos y
+**Total de un día:** hasta unas **880 lecturas** (204 de las ejecuciones fuera de perfiles, 513 de los trabajos y
 160 de perfiles) y **90 escrituras**. Un día normal, con menos referentes y menos comentarios que leer, ronda las
 650 lecturas. La hora más cargada es una de las rondas de red: unas 11 escrituras (espaciado de 3 a 8 min) con sus
 55 lecturas, más una clasificación, referentes y bandeja: hasta unas 150 lecturas.

@@ -557,6 +557,27 @@ class AnalyticsImport(models.Model):
         ordering=['-started_at']
         indexes=[models.Index(fields=['account','state','started_at'],name='analytics_import_last')]
 
+class CanaryRun(models.Model):
+    """One daily canary of a `directo` account (team_backend/canario.py): the connector's reads checked against the
+    fields Barrio uses. `operations` keeps per read its state, row count and a reason; never a LinkedIn value."""
+    class State(models.TextChoices):
+        RUNNING='running','En curso'
+        OK='ok','Todo bien'
+        BROKEN='roto','Algo cambió en LinkedIn'
+        HALTED='alto','Cuenta detenida'
+        NOT_RUN='no_corrio','No pudo correr'
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='canary_runs')
+    state=models.CharField(max_length=10,choices=State.choices,default=State.RUNNING)
+    operations=models.JSONField(default=list,blank=True)  # [{operacion, estado, motivo, filas}]
+    calls=models.PositiveIntegerField(default=0)
+    error_kind=models.CharField(max_length=40,blank=True)
+    error=models.TextField(blank=True)
+    started_at=models.DateTimeField(default=timezone.now)
+    finished_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        ordering=['-started_at']
+        indexes=[models.Index(fields=['account','started_at'],name='canary_run_last')]
+
 class ActionProposal(models.Model):
     referent_experiment=models.ForeignKey('ReferentExperiment',on_delete=models.PROTECT,null=True,blank=True)
     referent_experiment_version=models.PositiveIntegerField(null=True,blank=True)

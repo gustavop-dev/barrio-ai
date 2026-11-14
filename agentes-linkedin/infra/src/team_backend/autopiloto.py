@@ -289,6 +289,8 @@ def tick(user,now=None):
         except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
         try:report['analytics']=report.get('analytics',0)+_analytics(user,account,now)
         except Exception as exc:report['analytics_error']=type(exc).__name__  # analytics never stop the rest of the tick
+        try:report['canary']=report.get('canary',0)+_canary(user,account,now)
+        except Exception as exc:report['canary_error']=type(exc).__name__  # the canary never stops the rest of the tick
         try:report['inbox']=report.get('inbox',0)+_inbox(user,account,now)
         except Exception as exc:report['inbox_error']=type(exc).__name__  # the inbox never stops the rest of the tick
         try:report['replies']=report.get('replies',0)+_replies(user,account,now)
@@ -442,6 +444,17 @@ def _analytics(user,account,now):
     if _pending('import_analytics',account=str(account.id)) or not analitica.daily_due(account,now):return 0
     day=analitica.utc_today(now)
     _,created=enqueue_operation(user,'import_analytics',{'account':str(account.id)},request_id=_job_id('analytics',account.id,day))
+    return int(created)
+
+def _canary(user,account,now):
+    """The daily canary (canario.py): queue check_linkedin once per UTC day after LINKEDIN_CANARY_AFTER for a `directo`
+    account whose navegador service is configured; a run that could not run is queued again an hour later, up to
+    canario.TRIES a day (the attempt number keeps each try's job id apart)."""
+    from . import analitica, canario
+    if _pending('check_linkedin',account=str(account.id)) or not canario.daily_due(account,now):return 0
+    day=analitica.utc_today(now)
+    _,created=enqueue_operation(user,'check_linkedin',{'account':str(account.id)},
+                                request_id=_job_id('canary',account.id,day,canario.tries(account,now)))
     return int(created)
 
 def _inbox(user,account,now):
