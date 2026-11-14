@@ -108,7 +108,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
   6. **Dado** que la prueba diaria no pudo correr (servicio caído, ocupado o sin cupo), **cuando** falla el tercer intento del día, **entonces** llega «La prueba diaria de LinkedIn no pudo correr hoy»; los dos primeros intentos no avisan.
   7. **Dado** que en la prueba diaria el servicio paró la cuenta o no tiene sesión, **cuando** termina, **entonces** no llega `linkedin_canary`: la cuenta queda en pausa y llega la de «cuenta en pausa» (Tu turno) una sola vez, con qué hacer en el motivo.
   8. **Dado** que el servicio navegador no abre una cuenta `directo` porque su salida a internet cambió (503 `egress`), **cuando** una llamada o la prueba diaria lo ve, **entonces** llega una vez «LinkedIn directo: el servicio no abre la cuenta por otra salida a internet», con qué hacer (`python -m navegador salida <cuenta> --aceptar` o volver a la salida de antes); las llamadas siguientes del mismo episodio no avisan otra vez, la cuenta no se pausa y lo pendiente espera. Si la cuenta vuelve a abrirse y más tarde la salida cambia otra vez, avisa de nuevo.
-- **Brechas código/docs:** la app todavía no muestra la última prueba diaria; el backend la sirve en `canary` de cada cuenta.
+- **Brechas código/docs:** la app muestra la última prueba diaria en Ajustes › Máquina ([AJU-02](ajustes.md#aju-02)); la PWA todavía no.
 - **Cobertura QA:** Backend (`test_notificaciones`): eventos, `ref` único, tipos calculados y la push de la parada del servidor. `test_canario`: los criterios 5 a 8. `test_linkedin_directo` (`EgressNoticeTests`): el criterio 8.
 
 ## Retiradas

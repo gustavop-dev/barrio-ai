@@ -53,8 +53,9 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
   2. **Dado** «Pausar solo esta cuenta», **cuando** confirma con un motivo obligatorio, **entonces** aparece «Cuenta en pausa.» y el equipo deja de actuar con ella.
   3. **Dado** una cuenta en pausa, **cuando** pulsa «Reanudar la cuenta», **entonces** se reanuda sin confirmación y aparece «Cuenta reanudada.».
   4. **Dado** que no hay cuentas de Unipile, **cuando** abre la sección, **entonces** ve «No hay ninguna cuenta de Unipile configurada.».
-- **Brechas código/docs:** la cuenta de la API oficial de LinkedIn no aparece aquí (se gestiona en [AJU-06](#aju-06)).
-- **Cobertura QA:** pendiente
+  5. **Dado** una cuenta `directo` con su prueba diaria de LinkedIn (`canary` de la cuenta), **cuando** abre Ajustes › Máquina, **entonces** ve en su tarjeta «Prueba diaria: todo bien, hace X.»; si no pasó, una nota con «algo cambió en LinkedIn (falla …)», «se detuvo» o «no pudo correr» y el motivo. Si la parada ya pausó la cuenta, el motivo sale solo en la nota de la pausa. Una cuenta de Unipile o sin prueba todavía no muestra la línea.
+- **Brechas código/docs:** la cuenta de la API oficial de LinkedIn no aparece aquí (se gestiona en [AJU-06](#aju-06)). La PWA todavía no muestra la prueba diaria (criterio 5); la app sí.
+- **Cobertura QA:** App (`AjustesScreen.test.tsx`, «Ajustes · Máquina»): criterios 1, 2 y 5. `compartido` (`ajustes.test.ts`): la línea de la prueba diaria en cada estado. Sin E2E: ningún flujo de Maestro tiene una cuenta `directo`.
 
 ### AJU-03 · Orientación para el equipo <a id="aju-03"></a>
 

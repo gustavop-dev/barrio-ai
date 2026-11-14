@@ -1,9 +1,10 @@
 // Ajustes › Máquina: total stop and resume (overview.control) behind a confirmation, a stop from the
-// server that cannot be lifted here, and the pause of each Unipile account with a required reason.
+// server that cannot be lifted here, and the pause of each Unipile or directo account with a required reason; a
+// directo account also shows its last daily LinkedIn canary.
 import { useOverview, useSetAccountPaused, useSetControl } from '@compartido/api/hooks';
 import { keys } from '@compartido/api/queryClient';
 import type { Account, Control, Overview } from '@compartido/api/types';
-import { accountStatus, controlReason, providerLabel, stoppedFromServer, unipileAccounts } from '@compartido/logic/ajustes';
+import { accountStatus, canaryLine, controlReason, providerLabel, stoppedFromServer, unipileAccounts } from '@compartido/logic/ajustes';
 import { whenLabel } from '@compartido/logic/capturas';
 import { timeAgo } from '@compartido/logic/format';
 import { useQueryClient } from '@tanstack/react-query';
@@ -109,11 +110,28 @@ function ControlCard({ control }: { control: Control }) {
   );
 }
 
+/** The last daily LinkedIn canary of a `directo` account: a quiet line when it passed, a note with the reason when not. */
+function CanaryLine({ canary }: { canary: NonNullable<ReturnType<typeof canaryLine>> }) {
+  if (canary.tone === 'ok' || canary.tone === 'muted') {
+    return (
+      <T variant="detalle" soft>
+        {canary.text}
+      </T>
+    );
+  }
+  return (
+    <Note tone={canary.tone === 'bad' ? 'error' : 'warn'} title={canary.text}>
+      {canary.detail || undefined}
+    </Note>
+  );
+}
+
 function AccountCard({ account }: { account: Account }) {
   const toast = useToast();
   const mutation = useSetAccountPaused();
   const [asking, setAsking] = useState(false);
   const status = accountStatus(account);
+  const canary = canaryLine(account);
 
   const setPaused = (paused: boolean, reason = '') =>
     mutation.mutate(
@@ -138,6 +156,7 @@ function AccountCard({ account }: { account: Account }) {
       <T variant="detalle" soft>
         {account.last_checked_at ? `Comprobada ${timeAgo(account.last_checked_at)}` : 'Todavía sin comprobar'}
       </T>
+      {canary ? <CanaryLine canary={canary} /> : null}
       {account.paused && account.paused_reason ? <Note tone="warn">{account.paused_reason}</Note> : null}
       {account.paused ? (
         <Button variant="primary" block loading={mutation.isPending} loadingLabel="Reanudando…" onPress={() => setPaused(false)}>

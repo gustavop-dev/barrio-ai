@@ -190,6 +190,23 @@ describe('Ajustes · Máquina', () => {
     expect(screen.getByText('La parada viene del servidor (OPERATOR_PAUSED=true). No se puede levantar desde la app.')).toBeOnTheScreen();
   });
 
+  it('shows the last daily LinkedIn canary of a directo account', async () => {
+    const finished = new Date(Date.now() - 3 * 3600_000).toISOString();
+    const directo: Account = {
+      ...UNIPILE,
+      id: 'acc-d',
+      label: 'LinkedIn prueba',
+      provider: 'directo',
+      canary: { state: 'no_corrio', started_at: finished, finished_at: finished, calls: 0, failing: [], error_kind: 'network', error: 'El servicio no responde.' },
+    };
+    server({ 'GET /api/v1/operador/overview': { body: { ...overview(), accounts: [UNIPILE, directo, OFFICIAL] } } });
+    await renderAjustes();
+    expect(await screen.findByText('Prueba diaria: no pudo correr, hace 3 h.')).toBeOnTheScreen();
+    expect(screen.getByText('El servicio no responde.')).toBeOnTheScreen();
+    // The Unipile account has no canary: no line.
+    expect(screen.getAllByText(/^Prueba diaria/)).toHaveLength(1);
+  });
+
   it('pauses only the Unipile account, with a reason, and leaves the official one out', async () => {
     const api = server({ 'POST /api/v1/operador/accounts/acc-1/pause': { body: { ...UNIPILE, paused: true } } });
     await renderAjustes();

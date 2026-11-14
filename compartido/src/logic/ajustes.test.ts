@@ -2,9 +2,9 @@
 // the spend rows, the push switches and what the photo sheet PATCHes.
 import type { PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
-import type { Ajustes, Overview, RedSummary } from '../api/types';
+import type { AccountCanary, Ajustes, Overview, RedSummary } from '../api/types';
 import { padHour } from './format';
-import { capLines, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, monthAlert, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
+import { canaryLine, capLines, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, monthAlert, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
 import { inUseWarning, isFiltro, photoPatch, rejectedMessage, uploadedMessage } from './galeria';
 import { linkedinReconnected, linkedinReturnMessage } from './linkedin';
 
@@ -12,6 +12,30 @@ const overview = { accounts: [{ provider: 'unipile', capacity: { 'INT-03': { dai
 const ajustes = { limits: { 'INT-02': { daily: 20, weekly: 80 } } } as unknown as Ajustes;
 
 describe('Ajustes', () => {
+  const now = Date.parse('2026-11-14T15:00:00Z');
+  const canary = (fields: Partial<AccountCanary>): AccountCanary => ({
+    state: 'ok', started_at: '2026-11-14T11:58:00Z', finished_at: '2026-11-14T12:00:00Z', calls: 16, failing: [],
+    error_kind: '', error: '', ...fields,
+  });
+
+  it('tells the last daily canary of a directo account, and nothing without one', () => {
+    expect(canaryLine({ canary: canary({}), paused: false }, now)).toEqual({ text: 'Prueba diaria: todo bien, hace 3 h.', tone: 'ok', detail: '' });
+    expect(canaryLine({ canary: canary({ state: 'roto', failing: ['list_chats', 'get_post'] }), paused: false }, now)).toEqual({
+      text: 'Prueba diaria: algo cambió en LinkedIn (falla list_chats, get_post), hace 3 h.', tone: 'bad', detail: '',
+    });
+    expect(canaryLine({ canary: canary({ state: 'no_corrio', finished_at: null, error: 'El servicio no responde.' }), paused: false }, now)).toEqual({
+      text: 'Prueba diaria: no pudo correr, hace 3 h.', tone: 'warn', detail: 'El servicio no responde.',
+    });
+    // A stop pauses the account with the same reason: the pause note tells it.
+    expect(canaryLine({ canary: canary({ state: 'alto', error: 'Sin sesión.' }), paused: true }, now)?.detail).toBe('');
+    expect(canaryLine({ canary: canary({ state: 'alto', error: 'Sin sesión.' }), paused: false }, now)).toEqual({
+      text: 'Prueba diaria: se detuvo, hace 3 h.', tone: 'bad', detail: 'Sin sesión.',
+    });
+    expect(canaryLine({ canary: canary({ state: 'nuevo' }), paused: false }, now)?.tone).toBe('muted');
+    expect(canaryLine({ canary: null, paused: false }, now)).toBeNull();
+    expect(canaryLine({ paused: false }, now)).toBeNull();
+  });
+
   it('builds the caps from the usage, or the cap alone without usage', () => {
     expect(capLines(ajustes, overview, undefined, 'daily')).toEqual([
       { key: 'INT-03', label: 'Comentarios', used: 1, max: 3 },

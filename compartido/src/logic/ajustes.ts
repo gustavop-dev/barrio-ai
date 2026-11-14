@@ -54,6 +54,32 @@ export function unipileAccounts(accounts: Account[] | undefined): Account[] {
   return (accounts ?? []).filter((account) => !account.provider.startsWith('linkedin'));
 }
 
+const CANARY: Record<string, { label: string; tone: Tone }> = {
+  ok: { label: 'todo bien', tone: 'ok' },
+  roto: { label: 'algo cambió en LinkedIn', tone: 'bad' },
+  alto: { label: 'se detuvo', tone: 'bad' },
+  no_corrio: { label: 'no pudo correr', tone: 'warn' },
+};
+
+/** The last daily canary of a `directo` account, «Prueba diaria: todo bien, hace 3 h.», with what failed and the
+ *  reason when it did not pass; null when the account has none (another provider, or no run yet). A stop pauses the
+ *  account with the same reason, so a paused account does not repeat it. */
+export function canaryLine(
+  account: Pick<Account, 'canary' | 'paused'>,
+  now: number = Date.now(),
+): { text: string; tone: Tone; detail: string } | null {
+  const canary = account.canary;
+  if (!canary) return null;
+  const known = CANARY[canary.state] ?? { label: canary.state, tone: 'muted' as Tone };
+  const failing = canary.state === 'roto' && canary.failing.length ? ` (falla ${canary.failing.join(', ')})` : '';
+  const quiet = canary.state === 'ok' || (canary.state === 'alto' && account.paused);
+  return {
+    text: `Prueba diaria: ${known.label}${failing}, ${timeAgo(canary.finished_at ?? canary.started_at, now)}.`,
+    tone: known.tone,
+    detail: quiet ? '' : (canary.error ?? '').trim(),
+  };
+}
+
 /** «Motivo: revisando los topes de la semana.» */
 export function controlReason(control: Pick<Control, 'reason'>): string {
   return `Motivo: ${control.reason ? control.reason.replace(/\.$/, '') : 'sin motivo indicado'}.`;
