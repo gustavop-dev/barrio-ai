@@ -25,7 +25,9 @@ class OperatorBase(TransactionTestCase):
                                    # The weekly summary depends on the real weekday; test_resumen_semanal turns it on.
                                    'WEEKLY_SUMMARY_ENABLED':'false',
                                    # INT-04 reads the comments of every confirmed own post; test_respuestas turns it on.
-                                   'REPLIES_ENABLED':'false'})
+                                   'REPLIES_ENABLED':'false',
+                                   # The GASP type of a day depends on the real weekday; test_estrategia turns it on.
+                                   'STRATEGY_ENABLED':'false'})
         env.start();self.addCleanup(env.stop)
         self.weekend_patch=patch('team_backend.operador.is_weekend',return_value=False)
         self.weekend_patch.start();self.addCleanup(self.weekend_patch.stop)

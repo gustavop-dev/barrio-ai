@@ -391,6 +391,7 @@ class ResultadosTests(MetricsBase):
                                                'impressions':300,'engagement_pct':5.0,'cut':'24h'})
         pillars={p['pillar']:(p['value'],p['posts']) for p in content['by_pillar']['items']}
         self.assertEqual(pillars,{'business_to_product':(None,0),'applied_ai':(5.0,1),'architecture_delivery':(None,0)})  # hidden reposts: p2 left out
+        self.assertEqual(content['by_type']['items'],[])  # posts from before the GASP strategy carry no type
         rows={r['piece_id']:r for r in content['posts']}
         first=rows[str(self.p1.id)]
         self.assertEqual((first['impressions_24h'],first['impressions_7d'],first['reactions'],first['comments'],first['reposts'],first['engagement_pct']),
