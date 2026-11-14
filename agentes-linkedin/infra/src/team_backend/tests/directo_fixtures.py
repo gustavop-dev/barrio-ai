@@ -166,26 +166,56 @@ def comments(post,rows,embedded=()):
     return {'data':{'*elements':refs,'paging':{'count':len(rows),'start':0}},'included':included}
 
 def post_page(activity,drawn=()):
-    """The post page: its comment box's createComment request and one per drawn comment, inside escaped script
-    strings, as the page keeps them."""
+    """The post page: the createComment request of its comment box and, twice each as the page draws them, of the
+    reply box of each drawn comment (only its first few), inside escaped script strings, as the page keeps them."""
+    thread=f'urn:li:activity:{activity}'
     def box(n,parent=None):
-        collection={'threadUrn':{'activityUrn':{'activityId':activity}}}
-        if parent:collection['parentCommentUrn']={'commentId':parent,'thread':f'urn:li:activity:{activity}'}
-        payload={'collection':collection,'trackingId':'seguimiento-ficticio',
-                 **{field:{'key':f'{field}-ficticio{n}','namespace':'MemoryNamespace'} for field,_,_ in rutas.COMMENT_BOX}}
-        return {'requestId':rutas.COMMENT,'requestedArguments':{'payload':payload},'onSuccess':{'$type':'proto.sdui.actions.core.Noop'}}
-    tree=[box(0)]+[box(i+1,c) for i,c in enumerate(drawn)]
+        collection={'updateKey':{'feedType':3,'items':[{'feedUpdateUrn':{'updateUrnActivityUrn':{'activityUrn':{'activityId':activity}}},
+                                                        'trackingId':'c2VndWltaWVudG8='}],'aggregationType':0,'aggregationReasonTypes':[],'isVideoCarousel':False}}
+        metadata={'$type':'proto.sdui.common.RequestMetadata'}
+        if parent:
+            collection.update(threadUrn={'threadUrnCommentThreadUrn':{'commentUrn':{'commentId':parent,'thread':thread}}},
+                              parentThreadUrn={'threadUrnActivityThreadUrn':{'activityUrn':{'activityId':activity}}},
+                              parentCommentUrn={'commentId':parent,'thread':thread})
+            metadata['currentActor']={'$type':'proto.sdui.bindings.core.Bindable','content':{'$case':'stringBinding','stringBinding':{}},
+                                      'key':{'key':{'value':{'$case':'id','id':f'identitySwitcherActorContext-{thread}'}}}}
+        else:
+            collection['threadUrn']={'threadUrnActivityThreadUrn':{'activityUrn':{'activityId':activity}}}
+        keys={field:f'{field}-ficticio{n}' for field,_,_ in rutas.COMMENT_BOX}  # opaque on the page
+        args={'$type':rutas.RA,'requestedStateKeys':[{'key':{'value':{'$case':'id','id':k}}} for k in keys.values()],
+              'payload':{'optimisticKey':'<PrefixToExecutionId>optimisticComment','collection':collection,
+                         **{field:{'key':k,'namespace':'MemoryNamespace'} for field,k in keys.items()}},'requestMetadata':metadata}
+        return {'requestId':rutas.COMMENT,'requestedArguments':args,'isApfcEnabled':False,'isStreaming':False,'rumPageKey':'','maxRetries':0}
+    tree=[box(0)]+[b for i,c in enumerate(drawn) for b in (box(i+1,c),)*2]
     escaped=json.dumps(tree,separators=(',',':')).replace('"','\\"')
     return html(f'<html><head><title>Post</title></head><body><script>self.__next_f.push([1,"{escaped}"])</script></body></html>')
 
+def comment_written(activity,cid,text,parent=None):
+    """A createComment answer: the comment list drawn again, naming the new comment (many times) and, for a reply,
+    its parent. The new comment's own reply box comes pre-filled with a mention of its author, the account."""
+    def urn(c):return f'urn:li:comment:(activity:{activity},{c})'
+    rows=['{"id":"isCommentHighlighted-%s-ficticio"}'%urn(parent)] if parent else []
+    rows+=['{"id":"reactionState-%s"}'%urn(cid),'{"id":"isCommentHighlighted-%s-ficticio"}'%urn(cid),
+           '{"textProps":{"children":[%s]}}'%json.dumps(text),
+           '{"$type":"%s","text":"Cuenta Prueba ","attribute":[{"type":{"$case":"mention","mention":{"entityID":"%s"}}}]}'%(rutas.TEXT_MODEL,OWN[0])]
+    return stream('0:{"result":{"errors":[]}}\n1:['+','.join(rows)+']')
+
 # --------------------------------------------------------------------------- search
 
-def search_page(people):
-    """The people search page: its snippet request lists the results' profile and member ids; a lazy filter bar too."""
-    snippet={'requestId':rutas.SNIPPETS,'requestedArguments':{'payload':{
-        'memberProfileIds':[f'urn:li:fsd_profile:{p[0]}' for p in people],'memberEntityUrns':[f'urn:li:member:{p[2]}' for p in people]}}}
+def search_page(people,public=1):
+    """The people search page. It does not draw the cards: its snippet request lists the profile ids and maps each to
+    its member urn and card slot, and only the first `public` results have a profile prefetch with their public id. A
+    lazy filter bar too."""
+    ids=[p[0] for p in people]
+    snippet={'requestId':rutas.SNIPPETS,'requestedArguments':{'$type':rutas.RA,'requestedStateKeys':[],'payload':{
+        'memberProfileIds':ids,'searchQuery':'consulta ficticia','snippetSlots':{i:f'SearchResultssnippet_{i}' for i in ids},
+        'searchId':'00000000-0000-4000-8000-000000000001','memberTrackingIds':{i:'c2VndWltaWVudG8=' for i in ids},
+        'memberEntityUrns':{p[0]:f'urn:li:member:{p[2]}' for p in people}}}}
+    prefetch=[{'$type':'proto.sdui.actions.core.PrefetchScreen','screenId':'com.linkedin.sdui.flagshipnav.profile.Profile',
+               'url':f'/in/{p[1]}/','requestedArguments':{'$type':rutas.RA,'requestedStateKeys':[],'payload':{
+                   'vanityName':p[1],'isVanityNameResolved':True,'vieweeProfileId':p[0]}}} for p in people[:public]]
     bar={'$type':'proto.sdui.actions.core.LoadComponent','requestedArguments':{'payload':{'consulta':'ficticia'}},'newComponentId':rutas.FILTER_BAR}
-    escaped=json.dumps([snippet,bar],separators=(',',':')).replace('"','\\"')
+    escaped=json.dumps([snippet,*prefetch,bar],separators=(',',':')).replace('"','\\"')
     return html(f'<html><head><title>Buscar</title></head><body><script>self.__next_f.push([1,"{escaped}"])</script></body></html>')
 
 def filter_bar():
@@ -200,6 +230,17 @@ def typeahead(places):
     return stream('1:{"items":['+','.join(rows)+'],"errors":[]}')
 
 # --------------------------------------------------------------------------- invitations
+
+def invite_answer(person,iid):
+    """verifyQuotaAndCreateV2's answer: the new invitation's urn and the follow state it also creates."""
+    fsd=f'urn:li:fsd_profile:{person[0]}';following=f'urn:li:fsd_followingState:{fsd}';invitation=f'urn:li:fsd_invitation:{iid}'
+    return {'data':{'value':{'inviteeUrn':fsd,'followingStateUrn':following,'*invitation':invitation,'*invitee':fsd,
+                             'invitationUrn':invitation,'followEdgeUpdated':True,'*followingState':following,
+                             '$recipeTypes':['com.linkedin.voyager.dash.deco.relationships.InvitationCreationResultWithInvitee'],
+                             '$type':'com.linkedin.voyager.dash.relationships.invitation.InvitationCreationResult'},
+                    '$type':'com.linkedin.restli.common.ActionResponse'},
+            'included':[{'$type':'com.linkedin.voyager.dash.feed.FollowingState','entityUrn':following,'following':True,
+                         'followerCount':120,'followeeCount':None}]}
 
 def invitation(iid,other,kind,sent,secret='secreto-ficticio',message=None):
     me_urn=f'urn:li:fs_miniProfile:{OWN[0]}';other_urn=f'urn:li:fs_miniProfile:{other[0]}'

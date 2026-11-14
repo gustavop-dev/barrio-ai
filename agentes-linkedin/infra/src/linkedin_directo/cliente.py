@@ -74,6 +74,7 @@ class Cliente:
         errors = lectura.stream_errors(stream)
         if errors:
             raise LinkedInError(f'LinkedIn rechazó {operation} ({len(errors)} errores).', kind='rejected')
+        return stream
 
     def _graphql(self, prefixes, variables, fallback, host, operation):
         """A query id the page used itself, for a call with the same variable names, wins over the fixed one."""
@@ -220,26 +221,27 @@ class Cliente:
         return self._read(lectura.comments, answer, own['fsd'], cid, self.members)[:int(limit)]
 
     def _comment_template(self, aid, parent, operation):
-        """The post page carries one createComment request for its box and one per comment it draws (about the first
-        8); the text goes in the box's states. Without the right template nothing is sent."""
+        """The post page carries one createComment request for its box and one per reply box it draws (its first few
+        comments); a reply to a comment it does not draw is built from those (rutas.comment_template). Without a base
+        nothing is sent."""
         found = rutas.templates(self._page(rutas.post_page(aid), operation), rutas.COMMENT)
         try:
-            mine = [t for t in found if str((t['requestedArguments']['payload']['collection'].get('parentCommentUrn') or {})
-                    .get('commentId')) == parent] if parent else \
-                [t for t in found if 'parentCommentUrn' not in t['requestedArguments']['payload']['collection']]
+            template = rutas.comment_template(found, aid, parent)
         except PARSE_ERRORS:
-            mine = []
-        if not mine:
-            raise LinkedInError('La página del post no trae ' + ('ese comentario' if parent else 'la caja de comentarios')
-                                + '; no se envió nada.', kind='template_missing')
-        return mine[0]
+            template = None
+        if not template:
+            raise LinkedInError('La página del post no trae la caja de comentarios; no se envió nada.',
+                                kind='template_missing')
+        return template
 
-    def _written(self, text, thread=None):
-        """What a comment write returns: LinkedIn's answer is a component stream with no reliable id of the new
-        comment, so the id stays empty and the callers find it by reading (own comment with the same text)."""
-        return {'id': '', 'text': text, 'created_at': None, 'is_sender': True, 'thread_id': thread,
-                'author': lectura.user(self.me.get('fsd', ''), self.me.get('public_id', ''), kind='individual'),
-                'reply_counter': None}
+    def _written(self, text, stream, aid, thread=None):
+        """What a comment write returns. Its answer draws the comment list again with the new comment in it: the id
+        is read there (its time is in the id); '' when the answer does not name exactly one, and the callers then
+        find it by reading (own comment with the same text)."""
+        cid = lectura.written_comment(stream, aid, thread)
+        return {'id': cid, 'text': text, 'created_at': lectura.activity_time(cid) if cid else None, 'is_sender': True,
+                'thread_id': thread, 'reply_counter': None,
+                'author': lectura.user(self.me.get('fsd', ''), self.me.get('public_id', ''), kind='individual')}
 
     def _comment(self, aid, parent, text, operation):
         if not isinstance(text, str) or not text.strip():
@@ -249,19 +251,18 @@ class Cliente:
             states = rutas.comment_states(template, text)
         except PARSE_ERRORS:
             raise LinkedInError('La caja de comentarios cambió; no se envió nada.', kind='template_missing') from None
-        self._write(template, operation, states, rutas.POST_SCREEN)
+        return self._write(template, operation, states, rutas.POST_SCREEN)
 
     def create_comment(self, post_id, text):
         """Two calls: the post page (for the box's template) and the write."""
-        self._comment(activity_id(post_id), None, text, 'create_comment')
-        return self._written(text)
+        aid = activity_id(post_id)
+        return self._written(text, self._comment(aid, None, text, 'create_comment'), aid)
 
     def comment_in_thread(self, post_id, comment, text):
-        """Two calls: the post page and the write. Only works on a comment the page draws (about the first 8). The text
-        goes as it is: no mention of the comment's author is added."""
-        cid = comment_id(comment)
-        self._comment(activity_id(post_id), cid, text, 'comment_in_thread')
-        return self._written(text, cid)
+        """Two calls: the post page and the write, on any comment of the post (see _comment_template). The text goes
+        as it is: no mention of the comment's author is added, and a request carrying one is refused."""
+        aid, cid = activity_id(post_id), comment_id(comment)
+        return self._written(text, self._comment(aid, cid, text, 'comment_in_thread'), aid, cid)
 
     def react_to_comment(self, post_id, comment, reaction):
         kind, aid, cid = reaction_type(reaction), activity_id(post_id), comment_id(comment)
@@ -275,9 +276,10 @@ class Cliente:
 
     # --- network -----------------------------------------------------------------------------------------------------
     def search_people(self, keywords, location=None, profile_language=None):
-        """The people search page (one call): 10 results with their profile and member ids. Names, headlines and
-        distance are NOT read here (that would be one profile read per result): they come empty and the callers'
-        capped profile read fills them, as for a commenter."""
+        """The people search page (one call): 10 results with their profile and member ids, and the public id of the
+        first few. The page does not carry names, headlines, places or distance, and they are NOT read here (one
+        profile read per result): they come empty and the caller's capped profile read fills them when it needs them
+        (red._enrich, as for a commenter)."""
         if not isinstance(keywords, str) or not keywords.strip():
             raise invalid('Búsqueda')
         regions = [str(r) for r in location or [] if str(r).isdigit()] or None
@@ -285,11 +287,11 @@ class Cliente:
         html = self._page(rutas.search_page(keywords, regions, languages), 'search_people')
         found = self._read(lectura.search_results, html)
         own = self.me.get('fsd')
-        for fsd, member in found:
-            if member:
-                self.members[fsd] = member
-        return [dict(lectura.user(fsd, kind='individual'), location='', network_distance='SELF' if fsd == own else '',
-                     signals={}) for fsd, _ in found]
+        for row in found:
+            if row['member']:
+                self.members[row['id']] = row['member']
+        return [dict(lectura.user(row['id'], row['public_identifier'], kind='individual'), location='',
+                     network_distance='SELF' if row['id'] == own else '', signals={}) for row in found]
 
     def _geo_template(self):
         """The location typeahead request: the search page names a lazy filter bar, the filter bar carries the

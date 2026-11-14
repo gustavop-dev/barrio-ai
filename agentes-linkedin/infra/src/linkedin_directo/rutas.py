@@ -11,6 +11,7 @@ Two APIs live side by side:
 
 What rotates with LinkedIn deploys: GraphQL query ids (a live one the page used wins over the fixed one here), sduiids
 and the binding names of the comment box (taken from the page's template, never written by hand)."""
+import copy
 import json
 import re
 import uuid
@@ -168,6 +169,40 @@ def envelope(request, states=(), screen=None):
     if screen:
         args.update(screenId=screen, knownTemplateIds=[])
     return body
+
+
+def _collection(template):
+    return template['requestedArguments']['payload']['collection']
+
+
+def comment_template(found, activity_id, parent=None):
+    """The createComment request for the post's box, or for a reply to `parent`, from the page's templates (None when
+    there is no base). The page only draws the reply boxes of its first comments (4 of 42 on 2026-11-13); a reply to
+    any other one reuses another comment's reply template with the parent swapped, or turns the post's box into a
+    reply. The binding keys are opaque: they only need to match the states, and the states are built from them."""
+    box = [t for t in found if 'parentCommentUrn' not in _collection(t)]
+    if not parent:
+        return box[0] if box else None
+    replies = [t for t in found if 'parentCommentUrn' in _collection(t)]
+    exact = [t for t in replies if str((_collection(t)['parentCommentUrn'] or {}).get('commentId')) == str(parent)]
+    if exact or not (replies or box):
+        return exact[0] if exact else None
+    built = copy.deepcopy(replies[0] if replies else box[0])
+    urn = {'commentId': str(parent), 'thread': f'urn:li:activity:{activity_id}'}
+    collection = _collection(built)
+    collection['threadUrn'] = {'threadUrnCommentThreadUrn': {'commentUrn': dict(urn)}}
+    collection['parentThreadUrn'] = {'threadUrnActivityThreadUrn': {'activityUrn': {'activityId': str(activity_id)}}}
+    collection['parentCommentUrn'] = dict(urn)
+    return built
+
+
+def has_mention(value):
+    """True when a nested value carries a mention (the web pre-fills one of the parent's author in a reply box)."""
+    if isinstance(value, dict):
+        return value.get('$case') == 'mention' or 'mention' in value or any(has_mention(v) for v in value.values())
+    if isinstance(value, list):
+        return any(has_mention(v) for v in value)
+    return False
 
 
 def comment_states(template, text):

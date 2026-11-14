@@ -117,7 +117,8 @@ def reaction(payload):
 
 
 def comment(body, payload):
-    """A createComment from the post page's template, with the text in the box's plain field."""
+    """A createComment from the post page's template, with the text in the box's plain field and no mention anywhere
+    (the web pre-fills one of the parent's author in a reply box; Barrio never sends it)."""
     server = body.get('serverRequest') if isinstance(body.get('serverRequest'), dict) else {}
     binding = (payload.get('commentFieldBinding') or {}).get('key') if isinstance(payload.get('commentFieldBinding'), dict) else None
     texts = [s.get('value') for s in body.get('states') or [] if isinstance(s, dict) and s.get('key') == binding
@@ -125,6 +126,8 @@ def comment(body, payload):
     if server.get('requestId') != rutas.COMMENT or not isinstance(payload.get('collection'), dict) or not binding \
             or not any(isinstance(t, str) and t.strip() for t in texts):
         refuse('comentario sin plantilla de la página o sin texto')
+    if rutas.has_mention(body):
+        refuse('comentario con una mención')
 
 
 def invitation(body):

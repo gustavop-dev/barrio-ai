@@ -54,7 +54,7 @@ def search(people=(ANA,LUIS)):return ('GET',r'^/search/results/people/\?',F.sear
 DONE=stream('0:{"items":[],"errors":[]}')
 ME=('GET',r'^/voyager/api/me$',ok(F.me()))
 PROFILES=('GET',r'^/voyager/api/identity/dash/profiles\?',profiles)
-INVITE=('POST','^'+re.escape(rutas.voyager(rutas.INVITE))+'$',ok({'data':{'value':{'invitationUrn':'urn:li:fsd_invitation:7100001'}}}))
+INVITE=('POST','^'+re.escape(rutas.voyager(rutas.INVITE))+'$',ok(F.invite_answer(ANA,'7100001')))
 RECEIVED=('GET',r'^/voyager/api/relationships/invitationViews\?',ok(F.invitations(
     'received',[('7000001',ANA,SENT_AT,'Hola, conectemos'),('7000002',LUIS,SENT_AT,None)],newsletter=True)))
 ACCEPT=('POST',r'^/voyager/api/relationships/invitations/\d+\?action=accept$',ok({'data':{'*value':'urn:li:fs_relInvitation:7000001'}}))
@@ -217,7 +217,8 @@ class PostAndCommentTests(SimpleTestCase):
         self.assertEqual(e.exception.kind,'invalid');self.assertEqual(len(t.sent),2)
 
     def test_create_comment_fills_the_page_box_and_makes_one_write(self):
-        c,t=connector(page(),sdui(rutas.COMMENT))
+        new=F.snowflake(datetime(2026,11,10,19,tzinfo=UTC),6)
+        c,t=connector(page(),sdui(rutas.COMMENT,F.comment_written(POST,new,'Un aporte de prueba')))
         out=c.create_comment(POST,'Un aporte de prueba')
         read,write=t.sent
         self.assertEqual((read.method,read.path,read.kind,read.write),('GET',f'/feed/update/urn:li:activity:{POST}/','page',False))
@@ -231,26 +232,61 @@ class PostAndCommentTests(SimpleTestCase):
         self.assertEqual(values['commentFieldBinding-ficticio0'],'Un aporte de prueba')
         self.assertEqual(values['richCommentFieldBinding-ficticio0']['text'],'Un aporte de prueba')
         self.assertEqual(set(out),COMMENT_KEYS)
-        # The stream names no id of the new comment: the callers find their own by text.
-        self.assertEqual((out['id'],out['text'],out['is_sender'],out['thread_id']),('','Un aporte de prueba',True,None))
+        # The answer draws the comment list again with the new comment in it: its id, and its time is in the id.
+        self.assertEqual((out['id'],out['text'],out['is_sender'],out['thread_id'],out['created_at']),
+                         (new,'Un aporte de prueba',True,None,datetime(2026,11,10,19,tzinfo=UTC)))
+        self.assertFalse(rutas.has_mention(body))
+
+    def test_without_the_new_id_in_the_answer_the_callers_find_it_by_reading(self):
+        two=stream(F.comment_written(POST,F.COMMENT_A,'x').text+'\n'+F.comment_written(POST,F.COMMENT_B,'y').text)
+        for answer in (DONE,two):
+            with self.subTest(answer=answer.text[:30]):
+                c,t=connector(page(),sdui(rutas.COMMENT,answer))
+                self.assertEqual((c.create_comment(POST,'Hola')['id'],len(t.sent)),('',2))
 
     def test_comment_in_thread_uses_that_comment_template(self):
-        c,t=connector(page(F.COMMENT_B,F.COMMENT_A),sdui(rutas.COMMENT))
+        c,t=connector(page(F.COMMENT_B,F.COMMENT_A),sdui(rutas.COMMENT,F.comment_written(POST,F.REPLY,'Gracias por el aporte',F.COMMENT_A)))
         out=c.comment_in_thread(POST,F.COMMENT_A,'Gracias por el aporte')
         body=t.sent[1].body
         self.assertEqual(body['requestedArguments']['payload']['collection']['parentCommentUrn']['commentId'],F.COMMENT_A)
         self.assertEqual({s['key']:s['value'] for s in body['states']}['commentFieldBinding-ficticio2'],'Gracias por el aporte')
-        self.assertEqual((out['id'],out['thread_id']),('',F.COMMENT_A))
+        # The parent is in the answer too: the new id is the other one. No mention of the parent's author is sent.
+        self.assertEqual((out['id'],out['thread_id']),(F.REPLY,F.COMMENT_A))
+        rich=[s['value'] for s in body['states'] if s['originalProtoCase']=='textModelForWrite']
+        self.assertEqual(rich,[{'$type':rutas.TEXT_MODEL,'text':'Gracias por el aporte','attribute':[],'webDataAttributes':[]}])
+        self.assertFalse(rutas.has_mention(body))
+
+    def test_a_reply_to_a_comment_the_page_does_not_draw_reuses_another_reply_box(self):
+        c,t=connector(page(F.COMMENT_B),sdui(rutas.COMMENT,F.comment_written(POST,F.REPLY,'Hola',F.COMMENT_A)))
+        out=c.comment_in_thread(POST,F.COMMENT_A,'Hola')
+        args=t.sent[1].body['requestedArguments'];collection=args['payload']['collection']
+        thread=f'urn:li:activity:{POST}'
+        self.assertEqual((collection['parentCommentUrn'],collection['threadUrn'],collection['parentThreadUrn']),
+                         ({'commentId':F.COMMENT_A,'thread':thread},{'threadUrnCommentThreadUrn':{'commentUrn':{'commentId':F.COMMENT_A,'thread':thread}}},
+                          {'threadUrnActivityThreadUrn':{'activityUrn':{'activityId':POST}}}))
+        # B's binding keys, consistent between the payload, the asked state keys and the states sent.
+        keys={args['payload'][field]['key'] for field,_,_ in rutas.COMMENT_BOX}
+        self.assertEqual(keys,{s['key'] for s in args['states']})
+        self.assertEqual(keys,{k['key']['value']['id'] for k in args['requestedStateKeys']})
+        self.assertIn('commentFieldBinding-ficticio1',keys)
+        self.assertIn('currentActor',args['requestMetadata'])
+        self.assertEqual((out['id'],out['thread_id']),(F.REPLY,F.COMMENT_A))
+        # Only the box on the page: the box becomes the reply.
+        c,t=connector(page(),sdui(rutas.COMMENT))
+        c.comment_in_thread(POST,F.COMMENT_A,'Hola')
+        collection=t.sent[1].body['requestedArguments']['payload']['collection']
+        self.assertEqual((collection['parentCommentUrn']['commentId'],set(collection)),
+                         (F.COMMENT_A,{'updateKey','threadUrn','parentThreadUrn','parentCommentUrn'}))
+        self.assertEqual(collection['threadUrn']['threadUrnCommentThreadUrn']['commentUrn']['commentId'],F.COMMENT_A)
 
     def test_without_the_right_template_nothing_is_written(self):
-        c,t=connector(page(F.COMMENT_B))
-        with self.assertRaises(ConnectorError) as e:c.comment_in_thread(POST,F.COMMENT_A,'Hola')
-        self.assertEqual(e.exception.kind,'template_missing');self.assertEqual(len(t.sent),1)
         c,t=connector(('GET',r'^/feed/update/',html('<html><head><title>Post</title></head><body></body></html>')))
         with self.assertRaises(ConnectorError) as e:c.create_comment(POST,'Hola')
         self.assertEqual(e.exception.kind,'template_missing');self.assertEqual(len(t.sent),1)
+        with self.assertRaises(ConnectorError) as e:c.comment_in_thread(POST,F.COMMENT_A,'Hola')
+        self.assertEqual(e.exception.kind,'template_missing');self.assertEqual(len(t.sent),2)
         with self.assertRaises(ConnectorError) as e:c.create_comment(POST,'   ')
-        self.assertEqual(e.exception.kind,'invalid');self.assertEqual(len(t.sent),1)
+        self.assertEqual(e.exception.kind,'invalid');self.assertEqual(len(t.sent),2)
 
     def test_a_write_linkedin_answers_with_errors_is_rejected(self):
         c,_=connector(page(),sdui(rutas.COMMENT,stream('0:{"errors":[{"message":"no"}]}')))
@@ -273,7 +309,7 @@ class PostAndCommentTests(SimpleTestCase):
 
 
 class NetworkTests(SimpleTestCase):
-    def test_search_people_is_one_page_read_with_ids_only(self):
+    def test_search_people_is_one_page_read_with_what_the_page_carries(self):
         c,t=connector(search())
         found=c.search_people('fundadores ia',location=['900001'],profile_language=['es'])
         self.assertEqual(t.paths(),['/search/results/people/?keywords=fundadores%20ia&origin=GLOBAL_SEARCH_HEADER'
@@ -281,11 +317,24 @@ class NetworkTests(SimpleTestCase):
         self.assertEqual(t.sent[0].kind,'page')
         self.assertEqual([p['id'] for p in found],[ANA[0],LUIS[0]])
         self.assertEqual(set(found[0]),SEARCH_KEYS)
-        # Lazy: name, headline, distance and place come empty; the callers' capped profile read fills them.
+        # The member ids of all (kept for follow), the public id of the first ones (a profile prefetch).
+        self.assertEqual((c.client.members[ANA[0]],c.client.members[LUIS[0]]),(ANA[2],LUIS[2]))
+        self.assertEqual([(p['public_identifier'],p['profile_url']) for p in found],[('ana-ficticia',ana_url()),('','')])
+        # Lazy: name, headline, distance and place are not on the page; the caller's capped profile read fills them.
         self.assertEqual((found[0]['display_name'],found[0]['headline'],found[0]['network_distance'],found[0]['location'],
                           found[0]['signals'],found[0]['type']),('','','','',{},'individual'))
         with self.assertRaises(ConnectorError) as e:c.search_people('  ')
         self.assertEqual(e.exception.kind,'invalid');self.assertEqual(len(t.sent),1)
+
+    def test_search_results_take_both_forms_of_the_member_ids(self):
+        from linkedin_directo import lectura
+        page=F.search_page((ANA,LUIS),public=2).text
+        self.assertEqual(lectura.search_results(page),[{'id':ANA[0],'member':ANA[2],'public_identifier':'ana-ficticia'},
+                                                       {'id':LUIS[0],'member':LUIS[2],'public_identifier':'luis-ficticio'}])
+        snippet={'requestId':rutas.SNIPPETS,'requestedArguments':{'payload':{
+            'memberProfileIds':[f'urn:li:fsd_profile:{ANA[0]}'],'memberEntityUrns':[f'urn:li:member:{ANA[2]}']}}}
+        older=json.dumps([snippet],separators=(',',':')).replace('"','\\"')
+        self.assertEqual(lectura.search_results(older),[{'id':ANA[0],'member':ANA[2],'public_identifier':''}])
 
     def test_search_parameters_reads_the_location_typeahead(self):
         c,t=connector(search(),('POST','^'+re.escape(rutas.sdui(rutas.FILTER_BAR,'component'))+'$',F.filter_bar()),
@@ -529,9 +578,12 @@ class ErrorMappingTests(SimpleTestCase):
 
 
 class AllowlistTests(SimpleTestCase):
-    def comment_body(self,text):
+    def comment_body(self,text,mention=False):
         template=rutas.templates(rutas.unescape(F.post_page(POST).text),rutas.COMMENT)[0]
-        return rutas.envelope(template,rutas.comment_states(template,text),rutas.POST_SCREEN)
+        states=rutas.comment_states(template,text)
+        if mention:  # what the web pre-fills in a reply box: the parent's author
+            states[1]['value']['attribute']=[{'start':0,'length':4,'type':{'$case':'mention','mention':{'entityID':ANA[0]}}}]
+        return rutas.envelope(template,states,rutas.POST_SCREEN)
 
     def test_what_the_client_builds_is_allowed(self):
         allowed=(Request('GET','/voyager/api/me','voyager'),Request('GET',rutas.post_page(POST),'page'),
@@ -577,6 +629,7 @@ class AllowlistTests(SimpleTestCase):
             'comentario sin plantilla':Request('POST',rutas.sdui(rutas.COMMENT),'sdui',
                                                rutas.envelope({'requestId':rutas.COMMENT,'requestedArguments':{'payload':{'collection':{}}}}),True),
             'comentario vacío':Request('POST',rutas.sdui(rutas.COMMENT),'sdui',self.comment_body('   '),True),
+            'respuesta con mención':Request('POST',rutas.sdui(rutas.COMMENT),'sdui',self.comment_body('Hola',mention=True),True),
         }
         for why,request in refused.items():
             with self.subTest(why):

@@ -108,7 +108,8 @@ def moment(ms):
 
 
 def activity_time(activity_id):
-    """A post's creation time is in its id: activity id >> 22 is epoch milliseconds (there is no date field)."""
+    """A post's creation time is in its id: activity id >> 22 is epoch milliseconds (there is no date field). A
+    comment id carries it the same way (checked against the write's own time on 2026-11-13)."""
     return moment(int(activity_id) >> 22)
 
 
@@ -344,12 +345,31 @@ def invitation_id(answer):
 
 
 def search_results(html):
-    """(profile id, member id) of each result on a people search page: the page's own snippet request lists them."""
-    snippet = next(iter(rutas.templates(rutas.unescape(html), rutas.SNIPPETS)), {})
+    """What a people search page says of each result, in order: {id, member, public_identifier}. The page does not
+    draw its cards (the browser asks for them later, in the batchClassicSnippetRequest it carries): that request lists
+    the profile ids and maps each to its member urn, and the first few results (3 of 10 on 2026-11-13) also have a
+    profile prefetch with their public id. Names, headlines, places and distance are not on the page."""
+    page = rutas.unescape(html)
+    snippet = next(iter(rutas.templates(page, rutas.SNIPPETS)), {})
     payload = (snippet.get('requestedArguments') or {}).get('payload') or {}
     ids = [str(p).rsplit(':', 1)[-1] for p in payload.get('memberProfileIds') or []]
-    members = [str(m).rsplit(':', 1)[-1] for m in payload.get('memberEntityUrns') or []]
-    return [(p, m if m.isdigit() else '') for p, m in zip(ids, members + [''] * len(ids)) if p]
+    urns = payload.get('memberEntityUrns') or {}
+    if isinstance(urns, list):  # an older form: one urn per profile id, same order
+        urns = dict(zip(ids, urns))
+    public, decoder = {}, json.JSONDecoder()
+    for m in re.finditer(r'\{"vanityName":"', page):
+        try:
+            found = decoder.raw_decode(page, m.start())[0]
+        except ValueError:
+            continue
+        if isinstance(found.get('vieweeProfileId'), str) and isinstance(found.get('vanityName'), str):
+            public.setdefault(found['vieweeProfileId'], found['vanityName'])
+    out = []
+    for p in ids:
+        member = str(urns.get(p) or '').rsplit(':', 1)[-1] if isinstance(urns, dict) else ''
+        if p:
+            out.append({'id': p, 'member': member if member.isdigit() else '', 'public_identifier': public.get(p, '')})
+    return out
 
 
 def places(stream):
@@ -359,6 +379,14 @@ def places(stream):
                                         r'"SEARCH_FILTER_geoUrn"', stream)))
     labels = list(dict.fromkeys(re.findall(r'"children":\["([^"$][^"]{1,120})"\]', stream)))
     return [{'id': g, 'name': labels[i] if i < len(labels) else ''} for i, g in enumerate(ids)]
+
+
+def written_comment(stream, activity_id, parent=None):
+    """The id of the comment a createComment made, from its answer: the stream draws the post's comment list again
+    holding only the new comment (and, for a reply, its parent). '' unless exactly one other comment of the post is
+    named. Its creation time is in the id, as for a post (activity_time)."""
+    ids = {c for a, c in COMMENT.findall(stream or '') if a == str(activity_id)} - {str(parent or '')}
+    return ids.pop() if len(ids) == 1 else ''
 
 
 def stream_errors(stream):
