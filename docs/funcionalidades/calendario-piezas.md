@@ -167,15 +167,16 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** abre, plegado por secciones, el brief, las dos variantes, el panel de lectores, la selección, el verificador, la reparación y lo que costó.
-- **Código:** `brief`, `variants`, `panel`, `selection`, `verification` (con `rules` y `repair`), `citations`, `signals`, `usage`; PWA `calendario/ComoSeEscribio.tsx`; app `pieza/ComoSeEscribio.tsx`.
+- **Código:** `brief`, `variants`, `panel`, `selection`, `verification` (con `rules`, `repair`, `observations` y `day_attempt`), `citations`, `signals`, `usage`; PWA `calendario/ComoSeEscribio.tsx`; app `pieza/ComoSeEscribio.tsx`.
 - **Criterios de aceptación:**
   1. **Dado** una pieza lista, **cuando** abre «Cómo se escribió», **entonces** ve las secciones cerradas: Brief (lector, modalidad, pilar, tesis, enfoque, formato, valor para el lector, criterio de éxito, qué evitar, evidencia, por qué), Variantes A y B (con «Elegida»), Panel de lectores («Cinco perspectivas simuladas: son hipótesis…»), Selección, Verificador («Afirmaciones comprobadas N de M») y Fuentes y coste (coste por etapa y total).
   2. **Dado** una ronda de reparación, **cuando** abre el detalle, **entonces** aparece «Ronda de reparación» con qué había que corregir, qué cambió y el texto antes de reparar; sin ronda, la sección no aparece.
   3. **Dado** una etapa que no corrió, **cuando** abre su sección, **entonces** ve «Esta etapa aún no ha corrido.» o «Esta etapa no llegó a correr.».
   4. **Dado** que no hay coste registrado, **cuando** abre Fuentes y coste, **entonces** ve «Sin dato de coste.».
   5. **Dado** las variantes, **cuando** las mira en el teléfono, **entonces** van en pestañas (o deslizables en la app); en escritorio, lado a lado.
-- **Brechas código/docs:** —
-- **Cobertura QA:** CAL-09.1–3 y 5 en `07-pieza-veto.yaml` y `07-pieza-estados.yaml` (cada pliegue, variantes deslizadas, ronda de reparación, etapa que no corrió) · CAL-09.4 sin prueba E2E · 2026-11-08 · pasa
+  6. **Dado** una pieza que salió con hallazgos blandos ([EDI-25](motor-editorial.md#edi-25)) o que es el segundo intento de su día ([EDI-27](motor-editorial.md#edi-27)), **cuando** abre Verificador en la app, **entonces** ve «Conservadas como observación» con cada una e «Intento 2 de 2»; con segunda revisión, «Ronda de reparación» dice «N de M resueltos». Sin observaciones ni segundo intento no aparece nada nuevo.
+- **Brechas código/docs:** el criterio 6 está solo en la app; la PWA aún no muestra observaciones, intento ni segunda revisión.
+- **Cobertura QA:** CAL-09.1–3 y 5 en `07-pieza-veto.yaml` y `07-pieza-estados.yaml` (cada pliegue, variantes deslizadas, ronda de reparación, etapa que no corrió) · CAL-09.4 sin prueba E2E · 2026-11-08 · pasa. CAL-09.6 en `PiezaScreen.test.tsx`, escrito; CI pendiente.
 
 ### CAL-10 · Pieza en preparación <a id="cal-10"></a>
 

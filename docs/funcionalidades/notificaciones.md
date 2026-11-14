@@ -75,7 +75,7 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
   2. **Dado** `connection_fit` u `opportunity` con contacto, **cuando** la toca, **entonces** abre `/personas/<id>`.
   3. **Dado** `weekly_summary`, **cuando** la toca, **entonces** abre Resultados en `#resumen`.
   4. **Dado** `capture_processed` (enlace `/?enviado=1`), **cuando** la toca, **entonces** se abre la hoja de captura en «Lo que enviaste».
-  5. **Dado** `lead_silent`, **cuando** la toca, **entonces** abre la Lista del calendario filtrada con lo que no salió.
+  5. **Dado** `lead_silent`, o `gate_alert` de una compuerta que frena demasiado, **cuando** la toca, **entonces** abre la Lista del calendario filtrada con lo que no salió; `gate_alert` de un día sin post abre esa pieza.
   6. **Dado** una notificación sin enlace ya leída, **cuando** la toca, **entonces** no pasa nada.
 - **Brechas código/docs:** la oportunidad sin contacto enlaza a `/personas?pestana=oportunidades` desde la notificación y a `/personas?tab=oportunidades` desde el calendario; la PWA solo entiende `pestana` (ver [PRS-07](personas-oportunidades.md#prs-07)).
 - **Cobertura QA:** E2E `06-notificaciones` (criterios 1 y 2) y `06-notificaciones-destinos` (3 resumen semanal, 4 «Lo que enviaste» y la oportunidad sin contacto).
@@ -100,15 +100,16 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
 - **Qué hace para Gustavo:** cada cosa que pasa y no le pide nada aparece una sola vez en su bandeja.
 - **Código:** llamadas a `notificaciones.avisar` con un tipo de `FEED_KINDS`; `ref` único para no duplicar.
 - **Criterios de aceptación:**
-  1. **Dado** cada uno de estos eventos, **cuando** ocurre, **entonces** se guarda su Notificación: pieza lista (`piece_scheduled`), publicada, bloqueada, descartada, conexión que encaja, oportunidad nueva o que cambia de etapa, posts nuevos del Observatorio (`observatory`), captura procesada, líder sin aprobar en 7 días (`lead_silent`), la prueba diaria de LinkedIn rota, sin correr en todo el día o de nuevo bien (`linkedin_canary`) y resumen de la semana.
+  1. **Dado** cada uno de estos eventos, **cuando** ocurre, **entonces** se guarda su Notificación: pieza lista (`piece_scheduled`), publicada, bloqueada, descartada, conexión que encaja, oportunidad nueva o que cambia de etapa, posts nuevos del Observatorio (`observatory`), captura procesada, líder sin aprobar en 7 días (`lead_silent`), una compuerta que frena demasiado o un día sin post por una compuerta (`gate_alert`), la prueba diaria de LinkedIn rota, sin correr en todo el día o de nuevo bien (`linkedin_canary`) y resumen de la semana.
   2. **Dado** el mismo evento dos veces (mismo `ref`), **cuando** se avisa, **entonces** solo hay una Notificación.
   3. **Dado** `invites_expected` y `machine_paused_env`, **cuando** ocurren, **entonces** aparecen solo en «Próximo» (se calculan, no se guardan).
   4. **Dado** que la máquina se detiene desde el servidor, **cuando** el autopiloto lo ve, **entonces** llega una push una vez por parada ([PUS-05](notificaciones-push.md#pus-05)), sin guardarla en el feed.
   5. **Dado** que la prueba diaria de una cuenta `directo` encuentra una lectura rota, **cuando** termina, **entonces** llega «La prueba diaria de LinkedIn encontró lecturas rotas» con las lecturas que fallan; si al día siguiente sigue rota no llega otra, y cuando vuelve a pasar llega «La prueba diaria de LinkedIn vuelve a pasar».
   6. **Dado** que la prueba diaria no pudo correr (servicio caído, ocupado o sin cupo), **cuando** falla el tercer intento del día, **entonces** llega «La prueba diaria de LinkedIn no pudo correr hoy»; los dos primeros intentos no avisan.
   7. **Dado** que en la prueba diaria el servicio paró la cuenta o no tiene sesión, **cuando** termina, **entonces** no llega `linkedin_canary`: la cuenta queda en pausa y llega la de «cuenta en pausa» (Tu turno) una sola vez, con qué hacer en el motivo.
+  8. **Dado** una compuerta de contenido que en 7 días paró al menos la mitad (`COMPUERTAS_ALERTA_TASA`, 0,5) de al menos 4 decisiones (`COMPUERTAS_ALERTA_MIN`), **cuando** corre la comprobación del autopiloto, **entonces** llega `gate_alert` (capa sistema, push por defecto) «<compuerta>: frenó N de M en 7 días» con lo que más la para, una vez por compuerta y semana. Si ayer no salió post porque lo paró una compuerta y nadie lo reintentó ni desestimó, llega «El DD/MM no salió post: lo paró <compuerta>», una vez por día. `COMPUERTAS_ALERTAS=false` los apaga ([EDI-28](motor-editorial.md#edi-28)).
 - **Brechas código/docs:** la app todavía no muestra la última prueba diaria; el backend la sirve en `canary` de cada cuenta.
-- **Cobertura QA:** Backend (`test_notificaciones`): eventos, `ref` único, tipos calculados y la push de la parada del servidor. `test_canario`: los criterios 5 a 7.
+- **Cobertura QA:** Backend (`test_notificaciones`): eventos, `ref` único, tipos calculados y la push de la parada del servidor. `test_canario`: los criterios 5 a 7. `test_compuertas` (`AuditTests`): el criterio 8 (escrito; CI pendiente).
 
 ## Retiradas
 

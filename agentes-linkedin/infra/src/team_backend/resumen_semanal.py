@@ -271,7 +271,9 @@ def stops(w):
 def gates(w):
     """What each gate let through or stopped this week (auditoria_compuertas.py), without ids."""
     from . import auditoria_compuertas
-    return auditoria_compuertas.weekly(w)
+    try:return auditoria_compuertas.weekly(w)
+    except Exception as exc:  # the audit is a reading aid: it never stops the weekly summary
+        return unavailable(f'La auditoría de compuertas no se pudo leer ({type(exc).__name__}).')
 
 def week_stats(w,now):
     machine=resultados.Coverage.machine(w)
