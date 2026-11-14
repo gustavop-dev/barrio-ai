@@ -485,7 +485,7 @@ def next_slot(now=None,manual=False):
         if manual and pieces.filter(state__in=OPEN_PIECE_STATES).exists():continue
         if (not manual and pieces.exists() and not budget_retry(pieces,now) and not idea_retry(pieces)
                 and not compuertas.gate_retry(pieces,now,when)):continue
-        if Job.objects.filter(kind='prepare_piece',state__in=[Job.State.QUEUED,Job.State.RUNNING],params__slot=day.isoformat()).exclude(params__extra=True).exists():continue
+        if Job.objects.filter(kind='prepare_piece',state__in=[Job.State.QUEUED,Job.State.RUNNING],params__slot=day.isoformat()).exclude(params__contains={'extra':True}).exists():continue
         return day
     return None
 

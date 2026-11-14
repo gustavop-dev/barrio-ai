@@ -384,7 +384,8 @@ def findings(piece,text):
     """Per-type findings of the exact text, as «code: detail» issues that feed the circuit's repair round. Empty for a
     brief without a GASP type (strategy off, or an older piece). Only what a repaired text can fix is here; what the
     brief decided (reader need, a repeated story) goes to notes()."""
-    brief=piece.brief or {};results=piece.research;kind=brief.get('gasp_type')
+    # A minimal piece (a caller that only checks rules) has no brief: no GASP type, nothing to find.
+    brief=getattr(piece,'brief',None) or {};results=getattr(piece,'research',None) or [];kind=brief.get('gasp_type')
     if kind not in TYPES:return []
     out=[]
     ctas=len(CTA.findall(text or ''))
@@ -409,7 +410,7 @@ def findings(piece,text):
 def notes(piece,now=None):
     """Soft findings of the brief that a repaired text cannot fix (soft in compuertas.SOFT): they travel as risks of the
     proposal, never block and never cost a repair round."""
-    brief=piece.brief or {};kind=brief.get('gasp_type')
+    brief=getattr(piece,'brief',None) or {};kind=brief.get('gasp_type')
     if kind not in TYPES:return []
     out=[]
     if not (brief.get('reader_need') or brief.get('reader_value') or '').strip() or brief.get('audience_evidence_missing'):

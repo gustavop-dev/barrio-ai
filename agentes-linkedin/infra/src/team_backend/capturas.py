@@ -542,8 +542,10 @@ def ideas_for_director(now=None):
     now=now or timezone.now();expire_ideas(now)
     from .urgente import is_extra
     # An idea whose date waits for his answer in the Bandeja is not written meanwhile.
+    # day_request__contains, never exclude(day_request__state=…): on Postgres a capture without that key gives NULL and
+    # the exclude would drop every idea that never had a date problem.
     rows=Capture.objects.filter(state=Capture.State.IDEA,created_at__gte=now-timedelta(days=IDEA_DAYS)).exclude(
-        day_request__state='problem').order_by('-publish_asap','publish_asap_expected_slot','-created_at')[:IDEA_LIMIT]
+        day_request__contains={'state':'problem'}).order_by('-publish_asap','publish_asap_expected_slot','-created_at')[:IDEA_LIMIT]
     return [{'id':str(c.id),'text':_clip(c.text,6000),'date':_local(c.created_at).date().isoformat(),
              'investigation':c.investigation,
              'purpose':c.purpose,'publish_asap':c.publish_asap,'evidence':c.publish_asap_evidence,

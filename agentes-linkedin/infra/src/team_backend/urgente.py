@@ -46,7 +46,7 @@ def is_extra(capture):
 
 
 def _daily_jobs(day):
-    return Job.objects.filter(kind='prepare_piece',state__in=['queued','running'],params__slot=day.isoformat()).exclude(params__extra=True)
+    return Job.objects.filter(kind='prepare_piece',state__in=['queued','running'],params__slot=day.isoformat()).exclude(params__contains={'extra':True})
 
 
 def _extra_jobs(day):
