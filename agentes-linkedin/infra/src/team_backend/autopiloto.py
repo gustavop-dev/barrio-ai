@@ -547,7 +547,7 @@ def _execute(user,account,now):
     if _pending('execute_action'):return 0
     rounds=bool(operador.network_batches())
     # Without network rounds every write shares one spacing; with them a network write inside its round waits less.
-    if not rounds and not operador.spacing_ok(account,now):return 0
+    # His own post does not wait for the day's opening (operador.spacing_ok).
     due=operador.post_due(now)  # a network action or comment now could push his post past its hour
     # A reply on his own post goes first: the person who commented is waiting, and its window counts from the comment.
     first=Case(When(capability=ActionProposal.Capability.REPLY,then=0),default=1)
@@ -556,7 +556,7 @@ def _execute(user,account,now):
         if due and not proposal.piece_id:continue
         if proposal.piece_id and proposal.piece.scheduled_for>now:continue  # an own piece waits for its hour
         if rounds and not proposal.piece_id and operador.batch_issue(proposal.capability,now):continue
-        if rounds and not operador.spacing_ok(account,now,proposal.capability):continue
+        if not operador.spacing_ok(account,now,proposal.capability):continue
         if operador.capped(proposal) and operador.capacity_left(account,proposal.capability,now)<=0:continue
         if not proposal.piece_id and operador.deferred_until(account,proposal.capability,now):continue  # its last write left nothing
         job=operador.enqueue_execution(user,proposal)

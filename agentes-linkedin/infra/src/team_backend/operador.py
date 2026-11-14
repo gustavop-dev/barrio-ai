@@ -182,8 +182,11 @@ def spacing_ok(account,now=None,capability=None):
     # Every connector acts as the same LinkedIn member, so public writes share one spacing. An execution whose
     # pre-check found nothing to write does not count (an execution in flight does: it may be writing). Inside a
     # network round a network write only waits the round's short gap.
+    # The day's opening wait is drawn at the first attempt of the day; when that attempt is his own post at its
+    # hour, the post does not wait for it (14/11/2026: it left 15 minutes late). The gap after a real write still holds.
     event=policy_event('operator.schedule')
-    if event and datetime.fromisoformat(event.metadata['next_action_at'])>(now or timezone.now()):return False
+    own_post=capability==ActionProposal.Capability.PUBLISH and event is not None and event.metadata.get('opening')
+    if event and not own_post and datetime.fromisoformat(event.metadata['next_action_at'])>(now or timezone.now()):return False
     last=ActionExecution.objects.filter(wrote=True).order_by('-started_at').values_list('started_at',flat=True).first()
     gap=timedelta(seconds=batch_spacing()[0]) if capability in NETWORK and network_batch(now) is not None else min_spacing()
     return last is None or last<=(now or timezone.now())-gap
@@ -202,9 +205,12 @@ def prepare_day_schedule(now=None):
     if event and delay==event.metadata.get('delay'):delay=(delay+1)%1201
     next_at=max(opened,now)+timedelta(seconds=delay)
     previous=policy_event('operator.schedule')
-    if previous:next_at=max(next_at,datetime.fromisoformat(previous.metadata['next_action_at']))
+    pending=datetime.fromisoformat(previous.metadata['next_action_at']) if previous else None
+    # `opening`: the wait is only the day's varied start, not the gap a write reserved. His own post keeps its hour.
+    opening=pending is None or pending<=next_at
+    if not opening:next_at=pending
     _audit(None,'operator.day_schedule','member',day=day,delay=delay)
-    _audit(None,'operator.schedule','member',next_action_at=next_at.isoformat(),gap_seconds=delay)
+    _audit(None,'operator.schedule','member',next_action_at=next_at.isoformat(),gap_seconds=delay,opening=opening)
 
 def writes(account,capability):
     """Executions of a capability that wrote (or may have written) on LinkedIn: what the caps count."""

@@ -120,6 +120,21 @@ class ParticipationTests(NetworkBase):
             operador.prepare_day_schedule(self.now+timedelta(days=1))
             self.assertNotEqual(first['delay'],operador.policy_event('operator.day_schedule').metadata['delay'])
 
+    def test_his_own_post_does_not_wait_for_the_opening_of_the_day_but_waits_after_a_write(self):
+        self.day_schedule_patch.stop();self.spacing_patch.stop()
+        with patch('team_backend.operador.random.SystemRandom') as rng:
+            rng.return_value.randint.return_value=900
+            operador.prepare_day_schedule(self.now)
+        self.assertTrue(operador.policy_event('operator.schedule').metadata['opening'])
+        soon=self.now+timedelta(seconds=60)
+        self.assertFalse(operador.spacing_ok(self.account,soon))
+        self.assertFalse(operador.spacing_ok(self.account,soon,'INT-03'))
+        self.assertTrue(operador.spacing_ok(self.account,soon,'CONT-09'))
+        with patch('team_backend.operador.random.SystemRandom') as rng:
+            rng.return_value.randint.return_value=1500
+            operador.reserve_spacing(self.now)
+        self.assertFalse(operador.spacing_ok(self.account,soon,'CONT-09'))
+
     def test_health_excludes_immature_unknown_and_deduplicates_recipients(self):
         people=self.cohort();self.cohort(count=15,accepted=0,age=2);self.cohort(count=2,accepted=0,unknown=2)
         c=people[0];p=self.approved(c);p.state='confirmed';p.save()
