@@ -14,10 +14,19 @@ TOKEN_MIN = 24
 # LinkedIn's 30 s it stays under the backend's 75 s, so the backend never gives up on a call that still goes out.
 DEADLINE = 35.0
 LINKEDIN_TIMEOUT_MS = 30000
-# Conservative per account: the spike's busiest afternoon was 140 calls and 10 writes.
-BUDGETS = {('read', 'hour'): 60, ('read', 'day'): 300, ('write', 'hour'): 6, ('write', 'day'): 30}
+# Per account, a backstop behind the operator's own daily caps (README, «Topes frente al ritmo real»): a production
+# day of one account is at most about 880 reads and 90 writes (20 comments and replies, 20 reactions, 20 follows,
+# 20 invitations, 10 accepts). Windows are rolling, while the operator counts local days: two halves of two days can
+# fall in one window, hence about 1.5 times its caps per kind. The hourly ones smooth the network rounds.
+WRITE_KINDS = ('comment', 'reaction', 'follow', 'invitation', 'accept')
+BUDGETS = {('read', 'hour'): 150, ('read', 'day'): 1000, ('write', 'hour'): 15, ('write', 'day'): 100,
+           ('comment', 'day'): 30, ('reaction', 'day'): 30, ('follow', 'day'): 30, ('invitation', 'day'): 30,
+           ('accept', 'day'): 15}
 BUDGET_ENV = {('read', 'hour'): 'NAVEGADOR_LECTURAS_HORA', ('read', 'day'): 'NAVEGADOR_LECTURAS_DIA',
-              ('write', 'hour'): 'NAVEGADOR_ESCRITURAS_HORA', ('write', 'day'): 'NAVEGADOR_ESCRITURAS_DIA'}
+              ('write', 'hour'): 'NAVEGADOR_ESCRITURAS_HORA', ('write', 'day'): 'NAVEGADOR_ESCRITURAS_DIA',
+              ('comment', 'day'): 'NAVEGADOR_COMENTARIOS_DIA', ('reaction', 'day'): 'NAVEGADOR_REACCIONES_DIA',
+              ('follow', 'day'): 'NAVEGADOR_SEGUIMIENTOS_DIA', ('invitation', 'day'): 'NAVEGADOR_INVITACIONES_DIA',
+              ('accept', 'day'): 'NAVEGADOR_ACEPTACIONES_DIA'}
 ACCOUNT = re.compile(r'[a-z0-9][a-z0-9_\-]{0,62}')  # the backend's ConnectorAccount.external_account_id
 
 

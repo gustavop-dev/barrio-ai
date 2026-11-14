@@ -29,7 +29,7 @@ from django.db.models import Q
 from django.utils import timezone
 from knowledge import memory, providers
 from . import idioma, operador, orientacion, voz
-from .connectors import ConnectorError, get_connector, same_text
+from .connectors import ConnectorError, deferred, get_connector, same_text
 from .exceptions import Conflict
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, PostComment, TeamQuestion
 from .permissions import require
@@ -222,6 +222,7 @@ def read(user,account,now=None,origin_job=''):
             if exc.pause:
                 operador.set_account_pause(account,f'Lectura de comentarios detenida por el proveedor: {exc}')
                 summary['stopped']=str(exc);break
+            if deferred(exc):summary['stopped']=str(exc);break  # nothing came back: unscanned, the next run reads them
     summary.update(triage(user,account,now,origin_job))
     _audit(user,'replies.collected',account.id,**summary)
     return summary

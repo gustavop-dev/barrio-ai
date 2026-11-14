@@ -50,8 +50,14 @@ class Service:
 SERVICE = web.AppKey('service', Service)
 
 
-def reason(status, text):
-    return web.json_response({'reason': text}, status=status)
+def reason(status, text, code='', retry_after=None):
+    """The service's own answer. A spent budget adds `code: budget` and `retry_after` (seconds, also as the header)."""
+    body, headers = {'reason': text}, {}
+    if code:
+        body['code'] = code
+    if retry_after is not None:
+        body['retry_after'], headers['Retry-After'] = retry_after, str(retry_after)
+    return web.json_response(body, status=status, headers=headers)
 
 
 @web.middleware
@@ -92,7 +98,7 @@ async def calls(request):
         answer = await service.account(name).call(call, request_id, arrived)
     except Refused as exc:
         log.info('cuenta=%s op=%s -> %s %s', name if ACCOUNT.fullmatch(name) else '?', operation, exc.status, exc.reason)
-        return reason(exc.status, exc.reason)
+        return reason(exc.status, exc.reason, exc.code, exc.retry_after)
     return web.json_response({'status': answer.status, 'text': answer.text, 'content_type': answer.content_type,
                               'url': answer.url, 'redirected': answer.redirected})
 

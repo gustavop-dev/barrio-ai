@@ -17,6 +17,7 @@ import time
 
 from . import ajustes, pagina
 from .almacen import Store
+from .cuenta import WORDS
 
 LOCK_WAIT, LOCK_TRIES = 30, 5  # another browser on the profile: wait 30 s, up to 5 times
 # Never copied from another profile: Chromium's locks of the browser that had it open, and caches it rebuilds.
@@ -117,13 +118,14 @@ def status(settings, name=None):
             print(f'{name}: sin perfil')
             continue
         stopped = store.stopped()
-        used = {k: store.usage(k, now) for k in ('read', 'write')}
+        used = {k: store.usage(k, now) for k in ('read', 'write', *ajustes.WRITE_KINDS)}
         hour = {k: sum(1 for t in v if now - t < 3600) for k, v in used.items()}
+        kinds = ', '.join(f'{WORDS[k]} {len(used[k])}' for k in ajustes.WRITE_KINDS if used[k])
         print(f'{name}: sesión guardada {session_word(store.profile)}; '
               f'{"en uso por un navegador" if pagina.profile_busy(store.profile) else "sin navegador abierto"}; '
               + (f'DETENIDA desde {stopped.get("desde")}: {stopped.get("motivo")}' if stopped else 'activa')
               + f'; lecturas {hour["read"]}/h {len(used["read"])}/día, escrituras {hour["write"]}/h '
-              f'{len(used["write"])}/día')
+              f'{len(used["write"])}/día' + (f' ({kinds})' if kinds else ''))
     return 0
 
 

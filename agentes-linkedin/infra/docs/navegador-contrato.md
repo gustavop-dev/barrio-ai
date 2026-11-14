@@ -88,15 +88,23 @@ la página. Una redirección no se sigue: llega con `status` 0 y `redirected: tr
 Si el servicio no hace la llamada, contesta con su propio código y un JSON `{"reason": "texto corto"}`. Ese texto
 no debe llevar datos de LinkedIn.
 
+Cuando lo que se agotó es un tope de la cuenta, el 422 lo dice y dice cuándo vuelve a haber cupo (en segundos, también
+en el encabezado `Retry-After`):
+
+```json
+{"reason": "tope de invitaciones por día agotado; no salió nada", "code": "budget", "retry_after": 3600}
+```
+
 | Código | Significado | Lo que hace el backend |
 | --- | --- | --- |
 | 400 | Petición mal formada | Error `contract` |
 | 401, 403 | Falta el token (401) o no es el del servicio (403) | Error `config`; la cuenta se pausa |
 | 404 | Cuenta desconocida en el servicio | Error `config`; la cuenta se pausa |
 | 409 | Cuenta detenida por el servicio (LinkedIn frenó antes), o una escritura con un `request_id` que ya salió o está saliendo y cuya respuesta no quedó guardada | Error `stopped`; la cuenta se pausa |
-| 422 | Fuera de la lista permitida o tope de la hora o del día agotado; no salió nada | Error `refused` |
+| 422 | Fuera de la lista permitida; no salió nada | Error `refused` |
+| 422 con `code: budget` | Tope de la cuenta agotado (lecturas o escrituras por hora o por día, o un tipo de escritura por día); no salió nada | Error `budget` con `retry_after`. No pausa la cuenta y no cuenta como límite de LinkedIn: la acción queda aprobada y se reintenta pasado ese tiempo; una lectura espera a la siguiente vuelta |
 | 423 | Sin sesión: alguien tiene que entrar a mano en ese navegador | Error `login`; la cuenta se pausa |
-| 503 | Navegador no listo (no abrió, o el perfil lo tiene otro navegador) u ocupado: la llamada no pudo salir en los 35 s siguientes a su llegada; no salió nada | Error `not_sent` |
+| 503 | Navegador no listo (no abrió, o el perfil lo tiene otro navegador) u ocupado: la llamada no pudo salir en los 35 s siguientes a su llegada; no salió nada | Error `not_sent`: como `budget`, se reintenta más tarde (30 min si nadie dice otra cosa) |
 | 504 u otro 5xx | La página falló durante la llamada: pudo salir y no se sabe qué pasó | Escritura: incierta. Lectura: error `network` |
 
 El servicio juzga además lo mismo que el backend para detenerse: si una respuesta de LinkedIn trae una señal de

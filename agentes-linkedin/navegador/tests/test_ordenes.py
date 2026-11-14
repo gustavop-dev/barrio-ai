@@ -64,8 +64,10 @@ class SettingsTests(unittest.TestCase):
         self.assertLess(ajustes.DEADLINE + ajustes.LINKEDIN_TIMEOUT_MS / 1000 + 5, READ_TIMEOUT)
 
     def test_budgets_come_from_the_environment(self):
-        loaded = ajustes.load({'NAVEGADOR_TOKEN': TOKEN, 'NAVEGADOR_ESCRITURAS_DIA': '5'})
-        self.assertEqual(loaded.budgets, {**ajustes.BUDGETS, ('write', 'day'): 5})
+        loaded = ajustes.load({'NAVEGADOR_TOKEN': TOKEN, 'NAVEGADOR_ESCRITURAS_DIA': '5', 'NAVEGADOR_INVITACIONES_DIA': '0'})
+        self.assertEqual(loaded.budgets, {**ajustes.BUDGETS, ('write', 'day'): 5, ('invitation', 'day'): 0})
+        self.assertEqual(set(ajustes.BUDGET_ENV), set(ajustes.BUDGETS))
+        self.assertEqual({kind for kind, _ in ajustes.BUDGETS} - {'read', 'write'}, set(ajustes.WRITE_KINDS))
         for bad in ('muchas', '-1'):
             with self.subTest(bad=bad), self.assertRaises(ajustes.ConfigError):
                 ajustes.load({'NAVEGADOR_TOKEN': TOKEN, 'NAVEGADOR_LECTURAS_HORA': bad})
@@ -131,12 +133,12 @@ class ProfileTests(unittest.TestCase):
     def test_status_says_stopped_and_what_was_spent(self):
         self.run_quietly(cli.import_profile, self.settings, str(self.source), 'prueba')
         store = Store(self.settings.account_dir('prueba'))
-        store.count('write', time.time())
+        store.count(('write', 'reaction'), time.time())
         store.stop('LinkedIn: HTTP 429 en add_reaction; la cuenta se detiene.')
         out = self.run_quietly(cli.status, self.settings)
         self.assertIn('prueba: sesión guardada sí', out)
         self.assertIn('DETENIDA', out)
-        self.assertIn('escrituras 1/h 1/día', out)
+        self.assertIn('escrituras 1/h 1/día (reacciones 1)', out)
         self.assertIn('Reanudada', self.run_quietly(cli.resume, self.settings, 'prueba'))
         self.assertIn('activa', self.run_quietly(cli.status, self.settings, 'prueba'))
 

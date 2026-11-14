@@ -19,7 +19,7 @@ from django.db.models import Q
 from django.utils import timezone
 from knowledge import memory, providers, retrieval
 from knowledge.ingest import ENC
-from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, get_connector, public_identifier, same_text
+from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, deferred, get_connector, public_identifier, same_text
 from .exceptions import Conflict
 from .models import (OPEN_ACTION_STATES, ActionExecution, ActionProposal, ConnectorAccount, ObservedPost, PostComment, Referent)
 from .permissions import require
@@ -30,6 +30,10 @@ USER_ID=re.compile(r'[A-Za-z0-9_\-]{3,200}')
 NETWORK=('RED-01','RED-02','RED-04')
 POST_MAX_CHARS=3000  # LinkedIn's limit for a post's text
 STALE_EXECUTION=timedelta(seconds=300)
+# A write that left nothing for a reason that is not the account's (connectors.deferred) waits as long as the provider
+# says (the navegador service's budget) or DEFER_WAIT, within DEFER_BOUNDS, and is then tried again.
+WRITE_DEFERRED='operator.write_deferred'
+DEFER_WAIT,DEFER_BOUNDS=timedelta(minutes=30),(timedelta(minutes=1),timedelta(hours=24))
 # Catalogue grounding for INT-03 (B04, B06, B15): discovery, contributing comments, editing and facts.
 COMMENT_UNITS=['LI-03-M006-K02','LI-03-V018-K02','LI-03-V020-K04','LI-06-M003-K06','LI-06-M002-K09','LI-06-M002-K10']
 REFERENTS_UNITS=['LI-03-V009-K04','LI-03-V018-K02','LI-03-M005-K05','LI-03-M005-K06','LI-03-V020-K05']
@@ -428,6 +432,7 @@ def observe(user,account,referent_ids=None,limit=5):
             summary['errors'].append({'referent':str(referent.id),'error':str(exc)})
             if exc.pause:
                 set_account_pause(account,f'Lectura detenida: {exc}');break
+            if deferred(exc):break  # nothing came back: the rest wait for the next run instead of a refusal each
             continue
         summary['referents']+=1
         for post in posts:
@@ -672,6 +677,28 @@ def _publish(execution,proposal,connector,user):
            link=f'/calendario/pieza/{proposal.piece_id}',ref=f'piece_published:{proposal.id}')
     return result
 
+def deferred_until(account,capability,now=None):
+    """When a capability may write again after one of its writes left nothing (connectors.deferred); None when it
+    may now. execute() and the autopilot both wait for it, so a spent budget is never retried in a tight loop."""
+    from .models import AuditEvent
+    now=now or timezone.now()
+    last=(AuditEvent.objects.filter(action=WRITE_DEFERRED,target=str(account.id),metadata__capability=capability,
+                                    created_at__gte=now-DEFER_BOUNDS[1]).order_by('-created_at').first())
+    at=datetime.fromisoformat(last.metadata['retry_at']) if last else None
+    return at if at and at>now else None
+
+def _defer(execution,proposal,exc,user):
+    """Nothing left and the account is fine: the execution is undone, so it never counts as executed or failed, the
+    proposal is approved again and its capability waits until retry_at. The same «queda aprobada» as every gate."""
+    wait=timedelta(seconds=exc.retry_after) if getattr(exc,'retry_after',None) else DEFER_WAIT
+    at=timezone.now()+min(max(wait,DEFER_BOUNDS[0]),DEFER_BOUNDS[1])
+    with transaction.atomic():
+        ActionExecution.objects.filter(pk=execution.pk).delete()
+        ActionProposal.objects.filter(pk=proposal.pk).update(state=ActionProposal.State.APPROVED)
+        _audit(user,WRITE_DEFERRED,proposal.account_id,proposal=str(proposal.id),capability=proposal.capability,
+               kind=exc.kind,retry_at=at.isoformat())
+    return OperatorBlocked(f'No salió nada ({exc}). Queda aprobada; se intenta de nuevo desde las {at.astimezone(local_tz()):%H:%M}.')
+
 def execute(user,proposal_id):
     """Execute one approved proposal exactly once. Safety gates run before any write."""
     require(user,'execute_actions')
@@ -706,6 +733,8 @@ def execute(user,proposal_id):
         if proposal.piece_id and proposal.piece.scheduled_for>timezone.now():
             raise OperatorBlocked('Aún no es la hora programada de la pieza; queda aprobada para entonces.')
         if not within_window():raise OperatorBlocked('Fuera de la ventana horaria de actividad; queda aprobada para después.')
+        retry_at=None if proposal.piece_id else deferred_until(account,proposal.capability)
+        if retry_at:raise OperatorBlocked(f'La última escritura de {proposal.capability} no salió; queda aprobada hasta las {retry_at.astimezone(local_tz()):%H:%M}.')
         waits=batch_issue(proposal.capability) if not proposal.piece_id else ''
         if waits:raise OperatorBlocked(waits)
         if not spacing_ok(account,capability=proposal.capability):raise OperatorBlocked('Espaciado mínimo entre escrituras aún no cumplido; queda aprobada.')
@@ -781,6 +810,10 @@ def execute(user,proposal_id):
         avisar('uncertain','¿Salió o no?',f'{proposal.get_capability_display()}: el proveedor no confirmó. Resuélvela en la Bandeja.')
         return _finish(execution,'uncertain',user,error_kind='uncertain',note=str(exc)+' No se repite; conciliar.')
     except ConnectorError as exc:
+        # Before the write was accepted, nothing left: no failure, no limit rule, no pause; it waits (an own post keeps
+        # its own notice and fails as before).
+        if deferred(exc) and not getattr(execution,'_write_accepted',False) and not proposal.piece_id:
+            raise _defer(execution,proposal,exc,user) from None
         from . import red
         red.provider_failure(account,proposal,exc,user)
         if getattr(execution,'_write_accepted',False):

@@ -89,6 +89,27 @@ anteriores al 10/10/2025.
 6. **Prueba diaria.** La del spike, llevada al servicio: lecturas de comprobación sobre la cuenta de prueba y aviso
    en la Bandeja cuando algo se rompe.
 
+### Topes frente al ritmo real
+
+Un día completo de producción de una cuenta, sacado del código (13/11/2026; detalle por trabajo y fuentes en
+[`agentes-linkedin/navegador/README.md`](../agentes-linkedin/navegador/README.md#topes-frente-al-ritmo-real)):
+
+| Qué | Escrituras | Lecturas al día |
+| --- | --- | --- |
+| Comentar (10), responder (10), reaccionar (20) | 40 | hasta 140 |
+| Seguir (20), invitar (16 a 20), aceptar (10) | 50 | hasta 240, 180 de ellas de perfiles |
+| Post del día (API oficial) | 0 aquí | 4 |
+| Referentes cada 3 h (hasta 15) | — | hasta 120 |
+| Bandeja cada hora | — | hasta 132 |
+| Comentarios de los posts propios, métricas, descubrir, sincronizar, borradores y conciliación | — | hasta 245 |
+| Analítica (5 exportaciones) y prueba diaria (17) | — | 22 |
+| **Total**: los perfiles de todo (también clasificar) comparten un tope de 80 al día, 160 llamadas | **90** | **hasta unas 880**; un día normal, unas 650 |
+
+Topes del servicio por cuenta, en ventanas móviles: 150 lecturas por hora y 1000 por día; 15 escrituras por hora y
+100 por día; por día, 30 comentarios y respuestas, 30 reacciones, 30 seguimientos, 30 invitaciones y 15
+aceptaciones. Son una red de seguridad detrás de los topes del operador. Un tope agotado contesta 422 con
+`code: budget`: no pausa la cuenta, no cuenta como límite de LinkedIn y la acción se reintenta cuando hay cupo.
+
 Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Un Chromium por cuenta ocupa del orden de medio
 giga (estimación, sin medir): caben una o dos cuentas; más cuentas piden más máquina o el equipo del usuario.
 

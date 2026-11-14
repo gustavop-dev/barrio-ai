@@ -678,6 +678,30 @@ class ServiceTransportTests(SimpleTestCase):
             with self.subTest(write=status),self.assertRaises(LinkedInError):
                 self.service(lambda r,s=status:httpx.Response(s)).send(self.WRITE)
 
+    def test_a_spent_budget_in_the_service_is_its_own_kind_and_never_linkedin_pushing_back(self):
+        from team_backend import red
+        spent=lambda r:httpx.Response(422,json={'reason':'tope de invitaciones por día agotado; no salió nada','code':'budget',
+                                                'retry_after':3600},headers={'Retry-After':'3600'})
+        invite=Request('POST',rutas.voyager(rutas.INVITE),'voyager',rutas.invitation('ACoPersonaFicticia01'),True,'send_invitation')
+        for request in (self.READ,self.WRITE,invite):
+            with self.subTest(operation=request.operation),self.assertRaises(LinkedInError) as e:self.service(spent).send(request)
+            self.assertEqual((e.exception.kind,e.exception.pause,e.exception.status,e.exception.retry_after),('budget',False,422,3600))
+            self.assertIn('vuelve a haber cupo en 60 min',str(e.exception))
+        connector=DirectoConnector('cuenta-prueba',transport=self.service(spent))
+        with self.assertRaises(ConnectorError) as e:connector.send_invitation('ACoPersonaFicticia01')
+        exc=e.exception
+        self.assertEqual((exc.kind,exc.pause,exc.retry_after),('budget',False,3600))
+        self.assertTrue(connectors.deferred(exc))
+        # Neither the network's limit rules (provider_failure on the kind, invites_blocked on kind and note) see it.
+        self.assertIsNone(red.LIMIT_ERROR.search(exc.kind))
+        self.assertIsNone(red.LIMIT_ERROR.search(f'{exc.kind} {exc}'))
+        self.assertNotEqual(exc.status,429)
+        # A 422 without the code is the allowlist, as before; a malformed retry_after is not a budget.
+        for body in ({'reason':'fuera de la lista permitida; no salió nada'},{'reason':'x','code':'budget','retry_after':'pronto'}):
+            with self.subTest(body=body),self.assertRaises(LinkedInError) as e:
+                self.service(lambda r,b=body:httpx.Response(422,json=b)).send(self.READ)
+            self.assertEqual((e.exception.kind,e.exception.retry_after),('refused',None))
+
     def test_network_failures(self):
         def down(request):raise httpx.ConnectError('sin conexión',request=request)
         def late(request):raise httpx.ReadTimeout('tarde',request=request)

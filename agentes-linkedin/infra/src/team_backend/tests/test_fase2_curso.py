@@ -304,6 +304,41 @@ class ParticipationTests(NetworkBase):
         self.assertEqual(result.state,'sent');self.assertTrue(result.wrote)
         self.assertEqual(operador.capacity_left(self.account,'RED-02'),15)
 
+    def test_a_spent_service_budget_waits_approved_without_counting_pausing_or_reading_as_a_limit(self):
+        # The navegador service's own budget (docs/navegador-contrato.md): nothing left and the account is fine.
+        p=self.approved(note=True);left=operador.capacity_left(self.account,'RED-02');stage=red.ramp_state()['stage']
+        refusal=ConnectorError('Servicio navegador: presupuesto de la cuenta agotado en send_invitation (tope de invitaciones '
+                               'por día agotado; no salió nada); vuelve a haber cupo en 60 min.',status=422,kind='budget',retry_after=3600)
+        with patch.object(type(self.fake),'send_invitation',side_effect=refusal):
+            with self.assertRaisesRegex(operador.OperatorBlocked,'Queda aprobada'):operador.execute(self.gustavo,p.id)
+        p.refresh_from_db();self.account.refresh_from_db()
+        self.assertEqual(p.state,'approved');self.assertFalse(ActionExecution.objects.filter(proposal=p).exists())
+        self.assertFalse(self.account.paused)
+        self.assertEqual(operador.capacity_left(self.account,'RED-02'),left)
+        self.assertFalse(AuditEvent.objects.filter(action__in=['network.provider_limit','network.note_rejected']).exists())
+        self.assertEqual(red.ramp_state()['stage'],stage);self.assertFalse(red.invites_blocked()[0])
+        self.assertEqual(red.note_room(),2)  # the note keeps its reservation for the retry
+        # No tight loop: the capability waits for the service's retry_after; the others do not.
+        self.assertEqual(operador.deferred_until(self.account,'RED-02'),self.now+timedelta(seconds=3600))
+        self.assertIsNone(operador.deferred_until(self.account,'RED-01'))
+        with self.assertRaisesRegex(operador.OperatorBlocked,'no salió'):operador.execute(self.gustavo,p.id)
+        with patch('django.utils.timezone.now',return_value=self.now+timedelta(seconds=3601)):
+            result=operador.execute(self.gustavo,p.id)
+        self.assertEqual(result.state,'confirmed');self.assertEqual(self.fake.state['writes'],1)
+        self.assertEqual(operador.capacity_left(self.account,'RED-02'),left-1)
+
+    def test_a_profile_read_that_left_nothing_leaves_the_person_unchecked_and_ends_the_round(self):
+        a=self.contact('enrich-a','Persona A',stage='candidate');b=self.contact('enrich-b','Persona B',stage='candidate')
+        refusal=ConnectorError('Servicio navegador: presupuesto de la cuenta agotado en get_profile.',status=422,kind='budget',retry_after=600)
+        with patch.object(type(self.fake),'get_profile',side_effect=refusal) as read:ready=red._enrich(self.account,[a,b])
+        self.assertEqual((ready,read.call_count),([],1))
+        for person in (a,b):person.refresh_from_db();self.assertIsNone(person.profile_checked_at)
+        self.account.refresh_from_db();self.assertFalse(self.account.paused)
+        # LinkedIn answering that the profile is not there still settles it: classified with what there is.
+        gone=ConnectorError('LinkedIn: perfil no encontrado.',status=404,kind='not_found')
+        with patch.object(type(self.fake),'get_profile',side_effect=gone):ready=red._enrich(self.account,[a])
+        a.refresh_from_db();self.assertEqual(ready,[a]);self.assertIsNotNone(a.profile_checked_at)
+
     def test_tier_validates_and_upgrade_preserves_notes_and_ramp(self):
         self.assertEqual(red.note_policy()['tier'],'free');self.assertIsNone(red.note_policy()['provider_remaining'])
         p=self.approved(note=True)

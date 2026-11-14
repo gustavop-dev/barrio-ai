@@ -40,7 +40,8 @@ class DirectoConnector:
     def _do(self,name,*args,**kwargs):
         try:return getattr(self.client,name)(*args,**kwargs)
         except NoteQuota as exc:raise InvitationNoteQuota(str(exc),exc.status) from None
-        except LinkedInError as exc:raise ConnectorError(str(exc),status=exc.status,kind=exc.kind,pause=exc.pause) from None
+        except LinkedInError as exc:
+            raise ConnectorError(str(exc),status=exc.status,kind=exc.kind,pause=exc.pause,retry_after=exc.retry_after) from None
         except Uncertain as exc:raise ConnectorUncertain(str(exc)) from None
 
     def account_status(self):return self._do('account_status')

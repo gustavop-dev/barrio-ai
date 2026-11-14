@@ -11,8 +11,11 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
 
 - **Una llamada a la vez por cuenta**, y antes de cada una una pausa al azar de 3 a 7 s (configurable, nunca
   menos de 3 s).
-- **Topes por cuenta** por hora y por día, lecturas y escrituras por separado. Agotado un tope, la llamada no sale y
-  el backend recibe `422` («no salió nada»).
+- **Topes por cuenta** por hora y por día, lecturas y escrituras por separado, y además un tope por día para cada
+  tipo de escritura (comentarios y respuestas, reacciones, seguimientos, invitaciones, aceptaciones). Agotado uno, la
+  llamada no sale y el backend recibe `422` con `code: budget` y los segundos que faltan para que haya cupo
+  (`retry_after`). El backend no pausa la cuenta ni lo toma por un límite de LinkedIn: la acción queda aprobada y se
+  reintenta después. Los números salen del ritmo real (ver [Topes frente al ritmo real](#topes-frente-al-ritmo-real)).
 - **Lista permitida** revisada otra vez aquí: una escritura que no está en la lista no sale aunque el backend la
   pida.
 - **Una escritura no se repite.** Cada una lleva un `request_id`; si llega otra vez con el mismo, se devuelve la
@@ -77,10 +80,84 @@ no reintentar, revisar a mano) o 4 (no corrió).
 | `NAVEGADOR_DATOS` | `./datos` | Carpeta de datos |
 | `NAVEGADOR_HOST`, `NAVEGADOR_PUERTO` | `127.0.0.1`, `8790` | Dónde escucha (`0.0.0.0` en el contenedor) |
 | `NAVEGADOR_PAUSA_MIN`, `NAVEGADOR_PAUSA_MAX` | `3`, `7` | Pausa antes de cada llamada, en segundos (mínimo 3, máximo 15) |
-| `NAVEGADOR_LECTURAS_HORA`, `NAVEGADOR_LECTURAS_DIA` | `60`, `300` | Topes de lecturas por cuenta |
-| `NAVEGADOR_ESCRITURAS_HORA`, `NAVEGADOR_ESCRITURAS_DIA` | `6`, `30` | Topes de escrituras por cuenta |
+| `NAVEGADOR_LECTURAS_HORA`, `NAVEGADOR_LECTURAS_DIA` | `150`, `1000` | Topes de lecturas por cuenta |
+| `NAVEGADOR_ESCRITURAS_HORA`, `NAVEGADOR_ESCRITURAS_DIA` | `15`, `100` | Topes de escrituras por cuenta, todas juntas |
+| `NAVEGADOR_COMENTARIOS_DIA` | `30` | Comentarios y respuestas por día (INT-03 e INT-04) |
+| `NAVEGADOR_REACCIONES_DIA` | `30` | Reacciones por día (INT-02) |
+| `NAVEGADOR_SEGUIMIENTOS_DIA` | `30` | Seguimientos por día (RED-01) |
+| `NAVEGADOR_INVITACIONES_DIA` | `30` | Invitaciones por día (RED-02) |
+| `NAVEGADOR_ACEPTACIONES_DIA` | `15` | Aceptaciones por día (RED-04) |
 | `NAVEGADOR_RECARGA_HORAS` | `6` | Cada cuánto se recarga la página de inicio de una cuenta |
 | `NAVEGADOR_HEADLESS` | `false` | Sin ventana. No se recomienda, y la imagen no trae ese Chromium: en el servidor la ventana va a una pantalla virtual |
+
+Las horas y los días de los topes son ventanas móviles (las últimas 60 min, las últimas 24 h). `0` en un tope
+cierra ese tipo de llamada.
+
+## Topes frente al ritmo real
+
+Lo que cuesta en LinkedIn un día completo de producción de **una** cuenta, sacado del código el 13/11/2026 con los
+ajustes de producción: hasta 10 comentarios al día (5 el fin de semana), respuestas y reacciones hasta sus topes,
+20 seguimientos, 16 a 20 invitaciones (la rampa), 10 aceptaciones, 6 borradores de comentario
+(`OPERATOR_DAILY_PROPOSALS`) y dos rondas de red (`NETWORK_BATCHES`). El post del día sale por la API oficial y no
+pasa por este servicio. «Llamada» es una petición a LinkedIn; es lo que cuentan los topes.
+
+**Escrituras.** Cada ejecución empieza leyendo `/me` (`operador.execute`) y confirma releyendo:
+
+| Capacidad | Escrituras al día | Lecturas por escritura | Lecturas al día |
+| --- | --- | --- | --- |
+| INT-03 comentar | 10 | 4: `/me`, los comentarios del post (no repetir), la página del post (plantilla), la relectura | 40 |
+| INT-04 responder en posts propios | 10 | 4: `/me`, el hilo, la página del post, la relectura del hilo | 40 |
+| INT-02 reaccionar | 20 | 1 en un comentario (`/me`); 3 en un post (`/me`, el post antes y después) | hasta 60 |
+| RED-01 seguir | 20 | 5: `/me`, el perfil antes (2) y después (2) | 100 |
+| RED-02 invitar | 16 a 20 | 5, como seguir | hasta 100 |
+| RED-04 aceptar | 10 | 4: `/me`, las invitaciones recibidas, el perfil después (2) | 40 |
+| CONT-09 post del día | 0 aquí | 4: los posts propios antes y después (`/me` y la lista, dos veces) | 4 |
+| **Total** | **hasta 90** | | **hasta 384** |
+
+Fuentes: `operador.execute`, `red.execute_action`, `respuestas.execute_action`, `operador._publish` y el número de
+llamadas de cada operación en `linkedin_directo/cliente.py`.
+
+**Lecturas de los trabajos del autopiloto:**
+
+| Trabajo | Cada cuánto | Llamadas por vez | Al día | Fuente |
+| --- | --- | --- | --- | --- |
+| Referentes (DESC-04) | cada 3 h | 1 por referente activo (hasta 15) | hasta 120 | `autopiloto._observe`, `operador.observe`, `referentes.py` |
+| Borradores de comentario | 6 al día | 2: `/me` y los comentarios del post | 12 | `operador.propose_comment` |
+| Bandeja | cada hora | 3: `/me` dos veces y la lista; más los hilos con mensajes nuevos | 72 + hasta 60 | `conversaciones.read_inbox` y sus topes |
+| Descubrir (DESC-05) | cada 6 h | `/me`, hasta 5 posts de referentes y 2 búsquedas | 32 (+3 una vez: la ubicación) | `red.discover`, `red.search_location` |
+| Sincronizar la red | cada 6 h | 2: invitaciones recibidas y enviadas | 8 | `red.sync` |
+| Métricas (APRE-01) | cada 3 h, si toca | posts propios, post, comentarios, audiencia, visitas | ~15; tope 66 | `metricas.collect` y sus topes |
+| Comentarios en posts propios | cada 2 h los 3 primeros días del post, luego cada 12 h hasta el día 7 | `/me`, comentarios e hilos | ~45; tope 112 | `respuestas.read` y sus topes |
+| Analítica | una vez al día | 5 exportaciones: 14 días y 7, 28, 90 y 365 | 5 | `analitica.run` |
+| Prueba diaria | una vez al día | 17 | 17 | `linkedin_directo/canario.py` |
+| Conciliación | solo escrituras sin confirmar | 1 o 2 | ~10 | `operador.reconcile` |
+
+**Perfiles.** Leer un perfil son 2 llamadas (el perfil y su tarjeta). Las lecturas de perfil de seguir, invitar,
+aceptar, clasificar (`red._enrich`, 10 personas cada 30 min), sincronizar y referentes comparten un tope de 80
+perfiles al día (`OPERATOR_PROFILE_READ_DAILY_LIMIT`): como mucho 160 llamadas. Con 20 seguimientos y 20
+invitaciones ese tope ya se llena solo con ellas (4 perfiles por persona).
+
+**Total de un día:** hasta unas **880 lecturas** (204 de las ejecuciones fuera de perfiles, 514 de los trabajos y
+160 de perfiles) y **90 escrituras**. Un día normal, con menos referentes y menos comentarios que leer, ronda las
+650 lecturas. La hora más cargada es una de las rondas de red: unas 11 escrituras (espaciado de 3 a 8 min) con sus
+55 lecturas, más una clasificación, referentes y bandeja: hasta unas 150 lecturas.
+
+**Topes elegidos** (por cuenta; antes 60/300 lecturas y 6/30 escrituras, que frenaban una ronda de red):
+
+| Tope | Valor | Frente al ritmo real |
+| --- | --- | --- |
+| Lecturas por hora | 150 | La hora más cargada estimada |
+| Lecturas por día | 1000 | Unas 880 como mucho |
+| Escrituras por hora | 15 | Una ronda hace unas 11 por hora; lo que pase de 15 espera |
+| Escrituras por día, todas | 100 | 90 como mucho |
+| Comentarios y respuestas, reacciones, seguimientos, invitaciones | 30 cada uno por día | 20 cada uno |
+| Aceptaciones | 15 por día | 10 |
+
+El operador cuenta por día local y aquí se cuentan 24 h móviles, que pueden juntar la tarde de un día con la mañana
+del siguiente: por eso cada tipo tiene más o menos 1,5 veces el tope del operador. Siguen siendo una red de
+seguridad detrás de los topes del operador, no el ritmo: si un error del backend repitiera llamadas, se cortan aquí.
+Lo que más lee es la revisión de referentes (hasta 120 al día); pasarla a cada 6 h
+(`OPERATOR_OBSERVE_EVERY_MINUTES=360`) la deja en la mitad.
 
 ## En el servidor
 

@@ -231,6 +231,37 @@ class GuardTests(ServiceCase):
         self.assertEqual((await self.post(reaction(), client=again))[0], 200)
         self.assertEqual(len(self.browser.fetches), 5)
 
+    async def test_each_kind_of_write_has_its_own_daily_budget_and_a_refusal_says_when_it_reopens(self):
+        budgets = {**ajustes.BUDGETS, ('invitation', 'day'): 1, ('write', 'hour'): 10}
+        self.world.settings = replace(self.world.settings, budgets=budgets)
+        client = await self.start()
+        self.assertEqual((await self.post(invitation(None), client=client))[0], 200)
+        self.world.clock.now += 600
+        response = await client.post('/v1/cuentas/prueba/llamadas', json=invitation(None), headers=AUTH)
+        body = await response.json()
+        self.assertEqual((response.status, body['code']), (422, 'budget'))
+        self.assertEqual(body['retry_after'], 86400 - 600)  # the first invitation leaves the rolling day
+        self.assertEqual(response.headers['Retry-After'], str(86400 - 600))
+        self.assertIn('invitaciones por día', body['reason'])
+        self.assertEqual((await self.post(reaction(), client=client))[0], 200)  # other writes keep their own
+        self.assertEqual(len(self.browser.fetches), 2)
+        usage = json.loads((self.world.data / 'cuentas' / 'prueba' / 'consumo.json').read_text())
+        self.assertEqual({k: len(v) for k, v in usage.items()}, {'write': 2, 'invitation': 1, 'reaction': 1})
+        # A refusal outside the budgets (the allowlist) carries no code: the backend tells the two apart.
+        response = await client.post('/v1/cuentas/prueba/llamadas', json=call(path='/feed/'), headers=AUTH)
+        self.assertEqual((response.status, set(await response.json())), (422, {'reason'}))
+
+    def test_every_allowed_write_has_its_kind(self):
+        from linkedin_directo.transporte import Request
+        from navegador.cuenta import write_kind
+        writes = {'comment': Request('POST', rutas.sdui(rutas.COMMENT), 'sdui', {}, True),
+                  'reaction': Request('POST', rutas.sdui(rutas.REACT), 'sdui', {}, True),
+                  'follow': Request('POST', rutas.sdui(rutas.FOLLOW), 'sdui', {}, True),
+                  'invitation': Request('POST', rutas.voyager(rutas.INVITE), 'voyager', {}, True),
+                  'accept': Request('POST', rutas.voyager(rutas.ACCEPT.format('7000001')), 'voyager', {}, True)}
+        self.assertEqual({kind: write_kind(request) for kind, request in writes.items()}, {k: k for k in writes})
+        self.assertEqual(set(writes), set(ajustes.WRITE_KINDS))
+
 
 class RequestIdTests(ServiceCase):
     async def test_a_repeated_write_gets_the_stored_answer_and_is_never_sent_twice(self):

@@ -19,7 +19,7 @@ from django.db import transaction
 from django.utils import timezone
 from knowledge import providers
 from . import operador
-from .connectors import ConnectorError, get_connector
+from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .jobs import audit
 from .lider import _noul
@@ -245,7 +245,7 @@ def read_inbox(user,account,now=None):
         except ReadCapReached as exc:summary['stopped']=str(exc);break
         except ConnectorError as exc:
             _pause_on(account,exc)
-            if exc.pause:summary['stopped']=str(exc);break
+            if exc.pause or deferred(exc):summary['stopped']=str(exc);break  # nothing came back: still stale, read next run
             continue
         _from_messages(account,conversation,messages,now);summary['read']+=1
     for conversation in _to_assess(account,now)[:assess_per_run()]:

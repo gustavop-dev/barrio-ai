@@ -23,7 +23,7 @@ SERVICE = {
     403: ('config', True, False),
     404: ('config', True, False),  # unknown account in the service
     409: ('stopped', True, False),  # the service stopped this account (LinkedIn pushed back earlier): no retry
-    422: ('refused', False, False),  # outside the service's allowlist or budget: nothing left
+    422: ('refused', False, False),  # outside the service's allowlist: nothing left (its budget: 'budget', below)
     423: ('login', True, False),  # no session: someone has to log in by hand in that browser
     503: ('not_sent', False, False),  # browser not ready or busy: nothing left
     504: ('network', False, True),  # the call left the page and its answer did not come back in time
@@ -54,6 +54,13 @@ class ServiceTransport(Transport):
             kind, pause, sent = SERVICE.get(response.status_code, ('network', False, response.status_code >= 500))
             if sent and request.write:
                 raise Uncertain(f'Servicio navegador: HTTP {response.status_code} tras recibir {name}; resultado incierto.')
+            wait = _budget(response)
+            if wait:
+                # The account's budget in the service, not LinkedIn's: the message names neither a limit nor a quota,
+                # so the network's rules (red.LIMIT_ERROR) never take it for LinkedIn pushing back.
+                raise LinkedInError(f'Servicio navegador: presupuesto de la cuenta agotado en {name} '
+                                    f'({_reason(response)}); vuelve a haber cupo en {-(-wait // 60)} min.',
+                                    kind='budget', status=response.status_code, retry_after=wait)
             raise LinkedInError(f'Servicio navegador: HTTP {response.status_code} en {name} ({_reason(response)}).',
                                 kind=kind, status=response.status_code, pause=pause)
         try:
@@ -75,6 +82,17 @@ class ServiceTransport(Transport):
         except (httpx.HTTPError, ValueError):
             return None
         return data if isinstance(data, dict) and data.get('query_id') else None
+
+
+def _budget(response):
+    """Seconds until the account's budget in the service has room again, for a 422 that says it was the budget
+    (`code: budget`); None for anything else."""
+    try:
+        data = response.json() if response.status_code == 422 else {}
+        wait = data.get('retry_after') if isinstance(data, dict) and data.get('code') == 'budget' else None
+    except (ValueError, AttributeError):
+        return None
+    return max(1, min(int(wait), 86400)) if isinstance(wait, (int, float)) and not isinstance(wait, bool) else None
 
 
 def _reason(response):

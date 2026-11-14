@@ -4,7 +4,8 @@
 2. a write's request_id: already answered, the same answer again; in flight, or lost mid-send by a crash, 409;
 3. the stop flag: LinkedIn pushed back before, 409 until an operator clears it;
 4. one call at a time per account; a call that cannot reach the page within the deadline does not leave (503);
-5. the budgets, per hour and per day, reads and writes apart: 422;
+5. the budgets, per hour and per day, reads and writes apart, and per day each kind of write: 422 with code `budget`
+   and the seconds until the window has room again (retry_after);
 6. the page, opened on the first call and kept open: no session, 423; profile in use or no browser, 503;
 7. a random pause, then the page checked (on LinkedIn, the session cookie there, no 429/999 on its own calls);
 8. ONE fetch from inside the page, its answer returned as it came. Never a retry, never a redirect followed.
@@ -19,12 +20,13 @@ a token or anything LinkedIn answered."""
 import asyncio
 import json
 import logging
+import math
 import random
 import re
 import time
 from urllib.parse import parse_qs, urlsplit
 
-from linkedin_directo import permitidas
+from linkedin_directo import permitidas, rutas
 from linkedin_directo.errores import LinkedInError, Uncertain
 from linkedin_directo.transporte import HEADERS, Answer, check_answer
 
@@ -33,17 +35,28 @@ from .almacen import Store
 
 log = logging.getLogger('navegador')
 HOUR, DAY = 3600, 86400
-WORDS = {'read': 'lecturas', 'write': 'escrituras', 'hour': 'hora', 'day': 'día'}
+WORDS = {'read': 'lecturas', 'write': 'escrituras', 'hour': 'hora', 'day': 'día', 'comment': 'comentarios y respuestas',
+         'reaction': 'reacciones', 'follow': 'seguimientos', 'invitation': 'invitaciones', 'accept': 'aceptaciones'}
+WRITES = {rutas.COMMENT: 'comment', rutas.REACT: 'reaction', rutas.FOLLOW: 'follow'}  # by sduiid
 IDS = re.compile(r'urn(?::|%3A)li(?::|%3A)[^/]*|ACo[A-Za-z0-9_\-]{6,}|\d{5,}')
 TAG = re.compile(r'[A-Za-z][A-Za-z0-9_.]{0,100}')
 
 
 class Refused(Exception):
-    """The service does not make the call: the HTTP status it answers and a short reason, never LinkedIn's data."""
+    """The service does not make the call: the HTTP status it answers and a short reason, never LinkedIn's data. A spent
+    budget also says so (`code`) and when it has room again (`retry_after`, seconds)."""
 
-    def __init__(self, status, reason):
+    def __init__(self, status, reason, code='', retry_after=None):
         super().__init__(reason)
-        self.status, self.reason = status, reason
+        self.status, self.reason, self.code, self.retry_after = status, reason, code, retry_after
+
+
+def write_kind(request):
+    """Which of the five writes an allowed request is, read from the request itself (not from its operation name): a
+    comment and a reply share one."""
+    if request.kind == 'voyager':
+        return 'invitation' if request.path == rutas.voyager(rutas.INVITE) else 'accept'
+    return WRITES.get((parse_qs(urlsplit(request.path).query).get('sduiid') or [''])[0], '')
 
 
 def route(path):
@@ -136,12 +149,22 @@ class Account:
         except asyncio.TimeoutError:
             raise Refused(503, 'cuenta ocupada con otras llamadas; no salió nada') from None
 
-    def _budget(self, kind):
-        now = self.clock()
-        sent = self.store.usage(kind, now)
-        for window, span in (('hour', HOUR), ('day', DAY)):
-            if sum(1 for t in sent if now - t < span) >= self.settings.budgets[(kind, window)]:
-                raise Refused(422, f'tope de {WORDS[kind]} por {WORDS[window]} agotado; no salió nada')
+    def _budget(self, kinds):
+        """Refused(422, code 'budget') when a window of any of `kinds` is spent, with the seconds until the last of them
+        has room again. A refused call counts nowhere."""
+        now, spent, wait = self.clock(), [], 0.0
+        for kind in kinds:
+            sent = self.store.usage(kind, now)
+            for window, span in (('hour', HOUR), ('day', DAY)):
+                cap = self.settings.budgets.get((kind, window))
+                inside = sorted(t for t in sent if now - t < span)
+                if cap is None or len(inside) < cap:
+                    continue
+                spent.append(f'{WORDS[kind]} por {WORDS[window]}')
+                wait = max(wait, inside[len(inside) - cap] + span - now if cap else span)
+        if spent:
+            raise Refused(422, f'tope de {" y ".join(spent)} agotado; no salió nada', code='budget',
+                          retry_after=max(1, math.ceil(wait)))
 
     async def _stop(self, reason):
         self.store.stop(reason, self.clock())
@@ -191,8 +214,9 @@ class Account:
 
     async def _send(self, request, request_id, arrived):
         self._not_stopped()  # again: a call queued behind the one that stopped the account
-        kind = 'write' if request.write else 'read'
-        self._budget(kind)
+        kinds = ('write', write_kind(request)) if request.write else ('read',)
+        kinds = tuple(k for k in kinds if k)
+        self._budget(kinds)
         page = await self._open()
         waited, pause = self.clock() - arrived, self.rand(*self.settings.pause)
         await self.sleep(pause)
@@ -208,7 +232,7 @@ class Account:
             raise Refused(409, 'LinkedIn frenó antes de esta llamada; la cuenta se detiene; no salió nada')
         if request.write:
             self.store.sending(request_id, self.clock())
-        self.store.count(kind, self.clock())
+        self.store.count(kinds, self.clock())
         started = self.clock()
         body = json.dumps(request.body, ensure_ascii=False) if request.body is not None else None
         try:

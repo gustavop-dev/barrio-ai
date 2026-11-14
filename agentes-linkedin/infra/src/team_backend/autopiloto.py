@@ -497,6 +497,7 @@ def _execute(user,account,now):
         if rounds and not proposal.piece_id and operador.batch_issue(proposal.capability,now):continue
         if rounds and not operador.spacing_ok(account,now,proposal.capability):continue
         if operador.capped(proposal) and operador.capacity_left(account,proposal.capability,now)<=0:continue
+        if not proposal.piece_id and operador.deferred_until(account,proposal.capability,now):continue  # its last write left nothing
         job=operador.enqueue_execution(user,proposal)
         return int(job.state==Job.State.QUEUED)
     return 0

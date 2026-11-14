@@ -3,7 +3,8 @@ forgets nothing that guards LinkedIn:
 
 - perfil/        the Chromium profile. The LinkedIn session lives here and never leaves it.
 - detenida.json  present = the account is stopped (LinkedIn pushed back). Only an operator removes it (`reanudar`).
-- consumo.json   when each call left, over the last 24 h: the budgets count from it.
+- consumo.json   when each call left, over the last 24 h, per budget ('read', 'write' and each kind of write): the
+                 budgets count from it.
 - escrituras/    one file per write's request_id: LinkedIn's answer, or `sending` while it is out (and forever if the
                  process died mid-send). A repeated id gets the stored answer back, never a second send.
 
@@ -67,18 +68,20 @@ class Store:
         (self.root / 'detenida.json').unlink(missing_ok=True)
         return was
 
-    # --- budgets: the moments calls left, per kind ('read' or 'write') ----------------------------------------------
+    # --- budgets: the moments calls left, per budget ('read', 'write', or a kind of write such as 'comment') ---------
     def usage(self, kind, now):
         if self._usage is None:
             data = read_json(self.root / 'consumo.json')
             data = data if isinstance(data, dict) else {}
-            self._usage = {k: [t for t in data.get(k) or [] if isinstance(t, (int, float))] for k in ('read', 'write')}
-        self._usage[kind] = [t for t in self._usage[kind] if now - t < DAY]
+            self._usage = {k: [t for t in v if isinstance(t, (int, float))] for k, v in data.items() if isinstance(v, list)}
+        self._usage[kind] = [t for t in self._usage.get(kind) or [] if now - t < DAY]
         return list(self._usage[kind])
 
-    def count(self, kind, now):
-        self.usage(kind, now)
-        self._usage[kind].append(now)
+    def count(self, kinds, now):
+        """One call left now: it counts in each of `kinds` (a write in 'write' and in its own kind), in one file write."""
+        for kind in (kinds,) if isinstance(kinds, str) else kinds:
+            self.usage(kind, now)
+            self._usage[kind].append(now)
         write_json(self.root / 'consumo.json', self._usage)
 
     # --- writes by request_id ----------------------------------------------------------------------------------------

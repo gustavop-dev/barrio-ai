@@ -16,9 +16,19 @@ REACTIONS=('linkedin_like','linkedin_celebrate','linkedin_support','linkedin_lov
 
 class ConnectorError(Exception):
     """Definite failure: the provider did not apply the operation.
-    pause=True means further writes on this account must stop until a human reviews it."""
-    def __init__(self,message,*,status=None,kind='error',pause=False):
-        super().__init__(message);self.status=status;self.kind=kind;self.pause=pause
+    pause=True means further writes on this account must stop until a human reviews it. `retry_after` (seconds), when
+    known, is when the same call may be tried again (the navegador service's budget)."""
+    def __init__(self,message,*,status=None,kind='error',pause=False,retry_after=None):
+        super().__init__(message);self.status=status;self.kind=kind;self.pause=pause;self.retry_after=retry_after
+
+# Nothing came back and nothing is wrong with the account: the navegador service's budget per account ('budget'), the
+# provider never reached ('not_sent'), a read with no answer ('network', or a 5xx on a read: writes in doubt are
+# ConnectorUncertain). The work waits and is tried again later; it is never a pause, an executed or failed action, or a
+# verdict on a person or a post.
+DEFERRED_KINDS=('budget','not_sent','network')
+
+def deferred(exc):
+    return not exc.pause and (exc.kind in DEFERRED_KINDS or (exc.status or 0)>=500)
 
 class ConnectorUncertain(Exception):
     """The write may have reached LinkedIn; its effect is unknown until reconciled."""
