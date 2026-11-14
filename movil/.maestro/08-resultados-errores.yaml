@@ -84,12 +84,13 @@ tags: [resultados]
 
 # ---------------------------------------------------------------- LinkedIn's analytics without a «directo» account
 # cubre: RES-12
+# The tabs head the list: back up to them without centring (nothing above to centre them) and with room for the
+# whole Panorama (about ten swipes from its posts).
 - scrollUntilVisible:
     element:
       id: res-pestana-linkedin
     direction: UP
-    centerElement: true
-    timeout: 30000
+    timeout: 60000
 - tapOn:
     id: res-pestana-linkedin
 - extendedWaitUntil:

@@ -49,9 +49,7 @@ tags: [resultados]
     timeout: 20000
 - assertVisible: "Impresiones por día .*"
 - tapOn:
-    text: "Interacciones"
-    childOf:
-      id: ana-metrica
+    id: ana-metrica-engagements
 - extendedWaitUntil:
     visible: "Interacciones por día .*"
     timeout: 15000
@@ -106,13 +104,14 @@ tags: [resultados]
 - takeScreenshot: 08-resultados-linkedin-05-publico
 
 # ---------------------------------------------------------------- 7 días, then 90 días (partial, no exact range)
+# The period heads the list: back up to it without centring (nothing above to centre it), with room for ~20 swipes.
 - scrollUntilVisible:
     element:
       id: ana-periodo
     direction: UP
-    centerElement: true
-    timeout: 30000
-- tapOn: "7 días"
+    timeout: 60000
+- tapOn:
+    id: ana-periodo-7d
 - extendedWaitUntil:
     visible: ".* · 7 días \\(UTC\\)\\. Se compara con los 7 días anteriores\\."
     timeout: 30000
@@ -129,9 +128,9 @@ tags: [resultados]
     element:
       id: ana-periodo
     direction: UP
-    centerElement: true
-    timeout: 30000
-- tapOn: "90 días"
+    timeout: 60000
+- tapOn:
+    id: ana-periodo-90d
 - extendedWaitUntil:
     visible: ".* · 90 días \\(UTC\\)\\. Se compara con los 90 días anteriores\\."
     timeout: 30000
@@ -149,7 +148,7 @@ tags: [resultados]
       id: ana-top-motivo
     direction: DOWN
     centerElement: true
-    timeout: 30000
+    timeout: 60000
 - assertVisible: "LinkedIn da sus publicaciones principales solo para el rango que se le pide.*"
 
 # ---------------------------------------------------------------- «Personalizado»
@@ -157,8 +156,7 @@ tags: [resultados]
     element:
       id: ana-personalizado
     direction: UP
-    centerElement: true
-    timeout: 30000
+    timeout: 60000
 - tapOn:
     id: ana-personalizado
 - extendedWaitUntil:
@@ -172,9 +170,7 @@ tags: [resultados]
 - inputText: "2020-01-01"
 - hideKeyboard
 - tapOn:
-    text: "Ver este periodo"
-    childOf:
-      id: ana-rango
+    id: ana-rango-ver
 - extendedWaitUntil:
     visible: "Elige un día entre el .*"
     timeout: 10000
@@ -190,9 +186,7 @@ tags: [resultados]
 - hideKeyboard
 - assertNotVisible: "Elige un día entre el .*"
 - tapOn:
-    text: "Ver este periodo"
-    childOf:
-      id: ana-rango
+    id: ana-rango-ver
 - extendedWaitUntil:
     notVisible:
       id: ana-rango
