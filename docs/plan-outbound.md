@@ -100,6 +100,45 @@ El gasto sin evaluaciones ronda 30 USD al mes: queda dentro del límite general 
 - conversaciones abiertas y oportunidades;
 - gasto por comprador que aceptó.
 
+## La base actual y lo que hay que añadir (anotado el 14/11/2026)
+
+Revisión hecha a pedido de Gustavo: ¿el sistema de hoy sirve de base para el outbound? Sí, para calentar e invitar;
+no hay que rediseñar, hay que añadir encima. Queda pendiente para después de estabilizar el conector propio, la
+estrategia semanal y los filtros.
+
+Sirve ya: la ficha por persona con etapa, clasificación y evidencia; el registro de acciones con topes,
+enfriamientos y rampa; el circuito propuesta → revisión → ejecución; la Bandeja; la lectura de conversaciones y las
+oportunidades; la verificación de ronda semilla y el filtro de EE. UU.; la analítica nueva.
+
+Falta, en este orden:
+
+1. **Motor de secuencias con medición por contacto.** Hoy cada acción se decide suelta. «Seguir, comentar dos veces
+   en 7 a 14 días, invitar y, al aceptar, preparar un mensaje» es una secuencia con tiempos por persona, y no
+   existe. Con ella, registrar qué toque llevó a qué resultado: sin eso no se sabe si calentar rinde más que invitar
+   en frío. Es la pieza central.
+2. **Comentar a compradores.** Los comentarios solo apuntan a posts de referentes activos (`referent__active`).
+3. **Borrador del primer mensaje en la Bandeja.** La app no envía mensajes (INB-08): lo envía Gustavo, así que el
+   volumen queda limitado a lo que él alcance a mandar.
+4. **Lo que pasa fuera de LinkedIn:** el recurso descargable, la página, el formulario y el correo (sección
+   siguiente). El sistema no guarda hoy correos ni contactos que no vengan de LinkedIn.
+
+Dos debilidades de la base que hay que resolver por el camino:
+
+- **Una cuenta pausada frena las escrituras de todas** (`operador.py`). Bloquea el uso por una segunda persona.
+- **El líder descarta dos de cada tres propuestas** (209 descartes frente a 103 aprobaciones al 14/11/2026). En red
+  responde a criterios estrictos de Gustavo, pero un embudo que depende de volumen necesita saber si descarta bien;
+  la auditoría de filtros lo mostrará.
+
+## Recurso descargable y página de aterrizaje (por planear)
+
+Anotado el 14/11/2026 al definir la estrategia semanal (`docs/plan-estrategia-semanal.md`): el post de venta de cada
+semana debería terminar en una llamada agendada. La forma que Gustavo quiere estudiar la usa un creador que él
+sigue: el post lleva a una página de aterrizaje con un recurso descargable interesante; la persona deja sus datos en un
+formulario para descargarlo y de ahí sigue la conversación. Pide más planeación que un post: qué recurso, la página,
+el formulario, a dónde llegan los datos y qué se le escribe después. Mientras eso no exista, el post de venta sale
+sin enlace ni calendario e invita a conversar. Entra en este plan porque es parte del mismo embudo: el recurso es
+otra puerta de entrada de un comprador, junto con el calentamiento y la invitación.
+
 ## Decisiones abiertas (de Gustavo)
 
 1. ¿El reparto 6 / 2 / 2 de los comentarios está bien?

@@ -4,8 +4,8 @@ Diseño aprobado por Gustavo el 14/11/2026, abierto ese día a pedido de Gustavo
 cosas que se me ocurren pero sin una estructura definida». Antes el director decidía cada día por separado. Este plan
 añade una capa encima: la semana se decide entera, con un tipo de post por día, y Gustavo la ve antes de que empiece.
 
-**Estado (14/11/2026):** construido en la rama `feat/estrategia-gasp` (backend, app y pruebas), pendiente de CI y de
-revisión. Lo que falta está en [Pendiente](#pendiente).
+**Estado (14/11/2026):** construido (backend, app y pruebas) e integrado con las compuertas, el recorte de fotos y los
+referentes de industria en `feat/integracion-contenido`; pendiente de CI. Lo que falta está en [Pendiente](#pendiente).
 
 ## La regla general: la audiencia primero
 
