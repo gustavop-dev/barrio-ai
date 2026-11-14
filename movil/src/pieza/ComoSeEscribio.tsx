@@ -284,6 +284,13 @@ function VerifierFold({ piece, finished }: { piece: PieceDetail; finished: boole
         ) : null}
       </Fact>
       <Fact name="Afirmaciones comprobadas">{claims ? `${supported} de ${claims}` : null}</Fact>
+      {/* Soft findings that did not stop the piece: it went out with them (docs/compuertas.md). */}
+      <Fact name="Conservadas como observación">
+        {asArray(v.observations).length ? (
+          <Bullets items={asArray(v.observations).map((item) => findingLine(label(ISSUE_LABEL, item.issue), item.quote, item.detail))} />
+        ) : null}
+      </Fact>
+      <Fact name="Intento del día">{v.day_attempt && v.day_attempt.number > 1 ? `Intento ${v.day_attempt.number} de ${v.day_attempt.of}` : null}</Fact>
     </Fold>
   );
 }
@@ -311,6 +318,11 @@ function RepairFold({ piece }: { piece: PieceDetail }) {
         ) : null}
       </Fact>
       <Fact name="Qué cambió">{asArray(repair.changes).length ? <Bullets items={asArray(repair.changes).map((item) => item.change)} /> : null}</Fact>
+      <Fact name="Segunda revisión">
+        {asArray(repair.resolution).length
+          ? `${asArray(repair.resolution).filter((item) => item.resolved).length} de ${asArray(repair.resolution).length} resueltos`
+          : null}
+      </Fact>
       <Fact name="Nota">{repair.note || repair.rationale || null}</Fact>
       <Fact name="Texto antes de reparar">{repair.original_text ? <T selectable>{repair.original_text}</T> : null}</Fact>
     </Fold>

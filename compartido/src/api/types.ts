@@ -588,6 +588,18 @@ export interface Verification {
   rules?: string[];
   /** R4: the one repair round, when the rules or the verifier found concrete problems. */
   repair?: Repair;
+  /** Soft findings (hook_not_delivered, off_brief, other) that did not stop the piece (docs/compuertas.md). */
+  observations?: Observation[];
+  /** Which attempt of its day this piece was; the second only follows a content gate's block. */
+  day_attempt?: { number: number; of: number };
+  /** SHA-256 of what the verdict read, for the offline replay; never the content itself. */
+  context?: { public_facts?: string; private_guidance?: string; orientation?: string };
+}
+
+export interface Observation {
+  issue: string;
+  quote?: string;
+  detail?: string;
 }
 
 export interface RepairFinding {
@@ -613,6 +625,8 @@ export interface Repair {
   note?: string;
   repaired_sha256?: string;
   repaired_text?: string;
+  /** After the scoped second review: whether each first finding was resolved. */
+  resolution?: { source: 'reglas' | 'verificador'; issue: string; resolved: boolean }[];
 }
 
 export interface Signal {
