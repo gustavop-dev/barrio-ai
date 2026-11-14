@@ -14,6 +14,7 @@ from .grafo_views import EquipoGrafo
 from .orquestacion_views import CycleDecision
 from . import referentes_views as refs
 from .comunidad_views import Community, WithdrawSource
+from . import estrategia_views as es
 urlpatterns=[
  path('referentes/revisiones',refs.Reviews.as_view()),
  path('referentes/main-inicial',refs.InitialMain.as_view()),
@@ -58,6 +59,9 @@ urlpatterns=[
  path('memoria/hechos/<str:key>/retirar',rv.FactRetire.as_view()),path('orientacion',rv.OrientationView.as_view()),
  path('oportunidades',rv.Opportunities.as_view()),path('oportunidades/<uuid:oid>',rv.OpportunityDetail.as_view()),
  path('actividad',rv.Activity.as_view()),path('calendario',rv.Calendar.as_view()),path('ajustes',rv.Settings.as_view()),
+ # The weekly GASP plan (docs/plan-estrategia-semanal.md): its days, Gustavo's changes and a paid re-plan.
+ path('estrategia/semana',es.Week.as_view()),path('estrategia/dias/<str:day>',es.Day.as_view()),
+ path('estrategia/mover',es.Swap.as_view()),path('estrategia/planear',es.Plan.as_view()),
  path('red/contacts/<uuid:cid>/notas',rd.ContactNotes.as_view()),
  path('operador/referents/<uuid:rid>',op.ReferentDetail.as_view()),
  # Daily own publication: editorial calendar and pieces (CONT-01..07, CONT-09).

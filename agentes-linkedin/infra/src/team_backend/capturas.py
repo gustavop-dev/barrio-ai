@@ -535,11 +535,15 @@ def expire_ideas(now=None):
 def ideas_for_director(now=None):
     """`ideas_from_gustavo`: post ideas from the last 14 days not used yet, newest first."""
     now=now or timezone.now();expire_ideas(now)
-    rows=Capture.objects.filter(state=Capture.State.IDEA,created_at__gte=now-timedelta(days=IDEA_DAYS)).order_by('-publish_asap','publish_asap_expected_slot','-created_at')[:IDEA_LIMIT]
+    from .urgente import is_extra
+    # An idea whose date waits for his answer in the Bandeja is not written meanwhile.
+    rows=Capture.objects.filter(state=Capture.State.IDEA,created_at__gte=now-timedelta(days=IDEA_DAYS)).exclude(
+        day_request__state='problem').order_by('-publish_asap','publish_asap_expected_slot','-created_at')[:IDEA_LIMIT]
     return [{'id':str(c.id),'text':_clip(c.text,6000),'date':_local(c.created_at).date().isoformat(),
              'investigation':c.investigation,
              'purpose':c.purpose,'publish_asap':c.publish_asap,'evidence':c.publish_asap_evidence,
              'expected_slot':c.publish_asap_expected_slot.isoformat() if c.publish_asap_expected_slot else None,
+             'extra':is_extra(c),'gasp_type':(c.understanding or {}).get('gasp_type') if (c.understanding or {}).get('gasp_type') in ('G','A','S','P') else None,
              'photos':[{'id':str(p.id),'note':p.note,'ai_edit':p.ai_edit} for p in c.photos.filter(category='posts')]} for c in rows]
 
 def feedback_for_director(now=None):

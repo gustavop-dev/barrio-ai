@@ -683,6 +683,10 @@ class Calendar(APIView):
         priority={'tuyo':0,'sistema':1,'publicaciones':2,'conversaciones':3,'red':4}
         for value in days.values():
             value['events'].sort(key=lambda e:(priority[e['layer']],str(e['at'] or '')))
+        # The GASP type of each day (estrategia.py): the plan's, the structure's for coming days, or its post's.
+        from . import estrategia
+        gasp=estrategia.calendar_days(start,end)
+        for day,value in days.items():value['gasp']=gasp.get(day)
         return Response({'timezone':str(operador.local_tz()),'today':today,'lead_hours':editorial.lead_time().total_seconds()/3600,
                          'days':[{'date':day,**value} for day,value in sorted(days.items())],
                          'layers':{'tuyo':True,'publicaciones':True,'red':True,'conversaciones':'parcial','sistema':True}})

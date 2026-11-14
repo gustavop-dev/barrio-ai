@@ -323,15 +323,20 @@ def contenido(current,previous,now,coverage):
                 'impressions':m.impressions if m else None,'engagement_pct':engagement_pct(m) if m else None,'cut':kind}
     ranked=[p for p in posts if p.impressions(cut) is not None]
     best=max(ranked,key=lambda p:(p.impressions(cut),engagement_pct(p.cuts[cut]) or 0),default=None)
-    pillars={}
+    pillars={};types={}
     for p in posts:
         value=engagement_pct(p.cuts[cut]) if cut in p.cuts else None
         if value is not None:pillars.setdefault((p.piece.brief or {}).get('pillar') or 'sin_pilar',[]).append(value)
+        kind=(p.piece.brief or {}).get('gasp_type')
+        if kind:types.setdefault(kind,{'values':[],'impressions':[],'posts':0})['posts']+=1
+        if kind and value is not None:types[kind]['values'].append(value)
+        if kind and p.impressions(cut) is not None:types[kind]['impressions'].append(p.impressions(cut))
     table=[]
     for p in posts:
         latest=p.latest();commenters=p.commenters()
         table.append({'piece_id':str(p.piece.id),'date':p.piece.slot_date,'published_at':p.execution.started_at,'first_line':first_line(p.piece.final_text),
-                      'pillar':(p.piece.brief or {}).get('pillar'),'url':(latest.share_url if latest else '') or p.execution.external_url or None,
+                      'pillar':(p.piece.brief or {}).get('pillar'),'gasp_type':(p.piece.brief or {}).get('gasp_type'),
+                      'url':(latest.share_url if latest else '') or p.execution.external_url or None,
                       'impressions_24h':p.impressions('24h'),'impressions_7d':p.impressions('7d'),
                       'reactions':latest.reactions if latest else None,'comments':latest.comments if latest else None,
                       'reposts':latest.reposts if latest else None,'engagement_pct':engagement_pct(latest) if latest else None,
@@ -344,6 +349,10 @@ def contenido(current,previous,now,coverage):
             'by_pillar':{'cut':cut,'formula':ENGAGEMENT,'items':[{'pillar':k,'value':_num(statistics.mean(pillars[k]),2) if pillars.get(k) else None,
                                                                     'posts':len(pillars.get(k,[]))}
                                                                    for k in list(dict.fromkeys(editorial.PILLARS+list(pillars)))]},
+            # GASP (estrategia.py): mean interaction and median impressions per type, same cut; empty before the strategy.
+            'by_type':{'cut':cut,'formula':ENGAGEMENT,'items':[{'type':k,'value':_num(statistics.mean(types[k]['values']),2) if types[k]['values'] else None,
+                                                                 'median_impressions':_median(types[k]['impressions']),'posts':types[k]['posts']}
+                                                                for k in ('G','A','S','P') if k in types]},
             'posts':table}
 
 # --------------------------------------------------------------------------- 4. equipo

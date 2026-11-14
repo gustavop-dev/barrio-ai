@@ -34,6 +34,8 @@ EMAIL=re.compile(r'[\w.+-]+@[\w-]+\.[\w.]+')
 PHONE=re.compile(r'(?:\+?\d[\s().-]?){7,}')
 HASHTAG=re.compile(r'(?<!\w)#\w')
 # Own posts may name ProjectApp (modality projectapp); what they may not do is sell aggressively or ask for contact.
+# TODO(gate_policy): the GASP Sales post (estrategia, brief.gasp_type='S') may carry ONE invitation to talk; this rule
+# still blocks «message me»/«escríbeme» there. gate_policy(piece) (feat/compuertas-auditoria-reintento) decides it.
 POST_PITCH=re.compile(r'hire me|dm me|message me|contact me|book a call|schedule a call|link in (?:bio|comments)|reach out to me|'
                       r'send me a (?:dm|message)|limited (?:spots|offer)|sign up now|buy now|contr[aá]tame|escr[ií]beme|'
                       r'agenda(?:mos)? una llamada|cont[aá]ctame',re.I)
@@ -307,6 +309,10 @@ def tick(user,now=None):
     except Exception as exc:report['day_requests_error']=type(exc).__name__  # never stops the rest of the tick
     try:report['weekly_summary']=_weekly_summary(user,now)
     except Exception as exc:report['weekly_summary_error']=type(exc).__name__  # the weekly summary never stops the rest
+    try:
+        from . import estrategia
+        report['weekly_plan']=estrategia.queue(user,now)  # Sunday afternoon: next week's GASP plan, once
+    except Exception as exc:report['weekly_plan_error']=type(exc).__name__  # the plan never stops the rest
     return report
 
 def _editorial(user,now):
@@ -320,9 +326,16 @@ def _editorial(user,now):
     if not editorial.can_publish(account):return 0
     if not editorial.can_afford_preparation(now):return 0
     from . import urgente
+    extra=urgente.next_extra(now)
+    if extra:
+        # The post he asked for at a day and hour is an order: prepared right away, outside the CONT-09 caps.
+        attempt=EditorialPiece.objects.filter(slot_date=extra,second_of_day=True).count()
+        _,created=enqueue_operation(user,'prepare_piece',{'slot':extra.isoformat(),'extra':True},
+                                    request_id=_job_id('extra',extra) if not attempt else _job_id('extra',extra,attempt))
+        return int(created)
     slot=urgente.next_slot(now) or editorial.next_slot(now)
     if slot is None or operador.capacity_left(account,'CONT-09',urgente.reserved_at(slot) or editorial.scheduled_for(slot))<=0:return 0
-    attempt=EditorialPiece.objects.filter(slot_date=slot).count()  # a renewed-budget retry gets its own job id
+    attempt=EditorialPiece.objects.filter(slot_date=slot,second_of_day=False).count()  # a renewed-budget retry gets its own job id
     _,created=enqueue_operation(user,'prepare_piece',{'slot':slot.isoformat()},
                                 request_id=_job_id('piece',slot) if not attempt else _job_id('piece',slot,attempt))
     return int(created)
