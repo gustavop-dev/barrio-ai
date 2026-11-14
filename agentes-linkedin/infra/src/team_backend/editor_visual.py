@@ -11,9 +11,10 @@ from .models import GalleryPhoto
 from .orquestacion_schemas import ARRAY, OBJECT, STRING, obj
 
 
+# gustavo_request is optional: requests snapshotted before it existed still validate when a cycle resumes.
 REQUEST_SCHEMA = obj(('piece', 'text_sha256', 'context_sha256', 'post', 'brief', 'gallery', 'public_facts', 'sources'),
     piece=STRING, text_sha256=STRING, context_sha256=STRING, post=STRING, brief=OBJECT,
-    gallery=ARRAY, public_facts=ARRAY, sources=ARRAY)
+    gallery=ARRAY, public_facts=ARRAY, sources=ARRAY, gustavo_request=ARRAY)
 PROPOSAL_SCHEMA = obj(('text_sha256', 'context_sha256', 'choice', 'mode', 'reason'),
     text_sha256=STRING, context_sha256=STRING, choice=infografias.CHOICE_SCHEMA,
     mode={'type': 'string', 'enum': ['model', 'fallback']}, reason=STRING)
@@ -23,10 +24,13 @@ PACKAGE_SCHEMA = obj(('text_sha256', 'context_sha256', 'media', 'images', 'desig
 SYSTEM = '''Eres editor_visual de Editorial. Propones al director el medio del post ganador exacto;
 no publicas, no cambias su texto ni llamas a otros agentes. Devuelve solo el contrato de elección IMG.
 Elige foto, infografia o carrusel por su aporte al texto final. brief.image es una sugerencia inicial,
-no una orden: explica el motivo y cualquier cambio. Galería vacía: infografia. Un proceso puede llevar
-carrusel; un dato o frase puede llevar infografia; preguntas para la audiencia (o preguntas y respuestas
-rápidas que pida Gustavo) llevan infografia, con su plantilla preguntas. Usa solo fotos ofrecidas, como máximo ocho y sin
-repetir. Lee notas, uso previo y permiso de edición; prefiere las fotos de la propuesta si son pertinentes.
+no una orden: explica el motivo y cualquier cambio. gustavo_request trae lo que Gustavo dijo de este post (sus ideas
+y comentarios): si pide un formato (carrusel, infografía, su foto), ese es el formato. Carrusel (3–8 láminas que se
+leen en orden) cuando el post avanza por partes: pasos de un proceso, una lista de errores, lecciones o señales, antes
+y después, un marco con sus piezas o varias opciones comparadas. Infografia cuando lo protagoniza un dato o una frase;
+preguntas para la audiencia (o preguntas y respuestas rápidas que pida Gustavo) llevan infografia, con su plantilla
+preguntas. Galería vacía o sin foto pertinente: infografia o carrusel, según cómo avance el texto. Usa solo fotos
+ofrecidas, como máximo ocho y sin repetir. Lee notas, uso previo y permiso de edición; prefiere las fotos de la propuesta si son pertinentes.
 Alt describe la foto en inglés sin inventar experiencias. instruction cita literalmente la nota.
 No editar impide cualquier retoque. Una edición que Gustavo pide en la nota de su foto (fondo o lugar, peinado,
 ropa, retoques o luz) es válida: cítala en instruction con instruction_kind=edit y no descartes la foto
@@ -140,10 +144,13 @@ def source_context(photos):
 
 
 def request(piece, public, private):
+    from .lider import piece_request
     photos = gallery(piece)
+    # His own words about this post (the ideas it uses, his comments on it): a format he asks for is the format.
     return {'piece': str(piece.id), 'text_sha256': imagenes.sha(piece.final_text.encode()),
         'context_sha256': context_hash(piece, public, private, photos), 'post': piece.final_text,
-        'brief': piece.brief, 'gallery': photos, 'public_facts': public, 'sources': research.editorial_sources(piece)}
+        'brief': piece.brief, 'gallery': photos, 'public_facts': public, 'sources': research.editorial_sources(piece),
+        'gustavo_request': piece_request(piece.id)}
 
 
 def fallback(request, reason):

@@ -381,6 +381,62 @@ class PlainCropTests(EditorialBase):
         self.assertEqual(self.linkedin.state['posts'][0]['body']['content']['media']['id'],upload['id'])
 
 
+class CarouselTests(EditorialBase):
+    """IMG-INF-05 (Gustavo, 14/11/2026: «nunca hemos publicado carrusel»): the agents choose one when the post moves in
+    parts, and it reaches LinkedIn as a document titled with its cover."""
+    def claude(self,plan):
+        # The design stage passes model=…; the editorial fake of EditorialBase does not take it.
+        def fake(system,message,max_tokens=None,output_schema=None,effort=None,purpose='agent-run',**kwargs):
+            self.calls.append((purpose,json.loads(message),system,max_tokens))
+            answer=plan['design' if purpose.startswith('image-design') else purpose.split('-',1)[1]]
+            return {'text':json.dumps(answer),'model':'claude-opus-5-5','estimated_usd':0.01,'request_id':'req_'+purpose}
+        return patch('knowledge.providers.claude',side_effect=fake)
+
+    def test_a_carousel_the_director_chooses_reaches_linkedin_as_a_document_with_its_cover_title(self):
+        plan=answers()
+        plan['director']=dict(plan['director'],format='carrusel',
+                              image={'kind':'carrusel','reason':'El post avanza en tres pasos','photos':[]})
+        plan['design']={'slides':[slide('portada'),slide(),slide('cierre')]}
+        with patch('team_backend.connectors_images.ImageConnector',return_value=connectors_images.FakeImageConnector()):
+            piece=self.plan(plan)
+        self.assertEqual((piece.state,piece.image_kind),('ready','carrusel'),piece.note)
+        self.assertEqual([(r.kind,r.height) for r in piece.images.order_by('position')],[('carrusel',1350)]*3)
+        design=[c for c in self.calls if c[0]=='image-design']
+        self.assertEqual((len(design),design[0][1]['kind'],design[0][3]),(1,'carrusel',8000))  # room for 8 slides
+        proposal=piece.proposals.get();media=proposal.payload['media']
+        self.assertEqual((media['kind'],media['document_title']),('carrusel','Start with a decision'))
+        self.assertEqual(autopiloto.post_issues(proposal),[])
+        autopiloto.policy_review(proposal);proposal.refresh_from_db();self.assertEqual(proposal.state,'approved')
+        self.arrive(piece);operador.execute(self.autobot,proposal.id)
+        upload=self.linkedin.state['uploads'][0]
+        self.assertEqual((upload['mime'],upload['title'],upload['sha256']),
+                         ('application/pdf','Start with a decision',piece.image_document_sha256))
+        self.assertTrue(upload['bytes'].startswith(b'%PDF'))
+        # One document, titled with its cover; LinkedIn's document payload has no altText (the PDF carries it).
+        self.assertEqual(self.linkedin.state['posts'][0]['body']['content']['media'],{'id':upload['id'],'title':'Start with a decision'})
+
+    def test_the_carousel_title_is_bound_by_the_approval_and_other_manifests_do_not_change(self):
+        piece=ImageWorkflowTests.piece(self,'carrusel')
+        with patch('knowledge.providers.claude',return_value={'text':json.dumps({'slides':[slide('portada'),slide(),slide('cierre')]})}):
+            imagenes.prepare(piece,client=connectors_images.FakeImageConnector())
+        expected=imagenes.manifest(piece);self.assertEqual(expected['document_title'],'Start with a decision')
+        piece.image_spec=dict(piece.image_spec,slides=[dict(piece.image_spec['slides'][0],title='Another title')]+piece.image_spec['slides'][1:])
+        piece.save(update_fields=['image_spec'])
+        self.assertIn('Las imágenes no coinciden con la versión propuesta',imagenes.issues(piece,expected))
+        card=ImageWorkflowTests.piece(self,'infografia');imagenes.fallback(card,'Fixture')
+        self.assertNotIn('document_title',imagenes.manifest(card))
+
+    def test_the_team_is_told_when_a_carousel_fits_and_not_to_number_its_slides(self):
+        from team_backend import editor_visual, editorial
+        for system in (editor_visual.SYSTEM,editorial.DIRECTOR_SYSTEM):
+            self.assertIn('Galería vacía o sin foto pertinente: infografia o',system)
+            self.assertIn('ese es el formato',system)  # a format Gustavo asks for is the format
+            self.assertNotIn('Galería vacía: infografia',system)
+        self.assertIn('Carrusel (3–8 láminas que se leen en orden) cuando el post avanza por partes',editorial.DIRECTOR_SYSTEM)
+        self.assertIn('No numeres láminas',imagenes.DESIGN_SYSTEM)
+        self.assertIn('image_route="carrusel"',editorial.RETOUCH_SYSTEM)
+
+
 def editorial_action(piece):return piece.proposals.get()
 
 

@@ -288,8 +288,9 @@ def _apply(capture, piece, old):
                 raise ValueError('La edición de la foto no pasó la revisión visual (' + '; '.join(attempts)[:300] + ')')
             route = record['fallback'] = 'infografia'
         record['image_changed'] = True
-    if route == 'infografia':
-        _redesign(piece, public, private, client, [instruction])
+    if route in ('infografia', 'carrusel'):
+        # «carrusel»: he asked for one, so the image becomes a carousel whatever it was; «infografia» redesigns it.
+        _redesign(piece, public, private, client, [instruction], kind='carrusel' if route == 'carrusel' else None)
         record['image_changed'] = True
     elif record['text_changed'] and piece.image_kind in ('infografia', 'carrusel'):
         record['design_recheck'] = _recheck_design(piece, public, private, client)
@@ -370,16 +371,18 @@ def _edit_photos(piece, instruction, client, public, capture):
     return attempts + ['ok']
 
 
-def _redesign(piece, public, private, client, findings):
-    """A new infographic (or carousel) from the current text, with his comment as the designer's finding."""
+def _redesign(piece, public, private, client, findings, kind=None):
+    """A new infographic (or carousel) from the current text, with his comment as the designer's finding. `kind`:
+    the format he asked for; otherwise an infographic or carousel keeps its own, and anything else becomes one."""
     if not (isinstance(client, imagenes.connector.FakeImageConnector) or imagenes.connector.available('anthropic')):
         raise ValueError('Sin proveedor visual para rehacer la imagen')
     binding = piece.image_review.get('visual_binding', {})
     with transaction.atomic():
         imagenes.release(piece)  # a replaced photo goes back to the gallery
         piece.images.all().delete()
-        if piece.image_kind not in ('infografia', 'carrusel'):
-            piece.image_kind, piece.image_spec = 'infografia', {}
+        target = kind or (piece.image_kind if piece.image_kind in ('infografia', 'carrusel') else 'infografia')
+        if piece.image_kind != target:
+            piece.image_kind, piece.image_spec = target, {}
         piece.image_reason = _clip('Rehecha por un comentario de Gustavo', 500)
         piece.image_review = {'started': True, 'visual_binding': binding}
         piece.save(update_fields=['image_kind', 'image_spec', 'image_reason', 'image_review', 'updated_at'])

@@ -91,7 +91,7 @@ REPAIR_SCHEMA=_obj(decision=_enum(['repaired','discard']),final_text=_s(),change
     rationale=_s(),claims=_arr(CLAIM),citations=_arr(_s()))
 # A comment of Gustavo on a ready piece (retoque.py): what changes, the new text when it changes, and the image route.
 REWORK_SCHEMA=_obj(decision=_enum(['nada','texto','imagen','ambos']),reason=_s(),final_text=_s(),claims=_arr(CLAIM),
-    changes=_arr(_s()),image_route=_enum(['editar_foto','infografia','ninguna']),image_instruction=_s(),
+    changes=_arr(_s()),image_route=_enum(['editar_foto','infografia','carrusel','ninguna']),image_instruction=_s(),
     if_image_fails=_enum(['infografia','aplazar']),summary_for_gustavo=_s(),citations=_arr(_s()))
 
 # --------------------------------------------------------------------------- instructions
@@ -151,7 +151,13 @@ Cómo decidir:
   Si solo pide recortarla o encuadrarla, instruction_kind=crop. El código recorta cada foto al tamaño de LinkedIn
   (4:5 vertical o 1:1, centrada) sin IA: su formato y lo que deje fuera el recorte nunca son motivo para descartarla.
   En auto sin instrucción edita solo si hay un defecto visible concreto; ante la duda none. Sin instrucción suya no
-  alteres personas, texto ni logos. Un proceso en pasos puede llevar carrusel; un dato o una frase, infografia. Galería vacía: infografia.
+  alteres personas, texto ni logos.
+  Carrusel (3–8 láminas que se leen en orden) cuando el post avanza por partes: pasos de un proceso, una lista de
+  errores, lecciones o señales, antes y después, un marco con sus piezas o varias opciones comparadas. Infografia
+  cuando lo protagoniza un dato, una frase o preguntas para la audiencia. Si Gustavo pide un formato en la idea que
+  usas (carrusel, infografía, su foto), ese es el formato. Galería vacía o sin foto pertinente: infografia o
+  carrusel, según cómo avance el texto. En history, image dice el formato de cada pieza reciente: no repitas uno
+  por costumbre.
 - priority_capture es la idea de Gustavo reservada para este hueco (ya le avisamos que saldría este día), o null. Si existe, desarrolla esa idea e incluye su id
   en ideas_used. Si no pasa los criterios de calidad, salta el día y explica por qué: urgencia nunca baja la calidad.
 - evidence enumera los apoyos: observed_post (ref = id de la señal), public_fact (ref = key), course_unit
@@ -287,8 +293,10 @@ el líder antes de salir.
   image_instruction es la edición en inglés, concreta y fiel a lo que pidió (fondo o lugar, peinado, ropa, luz,
   encuadre); conserva su cara e identidad y no pidas texto, cifras, logos ni marcas. La edición parte de la foto
   original: si la imagen actual ya trae una edición pedida antes (image.images[].edit_instruction o reason),
-  image_instruction la repite junto al cambio nuevo, salvo que él pida quitarla. image_route="infografia" si
-  pide otra imagen sin foto o la pieza es una infografía; image_instruction resume en inglés qué debe cambiar.
+  image_instruction la repite junto al cambio nuevo, salvo que él pida quitarla. image_route="carrusel" si pide un
+  carrusel (o que la imagen cuente el post en láminas); image_instruction dice en inglés qué cuenta cada parte.
+  image_route="infografia" si pide otra imagen sin foto o la pieza es una infografía o un carrusel que hay que
+  cambiar; image_instruction resume en inglés qué debe cambiar.
   if_image_fails: "infografia" si el post se sostiene con una infografía cuando la edición no pasa la revisión
   visual; "aplazar" si el post depende de su foto. Sin imagen: image_route="ninguna" e image_instruction vacía.
 - reason explica la decisión en una frase; summary_for_gustavo le cuenta en español, en una frase, qué cambió.
@@ -584,7 +592,8 @@ def _history(now):
     for piece in EditorialPiece.objects.filter(state=EditorialPiece.State.READY).prefetch_related('post_metrics').order_by('-slot_date')[:HISTORY_LIMIT]:
         action=latest_action(piece);label=status(piece,action);brief=piece.brief or {}
         row={'date':piece.slot_date,'status':label,'pillar':brief.get('pillar'),'modality':brief.get('modality'),
-             'thesis':brief.get('thesis'),'approach':brief.get('approach'),'opening':piece.final_text[:280]}
+             'thesis':brief.get('thesis'),'approach':brief.get('approach'),'image':piece.image_kind or None,
+             'opening':piece.final_text[:280]}
         if label=='published':row['results']=_results(piece,action,now)
         rows.append(row)
         if label=='published' and piece.slot_date>=(now-timedelta(days=30)).date() and brief.get('modality') in mix:mix[brief['modality']]+=1
