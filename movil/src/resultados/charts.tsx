@@ -86,7 +86,7 @@ export interface KpiTileProps {
   format?: (value: number) => string;
 }
 
-function Sparkline({ points }: { points: string }) {
+export function Sparkline({ points }: { points: string }) {
   return (
     <View accessible={false} importantForAccessibility="no-hide-descendants">
       <Svg width="100%" height={28} viewBox="0 0 100 30" preserveAspectRatio="none">

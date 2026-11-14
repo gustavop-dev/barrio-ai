@@ -34,6 +34,7 @@ export const keys = {
   resultadosAll: ['resultados'] as const,
   resultados: (dias: number, modalidad: string) => ['resultados', dias, modalidad] as const,
   resumenSemanal: ['resultados', 'resumen-semanal'] as const,
+  analitica: (periodo: string, desde: string, hasta: string) => ['resultados', 'analitica', periodo, desde, hasta] as const,
   contactSearch: (filters: Record<string, unknown>) => ['red', 'search', filters] as const,
   oportunidadesAll: ['oportunidades'] as const,
   oportunidades: (filters: Record<string, unknown>) => ['oportunidades', filters] as const,

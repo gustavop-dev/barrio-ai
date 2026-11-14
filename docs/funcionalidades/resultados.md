@@ -2,7 +2,7 @@
 
 Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?, ¿el contenido aporta? y ¿el equipo trabaja bien? Todo comparado con el periodo anterior y sin presentar nunca un dato que falta como cero. El resumen semanal, que va arriba de Resultados, está en [resumen-semanal.md](resumen-semanal.md).
 
-- **Código:** backend `resultados.py` (`build`, `negocio`, `audiencia`, `contenido`, `equipo`, `spend`), `resultados_views.Resultados`, `metricas.py` (`collect`, trabajo `collect_metrics`), `analitica.py` (analítica de LinkedIn, trabajo `import_analytics`, `resultados_views.Analitica`); PWA `oficina/src/pages/Resultados.tsx`, `pages/resultados/*`; app `movil/src/resultados/*`; común `compartido/src/logic/resultados.ts`.
+- **Código:** backend `resultados.py` (`build`, `negocio`, `audiencia`, `contenido`, `equipo`, `spend`), `resultados_views.Resultados`, `metricas.py` (`collect`, trabajo `collect_metrics`), `analitica.py` (analítica de LinkedIn, trabajo `import_analytics`, `resultados_views.Analitica`); PWA `oficina/src/pages/Resultados.tsx`, `pages/resultados/*`; app `movil/src/resultados/*`; común `compartido/src/logic/resultados.ts`, `logic/analitica.ts`.
 - **Documentación:** sección «Resultados» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md), [`metricas-resultados.md`](../../agentes-linkedin/infra/docs/metricas-resultados.md).
 
 ## Resumen
@@ -20,6 +20,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
 | [RES-09](#res-09) | Medir los posts y la audiencia | backend | funciona |
 | [RES-10](#res-10) | Traer la analítica de LinkedIn | backend | funciona |
 | [RES-11](#res-11) | Consultar la analítica por periodo | backend | funciona |
+| [RES-12](#res-12) | Ver la analítica de LinkedIn en la app | app · backend | funciona |
 
 ---
 
@@ -185,8 +186,30 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   6. **Dado** `periodo=30d`, `desde` sin `hasta`, una fecha que no es AAAA-MM-DD, más de 366 días o una `cuenta` que no es `directo`, **cuando** se pide, **entonces** responde 400.
   7. **Dado** un usuario sin `operate_linkedin`, **cuando** pide la analítica, **entonces** recibe 403.
   8. **Dado** cualquier consulta, **cuando** se responde, **entonces** no se llama a LinkedIn.
-- **Brechas código/docs:** aún no hay pantalla en la PWA ni en la app (fase 3b).
-- **Cobertura QA:** pruebas de backend en `test_analitica.py` · sin prueba E2E
+- **Brechas código/docs:** la app la muestra ([RES-12](#res-12)); la PWA aún no.
+- **Cobertura QA:** pruebas de backend en `test_analitica.py` · la app la consulta en `movil/.maestro/08-resultados-linkedin.yaml` (RES-12)
+
+### RES-12 · Ver la analítica de LinkedIn en la app <a id="res-12"></a>
+
+- **Dónde:** app · backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** en Resultados, la pestaña «Analítica de LinkedIn» le muestra la analítica de su cuenta como la elige en LinkedIn: 7, 14, 28, 90 o 365 días, o un periodo suyo, con las cifras del periodo comparadas con el anterior, el día a día, los seguidores, sus publicaciones, las principales según LinkedIn y su público.
+- **Código:** app `movil/src/resultados/AnaliticaLinkedin.tsx` (pestaña de `ResultadosScreen.tsx`, `?pestana=linkedin`); común `compartido/src/logic/analitica.ts`, `useAnalitica`; backend [RES-11](#res-11). La PWA aún no tiene esta vista.
+- **Criterios de aceptación:**
+  1. **Dado** Resultados, **cuando** toca «Analítica de LinkedIn», **entonces** la pestaña queda en la URL (`?pestana=linkedin`) y ve 28 días, «Del … al … · 28 días (UTC). Se compara con los 28 días anteriores.» y «Actualizado hace …».
+  2. **Dado** «Periodo», **cuando** elige 7, 14, 90 o 365 días, **entonces** se pide ese periodo (`?periodo=7d…`), queda en la URL y las cifras anteriores se ven atenuadas mientras carga.
+  3. **Dado** «Personalizado», **cuando** escribe «Desde» y «Hasta» (AAAA-MM-DD), **entonces** solo acepta días entre el primero y el último importados, «Desde» no posterior a «Hasta» y como mucho 366 días; si no, dice qué corregir y no pide nada. Si vale, pide `?desde&hasta` y ningún periodo fijo queda elegido.
+  4. **Dado** un periodo con datos, **cuando** se muestra, **entonces** ve impresiones, interacciones, seguidores nuevos y tasa de interacción con su variación, o «sin comparación»; un dato que falta es «—» con su motivo, nunca 0.
+  5. **Dado** un periodo que no es un rango exacto importado, **cuando** se muestra, **entonces** «Miembros alcanzados» y «Principales según LinkedIn» dicen por qué no hay dato, en vez de sumar días o tomar otro rango.
+  6. **Dado** días sin importar en el periodo o en el anterior, **cuando** se muestra, **entonces** una nota dice cuántos días tienen datos y que no se compara.
+  7. **Dado** el gráfico «Por día», **cuando** cambia de cifra o toca un día, **entonces** dibuja esa cifra (un día sin dato corta la línea) y dice el valor del día tocado; un lector de pantalla oye el total y el día con más.
+  8. **Dado** sus publicaciones del periodo, **cuando** se muestran, **entonces** cada una lleva sus cifras «Desde que se publicó, al …», «—» en lo que LinkedIn no dio, «Ver en LinkedIn» y, si es una pieza del equipo, «Abrir la pieza».
+  9. **Dado** «Público», **cuando** se muestra, **entonces** ve a sus seguidores con el día de la captura y a quienes vieron sus publicaciones con su propio rango, avisando si es el rango importado más cercano; «< 1 %» se muestra tal cual.
+  10. **Dado** una importación fallida después de la última correcta, **cuando** abre la pestaña, **entonces** un aviso dice qué falló y cuándo, y que las cifras son de la última importación correcta.
+  11. **Dado** que no hay cuenta «directo» o aún no se importó nada, **cuando** abre la pestaña, **entonces** ve solo «Aún no hay analítica de LinkedIn» con el motivo, sin controles ni cifras vacías.
+  12. **Dado** que la consulta falla, **cuando** abre la pestaña, **entonces** ve «No se pudo cargar la analítica de LinkedIn» con «Reintentar».
+- **Brechas código/docs:** la PWA no tiene esta vista. Las cifras son las que la importación guardó: la app nunca llama a LinkedIn.
+- **Cobertura QA:** RES-12.1–9 en `movil/.maestro/08-resultados-linkedin.yaml` (`seed_qa --analitica`: 28, 7 y 90 días, personalizado rechazado y válido, gráfico, publicaciones, principales y público) · RES-12.11 en `08-resultados-errores.yaml` (sin cuenta «directo») · RES-12.10 y 12 sin prueba E2E (sí en `AnaliticaLinkedin.test.tsx`) · 2026-11-13 · pendiente del CI
 
 ## Retiradas
 

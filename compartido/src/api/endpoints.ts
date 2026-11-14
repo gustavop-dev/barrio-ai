@@ -7,6 +7,8 @@ import type {
   Actividad,
   ActividadFilters,
   Ajustes,
+  Analitica,
+  AnaliticaPreset,
   Calendario,
   Capability,
   Contact,
@@ -261,6 +263,9 @@ export function getActividad({ tipo = 'todo', desde = '', hasta = '', noSalio = 
 // ---------------------------------------------------------------- results
 export const getResultados = (dias: ResultadosDias = 28, modalidad: ResultadosModalidad = 'todo') =>
   api.get<Resultados>(`/api/v1/resultados${queryString({ dias, modalidad })}`);
+/** LinkedIn's analytics of the «directo» account, stored data only: a preset, or `desde` and `hasta` together. */
+export const getAnalitica = ({ periodo = '', desde = '', hasta = '' }: { periodo?: AnaliticaPreset | ''; desde?: string; hasta?: string } = {}) =>
+  api.get<Analitica>(`/api/v1/resultados/analitica${queryString(desde && hasta ? { desde, hasta } : { periodo })}`);
 
 // ---------------------------------------------------------------- opportunities
 const OPP = '/api/v1/oportunidades';

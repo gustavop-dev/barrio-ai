@@ -35,7 +35,9 @@ export function Segmented<V extends string>({
   /** Shows the label above the track, as Select does (Resultados' «Periodo»). The Calendario's views go without it. */
   showLabel?: boolean;
 }) {
-  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  // A value outside the options (Resultados › LinkedIn's custom range) selects none: no superficie at all.
+  const found = options.findIndex((option) => option.value === value);
+  const index = Math.max(0, found);
   const [width, setWidth] = useState(0);
   const { reduced } = useMotion();
   const seg = useSharedValue(index);
@@ -54,7 +56,7 @@ export function Segmented<V extends string>({
       testID={testID}
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
     >
-      {width ? <Indicator seg={seg} optionWidth={optionWidth} testID={testID ? `${testID}-seleccion` : undefined} /> : null}
+      {width && found >= 0 ? <Indicator seg={seg} optionWidth={optionWidth} testID={testID ? `${testID}-seleccion` : undefined} /> : null}
       {options.map((option) => {
         const selected = option.value === value;
         return (

@@ -351,7 +351,8 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 
 ### Pendiente de la analítica
 
-- **La vista** en la oficina y en la app.
+- **La vista en la oficina (PWA).** La app ya la muestra en Resultados › «Analítica de LinkedIn»
+  ([RES-12](../../../docs/funcionalidades/resultados.md#res-12)).
 - **Una sexta hoja sola con datos.** Aún no se vio: se lee como la de audiencia. Los nombres de las hojas quedan en `AnalyticsImport.sheets` para comprobarlo.
 - **Unir con la pieza** cuando LinkedIn enlaza un urn distinto del que guardamos.
 

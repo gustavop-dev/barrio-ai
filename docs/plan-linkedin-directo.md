@@ -81,7 +81,8 @@ anteriores al 10/10/2025.
 5. **Analítica.** Una importación diaria de los últimos 14 días (los días recientes aún cambian), seguida de los
    rangos exactos de 7, 28, 90 y 365 días que terminan ayer, y una carga inicial de 365 días. Se guarda por día y por post; la app muestra 7, 14, 28, 90, 365 días y rango personalizado
    desde nuestros datos, sin volver a pedirle nada a LinkedIn. El backend está hecho (fase 3a): modelos, importación,
-   comandos y `GET /api/v1/resultados/analitica`; detalle en
+   comandos y `GET /api/v1/resultados/analitica`; la app la muestra en Resultados › «Analítica de LinkedIn» (fase 3b,
+   [RES-12](funcionalidades/resultados.md#res-12)); falta la vista en la PWA. Detalle en
    [`metricas-resultados.md`](../agentes-linkedin/infra/docs/metricas-resultados.md#analítica-de-linkedin-cuenta-directo).
    Lo que solo vale para un rango exacto (miembros alcanzados, publicaciones principales, demografía del contenido)
    se muestra solo para ese rango, o con su propio rango.
@@ -101,7 +102,7 @@ LinkedIn desde producción.
 | 0 | Decisiones abiertas y el puente con Unipile | — |
 | 1 | Conector `directo` en el backend: las 21 operaciones con la interfaz actual, traducción de respuestas, pruebas con respuestas grabadas sin datos personales | CI; cuenta de prueba desde el computador de Gustavo |
 | 2 | Servicio «navegador»: contenedor, perfiles por cuenta, API interna, protecciones, inicio de sesión, pausa y aviso | Cuenta de prueba en el entorno elegido |
-| 3 | Analítica: importación diaria, carga inicial, modelos y pantalla de Resultados con intervalos. 3a, el backend, está hecho; falta la pantalla (3b) | Cuenta de prueba (3a); datos de la cuenta de Gustavo, solo lectura |
+| 3 | Analítica: importación diaria, carga inicial, modelos y pantalla de Resultados con intervalos. 3a (el backend) y 3b en la app están hechas; falta la vista en la PWA | Cuenta de prueba (3a); datos de la cuenta de Gustavo, solo lectura |
 | 4 | Prueba de resistencia: la cuenta de prueba trabajando 1 a 2 semanas a ritmo real, con la prueba diaria | Sin bloqueos ni verificaciones en ese periodo |
 | 5 | Paso de la cuenta de Gustavo: primero lecturas, luego una capacidad de escritura cada vez; Unipile queda de respaldo hasta el final | Una semana estable por capacidad |
 | 6 | Segundo usuario (CTO) y multitenant: alta con inicio de sesión propio, identidad fuera del código | Ver `barrio-multitenant` en la memoria del proyecto |
