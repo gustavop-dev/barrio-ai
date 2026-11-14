@@ -22,7 +22,8 @@ class ChangeDecision(APIView):
         data = valid(DecisionInput, request)
         get_or_404(ReferentChange, pk=cid)
         try:
-            item = referentes.decide(request.user, cid, data['version'], data['decision'], data.get('proposal'))
+            item = referentes.decide(request.user, cid, data['version'], data['decision'], data.get('proposal'),
+                                     note=data.get('note', ''))
         except (ValueError, TypeError) as exc:
             return Response({'detail': str(exc)}, status=400)
         return Response({'id': str(item.pk), 'state': item.state, 'version': item.version})
@@ -59,10 +60,10 @@ class InitialMain(APIView):
 class Reviews(APIView):
     def get(self, request):
         require(request.user, 'operate_linkedin')
-        rows = ReferentReview.objects.order_by('-month')
+        rows = ReferentReview.objects.order_by('-month', '-created_at')
         if request.query_params.get('account'):
             rows = rows.filter(account_id=request.query_params['account'])
-        return Response([{'id': str(r.pk), 'month': r.month, 'state': r.state, 'deadline': r.deadline,
+        return Response([{'id': str(r.pk), 'month': r.month, 'kind': r.kind, 'state': r.state, 'deadline': r.deadline,
             'dossier': r.dossier, 'changes': list(r.changes.values('id', 'version', 'state', 'proposal', 'history', 'conflict')),
             'experiments': list(ReferentExperiment.objects.filter(review=r).values('id', 'state', 'plan', 'results', 'history'))} for r in rows[:12]])
 
@@ -77,7 +78,9 @@ def cards(user, card, now):
         p, review = item.proposal, item.review
         outgoing = Referent.objects.filter(pk=p.get('outgoing')).first() if p.get('outgoing') else None
         incoming = p.get('incoming')
+        industry = review.kind == 'industria'
         title = (f'sale {outgoing.display_name if outgoing else "referente"} · entra {incoming["display_name"]}' if p['kind'] == 'swap'
+                 else f'Alta de industria: {incoming["display_name"]}' if p['kind'] == 'add' and industry
                  else f'Alta: {incoming["display_name"]}' if p['kind'] == 'add' else f'Baja: {outgoing.display_name if outgoing else "referente"}')
         endpoint = f'/api/v1/referentes/cambios/{item.pk}/decidir'
         auto = review.state == 'published' and item.state == 'pending' and not item.responded_at
@@ -88,11 +91,14 @@ def cards(user, card, now):
         sources = review.dossier.get('sources', [])
         current = Referent.objects.filter(account=review.account, active=True, archived_at__isnull=True)
         total, main = current.count(), current.filter(protected=True).count()
-        body = p['reason'] + (' Si no respondes, se aplicará al terminar el día 5 (America/Bogota).' if auto else 'Requiere decisión explícita; esta versión no se aplicará por silencio.')
+        body = p['reason'] + (' Si no respondes, se aplicará al terminar el día 5 (America/Bogota).' if auto else ' Requiere decisión explícita; esta versión no se aplicará por silencio.')
+        if industry and isinstance((incoming or {}).get('industria'), dict):
+            rows = incoming['industria'].get('criteria') or []
+            body += ' Criterios: ' + ', '.join(f"{row['label'].lower()} ({row['status_label'].lower()})" for row in rows) + '.'
         out.append(card(f'referent_change:{item.pk}', 'referente', title, body, actions, agent='investigador_lider',
             deadline=review.deadline, created_at=review.published_at,
             state_override='pospuesta' if item.state == 'postponed' else None,
-            referent_change={'id': str(item.pk), 'account': str(review.account_id), 'version': item.version, 'state': item.state,
+            referent_change={'id': str(item.pk), 'account': str(review.account_id), 'kind': review.kind, 'version': item.version, 'state': item.state,
                 'proposal': p, 'outgoing': referentes.snapshot(outgoing) if outgoing else None, 'sources': sources,
                 'evidence': review.dossier.get('evidence', {}), 'limitations': review.dossier.get('limitations', []),
                 'occupancy': {'before': total, 'after': total + (1 if p['kind'] == 'add' else -1 if p['kind'] == 'remove' else 0), 'main': main, 'variables': total-main},

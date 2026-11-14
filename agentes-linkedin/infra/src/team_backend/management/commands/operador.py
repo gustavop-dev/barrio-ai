@@ -17,6 +17,11 @@ class Command(BaseCommand):
         ref.add_argument('--motivo',required=True)
         obs=sub.add_parser('observar');obs.add_argument('--cuenta',required=True);obs.add_argument('--limite',type=int,default=5)
         sub.add_parser('referentes-extraordinaria',help='Revisión de referentes fuera del calendario mensual (decisión explícita)').add_argument('--cuenta',required=True)
+        ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada)')
+        ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
+        ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
+        ind.add_argument('--candidatos',type=int,default=6,help='Personas a medir en LinkedIn (1-9)')
+        ind.add_argument('--busquedas',type=int,default=4,help='Búsquedas de personas en LinkedIn (0-8)')
 
     def handle(self,**o):
         user=User.objects.filter(username=o['usuario'],is_active=True).first()
@@ -38,6 +43,27 @@ class Command(BaseCommand):
                 from team_backend import referentes
                 job=referentes.extraordinary(user,account)
                 self.stdout.write(f'Revisión extraordinaria en cola: trabajo {job.id}. Las propuestas llegan a la Bandeja.')
+            elif o['accion']=='referentes-industria':
+                from decimal import Decimal, InvalidOperation
+                from team_backend import referentes_industria
+                try:tope=Decimal(o['tope_usd']) if o['tope_usd'] is not None else None
+                except InvalidOperation:raise CommandError('--tope-usd debe ser un número') from None
+                if tope is not None and not (tope.is_finite() and tope>0):raise CommandError('--tope-usd debe ser positivo')
+                job,report=referentes_industria.enqueue(user,account,tope_usd=tope,candidatos=o['candidatos'],
+                                                        busquedas=o['busquedas'],confirm=o['confirmar'])
+                est=report['estimate'];reads=est['reads']
+                self.stdout.write(f"Costo máximo (reserva): {est['usd_max']} USD = {est['web_calls']} investigaciones web × "
+                                  f"{est['web_call_usd']} + selección {est['selection_usd']}. El real suele ser menor.")
+                self.stdout.write(f"Tope duro de esta búsqueda: {report['tope_usd']} USD. Quedan {report['cycle_left_usd']} USD "
+                                  f"este mes en referentes y {report['team_left_usd']} USD del equipo hoy.")
+                self.stdout.write(f"Lecturas de LinkedIn como máximo: {reads['search']} búsquedas, {reads['profile']} perfiles, "
+                                  f"{reads['content']} lecturas de contenido (dentro de los topes diarios).")
+                for line in report['warnings']:self.stdout.write('Aviso: '+line)
+                if report['issues']:raise CommandError(' '.join(report['issues']))
+                if job is None:
+                    self.stdout.write('No se encoló nada. Repite con --confirmar para lanzar la búsqueda.')
+                else:
+                    self.stdout.write(f'Búsqueda de referentes de industria en cola: trabajo {job.id}. Las propuestas llegan a la Bandeja.')
             elif o['accion']=='observar':
                 job,_=enqueue_operation(user,'observe',{'account':str(account.id),'limit':o['limite'],'referents':[]})
                 self.stdout.write(f'Observación en cola: trabajo {job.id}. El worker la procesará.')
