@@ -277,7 +277,12 @@ def tick(user,now=None):
     for proposal in ActionProposal.objects.select_related('post','piece','contact').filter(state=ActionProposal.State.PROPOSED).order_by('created_at'):
         policy_review(proposal,lead_budget);report['reviewed']+=1
     if lead_budget['deferred']:report['lead_deferred']=lead_budget['deferred']
-    if _lead_silence_due(now):report['lead_silent']=lead_silence(now)
+    if _lead_silence_due(now):
+        report['lead_silent']=lead_silence(now)
+        try:
+            from . import auditoria_compuertas
+            report['gate_alerts']=auditoria_compuertas.vigilar(now)
+        except Exception as exc:report['gate_alerts_error']=type(exc).__name__  # the audit never stops the tick
     try:report['plan']=_editorial(user,now)
     except ValueError as exc:report.update(plan=0,editorial_error=str(exc))  # misconfigured editorial never stops the rest
     for account in ConnectorAccount.objects.filter(paused=False):

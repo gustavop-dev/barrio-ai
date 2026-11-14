@@ -244,3 +244,93 @@ class ReplayTests(te.EvalBase):
         text=evaluaciones.render(report)
         self.assertIn('Repetición de la compuerta del post',text);self.assertIn('Bloqueadas que ahora pasan: 2',text)
         self.assertNotIn(SOFT['detail'],json.dumps(replay))  # ids and categories only
+
+
+class AuditTests(EditorialBase):
+    """compuertas auditar: per gate, days without a post and Gustavo's word, from what is stored; ids and categories only."""
+
+    def piece(self,days_ago,verification,state='blocked',note='',published=False):
+        tz=operador.local_tz();now=timezone.now()
+        piece=EditorialPiece.objects.create(account=self.official,slot_date=(now-timedelta(days=days_ago)).astimezone(tz).date(),
+            scheduled_for=now-timedelta(days=days_ago),state=state,note=note,final_text=GOOD_POST,verification=verification)
+        if published:
+            proposal=operador.create_proposal(self.gustavo,None,'CONT-09',{'text':GOOD_POST},citations=['x'],source='agent',piece=piece)
+            ActionProposal.objects.filter(pk=proposal.pk).update(state='confirmed',approved_hash=proposal.payload_hash,decided_at=now)
+        return piece
+
+    def history(self):
+        from team_backend.models import AuditEvent
+        hard='Hallazgo material (unsourced_figure): Needs a source.'
+        blocked=self.piece(3,{'verdict':'blocked','model_verdict':'blocked','blocking_reasons':[hard],'rules':[]},note=hard)
+        repaired=self.piece(4,{'verdict':'ready_for_execution','model_verdict':'blocked','blocking_reasons':[],'rules':[],
+                               'observations':[{'issue':'hook_not_delivered','quote':'q','detail':'Secret detail.'}],
+                               'repair':{'trigger':'verificador','outcome':'reparada','findings':[]}},state='ready',published=True)
+        rules=self.piece(1,{'verdict':'blocked','model_verdict':None,'blocking_reasons':['Contiene enlaces'],'rules':['Contiene enlaces']},
+                         note='Contiene enlaces')
+        money=self.piece(6,{},note='Ciclo detenido: cost_cap')
+        AuditEvent.objects.create(action='editorial.block_overridden',target=str(blocked.id),metadata={'kind':'verificador'})
+        posts=self.observed();now=timezone.now()
+        approved=operador.create_proposal(self.gustavo,posts[0],'INT-03',{'text':'A comment that passed.'},citations=['x'],source='agent')
+        ActionProposal.objects.filter(pk=approved.pk).update(state='approved',approved_hash=approved.payload_hash,decided_at=now,
+                                                             review={'decision':'approve','reasons':[]})
+        lead=['Líder: no aporta una idea concreta (aporta=0.3)']
+        discarded=operador.create_proposal(self.gustavo,posts[1],'INT-03',{'text':'A comment the lead stopped.'},citations=['x'],source='agent')
+        ActionProposal.objects.filter(pk=discarded.pk).update(state='discarded',decided_at=now,review={'decision':'discard','reasons':lead})
+        AuditEvent.objects.create(action='operator.policy_discarded',target=str(discarded.id),metadata={'issues':lead})
+        return {'blocked':blocked,'repaired':repaired,'rules':rules,'money':money,'discarded':discarded}
+
+    def test_each_gate_reports_what_entered_passed_and_stopped_with_categories_only(self):
+        from team_backend import auditoria_compuertas
+        h=self.history()
+        report=auditoria_compuertas.auditar(7)
+        rows={r['compuerta']:r for r in report['compuertas']}
+        verifier=rows['verificador']
+        self.assertEqual((verifier['entraron'],verifier['pasaron_a_la_primera'],verifier['pasaron_tras_reintento'],verifier['paradas']),(2,0,1,1))
+        self.assertEqual((verifier['motivos'],verifier['ejemplos']),([['unsourced_figure',1]],[{'id':str(h['blocked'].id),'categoria':'unsourced_figure'}]))
+        self.assertEqual((verifier['con_observaciones'],verifier['gustavo']['no_estuvo_de_acuerdo']),(1,1))
+        self.assertEqual((rows['reglas_post']['paradas'],rows['reglas_post']['motivos']),(1,[['enlaces',1]]))
+        self.assertEqual((rows['reparacion']['entraron'],rows['reparacion']['pasaron_a_la_primera']),(1,1))
+        self.assertEqual((rows['dinero']['paradas'],rows['dinero']['motivos']),(1,[['tope_del_ciclo',1]]))
+        lead=rows['lider:INT-03']
+        self.assertEqual((lead['entraron'],lead['pasaron_a_la_primera'],lead['paradas'],lead['motivos'],lead['descartes_sin_reescritura']),
+                         (2,1,1,[['aporta',1]],1))
+        causes={d['fecha']:d['causa'] for d in report['dias_sin_post']}
+        tz=operador.local_tz();day=lambda n:(timezone.now()-timedelta(days=n)).astimezone(tz).date().isoformat()
+        self.assertEqual((causes[day(1)],causes[day(3)],causes[day(6)],causes[day(2)]),
+                         ('compuerta:reglas_post','compuerta:verificador','dinero','sin_pieza'))
+        self.assertNotIn(day(4),causes)  # the repaired piece went out
+        self.assertEqual({d['fecha'] for d in report['callejones_sin_salida']},{day(1),day(3)})
+        dumped=json.dumps(report,ensure_ascii=False)
+        for secret in ('Needs a source','Secret detail','A comment','Which decision'):self.assertNotIn(secret,dumped)
+
+    def test_the_command_prints_the_audit_and_its_json(self):
+        from io import StringIO
+        from django.core.management import call_command
+        self.history()
+        out=StringIO();call_command('compuertas','auditar','--dias','7',stdout=out)
+        for expected in ('Auditoría de compuertas · 7 días','Verificador del post: 2 entraron','Gustavo: paradas 1, no estuvo de acuerdo en 1',
+                         'Líder (Jev) · INT-03','Callejones sin salida'):
+            self.assertIn(expected,out.getvalue())
+        out=StringIO();call_command('compuertas','auditar','--json',stdout=out)
+        self.assertIn('verificador',{r['compuerta'] for r in json.loads(out.getvalue())['compuertas']})
+
+    def test_one_notice_per_gate_and_week_and_one_per_day_a_gate_left_without_a_post(self):
+        from team_backend import auditoria_compuertas
+        from team_backend.models import Notification
+        h=self.history()
+        with patch.dict(os.environ,{'COMPUERTAS_ALERTA_MIN':'2','COMPUERTAS_ALERTA_TASA':'0.5'}):
+            self.assertGreaterEqual(auditoria_compuertas.vigilar(),2)
+            refs=set(Notification.objects.filter(kind='gate_alert').values_list('ref',flat=True))
+            self.assertTrue(any(r.startswith('gate_alert:verificador:') for r in refs))
+            self.assertIn(f'gate_day:{h["rules"].slot_date.isoformat()}',refs)
+            self.assertEqual(auditoria_compuertas.vigilar(),0)  # once per gate and week, once per day
+        with patch.dict(os.environ,{'COMPUERTAS_ALERTAS':'false'}):self.assertEqual(auditoria_compuertas.vigilar(),0)
+
+    def test_the_weekly_summary_keeps_the_gates_without_ids(self):
+        from team_backend import resumen_semanal
+        h=self.history()
+        today=timezone.now().astimezone(operador.local_tz()).date()
+        data=resumen_semanal.gates(resumen_semanal.window(today-timedelta(days=today.weekday())))
+        self.assertTrue(data['disponible'])
+        self.assertIn('lider:INT-03',data['por_compuerta'])
+        self.assertNotIn(str(h['blocked'].id),json.dumps(data))

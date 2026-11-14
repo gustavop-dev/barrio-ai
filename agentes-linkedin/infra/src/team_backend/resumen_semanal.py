@@ -268,11 +268,16 @@ def stops(w):
             'ejecuciones_fallidas':ActionExecution.objects.filter(state='failed',**_between('started_at',w)).count(),
             'ejecuciones_inciertas':ActionExecution.objects.filter(state='uncertain',**_between('started_at',w)).count()}
 
+def gates(w):
+    """What each gate let through or stopped this week (auditoria_compuertas.py), without ids."""
+    from . import auditoria_compuertas
+    return auditoria_compuertas.weekly(w)
+
 def week_stats(w,now):
     machine=resultados.Coverage.machine(w)
     return {'desde':w.first.isoformat(),'hasta':w.last.isoformat(),'publicaciones':publications(w,now,machine),
             'comentarios':comments(w,machine),'red':network(w),'oportunidades':opportunities(w),'conversaciones':conversations(w),
-            'capturas':captures(w),'gasto_ia':spend(w),'lider':lead(w),'pausas_y_bloqueos':stops(w)}
+            'capturas':captures(w),'gasto_ia':spend(w),'lider':lead(w),'pausas_y_bloqueos':stops(w),'compuertas':gates(w)}
 
 # Figures compared with the previous week: (name, path in week_stats).
 COMPARED=(('publicaciones.publicados',('publicaciones','publicados')),
