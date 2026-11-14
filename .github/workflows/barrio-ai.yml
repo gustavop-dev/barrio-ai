@@ -18,6 +18,7 @@ concurrency:
 jobs:
   backend:
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     services:
       postgres:
         image: pgvector/pgvector:0.8.2-pg17
@@ -75,6 +76,7 @@ jobs:
   # linkedin_directo comes from the backend's source tree, the same folder its image copies.
   navegador:
     runs-on: ubuntu-24.04
+    timeout-minutes: 10
     defaults:
       run:
         working-directory: agentes-linkedin/navegador
@@ -88,6 +90,7 @@ jobs:
 
   oficina:
     runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - id: present
@@ -117,6 +120,7 @@ jobs:
   # The native app (Expo) and compartido/ (shared with the PWA, linted, typed and tested from movil/).
   movil:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -160,6 +164,7 @@ jobs:
     if: github.event_name != 'pull_request'
     needs: [backend, navegador, oficina]
     runs-on: ubuntu-24.04
+    timeout-minutes: 30
     permissions:
       contents: read
       packages: write
