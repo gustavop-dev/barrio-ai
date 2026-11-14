@@ -50,6 +50,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 ## Pendiente de confirmar
 
 - No quedan decisiones de producto sin confirmar. Las ediciones que decide el equipo quedan resueltas con la opción de edición de [IMG-16](#img-16) (decisión de Gustavo, 2026-11-08): con «Que decida el equipo» o «Editar», el equipo aplica la edición y la muestra para veto, sin preguntar antes.
+- Por confirmar con Gustavo (recorte sin IA, 2026-11-14): «No editar» impide hoy también el recorte, así que esa foto sale en su formato original ([IMG-14](#img-14), criterio 5). Si el recorte sin IA debe aplicarse también con «No editar», basta con quitar esa excepción.
 
 - Valores técnicos elegidos: `ai_edit=auto`; `IMAGE_DAILY_USD=1` (retirado desde el 10/11/2026: presupuesto general, ver `knowledge/presupuesto.py`); `EDITORIAL_VETO_MINUTES=60`; urgencias en orden de llegada y sin desplazar piezas preparadas; búsqueda de hueco hasta 14 días; carrusel de 3–8 láminas. Se conserva la hora y cadencia configuradas.
 - Sin claves, presupuesto de IA o revisión visual: foto original si es válida; si no, tarjeta de marca fija sin datos variables. Solo se bloquea si tampoco puede prepararse/servirse esa imagen.
@@ -161,7 +162,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Criterios de aceptación:**
   1. **Dado** una propuesta CONT-09 sin imagen, **cuando** la revisa la política autónoma, **entonces** la descarta con un motivo como «Sin imagen».
   2. **Dado** una propuesta CONT-09 con imagen (foto, infografía o carrusel), **cuando** se calcula su `payload_hash`, **entonces** cubre el texto, el hash de cada imagen o lámina y su texto alternativo; cambiar cualquiera invalida la aprobación igual que cambiar el texto.
-  3. **Dado** una imagen sin su comprobación favorable sobre su hash exacto ([IMG-10](#img-10) para fotos editadas, [IMG-INF-06](#img-inf-06) para infografías y carruseles), **cuando** la revisa la política, **entonces** la descarta.
+  3. **Dado** una imagen sin su comprobación favorable sobre su hash exacto ([IMG-10](#img-10) para fotos editadas, [IMG-INF-06](#img-inf-06) para infografías y carruseles), **cuando** la revisa la política, **entonces** la descarta. Una foto sin editar o recortada sin IA no necesita esa comprobación: sus bytes exactos quedan ligados por SHA-256 y por el manifiesto ([IMG-14](#img-14)).
   4. **Dado** una pieza publicada, **cuando** se abre el post en LinkedIn, **entonces** lleva la imagen o el carrusel que muestra el detalle de la pieza.
   5. **Dado** el veredicto del verificador del texto, **cuando** se calcula, **entonces** sigue valiendo solo para el texto exacto; la imagen tiene su propia comprobación.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
@@ -194,28 +195,30 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Criterios de aceptación:**
   1. **Dado** una foto con «No editar» y la nota «recórtala», **cuando** se elige, **entonces** no se edita, se publica el original y queda registrado «Edición prohibida en la foto».
   2. **Dado** una foto con «Que decida el equipo» y la nota «úsala tal cual», **cuando** se elige, **entonces** no se edita.
-  3. **Dado** una foto con «Que decida el equipo» y la nota «recórtala», «quita el fondo» o «más luz», **cuando** se elige, **entonces** la edición hace exactamente eso y nada más.
+  3. **Dado** una foto con «Que decida el equipo» y la nota «quita el fondo» o «más luz», **cuando** se elige, **entonces** la edición hace exactamente eso y nada más.
   4. **Dado** una foto con «Que decida el equipo» y sin instrucción, **cuando** se elige, **entonces** decide el equipo según [IMG-08](#img-08).
   5. **Dado** una foto con «Editar» y una instrucción, **cuando** se elige, **entonces** se edita siguiendo la instrucción.
-  6. **Dado** una foto con «Editar» y sin instrucción, **cuando** se elige, **entonces** se edita igualmente: el equipo elige el retoque que más mejora la foto para LinkedIn (luz, enderezar, encuadre 4:5 o 1:1, quitar distracciones) y registra cuál.
+  6. **Dado** una foto con «Editar» y sin instrucción, **cuando** se elige, **entonces** se edita igualmente: el equipo elige el retoque que más mejora la foto para LinkedIn (luz, enderezar, quitar distracciones) y registra cuál. El encuadre no es un retoque con IA: lo hace siempre el recorte sin IA de [IMG-14](#img-14).
   7. **Dado** cualquier foto elegida, **cuando** se decide, **entonces** queda registrado qué se decidió y por qué: «Edición prohibida en la foto», «Instrucción de Gustavo: …», «Decisión del equipo: …» o «Edición pedida en la foto: …».
   8. **Dado** que la instrucción pide algo que la API no puede hacer bien («cambia la persona de la izquierda»), **cuando** se decide, **entonces** no se hace esa edición, se publica el original o el retoque seguro, y el motivo queda registrado.
+  9. **Dado** una foto con «Que decida el equipo» o «Editar» cuya nota solo pide recortarla o encuadrarla («recórtala»), **cuando** se elige, **entonces** no se llama a ningún modelo de imagen: el código la recorta, centrada ([IMG-14](#img-14)), y queda «Instrucción de Gustavo: recórtala; sale recortada a 1080×1350, centrada y sin IA».
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+- **Cobertura QA:** `test_imagenes.ImageWorkflowTests.test_edit_options_note_precedence_and_conservative_team_decision`; criterio 9 en `PlainCropTests.test_his_choices_on_the_photo_still_decide_and_his_own_rejected_ai_edit_keeps_the_original` y en `CaptureImageApiTests.test_structured_understanding_assigns_per_photo_instructions_without_a_second_call` (la captura entiende «recórtala» como `crop`). Escritas; ejecución pendiente del CI.
 
 ### IMG-08 · Ediciones que el equipo decide por su cuenta <a id="img-08"></a>
 
 - **Dónde:** backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** con «Que decida el equipo» y sin instrucción, el equipo solo edita cuando importa (oscura o torcida, encuadre para LinkedIn, objetos que distraen); con «Editar» y sin instrucción, elige el retoque que más mejora la foto. En los dos casos él la ve, con veto, antes de que salga.
-- **Implementación backend:** El director recibe previews y propone solo luz, enderezar, encuadre o distracciones. `auto` con duda conserva el original.
+- **Qué hace para Gustavo:** con «Que decida el equipo» y sin instrucción, el equipo solo edita cuando importa (oscura o torcida, objetos que distraen); con «Editar» y sin instrucción, elige el retoque que más mejora la foto. En los dos casos él la ve, con veto, antes de que salga. El encuadre para LinkedIn no es una edición: es el recorte sin IA de [IMG-14](#img-14).
+- **Implementación backend:** El director recibe previews y propone solo luz, enderezar o distracciones (`crop` sigue en el contrato, pero nunca va al modelo de imagen: se resuelve con el recorte de `imagenes.crop`). `auto` con duda conserva el original.
 - **Criterios de aceptación:**
   1. **Dado** una foto con «Que decida el equipo», sin instrucción y bien expuesta, recta y sin distracciones, **cuando** se elige, **entonces** no se edita.
-  2. **Dado** una foto oscura, torcida, mal encuadrada para LinkedIn o con objetos que distraen, **cuando** se elige, **entonces** el equipo la edita para corregir solo eso y registra el motivo («Estaba oscura: se aclaró»).
+  2. **Dado** una foto oscura, torcida o con objetos que distraen, **cuando** se elige, **entonces** el equipo la edita para corregir solo eso y registra el motivo («Estaba oscura: se aclaró»). Si además no tiene el tamaño de LinkedIn, el resultado se recorta igual que el recorte sin IA, centrado.
   3. **Dado** una edición decidida por el equipo, **cuando** se prepara la pieza, **entonces** se aplica y se muestra en el detalle de la pieza para que Gustavo pueda vetarla, sin preguntarle antes: elegir «Que decida el equipo» o «Editar» es su permiso.
   4. **Dado** que el equipo duda si editar una foto con «Que decida el equipo», **cuando** decide, **entonces** no edita. (Con «Editar» no hay duda: se edita.)
+  5. **Dado** una edición que decidió el equipo y que no pasa la comprobación, falla o no tiene proveedor, **cuando** termina, **entonces** sale la foto recortada sin IA ([IMG-14](#img-14)), nunca una foto de 9:16 sin recortar; si la comprobación la rechazó, se ve la edición descartada con sus motivos ([IMG-11](#img-11)).
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+- **Cobertura QA:** criterio 5 en `test_imagenes.PlainCropTests.test_a_team_edit_that_does_not_pass_or_cannot_run_falls_back_to_the_crop`. Escrita; ejecución pendiente del CI.
 
 ### IMG-09 · Editar con la API de imágenes de OpenAI sin perder el original <a id="img-09"></a>
 
@@ -228,31 +231,32 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   2. **Dado** la edición terminada, **cuando** se guarda, **entonces** el archivo original queda idéntico (mismo SHA-256 antes y después) y la versión editada se guarda en otro archivo, ligada a la foto y a la pieza.
   3. **Dado** la versión editada, **cuando** se pide, **entonces** se sirve por una ruta autenticada y privada, como el original (`GET /api/v1/galeria/<id>/imagen`): sin URL pública y con `Cache-Control: private`.
   4. **Dado** la foto editada, **cuando** se consulta en la Galería, **entonces** su estado es `editada` y su etiqueta «Editada con IA».
-  5. **Dado** un error o un tiempo de espera de OpenAI, **cuando** falla la edición, **entonces** no se repite sola (un paso pagado nunca se repite) y se publica el original, con el motivo registrado.
-  6. **Dado** que se agotó el presupuesto de imágenes ([IMG-13](#img-13)), **cuando** toca editar, **entonces** no se edita y se publica el original, con el motivo registrado.
-  7. **Dado** que Gustavo borra la foto de la Galería, **cuando** se borra, **entonces** se borran el original y todas sus versiones editadas.
-  8. **Dado** `LIVE_PROVIDERS=false` o sin clave de OpenAI, **cuando** toca editar, **entonces** no se llama a nadie y se publica el original.
+  5. **Dado** un error o un tiempo de espera de OpenAI, **cuando** falla la edición, **entonces** no se repite sola (un paso pagado nunca se repite) y se publica la foto sin editar, con el motivo registrado: recortada sin IA si la edición la decidió el equipo, su original si la pidió Gustavo ([IMG-14](#img-14)).
+  6. **Dado** que se agotó el presupuesto de imágenes ([IMG-13](#img-13)), **cuando** toca editar, **entonces** no se edita y se publica la foto sin editar como en el criterio 5, con el motivo registrado.
+  7. **Dado** que Gustavo borra la foto de la Galería, **cuando** se borra, **entonces** se borran el original, todas sus versiones editadas y sus recortes ([IMG-14](#img-14)).
+  8. **Dado** `LIVE_PROVIDERS=false` o sin clave de OpenAI, **cuando** toca editar, **entonces** no se llama a nadie y se publica la foto sin editar como en el criterio 5.
   9. **Dado** una infografía o un carrusel, **cuando** se prepara, **entonces** nunca se llama a la API de imágenes de OpenAI ([IMG-INF-08](#img-inf-08)).
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+- **Cobertura QA:** criterios 5, 7 y 8 con el recorte en `test_imagenes.PlainCropTests` (`test_a_team_edit_that_does_not_pass_or_cannot_run_falls_back_to_the_crop`, `test_deleting_the_photo_deletes_its_crop_too`). Escritas; ejecución pendiente del CI.
 
 ### IMG-10 · Comprobación de la edición con un modelo con visión <a id="img-10"></a>
 
 - **Dónde:** backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** antes de publicar una foto editada, un modelo que ve imágenes (Claude) confirma que la edición hizo lo que él pidió y no deforma a las personas, los textos ni la marca. Si no pasa, sale la foto original.
+- **Qué hace para Gustavo:** antes de publicar una foto editada, un modelo que ve imágenes (Claude) confirma que la edición hizo lo que él pidió y no deforma a las personas, los textos ni la marca. Si no pasa, sale la foto sin editar: recortada sin IA si la edición la decidió el equipo, su original si la pidió él ([IMG-14](#img-14)).
 - **Implementación backend:** Claude recibe original y resultado exacto, instrucción y post; revisión por SHA-256. Fallo o rechazo conserva el original.
 - **Criterios de aceptación:**
   1. **Dado** una foto editada, **cuando** se comprueba, **entonces** Claude recibe el original, la versión editada, la instrucción o el motivo y el texto del post, y devuelve un veredicto con sus motivos.
   2. **Dado** una edición que no sigue la instrucción (se pidió recortar y además cambió los colores), **cuando** se comprueba, **entonces** el veredicto es desfavorable.
   3. **Dado** una edición que cambia caras, cuerpos o el número de personas, deforma textos o altera un logotipo o la marca, **cuando** se comprueba, **entonces** el veredicto es desfavorable.
-  4. **Dado** un veredicto desfavorable, **cuando** termina, **entonces** se publica el original, el detalle de la pieza muestra por qué se descartó la edición y la foto no queda como `editada`.
+  4. **Dado** un veredicto desfavorable, **cuando** termina, **entonces** se publica la foto sin editar (recortada sin IA si la edición la decidió el equipo; su original si la pidió Gustavo), el detalle de la pieza muestra por qué se descartó la edición y la foto no queda como `editada`.
   5. **Dado** un veredicto favorable, **cuando** se guarda, **entonces** va ligado al SHA-256 de la imagen exacta; si la imagen cambia después, deja de valer.
-  6. **Dado** que la comprobación falla por un error del proveedor, **cuando** termina, **entonces** se publica el original (nunca una edición sin comprobar).
-  7. **Dado** una foto sin editar, **cuando** se prepara la pieza, **entonces** no hace falta esta comprobación.
+  6. **Dado** que la comprobación falla por un error del proveedor, **cuando** termina, **entonces** se publica la foto sin editar como en el criterio 4 (nunca una edición sin comprobar).
+  7. **Dado** una foto sin editar, también una recortada sin IA, **cuando** se prepara la pieza, **entonces** no hace falta esta comprobación ni se llama a ningún modelo.
   8. **Dado** una edición que pidió Gustavo (su nota en la foto o su comentario en la pieza), **cuando** se comprueba, **entonces** la revisión es tolerante: solo la rechaza si el cambio pedido no se ve, una persona deja de parecer la misma o sale deformada, aparecen texto, cifras, logos o marcas nuevos, o se ven caras o nombres de otras personas que pidió ocultar. Objetos añadidos o quitados, detalles del portátil o de las pantallas redibujados, luz o encuadre no la hacen fallar; quedan anotados en los motivos. Las ediciones que decide el equipo (criterios 2 y 3) siguen con la revisión estricta.
+  9. **Dado** una edición cuyo resultado se recorta al tamaño de LinkedIn (4:5 o 1:1, centrado), **cuando** se comprueba, **entonces** el encuadre y lo que deja fuera el recorte nunca la hacen fallar, ni en la revisión estricta ni en la tolerante.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+- **Cobertura QA:** criterios 4, 7 y 8 en `test_imagenes.PlainCropTests.test_his_choices_on_the_photo_still_decide_and_his_own_rejected_ai_edit_keeps_the_original` y `test_a_team_edit_that_does_not_pass_or_cannot_run_falls_back_to_the_crop`; el criterio 9 es una regla de los prompts de `connectors_images` (sin prueba de modelo). Escritas; ejecución pendiente del CI.
 
 ### IMG-11 · La imagen en el detalle de la pieza, con veto <a id="img-11"></a>
 
@@ -261,7 +265,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Qué hace para Gustavo:** en el detalle de la pieza, en la PWA y en la app, ve la imagen que saldrá: la foto (original y editada, con el motivo de la edición), la infografía o las láminas del carrusel, con su texto alternativo, y puede vetar hasta la hora de salida.
 - **Implementación backend:** Detalle con images[], origen, alt, motivo, revisión y PDF privado. `PieceImages.tsx` en app y PWA presenta foto, comparación y carrusel; tipos y lógica en `compartido/`.
 - **Criterios de aceptación:**
-  1. **Dado** una pieza con una foto sin editar, **cuando** abre su detalle, **entonces** ve la foto con «Se publica tal cual» y el motivo («Instrucción de Gustavo: úsala tal cual», «Edición prohibida en la foto»…).
+  1. **Dado** una pieza con una foto sin editar ni recortar, **cuando** abre su detalle, **entonces** ve la foto con «Se publica tal cual» y el motivo («Instrucción de Gustavo: úsala tal cual», «Edición prohibida en la foto»…).
   2. **Dado** una pieza con una foto editada, **cuando** abre su detalle, **entonces** ve el original y la versión editada (lado a lado en escritorio, alternables en el teléfono), el motivo de la edición y el veredicto de la comprobación.
   3. **Dado** una edición descartada por la comprobación, **cuando** abre el detalle, **entonces** ve que sale el original y por qué, y en la app ve también la edición descartada («Edición con IA descartada») con las razones, para juzgarla él mismo. El servidor guarda solo la última descartada de cada foto (`PieceImage.data.rejected_edit`, fuera del manifiesto: nunca se publica) y la sirve en `GET /api/v1/editorial/pieces/{id}/images/{img}/descartada`; una edición aceptada después la borra.
   4. **Dado** una pieza con infografía o carrusel, **cuando** abre su detalle, **entonces** ve la imagen o cada lámina en orden («1/5», «2/5»…), la plantilla usada, el resultado de la lista de 10 puntos y el texto alternativo de cada una.
@@ -270,8 +274,9 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   7. **Dado** que la imagen no carga, **cuando** abre el detalle, **entonces** ve un aviso en su lugar («No se pudo cargar la imagen») con «Reintentar», y el resto del detalle sigue.
   8. **Dado** una pieza en preparación sin imagen todavía, **cuando** abre el detalle, **entonces** ve «La imagen aparece cuando el equipo la prepare».
   9. **Dado** una imagen rehecha (por un comentario suyo, [EDI-22](motor-editorial.md#edi-22)), **cuando** vuelve a abrir el detalle, **entonces** ve la imagen nueva y no la que guardó antes el teléfono o el navegador: la URL de cada imagen lleva su versión (`?v=` + los primeros 16 caracteres de su sha256, `imagenes.url`), así que cambia con su contenido.
-- **Brechas código/docs:** Implementación de interfaz terminada; CI y QA visual pendientes.
-- **Cobertura QA:** `16-imagenes` (foto, infografía, carrusel de cuatro láminas y alt); `07-pieza-veto` (veto de la pieza completa). Jest/Vitest: original y editada, reintento, revisión, preparación, alt, paginación, hash recibido y fin del veto. Escritos; ejecución pendiente de Claude.
+  10. **Dado** una pieza con una foto recortada sin IA ([IMG-14](#img-14)), **cuando** abre su detalle en la app, **entonces** ve «Recortada, sin IA» (nunca «Editada con IA» ni «Se publica tal cual»), el motivo («…; sale recortada a 1080×1350, centrada y sin IA») y puede alternar con el original («Ver original» / «Ver recortada»). La API lo dice con `images[].cropped`.
+- **Brechas código/docs:** Implementación de interfaz terminada; CI y QA visual pendientes. Criterio 10: solo en la app (primero el móvil); la PWA aún muestra una foto recortada como «Se publica tal cual».
+- **Cobertura QA:** `16-imagenes` (foto, infografía, carrusel de cuatro láminas y alt); `07-pieza-veto` (veto de la pieza completa). Jest/Vitest: original y editada, reintento, revisión, preparación, alt, paginación, hash recibido y fin del veto. Criterio 10: Jest `PiezaScreen.test.tsx` («marks a plain crop without AI apart from an AI edit…») y `compartido/src/logic/imagenes.test.ts` (`photoTreatment`); `test_imagenes.PlainCropTests` comprueba `cropped` en la API. Escritos; ejecución pendiente de Claude.
 
 ### IMG-12 · La Galería marca la foto «usada en la pieza del …» <a id="img-12"></a>
 
@@ -299,7 +304,7 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   1. **Dado** una edición con OpenAI, **cuando** se llama, **entonces** antes se reserva su peor caso en el ledger con un propósito propio (por ejemplo `image-edit`, proveedor `openai`) y al terminar se liquida con el coste real.
   2. **Dado** una comprobación con Claude (de una foto editada o de una infografía), **cuando** se llama, **entonces** también pasa por el ledger con su propósito (por ejemplo `image-check`).
   3. **Dado** una infografía o un carrusel, **cuando** se dibuja, **entonces** no hay coste de modelo de imagen: solo cuentan la llamada que escribe su contenido y la comprobación visual.
-  4. **Dado** que se agotó el presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD` o el tope de seguridad diario `AI_DAILY_FUSE_USD`), **cuando** toca editar, **entonces** no se hace ninguna edición más y se publica el original.
+  4. **Dado** que se agotó el presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD` o el tope de seguridad diario `AI_DAILY_FUSE_USD`), **cuando** toca editar, **entonces** no se hace ninguna edición más y se publica la foto sin editar (recortada sin IA si la edición la decidió el equipo, [IMG-14](#img-14)). El recorte no cuesta nada: no llama a ningún proveedor.
   5. **Dado** el gasto de imágenes, **cuando** se calcula el presupuesto general de IA, **entonces** cuenta en él, como el de cualquier área.
   6. **Dado** un fallo de OpenAI que no se cobra, **cuando** termina, **entonces** la reserva queda `rejected`; un fallo incierto la deja `uncertain` y no se reintenta.
   7. **Dado** Ajustes › Gasto de IA, en la PWA y en la app, **cuando** lo abre, **entonces** ve una línea «Imágenes» con lo gastado hoy, sin tope propio.
@@ -316,16 +321,21 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
 - **Criterios de aceptación:**
   1. **Dado** una pieza aprobada con una foto o una infografía de imagen única, **cuando** llega su hora, **entonces** primero se sube la imagen a LinkedIn (registrar la subida y enviar los bytes) y después se crea el post que la referencia en `content.media`, con su texto alternativo, usando el mismo permiso `w_member_social`.
   2. **Dado** una pieza con carrusel, **cuando** llega su hora, **entonces** se sube como documento de hasta 8 láminas de 1080×1350 y se crea el post que lo referencia.
-  3. **Dado** la imagen que se publica, **cuando** se prepara, **entonces** tiene formato vertical 1080×1350 o cuadrado 1080×1080; nunca horizontal.
-  4. **Dado** una foto que no tiene ese formato y que se puede editar, **cuando** se prepara, **entonces** adaptar el encuadre cuenta como una edición y sigue [IMG-07](#img-07) a [IMG-10](#img-10). La edición se pide al modelo en la orientación de la foto (1024×1536 vertical, 1536×1024 horizontal) y el resultado se recorta, nunca se aplasta: una foto vertical sale a 1080×1350 y las demás a 1080×1080.
-  5. **Dado** una foto con «No editar» en otro formato, **cuando** se prepara, **entonces** se publica tal cual, sin recortarla.
+  3. **Dado** la imagen que se publica, **cuando** se prepara, **entonces** tiene formato vertical 1080×1350 o cuadrado 1080×1080; nunca horizontal. Una foto más pequeña que ese tamaño conserva su resolución con esa proporción (nunca se agranda), y una foto que sale tal cual (criterio 5) conserva la suya.
+  4. **Dado** una foto que no tiene ese formato (por ejemplo, una 9:16 del teléfono) y que se puede editar, **cuando** se prepara, **entonces** el código la recorta, centrada, sin ningún modelo de imagen ni comprobación visual (decisión de Gustavo, 2026-11-14: «centrar y recortar arriba y abajo»): una foto vertical conserva todo su ancho y pierde lo mismo arriba y abajo hasta 4:5 (1080×1350); una horizontal o cuadrada pierde lo mismo a cada lado hasta 1:1 (1080×1080). Antes se endereza según su EXIF y el resultado no copia sus metadatos. Si además lleva una edición con IA ([IMG-07](#img-07) a [IMG-10](#img-10)), esta se pide al modelo en la orientación de la foto (1024×1536 vertical, 1536×1024 horizontal) y su resultado se recorta igual, centrado, nunca se aplasta.
+  5. **Dado** una foto con «No editar», con la nota «úsala tal cual» o con una instrucción no segura, en otro formato, **cuando** se prepara, **entonces** se publica tal cual, sin recortarla.
   6. **Dado** que falla la subida de la imagen o del documento antes de crear el post, **cuando** termina, **entonces** la acción queda `failed` sin publicar nada (resultado definitivo) y llega el aviso correspondiente.
   7. **Dado** un 401, 403 o 429 al subir, **cuando** termina, **entonces** la cuenta pasa a pausa con aviso, como al publicar texto.
   8. **Dado** que la creación del post da un resultado incierto, **cuando** termina, **entonces** queda `uncertain` y nunca se repite ([EDI-12](motor-editorial.md#edi-12)).
   9. **Dado** el post publicado, **cuando** se confirma, **entonces** cada foto usada pasa a `publicada` con `published_at`.
   10. **Dado** el conector simulado (`linkedin_fake`), **cuando** se publica con imagen o carrusel, **entonces** guarda lo subido en su memoria para que las pruebas lo comprueben.
+  11. **Dado** una foto recortada, **cuando** se guarda, **entonces** el original queda intacto, el recorte va en otro archivo ligado a la pieza (`PieceImage.cropped`, con la caja del recorte y el SHA-256 del original en `data.crop`), el motivo dice «sale recortada a 1080×1350, centrada y sin IA» y la foto queda `elegida`, no `editada`.
+  12. **Dado** un recorte, **cuando** lo revisan la política, el verificador, el líder o cualquier agente que elige la imagen, **entonces** nunca retiene la pieza por el encuadre ni por lo que dejó fuera: no pasa por la comprobación visual, sus bytes exactos quedan ligados por SHA-256 y por el manifiesto, y los prompts que ven la foto dicen que su formato no es motivo para descartarla ni para editarla.
+  13. **Dado** una foto 9:16 de una propuesta de Gustavo, **cuando** el circuito diario prepara la pieza y llega su hora, **entonces** la pieza queda lista y sale en LinkedIn con la foto recortada a 1080×1350, sin ninguna llamada a un modelo de imagen ni a la comprobación visual y sin ningún bloqueo por el encuadre.
+  14. **Dado** una foto que ya mide 1080×1350 o 1080×1080, **cuando** se prepara, **entonces** sale tal cual, sin recortar.
+  15. **Dado** una edición con IA que decidió el equipo y que no pasa la comprobación, falla o no tiene proveedor, **cuando** termina, **entonces** sale la foto recortada sin IA; si la edición la pidió Gustavo y no pasa, sale su original, como dice [IMG-10](#img-10).
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+- **Cobertura QA:** criterios 3 a 5 y 11 a 15 en `test_imagenes.PlainCropTests` (`test_every_orientation_is_cut_by_code_to_its_size_without_upscaling_or_any_model_call`, `test_the_crop_is_centred_and_a_photo_with_linkedin_size_goes_out_as_it_is`, `test_a_phone_jpeg_is_turned_upright_cropped_and_loses_its_exif`, `test_his_choices_on_the_photo_still_decide_and_his_own_rejected_ai_edit_keeps_the_original`, `test_a_team_edit_that_does_not_pass_or_cannot_run_falls_back_to_the_crop`, `test_the_agents_that_choose_the_photo_are_told_its_format_never_rules_it_out`, `test_a_phone_photo_goes_from_his_capture_to_linkedin_without_an_image_model_or_a_block`) y `test_retoque.EditSizeTests.test_reframing_a_vertical_original_keeps_it_vertical_without_ai`. Escritas; ejecución pendiente del CI.
 
 ---
 
