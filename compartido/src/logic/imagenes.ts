@@ -17,6 +17,14 @@ export function orderedImages(images: readonly PieceImage[] = []): PieceImage[] 
   return [...images].sort((a, b) => a.position - b.position);
 }
 
+/** IMG-11/IMG-14: what the team did to his photo. An AI edit has its vision check; a crop is his own photo cut to
+ * LinkedIn's size by code, without AI. Null for designed images (infographic, carousel, card). */
+export function photoTreatment(image: Pick<PieceImage, 'kind' | 'edited' | 'cropped'>): 'editada' | 'recortada' | 'original' | null {
+  if (image.edited) return 'editada';
+  if (image.kind !== 'foto') return null;
+  return image.cropped ? 'recortada' : 'original';
+}
+
 export function imageAspect(image: Pick<PieceImage, 'width' | 'height'>): number {
   return image.width > 0 && image.height > 0 ? image.width / image.height : 1;
 }

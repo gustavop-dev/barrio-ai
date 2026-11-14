@@ -1,7 +1,7 @@
 import { publishAsapLines } from './capturas';
 import { photoPatch } from './galeria';
 import { pieceVetoable } from './piece';
-import { reviewLines } from './imagenes';
+import { photoTreatment, reviewLines } from './imagenes';
 
 describe('image workflow contract', () => {
   it.each(['no', 'auto', 'si'] as const)('patches only the changed choice (%s)', (ai_edit) => {
@@ -20,6 +20,13 @@ describe('image workflow contract', () => {
     expect(reviewLines({ ok: true, mode: 'fixed_brand_card' })).toEqual(['Plantilla fija de marca; sin revisión visual dinámica.']);
     expect(reviewLines({ started: true })).toEqual(['Comprobación en curso']);
     expect(reviewLines({ ok: false, reasons: ['Se alteró un nombre'] })).toEqual(['Comprobación no aprobada', 'Se alteró un nombre']);
+  });
+
+  it('tells an AI edit, a plain crop and the untouched photo apart (images from before the field are originals)', () => {
+    expect(photoTreatment({ kind: 'foto', edited: true, cropped: false })).toBe('editada');
+    expect(photoTreatment({ kind: 'foto', edited: false, cropped: true })).toBe('recortada');
+    expect(photoTreatment({ kind: 'foto', edited: false })).toBe('original');
+    expect(photoTreatment({ kind: 'carrusel', edited: false, cropped: false })).toBeNull();
   });
 });
 

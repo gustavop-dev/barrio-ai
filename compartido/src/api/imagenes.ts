@@ -28,6 +28,8 @@ export interface PieceImage {
   sha256: string;
   source_photos: { id: string; url: string }[];
   edited: boolean;
+  /** IMG-14: his photo cut to LinkedIn's size by code (no AI). Absent on images prepared before the field existed. */
+  cropped?: boolean;
   ai_edit: AIEdit;
   reason: string;
   template: 'portada' | 'pasos' | 'barras' | 'numero' | 'cierre' | 'preguntas' | null;
