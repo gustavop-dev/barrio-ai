@@ -393,7 +393,7 @@ class LeadRedraftTests(tr.LeadBase):
         ActionProposal.objects.filter(pk=self.first.pk).update(decided_at=timezone.now())
         jobs.enqueue_operation(self.gustavo,'propose_comment',{'post':str(self.other.id)})
         self.assertEqual(self.queue(),0)  # one paid draft at a time
-        Job.objects.all().delete()
+        Job.objects.filter(kind='propose_comment').delete()  # never ran: nothing refers to it
         rules=operador.create_proposal(self.gustavo,self.other,'INT-03',{'text':tr.GOOD+' #evals'},citations=[tal.UNIT],source='agent')
         self.assertEqual(autopiloto.policy_review(rules).state,'discarded')  # a rule, not the lead: R4 already redrafts that
         self.assertEqual(self.queue(),1)
