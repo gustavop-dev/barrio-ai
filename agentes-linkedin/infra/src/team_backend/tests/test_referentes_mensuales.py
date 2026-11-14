@@ -127,6 +127,20 @@ class MonthlyReferentTests(MonthlyDataMixin, TestCase):
         item.refresh_from_db(); self.assertEqual(item.state, 'conflict')
         self.assertIsNone(item.applied_at)
 
+    def test_an_extraordinary_review_on_day_one_is_never_applied_by_silence(self):
+        # referentes.extraordinary can be asked for on day 1: its notice says «nada se aplica sin tu decisión».
+        self.review.dossier = {'extraordinaria': True}; self.review.deadline = self.now + timedelta(days=7)
+        self.review.save(update_fields=['dossier', 'deadline'])
+        item = self.change(); self.publish()
+        self.assertEqual(self.review.state, 'late')
+        self.assertEqual(self.review.notices.get(event='day1').payload['title'], 'Revisión extraordinaria de referentes')
+        with patch('team_backend.operador.within_window', return_value=False):
+            refs.tick(self.user, self.now.replace(day=4, hour=10))
+        self.assertFalse(self.review.notices.filter(event='day4').exists())  # no «se aplicarán» reminder
+        refs.close(self.review, self.review.deadline)
+        item.refresh_from_db()
+        self.assertEqual(item.state, 'conflict'); self.assertIsNone(item.applied_at)
+
     def test_initial_notice_failure_rolls_back_publication(self):
         with patch.object(Notification.objects, 'create', side_effect=RuntimeError('database unavailable')):
             with self.assertRaises(RuntimeError): self.publish()

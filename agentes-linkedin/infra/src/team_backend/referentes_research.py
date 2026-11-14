@@ -228,6 +228,7 @@ def run(job):
             if review.state == 'preparing':
                 review.state = 'incomplete'
                 review.dossier = {'status': 'Investigación incompleta', 'summary': 'Revisión detenida; se conserva el ledger y no se repiten llamadas inciertas.',
-                                  'limitations': ['Motivo: '+(str(exc) if isinstance(exc,orquestacion.CycleStopped) else type(exc).__name__)]}
+                                  'limitations': ['Motivo: '+(str(exc) if isinstance(exc,orquestacion.CycleStopped) else type(exc).__name__)],
+                                  'extraordinaria': extraordinary}
                 review.save()
     return publish(review, timezone.now())

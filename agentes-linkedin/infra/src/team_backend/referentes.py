@@ -202,8 +202,11 @@ def publish(review, now=None):
         return review
     review.published_at = now
     # Late batches stay explicit-only, including after a failed initial publication transaction. An industry search
-    # (referentes_industria) is never applied by silence, whatever day it lands.
-    review.state = 'published' if now.astimezone(TZ).date() == review.month and review.kind == 'mensual' else 'late'
+    # (referentes_industria) and an extraordinary review (its notice promises «nada se aplica sin tu decisión») are
+    # never applied by silence, whatever day they land: even one asked for on day 1.
+    on_time = (now.astimezone(TZ).date() == review.month and review.kind == 'mensual'
+               and not (review.dossier or {}).get('extraordinaria'))
+    review.state = 'published' if on_time else 'late'
     if control.revision != review.expected_revision or not control.initialized:
         review.state = 'conflict'
     review.save()
@@ -359,9 +362,9 @@ def tick(user, now=None):
     for review in ReferentReview.objects.filter(closed_at__isnull=True).select_related('account'):
         publish(review, now)
         review.refresh_from_db()
-        # The day-4 reminder promises an application by silence: only the monthly batch has one.
+        # The day-4 reminder promises an application by silence: only the on-time monthly batch has one.
         if (local.day == 4 and local.hour >= 9 and review.month == local.date().replace(day=1) and review.published_at
-                and review.kind == 'mensual'):
+                and review.kind == 'mensual' and review.state == 'published'):
             if review.changes.filter(state='pending', responded_at__isnull=True).exists():
                 with transaction.atomic():
                     lock(review.account)
