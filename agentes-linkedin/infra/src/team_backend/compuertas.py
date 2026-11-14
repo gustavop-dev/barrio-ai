@@ -30,6 +30,10 @@ DEFAULT_POLICY={'cta_max':0}
 BLOCKED_BARE='El verificador emitió blocked'
 LEAD_REDRAFT='Reescrito una vez con las razones del líder'  # risk of a comment redrafted after a lead discard
 
+def lead_redraft():
+    """A comment the lead discarded gets ONE redraft with its reasons (COMMENT_LEAD_REDRAFT, on by default)."""
+    return os.environ.get('COMMENT_LEAD_REDRAFT','true').lower()=='true'
+
 # --------------------------------------------------------------------------- policy and severity
 
 def gate_policy(piece=None):

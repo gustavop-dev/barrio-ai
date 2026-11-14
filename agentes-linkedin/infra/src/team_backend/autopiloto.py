@@ -14,7 +14,7 @@ import uuid
 from collections import Counter
 from datetime import timedelta
 from decimal import Decimal
-from django.db.models import Case, Q, When
+from django.db.models import Case, Count, Q, When
 from django.utils import timezone
 from knowledge import db, memory
 from . import guardas, idioma, lider, oficina_eventos, operador, red
@@ -289,6 +289,8 @@ def tick(user,now=None):
         try:report['community_study']=report.get('community_study',0)+comunidad.schedule(user,account,now)
         except Exception as exc:report['community_error']=type(exc).__name__
         report['observe']+=_observe(user,account,now)
+        redrafted=_lead_redraft(user,account,now)  # before a new draft: it holds the one draft at a time
+        if redrafted:report['lead_redraft']=report.get('lead_redraft',0)+redrafted
         report['propose']+=_propose(user,account,now)
         report['network']=report.get('network',0)+_network(user,account,now)
         try:report['metrics']=report.get('metrics',0)+_metrics(user,account,now)
@@ -408,6 +410,35 @@ def _propose(user,account,now):
             if _prefilter(post)=='skip':continue
         _,created=enqueue_operation(user,'propose_comment',{'post':str(post.id)},request_id=_job_id('propose',post.id))
         return int(created)
+    return 0
+
+def _lead_redraft(user,account,now):
+    """A comment the lead discarded in the last 24 h gets ONE redraft with the lead's reasons (docs/compuertas.md): same
+    write slot, budget, daily room and one-draft-at-a-time as _propose. The redraft goes through the rules and the lead
+    again; a post that already has two comment drafts is never redrafted."""
+    from . import compuertas
+    if not compuertas.lead_redraft() or not lider.enabled() or autonomy('INT-03')!='auto':return 0
+    if 'INT-03' not in lider.capabilities() or operador.capacity_left(account,'INT-03',now)-open_comments(account)<=0:return 0
+    from knowledge import presupuesto
+    if presupuesto.left(now)<=0 or Job.objects.filter(kind='propose_comment',state__in=[Job.State.QUEUED,Job.State.RUNNING]).exists():
+        return 0
+    day,_=operador.period_starts(now)
+    drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
+    if int(setting('OPERATOR_DAILY_PROPOSALS','6'))-drafted<=0:return 0
+    max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
+    discarded=(ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',
+                                             state=ActionProposal.State.DISCARDED,review__decision='discard',
+                                             decided_at__gte=now-timedelta(hours=24),post__posted_at__gte=now-max_age,
+                                             post__referent__active=True)
+               .exclude(post__referent_id__in=recent_comment_authors(account,now))
+               .annotate(drafts=Count('post__proposals',filter=Q(post__proposals__capability='INT-03'))).filter(drafts=1)
+               .select_related('post').order_by('-decided_at'))
+    from . import experimentos
+    for proposal in discarded[:10]:
+        if not experimentos.eligible(proposal.post,now):continue
+        _,created=enqueue_operation(user,'propose_comment',{'post':str(proposal.post_id),'redraft_of':str(proposal.id)},
+                                    request_id=_job_id('redraft',proposal.id))
+        if created:return 1
     return 0
 
 def _every(name,default):

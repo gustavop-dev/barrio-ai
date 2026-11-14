@@ -10,10 +10,12 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from team_backend import autopiloto, compuertas, editorial, evaluaciones, operador
-from team_backend.models import ActionProposal, EditorialPiece
+from team_backend import autopiloto, compuertas, editorial, evaluaciones, jobs, operador
+from team_backend.models import ActionProposal, EditorialPiece, Job, ObservedPost
 from team_backend.tests import test_auditoria_editorial as tae
+from team_backend.tests import test_auditoria_lider as tal
 from team_backend.tests import test_evaluaciones as te
+from team_backend.tests import test_rediseno as tr
 from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answers
 
 SOFT={'issue':'hook_not_delivered','severity':'material','quote':'Which decision','detail':'The hook promises more than the close.'}
@@ -334,3 +336,65 @@ class AuditTests(EditorialBase):
         self.assertTrue(data['disponible'])
         self.assertIn('lider:INT-03',data['por_compuerta'])
         self.assertNotIn(str(h['blocked'].id),json.dumps(data))
+
+
+class LeadRedraftTests(tr.LeadBase):
+    """A comment the lead discarded gets ONE redraft with its reasons; the lead judges the new text; never a third draft."""
+    BETTER='Evals hide most of the work, and the hard part is choosing which failure to measure first. What did you start with?'
+
+    def setUp(self):
+        super().setUp();self.post,self.other=self.observed()
+        ObservedPost.objects.filter(pk__in=[self.post.pk,self.other.pk]).update(posted_at=timezone.now()-timedelta(hours=2))
+        self.jev.probabilities=dict(tr.COMMENT_OK,aporta=0.4)
+        first=operador.create_proposal(self.gustavo,self.post,'INT-03',{'text':tr.GOOD},citations=[tal.UNIT],source='agent')
+        self.first=autopiloto.policy_review(first);self.first.refresh_from_db()
+
+    def queue(self):
+        return autopiloto._lead_redraft(self.gustavo,self.account,timezone.now())
+
+    def redraft(self,*answers):
+        self.assertEqual(self.queue(),1)
+        with patch('knowledge.providers.claude',side_effect=list(answers)) as claude:jobs.process_one(self.worker)
+        job=Job.objects.get(kind='propose_comment');self.assertEqual(job.state,'complete',job.error)
+        return claude,ActionProposal.objects.exclude(pk=self.first.pk).get(post=self.post)
+
+    def test_a_comment_the_lead_discarded_is_redrafted_once_with_its_reasons(self):
+        self.assertEqual((self.first.state,self.first.review['decision']),('discarded','discard'))
+        claude,redraft=self.redraft(tal.draft(self.BETTER))
+        self.assertEqual(Job.objects.get(kind='propose_comment').params,{'post':str(self.post.id),'redraft_of':str(self.first.id)})
+        revision=json.loads(claude.call_args.args[1])['revision']
+        self.assertEqual(revision,{'previous_comment':tr.GOOD,'lead_reasons':self.first.review['reasons']})
+        self.assertIn('aporta=0.4',revision['lead_reasons'][0])
+        self.assertIn('lead_reasons',claude.call_args.args[0])  # the drafter knows what the revision holds
+        self.assertEqual(redraft.payload['text'],self.BETTER)
+        self.assertIn(compuertas.LEAD_REDRAFT+': '+'; '.join(self.first.review['reasons']),redraft.risks)
+        self.jev.probabilities=tr.COMMENT_OK
+        self.assertEqual(autopiloto.policy_review(redraft).state,'approved')  # the lead judges the new text
+        from team_backend import auditoria_compuertas
+        lead={r['compuerta']:r for r in auditoria_compuertas.auditar(7)['compuertas']}['lider:INT-03']
+        self.assertEqual((lead['entraron'],lead['pasaron_a_la_primera'],lead['pasaron_tras_reintento'],lead['paradas'],
+                          lead['descartes_sin_reescritura']),(2,0,1,1,0))
+
+    def test_a_redraft_is_final_no_rules_redraft_and_no_second_lead_redraft(self):
+        claude,redraft=self.redraft(tal.draft(self.BETTER+' #evals'))
+        self.assertEqual(claude.call_count,1)  # the lead redraft was the one redraft
+        redraft=autopiloto.policy_review(redraft);redraft.refresh_from_db()
+        self.assertEqual(redraft.state,'discarded');self.assertIn('Contiene hashtags',redraft.risks)
+        self.assertEqual(self.queue(),0)
+        with self.assertRaises(operador.Conflict):operador.propose_comment(self.gustavo,self.post.id,redraft_of=self.first.id)
+        with self.assertRaises(ValueError):operador.propose_comment(self.gustavo,self.other.id,redraft_of=self.first.id)
+
+    def test_only_recent_lead_discards_with_the_lead_on_and_room_to_draft(self):
+        for env in ({'COMMENT_LEAD_REDRAFT':'false'},{'LEAD_ENABLED':'false'},{'OPERATOR_AUTONOMY':'INT-03=approval'},
+                    {'OPERATOR_DAILY_PROPOSALS':'1'}):
+            with patch.dict(os.environ,env):self.assertEqual(self.queue(),0,env)
+        ActionProposal.objects.filter(pk=self.first.pk).update(decided_at=timezone.now()-timedelta(hours=25))
+        self.assertEqual(self.queue(),0)
+        ActionProposal.objects.filter(pk=self.first.pk).update(decided_at=timezone.now())
+        jobs.enqueue_operation(self.gustavo,'propose_comment',{'post':str(self.other.id)})
+        self.assertEqual(self.queue(),0)  # one paid draft at a time
+        Job.objects.all().delete()
+        rules=operador.create_proposal(self.gustavo,self.other,'INT-03',{'text':tr.GOOD+' #evals'},citations=[tal.UNIT],source='agent')
+        self.assertEqual(autopiloto.policy_review(rules).state,'discarded')  # a rule, not the lead: R4 already redrafts that
+        self.assertEqual(self.queue(),1)
+        self.assertEqual(Job.objects.get(kind='propose_comment').params['redraft_of'],str(self.first.id))
