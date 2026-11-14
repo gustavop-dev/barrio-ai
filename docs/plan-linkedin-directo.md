@@ -122,9 +122,10 @@ aceptaciones. Son una red de seguridad detrás de los topes del operador. Un top
 
 Hecho y probado con respuestas inventadas y el navegador falso de las pruebas; nada de esto salió a LinkedIn:
 
-- **Topes por tipo de escritura** en el servicio, con el 422 `budget` de arriba. Una acción que no salió por tope, por
-  servicio ocupado o por la red vuelve a aprobada sin contar en los topes del día ni pausar, y se reintenta pasado
-  el `retry_after` (30 min si no llega). Las lecturas cortadas así se retoman en la siguiente vuelta.
+- **Topes por tipo de escritura** en el servicio, con el 422 `budget` de arriba. Una acción que el servicio no dejó salir
+  (su tope, o no enviada: ocupado, sin abrir, otra salida o el servicio caído) vuelve a aprobada sin contar en los
+  topes del día ni pausar, y se reintenta pasado el `retry_after` (30 min si no llega). Las lecturas cortadas así se
+  retoman en la siguiente vuelta. Cualquier otro error, de este proveedor o de otro, sigue como antes.
 - **Salida a internet.** Proxy opcional para todas las cuentas (`NAVEGADOR_PROXY`) o por cuenta
   (`NAVEGADOR_PROXY_CUENTAS`), con usuario y clave solo desde el entorno, nunca en disco ni en el log. El servicio
   guarda por cuenta una etiqueta sin secretos de la salida de su sesión y no la abre por otra hasta que alguien lo

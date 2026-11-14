@@ -16,6 +16,9 @@ import re
 from linkedin_directo import Cliente, LinkedInError, NoteQuota, Uncertain
 from .connectors import ConnectorError, ConnectorUncertain, InvitationNoteQuota
 
+# The navegador service's refusals before the call left (linkedin_directo/servicio.py): its budget, and not sent (503:
+# browser busy or not ready, another internet exit; the service unreachable). connectors.deferred waits for these only.
+DEFERRED_KINDS=('budget','not_sent')
 TRANSPORT=None  # tests inject a linkedin_directo Transport; production builds a ServiceTransport from the environment
 ACCOUNT=re.compile(r'[a-z0-9][a-z0-9_\-]{0,62}')
 
@@ -42,7 +45,8 @@ class DirectoConnector:
         try:return getattr(self.client,name)(*args,**kwargs)
         except NoteQuota as exc:raise InvitationNoteQuota(str(exc),exc.status) from None
         except LinkedInError as exc:
-            raise ConnectorError(str(exc),status=exc.status,kind=exc.kind,pause=exc.pause,retry_after=exc.retry_after) from None
+            raise ConnectorError(str(exc),status=exc.status,kind=exc.kind,pause=exc.pause,retry_after=exc.retry_after,
+                                 deferrable=exc.kind in DEFERRED_KINDS and not exc.pause) from None
         except Uncertain as exc:raise ConnectorUncertain(str(exc)) from None
 
     def account_status(self):return self._do('account_status')

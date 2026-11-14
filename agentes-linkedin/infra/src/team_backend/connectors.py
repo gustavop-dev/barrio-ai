@@ -17,18 +17,19 @@ REACTIONS=('linkedin_like','linkedin_celebrate','linkedin_support','linkedin_lov
 class ConnectorError(Exception):
     """Definite failure: the provider did not apply the operation.
     pause=True means further writes on this account must stop until a human reviews it. `retry_after` (seconds), when
-    known, is when the same call may be tried again (the navegador service's budget)."""
-    def __init__(self,message,*,status=None,kind='error',pause=False,retry_after=None):
+    known, is when the same call may be tried again (the navegador service's budget). `deferrable` is set only by
+    connectors_directo, for the navegador service's own refusals before anything left (see `deferred`)."""
+    def __init__(self,message,*,status=None,kind='error',pause=False,retry_after=None,deferrable=False):
         super().__init__(message);self.status=status;self.kind=kind;self.pause=pause;self.retry_after=retry_after
-
-# Nothing came back and nothing is wrong with the account: the navegador service's budget per account ('budget'), the
-# provider never reached ('not_sent'), a read with no answer ('network', or a 5xx on a read: writes in doubt are
-# ConnectorUncertain). The work waits and is tried again later; it is never a pause, an executed or failed action, or a
-# verdict on a person or a post.
-DEFERRED_KINDS=('budget','not_sent','network')
+        self.deferrable=deferrable
 
 def deferred(exc):
-    return not exc.pause and (exc.kind in DEFERRED_KINDS or (exc.status or 0)>=500)
+    """The one rule for «nothing left, wait and try again»: only the navegador service refusing before the call left,
+    for a reason that is ours and not the account's (its budget, or the call not sent: browser busy or not ready, another
+    internet exit, the service unreachable). Such work waits and is retried; it is never a pause, an executed or failed
+    action, or a verdict on a person or a post. Every other error, of every provider (a 5xx, not found, Unipile's own
+    not_sent…), keeps its meaning."""
+    return bool(getattr(exc,'deferrable',False)) and not exc.pause
 
 class ConnectorUncertain(Exception):
     """The write may have reached LinkedIn; its effect is unknown until reconciled."""

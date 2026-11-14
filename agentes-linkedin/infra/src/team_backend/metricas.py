@@ -14,7 +14,7 @@ from datetime import timedelta
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from . import operador
-from .connectors import ConnectorError, deferred, get_connector, same_text
+from .connectors import ConnectorError, get_connector, same_text
 from .models import ActionExecution, AudienceSnapshot, AuditEvent, Contact, EditorialPiece, PostMetric
 from .permissions import require
 
@@ -155,8 +155,6 @@ def collect_posts(account,connector,now,summary):
             except ConnectorError as exc:
                 if exc.pause:raise
                 summary['comments_error']=str(exc)
-                # Nothing came back (the service's budget, no answer): the snapshot waits for the next run, whole.
-                if deferred(exc):summary['pending']+=len(kinds);continue
         summary['refreshed']+=1;summary['captured']+=_capture(execution,kinds,post,now,commenters)
 
 # --------------------------------------------------------------------------- audience

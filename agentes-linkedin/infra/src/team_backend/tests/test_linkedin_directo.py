@@ -712,6 +712,23 @@ class ServiceTransportTests(SimpleTestCase):
                 self.service(lambda r,b=body:httpx.Response(422,json=b)).send(self.READ)
             self.assertEqual((e.exception.kind,e.exception.retry_after),('refused',None))
 
+    def test_only_the_service_refusing_before_the_call_left_waits(self):
+        """connectors.deferred is narrow: the service's budget and its «not sent» (busy, not ready, another exit,
+        unreachable). A 5xx, a stop or LinkedIn's own errors keep their meaning, and so does every other provider."""
+        def down(request):raise httpx.ConnectError('sin conexión',request=request)
+        cases=((lambda r:httpx.Response(503,json={'reason':'ocupado'}),True),(down,True),
+               (lambda r:httpx.Response(504,json={'reason':'tarde'}),False),(lambda r:httpx.Response(502),False),
+               (lambda r:httpx.Response(409,json={'reason':'detenida'}),False),(lambda r:httpx.Response(423),False),
+               (lambda r:httpx.Response(422,json={'reason':'fuera de la lista'}),False))
+        for i,(handler,waits) in enumerate(cases):
+            connector=DirectoConnector('cuenta-prueba',transport=self.service(handler))
+            with self.subTest(case=i),self.assertRaises(ConnectorError) as e:connector.account_status()
+            self.assertEqual(connectors.deferred(e.exception),waits)
+        for other in (ConnectorError('Unipile: no fue posible conectar.',kind='not_sent'),
+                      ConnectorError('Simulado: HTTP 500.',status=500,kind='provider/server_error'),
+                      ConnectorError('x',status=422,kind='budget'),ConnectorError('x',kind='network')):
+            self.assertFalse(connectors.deferred(other))
+
     def test_network_failures(self):
         def down(request):raise httpx.ConnectError('sin conexión',request=request)
         def late(request):raise httpx.ReadTimeout('tarde',request=request)

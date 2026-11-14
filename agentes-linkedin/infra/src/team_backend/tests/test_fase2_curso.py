@@ -308,7 +308,8 @@ class ParticipationTests(NetworkBase):
         # The navegador service's own budget (docs/navegador-contrato.md): nothing left and the account is fine.
         p=self.approved(note=True);left=operador.capacity_left(self.account,'RED-02');stage=red.ramp_state()['stage']
         refusal=ConnectorError('Servicio navegador: presupuesto de la cuenta agotado en send_invitation (tope de invitaciones '
-                               'por día agotado; no salió nada); vuelve a haber cupo en 60 min.',status=422,kind='budget',retry_after=3600)
+                               'por día agotado; no salió nada); vuelve a haber cupo en 60 min.',status=422,kind='budget',retry_after=3600,
+                               deferrable=True)
         with patch.object(type(self.fake),'send_invitation',side_effect=refusal):
             with self.assertRaisesRegex(operador.OperatorBlocked,'Queda aprobada'):operador.execute(self.gustavo,p.id)
         p.refresh_from_db();self.account.refresh_from_db()
@@ -329,7 +330,8 @@ class ParticipationTests(NetworkBase):
 
     def test_a_profile_read_that_left_nothing_leaves_the_person_unchecked_and_ends_the_round(self):
         a=self.contact('enrich-a','Persona A',stage='candidate');b=self.contact('enrich-b','Persona B',stage='candidate')
-        refusal=ConnectorError('Servicio navegador: presupuesto de la cuenta agotado en get_profile.',status=422,kind='budget',retry_after=600)
+        refusal=ConnectorError('Servicio navegador: presupuesto de la cuenta agotado en get_profile.',status=422,kind='budget',retry_after=600,
+                               deferrable=True)  # as connectors_directo raises it
         with patch.object(type(self.fake),'get_profile',side_effect=refusal) as read:ready=red._enrich(self.account,[a,b])
         self.assertEqual((ready,read.call_count),([],1))
         for person in (a,b):person.refresh_from_db();self.assertIsNone(person.profile_checked_at)
