@@ -122,10 +122,21 @@ def _reworks(gates,since,until):
 
 # --------------------------------------------------------------------------- proposals: policy and lead
 
+def _lead(gate,p):
+    """One decision of the lead: passed at once, passed after its redraft, or stopped."""
+    review=p.review or {};gate.entered+=1
+    if review.get('decision')=='approve':
+        if any(str(r).startswith(compuertas.LEAD_REDRAFT) for r in p.risks):gate.after+=1
+        else:gate.first+=1
+    else:gate.stop(str(p.id),_categories(review.get('reasons')))
+
 def _proposals(gates,since,until):
     discards={e.target:(e.metadata or {}).get('issues') or [] for e in AuditEvent.objects.filter(
         action='operator.policy_discarded',created_at__gte=since,created_at__lt=until)}
     lead_discarded_comments=[]
+    # On the network the lead reviews the same person again and again (one was reviewed 53 times in a week): a person
+    # counts once per gate, by the lead's latest decision in the window; `revisiones` keeps the raw number of reviews.
+    people={}
     for p in ActionProposal.objects.filter(decided_at__gte=since,decided_at__lt=until).order_by('decided_at'):
         cap=p.capability;review=p.review or {};decision=review.get('decision');pid=str(p.id)
         policy=gates['politica:'+cap];lead=gates['lider:'+cap]
@@ -136,16 +147,15 @@ def _proposals(gates,since,until):
             if issues is not None and decision!='discard':policy.stop(pid,_categories(issues))
             else:policy.first+=1
         if decision in ('approve','discard'):
-            lead.entered+=1
-            if decision=='approve':
-                if any(str(r).startswith(compuertas.LEAD_REDRAFT) for r in p.risks):lead.after+=1
-                else:lead.first+=1
+            if cap in operador.NETWORK and p.contact_id:
+                people[(cap,p.contact_id)]=p;lead.extra['revisiones']=lead.extra.get('revisiones',0)+1
             else:
-                lead.stop(pid,_categories(review.get('reasons')))
-                if cap==ActionProposal.Capability.COMMENT and p.post_id:lead_discarded_comments.append(p)
+                _lead(lead,p)
+                if decision=='discard' and cap==ActionProposal.Capability.COMMENT and p.post_id:lead_discarded_comments.append(p)
         if p.state==ActionProposal.State.REJECTED and p.approved_hash:
             (lead if decision=='approve' else policy).vetoed+=1
             if cap==ActionProposal.Capability.PUBLISH:gates['verificador'].vetoed+=1
+    for (cap,_),p in people.items():_lead(gates['lider:'+cap],p)
     for p in ActionProposal.objects.filter(state=ActionProposal.State.PROPOSED,review__decision='retry'):
         gates['lider:'+p.capability].waiting+=1  # Jev did not answer: it is asked again later
     if lead_discarded_comments:
@@ -298,6 +308,7 @@ def render(report):
             out.append(f'  Gustavo: paradas {r["paradas"]}, no estuvo de acuerdo en {g["no_estuvo_de_acuerdo"]} · '
                        f'vetó {g["vetadas_tras_pasar"]} de las que pasaron')
         if r.get('descartes_sin_reescritura') is not None:out.append(f'  Descartes sin reescritura: {r["descartes_sin_reescritura"]}')
+        if r.get('revisiones') is not None:out.append(f'  Cuenta personas: {r["entraron"]} personas en {r["revisiones"]} revisiones del líder')
     if not report['compuertas']:out.append('Sin actividad de compuertas en el periodo.')
     out.append('')
     days=report['dias_sin_post']

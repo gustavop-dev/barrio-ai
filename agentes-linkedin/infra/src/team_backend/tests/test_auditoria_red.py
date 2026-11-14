@@ -5,10 +5,13 @@ from unittest.mock import patch
 
 from django.utils import timezone
 
-from team_backend import autopiloto, operador, red
+from team_backend import autopiloto, lider, operador, red
 from team_backend.connectors import ConnectorError, FakeConnector
 from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Job
 from team_backend.tests.test_red import SUBSTANTIVE, NetworkBase
+from team_backend.tests.test_rediseno import PERSON_OK, LeadBase
+
+RISKS={'falsa','empresa','reclutador','prospector','proveedor'}  # what the lead asks about a buyer (14/11/2026)
 
 
 def execution_reads(account):
@@ -133,11 +136,11 @@ class SingleFitJudgeTests(NetworkBase):
         self.asked=[]
         def jev(state,questions,purpose='lead-review'):
             self.asked.append({'state':state,'questions':questions})
-            return {'answers':{q:{'noul':0.1 if q=='riesgo' else 0.9} for q in questions},'model':'jev-1.14.0','estimated_usd':0.00003}
+            return {'answers':{q:{'noul':0.1 if q in RISKS else 0.9} for q in questions},'model':'jev-1.14.0','estimated_usd':0.00003}
         typesafe=patch('knowledge.providers.typesafe',side_effect=jev);typesafe.start();self.addCleanup(typesafe.stop)
 
     def test_the_lead_asks_only_risk_for_every_network_action(self):
-        thresholds={'RED-01':0.3,'RED-02':0.2,'RED-04':0.3}
+        thresholds={'RED-01':0.6,'RED-02':0.5,'RED-04':0.6}
         for capability,threshold in thresholds.items():
             with self.subTest(capability):
                 contact=self.contact(f'founder-{capability.lower()}',f'Founder {capability}',
@@ -146,13 +149,13 @@ class SingleFitJudgeTests(NetworkBase):
                 if capability=='RED-04':Contact.objects.filter(pk=contact.pk).update(invitation_id='inv:1')
                 proposal=operador.create_proposal(self.bot,None,capability,payload,source='agent',contact=Contact.objects.get(pk=contact.pk))
                 autopiloto.policy_review(proposal);proposal.refresh_from_db()
-                self.assertEqual(set(self.asked[-1]['questions']),{'riesgo'})
+                self.assertEqual(set(self.asked[-1]['questions']),RISKS)  # a buyer: selling services is asked too
                 self.assertIn('criterios_del_barrio',self.asked[-1]['state'])
-                self.assertEqual((proposal.state,proposal.review['thresholds']),('approved',{'riesgo':['max',threshold]}))
+                self.assertEqual((proposal.state,proposal.review['thresholds']),('approved',{q:['max',threshold] for q in RISKS}))
         self.human.put('/api/v1/orientacion',{'text':'Priorizar founders técnicos.'},format='json')
         proposal=red._propose(self.bot,self.contact('founder-ori','Ori Founder'),'RED-01',{'user_id':'ACofounder-ori'})
         autopiloto.policy_review(proposal)
-        self.assertEqual(set(self.asked[-1]['questions']),{'riesgo','orientacion'})
+        self.assertEqual(set(self.asked[-1]['questions']),RISKS|{'orientacion'})
 
     def test_a_low_risk_never_stands_in_for_the_classifier(self):
         ana=self.contact('founder-ana','Ana Founder',fit=False)
@@ -177,7 +180,53 @@ class SingleFitJudgeTests(NetworkBase):
         accept=ActionProposal.objects.get(contact=eva,state='proposed')
         autopiloto.policy_review(accept);accept.refresh_from_db()
         self.assertEqual((accept.capability,accept.state),('RED-04','approved'))
-        self.assertEqual(set(self.asked[-1]['questions']),{'riesgo'})
+        self.assertEqual(set(self.asked[-1]['questions']),RISKS)
+
+
+class LeadByRoleTests(NetworkBase,LeadBase):
+    """14/11/2026: the lead reads the classifier's role and reason and looks for concrete risks of the person; selling
+    services is a risk only for the buyer hypothesis. Jev is test_rediseno's httpx mock (self.jev)."""
+
+    def setUp(self):
+        super().setUp();self.jev.probabilities=dict(PERSON_OK)
+        env=patch.dict(os.environ,{'OPERATOR_AUTONOMY':'RED-01=auto,RED-02=auto'});env.start();self.addCleanup(env.stop)
+
+    def review(self,slug,capability='RED-01',role='comprador'):
+        contact=self.contact(slug,slug.replace('-',' ').title())
+        Contact.objects.filter(pk=contact.pk).update(signals={'bio':'Construyo software de inventario para tiendas de barrio.','followers':1200},
+            classification=dict(contact.classification,role=role,reason='Fundó una empresa de software de inventario'))
+        proposal=red._propose(self.bot,Contact.objects.get(pk=contact.pk),capability,{'user_id':contact.provider_user_id})
+        asked=len(self.jev.requests)
+        autopiloto.policy_review(proposal);proposal.refresh_from_db()
+        self.assertEqual(len(self.jev.requests),asked+1)  # the lead was asked: no deterministic rule decided first
+        return proposal,self.jev.requests[-1]
+
+    def test_the_lead_reads_the_role_and_reason_of_the_classifier_and_the_bio(self):
+        proposal,body=self.review('founder-ana')
+        self.assertEqual(proposal.state,'approved')
+        self.assertEqual(body['state']['clasificacion'],{'papel':lider.ROLE_MEANING['comprador'],'razon':'Fundó una empresa de software de inventario'})
+        self.assertTrue(body['state']['clasificacion']['papel'].startswith('comprador (hipótesis)'))
+        person=body['state']['persona']
+        self.assertEqual((person['bio'],person['seguidores']),('Construyo software de inventario para tiendas de barrio.',1200))
+        self.assertNotIn('riesgo',body['questions'])
+
+    def test_selling_services_is_asked_and_checked_only_for_a_buyer(self):
+        self.jev.probabilities=dict(PERSON_OK,proveedor=0.9)
+        buyer,body=self.review('founder-ana')
+        self.assertEqual(set(body['questions']),RISKS)
+        self.assertEqual(buyer.state,'discarded')
+        self.assertIn('Líder: vende sus propios servicios; no parece comprador (proveedor=0.9)',buyer.risks)
+        ally,body=self.review('founder-bea',role='aliado')  # the same answers: an ally sells services by nature
+        self.assertEqual(set(body['questions']),RISKS-{'proveedor'})
+        self.assertEqual(ally.state,'approved');self.assertNotIn('proveedor',ally.review['thresholds'])
+
+    def test_an_invitation_has_a_stricter_threshold_than_a_follow(self):
+        self.jev.probabilities=dict(PERSON_OK,prospector=0.55)
+        follow,_=self.review('founder-ana')
+        invite,_=self.review('founder-bea',capability='RED-02')
+        self.assertEqual((follow.state,follow.review['thresholds']['prospector']),('approved',['max',0.6]))
+        self.assertEqual((invite.state,invite.review['thresholds']['prospector']),('discarded',['max',0.5]))
+        self.assertIn('Líder: se dedica a prospectar en frío para otros (prospector=0.55)',invite.risks)
 
 
 class DiscoveryBacklogTests(NetworkBase):

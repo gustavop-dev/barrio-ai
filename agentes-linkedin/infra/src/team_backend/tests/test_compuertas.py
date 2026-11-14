@@ -334,6 +334,28 @@ class AuditTests(EditorialBase):
         dumped=json.dumps(report,ensure_ascii=False)
         for secret in ('Needs a source','Secret detail','A comment','Which decision'):self.assertNotIn(secret,dumped)
 
+    def test_the_lead_on_the_network_counts_people_by_their_latest_decision_not_reviews(self):
+        from team_backend import auditoria_compuertas
+        from team_backend.models import Contact
+        now=timezone.now()
+        def person(uid):
+            return Contact.objects.create(account=self.account,provider_user_id=uid,display_name=uid,source='commenter',stage='fit',
+                                          classification={'fit':True,'role':'par'})
+        def reviewed(contact,decision,minutes_ago):
+            return ActionProposal.objects.create(account=self.account,contact=contact,capability='RED-01',payload={'user_id':contact.provider_user_id},
+                payload_hash=f'{contact.provider_user_id}-{minutes_ago}',state='discarded' if decision=='discard' else 'approved',
+                decided_at=now-timedelta(minutes=minutes_ago),
+                review={'decision':decision,'reasons':['Líder: se dedica a reclutar (reclutador=0.9)'] if decision=='discard' else []})
+        stubborn,turned,fine=person('u-stubborn'),person('u-turned'),person('u-fine')
+        reviewed(stubborn,'discard',50);reviewed(stubborn,'discard',40);last=reviewed(stubborn,'discard',30)  # one person stopped
+        reviewed(turned,'discard',45);reviewed(turned,'approve',20)  # its latest decision counts: passed
+        reviewed(fine,'approve',10)
+        report=auditoria_compuertas.auditar(7)
+        lead={r['compuerta']:r for r in report['compuertas']}['lider:RED-01']
+        self.assertEqual((lead['entraron'],lead['pasaron_a_la_primera'],lead['paradas'],lead['tasa_parada'],lead['revisiones']),(3,2,1,0.333,6))
+        self.assertEqual((lead['motivos'],lead['ejemplos']),([['reclutador',1]],[{'id':str(last.id),'categoria':'reclutador'}]))
+        self.assertIn('Cuenta personas: 3 personas en 6 revisiones del líder',auditoria_compuertas.render(report))
+
     def test_the_command_prints_the_audit_and_its_json(self):
         from io import StringIO
         from django.core.management import call_command

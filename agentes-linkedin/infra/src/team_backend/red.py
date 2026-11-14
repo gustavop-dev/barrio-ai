@@ -532,8 +532,15 @@ Reglas:
   pagan); presemilla, idea o «startup» sin negocio visible no es comprador. El resto de la comunidad (par,
   recomendador, divulgador, aliado, líder) encaja mejor en EE. UU. y también puede estar en Latinoamérica.
 - signals: is_open_to_work en un founder sugiere que no tiene un negocio establecido; is_hiring sugiere tracción.
-- fit=false para cuentas de empresa, reclutadores o vendedores que buscan venderle algo a Gustavo, perfiles sin
-  relación con producto, software, startups o negocio, y cuando falte información para juzgar.
+- fit=false para cuentas de empresa, reclutadores, quienes prospectan en frío para otros (generación de leads,
+  agendamiento de citas, mensajes masivos), perfiles sin relación con producto, software, startups o negocio, y
+  cuando falte información para juzgar.
+- Vender servicios no descarta a nadie: casi todos venden algo. Lo que decide es a quién le vende. Quien vende
+  servicios (consultor, agencia, ghostwriter, ejecutivo fraccional, coach) encaja como aliado, recomendador o
+  divulgador solo si sus clientes o su audiencia declarados son founders o líderes de startups o de empresas de
+  tecnología: acerca a Gustavo a esa gente y puede recomendarlo. Si sus clientes o su audiencia son otro público
+  (consumo masivo, profesionales en general, otras industrias) o no se sabe a quién le vende, fit=false: Gustavo
+  solo le serviría como cliente. reason dice a quién le vende.
 - affinity: «hispanohablante_declarada» solo si consta en el idioma de su texto, su ubicación o lo que declara.
   Nunca la infieras por nombre, apellido, foto o apariencia. Sin dato: «desconocida».
 - reason: una frase concreta en español con la evidencia (qué dice su titular o su comentario). Es interna.

@@ -15,7 +15,7 @@ from team_backend import autopiloto, jobs, notificaciones, operador, voz
 from team_backend.models import ActionProposal, AuditEvent, Contact, Job, Notification, ObservedPost
 from team_backend.tests.fakes import FakeAnthropic
 from team_backend.tests.test_operador import OperatorBase
-from team_backend.tests.test_rediseno import GOOD, LeadBase
+from team_backend.tests.test_rediseno import GOOD, PERSON_OK, LeadBase
 
 UNIT='LI-03-M006-K02'
 
@@ -238,7 +238,7 @@ class LeadReviewCapTests(LeadBase):
 
     def setUp(self):
         super().setUp()
-        self.jev.probabilities={'encaja':0.85,'riesgo':0.05}
+        self.jev.probabilities=dict(PERSON_OK)
         env=patch.dict(os.environ,{'OPERATOR_AUTONOMY':'RED-01=auto','LEAD_MAX_REVIEWS_PER_TICK':'5'})
         env.start();self.addCleanup(env.stop)
 
@@ -254,7 +254,7 @@ class LeadReviewCapTests(LeadBase):
         return out
 
     def lead_calls(self):
-        return len([r for r in self.jev.requests if 'riesgo' in r['questions']])  # RED reviews ask riesgo (R2: one fit judge)
+        return len([r for r in self.jev.requests if 'reclutador' in r['questions']])  # RED reviews ask about the person's risks (R2)
 
     def states(self,proposals):
         return [ActionProposal.objects.get(pk=p.pk).state for p in proposals]

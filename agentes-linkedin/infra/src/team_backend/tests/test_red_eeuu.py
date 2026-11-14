@@ -220,7 +220,7 @@ class LeadDoubtTests(NetworkBase):
         self.asked=[]
         def jev(state,questions,purpose='lead-review'):
             self.asked.append(questions)
-            return {'answers':{q:{'noul':0.9 if q=='riesgo' else 0.1} for q in questions},'model':'jev-1.14.0','estimated_usd':0.00003}
+            return {'answers':{q:{'noul':0.9 if q=='reclutador' else 0.1} for q in questions},'model':'jev-1.14.0','estimated_usd':0.00003}
         typesafe=patch('knowledge.providers.typesafe',side_effect=jev);typesafe.start();self.addCleanup(typesafe.stop)
 
     def test_a_lead_doubt_rests_the_person_until_gustavo_says_it_fits(self):

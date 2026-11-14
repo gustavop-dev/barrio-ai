@@ -92,7 +92,7 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
   3. **Dado** cualquier umbral fallido, **cuando** se decide, **entonces** la acción pasa a `discarded` con «Descartada por el líder (…)» y `review` guarda respuestas, umbrales, modelo y coste. Un comentario así tiene una reescritura con esas razones ([COM-12](#com-12)).
   4. **Dado** que Jev no responde, **cuando** se revisa, **entonces** la acción queda en `proposed`, se reintenta tras `LEAD_RETRY_MINUTES` (10) y el resto del ciclo no vuelve a llamar a Jev.
   5. **Dado** más de 5 propuestas pendientes, **cuando** corre un ciclo, **entonces** el líder revisa como mucho `LEAD_MAX_REVIEWS_PER_TICK` (5), de la más antigua a la más reciente.
-  6. **Dado** una acción de red, **cuando** la revisa el líder, **entonces** solo pregunta por el riesgo (≤ 0,3 para seguir y aceptar, ≤ 0,2 para invitar); el encaje no se vuelve a juzgar.
+  6. **Dado** una acción de red, **cuando** la revisa el líder, **entonces** solo pregunta por riesgos concretos de la persona (perfil falso, cuenta de una organización, reclutador, prospector en frío; y, solo si el clasificador la marcó compradora, si vive de vender sus servicios), con el papel y la razón del clasificador a la vista: cada uno ≤ 0,6 para seguir y aceptar, ≤ 0,5 para invitar; el encaje no se vuelve a juzgar.
   7. **Dado** `LEAD_ENABLED=false`, **cuando** una acción pasa las reglas en `auto`, **entonces** se aprueba por política sin Jev.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente

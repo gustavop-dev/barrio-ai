@@ -37,7 +37,7 @@ llamar a modelos. Código: `team_backend/compuertas.py` (severidad, segunda revi
 | Prefiltro de comentarios | `autopiloto._prefilter`, `lider.comment_worthy` | posts donde comentar es ruido | se salta el post |
 | Reglas del comentario | `autopiloto.comment_text_issues` | longitud, pitch, enlaces, hashtags, afirmaciones sin evidencia, idioma, privacidad | una reescritura (R4) |
 | Líder INT-03 (Jev) | `lider.review` | `aporta`, `pitch`, `inventa`, `respeto`, `orientacion` | una reescritura con sus razones |
-| Red RED-01/02/04 | `red.classify`, `red.network_issues`, líder (`riesgo`) | quién encaja y el riesgo | sin cambios: criterio estricto de Gustavo; su «Sí, encaja» levanta la duda del líder |
+| Red RED-01/02/04 | `red.classify`, `red.network_issues`, líder (riesgos concretos por papel) | quién encaja y los riesgos de la persona | sin cambios: criterio estricto de Gustavo; su «Sí, encaja» levanta la duda del líder |
 | Dinero | `knowledge/presupuesto.py`, `cost_cap` del ciclo | presupuesto agotado | espera; se reintenta al haber presupuesto, no cuenta como intento |
 
 ## Severidad del verificador
