@@ -34,9 +34,14 @@ EMAIL=re.compile(r'[\w.+-]+@[\w-]+\.[\w.]+')
 PHONE=re.compile(r'(?:\+?\d[\s().-]?){7,}')
 HASHTAG=re.compile(r'(?<!\w)#\w')
 # Own posts may name ProjectApp (modality projectapp); what they may not do is sell aggressively or ask for contact.
-POST_PITCH=re.compile(r'hire me|dm me|message me|contact me|book a call|schedule a call|link in (?:bio|comments)|reach out to me|'
-                      r'send me a (?:dm|message)|limited (?:spots|offer)|sign up now|buy now|contr[aá]tame|escr[ií]beme|'
-                      r'agenda(?:mos)? una llamada|cont[aá]ctame',re.I)
+# Two halves (compuertas.pitch): hard selling never passes; a conversational call to action passes only within the piece's
+# gate policy (cta_max, default 0). POST_PITCH is both, as before.
+_POST_CTA=r'dm me|message me|contact me|reach out to me|send me a (?:dm|message)|escr[ií]beme|cont[aá]ctame'
+_POST_SELL=(r'hire me|book a call|schedule a call|link in (?:bio|comments)|limited (?:spots|offer)|sign up now|buy now|'
+            r'contr[aá]tame|agenda(?:mos)? una llamada')
+POST_CTA=re.compile(_POST_CTA,re.I)
+POST_SELL=re.compile(_POST_SELL,re.I)
+POST_PITCH=re.compile(_POST_SELL+'|'+_POST_CTA,re.I)
 POST_LENGTH=(200,2200)
 POST_MAX_HASHTAGS=3
 
@@ -60,13 +65,9 @@ def enabled():
 
 def post_issues(proposal):
     """CONT-09: deterministic rules plus the mandatory verifier verdict on this exact text."""
-    text=proposal.payload.get('text','');issues=[]
-    low,high=POST_LENGTH
-    if not low<=len(text)<=high:issues.append(f'Longitud fuera de {low}–{high} caracteres')
-    for pattern,reason in ((EMAIL,'Contiene un correo'),(PHONE,'Contiene un número de teléfono'),(URL,'Contiene enlaces'),
-                           (POST_PITCH,'Contiene pitch agresivo o petición de contacto')):
-        if pattern.search(text):issues.append(reason)
-    if len(HASHTAG.findall(text))>POST_MAX_HASHTAGS:issues.append(f'Más de {POST_MAX_HASHTAGS} hashtags')
+    from . import compuertas
+    text=proposal.payload.get('text','')
+    issues=compuertas.form_rules(text,compuertas.gate_policy(proposal.piece if proposal.piece_id else None))
     public,private=guardas.blocks()
     issues+=guardas.private_leaks(text,private)+guardas.invented_experience(text,public)
     verification=proposal.piece.verification if proposal.piece_id else {}
