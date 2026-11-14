@@ -160,6 +160,11 @@ class CaseTests(EvalBase):
                          {'vetoed':('descartado_por_gustavo',False),'risky':('riesgo_lider',False),'discarded':('descartado_por_gustavo',False),
                           'accepted':('acepto_invitacion',True),'commenter':('comento_post_propio',True)})
         self.assertEqual(len(cases),5)  # the silent and the unclassified contacts are not cases
+        # «riesgo» above is a stored review from before 14/11/2026; the lead's questions about the person since then count too.
+        ActionProposal.objects.filter(contact=c['risky']).update(review={'decision':'discard','reasons':['Líder: se dedica a reclutar (reclutador=0.9)']})
+        self.assertEqual(evaluaciones.contact_signal(c['risky'],set()),('riesgo_lider',False))
+        ActionProposal.objects.filter(contact=c['risky']).update(review={'decision':'discard','reasons':['Líder: contradice la orientación de Gustavo (orientacion=0.1)']})
+        self.assertIsNone(evaluaciones.contact_signal(c['risky'],set()))  # the orientation says nothing about fit
 
 
 class DryRunTests(EvalBase):
@@ -350,10 +355,14 @@ class PaidRunTests(EvalBase):
         self.assertEqual(metrics['acuerdo_encaje'],{'aciertos':4,'total':5,'pct':80.0})
         self.assertEqual(metrics['acuerdo_linea_base'],{'aciertos':2,'total':5,'pct':40.0})
         jev_calls=[]
-        with patch('knowledge.providers.claude',side_effect=forbidden),patch('knowledge.providers.typesafe',side_effect=jev({'encaja':0.9,'riesgo':0.1},jev_calls)):
+        person_ok={'encaja':0.9,'falsa':0.1,'empresa':0.1,'reclutador':0.1,'prospector':0.1}
+        with patch('knowledge.providers.claude',side_effect=forbidden),patch('knowledge.providers.typesafe',side_effect=jev(person_ok,jev_calls)):
             report=self.evaluate(['clasificador'],execute=True,max_usd=Decimal('2'),models=['jev'])
         self.assertEqual(len(jev_calls),5)
-        self.assertEqual(set(jev_calls[0]['questions']),{'encaja','riesgo'})
+        # Jev does not see the verdict it is graded against: no role or reason of the classifier, so no buyer-only question.
+        self.assertEqual(set(jev_calls[0]['questions']),{'encaja','falsa','empresa','reclutador','prospector'})
+        self.assertNotIn('clasificacion',jev_calls[0]['state'])
+        self.assertEqual(Contact.objects.get(pk=c['risky'].pk).classification['role'],'comprador')  # the contact itself is untouched
         metrics=report['agentes']['clasificador']['resultados']['jev']['metricas']
         self.assertEqual(metrics['acuerdo_encaje'],{'aciertos':2,'total':5,'pct':40.0})  # Jev said yes to everyone
 

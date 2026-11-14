@@ -24,6 +24,9 @@ class Command(BaseCommand):
         cambio.add_argument('--slug','--id-externo',dest='slug',default='',help='directo: el nombre de la cuenta en el servicio navegador; unipile: su id acc_…')
         cambio.add_argument('--prueba',action='store_true',help='Solo decir qué cambiaría, por tabla y campo, y qué no se puede traducir')
         cambio.add_argument('--aceptar-ids-viejos',action='store_true',help='Cambiar dejando como están los ids que no se pueden traducir (caducan las propuestas abiertas que dependen de ellos)')
+        cola=sub.add_parser('reclasificar-cola',help='Devuelve al clasificador a las personas que siguen en cola (encajan, sin seguir ni invitar) clasificadas antes de una fecha; sin --confirmar solo cuenta')
+        cola.add_argument('--cuenta',required=True);cola.add_argument('--antes',required=True,help='Fecha y hora ISO con zona, por ejemplo 2026-11-12T20:40:00+00:00')
+        cola.add_argument('--confirmar',action='store_true')
         ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada)')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
@@ -50,6 +53,15 @@ class Command(BaseCommand):
                 from team_backend import referentes
                 job=referentes.extraordinary(user,account)
                 self.stdout.write(f'Revisión extraordinaria en cola: trabajo {job.id}. Las propuestas llegan a la Bandeja.')
+            elif o['accion']=='reclasificar-cola':
+                from datetime import datetime
+                from team_backend import red
+                try:before=datetime.fromisoformat(o['antes'])
+                except ValueError:raise CommandError('--antes debe ser una fecha ISO') from None
+                if before.tzinfo is None:raise CommandError('--antes debe llevar zona horaria, por ejemplo +00:00')
+                result=red.requeue(user,account,before,confirm=o['confirmar'])
+                self.stdout.write(f"En cola clasificadas antes de {before.isoformat()}: {result['found']}. "+
+                                  (f"Devueltas al clasificador: {result['requeued']}." if o['confirmar'] else 'Con --confirmar vuelven al clasificador.'))
             elif o['accion']=='referentes-industria':
                 from decimal import Decimal, InvalidOperation
                 from team_backend import referentes_industria

@@ -78,7 +78,8 @@ flowchart LR
   - el destinatario no coincide;
   - la invitación lleva algo más que `user_id`;
   - las invitaciones están en pausa por límite.
-- **Agente líder.** Con `LEAD_ENABLED=true`, Jev revisa cada RED-* que pasó la compuerta, pero solo pregunta por el riesgo: `riesgo` ≤ 0,3 para seguir y aceptar, y ≤ 0,2 para invitar. Si hay orientación, también pregunta que no la contradiga. Ver [rediseno-backend.md](rediseno-backend.md).
+- **Quien vende servicios.** El clasificador no descarta a nadie por vender: decide a quién le vende. Un consultor, una agencia, un ghostwriter o un ejecutivo fraccional encaja como aliado, recomendador o divulgador solo si sus clientes o su audiencia declarados son founders o líderes de startups o de empresas de tecnología; con otro público, o si no se sabe a quién le vende, no encaja (Gustavo, 14/11/2026: «hay que discernir si ayuda a nuestros propósitos o no»).
+- **Agente líder.** Con `LEAD_ENABLED=true`, Jev revisa cada RED-* que pasó la compuerta, pero solo pregunta por riesgos concretos de la persona, con el papel y la razón del clasificador a la vista: `falsa`, `empresa`, `reclutador` y `prospector` (y `proveedor` solo si el papel es comprador), cada uno ≤ 0,6 para seguir y aceptar, y ≤ 0,5 para invitar. Medido el 14/11/2026: la pregunta única de riesgo quedaba entre 0,3 y 0,6 para personas que encajan. Si hay orientación, también pregunta que no la contradiga. Ver [rediseno-backend.md](rediseno-backend.md).
 - **Pausa por límite.** Si LinkedIn rechaza una invitación por límite (429, o un error cuyo tipo o nota menciona *limit*, *quota*, *throttle* o *exceed*), las invitaciones se detienen 7 días (`red.invites_blocked`).
 - **Vetos de Gustavo.**
   - **Rechazar una acción de red** deja a la persona en `discarded`: nunca se vuelve a proponer.

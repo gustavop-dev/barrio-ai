@@ -532,8 +532,15 @@ Reglas:
   pagan); presemilla, idea o «startup» sin negocio visible no es comprador. El resto de la comunidad (par,
   recomendador, divulgador, aliado, líder) encaja mejor en EE. UU. y también puede estar en Latinoamérica.
 - signals: is_open_to_work en un founder sugiere que no tiene un negocio establecido; is_hiring sugiere tracción.
-- fit=false para cuentas de empresa, reclutadores o vendedores que buscan venderle algo a Gustavo, perfiles sin
-  relación con producto, software, startups o negocio, y cuando falte información para juzgar.
+- fit=false para cuentas de empresa, reclutadores, quienes prospectan en frío para otros (generación de leads,
+  agendamiento de citas, mensajes masivos), perfiles sin relación con producto, software, startups o negocio, y
+  cuando falte información para juzgar.
+- Vender servicios no descarta a nadie: casi todos venden algo. Lo que decide es a quién le vende. Quien vende
+  servicios (consultor, agencia, ghostwriter, ejecutivo fraccional, coach) encaja como aliado, recomendador o
+  divulgador solo si sus clientes o su audiencia declarados son founders o líderes de startups o de empresas de
+  tecnología: acerca a Gustavo a esa gente y puede recomendarlo. Si sus clientes o su audiencia son otro público
+  (consumo masivo, profesionales en general, otras industrias) o no se sabe a quién le vende, fit=false: Gustavo
+  solo le serviría como cliente. reason dice a quién le vende.
 - affinity: «hispanohablante_declarada» solo si consta en el idioma de su texto, su ubicación o lo que declara.
   Nunca la infieras por nombre, apellido, foto o apariencia. Sin dato: «desconocida».
 - reason: una frase concreta en español con la evidencia (qué dice su titular o su comentario). Es interna.
@@ -819,11 +826,15 @@ def _resting(capability,now):
                                            started_at__gte=now-retry_after()).exclude(error_kind='account_not_running')
             .values('proposal__contact_id'))
 
+# A discard of the lead with its current questions on a person. Until 14/11/2026 it asked one compound «riesgo» that
+# stopped people who fit: those discards no longer rest anyone nor show as a doubt.
+LEAD_DISCARD={'review__decision':'discard','review__thresholds__has_key':'falsa'}
+
 def _lead_resting(capability,now):
     """People the lead turned down for this action rest NETWORK_LEAD_REST_DAYS, unless Gustavo said they fit
     (confirm_fit): proposed again every hour, they spent the cycle's reviews before any invitation had room."""
     return (ActionProposal.objects.filter(capability=capability,contact__isnull=False,state=ActionProposal.State.DISCARDED,
-                                          review__decision='discard',decided_at__gte=now-lead_rest())
+                                          decided_at__gte=now-lead_rest(),**LEAD_DISCARD)
             .exclude(contact__classification__has_key='confirmed_by_gustavo').values('contact_id'))
 
 def stage_waiting():
@@ -1137,12 +1148,39 @@ def discard(user,contact_id,note_text):
         operador._audit(user,'network.contact_discarded',contact.id)
     return contact
 
+def requeue(user,account,before,confirm=False):
+    """Send back to the classifier the people still waiting in the queue (stage «fit») who were classified before
+    `before`, that is, under earlier criteria (14/11/2026: most of those judged before the seed and US rules no longer
+    fit). Nobody followed, invited or connected is touched, nor anyone Gustavo confirmed. Their open proposals are
+    discarded and the classifier judges them again in its next rounds. Without `confirm` it only counts."""
+    require(user,'operate_linkedin')
+    def stale(contact):
+        at=(contact.classification or {}).get('classified_at')
+        return bool(at) and datetime.fromisoformat(at)<before
+    ids=[c.pk for c in Contact.objects.filter(account=account,stage='fit').exclude(classification__has_key='confirmed_by_gustavo') if stale(c)]
+    if not confirm:return {'found':len(ids),'requeued':0}
+    done=0
+    for pk in ids:
+        with transaction.atomic():
+            contact=Contact.objects.select_for_update().get(pk=pk)
+            if contact.stage!='fit' or not stale(contact) or contact.proposals.filter(state__in=['executing','sent','uncertain']).exists():continue
+            for proposal in contact.proposals.filter(state__in=['proposed','approved']):
+                proposal.state=ActionProposal.State.DISCARDED;proposal.decided_at=timezone.now()
+                proposal.decision_note='La persona vuelve al clasificador con el criterio vigente.'
+                proposal.save(update_fields=['state','decided_at','decision_note'])
+            previous=contact.classification;contact.classification={}
+            _stage(contact,'candidate','requeued',f'Vuelve al clasificador con el criterio vigente (antes: {previous.get("role")}).')
+            contact.save()
+            operador._audit(user,'network.contact_requeued',contact.id,role=previous.get('role'),classified_at=previous.get('classified_at'))
+            done+=1
+    return {'found':len(ids),'requeued':done}
+
 def lead_doubt(contact,now=None):
     """The lead's last word on this person, when it turned down an action within the rest and Gustavo has not answered."""
     if (contact.classification or {}).get('confirmed_by_gustavo'):return None
     now=now or timezone.now()
     proposal=(contact.proposals.filter(capability__in=NETWORK_CAPABILITIES,state=ActionProposal.State.DISCARDED,
-                                       review__decision='discard',decided_at__gte=now-lead_rest()).order_by('-decided_at').first())
+                                       decided_at__gte=now-lead_rest(),**LEAD_DISCARD).order_by('-decided_at').first())
     if proposal is None:return None
     return {'capability':proposal.capability,'reasons':list((proposal.review or {}).get('reasons') or [])[:3],
             'decided_at':proposal.decided_at.isoformat(),'until':(proposal.decided_at+lead_rest()).isoformat()}

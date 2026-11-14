@@ -11,7 +11,8 @@ Per agent, the case and the known outcome it is graded against:
                 the course units: production's (the active catalog core or the fixed list), «fijas» or a catalog
                 version measured in shadow before it is activated (catalogo.py).
 - clasificador  classified contacts with a later signal: Gustavo discarded or vetoed them, or the lead discarded an
-                action for riesgo (no fit); the person accepted the invitation or commented on an own post (fit).
+                action for a risk of the person (no fit: «riesgo» in stored reviews until 14/11/2026, then lider.NETWORK_RISKS);
+                the person accepted the invitation or commented on an own post (fit).
 - lectores      ablation: the selection is re-run with and without the stored panel, and the difference is
                 compared with the run-to-run noise (with panel against the stored selection).
 - director      descriptive only: skipped and written days, pillar and modality against the metrics that exist.
@@ -30,6 +31,7 @@ The run reads the database and only writes usage ledger rows: no proposal, job o
 
 The request builders mirror the production calls (editorial._stage/_check/_repair_round, operador.propose_comment,
 red.classify, lider.review): keep them in step. tests/test_evaluaciones.py compares them with the real calls."""
+import copy
 import difflib
 import json
 import math
@@ -48,7 +50,8 @@ GO_LIVE=date(2026,11,6)  # the machine went live in production
 TARGET=(20,30)
 AGENTS=('verificador','comentarios','clasificador','lectores','director')
 FIXED='fijas'  # evaluar --catalogo fijas: the fixed lists in code, whatever catalog is active
-JEV='jev'  # --modelo jev: the classifier judged by Jev (audit C3): the lead's risk question plus a fit question
+JEV='jev'  # --modelo jev: the classifier judged by Jev (audit C3): the lead's risk questions plus a fit question
+LEAD_RISKS=('riesgo',)+lider.NETWORK_RISKS  # «riesgo»: the single question the lead asked until 14/11/2026, in stored reviews
 TOKEN_FACTOR=1.2  # Claude's tokenizer counts ~15–20% more than cl100k (audit, «Costos»)
 # Typical output tokens (thinking included) when the ledger has no history for the production purpose.
 DEFAULT_OUTPUT={'editorial-verificador':4000,'editorial-seleccion':5000,'editorial-reparacion':5000,'propose-comment':2000,
@@ -140,7 +143,8 @@ def contact_signal(contact,commenters):
     proposals=list(contact.proposals.all())
     if any(p.state=='rejected' for p in proposals) or AuditEvent.objects.filter(action='network.contact_discarded',target=str(contact.id)).exists():
         return 'descartado_por_gustavo',False
-    if any((p.review or {}).get('decision')=='discard' and any('(riesgo=' in str(r) for r in p.review.get('reasons',[])) for p in proposals):
+    if any((p.review or {}).get('decision')=='discard' and any(f'({q}=' in str(r) for r in p.review.get('reasons',[]) for q in LEAD_RISKS)
+           for p in proposals):
         return 'riesgo_lider',False
     if contact.stage==Contact.Stage.CONNECTED and contact.invited_at:return 'acepto_invitacion',True
     if contact.provider_user_id in commenters:return 'comento_post_propio',True
@@ -230,9 +234,13 @@ FIT_QUESTION=('Según `persona.titular`, `persona.ubicacion` y `persona.evidenci
               'descrito en `criterios_del_barrio`?')
 
 def jev_classify_request(contact,orientation):
-    """Jev as the classifier: the lead's follow state and risk question (and orientation), plus a fit question of its
-    own, since R2 left the lead judging only risk. Fit needs encaja >= 0.6 and the lead's thresholds."""
-    state,questions,checks=lider._questions(ActionProposal(capability=ActionProposal.Capability.FOLLOW,contact=contact),orientation)
+    """Jev as the classifier: the lead's follow state and risk questions (and orientation), plus a fit question of its
+    own, since R2 left the lead judging only risk. Fit needs encaja >= 0.6 and the lead's thresholds. The lead reads the
+    classifier's role and reason, which is the verdict being graded: Jev gets the person without them, so it is asked
+    the questions every role gets."""
+    blind=copy.copy(contact);blind.classification={}
+    state,questions,checks=lider._questions(ActionProposal(capability=ActionProposal.Capability.FOLLOW,contact=blind),orientation)
+    state.pop('clasificacion',None)
     return state,dict({'encaja':lider._noul(FIT_QUESTION)},**questions),[FIT_CHECK]+checks
 
 def jev_verdict(answers,checks):

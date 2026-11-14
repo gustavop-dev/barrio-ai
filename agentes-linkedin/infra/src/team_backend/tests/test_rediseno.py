@@ -26,6 +26,8 @@ class JevMock:
         return httpx.Response(200,json={'model':'jev-1.14.0','answers':answers,'usage':{'input_tokens':500,'output_tokens':40}})
 
 COMMENT_OK={'aporta':0.92,'pitch':0.03,'inventa':0.02,'respeto':0.98,'idioma':0.97,'orientacion':0.9}
+# Every question the lead asks about a person, explicitly low: a test must not pass on JevMock's 0.5 for an id it forgot.
+PERSON_OK={'falsa':0.05,'empresa':0.04,'reclutador':0.03,'prospector':0.05,'proveedor':0.1}
 
 class LeadBase(OperatorBase):
     def setUp(self):
@@ -81,7 +83,7 @@ class LeadTests(LeadBase):
         self.assertEqual(ActionExecution.objects.count(),0)
 
     def test_lead_judges_people_before_following(self):
-        self.jev.probabilities={'encaja':0.85,'riesgo':0.05}
+        self.jev.probabilities=dict(PERSON_OK)
         person=self.fake.seed_person('founder-ana','Ana Founder',headline='Founder @ Tiny')
         contact=Contact.objects.create(account=self.account,provider_user_id=person['id'],display_name='Ana Founder',headline='Founder @ Tiny',
             location='Austin, Texas',source='manual',stage='fit',  # a buyer in the USA (BAR-17)

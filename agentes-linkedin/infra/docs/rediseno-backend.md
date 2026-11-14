@@ -22,9 +22,9 @@ Sustituye la aprobación humana de cada acción. Se activa con `LEAD_ENABLED=tru
    | --- | --- |
    | Comentario (INT-03) | `aporta` ≥ 0,7, `pitch` ≤ 0,2, `inventa` ≤ 0,2, `respeto` ≥ 0,8, `idioma` ≥ 0,7 |
    | Publicación (CONT-09), además del verificador con Opus | `clara` ≥ 0,6, `pitch` ≤ 0,2, `inventa` ≤ 0,2 |
-   | Seguir (RED-01) | `riesgo` ≤ 0,3 |
-   | Invitar (RED-02) | `riesgo` ≤ 0,2 |
-   | Aceptar (RED-04) | `riesgo` ≤ 0,3 |
+   | Seguir (RED-01) | `falsa`, `empresa`, `reclutador` y `prospector` ≤ 0,6; `proveedor` ≤ 0,6 solo si el papel es comprador |
+   | Invitar (RED-02) | las mismas preguntas ≤ 0,5 |
+   | Aceptar (RED-04) | las mismas preguntas ≤ 0,6 |
 
    Si hay orientación, se añade `orientacion` ≥ 0,4 (que no la contradiga).
 

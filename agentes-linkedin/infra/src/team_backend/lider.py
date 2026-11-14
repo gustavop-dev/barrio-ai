@@ -28,7 +28,8 @@ LEAD_UNITS=operador.LEAD_UNITS
 CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
-    'riesgo':['LI-03-M005-K06'],'tema':['LI-03-M005-K06'],
+    'falsa':['LI-03-M005-K06'],'empresa':['LI-03-M005-K06'],'reclutador':['LI-03-M005-K06'],'prospector':['LI-03-M005-K06'],
+    'proveedor':['LI-03-M005-K06'],'tema':['LI-03-M005-K06'],
 }
 
 def ground_questions(state,questions):
@@ -55,11 +56,31 @@ CHECKS={
              ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos'),('respeto','min',0.8,'no es del todo respetuoso')],
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
-    # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues; the lead weighs risk.
-    CAP.FOLLOW:[('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
-    CAP.INVITE:[('riesgo','max',0.2,'parece vendedor, reclutador o cuenta ajena al nicho')],
-    CAP.ACCEPT:[('riesgo','max',0.3,'parece vendedor, reclutador o cuenta ajena al nicho')],
 }
+# RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues. The lead only looks for
+# concrete risks of the person, reads the classifier's role and reason, and asks about selling services only for the
+# buyer hypothesis (measured 14/11/2026: the single compound question sat at 0.3–0.6 for people who fit).
+# An invitation is scarcer than a follow or an acceptance, so it gets the stricter threshold.
+NETWORK_THRESHOLD={CAP.FOLLOW:0.6,CAP.INVITE:0.5,CAP.ACCEPT:0.6}
+PERSON_CHECKS=[('falsa','el perfil parece falso o de relleno'),('empresa','es la cuenta de una organización, no una persona'),
+               ('reclutador','se dedica a reclutar'),('prospector','se dedica a prospectar en frío para otros')]
+BUYER_CHECK=('proveedor','vende sus propios servicios; no parece comprador')
+NETWORK_RISKS=tuple(qid for qid,_ in PERSON_CHECKS+[BUYER_CHECK])
+# What each role of the classifier (red.ROLES) means, as the lead reads it in `clasificacion.papel`.
+ROLE_MEANING={
+    'par':'par: construye producto o software, o funda una startup de tecnología, como Gustavo',
+    'comprador':'comprador (hipótesis): dirige una empresa con producto u operación propia y podría contratar ingeniería de producto',
+    'recomendador':'recomendador: trabaja cerca de founders (inversor, asesor, ejecutivo fraccional, aceleradora) y puede recomendar proveedores',
+    'aliado':'aliado: ofrece a startups un servicio complementario al de Gustavo, no competidor',
+    'divulgador':'divulgador: crea contenido con audiencia sobre los temas del barrio',
+    'lider':'líder: dirige una empresa, una comunidad o un equipo en tecnología o negocio',
+}
+
+def network_checks(capability,role=None):
+    """The lead's checks on a person: the concrete risks for every role, plus selling services for a buyer."""
+    threshold=NETWORK_THRESHOLD[capability]
+    return [(qid,'max',threshold,label) for qid,label in PERSON_CHECKS+([BUYER_CHECK] if role=='comprador' else [])]
+
 ORIENTATION_CHECK=('orientacion','min',0.4,'contradice la orientación de Gustavo')
 # His own request: «min» checks fail only below these (yes clearly unlikely), «max» checks only above (yes clearly likely).
 GUSTAVO_THRESHOLDS={'clara':0.3,'pitch':0.6,'inventa':0.6,'idioma':0.5,'orientacion':0.2}
@@ -165,22 +186,40 @@ def _questions(proposal,orientation):
         kind='post'
     else:
         # Whether the person fits is judged once, by the classifier, and checked by red.network_issues (audit R2).
-        # The lead only weighs the risk of the person and, when there is one, Gustavo's orientation; the niche in
-        # `criterios_del_barrio` is the context for «ajena al nicho» and for the orientation.
-        contact=proposal.contact;evidence=contact.evidence or {}
-        state={'persona':{'nombre':contact.display_name,'titular':contact.headline[:400],'ubicacion':contact.location,
-                          'grado':contact.network_distance,'origen':contact.source,
+        # The lead only looks for concrete risks of the person, reads the classifier's role and reason, and asks about
+        # selling services only for the buyer hypothesis (measured 14/11/2026: the single compound question sat at
+        # 0.3–0.6 for people who fit). `criterios_del_barrio` is the context for the risks and for the orientation.
+        contact=proposal.contact;evidence=contact.evidence or {};classification=contact.classification or {};signals=contact.signals or {}
+        role=classification.get('role')
+        state={'persona':{'nombre':contact.display_name,'titular':contact.headline[:400],'bio':(signals.get('bio') or '')[:600],
+                          'ubicacion':contact.location,'seguidores':signals.get('followers'),'grado':contact.network_distance,'origen':contact.source,
                           'evidencia':evidence.get('comment') or evidence.get('invitation_message') or evidence.get('query') or ''},
+               'clasificacion':{'papel':ROLE_MEANING.get(role,role or ''),'razon':classification.get('reason') or ''},
                'criterios_del_barrio':CRITERIA_DEL_BARRIO}
         questions={
-            'riesgo':_noul('¿`persona` parece un reclutador masivo, un vendedor que busca venderle a Gustavo, una cuenta de empresa, una '
-                           'cuenta falsa o alguien sin relación con producto, software, startups o negocio?'),
+            'falsa':_noul('¿El perfil de `persona` parece falso, automatizado o de relleno: sin cargo ni actividad reconocible, o con '
+                          'promesas de dinero fácil?','Titular vacío o incoherente, o promesas de ingresos, cripto u «oportunidades» por mensaje',
+                          'Muestra un cargo, una empresa o una actividad profesional reconocible, aunque el perfil sea breve'),
+            'empresa':_noul('¿`persona` es la cuenta de una empresa, una marca, un medio o una comunidad, y no una persona individual?',
+                            'El nombre y el titular describen una organización','Es una persona, aunque nombre la empresa donde trabaja o que fundó'),
+            'reclutador':_noul('¿La actividad principal de `persona` es reclutar, seleccionar personal o colocar talento para otras empresas?',
+                               'Reclutador, headhunter, talent acquisition, staffing o bolsa de empleo',
+                               'Cualquier otra actividad, aunque su empresa esté contratando o lidere equipos'),
+            'prospector':_noul('¿`persona` se dedica sobre todo a conseguir citas o clientes para otros con prospección en frío: generación de '
+                               'leads, agendamiento de llamadas o envíos masivos de mensajes?',
+                               'Vende lead generation, appointment setting, cold email u outreach hecho para otros',
+                               'Vende otra cosa o no vende; hacer marketing, ventas, RevOps o contenido para su propio negocio no cuenta'),
         }
+        if role=='comprador':
+            questions['proveedor']=_noul('¿`persona` vive de vender sus propios servicios profesionales (consultoría, agencia, freelance, '
+                                         'coaching) en vez de dirigir una empresa con producto u operación propia?',
+                                         'Es consultor, freelancer, coach o dueño de una agencia de servicios',
+                                         'Dirige o fundó una empresa con producto, clientes u operación propia, aunque también asesore')
         kind=capability
     if kind in ('text','post','reply'):
         public,_=memory.confirmed_blocks()
         state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
-    checks=list(CHECKS[kind])
+    checks=list(CHECKS[kind]) if kind in CHECKS else network_checks(capability,role)
     if kind=='post':
         questions['idioma']=_noul('¿La publicación está en inglés?');checks.append(('idioma','min',0.7,'no está en inglés'))
     if capability==CAP.INVITE and proposal.payload.get('note'):
