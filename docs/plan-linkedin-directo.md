@@ -154,6 +154,11 @@ Falta:
 - El rodaje de la fase 4 en el servidor y, si su IP no aguanta, el túnel de casa.
 - La prueba diaria en la PWA.
 - Conectar desde la app en el servidor: entrar de verdad en LinkedIn desde el teléfono y que la sesión quede.
+- Pasar una cuenta con historia de Unipile a directo: el cambio en la misma fila está hecho (`operador
+  cambiar-proveedor`), pero los ids de posts, comentarios, invitaciones y conversaciones guardados con Unipile no
+  valen con directo y no se traducen; se niega si la cuenta tiene alguno
+  ([Cambiar de proveedor](../agentes-linkedin/infra/docs/navegador-contrato.md#cambiar-de-proveedor)). Antes de pasar
+  la cuenta de Gustavo hay que traducirlos, y para eso ver qué ids da Unipile de verdad.
 
 Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Medido el 13/11/2026: con el navegador de una
 cuenta abierto tras un canario de 16 llamadas, el contenedor del servicio ocupaba cerca de 1 GiB y quedaron unos 1,5 GB

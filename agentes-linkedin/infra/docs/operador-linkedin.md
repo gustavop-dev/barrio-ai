@@ -85,6 +85,10 @@ Cuando una cuenta se pausa (429, restricción, reautenticación o estado distint
 5. Arrancar el servicio `autopilot` de Docker Compose. A partir de ahí el ciclo observa, redacta, aprueba por política, ejecuta y concilia solo. Lo que hace queda en `/admin/` (Propuestas de acción, Auditoría) y se puede rechazar desde allí.
 6. Prueba de aceptación: un comentario aprobado por la política aparece una vez en LinkedIn, con `external_id`, estado `confirmed` y eventos de auditoría.
 
+Pasar una cuenta ya registrada de Unipile a LinkedIn directo, o al revés, sin perder su historia: `operador
+cambiar-proveedor` ([navegador-contrato.md](navegador-contrato.md#cambiar-de-proveedor)). Los ids de posts, comentarios,
+invitaciones y conversaciones guardados con un proveedor no valen con el otro: se niega si la cuenta tiene alguno.
+
 ## API (`/api/v1/operador/…`)
 
 | Ruta | Uso |

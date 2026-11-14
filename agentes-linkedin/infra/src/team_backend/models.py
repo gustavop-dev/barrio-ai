@@ -148,6 +148,9 @@ class ConnectorAccount(models.Model):
     paused_reason=models.TextField(blank=True)
     last_checked_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
+    # The provider and external id before the last switch (proveedor.py: Unipile <-> directo on the same row), which
+    # `cambiar-proveedor --volver` puts back: {provider, external_account_id, until, by}. Empty if never switched.
+    previous_provider=models.JSONField(default=dict,blank=True)
     class Meta:
         constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
     def __str__(self):return f'{self.label} ({self.provider})'

@@ -211,7 +211,8 @@ llamar. Si no pasa, contesta 422 y no envía nada.
 
 ## Ids que devuelve el conector
 
-Son los mismos que usan los llamadores con Unipile, para que una cuenta pueda cambiar de proveedor.
+Los campos son los mismos que con Unipile. Los ids, solo para las personas: los demás son los de LinkedIn, y los de
+Unipile no tienen por qué serlo (abajo, «Cambiar de proveedor»).
 
 | Objeto | Id |
 | --- | --- |
@@ -224,3 +225,47 @@ Son los mismos que usan los llamadores con Unipile, para que una cuenta pueda ca
 
 Seguir a alguien necesita su número de miembro. El conector lo guarda de cada lectura que lo trae (perfil, comentario,
 búsqueda, post). Si no lo tiene, lee el perfil antes.
+
+## Cambiar de proveedor
+
+`operador cambiar-proveedor` pasa una cuenta de Unipile a directo, o al revés, en la misma fila: sus contactos,
+publicaciones, propuestas e historia siguen con ella (`team_backend/proveedor.py`).
+
+```bash
+python manage.py operador --usuario gustavo cambiar-proveedor --cuenta <uuid> --a directo --slug <cuenta>
+python manage.py operador --usuario gustavo cambiar-proveedor --cuenta <uuid> --volver
+```
+
+Guarda en la fila el proveedor y el id que tenía (`previous_provider`) y `--volver` los repone (y guarda los de ahora:
+se puede ir y volver). Deja el estado de la cuenta en «sin comprobar» y no pausa nada: después, `comprobar`. Queda
+auditado (`operator.account_provider_switched`). No cambia si: la cuenta ya es de ese proveedor o no es de ninguno de
+los dos; el id no tiene la forma del proveedor (directo: el nombre en el servicio; Unipile: `acc_…`); otra fila ya
+tiene ese proveedor y ese id (la cuenta del rodaje, por ejemplo); hay una acción ejecutándose, enviada sin confirmar o
+incierta (se concilia con el proveedor que la envió); o hay una conexión desde la app en curso.
+
+**Los ids guardados no se traducen.** Cada fila guarda el id que le dio el proveedor de entonces:
+
+| Qué | Dónde se guarda | ¿Vale con el otro proveedor? |
+| --- | --- | --- |
+| Persona | `Contact`, `Referent`, autores de posts y comentarios, `Conversation.attendee_provider_id`, `EvidencePerson`, propuestas de red | Sí, si el id de Unipile es el `ACo…` del perfil, como suponen el código y las pruebas (ninguna captura real lo muestra). |
+| Post | `ObservedPost.provider_post_id`, `PostMetric`, `EditorialPiece.metrics.unipile_post_id`, `PostComment.provider_post_id`, `PersonEvidence.post_id`, `ActionExecution.external_id` | No. Unipile da un base64 de `["activity:<n>"]` (la única forma real en el repo); directo, el número `n`, y rechaza lo demás. |
+| Comentario e hilo | `PostComment.provider_comment_id` y `thread_id`, `ActionExecution.external_id`, `CommunitySource`, `PersonEvidence` | No se sabe: directo usa el número de LinkedIn y rechaza lo demás; la forma real de Unipile no está en el repo. |
+| Invitación | `Contact.invitation_id`, `payload.request_id` de RED-04 | No se sabe. La sincronización reescribe las de los contactos con invitación recibida. |
+| Conversación y mensaje | `Conversation.provider_chat_id`, `messages[].id`, `InboxSeen` | No se sabe. Directo usa el id del hilo (`2-…`) y rechaza lo demás. |
+| Ubicación de búsqueda | `AuditEvent network.search_location` | Probablemente: los dos usan el número de LinkedIn. Directo ignora uno que no lo sea. |
+
+Por eso, si la cuenta guarda alguno de esos ids, el cambio se niega y dice cuántos hay de cada uno. Con
+`--aceptar-ids-viejos` cambia igualmente y esas filas quedan como historia. Lo que pasa entonces, de Unipile a directo:
+las publicaciones de los referentes se vuelven a observar como nuevas (filas repetidas, un aviso de posts nuevos, y el
+equipo podría comentar dos veces el mismo post); las propuestas abiertas sobre las filas viejas fallan como no
+válidas; las piezas ya medidas no reciben más métricas y las respuestas a comentarios de la última semana no se leen;
+las conversaciones recientes se vuelven a leer y evaluar (gasto de IA, tarjetas y avisos otra vez). Una cuenta nueva,
+sin nada de eso, cambia sin más.
+
+Para pasar una cuenta con historia hace falta antes traducir esos ids, y no está hecho: los posts de Unipile se
+pueden pasar a directo descodificando el base64 o sacando el `urn:li:activity` de `share_url`, pero solo hay una
+forma real comprobada; para comentarios, invitaciones, conversaciones y mensajes hay que ver antes qué da Unipile de
+verdad. `EditorialPiece.metrics` guarda `source: unipile` y `unipile_post_id` también con directo: es el nombre del
+campo, no el proveedor. La analítica de creador y la prueba diaria son solo de las cuentas directo: al volver a
+Unipile se quedan en la fila, sin leerse.
+
