@@ -167,7 +167,7 @@ class World:
         self.data = Path(self.tmp.name)
         account_dir(self.data)
         self.browser = browser or Browser()
-        self.clock, self.pauses, self.advance = Clock(), [], True
+        self.clock, self.pauses, self.advance, self.screen = Clock(), [], True, True
         self.settings = settings(self.data, **changes)
 
     def opener(self, profile, settings):
@@ -181,4 +181,5 @@ class World:
         await asyncio.sleep(0)
 
     def deps(self):
-        return {'opener': self.opener, 'clock': self.clock, 'sleep': self.sleep, 'rand': lambda low, high: high}
+        return {'opener': self.opener, 'clock': self.clock, 'sleep': self.sleep, 'rand': lambda low, high: high,
+                'display': lambda: self.screen}

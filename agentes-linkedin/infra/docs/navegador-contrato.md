@@ -112,7 +112,7 @@ de un episodio y empieza de nuevo cuando la cuenta vuelve a abrirse por su salid
 | 422 | Fuera de la lista permitida; no salió nada | Error `refused` |
 | 422 con `code: budget` | Tope de la cuenta agotado (lecturas o escrituras por hora o por día, o un tipo de escritura por día); no salió nada | Error `budget` con `retry_after`. No pausa la cuenta y no cuenta como límite de LinkedIn: la acción queda aprobada y se reintenta pasado ese tiempo; una lectura espera a la siguiente vuelta |
 | 423 | Sin sesión: alguien tiene que entrar a mano en ese navegador | Error `login`; la cuenta se pausa y el motivo dice qué hacer: `python -m navegador login <cuenta>` y reanudarla en Barrio |
-| 503 | Navegador no listo (no abrió, o el perfil lo tiene otro navegador) u ocupado (la llamada no pudo salir en los 35 s siguientes a su llegada); no salió nada | Error `not_sent`: como `budget`, se reintenta más tarde (30 min si nadie dice otra cosa) |
+| 503 | Navegador no listo (no abrió, no tiene pantalla, o el perfil lo tiene otro navegador) u ocupado (la llamada no pudo salir en los 35 s siguientes a su llegada); no salió nada | Error `not_sent`: como `budget`, se reintenta más tarde (30 min si nadie dice otra cosa) |
 | 503 con `code: egress` | La salida a internet de la cuenta no es la de su última sesión: no la abre hasta que alguien acepte la nueva en el servidor (`python -m navegador salida <cuenta> --aceptar`) o vuelva a poner la de antes; no salió nada | Error `egress`: espera y se reintenta como `not_sent`, sin pausar la cuenta. Avisa en Notificaciones (`navegador_salida`) una sola vez por episodio (su `since`), con qué hacer |
 | 504 u otro 5xx | La página falló durante la llamada: pudo salir y no se sabe qué pasó | Escritura: incierta. Lectura: error `network` |
 
@@ -132,7 +132,8 @@ lee y qué campos debe traer cada respuesta vive en `linkedin_directo/canario.py
 como en cualquier llamada).
 
 `GET {NAVEGADOR_URL}/health` (sin token) contesta `{"status": "ok"}` mientras el servicio está arriba; no abre ningún
-navegador.
+navegador. Si el navegador (con ventana) no tiene pantalla donde dibujar, contesta `503 {"status": "sin_pantalla"}`: el
+contenedor necesita un reinicio, y cada llamada recibe 503 sin que salga nada.
 
 Si no se puede conectar con el servicio, la llamada no salió (`not_sent`). Si se cae la conexión ya enviada, una
 escritura queda incierta. El backend espera 75 s como máximo: el servicio pausa de 3 a 7 s antes de cada llamada y le

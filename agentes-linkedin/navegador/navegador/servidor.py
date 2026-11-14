@@ -2,7 +2,8 @@
 
 - POST /v1/cuentas/{cuenta}/llamadas  one LinkedIn call; 200 with what LinkedIn answered, or the service's own status
 - GET  /v1/cuentas/{cuenta}/consultas  a fresh GraphQL query id the page used itself
-- GET  /health                         for the container's health check: no token, no data
+- GET  /health                         for the container's health check: no token, no data; 503 `sin_pantalla` when the
+                                        headed browser has no screen to draw on (the container needs a restart)
 
 /v1 needs `Authorization: Bearer <NAVEGADOR_TOKEN>`, compared in constant time (401 without it, 403 when wrong).
 aiohttp's access log is off: each call gets one line from cuenta.py with nothing LinkedIn answered in it."""
@@ -28,10 +29,14 @@ NAME = re.compile(r'[A-Za-z][A-Za-z0-9_]{0,100}')
 MAX_PATH = 8192
 
 
+SWEEP_EVERY = 60  # seconds between two looks for idle browsers
+
+
 class Service:
-    def __init__(self, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform):
-        self.settings, self.opener, self.clock = settings, opener, clock
-        self.deps = {'clock': clock, 'sleep': sleep, 'rand': rand}
+    def __init__(self, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform,
+                 display=pagina.display_ready):
+        self.settings, self.opener, self.clock, self.display = settings, opener, clock, display
+        self.deps = {'clock': clock, 'sleep': sleep, 'rand': rand, 'display': display}
         self.accounts = {}
 
     def account(self, name):
@@ -45,6 +50,17 @@ class Service:
         for account in self.accounts.values():
             await account.close()
         await pagina.stop_driver()
+
+    async def sweep(self):
+        """Close the browsers idle for settings.idle_minutes; returns how many closed."""
+        closed = 0
+        for account in list(self.accounts.values()):
+            closed += await account.close_if_idle()
+        return closed
+
+    def screen(self):
+        """False when the headed browser has no screen to draw on."""
+        return self.settings.headless or self.display() is not False
 
 
 SERVICE = web.AppKey('service', Service)
@@ -122,11 +138,14 @@ async def queries(request):
 
 
 async def health(request):
+    if not request.app[SERVICE].screen():
+        return web.json_response({'status': 'sin_pantalla'}, status=503)
     return web.json_response({'status': 'ok'})
 
 
 def build(settings, **deps):
-    """The aiohttp app. `deps` (opener, clock, sleep, rand) replace the browser and time in the tests."""
+    """The aiohttp app. `deps` (opener, clock, sleep, rand, display) replace the browser, time and the screen in the
+    tests."""
     app = web.Application(middlewares=[token], client_max_size=1024 * 1024)
     service = Service(settings, **deps)
     app[SERVICE] = service
@@ -134,8 +153,22 @@ def build(settings, **deps):
     app.router.add_post('/v1/cuentas/{cuenta}/llamadas', calls)
     app.router.add_get('/v1/cuentas/{cuenta}/consultas', queries)
 
+    async def sweeping(app):
+        async def loop():
+            while True:
+                await asyncio.sleep(SWEEP_EVERY)
+                try:
+                    await service.sweep()
+                except Exception as exc:  # a browser that fails to close is closed again on the next call
+                    log.warning('cierre por inactividad falló (%s)', type(exc).__name__)
+        task = asyncio.create_task(loop()) if settings.idle_minutes else None
+        yield
+        if task:
+            task.cancel()
+
     async def cleanup(app):
         await service.close()
+    app.cleanup_ctx.append(sweeping)
     app.on_cleanup.append(cleanup)
     return app
 

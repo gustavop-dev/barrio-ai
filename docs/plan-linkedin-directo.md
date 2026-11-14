@@ -140,8 +140,12 @@ Falta:
   el túnel de casa y la prueba diaria real.
 - Mostrar la última prueba diaria en Ajustes › Máquina, junto al estado de la cuenta: el backend ya la sirve.
 
-Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Un Chromium por cuenta ocupa del orden de medio
-giga (estimación, sin medir): caben una o dos cuentas; más cuentas piden más máquina o el equipo del usuario.
+Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Medido el 13/11/2026: con el navegador de una
+cuenta abierto tras un canario de 16 llamadas, el contenedor del servicio ocupaba cerca de 1 GiB y quedaron unos 1,5 GB
+disponibles. Dos cuentas a la vez caben justas; más cuentas piden más máquina o el equipo del usuario. El navegador
+queda abierto: cerrarlo sin uso (`NAVEGADOR_CIERRE_INACTIVO_MIN`, apagado) solo compensa con varias cuentas en un
+servidor pequeño, porque el backend llama al menos cada hora y cada reapertura es una carga más del inicio que LinkedIn
+ve. Ninguna bandera de Chromium ni bloqueo de imágenes para ahorrar memoria: cambiarían cómo LinkedIn ve el navegador.
 
 ## Orden de construcción
 

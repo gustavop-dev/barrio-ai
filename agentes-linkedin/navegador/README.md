@@ -24,6 +24,18 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
   o desaparece la cookie de sesión, la cuenta queda **detenida** (se guarda en disco) y todo recibe `409` hasta
   que alguien la revise y la reanude. Nunca intenta saltarse nada.
 - **Sin sesión**, `423`: alguien tiene que entrar a mano.
+- **Memoria.** Con el navegador de una cuenta abierto, el contenedor ocupaba en el servidor cerca de **1 GiB** (medido
+  el 13/11/2026 tras un canario de 16 llamadas). El navegador queda abierto. Opcional y apagado:
+  `NAVEGADOR_CIERRE_INACTIVO_MIN` lo cierra tras esos minutos sin llamadas y la siguiente llamada lo abre otra vez. Solo
+  compensa con varias cuentas en un servidor pequeño: el backend llama al menos cada hora (bandeja, comentarios de
+  posts propios, referentes cada 3 h, acciones durante el día), así que casi siempre cerraría para volver a abrir, y
+  cada reapertura es una carga más del inicio que LinkedIn ve. Nunca se cierra con una llamada en curso o esperando. No
+  se usa ninguna bandera de Chromium ni bloqueo de imágenes para ahorrar memoria: cambiarían cómo LinkedIn ve el
+  navegador.
+- **Sin pantalla**, `503`: el navegador va con ventana sobre una pantalla virtual (Xvfb). Si no responde, no se abre
+  nada, la llamada recibe `503` («sin pantalla») y `/health` contesta `503` con `sin_pantalla`. Al arrancar, el
+  contenedor borra el candado y el socket que deja la pantalla de la vez anterior (un `restart` conserva `/tmp`), espera
+  a que la nueva acepte conexiones y, si no lo hace, termina con error para que Docker lo vuelva a arrancar.
 - **Una sola salida a internet por sesión.** Que una sesión aparezca desde otra IP es lo primero que hace que
   LinkedIn la cierre. El navegador de cada cuenta sale directo o por un proxy (`NAVEGADOR_PROXY`); la cuenta recuerda
   por cuál salió la última vez (solo una etiqueta: `directo` o un resumen del servidor y el puerto, nunca la dirección
@@ -102,6 +114,7 @@ mismas paradas. Qué se lee y qué campos debe traer cada respuesta está en `li
 | `NAVEGADOR_INVITACIONES_DIA` | `30` | Invitaciones por día (RED-02) |
 | `NAVEGADOR_ACEPTACIONES_DIA` | `15` | Aceptaciones por día (RED-04) |
 | `NAVEGADOR_RECARGA_HORAS` | `6` | Cada cuánto se recarga la página de inicio de una cuenta |
+| `NAVEGADOR_CIERRE_INACTIVO_MIN` | vacío (`0`, nunca) | Cerrar el navegador de una cuenta tras estos minutos sin llamadas; ver «Memoria» arriba |
 | `NAVEGADOR_PROXY` | vacío (`directo`) | Por dónde sale a internet el navegador de cada cuenta: `esquema://servidor:puerto` con `http`, `https` o `socks5`. Sin usuario ni clave en la dirección |
 | `NAVEGADOR_PROXY_CUENTAS` | vacío | Una salida propia por cuenta: `cuenta=esquema://servidor:puerto` o `cuenta=directo`, separadas por comas |
 | `NAVEGADOR_PROXY_USUARIO`, `NAVEGADOR_PROXY_CLAVE` | vacío | Credenciales del proxy, juntas. Solo con `http` o `https` (Chromium no las admite en `socks5`). Se leen del entorno y no se escriben en disco ni en el registro |

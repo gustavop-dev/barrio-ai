@@ -9,6 +9,7 @@ page's requests include ours. The x-li-* headers the web app adds are kept to se
 
 patchright is imported only when a browser opens: the unit tests replace the browser with a fake one (`launcher`)."""
 import os
+import re
 import socket
 import sqlite3
 import time
@@ -30,6 +31,8 @@ GOTO_TIMEOUT_MS = 45000
 VOYAGER_COPY = ('x-li-lang', 'x-li-track', 'x-li-page-instance')  # what the web app adds; never its csrf-token
 PAGING = {'start', 'count', 'paginationToken'}
 ALARMS = (429, 999)
+X_SOCKETS = Path('/tmp/.X11-unix')
+LOCAL_DISPLAY = re.compile(r':(\d+)(?:\.\d+)?')
 
 # Runs in the page. A redirect is not followed (`manual` turns it into an opaqueredirect) and a call gives up after
 # `timeout` ms. The csrf-token is the JSESSIONID cookie, read here.
@@ -147,6 +150,30 @@ def stored_session(profile):
     return any(not expires or expires > now for (expires,) in rows)
 
 
+# --- the screen ------------------------------------------------------------------------------------------------------
+def display():
+    """The X display a headed browser draws on: DISPLAY, else the image's virtual one (NAVEGADOR_PANTALLA: commands run
+    with `docker exec` do not get the DISPLAY entrada.sh exports), else :0 (WSLg)."""
+    return os.environ.get('DISPLAY') or os.environ.get('NAVEGADOR_PANTALLA') or ':0'
+
+
+def display_ready(name=None):
+    """Whether that local X screen accepts a connection; None for a display on another machine. A socket file is not
+    enough: a restarted container keeps its /tmp, and the file of a screen that died stays there."""
+    found = LOCAL_DISPLAY.fullmatch(name or display())
+    if not found:
+        return None
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(1)
+    try:
+        sock.connect(str(X_SOCKETS / f'X{found.group(1)}'))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
+
 # --- the browser -----------------------------------------------------------------------------------------------------
 _driver = None
 
@@ -170,10 +197,10 @@ async def stop_driver():
 
 async def launch(profile, headless=False, proxy=None):
     """A persistent context on `profile`, as the spike opened it, going out through `proxy` (ajustes.Egress.option)
-    when given. Headed needs a screen: WSL shells often export DISPLAY empty while WSLg listens on :0; the image runs a
-    virtual one (entrada.sh)."""
+    when given. Headed needs a screen (display()): WSL shells often export DISPLAY empty while WSLg listens on :0; the
+    image runs a virtual one (entrada.sh)."""
     pw = await driver()
-    env = {**os.environ, 'DISPLAY': os.environ.get('DISPLAY') or ':0'}
+    env = {**os.environ, 'DISPLAY': display()}
     options = {'proxy': proxy} if proxy else {}
     return await pw.chromium.launch_persistent_context(str(profile), headless=headless, no_viewport=not headless,
                                                        env=env, **options)

@@ -140,6 +140,10 @@ def internet_exit(settings, name, accept=False):
 
 
 def status(settings, name=None):
+    ready = None if settings.headless else pagina.display_ready()
+    if ready is not None:  # run it with `docker compose exec` to see the service's own screen
+        print(f'pantalla {pagina.display()}: ' + ('lista' if ready else
+                                                  'NO RESPONDE: el navegador no puede abrir; reinicia el contenedor'))
     folder = settings.data / 'cuentas'
     names = [name] if name else sorted(p.name for p in folder.iterdir() if p.is_dir()) if folder.is_dir() else []
     if not names:

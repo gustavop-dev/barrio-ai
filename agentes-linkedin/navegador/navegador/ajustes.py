@@ -70,6 +70,7 @@ class Settings:
     budgets: dict = field(default_factory=lambda: dict(BUDGETS))
     deadline: float = DEADLINE
     reload_hours: float = 6.0  # the feed is loaded again after this long: fresh query ids, a page that looks used
+    idle_minutes: float = 0.0  # close an account's browser after this long without calls (0 = never): ~1 GiB each
     headless: bool = False
     host: str = '127.0.0.1'
     port: int = 8790
@@ -146,6 +147,7 @@ def load(env=None, need_token=True):
         pause=pause(number(env, 'NAVEGADOR_PAUSA_MIN', 3.0, float), number(env, 'NAVEGADOR_PAUSA_MAX', 7.0, float)),
         budgets=budgets,
         reload_hours=number(env, 'NAVEGADOR_RECARGA_HORAS', 6.0, float),
+        idle_minutes=number(env, 'NAVEGADOR_CIERRE_INACTIVO_MIN', 0.0, float),
         headless=(env.get('NAVEGADOR_HEADLESS') or 'false').lower() == 'true',
         host=env.get('NAVEGADOR_HOST') or '127.0.0.1',
         port=number(env, 'NAVEGADOR_PUERTO', 8790),

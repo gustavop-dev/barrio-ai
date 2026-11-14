@@ -19,7 +19,7 @@ from linkedin_directo import rutas
 from navegador import __main__ as cli
 from navegador import ajustes
 from navegador.almacen import IMPORTED, Store, stamp
-from navegador.servidor import build
+from navegador.servidor import SERVICE, build
 from tests.falsos import MESSAGING, POST, PROFILE, TOKEN, Browser, Request, Response, World, call, invitation, raw, \
     reaction
 
@@ -496,6 +496,67 @@ class LogTests(ServiceCase):
         self.assertIn('/feed/update/{id}/', text)
         self.assertIn('DETENIDA', text)
         self.assertIn('op=account_status -> 409', text)
+
+
+class ScreenTests(ServiceCase):
+    async def test_without_a_screen_nothing_opens_and_the_health_check_says_so(self):
+        self.world.screen = False  # Xvfb did not come back after a restart
+        response = await self.client.get('/health')
+        self.assertEqual((response.status, await response.json()), (503, {'status': 'sin_pantalla'}))
+        status, body = await self.post(call())
+        self.assertEqual(status, 503)
+        self.assertIn('sin pantalla', body['reason'])
+        self.assertNotIn('code', body)
+        self.assertEqual((self.browser.launches, self.browser.fetches), (0, []))
+        self.world.screen = True
+        self.assertEqual((await self.client.get('/health')).status, 200)
+        self.assertEqual((await self.post(call()))[0], 200)
+
+    async def test_a_headless_browser_needs_no_screen(self):
+        self.world.screen = False
+        self.world.settings = replace(self.world.settings, headless=True)
+        client = await self.start()
+        self.assertEqual((await client.get('/health')).status, 200)
+        self.assertEqual((await self.post(call(), client=client))[0], 200)
+
+
+class IdleTests(ServiceCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.world.settings = replace(self.world.settings, idle_minutes=30)
+        self.client = await self.start()
+
+    def service(self, client=None):
+        return (client or self.client).server.app[SERVICE]
+
+    async def test_an_idle_browser_closes_and_the_next_call_opens_it_again(self):
+        self.assertEqual((await self.post(call()))[0], 200)
+        self.world.clock.now += 29 * 60
+        self.assertEqual(await self.service().sweep(), 0)
+        self.world.clock.now += 2 * 60
+        with self.assertLogs('navegador', 'INFO') as logs:
+            self.assertEqual(await self.service().sweep(), 1)
+        self.assertIn('cerrado tras 30 min sin llamadas', logs.output[0])
+        self.assertTrue(self.browser.contexts[0].closed)
+        self.assertEqual(await self.service().sweep(), 0)  # nothing open
+        self.assertEqual((await self.post(call()))[0], 200)  # one more feed load, as LinkedIn sees it
+        self.assertEqual((self.browser.launches, self.browser.gotos, len(self.browser.fetches)), (2, 2, 2))
+
+    async def test_never_while_a_call_is_out_nor_when_turned_off(self):
+        self.browser.gate = asyncio.Event()
+        out = asyncio.ensure_future(self.post(call()))
+        await until(lambda: self.browser.fetches)
+        self.world.clock.now += 3600
+        self.assertEqual(await self.service().sweep(), 0)
+        self.browser.gate.set()
+        self.assertEqual((await out)[0], 200)
+        self.assertEqual(await self.service().sweep(), 0)  # the call that just ended is use
+        self.assertFalse(self.browser.contexts[0].closed)
+        self.world.settings = replace(self.world.settings, idle_minutes=0)
+        client = await self.start()
+        self.assertEqual((await self.post(call(), client=client))[0], 200)
+        self.world.clock.now += 86400
+        self.assertEqual(await self.service(client).sweep(), 0)
 
 
 if __name__ == '__main__':

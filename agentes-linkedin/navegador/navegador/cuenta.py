@@ -7,7 +7,9 @@
 5. the budgets, per hour and per day, reads and writes apart, and per day each kind of write: 422 with code `budget`
    and the seconds until the window has room again (retry_after);
 6. the page, opened on the first call and kept open, only by the internet exit the session last used (a different
-   one, 503 until an operator accepts it); no session, 423; profile in use or no browser, 503;
+   one, 503 until an operator accepts it); no session, 423; profile in use, no browser or no screen for it, 503. Only
+   when `idle_minutes` is set (off by default: the backend calls at least hourly, so it would mostly churn) it is
+   closed after that long without calls, and the next call opens it again: one more feed load, as LinkedIn sees it;
 7. a random pause, then the page checked (on LinkedIn, the session cookie there, no 429/999 on its own calls);
 8. ONE fetch from inside the page, its answer returned as it came. Never a retry, never a redirect followed.
 
@@ -82,14 +84,16 @@ def pushback(request, answer):
 
 
 class Account:
-    def __init__(self, name, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform):
+    def __init__(self, name, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform,
+                 display=pagina.display_ready):
         self.name, self.settings = name, settings
         self.opener = opener or pagina.Page.open
-        self.clock, self.sleep, self.rand = clock, sleep, rand
+        self.clock, self.sleep, self.rand, self.display = clock, sleep, rand, display
         self.store = Store(settings.account_dir(name))
         self.lock = asyncio.Lock()
         self.page = None
         self.in_flight = set()
+        self.used = clock()  # the last call or query: the page closes after settings.idle_minutes without one
         self.store.prune_writes(time.time())
 
     # --- the two things the service is asked -------------------------------------------------------------------------
@@ -114,6 +118,7 @@ class Account:
             try:
                 return await self._send(request, request_id, arrived)
             finally:
+                self.used = self.clock()
                 self.lock.release()
         finally:
             if request.write:
@@ -128,6 +133,7 @@ class Account:
             page = await self._open()
             found = pagina.pick_live(page.live, prefixes, variables)
         finally:
+            self.used = self.clock()
             self.lock.release()
         if not found:
             raise Refused(404, 'la página no hizo ninguna consulta así')
@@ -138,6 +144,20 @@ class Account:
         page, self.page = self.page, None
         if page is not None:
             await page.close()
+
+    async def close_if_idle(self):
+        """Close the page after settings.idle_minutes without a call (0 = never): an open account's browser holds about
+        1 GiB. Never while a call holds or waits for the account. True when it closed."""
+        idle = self.settings.idle_minutes * 60
+        if not idle or self.page is None or self.lock.locked() or self.clock() - self.used < idle:
+            return False
+        async with self.lock:  # behind a call that was about to take it, if any: then that call counts as use
+            if self.page is None or self.clock() - self.used < idle:
+                return False
+            await self.close()
+        log.info('cuenta=%s navegador cerrado tras %.0f min sin llamadas; la próxima llamada lo vuelve a abrir',
+                 self.name, idle / 60)
+        return True
 
     # --- the guards --------------------------------------------------------------------------------------------------
     def _not_stopped(self):
@@ -206,6 +226,10 @@ class Account:
                 page = None
         if page is None:
             label = self._egress()
+            if not self.settings.headless and self.display() is False:
+                log.warning('cuenta=%s sin pantalla para el navegador (%s no responde)', self.name, pagina.display())
+                raise Refused(503, 'sin pantalla para el navegador (la pantalla virtual no responde); no salió nada. '
+                                   'Reinicia el contenedor del servicio')
             try:
                 self.page = await self.opener(self.store.profile, self.settings)
             except pagina.NoSession:

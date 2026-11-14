@@ -19,7 +19,9 @@ COPY navegador ./navegador
 # context brings that one folder, so the service and the backend check calls with the same code.
 COPY --from=directo . ./linkedin_directo/
 COPY entrada.sh /usr/local/bin/entrada.sh
-ENV NAVEGADOR_HOST=0.0.0.0 NAVEGADOR_DATOS=/datos
+# The virtual screen's number (entrada.sh), also for `docker exec`'d commands such as `estado`, which do not get its
+# DISPLAY.
+ENV NAVEGADOR_HOST=0.0.0.0 NAVEGADOR_DATOS=/datos NAVEGADOR_PANTALLA=:99
 USER app
 EXPOSE 8790
 ENTRYPOINT ["entrada.sh"]

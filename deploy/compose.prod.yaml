@@ -132,6 +132,8 @@ services:
       NAVEGADOR_ACEPTACIONES_DIA: ${NAVEGADOR_ACEPTACIONES_DIA:-}
       NAVEGADOR_PAUSA_MIN: ${NAVEGADOR_PAUSA_MIN:-3}
       NAVEGADOR_PAUSA_MAX: ${NAVEGADOR_PAUSA_MAX:-7}
+      # Close an account's browser after this many idle minutes (empty or 0 = never, the default; README «Memoria»).
+      NAVEGADOR_CIERRE_INACTIVO_MIN: ${NAVEGADOR_CIERRE_INACTIVO_MIN:-}
       # Internet exit (empty = straight out); a change of exit is refused until accepted (README «Salida a internet»).
       NAVEGADOR_PROXY: ${NAVEGADOR_PROXY:-}
       NAVEGADOR_PROXY_CUENTAS: ${NAVEGADOR_PROXY_CUENTAS:-}

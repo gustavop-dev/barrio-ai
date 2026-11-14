@@ -103,6 +103,30 @@ class SettingsTests(unittest.TestCase):
     def test_only_serving_and_the_canary_need_the_token(self):
         self.assertEqual(ajustes.load({}, need_token=False).token, '')
 
+    def test_an_idle_browser_stays_open_unless_told_otherwise(self):
+        self.assertEqual(ajustes.load({}, need_token=False).idle_minutes, 0)
+        self.assertEqual(ajustes.load({'NAVEGADOR_CIERRE_INACTIVO_MIN': ''}, need_token=False).idle_minutes, 0)
+        self.assertEqual(ajustes.load({'NAVEGADOR_CIERRE_INACTIVO_MIN': '45'}, need_token=False).idle_minutes, 45)
+
+
+class ScreenTests(unittest.TestCase):
+    def test_a_screen_is_ready_only_when_it_accepts_a_connection(self):
+        with tempfile.TemporaryDirectory() as tmp, patch('navegador.pagina.X_SOCKETS', Path(tmp)):
+            self.assertFalse(pagina.display_ready(':99'))
+            live = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            live.bind(str(Path(tmp) / 'X99'))
+            live.listen(1)
+            try:
+                self.assertTrue(pagina.display_ready(':99'))
+                self.assertTrue(pagina.display_ready(':99.0'))
+            finally:
+                live.close()
+            self.assertTrue((Path(tmp) / 'X99').exists())  # what a restarted container keeps in /tmp
+            self.assertFalse(pagina.display_ready(':99'))
+        self.assertIsNone(pagina.display_ready('otra-maquina:0'))
+        with patch.dict(os.environ, {'DISPLAY': '', 'NAVEGADOR_PANTALLA': ':42'}):
+            self.assertEqual(pagina.display(), ':42')  # what `docker exec` sees: the image's screen
+
 
 class ProfileTests(unittest.TestCase):
     def setUp(self):
@@ -182,6 +206,10 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('escrituras 1/h 1/día (reacciones 1)', out)
         self.assertIn('Reanudada', self.run_quietly(cli.resume, self.settings, 'prueba'))
         self.assertIn('activa', self.run_quietly(cli.status, self.settings, 'prueba'))
+        with patch('navegador.pagina.display_ready', return_value=False):
+            self.assertIn(': NO RESPONDE', self.run_quietly(cli.status, self.settings))
+        with patch('navegador.pagina.display_ready', return_value=True):
+            self.assertIn(': lista', self.run_quietly(cli.status, self.settings))
 
 
 class RouteTests(unittest.TestCase):
