@@ -220,7 +220,8 @@ def redeem(raw):
     if not raw or len(raw) > 200:
         return None
     with transaction.atomic():
-        login = (BrowserLogin.objects.select_for_update().select_related('user')
+        # Only the login row is locked: its user is a nullable join, and PostgreSQL cannot lock that side of it.
+        login = (BrowserLogin.objects.select_for_update(of=('self',)).select_related('user')
                  .filter(ticket_hash=_hash(raw), ticket_expires_at__gt=timezone.now()).first())
         if login is None:
             return None
