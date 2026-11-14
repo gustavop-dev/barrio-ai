@@ -16,13 +16,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from unittest.mock import patch
 
-from linkedin_directo import rutas
+from linkedin_directo import LinkedInError, rutas
+from linkedin_directo.canario import INVITATION, Recorder, verdict
 from linkedin_directo.servicio import READ_TIMEOUT
 
 from navegador import __main__ as cli
 from navegador import ajustes, pagina
 from navegador.almacen import IMPORTED, Store
-from navegador.canario import INVITATION, Recorder, verdict
+from navegador import canario as canary
 from navegador.cuenta import route
 from navegador.pagina import stored_session
 from tests.falsos import TOKEN, settings
@@ -205,8 +206,7 @@ class CanaryTests(unittest.TestCase):
         def counts(urn, comments):
             return {'$type': 'com.linkedin.voyager.feed.shared.SocialActivityCounts', 'urn': urn,
                     'numComments': comments}
-        recorder = Recorder('http://127.0.0.1:1', TOKEN, 'prueba')
-        self.addCleanup(recorder.http.close)
+        recorder = Recorder(None)  # only the counters of an answer already in hand are read
         recorder.last = json.dumps({'included': [
             counts('urn:li:activity:1001', 3), counts('urn:li:activity:1002', 9), counts('urn:li:activity:1003', 0),
             counts('urn:li:comment:(activity:1002,2001)', 4), counts('urn:li:comment:(activity:1002,2002)', 0)]})
@@ -223,6 +223,31 @@ class CanaryTests(unittest.TestCase):
         self.assertEqual(verdict([], 1, INVITATION), ('roto', '0 filas (se esperaba al menos 1)', 0))
         self.assertEqual(verdict([{'id': '1', 'user': {'id': ''}, 'created_at': None}], 1, INVITATION),
                          ('roto', 'faltan campos: user.id, created_at', 1))
+
+    def test_the_command_keeps_the_report_and_says_how_it_ended(self):
+        class Refusing:
+            def __init__(self, error):
+                self.error = error
+
+            def send(self, request):
+                raise self.error
+
+            def live_query(self, prefixes, variables):
+                return None
+        cases = ((LinkedInError('El servicio navegador no respondió; account_status no salió.', kind='not_sent'),
+                  canary.NOT_RUN, 'no_corrio'),
+                 (LinkedInError('Servicio navegador: HTTP 423 en account_status (sin sesión).', kind='login', status=423,
+                                pause=True), canary.HALTED, 'alto'))
+        for error, code, result in cases:
+            with self.subTest(result=result), tempfile.TemporaryDirectory() as tmp:
+                lines = []
+                self.assertEqual(canary.run('', TOKEN, 'prueba', Path(tmp), out=lines.append, transport=Refusing(error)), code)
+                [saved] = (Path(tmp) / 'canario').iterdir()
+                report = json.loads(saved.read_text())
+                self.assertEqual((report['resultado'], report['codigo'], report['llamadas'], len(report['operaciones'])),
+                                 (result, code, 1, 1))
+                self.assertEqual(report['error']['kind'], error.kind)
+                self.assertEqual('DETENIDO' in lines[-1], code == canary.HALTED)
 
 
 if __name__ == '__main__':
