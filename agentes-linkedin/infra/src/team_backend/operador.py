@@ -455,11 +455,14 @@ def observe(user,account,referent_ids=None,limit=5):
     return summary
 
 def set_account_pause(account,reason,actor=None,notify=True):
-    """`notify=False` when the caller sends a more precise push itself (the expired LinkedIn token: linkedin_expired)."""
-    ConnectorAccount.objects.filter(pk=account.pk).update(paused=True,paused_reason=reason)
+    """`notify=False` when the caller sends a more precise push itself (the expired LinkedIn token: linkedin_expired).
+    Only the pause that stops a running account pushes: jobs already queued that hit the same stop update the reason
+    without a second notice."""
+    first=ConnectorAccount.objects.filter(pk=account.pk,paused=False).update(paused=True,paused_reason=reason)
+    if not first:ConnectorAccount.objects.filter(pk=account.pk).update(paused=True,paused_reason=reason)
     account.paused=True;account.paused_reason=reason
     _audit(actor,'operator.account_paused',account.id,reason=reason)
-    if notify:
+    if notify and first:
         from .notificaciones import avisar
         avisar('account_paused','LinkedIn: cuenta en pausa',f'{account.label}: {reason} Solo Gustavo puede reanudarla.')
 

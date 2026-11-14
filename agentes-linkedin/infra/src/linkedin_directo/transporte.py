@@ -94,8 +94,9 @@ def check_answer(request, answer):
     name = request.operation or request.kind
 
     def stop(why, kind):
-        raise LinkedInError(f'LinkedIn: {why} en {name}; la cuenta se detiene.', kind=kind, status=status or None,
-                            pause=True)
+        raise LinkedInError(f'LinkedIn: {why} en {name}; la cuenta se detiene. Revisa LinkedIn a mano en el navegador '
+                            'del servicio y, cuando esté bien, reanuda la cuenta allí y en Barrio.', kind=kind,
+                            status=status or None, pause=True)
 
     if answer.redirected or 300 <= status < 400:
         stop('redirección', 'redirect')

@@ -28,6 +28,13 @@ SERVICE = {
     503: ('not_sent', False, False),  # browser not ready or busy: nothing left
     504: ('network', False, True),  # the call left the page and its answer did not come back in time
 }
+# What the owner has to do when the service stopped the account: the callers put the message in the pause reason.
+TO_DO = {
+    409: 'Revisa LinkedIn a mano en el navegador del servicio (verificación, aviso o restricción) y, cuando esté bien, '
+         'reanuda la cuenta allí (python -m navegador reanudar {}) y en Barrio.',
+    423: 'Inicia sesión de nuevo en LinkedIn en el navegador del servicio (python -m navegador login {}) y reanuda la '
+         'cuenta en Barrio.',
+}
 
 
 class ServiceTransport(Transport):
@@ -61,8 +68,9 @@ class ServiceTransport(Transport):
                 raise LinkedInError(f'Servicio navegador: presupuesto de la cuenta agotado en {name} '
                                     f'({_reason(response)}); vuelve a haber cupo en {-(-wait // 60)} min.',
                                     kind='budget', status=response.status_code, retry_after=wait)
-            raise LinkedInError(f'Servicio navegador: HTTP {response.status_code} en {name} ({_reason(response)}).',
-                                kind=kind, status=response.status_code, pause=pause)
+            hint = TO_DO.get(response.status_code, '').format(self.account)
+            raise LinkedInError(f'Servicio navegador: HTTP {response.status_code} en {name} ({_reason(response)}).'
+                                + (f' {hint}' if hint else ''), kind=kind, status=response.status_code, pause=pause)
         try:
             data = response.json()
             return Answer(status=int(data['status']), text=data.get('text') or '',
