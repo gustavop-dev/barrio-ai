@@ -29,6 +29,8 @@ su conexión, y que además traiga la analítica de la cuenta (impresiones, alca
 | Iniciar sesión en el navegador automatizado no anula la sesión | Dos sesiones de solo lectura en la cuenta principal, sin incidentes |
 | La analítica completa se obtiene con una petición | La respuesta al diálogo «Exportación» ya trae el libro entero; solo lleva fecha de inicio y de fin |
 | Esa petición también funciona enviada por código | Cuenta de prueba, 13/11/2026: 7, 28 y 365 días desde la página de inicio, sin abrir la de analítica; respuesta en menos de un segundo |
+| Entrar a mano en el servidor funciona | El paso a paso del README del servicio (contenedor de login, túnel SSH, noVNC): sesión guardada y abierta después por el servicio |
+| Las lecturas salen bien desde la IP del servidor | La prueba diaria por el servicio en el servidor: 14 de 14 lecturas, 16 llamadas, 105 s |
 
 Por dónde va cada cosa hoy:
 
@@ -50,11 +52,13 @@ anteriores al 10/10/2025.
   10 comentarios, 20 seguimientos y 16 invitaciones diarias durante semanas.
 - **La cuenta real:** ahí solo se leyó la analítica con clics. Ninguna de las 21 operaciones se ha ejecutado en ella
   por esta vía.
-- **El servidor:** todo corrió desde el computador de Gustavo, con su conexión de casa. Desde el servidor (IP de
-  centro de datos) no se ha probado nada.
+- **El servidor en el tiempo:** desde la IP del servidor (centro de datos) solo corrió la prueba diaria, una vez y
+  sin escrituras. Si LinkedIn tolera esa IP días seguidos y con escrituras es lo que mide la
+  [fase 4](#fase-4-rodaje-de-la-cuenta-de-prueba).
 - **La analítica de una cuenta con actividad por código:** la cuenta de prueba no tiene impresiones, así que no se
   vieron hojas con datos de publicaciones ni de demografía. Tampoco los rangos anteriores al límite.
-- **Si leer la tarjeta de un perfil cuenta como visita** a ese perfil.
+- **Si leer la tarjeta de un perfil cuenta como visita** a ese perfil. Las librerías públicas dicen que sí: hay que
+  contar con que esas personas ven la visita.
 
 ## Riesgos
 
@@ -118,7 +122,7 @@ Topes del servicio por cuenta, en ventanas móviles: 150 lecturas por hora y 100
 aceptaciones. Son una red de seguridad detrás de los topes del operador. Un tope agotado contesta 422 con
 `code: budget`: no pausa la cuenta, no cuenta como límite de LinkedIn y la acción se reintenta cuando hay cupo.
 
-### Hecho y lo que falta (13/11/2026)
+### Hecho y lo que falta (14/11/2026)
 
 Hecho y probado con respuestas inventadas y el navegador falso de las pruebas; nada de esto salió a LinkedIn:
 
@@ -130,15 +134,20 @@ Hecho y probado con respuestas inventadas y el navegador falso de las pruebas; n
   (`NAVEGADOR_PROXY_CUENTAS`), con usuario y clave solo desde el entorno, nunca en disco ni en el log. El servicio
   guarda por cuenta una etiqueta sin secretos de la salida de su sesión y no la abre por otra hasta que alguien lo
   acepta (`python -m navegador salida <cuenta> --aceptar`): una sesión que salta de IP es lo que más verificaciones
-  provoca. Un perfil importado de otro equipo también espera esa aceptación.
-- **Prueba diaria** en el backend, con sus avisos y la pausa (punto 6).
+  provoca. Un perfil importado de otro equipo también espera esa aceptación. Mientras tanto el backend avisa una vez,
+  en el acto (`navegador_salida`, con qué hacer), sin pausar la cuenta: lo pendiente espera y nada se pierde.
+- **Prueba diaria** en el backend, con sus avisos y la pausa (punto 6). La app la muestra en la tarjeta de la cuenta
+  (Ajustes › Máquina, [AJU-02](funcionalidades/ajustes.md#aju-02)); la PWA, todavía no.
+- **Rodaje de la fase 4** (abajo), con sus paradas, y el servicio más firme para el servidor: la pantalla virtual vuelve
+  tras reiniciar el contenedor, y un login en otro contenedor espera a que el servicio suelte el perfil.
 - **Filtro de grado de red** en la búsqueda (`rutas.search_page(network=...)`): escrito, apagado y sin verificar.
+
+Hecho en el servidor: entrar a mano por el túnel y noVNC, y una prueba diaria de 14 de 14 desde su IP (arriba).
 
 Falta:
 
-- Correrlo contra LinkedIn con la cuenta de prueba (fase 4): los topes frente a lo que LinkedIn tolera, la salida por
-  el túnel de casa y la prueba diaria real.
-- Mostrar la última prueba diaria en Ajustes › Máquina, junto al estado de la cuenta: el backend ya la sirve.
+- El rodaje de la fase 4 en el servidor y, si su IP no aguanta, el túnel de casa.
+- La prueba diaria en la PWA.
 
 Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Medido el 13/11/2026: con el navegador de una
 cuenta abierto tras un canario de 16 llamadas, el contenedor del servicio ocupaba cerca de 1 GiB y quedaron unos 1,5 GB
@@ -146,6 +155,59 @@ disponibles. Dos cuentas a la vez caben justas; más cuentas piden más máquina
 queda abierto: cerrarlo sin uso (`NAVEGADOR_CIERRE_INACTIVO_MIN`, apagado) solo compensa con varias cuentas en un
 servidor pequeño, porque el backend llama al menos cada hora y cada reapertura es una carga más del inicio que LinkedIn
 ve. Ninguna bandera de Chromium ni bloqueo de imágenes para ahorrar memoria: cambiarían cómo LinkedIn ve el navegador.
+
+## Fase 4: rodaje de la cuenta de prueba
+
+Antes de pasar la cuenta de Gustavo, una cuenta **de prueba** trabaja en el servidor una o dos semanas a ritmo de
+producción, para saber si LinkedIn tolera la IP del servidor y nuestro ritmo. Detalle en el README del servicio
+([Rodaje](../agentes-linkedin/navegador/README.md#rodaje)) y paso a paso en el servidor
+([En el servidor](../agentes-linkedin/navegador/README.md#en-el-servidor)).
+
+**Qué hace.** `python -m navegador rodaje <cuenta>`, en el contenedor `rodaje` (perfil `rodaje` de Compose, apagado
+por defecto), hace un día de producción tras otro por el servicio en marcha: el mismo cliente, las mismas llamadas,
+topes, paradas y lista permitida que usa el backend, pero sin backend (no crea propuestas, no gasta IA ni toca la
+base). Entre semana, de 08:00 a 20:00 de Bogotá con una pausa larga cerca del mediodía y desfases al azar: unas 290 a
+330 lecturas con la mezcla de producción (referentes, perfiles con su tarjeta, búsquedas con el filtro de lugar,
+bandeja, posts propios, métricas, red, una exportación de analítica y la prueba diaria) y 12 escrituras inofensivas:
+6 «me gusta», 4 seguimientos y 2 invitaciones sin nota a creadores fuera de la red, más hasta 5 aceptaciones de
+invitaciones reales. El fin de semana, la mitad. Nunca toca dos veces la misma publicación o persona, no comenta ni
+responde (solo con un número explícito y textos propios), y nunca deja de seguir, retira, borra ni manda mensajes.
+
+**Qué no prueba.**
+
+- La cuenta real: una cuenta casi vacía y nueva puede recibir otro trato que una con años de historia.
+- El volumen de escritura de producción: 12 al día frente a hasta 90, sin comentarios ni respuestas. Las escrituras
+  crecen en la fase 5, una capacidad cada vez.
+- Un día cargado de lecturas, salvo con `RODAJE_ESCALA` (2 o 3: unas 600 a 880 al día).
+- El backend: autopiloto, workers, conciliación y avisos. La prueba diaria del backend corre solo para cuentas
+  `directo` dadas de alta en Barrio; la de prueba no lo está (el autopiloto actuaría con ella), así que no sale en la
+  app: el rodaje corre su propia prueba diaria y la guarda en su resumen.
+- El túnel de casa: solo se monta si la IP del servidor no aguanta.
+
+Efecto en terceros, igual que en producción: unas 40 tarjetas de perfil al día, que probablemente cuentan como visitas,
+y las reacciones, seguimientos e invitaciones de la tabla.
+
+**Cómo se lee.** `rodaje estado` (los últimos 14 días en una tabla): por día lecturas, escrituras hechas por tipo,
+respuestas de LinkedIn que no fueron 200, topes agotados, rechazos del servicio, la prueba diaria, la última parada y el
+código de salida (0 bien, 3 parada, 4 no pudo). El detalle de cada día queda en
+`cuentas/<cuenta>/rodaje/rodaje-AAAA-MM-DD.json`; `navegador estado` dice si la cuenta tiene una parada y su motivo.
+
+| Señal | Qué es |
+| --- | --- |
+| Bien | Código 0, prueba diaria `ok`, ninguna respuesta de LinkedIn que no sea 200 salvo algún 404 suelto (contenido borrado), escrituras confirmadas al releer |
+| Alarma | Código 3 por LinkedIn: reto, verificación, redirección al login, 401, 403, 429 o 999, o la sesión cerrada. El día termina solo |
+| No habla del aguante | Código 4 (otra salida a internet, configuración), un tope del servicio agotado, el servicio caído, o una prueba diaria `roto`: LinkedIn cambió un campo y se arregla el conector |
+
+**Criterio para pasar la cuenta real** (propuesta; decide Gustavo):
+
+1. 10 días seguidos a ritmo normal, al menos 7 entre semana, sin ninguna alarma y sin volver a entrar a mano.
+2. La prueba diaria `ok` todos esos días; un `roto` arreglado no reinicia la cuenta de días, una alarma sí.
+3. Todas las escrituras confirmadas releyendo; ninguna incierta sin explicar.
+4. Después, 3 días con `RODAJE_ESCALA=2` (unas 600 lecturas, un día normal de producción) con el mismo resultado.
+
+Si LinkedIn frena, el rodaje se detiene solo y no vuelve a llamar ese día. Se mira el motivo, se resuelve (entrar a mano
+si pidió verificación) y la cuenta de días empieza de cero. Si frena otra vez desde la IP del servidor, se monta el
+túnel de casa (decisión abierta 3) y la fase 4 se repite por ahí.
 
 ## Orden de construcción
 
@@ -158,7 +220,7 @@ LinkedIn desde producción.
 | 1 | Conector `directo` en el backend: las 21 operaciones con la interfaz actual, traducción de respuestas, pruebas con respuestas grabadas sin datos personales | CI; cuenta de prueba desde el computador de Gustavo |
 | 2 | Servicio «navegador»: contenedor, perfiles por cuenta, API interna, protecciones, inicio de sesión, pausa y aviso | Cuenta de prueba en el entorno elegido |
 | 3 | Analítica: importación diaria, carga inicial, modelos y pantalla de Resultados con intervalos. 3a (el backend) y 3b en la app están hechas; falta la vista en la PWA | Cuenta de prueba (3a); datos de la cuenta de Gustavo, solo lectura |
-| 4 | Prueba de resistencia: la cuenta de prueba trabajando 1 a 2 semanas a ritmo real, con la prueba diaria | Sin bloqueos ni verificaciones en ese periodo |
+| 4 | Prueba de resistencia: la cuenta de prueba trabajando 1 a 2 semanas a ritmo real, con la prueba diaria ([rodaje](#fase-4-rodaje-de-la-cuenta-de-prueba)) | El criterio de esa sección: 10 días seguidos sin alarmas y la prueba diaria bien |
 | 5 | Paso de la cuenta de Gustavo: primero lecturas, luego una capacidad de escritura cada vez; Unipile queda de respaldo hasta el final | Una semana estable por capacidad |
 | 6 | Segundo usuario (CTO) y multitenant: alta con inicio de sesión propio, identidad fuera del código | Ver `barrio-multitenant` en la memoria del proyecto |
 

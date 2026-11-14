@@ -294,7 +294,9 @@ la última parada y el código (0 bien, 3 parada, 4 no pudo, «en curso»).
 | `NAVEGADOR_URL`, `NAVEGADOR_TOKEN` | `127.0.0.1:NAVEGADOR_PUERTO`, — | El servicio y su token |
 
 En el servidor corre en el contenedor `rodaje` (perfil `rodaje` de `deploy/compose.prod.yaml`), con la misma imagen
-y el mismo volumen que `navegador`; ver [En el servidor](#en-el-servidor).
+y el mismo volumen que `navegador`; ver [En el servidor](#en-el-servidor). Qué señal es buena, cuál es alarma y el
+criterio para pasar la cuenta real:
+[plan, «Fase 4»](../../docs/plan-linkedin-directo.md#fase-4-rodaje-de-la-cuenta-de-prueba).
 
 ## En el servidor
 
