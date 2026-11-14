@@ -120,8 +120,9 @@ Las fotos llegan con la nota de Gustavo (de voz o escrita) como contexto y, si l
   7. **Dado** que no se puede preparar ninguna imagen válida, **cuando** termina la preparación, **entonces** la pieza queda bloqueada con el motivo y llega el aviso de pieza bloqueada ([EDI-09](motor-editorial.md#edi-09)); no se publica sin imagen.
   8. **Dado** que Gustavo pide un formato para el post (en la idea que usa la pieza o en un comentario sobre ella: «hazlo carrusel»), **cuando** se decide, **entonces** ese es el formato: el director lo lee en su idea y `editor_visual` recibe sus palabras en `gustavo_request` (las mismas que lee el líder, `lider.piece_request`).
   9. **Dado** el historial que recibe el director, **cuando** decide, **entonces** cada pieza reciente dice su formato de imagen (`history[].image`), para no repetir uno por costumbre.
+  10. **Dado** un día con idea planeada en la semana GASP ([EDI-29](motor-editorial.md#edi-29)) y sin un formato pedido por Gustavo, **cuando** el director usa esa idea, **entonces** el formato planeado es el formato, salvo que no encaje con el texto final: un carrusel pasa a infografía si el texto no avanza por partes y una foto sin foto pertinente pasa a infografía o carrusel.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales. Hasta el 14/11/2026 nunca salió un carrusel. Causas leídas en el código (no se miraron datos de producción): los prompts solo lo proponían para «un proceso en pasos» y elegían infografía con la Galería vacía; `editor_visual` no veía lo que Gustavo pidió; un carrusel con láminas o títulos numerados («3 mistakes») choca con la regla de cifras sin fuente y, tras la corrección, la tarjeta de marca ocupa su lugar y cambia `image_kind`, así que el intento no se ve; y un comentario no podía pedir uno.
-- **Cobertura QA:** criterios 3, 5 y 8 en `test_imagenes.CarouselTests` (`test_a_carousel_the_director_chooses_reaches_linkedin_as_a_document_with_its_cover_title`, `test_the_team_is_told_when_a_carousel_fits_and_not_to_number_its_slides`) y `test_editor_visual.VisualTests.test_the_format_gustavo_asks_for_reaches_the_selector`. Escritas; ejecución pendiente del CI.
+- **Cobertura QA:** criterios 3, 5, 8 y 10 en `test_imagenes.CarouselTests` (`test_a_carousel_the_director_chooses_reaches_linkedin_as_a_document_with_its_cover_title`, `test_the_team_is_told_when_a_carousel_fits_and_not_to_number_its_slides`) y `test_editor_visual.VisualTests.test_the_format_gustavo_asks_for_reaches_the_selector`. Escritas; ejecución pendiente del CI.
 
 ### IMG-16 · Opción «Edición con IA» en la captura, la Galería y Ajustes <a id="img-16"></a>
 
@@ -371,13 +372,13 @@ Las reglas son las del tablero «Infografías hechas con IA · reglas» (`Infogr
   2. **Dado** un titular de más de 8 palabras, una lámina de más de 30 palabras o una imagen única de más de 40, **cuando** se valida, **entonces** se rechaza y el agente lo corrige antes de dibujar.
   3. **Dado** un tipo de gráfico que no está permitido (torta de más de 3 partes, 3D, doble eje, medidores, nubes de palabras), **cuando** se valida, **entonces** se rechaza; solo pasan número protagonista, barras horizontales (hasta 5), línea simple (una serie, dos como máximo), antes y después, pasos (3 a 5) y lista numerada.
   4. **Dado** unos pasos con 2 o con 6 elementos, o unas barras con 6 categorías, **cuando** se valida, **entonces** se rechaza.
-  5. **Dado** el texto público, **cuando** se valida, **entonces** está en inglés, sin emojis, sin hashtags, sin dobles exclamaciones y con mayúsculas solo en las etiquetas.
-  6. **Dado** un titular de portada, **cuando** se valida, **entonces** va en minúsculas salvo la primera letra.
+  5. **Dado** el texto público, **cuando** se valida, **entonces** está en inglés, sin emojis, sin hashtags, sin dobles exclamaciones y con mayúsculas solo en las etiquetas. Las siglas conocidas (AI, MVP, CTO, API, US…, `infografias.ACRONYMS`) son palabras, no gritos; los plurales y formas mixtas (APIs, B2B, SaaS) nunca chocaron con la regla.
+  6. **Dado** un titular de portada, **cuando** se valida, **entonces** va en minúsculas salvo la primera letra y las siglas conocidas («Ship AI agents safely»).
   7. **Dado** una respuesta que no cumple el esquema tras la corrección, **cuando** termina, **entonces** no se dibuja nada y el equipo elige otra imagen o la pieza queda bloqueada con el motivo ([IMG-15](#img-15)).
   8. **Dado** que Gustavo pide preguntas (o «preguntas y respuestas rápidas») o el post remite a las preguntas de la imagen, **cuando** diseña, **entonces** usa la plantilla `preguntas`: de 2 a 4 preguntas en viñetas, sin numerar, cada una con una respuesta corta opcional después del «?»; sin cifras no necesita fuente. Origen: 12/11/2026, el diseñador puso tres preguntas en la plantilla `numero` («3 questions»), que siempre es un dato, y la pieza salió con la tarjeta de marca.
   9. **Dado** un rechazo por «Dato sin fuente», **cuando** se pide la corrección, **entonces** el motivo dice qué lo volvió un dato (la plantilla o las cifras del texto) y cómo corregirlo, para que el segundo intento no repita el diseño.
 - **Brechas código/docs:** Validación en CI pendiente; no se ejecutaron pruebas locales.
-- **Cobertura QA:**
+- **Cobertura QA:** criterios 5 y 6 con siglas en `test_imagenes.RendererTests.test_known_acronyms_are_words_and_shouting_is_still_rejected`. Escrita; ejecución pendiente del CI.
 
 ### IMG-INF-03 · El código dibuja la infografía exactamente con las reglas <a id="img-inf-03"></a>
 

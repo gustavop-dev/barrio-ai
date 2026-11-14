@@ -188,9 +188,11 @@ Cómo decidir:
   Carrusel (3–8 láminas que se leen en orden) cuando el post avanza por partes: pasos de un proceso, una lista de
   errores, lecciones o señales, antes y después, un marco con sus piezas o varias opciones comparadas. Infografia
   cuando lo protagoniza un dato, una frase o preguntas para la audiencia. Si Gustavo pide un formato en la idea que
-  usas (carrusel, infografía, su foto), ese es el formato. Galería vacía o sin foto pertinente: infografia o
-  carrusel, según cómo avance el texto. En history, image dice el formato de cada pieza reciente: no repitas uno
-  por costumbre.
+  usas (carrusel, infografía, su foto), ese es el formato. Si no pide ninguno y usas strategy.planned, su format es el
+  formato, salvo que no encaje con el texto final: un carrusel planeado pasa a infografia si el texto no avanza por
+  partes, y una foto planeada sin foto pertinente en gallery pasa a infografia o carrusel.
+  Galería vacía o sin foto pertinente: infografia o carrusel, según cómo avance el texto. En history, image dice el
+  formato de cada pieza reciente: no repitas uno por costumbre.
 - priority_capture es la idea de Gustavo reservada para este hueco (ya le avisamos que saldría este día), o null. Si existe, desarrolla esa idea e incluye su id
   en ideas_used. Si no pasa los criterios de calidad, salta el día y explica por qué: urgencia nunca baja la calidad.
 - evidence enumera los apoyos: observed_post (ref = id de la señal), public_fact (ref = key), course_unit

@@ -118,6 +118,20 @@ class RendererTests(SimpleTestCase):
         with self.assertRaises(ValueError):infografias.validate({'slides':[value]},'infografia',[{'key':'fact'}])
         with self.assertRaises(ValueError):infografias.validate({'slides':[slide('portada')]*9},'carrusel')
 
+    def test_known_acronyms_are_words_and_shouting_is_still_rejected(self):
+        # «AI», «MVP» or «CTO» are how his reader knows the word; the rule is against shouting, not against acronyms.
+        for title in ('Ship AI agents safely','Scope your MVP first','What a CTO should ask','APIs before UI polish'):
+            with self.subTest(title=title):
+                infografias.validate({'slides':[dict(slide(),title=title,alt=f'Slide titled {title}.')]},'infografia')
+        for title in ('Start with the WORKFLOW','AI is NOT magic'):
+            with self.subTest(title=title),self.assertRaisesMessage(ValueError,'Mayúsculas solo en etiquetas'):
+                infografias.validate({'slides':[dict(slide(),title=title)]},'infografia')
+        self.assertEqual(infografias.shouting('LLM costs in the US and EU'),[])
+        cover=dict(slide('portada'),title='Ship AI agents safely',highlight='agents')
+        infografias.validate({'slides':[cover,slide(),slide('cierre')]},'carrusel')
+        with self.assertRaisesMessage(ValueError,'Portada en minúsculas'):
+            infografias.validate({'slides':[dict(cover,title='Ship Agents Safely',highlight='Agents'),slide(),slide('cierre')]},'carrusel')
+
 
 class ImageWorkflowTests(EditorialBase):
     def piece(self,kind='foto',photo=None,edit='none'):
@@ -433,6 +447,7 @@ class CarouselTests(EditorialBase):
             self.assertIn('ese es el formato',system)  # a format Gustavo asks for is the format
             self.assertNotIn('Galería vacía: infografia',system)
         self.assertIn('Carrusel (3–8 láminas que se leen en orden) cuando el post avanza por partes',editorial.DIRECTOR_SYSTEM)
+        self.assertIn('usas strategy.planned, su format es el',editorial.DIRECTOR_SYSTEM)  # the week's plan sets the format
         self.assertIn('No numeres láminas',imagenes.DESIGN_SYSTEM)
         self.assertIn('image_route="carrusel"',editorial.RETOUCH_SYSTEM)
 
