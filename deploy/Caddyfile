@@ -18,6 +18,27 @@
 		max_size 130MB
 	}
 
+	# Conectar LinkedIn desde la app (agentes-linkedin/navegador/README.md «Conectar desde la app»): the remote view of
+	# a login in progress, served by the navegador service only while it lasts. OFF unless LINKEDIN_CONEXION_APP=true
+	# (the matcher compares that value at load time). Every request asks the backend first (forward_auth): only a browser
+	# holding the cookie of a live login passes, and the backend's answer brings the view key that Caddy adds to the
+	# request it passes on. The person's browser never sees that key; a header it sends under that name is dropped.
+	@pantalla {
+		path /conectar/*
+		expression `"{$LINKEDIN_CONEXION_APP:false}" == "true"`
+	}
+	handle @pantalla {
+		route {
+			request_header -X-Pantalla-Clave
+			forward_auth api:8787 {
+				uri /api/v1/linkedin/pantalla/permitir
+				copy_headers X-Pantalla-Clave
+			}
+			uri strip_prefix /conectar
+			reverse_proxy navegador:8791
+		}
+	}
+
 	@backend path /api/* /admin/* /static/* /health
 	handle @backend {
 		reverse_proxy api:8787

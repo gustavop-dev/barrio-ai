@@ -4,6 +4,7 @@ from . import views
 from . import operador_views as op
 from . import oficina_views as of
 from . import linkedin_views as li
+from . import conexion_views as cx
 from . import editorial_views as ed
 from . import red_views as rd
 from . import resultados_views as rs
@@ -76,6 +77,11 @@ urlpatterns=[
  path('operador/accounts',op.Accounts.as_view()),
  path('operador/accounts/<uuid:aid>/check',op.AccountCheck.as_view()),
  path('operador/accounts/<uuid:aid>/pause',op.AccountPause.as_view()),
+ path('operador/accounts/<uuid:aid>/conexion',cx.AccountLogin.as_view()),
+ path('operador/conexiones/<uuid:lid>',cx.LoginDetail.as_view()),
+ path('operador/conexiones/<uuid:lid>/enlace',cx.LoginLink.as_view()),
+ path('operador/conexiones/<uuid:lid>/cancelar',cx.LoginCancel.as_view()),
+ path('linkedin/pantalla/entrar',cx.enter),path('linkedin/pantalla/permitir',cx.allow),
  path('operador/referents',op.Referents.as_view()),
  path('operador/observe',op.Observe.as_view()),
  path('operador/posts',op.Posts.as_view()),

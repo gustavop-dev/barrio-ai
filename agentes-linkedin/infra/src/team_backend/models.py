@@ -578,6 +578,34 @@ class CanaryRun(models.Model):
         ordering=['-started_at']
         indexes=[models.Index(fields=['account','started_at'],name='canary_run_last')]
 
+class BrowserLogin(models.Model):
+    """A login from the app into the navegador browser of a `directo` account (team_backend/conexion.py). The single-use
+    ticket and the remote view's cookie are kept only as SHA-256 hashes; the view's key is never stored (an HMAC of the
+    service token and `session`, which alone opens nothing)."""
+    class State(models.TextChoices):
+        STARTING='abriendo','Abriendo'
+        WAITING='esperando','Esperando'
+        CONNECTED='conectada','Conectada'
+        EXPIRED='vencida','Vencida'
+        CANCELLED='cancelada','Cancelada'
+        FAILED='fallida','Fallida'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='browser_logins')
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True)
+    session=models.CharField(max_length=64)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.STARTING)
+    reason=models.TextField(blank=True)
+    still_stopped=models.BooleanField(default=False)  # the service kept a stop that a login does not mend
+    started_at=models.DateTimeField(default=timezone.now)
+    expires_at=models.DateTimeField()
+    finished_at=models.DateTimeField(null=True,blank=True)
+    ticket_hash=models.CharField(max_length=64,blank=True,db_index=True)
+    ticket_expires_at=models.DateTimeField(null=True,blank=True)
+    cookie_hash=models.CharField(max_length=64,blank=True,db_index=True)
+    class Meta:
+        ordering=['-started_at']
+        indexes=[models.Index(fields=['account','started_at'],name='browser_login_last')]
+
 class ActionProposal(models.Model):
     referent_experiment=models.ForeignKey('ReferentExperiment',on_delete=models.PROTECT,null=True,blank=True)
     referent_experiment_version=models.PositiveIntegerField(null=True,blank=True)

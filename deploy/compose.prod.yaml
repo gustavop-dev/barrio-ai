@@ -98,6 +98,8 @@ services:
       dockerfile: oficina/Dockerfile
     environment:
       BARRIO_DOMAIN: ${BARRIO_DOMAIN:?Configurar .env}
+      # The /conectar/ route of the Caddyfile (Conectar LinkedIn desde la app): off unless true.
+      LINKEDIN_CONEXION_APP: ${LINKEDIN_CONEXION_APP:-false}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -139,6 +141,10 @@ services:
       NAVEGADOR_PROXY_CUENTAS: ${NAVEGADOR_PROXY_CUENTAS:-}
       NAVEGADOR_PROXY_USUARIO: ${NAVEGADOR_PROXY_USUARIO:-}
       NAVEGADOR_PROXY_CLAVE: ${NAVEGADOR_PROXY_CLAVE:-}
+      # Conectar LinkedIn desde la app (README «Conectar desde la app»): off unless true. The remote view listens on
+      # 8791 of the internal network only while a login lasts; Caddy reaches it at /conectar/ behind the backend's check.
+      NAVEGADOR_CONEXION: ${LINKEDIN_CONEXION_APP:-}
+      NAVEGADOR_CONEXION_MIN: ${NAVEGADOR_CONEXION_MIN:-}
     volumes: ["navegador-datos:/datos"]  # browser profiles (sessions), stops, budgets and write records
     shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default
     healthcheck:

@@ -67,14 +67,21 @@ class AccountInput(serializers.Serializer):
 class AccountOutput(serializers.ModelSerializer):
     # The last daily canary of a directo account (canario.latest); null for other providers or before the first run.
     canary=serializers.SerializerMethodField()
+    # Conectar LinkedIn desde la app (conexion.latest): whether it is on and the last login; null for other providers.
+    connect=serializers.SerializerMethodField()
     class Meta:
         model=ConnectorAccount
         fields=['id','provider','external_account_id','label','status','is_locked','paused','paused_reason','last_checked_at','created_at',
-                'canary']
+                'canary','connect']
     def get_canary(self,account):
         from .canario import latest
         out=latest(account);moment=serializers.DateTimeField()
         if out:out.update({k:out[k] and moment.to_representation(out[k]) for k in ('started_at','finished_at')})
+        return out
+    def get_connect(self,account):
+        from .conexion import latest
+        out=latest(account);moment=serializers.DateTimeField()
+        if out and out['last']:out['last'].update({k:out['last'][k] and moment.to_representation(out['last'][k]) for k in ('started_at','expires_at','finished_at')})
         return out
 
 class PauseInput(serializers.Serializer):
