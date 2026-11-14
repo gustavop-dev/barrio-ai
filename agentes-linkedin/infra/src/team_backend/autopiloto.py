@@ -287,6 +287,10 @@ def tick(user,now=None):
         report['network']=report.get('network',0)+_network(user,account,now)
         try:report['metrics']=report.get('metrics',0)+_metrics(user,account,now)
         except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
+        try:report['analytics']=report.get('analytics',0)+_analytics(user,account,now)
+        except Exception as exc:report['analytics_error']=type(exc).__name__  # analytics never stop the rest of the tick
+        try:report['canary']=report.get('canary',0)+_canary(user,account,now)
+        except Exception as exc:report['canary_error']=type(exc).__name__  # the canary never stops the rest of the tick
         try:report['inbox']=report.get('inbox',0)+_inbox(user,account,now)
         except Exception as exc:report['inbox_error']=type(exc).__name__  # the inbox never stops the rest of the tick
         try:report['replies']=report.get('replies',0)+_replies(user,account,now)
@@ -406,7 +410,7 @@ def _every(name,default):
 def _network(user,account,now):
     """DESC/RED: queue discovery, classification, planning and sync for the Unipile account, each on its own clock.
     Reads and the cheaper classifier run on their own; follows, invitations and acceptances become proposals."""
-    if not red.enabled() or account.provider not in ('unipile','fake'):return 0
+    if not red.enabled() or account.provider not in ('unipile','fake','directo'):return 0
     queued=0
     def enqueue(kind,every,condition=True):
         nonlocal queued
@@ -431,6 +435,26 @@ def _metrics(user,account,now):
     if not metricas.due(now):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     _,created=enqueue_operation(user,'collect_metrics',{'account':str(account.id)},request_id=_job_id('metrics',account.id,bucket))
+    return int(created)
+
+def _analytics(user,account,now):
+    """Creator analytics (analitica.py): queue import_analytics once per UTC day after ANALYTICS_DAILY_AFTER for a
+    `directo` account whose navegador service is configured; one job a day, whatever its outcome."""
+    from . import analitica
+    if _pending('import_analytics',account=str(account.id)) or not analitica.daily_due(account,now):return 0
+    day=analitica.utc_today(now)
+    _,created=enqueue_operation(user,'import_analytics',{'account':str(account.id)},request_id=_job_id('analytics',account.id,day))
+    return int(created)
+
+def _canary(user,account,now):
+    """The daily canary (canario.py): queue check_linkedin once per UTC day after LINKEDIN_CANARY_AFTER for a `directo`
+    account whose navegador service is configured; a run that could not run is queued again an hour later, up to
+    canario.TRIES a day (the attempt number keeps each try's job id apart)."""
+    from . import analitica, canario
+    if _pending('check_linkedin',account=str(account.id)) or not canario.daily_due(account,now):return 0
+    day=analitica.utc_today(now)
+    _,created=enqueue_operation(user,'check_linkedin',{'account':str(account.id)},
+                                request_id=_job_id('canary',account.id,day,canario.tries(account,now)))
     return int(created)
 
 def _inbox(user,account,now):
@@ -486,6 +510,7 @@ def _execute(user,account,now):
         if rounds and not proposal.piece_id and operador.batch_issue(proposal.capability,now):continue
         if rounds and not operador.spacing_ok(account,now,proposal.capability):continue
         if operador.capped(proposal) and operador.capacity_left(account,proposal.capability,now)<=0:continue
+        if not proposal.piece_id and operador.deferred_until(account,proposal.capability,now):continue  # its last write left nothing
         job=operador.enqueue_execution(user,proposal)
         return int(job.state==Job.State.QUEUED)
     return 0

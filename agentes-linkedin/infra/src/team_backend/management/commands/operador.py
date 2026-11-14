@@ -11,7 +11,7 @@ class Command(BaseCommand):
         parser.add_argument('--usuario',required=True,help='Usuario humano que actúa (p. ej. el administrador)')
         sub=parser.add_subparsers(dest='accion',required=True)
         cuenta=sub.add_parser('cuenta');cuenta.add_argument('--account-id',required=True);cuenta.add_argument('--etiqueta',required=True)
-        cuenta.add_argument('--proveedor',default='unipile',choices=['unipile','fake'])
+        cuenta.add_argument('--proveedor',default='unipile',choices=['unipile','fake','directo'])
         sub.add_parser('comprobar').add_argument('--cuenta',required=True)
         ref=sub.add_parser('referente');ref.add_argument('--cuenta',required=True);ref.add_argument('--perfil',required=True,help='URL linkedin.com/in/... o identificador público')
         ref.add_argument('--motivo',required=True)

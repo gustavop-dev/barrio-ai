@@ -1,8 +1,9 @@
-# cubre: RES-03, RES-05, RES-06, RES-08, SEM-05
+# cubre: RES-03, RES-05, RES-06, RES-08, RES-12, SEM-05
 # Resultados when the backend fails or comes back empty (QA failure switch, comun/qa-fallo.js; README «Fallos
 # simulados»). Both the figures and the weekly summary fail: «No se pudieron cargar los resultados» with «Reintentar»,
 # and only the summary's block says «No se pudo cargar el resumen de la semana.» (SEM-05: still without «Reintentar»).
-# «Reintentar» brings the figures back. Then a period with nothing: no posts, no active opportunities.
+# «Reintentar» brings the figures back. Then a period with nothing: no posts, no active opportunities. Last, the
+# «Analítica de LinkedIn» tab without a «directo» account, as production is today: one quiet card, no controls.
 appId: co.projectapp.office
 name: Resultados · errores y vacíos
 tags: [resultados]
@@ -80,3 +81,24 @@ tags: [resultados]
     timeout: 30000
 - takeScreenshot: 08-resultados-errores-03-sin-posts
 - runScript: comun/qa-fallos-limpiar.js
+
+# ---------------------------------------------------------------- LinkedIn's analytics without a «directo» account
+# cubre: RES-12
+# The tabs head the list: back up to them without centring (nothing above to centre them) and with room for the
+# whole Panorama (about ten swipes from its posts).
+- scrollUntilVisible:
+    element:
+      id: res-pestana-linkedin
+    direction: UP
+    timeout: 60000
+- tapOn:
+    id: res-pestana-linkedin
+- extendedWaitUntil:
+    visible:
+      id: ana-no-disponible
+    timeout: 30000
+- assertVisible: "Aún no hay analítica de LinkedIn"
+- assertVisible: "Aún no hay una cuenta de LinkedIn conectada por el navegador.*"
+- assertNotVisible:
+    id: ana-periodo
+- takeScreenshot: 08-resultados-errores-04-linkedin-no-disponible

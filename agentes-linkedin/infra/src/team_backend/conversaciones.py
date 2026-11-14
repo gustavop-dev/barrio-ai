@@ -19,7 +19,7 @@ from django.db import transaction
 from django.utils import timezone
 from knowledge import providers
 from . import operador
-from .connectors import ConnectorError, get_connector
+from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .jobs import audit
 from .lider import _noul
@@ -27,7 +27,7 @@ from .models import AuditEvent, Contact, Conversation, Opportunity
 from .permissions import require
 
 READ_CAPS={'chats':24,'messages':60}  # per local day: one list per run at the default hourly clock, a few threads each
-PROVIDERS=('unipile','fake')
+PROVIDERS=('unipile','fake','directo')
 CLOSE_HOW={'respondi':'Respondiste','no_responder':'Sin responder'}
 THREAD=re.compile(r'2-[A-Za-z0-9_=\-]+')  # LinkedIn messaging thread ids (linkedin.com/messaging/thread/<id>/)
 
@@ -245,7 +245,7 @@ def read_inbox(user,account,now=None):
         except ReadCapReached as exc:summary['stopped']=str(exc);break
         except ConnectorError as exc:
             _pause_on(account,exc)
-            if exc.pause:summary['stopped']=str(exc);break
+            if exc.pause or deferred(exc):summary['stopped']=str(exc);break  # nothing came back: still stale, read next run
             continue
         _from_messages(account,conversation,messages,now);summary['read']+=1
     for conversation in _to_assess(account,now)[:assess_per_run()]:

@@ -8,9 +8,9 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import override_settings
 from rest_framework.test import APIClient
-from team_backend import editorial, perfil_contenido
+from team_backend import analitica, editorial, perfil_contenido
 from team_backend.management.commands.seed_qa import EXTRA_DEVICE, QA_PASSWORD_DEFAULT, uid
-from team_backend.models import (ActionProposal, Capture, CommunitySource, CommunityStudy, CommunityWithdrawal,
+from team_backend.models import (ActionProposal, AnalyticsDay, Capture, CommunitySource, CommunityStudy, CommunityWithdrawal,
                                  ConnectorAccount, Contact, EditorialPiece, GalleryPhoto, Notification, Opportunity,
                                  PostMetric, Referent, ReferentChange, ReferentControl, ReferentExperiment, ReferentNotice,
                                  ReferentReview, TeamQuestion, WeeklySummary, ProfileProposal, ProfileAsset, ProfileSchedule)
@@ -61,6 +61,39 @@ class SeedQaTests(MediaMixin,OperatorBase):
         card=next(item for item in turn['items'] if item['id']==f'question:{question.pk}')
         self.assertIn('hazme la propuesta del perfil',card['question']['purpose'])
         self.assertEqual(ProfileProposal.objects.count(),1)  # the existing manual checklist only
+
+    def test_analytics_flow_seeds_a_directo_account_the_app_reads_and_the_next_seed_removes(self):
+        """Catch 08-resultados-linkedin losing its states: full 28 days, a partial 90 without LinkedIn's exact-range data,
+        posts linked to the pieces; the next flow's seed replaces the QA account, but a real «directo» one stops it."""
+        self.seed(analitica=True)
+        app=self.device()
+        month=app.get('/api/v1/resultados/analitica').json()
+        self.assertTrue(month['disponible'])
+        self.assertEqual(month['cuenta']['id'],str(uid('account:directo')))
+        impressions=month['totales']['impressions']
+        self.assertEqual((month['periodo']['dias'],impressions['days_with_data'],impressions['comparable']),(28,28,True))
+        self.assertEqual((month['totales']['members_reached']['value'],month['totales']['members_reached']['comparable']),(3480,True))
+        self.assertTrue(month['posts']['top_linkedin']['por_impresiones'])
+        self.assertTrue(month['demografia']['contenido']['exacto'])
+        self.assertTrue(month['demografia']['audiencia']['groups'])
+        self.assertIsNotNone(month['seguidores']['total'])
+        self.assertIsNone(month['ultimo_error'])
+        pieces={post['piece_id'] for post in month['posts']['publicados']}
+        self.assertTrue({str(uid('piece:publicada3')),str(uid('piece:publicada8'))}<=pieces)
+        quarter=app.get('/api/v1/resultados/analitica',{'periodo':'90d'}).json()
+        self.assertEqual((quarter['totales']['impressions']['days_with_data'],quarter['totales']['impressions']['comparable']),(87,False))
+        self.assertIsNone(quarter['totales']['members_reached']['value'])
+        self.assertIsNone(quarter['posts']['top_linkedin'])
+        self.assertFalse(quarter['demografia']['contenido']['exacto'])
+        week=app.get('/api/v1/resultados/analitica',{'periodo':'7d'}).json()
+        self.assertEqual((week['totales']['members_reached']['value'],week['totales']['impressions']['comparable']),(1240,True))
+
+        self.seed()
+        self.assertFalse(ConnectorAccount.objects.filter(provider='directo').exists())
+        self.assertEqual(AnalyticsDay.objects.count(),0)
+        self.assertEqual(app.get('/api/v1/resultados/analitica').json(),{'disponible':False,'motivo':analitica.NO_ACCOUNT})
+        ConnectorAccount.objects.create(provider='directo',external_account_id='real-directo',label='Cuenta real')
+        with self.assertRaises(CommandError):self.seed(analitica=True)
 
     def test_builds_every_state_and_is_idempotent(self):
         """Catch a flow losing its data: every state the app shows exists, the API serves it, and reseeding repeats it."""

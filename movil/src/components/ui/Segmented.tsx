@@ -18,6 +18,8 @@ function Indicator({ seg, optionWidth, testID }: { seg: SharedValue<number>; opt
  * Segmented control (ui.css .segmented, the Calendario's Mes · Semana · Lista, Resultados' Periodo): a linea
  * track, the chosen one on superficie. The superficie is one piece that slides to the chosen option
  * (MovCalendario and MovResultados, `seg`); until the track is measured the chosen option paints it itself.
+ * Each option is `${testID}-${value}`: in the Android tree Maestro reads, the options are the track's siblings, not its
+ * children, so `childOf` the track finds none.
  */
 export function Segmented<V extends string>({
   label,
@@ -35,7 +37,9 @@ export function Segmented<V extends string>({
   /** Shows the label above the track, as Select does (Resultados' «Periodo»). The Calendario's views go without it. */
   showLabel?: boolean;
 }) {
-  const index = Math.max(0, options.findIndex((option) => option.value === value));
+  // A value outside the options (Resultados › LinkedIn's custom range) selects none: no superficie at all.
+  const found = options.findIndex((option) => option.value === value);
+  const index = Math.max(0, found);
   const [width, setWidth] = useState(0);
   const { reduced } = useMotion();
   const seg = useSharedValue(index);
@@ -54,7 +58,7 @@ export function Segmented<V extends string>({
       testID={testID}
       onLayout={(event: LayoutChangeEvent) => setWidth(event.nativeEvent.layout.width)}
     >
-      {width ? <Indicator seg={seg} optionWidth={optionWidth} testID={testID ? `${testID}-seleccion` : undefined} /> : null}
+      {width && found >= 0 ? <Indicator seg={seg} optionWidth={optionWidth} testID={testID ? `${testID}-seleccion` : undefined} /> : null}
       {options.map((option) => {
         const selected = option.value === value;
         return (
@@ -69,6 +73,7 @@ export function Segmented<V extends string>({
               onChange(option.value);
             }}
             style={[styles.option, selected && !width ? styles.selected : null]}
+            testID={testID ? `${testID}-${option.value}` : undefined}
           >
             <T variant="detalle" color={selected ? colors.ink : colors.inkSoft}>
               {option.label}

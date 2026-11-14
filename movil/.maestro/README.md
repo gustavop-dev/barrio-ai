@@ -92,6 +92,8 @@ Para comparar con el diseño, abre las capturas junto a los tableros `movil/dise
 - cuatro fotos generadas para los posts (la app ya no tiene Galería; la PWA sí) y una foto de perfil sintética (función 03) en Ajustes › Fotos de perfil;
 - unos 100 días de audiencia, trabajos y sincronizaciones de red para Resultados, el resumen semanal y filas de gasto.
 
+Algunos flujos piden un escenario más (`correr-maestro.sh` pasa la opción solo a ese flujo): `--perfil-capturas` (`18-perfil`), `--referentes-mensual` (`19-referentes-mensual`) y `--analitica` (`08-resultados-linkedin`), que añade una cuenta «directo» inventada con 400 días de analítica de LinkedIn, sus rangos exactos de 7, 14 y 28 días, seguidores, público y ocho publicaciones. Sin esa opción no hay cuenta «directo», como hoy en producción.
+
 Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con los mismos ids y textos. Por eso **se niega a correr** si no está `QA_SEED=permitido`, si hay un interruptor `LIVE_*` activado o si la base tiene una cuenta real de LinkedIn. La prueba `team_backend/tests/test_seed_qa.py` lo cubre en el CI normal.
 
 ## Los flujos
@@ -118,7 +120,8 @@ Es idempotente: cada ejecución vacía el mundo de QA y lo vuelve a crear con lo
 | `07-pieza-estados` | las piezas pasadas desde el panel de su día: bloqueada (y la capa «Red» apagada; su fila de «Lo importante del día» se despliega para «Abrir»), publicada con sus cortes y «—», saltada y fallida; tocar otro día lo elige sin hoja y la tira se queda donde estaba |
 | `07-calendario-errores` | con el interruptor de fallos: el calendario, la actividad, la pieza y la pieza del día fallan («Reintentar»); un veto rechazado; «Próximo» y «Lo que pasó» vacíos |
 | `08-resultados` | el resumen semanal con «Usar como orientación» y «Descartar», cada uno con «Deshacer»; el «Periodo» y la «Modalidad»; los accesos a cada sección; un dato que falta como «—» con su motivo; la definición de un gráfico; tocar una barra, una oportunidad activa y el mejor post |
-| `08-resultados-errores` | con el interruptor de fallos: las cifras y el resumen semanal fallan, «Reintentar»; un periodo sin posts ni oportunidades activas |
+| `08-resultados-errores` | con el interruptor de fallos: las cifras y el resumen semanal fallan, «Reintentar»; un periodo sin posts ni oportunidades activas; «Analítica de LinkedIn» sin cuenta «directo» |
+| `08-resultados-linkedin` | «Analítica de LinkedIn» con `seed_qa --analitica`: 28 días con todas sus cifras, el gráfico por día (otra cifra, un día tocado), publicaciones, principales y público; 7 días; 90 días incompleto y sin rango exacto; «Personalizado» rechazado y válido |
 | `09-personas` | Conexiones: pestañas, aviso de red apagada, solo quienes aceptaron (filas con su etiqueta, «Aceptó el …», «Te toca» y la sección «Antes»), chips de etiqueta con su número («Sin etiqueta» al final), búsqueda sin resultados y «Quitar filtros»; la ficha de Laura abierta desde su enlace (recorrido, por qué encaja, de dónde salió, sin conversación, una nota nueva) y «Marcar como oportunidad» |
 | `11-ajustes` | de Máquina a Captura: parada total y reanudar, pausar la cuenta simulada, orientación (descartar y guardar), Autonomía, Gasto, «Conectar LinkedIn» abre la oficina web, micrófono y edición con IA |
 | `12-oportunidades` | el tablero por etapas, mover con el selector y «Deshacer», que el cambio se guarde, «Cerradas sin acuerdo»; nueva oportunidad (obligatorios, «De Personas», fuera de la red, fecha inválida), editar y eliminar |

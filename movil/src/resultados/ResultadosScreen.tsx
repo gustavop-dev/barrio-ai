@@ -1,6 +1,7 @@
-// Resultados: the weekly summary on top, then «¿vamos bien?» in the order business → audience → content →
-// team. Periodo and Modalidad live in the route params (?dias=&modalidad=, as in the PWA); the chips jump
-// to each section. A virtualized list: the sections and every post card are its rows. Pull to refresh.
+// Resultados, in two tabs (?pestana=, as Personas). «Panorama»: the weekly summary on top, then «¿vamos bien?» in
+// the order business → audience → content → team. Periodo and Modalidad live in the route params
+// (?dias=&modalidad=, as in the PWA); the chips jump to each section. A virtualized list: the sections and every
+// post card are its rows. Pull to refresh. «Analítica de LinkedIn» is AnaliticaLinkedin.tsx.
 // Motion (MovResultados): Periodo is a segmented control whose selection slides (`seg`); the figures count
 // and the bars grow (CountUp.tsx).
 import { useResultados, useResumenSemanal } from '@compartido/api/hooks';
@@ -22,11 +23,12 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { useParamState } from '@/components/shell/useParamState';
 import { useContentInsets } from '@/components/shell/useContentInsets';
-import { ErrorRetry, PageHeader, Section, Segmented, Skeleton, T, pageContent } from '@/components/ui';
+import { ErrorRetry, PageHeader, Section, Segmented, Skeleton, T, TabBar, pageContent } from '@/components/ui';
 import { Select } from '@/components/ui/Select';
 import { OportunidadForm } from '@/personas/OportunidadForm';
 import { useMotion } from '@/theme/motion';
 import { colors, radius, space } from '@/theme/tokens';
+import { AnaliticaLinkedin } from './AnaliticaLinkedin';
 import { PostCard, PostsHeader } from './PostCard';
 import { ResumenSemanal } from './ResumenSemanal';
 import { Contenido, Equipo, Gente, Negocio, SectionBoundary } from './sections';
@@ -51,7 +53,26 @@ function readPosts(data: Resultados | undefined): ResultadosPost[] {
   return Array.isArray(posts) ? posts : [];
 }
 
+type Tab = 'panorama' | 'linkedin';
+
+const TABS: readonly { value: Tab; label: string }[] = [
+  { value: 'panorama', label: 'Panorama' },
+  { value: 'linkedin', label: 'Analítica de LinkedIn' },
+];
+
 export function ResultadosScreen() {
+  const [params, setParams] = useParamState(['pestana'] as const);
+  const tab: Tab = params.pestana === 'linkedin' ? 'linkedin' : 'panorama';
+  const top = (
+    <View style={styles.top}>
+      <PageHeader title="Resultados" />
+      <TabBar<Tab> label="Resultados" tabs={TABS} value={tab} onChange={(next) => setParams({ pestana: next === 'panorama' ? '' : next })} testIDPrefix="res-pestana" />
+    </View>
+  );
+  return tab === 'linkedin' ? <AnaliticaLinkedin top={top} /> : <Panorama top={top} />;
+}
+
+function Panorama({ top }: { top: ReactNode }) {
   const [params, setParams] = useParamState(['dias', 'modalidad'] as const);
   const route = useLocalSearchParams<{ ancla?: string }>();
   const dias = readDias(params.dias);
@@ -132,7 +153,7 @@ export function ResultadosScreen() {
 
   const header = (
     <View style={styles.header}>
-      <PageHeader title="Resultados" />
+      {top}
       <ResumenSemanal />
       <View style={styles.controls}>
         <Segmented label="Periodo" showLabel testID="res-periodo" value={String(dias)} options={PERIOD_OPTIONS} onChange={(value) => setParams({ dias: value === '28' ? '' : value })} />
@@ -183,6 +204,7 @@ export function ResultadosScreen() {
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: colors.paper },
   rows: { gap: space[3] },
+  top: { gap: space[4] },
   header: { gap: space[6], marginBottom: space[3] },
   controls: { gap: space[3] },
   selects: { flexDirection: 'row', flexWrap: 'wrap', gap: space[3] },

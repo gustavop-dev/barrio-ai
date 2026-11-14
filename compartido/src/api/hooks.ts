@@ -19,6 +19,7 @@ import {
   getActividad,
   getActivity,
   getAjustes,
+  getAnalitica,
   getCalendar,
   getCalendario,
   getContact,
@@ -55,6 +56,7 @@ import {
 import { keys } from './queryClient';
 import type {
   ActividadFilters,
+  AnaliticaPreset,
   ContactSearch,
   ContactStage,
   NewMemoryFact,
@@ -183,6 +185,17 @@ export function useResultados(dias: ResultadosDias = 28, modalidad: ResultadosMo
   return useQuery({
     queryKey: keys.resultados(dias, modalidad),
     queryFn: () => getResultados(dias, modalidad),
+    placeholderData: keepPreviousData,
+    refetchInterval: REFRESH.resultados,
+  });
+}
+
+/** LinkedIn's analytics (Resultados › Analítica de LinkedIn): a preset, or a custom range when `desde` and `hasta` come. */
+export function useAnalitica({ periodo = '', desde = '', hasta = '' }: { periodo?: AnaliticaPreset | ''; desde?: string; hasta?: string }) {
+  const custom = Boolean(desde && hasta);
+  return useQuery({
+    queryKey: keys.analitica(custom ? '' : periodo, custom ? desde : '', custom ? hasta : ''),
+    queryFn: () => getAnalitica(custom ? { desde, hasta } : { periodo }),
     placeholderData: keepPreviousData,
     refetchInterval: REFRESH.resultados,
   });

@@ -23,7 +23,7 @@ from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, providers
 from . import guardas, operador, ubicacion
-from .connectors import ConnectorError, get_connector
+from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .models import OPEN_ACTION_STATES, ActionExecution, ActionProposal, AuditEvent, Contact, ObservedPost, Referent
 from .permissions import require
@@ -448,7 +448,7 @@ def discover(user,account,now=None):
             from .evidencia import referent_comments
             referent_comments(post,None,now)
             _pause_on(account,exc)
-            if exc.pause:summary['stopped']=str(exc);break
+            if exc.pause or deferred(exc):summary['stopped']=str(exc);break  # nothing came back: the next run reads it
             continue
         from .evidencia import referent_comments
         referent_comments(post,comments,now)
@@ -470,7 +470,9 @@ def discover(user,account,now=None):
         try:
             _read(account,'search');people=connector.search_people(keywords,location=location,profile_language=languages)
         except ReadCapReached as exc:summary['stopped']=str(exc);people=[]
-        except ConnectorError as exc:_pause_on(account,exc);people=[]
+        except ConnectorError as exc:
+            _pause_on(account,exc);people=[]
+            if deferred(exc):summary['stopped']=str(exc);break  # nothing came back: this query keeps its turn
         else:
             summary['searches']+=1
             if people:operador._audit(user,'network.research_result',account.id,kind='search',key=query,result_count=len(people))
@@ -491,7 +493,10 @@ def search_location(account,connector,summary):
     try:
         _read(account,'search');found=connector.search_parameters('LOCATION',name)
     except ReadCapReached as exc:summary['stopped']=str(exc);return None
-    except ConnectorError as exc:_pause_on(account,exc);return None
+    except ConnectorError as exc:
+        _pause_on(account,exc)
+        if deferred(exc):summary['stopped']=str(exc)  # nothing came back: no search at all rather than everywhere
+        return None
     ids=[p['id'] for p in found if p['name'].strip().lower()==name.lower()][:1] or [p['id'] for p in found[:1]]
     operador._audit(None,'network.search_location',account.id,name=name,ids=ids,names=[p['name'] for p in found[:5]])
     return ids or None
@@ -556,7 +561,8 @@ def _enrich(account,contacts):
         except ReadCapReached:break
         except ConnectorError as exc:
             _pause_on(account,exc)
-            if exc.pause:break
+            # Nothing came back (the service's budget, no answer): unchecked, the person waits for the next round.
+            if exc.pause or deferred(exc):break
             contact.profile_checked_at=timezone.now();contact.save()  # unreadable profile: classify with what we have
         ready.append(contact)
     return ready

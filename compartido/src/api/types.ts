@@ -1473,6 +1473,96 @@ export interface Resultados {
   };
 }
 
+// ---------------------------------------------------------------- LinkedIn analytics (Resultados › Analítica de LinkedIn)
+
+export type AnaliticaPreset = '7d' | '14d' | '28d' | '90d' | '365d';
+
+/** A KPI of the analytics. The daily sums say how many days of the period had data; members reached, when LinkedIn gave it. */
+export interface AnaliticaKpi extends Kpi {
+  days?: number;
+  days_with_data?: number;
+  captured_at?: string | null;
+}
+
+export interface AnaliticaDay {
+  date: string;
+  impressions: number | null;
+  engagements: number | null;
+  new_followers: number | null;
+}
+
+/** A post of the period with its lifetime figures as LinkedIn gave them on `as_of`. Percentages 0–100. */
+export interface AnaliticaPost {
+  post_urn: string;
+  url: string;
+  piece_id: string | null;
+  published: string | null;
+  /** LinkedIn's own label, as written. */
+  kind: string;
+  impressions: number | null;
+  network_pct: number | null;
+  outside_pct: number | null;
+  members_reached: number | null;
+  followers_gained: number | null;
+  profile_views: number | null;
+  reactions: number | null;
+  comments: number | null;
+  shares: number | null;
+  saves: number | null;
+  sends: number | null;
+  button_clicks: number | null;
+  as_of: string;
+}
+
+/** One of LinkedIn's top posts of an exact range: interactions or impressions in that range. */
+export interface AnaliticaTopItem {
+  post_urn: string;
+  url: string;
+  piece_id: string | null;
+  published: string | null;
+  value: number | null;
+}
+
+/** LinkedIn's own group label (location, seniority…) and its rows; `below` is «< pct %». */
+export interface AnaliticaDemographicGroup {
+  group: string;
+  rows: { label: string; pct: number | null; below: boolean; value: number | null }[];
+}
+
+/** GET /api/v1/resultados/analitica?periodo= or ?desde&hasta, with a «directo» account. */
+export interface AnaliticaData {
+  /** False until a first import succeeded (`motivo` says so). */
+  disponible: boolean;
+  motivo: string | null;
+  cuenta: { id: string; label: string };
+  periodo: { desde: string; hasta: string; dias: number; preset: AnaliticaPreset | null; zona_horaria: string; anterior: { desde: string; hasta: string } };
+  limites: { primer_dia: string | null; ultimo_dia: string | null; linkedin_desde: string };
+  actualizado: { at: string; desde: string; hasta: string; tipo: string } | null;
+  /** A failed import after the last good one. */
+  ultimo_error: { at: string; tipo: string; kind: string | null; error: string } | null;
+  totales: { impressions: AnaliticaKpi; engagements: AnaliticaKpi; new_followers: AnaliticaKpi; engagement_rate: AnaliticaKpi; members_reached: AnaliticaKpi };
+  serie: AnaliticaDay[];
+  seguidores: { total: number | null; at: string | null; serie: { date: string; value: number | null }[]; definition: string; unavailable_reason: string | null };
+  posts: {
+    publicados: AnaliticaPost[];
+    definition: string;
+    top_linkedin: { desde: string; hasta: string; captured_at: string; por_interacciones: AnaliticaTopItem[]; por_impresiones: AnaliticaTopItem[] } | null;
+    top_unavailable_reason: string | null;
+  };
+  demografia: {
+    audiencia: { at: string; groups: AnaliticaDemographicGroup[] } | null;
+    contenido: { desde: string; hasta: string; exacto: boolean; captured_at: string; groups: AnaliticaDemographicGroup[] } | null;
+  };
+}
+
+/** No «directo» account at all (production today): only the reason. */
+export interface AnaliticaSinCuenta {
+  disponible: false;
+  motivo: string;
+}
+
+export type Analitica = AnaliticaData | AnaliticaSinCuenta;
+
 // ---------------------------------------------------------------- weekly summary (Resultados › Resumen de la semana)
 
 /** A claim of the analysis, tied to the figure of the stats it rests on (`cifra`). */

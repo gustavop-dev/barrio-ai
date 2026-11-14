@@ -62,6 +62,8 @@ OPERATION_PERMISSIONS={
     'plan_network':['operate_linkedin'],
     'sync_network':['operate_linkedin'],
     'collect_metrics':['operate_linkedin'],
+    'import_analytics':['operate_linkedin'],
+    'check_linkedin':['operate_linkedin'],
     'process_capture':['operate_linkedin','run_agents','use_paid_providers'],
     'read_inbox':['operate_linkedin','run_agents','use_paid_providers'],
     'weekly_summary':['operate_linkedin','run_agents','use_paid_providers'],

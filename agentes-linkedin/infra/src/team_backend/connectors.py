@@ -16,9 +16,20 @@ REACTIONS=('linkedin_like','linkedin_celebrate','linkedin_support','linkedin_lov
 
 class ConnectorError(Exception):
     """Definite failure: the provider did not apply the operation.
-    pause=True means further writes on this account must stop until a human reviews it."""
-    def __init__(self,message,*,status=None,kind='error',pause=False):
-        super().__init__(message);self.status=status;self.kind=kind;self.pause=pause
+    pause=True means further writes on this account must stop until a human reviews it. `retry_after` (seconds), when
+    known, is when the same call may be tried again (the navegador service's budget). `deferrable` is set only by
+    connectors_directo, for the navegador service's own refusals before anything left (see `deferred`)."""
+    def __init__(self,message,*,status=None,kind='error',pause=False,retry_after=None,deferrable=False):
+        super().__init__(message);self.status=status;self.kind=kind;self.pause=pause;self.retry_after=retry_after
+        self.deferrable=deferrable
+
+def deferred(exc):
+    """The one rule for «nothing left, wait and try again»: only the navegador service refusing before the call left,
+    for a reason that is ours and not the account's (its budget, or the call not sent: browser busy or not ready, another
+    internet exit, the service unreachable). Such work waits and is retried; it is never a pause, an executed or failed
+    action, or a verdict on a person or a post. Every other error, of every provider (a 5xx, not found, Unipile's own
+    not_sent…), keeps its meaning."""
+    return bool(getattr(exc,'deferrable',False)) and not exc.pause
 
 class ConnectorUncertain(Exception):
     """The write may have reached LinkedIn; its effect is unknown until reconciled."""
@@ -535,6 +546,9 @@ class FakeConnector:
 def get_connector(account):
     if account.provider=='unipile':return UnipileConnector(account.external_account_id)
     if account.provider=='fake':return FakeConnector(account.external_account_id)
+    if account.provider=='directo':
+        from .connectors_directo import DirectoConnector
+        return DirectoConnector(account.external_account_id)
     if account.provider in ('linkedin','linkedin_fake'):
         from .connectors_linkedin import connector_for
         return connector_for(account)

@@ -10,9 +10,10 @@ En esta fase ya funcionan:
 - **la captura**: mantener pulsado para grabar, foto, nota y envío con «Deshacer»;
 - el registro de avisos push;
 - **Galería**, **Ajustes** y **Notificaciones**, completas;
-- **Calendario** (Mes, Semana y Lista, deslizando la semana o el mes y con el panel del día en una hoja) y **el detalle de una pieza**, con el veto y su «Deshacer».
+- **Calendario** (Mes, Semana y Lista, deslizando la semana o el mes y con el panel del día en una hoja) y **el detalle de una pieza**, con el veto y su «Deshacer»;
+- **Resultados**, en dos pestañas: «Panorama» (el resumen de la semana y las cuatro preguntas) y «Analítica de LinkedIn» (la analítica de la cuenta de 7, 14, 28, 90 o 365 días, o de un periodo personalizado).
 
-Las demás vistas (Oficina, Resultados, Personas y la ficha de una persona) se ven por ahora como «En construcción».
+Las demás vistas (Oficina, Personas y la ficha de una persona) se ven por ahora como «En construcción».
 
 ## Probarla en tu Android con Expo Go (desde este portátil con WSL)
 

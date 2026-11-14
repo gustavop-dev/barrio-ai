@@ -24,8 +24,10 @@ GET `/api/v1/operador/overview`:
   "autopilot": { "enabled": true, "policy_version": "autonomia-v1" },
   "control": { "paused": false, "reason": "", "source": "db|env|none", "updated_at": "ISO|null", "updated_by": "username|null" },
   "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota", "open_now": true, "min_spacing_seconds": 1200 },
-  "accounts": [ { "id": "uuid", "label": "…", "provider": "unipile|fake|linkedin|linkedin_fake", "status": "running|token_expired|…",
+  "accounts": [ { "id": "uuid", "label": "…", "provider": "unipile|fake|directo|linkedin|linkedin_fake", "status": "running|token_expired|…",
                   "is_locked": false, "paused": false, "paused_reason": "", "last_checked_at": "ISO|null",
+                  "canary": { "state": "ok|roto|alto|no_corrio", "started_at": "ISO", "finished_at": "ISO", "calls": 16,
+                              "failing": ["profile_views"], "error_kind": "", "error": "" } | null,
                   "capacity": { "INT-03": { "daily": 3, "weekly": 12, "daily_used": 1, "weekly_used": 4, "left": 2 },
                                 "INT-02": { "…": "…" }, "CONT-09": { "daily": 1, "weekly": 7, "…": "…" } } } ],
   "today": { "proposals": { "proposed": 0, "approved": 1, "discarded": 2, "confirmed": 1, "…": 0 },
@@ -34,6 +36,12 @@ GET `/api/v1/operador/overview`:
   "counts": { "referents": 7, "posts": 31, "uncertain": 0 }
 }
 ```
+
+`canary` es la última prueba diaria terminada de una cuenta `directo` (null en las demás o antes de la primera):
+`ok` (las 14 lecturas traen sus campos), `roto` (LinkedIn cambió algo; `failing` dice qué lecturas), `alto` (el
+servicio paró la cuenta o no tiene sesión: la cuenta queda en pausa y `paused_reason` dice qué hacer) o `no_corrio`
+(el servicio no estaba, estaba ocupado o sin cupo; `error` lo dice). `GET /api/v1/operador/accounts` trae el mismo
+campo.
 
 POST `/api/v1/operador/control` con `{ paused: bool, reason: string }`. Es la parada total de la máquina y requiere sesión humana. Responde con el objeto `control`. Si `OPERATOR_PAUSED=true` está en el entorno, la parada no se puede levantar desde la app: responde 409 con su explicación.
 
@@ -339,6 +347,8 @@ Reglas para la PWA:
 `metrics` sí se serializa: lleva los últimos valores leídos (`impressions`, `reactions`, `comments`, `reposts`, `observed_at`, `source`, `unipile_post_id` y `share_url`).
 
 Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos cada `METRICS_EVERY_MINUTES`. No tiene rol en la escena de la oficina.
+
+**Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo`, servida desde lo importado: nunca llama a LinkedIn. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
 
 
 ## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes
@@ -716,6 +726,8 @@ Reglas de prioridad:
 
 - Los elementos de `upcoming` se calculan en cada consulta y nunca cuentan como no leídos.
 - `capture_processed` enlaza a `/?enviado=1`, que abre «Lo que enviaste».
+- `linkedin_canary` (capa `sistema`, push activada por defecto) avisa de la prueba diaria de una cuenta `directo`: una
+  vez cuando encuentra lecturas rotas o no pudo correr en todo el día, y otra cuando vuelve a pasar. Sin enlace.
 - `lead_silent` (capa `sistema`, push activada por defecto) avisa de que el agente líder lleva 7 días sin aprobar nada en una capacidad. Llega una vez por capacidad y semana, y enlaza a `/calendario?vista=lista&tipo=<tipo>&no_salio=1`.
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
@@ -725,7 +737,7 @@ Reglas de prioridad:
 | Va a | Tipos con push |
 | --- | --- |
 | Tu turno | Todos |
-| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent` y `weekly_summary` |
+| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent`, `linkedin_canary` y `weekly_summary` |
 
 Quién emite cada tipo sin tarjeta propia: `machine_paused` al detener la máquina desde la app; `linkedin_expired` cuando el autopiloto ve el token caducado (en lugar de `account_paused`); `machine_paused_env` una vez por parada, cuando el autopiloto ve `OPERATOR_PAUSED` (un AuditEvent `operator.env_paused` marca que ya salió; nunca se guarda en el feed: «Próximo» la muestra mientras dura). Los urgentes (`uncertain`, `linkedin_expired`, `machine_paused` y `machine_paused_env`) van con prioridad alta.
 

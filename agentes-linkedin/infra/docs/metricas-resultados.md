@@ -3,6 +3,7 @@
 Este bloque responde a «¿vamos bien?» con datos reales de LinkedIn. Tiene dos partes:
 - **Captura** (`src/team_backend/metricas.py`): cortes de cada post propio a las 24 h, 72 h y 7 días, y una foto diaria de la audiencia.
 - **Resultados** (`resultados.py` y `resultados_views.py`): el endpoint `GET /api/v1/resultados` que alimenta la vista Resultados de la oficina (sección 4 de `DISENO-VISTAS.md`).
+- **Analítica de LinkedIn** (`analitica.py`): la analítica de creador que da LinkedIn a una cuenta `directo`, importada a diario y servida por `GET /api/v1/resultados/analitica`. Ver [su sección](#analítica-de-linkedin-cuenta-directo).
 
 Sigue las reglas de [datos y resultados del equipo](datos-y-resultados-del-equipo.md): el backend calcula los números, `null` significa «sin dato» y nunca se muestra como 0, y cada proporción guarda su fórmula, su numerador y su denominador.
 
@@ -62,7 +63,7 @@ Todo se lee con la cuenta Unipile (o su simulada en pruebas). La API oficial de 
 - **Encolado.** El autopiloto (`autopiloto._metrics`) encola `collect_metrics` más o menos cada `METRICS_EVERY_MINUTES` (180 por defecto; con 0 queda apagado).
   - Va de uno en uno, con id determinista por franja y el mismo patrón `_pending` que la red.
   - Solo encola si hay algo pendiente: un corte vencido sin capturar, o la foto de hoy.
-  - Solo corre con la cuenta `unipile` o `fake`.
+  - Solo corre con la cuenta `unipile`, `directo` o `fake`.
 - **Si falla.** Un fallo al encolar nunca detiene el resto del ciclo: el informe del tick lleva `metrics_error`.
 - **Pausas.** Con la parada total no corre, como el resto del ciclo. Tampoco corre con la cuenta pausada.
 - **Permiso.** El trabajo requiere `operate_linkedin`. No gasta en modelos y su `result_status` es corto, por ejemplo `cortes:2 audiencia:creada`.
@@ -223,6 +224,137 @@ Todas las fichas tienen la misma forma:
 `GET /api/v1/editorial/pieces/<id>` añade dos campos para la sección «Resultado» del detalle:
 - `snapshots`: `[{ kind: "24h|72h|7d", impressions, reactions, comments, reposts, engagement_pct, captured_at, age_hours }]`, en orden de edad. Es una lista vacía mientras no haya cortes.
 - `commenters`: los del corte más reciente con comentarios leídos, `[{ provider_user_id, name, substantive, role, fit }]`, con el rol actualizado con la clasificación de hoy. Es `null` si nunca se leyeron.
+
+## Analítica de LinkedIn (cuenta «directo»)
+
+Con el proveedor `directo` (LinkedIn sin Unipile, [plan](../../../docs/plan-linkedin-directo.md)) se lee la analítica de creador de LinkedIn: lo mismo que da su ventana «Exportar» de la página de analítica. Es una fuente aparte. No cambia los cortes ni la foto de la audiencia de arriba, y Resultados y el resumen semanal siguen igual.
+
+- **Código:** `src/linkedin_directo/analitica.py` lee el libro; `src/team_backend/analitica.py` importa, guarda y responde; `management/commands/analitica.py` es el comando.
+- **Pruebas:** `tests/test_analitica.py`, con libros escritos a mano y cifras inventadas (`tests/analitica_fixtures.py`).
+
+### Fuente
+
+- **Una llamada por rango:** el diálogo de exportación (`POST /flagship-web/rsc-action/actions/navigation`, pantalla `…creatoranalytics.AggregateAnalyticsExportModal`) con dos fechas. Solo lee: abrir el diálogo no cambia nada. La lista permitida revisa el cuerpo entero ([contrato del navegador](navegador-contrato.md#lista-permitida)).
+- La respuesta ya trae el libro entero en JSON (`excelDoc`), así que no se descarga ningún archivo.
+- **Días UTC**, los dos extremos incluidos. Un rango tiene como mucho 366 días. LinkedIn no da nada anterior al 2025-10-10 (`ANALYTICS_EARLIEST`).
+- **Por posición.** Los nombres de las hojas y las etiquetas llegan en el idioma de la cuenta, así que todo se lee por posición.
+- **Cifras como texto** del idioma de la cuenta: «1.234» o «1,234», «12 %» o «12%», «< 1 %», fechas d/m o m/d. El orden de las fechas sale de las propias fechas y del rango pedido. Si las dos lecturas valen y dan fechas distintas, hace falta `ANALYTICS_DATE_ORDER`.
+- Un guion o una celda vacía es `null`, nunca 0.
+
+**Comprobado con la cuenta de pruebas el 2026-11-13**, con 3 exportaciones (7, 28 y 365 días) y ninguna escritura:
+- La petición enviada por código desde la página de inicio funciona. No hace falta abrir la página de analítica.
+- LinkedIn contestó 200 en menos de un segundo, con el libro tal cual en el flujo de la respuesta.
+- La cuenta, casi vacía, recibió 6 hojas: faltaba la de demografía del contenido.
+
+| Hoja | Qué trae | ¿Depende del rango? |
+| --- | --- | --- |
+| 1 · Descubrimiento | Impresiones y miembros alcanzados | Sí |
+| 2 · Interacción | Impresiones e interacciones por día | Sí |
+| 3 · Publicaciones recientes | Las últimas publicaciones, con 15 columnas de cifras de toda su vida | No |
+| 4 · Publicaciones principales | Dos listas, por interacciones y por impresiones en el rango (hasta 50, también posts viejos) | Sí |
+| 5 · Seguidores | El total de hoy y los seguidores nuevos por día | El total no; los días sí |
+| 6 · Demografía de la audiencia | Grupo, etiqueta y porcentaje de los seguidores | No |
+| 7 · Demografía del contenido | Lo mismo, de quien vio los posts del rango. Puede faltar: al parecer, cuando nadie los vio | Sí |
+
+### Dónde se guarda
+
+| Modelo | Una fila por | Qué guarda |
+| --- | --- | --- |
+| `AnalyticsDay` | cuenta y día | Impresiones, interacciones y seguidores nuevos. Cada importación que cubre el día lo actualiza; un dato ya visto no se borra con un vacío. |
+| `AnalyticsPost` | cuenta y urn del post | Las cifras de toda la vida de una publicación reciente, la última vez que se vio (`last_seen_at`), y su pieza editorial si es nuestra. |
+| `AnalyticsSnapshot` | cuenta y día de captura | Total de seguidores y demografía de la audiencia. La última importación del día gana. |
+| `AnalyticsRange` | cuenta y rango exacto | Lo que solo vale para ese rango: impresiones, miembros alcanzados, las dos listas de LinkedIn y la demografía del contenido (`null` si faltó la hoja). |
+| `AnalyticsImport` | exportación pedida | Rango, tipo (`diaria`, `manual`, `carga_inicial`), estado, filas de cada clase, nombres de las hojas y error. |
+
+`PostMetric` y `AudienceSnapshot` no se tocan: miden otra cosa (cortes a una edad fija y la foto diaria de Unipile).
+
+Una publicación se une a su pieza editorial por cualquiera de los ids que guardamos de ella: el urn de la ejecución CONT-09, y el id o el enlace de `PostMetric` y de `EditorialPiece.metrics`. LinkedIn enlaza unas veces el urn `activity` y otras el `share`. Si no coincide con el guardado, la publicación queda sin pieza.
+
+### Importación
+
+- **Diaria** (trabajo `import_analytics`). El autopiloto la pone en cola una vez por día UTC, desde las 01:30 UTC. Solo para cuentas `directo` sin pausa y con el servicio configurado (`LIVE_LINKEDIN_DIRECTO`, `NAVEGADOR_URL` y `NAVEGADOR_TOKEN`). Hay un intento al día aunque falle; el del día siguiente cubre el hueco.
+  1. Primero trae los últimos 14 días completos, que terminan ayer (`ANALYTICS_DAILY_DAYS`), porque los días recientes todavía cambian. Es la importación que pone al día los días.
+  2. Después, uno tras otro, los rangos exactos que ofrece la app, también terminados ayer: 7, 28, 90 y 365 días (`ANALYTICS_DAILY_RANGES`; el de 14 ya lo trajo el paso 1). Así cada periodo predefinido tiene sus miembros alcanzados, sus publicaciones principales y su demografía del contenido.
+  - Cada exportación deja su propia fila de importación (`diaria`). El lote para en el primer fallo: si LinkedIn frena, no se le pide nada más.
+  - Los rangos van como mucho una vez por día UTC: si el trabajo corre otra vez ese día, se salta los rangos ya intentados y, después de un fallo del día, no pide ninguno.
+  - Son cinco lecturas al día de los topes del servicio, en vez de una.
+- **A mano:** `manage.py analitica importar --cuenta <id o nombre> (--desde AAAA-MM-DD --hasta AAAA-MM-DD | --dias N)`.
+- **Carga inicial:** `manage.py analitica carga-inicial --cuenta <…> [--desde AAAA-MM-DD] [--trozo N]`. Va de ayer hacia atrás, en trozos de `ANALYTICS_CHUNK_DAYS` días, y para en el primer fallo.
+- **Estado:** `manage.py analitica estado [--cuenta <…>]` muestra las últimas 10 importaciones, sin cifras.
+- **Pausas.** Nada se lee con la máquina o la cuenta en pausa.
+- **Si LinkedIn frena** (login, verificación, CAPTCHA, 401/403/429/999, redirección o la parada del servicio), la importación queda con error y la cuenta se pausa, como en las demás lecturas.
+- **Si el libro cambió de forma**, la importación queda con error `analytics_parse` y un mensaje con la hoja y la fila, nunca con el valor de una celda. La cuenta no se pausa: el arreglo es nuestro.
+- **Topes.** Cada exportación gasta una lectura de los topes del servicio (60 por hora y 300 por día). La carga inicial de un año son una o dos lecturas.
+
+### Endpoint de la analítica
+
+`GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d`, o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta=<id>` opcional.
+
+- **Permiso** `operate_linkedin`. Solo lectura: responde con lo guardado y nunca llama a LinkedIn.
+- **Periodo.** Por defecto `28d`. Un periodo predefinido termina ayer (UTC), o en el último día guardado si las importaciones van atrasadas. Un rango propio va de 1 a 366 días. Cualquier otro valor da 400.
+- **Cuenta.** Sin `cuenta`, la cuenta `directo` importada más recientemente. Si no hay ninguna: `{ "disponible": false, "motivo": "…" }`.
+
+Reglas:
+- **Totales.** Impresiones, interacciones y seguidores nuevos suman los días con dato. Usan la [ficha de KPI](#ficha-de-kpi) con dos campos más: `days` y `days_with_data`. La tasa de interacción es interacciones / impresiones × 100, con los días que traen los dos datos.
+- **Comparación** con el periodo anterior de la misma duración, solo si los dos periodos tienen todos sus días. Si no, `previous` es `null` y `comparable` es `false`.
+- **Miembros alcanzados.** No se pueden sumar por días. Solo aparecen si se importó justo ese rango (`AnalyticsRange`). La importación diaria trae los rangos de los cinco periodos predefinidos, que terminan ayer; un rango propio, o un predefinido cuando las importaciones van atrasadas, no los tiene. Si no, `null` con su motivo.
+- **Publicaciones.** `publicados` son las publicaciones del periodo con sus cifras de toda la vida, tal como LinkedIn las dio la última vez (`as_of`), de más a menos impresiones. Es la elección honesta: la hoja de recientes no depende del rango, y las listas de LinkedIn solo valen para su rango exacto. `top_linkedin` son esas dos listas, solo si se importó justo ese rango.
+- **Seguidores.** El total es el que LinkedIn dio el día de cada importación, no el de una fecha pasada. `seguidores.serie` son esas capturas dentro del periodo.
+- **Demografía.** `audiencia` es la última captura, sea cual sea el periodo. `contenido` es la del rango importado más cercano, con su propio rango y `exacto`.
+- **Frescura.** `actualizado` es la última importación correcta. `ultimo_error` es la última fallida, si vino después. `limites` da el primer y el último día guardados y el primer día que da LinkedIn.
+
+Ejemplo recortado, con cifras inventadas:
+
+```json
+{
+  "disponible": true, "motivo": null,
+  "cuenta": { "id": "…", "label": "Cuenta de pruebas" },
+  "periodo": { "desde": "2026-10-16", "hasta": "2026-11-12", "dias": 28, "preset": "28d", "zona_horaria": "UTC",
+               "anterior": { "desde": "2026-09-18", "hasta": "2026-10-15" } },
+  "limites": { "primer_dia": "2025-11-13", "ultimo_dia": "2026-11-12", "linkedin_desde": "2025-10-10" },
+  "actualizado": { "at": "2026-11-13T01:31:05Z", "desde": "2026-10-30", "hasta": "2026-11-12", "tipo": "diaria" },
+  "ultimo_error": null,
+  "totales": {
+    "impressions": { "value": 280, "previous": 140, "delta": 140, "delta_pct": 100.0, "comparable": true, "days": 28, "days_with_data": 28, "…": "…" },
+    "engagements": { "…": "…" }, "new_followers": { "…": "…" },
+    "engagement_rate": { "value": 10.0, "numerator": 28, "denominator": 280, "…": "…" },
+    "members_reached": { "value": null, "unavailable_reason": "LinkedIn da los miembros alcanzados solo para un rango completo…", "captured_at": null, "…": "…" }
+  },
+  "serie": [{ "date": "2026-10-16", "impressions": 10, "engagements": 1, "new_followers": 1 }],
+  "seguidores": { "total": 110, "at": "2026-11-13", "serie": [{ "date": "2026-11-13", "value": 110 }], "definition": "…", "unavailable_reason": null },
+  "posts": {
+    "publicados": [{ "post_urn": "urn:li:activity:…", "url": "…", "piece_id": null, "published": "2026-10-28", "kind": "…",
+                     "impressions": 2500, "network_pct": 55.5, "outside_pct": 44.5, "members_reached": 1700, "followers_gained": 5,
+                     "profile_views": 20, "reactions": 40, "comments": 9, "shares": 2, "saves": 3, "sends": 1, "button_clicks": 0,
+                     "as_of": "2026-11-13T01:31:05Z" }],
+    "definition": "…", "top_linkedin": null, "top_unavailable_reason": "LinkedIn da sus publicaciones principales solo para el rango…"
+  },
+  "demografia": {
+    "audiencia": { "at": "2026-11-13", "groups": [{ "group": "…", "rows": [{ "label": "…", "pct": 32.0, "below": false, "value": null }] }] },
+    "contenido": { "desde": "2026-10-30", "hasta": "2026-11-12", "exacto": false, "captured_at": "…", "groups": [] }
+  }
+}
+```
+
+Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ "post_urn", "url", "piece_id", "published", "value" }], "por_impresiones": […] }`.
+
+### Configuración de la analítica
+
+| Variable | Por defecto | Qué hace |
+| --- | --- | --- |
+| `ANALYTICS_DAILY_DAYS` | 14 | Días de la importación diaria; con 0 queda apagada. |
+| `ANALYTICS_DAILY_RANGES` | 7,14,28,90,365 | Rangos exactos (días que terminan ayer) que la importación diaria trae después, en ese orden; el de `ANALYTICS_DAILY_DAYS` no se repite. Vacío o 0: solo los 14 días. |
+| `ANALYTICS_DAILY_AFTER` | 01:30 | Hora UTC desde la que se pone en cola la importación diaria. |
+| `ANALYTICS_CHUNK_DAYS` | 365 | Días por exportación en la carga inicial (de 1 a 366). |
+| `ANALYTICS_EARLIEST` | 2025-10-10 | Primer día que da LinkedIn. |
+| `ANALYTICS_DATE_ORDER` | — | `dmy` o `mdy`: el orden de fechas de la cuenta. Solo hace falta si un libro sale ambiguo. |
+
+### Pendiente de la analítica
+
+- **La vista en la oficina (PWA).** La app ya la muestra en Resultados › «Analítica de LinkedIn»
+  ([RES-12](../../../docs/funcionalidades/resultados.md#res-12)).
+- **Una sexta hoja sola con datos.** Aún no se vio: se lee como la de audiencia. Los nombres de las hojas quedan en `AnalyticsImport.sheets` para comprobarlo.
+- **Unir con la pieza** cuando LinkedIn enlaza un urn distinto del que guardamos.
 
 ## Configuración
 

@@ -143,7 +143,8 @@ JOB_ROLES={'prepare_profile_assets':'perfil','prepare_profile':'perfil','review_
            'execute_action':'operador_cuenta','reconcile_action':'operador_cuenta',
            'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
            'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad',
-           'collect_metrics':'analista_barrio_resultados','process_capture':'operador_cuenta',
+           'collect_metrics':'analista_barrio_resultados','import_analytics':'analista_barrio_resultados','check_linkedin':'operador_cuenta',
+           'process_capture':'operador_cuenta',
            'weekly_summary':'analista_barrio_resultados','read_inbox':'conversaciones_inbox',
            'community_study':'analista_barrio_resultados'}
 DESCRIPTIONS={'prepare_profile_assets':'Preparando tus fotos y banner','prepare_profile':'Preparando tu propuesta de perfil','review_referents':'Revisando referentes del mes','advance_experiments':'Midiendo el experimento de referentes','observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
@@ -152,7 +153,9 @@ DESCRIPTIONS={'prepare_profile_assets':'Preparando tus fotos y banner','prepare_
               'agent_run':'Preparando una propuesta','prepare_piece':'Preparando la pieza del día',
               'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',
               'plan_network':'Preparando seguimientos e invitaciones','sync_network':'Revisando invitaciones y conexiones',
-              'collect_metrics':'Midiendo los posts y la audiencia','process_capture':'Leyendo lo que enviaste al equipo',
+              'collect_metrics':'Midiendo los posts y la audiencia','import_analytics':'Trayendo la analítica de LinkedIn',
+              'check_linkedin':'Probando que LinkedIn responde como siempre',
+              'process_capture':'Leyendo lo que enviaste al equipo',
               'weekly_summary':'Escribiendo el resumen de la semana','read_inbox':'Leyendo el inbox de LinkedIn',
               'community_study':'Estudiando la comunidad con evidencia pública'}
 STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',

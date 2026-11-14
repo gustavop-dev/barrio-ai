@@ -18,7 +18,7 @@ from django.utils import timezone
 from knowledge import providers
 
 from . import evidencia, operador, orquestacion, posicionamiento, red
-from .connectors import ConnectorError, get_connector
+from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .jobs import audit, enqueue_operation
 from .models import (AuditEvent, CommunitySource, CommunityStudy, CommunityWithdrawal,
@@ -147,7 +147,7 @@ def enqueue(user, account, *, refresh=False, now=None):
 
 
 def schedule(user, account, now):
-    if account.paused or account.provider not in ('unipile', 'fake'):
+    if account.paused or account.provider not in ('unipile', 'fake', 'directo'):
         return 0
     period, _ = month(now)
     latest = CommunityStudy.objects.filter(account=account, period=period).order_by('-version').first()
@@ -364,7 +364,13 @@ def read_public(request):
         return ReadResult(count, 'partial', target)  # bounded pages never promise complete coverage
     except red.ReadCapReached:
         return ReadResult(0, 'read_cap', target)  # no request was made; retain confirmed evidence
-    except (ConnectorError, ValueError, OSError, AttributeError):
+    except ConnectorError as exc:
+        # Nothing came back (the service's budget, no answer): that says nothing about the source; keep it and its
+        # person unblocked.
+        if deferred(exc): return ReadResult(0, 'not_sent', target)
+        retire(previous, reason='unavailable', now=now)
+        return ReadResult(0, 'unavailable', target)
+    except (ValueError, OSError, AttributeError):
         retire(previous, reason='unavailable', now=now)
         return ReadResult(0, 'unavailable', target)
 

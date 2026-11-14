@@ -40,7 +40,7 @@ def read_profile():
     from .connectors import get_connector, ConnectorError
     from .red import _read, ReadCapReached
     at=timezone.now().isoformat();result={'sections':{},'evidence':[],'at':at,'limitations':['El conector no expone todas las secciones.']}
-    account=ConnectorAccount.objects.filter(provider__in=['unipile','fake'],paused=False,is_locked=False).order_by('created_at').first()
+    account=ConnectorAccount.objects.filter(provider__in=['unipile','fake','directo'],paused=False,is_locked=False).order_by('created_at').first()
     if not account:return result
     try:
         _read(account,'profile',purpose='profile-strategy')
