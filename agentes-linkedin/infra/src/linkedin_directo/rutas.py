@@ -121,11 +121,17 @@ def post_page(activity_id):
     return f'/feed/update/urn:li:activity:{activity_id}/'
 
 
-def search_page(keywords, regions=None, languages=None, page=1):
+NETWORK_DEGREES = ('F', 'S', 'O')  # the web app's `network` filter: 1st degree, 2nd, 3rd and beyond
+
+
+def search_page(keywords, regions=None, languages=None, page=1, network=None):
     """The people search page. `regions` are geo ids from the location typeahead; `languages` two-letter codes (the
-    web app's `profileLanguage` filter, not tried in the spike)."""
+    web app's `profileLanguage` filter, not tried in the spike). `network` the degrees to keep (NETWORK_DEGREES; ('S',
+    'O') leaves the 1st degree out): UNVERIFIED, the web app's form as seen in its address bar, never sent by the spike
+    or by Barrio. Nothing passes it yet; off (None), the page is the one the spike proved."""
+    degrees = [d for d in network or () if d in NETWORK_DEGREES]
     query = f'?keywords={quote(keywords)}&origin=GLOBAL_SEARCH_HEADER'
-    for name, values in (('geoUrn', regions), ('profileLanguage', languages)):
+    for name, values in (('geoUrn', regions), ('network', degrees), ('profileLanguage', languages)):
         if values:
             query += f'&{name}=' + quote(json.dumps([str(v) for v in values], separators=(',', ':')))
     if page > 1:

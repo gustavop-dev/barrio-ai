@@ -336,6 +336,16 @@ class NetworkTests(SimpleTestCase):
         older=json.dumps([snippet],separators=(',',':')).replace('"','\\"')
         self.assertEqual(lectura.search_results(older),[{'id':ANA[0],'member':ANA[2],'public_identifier':''}])
 
+    def test_the_unverified_network_degree_filter_is_off_unless_asked(self):
+        plain=rutas.search_page('fundadores',['900001'])
+        self.assertNotIn('network',plain)
+        self.assertEqual(rutas.search_page('fundadores',['900001'],network=['S','O','X']),
+                         plain.replace('&origin=GLOBAL_SEARCH_HEADER&geoUrn=%5B%22900001%22%5D',
+                                       '&origin=GLOBAL_SEARCH_HEADER&geoUrn=%5B%22900001%22%5D&network=%5B%22S%22%2C%22O%22%5D'))
+        self.assertEqual(rutas.search_page('fundadores',network=['X']),rutas.search_page('fundadores'))
+        permitidas.check(Request('GET',rutas.search_page('fundadores',network=['S','O']),'page'))
+        self.assertNotIn('network=',inspect.getsource(cliente.Cliente.search_people))  # nothing turns it on yet
+
     def test_search_parameters_reads_the_location_typeahead(self):
         c,t=connector(search(),('POST','^'+re.escape(rutas.sdui(rutas.FILTER_BAR,'component'))+'$',F.filter_bar()),
                       sdui(rutas.GEO_TYPEAHEAD,F.typeahead([('900001','Ciudad Ficticia'),('900002','Otra Ciudad')])))
