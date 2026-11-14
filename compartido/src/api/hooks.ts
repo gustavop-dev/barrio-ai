@@ -49,6 +49,10 @@ import {
   saveOrientacion,
   setAccountPaused,
   setControl,
+  startLinkedInLogin,
+  getLinkedInLogin,
+  reopenLinkedInLogin,
+  cancelLinkedInLogin,
   undoPregunta,
   updateOportunidad,
   updateReferent,
@@ -408,6 +412,38 @@ export function useSetAccountPaused() {
   return useMutation({
     mutationFn: ({ accountId, paused, reason }: { accountId: string; paused: boolean; reason: string }) => setAccountPaused(accountId, paused, reason),
     onSettled: () => invalidate(client, keys.overview, keys.accounts, keys.tuTurno, keys.linkedin),
+  });
+}
+
+/** Conectar LinkedIn desde la app: start (or open again) the login of a `directo` account. */
+export function useStartLinkedInLogin() {
+  return useMutation({ mutationFn: (accountId: string) => startLinkedInLogin(accountId) });
+}
+
+export function useReopenLinkedInLogin() {
+  return useMutation({ mutationFn: (loginId: string) => reopenLinkedInLogin(loginId) });
+}
+
+export function useCancelLinkedInLogin() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (loginId: string) => cancelLinkedInLogin(loginId), onSettled: () => invalidate(client, keys.overview, keys.accounts) });
+}
+
+/** The login while it lasts, asked every 3 s; once it ended, the accounts refresh (a pause may be gone). */
+export function useLinkedInLogin(loginId: string | null, active: boolean) {
+  const client = useQueryClient();
+  return useQuery({
+    queryKey: keys.linkedinLogin(loginId ?? ''),
+    queryFn: async () => {
+      const answer = await getLinkedInLogin(loginId as string);
+      if (answer.login.state !== 'abriendo' && answer.login.state !== 'esperando') void invalidate(client, keys.overview, keys.accounts);
+      return answer;
+    },
+    enabled: Boolean(loginId) && active,
+    refetchInterval: (query) => {
+      const state = query.state.data?.login.state;
+      return active && (!state || state === 'abriendo' || state === 'esperando') ? 3000 : false;
+    },
   });
 }
 

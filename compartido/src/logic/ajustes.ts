@@ -3,8 +3,8 @@
 // Pure: shared by the PWA and the native app, each draws it with its own components.
 import type { AjustesConPush, PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
-import type { Account, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary } from '../api/types';
-import { formatUsd, timeAgo } from './format';
+import type { Account, AccountLogin, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary } from '../api/types';
+import { formatTime, formatUsd, timeAgo } from './format';
 import type { Tone } from './tone';
 
 /** The sections in order; the ids are the anchors (`/ajustes#maquina`, the pause banner links there). */
@@ -78,6 +78,42 @@ export function canaryLine(
     tone: known.tone,
     detail: quiet ? '' : (canary.error ?? '').trim(),
   };
+}
+
+/** Conectar LinkedIn desde la app: said next to the button, before the person types anything. */
+export const LOGIN_PRIVACY =
+  'Escribes la clave y el código en la propia página de LinkedIn, abierta en un navegador del servidor de Barrio. Barrio no los guarda.';
+
+export function loginActive(login: Pick<AccountLogin, 'state'> | null | undefined): boolean {
+  return login?.state === 'abriendo' || login?.state === 'esperando';
+}
+
+/** «Conectar LinkedIn» the first time, «Volver a conectar» once the account had a session. */
+export function connectLabel(account: Pick<Account, 'status' | 'connect'>, login: Pick<AccountLogin, 'state'> | null = null): string {
+  return account.status === 'running' || (login ?? account.connect?.last)?.state === 'conectada' ? 'Volver a conectar' : 'Conectar LinkedIn';
+}
+
+/** The state of the last login, in one line and its tone. */
+export function loginLine(login: AccountLogin, now: number = Date.now()): { text: string; tone: Tone } {
+  const when = timeAgo(login.finished_at ?? login.started_at, now);
+  switch (login.state) {
+    case 'abriendo':
+      return { text: 'Abriendo el navegador del servidor…', tone: 'info' };
+    case 'esperando':
+      return { text: `Esperando a que entres en LinkedIn (hasta las ${formatTime(login.expires_at)}).`, tone: 'info' };
+    case 'conectada':
+      return login.still_stopped
+        ? { text: `Sesión guardada ${when}, pero la cuenta sigue detenida en el servidor: hay que revisarla allí.`, tone: 'warn' }
+        : { text: `LinkedIn conectado ${when}.`, tone: 'ok' };
+    case 'vencida':
+      return { text: `Se acabó el tiempo sin entrar en LinkedIn (${when}). Vuelve a intentarlo.`, tone: 'warn' };
+    case 'cancelada':
+      return { text: `Conexión cancelada ${when}.`, tone: 'muted' };
+    case 'fallida':
+      return { text: `No se pudo conectar${login.reason ? `: ${login.reason.replace(/\.$/, '')}` : ''}.`, tone: 'bad' };
+    default:
+      return { text: login.state, tone: 'muted' };
+  }
 }
 
 /** «Motivo: revisando los topes de la semana.» */

@@ -2,9 +2,9 @@
 // the spend rows, the push switches and what the photo sheet PATCHes.
 import type { PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
-import type { AccountCanary, Ajustes, Overview, RedSummary } from '../api/types';
+import type { AccountCanary, AccountLogin, Ajustes, Overview, RedSummary } from '../api/types';
 import { padHour } from './format';
-import { canaryLine, capLines, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, monthAlert, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
+import { canaryLine, capLines, connectLabel, loginActive, loginLine, controlReason, disabledKinds, factsLabel, isAjustesSection, isUnavailable, monthAlert, readLines, spacingLabel, spendLine, spendRows } from './ajustes';
 import { inUseWarning, isFiltro, photoPatch, rejectedMessage, uploadedMessage } from './galeria';
 import { linkedinReconnected, linkedinReturnMessage } from './linkedin';
 
@@ -34,6 +34,26 @@ describe('Ajustes', () => {
     expect(canaryLine({ canary: canary({ state: 'nuevo' }), paused: false }, now)?.tone).toBe('muted');
     expect(canaryLine({ canary: null, paused: false }, now)).toBeNull();
     expect(canaryLine({ paused: false }, now)).toBeNull();
+  });
+
+  it('tells the state of a login from the app and names the button', () => {
+    const login = (fields: Partial<AccountLogin>): AccountLogin => ({
+      id: 'l1', state: 'esperando', reason: '', still_stopped: false, started_at: '2026-11-14T14:58:00Z',
+      expires_at: '2026-11-14T15:10:00Z', finished_at: '2026-11-14T14:59:00Z', ...fields,
+    });
+    expect(loginLine(login({ state: 'conectada' }), now)).toEqual({ text: 'LinkedIn conectado hace 1 min.', tone: 'ok' });
+    expect(loginLine(login({ state: 'conectada', still_stopped: true }), now).tone).toBe('warn');
+    expect(loginLine(login({ state: 'fallida', reason: 'el perfil está abierto en otro navegador.' }), now)).toEqual({
+      text: 'No se pudo conectar: el perfil está abierto en otro navegador.', tone: 'bad',
+    });
+    expect(loginLine(login({ state: 'vencida' }), now).tone).toBe('warn');
+    expect(loginLine(login({ state: 'esperando' }), now).text).toMatch(/^Esperando a que entres en LinkedIn \(hasta las \d{2}:\d{2}\)\.$/);
+    expect([loginActive(login({})), loginActive(login({ state: 'abriendo' })), loginActive(login({ state: 'cancelada' })), loginActive(null)]).toEqual([
+      true, true, false, false,
+    ]);
+    expect(connectLabel({ status: 'unknown', connect: { enabled: true, last: null } })).toBe('Conectar LinkedIn');
+    expect(connectLabel({ status: 'running', connect: null })).toBe('Volver a conectar');
+    expect(connectLabel({ status: 'unknown', connect: null }, login({ state: 'conectada' }))).toBe('Volver a conectar');
   });
 
   it('builds the caps from the usage, or the cap alone without usage', () => {

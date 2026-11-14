@@ -15,7 +15,7 @@ from .permissions import require
 
 GONE = ('<!doctype html><html lang="es"><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
         '<title>Conectar LinkedIn</title><body style="font-family:sans-serif;padding:24px">'
-        '<p>Este enlace ya se usó o venció.</p><p>Vuelve a la app y pulsa «Volver a abrir» o «Conectar LinkedIn».</p>'
+        '<p>Este enlace ya se usó o venció.</p><p>Vuelve a la app y pulsa «Abrir de nuevo» o «Conectar LinkedIn».</p>'
         '</body></html>')
 
 
