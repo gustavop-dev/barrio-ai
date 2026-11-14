@@ -7,6 +7,8 @@
   estado [<cuenta>]            perfil, sesión, parada, salida y consumo de cada cuenta
   salida <cuenta> [--aceptar]  la salida a internet de la cuenta; --aceptar la cambia a la configurada
   canario <cuenta>             la revisión diaria, solo lectura, a través del servicio en marcha
+  rodaje <cuenta>              la prueba de resistencia de la fase 4: un día de producción, día tras día
+  rodaje estado [<cuenta>]     los últimos días de rodaje en una tabla
 
 Los datos van en NAVEGADOR_DATOS (por defecto ./datos): un perfil de navegador por cuenta y su estado."""
 import argparse
@@ -16,7 +18,7 @@ import shutil
 import sys
 import time
 
-from . import ajustes, pagina
+from . import ajustes, pagina, rodaje
 from .almacen import IMPORTED, Store
 from .cuenta import WORDS
 
@@ -178,9 +180,16 @@ def main(argv=None):
     canary = orders.add_parser('canario', help='revisión diaria de solo lectura')
     canary.add_argument('cuenta')
     canary.add_argument('--url', help='dirección del servicio (por defecto NAVEGADOR_URL o 127.0.0.1:NAVEGADOR_PUERTO)')
+    rodaje.options(orders.add_parser('rodaje', help='prueba de resistencia de la fase 4 (README «Rodaje»)'))
     args = parser.parse_args(argv)
+    soak_status = args.orden == 'rodaje' and args.cuenta == 'estado'
     try:
-        settings = ajustes.load(need_token=args.orden in ('servir', 'canario'))
+        settings = ajustes.load(need_token=args.orden in ('servir', 'canario', 'rodaje') and not soak_status)
+        if args.orden == 'rodaje':
+            named = args.otra if soak_status else args.cuenta
+            if named:  # none: RODAJE_CUENTA was empty too, and rodaje.main says so
+                account_name(named)
+            return rodaje.main(args, settings)
     except ajustes.ConfigError as exc:
         sys.exit(str(exc))
     name = account_name(args.cuenta) if getattr(args, 'cuenta', None) else None

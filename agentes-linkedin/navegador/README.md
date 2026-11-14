@@ -45,6 +45,7 @@ cuentas/<cuenta>/consumo.json     las llamadas de las últimas 24 h (para los to
 cuentas/<cuenta>/salida.json      la etiqueta de la última salida a internet de su sesión
 cuentas/<cuenta>/salida-rechazada.json  desde cuándo rechaza otra salida (solo una hora; se borra al resolverse)
 cuentas/<cuenta>/escrituras/      una ficha por request_id de escritura (7 días)
+cuentas/<cuenta>/rodaje/          el rodaje de la fase 4: un resumen por día y lo ya hecho (solo resúmenes con sal)
 canario/                          los informes del canario
 ```
 
@@ -191,6 +192,95 @@ seguridad detrás de los topes del operador, no el ritmo: si un error del backen
 Lo que más lee es la revisión de referentes (hasta 120 al día); pasarla a cada 6 h
 (`OPERATOR_OBSERVE_EVERY_MINUTES=360`) la deja en la mitad.
 
+## Rodaje
+
+La fase 4 de `docs/plan-linkedin-directo.md`: antes de pasar la cuenta real, una cuenta **de prueba** hace en el
+servidor, durante una o dos semanas, un día de producción tras otro, para saber si LinkedIn tolera la IP del servidor
+y el ritmo. `python -m navegador rodaje <cuenta>` habla solo con el servicio en marcha, igual que el backend (mismo
+cliente, mismas llamadas, mismos topes, paradas, lista permitida y `request_id`), y nada más: sin backend, sin base de
+datos, sin propuestas y sin IA.
+
+**Un día entre semana**, entre las 08:00 y las 20:00 de America/Bogota, al ritmo por hora de producción:
+
+| Rutina | Veces | Qué lee (como en producción) |
+| --- | --- | --- |
+| Descubrir | 2 | `/me`, el typeahead de ubicación (una vez al día) y 2 búsquedas de personas con ese lugar (`red.discover`) |
+| Referentes | 4 | Los posts de las 15 personas del día (`operador.observe`) |
+| Perfiles | 8 | 5 perfiles con su tarjeta (`red._enrich`) |
+| Borradores | 6 | `/me` y los comentarios de un post (`operador.propose_comment`) |
+| Bandeja | 12 | `/me`, los chats y los mensajes de los no leídos (`conversaciones.read_inbox`) |
+| Posts propios | 6 | `/me`, los posts propios y los comentarios e hilos de los de la semana (`respuestas.read`) |
+| Métricas | 4 | Posts propios, el último y sus comentarios, audiencia y visitas (`metricas.collect`) |
+| Red | 3 | Invitaciones recibidas y enviadas, y aceptar las recibidas (`red.sync`, RED-04) |
+| Analítica | 1 | Una exportación, los últimos 28 días |
+| Canario | 1 | La prueba diaria: 14 lecturas, 16 llamadas |
+
+Y unas pocas escrituras inofensivas, cada una leída antes y después como en producción:
+
+| Escritura | Por defecto al día | A quién |
+| --- | --- | --- |
+| Reacción «me gusta» | 6 | Posts públicos grandes (50 reacciones o más) de personas, nunca de páginas |
+| Seguir | 4 | Autores de esos posts, si no se les sigue ni son contactos |
+| Invitar, sin nota | 2 | Creadores (5000 seguidores o más) fuera de la red (3.er grado o más), sin invitación pendiente |
+| Aceptar | 5 | Invitaciones reales recibidas de personas (la lista ya deja fuera boletines y páginas) |
+| Comentar, responder | 0 | Solo con un número explícito y textos propios (`--textos`), cada uno una sola vez |
+
+Comentar en posts ajenos desde una cuenta de prueba es spam para esas personas: por eso va en 0 y nunca se genera un
+texto. Una respuesta solo va en un hilo de un post **propio** (INT-04). Nunca deja de seguir, retira, borra ni manda
+un mensaje: el cliente no tiene esas llamadas y la lista permitida las rechaza.
+
+En total, unas **290 a 330 lecturas y 12 escrituras** (más hasta 5 aceptaciones, si alguien invitó a la cuenta). El
+fin de semana, la mitad: unas 150 lecturas, 3 reacciones, 2 seguimientos, 1 invitación y hasta 2 aceptaciones (la
+analítica y el canario no bajan). `--escala` multiplica las lecturas (hasta 3, unas 880 al día: el día más cargado de
+producción, por debajo del tope de 1000 del servicio).
+
+**Cómo reparte el día.** Cada rutina se reparte en el horario con un desfase al azar (nunca una rejilla), alrededor
+de una pausa larga de 60 a 120 min cerca del mediodía. Descubrir y referentes van en los primeros 25 min, para tener
+de dónde escoger; la primera escritura, 45 min después de empezar, y entre dos escrituras al menos 20 min (las
+aceptaciones de una misma ronda de red, de 3 a 8 min, como en producción). Un día se planea con una semilla de la
+cuenta y la fecha: si el contenedor se reinicia, ese día sale igual, corre solo lo que queda por delante y lo que ya
+salió cuenta en los topes del día.
+
+**Nunca dos veces.** Ninguna publicación, persona, invitación o texto se toca dos veces, ni entre días ni tras un
+reinicio: `rodaje/hecho.json` guarda un resumen con sal (SHA-256) y la fecha, nunca el id ni el nombre.
+
+**Paradas.** Si el servicio tiene la cuenta detenida o sin sesión, o LinkedIn frena (401/403/429/999, redirección,
+reto), el día termina en el acto y el comando sale con **3**. Si el servicio no abre la cuenta por otra salida a
+internet o su configuración falla (token, cuenta desconocida), sale con **4**: eso lo arregla alguien en el servidor.
+Un tope del servicio agotado, el servicio caído o una llamada sin respuesta cortan solo esa rutina; el día sigue.
+Vuelto a arrancar el mismo día después de una parada, espera al día siguiente, y antes de cada paso lee la parada del
+disco: con la cuenta detenida, no sale ni una llamada.
+
+**El resumen de cada día**, `cuentas/<cuenta>/rodaje/rodaje-AAAA-MM-DD.json` (se reescribe tras cada paso): el plan
+y la pausa larga, corridas y segundos por rutina, llamadas, rechazos y segundos por operación, las respuestas de
+LinkedIn por estado HTTP, los rechazos del servicio por estado y tipo, los topes agotados, por tipo de escritura cuántas
+salieron, se hicieron, se confirmaron releyendo, quedaron inciertas o rechazadas (y cuántas no tenían candidato, ya
+estaban hechas o no encajaban), los errores por tipo, las paradas (hora, tipo, estado, motivo), el resultado del
+canario y el código de salida. Nunca un nombre, un id o un texto.
+
+```bash
+uv run python -m navegador rodaje prueba          # con el servicio en marcha; hasta que se detenga (--dias N)
+uv run python -m navegador rodaje estado          # los últimos 14 días (--dias N) de cada cuenta en una tabla
+```
+
+`estado` muestra por día: lecturas, escrituras hechas (reacciones/seguimientos/invitaciones/aceptaciones/
+comentarios/respuestas), respuestas de LinkedIn que no fueron 200, topes agotados, rechazos del servicio, el canario,
+la última parada y el código (0 bien, 3 parada, 4 no pudo, «en curso»).
+
+| Variable | Por defecto | Qué es |
+| --- | --- | --- |
+| `RODAJE_CUENTA` | — | La cuenta de prueba (la de `login`); también como argumento |
+| `RODAJE_HORARIO`, `RODAJE_ZONA` | `08:00-20:00`, `America/Bogota` | Horario de trabajo y su zona |
+| `RODAJE_ESCALA` | `1` | Multiplica las lecturas (de 0 a 3) |
+| `RODAJE_REACCIONES`, `_SEGUIMIENTOS`, `_INVITACIONES`, `_ACEPTACIONES` | `6`, `4`, `2`, `5` | Escrituras al día (de 0 a 30) |
+| `RODAJE_COMENTARIOS`, `RODAJE_RESPUESTAS` | `0`, `0` | Con un número, hace falta `RODAJE_TEXTOS` |
+| `RODAJE_TEXTOS` | vacío | Archivo con textos propios, uno por línea; cada uno sale una sola vez |
+| `RODAJE_LUGAR`, `RODAJE_BUSQUEDAS` | `United States`, `founder,product manager,cto,software engineer` | El lugar del filtro y las búsquedas de personas |
+| `NAVEGADOR_URL`, `NAVEGADOR_TOKEN` | `127.0.0.1:NAVEGADOR_PUERTO`, — | El servicio y su token |
+
+En el servidor corre en el contenedor `rodaje` (perfil `rodaje` de `deploy/compose.prod.yaml`), con la misma imagen
+y el mismo volumen que `navegador`; ver [En el servidor](#en-el-servidor).
+
 ## En el servidor
 
 **Pendiente de probar en el servidor.** Está montado pero apagado:
@@ -237,7 +327,8 @@ un túnel SSH, y solo mientras dura el inicio de sesión.
 
 `tests/` corre el servicio entero sobre un navegador falso (sin Chromium y sin LinkedIn): token, códigos de
 respuesta, una llamada a la vez, la pausa mínima, los topes, la lista permitida, los `request_id`, la parada y su
-reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos. Corren en CI (job
+reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos;
+y el rodaje con un reloj falso (el plan del día, los topes, nada dos veces, las paradas y el resumen sin datos). Corren en CI (job
 `navegador` de `.github/workflows/barrio-ai.yml`):
 
 ```bash

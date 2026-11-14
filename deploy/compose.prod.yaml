@@ -147,6 +147,35 @@ services:
     stop_grace_period: 60s  # a call in flight finishes and the browser closes its profile cleanly
     restart: unless-stopped
     logging: *logging
+  rodaje:
+    # Phase 4's soak run (docs/plan-linkedin-directo.md «Fase 4», navegador README «Rodaje»): ONE test account doing a
+    # production day through the running navegador service, day after day. OFF until the `rodaje` profile is named, and
+    # it needs `navegador` up (no depends_on: across profiles it would not start alone). It talks to that service only:
+    # no backend, no database. Its daily summaries go next to the account in the same volume.
+    profiles: ["rodaje"]
+    image: ghcr.io/gustavop-dev/barrio-ai-navegador:${BARRIO_TAG:-latest}
+    entrypoint: ["python", "-m", "navegador", "rodaje"]  # no virtual screen: it opens no browser
+    environment:
+      NAVEGADOR_TOKEN: ${NAVEGADOR_TOKEN:-}
+      NAVEGADOR_URL: http://navegador:8790
+      # Empty = the soak's own defaults (navegador/rodaje.py; deploy/.env.example lists them).
+      RODAJE_CUENTA: ${RODAJE_CUENTA:-}
+      RODAJE_HORARIO: ${RODAJE_HORARIO:-}
+      RODAJE_ZONA: ${RODAJE_ZONA:-}
+      RODAJE_ESCALA: ${RODAJE_ESCALA:-}
+      RODAJE_REACCIONES: ${RODAJE_REACCIONES:-}
+      RODAJE_SEGUIMIENTOS: ${RODAJE_SEGUIMIENTOS:-}
+      RODAJE_INVITACIONES: ${RODAJE_INVITACIONES:-}
+      RODAJE_ACEPTACIONES: ${RODAJE_ACEPTACIONES:-}
+      RODAJE_COMENTARIOS: ${RODAJE_COMENTARIOS:-}
+      RODAJE_RESPUESTAS: ${RODAJE_RESPUESTAS:-}
+      RODAJE_TEXTOS: ${RODAJE_TEXTOS:-}
+      RODAJE_LUGAR: ${RODAJE_LUGAR:-}
+      RODAJE_BUSQUEDAS: ${RODAJE_BUSQUEDAS:-}
+    volumes: ["navegador-datos:/datos"]
+    # A stop ends the process (3 or 4); started again, it waits for the next day and checks the stop before any call.
+    restart: unless-stopped
+    logging: *logging
 volumes:
   knowledge-db:
   media:
