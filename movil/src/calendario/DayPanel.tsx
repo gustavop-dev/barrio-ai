@@ -3,8 +3,9 @@
 // tab, so it no longer leads here) and, last, the day's summary with «Ver todo lo del día» folded. The rows are
 // compact: one line with «…» that a tap unfolds in place, and another folds again. Sections other than the
 // publication and «Lo importante» show only when they have something, as in the PWA's DayPanel.
+import { GASP_PURPOSE } from '@compartido/api/estrategia';
 import { usePiece } from '@compartido/api/hooks';
-import type { Actividad, ActividadTipo, CalendarEvent, CalendarLayer, CalendarioDay } from '@compartido/api/types';
+import type { Actividad, ActividadTipo, CalendarEvent, CalendarGasp, CalendarLayer, CalendarioDay } from '@compartido/api/types';
 import { dayOf, daysBetween, longDayTitle } from '@compartido/logic/dates';
 import { pieceStatus, vetoable } from '@compartido/logic/editorial';
 import {
@@ -164,6 +165,26 @@ function DayPiece({ event, today, timeZone, now }: { event: CalendarEvent; today
   );
 }
 
+/** The day's GASP type (estrategia.py): what it is for and, once the week is planned, its idea and the reader's need. */
+function DayType({ gasp }: { gasp: CalendarGasp }) {
+  return (
+    <View style={styles.type} testID="tipo-del-dia" collapsable={false}>
+      <View style={styles.typeHead}>
+        <Badge tone="info">{`Post de ${gasp.label.toLowerCase()}`}</Badge>
+        <T variant="detalle" soft style={styles.typePurpose}>
+          {GASP_PURPOSE[gasp.type]}
+        </T>
+      </View>
+      {gasp.idea ? <T numberOfLines={2}>{gasp.idea}</T> : null}
+      {gasp.reader_need ? (
+        <T variant="detalle" soft numberOfLines={2}>
+          {`Para el lector: ${gasp.reader_need}`}
+        </T>
+      ) : null}
+    </View>
+  );
+}
+
 /** «1 post · 6 comentarios…»: each part opens «Ver todo lo del día» filtered by its type. The «·» closes the part before
  * it, so a wrapped line never starts with one (backlog #15). */
 function Summary({ day, onPick }: { day: CalendarioDay | undefined; onPick: (tipo: ActividadTipo) => void }) {
@@ -261,6 +282,7 @@ export function DayPanel({ date, day, today, timeZone, leadHours, visible, loadi
       {heading}
 
       <Block label={pieces.length > 1 ? 'Publicaciones del día' : 'Publicación del día'} testID="bloque-publicacion">
+        {day?.gasp ? <DayType gasp={day.gasp} /> : null}
         {pieces.length ? (
           <View style={styles.pieces}>
             {pieces.map((piece) => (
@@ -391,5 +413,8 @@ const styles = StyleSheet.create({
   rowText: { flex: 1 },
   done: { flexDirection: 'row', alignItems: 'center', gap: space[1] },
   all: { borderTopWidth: 1, borderTopColor: colors.line },
+  type: { gap: space[1] },
+  typeHead: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: space[2] },
+  typePurpose: { flexShrink: 1 },
   allSummary: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
 });

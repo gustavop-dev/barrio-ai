@@ -1,4 +1,4 @@
-# cubre: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05, CAL-13, PRS-08, PRS-10
+# cubre: CAL-01, CAL-02, CAL-03, CAL-04, CAL-05, CAL-13, CAL-18, PRS-08, PRS-10
 # Calendario: the views, the day panel and the queue. Semana, Mes and Lista; swiping the week strip and the month turns
 # them and the range under the title follows (a254114: the week swipe used to close the app), but never moves the
 # selected day: its panel stays under the calendar. There are no «‹ Hoy ›» buttons. A month with nothing and a day
@@ -8,7 +8,7 @@
 # without a piece, yesterday's summary opening «Ver todo lo del día» filtered. Lista: «Próximo» with tomorrow's
 # piece, «En cola» with a network action (vetoed: it says the person is discarded for good, and it goes once the 5 s
 # pass) and a reaction (vetoed and undone), «Lo que pasó» filtered by type and with «Mostrar lo que no salió». Last,
-# the veto note says it is required.
+# the veto note says it is required. Under Semana, «La semana» with each day's GASP type and a day's sheet (CAL-18).
 # The piece detail is in 07-pieza-veto (tomorrow's piece) and 07-pieza-estados (the past ones).
 # Dates come from comun/calendario-fechas.js (Bogotá's today, as the app computes it); the range under the title may end
 # in « · Horas de Bogotá» if the device zone differs, hence the «.*». Text in the «etiqueta» style (badges, section
@@ -143,6 +143,40 @@ tags: [calendario]
     direction: DOWN
     centerElement: true
     timeout: 15000
+
+# cubre: CAL-18
+# «La semana» under the panel (PlanSemana.tsx): each day's GASP type and the mix of the next four weeks. The seed has
+# no plan, so the week is the structure's; whether today can still change depends on its piece, so only the sheet and
+# its title are checked. Android back closes the sheet.
+- scrollUntilVisible:
+    element:
+      id: plan-mes
+    direction: DOWN
+    timeout: 20000
+- assertVisible:
+    id: plan-semana
+- assertVisible: "En cuatro semanas: Crecimiento.*"
+- scrollUntilVisible:
+    element:
+      id: "plan-dia-${output.hoy}"
+    direction: UP
+    timeout: 10000
+- tapOn:
+    id: "plan-dia-${output.hoy}"
+- extendedWaitUntil:
+    visible:
+      id: plan-dia-hoja
+    timeout: 10000
+- assertVisible:
+    text: "${output.hoyTitulo}"
+    childOf:
+      id: plan-dia-hoja
+- takeScreenshot: 07-calendario-la-semana
+- back
+- extendedWaitUntil:
+    notVisible:
+      id: plan-dia-hoja
+    timeout: 10000
 
 # ---------------------------------------------------------------- Mes: the grid, swiped forward, a month with nothing
 # cubre: CAL-01, CAL-03

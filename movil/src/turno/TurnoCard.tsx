@@ -347,37 +347,46 @@ function DayPost({ post, testID }: { post: { id: string; thesis: string; schedul
   );
 }
 
-/** «¿Seguro que lo quieres ese día?»: his post, where it waits now, and what already goes out on the day he asked for. */
+/**
+ * «No puedo publicarlo cuando pediste» (14/11/2026): a date he asks for is an order; only one that cannot be kept asks
+ * him, at once. Why, what he asked for, and his idea, which waits for his answer.
+ */
 function DayRequestDetails({ card }: { card: TurnoCardData }) {
   const request = card.day_request!;
   return (
     <>
-      <View style={styles.block}>
-        <T variant="etiqueta" soft>
-          Tu post, mientras decides
-        </T>
-        <DayPost post={request.piece} testID="day-request-piece" />
-      </View>
-      {request.others.length ? (
+      {request.problem_label ? (
         <View style={styles.block}>
           <T variant="etiqueta" soft>
-            {`Ya sale el ${longDate(request.asked_at)}`}
+            Por qué no
           </T>
-          {request.others.map((post) => (
-            <DayPost key={post.id} post={post} testID={`day-request-other-${post.id}`} />
-          ))}
+          <T testID="day-request-problem">{request.problem_label}</T>
         </View>
       ) : null}
-      {request.evidence ? (
+      {request.evidence || request.asked_at ? (
         <View style={styles.block}>
           <T variant="etiqueta" soft>
             Lo que pediste
           </T>
-          <Quote>{request.evidence}</Quote>
+          {request.evidence ? <Quote>{request.evidence}</Quote> : null}
+          {request.asked_at ? (
+            <T variant="detalle" soft>
+              {`${longDate(request.asked_at)}, ${clock(request.asked_at)}`}
+            </T>
+          ) : null}
         </View>
       ) : null}
+      {request.idea ? (
+        <View style={styles.block}>
+          <T variant="etiqueta" soft>
+            Tu idea, mientras decides
+          </T>
+          <T testID="day-request-idea">{request.idea}</T>
+        </View>
+      ) : null}
+      {request.piece ? <DayPost post={request.piece} testID="day-request-piece" /> : null}
       <T variant="detalle" soft>
-        Si no respondes antes de una hora de tu hora, se queda en el siguiente día libre.
+        Una fecha que se puede cumplir nunca se pregunta: sale ese día a esa hora, además del post diario.
       </T>
     </>
   );
