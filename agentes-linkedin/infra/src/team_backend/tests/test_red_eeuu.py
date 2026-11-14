@@ -105,6 +105,13 @@ class StageCheckTests(NetworkBase):
         env=patch.dict(os.environ,{'NETWORK_STAGE_CHECK':'true','NETWORK_BUYER_REGION':'us'});env.start();self.addCleanup(env.stop)
         self.judged=[]
 
+    def test_the_classify_step_declares_every_paid_purpose_of_the_stage_check(self):
+        # The job was blocked («undeclared_provider») every time a buyer waited for the web check: nobody was ever checked.
+        from team_backend.grafo import load_graph
+        edge=next(e for e in load_graph()['edges'] if e['id']=='clasificar')
+        self.assertLessEqual({'network-classify','web-research-tool','network-stage'},set(edge['runtime']['purposes']['anthropic']))
+        self.assertGreaterEqual(edge['call_timeout_s'],300)  # one classification and up to three web checks in one call
+
     def buyer(self,slug,name):
         contact=self.contact(slug,name)
         contact.location='Austin, Texas';contact.headline='Founder & CEO at Acme Robotics'
