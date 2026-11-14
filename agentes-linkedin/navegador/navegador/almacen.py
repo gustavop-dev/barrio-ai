@@ -3,7 +3,8 @@ forgets nothing that guards LinkedIn:
 
 - perfil/        the Chromium profile. The LinkedIn session lives here and never leaves it.
 - perfil-en-uso.lock  flock'd while a browser of ours has the profile open (pagina.hold), seen from other containers.
-- detenida.json  present = the account is stopped (LinkedIn pushed back). Only an operator removes it (`reanudar`).
+- detenida.json  present = the account is stopped (LinkedIn pushed back). Only an operator removes it (`reanudar`), or
+                 a login from the app when the stop was the session going away (`sesion`, conexion.py).
 - consumo.json   when each call left, over the last 24 h, per budget ('read', 'write' and each kind of write): the
                  budgets count from it.
 - salida.json    the internet exit the session last went out by: a label (ajustes.Egress.label), never an address or
@@ -64,9 +65,12 @@ class Store:
             return None
         return data if isinstance(data, dict) and data else {'motivo': 'archivo de parada ilegible', 'desde': ''}
 
-    def stop(self, reason, now=None):
+    def stop(self, reason, now=None, session=False):
+        """`session`: the stop was the session going away (a login or checkpoint page, the cookie gone), which a new
+        login in this browser mends; any other pushback waits for an operator."""
         if not self.stopped():
-            write_json(self.root / 'detenida.json', {'motivo': str(reason)[:300], 'desde': stamp(now or time.time())})
+            write_json(self.root / 'detenida.json', {'motivo': str(reason)[:300], 'desde': stamp(now or time.time()),
+                                                     **({'sesion': True} if session else {})})
 
     def resume(self):
         """Clear the stop; returns what it said, or None when the account was not stopped."""

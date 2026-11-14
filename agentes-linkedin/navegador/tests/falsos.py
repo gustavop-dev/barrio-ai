@@ -59,16 +59,17 @@ class Browser:
 
     def __init__(self, answers=(), session=True, landing=FEED, own_calls=()):
         self.answers, self.session, self.landing, self.own_calls = list(answers), session, landing, list(own_calls)
-        self.fetches, self.contexts, self.gotos, self.events, self.proxies = [], [], 0, [], []
+        self.fetches, self.contexts, self.gotos, self.events, self.proxies, self.screens = [], [], 0, [], [], []
         self.active = self.most = 0
         self.gate = None  # an asyncio.Event every fetch waits on
         self.after = None
         self.fail_launch = None
 
-    async def launch(self, profile, headless=False, proxy=None):
+    async def launch(self, profile, headless=False, proxy=None, screen=None):
         if self.fail_launch:
             raise self.fail_launch
         self.proxies.append(proxy)
+        self.screens.append(screen)
         ctx = Context(self)
         self.contexts.append(ctx)
         return ctx

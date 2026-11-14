@@ -61,7 +61,21 @@ class NoSession(Exception):
 
 
 class Stop(Exception):
-    """LinkedIn pushed back or the session went away while opening: the account stops."""
+    """LinkedIn pushed back or the session went away while opening: the account stops. `session`: it was the session
+    (a login or checkpoint page), which a new login mends."""
+
+    def __init__(self, reason, session=False):
+        super().__init__(reason)
+        self.session = session
+
+
+LOST = ('la página está en ', 'se fue la cookie de sesión')  # what trouble() says when the session went away
+
+
+def lost_session(reason):
+    """Whether a reason of trouble() is the session going away (a login or checkpoint path, the cookie gone) rather
+    than LinkedIn pushing back (429/999 on the page's own calls)."""
+    return str(reason).startswith(LOST)
 
 
 class Busy(Exception):
@@ -247,12 +261,12 @@ async def stop_driver():
             _driver = None
 
 
-async def launch(profile, headless=False, proxy=None):
+async def launch(profile, headless=False, proxy=None, screen=None):
     """A persistent context on `profile`, as the spike opened it, going out through `proxy` (ajustes.Egress.option)
-    when given. Headed needs a screen (display()): WSL shells often export DISPLAY empty while WSLg listens on :0; the
-    image runs a virtual one (entrada.sh)."""
+    when given. Headed needs a screen (`screen`, else display()): WSL shells often export DISPLAY empty while WSLg
+    listens on :0; the image runs a virtual one (entrada.sh), and a login from the app one of its own (conexion.py)."""
     pw = await driver()
-    env = {**os.environ, 'DISPLAY': display()}
+    env = {**os.environ, 'DISPLAY': screen or display()}
     options = {'proxy': proxy} if proxy else {}
     return await pw.chromium.launch_persistent_context(str(profile), headless=headless, no_viewport=not headless,
                                                        env=env, **options)
@@ -314,10 +328,11 @@ class Page:
         self.loaded_at = self.clock()
         parts = urlsplit(self.tab.url)
         if bad_path(self.tab.url) or parts.netloc != HOST or not parts.path.startswith('/feed'):
-            raise Stop(f'al cargar el inicio, LinkedIn llevó a /{parts.path.strip("/").split("/")[0]}')
+            raise Stop(f'al cargar el inicio, LinkedIn llevó a /{parts.path.strip("/").split("/")[0]}',
+                       session=bool(bad_path(self.tab.url)))
         reason = await self.trouble()
         if reason:
-            raise Stop(reason)
+            raise Stop(reason, session=lost_session(reason))
 
     def alive(self):
         try:

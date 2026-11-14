@@ -398,6 +398,8 @@ class StopTests(ServiceCase):
             with self.subTest(word=word):
                 status, body = await self.send(answer)
                 self.assertEqual((status, body['status']), (200, answer['status']))  # it left: its answer goes back
+                # Only an answer from a login or checkpoint page is the session going away; a login does not mend a 429.
+                self.assertEqual(bool(self.store().stopped().get('sesion')), word == '/checkpoint')
                 await self.assert_stopped(word)
                 self.store().resume()
 
@@ -424,6 +426,7 @@ class StopTests(ServiceCase):
         status, _ = await self.post(reaction())
         self.assertEqual(status, 409)
         self.assertEqual(self.browser.fetches, [])
+        self.assertTrue(self.store().stopped().get('sesion'))  # a new login mends it (conexion.py)
         await self.assert_stopped('/login')
 
     async def test_an_operator_clears_the_stop(self):
