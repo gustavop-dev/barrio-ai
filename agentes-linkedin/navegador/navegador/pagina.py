@@ -8,6 +8,7 @@ values): GraphQL query ids rotate with LinkedIn deploys and these are fresh. Onl
 page's requests include ours. The x-li-* headers the web app adds are kept to send the same ones (in memory only).
 
 patchright is imported only when a browser opens: the unit tests replace the browser with a fake one (`launcher`)."""
+import fcntl
 import os
 import re
 import socket
@@ -64,7 +65,7 @@ class Stop(Exception):
 
 
 class Busy(Exception):
-    """The profile is open in another browser (a login, another process)."""
+    """The profile is open in another browser (a login, the service, another process)."""
 
 
 # --- live GraphQL query ids ------------------------------------------------------------------------------------------
@@ -115,10 +116,61 @@ def is_browser(pid):
         return True  # cannot tell: count it as a browser
 
 
+def hold_path(profile):
+    return Path(profile).parent / 'perfil-en-uso.lock'
+
+
+def hold(profile):
+    """This process's hold on the profile while a browser of ours has it open: an exclusive flock on a file next to it.
+    Chromium's own SingletonLock names a pid, and another container (a `compose run` login while the service runs, both
+    named `navegador`) cannot see that pid and would take the profile over; a flock on the shared volume it does see, and
+    the kernel drops it when the process ends, so it is never stale. Busy when another process holds it. Returns the
+    descriptor to give to let_go."""
+    fd = os.open(hold_path(profile), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise Busy() from None
+    if singleton_busy(profile):  # a browser not of ours (opened by hand in this container) has it
+        os.close(fd)
+        raise Busy()
+    return fd
+
+
+def let_go(fd):
+    if fd is not None:
+        try:
+            os.close(fd)  # closing it drops the flock
+        except OSError:
+            pass
+
+
+def held(profile):
+    """Whether some process holds the profile (hold), without creating anything."""
+    try:
+        fd = os.open(hold_path(profile), os.O_RDONLY)
+    except OSError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        return False
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(fd)
+
+
 def profile_busy(profile):
+    """Whether a browser has the profile open: one of ours (hold) or any Chromium on this machine (singleton_busy)."""
+    return held(profile) or singleton_busy(profile)
+
+
+def singleton_busy(profile):
     """Chromium holds a SingletonLock symlink (`<host>-<pid>`) while a browser uses the profile. A lock left by a dead
     browser on this machine is not a lock: Chromium takes it over, and so do we (same rule as Chromium's: the pid must
-    be alive and be a browser). The compose service has a fixed hostname so a restarted container is this machine."""
+    be alive and be a browser). The compose service has a fixed hostname so a restarted container is this machine. It
+    cannot see a browser of another container with that same name: hold covers ours."""
     lock = Path(profile) / 'SingletonLock'
     if not lock.is_symlink():
         return False
@@ -213,8 +265,8 @@ async def has_session(ctx):
 class Page:
     """One account's open LinkedIn page. Account (cuenta.py) drives it; nothing here decides what may leave."""
 
-    def __init__(self, ctx, tab, clock=time.time):
-        self.ctx, self.tab, self.clock = ctx, tab, clock
+    def __init__(self, ctx, tab, clock=time.time, holding=None):
+        self.ctx, self.tab, self.clock, self.holding = ctx, tab, clock, holding
         self.live = []  # GraphQL GETs the page made by itself while loading the feed
         self.voyager_headers = {}
         self.sdui_headers = {}  # x-li-* and accept of the page's own latest server-driven UI request
@@ -227,15 +279,19 @@ class Page:
     @classmethod
     async def open(cls, profile, settings, launcher=None, clock=time.time):
         """Open the profile and load the feed. NoSession: the profile has no session cookie (nothing was loaded).
-        Stop: LinkedIn sent the feed elsewhere (login, checkpoint...). Busy: another browser holds the profile."""
-        if profile_busy(profile):
-            raise Busy()
-        ctx = await (launcher or launch)(profile, headless=settings.headless,
-                                         proxy=settings.egress(profile.parent.name).option())
+        Stop: LinkedIn sent the feed elsewhere (login, checkpoint...). Busy: another browser holds the profile. The
+        page keeps the hold on the profile until it closes."""
+        holding = hold(profile)
+        try:
+            ctx = await (launcher or launch)(profile, headless=settings.headless,
+                                             proxy=settings.egress(profile.parent.name).option())
+        except BaseException:
+            let_go(holding)
+            raise
         try:
             if not await has_session(ctx):
                 raise NoSession()
-            page = cls(ctx, ctx.pages[0] if ctx.pages else await ctx.new_page(), clock)
+            page = cls(ctx, ctx.pages[0] if ctx.pages else await ctx.new_page(), clock, holding)
             await page.reload()
             return page
         except BaseException:
@@ -243,6 +299,7 @@ class Page:
                 await ctx.close()
             except Exception:  # the window may already be gone
                 pass
+            let_go(holding)
             raise
 
     async def reload(self):
@@ -292,6 +349,8 @@ class Page:
             await self.ctx.close()
         except Exception:  # the window may already be gone
             pass
+        let_go(self.holding)
+        self.holding = None
 
     # --- what the page does by itself (recording must never break it) --------------------------------------------
     def _seen(self, request):

@@ -172,6 +172,27 @@ class ProfileTests(unittest.TestCase):
         self.assertIn('salida prueba --aceptar', str(stop.exception.code))
         self.assertEqual(store.egress(), 'directo')
 
+    def test_a_profile_held_by_a_browser_of_ours_is_busy_for_everyone_else(self):
+        profile = self.settings.account_dir('prueba') / 'perfil'
+        profile.mkdir(parents=True)
+        self.assertFalse(pagina.profile_busy(profile))
+        holding = pagina.hold(profile)  # the service's page, seen from a login in another container
+        try:
+            self.assertTrue(pagina.profile_busy(profile))
+            with self.assertRaises(pagina.Busy):
+                pagina.hold(profile)
+            with patch.object(cli, 'LOCK_TRIES', 2), patch('navegador.__main__.time.sleep') as sleep, \
+                    patch('navegador.pagina.launch') as launch, self.assertRaises(SystemExit) as stop, \
+                    redirect_stdout(io.StringIO()):
+                asyncio.run(cli.login(self.settings, 'prueba'))
+            launch.assert_not_called()
+            self.assertEqual(sleep.call_count, 2)
+            self.assertIn('abierto en otro navegador', str(stop.exception.code))
+        finally:
+            pagina.let_go(holding)
+        self.assertFalse(pagina.profile_busy(profile))  # it goes with its process: never stale
+        pagina.let_go(pagina.hold(profile))
+
     def test_refused_while_a_browser_has_it_open_or_when_it_is_not_a_profile(self):
         (self.source / 'SingletonLock').unlink()
         os.symlink(f'{socket.gethostname()}-{os.getpid()}', self.source / 'SingletonLock')

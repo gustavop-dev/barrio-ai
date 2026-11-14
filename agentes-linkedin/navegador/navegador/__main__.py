@@ -35,9 +35,13 @@ def account_name(name):
 
 
 def wait_free(profile):
+    """Take the hold on the profile (pagina.hold: the service in another container sees it too), waiting while a
+    browser has it. Returns the hold, to let go once the browser is closed."""
     for attempt in range(LOCK_TRIES + 1):
-        if not pagina.profile_busy(profile):
-            return
+        try:
+            return pagina.hold(profile)
+        except pagina.Busy:
+            pass
         if attempt == LOCK_TRIES:
             sys.exit('El perfil sigue abierto en otro navegador (¿el servicio?): no se hizo nada. Detén el servicio y '
                      'vuelve a intentarlo.')
@@ -64,25 +68,28 @@ async def login(settings, name):
     store = Store(settings.account_dir(name))
     store.profile.mkdir(parents=True, exist_ok=True, mode=0o700)
     egress, last = same_egress(settings, store, name)
-    wait_free(store.profile)
-    ctx = await pagina.launch(store.profile, headless=False, proxy=egress.option())
-    if last is None:
-        store.set_egress(egress.label)
+    holding = wait_free(store.profile)
     try:
-        tab = ctx.pages[0] if ctx.pages else await ctx.new_page()
-        await tab.goto(pagina.LOGIN)
-        print('Entra en LinkedIn en la ventana (la clave y la verificación las escribes tú; no pasan por este '
-              'programa). Cuando veas tu inicio, cierra la ventana.', flush=True)
-        while ctx.pages:
-            await asyncio.sleep(0.5)
-    finally:
+        ctx = await pagina.launch(store.profile, headless=False, proxy=egress.option())
+        if last is None:
+            store.set_egress(egress.label)
         try:
-            await ctx.close()
-        except Exception:  # already closed with the window
-            pass
-        await pagina.stop_driver()
-    # Read from the profile on disk: closing the last window ends the browser, and Chromium writes its cookies then.
-    has = pagina.stored_session(store.profile)
+            tab = ctx.pages[0] if ctx.pages else await ctx.new_page()
+            await tab.goto(pagina.LOGIN)
+            print('Entra en LinkedIn en la ventana (la clave y la verificación las escribes tú; no pasan por este '
+                  'programa). Cuando veas tu inicio, cierra la ventana.', flush=True)
+            while ctx.pages:
+                await asyncio.sleep(0.5)
+        finally:
+            try:
+                await ctx.close()
+            except Exception:  # already closed with the window
+                pass
+            await pagina.stop_driver()
+        # Read from the profile on disk: closing the last window ends the browser, and Chromium writes its cookies then.
+        has = pagina.stored_session(store.profile)
+    finally:
+        pagina.let_go(holding)
     print('Sesión guardada.' if has else 'No quedó sesión: vuelve a intentarlo.')
     if store.stopped():
         print('La cuenta sigue detenida. Cuando sepas por qué se detuvo: python -m navegador reanudar ' + name)

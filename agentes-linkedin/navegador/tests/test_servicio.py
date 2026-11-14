@@ -17,7 +17,7 @@ from aiohttp.test_utils import TestClient, TestServer
 from linkedin_directo import rutas
 
 from navegador import __main__ as cli
-from navegador import ajustes
+from navegador import ajustes, pagina
 from navegador.almacen import IMPORTED, Store, stamp
 from navegador.servidor import SERVICE, build
 from tests.falsos import MESSAGING, POST, PROFILE, TOKEN, Browser, Request, Response, World, call, invitation, raw, \
@@ -44,10 +44,14 @@ class ServiceCase(unittest.IsolatedAsyncioTestCase):
         self.client = await self.start()
 
     async def start(self):
-        """The service as a new process would be: a fresh app on the same data folder (and the same fake browser)."""
+        """The service as a new process would be: the previous one gone (its browsers closed, its holds on the profiles
+        dropped) and a fresh app on the same data folder (and the same fake browser)."""
+        if getattr(self, 'running', None):
+            await self.running.close()
         client = TestClient(TestServer(build(self.world.settings, **self.world.deps())))
         await client.start_server()
         self.addAsyncCleanup(client.close)
+        self.running = client
         return client
 
     async def post(self, body, account='prueba', headers=AUTH, client=None):
@@ -496,6 +500,25 @@ class LogTests(ServiceCase):
         self.assertIn('/feed/update/{id}/', text)
         self.assertIn('DETENIDA', text)
         self.assertIn('op=account_status -> 409', text)
+
+
+class HoldTests(ServiceCase):
+    async def test_an_open_page_holds_the_profile_against_a_login_from_another_container(self):
+        profile = self.world.settings.account_dir('prueba') / 'perfil'
+        self.assertEqual((await self.post(call()))[0], 200)
+        self.assertTrue(pagina.profile_busy(profile))
+        with self.assertRaises(pagina.Busy):
+            pagina.hold(profile)
+        await self.running.close()  # the service stopped: its hold goes with it
+        self.assertFalse(pagina.profile_busy(profile))
+
+    async def test_a_profile_held_elsewhere_does_not_open(self):
+        holding = pagina.hold(self.world.settings.account_dir('prueba') / 'perfil')  # a login in another container
+        self.addCleanup(pagina.let_go, holding)
+        status, body = await self.post(call())
+        self.assertEqual(status, 503)
+        self.assertIn('otro navegador', body['reason'])
+        self.assertEqual(self.browser.launches, 0)
 
 
 class ScreenTests(ServiceCase):

@@ -2,6 +2,7 @@
 forgets nothing that guards LinkedIn:
 
 - perfil/        the Chromium profile. The LinkedIn session lives here and never leaves it.
+- perfil-en-uso.lock  flock'd while a browser of ours has the profile open (pagina.hold), seen from other containers.
 - detenida.json  present = the account is stopped (LinkedIn pushed back). Only an operator removes it (`reanudar`).
 - consumo.json   when each call left, over the last 24 h, per budget ('read', 'write' and each kind of write): the
                  budgets count from it.

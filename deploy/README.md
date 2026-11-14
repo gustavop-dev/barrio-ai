@@ -98,6 +98,7 @@ Detalle completo en [publicación diaria](../agentes-linkedin/infra/docs/publica
 | Copias de seguridad | `crontab -e` → `0 4 * * * /ruta/barrio-ai/deploy/backup.sh` (conserva 14 días). Guarda la base (`knowledge-*.dump`) y los audios y fotos del volumen `media` (`media-*.tar.gz`). Copia periódicamente `deploy/backups/` fuera del servidor. Restaurar los archivos: [capturas-galeria.md](../agentes-linkedin/infra/docs/capturas-galeria.md#servidor). |
 | Actualizar | Tras el merge a `main` y el workflow en verde: `rsync` de `deploy/` si cambió, y `docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d`. Las migraciones se aplican solas. |
 | Volver atrás | `BARRIO_TAG=<sha de un commit anterior>` en `.env`, luego `pull` y `up -d`. Las migraciones no se deshacen solas. |
+| LinkedIn directo | El servicio `navegador` y el rodaje de la fase 4 van bajo los perfiles `navegador` y `rodaje`: un `pull` o `up -d` normal no los toca. Para actualizarlos, añadir `--profile navegador --profile rodaje` a los dos. Encenderlos, entrar a mano en LinkedIn y el rodaje: [En el servidor](../agentes-linkedin/navegador/README.md#en-el-servidor). |
 | Logs | `docker compose -f compose.prod.yaml logs -f autopilot worker worker-acciones`. |
 | Admin | `https://barrio.tudominio.com/admin/`. |
 

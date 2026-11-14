@@ -52,6 +52,8 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
 
 ```
 cuentas/<cuenta>/perfil/          el perfil de Chromium (la sesión de LinkedIn vive aquí)
+cuentas/<cuenta>/perfil-en-uso.lock  tomado (flock) mientras un navegador nuestro tiene abierto el perfil, también
+                                  desde otro contenedor; el sistema lo suelta al terminar el proceso
 cuentas/<cuenta>/detenida.json    existe solo si la cuenta está detenida: desde cuándo y por qué
 cuentas/<cuenta>/consumo.json     las llamadas de las últimas 24 h (para los topes)
 cuentas/<cuenta>/salida.json      la etiqueta de la última salida a internet de su sesión
@@ -296,51 +298,72 @@ y el mismo volumen que `navegador`; ver [En el servidor](#en-el-servidor).
 
 ## En el servidor
 
-**Pendiente de probar en el servidor.** Está montado pero apagado:
+Montado y apagado hasta que se nombra su perfil:
 
 - La imagen `ghcr.io/gustavop-dev/barrio-ai-navegador` se construye en cada push a `main`.
-- En `deploy/compose.prod.yaml` el servicio `navegador` está bajo el perfil `navegador`: un `up -d` normal no lo
-  arranca. No publica puertos y Caddy no lo expone; el backend lo alcanza en `http://navegador:8790` por la red
-  interna. Sus datos van en el volumen `navegador-datos`.
+- En `deploy/compose.prod.yaml` el servicio `navegador` está bajo el perfil `navegador` y el rodaje bajo `rodaje`: un
+  `up -d` normal no arranca ninguno. No publican puertos y Caddy no los expone; el backend alcanza el servicio en
+  `http://navegador:8790` por la red interna. Los dos usan el volumen `navegador-datos`.
 - Dentro del contenedor el navegador dibuja en una pantalla virtual (Xvfb) y corre con ventana, como en un
-  escritorio.
+  escritorio. Un reinicio del contenedor (`restart`, `stop` + `up -d`, el servidor que se reinicia) la vuelve a
+  levantar; si no arranca, el contenedor termina con error y Docker lo intenta otra vez.
 
-Encenderlo, cuando toque (fase 4):
+Qué está comprobado y dónde: **[servidor]** probado en el servidor el 13/11/2026; **[local]** probado en Docker en la
+laptop contra una página local, sin LinkedIn; **[pendiente]** solo se puede probar en el servidor y falta.
+
+### Paso a paso
+
+Todo en el servidor, salvo el túnel. Las órdenes repiten
+`docker compose -f compose.prod.yaml --env-file .env --profile navegador`; abajo va como `dc`:
 
 ```bash
-cd /opt/barrio-ai/deploy   # con NAVEGADOR_TOKEN en .env
-docker compose -f compose.prod.yaml --env-file .env --profile navegador pull navegador
-docker compose -f compose.prod.yaml --env-file .env --profile navegador up -d navegador
+alias dc='docker compose -f compose.prod.yaml --env-file .env --profile navegador --profile rodaje'
 ```
 
-### Entrar a mano en LinkedIn desde el servidor
-
-La clave y la verificación las escribe la persona en la ventana del navegador; nunca pasan por un programa. El
-servidor no tiene pantalla, así que esa ventana se ve por noVNC, atado al `127.0.0.1` del servidor y alcanzado por
-un túnel SSH, y solo mientras dura el inicio de sesión.
-
-1. Detener el servicio si está corriendo (el perfil de una cuenta lo usa un solo navegador a la vez):
-   `docker compose -f compose.prod.yaml --env-file .env --profile navegador stop navegador`
-2. En el servidor, abrir el navegador de la cuenta con la pantalla visible por noVNC:
+1. **Preparar** [servidor]. `cd /opt/barrio-ai/deploy`. En `.env`: `NAVEGADOR_TOKEN` (`openssl rand -hex 32`, el
+   mismo que usa el backend) y, para el rodaje, `RODAJE_CUENTA=<cuenta>`. Si cambió `deploy/`, el `rsync` de
+   `deploy/README.md`. Luego `dc pull navegador`.
+2. **Detener el servicio** si está corriendo [servidor]: `dc stop navegador`. Un perfil lo usa un solo navegador a
+   la vez. Si no se detiene, `login` lo nota aunque corra en otro contenedor (el servicio tiene tomado
+   `perfil-en-uso.lock` mientras su navegador está abierto), espera 30 s hasta 5 veces y se rinde sin abrir nada
+   [local].
+3. **Abrir el navegador de la cuenta con su pantalla** [servidor] [local]:
    ```bash
-   docker compose -f compose.prod.yaml --env-file .env --profile navegador run --rm \
-     -e NAVEGADOR_VNC=1 -p 127.0.0.1:6080:6080 navegador python -m navegador login <cuenta>
+   dc run -d --name barrio-login -e NAVEGADOR_VNC=1 -p 127.0.0.1:6080:6080 navegador python -m navegador login <cuenta>
+   docker logs barrio-login     # la dirección y la clave de un solo uso de la pantalla
    ```
-   Imprime una clave de un solo uso para la pantalla.
-3. En la laptop, el túnel: `ssh -N -L 6080:127.0.0.1:6080 barrio-ai` y abrir
+   noVNC queda atado al `127.0.0.1` del servidor (`docker port barrio-login` dice `127.0.0.1:6080`), nunca a una
+   dirección pública [local]. `docker ps` muestra ese contenedor como `unhealthy`: es normal, ahí no escucha el
+   servicio (la prueba de salud es la de `servir`). La clave queda en el registro de ese contenedor hasta borrarlo
+   (paso 6) y no sirve sin el túnel.
+4. **El túnel, en la laptop** [servidor]: `ssh -N -L 6080:127.0.0.1:6080 barrio-ai`, y en el navegador de la laptop
    `http://127.0.0.1:6080/vnc.html` con esa clave.
-4. Entrar en LinkedIn en esa ventana. Al ver el inicio, cerrar la pestaña (Ctrl+W). El comando dice si la sesión
-   quedó guardada y el contenedor desaparece con la pantalla.
-5. Volver a encender el servicio (`up -d navegador`) y, si la cuenta estaba detenida y ya se sabe por qué,
-   `docker compose ... run --rm navegador python -m navegador reanudar <cuenta>`.
+5. **Entrar en LinkedIn** en esa ventana [servidor]. La clave y la verificación las escribe la persona en la página
+   de LinkedIn; no pasan por ningún programa de Barrio. Al ver el inicio, cerrar la pestaña con Ctrl+W.
+6. **Comprobar y limpiar** [servidor] [local]: `docker logs barrio-login` termina con «Sesión guardada.» y
+   `docker wait barrio-login` dice `0` («No quedó sesión», `1`: repetir desde el paso 3). Luego
+   `docker rm barrio-login` y cerrar el túnel (Ctrl+C).
+7. **Encender el servicio** [servidor] [local]: `dc up -d navegador`. Abre el perfil que dejó `login` (mismo volumen,
+   mismo usuario, mismo nombre de máquina `navegador`). Si la cuenta estaba detenida y ya se sabe por qué:
+   `dc exec navegador python -m navegador reanudar <cuenta>`.
+8. **Verificar** [servidor] [local]: `dc exec navegador python -m navegador estado` dice `pantalla :99: lista` y
+   `<cuenta>: sesión guardada sí; … activa; salida directo`. Con `exec` (no `run`) se ve la pantalla del propio
+   servicio. Opcional, la prueba diaria a mano: `dc exec navegador python -m navegador canario <cuenta>` (16 lecturas;
+   sale con 0 si todo bien). Desde la IP del servidor pasó 14 de 14 [servidor].
+9. **Arrancar el rodaje** [local; contra LinkedIn, pendiente]: `dc up -d rodaje` (con `navegador` ya arriba).
+   `dc logs -f rodaje` muestra cada paso; `dc run --rm rodaje estado`, la tabla de los últimos días. Pararlo:
+   `dc stop rodaje`. Si se detuvo (código 3 o 4 en la tabla), revisar con el paso 8 antes de nada; el contenedor
+   vuelve a arrancar solo y espera al día siguiente.
 
-`estado` y `canario` se corren igual: `docker compose ... exec navegador python -m navegador estado`.
+Para volver a entrar (sesión caducada, `423`), los pasos 2 a 8. El rodaje no hace falta pararlo: con la cuenta sin
+sesión o detenida, termina el día sin llamar a nada.
 
 ## Pruebas
 
 `tests/` corre el servicio entero sobre un navegador falso (sin Chromium y sin LinkedIn): token, códigos de
 respuesta, una llamada a la vez, la pausa mínima, los topes, la lista permitida, los `request_id`, la parada y su
 reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos;
+que un perfil abierto se note desde otro proceso, la pantalla y el cierre por inactividad;
 y el rodaje con un reloj falso (el plan del día, los topes, nada dos veces, las paradas y el resumen sin datos). Corren en CI (job
 `navegador` de `.github/workflows/barrio-ai.yml`):
 
