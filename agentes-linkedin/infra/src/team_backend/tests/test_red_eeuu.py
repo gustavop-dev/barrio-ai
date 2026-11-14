@@ -255,6 +255,36 @@ class LeadDoubtTests(NetworkBase):
         red.plan(self.bot,self.account)
         self.assertTrue(ActionProposal.objects.filter(contact=ana,state='proposed').exists())
 
+    def test_a_discard_of_the_old_single_risk_question_no_longer_rests_the_person(self):
+        ana=self.contact('founder-cora','Cora Founder')
+        red.plan(self.bot,self.account)
+        proposal=ActionProposal.objects.get(contact=ana)
+        ActionProposal.objects.filter(pk=proposal.pk).update(state='discarded',decided_at=timezone.now(),review={
+            'decision':'discard','reasons':['Líder: parece vendedor, reclutador o cuenta ajena al nicho (riesgo=0.45)'],
+            'answers':{'riesgo':0.45},'thresholds':{'riesgo':['max',0.3]}})
+        self.assertIsNone(self.human.get(f'/api/v1/red/contacts/{ana.pk}').json()['lead_doubt'])
+        red.plan(self.bot,self.account)
+        self.assertTrue(ActionProposal.objects.filter(contact=ana,state='proposed').exists())
+
+    def test_people_in_the_queue_classified_under_earlier_criteria_go_back_to_the_classifier(self):
+        cutoff=timezone.now()-timedelta(days=1)
+        def person(slug,when,stage='fit',**extra):
+            contact=self.contact(slug,slug.title(),stage=stage)
+            contact.classification=dict(contact.classification,classified_at=when.isoformat(),**extra);contact.save();return contact
+        old=person('founder-old',cutoff-timedelta(days=2))
+        recent=person('founder-new',cutoff+timedelta(hours=1))
+        followed=person('founder-seg',cutoff-timedelta(days=2),stage='followed')
+        confirmed=person('founder-ok',cutoff-timedelta(days=2),confirmed_by_gustavo={'at':'2026-11-13T00:00:00+00:00','by':'gustavo'})
+        red.plan(self.bot,self.account)  # whatever it proposed for them is open
+        self.assertEqual(red.requeue(self.bot,self.account,cutoff),{'found':1,'requeued':0})
+        old.refresh_from_db();self.assertEqual(old.stage,'fit')
+        self.assertEqual(red.requeue(self.bot,self.account,cutoff,confirm=True),{'found':1,'requeued':1})
+        for contact in (old,recent,followed,confirmed):contact.refresh_from_db()
+        self.assertEqual((old.stage,old.classification,old.history[-1]['event']),('candidate',{},'requeued'))
+        self.assertFalse(ActionProposal.objects.filter(contact=old,state__in=['proposed','approved']).exists())
+        self.assertEqual((recent.stage,followed.stage,confirmed.stage),('fit','followed','fit'))
+        self.assertTrue(recent.classification and followed.classification and confirmed.classification)
+
     def test_only_a_fitting_person_in_course_can_be_confirmed(self):
         out=self.contact('founder-out','Out Founder',fit=False)
         self.assertEqual(self.human.post(f'/api/v1/red/contacts/{out.pk}/encaja',format='json').status_code,409)
