@@ -3,8 +3,8 @@
 // Pure: shared by the PWA and the native app, each draws it with its own components.
 import type { AjustesConPush, PushType } from '../api/capturas';
 import { ApiError } from '../api/client';
-import type { Account, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary } from '../api/types';
-import { formatUsd, timeAgo } from './format';
+import type { Account, AccountLogin, Ajustes, AjustesSpend, CapacityInfo, Control, NetworkRead, Orientation, Overview, RedSummary } from '../api/types';
+import { formatTime, formatUsd, timeAgo } from './format';
 import type { Tone } from './tone';
 
 /** The sections in order; the ids are the anchors (`/ajustes#maquina`, the pause banner links there). */
@@ -52,6 +52,68 @@ export function providerLabel(account: Pick<Account, 'provider'>): string {
 /** The accounts the machine acts with through Unipile; the official LinkedIn one lives in its own section. */
 export function unipileAccounts(accounts: Account[] | undefined): Account[] {
   return (accounts ?? []).filter((account) => !account.provider.startsWith('linkedin'));
+}
+
+const CANARY: Record<string, { label: string; tone: Tone }> = {
+  ok: { label: 'todo bien', tone: 'ok' },
+  roto: { label: 'algo cambió en LinkedIn', tone: 'bad' },
+  alto: { label: 'se detuvo', tone: 'bad' },
+  no_corrio: { label: 'no pudo correr', tone: 'warn' },
+};
+
+/** The last daily canary of a `directo` account, «Prueba diaria: todo bien, hace 3 h.», with what failed and the
+ *  reason when it did not pass; null when the account has none (another provider, or no run yet). A stop pauses the
+ *  account with the same reason, so a paused account does not repeat it. */
+export function canaryLine(
+  account: Pick<Account, 'canary' | 'paused'>,
+  now: number = Date.now(),
+): { text: string; tone: Tone; detail: string } | null {
+  const canary = account.canary;
+  if (!canary) return null;
+  const known = CANARY[canary.state] ?? { label: canary.state, tone: 'muted' as Tone };
+  const failing = canary.state === 'roto' && canary.failing.length ? ` (falla ${canary.failing.join(', ')})` : '';
+  const quiet = canary.state === 'ok' || (canary.state === 'alto' && account.paused);
+  return {
+    text: `Prueba diaria: ${known.label}${failing}, ${timeAgo(canary.finished_at ?? canary.started_at, now)}.`,
+    tone: known.tone,
+    detail: quiet ? '' : (canary.error ?? '').trim(),
+  };
+}
+
+/** Conectar LinkedIn desde la app: said next to the button, before the person types anything. */
+export const LOGIN_PRIVACY =
+  'Escribes la clave y el código en la propia página de LinkedIn, abierta en un navegador del servidor de Barrio. Barrio no los guarda.';
+
+export function loginActive(login: Pick<AccountLogin, 'state'> | null | undefined): boolean {
+  return login?.state === 'abriendo' || login?.state === 'esperando';
+}
+
+/** «Conectar LinkedIn» the first time, «Volver a conectar» once the account had a session. */
+export function connectLabel(account: Pick<Account, 'status' | 'connect'>, login: Pick<AccountLogin, 'state'> | null = null): string {
+  return account.status === 'running' || (login ?? account.connect?.last)?.state === 'conectada' ? 'Volver a conectar' : 'Conectar LinkedIn';
+}
+
+/** The state of the last login, in one line and its tone. */
+export function loginLine(login: AccountLogin, now: number = Date.now()): { text: string; tone: Tone } {
+  const when = timeAgo(login.finished_at ?? login.started_at, now);
+  switch (login.state) {
+    case 'abriendo':
+      return { text: 'Abriendo el navegador del servidor…', tone: 'info' };
+    case 'esperando':
+      return { text: `Esperando a que entres en LinkedIn (hasta las ${formatTime(login.expires_at)}).`, tone: 'info' };
+    case 'conectada':
+      return login.still_stopped
+        ? { text: `Sesión guardada ${when}, pero la cuenta sigue detenida en el servidor: hay que revisarla allí.`, tone: 'warn' }
+        : { text: `LinkedIn conectado ${when}.`, tone: 'ok' };
+    case 'vencida':
+      return { text: `Se acabó el tiempo sin entrar en LinkedIn (${when}). Vuelve a intentarlo.`, tone: 'warn' };
+    case 'cancelada':
+      return { text: `Conexión cancelada ${when}.`, tone: 'muted' };
+    case 'fallida':
+      return { text: `No se pudo conectar${login.reason ? `: ${login.reason.replace(/\.$/, '')}` : ''}.`, tone: 'bad' };
+    default:
+      return { text: login.state, tone: 'muted' };
+  }
 }
 
 /** «Motivo: revisando los topes de la semana.» */

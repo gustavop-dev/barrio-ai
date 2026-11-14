@@ -7,7 +7,9 @@
 5. the budgets, per hour and per day, reads and writes apart, and per day each kind of write: 422 with code `budget`
    and the seconds until the window has room again (retry_after);
 6. the page, opened on the first call and kept open, only by the internet exit the session last used (a different
-   one, 503 until an operator accepts it); no session, 423; profile in use or no browser, 503;
+   one, 503 until an operator accepts it); no session, 423; profile in use, no browser or no screen for it, 503. Only
+   when `idle_minutes` is set (off by default: the backend calls at least hourly, so it would mostly churn) it is
+   closed after that long without calls, and the next call opens it again: one more feed load, as LinkedIn sees it;
 7. a random pause, then the page checked (on LinkedIn, the session cookie there, no 429/999 on its own calls);
 8. ONE fetch from inside the page, its answer returned as it came. Never a retry, never a redirect followed.
 
@@ -45,11 +47,12 @@ TAG = re.compile(r'[A-Za-z][A-Za-z0-9_.]{0,100}')
 
 class Refused(Exception):
     """The service does not make the call: the HTTP status it answers and a short reason, never LinkedIn's data. A spent
-    budget also says so (`code`) and when it has room again (`retry_after`, seconds)."""
+    budget also says so (`code` budget) and when it has room again (`retry_after`, seconds); another internet exit says
+    so too (`code` egress) and since when it is refused (`since`): only an operator clears that one."""
 
-    def __init__(self, status, reason, code='', retry_after=None):
+    def __init__(self, status, reason, code='', retry_after=None, since=None):
         super().__init__(reason)
-        self.status, self.reason, self.code, self.retry_after = status, reason, code, retry_after
+        self.status, self.reason, self.code, self.retry_after, self.since = status, reason, code, retry_after, since
 
 
 def write_kind(request):
@@ -70,25 +73,29 @@ def route(path):
 
 
 def pushback(request, answer):
-    """Why this answer stops the account, by the backend's own judgment (pause=True); '' when it does not."""
+    """(why this answer stops the account, by the backend's own judgment (pause=True), or ''; whether that was the
+    session: an answer from a login or checkpoint page)."""
     try:
         check_answer(request, answer)
     except LinkedInError as exc:
-        return str(exc) if exc.pause else ''
+        return (str(exc), exc.kind == 'login') if exc.pause else ('', False)
     except Uncertain:
-        return ''
-    return ''
+        return '', False
+    return '', False
 
 
 class Account:
-    def __init__(self, name, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform):
+    def __init__(self, name, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform,
+                 display=pagina.display_ready):
         self.name, self.settings = name, settings
         self.opener = opener or pagina.Page.open
-        self.clock, self.sleep, self.rand = clock, sleep, rand
+        self.clock, self.sleep, self.rand, self.display = clock, sleep, rand, display
         self.store = Store(settings.account_dir(name))
         self.lock = asyncio.Lock()
         self.page = None
+        self.connecting = None  # the login from the app in progress on this account (conexion.Login), if any
         self.in_flight = set()
+        self.used = clock()  # the last call or query: the page closes after settings.idle_minutes without one
         self.store.prune_writes(time.time())
 
     # --- the two things the service is asked -------------------------------------------------------------------------
@@ -113,6 +120,7 @@ class Account:
             try:
                 return await self._send(request, request_id, arrived)
             finally:
+                self.used = self.clock()
                 self.lock.release()
         finally:
             if request.write:
@@ -127,6 +135,7 @@ class Account:
             page = await self._open()
             found = pagina.pick_live(page.live, prefixes, variables)
         finally:
+            self.used = self.clock()
             self.lock.release()
         if not found:
             raise Refused(404, 'la página no hizo ninguna consulta así')
@@ -138,8 +147,26 @@ class Account:
         if page is not None:
             await page.close()
 
+    async def close_if_idle(self):
+        """Close the page after settings.idle_minutes without a call (0 = never): an open account's browser holds about
+        1 GiB. Never while a call holds or waits for the account. True when it closed."""
+        idle = self.settings.idle_minutes * 60
+        if not idle or self.page is None or self.lock.locked() or self.clock() - self.used < idle:
+            return False
+        async with self.lock:  # behind a call that was about to take it, if any: then that call counts as use
+            if self.page is None or self.clock() - self.used < idle:
+                return False
+            await self.close()
+        log.info('cuenta=%s navegador cerrado tras %.0f min sin llamadas; la próxima llamada lo vuelve a abrir',
+                 self.name, idle / 60)
+        return True
+
     # --- the guards --------------------------------------------------------------------------------------------------
     def _not_stopped(self):
+        if self.connecting is not None:
+            # Not a stop: nothing is wrong with the account, and the backend retries the call later (503, never paused).
+            raise Refused(503, 'se está entrando a mano en LinkedIn en esta cuenta desde la app; no salió nada',
+                          code='conexion', retry_after=self.connecting.left())
         if self.store.stopped():
             raise Refused(409, 'cuenta detenida: LinkedIn frenó antes; alguien tiene que revisarla y reanudarla')
 
@@ -178,11 +205,13 @@ class Account:
             log.warning('cuenta=%s salida distinta de la última (%s, ahora %s): no se abre', self.name, last, label)
             why = 'la sesión se importó de otro equipo' if last == IMPORTED else 'la salida a internet cambió'
             raise Refused(503, f'{why}; no salió nada. Para abrirla por esta salida: python -m navegador salida '
-                               f'{self.name} --aceptar')
+                               f'{self.name} --aceptar', code='egress', since=self.store.egress_refused(self.clock()))
+        else:
+            self.store.egress_matches()
         return label
 
-    async def _stop(self, reason):
-        self.store.stop(reason, self.clock())
+    async def _stop(self, reason, session=False):
+        self.store.stop(reason, self.clock(), session=session)
         log.warning('cuenta=%s DETENIDA: %s', self.name, reason)
         await self.close()
 
@@ -195,7 +224,7 @@ class Account:
             try:
                 await page.reload()  # fresh query ids; a tab left on one load for days looks abandoned
             except pagina.Stop as exc:
-                await self._stop(str(exc))
+                await self._stop(str(exc), exc.session)
                 raise Refused(409, 'LinkedIn frenó al recargar el inicio; la cuenta se detiene') from None
             except Exception as exc:
                 log.warning('cuenta=%s la recarga falló (%s); se vuelve a abrir', self.name, type(exc).__name__)
@@ -203,6 +232,10 @@ class Account:
                 page = None
         if page is None:
             label = self._egress()
+            if not self.settings.headless and self.display() is False:
+                log.warning('cuenta=%s sin pantalla para el navegador (%s no responde)', self.name, pagina.display())
+                raise Refused(503, 'sin pantalla para el navegador (la pantalla virtual no responde); no salió nada. '
+                                   'Reinicia el contenedor del servicio')
             try:
                 self.page = await self.opener(self.store.profile, self.settings)
             except pagina.NoSession:
@@ -210,7 +243,7 @@ class Account:
             except pagina.Busy:
                 raise Refused(503, 'el perfil está abierto en otro navegador; no salió nada') from None
             except pagina.Stop as exc:
-                await self._stop(str(exc))
+                await self._stop(str(exc), exc.session)
                 raise Refused(409, 'LinkedIn frenó al abrir el inicio; la cuenta se detiene') from None
             except Exception as exc:
                 log.warning('cuenta=%s el navegador no abrió (%s)', self.name, type(exc).__name__)
@@ -244,7 +277,7 @@ class Account:
             await self.close()
             raise Refused(503, f'la página no está lista ({type(exc).__name__}); no salió nada') from None
         if reason:
-            await self._stop(reason)
+            await self._stop(reason, pagina.lost_session(reason))
             raise Refused(409, 'LinkedIn frenó antes de esta llamada; la cuenta se detiene; no salió nada')
         if request.write:
             self.store.sending(request_id, self.clock())
@@ -258,7 +291,7 @@ class Account:
                 reason = await page.trouble()
             except Exception:
                 reason = ''
-            await (self._stop(reason) if reason else self.close())
+            await (self._stop(reason, pagina.lost_session(reason)) if reason else self.close())
             log.warning('cuenta=%s op=%s %s %s -> la página falló durante la llamada (%s)', self.name,
                         request.operation or '-', request.method, route(request.path), type(exc).__name__)
             raise Refused(504, 'la página falló durante la llamada; pudo haber salido') from None
@@ -266,10 +299,11 @@ class Account:
                         content_type=raw.get('ctype') or '', url=raw.get('url') or '',
                         redirected=raw.get('type') == 'opaqueredirect')
         took = self.clock() - started
-        reason = pushback(request, answer)
+        reason, session = pushback(request, answer)
         if not reason:
             try:
                 reason = await page.trouble()
+                session = pagina.lost_session(reason)
             except Exception:  # the answer is in hand; the page will be opened again for the next call
                 await self.close()
         if request.write:
@@ -280,5 +314,5 @@ class Account:
                  request.operation or '-', request.method, request.kind, route(request.path),
                  'redirección' if answer.redirected else answer.status, waited, pause, took)
         if reason:
-            await self._stop(reason)
+            await self._stop(reason, session)
         return answer

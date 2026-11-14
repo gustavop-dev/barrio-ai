@@ -98,6 +98,8 @@ services:
       dockerfile: oficina/Dockerfile
     environment:
       BARRIO_DOMAIN: ${BARRIO_DOMAIN:?Configurar .env}
+      # The /conectar/ route of the Caddyfile (Conectar LinkedIn desde la app): off unless true.
+      LINKEDIN_CONEXION_APP: ${LINKEDIN_CONEXION_APP:-false}
     ports: ["80:80", "443:443", "443:443/udp"]
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
@@ -132,11 +134,17 @@ services:
       NAVEGADOR_ACEPTACIONES_DIA: ${NAVEGADOR_ACEPTACIONES_DIA:-}
       NAVEGADOR_PAUSA_MIN: ${NAVEGADOR_PAUSA_MIN:-3}
       NAVEGADOR_PAUSA_MAX: ${NAVEGADOR_PAUSA_MAX:-7}
+      # Close an account's browser after this many idle minutes (empty or 0 = never, the default; README «Memoria»).
+      NAVEGADOR_CIERRE_INACTIVO_MIN: ${NAVEGADOR_CIERRE_INACTIVO_MIN:-}
       # Internet exit (empty = straight out); a change of exit is refused until accepted (README «Salida a internet»).
       NAVEGADOR_PROXY: ${NAVEGADOR_PROXY:-}
       NAVEGADOR_PROXY_CUENTAS: ${NAVEGADOR_PROXY_CUENTAS:-}
       NAVEGADOR_PROXY_USUARIO: ${NAVEGADOR_PROXY_USUARIO:-}
       NAVEGADOR_PROXY_CLAVE: ${NAVEGADOR_PROXY_CLAVE:-}
+      # Conectar LinkedIn desde la app (README «Conectar desde la app»): off unless true. The remote view listens on
+      # 8791 of the internal network only while a login lasts; Caddy reaches it at /conectar/ behind the backend's check.
+      NAVEGADOR_CONEXION: ${LINKEDIN_CONEXION_APP:-}
+      NAVEGADOR_CONEXION_MIN: ${NAVEGADOR_CONEXION_MIN:-}
     volumes: ["navegador-datos:/datos"]  # browser profiles (sessions), stops, budgets and write records
     shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default
     healthcheck:
@@ -145,6 +153,35 @@ services:
       timeout: 6s
       retries: 3
     stop_grace_period: 60s  # a call in flight finishes and the browser closes its profile cleanly
+    restart: unless-stopped
+    logging: *logging
+  rodaje:
+    # Phase 4's soak run (docs/plan-linkedin-directo.md «Fase 4», navegador README «Rodaje»): ONE test account doing a
+    # production day through the running navegador service, day after day. OFF until the `rodaje` profile is named, and
+    # it needs `navegador` up (no depends_on: across profiles it would not start alone). It talks to that service only:
+    # no backend, no database. Its daily summaries go next to the account in the same volume.
+    profiles: ["rodaje"]
+    image: ghcr.io/gustavop-dev/barrio-ai-navegador:${BARRIO_TAG:-latest}
+    entrypoint: ["python", "-m", "navegador", "rodaje"]  # no virtual screen: it opens no browser
+    environment:
+      NAVEGADOR_TOKEN: ${NAVEGADOR_TOKEN:-}
+      NAVEGADOR_URL: http://navegador:8790
+      # Empty = the soak's own defaults (navegador/rodaje.py; deploy/.env.example lists them).
+      RODAJE_CUENTA: ${RODAJE_CUENTA:-}
+      RODAJE_HORARIO: ${RODAJE_HORARIO:-}
+      RODAJE_ZONA: ${RODAJE_ZONA:-}
+      RODAJE_ESCALA: ${RODAJE_ESCALA:-}
+      RODAJE_REACCIONES: ${RODAJE_REACCIONES:-}
+      RODAJE_SEGUIMIENTOS: ${RODAJE_SEGUIMIENTOS:-}
+      RODAJE_INVITACIONES: ${RODAJE_INVITACIONES:-}
+      RODAJE_ACEPTACIONES: ${RODAJE_ACEPTACIONES:-}
+      RODAJE_COMENTARIOS: ${RODAJE_COMENTARIOS:-}
+      RODAJE_RESPUESTAS: ${RODAJE_RESPUESTAS:-}
+      RODAJE_TEXTOS: ${RODAJE_TEXTOS:-}
+      RODAJE_LUGAR: ${RODAJE_LUGAR:-}
+      RODAJE_BUSQUEDAS: ${RODAJE_BUSQUEDAS:-}
+    volumes: ["navegador-datos:/datos"]
+    # A stop ends the process (3 or 4); started again, it waits for the next day and checks the stop before any call.
     restart: unless-stopped
     logging: *logging
 volumes:

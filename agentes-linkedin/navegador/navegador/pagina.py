@@ -8,7 +8,9 @@ values): GraphQL query ids rotate with LinkedIn deploys and these are fresh. Onl
 page's requests include ours. The x-li-* headers the web app adds are kept to send the same ones (in memory only).
 
 patchright is imported only when a browser opens: the unit tests replace the browser with a fake one (`launcher`)."""
+import fcntl
 import os
+import re
 import socket
 import sqlite3
 import time
@@ -30,6 +32,8 @@ GOTO_TIMEOUT_MS = 45000
 VOYAGER_COPY = ('x-li-lang', 'x-li-track', 'x-li-page-instance')  # what the web app adds; never its csrf-token
 PAGING = {'start', 'count', 'paginationToken'}
 ALARMS = (429, 999)
+X_SOCKETS = Path('/tmp/.X11-unix')
+LOCAL_DISPLAY = re.compile(r':(\d+)(?:\.\d+)?')
 
 # Runs in the page. A redirect is not followed (`manual` turns it into an opaqueredirect) and a call gives up after
 # `timeout` ms. The csrf-token is the JSESSIONID cookie, read here.
@@ -57,11 +61,25 @@ class NoSession(Exception):
 
 
 class Stop(Exception):
-    """LinkedIn pushed back or the session went away while opening: the account stops."""
+    """LinkedIn pushed back or the session went away while opening: the account stops. `session`: it was the session
+    (a login or checkpoint page), which a new login mends."""
+
+    def __init__(self, reason, session=False):
+        super().__init__(reason)
+        self.session = session
+
+
+LOST = ('la página está en ', 'se fue la cookie de sesión')  # what trouble() says when the session went away
+
+
+def lost_session(reason):
+    """Whether a reason of trouble() is the session going away (a login or checkpoint path, the cookie gone) rather
+    than LinkedIn pushing back (429/999 on the page's own calls)."""
+    return str(reason).startswith(LOST)
 
 
 class Busy(Exception):
-    """The profile is open in another browser (a login, another process)."""
+    """The profile is open in another browser (a login, the service, another process)."""
 
 
 # --- live GraphQL query ids ------------------------------------------------------------------------------------------
@@ -112,10 +130,61 @@ def is_browser(pid):
         return True  # cannot tell: count it as a browser
 
 
+def hold_path(profile):
+    return Path(profile).parent / 'perfil-en-uso.lock'
+
+
+def hold(profile):
+    """This process's hold on the profile while a browser of ours has it open: an exclusive flock on a file next to it.
+    Chromium's own SingletonLock names a pid, and another container (a `compose run` login while the service runs, both
+    named `navegador`) cannot see that pid and would take the profile over; a flock on the shared volume it does see, and
+    the kernel drops it when the process ends, so it is never stale. Busy when another process holds it. Returns the
+    descriptor to give to let_go."""
+    fd = os.open(hold_path(profile), os.O_RDWR | os.O_CREAT, 0o600)
+    try:
+        fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except BlockingIOError:
+        os.close(fd)
+        raise Busy() from None
+    if singleton_busy(profile):  # a browser not of ours (opened by hand in this container) has it
+        os.close(fd)
+        raise Busy()
+    return fd
+
+
+def let_go(fd):
+    if fd is not None:
+        try:
+            os.close(fd)  # closing it drops the flock
+        except OSError:
+            pass
+
+
+def held(profile):
+    """Whether some process holds the profile (hold), without creating anything."""
+    try:
+        fd = os.open(hold_path(profile), os.O_RDONLY)
+    except OSError:
+        return False
+    try:
+        fcntl.flock(fd, fcntl.LOCK_SH | fcntl.LOCK_NB)
+        return False
+    except BlockingIOError:
+        return True
+    finally:
+        os.close(fd)
+
+
 def profile_busy(profile):
+    """Whether a browser has the profile open: one of ours (hold) or any Chromium on this machine (singleton_busy)."""
+    return held(profile) or singleton_busy(profile)
+
+
+def singleton_busy(profile):
     """Chromium holds a SingletonLock symlink (`<host>-<pid>`) while a browser uses the profile. A lock left by a dead
     browser on this machine is not a lock: Chromium takes it over, and so do we (same rule as Chromium's: the pid must
-    be alive and be a browser). The compose service has a fixed hostname so a restarted container is this machine."""
+    be alive and be a browser). The compose service has a fixed hostname so a restarted container is this machine. It
+    cannot see a browser of another container with that same name: hold covers ours."""
     lock = Path(profile) / 'SingletonLock'
     if not lock.is_symlink():
         return False
@@ -147,6 +216,30 @@ def stored_session(profile):
     return any(not expires or expires > now for (expires,) in rows)
 
 
+# --- the screen ------------------------------------------------------------------------------------------------------
+def display():
+    """The X display a headed browser draws on: DISPLAY, else the image's virtual one (NAVEGADOR_PANTALLA: commands run
+    with `docker exec` do not get the DISPLAY entrada.sh exports), else :0 (WSLg)."""
+    return os.environ.get('DISPLAY') or os.environ.get('NAVEGADOR_PANTALLA') or ':0'
+
+
+def display_ready(name=None):
+    """Whether that local X screen accepts a connection; None for a display on another machine. A socket file is not
+    enough: a restarted container keeps its /tmp, and the file of a screen that died stays there."""
+    found = LOCAL_DISPLAY.fullmatch(name or display())
+    if not found:
+        return None
+    sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    sock.settimeout(1)
+    try:
+        sock.connect(str(X_SOCKETS / f'X{found.group(1)}'))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
+
 # --- the browser -----------------------------------------------------------------------------------------------------
 _driver = None
 
@@ -168,12 +261,12 @@ async def stop_driver():
             _driver = None
 
 
-async def launch(profile, headless=False, proxy=None):
+async def launch(profile, headless=False, proxy=None, screen=None):
     """A persistent context on `profile`, as the spike opened it, going out through `proxy` (ajustes.Egress.option)
-    when given. Headed needs a screen: WSL shells often export DISPLAY empty while WSLg listens on :0; the image runs a
-    virtual one (entrada.sh)."""
+    when given. Headed needs a screen (`screen`, else display()): WSL shells often export DISPLAY empty while WSLg
+    listens on :0; the image runs a virtual one (entrada.sh), and a login from the app one of its own (conexion.py)."""
     pw = await driver()
-    env = {**os.environ, 'DISPLAY': os.environ.get('DISPLAY') or ':0'}
+    env = {**os.environ, 'DISPLAY': screen or display()}
     options = {'proxy': proxy} if proxy else {}
     return await pw.chromium.launch_persistent_context(str(profile), headless=headless, no_viewport=not headless,
                                                        env=env, **options)
@@ -186,8 +279,8 @@ async def has_session(ctx):
 class Page:
     """One account's open LinkedIn page. Account (cuenta.py) drives it; nothing here decides what may leave."""
 
-    def __init__(self, ctx, tab, clock=time.time):
-        self.ctx, self.tab, self.clock = ctx, tab, clock
+    def __init__(self, ctx, tab, clock=time.time, holding=None):
+        self.ctx, self.tab, self.clock, self.holding = ctx, tab, clock, holding
         self.live = []  # GraphQL GETs the page made by itself while loading the feed
         self.voyager_headers = {}
         self.sdui_headers = {}  # x-li-* and accept of the page's own latest server-driven UI request
@@ -200,15 +293,19 @@ class Page:
     @classmethod
     async def open(cls, profile, settings, launcher=None, clock=time.time):
         """Open the profile and load the feed. NoSession: the profile has no session cookie (nothing was loaded).
-        Stop: LinkedIn sent the feed elsewhere (login, checkpoint...). Busy: another browser holds the profile."""
-        if profile_busy(profile):
-            raise Busy()
-        ctx = await (launcher or launch)(profile, headless=settings.headless,
-                                         proxy=settings.egress(profile.parent.name).option())
+        Stop: LinkedIn sent the feed elsewhere (login, checkpoint...). Busy: another browser holds the profile. The
+        page keeps the hold on the profile until it closes."""
+        holding = hold(profile)
+        try:
+            ctx = await (launcher or launch)(profile, headless=settings.headless,
+                                             proxy=settings.egress(profile.parent.name).option())
+        except BaseException:
+            let_go(holding)
+            raise
         try:
             if not await has_session(ctx):
                 raise NoSession()
-            page = cls(ctx, ctx.pages[0] if ctx.pages else await ctx.new_page(), clock)
+            page = cls(ctx, ctx.pages[0] if ctx.pages else await ctx.new_page(), clock, holding)
             await page.reload()
             return page
         except BaseException:
@@ -216,6 +313,7 @@ class Page:
                 await ctx.close()
             except Exception:  # the window may already be gone
                 pass
+            let_go(holding)
             raise
 
     async def reload(self):
@@ -230,10 +328,11 @@ class Page:
         self.loaded_at = self.clock()
         parts = urlsplit(self.tab.url)
         if bad_path(self.tab.url) or parts.netloc != HOST or not parts.path.startswith('/feed'):
-            raise Stop(f'al cargar el inicio, LinkedIn llevó a /{parts.path.strip("/").split("/")[0]}')
+            raise Stop(f'al cargar el inicio, LinkedIn llevó a /{parts.path.strip("/").split("/")[0]}',
+                       session=bool(bad_path(self.tab.url)))
         reason = await self.trouble()
         if reason:
-            raise Stop(reason)
+            raise Stop(reason, session=lost_session(reason))
 
     def alive(self):
         try:
@@ -265,6 +364,8 @@ class Page:
             await self.ctx.close()
         except Exception:  # the window may already be gone
             pass
+        let_go(self.holding)
+        self.holding = None
 
     # --- what the page does by itself (recording must never break it) --------------------------------------------
     def _seen(self, request):

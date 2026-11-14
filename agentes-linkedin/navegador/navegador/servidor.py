@@ -2,7 +2,10 @@
 
 - POST /v1/cuentas/{cuenta}/llamadas  one LinkedIn call; 200 with what LinkedIn answered, or the service's own status
 - GET  /v1/cuentas/{cuenta}/consultas  a fresh GraphQL query id the page used itself
-- GET  /health                         for the container's health check: no token, no data
+- POST /v1/cuentas/{cuenta}/conexion   start a login from the app (conexion.py; off unless NAVEGADOR_CONEXION=true)
+- GET|DELETE /v1/conexiones/{sesion}   that login's state, or cancel it
+- GET  /health                         for the container's health check: no token, no data; 503 `sin_pantalla` when the
+                                        headed browser has no screen to draw on (the container needs a restart)
 
 /v1 needs `Authorization: Bearer <NAVEGADOR_TOKEN>`, compared in constant time (401 without it, 403 when wrong).
 aiohttp's access log is off: each call gets one line from cuenta.py with nothing LinkedIn answered in it."""
@@ -19,6 +22,7 @@ from linkedin_directo.transporte import KINDS, Request
 
 from . import pagina
 from .ajustes import ACCOUNT
+from .conexion import Connections
 from .cuenta import Account, Refused
 
 log = logging.getLogger('navegador')
@@ -28,11 +32,16 @@ NAME = re.compile(r'[A-Za-z][A-Za-z0-9_]{0,100}')
 MAX_PATH = 8192
 
 
+SWEEP_EVERY = 60  # seconds between two looks for idle browsers
+
+
 class Service:
-    def __init__(self, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform):
-        self.settings, self.opener, self.clock = settings, opener, clock
-        self.deps = {'clock': clock, 'sleep': sleep, 'rand': rand}
+    def __init__(self, settings, opener=None, clock=time.time, sleep=asyncio.sleep, rand=random.uniform,
+                 display=pagina.display_ready, connect=None):
+        self.settings, self.opener, self.clock, self.sleep, self.display = settings, opener, clock, sleep, display
+        self.deps = {'clock': clock, 'sleep': sleep, 'rand': rand, 'display': display}
         self.accounts = {}
+        self.connections = Connections(self, **(connect or {}))
 
     def account(self, name):
         if not ACCOUNT.fullmatch(name or '') or not (self.settings.account_dir(name) / 'perfil').is_dir():
@@ -42,21 +51,36 @@ class Service:
         return self.accounts[name]
 
     async def close(self):
+        await self.connections.close()
         for account in self.accounts.values():
             await account.close()
         await pagina.stop_driver()
+
+    async def sweep(self):
+        """Close the browsers idle for settings.idle_minutes; returns how many closed."""
+        closed = 0
+        for account in list(self.accounts.values()):
+            closed += await account.close_if_idle()
+        return closed
+
+    def screen(self):
+        """False when the headed browser has no screen to draw on."""
+        return self.settings.headless or self.display() is not False
 
 
 SERVICE = web.AppKey('service', Service)
 
 
-def reason(status, text, code='', retry_after=None):
-    """The service's own answer. A spent budget adds `code: budget` and `retry_after` (seconds, also as the header)."""
+def reason(status, text, code='', retry_after=None, since=None):
+    """The service's own answer. A spent budget adds `code: budget` and `retry_after` (seconds, also as the header);
+    another internet exit, `code: egress` and `since` (when that refusal began)."""
     body, headers = {'reason': text}, {}
     if code:
         body['code'] = code
     if retry_after is not None:
         body['retry_after'], headers['Retry-After'] = retry_after, str(retry_after)
+    if since:
+        body['since'] = since
     return web.json_response(body, status=status, headers=headers)
 
 
@@ -98,7 +122,7 @@ async def calls(request):
         answer = await service.account(name).call(call, request_id, arrived)
     except Refused as exc:
         log.info('cuenta=%s op=%s -> %s %s', name if ACCOUNT.fullmatch(name) else '?', operation, exc.status, exc.reason)
-        return reason(exc.status, exc.reason, exc.code, exc.retry_after)
+        return reason(exc.status, exc.reason, exc.code, exc.retry_after, exc.since)
     return web.json_response({'status': answer.status, 'text': answer.text, 'content_type': answer.content_type,
                               'url': answer.url, 'redirected': answer.redirected})
 
@@ -114,25 +138,69 @@ async def queries(request):
         found = await service.account(name).live_query(prefixes, variables, arrived)
     except Refused as exc:
         log.info('cuenta=%s consultas -> %s %s', name if ACCOUNT.fullmatch(name) else '?', exc.status, exc.reason)
-        return reason(exc.status, exc.reason)
+        return reason(exc.status, exc.reason, exc.code, exc.retry_after, exc.since)
     return web.json_response(found)
 
 
+def answer_login(login, status=200):
+    return web.json_response(login.public(), status=status)
+
+
+async def connect_start(request):
+    service, name = request.app[SERVICE], request.match_info['cuenta']
+    try:
+        login = await service.connections.start(name)
+    except Refused as exc:
+        log.info('cuenta=%s conexión -> %s %s', name if ACCOUNT.fullmatch(name) else '?', exc.status, exc.reason)
+        return reason(exc.status, exc.reason, exc.code, exc.retry_after, exc.since)
+    return answer_login(login, 201)
+
+
+async def connect_state(request):
+    login = request.app[SERVICE].connections.find(request.match_info['sesion'])
+    return answer_login(login) if login else reason(404, 'conexión desconocida (¿el servicio se reinició?)')
+
+
+async def connect_cancel(request):
+    login = await request.app[SERVICE].connections.cancel(request.match_info['sesion'])
+    return answer_login(login) if login else reason(404, 'conexión desconocida (¿el servicio se reinició?)')
+
+
 async def health(request):
+    if not request.app[SERVICE].screen():
+        return web.json_response({'status': 'sin_pantalla'}, status=503)
     return web.json_response({'status': 'ok'})
 
 
 def build(settings, **deps):
-    """The aiohttp app. `deps` (opener, clock, sleep, rand) replace the browser and time in the tests."""
+    """The aiohttp app. `deps` (opener, clock, sleep, rand, display, and `connect` for conexion.Connections) replace the
+    browser, time, the screen and the login's processes in the tests."""
     app = web.Application(middlewares=[token], client_max_size=1024 * 1024)
     service = Service(settings, **deps)
     app[SERVICE] = service
     app.router.add_get('/health', health)
     app.router.add_post('/v1/cuentas/{cuenta}/llamadas', calls)
     app.router.add_get('/v1/cuentas/{cuenta}/consultas', queries)
+    app.router.add_post('/v1/cuentas/{cuenta}/conexion', connect_start)
+    app.router.add_get('/v1/conexiones/{sesion}', connect_state)
+    app.router.add_delete('/v1/conexiones/{sesion}', connect_cancel)
+
+    async def sweeping(app):
+        async def loop():
+            while True:
+                await asyncio.sleep(SWEEP_EVERY)
+                try:
+                    await service.sweep()
+                except Exception as exc:  # a browser that fails to close is closed again on the next call
+                    log.warning('cierre por inactividad falló (%s)', type(exc).__name__)
+        task = asyncio.create_task(loop()) if settings.idle_minutes else None
+        yield
+        if task:
+            task.cancel()
 
     async def cleanup(app):
         await service.close()
+    app.cleanup_ctx.append(sweeping)
     app.on_cleanup.append(cleanup)
     return app
 

@@ -100,15 +100,16 @@ La bandeja de lo que viene o ya pasó y no le pide nada a Gustavo: la próxima p
 - **Qué hace para Gustavo:** cada cosa que pasa y no le pide nada aparece una sola vez en su bandeja.
 - **Código:** llamadas a `notificaciones.avisar` con un tipo de `FEED_KINDS`; `ref` único para no duplicar.
 - **Criterios de aceptación:**
-  1. **Dado** cada uno de estos eventos, **cuando** ocurre, **entonces** se guarda su Notificación: pieza lista (`piece_scheduled`), publicada, bloqueada, descartada, conexión que encaja, oportunidad nueva o que cambia de etapa, posts nuevos del Observatorio (`observatory`), captura procesada, líder sin aprobar en 7 días (`lead_silent`), la prueba diaria de LinkedIn rota, sin correr en todo el día o de nuevo bien (`linkedin_canary`) y resumen de la semana.
+  1. **Dado** cada uno de estos eventos, **cuando** ocurre, **entonces** se guarda su Notificación: pieza lista (`piece_scheduled`), publicada, bloqueada, descartada, conexión que encaja, oportunidad nueva o que cambia de etapa, posts nuevos del Observatorio (`observatory`), captura procesada, líder sin aprobar en 7 días (`lead_silent`), la prueba diaria de LinkedIn rota, sin correr en todo el día o de nuevo bien (`linkedin_canary`), la cuenta `directo` que el servicio no abre por otra salida a internet (`navegador_salida`) y resumen de la semana.
   2. **Dado** el mismo evento dos veces (mismo `ref`), **cuando** se avisa, **entonces** solo hay una Notificación.
   3. **Dado** `invites_expected` y `machine_paused_env`, **cuando** ocurren, **entonces** aparecen solo en «Próximo» (se calculan, no se guardan).
   4. **Dado** que la máquina se detiene desde el servidor, **cuando** el autopiloto lo ve, **entonces** llega una push una vez por parada ([PUS-05](notificaciones-push.md#pus-05)), sin guardarla en el feed.
   5. **Dado** que la prueba diaria de una cuenta `directo` encuentra una lectura rota, **cuando** termina, **entonces** llega «La prueba diaria de LinkedIn encontró lecturas rotas» con las lecturas que fallan; si al día siguiente sigue rota no llega otra, y cuando vuelve a pasar llega «La prueba diaria de LinkedIn vuelve a pasar».
   6. **Dado** que la prueba diaria no pudo correr (servicio caído, ocupado o sin cupo), **cuando** falla el tercer intento del día, **entonces** llega «La prueba diaria de LinkedIn no pudo correr hoy»; los dos primeros intentos no avisan.
   7. **Dado** que en la prueba diaria el servicio paró la cuenta o no tiene sesión, **cuando** termina, **entonces** no llega `linkedin_canary`: la cuenta queda en pausa y llega la de «cuenta en pausa» (Tu turno) una sola vez, con qué hacer en el motivo.
-- **Brechas código/docs:** la app todavía no muestra la última prueba diaria; el backend la sirve en `canary` de cada cuenta.
-- **Cobertura QA:** Backend (`test_notificaciones`): eventos, `ref` único, tipos calculados y la push de la parada del servidor. `test_canario`: los criterios 5 a 7.
+  8. **Dado** que el servicio navegador no abre una cuenta `directo` porque su salida a internet cambió (503 `egress`), **cuando** una llamada o la prueba diaria lo ve, **entonces** llega una vez «LinkedIn directo: el servicio no abre la cuenta por otra salida a internet», con qué hacer (`python -m navegador salida <cuenta> --aceptar` o volver a la salida de antes); las llamadas siguientes del mismo episodio no avisan otra vez, la cuenta no se pausa y lo pendiente espera. Si la cuenta vuelve a abrirse y más tarde la salida cambia otra vez, avisa de nuevo.
+- **Brechas código/docs:** la app muestra la última prueba diaria en Ajustes › Máquina ([AJU-02](ajustes.md#aju-02)); la PWA todavía no.
+- **Cobertura QA:** Backend (`test_notificaciones`): eventos, `ref` único, tipos calculados y la push de la parada del servidor. `test_canario`: los criterios 5 a 8. `test_linkedin_directo` (`EgressNoticeTests`): el criterio 8.
 
 ## Retiradas
 

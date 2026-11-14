@@ -24,12 +24,25 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
   o desaparece la cookie de sesión, la cuenta queda **detenida** (se guarda en disco) y todo recibe `409` hasta
   que alguien la revise y la reanude. Nunca intenta saltarse nada.
 - **Sin sesión**, `423`: alguien tiene que entrar a mano.
+- **Memoria.** Con el navegador de una cuenta abierto, el contenedor ocupaba en el servidor cerca de **1 GiB** (medido
+  el 13/11/2026 tras un canario de 16 llamadas). El navegador queda abierto. Opcional y apagado:
+  `NAVEGADOR_CIERRE_INACTIVO_MIN` lo cierra tras esos minutos sin llamadas y la siguiente llamada lo abre otra vez. Solo
+  compensa con varias cuentas en un servidor pequeño: el backend llama al menos cada hora (bandeja, comentarios de
+  posts propios, referentes cada 3 h, acciones durante el día), así que casi siempre cerraría para volver a abrir, y
+  cada reapertura es una carga más del inicio que LinkedIn ve. Nunca se cierra con una llamada en curso o esperando. No
+  se usa ninguna bandera de Chromium ni bloqueo de imágenes para ahorrar memoria: cambiarían cómo LinkedIn ve el
+  navegador.
+- **Sin pantalla**, `503`: el navegador va con ventana sobre una pantalla virtual (Xvfb). Si no responde, no se abre
+  nada, la llamada recibe `503` («sin pantalla») y `/health` contesta `503` con `sin_pantalla`. Al arrancar, el
+  contenedor borra el candado y el socket que deja la pantalla de la vez anterior (un `restart` conserva `/tmp`), espera
+  a que la nueva acepte conexiones y, si no lo hace, termina con error para que Docker lo vuelva a arrancar.
 - **Una sola salida a internet por sesión.** Que una sesión aparezca desde otra IP es lo primero que hace que
   LinkedIn la cierre. El navegador de cada cuenta sale directo o por un proxy (`NAVEGADOR_PROXY`); la cuenta recuerda
   por cuál salió la última vez (solo una etiqueta: `directo` o un resumen del servidor y el puerto, nunca la dirección
-  ni la clave). Si la salida configurada cambia, la cuenta no se abre (`503`, «no salió nada») hasta que alguien lo
-  confirme con `python -m navegador salida <cuenta> --aceptar`. Un perfil importado de otro equipo también espera esa
-  confirmación.
+  ni la clave). Si la salida configurada cambia, la cuenta no se abre (`503` con `code: egress` y desde cuándo,
+  «no salió nada») hasta que alguien lo confirme con `python -m navegador salida <cuenta> --aceptar`. Un perfil
+  importado de otro equipo también espera esa confirmación. El backend avisa de eso una vez en Notificaciones
+  (`navegador_salida`), sin pausar la cuenta: lo pendiente espera y sale solo cuando la salida queda resuelta.
 - **Registro sin datos**: solo método, ruta sin ids, estado y tiempos. Nunca cookies, tokens, cuerpos ni datos de
   otras personas.
 
@@ -39,10 +52,15 @@ El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-
 
 ```
 cuentas/<cuenta>/perfil/          el perfil de Chromium (la sesión de LinkedIn vive aquí)
-cuentas/<cuenta>/detenida.json    existe solo si la cuenta está detenida: desde cuándo y por qué
+cuentas/<cuenta>/perfil-en-uso.lock  tomado (flock) mientras un navegador nuestro tiene abierto el perfil, también
+                                  desde otro contenedor; el sistema lo suelta al terminar el proceso
+cuentas/<cuenta>/detenida.json    existe solo si la cuenta está detenida: desde cuándo, por qué y si fue por la sesión
+                                  (`sesion`: login, verificación o cookie perdida; una entrada desde la app la quita)
 cuentas/<cuenta>/consumo.json     las llamadas de las últimas 24 h (para los topes)
 cuentas/<cuenta>/salida.json      la etiqueta de la última salida a internet de su sesión
+cuentas/<cuenta>/salida-rechazada.json  desde cuándo rechaza otra salida (solo una hora; se borra al resolverse)
 cuentas/<cuenta>/escrituras/      una ficha por request_id de escritura (7 días)
+cuentas/<cuenta>/rodaje/          el rodaje de la fase 4: un resumen por día y lo ya hecho (solo resúmenes con sal)
 canario/                          los informes del canario
 ```
 
@@ -99,9 +117,13 @@ mismas paradas. Qué se lee y qué campos debe traer cada respuesta está en `li
 | `NAVEGADOR_INVITACIONES_DIA` | `30` | Invitaciones por día (RED-02) |
 | `NAVEGADOR_ACEPTACIONES_DIA` | `15` | Aceptaciones por día (RED-04) |
 | `NAVEGADOR_RECARGA_HORAS` | `6` | Cada cuánto se recarga la página de inicio de una cuenta |
+| `NAVEGADOR_CIERRE_INACTIVO_MIN` | vacío (`0`, nunca) | Cerrar el navegador de una cuenta tras estos minutos sin llamadas; ver «Memoria» arriba |
 | `NAVEGADOR_PROXY` | vacío (`directo`) | Por dónde sale a internet el navegador de cada cuenta: `esquema://servidor:puerto` con `http`, `https` o `socks5`. Sin usuario ni clave en la dirección |
 | `NAVEGADOR_PROXY_CUENTAS` | vacío | Una salida propia por cuenta: `cuenta=esquema://servidor:puerto` o `cuenta=directo`, separadas por comas |
 | `NAVEGADOR_PROXY_USUARIO`, `NAVEGADOR_PROXY_CLAVE` | vacío | Credenciales del proxy, juntas. Solo con `http` o `https` (Chromium no las admite en `socks5`). Se leen del entorno y no se escriben en disco ni en el registro |
+| `NAVEGADOR_CONEXION` | `false` | Conectar desde la app (abajo). En compose sale de `LINKEDIN_CONEXION_APP` |
+| `NAVEGADOR_CONEXION_MIN` | `10` | Cuánto puede durar como mucho una conexión desde la app (de 2 a 30 min) |
+| `NAVEGADOR_PANTALLA_CONEXION`, `NAVEGADOR_PUERTO_PANTALLA` | `:98`, `8791` | La pantalla propia de esa conexión y el puerto de su vista remota (red interna) |
 | `NAVEGADOR_HEADLESS` | `false` | Sin ventana. No se recomienda, y la imagen no trae ese Chromium: en el servidor la ventana va a una pantalla virtual |
 
 Las horas y los días de los topes son ventanas móviles (las últimas 60 min, las últimas 24 h). `0` en un tope
@@ -189,53 +211,217 @@ seguridad detrás de los topes del operador, no el ritmo: si un error del backen
 Lo que más lee es la revisión de referentes (hasta 120 al día); pasarla a cada 6 h
 (`OPERATOR_OBSERVE_EVERY_MINUTES=360`) la deja en la mitad.
 
-## En el servidor
+## Rodaje
 
-**Pendiente de probar en el servidor.** Está montado pero apagado:
+La fase 4 de `docs/plan-linkedin-directo.md`: antes de pasar la cuenta real, una cuenta **de prueba** hace en el
+servidor, durante una o dos semanas, un día de producción tras otro, para saber si LinkedIn tolera la IP del servidor
+y el ritmo. `python -m navegador rodaje <cuenta>` habla solo con el servicio en marcha, igual que el backend (mismo
+cliente, mismas llamadas, mismos topes, paradas, lista permitida y `request_id`), y nada más: sin backend, sin base de
+datos, sin propuestas y sin IA.
 
-- La imagen `ghcr.io/gustavop-dev/barrio-ai-navegador` se construye en cada push a `main`.
-- En `deploy/compose.prod.yaml` el servicio `navegador` está bajo el perfil `navegador`: un `up -d` normal no lo
-  arranca. No publica puertos y Caddy no lo expone; el backend lo alcanza en `http://navegador:8790` por la red
-  interna. Sus datos van en el volumen `navegador-datos`.
-- Dentro del contenedor el navegador dibuja en una pantalla virtual (Xvfb) y corre con ventana, como en un
-  escritorio.
+**Un día entre semana**, entre las 08:00 y las 20:00 de America/Bogota, al ritmo por hora de producción:
 
-Encenderlo, cuando toque (fase 4):
+| Rutina | Veces | Qué lee (como en producción) |
+| --- | --- | --- |
+| Descubrir | 2 | `/me`, el typeahead de ubicación (una vez al día) y 2 búsquedas de personas con ese lugar (`red.discover`) |
+| Referentes | 4 | Los posts de las 15 personas del día (`operador.observe`) |
+| Perfiles | 8 | 5 perfiles con su tarjeta (`red._enrich`) |
+| Borradores | 6 | `/me` y los comentarios de un post (`operador.propose_comment`) |
+| Bandeja | 12 | `/me`, los chats y los mensajes de los no leídos (`conversaciones.read_inbox`) |
+| Posts propios | 6 | `/me`, los posts propios y los comentarios e hilos de los de la semana (`respuestas.read`) |
+| Métricas | 4 | Posts propios, el último y sus comentarios, audiencia y visitas (`metricas.collect`) |
+| Red | 3 | Invitaciones recibidas y enviadas, y aceptar las recibidas (`red.sync`, RED-04) |
+| Analítica | 1 | Una exportación, los últimos 28 días |
+| Canario | 1 | La prueba diaria: 14 lecturas, 16 llamadas |
+
+Y unas pocas escrituras inofensivas, cada una leída antes y después como en producción:
+
+| Escritura | Por defecto al día | A quién |
+| --- | --- | --- |
+| Reacción «me gusta» | 6 | Posts públicos grandes (50 reacciones o más) de personas, nunca de páginas |
+| Seguir | 4 | Autores de esos posts, si no se les sigue ni son contactos |
+| Invitar, sin nota | 2 | Creadores (5000 seguidores o más) fuera de la red (3.er grado o más), sin invitación pendiente |
+| Aceptar | 5 | Invitaciones reales recibidas de personas (la lista ya deja fuera boletines y páginas) |
+| Comentar, responder | 0 | Solo con un número explícito y textos propios (`--textos`), cada uno una sola vez |
+
+Comentar en posts ajenos desde una cuenta de prueba es spam para esas personas: por eso va en 0 y nunca se genera un
+texto. Una respuesta solo va en un hilo de un post **propio** (INT-04). Nunca deja de seguir, retira, borra ni manda
+un mensaje: el cliente no tiene esas llamadas y la lista permitida las rechaza.
+
+En total, unas **290 a 330 lecturas y 12 escrituras** (más hasta 5 aceptaciones, si alguien invitó a la cuenta). El
+fin de semana, la mitad: unas 150 lecturas, 3 reacciones, 2 seguimientos, 1 invitación y hasta 2 aceptaciones (la
+analítica y el canario no bajan). `--escala` multiplica las lecturas (hasta 3, unas 880 al día: el día más cargado de
+producción, por debajo del tope de 1000 del servicio).
+
+**Cómo reparte el día.** Cada rutina se reparte en el horario con un desfase al azar (nunca una rejilla), alrededor
+de una pausa larga de 60 a 120 min cerca del mediodía. Descubrir y referentes van en los primeros 25 min, para tener
+de dónde escoger; la primera escritura, 45 min después de empezar, y entre dos escrituras al menos 20 min (las
+aceptaciones de una misma ronda de red, de 3 a 8 min, como en producción). Un día se planea con una semilla de la
+cuenta y la fecha: si el contenedor se reinicia, ese día sale igual, corre solo lo que queda por delante y lo que ya
+salió cuenta en los topes del día.
+
+**Nunca dos veces.** Ninguna publicación, persona, invitación o texto se toca dos veces, ni entre días ni tras un
+reinicio: `rodaje/hecho.json` guarda un resumen con sal (SHA-256) y la fecha, nunca el id ni el nombre.
+
+**Paradas.** Si el servicio tiene la cuenta detenida o sin sesión, o LinkedIn frena (401/403/429/999, redirección,
+reto), el día termina en el acto y el comando sale con **3**. Si el servicio no abre la cuenta por otra salida a
+internet o su configuración falla (token, cuenta desconocida), sale con **4**: eso lo arregla alguien en el servidor.
+Un tope del servicio agotado, el servicio caído o una llamada sin respuesta cortan solo esa rutina; el día sigue.
+Vuelto a arrancar el mismo día después de una parada, espera al día siguiente, y antes de cada paso lee la parada del
+disco: con la cuenta detenida, no sale ni una llamada.
+
+**El resumen de cada día**, `cuentas/<cuenta>/rodaje/rodaje-AAAA-MM-DD.json` (se reescribe tras cada paso): el plan
+y la pausa larga, corridas y segundos por rutina, llamadas, rechazos y segundos por operación, las respuestas de
+LinkedIn por estado HTTP, los rechazos del servicio por estado y tipo, los topes agotados, por tipo de escritura cuántas
+salieron, se hicieron, se confirmaron releyendo, quedaron inciertas o rechazadas (y cuántas no tenían candidato, ya
+estaban hechas o no encajaban), los errores por tipo, las paradas (hora, tipo, estado, motivo), el resultado del
+canario y el código de salida. Nunca un nombre, un id o un texto.
 
 ```bash
-cd /opt/barrio-ai/deploy   # con NAVEGADOR_TOKEN en .env
-docker compose -f compose.prod.yaml --env-file .env --profile navegador pull navegador
-docker compose -f compose.prod.yaml --env-file .env --profile navegador up -d navegador
+uv run python -m navegador rodaje prueba          # con el servicio en marcha; hasta que se detenga (--dias N)
+uv run python -m navegador rodaje estado          # los últimos 14 días (--dias N) de cada cuenta en una tabla
 ```
 
-### Entrar a mano en LinkedIn desde el servidor
+`estado` muestra por día: lecturas, escrituras hechas (reacciones/seguimientos/invitaciones/aceptaciones/
+comentarios/respuestas), respuestas de LinkedIn que no fueron 200, topes agotados, rechazos del servicio, el canario,
+la última parada y el código (0 bien, 3 parada, 4 no pudo, «en curso»).
 
-La clave y la verificación las escribe la persona en la ventana del navegador; nunca pasan por un programa. El
-servidor no tiene pantalla, así que esa ventana se ve por noVNC, atado al `127.0.0.1` del servidor y alcanzado por
-un túnel SSH, y solo mientras dura el inicio de sesión.
+| Variable | Por defecto | Qué es |
+| --- | --- | --- |
+| `RODAJE_CUENTA` | — | La cuenta de prueba (la de `login`); también como argumento |
+| `RODAJE_HORARIO`, `RODAJE_ZONA` | `08:00-20:00`, `America/Bogota` | Horario de trabajo y su zona |
+| `RODAJE_ESCALA` | `1` | Multiplica las lecturas (de 0 a 3) |
+| `RODAJE_REACCIONES`, `_SEGUIMIENTOS`, `_INVITACIONES`, `_ACEPTACIONES` | `6`, `4`, `2`, `5` | Escrituras al día (de 0 a 30) |
+| `RODAJE_COMENTARIOS`, `RODAJE_RESPUESTAS` | `0`, `0` | Con un número, hace falta `RODAJE_TEXTOS` |
+| `RODAJE_TEXTOS` | vacío | Archivo con textos propios, uno por línea; cada uno sale una sola vez |
+| `RODAJE_LUGAR`, `RODAJE_BUSQUEDAS` | `United States`, `founder,product manager,cto,software engineer` | El lugar del filtro y las búsquedas de personas |
+| `NAVEGADOR_URL`, `NAVEGADOR_TOKEN` | `127.0.0.1:NAVEGADOR_PUERTO`, — | El servicio y su token |
 
-1. Detener el servicio si está corriendo (el perfil de una cuenta lo usa un solo navegador a la vez):
-   `docker compose -f compose.prod.yaml --env-file .env --profile navegador stop navegador`
-2. En el servidor, abrir el navegador de la cuenta con la pantalla visible por noVNC:
+En el servidor corre en el contenedor `rodaje` (perfil `rodaje` de `deploy/compose.prod.yaml`), con la misma imagen
+y el mismo volumen que `navegador`; ver [En el servidor](#en-el-servidor). Qué señal es buena, cuál es alarma y el
+criterio para pasar la cuenta real:
+[plan, «Fase 4»](../../docs/plan-linkedin-directo.md#fase-4-rodaje-de-la-cuenta-de-prueba).
+
+## Conectar desde la app
+
+Para entrar a mano en LinkedIn desde el teléfono, sin túnel SSH: Ajustes › Máquina, en la tarjeta de una cuenta
+`directo`, «Conectar LinkedIn» (o «Volver a conectar»). Lo mismo que el `login` por SSH de abajo, pero dentro del
+servicio en marcha (`navegador/conexion.py`), porque la app no puede parar ni arrancar contenedores. Apagado: se
+enciende con `LINKEDIN_CONEXION_APP=true` en `deploy/.env` y `up -d` de `web` y del servicio (backend, servicio y la ruta
+`/conectar/` de Caddy leen la misma variable). La cuenta tiene que existir antes en Barrio (la app no la crea):
+
+```bash
+dc exec api python manage.py operador --usuario gustavo cuenta --proveedor directo --account-id <cuenta> --etiqueta "LinkedIn …"
+```
+
+**Cómo va.** La app pide la conexión al backend; el backend, al servicio. El servicio cierra la página de esa cuenta
+(las llamadas reciben 503 `conexion`: nada sale, el backend reintenta después y no pausa) y abre su navegador, por la
+salida a internet de su sesión, en una pantalla virtual propia (`:98`, del mismo tamaño que la del servicio), con la
+página de entrada de LinkedIn. La app abre en el navegador del teléfono un enlace de un solo uso; la persona ve esa
+pantalla (noVNC) y escribe allí la clave y el código. Cuando la pestaña llega al inicio con la cookie de sesión, el
+servicio cierra ese navegador (Chromium guarda las cookies al cerrar), comprueba la sesión en el perfil y lo apaga todo;
+la cuenta vuelve a abrirse en la pantalla del servicio en su próxima llamada. Si no, se acaba a los 10 minutos.
+
+**Quién llega a qué y cuánto tiempo:**
+
+| Qué | Dónde vive | Quién lo ve |
+| --- | --- | --- |
+| La vista remota (x11vnc + un puente noVNC del servicio) | Solo mientras dura la conexión: x11vnc en el loopback del contenedor, sin clave VNC; el puente en 8791 de la red interna, sin puerto publicado | Caddy, en `/conectar/`, y solo para peticiones que el backend deja pasar |
+| La pantalla de la conexión | `:98`, aparte de la `:99` del servicio | Nadie ve las ventanas de las otras cuentas, que están en la `:99` |
+| El boleto del enlace | En la base, solo su SHA-256; vale 2 min y una vez | La app (en la respuesta de su sesión) y el navegador que lo abre |
+| La cookie de la vista (`barrio_pantalla`) | En la base, solo su SHA-256; HttpOnly, Secure, SameSite=Strict, `Path=/conectar/`, hasta el final de la conexión; un enlace nuevo la reemplaza | El navegador del teléfono |
+| La clave de la vista | En ninguna parte: HMAC-SHA256 del token del servicio y del id de la conexión, calculada por el backend y por el servicio | Caddy la añade a cada petición que pasa al servicio (`forward_auth`); la que mande el navegador se borra antes |
+| La clave y el código de LinkedIn | Los teclea la persona en la página de LinkedIn; pasan como pulsaciones por el puente | Nadie los guarda; nunca van a un log |
+
+La app usa el navegador del sistema (expo-web-browser), no un WebView: sería un módulo nativo nuevo. En el teléfono la
+pantalla se ve escalada (1366 × 900): se puede ampliar con los dedos; con una tableta o un computador es más cómodo.
+
+Al terminar `conectada`, el servicio quita una parada de la cuenta solo si fue por la sesión (página de login o de
+verificación, cookie perdida), y el backend quita la pausa que puso por eso (servicio detenido o sin sesión) si el
+servicio ya no la tiene detenida. Una parada por un 429, un 999 o un reto se queda: una sesión que sigue viva llega al
+inicio sin que nadie haya mirado nada. Nada más corre solo. Se pueden iniciar 4 conexiones por cuenta y hora, una a la
+vez en el servicio; queda auditado quién la inició, la abrió, la canceló y cómo terminó.
+
+Comprobado **[local]** (Docker, red privada, Caddy 2 con este mismo bloque, el backend sustituido por un doble que
+contesta como `allow`, y la página de entrada cambiada por una local: nada fue a LinkedIn): la conexión abre `:98`,
+x11vnc con `-localhost -nopw -nevershared -dontdisconnect` y el puente; sin cookie, con una cookie mala o con la clave
+puesta a mano en la cabecera, Caddy contesta 401; con la cookie, noVNC carga y se conecta por WebSocket a través de
+Caddy («Connected to navegador:98») y muestra la ventana con la página local; las llamadas de la cuenta reciben 503
+`conexion`; al cancelar, x11vnc y `:98` terminan, Caddy contesta 502 y la clave no aparece en `docker logs`; dos
+conexiones seguidas abren y cierran limpias. **[pendiente]** en el servidor: con HTTPS y el backend real, entrar de verdad
+en LinkedIn desde el teléfono y que la sesión quede (`conectada`), y cómo se ve en una pantalla de teléfono.
+
+## En el servidor
+
+Montado y apagado hasta que se nombra su perfil:
+
+- La imagen `ghcr.io/gustavop-dev/barrio-ai-navegador` se construye en cada push a `main`.
+- En `deploy/compose.prod.yaml` el servicio `navegador` está bajo el perfil `navegador` y el rodaje bajo `rodaje`: un
+  `up -d` normal no arranca ninguno. No publican puertos y Caddy no los expone; el backend alcanza el servicio en
+  `http://navegador:8790` por la red interna. Los dos usan el volumen `navegador-datos`.
+- Dentro del contenedor el navegador dibuja en una pantalla virtual (Xvfb) y corre con ventana, como en un
+  escritorio. Un reinicio del contenedor (`restart`, `stop` + `up -d`, el servidor que se reinicia) la vuelve a
+  levantar; si no arranca, el contenedor termina con error y Docker lo intenta otra vez.
+
+Qué está comprobado y dónde: **[servidor]** probado en el servidor el 13/11/2026; **[local]** probado en Docker en la
+laptop contra una página local, sin LinkedIn; **[pendiente]** solo se puede probar en el servidor y falta.
+
+### Paso a paso
+
+Todo en el servidor, salvo el túnel. Las órdenes repiten
+`docker compose -f compose.prod.yaml --env-file .env --profile navegador`; abajo va como `dc`:
+
+```bash
+alias dc='docker compose -f compose.prod.yaml --env-file .env --profile navegador --profile rodaje'
+```
+
+1. **Preparar** [servidor]. `cd /opt/barrio-ai/deploy`. En `.env`: `NAVEGADOR_TOKEN` (`openssl rand -hex 32`, el
+   mismo que usa el backend) y, para el rodaje, `RODAJE_CUENTA=<cuenta>`. Si cambió `deploy/`, el `rsync` de
+   `deploy/README.md`. Luego `dc pull navegador`.
+2. **Detener el servicio** si está corriendo [servidor]: `dc stop navegador`. Un perfil lo usa un solo navegador a
+   la vez. Si no se detiene, `login` lo nota aunque corra en otro contenedor (el servicio tiene tomado
+   `perfil-en-uso.lock` mientras su navegador está abierto), espera 30 s hasta 5 veces y se rinde sin abrir nada
+   [local].
+3. **Abrir el navegador de la cuenta con su pantalla** [servidor] [local]:
    ```bash
-   docker compose -f compose.prod.yaml --env-file .env --profile navegador run --rm \
-     -e NAVEGADOR_VNC=1 -p 127.0.0.1:6080:6080 navegador python -m navegador login <cuenta>
+   dc run -d --name barrio-login -e NAVEGADOR_VNC=1 -p 127.0.0.1:6080:6080 navegador python -m navegador login <cuenta>
+   docker logs barrio-login     # la dirección y la clave de un solo uso de la pantalla
    ```
-   Imprime una clave de un solo uso para la pantalla.
-3. En la laptop, el túnel: `ssh -N -L 6080:127.0.0.1:6080 barrio-ai` y abrir
+   noVNC queda atado al `127.0.0.1` del servidor (`docker port barrio-login` dice `127.0.0.1:6080`), nunca a una
+   dirección pública [local]. `docker ps` muestra ese contenedor como `unhealthy`: es normal, ahí no escucha el
+   servicio (la prueba de salud es la de `servir`). La clave queda en el registro de ese contenedor hasta borrarlo
+   (paso 6) y no sirve sin el túnel.
+4. **El túnel, en la laptop** [servidor]: `ssh -N -L 6080:127.0.0.1:6080 barrio-ai`, y en el navegador de la laptop
    `http://127.0.0.1:6080/vnc.html` con esa clave.
-4. Entrar en LinkedIn en esa ventana. Al ver el inicio, cerrar la pestaña (Ctrl+W). El comando dice si la sesión
-   quedó guardada y el contenedor desaparece con la pantalla.
-5. Volver a encender el servicio (`up -d navegador`) y, si la cuenta estaba detenida y ya se sabe por qué,
-   `docker compose ... run --rm navegador python -m navegador reanudar <cuenta>`.
+5. **Entrar en LinkedIn** en esa ventana [servidor]. La clave y la verificación las escribe la persona en la página
+   de LinkedIn; no pasan por ningún programa de Barrio. Al ver el inicio, cerrar la pestaña con Ctrl+W.
+6. **Comprobar y limpiar** [servidor] [local]: `docker logs barrio-login` termina con «Sesión guardada.» y
+   `docker wait barrio-login` dice `0` («No quedó sesión», `1`: repetir desde el paso 3). Luego
+   `docker rm barrio-login` y cerrar el túnel (Ctrl+C).
+7. **Encender el servicio** [servidor] [local]: `dc up -d navegador`. Abre el perfil que dejó `login` (mismo volumen,
+   mismo usuario, mismo nombre de máquina `navegador`). Si la cuenta estaba detenida y ya se sabe por qué:
+   `dc exec navegador python -m navegador reanudar <cuenta>`.
+8. **Verificar** [servidor] [local]: `dc exec navegador python -m navegador estado` dice `pantalla :99: lista` y
+   `<cuenta>: sesión guardada sí; … activa; salida directo`. Con `exec` (no `run`) se ve la pantalla del propio
+   servicio. Opcional, la prueba diaria a mano: `dc exec navegador python -m navegador canario <cuenta>` (16 lecturas;
+   sale con 0 si todo bien). Desde la IP del servidor pasó 14 de 14 [servidor].
+9. **Arrancar el rodaje** [local; contra LinkedIn, pendiente]: `dc up -d rodaje` (con `navegador` ya arriba).
+   `dc logs -f rodaje` muestra cada paso; `dc run --rm rodaje estado`, la tabla de los últimos días. Pararlo:
+   `dc stop rodaje`. Si se detuvo (código 3 o 4 en la tabla), revisar con el paso 8 antes de nada; el contenedor
+   vuelve a arrancar solo y espera al día siguiente.
 
-`estado` y `canario` se corren igual: `docker compose ... exec navegador python -m navegador estado`.
+Para volver a entrar (sesión caducada, `423`), los pasos 2 a 8. El rodaje no hace falta pararlo: con la cuenta sin
+sesión o detenida, termina el día sin llamar a nada.
 
 ## Pruebas
 
 `tests/` corre el servicio entero sobre un navegador falso (sin Chromium y sin LinkedIn): token, códigos de
 respuesta, una llamada a la vez, la pausa mínima, los topes, la lista permitida, los `request_id`, la parada y su
-reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos. Corren en CI (job
+reanudación, la falta de sesión, la salida a internet y su guarda, las cabeceras y que el registro no guarde secretos;
+que un perfil abierto se note desde otro proceso, la pantalla y el cierre por inactividad; la conexión desde la app
+con procesos falsos (una a la vez, la vista solo con su clave y solo mientras dura, sus cuatro finales, qué parada
+quita y que la clave no va al registro);
+y el rodaje con un reloj falso (el plan del día, los topes, nada dos veces, las paradas y el resumen sin datos). Corren en CI (job
 `navegador` de `.github/workflows/barrio-ai.yml`):
 
 ```bash

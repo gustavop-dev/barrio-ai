@@ -2,6 +2,7 @@ import type { PieceDetailFull } from './calendario';
 import { api, LOGIN_PATH, SESSION_PATH, TOKEN_PATH } from './client';
 import type {
   Account,
+  AccountLoginAnswer,
   Action,
   Activity,
   Actividad,
@@ -84,6 +85,11 @@ export const getFeed = (limit = 50) => api.get<FeedEvent[]>(`${OP}/feed?limit=${
 export const getAccounts = () => api.get<Paginated<Account> | Account[]>(`${OP}/accounts`);
 export const setAccountPaused = (accountId: string, paused: boolean, reason = '') =>
   api.post<Account>(`${OP}/accounts/${id(accountId)}/pause`, { paused, reason });
+/** Conectar LinkedIn desde la app (team_backend/conexion.py): a `directo` account only. */
+export const startLinkedInLogin = (accountId: string) => api.post<AccountLoginAnswer>(`${OP}/accounts/${id(accountId)}/conexion`);
+export const getLinkedInLogin = (loginId: string) => api.get<AccountLoginAnswer>(`${OP}/conexiones/${id(loginId)}`);
+export const reopenLinkedInLogin = (loginId: string) => api.post<AccountLoginAnswer>(`${OP}/conexiones/${id(loginId)}/enlace`);
+export const cancelLinkedInLogin = (loginId: string) => api.post<AccountLoginAnswer>(`${OP}/conexiones/${id(loginId)}/cancelar`);
 
 // ---------------------------------------------------------------- actions
 /**

@@ -7,6 +7,8 @@
   estado [<cuenta>]            perfil, sesión, parada, salida y consumo de cada cuenta
   salida <cuenta> [--aceptar]  la salida a internet de la cuenta; --aceptar la cambia a la configurada
   canario <cuenta>             la revisión diaria, solo lectura, a través del servicio en marcha
+  rodaje <cuenta>              la prueba de resistencia de la fase 4: un día de producción, día tras día
+  rodaje estado [<cuenta>]     los últimos días de rodaje en una tabla
 
 Los datos van en NAVEGADOR_DATOS (por defecto ./datos): un perfil de navegador por cuenta y su estado."""
 import argparse
@@ -16,7 +18,7 @@ import shutil
 import sys
 import time
 
-from . import ajustes, pagina
+from . import ajustes, pagina, rodaje
 from .almacen import IMPORTED, Store
 from .cuenta import WORDS
 
@@ -33,9 +35,13 @@ def account_name(name):
 
 
 def wait_free(profile):
+    """Take the hold on the profile (pagina.hold: the service in another container sees it too), waiting while a
+    browser has it. Returns the hold, to let go once the browser is closed."""
     for attempt in range(LOCK_TRIES + 1):
-        if not pagina.profile_busy(profile):
-            return
+        try:
+            return pagina.hold(profile)
+        except pagina.Busy:
+            pass
         if attempt == LOCK_TRIES:
             sys.exit('El perfil sigue abierto en otro navegador (¿el servicio?): no se hizo nada. Detén el servicio y '
                      'vuelve a intentarlo.')
@@ -62,25 +68,28 @@ async def login(settings, name):
     store = Store(settings.account_dir(name))
     store.profile.mkdir(parents=True, exist_ok=True, mode=0o700)
     egress, last = same_egress(settings, store, name)
-    wait_free(store.profile)
-    ctx = await pagina.launch(store.profile, headless=False, proxy=egress.option())
-    if last is None:
-        store.set_egress(egress.label)
+    holding = wait_free(store.profile)
     try:
-        tab = ctx.pages[0] if ctx.pages else await ctx.new_page()
-        await tab.goto(pagina.LOGIN)
-        print('Entra en LinkedIn en la ventana (la clave y la verificación las escribes tú; no pasan por este '
-              'programa). Cuando veas tu inicio, cierra la ventana.', flush=True)
-        while ctx.pages:
-            await asyncio.sleep(0.5)
-    finally:
+        ctx = await pagina.launch(store.profile, headless=False, proxy=egress.option())
+        if last is None:
+            store.set_egress(egress.label)
         try:
-            await ctx.close()
-        except Exception:  # already closed with the window
-            pass
-        await pagina.stop_driver()
-    # Read from the profile on disk: closing the last window ends the browser, and Chromium writes its cookies then.
-    has = pagina.stored_session(store.profile)
+            tab = ctx.pages[0] if ctx.pages else await ctx.new_page()
+            await tab.goto(pagina.LOGIN)
+            print('Entra en LinkedIn en la ventana (la clave y la verificación las escribes tú; no pasan por este '
+                  'programa). Cuando veas tu inicio, cierra la ventana.', flush=True)
+            while ctx.pages:
+                await asyncio.sleep(0.5)
+        finally:
+            try:
+                await ctx.close()
+            except Exception:  # already closed with the window
+                pass
+            await pagina.stop_driver()
+        # Read from the profile on disk: closing the last window ends the browser, and Chromium writes its cookies then.
+        has = pagina.stored_session(store.profile)
+    finally:
+        pagina.let_go(holding)
     print('Sesión guardada.' if has else 'No quedó sesión: vuelve a intentarlo.')
     if store.stopped():
         print('La cuenta sigue detenida. Cuando sepas por qué se detuvo: python -m navegador reanudar ' + name)
@@ -138,6 +147,10 @@ def internet_exit(settings, name, accept=False):
 
 
 def status(settings, name=None):
+    ready = None if settings.headless else pagina.display_ready()
+    if ready is not None:  # run it with `docker compose exec` to see the service's own screen
+        print(f'pantalla {pagina.display()}: ' + ('lista' if ready else
+                                                  'NO RESPONDE: el navegador no puede abrir; reinicia el contenedor'))
     folder = settings.data / 'cuentas'
     names = [name] if name else sorted(p.name for p in folder.iterdir() if p.is_dir()) if folder.is_dir() else []
     if not names:
@@ -178,9 +191,16 @@ def main(argv=None):
     canary = orders.add_parser('canario', help='revisión diaria de solo lectura')
     canary.add_argument('cuenta')
     canary.add_argument('--url', help='dirección del servicio (por defecto NAVEGADOR_URL o 127.0.0.1:NAVEGADOR_PUERTO)')
+    rodaje.options(orders.add_parser('rodaje', help='prueba de resistencia de la fase 4 (README «Rodaje»)'))
     args = parser.parse_args(argv)
+    soak_status = args.orden == 'rodaje' and args.cuenta == 'estado'
     try:
-        settings = ajustes.load(need_token=args.orden in ('servir', 'canario'))
+        settings = ajustes.load(need_token=args.orden in ('servir', 'canario', 'rodaje') and not soak_status)
+        if args.orden == 'rodaje':
+            named = args.otra if soak_status else args.cuenta
+            if named:  # none: RODAJE_CUENTA was empty too, and rodaje.main says so
+                account_name(named)
+            return rodaje.main(args, settings)
     except ajustes.ConfigError as exc:
         sys.exit(str(exc))
     name = account_name(args.cuenta) if getattr(args, 'cuenta', None) else None

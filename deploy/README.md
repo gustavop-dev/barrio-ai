@@ -98,6 +98,7 @@ Detalle completo en [publicación diaria](../agentes-linkedin/infra/docs/publica
 | Copias de seguridad | `crontab -e` → `0 4 * * * /ruta/barrio-ai/deploy/backup.sh` (conserva 14 días). Guarda la base (`knowledge-*.dump`) y los audios y fotos del volumen `media` (`media-*.tar.gz`). Copia periódicamente `deploy/backups/` fuera del servidor. Restaurar los archivos: [capturas-galeria.md](../agentes-linkedin/infra/docs/capturas-galeria.md#servidor). |
 | Actualizar | Tras el merge a `main` y el workflow en verde: `rsync` de `deploy/` si cambió, y `docker compose -f compose.prod.yaml --env-file .env pull && docker compose -f compose.prod.yaml --env-file .env up -d`. Las migraciones se aplican solas. |
 | Volver atrás | `BARRIO_TAG=<sha de un commit anterior>` en `.env`, luego `pull` y `up -d`. Las migraciones no se deshacen solas. |
+| LinkedIn directo | El servicio `navegador` y el rodaje de la fase 4 van bajo los perfiles `navegador` y `rodaje`: un `pull` o `up -d` normal no los toca. Para actualizarlos, añadir `--profile navegador --profile rodaje` a los dos. Encenderlos, entrar a mano en LinkedIn y el rodaje: [En el servidor](../agentes-linkedin/navegador/README.md#en-el-servidor). Entrar desde la app (Ajustes › Máquina) está apagado: `LINKEDIN_CONEXION_APP=true` en `.env` y `up -d web` más `--profile navegador up -d navegador` ([Conectar desde la app](../agentes-linkedin/navegador/README.md#conectar-desde-la-app)). |
 | Logs | `docker compose -f compose.prod.yaml logs -f autopilot worker worker-acciones`. |
 | Admin | `https://barrio.tudominio.com/admin/`. |
 
@@ -107,4 +108,5 @@ Detalle completo en [publicación diaria](../agentes-linkedin/infra/docs/publica
 - Las claves nunca llegan a la PWA.
 - Las decisiones humanas (parada, veto, resolución, confirmar memoria, suscribir push) exigen sesión humana: la de la PWA con CSRF o el token de dispositivo de la app móvil ([app-movil-backend.md](../agentes-linkedin/infra/docs/app-movil-backend.md)). Un token de servicio nunca decide.
 - El login limita intentos por IP y usuario, y el de la app móvil comparte ese contador.
+- La vista remota del navegador de LinkedIn (`/conectar/`) solo existe con `LINKEDIN_CONEXION_APP=true` y mientras dura una conexión iniciada desde la app; Caddy pregunta al backend en cada petición y solo deja pasar al navegador que canjeó el enlace de un solo uso. El servicio `navegador` no publica ningún puerto.
 - HSTS se envía solo para el dominio exacto. `DJANGO_HSTS_SUBDOMAINS=true` lo extiende a los subdominios, solo si todos usan HTTPS.

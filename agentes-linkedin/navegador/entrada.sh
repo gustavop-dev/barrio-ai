@@ -5,10 +5,24 @@
 set -eu
 
 if [ -z "${DISPLAY:-}" ]; then
-  export DISPLAY=:99
-  Xvfb :99 -screen 0 1366x900x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
-  for _ in 1 2 3 4 5 6 7 8 9 10; do
-    [ -e /tmp/.X11-unix/X99 ] && break
+  pantalla="${NAVEGADOR_PANTALLA:-:99}"
+  n="${pantalla#:}"
+  export DISPLAY="$pantalla"
+  # A restarted container keeps its /tmp: the previous run's lock would make Xvfb refuse to start, and its socket file
+  # alone looks like a live screen. Nothing else runs yet in this container, so both are stale.
+  rm -f "/tmp/.X$n-lock" "/tmp/.X11-unix/X$n"
+  Xvfb "$pantalla" -screen 0 1366x900x24 -nolisten tcp >/tmp/xvfb.log 2>&1 &
+  xvfb=$!
+  # Ready when it accepts a connection (navegador.pagina.display_ready), not when a file appears. If it does not, the
+  # container ends with an error so Docker starts it again, instead of serving without a screen.
+  intentos=0
+  until python -c 'from navegador.pagina import display_ready; raise SystemExit(0 if display_ready() else 1)'; do
+    intentos=$((intentos + 1))
+    if ! kill -0 "$xvfb" 2>/dev/null || [ "$intentos" -ge 20 ]; then
+      echo "La pantalla virtual ($pantalla) no arrancó; el contenedor termina para que Docker lo vuelva a arrancar." >&2
+      tail -n 5 /tmp/xvfb.log >&2 || true
+      exit 1
+    fi
     sleep 0.5
   done
 fi

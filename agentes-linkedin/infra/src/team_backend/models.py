@@ -148,9 +148,33 @@ class ConnectorAccount(models.Model):
     paused_reason=models.TextField(blank=True)
     last_checked_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
+    # The provider and external id before the last switch (proveedor.py: Unipile <-> directo on the same row), which
+    # `cambiar-proveedor --volver` puts back: {provider, external_account_id, until, by}. Empty if never switched.
+    previous_provider=models.JSONField(default=dict,blank=True)
     class Meta:
         constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
     def __str__(self):return f'{self.label} ({self.provider})'
+    @property
+    def switched_at(self):
+        """When the account last changed provider, or None. Ids an audit event kept before then are the other provider's."""
+        from django.utils.dateparse import parse_datetime
+        return parse_datetime((self.previous_provider or {}).get('until') or '')
+
+class ProviderIdOriginal(models.Model):
+    """A stored LinkedIn id as it was before a provider switch rewrote it (proveedor.py), so switching back puts the
+    exact value back even where the translation is not one to one. `provider` is the one the original belongs to;
+    `field` names the column or the JSON path. Kept until `cambiar-proveedor --olvidar-originales`."""
+    id=models.BigAutoField(primary_key=True)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='provider_id_originals')
+    provider=models.CharField(max_length=20)
+    model=models.CharField(max_length=40)
+    object_id=models.CharField(max_length=64)
+    field=models.CharField(max_length=60)
+    original=models.TextField()
+    translated=models.TextField()
+    created_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        constraints=[models.UniqueConstraint(fields=['account','provider','model','object_id','field'],name='unique_provider_id_original')]
 
 class Referent(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
@@ -577,6 +601,34 @@ class CanaryRun(models.Model):
     class Meta:
         ordering=['-started_at']
         indexes=[models.Index(fields=['account','started_at'],name='canary_run_last')]
+
+class BrowserLogin(models.Model):
+    """A login from the app into the navegador browser of a `directo` account (team_backend/conexion.py). The single-use
+    ticket and the remote view's cookie are kept only as SHA-256 hashes; the view's key is never stored (an HMAC of the
+    service token and `session`, which alone opens nothing)."""
+    class State(models.TextChoices):
+        STARTING='abriendo','Abriendo'
+        WAITING='esperando','Esperando'
+        CONNECTED='conectada','Conectada'
+        EXPIRED='vencida','Vencida'
+        CANCELLED='cancelada','Cancelada'
+        FAILED='fallida','Fallida'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='browser_logins')
+    user=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True)
+    session=models.CharField(max_length=64)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.STARTING)
+    reason=models.TextField(blank=True)
+    still_stopped=models.BooleanField(default=False)  # the service kept a stop that a login does not mend
+    started_at=models.DateTimeField(default=timezone.now)
+    expires_at=models.DateTimeField()
+    finished_at=models.DateTimeField(null=True,blank=True)
+    ticket_hash=models.CharField(max_length=64,blank=True,db_index=True)
+    ticket_expires_at=models.DateTimeField(null=True,blank=True)
+    cookie_hash=models.CharField(max_length=64,blank=True,db_index=True)
+    class Meta:
+        ordering=['-started_at']
+        indexes=[models.Index(fields=['account','started_at'],name='browser_login_last')]
 
 class ActionProposal(models.Model):
     referent_experiment=models.ForeignKey('ReferentExperiment',on_delete=models.PROTECT,null=True,blank=True)
@@ -1044,6 +1096,9 @@ class Conversation(models.Model):
     assessment=models.JSONField(default=dict,blank=True)
     # Inbound message id at which Gustavo closed the card («Hecho, respondí» / «No responder»); a newer one reopens it.
     closed_message_id=models.CharField(max_length=200,blank=True)
+    # Set by a provider switch (proveedor.py): {from, at}. The next read of the thread brings the same messages with the
+    # other provider's ids; conversaciones.carry moves what the old ids had (judged, closed, seen) onto the new ones.
+    carry=models.JSONField(default=dict,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
     class Meta:

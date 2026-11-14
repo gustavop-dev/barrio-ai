@@ -43,6 +43,22 @@ servicio paró la cuenta o no tiene sesión: la cuenta queda en pausa y `paused_
 (el servicio no estaba, estaba ocupado o sin cupo; `error` lo dice). `GET /api/v1/operador/accounts` trae el mismo
 campo.
 
+Una cuenta `directo` trae además `connect: { enabled: bool, last: login | null }` (null en las demás): si el servidor
+permite entrar en LinkedIn desde la app (`LINKEDIN_CONEXION_APP`) y la última conexión. Cada conexión
+(`login`) es `{ id, state: "abriendo|esperando|conectada|vencida|cancelada|fallida", reason, still_stopped, started_at,
+expires_at, finished_at }` ([AJU-13](../docs/funcionalidades/ajustes.md#aju-13)):
+- `POST /api/v1/operador/accounts/<id>/conexion` (sesión humana): abre el navegador del servidor en la página de entrada
+  de LinkedIn. 201 `{ login, url }`, con `url` un enlace de un solo uso (2 min) a la vista remota; si ya hay una
+  esperando del mismo usuario, la misma con un enlace nuevo. 404 apagado, 400 otro proveedor, 429 más de 4 por cuenta
+  y hora, 503 `{ detail }` si el servicio no puede (caído, ocupado con otra conexión).
+- `GET /api/v1/operador/conexiones/<id>`: `{ login, url: null }`, preguntando al servicio mientras dura; al terminar
+  `conectada`, levanta la pausa de la cuenta si la puso el servicio (detenida o sin sesión) y ya no la tiene detenida.
+- `POST /api/v1/operador/conexiones/<id>/enlace`: otro enlace para la misma conexión, solo para quien la inició (400
+  si ya terminó). `POST …/<id>/cancelar`: la cancela.
+- `GET /api/v1/linkedin/pantalla/entrar?ticket=` (sin sesión: lo abre el navegador del sistema) canjea el enlace por la
+  cookie de la vista y redirige a `/conectar/`; 410 si ya se usó o venció. `GET /api/v1/linkedin/pantalla/permitir` es
+  solo para Caddy (`forward_auth`).
+
 POST `/api/v1/operador/control` con `{ paused: bool, reason: string }`. Es la parada total de la máquina y requiere sesión humana. Responde con el objeto `control`. Si `OPERATOR_PAUSED=true` está en el entorno, la parada no se puede levantar desde la app: responde 409 con su explicación.
 
 `llm_spent_usd` y `editorial_llm_spent_usd` son lo gastado hoy en comentarios y en la publicación diaria. Ninguna de las dos tiene tope propio: desde el 10/11/2026 hay un solo presupuesto de IA para todo el equipo (`knowledge/presupuesto.py`), y `llm_daily_cap_usd` y `editorial_llm_daily_cap_usd` traen su tope de seguridad diario (`AI_DAILY_FUSE_USD`, 15 USD por defecto). La PWA solo muestra `editorial_llm_*` si llega; el overview no trae la próxima pieza, que se lee del calendario editorial.
@@ -728,6 +744,9 @@ Reglas de prioridad:
 - `capture_processed` enlaza a `/?enviado=1`, que abre «Lo que enviaste».
 - `linkedin_canary` (capa `sistema`, push activada por defecto) avisa de la prueba diaria de una cuenta `directo`: una
   vez cuando encuentra lecturas rotas o no pudo correr en todo el día, y otra cuando vuelve a pasar. Sin enlace.
+- `navegador_salida` (capa `sistema`, push activada por defecto) avisa de que el servicio navegador no abre una cuenta
+  `directo` porque su salida a internet cambió, con qué hacer en el servidor. Una vez por episodio; no pausa la cuenta.
+  Sin enlace.
 - `lead_silent` (capa `sistema`, push activada por defecto) avisa de que el agente líder lleva 7 días sin aprobar nada en una capacidad. Llega una vez por capacidad y semana, y enlaza a `/calendario?vista=lista&tipo=<tipo>&no_salio=1`.
 
 **`POST /api/v1/notificaciones/leer`** recibe `{ "ids": [...] }` o `{ "todas": true }` y devuelve `{ "unread": n }`.
@@ -737,7 +756,7 @@ Reglas de prioridad:
 | Va a | Tipos con push |
 | --- | --- |
 | Tu turno | Todos |
-| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent`, `linkedin_canary` y `weekly_summary` |
+| Notificaciones | `piece_scheduled`, `piece_published`, `piece_blocked`, `machine_paused_env`, `lead_silent`, `linkedin_canary`, `navegador_salida` y `weekly_summary` |
 
 Quién emite cada tipo sin tarjeta propia: `machine_paused` al detener la máquina desde la app; `linkedin_expired` cuando el autopiloto ve el token caducado (en lugar de `account_paused`); `machine_paused_env` una vez por parada, cuando el autopiloto ve `OPERATOR_PAUSED` (un AuditEvent `operator.env_paused` marca que ya salió; nunca se guarda en el feed: «Próximo» la muestra mientras dura). Los urgentes (`uncertain`, `linkedin_expired`, `machine_paused` y `machine_paused_env`) van con prioridad alta.
 

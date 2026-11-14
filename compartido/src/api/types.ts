@@ -85,6 +85,46 @@ export interface Account {
   paused_reason: string;
   last_checked_at: string | null;
   capacity?: Record<string, CapacityInfo>;
+  /** The last daily LinkedIn canary of a `directo` account; null for other providers or before its first run. */
+  canary?: AccountCanary | null;
+  /** Conectar LinkedIn desde la app (team_backend/conexion.latest); null for other providers. */
+  connect?: AccountConnect | null;
+}
+
+/** A login into a `directo` account's browser on the server (team_backend/conexion.output). */
+export interface AccountLogin {
+  id: string;
+  state: 'abriendo' | 'esperando' | 'conectada' | 'vencida' | 'cancelada' | 'fallida' | (string & {});
+  reason: string;
+  /** The service kept a stop that a login does not mend (429, a challenge): someone has to look on the server. */
+  still_stopped: boolean;
+  started_at: string;
+  expires_at: string;
+  finished_at: string | null;
+}
+
+export interface AccountConnect {
+  /** LINKEDIN_CONEXION_APP on the server. */
+  enabled: boolean;
+  last: AccountLogin | null;
+}
+
+/** Start, poll, open again or cancel: the login, and a single-use link to its remote view while it waits. */
+export interface AccountLoginAnswer {
+  login: AccountLogin;
+  url: string | null;
+}
+
+/** team_backend/canario.latest: states and read names only, never a LinkedIn value. */
+export interface AccountCanary {
+  state: 'ok' | 'roto' | 'alto' | 'no_corrio' | (string & {});
+  started_at: string;
+  finished_at: string | null;
+  calls: number;
+  /** The reads that did not pass (operation names such as `list_chats`). */
+  failing: string[];
+  error_kind: string;
+  error: string;
 }
 
 export interface Overview {

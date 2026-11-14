@@ -33,6 +33,8 @@ ACCOUNT = re.compile(r'[a-z0-9][a-z0-9_\-]{0,62}')  # the backend's ConnectorAcc
 # Where a browser goes out to the internet: straight (DIRECT) or through a proxy given as scheme://host:port, never with
 # a user or password in it (those come apart, from NAVEGADOR_PROXY_USUARIO and _CLAVE, and are never logged or stored).
 DIRECT = 'directo'
+# A login from the app (conexion.py): how long the remote view may stay open, within these bounds.
+CONNECT_MINUTES, CONNECT_FLOOR, CONNECT_CEILING = 10.0, 2.0, 30.0
 PROXY = re.compile(r'(http|https|socks5)://([A-Za-z0-9.\-]{1,253}|\[[0-9A-Fa-f:.]{2,45}\]):(\d{1,5})')
 
 
@@ -70,6 +72,7 @@ class Settings:
     budgets: dict = field(default_factory=lambda: dict(BUDGETS))
     deadline: float = DEADLINE
     reload_hours: float = 6.0  # the feed is loaded again after this long: fresh query ids, a page that looks used
+    idle_minutes: float = 0.0  # close an account's browser after this long without calls (0 = never): ~1 GiB each
     headless: bool = False
     host: str = '127.0.0.1'
     port: int = 8790
@@ -77,6 +80,12 @@ class Settings:
     proxies: dict = field(default_factory=dict)  # account -> its own proxy server, or '' to go straight out
     proxy_user: str = field(default='', repr=False)
     proxy_password: str = field(default='', repr=False)
+    # Logging in from the app (conexion.py, README «Conectar desde la app»): off unless NAVEGADOR_CONEXION=true.
+    connect: bool = False
+    connect_minutes: float = CONNECT_MINUTES
+    connect_screen: str = ':98'  # the login's own virtual screen, never the service's (:99)
+    view_port: int = 8791  # noVNC and its WebSocket, only while a login lasts
+    novnc: Path = Path('/usr/share/novnc')
 
     def account_dir(self, account):
         return self.data / 'cuentas' / account
@@ -146,6 +155,7 @@ def load(env=None, need_token=True):
         pause=pause(number(env, 'NAVEGADOR_PAUSA_MIN', 3.0, float), number(env, 'NAVEGADOR_PAUSA_MAX', 7.0, float)),
         budgets=budgets,
         reload_hours=number(env, 'NAVEGADOR_RECARGA_HORAS', 6.0, float),
+        idle_minutes=number(env, 'NAVEGADOR_CIERRE_INACTIVO_MIN', 0.0, float),
         headless=(env.get('NAVEGADOR_HEADLESS') or 'false').lower() == 'true',
         host=env.get('NAVEGADOR_HOST') or '127.0.0.1',
         port=number(env, 'NAVEGADOR_PUERTO', 8790),
@@ -153,4 +163,10 @@ def load(env=None, need_token=True):
         proxies=own,
         proxy_user=user,
         proxy_password=password,
+        connect=(env.get('NAVEGADOR_CONEXION') or 'false').strip().lower() == 'true',
+        connect_minutes=min(max(number(env, 'NAVEGADOR_CONEXION_MIN', CONNECT_MINUTES, float), CONNECT_FLOOR),
+                            CONNECT_CEILING),
+        connect_screen=(env.get('NAVEGADOR_PANTALLA_CONEXION') or ':98').strip(),
+        view_port=number(env, 'NAVEGADOR_PUERTO_PANTALLA', 8791),
+        novnc=Path(env.get('NAVEGADOR_NOVNC') or '/usr/share/novnc'),
     )

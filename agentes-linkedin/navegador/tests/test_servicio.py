@@ -17,9 +17,9 @@ from aiohttp.test_utils import TestClient, TestServer
 from linkedin_directo import rutas
 
 from navegador import __main__ as cli
-from navegador import ajustes
-from navegador.almacen import IMPORTED, Store
-from navegador.servidor import build
+from navegador import ajustes, pagina
+from navegador.almacen import IMPORTED, Store, stamp
+from navegador.servidor import SERVICE, build
 from tests.falsos import MESSAGING, POST, PROFILE, TOKEN, Browser, Request, Response, World, call, invitation, raw, \
     reaction
 
@@ -44,10 +44,14 @@ class ServiceCase(unittest.IsolatedAsyncioTestCase):
         self.client = await self.start()
 
     async def start(self):
-        """The service as a new process would be: a fresh app on the same data folder (and the same fake browser)."""
+        """The service as a new process would be: the previous one gone (its browsers closed, its holds on the profiles
+        dropped) and a fresh app on the same data folder (and the same fake browser)."""
+        if getattr(self, 'running', None):
+            await self.running.close()
         client = TestClient(TestServer(build(self.world.settings, **self.world.deps())))
         await client.start_server()
         self.addAsyncCleanup(client.close)
+        self.running = client
         return client
 
     async def post(self, body, account='prueba', headers=AUTH, client=None):
@@ -155,12 +159,14 @@ class StatusTests(ServiceCase):
             status, body = await self.post(call())
         self.assertEqual(status, 503)
         self.assertIn('otro navegador', body['reason'])
+        self.assertNotIn('code', body)  # passing: only another internet exit carries a code (egress)
         self.assertEqual(self.browser.launches, 0)
         lock.unlink()
         self.browser.fail_launch = RuntimeError('sin pantalla')
         status, body = await self.post(call())
         self.assertEqual(status, 503)
         self.assertIn('no abrió', body['reason'])
+        self.assertNotIn('code', body)
         self.assertEqual(self.browser.fetches, [])
 
     async def test_504_when_the_page_fails_mid_call_and_that_write_is_never_repeated(self):
@@ -285,10 +291,15 @@ class EgressTests(ServiceCase):
         self.assertEqual((self.store().egress(), self.browser.proxies), ('directo', [None]))
         self.world.settings = replace(self.world.settings, proxy='socks5://127.0.0.1:1080')
         client = await self.start()  # the service again, now with a proxy
+        refused_at = stamp(self.world.clock.now)
         status, body = await self.post(call(), client=client)
         self.assertEqual(status, 503)
         self.assertIn('la salida a internet cambió; no salió nada', body['reason'])
         self.assertIn('salida prueba --aceptar', body['reason'])
+        # Its own code, and since when: every refusal of the episode says the same moment (the backend tells it once).
+        self.assertEqual((body['code'], body['since']), ('egress', refused_at))
+        self.world.clock.now += 3600
+        self.assertEqual((await self.post(call(), client=client))[1]['since'], body['since'])
         self.assertEqual((self.browser.launches, len(self.browser.fetches)), (1, 1))
         self.assertIsNone(self.store().stopped())  # not LinkedIn pushing back: nothing to resume
         with redirect_stdout(io.StringIO()) as out:
@@ -297,12 +308,33 @@ class EgressTests(ServiceCase):
         self.assertIn('DISTINTA', out.getvalue())
         self.assertEqual((await self.post(call(), client=client))[0], 200)
         self.assertEqual(self.browser.proxies[-1], {'server': 'socks5://127.0.0.1:1080'})
+        # A later change is a new episode, with its own moment.
+        self.world.settings = replace(self.world.settings, proxy='')
+        client = await self.start()
+        status, again = await self.post(call(), client=client)
+        self.assertEqual((status, again['code']), (503, 'egress'))
+        self.assertNotEqual(again['since'], body['since'])
+
+    async def test_an_exit_put_back_ends_the_episode(self):
+        self.assertEqual((await self.post(call()))[0], 200)
+        moved = await self.start_with(proxy='socks5://127.0.0.1:1080')
+        first = (await self.post(call(), client=moved))[1]['since']
+        back = await self.start_with(proxy='')  # someone put the old exit back: it opens, and the episode is over
+        self.assertEqual((await self.post(call(), client=back))[0], 200)
+        self.world.clock.now += 60
+        moved = await self.start_with(proxy='socks5://127.0.0.1:1080')
+        self.assertNotEqual((await self.post(call(), client=moved))[1]['since'], first)
+
+    async def start_with(self, **changes):
+        self.world.settings = replace(self.world.settings, **changes)
+        return await self.start()
 
     async def test_a_profile_imported_from_another_machine_waits_for_the_operator(self):
         self.store().set_egress(IMPORTED)  # what `importar` leaves
         status, body = await self.post(call())
         self.assertEqual(status, 503)
         self.assertIn('la sesión se importó de otro equipo', body['reason'])
+        self.assertEqual(body['code'], 'egress')
         self.assertEqual(self.browser.launches, 0)
 
 
@@ -366,6 +398,8 @@ class StopTests(ServiceCase):
             with self.subTest(word=word):
                 status, body = await self.send(answer)
                 self.assertEqual((status, body['status']), (200, answer['status']))  # it left: its answer goes back
+                # Only an answer from a login or checkpoint page is the session going away; a login does not mend a 429.
+                self.assertEqual(bool(self.store().stopped().get('sesion')), word == '/checkpoint')
                 await self.assert_stopped(word)
                 self.store().resume()
 
@@ -392,6 +426,7 @@ class StopTests(ServiceCase):
         status, _ = await self.post(reaction())
         self.assertEqual(status, 409)
         self.assertEqual(self.browser.fetches, [])
+        self.assertTrue(self.store().stopped().get('sesion'))  # a new login mends it (conexion.py)
         await self.assert_stopped('/login')
 
     async def test_an_operator_clears_the_stop(self):
@@ -468,6 +503,86 @@ class LogTests(ServiceCase):
         self.assertIn('/feed/update/{id}/', text)
         self.assertIn('DETENIDA', text)
         self.assertIn('op=account_status -> 409', text)
+
+
+class HoldTests(ServiceCase):
+    async def test_an_open_page_holds_the_profile_against_a_login_from_another_container(self):
+        profile = self.world.settings.account_dir('prueba') / 'perfil'
+        self.assertEqual((await self.post(call()))[0], 200)
+        self.assertTrue(pagina.profile_busy(profile))
+        with self.assertRaises(pagina.Busy):
+            pagina.hold(profile)
+        await self.running.close()  # the service stopped: its hold goes with it
+        self.assertFalse(pagina.profile_busy(profile))
+
+    async def test_a_profile_held_elsewhere_does_not_open(self):
+        holding = pagina.hold(self.world.settings.account_dir('prueba') / 'perfil')  # a login in another container
+        self.addCleanup(pagina.let_go, holding)
+        status, body = await self.post(call())
+        self.assertEqual(status, 503)
+        self.assertIn('otro navegador', body['reason'])
+        self.assertEqual(self.browser.launches, 0)
+
+
+class ScreenTests(ServiceCase):
+    async def test_without_a_screen_nothing_opens_and_the_health_check_says_so(self):
+        self.world.screen = False  # Xvfb did not come back after a restart
+        response = await self.client.get('/health')
+        self.assertEqual((response.status, await response.json()), (503, {'status': 'sin_pantalla'}))
+        status, body = await self.post(call())
+        self.assertEqual(status, 503)
+        self.assertIn('sin pantalla', body['reason'])
+        self.assertNotIn('code', body)
+        self.assertEqual((self.browser.launches, self.browser.fetches), (0, []))
+        self.world.screen = True
+        self.assertEqual((await self.client.get('/health')).status, 200)
+        self.assertEqual((await self.post(call()))[0], 200)
+
+    async def test_a_headless_browser_needs_no_screen(self):
+        self.world.screen = False
+        self.world.settings = replace(self.world.settings, headless=True)
+        client = await self.start()
+        self.assertEqual((await client.get('/health')).status, 200)
+        self.assertEqual((await self.post(call(), client=client))[0], 200)
+
+
+class IdleTests(ServiceCase):
+    async def asyncSetUp(self):
+        await super().asyncSetUp()
+        self.world.settings = replace(self.world.settings, idle_minutes=30)
+        self.client = await self.start()
+
+    def service(self, client=None):
+        return (client or self.client).server.app[SERVICE]
+
+    async def test_an_idle_browser_closes_and_the_next_call_opens_it_again(self):
+        self.assertEqual((await self.post(call()))[0], 200)
+        self.world.clock.now += 29 * 60
+        self.assertEqual(await self.service().sweep(), 0)
+        self.world.clock.now += 2 * 60
+        with self.assertLogs('navegador', 'INFO') as logs:
+            self.assertEqual(await self.service().sweep(), 1)
+        self.assertIn('cerrado tras 30 min sin llamadas', logs.output[0])
+        self.assertTrue(self.browser.contexts[0].closed)
+        self.assertEqual(await self.service().sweep(), 0)  # nothing open
+        self.assertEqual((await self.post(call()))[0], 200)  # one more feed load, as LinkedIn sees it
+        self.assertEqual((self.browser.launches, self.browser.gotos, len(self.browser.fetches)), (2, 2, 2))
+
+    async def test_never_while_a_call_is_out_nor_when_turned_off(self):
+        self.browser.gate = asyncio.Event()
+        out = asyncio.ensure_future(self.post(call()))
+        await until(lambda: self.browser.fetches)
+        self.world.clock.now += 3600
+        self.assertEqual(await self.service().sweep(), 0)
+        self.browser.gate.set()
+        self.assertEqual((await out)[0], 200)
+        self.assertEqual(await self.service().sweep(), 0)  # the call that just ended is use
+        self.assertFalse(self.browser.contexts[0].closed)
+        self.world.settings = replace(self.world.settings, idle_minutes=0)
+        client = await self.start()
+        self.assertEqual((await self.post(call(), client=client))[0], 200)
+        self.world.clock.now += 86400
+        self.assertEqual(await self.service(client).sweep(), 0)
 
 
 if __name__ == '__main__':

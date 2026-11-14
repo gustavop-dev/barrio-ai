@@ -16,7 +16,7 @@ from linkedin_directo.servicio import ServiceTransport
 from team_backend import connectors, connectors_directo, conversaciones, metricas, operador, respuestas
 from team_backend.connectors import ConnectorError, ConnectorUncertain, InvitationNoteQuota, UnipileConnector, get_connector
 from team_backend.connectors_directo import DirectoConnector
-from team_backend.models import ConnectorAccount
+from team_backend.models import AuditEvent, ConnectorAccount, Notification
 from team_backend.serializers import AccountInput
 from team_backend.tests import directo_fixtures as F
 from team_backend.tests.directo_fixtures import ANA, LUIS, OWN, POST, html, ok, stream
@@ -726,8 +726,24 @@ class ServiceTransportTests(SimpleTestCase):
             self.assertEqual(connectors.deferred(e.exception),waits)
         for other in (ConnectorError('Unipile: no fue posible conectar.',kind='not_sent'),
                       ConnectorError('Simulado: HTTP 500.',status=500,kind='provider/server_error'),
-                      ConnectorError('x',status=422,kind='budget'),ConnectorError('x',kind='network')):
+                      ConnectorError('x',status=422,kind='budget'),ConnectorError('x',kind='network'),
+                      ConnectorError('x',status=503,kind='egress')):
             self.assertFalse(connectors.deferred(other))
+
+    def test_another_internet_exit_is_its_own_kind_and_says_what_to_do(self):
+        body={'reason':'la salida a internet cambió; no salió nada','code':'egress','since':'2026-11-13T12:00:00+00:00'}
+        for request in (self.READ,self.WRITE):
+            with self.subTest(write=request.write),self.assertRaises(LinkedInError) as e:
+                self.service(lambda r:httpx.Response(503,json=body)).send(request)
+            exc=e.exception
+            self.assertEqual((exc.kind,exc.pause,exc.status,exc.since,exc.retry_after),('egress',False,503,body['since'],None))
+            self.assertIn('python -m navegador salida cuenta-prueba --aceptar',str(exc))
+        # Only a 503 that says so: without the code it stays «not sent», with no time it still is another exit.
+        for status,answer,kind,since in ((503,{'reason':'ocupado'},'not_sent',None),(503,{'reason':'x','code':'egress'},'egress',''),
+                                         (422,{'reason':'x','code':'egress'},'refused',None)):
+            with self.subTest(answer=answer),self.assertRaises(LinkedInError) as e:
+                self.service(lambda r,s=status,a=answer:httpx.Response(s,json=a)).send(self.READ)
+            self.assertEqual((e.exception.kind,e.exception.since),(kind,since))
 
     def test_network_failures(self):
         def down(request):raise httpx.ConnectError('sin conexión',request=request)
@@ -827,3 +843,50 @@ class ProviderWiringTests(TestCase):
         self.assertTrue(AccountInput(data={'provider':'directo','external_account_id':'cuenta-prueba','label':'Prueba'}).is_valid())
         for providers in (metricas.PROVIDERS,conversaciones.PROVIDERS,respuestas.PROVIDERS):
             self.assertIn('directo',providers)
+
+
+class EgressNoticeTests(TestCase):
+    """The service refusing to open the account by another internet exit (503 `egress`): nothing left, the work waits
+    like any refusal before sending, the owner hears it once per episode with what to do, and nothing is paused."""
+    SINCE='2026-11-13T12:00:00+00:00'
+
+    def setUp(self):
+        push=patch('team_backend.alerts.notify');self.push=push.start();self.addCleanup(push.stop)
+        self.account=ConnectorAccount.objects.create(provider='directo',external_account_id='cuenta-prueba',label='Cuenta directa de prueba')
+
+    def refuse(self,since,method='account_status'):
+        body={'reason':'la salida a internet cambió; no salió nada','code':'egress','since':since}
+        transport=ServiceTransport('http://navegador.interno:8080/','token-ficticio','cuenta-prueba',
+                                   http_transport=httpx.MockTransport(lambda r:httpx.Response(503,json=body)))
+        with self.assertRaises(ConnectorError) as e:getattr(DirectoConnector('cuenta-prueba',transport=transport),method)()
+        return e.exception
+
+    def notices(self):
+        return Notification.objects.filter(kind='navegador_salida')
+
+    def test_told_once_per_episode_and_never_a_pause(self):
+        for method in ('account_status','list_chats','own_audience'):  # one episode, three jobs
+            exc=self.refuse(self.SINCE,method)
+            self.assertEqual((exc.kind,exc.pause),('egress',False));self.assertTrue(connectors.deferred(exc))
+        [notice]=self.notices()
+        self.assertEqual((notice.layer,notice.title),('sistema','LinkedIn directo: el servicio no abre la cuenta por otra salida a internet'))
+        self.assertIn('Cuenta directa de prueba',notice.detail)
+        self.assertIn('python -m navegador salida cuenta-prueba --aceptar',notice.detail)
+        self.assertNotIn('token-ficticio',notice.detail)
+        self.assertEqual(self.push.call_count,1)
+        self.account.refresh_from_db();self.assertEqual((self.account.paused,self.account.paused_reason),(False,''))
+        Notification.objects.all().delete()  # its notification purged (7 days): the same episode is not told again
+        self.refuse(self.SINCE)
+        self.assertFalse(self.notices().exists())
+        # The account opened again (the service starts a new moment) and later the exit changed again: told again.
+        self.refuse('2026-11-14T08:00:00+00:00')
+        self.assertEqual((self.notices().count(),self.push.call_count),(1,2))
+
+    def test_other_refusals_and_providers_say_nothing(self):
+        for status,body in ((503,{'reason':'ocupado'}),(422,{'reason':'x','code':'budget','retry_after':60})):
+            transport=ServiceTransport('http://navegador.interno:8080/','token-ficticio','cuenta-prueba',
+                                       http_transport=httpx.MockTransport(lambda r,s=status,b=body:httpx.Response(s,json=b)))
+            with self.subTest(status=status),self.assertRaises(ConnectorError):
+                DirectoConnector('cuenta-prueba',transport=transport).account_status()
+        self.assertFalse(self.notices().exists());self.push.assert_not_called()
+        self.assertFalse(AuditEvent.objects.filter(action=connectors_directo.EGRESS_NOTICE).exists())

@@ -21,6 +21,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 | [AJU-10](#aju-10) | Acceso a «Lo que el equipo sabe de ti» | PWA · app · backend | funciona |
 | [AJU-11](#aju-11) | Orden y anclas de Ajustes | PWA · app | funciona |
 | [AJU-12](#aju-12) | Fotos de perfil | app · backend | funciona |
+| [AJU-13](#aju-13) | Conectar LinkedIn en el navegador del servidor (cuenta `directo`) | app · backend · navegador | parcial |
 
 ---
 
@@ -53,8 +54,9 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
   2. **Dado** «Pausar solo esta cuenta», **cuando** confirma con un motivo obligatorio, **entonces** aparece «Cuenta en pausa.» y el equipo deja de actuar con ella.
   3. **Dado** una cuenta en pausa, **cuando** pulsa «Reanudar la cuenta», **entonces** se reanuda sin confirmación y aparece «Cuenta reanudada.».
   4. **Dado** que no hay cuentas de Unipile, **cuando** abre la sección, **entonces** ve «No hay ninguna cuenta de Unipile configurada.».
-- **Brechas código/docs:** la cuenta de la API oficial de LinkedIn no aparece aquí (se gestiona en [AJU-06](#aju-06)).
-- **Cobertura QA:** pendiente
+  5. **Dado** una cuenta `directo` con su prueba diaria de LinkedIn (`canary` de la cuenta), **cuando** abre Ajustes › Máquina, **entonces** ve en su tarjeta «Prueba diaria: todo bien, hace X.»; si no pasó, una nota con «algo cambió en LinkedIn (falla …)», «se detuvo» o «no pudo correr» y el motivo. Si la parada ya pausó la cuenta, el motivo sale solo en la nota de la pausa. Una cuenta de Unipile o sin prueba todavía no muestra la línea.
+- **Brechas código/docs:** la cuenta de la API oficial de LinkedIn no aparece aquí (se gestiona en [AJU-06](#aju-06)). La PWA todavía no muestra la prueba diaria (criterio 5); la app sí.
+- **Cobertura QA:** App (`AjustesScreen.test.tsx`, «Ajustes · Máquina»): criterios 1, 2 y 5. `compartido` (`ajustes.test.ts`): la línea de la prueba diaria en cada estado. Sin E2E: ningún flujo de Maestro tiene una cuenta `directo`.
 
 ### AJU-03 · Orientación para el equipo <a id="aju-03"></a>
 
@@ -207,6 +209,24 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
   3. **Dado** «Subir fotos de perfil», **cuando** elige fotos en el teléfono, **entonces** suben como categoría Perfil con permiso para Perfil, con su progreso y el aviso «Fotos subidas a Perfil.».
   4. **Dado** una foto, **cuando** la toca, **entonces** se abre su hoja: función, permiso, «Instrucciones para Perfil», «Edición con IA», «Guardar» (solo envía lo que cambió) y «Quitar la foto» tras confirmar; la imagen abre el visor a pantalla completa, que recorre las fotos en el orden de la rejilla. La hoja no ofrece cambiar la categoría a «Posts».
 - **Cobertura QA:** Jest `FotosPerfil.test.tsx` (1 a 4) y `AjustesScreen.test.tsx` (`ancla=fotos`); Maestro `18-perfil` (1 y 3).
+
+### AJU-13 · Conectar LinkedIn en el navegador del servidor (cuenta `directo`) <a id="aju-13"></a>
+
+- **Dónde:** app · backend · navegador
+- **Estado:** parcial (probado en local con una página de entrada local; falta entrar de verdad en LinkedIn desde el servidor)
+- **Qué hace para Gustavo:** entra en LinkedIn desde el teléfono, en el navegador del servidor que usa una cuenta `directo`, sin túnel SSH: escribe la clave y el código en la página de LinkedIn, que ve a distancia, y la cuenta queda con su sesión. La cuenta se crea antes en el servidor (`operador cuenta --proveedor directo`); la app no la crea.
+- **Código:** `POST /api/v1/operador/accounts/<id>/conexion`, `GET /api/v1/operador/conexiones/<id>`, `POST …/<id>/enlace`, `POST …/<id>/cancelar`, `GET /api/v1/linkedin/pantalla/entrar?ticket=` y `GET /api/v1/linkedin/pantalla/permitir` (`team_backend/conexion.py`, `conexion_views.py`, modelo `BrowserLogin`); `overview.accounts[].connect`; servicio `navegador/conexion.py` (`POST /v1/cuentas/<cuenta>/conexion`, `GET|DELETE /v1/conexiones/<sesion>`); ruta `/conectar/` de `deploy/Caddyfile`; app `ajustes/Maquina.tsx` (`ConnectLinkedIn`); común `compartido/src/logic/ajustes.ts` (`connectLabel`, `loginLine`, `LOGIN_PRIVACY`). Diseño de seguridad en el [README del servicio](../../agentes-linkedin/navegador/README.md#conectar-desde-la-app).
+- **Criterios de aceptación:**
+  1. **Dado** una cuenta `directo` y `LINKEDIN_CONEXION_APP=true`, **cuando** abre Ajustes › Máquina, **entonces** ve en su tarjeta «Conectar LinkedIn» («Volver a conectar» si la cuenta ya tuvo sesión) y debajo «Escribes la clave y el código en la propia página de LinkedIn, abierta en un navegador del servidor de Barrio. Barrio no los guarda.». Con el interruptor apagado, o en una cuenta de Unipile, no hay botón y la API responde 404 (apagado) o 400 (otro proveedor).
+  2. **Dado** el botón, **cuando** lo pulsa, **entonces** el servidor abre su navegador en la página de entrada de LinkedIn y la app abre en el navegador del sistema un enlace de un solo uso (vale 2 minutos) con esa pantalla; mientras dura ve «Esperando a que entres en LinkedIn (hasta las HH:MM).», «Abrir de nuevo» y «Cancelar la conexión».
+  3. **Dado** que entra en LinkedIn en esa pantalla, **cuando** llega al inicio, **entonces** la conexión termina sola, el servidor cierra la pantalla y la app muestra «LinkedIn conectado hace X.»; si la cuenta estaba en pausa porque el servicio se detuvo o se quedó sin sesión, la pausa se levanta. Una pausa por otro motivo, o una parada del servicio por un 429, un 999 o un reto, se queda («Sesión guardada …, pero la cuenta sigue detenida en el servidor: hay que revisarla allí.»).
+  4. **Dado** que no entra, **cuando** pasan 10 minutos (`NAVEGADOR_CONEXION_MIN`) o pulsa «Cancelar la conexión», **entonces** la pantalla se cierra y ve «Se acabó el tiempo sin entrar en LinkedIn (hace X). Vuelve a intentarlo.» o «Conexión cancelada hace X.».
+  5. **Dado** el navegador del servidor caído o ocupado con otra conexión, **cuando** pulsa el botón, **entonces** ve «El navegador del servidor no está disponible ahora.» con el motivo (503).
+  6. **Dado** el enlace ya usado, caducado, de una conexión terminada o sin la cookie que deja, **cuando** se abre o se pide `/conectar/`, **entonces** responde 410 (el enlace) o 401 (la vista) y no llega nada al servicio.
+  7. **Dado** más de 4 intentos en una hora para la misma cuenta, **cuando** pulsa el botón, **entonces** responde 429. Un token de servicio no puede iniciarla (403). Inicio, apertura de la vista, cancelación y final quedan en la auditoría.
+  8. **Dado** una conexión en curso, **cuando** el equipo intenta usar esa cuenta, **entonces** el servicio responde 503 `conexion` y el backend reintenta más tarde sin pausar la cuenta.
+- **Brechas código/docs:** la PWA no tiene el botón. La pantalla del servidor (1366 × 900) se ve escalada en el teléfono: se puede ampliar con los dedos. Sin probar todavía en el servidor: entrar de verdad en LinkedIn y que la sesión quede, con HTTPS y el backend real detrás de Caddy.
+- **Cobertura QA:** App (`AjustesScreen.test.tsx`, «Conectar LinkedIn (directo)»): criterios 1, 2, 3, 4 y 5. `compartido` (`ajustes.test.ts`): el texto de cada estado y del botón. Backend (`team_backend/tests/test_conexion.py`): 1, 2, 3, 4, 6 y 7. Servicio (`navegador/tests/test_conexion.py`): 3, 4 y 8, la vista solo con su clave y que la clave no va al registro. Local (Docker, Caddy, página local, nada a LinkedIn): 2, 4 y 6. Sin E2E: ningún flujo de Maestro tiene una cuenta `directo`.
 
 ---
 

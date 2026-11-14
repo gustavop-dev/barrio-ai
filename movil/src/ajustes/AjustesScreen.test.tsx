@@ -190,6 +190,91 @@ describe('Ajustes · Máquina', () => {
     expect(screen.getByText('La parada viene del servidor (OPERATOR_PAUSED=true). No se puede levantar desde la app.')).toBeOnTheScreen();
   });
 
+  it('shows the last daily LinkedIn canary of a directo account', async () => {
+    const finished = new Date(Date.now() - 3 * 3600_000).toISOString();
+    const directo: Account = {
+      ...UNIPILE,
+      id: 'acc-d',
+      label: 'LinkedIn prueba',
+      provider: 'directo',
+      canary: { state: 'no_corrio', started_at: finished, finished_at: finished, calls: 0, failing: [], error_kind: 'network', error: 'El servicio no responde.' },
+    };
+    server({ 'GET /api/v1/operador/overview': { body: { ...overview(), accounts: [UNIPILE, directo, OFFICIAL] } } });
+    await renderAjustes();
+    expect(await screen.findByText('Prueba diaria: no pudo correr, hace 3 h.')).toBeOnTheScreen();
+    expect(screen.getByText('El servicio no responde.')).toBeOnTheScreen();
+    // The Unipile account has no canary: no line.
+    expect(screen.getAllByText(/^Prueba diaria/)).toHaveLength(1);
+  });
+
+  describe('Conectar LinkedIn (directo)', () => {
+    const LATER = new Date(Date.now() + 10 * 60_000).toISOString();
+    const login = (state: string, extra: Record<string, unknown> = {}) => ({
+      id: 'login-1', state, reason: '', still_stopped: false, started_at: new Date().toISOString(), expires_at: LATER, finished_at: null, ...extra,
+    });
+    const directo = (connect: Account['connect']): Account => ({ ...UNIPILE, id: 'acc-d', label: 'LinkedIn prueba', provider: 'directo', status: 'unknown', connect });
+    const withAccount = (account: Account, extra: Record<string, FakeHandler> = {}) =>
+      server({ 'GET /api/v1/operador/overview': { body: { ...overview(), accounts: [UNIPILE, account, OFFICIAL] } }, ...extra });
+
+    it('starts a login, opens the remote view in the in-app browser and shows when it is connected', async () => {
+      const api = withAccount(directo({ enabled: true, last: null }), {
+        'POST /api/v1/operador/accounts/acc-d/conexion': { status: 201, body: { login: login('esperando'), url: 'https://barrio.example/api/v1/linkedin/pantalla/entrar?ticket=t' } },
+        'GET /api/v1/operador/conexiones/login-1': { body: { login: login('conectada', { finished_at: new Date().toISOString() }), url: null } },
+      });
+      await renderAjustes();
+      expect(await screen.findByText(/Escribes la clave y el código en la propia página de LinkedIn/)).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Conectar LinkedIn: LinkedIn prueba' }));
+      await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://barrio.example/api/v1/linkedin/pantalla/entrar?ticket=t', expect.anything()));
+      expect(api.find('POST', '/api/v1/operador/accounts/acc-d/conexion')).toHaveLength(1);
+      expect(await screen.findByText('LinkedIn conectado hace un momento.')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Volver a conectar: LinkedIn prueba' })).toBeOnTheScreen();
+    });
+
+    it('while it waits, opens it again or cancels it', async () => {
+      const api = withAccount(directo({ enabled: true, last: login('esperando') }), {
+        'GET /api/v1/operador/conexiones/login-1': { body: { login: login('esperando'), url: null } },
+        'POST /api/v1/operador/conexiones/login-1/enlace': { body: { login: login('esperando'), url: 'https://barrio.example/api/v1/linkedin/pantalla/entrar?ticket=u' } },
+        'POST /api/v1/operador/conexiones/login-1/cancelar': { body: { login: login('cancelada', { finished_at: new Date().toISOString() }), url: null } },
+      });
+      await renderAjustes();
+      expect(await screen.findByText(/^Esperando a que entres en LinkedIn \(hasta las/)).toBeOnTheScreen();
+      await fireEvent.press(screen.getByRole('button', { name: 'Abrir de nuevo' }));
+      await waitFor(() => expect(WebBrowser.openBrowserAsync).toHaveBeenCalledWith('https://barrio.example/api/v1/linkedin/pantalla/entrar?ticket=u', expect.anything()));
+      await fireEvent.press(screen.getByRole('button', { name: 'Cancelar la conexión' }));
+      expect(await screen.findByText('Conexión cancelada hace un momento.')).toBeOnTheScreen();
+      expect(api.find('POST', '/api/v1/operador/conexiones/login-1/cancelar')).toHaveLength(1);
+    });
+
+    it.each([
+      ['vencida', {}, 'Se acabó el tiempo sin entrar en LinkedIn (hace un momento). Vuelve a intentarlo.'],
+      ['fallida', { reason: 'el perfil está abierto en otro navegador' }, 'No se pudo conectar: el perfil está abierto en otro navegador.'],
+      ['conectada', { still_stopped: true }, 'Sesión guardada hace un momento, pero la cuenta sigue detenida en el servidor: hay que revisarla allí.'],
+    ])('tells how the last login ended (%s)', async (state, extra, text) => {
+      withAccount(directo({ enabled: true, last: login(state, { finished_at: new Date().toISOString(), ...extra }) }));
+      await renderAjustes();
+      expect(await screen.findByText(text)).toBeOnTheScreen();
+    });
+
+    it('says when the server browser is not available', async () => {
+      withAccount(directo({ enabled: true, last: null }), {
+        'POST /api/v1/operador/accounts/acc-d/conexion': { status: 503, body: { detail: 'El navegador del servidor no responde; inténtalo más tarde.' } },
+      });
+      await renderAjustes();
+      await fireEvent.press(await screen.findByRole('button', { name: 'Conectar LinkedIn: LinkedIn prueba' }));
+      expect(await screen.findByText('El navegador del servidor no está disponible ahora.')).toBeOnTheScreen();
+      expect(screen.getByText('El navegador del servidor no responde; inténtalo más tarde.')).toBeOnTheScreen();
+      expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
+    });
+
+    it('shows nothing when the server has it off, nor for Unipile', async () => {
+      withAccount(directo({ enabled: false, last: null }));
+      await renderAjustes();
+      expect(await screen.findByText('LinkedIn prueba (directo)')).toBeOnTheScreen();
+      expect(screen.queryByText(/Conectar LinkedIn/)).toBeNull();
+      expect(screen.queryByText(/Escribes la clave/)).toBeNull();
+    });
+  });
+
   it('pauses only the Unipile account, with a reason, and leaves the official one out', async () => {
     const api = server({ 'POST /api/v1/operador/accounts/acc-1/pause': { body: { ...UNIPILE, paused: true } } });
     await renderAjustes();

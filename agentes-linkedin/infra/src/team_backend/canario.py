@@ -11,7 +11,8 @@ linkedin_directo/canario.py, reached through DirectoConnector.canary(). Each run
 - run: the check_linkedin job. A stop (the service stopped the account or has no session, LinkedIn pushed back) pauses
   the account like any other read, with what the owner has to do in the reason; set_account_pause sends that notice.
 - Notices (Notificaciones, kind linkedin_canary): once when the day's result turns broken or not run, and once when it
-  is fine again. Days compare by their last run; a run that will be tried again says nothing yet.
+  is fine again. Days compare by their last run; a run that will be tried again says nothing yet. A run the service
+  refused for another internet exit is also told at once, like any call (connectors_directo.egress_notice).
 - latest: the last finished run, as GET /api/v1/operador/overview and /api/v1/operador/accounts show it (`canary`)."""
 import os
 from datetime import datetime, time, timedelta, timezone as dt_timezone
@@ -91,6 +92,9 @@ def run(account,now=None,connector=None):
     operador._audit(None,'linkedin.canary',account.id,state=log.state,calls=log.calls,failing=failing(log),
                     error_kind=log.error_kind)
     CanaryRun.objects.filter(id__in=list(account.canary_runs.values_list('id',flat=True)[KEEP:])).delete()
+    if error.get('kind')=='egress':  # the canary reads through the transport, not the connector: tell it from here too
+        from .connectors_directo import egress_notice
+        egress_notice(account.external_account_id,error.get('desde'),log.error)
     if error.get('pausa') or log.state==CanaryRun.State.HALTED:
         # Its own notice would repeat the pause's: the reason says what happened and what to do.
         operador.set_account_pause(account,f'La prueba diaria de LinkedIn se detuvo: {log.error or "el servicio paró la cuenta."}')

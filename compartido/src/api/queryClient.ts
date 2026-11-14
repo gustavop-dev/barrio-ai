@@ -7,6 +7,7 @@ export const keys = {
   feed: ['feed'] as const,
   activity: ['activity'] as const,
   accounts: ['accounts'] as const,
+  linkedinLogin: (id: string) => ['linkedinLogin', id] as const,
   actions: (state: string, page: number, capability = '') => ['actions', state, page, capability] as const,
   actionsAll: ['actions'] as const,
   referents: (account: string) => ['referents', account] as const,

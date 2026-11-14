@@ -10,7 +10,8 @@ ids).
 
 Result: 'ok' every read gave its fields; 'roto' something broke (LinkedIn changed an answer); 'alto' LinkedIn pushed
 back or the service has the account stopped or without a session (do not retry: someone has to look); 'no_corrio' it
-could not run (the service unreachable, busy or out of budget, its configuration): nothing to judge."""
+could not run (the service unreachable, busy or out of budget, another internet exit, its configuration): nothing to
+judge."""
 import json
 import time
 from datetime import datetime
@@ -22,7 +23,7 @@ from .transporte import Transport
 
 OK, BROKEN, HALTED, NOT_RUN = 'ok', 'roto', 'alto', 'no_corrio'
 # Nothing reached LinkedIn, or nothing came back: the run says nothing about LinkedIn and stops there.
-NOT_RUN_KINDS = ('config', 'disabled', 'not_sent', 'budget', 'network')
+NOT_RUN_KINDS = ('config', 'disabled', 'not_sent', 'budget', 'network', 'egress')
 HALT_KINDS = ('stopped', 'login')
 
 
@@ -188,6 +189,8 @@ def run(transport, out=None, clock=time.time):
                 row['estado'] = result = HALTED
             if result:
                 error = {'kind': exc.kind, 'pausa': exc.pause, 'motivo': str(exc)[:600]}  # keeps what to do
+                if exc.since is not None:
+                    error['desde'] = exc.since  # another internet exit: since when (team_backend tells it once)
         except Exception as exc:  # an answer so changed that reading it failed: that is what the canary is for
             row.update(estado=BROKEN, motivo=f'respuesta ilegible ({type(exc).__name__})')
         rows.append(row)

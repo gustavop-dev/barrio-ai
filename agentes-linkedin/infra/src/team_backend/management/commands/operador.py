@@ -5,7 +5,7 @@ from team_backend.jobs import enqueue_operation
 from team_backend.models import ConnectorAccount
 
 class Command(BaseCommand):
-    help='Primer uso del operador: registrar cuenta, comprobarla, añadir referentes y encolar observación.'
+    help='Primer uso del operador: registrar cuenta, comprobarla, añadir referentes, encolar observación y cambiar de proveedor.'
 
     def add_arguments(self,parser):
         parser.add_argument('--usuario',required=True,help='Usuario humano que actúa (p. ej. el administrador)')
@@ -17,6 +17,13 @@ class Command(BaseCommand):
         ref.add_argument('--motivo',required=True)
         obs=sub.add_parser('observar');obs.add_argument('--cuenta',required=True);obs.add_argument('--limite',type=int,default=5)
         sub.add_parser('referentes-extraordinaria',help='Revisión de referentes fuera del calendario mensual (decisión explícita)').add_argument('--cuenta',required=True)
+        cambio=sub.add_parser('cambiar-proveedor',help='Pasar una cuenta entre Unipile y directo sin perder su historia, traduciendo sus ids (navegador-contrato.md «Cambiar de proveedor»)')
+        cambio.add_argument('--cuenta',required=True);destino=cambio.add_mutually_exclusive_group(required=True)
+        destino.add_argument('--a',choices=['unipile','directo']);destino.add_argument('--volver',action='store_true',help='El proveedor y el id que tenía antes del último cambio, con los ids originales')
+        destino.add_argument('--olvidar-originales',action='store_true',help='Borrar los ids originales guardados por los cambios de esta cuenta')
+        cambio.add_argument('--slug','--id-externo',dest='slug',default='',help='directo: el nombre de la cuenta en el servicio navegador; unipile: su id acc_…')
+        cambio.add_argument('--prueba',action='store_true',help='Solo decir qué cambiaría, por tabla y campo, y qué no se puede traducir')
+        cambio.add_argument('--aceptar-ids-viejos',action='store_true',help='Cambiar dejando como están los ids que no se pueden traducir (caducan las propuestas abiertas que dependen de ellos)')
 
     def handle(self,**o):
         user=User.objects.filter(username=o['usuario'],is_active=True).first()
@@ -41,6 +48,18 @@ class Command(BaseCommand):
             elif o['accion']=='observar':
                 job,_=enqueue_operation(user,'observe',{'account':str(account.id),'limit':o['limite'],'referents':[]})
                 self.stdout.write(f'Observación en cola: trabajo {job.id}. El worker la procesará.')
+            elif o['accion']=='cambiar-proveedor':
+                from team_backend import proveedor
+                if o['olvidar_originales']:
+                    self.stdout.write(f'Ids originales borrados: {proveedor.forget_originals(user,account)}.');return
+                if o['prueba']:
+                    self.stdout.write('\n'.join(proveedor.report(proveedor.preview(account,o['a'],o['slug'],o['volver']))));return
+                before=account.provider
+                account,plan=(proveedor.switch_back(user,account,o['aceptar_ids_viejos']) if o['volver']
+                              else proveedor.switch(user,account,o['a'],o['slug'],o['aceptar_ids_viejos']))
+                self.stdout.write('\n'.join(proveedor.report(plan)))
+                self.stdout.write(f'Cuenta {account.id}: de {before} a {account.provider} ({account.external_account_id}). '
+                                  'Sigue en pausa: ejecuta "comprobar" y reanúdala.')
         except (ValueError,PermissionError) as exc:raise CommandError(str(exc)) from None
         except Exception as exc:
             detail=getattr(exc,'detail',None)
