@@ -33,7 +33,9 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 | [EDI-21](#edi-21) | Agente visual dedicado al post ganador | PWA · app · backend | parcial |
 | [EDI-22](#edi-22) | Un comentario sobre una pieza lista la rehace | backend | funciona |
 | [EDI-23](#edi-23) | Ante un bloqueo, Gustavo pide un cambio o lo desestima | PWA · app · backend | implementado |
-| [EDI-24](#edi-24) | Pedir un día que ya tiene post: Tu turno pregunta antes de publicar dos | app · backend | implementado |
+| [EDI-24](#edi-24) | Una fecha pedida es una orden: sale como post extra ese día | app · backend | implementado |
+| [EDI-25](#edi-25) | La semana GASP: un tipo por día y el plan del domingo | app · backend | implementado |
+| [EDI-26](#edi-26) | El tipo del día en la pieza y sus comprobaciones | backend | implementado |
 
 ---
 
@@ -402,24 +404,58 @@ El flujo de imagen está implementado en el backend; la interfaz queda para fase
   6. **Dado** «Pedir un cambio» en una pieza bloqueada, **cuando** llega su comentario, **entonces** la pieza se reabre (con imagen si faltaba), el director recibe las razones del bloqueo (`bloqueo`) para resolverlas junto a lo que pide, y la versión nueva pasa por el verificador y por Jev en su modo suave para pedidos de Gustavo. Si vuelve a quedar fuera, puede desestimarla.
 - **Cobertura QA:** `tests/test_retoque.py` (`RescueTests`: desestimar un bloqueo del verificador por la API y el trabajo, desestimar el descarte del líder, sin salida por otro día, hora pasada o presupuesto, comentario que reabre una pieza bloqueada); `PiezaScreen.test.tsx` y `PiezaDetalle.test.tsx` (pedir un cambio, desestimar con nota, sin salida).
 
-### EDI-24 · Pedir un día que ya tiene post: Tu turno pregunta antes de publicar dos <a id="edi-24"></a>
+### EDI-24 · Una fecha pedida es una orden: sale como post extra ese día <a id="edi-24"></a>
 
 - **Dónde:** app · backend (la PWA solo reconoce el tipo de tarjeta)
-- **Estado:** implementado
-- **Qué hace para Gustavo:** la regla sigue siendo un post al día, pero un día y una hora que él pide pasan por encima de ella si él lo autoriza. Cuando pide, por ejemplo, «publícalo mañana al mediodía» y ese día ya sale un post de otra idea suya, su post se prepara de inmediato para el siguiente día libre a su hora y Tu turno le pregunta: «¿Seguro que lo quieres el viernes 13/11 a las 12:00?». «Sí» lo pasa a ese día como segundo post; «Dejarlo el lunes…» lo deja en el siguiente día libre.
-- **Origen:** 12/11/2026, un audio pidió un post para el viernes al mediodía y salió programado para el lunes sin preguntar, porque el viernes ya tenía un post de otra idea suya.
-- **Código:** `urgente._requested`, `_askable`, `day_requests`, `tick_day_requests`, `cards`, `confirm_day`, `recently_resolved`; `Capture.day_request`, `EditorialPiece.second_of_day` (migración `0032`); `operador.capped` y `capacity_left`; `POST /api/v1/capturas/<id>/fecha` (`capturas_views.CaptureDay`); tarjeta `fecha` en `GET /api/v1/tu-turno` (`tasks.fechas`); push `day_request`. App `movil/src/turno/TurnoCard.tsx` (`DayRequestDetails`), `actions.ts`; calendario `movil/src/calendario/DayPanel.tsx` (`piecesOfDay`).
+- **Estado:** implementado (14/11/2026)
+- **Qué hace para Gustavo:** un día y una hora que él pide («publica esto el martes a las 12») se obedecen: su post sale ese día a esa hora como un post extra, junto al post diario, que no se mueve. Sin hora, sale a las 12:00 (`EDITORIAL_EXTRA_TIME`). Solo si la fecha no se puede cumplir, la Bandeja le pregunta en el momento: «No puedo publicarlo cuando pediste», con el motivo, sus palabras y su idea, y dos respuestas: «Al primer día libre» o «Descartarla».
+- **Origen:** 12/11/2026, un audio pidió un post para el viernes al mediodía y salió programado para el lunes sin preguntar. El primer arreglo (13/11) lo dejaba en el siguiente día libre y preguntaba días después en Tu turno si salía también en su fecha; el 14/11 Gustavo pidió que una fecha pedida sea una orden. El fallo estaba en `urgente._requested` (corría el post del equipo, mandaba la idea al siguiente día libre y dejaba la pregunta `pending`) y en `_askable`.
+- **Código:** `urgente._requested`, `problem`, `ask`, `PROBLEMS`, `is_extra`, `next_extra`, `extra_at`, `tick_day_requests`, `_honor_legacy`, `cards`, `confirm_day`; `capture_intent.requested` (día y hora del fragmento literal, o el problema: `pasada`, `lejana`, `ambigua`); `autopiloto._editorial` prepara el extra en cuanto llega; `editorial.next_slot` no cuenta el extra como el post del día; `Capture.day_request`, `EditorialPiece.second_of_day`; `POST /api/v1/capturas/<id>/fecha {decision: siguiente | descartar}` (`capturas_views.CaptureDay`); tarjeta `fecha` en `GET /api/v1/tu-turno`; push `day_request`. App `movil/src/turno/TurnoCard.tsx` (`DayRequestDetails`), `actions.ts`; calendario `movil/src/calendario/DayPanel.tsx` (`piecesOfDay`).
 - **Criterios de aceptación:**
-  1. **Dado** una idea con día y hora pedidos cuyo día solo tiene un post que el equipo preparó por su cuenta, **cuando** se asignan los huecos, **entonces** su idea toma esa hora y el post del equipo se corre al siguiente día libre, sin preguntar ([EDI-20](#edi-20)): ese día sigue teniendo un post.
-  2. **Dado** que ese día ya tiene un post de otra idea suya (o otra idea suya lo reservó), **cuando** se asignan los huecos, **entonces** la idea va al siguiente día libre a su hora, `day_request.state` queda `pending` y el motivo dice que Tu turno le preguntará.
-  3. **Dado** que su post está listo, **cuando** abre Tu turno, **entonces** ve la tarjeta `fecha` con el post que ya sale ese día, el suyo y dónde espera, y sus palabras; el push `day_request` sale una sola vez.
-  4. **Dado** «Sí, el … a las …», **cuando** responde, **entonces** su post pasa a ese día y hora como `second_of_day`, fuera de los topes de CONT-09 (ni cuenta ni lo frena el tope diario o semanal), y el otro post no se mueve. Nunca hay un tercer post ese día.
-  5. **Dado** «Dejarlo el …», **cuando** responde, **entonces** se queda en el siguiente día libre y la tarjeta desaparece.
-  6. **Dado** que no responde antes de su hora menos el plazo de veto (`EDITORIAL_VETO_MINUTES`), **cuando** corre el piloto, **entonces** la pregunta caduca y el post se queda en el siguiente día libre.
-  7. **Dado** la tarjeta, **cuando** desliza, **entonces** no pasa nada: autorizar un segundo post es un toque en su botón.
-  8. **Dado** un día con dos posts, **cuando** abre el calendario de la app, **entonces** el panel del día muestra los dos («Publicaciones del día»).
-  9. Los dos posts del día se separan como cualquier escritura (20 a 40 minutos como mínimo); no hay otra separación mínima.
-- **Cobertura QA:** `tests/test_publish_asap.py` (`IdeaScheduleTests`: pregunta y «sí» con segundo post fuera de topes, «no» y caducidad, el post del equipo se corre sin preguntar); `TuTurnoScreen.test.tsx` y `actions.test.ts` (tarjeta, detalles, respuesta, sin deslizar).
+  1. **Dado** una idea con día y hora pedidos que se pueden cumplir, **cuando** se asignan los huecos, **entonces** queda en esa hora como post extra (`second_of_day`), el post diario de ese día no se mueve y no se pregunta nada.
+  2. **Dado** ese post extra, **cuando** corre el autopiloto, **entonces** lo prepara enseguida y una sola vez, fuera de los topes de CONT-09 y fuera de la estructura GASP.
+  3. **Dado** una fecha que ya pasó, que cae dentro del plazo de veto o fuera de la ventana, que está a más de 14 días, que no se entiende o un día que ya tiene dos posts (el diario y otro que pidió), **cuando** se asignan los huecos, **entonces** la idea no toma otro día: queda esperando, la Bandeja muestra la tarjeta `fecha` con el motivo y el push `day_request` sale una sola vez.
+  4. **Dado** «Al primer día libre», **cuando** responde, **entonces** la idea pierde su fecha y va al primer día libre, escrita según el tipo de ese día ([EDI-25](#edi-25)); el aviso dice «Va al primer día libre».
+  5. **Dado** «Descartarla», **cuando** responde, **entonces** la idea queda sin usar con ese motivo.
+  6. **Dado** una segunda respuesta, **cuando** llega, **entonces** el servidor responde 409; `mismo_dia` ya no existe y responde 400.
+  7. **Dado** una pregunta del flujo anterior (`pending`), **cuando** corre el piloto, **entonces** su post pasa a su fecha como extra si todavía se puede; si no, la pregunta caduca.
+  8. **Dado** la tarjeta, **cuando** desliza, **entonces** no pasa nada: se responde con un botón.
+  9. **Dado** un día con dos posts, **cuando** abre el calendario de la app, **entonces** el panel del día muestra los dos («Publicaciones del día»). Nunca hay un tercero.
+- **Cobertura QA:** `tests/test_publish_asap.py` (`IdeaScheduleTests`: post extra sin mover el diario, el autopiloto lo prepara una vez, fecha que no se puede cumplir pregunta y espera, descartar, pregunta del flujo anterior; `CaptureIntentTests`: una fecha imposible es un problema y nunca otro día); `TuTurnoScreen.test.tsx` y `actions.test.ts` (tarjeta, detalles, respuestas, sin deslizar). Pendiente de CI.
+
+### EDI-25 · La semana GASP: un tipo por día y el plan del domingo <a id="edi-25"></a>
+
+- **Dónde:** app · backend
+- **Estado:** implementado (14/11/2026); diseño en [`docs/plan-estrategia-semanal.md`](../plan-estrategia-semanal.md)
+- **Qué hace para Gustavo:** cada día tiene un tipo de post: crecimiento, autoridad, venta o personal. La semana es G, A, G, A, S, P, G y una semana de cada dos el domingo pasa a venta; en cuatro semanas, 10 · 8 · 6 · 4. El domingo por la tarde el director planea la semana siguiente dentro de esa estructura: la idea de cada día, qué necesita el lector y la señal de la audiencia que la respalda. Gustavo lo ve en Calendario › Semana ([CAL-18](calendario-piezas.md#cal-18)) y puede cambiarlo.
+- **Responsable:** `director_editorial` (trabajo `plan_week`, ciclo `plan_semanal` en `agentes-linkedin/equipos/grafo.yaml`, arista `plan_a_gustavo`).
+- **Código:** `estrategia.py` (`allocate`, `mix_warnings`, `month_share`, `ensure`, `audience_signals`, `run`, `queue`, `regenerate`, `change`, `swap`, `displace`, `payload`, `calendar_days`); modelo `WeeklyPlan` (migración `0039_plan_semanal`); `estrategia_views.py` (`GET /api/v1/estrategia/semana`, `PATCH …/dias/<fecha>`, `POST …/mover`, `POST …/planear`); `urgente._undated` (una idea con tipo claro va al día de su tipo más cercano). Variables `STRATEGY_*` en `agentes-linkedin/infra/.env.example`.
+- **Criterios de aceptación:**
+  1. **Dado** una semana sin planear, **cuando** se consulta, **entonces** tiene los tipos de la estructura, sin modelo y sin coste.
+  2. **Dado** el domingo después de `STRATEGY_PLAN_TIME`, con publicación posible, CONT-09 encendido y presupuesto, **cuando** corre el autopiloto, **entonces** encola un solo `plan_week` para la semana siguiente; con la estrategia apagada o sin autonomía no encola nada.
+  3. **Dado** el plan del director, **cuando** se guarda, **entonces** los tipos son los de la estructura, una idea con señal de la audiencia va antes que una sin ella, una señal que no se le dio no cuenta y lo que Gustavo cambió se conserva. Le llega el aviso `weekly_plan`.
+  4. **Dado** «Volver a planear», **cuando** confirma el coste, **entonces** responde 202 y planea esa semana (solo esta o la siguiente); el mismo `request_id` devuelve el mismo trabajo (200); con otro plan en curso o sin presupuesto, 409.
+  5. **Dado** un día que aún no se preparó, **cuando** cambia su tipo, cambia dos días o descarta su idea, **entonces** se guarda como suyo; un día pasado o ya preparado responde 409.
+  6. **Dado** una idea suya que claramente es de un tipo, **cuando** se asignan los huecos, **entonces** toma el día de ese tipo más cercano y la idea planeada ahí queda apartada; una idea sin tipo claro va al primer día libre y el motivo dice «Se escribe como post de …».
+  7. **Dado** el calendario, Resultados y el resumen semanal, **cuando** se consultan, **entonces** traen el tipo de cada día, la interacción por tipo y qué señales de la audiencia movieron el plan de la semana siguiente.
+- **Cobertura QA:** `tests/test_estrategia.py` (`StructureTests`, `WeeklyPlanTests`, `IdeaTypeTests`), `test_metricas.py` (`by_type`); `PlanSemana.test.tsx`, `CalendarioScreen.test.tsx`, `ResultadosScreen.test.tsx`; Maestro `07-calendario.yaml` (CAL-18). Pendiente de CI.
+
+### EDI-26 · El tipo del día en la pieza y sus comprobaciones <a id="edi-26"></a>
+
+- **Dónde:** backend
+- **Estado:** implementado (14/11/2026); cómo frena cada hallazgo depende de `gate_policy`, en otra rama
+- **Qué hace para Gustavo:** el director escribe la pieza del día con su tipo como restricción y dice qué necesita el lector. Crecimiento toma como modelo la estructura de un post de referente que funcionó; venta lleva una sola invitación a conversar; personal cuenta, sin material suyo, la historia pública de un founder sobre el dolor de la semana, atribuida y con su fuente. El código comprueba en el texto final lo propio de cada tipo.
+- **Responsable:** `director_editorial` (brief), los redactores y `editor_verificador`; la investigación web de la pieza busca la historia de P.
+- **Código:** `estrategia.director_input`, `finalize_brief`, `story_question`, `used_stories`, `findings`, `notes`, `SEVERITY`, `code`; `editorial._story_research`, `_run` (las notas entran como riesgos «Estrategia: …»), `_check` (los hallazgos entran en las reglas y en la ronda de reparación de [EDI-08](#edi-08)); `TODO(gate_policy)` en `autopiloto.py` y en `VERIFIER_SYSTEM`.
+- **Criterios de aceptación:**
+  1. **Dado** la estrategia encendida, **cuando** el director escribe el brief, **entonces** lleva `gasp_type` (el del día; el post extra no tiene tipo de día), `reader_need` y `audience_evidence` solo si apunta a una señal ofrecida.
+  2. **Dado** un día P sin material suyo y con investigación web disponible, **cuando** se prepara, **entonces** hace una sola investigación cuya pregunta es solo el dolor de la semana; con material suyo no busca nada.
+  3. **Dado** una historia de P, **cuando** se comprueba el texto, **entonces** `unsourced_third_party_story` si no está en una fuente guardada, `first_person_appropriation` si no se atribuye a su protagonista y `fabricated_quote` por cada cita que no está literal en las fuentes.
+  4. **Dado** S, G o P, **cuando** se comprueba el texto, **entonces** `cta_count` con más de una llamada a la acción en S o alguna en P, y `offer_in_growth` u `offer_in_personal` si ofrece servicios.
+  5. **Dado** una pieza sin señal que respalde lo que necesita el lector (cuando había señales) o una historia que ya salió en 12 semanas, **cuando** queda lista, **entonces** sale con el riesgo `no_reader_need` o `repeated_story`, sin bloquear.
+  6. **Dado** la estrategia apagada o una pieza anterior sin tipo, **cuando** se comprueba, **entonces** no hay hallazgos por tipo.
+- **Brechas:** hasta que llegue `gate_policy`, un hallazgo blando que la reparación no arregla sigue bloqueando, y la única llamada a la acción de S choca con `POST_PITCH` y `aggressive_pitch`. Las pruebas de venta (`SalesGateTests`) esperan con `skipUnless` a que exista `editorial.gate_policy`.
+- **Cobertura QA:** `tests/test_estrategia.py` (`PersonalStoryTests`, `FindingTests`, `SalesGateTests`). Pendiente de CI.
 
 ## Retiradas
 

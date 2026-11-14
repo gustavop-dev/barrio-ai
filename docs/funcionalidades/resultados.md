@@ -93,8 +93,9 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   3. **Dado** que no hay posts en el periodo, **cuando** se pinta, **entonces** ve «Sin posts publicados en el periodo.».
   4. **Dado** un mejor post, **cuando** se pinta, **entonces** ve su primera línea, fecha, pilar, impresiones e interacción con «Ver la pieza»; si ninguno tiene corte, «Aún ningún post del periodo tiene su corte de impresiones.».
   5. **Dado** posts sin corte, **cuando** se pinta «Interacción media por pilar», **entonces** ve «Sin posts con corte en el periodo.».
-- **Brechas código/docs:** —
-- **Cobertura QA:** RES-05.2–4 en `08-resultados.yaml` y `08-resultados-errores.yaml` (barra que abre la pieza, mejor post, periodo sin posts) · RES-05.1 y 5 sin prueba E2E · 2026-11-08 · pasa
+  6. **Dado** posts del periodo con tipo GASP ([EDI-25](motor-editorial.md#edi-25)), **cuando** abre la sección en la app, **entonces** ve «Interacción media por tipo de post» con el mismo corte, y en cada tipo sus posts y sus impresiones medianas («Crecimiento · 2 posts · 1.400 impresiones: 2,9 %»). Sin posts con tipo, no aparece. La API lo trae en `contenido.by_type` y cada post lleva `gasp_type`.
+- **Brechas código/docs:** la PWA aún no pinta `by_type`.
+- **Cobertura QA:** RES-05.2–4 en `08-resultados.yaml` y `08-resultados-errores.yaml` (barra que abre la pieza, mejor post, periodo sin posts) · RES-05.1 y 5 sin prueba E2E · 2026-11-08 · pasa · RES-05.6 en `ResultadosScreen.test.tsx` y `test_metricas.py`, pendiente de CI
 
 ### RES-06 · Posts del periodo <a id="res-06"></a>
 

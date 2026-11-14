@@ -49,8 +49,9 @@ Cada lunes, el analista de resultados escribe para Gustavo el resumen de la sema
   3. **Dado** que Gustavo no envió capturas, **cuando** se calculan, **entonces** `capturas` está disponible con 0 (un cero real).
   4. **Dado** dos de tres posts con corte de 72 h, **cuando** se calculan los avisos, **entonces** `avisos_de_datos` incluye «Pocos datos: 2 de 3 posts con corte de 72 h».
   5. **Dado** `comparacion`, **cuando** el valor anterior es 0 o falta, **entonces** `variacion_pct` es `null`.
+  6. **Dado** la estrategia GASP ([EDI-25](motor-editorial.md#edi-25)), **cuando** se calculan, **entonces** `por_tipo` trae por tipo los posts publicados y medidos a 72 h, sus medianas de impresiones e interacción, los comentarios con sustancia y lo que más respondió la audiencia (primera línea, qué necesitaba el lector y la señal); sin posts con tipo es `{disponible: false, motivo}`. `plan_siguiente` dice qué señales de la audiencia movieron el plan de la semana siguiente, o que aún no tiene plan.
 - **Brechas código/docs:** —
-- **Cobertura QA:** pendiente
+- **Cobertura QA:** pendiente; `por_tipo` y `plan_siguiente` en `tests/test_estrategia.py` (pendiente de CI)
 
 ### SEM-03 · Validador de cifras <a id="sem-03"></a>
 
