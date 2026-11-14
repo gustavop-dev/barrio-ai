@@ -177,7 +177,13 @@ class ProviderIdOriginal(models.Model):
         constraints=[models.UniqueConstraint(fields=['account','provider','model','object_id','field'],name='unique_provider_id_original')]
 
 class Referent(models.Model):
+    class Kind(models.TextChoices):
+        # Main or variable (protected) is the slot; the kind is why the team reads them. Gustavo, 14/11/2026: big voices of
+        # his own industry that sell what he sells, so that what works for them becomes a model (referentes_industria.py).
+        NICHO='nicho','Voz del nicho'
+        INDUSTRIA='industria','Referente de industria'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    kind=models.CharField(max_length=16,choices=Kind.choices,default=Kind.NICHO)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='referents')
     public_identifier=models.CharField(max_length=100)
     provider_user_id=models.CharField(max_length=200,blank=True)
@@ -211,6 +217,9 @@ class ReferentReview(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
     month=models.DateField()
+    # mensual: the monthly batch (and the extraordinary one, which takes its place); industria: the search Gustavo starts
+    # by hand (operador referentes-industria), at most one a month, never applied by silence.
+    kind=models.CharField(max_length=16,default='mensual')
     state=models.CharField(max_length=24,default='preparing')
     dossier=models.JSONField(default=dict)
     expected_revision=models.PositiveIntegerField(default=1)
@@ -219,7 +228,7 @@ class ReferentReview(models.Model):
     closed_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     class Meta:
-        constraints=[models.UniqueConstraint(fields=['account','month'],name='unique_referent_month')]
+        constraints=[models.UniqueConstraint(fields=['account','month','kind'],name='unique_referent_month_kind')]
 
 
 class ReferentChange(models.Model):
@@ -286,6 +295,12 @@ class ObservedPost(models.Model):
     observed_at=models.DateTimeField(default=timezone.now)
     # DESC-05: when its commenters were last read to discover people (each post is scanned once).
     commenters_scanned_at=models.DateTimeField(null=True,blank=True)
+    # «What worked for them» (modelos_crecimiento.py). outlier: how the post did against its author's own norm. structure:
+    # its shape (hook, length band, outline, closing…) as labels and numbers, never a sentence of it. audience: what its
+    # comments were like (counts and de-identified themes), computed when a step already read them; no names, no text.
+    outlier=models.JSONField(default=dict,blank=True)
+    structure=models.JSONField(default=dict,blank=True)
+    audience=models.JSONField(default=dict,blank=True)
     class Meta:
         ordering=['-posted_at','-observed_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]

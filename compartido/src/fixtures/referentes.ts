@@ -20,6 +20,33 @@ export const MONTHLY_CARD: TurnoCard = {
     evidence: { coverage: { observed: 12, classified: 8, fit: 5, fit_pct: 62.5 } }, limitations: ['Muestra parcial; sin causalidad.'],
     occupancy: { before: 15, after: 15, main: 5, variables: 10 } },
 };
+/** An industry referent proposal (invented person and company): explicit decision only, with its criteria. */
+export const INDUSTRY_CARD: TurnoCard = {
+  ...MONTHLY_CARD, id: 'referent_change:change-2', title: 'Alta de industria: Lia Constructora',
+  body: 'Vende MVPs a founders de EE. UU. y conversa con ellos. Requiere decisión explícita; esta versión no se aplicará por silencio.',
+  deadline: '2026-11-28T09:00:00-05:00',
+  actions: [{ label: 'Aprobar alta', endpoint: '/api/v1/referentes/cambios/change-2/decidir', body: { version: 1, decision: 'approve' }, primary: true }],
+  referent_change: { ...MONTHLY_CARD.referent_change!, id: 'change-2', kind: 'industria', version: 1, endpoint: '/api/v1/referentes/cambios/change-2/decidir',
+    outgoing: null, occupancy: { before: 6, after: 7, main: 5, variables: 1 },
+    sources: [{ id: 'linkedin:lia-constructora-test', url: 'https://www.linkedin.com/in/lia-constructora-test/', title: 'Perfil público en LinkedIn (lectura del equipo)', retrieved_at: '2026-11-14T12:00:00Z' }],
+    proposal: { kind: 'add', reason: 'Vende MVPs a founders de EE. UU. y conversa con ellos.', evidence: ['linkedin:lia-constructora-test'], incoming: {
+      identifier: 'lia-constructora-test', display_name: 'Lia Constructora', profile_url: 'https://www.linkedin.com/in/lia-constructora-test/',
+      niche: 'Estudio de producto', audience: 'Founders de startups en EE. UU.', contribution: 'Criterio de entrega', top_voice: false,
+      sources: ['linkedin:lia-constructora-test'],
+      industria: { rule: 'industria-v1', passed: true, slug: 'lia-constructora-test', company: 'Estudio Ejemplo', services: ['producto'], reasons: [],
+        criteria: [
+          { key: 'servicios', label: 'Vende lo mismo que Gustavo', status: 'cumple', status_label: 'Cumple', detail: 'Vende: producto.', required: true },
+          { key: 'tamano', label: 'Es grande', status: 'cumple', status_label: 'Cumple', detail: '24.000 seguidores; mediana de 140 interacciones en 12 posts.', required: true },
+          { key: 'autoridad', label: 'Autoridad verificable', status: 'cumple', status_label: 'Cumple', detail: '2 de 2 pruebas verificadas (casos, equipo).', required: true },
+          { key: 'actividad', label: 'Publica seguido', status: 'cumple', status_label: 'Cumple', detail: '9 posts propios en 30 días; último hace 1 días.', required: true },
+          { key: 'mercado_eeuu', label: 'Vende en EE. UU.', status: 'cumple', status_label: 'Cumple', detail: 'Perfil en EE. UU. (Austin, Texas).', required: true },
+          { key: 'audiencia', label: 'Su audiencia es el barrio', status: 'sin_medir', status_label: 'Sin medir (no cuenta como cumplido)', detail: 'De 30 comentaristas de su mejor post, 2 ya estaban clasificados (hacen falta 5).', required: false },
+        ],
+        authority: [{ kind: 'casos', claim: 'Publica casos de MVPs entregados', sources: ['linkedin:lia-constructora-test'], verified: true },
+          { kind: 'equipo', claim: 'Equipo de ingenieros propio', sources: ['linkedin:lia-constructora-test'], verified: true }],
+        measures: { followers: 24000, median_interactions: 140, sample: 12, posts_30d: 9, days_since_last: 1, location: 'Austin, Texas', region: 'us', found_by: ['producto'] },
+        audience: { commenters: 30, classified: 2, fit: 1, us: 1, fit_share: null } } } } },
+};
 export const EXPERIMENT_PLAN: ExperimentPlan = { base_days: 14, focus_days: 28, followup_days: 7, comments_week: 2,
   min_classified: 10, min_coverage: .7, min_fit_week: 2, min_exposure: 4, control_referent: '', confounders: 'Otras acciones de red',
   hypothesis: 'Atraer personas con encaje', audience: 'Founders', comparison: 'Frente a la base', fit_criterion: 'Necesidad de software',

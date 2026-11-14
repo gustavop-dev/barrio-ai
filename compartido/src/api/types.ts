@@ -801,6 +801,8 @@ export interface LinkedInStatus {
 // ---------------------------------------------------------------- referents
 
 export interface Referent {
+  /** nicho: a voice of the niche; industria: a big seller of Gustavo's own services (referentes_industria.py). */
+  kind?: 'nicho' | 'industria';
   protected?: boolean;
   position?: number;
   revision?: number;

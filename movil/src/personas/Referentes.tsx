@@ -114,6 +114,7 @@ function ReferentCard({ referent, candidates, onRemove }: { referent: Referent; 
           )}
         </View>
         {referent.protected ? <Badge tone="info">Main · Protegido</Badge> : null}
+        {referent.kind === 'industria' ? <Badge tone="info">Industria</Badge> : null}
         {active ? <Badge tone="ok">Activo</Badge> : <Badge tone="muted">Inactivo</Badge>}
       </View>
       {referent.reason ? <T>{referent.reason}</T> : null}

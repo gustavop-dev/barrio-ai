@@ -451,7 +451,9 @@ def discover(user,account,now=None):
             if exc.pause or deferred(exc):summary['stopped']=str(exc);break  # nothing came back: the next run reads it
             continue
         from .evidencia import referent_comments
+        from .modelos_crecimiento import store_audience
         referent_comments(post,comments,now)
+        store_audience(post,comments,now)  # counts and themes only, for «what worked for them»
         post.commenters_scanned_at=now;post.save(update_fields=['commenters_scanned_at']);summary['posts']+=1
         for comment in comments:
             author=comment['author'];uid=author.get('id')
