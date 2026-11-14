@@ -8,8 +8,8 @@ from unittest.mock import patch
 from PIL import Image
 from django.utils import timezone
 
-from team_backend import autopiloto, capturas, connectors_images, editor_visual, editorial, guardas, imagenes, lider
-from team_backend import jobs, operador, orquestacion, rescate, retoque, urgente
+from team_backend import autopiloto, capturas, connectors_images, editor_visual, editorial, guardas, imagenes, infografias
+from team_backend import jobs, lider, operador, orquestacion, rescate, retoque, urgente
 from team_backend.connectors_images import FakeImageConnector
 from team_backend.models import ActionProposal, Capture, CycleLedger, EditorialPiece, GalleryPhoto, Job
 from team_backend.tests import test_imagenes as image_cases
@@ -445,6 +445,28 @@ class BindingV2Tests(EditorialBase):
         self.assertTrue(editor_visual.freshness_issues(piece))
         piece.final_text = GOOD_POST
         piece.signals = [{'id': 'nuevo', 'text': 'Otra fuente'}]
+        self.assertTrue(editor_visual.freshness_issues(piece))
+
+    def test_a_rewritten_rule_does_not_make_the_package_stale(self):
+        piece = self.bound()
+        self.assertEqual(piece.image_review['visual_binding']['rule'], infografias.version())
+        with patch.object(infografias, 'version', return_value='regla-nueva'):
+            self.assertEqual(editor_visual.freshness_issues(piece), [])
+            piece.signals = [{'id': 'nuevo', 'text': 'Otra fuente'}]
+            self.assertTrue(editor_visual.freshness_issues(piece))
+
+    def test_a_package_bound_before_the_rule_was_recorded_is_checked_against_the_earlier_rules(self):
+        piece = self.bound()
+        photos, _ = editor_visual.used_photos(piece)
+        binding = {k: v for k, v in piece.image_review['visual_binding'].items() if k != 'rule'}
+
+        def rebound(rule):
+            piece.image_review = dict(piece.image_review, visual_binding=dict(
+                binding, content_sha256=editor_visual.content_hash(piece, photos, rule)))
+
+        rebound(editor_visual.EARLIER_RULES[0])
+        self.assertEqual(editor_visual.freshness_issues(piece), [])
+        rebound('una-regla-desconocida')
         self.assertTrue(editor_visual.freshness_issues(piece))
 
     def test_a_still_valid_v1_binding_is_upgraded_and_a_stale_one_keeps_failing(self):
