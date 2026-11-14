@@ -16,9 +16,21 @@ from .referentes import bounds, lock, publish, snapshot, validate_proposal
 REQUEST_SCHEMA = {'type': 'object', 'properties': {'context': {'type': 'object'}, 'research': {'type': 'array'},
     'evidence': {'type': 'object'}}, 'required': ['context', 'research', 'evidence'], 'additionalProperties': False}
 SOURCE_IDS = {'type': 'array', 'items': {'type': 'string'}}
+AUTHORITY_KINDS = ['clientes', 'casos', 'equipo', 'trayectoria', 'charlas']
+# Claims of an industry candidate (referentes_industria.py): optional here, required by its own stricter selection
+# schema. The code checks every claim against the cited sources; the monthly review drops the key.
+INDUSTRY_SCHEMA = {'type': 'object', 'properties': {
+    'company': {'type': 'string'},
+    'services': {'type': 'array', 'items': {'type': 'string', 'enum': list(posicionamiento.SERVICES)}},
+    'service_sources': SOURCE_IDS,
+    'authority': {'type': 'array', 'items': {'type': 'object', 'properties': {
+        'kind': {'type': 'string', 'enum': AUTHORITY_KINDS}, 'claim': {'type': 'string'}, 'sources': SOURCE_IDS},
+        'required': ['kind', 'claim', 'sources'], 'additionalProperties': False}},
+    'us_market': {'type': 'boolean'}, 'us_sources': SOURCE_IDS},
+    'required': ['company', 'services', 'service_sources', 'authority', 'us_market', 'us_sources'], 'additionalProperties': False}
 CANDIDATE_SCHEMA = {'type': 'object', 'properties': {
     **{k: {'type': 'string'} for k in ('identifier', 'display_name', 'profile_url', 'niche', 'audience', 'contribution')},
-    'top_voice': {'type': 'boolean'}, 'sources': SOURCE_IDS},
+    'top_voice': {'type': 'boolean'}, 'sources': SOURCE_IDS, 'industria': INDUSTRY_SCHEMA},
     'required': ['identifier', 'display_name', 'profile_url', 'niche', 'audience', 'contribution', 'top_voice', 'sources'],
     'additionalProperties': False}
 CHANGE_SCHEMA = {'type': 'object', 'properties': {'kind': {'type': 'string', 'enum': ['add', 'remove', 'swap']},
@@ -102,8 +114,10 @@ def fan_out(runtime, review):
         return results
 
 
-def _verified_changes(account, result, web, evidence):
+def _verified_changes(account, result, web, evidence, extra=()):
+    """`extra`: sources the run read itself (referentes_industria: `linkedin:<slug>` profile lines)."""
     sources = {s.id: asdict(s) for r in web for s in r.sources}
+    sources.update({s['id']: dict(s) for s in extra})
     known = set(sources) | {r['record_id'] for r in evidence['referents']} | {e['id'] for e in evidence.get('experiments',[])}
     changes, used_in, used_out, issues = [], set(), set(), []
     slots = Referent.objects.filter(account=account, active=True, archived_at__isnull=True, protected=False).count()
@@ -145,6 +159,9 @@ def _verified_changes(account, result, web, evidence):
 
 
 def run(job):
+    if job.params.get('industria') is True:
+        from . import referentes_industria
+        return referentes_industria.run(job)
     now = timezone.now()
     account = ConnectorAccount.objects.get(pk=job.params['account'])
     month = date.fromisoformat(job.params['month']).replace(day=1)
@@ -154,7 +171,8 @@ def run(job):
         control = lock(account)
         if not control.initialized:
             raise ValueError(control.issue)
-        review, _ = ReferentReview.objects.get_or_create(account=account, month=month,
+        # The industry search of the same month is another row (kind 'industria').
+        review, _ = ReferentReview.objects.get_or_create(account=account, month=month, kind='mensual',
             defaults={'deadline': now + timedelta(days=7) if extraordinary else bounds(month)[1],
                       'expected_revision': control.revision})
         if review.state != 'preparing':
@@ -177,6 +195,8 @@ def run(job):
                 selected = runtime.call('seleccionar_referentes', request, lambda: select(request), key='selection')
             else:
                 selected = {'summary': 'Investigación incompleta: faltan fuentes verificables o biblioteca.', 'changes': [], 'continuity': []}
+            for change in selected['changes']:
+                (change.get('incoming') or {}).pop('industria', None)  # only the industry search verifies those claims
             changes, sources, issues = _verified_changes(account, selected, web, evidence_data)
             dossier = {'summary': selected['summary'], 'sources': sources, 'evidence': evidence_data,
                 'versions': {k: ctx[k]['version'] for k in ('memory', 'orientation', 'positioning')},
@@ -208,6 +228,7 @@ def run(job):
             if review.state == 'preparing':
                 review.state = 'incomplete'
                 review.dossier = {'status': 'Investigación incompleta', 'summary': 'Revisión detenida; se conserva el ledger y no se repiten llamadas inciertas.',
-                                  'limitations': ['Motivo: '+(str(exc) if isinstance(exc,orquestacion.CycleStopped) else type(exc).__name__)]}
+                                  'limitations': ['Motivo: '+(str(exc) if isinstance(exc,orquestacion.CycleStopped) else type(exc).__name__)],
+                                  'extraordinaria': extraordinary}
                 review.save()
     return publish(review, timezone.now())

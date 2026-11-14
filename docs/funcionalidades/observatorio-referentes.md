@@ -16,6 +16,8 @@ Hoy `operador.observe` lee los posts de `Referent.active=True`; los referentes l
 | [OBS-02](#obs-02) | Cinco main protegidos y ventana mensual para diez plazas | PWA · app · backend | funciona |
 | [OBS-03](#obs-03) | Evidencia de audiencia y encaje por referente | backend | funciona |
 | [OBS-04](#obs-04) | Experimentos de participación con resultado medible | PWA · app · backend | funciona |
+| [OBS-05](#obs-05) | Referentes de industria con criterios verificables | app · backend | funciona |
+| [OBS-06](#obs-06) | Modelos de crecimiento: lo que les funciona, sin copiar texto | backend | funciona |
 
 ## Datos disponibles y límites de los conectores <a id="datos-conectores"></a>
 
@@ -123,6 +125,45 @@ Fuentes locales: [connectors.py](../../agentes-linkedin/infra/src/team_backend/c
   6. **Dado** el cierre, **cuando** evalúa, **entonces** entrega «señal favorable», «sin mejora observada» o «inconcluso», con cifras, fuentes y límites. Recomienda mantener/medir main, nunca retirarlos; posibles cambios variables entran al siguiente lote OBS-02. El resultado por sí solo no ejecuta ni salta la ventana, y la orientación sigue requiriendo aprobación positiva.
 - **Brechas código/docs:** implementación entregada en fase 5; ejecución de CI/QA delegada a Claude, sin pruebas locales. Conservar los límites observacionales de OBS-03.
 - **Cobertura QA:** casos sintéticos en `test_referentes_mensuales.py`, Jest/Vitest y `19-referentes-mensual.yaml`; pendientes de ejecución por Claude. [Entrega y verificaciones](../../agentes-linkedin/infra/docs/referentes-mensuales.md).
+
+### OBS-05 · Referentes de industria con criterios verificables <a id="obs-05"></a>
+
+- **Dónde:** app · backend (Oficina aún sin la vista de criterios)
+- **Estado:** funciona
+- **Qué hace para Gustavo:** le propone voces grandes de su industria que venden lo mismo que él en EE. UU., cada una con seis criterios comprobables, para que decida quién entra. Pedido del 14/11/2026; [plan y umbrales](../plan-referentes-industria.md).
+- **Responsable:** `investigador_lider` dentro del ciclo `referentes_mensuales` (mismas aristas y presupuesto). Gustavo decide cada alta.
+- **Cadencia:** a mano, como mucho una búsqueda de industria por cuenta y mes: `operador referentes-industria --cuenta <id>` imprime el peor caso y solo encola con `--confirmar`.
+- **Tu turno:** tarjeta «Alta de industria: …» con los seis criterios (Cumple · No cumple · Sin medir), sus datos y fuentes; 14 días para decidir y nunca se aplica por silencio. Rechazar con nota hace que no se vuelva a proponer.
+- **Datos necesarios y disponibilidad:** lecturas de LinkedIn de la cuenta conectada (búsqueda de personas, perfil, posts y comentarios del mejor post) e investigación web solo de los candidatos que pasan lo medible. `Referent.kind`, `ReferentReview.kind` y el dossier `industria` (criterios, descartados, reservas y gasto).
+- **Código:** `referentes_industria.py` (criterios, guarda, coste, lecturas, selección y verificación), `referentes_research.run`, `referentes.publish/decide/close`; migración `0041_referentes_industria`.
+- **Criterios de aceptación:**
+  1. **Dado** un candidato con 24.000 seguidores, mediana 140 en 12 posts, 9 posts en 30 días, perfil en EE. UU. y dos pruebas de autoridad de tipos distintos verificadas en fuentes que lo nombran, **cuando** termina la búsqueda, **entonces** la tarjeta muestra cada criterio con su dato y el criterio de audiencia sin medir como «Sin medir (no cuenta como cumplido)».
+  2. **Dado** un candidato cuyos comentaristas clasificados encajan menos que el umbral, **cuando** se mide, **entonces** se descarta antes de pagar investigación web y no se vuelve a proponer durante 90 días.
+  3. **Dado** que la selección afirma un servicio, un cliente o el mercado de EE. UU., **cuando** ninguna fuente citada que nombra al candidato lo dice, **entonces** ese criterio queda «No cumple» y el candidato no se publica.
+  4. **Dado** una propuesta de industria sin respuesta, **cuando** llega el cierre del día 5 o vence su plazo, **entonces** no se aplica: solo entra con la decisión explícita de Gustavo.
+  5. **Dado** un tope que no alcanza, una búsqueda de industria ya hecha este mes, ninguna plaza variable libre o la cuenta de publicación oficial, **cuando** se pide la búsqueda, **entonces** no se encola nada y se dice por qué.
+  6. **Dado** una edición que cambia el perfil propuesto, **cuando** se guarda, **entonces** la evaluación de industria se quita porque correspondía a otra persona.
+- **Límites:** leer un perfil con el conector directo registra una visita. El formato del post (imagen, video) no se conoce. Los umbrales son punto de partida y se recalibran con datos.
+- **Cobertura QA:** casos sintéticos en `test_referentes_industria.py` (búsqueda completa con conector falso, guarda, coste, criterios, decisión explícita) y en `ReferentDecision.test.tsx`; pendientes de CI. No se ejecutaron tests locales.
+
+### OBS-06 · Modelos de crecimiento: lo que les funciona, sin copiar texto <a id="obs-06"></a>
+
+- **Dónde:** backend
+- **Estado:** funciona
+- **Qué hace para Gustavo:** detecta los posts de sus referentes de industria que funcionaron muy por encima de lo habitual de cada uno, describe su estructura y quién les respondió, y los entrega a la estrategia semanal como modelos de estructura y ángulo.
+- **Responsable:** `operador_cuenta` al observar; la estrategia semanal consume el resultado.
+- **Cadencia:** después de cada observación; hasta 4 lecturas de comentarios al día para atípicos nuevos.
+- **Tu turno:** ninguna tarjeta propia.
+- **Datos necesarios y disponibilidad:** `ObservedPost.outlier`, `structure` y `audience` (etiquetas y conteos), `PersonEvidence` y `Contact` para el encaje de quienes comentaron. Sin llamadas pagadas.
+- **Código:** `modelos_crecimiento.refresh/after_observe/growth_models/audience_questions`; ganchos en `operador.observe` y `red.discover`; la estrategia los lee en `estrategia.industry_models` y `estrategia.audience_questions` ([EDI-29](motor-editorial.md#edi-29)).
+- **Criterios de aceptación:**
+  1. **Dado** un post con 3 veces la mediana de los otros posts asentados de su autor, z robusto ≥ 3 y al menos 20 interacciones, **cuando** se observa, **entonces** se marca atípico con su regla, muestra y cifras; con menos de 6 posts de base dice «muestra insuficiente».
+  2. **Dado** un post sin contadores visibles, **cuando** se juzga, **entonces** no se trata como cero ni como atípico.
+  3. **Dado** un atípico, **cuando** la estrategia pide modelos, **entonces** recibe su enlace, cifras, estructura en etiquetas y audiencia en conteos y temas, nunca frases del post ni nombres de quienes comentaron.
+  4. **Dado** dos atípicos de tamaño parecido, **cuando** se ordenan, **entonces** va primero el que llegó a más personas con encaje del barrio.
+  5. **Dado** un anuncio de vacantes o una promoción viral, **cuando** se ordenan modelos, **entonces** se excluye.
+  6. **Dado** comentarios de atípicos con preguntas y objeciones, **cuando** se piden las dudas de la audiencia, **entonces** se agrupan por tema con número de posts y referentes.
+- **Cobertura QA:** casos sintéticos en `test_referentes_industria.py` y `test_estrategia.py` (`GrowthModelSourceTests`); pendientes de CI.
 
 ## Retiradas
 

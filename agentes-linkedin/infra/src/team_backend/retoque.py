@@ -20,7 +20,7 @@ from django.core.files.base import ContentFile
 from django.db import transaction
 from django.utils import timezone
 
-from . import capturas, editor_visual, editorial, guardas, imagenes, operador, orientacion, orquestacion, urgente
+from . import capturas, compuertas, editor_visual, editorial, guardas, imagenes, operador, orientacion, orquestacion, urgente
 from .grafo import load_graph
 from .models import ActionExecution, ActionProposal, Capture, ConnectorAccount, CycleLedger, EditorialPiece, GalleryPhoto, Job
 
@@ -236,7 +236,7 @@ def _image_context(piece):
     photos = {p['id']: p for p in editor_visual.gallery(piece)}
     rows = list(piece.images.order_by('position'))
     return {'kind': piece.image_kind, 'reason': piece.image_reason,
-            'images': [{'kind': r.kind, 'alt': r.alt, 'edited': r.edited, 'reason': r.reason,
+            'images': [{'kind': r.kind, 'alt': r.alt, 'edited': r.edited, 'cropped': r.cropped, 'reason': r.reason,
                         'edit_instruction': (r.review or {}).get('instruction', '')} for r in rows],
             'photos': [{'id': str(r.source_photo_id), 'note': photos.get(str(r.source_photo_id), {}).get('note', ''),
                         'ai_edit': r.ai_edit} for r in rows if r.source_photo_id],
@@ -288,8 +288,9 @@ def _apply(capture, piece, old):
                 raise ValueError('La edición de la foto no pasó la revisión visual (' + '; '.join(attempts)[:300] + ')')
             route = record['fallback'] = 'infografia'
         record['image_changed'] = True
-    if route == 'infografia':
-        _redesign(piece, public, private, client, [instruction])
+    if route in ('infografia', 'carrusel'):
+        # «carrusel»: he asked for one, so the image becomes a carousel whatever it was; «infografia» redesigns it.
+        _redesign(piece, public, private, client, [instruction], kind='carrusel' if route == 'carrusel' else None)
         record['image_changed'] = True
     elif record['text_changed'] and piece.image_kind in ('infografia', 'carrusel'):
         record['design_recheck'] = _recheck_design(piece, public, private, client)
@@ -316,12 +317,13 @@ def _rewrite(piece, decision, memory, frozen, public, private, capture):
     if reasons and editorial.repair_enabled() and editorial._findings(review, issues):
         repair, new, claims, review, reasons, issues = editorial._repair_round(
             piece, memory, frozen, new, claims, review, reasons, issues, public, private)
+    reasons, observations = editorial.settle(piece, review, reasons, issues, claims)  # only hard findings stop his change
     if reasons:
         raise ValueError('El texto nuevo no pasó la verificación: ' + '; '.join(reasons)[:400])
     piece.final_text = new
     piece.verification = dict(review or {}, model_verdict=(review or {}).get('verdict'), verdict='ready_for_execution',
         blocking_reasons=[], rules=issues, text_sha256=editorial._sha(new), claims=claims, rework=str(capture.id),
-        **({'repair': repair} if repair else {}))
+        observations=observations, **({'repair': repair} if repair else {}))
     piece.save(update_fields=['final_text', 'verification', 'updated_at'])
     return True
 
@@ -356,7 +358,8 @@ def _edit_photos(piece, instruction, client, public, capture):
             row.mime = 'image/png'
             row.width, row.height = size
             row.sha256 = imagenes.sha(candidate)
-            row.edited = True
+            row.edited, row.cropped = True, False  # the edit starts from the original: no plain crop is left in it
+            row.data = {k: v for k, v in (row.data or {}).items() if k != 'crop'}
             row.review = dict(review, instruction=instruction)  # the next comment edits the original again: it keeps this
             row.reason = _clip('Comentario de Gustavo: ' + capture.text, 1000)
             imagenes.forget_rejected(row)
@@ -369,16 +372,18 @@ def _edit_photos(piece, instruction, client, public, capture):
     return attempts + ['ok']
 
 
-def _redesign(piece, public, private, client, findings):
-    """A new infographic (or carousel) from the current text, with his comment as the designer's finding."""
+def _redesign(piece, public, private, client, findings, kind=None):
+    """A new infographic (or carousel) from the current text, with his comment as the designer's finding. `kind`:
+    the format he asked for; otherwise an infographic or carousel keeps its own, and anything else becomes one."""
     if not (isinstance(client, imagenes.connector.FakeImageConnector) or imagenes.connector.available('anthropic')):
         raise ValueError('Sin proveedor visual para rehacer la imagen')
     binding = piece.image_review.get('visual_binding', {})
     with transaction.atomic():
         imagenes.release(piece)  # a replaced photo goes back to the gallery
         piece.images.all().delete()
-        if piece.image_kind not in ('infografia', 'carrusel'):
-            piece.image_kind, piece.image_spec = 'infografia', {}
+        target = kind or (piece.image_kind if piece.image_kind in ('infografia', 'carrusel') else 'infografia')
+        if piece.image_kind != target:
+            piece.image_kind, piece.image_spec = target, {}
         piece.image_reason = _clip('Rehecha por un comentario de Gustavo', 500)
         piece.image_review = {'started': True, 'visual_binding': binding}
         piece.save(update_fields=['image_kind', 'image_spec', 'image_reason', 'image_review', 'updated_at'])
@@ -436,8 +441,9 @@ def _propose(capture, piece, old, record):
                 publish_asap_expected_slot=when, publish_asap_reason='Se movió para conservar tu plazo de veto tras rehacerla')
         summary = record['summary'] or record['reason']
         dropped = set((old.review or {}).get('reasons') or []) if old.state == ActionProposal.State.DISCARDED else set()
-        risks = [r for r in old.risks if not str(r).startswith(('Rehecha por un comentario', 'Líder:', 'Bloqueada por'))
-                 and r not in dropped]
+        risks = [r for r in old.risks if not str(r).startswith(('Rehecha por un comentario', 'Líder:', 'Bloqueada por',
+                                                                'Conservada como observación')) and r not in dropped]
+        risks += compuertas.observation_risks((piece.verification or {}).get('observations') or [])
         if changed:
             risks.append(_clip('Rehecha por un comentario de Gustavo: ' + summary, 500))
         new = operador.create_proposal(old.created_by, None, 'CONT-09',

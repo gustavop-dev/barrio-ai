@@ -3,6 +3,7 @@
 // the layers, the veto with «Deshacer», the states (far future, error, empty month, Horas de Bogotá) and Lista.
 import type { Actividad, Calendario } from '@compartido/api/types';
 import { actividadFixture, calendarioFixture, NOW, piece, shellOverview, WEEK_DAYS } from '@compartido/fixtures/calendario';
+import { semanaFixture } from '@compartido/fixtures/estrategia';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
 import * as Haptics from 'expo-haptics';
 import { State } from 'react-native-gesture-handler';
@@ -610,6 +611,26 @@ describe('Calendario · lista', () => {
     await waitFor(() => expect(api.find('POST', '/api/v1/editorial/plan')).toHaveLength(1));
     expect(api.find('POST', '/api/v1/editorial/plan')[0]!.body).toEqual({ request_id: expect.stringMatching(/^[0-9a-f-]{36}$/) });
     expect(await screen.findByText(/Preparación en cola para el lunes 9 de noviembre\. El circuito tarda unos minutos/)).toBeOnTheScreen();
+  });
+});
+
+describe('Calendario · tipo de cada día (GASP)', () => {
+  it('shows the type of each day in the week strip, in the day panel and the week below', async () => {
+    const api = server({ 'GET /api/v1/estrategia/semana': { body: semanaFixture() } }, (d, h) => {
+      const calendar = calendarioFixture(d, h, WEEK_DAYS);
+      const gasp = { type: 'S' as const, label: 'Venta', idea: 'A conversation about scope', reader_need: 'Saber si su piloto está listo.', planned: true };
+      return { ...calendar, days: calendar.days.map((item) => (item.date === '2026-11-07' ? { ...item, gasp } : item)) };
+    });
+    await renderCalendario();
+    expect(await screen.findByTestId('tipo-2026-11-07')).toHaveTextContent('S');
+    await waitFor(() => expect(screen.getByTestId('dia-2026-11-07').props.accessibilityLabel).toContain('hoy, post de venta'));
+    const type = within(panel()).getByTestId('tipo-del-dia');
+    expect(within(type).getByText('Post de venta')).toBeOnTheScreen();
+    expect(within(type).getByText('Convertir atención en conversaciones')).toBeOnTheScreen();
+    expect(within(type).getByText('Para el lector: Saber si su piloto está listo.')).toBeOnTheScreen();
+    expect(screen.queryByTestId('tipo-2026-11-06')).toBeNull();  // a day without a type says nothing
+    expect(await screen.findByTestId('plan-semana')).toBeOnTheScreen();
+    expect(search(api.find('GET', '/api/v1/estrategia/semana')[0]!).get('dia')).toBe('2026-11-07');
   });
 });
 

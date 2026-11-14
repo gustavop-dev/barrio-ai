@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.6-retoque-por-comentario",
+  "graph_version": "6.7-plan-semanal",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -645,6 +645,10 @@
       "binding": "team_backend.editorial.REWORK_SCHEMA",
       "kind": "json_schema",
       "description": "rework"
+    },
+    "weekly_plan": {
+      "binding": "team_backend.models.WeeklyPlan",
+      "kind": "model"
     }
   },
   "nodes": [
@@ -655,7 +659,7 @@
       "role": "orchestrator",
       "status": "active",
       "binding": "team_backend.editorial._run",
-      "description": "El código editorial coordina el brief y la pieza. Consulta herramientas y decide si continuar; el director no publica.",
+      "description": "El código editorial coordina el brief y la pieza. Consulta herramientas y decide si continuar; el director no publica. Cada domingo planea la semana GASP siguiente (estrategia.py).",
       "skills": [
         "El código editorial coordina el brief y la pieza"
       ],
@@ -694,16 +698,19 @@
         "editorial_input",
         "brief_input",
         "profile_proposal",
-        "community_study"
+        "community_study",
+        "weekly_plan"
       ],
       "output_schemas": [
         "brief",
-        "community_study"
+        "community_study",
+        "weekly_plan"
       ],
       "activity": {
         "job_kinds": [
           "prepare_piece",
-          "community_study"
+          "community_study",
+          "plan_week"
         ],
         "event_roles": [
           "director_editorial"
@@ -1734,7 +1741,8 @@
       "model_note": "Servicio determinista, humano o todavía planificado.",
       "budget_ref": "ninguno",
       "input_schemas": [
-        "proposal"
+        "proposal",
+        "weekly_plan"
       ],
       "output_schemas": [
         "veto",
@@ -4049,6 +4057,21 @@
           ]
         }
       }
+    },
+    {
+      "id": "plan_a_gustavo",
+      "from": "director_editorial",
+      "to": "gustavo",
+      "cycles": [
+        "plan_semanal"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "weekly_plan",
+      "response_schema": "weekly_plan",
+      "max_calls_per_cycle": 1,
+      "response_required": false,
+      "status": "active",
+      "condition": "Artefacto persistido: Gustavo lo ve en el Calendario y puede cambiar un tipo, mover dos días o descartar una idea; si no toca nada, se sigue tal cual."
     }
   ],
   "cycles": [
@@ -4490,6 +4513,47 @@
         ],
         "checkpoint_resume": false,
         "note": "Task/progress ledger por ciclo y reanudación quedan para 3b."
+      }
+    },
+    {
+      "id": "plan_semanal",
+      "label": "Plan de la semana",
+      "status": "active",
+      "orchestrator": "director_editorial",
+      "participants": [
+        "director_editorial",
+        "gustavo"
+      ],
+      "triggers": [
+        {
+          "kind": "plan_week",
+          "cadence": "Domingo tras STRATEGY_PLAN_TIME para la semana siguiente, o «Volver a planear» (esta semana o la siguiente).",
+          "binding": "team_backend.estrategia.queue",
+          "deduplication": "IDs deterministas del job; _pending_job impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "editorial"
+        ],
+        "max_depth": 1,
+        "calls": 1,
+        "cycle_cost_cap": null,
+        "timeout": "Provider timeout.",
+        "scope": "Una llamada por intento (purpose editorial-plan) dentro del presupuesto del equipo y de STRATEGY_PLAN_LLM_USD por semana. La estructura de tipos es determinista y no gasta."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "WeeklyPlan",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Un plan por semana (WeeklyPlan.week_start único); los cambios de Gustavo quedan en su historial."
       }
     },
     {
@@ -4989,7 +5053,8 @@
       "review_referents": "investigador_lider",
       "advance_experiments": "investigador_lider",
       "community_study": "analista_barrio_resultados",
-      "prepare_profile_assets": "perfil"
+      "prepare_profile_assets": "perfil",
+      "plan_week": "director_editorial"
     },
     "stage_roles": {
       "director": [

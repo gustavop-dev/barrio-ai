@@ -185,7 +185,7 @@ def signals(post):
     """COM-11: bounded public evidence only; no private messages, person targeting or invented followers."""
     if not post.referent_id:
         return {'limitations': ['Sin referente asociado.']}
-    review = ReferentReview.objects.filter(account=post.account, published_at__isnull=False).order_by('-month').first()
+    review = ReferentReview.objects.filter(account=post.account, published_at__isnull=False, kind='mensual').order_by('-month').first()
     attribution = ReferentAttribution.objects.filter(referent=post.referent).order_by('-as_of').first()
     focus = active_focus(post.account)
     report = attribution.report if attribution else {}

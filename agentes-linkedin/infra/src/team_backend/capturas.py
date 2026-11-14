@@ -186,10 +186,15 @@ def add_photos(user,uploads,metadata=None):
     audit(user,'gallery.uploaded','galeria',photos=len(photos))
     return photos
 
+def _derived(photo):
+    """The photo's own derived files in pieces: AI edits and plain crops (IMG-09: deleting the photo deletes them)."""
+    from django.db.models import Q
+    return photo.uses.filter(Q(edited=True)|Q(cropped=True))
+
 def delete_photo(user,photo):
     require(user,'approve_actions')
     pid,name=photo.id,photo.image.name  # delete() clears the instance's pk
-    versions=[p.image.name for p in photo.uses.filter(edited=True)]
+    versions=[p.image.name for p in _derived(photo)]
     with transaction.atomic():
         # GAL-05 still removes ordinary post versions. Keep Perfil's exclusion records
         # after SET_NULL detaches their source; their private files are deleted below.
@@ -509,7 +514,7 @@ def undo(user,capture_id):
         photos=list(capture.photos.all())
         names=[capture.audio.name if capture.audio else '']+[p.image.name for p in photos]
         for photo in photos:
-            names.extend(p.image.name for p in photo.uses.filter(edited=True))
+            names.extend(p.image.name for p in _derived(photo))
             photo.delete()
         capture.publish_asap=False;capture.publish_asap_evidence='';capture.publish_asap_expected_slot=None;capture.understanding={}
         capture.publish_at=None;capture.publish_at_evidence=''
@@ -535,11 +540,17 @@ def expire_ideas(now=None):
 def ideas_for_director(now=None):
     """`ideas_from_gustavo`: post ideas from the last 14 days not used yet, newest first."""
     now=now or timezone.now();expire_ideas(now)
-    rows=Capture.objects.filter(state=Capture.State.IDEA,created_at__gte=now-timedelta(days=IDEA_DAYS)).order_by('-publish_asap','publish_asap_expected_slot','-created_at')[:IDEA_LIMIT]
+    from .urgente import is_extra
+    # An idea whose date waits for his answer in the Bandeja is not written meanwhile.
+    # day_request__contains, never exclude(day_request__state=…): on Postgres a capture without that key gives NULL and
+    # the exclude would drop every idea that never had a date problem.
+    rows=Capture.objects.filter(state=Capture.State.IDEA,created_at__gte=now-timedelta(days=IDEA_DAYS)).exclude(
+        day_request__contains={'state':'problem'}).order_by('-publish_asap','publish_asap_expected_slot','-created_at')[:IDEA_LIMIT]
     return [{'id':str(c.id),'text':_clip(c.text,6000),'date':_local(c.created_at).date().isoformat(),
              'investigation':c.investigation,
              'purpose':c.purpose,'publish_asap':c.publish_asap,'evidence':c.publish_asap_evidence,
              'expected_slot':c.publish_asap_expected_slot.isoformat() if c.publish_asap_expected_slot else None,
+             'extra':is_extra(c),'gasp_type':(c.understanding or {}).get('gasp_type') if (c.understanding or {}).get('gasp_type') in ('G','A','S','P') else None,
              'photos':[{'id':str(p.id),'note':p.note,'ai_edit':p.ai_edit} for p in c.photos.filter(category='posts')]} for c in rows]
 
 def feedback_for_director(now=None):
@@ -675,4 +686,4 @@ def photo_payload(p,now=None):
 
 def _photo_versions(photo):
     from .imagenes import payload
-    return [payload(row) for row in photo.uses.filter(edited=True)]
+    return [payload(row) for row in _derived(photo)]

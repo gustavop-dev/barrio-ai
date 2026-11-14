@@ -60,6 +60,7 @@ Todo va por semana local, del lunes a las 00:00 al lunes siguiente a las 00:00 (
 | `gasto_ia` | Gasto del ledger por área (general, editorial, red, resumen semanal y otros de Anthropic) y por proveedor (Jev, AssemblyAI…), con el presupuesto general de IA en `presupuesto_usd: {mensual, tope_diario_seguridad}` | Siempre disponible |
 | `lider` | Aprobadas y descartadas por capacidad y las tres preguntas que más fallan | `LEAD_ENABLED` apagado |
 | `pausas_y_bloqueos` | Paradas y reanudaciones de la máquina, pausas de cuenta, piezas bloqueadas, fallidas o sin presupuesto, y ejecuciones fallidas o inciertas | Siempre disponible |
+| `compuertas` | Por compuerta: entraron, paradas, pasaron tras reintento, con observaciones, tasa de parada, motivo principal y desacuerdos de Gustavo; días sin post por causa y segundo intento ([`compuertas.md`](compuertas.md)). Sin ids | La auditoría no se pudo leer |
 
 Además:
 - `comparacion`: 15 cifras clave con `semana`, `semana_anterior`, `diferencia` y `variacion_pct`, ya calculadas. La variación es `null` si falta alguno de los dos valores o si el anterior es 0.

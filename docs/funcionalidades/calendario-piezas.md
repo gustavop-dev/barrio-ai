@@ -26,6 +26,7 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 | [CAL-15](#cal-15) | Aprobar una pieza en modo aprobación | PWA · app · backend | parcial |
 | [CAL-16](#cal-16) | Enlaces antiguos llevan al Calendario o a la pieza | PWA · app | funciona |
 | [CAL-17](#cal-17) | Fecha prevista y aviso de una captura urgente | backend | funciona |
+| [CAL-18](#cal-18) | «La semana»: el tipo de cada día (GASP) | app · backend | implementado |
 
 ---
 
@@ -167,15 +168,16 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** abre, plegado por secciones, el brief, las dos variantes, el panel de lectores, la selección, el verificador, la reparación y lo que costó.
-- **Código:** `brief`, `variants`, `panel`, `selection`, `verification` (con `rules` y `repair`), `citations`, `signals`, `usage`; PWA `calendario/ComoSeEscribio.tsx`; app `pieza/ComoSeEscribio.tsx`.
+- **Código:** `brief`, `variants`, `panel`, `selection`, `verification` (con `rules`, `repair`, `observations` y `day_attempt`), `citations`, `signals`, `usage`; PWA `calendario/ComoSeEscribio.tsx`; app `pieza/ComoSeEscribio.tsx`.
 - **Criterios de aceptación:**
   1. **Dado** una pieza lista, **cuando** abre «Cómo se escribió», **entonces** ve las secciones cerradas: Brief (lector, modalidad, pilar, tesis, enfoque, formato, valor para el lector, criterio de éxito, qué evitar, evidencia, por qué), Variantes A y B (con «Elegida»), Panel de lectores («Cinco perspectivas simuladas: son hipótesis…»), Selección, Verificador («Afirmaciones comprobadas N de M») y Fuentes y coste (coste por etapa y total).
   2. **Dado** una ronda de reparación, **cuando** abre el detalle, **entonces** aparece «Ronda de reparación» con qué había que corregir, qué cambió y el texto antes de reparar; sin ronda, la sección no aparece.
   3. **Dado** una etapa que no corrió, **cuando** abre su sección, **entonces** ve «Esta etapa aún no ha corrido.» o «Esta etapa no llegó a correr.».
   4. **Dado** que no hay coste registrado, **cuando** abre Fuentes y coste, **entonces** ve «Sin dato de coste.».
   5. **Dado** las variantes, **cuando** las mira en el teléfono, **entonces** van en pestañas (o deslizables en la app); en escritorio, lado a lado.
-- **Brechas código/docs:** —
-- **Cobertura QA:** CAL-09.1–3 y 5 en `07-pieza-veto.yaml` y `07-pieza-estados.yaml` (cada pliegue, variantes deslizadas, ronda de reparación, etapa que no corrió) · CAL-09.4 sin prueba E2E · 2026-11-08 · pasa
+  6. **Dado** una pieza que salió con hallazgos blandos ([EDI-25](motor-editorial.md#edi-25)) o que es el segundo intento de su día ([EDI-27](motor-editorial.md#edi-27)), **cuando** abre Verificador en la app, **entonces** ve «Conservadas como observación» con cada una e «Intento 2 de 2»; con segunda revisión, «Ronda de reparación» dice «N de M resueltos». Sin observaciones ni segundo intento no aparece nada nuevo.
+- **Brechas código/docs:** el criterio 6 está solo en la app; la PWA aún no muestra observaciones, intento ni segunda revisión.
+- **Cobertura QA:** CAL-09.1–3 y 5 en `07-pieza-veto.yaml` y `07-pieza-estados.yaml` (cada pliegue, variantes deslizadas, ronda de reparación, etapa que no corrió) · CAL-09.4 sin prueba E2E · 2026-11-08 · pasa. CAL-09.6 en `PiezaScreen.test.tsx`, escrito; CI pendiente.
 
 ### CAL-10 · Pieza en preparación <a id="cal-10"></a>
 
@@ -291,6 +293,20 @@ Lo que el equipo hizo y va a hacer, día a día y por capas, y el detalle de cad
   4. **Dado** una pieza vetada, fallida o caducada, **cuando** se cierra, **entonces** libera la idea y las fotos para reconsiderarlas; jamás reintenta una publicación incierta.
 - **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
 - **Cobertura QA:**
+
+### CAL-18 · «La semana»: el tipo de cada día (GASP) <a id="cal-18"></a>
+
+- **Dónde:** app · backend (la PWA aún no lo muestra)
+- **Estado:** implementado (14/11/2026)
+- **Qué hace para Gustavo:** en Semana, bajo el panel del día, «La semana» muestra el tipo de cada día (crecimiento, autoridad, venta o personal), la idea que planeó el director, qué necesita el lector y la señal de la audiencia que la respalda, y cómo queda la mezcla en cuatro semanas. Desde ahí cambia el tipo de un día, lo cambia con otro o descarta su idea, y puede volver a planear la semana sabiendo lo que cuesta. La tira de la semana lleva la letra del tipo de cada día y el panel del día dice «Post de …». El motor está en [EDI-29](motor-editorial.md#edi-29).
+- **Código:** app `movil/src/calendario/PlanSemana.tsx` (`evidenceLine`, `monthLine`), `Grids.tsx` (`WeekStrip`, `dayLabel`), `DayPanel.tsx` (`DayType`), `CalendarioScreen.tsx`; `compartido/src/api/estrategia.ts`; backend `estrategia_views.py` y `gasp` en cada día de `GET /api/v1/calendario`.
+- **Criterios de aceptación:**
+  1. **Dado** la vista Semana de esta semana o una futura, **cuando** carga, **entonces** ve «La semana» con su estado («Planeada» o «Solo la estructura»), cada día con su letra, su tipo, su idea o para qué sirve ese tipo, «Para el lector: …» y la señal («Algo que contaste de un comprador: …», o «Sin señal de la audiencia todavía: el director la busca ese día.»), los avisos de la mezcla y «En cuatro semanas: Crecimiento 36 % · Autoridad 29 % · Venta 21 % · Personal 14 %».
+  2. **Dado** un día que aún no se preparó, **cuando** lo toca, **entonces** se abre su hoja con «Tipo del día», «Cambiar con otro día» y, si tiene idea planeada, «Descartar la idea»; un día pasado o ya preparado dice «Ese día ya pasó o su post ya está preparado: su tipo no cambia.».
+  3. **Dado** «Volver a planear», **cuando** lo toca, **entonces** primero ve lo que cuesta («Tiene coste: unos 0,20 USD (como mucho 0,47 USD)») y solo al confirmar se pide; después dice que el director está planeando.
+  4. **Dado** una semana que ya pasó o la estrategia apagada, **cuando** se muestra Semana, **entonces** no hay «La semana».
+  5. **Dado** un día con tipo, **cuando** lo elige, **entonces** su panel empieza con «Post de …», para qué sirve y, si la hay, la idea y «Para el lector: …».
+- **Cobertura QA:** `PlanSemana.test.tsx`, `CalendarioScreen.test.tsx` («Calendario · tipo de cada día (GASP)»); CAL-18.1 y 2 en `07-calendario.yaml` («La semana» y la hoja de hoy). Pendiente de CI.
 
 ## Imágenes
 

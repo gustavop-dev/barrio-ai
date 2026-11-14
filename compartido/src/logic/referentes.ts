@@ -1,4 +1,4 @@
-import type { ReferentChangeCard, ReferentProposal, ReferentExperimentCard } from '../api/referentes';
+import type { ReferentCandidate, ReferentChangeCard, ReferentProposal, ReferentExperimentCard } from '../api/referentes';
 import { normalizeProfileUrl } from '../api/personas';
 
 export function monthlyCountdown(deadline: string, now = Date.now()): string {
@@ -10,7 +10,20 @@ export function monthlyCountdown(deadline: string, now = Date.now()): string {
 }
 export function proposalTitle(p: ReferentProposal, outgoing = 'referente'): string {
   return p.kind === 'swap' ? `sale ${outgoing} · entra ${p.incoming?.display_name ?? 'referente'}`
-    : p.kind === 'add' ? `Alta: ${p.incoming?.display_name ?? 'referente'}` : `Baja: ${outgoing}`;
+    : p.kind === 'add' ? `${p.incoming?.industria ? 'Alta de industria' : 'Alta'}: ${p.incoming?.display_name ?? 'referente'}` : `Baja: ${outgoing}`;
+}
+const STATUS_MARK = { cumple: '✓', no_cumple: '✗', sin_medir: '?' } as const;
+/** An industry candidate's criteria, one line each, plus what it sells and why the team watches it. Empty for a niche voice. */
+export function industryLines(candidate: ReferentCandidate | undefined): string[] {
+  const ind = candidate?.industria;
+  if (!ind) return [];
+  const authority = ind.authority.filter(a => a.verified).map(a => `${a.kind}: ${a.claim}`);
+  return [
+    ...(ind.company ? [`Empresa: ${ind.company}`] : []),
+    ...ind.criteria.map(c => `${STATUS_MARK[c.status]} ${c.label} — ${c.status_label}. ${c.detail}`),
+    ...(authority.length ? [`Autoridad verificada: ${authority.join(' · ')}`] : []),
+    'Lo que le funcione se estudia por estructura y ángulo; nunca se copian sus textos.',
+  ];
 }
 export function editFields(card: ReferentChangeCard) {
   const p = card.proposal;
@@ -32,6 +45,8 @@ export function editedProposal(card: ReferentChangeCard, fields: ReturnType<type
     proposal.incoming = { ...proposal.incoming, profile_url: url, identifier: url.split('/in/')[1]!.replace(/\/$/, ''),
       display_name: fields.name.trim(), niche: fields.niche.trim(), audience: fields.audience.trim(), contribution: fields.contribution.trim(),
       ...(changed ? { top_voice: false, sources: [fields.source] } : {}) };
+    // The industry evaluation measured one profile; another profile has none (the backend refuses a mismatched one).
+    if (changed) delete proposal.incoming.industria;
     if (fields.source) proposal.evidence = [...proposal.evidence, fields.source];
   }
   return proposal;

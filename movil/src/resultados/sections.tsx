@@ -21,6 +21,7 @@ import {
   withPeriod,
   type NegocioOn,
 } from '@compartido/logic/resultados';
+import { GASP_LABEL } from '@compartido/api/estrategia';
 import { formatNumber, formatPct } from '@compartido/logic/format';
 import { MODALITY_SHORT } from '@compartido/logic/personas';
 import type { Kpi, Resultados } from '@compartido/api/types';
@@ -216,11 +217,17 @@ export function Gente({ data }: { data: Resultados['audiencia'] }) {
 
 // ---------------------------------------------------------------- 3 · contenido
 
-/** KPIs, the chart, the best post and the pillars; the posts follow as rows of the list. */
+/** «· 2 posts · 1.400 impresiones» after a GASP type. */
+function typeSub(item: { posts: number; median_impressions: number | null }): string {
+  return `· ${postsCount(item.posts)}${item.median_impressions !== null ? ` · ${formatNumber(item.median_impressions)} impresiones` : ''}`;
+}
+
+/** KPIs, the chart, the best post, the pillars and the GASP types; the posts follow as rows of the list. */
 export function Contenido({ data }: { data: Resultados['contenido'] }) {
   const kpis = data.kpis;
   const best = data.best_post;
   const pillars = sortPillars(data.by_pillar?.items);
+  const types = data.by_type?.items ?? [];
   return (
     <View style={styles.stack}>
       <KpiGrid>
@@ -259,6 +266,21 @@ export function Contenido({ data }: { data: Resultados['contenido'] }) {
           <Muted>Sin posts con corte en el periodo.</Muted>
         )}
       </ChartCard>
+      {types.length ? (
+        // The weekly GASP strategy (estrategia.py): hidden until a post of the period carries a type.
+        <ChartCard title="Interacción media por tipo de post" formula={data.by_type?.formula}>
+          <BarList
+            label="Interacción media por tipo de post"
+            items={types.map((item) => ({
+              key: item.type,
+              label: GASP_LABEL[item.type] ?? item.type,
+              sub: typeSub(item),
+              value: item.value,
+              display: item.value === null ? undefined : formatPct(item.value),
+            }))}
+          />
+        </ChartCard>
+      ) : null}
     </View>
   );
 }

@@ -171,7 +171,7 @@ export interface PhotoOutput {
   note: string;
   ai_edit: AIEdit;
   instruction?: string;
-  instruction_kind?: '' | 'none' | 'original' | 'edit' | 'unsafe';
+  instruction_kind?: '' | 'none' | 'original' | 'crop' | 'edit' | 'unsafe';
   versions?: PieceImage[];
   used_in: { piece_id: string | null; date: string | null; text: string } | null;
   capture_id: string | null;

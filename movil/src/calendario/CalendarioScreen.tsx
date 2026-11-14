@@ -10,6 +10,8 @@
 // side the date moved to (DaySwap.tsx); Semana ↔ Mes makes the week leave, the month enter row by row and the
 // selection travel to its cell, while the calendar's height eases between both (ViewSwitch.tsx, Grids.tsx,
 // Pager.tsx).
+//
+// Semana ends with «La semana» (PlanSemana.tsx): the GASP type and planned idea of each day of the week on screen.
 import { getCalendario } from '@compartido/api/endpoints';
 import { REFRESH, useActividad, useCalendario, useOverview } from '@compartido/api/hooks';
 import { keys } from '@compartido/api/queryClient';
@@ -31,6 +33,7 @@ import { LayerChips } from './LayerChips';
 import { ListView } from './ListView';
 import { Pager, type PageOffset } from './Pager';
 import { useCalendarParams } from './params';
+import { PlanSemana } from './PlanSemana';
 import { rangeOf, shifted, useVisiblePeriod } from './period';
 import { usePill } from './Selection';
 import { useNow } from './useNow';
@@ -227,6 +230,7 @@ export function CalendarioScreen() {
           )
         }
       />
+      {vista === 'semana' ? <PlanSemana fecha={anchor} today={today} /> : null}
     </ScrollView>
   );
 }

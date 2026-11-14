@@ -51,7 +51,7 @@ def lock(account):
 
 def snapshot(ref):
     return {'id': str(ref.pk), 'identifier': ref.public_identifier, 'display_name': ref.display_name,
-            'profile_url': ref.profile_url, 'reason': ref.reason, 'active': ref.active,
+            'profile_url': ref.profile_url, 'reason': ref.reason, 'active': ref.active, 'kind': ref.kind,
             'protected': ref.protected, 'position': ref.position, 'revision': ref.revision,
             'archived': bool(ref.archived_at)}
 
@@ -153,7 +153,7 @@ def validate_proposal(account, data, *, evidence=None):
             if not report.get('exposure_count') or not report.get('coverage', {}).get('classified'):
                 raise ValueError('Baja sin muestra clasificada y exposición: seguir midiendo.')
     if incoming:
-        if not isinstance(incoming, dict) or set(incoming) - {'identifier', 'display_name', 'profile_url', 'niche', 'audience', 'contribution', 'top_voice', 'sources'}:
+        if not isinstance(incoming, dict) or set(incoming) - {'identifier', 'display_name', 'profile_url', 'niche', 'audience', 'contribution', 'top_voice', 'sources', 'industria'}:
             raise ValueError('Candidato inválido')
         for field in ('identifier', 'display_name', 'profile_url', 'niche', 'audience', 'contribution'):
             if not isinstance(incoming.get(field), str) or not incoming[field].strip():
@@ -164,6 +164,10 @@ def validate_proposal(account, data, *, evidence=None):
                 or url.username or url.password or url.port not in (None,443) or not re.fullmatch(r'/in/[^/]+/?',url.path)
                 or slug != public_identifier(incoming['identifier'])):
             raise ValueError('El enlace debe identificar el perfil propuesto.')
+        # referentes_industria: the evaluation belongs to one profile; an edit that changes the profile must drop it.
+        industry = incoming.get('industria')
+        if industry is not None and (not isinstance(industry, dict) or industry.get('slug', slug) != slug):
+            raise ValueError('La evaluación de industria corresponde a otro perfil; quítala al cambiar el perfil.')
         if Referent.objects.filter(account=account, public_identifier=slug, active=True, archived_at__isnull=True).exists():
             raise ValueError('El candidato ya está activo.')
         if Referent.objects.filter(account=account, public_identifier=slug, protected=True).exists():
@@ -197,11 +201,22 @@ def publish(review, now=None):
     if now < bounds(review.month)[0]:
         return review
     review.published_at = now
-    # Late batches stay explicit-only, including after a failed initial publication transaction.
-    review.state = 'published' if now.astimezone(TZ).date() == review.month else 'late'
+    # Late batches stay explicit-only, including after a failed initial publication transaction. An industry search
+    # (referentes_industria) and an extraordinary review (its notice promises «nada se aplica sin tu decisión») are
+    # never applied by silence, whatever day they land: even one asked for on day 1.
+    on_time = (now.astimezone(TZ).date() == review.month and review.kind == 'mensual'
+               and not (review.dossier or {}).get('extraordinaria'))
+    review.state = 'published' if on_time else 'late'
     if control.revision != review.expected_revision or not control.initialized:
         review.state = 'conflict'
     review.save()
+    if review.kind == 'industria':
+        n = review.changes.count()
+        notice(review, 'day1', 'Referentes de industria por decidir',
+            (f'{n} {"voz grande" if n == 1 else "voces grandes"} de tu industria en EE. UU., con los criterios que cumple cada una. '
+             if n else 'Ningún candidato cumplió todos los criterios; el detalle queda en Personas. ')
+            + f'Decide hasta el {review.deadline.astimezone(TZ):%d/%m}; nada se aplica sin tu decisión.', now)
+        return review
     if (review.dossier or {}).get('extraordinaria'):
         notice(review, 'day1', 'Revisión extraordinaria de referentes',
             f'Voces con audiencia en EE. UU. para los cupos variables. Decide cada propuesta hasta el '
@@ -222,7 +237,7 @@ def extraordinary(user, account, now=None):
     month = month_start(now)
     if not ReferentControl.objects.filter(account=account, initialized=True).exists():
         raise ValueError('Primero identifica los cinco main de la cuenta.')
-    if ReferentReview.objects.filter(account=account, month=month).exists():
+    if ReferentReview.objects.filter(account=account, month=month, kind='mensual').exists():
         raise Conflict('Ya hay una revisión de referentes este mes; decide esa en la Bandeja.')
     job, _ = enqueue_operation(user, 'review_referents',
         {'account': str(account.pk), 'month': month.isoformat(), 'extraordinaria': True},
@@ -247,6 +262,8 @@ def _apply(item, control, user, automatic, now):
         before = snapshot(incoming)
         incoming.active, incoming.archived_at, incoming.reason = True, None, data['reason']
         incoming.display_name, incoming.profile_url = candidate['display_name'], candidate['profile_url']
+        if review.kind == 'industria':
+            incoming.kind = Referent.Kind.INDUSTRIA
         changed(control, user, incoming, before, 'monthly_deadline' if automatic else 'tu_turno', data['reason'])
     after_count = capacity(review.account)
     item.state = 'aplicada_por_plazo' if automatic else 'approved'
@@ -260,7 +277,8 @@ def _apply(item, control, user, automatic, now):
 
 
 @transaction.atomic
-def decide(user, item_id, version, decision, proposal=None, now=None):
+def decide(user, item_id, version, decision, proposal=None, now=None, note=''):
+    """`note`: Gustavo's why, kept in the history; a rejected industry candidate's note is shown to the next search."""
     require_gustavo(user)
     now = now or timezone.now()
     item = ReferentChange.objects.select_related('review__account').get(pk=item_id)
@@ -273,7 +291,8 @@ def decide(user, item_id, version, decision, proposal=None, now=None):
     if decision not in ('approve', 'reject', 'edit', 'edit_apply', 'adjust', 'later'):
         raise ValueError('Decisión desconocida')
     item.history.append({'version': item.version, 'proposal': item.proposal, 'state': item.state,
-                         'decision': decision, 'actor': str(user.pk), 'at': now.isoformat()})
+                         'decision': decision, 'actor': str(user.pk), 'at': now.isoformat(),
+                         **({'note': str(note).strip()[:500]} if note and str(note).strip() else {})})
     if decision in ('edit', 'edit_apply'):
         item.proposal = validate_proposal(item.review.account, proposal)
     item.version += 1
@@ -298,7 +317,7 @@ def close(review, now=None):
     review = ReferentReview.objects.select_for_update().get(pk=review.pk)
     if now < review.deadline or review.closed_at:
         return
-    eligible = (control.initialized and review.state == 'published' and review.published_at
+    eligible = (control.initialized and review.kind == 'mensual' and review.state == 'published' and review.published_at
                 and review.published_at.astimezone(TZ).date() == review.month
                 and review.notices.filter(event='day1').exists()
                 and review.expected_revision == control.revision)
@@ -314,13 +333,18 @@ def close(review, now=None):
                 control.refresh_from_db(); review.refresh_from_db(); item.refresh_from_db()
                 item.conflict = str(exc)
         else:
-            item.conflict = 'Lote tardío, aviso ausente o lista modificada: requiere decisión explícita.'
+            item.conflict = ('Referente de industria: solo entra con tu decisión explícita.' if review.kind == 'industria'
+                             else 'Lote tardío, aviso ausente o lista modificada: requiere decisión explícita.')
         item.state = 'conflict'
         item.save(update_fields=['state', 'conflict'])
     review.closed_at = now
     review.save(update_fields=['closed_at'])
     states = list(review.changes.values('id', 'state', 'conflict'))
-    result_notice=notice(review, 'closed', 'Cierre de referentes',
+    if review.kind == 'industria':
+        result_notice = notice(review, 'closed', 'Cierre de referentes de industria',
+            f'Sin decisión: {sum(x["state"] == "conflict" for x in states)}; siguen en la Bandeja y no se aplicaron.', now)
+    else:
+        result_notice=notice(review, 'closed', 'Cierre de referentes',
            f'Aplicadas por plazo autorizado: {sum(x["state"] == "aplicada_por_plazo" for x in states)}. '
            f'Conflictos: {sum(x["state"] == "conflict" for x in states)}. Protegidos conservados.', now)
     result_notice.payload['changes']=[{'id':str(item.pk),'state':item.state,'proposal':item.proposal,'conflict':item.conflict}
@@ -338,7 +362,9 @@ def tick(user, now=None):
     for review in ReferentReview.objects.filter(closed_at__isnull=True).select_related('account'):
         publish(review, now)
         review.refresh_from_db()
-        if local.day == 4 and local.hour >= 9 and review.month == local.date().replace(day=1) and review.published_at:
+        # The day-4 reminder promises an application by silence: only the on-time monthly batch has one.
+        if (local.day == 4 and local.hour >= 9 and review.month == local.date().replace(day=1) and review.published_at
+                and review.kind == 'mensual' and review.state == 'published'):
             if review.changes.filter(state='pending', responded_at__isnull=True).exists():
                 with transaction.atomic():
                     lock(review.account)

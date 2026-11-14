@@ -2,7 +2,7 @@
 
 El equipo observa los posts de los referentes de Gustavo, escribe comentarios en su voz y los publica solos. El agente líder (Jev, de TypeSafe) aprueba o descarta cada acción en lugar de Gustavo; nunca escala nada.
 
-- **Código:** `agentes-linkedin/infra/src/team_backend/operador.py` (`observe`, `propose_comment`, `_draft_comment`, `execute`), `autopiloto.py` (`_observe`, `_propose`, `_prefilter`, `policy_review`, `content_issues`, `lead_silence`), `lider.py` (`review`, `comment_worthy`).
+- **Código:** `agentes-linkedin/infra/src/team_backend/operador.py` (`observe`, `propose_comment`, `_draft_comment`, `execute`), `autopiloto.py` (`_observe`, `_lead_redraft`, `_propose`, `_prefilter`, `policy_review`, `content_issues`, `lead_silence`), `lider.py` (`review`, `comment_worthy`).
 - **Documentación:** [`rediseno-backend.md`](../../agentes-linkedin/infra/docs/rediseno-backend.md), [`mapa-agentes-runtime.md`](../../agentes-linkedin/infra/docs/mapa-agentes-runtime.md), [`operador-linkedin.md`](../../agentes-linkedin/infra/docs/operador-linkedin.md).
 - **Entorno de prueba:** cuenta `fake` (Unipile simulado), Claude y TypeSafe parcheados, como en `tests/test_operador.py` y `tests/test_auditoria_lider.py`.
 
@@ -21,6 +21,7 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
 | [COM-09](#com-09) | Proponer un comentario a mano para un post | backend | parcial |
 | [COM-10](#com-10) | Gestionar referentes | PWA · app · backend | funciona |
 | [COM-11](#com-11) | Relaciones usa la evidencia de referentes y de su audiencia | backend | funciona |
+| [COM-12](#com-12) | Un comentario que el líder descartó se reescribe una vez con sus razones | backend | implementado |
 
 ---
 
@@ -88,7 +89,7 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
 - **Criterios de aceptación:**
   1. **Dado** `LEAD_ENABLED=true` e INT-03 en `auto`, **cuando** un comentario pasa las reglas, **entonces** Jev responde `aporta`, `pitch`, `inventa`, `respeto` e `idioma`, y se aprueba solo si `aporta` ≥ 0,7, `pitch` ≤ 0,2, `inventa` ≤ 0,2, `respeto` ≥ 0,8 e `idioma` ≥ 0,7.
   2. **Dado** una orientación de Gustavo, **cuando** se revisa, **entonces** se añade `orientacion` ≥ 0,4.
-  3. **Dado** cualquier umbral fallido, **cuando** se decide, **entonces** la acción pasa a `discarded` con «Descartada por el líder (…)» y `review` guarda respuestas, umbrales, modelo y coste.
+  3. **Dado** cualquier umbral fallido, **cuando** se decide, **entonces** la acción pasa a `discarded` con «Descartada por el líder (…)» y `review` guarda respuestas, umbrales, modelo y coste. Un comentario así tiene una reescritura con esas razones ([COM-12](#com-12)).
   4. **Dado** que Jev no responde, **cuando** se revisa, **entonces** la acción queda en `proposed`, se reintenta tras `LEAD_RETRY_MINUTES` (10) y el resto del ciclo no vuelve a llamar a Jev.
   5. **Dado** más de 5 propuestas pendientes, **cuando** corre un ciclo, **entonces** el líder revisa como mucho `LEAD_MAX_REVIEWS_PER_TICK` (5), de la más antigua a la más reciente.
   6. **Dado** una acción de red, **cuando** la revisa el líder, **entonces** solo pregunta por el riesgo (≤ 0,3 para seguir y aceptar, ≤ 0,2 para invitar); el encaje no se vuelve a juzgar.
@@ -180,6 +181,23 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
   5. **Dado** la actividad diaria, **cuando** redacta/verifica un comentario, **entonces** lo entrega en inglés, con aporte situado y fundamento del curso; no publica elogio vacío, pitch ni repetición para alcanzar 100 interacciones. La falta de aporte se informa y no se compensa con ráfagas.
 - **Brechas código/docs:** implementación entregada en fase 5; ejecución de CI/QA delegada a Claude, sin pruebas locales. Conservar los límites observacionales de OBS-03.
 - **Cobertura QA:** casos sintéticos en `test_referentes_mensuales.py`, Jest/Vitest y `19-referentes-mensual.yaml`; pendientes de ejecución por Claude. [Entrega y verificaciones](../../agentes-linkedin/infra/docs/referentes-mensuales.md).
+
+### COM-12 · Un comentario que el líder descartó se reescribe una vez con sus razones <a id="com-12"></a>
+
+- **Dónde:** backend
+- **Estado:** implementado
+- **Qué hace para Gustavo:** si Jev descarta un comentario («no aporta una idea concreta», «suena a venta»…), el equipo lo reescribe una vez sabiendo por qué, y Jev juzga el texto nuevo. Antes ese descarte era definitivo. Nunca hay una tercera vuelta.
+- **Origen:** Gustavo, 14/11/2026: «si nos bloquea buscar una manera de reintentar… tampoco iteraciones infinitas» ([`compuertas.md`](../../agentes-linkedin/infra/docs/compuertas.md)).
+- **Código:** `autopiloto._lead_redraft` (en cada tick, antes de `_propose`), `operador.propose_comment(redraft_of=…)`, `operador.run_job` (`params.redraft_of`), `COMMENT_SYSTEM` (`revision.lead_reasons`), `compuertas.lead_redraft`, `compuertas.LEAD_REDRAFT`.
+- **Criterios de aceptación:**
+  1. **Dado** `LEAD_ENABLED=true`, INT-03 en `auto`, `COMMENT_LEAD_REDRAFT=true` (por defecto) y un comentario del equipo que Jev descartó en las últimas 24 h, sobre un post de un referente activo de menos de `OPERATOR_MAX_POST_AGE_HOURS`, **cuando** corre el autopiloto con cupo de INT-03, presupuesto de IA, sitio en `OPERATOR_DAILY_PROPOSALS` y ningún `propose_comment` en cola, **entonces** encola un `propose_comment` con `{post, redraft_of}` (id determinista por descarte).
+  2. **Dado** ese trabajo, **cuando** redacta, **entonces** el redactor recibe `revision: {previous_comment, lead_reasons}` y la propuesta nueva lleva el riesgo «Reescrito una vez con las razones del líder: …»; pasa por las reglas fijas y por Jev como cualquier comentario.
+  3. **Dado** que la reescritura rompe una regla fija, **cuando** se redacta, **entonces** no tiene la reescritura por reglas de [COM-04](#com-04): la política la descarta.
+  4. **Dado** un post que ya tiene dos borradores de comentario, **cuando** corre el autopiloto o se pide otra reescritura, **entonces** no se encola nada y `propose_comment` responde «Este comentario ya se reescribió una vez con las razones del líder…».
+  5. **Dado** un descarte por las reglas (no por Jev), una decisión del redactor de no comentar o un descarte de hace más de 24 h, **cuando** corre el autopiloto, **entonces** no hay reescritura por el líder.
+  6. **Dado** la auditoría de compuertas, **cuando** la reescritura se aprueba, **entonces** cuenta en «Líder (Jev) · INT-03» como «pasó tras reintento», y «Descartes sin reescritura» cuenta los descartes que no tuvieron otro borrador.
+- **Brechas código/docs:** las respuestas INT-04 no tienen esta reescritura.
+- **Cobertura QA:** `tests/test_compuertas.py` (`LeadRedraftTests`), escrito; CI pendiente.
 
 ## Retiradas
 

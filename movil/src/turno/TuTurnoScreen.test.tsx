@@ -152,18 +152,18 @@ describe('Tu turno', () => {
     await waitFor(() => expect(server.find('POST', '/api/v1/respuestas/pc-1/mensaje')[0]?.body).toEqual({ how: 'enviado' }));
   });
 
-  it('asks whether a post goes out on a day that already has one, shows both posts and sends his answer', async () => {
+  it('says at once why a date he asked for cannot be kept, shows his idea and sends his answer', async () => {
     const server = await renderTurno(turnoFixture({ count: 1, items: [DAY_REQUEST_CARD] }), { 'POST /api/v1/capturas/cap-1/fecha': { body: {} } });
     const card = await screen.findByTestId(`turno-card-${DAY_REQUEST_CARD.id}`);
     expect(within(card).getByText('Fecha pedida')).toBeOnTheScreen();
-    expect(within(card).getByText(DAY_REQUEST_CARD.title)).toBeOnTheScreen();
+    expect(within(card).getByText('No puedo publicarlo cuando pediste')).toBeOnTheScreen();
     await fireEvent.press(within(card).getByTestId(`turno-more-${DAY_REQUEST_CARD.id}`));
-    expect(within(card).getByText('Tu post, mientras decides')).toBeOnTheScreen();
-    expect(within(card).getByTestId('day-request-piece')).toHaveTextContent(/How do founders decide/);
-    expect(within(card).getByTestId('day-request-other-p-friday')).toHaveTextContent(/Cycles between agents/);
+    expect(within(card).getByTestId('day-request-problem')).toHaveTextContent('Ese día ya tiene dos posts: el diario y otro que pediste.');
+    expect(within(card).getByTestId('day-request-idea')).toHaveTextContent(/How do founders decide/);
     expect(within(card).getByText('“lo publiques mañana a las 12 del día, del mediodía”')).toBeOnTheScreen();
-    await fireEvent.press(within(card).getByText('Sí, el viernes 13/11 a las 12:00'));
-    await waitFor(() => expect(server.find('POST', '/api/v1/capturas/cap-1/fecha')[0]?.body).toEqual({ decision: 'mismo_dia' }));
+    expect(within(card).queryByTestId('day-request-piece')).toBeNull();
+    await fireEvent.press(within(card).getByText('Al primer día libre'));
+    await waitFor(() => expect(server.find('POST', '/api/v1/capturas/cap-1/fecha')[0]?.body).toEqual({ decision: 'siguiente' }));
   });
 
   it('asks for a note before resolving an uncertain action and sends it', async () => {

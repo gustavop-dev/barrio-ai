@@ -132,6 +132,14 @@ export function resultadosFixture(overrides: Partial<Resultados> = {}): Resultad
           { pillar: 'architecture_delivery', value: null, posts: 0 },
         ],
       },
+      by_type: {
+        cut: '7d',
+        formula: '(reacciones + comentarios + republicaciones) / impresiones × 100',
+        items: [
+          { type: 'G', value: 2.9, median_impressions: 1400, posts: 2 },
+          { type: 'A', value: 3.4, median_impressions: 960, posts: 1 },
+        ],
+      },
       posts: [
         {
           piece_id: 'p-1',

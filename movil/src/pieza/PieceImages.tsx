@@ -1,6 +1,6 @@
 import type { PieceMedia, PieceImage, RejectedEdit } from '@compartido/api/imagenes';
 import { sameOrigin } from '@compartido/api/capturas';
-import { imageAspect, IMAGE_KIND_LABEL, orderedImages, reviewLines, TEMPLATE_LABEL } from '@compartido/logic/imagenes';
+import { imageAspect, IMAGE_KIND_LABEL, orderedImages, photoTreatment, reviewLines, TEMPLATE_LABEL } from '@compartido/logic/imagenes';
 import { useEffect, useRef, useState } from 'react';
 import { ScrollView, StyleSheet, View, type ScrollViewInstance } from 'react-native';
 import { ApiImage, Badge, Button, Card, Note, Section, T } from '@/components/ui';
@@ -55,7 +55,8 @@ function Gallery({ images, media }: { images: PieceImage[]; media: PieceMedia })
   const [original, setOriginal] = useState(false);
   const { reduced } = useMotion();
   const current = images[index]!;
-  const compare = current.edited && Boolean(sameOrigin(current.source_photos[0]?.url));
+  const treatment = photoTreatment(current);
+  const compare = (treatment === 'editada' || treatment === 'recortada') && Boolean(sameOrigin(current.source_photos[0]?.url));
   const go = (next: number) => { setOriginal(false); setIndex(next); };
   useEffect(() => { pager.current?.scrollTo({ x: index * width, animated: !reduced }); }, [index, width, reduced]);
 
@@ -63,7 +64,9 @@ function Gallery({ images, media }: { images: PieceImage[]; media: PieceMedia })
     <View testID="piece-images" collapsable={false} style={styles.content}>
       <View style={styles.labels}>
         <Badge tone="info">{IMAGE_KIND_LABEL[media.image_kind ?? current.kind]}</Badge>
-        {current.edited ? <Badge tone="info">Editada con IA</Badge> : current.kind === 'foto' ? <T variant="detalle">Se publica tal cual</T> : null}
+        {treatment === 'editada' ? <Badge tone="info">Editada con IA</Badge>
+          : treatment === 'recortada' ? <Badge tone="info">Recortada, sin IA</Badge>
+            : treatment === 'original' ? <T variant="detalle">Se publica tal cual</T> : null}
       </View>
       <View onLayout={(event) => setWidth(event.nativeEvent.layout.width)} style={styles.frame}>
         <ScrollView ref={pager} testID="piece-images-pager" horizontal pagingEnabled showsHorizontalScrollIndicator={false}
@@ -84,7 +87,7 @@ function Gallery({ images, media }: { images: PieceImage[]; media: PieceMedia })
         <Button size="small" disabled={index === images.length - 1} onPress={() => go(index + 1)} testID="piece-image-next">Siguiente</Button>
       </View> : null}
       {compare ? <Button size="small" onPress={() => setOriginal((value) => !value)} testID="piece-image-compare">
-        {original ? 'Ver editada' : 'Ver original'}
+        {original ? (treatment === 'recortada' ? 'Ver recortada' : 'Ver editada') : 'Ver original'}
       </Button> : null}
       {current.rejected_edit && sameOrigin(current.rejected_edit.url) ? <Rejected key={current.rejected_edit.url} edit={current.rejected_edit} alt={current.alt} /> : null}
       {current.template ? <T variant="detalle" soft>{`Plantilla: ${TEMPLATE_LABEL[current.template]}`}</T> : null}

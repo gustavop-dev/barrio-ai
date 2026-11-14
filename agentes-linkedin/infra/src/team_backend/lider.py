@@ -69,9 +69,13 @@ def gustavo_request(proposal):
     """What Gustavo said for this post (the ideas the piece uses and his comments on it), oldest first; [] when the
     post is the team's own."""
     if proposal.capability!=CAP.PUBLISH or not proposal.piece_id:return []
+    return piece_request(proposal.piece_id)
+
+def piece_request(piece_id):
+    """gustavo_request for a piece that has no proposal yet (editor_visual reads it to honour a format he asks for)."""
     from django.db.models import Q
     from .models import Capture
-    pid=str(proposal.piece_id)
+    pid=str(piece_id)
     rows=Capture.objects.filter(Q(state=Capture.State.USED,routed_to__used_in=pid)|
                                 Q(state=Capture.State.NOTED,context_type='pieza',context_id=pid)).order_by('created_at')
     texts=[' '.join((c.text or '').split())[:GUSTAVO_TEXT_CHARS] for c in rows]
@@ -139,9 +143,17 @@ def _questions(proposal,orientation):
     elif capability==CAP.PUBLISH:
         state={'publicacion':proposal.payload['text']}
         asked=gustavo_request(proposal)
+        # A Sales post of the weekly strategy may carry ONE invitation to talk (compuertas.gate_policy): the rules and the
+        # verifier already let it through, so the lead must not discard it for exactly that.
+        from . import compuertas
+        sales=compuertas.gate_policy(proposal.piece if proposal.piece_id else None).get('cta_max')
         questions={
             'clara':_noul('¿La `publicacion` desarrolla una sola idea clara que un lector puede entender sin contexto adicional?'),
-            'pitch':_noul('¿La `publicacion` vende de forma agresiva, crea urgencia artificial o pide que le escriban o lo contraten?'),
+            'pitch':_noul('¿La `publicacion` vende de forma agresiva, crea urgencia artificial o pide que le escriban o lo contraten?'
+                          if not sales else
+                          '¿La `publicacion` vende de forma agresiva, crea urgencia artificial, pide que lo contraten o trae más de '
+                          'una invitación a escribirle o a comentar? Es un post de venta: una sola invitación a conversar es lo que '
+                          'debe llevar y no cuenta como venta.'),
             'inventa':_noul('¿La `publicacion` atribuye a Gustavo una experiencia, un cliente, un proyecto, una cifra o un resultado que '
                             'no aparece en `hechos_publicos_de_gustavo`?'),
         }

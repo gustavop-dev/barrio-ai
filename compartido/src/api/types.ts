@@ -628,10 +628,24 @@ export interface Verification {
   rules?: string[];
   /** R4: the one repair round, when the rules or the verifier found concrete problems. */
   repair?: Repair;
+  /** Soft findings (hook_not_delivered, off_brief, other and the GASP type ones such as cta_count) that did not stop the
+   * piece (docs/compuertas.md). */
+  observations?: Observation[];
+  /** Which attempt of its day this piece was; the second only follows a content gate's block. */
+  day_attempt?: { number: number; of: number };
+  /** SHA-256 of what the verdict read, for the offline replay; never the content itself. */
+  context?: { public_facts?: string; private_guidance?: string; orientation?: string };
+}
+
+export interface Observation {
+  issue: string;
+  quote?: string;
+  detail?: string;
 }
 
 export interface RepairFinding {
-  source: 'reglas' | 'verificador';
+  /** estrategia: a per-type finding of the weekly strategy (cta_count, offer_in_growth…), found by code. */
+  source: 'reglas' | 'verificador' | 'estrategia';
   issue: string;
   quote?: string;
   detail?: string;
@@ -653,6 +667,8 @@ export interface Repair {
   note?: string;
   repaired_sha256?: string;
   repaired_text?: string;
+  /** After the scoped second review: whether each first finding was resolved. */
+  resolution?: { source: 'reglas' | 'verificador' | 'estrategia'; issue: string; resolved: boolean }[];
 }
 
 export interface Signal {
@@ -787,6 +803,8 @@ export interface LinkedInStatus {
 // ---------------------------------------------------------------- referents
 
 export interface Referent {
+  /** nicho: a voice of the niche; industria: a big seller of Gustavo's own services (referentes_industria.py). */
+  kind?: 'nicho' | 'industria';
   protected?: boolean;
   position?: number;
   revision?: number;
@@ -940,16 +958,26 @@ export interface TurnoDayPost {
   scheduled_for: string;
 }
 
+/** Why a date he asked for cannot be kept (urgente.PROBLEMS). */
+export type DayRequestProblem = 'pasada' | 'veto' | 'ventana' | 'lejana' | 'ambigua' | 'llena';
+
 /**
- * The `fecha` card (`day_request:<capture>`): the day and hour he asked for already had a post, so his post waits on the
- * next free day. `POST /api/v1/capturas/<capture>/fecha {decision: mismo_dia | siguiente}`.
+ * The `fecha` card (`day_request:<capture>`, 14/11/2026): a day and hour he asks for is an order and goes out as an extra
+ * post that day; only a date that cannot be kept (past, inside the veto notice, outside the window, beyond 14 days,
+ * unclear, or a day with two posts already) asks him, at once. The idea waits for his answer.
+ * `POST /api/v1/capturas/<capture>/fecha {decision: siguiente | descartar}`.
  */
 export interface TurnoDayRequest {
   capture_id: string;
-  /** The day and hour he asked for, and the words he used. */
-  asked_at: string;
+  /** The day and hour he asked for (null when the words gave no date), and the words he used. */
+  asked_at: string | null;
   evidence: string;
-  piece: TurnoDayPost;
+  problem: DayRequestProblem | string;
+  problem_label: string;
+  /** His idea, as he sent it (clipped). */
+  idea: string;
+  /** Always null and empty since 14/11: kept for older cards. */
+  piece: TurnoDayPost | null;
   others: TurnoDayPost[];
 }
 
@@ -1205,11 +1233,26 @@ export interface CalendarDayCounts {
   connections_fit: number;
 }
 
+/** The weekly GASP types (estrategia.py): G crecimiento, A autoridad, S venta, P personal. */
+export type GaspType = 'G' | 'A' | 'S' | 'P';
+
+/** `gasp` of a calendar day: the plan's type, the structure's for a coming day, or the type its post carried. */
+export interface CalendarGasp {
+  type: GaspType;
+  label: string;
+  idea: string | null;
+  reader_need: string | null;
+  /** The director planned the week (not only its structure). */
+  planned: boolean;
+}
+
 export interface CalendarioDay {
   date: string;
   counts: CalendarDayCounts;
   /** Ordered by layer priority (Tuyo > Sistema > Publicaciones > Conversaciones > Red), then by time. */
   events: CalendarEvent[];
+  /** Null with the strategy off, or a past day without a typed post. */
+  gasp?: CalendarGasp | null;
 }
 
 /** GET /api/v1/calendario?desde=&hasta= (93 days at most; days in America/Bogota). */
@@ -1450,6 +1493,8 @@ export interface ResultadosPost {
   published_at: string | null;
   first_line: string;
   pillar: string | null;
+  /** GASP type of the post (G, A, S, P), null before the strategy. */
+  gasp_type?: GaspType | null;
   url: string | null;
   impressions_24h: number | null;
   impressions_7d: number | null;
@@ -1491,6 +1536,12 @@ export interface Resultados {
     };
     best_post: { piece_id: string; first_line: string; date: string; pillar: string | null; impressions: number | null; engagement_pct: number | null; cut: '7d' | '24h' | null } | null;
     by_pillar: { cut: '7d' | '24h' | null; formula: string; items: { pillar: string; value: number | null; posts: number }[] };
+    /** Per GASP type (estrategia.py), same cut: mean interaction and median impressions. Empty before the strategy. */
+    by_type?: {
+      cut: '7d' | '24h' | null;
+      formula: string;
+      items: { type: GaspType; value: number | null; median_impressions: number | null; posts: number }[];
+    };
     posts: ResultadosPost[];
   };
   equipo: {

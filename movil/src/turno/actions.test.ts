@@ -55,11 +55,11 @@ describe('swipe intents', () => {
     expect(swipeIntents(cardFixture({ actions: [] }))).toEqual({ right: null, left: null });
   });
 
-  it('a second post on the day he asked for is a tap on its button, never a swipe', () => {
+  it('a date that cannot be kept is a tap on its button, never a swipe', () => {
     expect(swipeIntents(DAY_REQUEST_CARD)).toEqual({ right: null, left: null });
-    const [same, next] = DAY_REQUEST_CARD.actions;
-    expect(successMessage(same!)).toBe('Listo: sale el día que pediste');
-    expect(successMessage(next!)).toBe('Se queda en el siguiente día libre');
+    const [next, discard] = DAY_REQUEST_CARD.actions;
+    expect(successMessage(next!)).toBe('Va al primer día libre');
+    expect(successMessage(discard!)).toBe('Idea descartada');
     expect(hasDetails(DAY_REQUEST_CARD)).toBe(true);
   });
 

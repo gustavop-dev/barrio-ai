@@ -30,7 +30,7 @@ Cada función se escribió leyendo el código (`agentes-linkedin/infra/`, `ofici
 | [notificaciones-push.md](notificaciones-push.md) | `PUS` | Web Push de la PWA, push nativa de la app y sus interruptores |
 | [app-movil-instalacion.md](app-movil-instalacion.md) | `APP` | Compilar e instalar la app, a qué servidor apunta, sus permisos y sus actualizaciones OTA |
 | [imagenes-en-publicaciones.md](imagenes-en-publicaciones.md) | `IMG`, `IMG-INF` | La imagen de cada post: foto de la Galería, infografía o carrusel, hasta LinkedIn (no implementado) |
-| [observatorio-referentes.md](observatorio-referentes.md) | `OBS` | Cinco main protegidos, diez plazas variables, altas/bajas/swaps con ventana días 1–5 y experimentos con evidencia |
+| [observatorio-referentes.md](observatorio-referentes.md) | `OBS` | Cinco main protegidos, diez plazas variables, altas/bajas/swaps con ventana días 1–5, experimentos con evidencia, referentes de industria y modelos de crecimiento |
 | [comunidad-lectores.md](comunidad-lectores.md) | `LEC` | Estudio de la comunidad, sus límites de privacidad y su uso por los cinco lectores |
 | [estrategia-perfil.md](estrategia-perfil.md) | `EST` | Propuestas semestrales/mensuales y desde captura: assets de Perfil, previews, Markdown fundamentado y checklist manual |
 | [biblioteca-equipos.md](biblioteca-equipos.md) | `BIB` | Unidades curadas para Observatorio, red, inbox, líder y resumen semanal; política de invitaciones y evaluaciones. Capturas no necesita biblioteca |

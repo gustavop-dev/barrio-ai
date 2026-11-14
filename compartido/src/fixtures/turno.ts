@@ -334,7 +334,10 @@ export const MESSAGE_CARD: TurnoCard = cardFixture({
   },
 });
 
-/** He asked for a day that already had a post: his post waits on the next free day until he decides (12/11/2026). */
+/**
+ * A date he asked for that cannot be kept (14/11/2026): that day already has the daily post and another one he asked
+ * for. A date that can be kept never asks: it goes out as an extra post that day.
+ */
 export const DAY_REQUEST_CARD: TurnoCard = cardFixture({
   id: 'day_request:cap-1',
   type: 'fecha',
@@ -343,20 +346,22 @@ export const DAY_REQUEST_CARD: TurnoCard = cardFixture({
   state: 'nueva',
   agent: 'director_editorial',
   agent_label: 'Director editorial',
-  title: '¿Seguro que lo quieres el viernes 13/11 a las 12:00?',
-  body: 'Ese día ya sale «Cycles between agents are the hard decision» a las 08:30: serían dos posts ese día. Mientras decides, el tuyo queda el lunes 16/11 a las 12:00, el siguiente día libre.',
-  deadline: hoursFromNow(20),
+  title: 'No puedo publicarlo cuando pediste',
+  body: 'Ese día ya tiene dos posts: el diario y otro que pediste. Pediste «lo publiques mañana a las 12 del día, del mediodía». Mientras decides, la idea espera.',
+  deadline: null,
   created_at: hoursFromNow(-1),
   actions: [
-    { label: 'Sí, el viernes 13/11 a las 12:00', endpoint: '/api/v1/capturas/cap-1/fecha', body: { decision: 'mismo_dia' }, primary: true },
-    { label: 'Dejarlo el lunes 16/11', endpoint: '/api/v1/capturas/cap-1/fecha', body: { decision: 'siguiente' } },
-    { label: 'Ver el post', href: '/calendario/pieza/p-new' },
+    { label: 'Al primer día libre', endpoint: '/api/v1/capturas/cap-1/fecha', body: { decision: 'siguiente' }, primary: true },
+    { label: 'Descartarla', endpoint: '/api/v1/capturas/cap-1/fecha', body: { decision: 'descartar' } },
   ],
   day_request: {
     capture_id: 'cap-1',
     asked_at: hoursFromNow(21),
     evidence: 'lo publiques mañana a las 12 del día, del mediodía',
-    piece: { id: 'p-new', thesis: 'How do founders decide how long to fund a business that loses money?', scheduled_for: hoursFromNow(93) },
-    others: [{ id: 'p-friday', thesis: 'Cycles between agents are the hard decision', scheduled_for: hoursFromNow(17) }],
+    problem: 'llena',
+    problem_label: 'Ese día ya tiene dos posts: el diario y otro que pediste.',
+    idea: 'How do founders decide how long to fund a business that loses money?',
+    piece: null,
+    others: [],
   },
 });

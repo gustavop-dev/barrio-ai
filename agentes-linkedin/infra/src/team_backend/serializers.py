@@ -111,7 +111,7 @@ class ReferentOutput(serializers.ModelSerializer):
     class Meta:
         model=Referent
         fields=['id','account_id','public_identifier','provider_user_id','display_name','profile_url','reason','active','created_at',
-                'last_observed_at','contacts_count','protected','position','revision','can_manage_protected','protection_history']
+                'last_observed_at','contacts_count','protected','position','revision','can_manage_protected','protection_history','kind']
 
 class ReferentPatch(serializers.Serializer):
     version=serializers.IntegerField(required=False,min_value=1)

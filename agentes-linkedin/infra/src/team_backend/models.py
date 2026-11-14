@@ -177,7 +177,13 @@ class ProviderIdOriginal(models.Model):
         constraints=[models.UniqueConstraint(fields=['account','provider','model','object_id','field'],name='unique_provider_id_original')]
 
 class Referent(models.Model):
+    class Kind(models.TextChoices):
+        # Main or variable (protected) is the slot; the kind is why the team reads them. Gustavo, 14/11/2026: big voices of
+        # his own industry that sell what he sells, so that what works for them becomes a model (referentes_industria.py).
+        NICHO='nicho','Voz del nicho'
+        INDUSTRIA='industria','Referente de industria'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    kind=models.CharField(max_length=16,choices=Kind.choices,default=Kind.NICHO)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='referents')
     public_identifier=models.CharField(max_length=100)
     provider_user_id=models.CharField(max_length=200,blank=True)
@@ -211,6 +217,9 @@ class ReferentReview(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
     month=models.DateField()
+    # mensual: the monthly batch (and the extraordinary one, which takes its place); industria: the search Gustavo starts
+    # by hand (operador referentes-industria), at most one a month, never applied by silence.
+    kind=models.CharField(max_length=16,default='mensual')
     state=models.CharField(max_length=24,default='preparing')
     dossier=models.JSONField(default=dict)
     expected_revision=models.PositiveIntegerField(default=1)
@@ -219,7 +228,7 @@ class ReferentReview(models.Model):
     closed_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     class Meta:
-        constraints=[models.UniqueConstraint(fields=['account','month'],name='unique_referent_month')]
+        constraints=[models.UniqueConstraint(fields=['account','month','kind'],name='unique_referent_month_kind')]
 
 
 class ReferentChange(models.Model):
@@ -286,6 +295,12 @@ class ObservedPost(models.Model):
     observed_at=models.DateTimeField(default=timezone.now)
     # DESC-05: when its commenters were last read to discover people (each post is scanned once).
     commenters_scanned_at=models.DateTimeField(null=True,blank=True)
+    # «What worked for them» (modelos_crecimiento.py). outlier: how the post did against its author's own norm. structure:
+    # its shape (hook, length band, outline, closing…) as labels and numbers, never a sentence of it. audience: what its
+    # comments were like (counts and de-identified themes), computed when a step already read them; no names, no text.
+    outlier=models.JSONField(default=dict,blank=True)
+    structure=models.JSONField(default=dict,blank=True)
+    audience=models.JSONField(default=dict,blank=True)
     class Meta:
         ordering=['-posted_at','-observed_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]
@@ -380,8 +395,8 @@ class EditorialPiece(models.Model):
     metrics=models.JSONField(default=dict,blank=True)
     note=models.TextField(blank=True)
     origin_job=models.CharField(max_length=40,blank=True)
-    # One post a day, except a second one Gustavo authorized for the day and hour he asked for (urgente.confirm_day). It
-    # does not count for the CONT-09 caps.
+    # One post a day, except the extra one Gustavo asked for at a day and hour (urgente.py: an order, 14/11/2026). It does
+    # not count for the CONT-09 caps nor for the GASP structure.
     second_of_day=models.BooleanField(default=False)
     created_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,related_name='+')
     created_at=models.DateTimeField(default=timezone.now)
@@ -932,8 +947,9 @@ class Capture(models.Model):
     # The day and hour Gustavo asked for («publícalo mañana a las 10»), from the literal fragment in publish_at_evidence.
     publish_at=models.DateTimeField(null=True,blank=True)
     publish_at_evidence=models.TextField(blank=True)
-    # That day already had a post: {state: pending|same_day|next_free|expired, asked, at, answered_at, notified}.
-    # Pending, Tu turno asks him whether it goes out that day too (a second post) or keeps the next free day.
+    # The date he asked for cannot be kept (past, inside the veto notice, outside the window, beyond 14 days, unclear or
+    # a day that already has two posts): {state: problem|next_free|discarded|expired, problem, asked, at, answered_at,
+    # notified}. A problem is a Bandeja card at once (urgente.py). Older rows may say pending|same_day (flow before 14/11).
     day_request=models.JSONField(default=dict,blank=True)
     understanding=models.JSONField(default=dict,blank=True)
     investigation=models.JSONField(default=dict,blank=True)
@@ -1025,7 +1041,8 @@ class PieceImage(models.Model):
     height=models.PositiveIntegerField()
     sha256=models.CharField(max_length=64)
     alt=models.TextField()
-    edited=models.BooleanField(default=False)
+    edited=models.BooleanField(default=False)  # pixels made by the image model (checked by vision, IMG-10)
+    cropped=models.BooleanField(default=False)  # his photo cut to LinkedIn's size by code, no model (IMG-14); data.crop
     ai_edit=models.CharField(max_length=4,choices=AIEdit.choices,default=AIEdit.NO)
     reason=models.TextField(blank=True)
     template=models.CharField(max_length=20,blank=True)
@@ -1128,6 +1145,34 @@ class WeeklySummary(models.Model):
     previous_orientation=models.TextField(blank=True)
     decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
     decided_at=models.DateTimeField(null=True,blank=True)
+    origin_job=models.CharField(max_length=40,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:ordering=['-week_start']
+    def __str__(self):return f'{self.week_start} · {self.get_state_display()}'
+
+
+class WeeklyPlan(models.Model):
+    """director_editorial (estrategia.py): the GASP type of each day of one local ISO week and, once planned, its idea
+    with the reader's need and the audience signal behind it. One per week; Gustavo's changes are kept in `history`."""
+    class State(models.TextChoices):
+        TEMPLATE='estructura','Solo la estructura'
+        PLANNED='planeada','Planeada'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    week_start=models.DateField(unique=True)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.TEMPLATE)
+    # One per day, Monday first: {date, type, type_reason, idea, reason, pillar, modality, approach, format, reader,
+    # reader_need, audience_evidence, evidence_ok, pain, state, owner_edited, piece_id}.
+    slots=models.JSONField(default=list,blank=True)
+    summary=models.TextField(blank=True)
+    warnings=models.JSONField(default=list,blank=True)
+    # The audience signals the plan read and used: what the weekly summary reports as what moved the week.
+    signals=models.JSONField(default=dict,blank=True)
+    # Planned ideas displaced by a type change or by an idea of Gustavo: kept for later weeks.
+    kept_ideas=models.JSONField(default=list,blank=True)
+    history=models.JSONField(default=list,blank=True)
+    usage=models.JSONField(default=list,blank=True)
+    cost_usd=models.DecimalField(max_digits=12,decimal_places=6,null=True,blank=True)
     origin_job=models.CharField(max_length=40,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(auto_now=True)

@@ -19,7 +19,7 @@ INBOX_KINDS={
     'account_paused':('importante',True,'Cuenta en pausa'),
     'conversation':('importante',True,'Conversación que te toca'),
     'dm_ready':('importante',True,'Mensaje sugerido para alguien que conversó contigo'),
-    'day_request':('importante',True,'Pediste un día que ya tiene post'),
+    'day_request':('importante',True,'Una fecha que pediste no se puede cumplir'),
     'question':('cuando_puedas',True,'Pregunta nueva del equipo'),
     'profile_task':('cuando_puedas',True,'Tarea de perfil nueva'),
 }
@@ -40,9 +40,11 @@ FEED_KINDS={
     'capture_processed':('tuyo',False,'Captura procesada'),
     'machine_paused_env':('sistema',True,'Máquina detenida desde el servidor'),
     'lead_silent':('sistema',True,'El líder no aprueba nada en una capacidad'),
+    'gate_alert':('sistema',True,'Una compuerta frena demasiado o un día quedó sin post'),
     'linkedin_canary':('sistema',True,'Prueba diaria de LinkedIn: rota, sin correr o de nuevo bien'),
     'navegador_salida':('sistema',True,'LinkedIn directo: el servicio no abre la cuenta por otra salida a internet'),
     'weekly_summary':('tuyo',True,'Resumen de la semana listo'),
+    'weekly_plan':('publicaciones',True,'Plan de la semana listo'),
 }
 
 # Computed every time «Próximo» is read: they push when they happen but are never stored in the feed.

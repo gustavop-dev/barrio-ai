@@ -222,6 +222,28 @@ class ReworkTests(ReworkBase):
         piece.refresh_from_db()
         self.assertEqual((piece.state, capture.routed_to['rework']['state']), ('blocked', 'aplazada'))
 
+    def test_a_comment_asking_for_a_carousel_turns_the_image_into_one(self):
+        # IMG-INF-05 (Gustavo, 14/11/2026): «hazlo carrusel» had no route; a photo or an infographic becomes a carousel.
+        plan = {'retoque': decision('imagen', 'carrusel', instruction='Tell the three steps, one per slide.'),
+                'design': {'slides': [slide('portada'), slide(), slide('cierre')]}}
+        for days, kind in ((3, 'foto'), (4, 'infografia')):
+            with self.subTest(kind=kind):
+                piece, old = self.ready(kind=kind, days=days)
+                photo = piece.images.get().source_photo if kind == 'foto' else None
+                self.calls = []
+                capture = self.rework(self.comment(piece, 'Hazlo carrusel, un paso por lámina.'), plan)
+                piece.refresh_from_db()
+                new = piece.proposals.get(state='proposed')
+                self.assertEqual((piece.state, piece.image_kind, capture.routed_to['rework']['state']), ('ready', 'carrusel', 'rehecha'))
+                self.assertEqual([r.kind for r in piece.images.order_by('position')], ['carrusel'] * 3)
+                self.assertEqual(new.payload['media']['document_title'], 'Start with a decision')
+                self.assertEqual(imagenes.issues(piece, new.payload['media']), [])
+                design = [c[1] for c in self.calls if c[0] == 'image-design']
+                self.assertEqual((design[0]['kind'], design[0]['findings']), ('carrusel', ['Tell the three steps, one per slide.']))
+                if photo:
+                    photo.refresh_from_db()
+                    self.assertEqual(photo.state, 'sin_usar')  # the replaced photo goes back to the gallery
+
     def test_a_published_or_past_piece_only_keeps_the_comment(self):
         piece, old = self.ready()
         ActionProposal.objects.filter(pk=old.pk).update(state='sent')
@@ -453,16 +475,17 @@ class EditSizeTests(EditorialBase):
         self.assertEqual(imagenes.post_size(1600, 900), (1080, 1080))  # never horizontal (IMG-12)
         self.assertEqual(imagenes.post_size(1080, 1080), (1080, 1080))
 
-    def test_reframing_a_vertical_original_keeps_it_vertical(self):
+    def test_reframing_a_vertical_original_keeps_it_vertical_without_ai(self):
+        # IMG-14: reframing is a centred crop by code (it was an image-model edit plus a check); smaller than 1080 wide,
+        # it keeps its own resolution at 4:5.
         photo = image_cases.ImageWorkflowTests.photo(self, size=(900, 1200))
         piece = image_cases.ImageWorkflowTests.piece(self, photo=photo)
         fake = FakeImageConnector(edited=png((1024, 1536), '#dedfd4'))
         imagenes.prepare(piece, client=fake)
         row = piece.images.get()
-        self.assertEqual([c[0] for c in fake.calls], ['edit', 'check'])
-        self.assertEqual(fake.calls[0][2], imagenes.SAFE_EDITS['crop'])
-        self.assertEqual((row.edited, row.width, row.height), (True, 1080, 1350))
-        self.assertEqual(Image.open(io.BytesIO(imagenes.read(row.image))).size, (1080, 1350))
+        self.assertEqual(fake.calls, [])
+        self.assertEqual((row.edited, row.cropped, row.width, row.height), (False, True, 900, 1125))
+        self.assertEqual(Image.open(io.BytesIO(imagenes.read(row.image))).size, (900, 1125))
         self.assertIsNone(orquestacion.current())
 
 

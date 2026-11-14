@@ -17,10 +17,11 @@ flowchart LR
     G -->|sin problemas| V[e) Verificador sobre el hash del texto]
     G -->|problemas concretos| F[f) Una ronda de reparación]
     V -->|hallazgos concretos| F
-    F -->|reglas y verificador otra vez| V2[Veredicto final]
-    V2 -->|blocked| B[Pieza bloqueada + push]
+    F -->|reglas y segunda revisión acotada| V2[Veredicto final]
+    V2 -->|hallazgo duro| B[Pieza bloqueada + push]
+    B -->|compuerta de contenido, una vez por día| T
     V -->|blocked sin hallazgos concretos| B
-    V2 -->|ready_for_execution| P[Propuesta CONT-09]
+    V2 -->|ready_for_execution o solo blandos como observación| P[Propuesta CONT-09]
     V -->|ready_for_execution| P
     P -->|política autonomia-v1| A[Aprobada + push: se puede vetar]
     A -->|EDITORIAL_POST_TIME| X[Operador: Posts API, una sola vez]
@@ -97,17 +98,19 @@ La fase 1 de imágenes amplía el brief con `format` foto/infografia/carrusel e 
 - **Lectores.** Comprador, recomendador, divulgador, líder y par dan fortalezas y objeciones por variante, clasificadas como `material`, `preference` o `missing_data`. Son hipótesis, no métricas. No reciben memoria ni la autoría de las variantes.
 - **Selección.** El director elige A o B, las fusiona o descarta la pieza. Decide por objetivo, verdad, utilidad y voz, no por mayoría.
 - **Reglas antes del verificador (R3).** Justo después de la selección, `editorial.text_rules()` aplica al texto exacto las reglas deterministas de la política (`autopiloto.post_issues`, con sus mismos patrones y límites): longitud de 200 a 2 200 caracteres, sin correos, teléfonos ni enlaces, sin pitch agresivo, como mucho 3 hashtags, sin filtración privada (`guardas.private_leaks`) y sin experiencia que los hechos públicos no respalden (`guardas.invented_experience`). Si algo falla, el verificador no se paga para ese texto. Cada guarda corre una vez por versión del texto dentro del circuito; la política las vuelve a aplicar como compuerta final.
-- **Verificador.** Contrasta cada afirmación con `public_facts` y las fuentes observadas. Marca experiencias inventadas, cifras sin fuente, pitch agresivo, datos privados, filtraciones de `private_guidance`, ganchos incumplidos y piezas fuera del brief. El veredicto final se calcula sobre el SHA-256 del texto exacto y es `blocked` en cualquiera de estos casos:
-  - las reglas deterministas encontraron un problema (el verificador no corre);
-  - el modelo emite `blocked`;
-  - hay un hallazgo `material`;
+- **Verificador.** Contrasta cada afirmación con `public_facts` y las fuentes observadas. Marca experiencias inventadas, cifras sin fuente, pitch agresivo, datos privados, filtraciones de `private_guidance`, ganchos incumplidos y piezas fuera del brief. Solo un hecho sin respaldo es material: opiniones, criterio, razonamientos y preguntas no. El veredicto final se calcula sobre el SHA-256 del texto exacto, con la severidad de [`compuertas.md`](compuertas.md), y es `blocked` en cualquiera de estos casos:
+  - las reglas deterministas o las fuentes web encontraron un problema (sin reglas que pasen, el verificador no corre);
+  - el modelo emite `blocked` sin hallazgos concretos;
+  - hay un hallazgo `material` duro (experiencia inventada, cifra o afirmación sin respaldo, datos privados, fuga de la guía privada, pitch agresivo);
   - hay una afirmación `unsupported`.
-- **Ronda de reparación (R4).** Si las reglas o el verificador encuentran problemas concretos (motivos de las reglas, hallazgos `material` o afirmaciones `unsupported`), la etapa `reparacion` recibe el texto final, el brief, la memoria, las fuentes y los hallazgos exactos, y devuelve un texto corregido con el cambio mínimo, en la voz de Gustavo. Después se repiten una vez las reglas y el verificador. Hay una sola ronda por pieza:
+  Un hallazgo `material` blando (`hook_not_delivered`, `off_brief`, `other`) dispara la ronda de reparación y, si sigue, la pieza sale con él en `verification.observations` y como riesgo «Conservada como observación…».
+- **Ronda de reparación (R4).** Si las reglas o el verificador encuentran problemas concretos (motivos de las reglas, hallazgos `material` o afirmaciones `unsupported`), la etapa `reparacion` recibe el texto final, el brief, la memoria, las fuentes y los hallazgos exactos, y devuelve un texto corregido con el cambio mínimo, en la voz de Gustavo. Después se repiten una vez las reglas y el verificador, que esta vez es una **segunda revisión acotada** (`second_review`): recibe los hallazgos y los cambios, comprueba si cada uno quedó resuelto y solo marca lo que sigue o un problema grave nuevo. Hay una sola ronda por pieza:
   - si el texto reparado pasa, la pieza sigue como siempre y su propuesta lleva el riesgo «Reparada en una ronda…»;
-  - si sigue bloqueado, la pieza termina `blocked`, como antes;
-  - si la reparación descarta la pieza o no cambia el texto, termina `blocked` con los motivos originales, sin volver a verificar;
+  - si sigue con un hallazgo duro, la pieza termina `blocked`, como antes; si solo quedan blandos, sale con ellos como observación;
+  - si la reparación descarta la pieza o no cambia el texto, se queda el texto original: `blocked` si sus hallazgos eran duros y, si eran blandos, sale con ellos como observación;
   - un `blocked` del verificador sin hallazgos concretos no tiene nada que reparar y bloquea directamente.
-  La ronda pasa por `_guard()` como cualquier etapa. Si el presupuesto de IA se agota durante la ronda, la pieza termina `blocked` con los motivos originales (no `failed`): un defecto de contenido no se reintenta al día siguiente. El registro queda en `verification.repair` (disparador, hallazgos, texto original, primer veredicto, cambios y resultado) y el detalle de la pieza en la PWA lo muestra en «Ronda de reparación». `EDITORIAL_REPAIR=false` apaga la ronda.
+  La ronda pasa por `_guard()` como cualquier etapa. Si el presupuesto de IA se agota durante la ronda, la pieza termina `blocked` con los motivos originales cuando son duros (no `failed`), y ese día puede tener su segundo intento cuando haya presupuesto. El registro queda en `verification.repair` (disparador, hallazgos, texto original, primer veredicto, cambios, resultado y, tras la segunda revisión, `resolution` por hallazgo) y el detalle de la pieza lo muestra en «Ronda de reparación». `EDITORIAL_REPAIR=false` apaga la ronda.
+- **Segundo intento del día.** Un día cuya pieza paró una compuerta de contenido (reglas, verificador o revisión visual) mientras se preparaba se vuelve a preparar una vez (`EDITORIAL_DAY_ATTEMPTS=2`) si quedan `EDITORIAL_RETRY_MIN_MINUTES` (90) antes de su hora; el director recibe `previous_attempts` con la tesis y los motivos del intento bloqueado. Detalle en [`compuertas.md`](compuertas.md).
 
 ### Memoria: hechos públicos y orientación privada
 
@@ -163,10 +166,10 @@ Cada pieza publicada del historial lleva `results` con sus cortes de `PostMetric
 CONT-09 se aprueba solo si se cumplen todas estas condiciones (las mismas reglas deterministas ya corrieron en el circuito antes del verificador; la política las repite como compuerta final):
 - la longitud está entre 200 y 2 200 caracteres;
 - no hay correos, teléfonos ni enlaces;
-- no hay pitch agresivo ni petición de contacto (mencionar ProjectApp está permitido);
+- no hay pitch agresivo ni petición de contacto (mencionar ProjectApp está permitido; un tipo de post con `gate_policy.cta_max=1` admite una sola invitación conversacional, nunca venta dura);
 - hay 3 hashtags como máximo;
 - no hay filtración privada ni experiencia sin hechos públicos;
-- el verificador dio `ready_for_execution` sobre el mismo `text_sha256`;
+- el verificador dio `ready_for_execution` sobre el mismo `text_sha256` (puede llevar observaciones blandas);
 - no hay afirmaciones pendientes;
 - hay al menos una unidad del curso citada.
 
@@ -175,10 +178,10 @@ Si cualquier edición cambia el texto, invalida el veredicto y la política desc
 ## Programación (`autopiloto.tick`)
 
 - **Hueco diario.** La hora es `EDITORIAL_POST_TIME` (08:30 por defecto), en `OPERATOR_TIMEZONE`, y debe caer dentro de `OPERATOR_WINDOW`. La preparación empieza `EDITORIAL_LEAD_HOURS` antes (12 h por defecto). Así hay margen para vetar y llega una push «pieza lista» con la hora de salida.
-- **Las ideas de Gustavo tienen fecha al llegar y se preparan ya** (`urgente.assign_slots`). Sin fecha van al siguiente día libre de la cola; «cuanto antes» toma el primer hueco libre; un día y una hora pedidos («publícalo mañana a las 10», leídos por `cuando.py` del fragmento literal) se respetan, y un post que el equipo preparó por su cuenta ese día pasa al siguiente día libre. Cada idea con fecha se prepara en cuanto la tiene, no `EDITORIAL_LEAD_HOURS` antes. Si el director no toma la idea reservada, la idea vuelve a la mesa sin fecha propia y ese día vuelve al post diario. Lo mismo vale para un día cuyas únicas piezas eran para la idea y no salieron (saltadas, bloqueadas o fallidas). Cada pieza de su hueco que termina bloqueada o fallida por algo que no es dinero cuenta un intento, una sola vez por pieza; tras dos intentos la idea pierde su fecha y sigue en la mesa del director para un día normal. Push «Tu idea ya tiene fecha» con el día y la hora.
+- **Las ideas de Gustavo tienen fecha al llegar y se preparan ya** (`urgente.assign_slots`). Sin fecha van al siguiente día libre de la cola y se escriben según el tipo GASP de ese día; una idea que claramente es de un tipo toma el día de ese tipo más cercano (`docs/plan-estrategia-semanal.md`). «Cuanto antes» toma el primer hueco libre. Un día y una hora pedidos («publícalo mañana a las 10», leídos por `cuando.py` del fragmento literal) son una orden desde el 14/11/2026: el post sale ese día a esa hora como post extra, junto al diario, que no se mueve; sin hora, a `EDITORIAL_EXTRA_TIME`. Si la fecha no se puede cumplir (pasada, dentro del veto, fuera de la ventana, a más de 14 días, ambigua o un día que ya tiene dos posts), la Bandeja pregunta en el momento y la idea espera (EDI-24). Cada idea con fecha se prepara en cuanto la tiene, no `EDITORIAL_LEAD_HOURS` antes. Si el director no toma la idea reservada, la idea vuelve a la mesa sin fecha propia y ese día vuelve al post diario. Lo mismo vale para un día cuyas únicas piezas eran para la idea y no salieron (saltadas, bloqueadas o fallidas). Cada pieza de su hueco que termina bloqueada o fallida por algo que no es dinero cuenta un intento, una sola vez por pieza; tras dos intentos la idea pierde su fecha y sigue en la mesa del director para un día normal. Push «Tu idea ya tiene fecha» con el día y la hora.
 - **Quedarse sin presupuesto no gasta el día.** Una pieza detenida solo por dinero (`failed` o `blocked` con la nota «Presupuesto de IA agotado», la antigua «Presupuesto editorial diario agotado» o «Ciclo detenido: cost_cap») no ocupa su día: el autopiloto lo vuelve a intentar desde el día local siguiente, cuando hay presupuesto, con un trabajo nuevo, y para una idea de Gustavo ese día sigue libre. Cualquier otro fallo no se reintenta solo.
 - **No se empieza lo que no se puede terminar.** Una preparación, del autopiloto o de una idea, no empieza si del presupuesto de IA quedan menos de `EDITORIAL_PREPARE_MIN_USD` (3 USD por defecto, lo que reserva una pieza con imágenes): se detendría a medias. Espera a que haya presupuesto; la idea lo dice con «Preparación pendiente de presupuesto de IA.».
-- **Una preparación cada vez.** El trabajo `prepare_piece` tiene un id determinista por hueco, así que el autopiloto lo intenta una sola vez por día. Una preparación interrumpida pasa a `failed` sin repetir el gasto.
+- **Una preparación cada vez.** El trabajo `prepare_piece` tiene un id determinista por hueco e intento, así que el autopiloto lo intenta una sola vez por día, salvo el segundo intento tras una compuerta de contenido ([`compuertas.md`](compuertas.md)). Una preparación interrumpida pasa a `failed` sin repetir el gasto.
 - **No se prepara una pieza que no podría salir.** Hace falta una cuenta oficial conectada, sin pausa y con `LIVE_LINKEDIN_OFFICIAL=true`, CONT-09 distinto de `off` y cupo semanal.
 - **Topes.** CONT-09 admite 1 al día y 7 a la semana (`publicaciones` del reparto), configurables en `OPERATOR_DAILY_LIMITS` y `OPERATOR_WEEKLY_LIMITS`. Además, la base de datos impide más de una pieza abierta por día y más de una acción abierta por pieza.
 - **Presupuesto de IA.** La publicación no tiene tope propio: gasta del presupuesto único del equipo (`knowledge/presupuesto.py`), `AI_MONTHLY_LIMIT_USD` (100 USD por mes calendario en `OPERATOR_TIMEZONE`) con el tope de seguridad diario `AI_DAILY_FUSE_USD` (15 USD), que suman todos los proveedores y áreas, incluidas las reservas pendientes o inciertas. Se comprueba antes de encolar (`EDITORIAL_PREPARE_MIN_USD`), antes de cada etapa (`_guard()`) y en cada reserva (`providers.reserve`); al agotarse, la pieza se detiene. El ciclo `pieza_diaria` tiene además un tope de 8 USD por ciclo sobre sus reservas, contra gastos desbocados. `<PROVEEDOR>_LIMIT_USD` es opcional: si se fija, añade un techo mensual a ese proveedor.
@@ -195,7 +198,7 @@ Tokens aproximados: unas 62 000 de unidades del curso entre las cinco etapas, un
 | `claude-sonnet-5-5` (2 / 10) | ≈ 0,22–0,26 USD | ≈ 0,06 USD |
 | `claude-haiku-5-5` (0,10 / 0,50) | ≈ 0,01 USD | < 0,01 USD |
 
-Una pieza que necesita la ronda de reparación suma una llamada de reparación y, si cambió el texto, un segundo verificador: unos 0,2–0,3 USD más con opus. Una pieza que las reglas frenan antes del verificador se ahorra ese verificador. Con opus salen unos 13–15 USD al mes con una pieza diaria. Cada etapa reserva primero su peor caso: con opus, unos 0,26 USD como máximo en la del redactor. Las etapas son secuenciales y se liquidan antes de pasar a la siguiente, así que `EDITORIAL_PREPARE_MIN_USD` (3 USD) cubre una pieza con imágenes y el tope de 8 USD del ciclo solo frena un gasto desbocado.
+Una pieza que necesita la ronda de reparación suma una llamada de reparación y, si cambió el texto, un segundo verificador (la segunda revisión acotada, que solo añade los hallazgos y los cambios a su entrada): unos 0,2–0,3 USD más con opus. Un día con segundo intento paga otra preparación completa, como mucho una vez ([`compuertas.md`](compuertas.md)). Una pieza que las reglas frenan antes del verificador se ahorra ese verificador. Con opus salen unos 13–15 USD al mes con una pieza diaria. Cada etapa reserva primero su peor caso: con opus, unos 0,26 USD como máximo en la del redactor. Las etapas son secuenciales y se liquidan antes de pasar a la siguiente, así que `EDITORIAL_PREPARE_MIN_USD` (3 USD) cubre una pieza con imágenes y el tope de 8 USD del ciclo solo frena un gasto desbocado.
 
 ## API para la PWA
 
@@ -241,6 +244,8 @@ Notificaciones push (y `OPERATOR_ALERT_WEBHOOK`):
    AI_MONTHLY_LIMIT_USD=100         # presupuesto de IA de todo el equipo por mes
    AI_DAILY_FUSE_USD=15             # su tope de seguridad diario
    EDITORIAL_REPAIR=true            # ronda de reparación (R4); false la apaga
+   EDITORIAL_DAY_ATTEMPTS=2         # segundo intento de un día que paró una compuerta (docs/compuertas.md); 1 lo apaga
+   EDITORIAL_RETRY_MIN_MINUTES=90   # margen mínimo antes de la hora para ese segundo intento
    # EDITORIAL_MODEL_LECTORES=…     # C3: modelo de una etapa; sin fijar, el de siempre
    OPERATOR_AUTONOMY=INT-03=auto,INT-02=auto,CONT-09=auto
    ```

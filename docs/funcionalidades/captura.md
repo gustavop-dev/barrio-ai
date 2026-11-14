@@ -282,6 +282,8 @@ Con un gesto, Gustavo le manda al equipo una nota de voz, fotos y una nota escri
   3. **Dado** «sácalo mañana», **cuando** se interpreta, **entonces** no se reserva antes de mañana ni se saltan verificaciones.
   4. **Dado** que falla la interpretación, **cuando** se guarda la captura, **entonces** conserva el texto y registra el error; no inventa una urgencia ni repite el paso pagado.
   5. **Dado** una idea urgente, **cuando** se consulta, **entonces** muestra evidencia, fecha prevista y condiciones, sin botón ni campo editable de urgencia.
+  6. **Dado** un día y una hora pedidos («publica esto el martes a las 12»), **cuando** se interpretan del fragmento literal, **entonces** son una orden: el post sale ese día a esa hora como post extra ([EDI-24](motor-editorial.md#edi-24)); sin hora, a `EDITORIAL_EXTRA_TIME`. Una fecha pasada, a más de 14 días o que no se entiende queda como problema (`pasada`, `lejana`, `ambigua`) y la Bandeja pregunta en el momento; nunca se cambia por otro día sin preguntar.
+  7. **Dado** la misma clasificación, **cuando** la idea pide claramente un tipo de post, **entonces** guarda `gasp_type` (G, A, S o P; «ninguno» si no está claro) y la idea toma el día de ese tipo más cercano ([EDI-29](motor-editorial.md#edi-29)); el director recibe la idea con su tipo y si es un post extra. Su motivo («El día de … más cercano» o «Se escribe como post de …») es el que ve en «Lo que enviaste».
 - **Validación:** pruebas escritas; CI pendiente. Sin ejecución local.
 - **Cobertura QA:** `16-imagenes` (línea, fecha prevista, evidencia y condiciones); Jest/Vitest de captura (zona de Bogotá) y lógica compartida (sin fecha y sin urgencia). Escritos; ejecución pendiente de Claude.
 

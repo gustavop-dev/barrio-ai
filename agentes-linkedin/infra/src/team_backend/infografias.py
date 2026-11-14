@@ -47,7 +47,7 @@ SLIDE=obj(template=enum('portada','pasos','barras','numero','cierre','preguntas'
 DESIGN_SCHEMA=obj(slides=array(SLIDE))
 CHOICE_SCHEMA=obj(kind=enum('foto','infografia','carrusel'),reason=string(),
                   photos=array(obj(id=string(),reason=string(),alt=string(),edit=enum('none','light','straighten','crop','distractions'),
-                                   edit_reason=string(),instruction=string(),instruction_kind=enum('none','original','edit','unsafe'))))
+                                   edit_reason=string(),instruction=string(),instruction_kind=enum('none','original','crop','edit','unsafe'))))
 
 
 def schema_check(value,schema,path='respuesta'):
@@ -62,6 +62,31 @@ def schema_check(value,schema,path='respuesta'):
         for key,item in value.items():schema_check(item,schema['properties'][key],path+'.'+key)
     if kind=='array':
         for item in value:schema_check(item,schema['items'],path+'[]')
+
+
+# Capitals only in labels, but an acronym is how the reader knows the word: «AI agents» or «your MVP» is not shouting.
+# Plurals («APIs», «MVPs») and mixed forms («B2B», «SaaS», «iOS») never matched the rule; these are the all-capital ones.
+ACRONYMS=frozenset(('AI ML LLM LLMS GPT NLP RAG API SDK UI UX QA MVP POC PMF GTM ROI KPI OKR ARR MRR CAC LTV NPS CRM ERP SEO '
+                    'SQL AWS GCP CI CD IT IP OS PDF CSV JSON HTTP SSO SLA SOC GDPR HIPAA CEO CTO CFO COO CPO VP PM HR VC YC '
+                    'US USA UK EU LATAM FAQ DM').split())
+SHOUT=re.compile(r'\b[A-Z]{2,}\b')
+
+
+def shouting(text):
+    """The all-capital words of `text` that are not a known acronym."""
+    return [word for word in SHOUT.findall(text) if word not in ACRONYMS]
+
+
+def acronym(word):
+    """A known acronym, alone or in plural («AI», «APIs»), with the punctuation around it."""
+    core=word.strip('.,:;!?¿¡«»"\'()')
+    return core in ACRONYMS or (core.endswith('s') and core[:-1] in ACRONYMS)
+
+
+def cover_case_ok(title):
+    """A cover title goes in lower case after its first letter; a known acronym keeps its capitals."""
+    words=title.split()
+    return all(acronym(w) or (w[1:] if i==0 else w)==(w[1:] if i==0 else w).lower() for i,w in enumerate(words))
 
 
 # «preguntas»: 2–4 questions for the audience in `steps`, as bullets; the text after the «?» is an optional short answer.
@@ -97,11 +122,13 @@ def validate(design,kind,public=(),sources=()):
         for text in texts+[slide['alt']]:
             if '#' in text or '!!' in text or any(ord(c)>=0x1F000 or 0x2600<=ord(c)<=0x27BF for c in text):
                 raise ValueError('Sin emojis, hashtags ni dobles exclamaciones')
-            if re.search(r'\b[A-Z]{2,}\b',text):raise ValueError('Mayúsculas solo en etiquetas')
+            if shouting(text):
+                raise ValueError(f'Mayúsculas solo en etiquetas: «{shouting(text)[0]}» (las siglas conocidas, como AI, '
+                                 'MVP o CTO, sí valen)')
         if not 8<=len(slide['alt'].strip())<=1500:raise ValueError('Falta texto alternativo descriptivo')
         if re.search(r'follow me|subscribe|sígueme', ' '.join(texts),re.I):raise ValueError('El cierre invita a conversar')
         if template=='portada':
-            if title[1:]!=title[1:].lower():raise ValueError('Portada en minúsculas salvo primera letra')
+            if not cover_case_ok(title):raise ValueError('Portada en minúsculas salvo primera letra y siglas conocidas')
             if slide['highlight'] not in title.split() or len(slide['highlight'].split())!=1:raise ValueError('Una palabra de acento en la portada')
         if template=='pasos' and not 3<=len(slide['steps'])<=5:raise ValueError('De 3 a 5 pasos')
         if template=='preguntas':

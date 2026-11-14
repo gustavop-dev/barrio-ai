@@ -38,6 +38,20 @@ NOT_WANTED='No buscan vendedores ni reclutadores masivos.'
 LOCATION=('el barrio se construye en EE. UU.: los compradores (founders) deben estar allí; el resto de la comunidad va '
           'primero si está allí y también puede venir de Latinoamérica.')
 
+# What Gustavo sells, restated from IDENTITY, PROJECTAPP, PILLARS and the two business modalities below; no new direction,
+# so VERSION stays. An «industry referent» (referentes_industria.py) must sell one of these. `terms` are the English words
+# a profile or a page uses for the same service (the barrio is built in the United States), used to search and to match.
+SERVICES={
+    'software_a_la_medida':{'label':'desarrollo de software a la medida (entrega externa, proyecto definido o equipo continuo)',
+        'source':'PROJECTAPP, modalidad projectapp','terms':('custom software development','software development agency')},
+    'producto':{'label':'convertir necesidades de negocio en un producto de software que funciona y evolucionarlo',
+        'source':'IDENTITY, pilar business_to_product','terms':('product development','mvp development')},
+    'ia_aplicada':{'label':'incorporar IA en soluciones concretas','source':'IDENTITY, pilar applied_ai',
+        'terms':('applied ai','ai development')},
+    'liderazgo_tecnico':{'label':'liderazgo técnico en startups: decisiones de arquitectura y de entrega',
+        'source':'modalidad personal_startups, pilar architecture_delivery','terms':('fractional cto','technical leadership')},
+}
+
 # Canonical modality -> what it is for Gustavo (editorial) and who belongs to it (neighborhood criteria).
 MODALITIES={
     'personal_startups':{'purpose':'oportunidades de trabajo personal en startups',
