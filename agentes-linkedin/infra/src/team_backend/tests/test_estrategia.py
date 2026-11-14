@@ -1,6 +1,7 @@
 """The weekly GASP strategy (estrategia.py, docs/plan-estrategia-semanal.md): the structure, the paid weekly plan, his
 changes, the audience first, the public founder stories of P and the per-type findings."""
 import hashlib
+import json
 import os
 import uuid
 from datetime import date, datetime, time, timedelta
@@ -8,8 +9,9 @@ from decimal import Decimal
 from unittest.mock import patch
 from django.test import SimpleTestCase
 from django.utils import timezone
-from team_backend import autopiloto, compuertas, editorial, estrategia, lider, operador, research, resumen_semanal, urgente
-from team_backend.models import ActionProposal, Capture, EditorialPiece, Job, Notification, WeeklyPlan
+from team_backend import (autopiloto, compuertas, editorial, estrategia, lider, modelos_crecimiento, operador, research,
+                          resumen_semanal, urgente)
+from team_backend.models import ActionProposal, Capture, EditorialPiece, Job, Notification, ObservedPost, Referent, WeeklyPlan
 from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answers
 
 MONDAY=date(2026,11,16)  # a normal week; the next one doubles S
@@ -325,6 +327,56 @@ class FindingTests(StrategyBase):
         self.assertEqual((brief['audience_evidence'],brief['audience_evidence_missing']),(None,True))
         brief=estrategia.finalize_brief({'gasp_type':'S','reader_value':'Algo.'},{'extra':True,'type':None,'audience_signals':{}})
         self.assertEqual((brief['gasp_type'],brief['audience_evidence_missing']),('S',False))  # no signals yet: not punished
+
+
+class GrowthModelSourceTests(StrategyBase):
+    """G models: the outliers of the industry referents first (modelos_crecimiento), the observed referents' while there
+    are none (production today). Only labels and numbers reach the model, never a sentence of a post or a comment."""
+    TEXT=('Three things nobody tells you about scoping an MVP.\n\n1. Cut the dashboard nobody opens.\n2. Keep the decision '
+          'it supports.\n3. Ship the audit trail first.\n\nWhich one would you cut first?')
+    QUESTION='How much does a retainer like that cost for a small team?'
+
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'STRATEGY_WEEK_TEMPLATE':'G,G,G,G,G,G,G','STRATEGY_SALES_DOUBLE_EVERY':'0'})
+        env.start();self.addCleanup(env.stop)
+        self.now=timezone.now()
+
+    def posts(self,slug,kind,scores):
+        referent=Referent.objects.create(account=self.official,public_identifier=slug,display_name=slug.title(),reason='Synthetic',
+                                         kind=kind,provider_user_id='ACo'+slug)
+        return [ObservedPost.objects.create(account=self.official,referent=referent,provider_post_id=f'activity:{slug}:{i}',
+                    share_url=f'https://www.linkedin.com/feed/update/urn:li:activity:{slug}{i}',author_name=referent.display_name,
+                    author_provider_id=referent.provider_user_id,text=self.TEXT,posted_at=self.now-timedelta(days=3+i),
+                    reactions_count=score,comments_count=0) for i,score in enumerate(scores)]
+
+    def no_text(self,value):
+        dumped=json.dumps(value,ensure_ascii=False,default=str)
+        for sentence in [l for l in self.TEXT.splitlines() if l.strip()]+[self.QUESTION]:self.assertNotIn(sentence[:30],dumped)
+
+    def test_without_industry_referents_the_observed_outliers_are_the_models_as_labels(self):
+        niche=self.posts('nicho','nicho',[100,10,10])
+        models=estrategia.growth_models(self.now)
+        self.assertEqual([(m['id'],m['source']) for m in models],[(str(niche[0].id),'observados')])
+        self.assertEqual(models[0]['structure']['form'],'lista')
+        self.assertNotIn('opening',models[0])
+        self.no_text(models)
+
+    def test_industry_outliers_come_first_and_their_audience_questions_are_evidence(self):
+        self.posts('nicho','nicho',[100,10,10])
+        industry=self.posts('industria','industria',[280]+[10]*6)
+        modelos_crecimiento.refresh(self.official,now=self.now)
+        comments=[{'id':'c1','is_sender':False,'text':self.QUESTION,'author':{'id':'ACoAlguien'}}]
+        modelos_crecimiento.store_audience(industry[0],comments,self.now)
+        signals=estrategia.audience_signals(self.now)
+        self.assertEqual([(m['id'],m['source']) for m in signals['referent_outlier']],[(str(industry[0].id),'industria')])
+        self.assertEqual(signals['referent_outlier'][0]['audience']['questions'],[modelos_crecimiento.THEMES['costo'][0]])
+        ref=next(q['id'] for q in signals['audience_question'] if q['kind']=='pregunta')
+        self.assertEqual(ref,'tema:pregunta:costo')
+        self.assertTrue(estrategia.valid_evidence({'kind':'audience_question','ref':ref,'note':'Preguntan cuánto cuesta.'},signals))
+        strategy=estrategia.director_input(EditorialPiece(slot_date=self.today),[],None,self.now)
+        self.assertEqual(strategy['growth_models'],signals['referent_outlier'])
+        self.no_text(strategy)
 
 
 class SalesGateTests(StrategyBase):

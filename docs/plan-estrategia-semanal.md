@@ -203,8 +203,12 @@ el líder; la venta dura («book a call», «hire me») y una segunda petición 
 ## Pendiente
 
 - **CI:** nada de esto se ejecutó en local; las pruebas de backend, Jest y Maestro corren en CI.
-- **Referentes de la industria:** `estrategia.growth_models` es la única entrada de los modelos de G; cuando esté su
-  revisión se cambia `observed_outliers` sin tocar el resto.
+- **Referentes de la industria:** conectados (integración del 14/11/2026). `estrategia.growth_models` toma primero los
+  atípicos de los referentes de industria (`modelos_crecimiento.growth_models`) y, mientras no haya ninguno aprobado y
+  observado, los de los referentes observados (`observed_outliers`). Lo que preguntan y objetan sus audiencias
+  (`modelos_crecimiento.audience_questions`) entra como señal `audience_question`, citable como evidencia de un día.
+  Ambos llegan como etiquetas y cifras, nunca con frases de un post ni de un comentario. La búsqueda de referentes
+  de industria sigue siendo a mano (`operador referentes-industria`).
 
 ## Decisiones de Gustavo (14/11/2026)
 

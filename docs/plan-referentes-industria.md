@@ -149,4 +149,6 @@ La rama de estrategia semanal consume dos funciones de `modelos_crecimiento` (si
    comentaristas clasificados?
 3. Agrupar preguntas libres con un modelo (≈ 0,0005 USD por post con Haiku) en vez de la taxonomía fija: requiere su visto bueno.
 4. Oficina (escritorio) aún no muestra los criterios; la app móvil sí.
-5. La integración con la estrategia semanal (GASP) vive en otra rama: falta conectar `growth_models` y `audience_questions`.
+5. Integración con la estrategia semanal (GASP), hecha el 14/11/2026: `estrategia.growth_models` usa estos atípicos
+   antes que los de los referentes observados, y `audience_questions` es la señal `audience_question` del plan y del
+   director (ids `tema:<pregunta|objecion>:<tema>`). Solo etiquetas y cifras; sin llamadas pagadas nuevas.

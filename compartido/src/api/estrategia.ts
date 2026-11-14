@@ -22,13 +22,19 @@ export const GASP_PURPOSE: Record<GaspType, string> = {
   P: 'Lo humano de construir empresas',
 };
 
-export type AudienceSignalKind = 'referent_outlier' | 'comment_question' | 'owner_capture' | 'results_by_type';
+export type AudienceSignalKind =
+  | 'referent_outlier'
+  | 'comment_question'
+  | 'owner_capture'
+  | 'results_by_type'
+  | 'audience_question';
 
 export const SIGNAL_LABEL: Record<AudienceSignalKind, string> = {
   referent_outlier: 'Un post de referente que superó su mediana',
   comment_question: 'Una pregunta en tus comentarios',
   owner_capture: 'Algo que contaste de un comprador',
   results_by_type: 'Lo que funcionó por tipo',
+  audience_question: 'Lo que pregunta la audiencia de tu industria',
 };
 
 export interface AudienceEvidence {

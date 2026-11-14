@@ -49,7 +49,7 @@ PAINS=(('miedo_a_fracasar','the fear of failing before or after launching','el m
        ('sin_dinero','running out of money or almost going bankrupt','quedarse sin dinero'),
        ('producto_sin_demanda','building a product nobody wanted','un producto que nadie quería'),
        ('mala_contratacion','a wrong early hire','una mala contratación'))
-EVIDENCE_KINDS=('referent_outlier','comment_question','owner_capture','results_by_type')
+EVIDENCE_KINDS=('referent_outlier','comment_question','owner_capture','results_by_type','audience_question')
 FORMATS=('foto','infografia','carrusel')
 PLAN_MAX_TOKENS=16000
 TYPICAL_INPUT_TOKENS=15000;TYPICAL_OUTPUT_TOKENS=6000
@@ -176,16 +176,16 @@ def piece_type(piece):
 def _score(post):
     return (post.reactions_count or 0)+2*(post.comments_count or 0)
 
-def _structure(text):
-    lines=[l for l in (text or '').splitlines() if l.strip()]
-    return {'chars':len(text or ''),'paragraphs':len(lines),
-            'list':sum(1 for l in lines if re.match(r'\s*(?:[-•→✅]|\d+[.)])',l))>=3,
-            'ends_with_question':(text or '').rstrip().endswith('?'),
-            'opening':lines[0][:160] if lines else ''}
+def _shape(post):
+    """A post's shape as labels and numbers (modelos_crecimiento.structure: hook, length band, outline, closing, angle…):
+    never a sentence of it, so a model can be imitated in form and never copied."""
+    from . import modelos_crecimiento
+    shape=post.structure if (post.structure or {}).get('rule')==modelos_crecimiento.STRUCTURE_RULE else modelos_crecimiento.structure(post.text)
+    return {k:v for k,v in shape.items() if k!='rule'}
 
 def observed_outliers(now,days=30,limit=8):
-    """Posts of referents that beat their own median in the last `days`: structure and angle to model, never text to copy.
-    The one replaceable source of growth_models (the referents of the industry come from their own review)."""
+    """Posts of the observed referents that beat their own median in the last `days`: the fallback of growth_models while
+    no industry referent has models yet (the case until Gustavo approves the first ones)."""
     rows=list(ObservedPost.objects.select_related('referent').filter(is_repost=False,referent__isnull=False,
               posted_at__gte=now-timedelta(days=days)).exclude(text=''))
     by_author={}
@@ -196,14 +196,38 @@ def observed_outliers(now,days=30,limit=8):
         median=statistics.median(_score(p) for p in posts)
         for post in posts:
             if _score(post)>max(median,1)*1.5:
-                out.append({'id':str(post.id),'author':post.author_name,'reactions':post.reactions_count,'comments':post.comments_count,
-                            'times_median':round(_score(post)/max(median,1),1),**_structure(post.text)})
+                out.append({'id':str(post.id),'source':'observados','author':post.author_name,'reactions':post.reactions_count,
+                            'comments':post.comments_count,'times_median':round(_score(post)/max(median,1),1),'structure':_shape(post)})
     return sorted(out,key=lambda o:-o['times_median'])[:limit]
 
+def industry_models(now):
+    """The outliers of the industry referents (modelos_crecimiento.growth_models, best model first) in the shape the plan
+    and the director read: the id they cite as evidence, counters, the shape and what their audience asked, as labels."""
+    from . import modelos_crecimiento
+    out=[]
+    for m in modelos_crecimiento.growth_models(now=now):
+        perf,heard=m['performance'],m['audience']
+        out.append({'id':m['post_id'],'source':'industria','author':m['referent']['name'],'reactions':perf.get('reactions'),
+                    'comments':perf.get('comments'),'times_median':perf.get('lift'),'relevance':m['relevance'],
+                    'structure':m['structure'],
+                    'audience':{'measured':heard['measured'],'questions_pct':heard.get('questions_pct'),
+                                'objections_pct':heard.get('objections_pct'),'themes':[t['label'] for t in heard['themes']],
+                                'questions':[t['label'] for t in heard['questions']],'objections':[t['label'] for t in heard['objections']],
+                                'barrio_share':(heard.get('barrio') or {}).get('fit_share')}})
+    return out
+
 def growth_models(now=None):
-    """G models: clean input (id, author, counters, structure and opening line). Replace observed_outliers to change
-    where they come from; the shape stays."""
-    return observed_outliers(now or timezone.now())
+    """G models: the industry referents' outliers first; while there are none, the observed referents' (observed_outliers).
+    Labels and numbers only, never a sentence of a post."""
+    now=now or timezone.now()
+    return industry_models(now) or observed_outliers(now)
+
+def audience_questions(now):
+    """What the audience of the industry referents asks and objects to, by theme (modelos_crecimiento.audience_questions):
+    counts over comments already summarized, no sentence of anyone. Each theme is a signal the plan can cite."""
+    from . import modelos_crecimiento
+    return [{'id':f"tema:{r['kind']}:{r['theme']}",'theme':r['label'],'kind':r['kind'],'count':r['count'],'posts':r['posts'],
+             'referents':r['referents']} for r in modelos_crecimiento.audience_questions(now=now)]
 
 def comment_questions(now,days=30,limit=8):
     rows=PostComment.objects.filter(own=False,commented_at__gte=now-timedelta(days=days),text__contains='?').order_by('-commented_at')[:limit]
@@ -223,7 +247,8 @@ def results_by_type(now,days=30):
 def audience_signals(now=None):
     now=now or timezone.now()
     return {'referent_outlier':growth_models(now),'comment_question':comment_questions(now),
-            'owner_capture':owner_captures(now),'results_by_type':results_by_type(now)}
+            'owner_capture':owner_captures(now),'results_by_type':results_by_type(now),
+            'audience_question':audience_questions(now)}
 
 def offered(signals):
     return {kind:{str(item['id']) for item in signals.get(kind) or []} for kind in EVIDENCE_KINDS}
@@ -424,16 +449,18 @@ La regla general: la audiencia primero. No se trata de Gustavo, se trata de la a
 - reader: el lector principal; reader_need: qué necesita ese lector y qué se lleva del post, en una frase.
 - audience_evidence: la señal de la audiencia que lo respalda, con kind y ref EXACTOS de audience_signals:
   referent_outlier (un post de referente que superó su mediana), comment_question (una pregunta en los comentarios de
-  sus posts), owner_capture (una pregunta u objeción de un comprador que Gustavo contó en sus capturas) o
-  results_by_type (lo que funcionó por tipo). note explica en una frase qué dice esa señal. Una idea con evidencia gana a
-  una sin ella; no inventes refs.
+  sus posts), owner_capture (una pregunta u objeción de un comprador que Gustavo contó en sus capturas),
+  results_by_type (lo que funcionó por tipo) o audience_question (un tema que pregunta u objeta la audiencia de los
+  referentes de su industria). note explica en una frase qué dice esa señal. Una idea con evidencia gana a una sin ella;
+  no inventes refs.
 Por día, options trae de una a tres opciones en orden de preferencia.
 
 Cada tipo:
 - G: idea amplia del territorio, accesible, para gente nueva; toma como modelo la estructura y el ángulo de
   growth_models, nunca su texto. Sin oferta.
 - A: profundidad: paso a paso, análisis, una decisión de arquitectura o de producto con sus consecuencias. El carrusel de
-  la semana suele ir en A.
+  la semana suele ir en A: un carrusel es para un post que avanza por partes (pasos, una lista de errores o señales,
+  antes y después, un marco con sus piezas); un dato o una frase va mejor en infografia.
 - S: un problema concreto del comprador, cómo se resuelve y una sola invitación a conversar. Sin enlace ni calendario.
   modality = sales_purpose de ese día.
 - P: lo humano de construir empresas sobre el dolor de la semana (pain): si ideas_from_gustavo trae material personal

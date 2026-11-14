@@ -155,7 +155,7 @@ Fuentes locales: [connectors.py](../../agentes-linkedin/infra/src/team_backend/c
 - **Cadencia:** después de cada observación; hasta 4 lecturas de comentarios al día para atípicos nuevos.
 - **Tu turno:** ninguna tarjeta propia.
 - **Datos necesarios y disponibilidad:** `ObservedPost.outlier`, `structure` y `audience` (etiquetas y conteos), `PersonEvidence` y `Contact` para el encaje de quienes comentaron. Sin llamadas pagadas.
-- **Código:** `modelos_crecimiento.refresh/after_observe/growth_models/audience_questions`; ganchos en `operador.observe` y `red.discover`.
+- **Código:** `modelos_crecimiento.refresh/after_observe/growth_models/audience_questions`; ganchos en `operador.observe` y `red.discover`; la estrategia los lee en `estrategia.industry_models` y `estrategia.audience_questions` ([EDI-29](motor-editorial.md#edi-29)).
 - **Criterios de aceptación:**
   1. **Dado** un post con 3 veces la mediana de los otros posts asentados de su autor, z robusto ≥ 3 y al menos 20 interacciones, **cuando** se observa, **entonces** se marca atípico con su regla, muestra y cifras; con menos de 6 posts de base dice «muestra insuficiente».
   2. **Dado** un post sin contadores visibles, **cuando** se juzga, **entonces** no se trata como cero ni como atípico.
@@ -163,7 +163,7 @@ Fuentes locales: [connectors.py](../../agentes-linkedin/infra/src/team_backend/c
   4. **Dado** dos atípicos de tamaño parecido, **cuando** se ordenan, **entonces** va primero el que llegó a más personas con encaje del barrio.
   5. **Dado** un anuncio de vacantes o una promoción viral, **cuando** se ordenan modelos, **entonces** se excluye.
   6. **Dado** comentarios de atípicos con preguntas y objeciones, **cuando** se piden las dudas de la audiencia, **entonces** se agrupan por tema con número de posts y referentes.
-- **Cobertura QA:** casos sintéticos en `test_referentes_industria.py`; pendientes de CI.
+- **Cobertura QA:** casos sintéticos en `test_referentes_industria.py` y `test_estrategia.py` (`GrowthModelSourceTests`); pendientes de CI.
 
 ## Retiradas
 

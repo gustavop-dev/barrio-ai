@@ -73,7 +73,8 @@ BRIEF_SCHEMA=_obj(decision=_enum(['write','skip']),skip_reason=_s(),primary_read
     research_request=_obj(needed=_b(),public_question=_s(),public_only=_b()))
 # The weekly GASP strategy (estrategia.py). Optional so older checkpoints and briefs stay valid; the code fills and checks
 # them (estrategia.finalize_brief) whenever the strategy is on.
-AUDIENCE_EVIDENCE=_obj(kind=_enum(['referent_outlier','comment_question','owner_capture','results_by_type']),ref=_s(),note=_s())
+AUDIENCE_EVIDENCE=_obj(kind=_enum(['referent_outlier','comment_question','owner_capture','results_by_type','audience_question']),
+    ref=_s(),note=_s())  # estrategia.EVIDENCE_KINDS
 STORY=_obj(protagonist=_s(),company=_s(),source_ref=_s(),pain=_s(),summary=_s())
 BRIEF_SCHEMA['properties'].update(gasp_type=_enum(['G','A','S','P']),audience_evidence=AUDIENCE_EVIDENCE,story=STORY)
 VARIANT=_obj(angle=_s(),text=_s(),claims=_arr(CLAIM),uncertainties=_arr(_s()))
@@ -131,9 +132,10 @@ Cómo decidir:
 - La audiencia primero: la pieza es para el lector, no sobre Gustavo. primary_reader y reader_value dicen qué necesita
   ese lector y qué se lleva. audience_evidence nombra la señal de la audiencia que lo respalda con kind y ref exactos de
   strategy.audience_signals: referent_outlier (un post de referente que superó su mediana), comment_question (una
-  pregunta en los comentarios de sus posts), owner_capture (una pregunta u objeción de un comprador que Gustavo contó) o
-  results_by_type (lo que funcionó por tipo); note dice en una frase qué dice esa señal. Una idea con evidencia de la
-  audiencia gana a una sin ella. Una idea de Gustavo se adapta a lo que necesita el lector: nunca es un diario.
+  pregunta en los comentarios de sus posts), owner_capture (una pregunta u objeción de un comprador que Gustavo contó),
+  results_by_type (lo que funcionó por tipo) o audience_question (un tema que pregunta u objeta la audiencia de los
+  referentes de su industria); note dice en una frase qué dice esa señal. Una idea con evidencia de la audiencia gana a
+  una sin ella. Una idea de Gustavo se adapta a lo que necesita el lector: nunca es un diario.
 - strategy (o null) trae el tipo GASP del día, que fija la semana y aplica el código: escribe para ese tipo y devuelve
   gasp_type igual a strategy.type. strategy.rule resume el tipo:
   · G crecimiento: idea amplia de su territorio para gente nueva; toma como modelo growth_models (estructura y ángulo de
