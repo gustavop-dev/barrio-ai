@@ -105,7 +105,9 @@ def _pending(now):
     for target,metadata in AuditEvent.objects.filter(action='metrics.collected',created_at__lte=now).order_by('-created_at').values_list('target','metadata')[:20]:
         if target in accounts:continue
         accounts.add(target)
-        for item in (metadata or {}).get('pending') or []:
+        pending=(metadata or {}).get('pending')
+        for item in pending if isinstance(pending,list) else []:  # older events stored only a count
+            if not isinstance(item,dict):continue
             for cut in item.get('cuts') or []:out.setdefault((str(item.get('piece')),cut),item.get('reason'))
     return out
 
@@ -330,18 +332,27 @@ def verdicts(report):
         out[flow]={'veredicto':verdict,'pendiente':[f'{c}: {s}' for c,s in states.items() if s!='ok']}
     return out
 
+def _check(build):
+    """One check of the diagnosis. Stored history has shapes no fixture has (its first run in production died on an
+    old audit event): a check that cannot read its data says so and the rest of the report still comes out."""
+    try:return build()
+    except Exception as exc:return {'estado':'error','motivo':f'{type(exc).__name__}: {str(exc)[:160]}'}
+
 def report(dias=DIAS,now=None):
     """The whole diagnosis of the last `dias` days up to `now`."""
     now=now or timezone.now();since=now-timedelta(days=dias);weeks=_weeks(since,now)
-    posts,pieces=_posts(since,now)
+    try:posts,pieces=_posts(since,now)
+    except Exception as exc:posts,pieces={'estado':'error','motivo':f'{type(exc).__name__}: {str(exc)[:160]}'},[]
     out={'desde':_local(since).date().isoformat(),'hasta':_local(now).date().isoformat(),'dias':dias,'generado':now.isoformat(),
-         'llega':{'posts':posts,'analitica':_analytics(pieces,now),
-                  'comentarios':dict(_measured((desenlaces.COMMENT,),'72h',since,now,wrote=True),tasas=desenlaces.comment_rates(dias,now)),
-                  'red':dict(_measured(desenlaces.NETWORK,'7d',since,now),interactuaron=len(desenlaces.network_engaged(days=dias,now=now))),
-                  'investigacion':_research(since,now),'resumen_semanal':_summaries(weeks,now),'canario':_canary(now),
-                  'visitas_perfil':_profile_views(since,now),'contactos':_contacts(since,now)},
-         'usan':{**{name:_usage(name,since,now) for name in SNAPSHOTS},'resumen_stats':_summary_stats(weeks,now)},
-         'vuelve':{'recomendaciones':_recommendations(since,now),'plan_semanal':_plan(now)}}
+         'llega':{'posts':posts,'analitica':_check(lambda:_analytics(pieces,now)),
+                  'comentarios':_check(lambda:dict(_measured((desenlaces.COMMENT,),'72h',since,now,wrote=True),tasas=desenlaces.comment_rates(dias,now))),
+                  'red':_check(lambda:dict(_measured(desenlaces.NETWORK,'7d',since,now),interactuaron=len(desenlaces.network_engaged(days=dias,now=now)))),
+                  'investigacion':_check(lambda:_research(since,now)),'resumen_semanal':_check(lambda:_summaries(weeks,now)),
+                  'canario':_check(lambda:_canary(now)),'visitas_perfil':_check(lambda:_profile_views(since,now)),
+                  'contactos':_check(lambda:_contacts(since,now))},
+         'usan':{**{name:_check(lambda name=name:_usage(name,since,now)) for name in SNAPSHOTS},
+                 'resumen_stats':_check(lambda:_summary_stats(weeks,now))},
+         'vuelve':{'recomendaciones':_check(lambda:_recommendations(since,now)),'plan_semanal':_check(lambda:_plan(now))}}
     out['veredictos']=verdicts(out)
     return out
 

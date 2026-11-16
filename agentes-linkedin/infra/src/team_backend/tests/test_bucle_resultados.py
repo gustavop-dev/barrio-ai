@@ -144,6 +144,17 @@ class LoopBase(OperatorBase):
 
 
 class ReportTests(LoopBase):
+    def test_an_old_audit_event_with_a_pending_count_and_a_check_that_fails_do_not_stop_the_report(self):
+        from unittest.mock import patch
+        from team_backend import bucle_resultados
+        from team_backend.models import AuditEvent
+        AuditEvent.objects.create(action='metrics.collected',target='cuenta-vieja',created_at=NOW-timedelta(minutes=5),metadata={'pending':1,'captured':1})
+        with patch.object(bucle_resultados,'_canary',side_effect=TypeError('forma vieja')):
+            report=bucle_resultados.report(now=NOW)
+        self.assertEqual(report['llega']['canario'],{'estado':'error','motivo':'TypeError: forma vieja'})
+        self.assertIn('posts',report['llega']);self.assertIn('veredictos',report)
+        self.assertIn('llega.canario: error',report['veredictos']['cuenta']['pendiente'])
+
     def test_what_arrives_what_the_agents_use_and_what_returns(self):
         w=self.world();r=bucle_resultados.report(14,NOW)
         self.assertEqual((r['desde'],r['hasta'],r['dias']),('2026-11-02','2026-11-16',14))
