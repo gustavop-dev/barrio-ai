@@ -176,7 +176,7 @@ class SharedEvidenceTests(TestCase):
         self.assertNotIn(manual.details['evidence_ref'], json.dumps(asdict(result)))
         self.assertIsNone(manual.event_at)
         with self.assertRaises(ValueError):
-            ev.observe(manual.person, kind='reactor', source='unipile', source_id='x', observed_at=self.t)
+            ev.observe(manual.person, kind='reactor', source='otra_fuente', source_id='x', observed_at=self.t)
         with self.assertRaises(ValueError):
             ev.add_manual(self.user, self.account, provider_user_id='person-a', source_id='bad',
                           observed_at=self.t, evidence_ref='PRIVATE INBOX TEXT')

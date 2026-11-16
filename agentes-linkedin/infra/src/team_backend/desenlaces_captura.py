@@ -11,17 +11,19 @@ Reads count against their own daily caps through the audit log (outcomes.read, O
 spent cap, a pause or the navegador service's «nothing left» stops the reads and leaves the rest pending for the next
 run, another read error leaves only that comment pending. Each age is written once. Null means unread, never zero."""
 import os
+import re
 from datetime import timedelta
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
-from . import desenlaces, ids_linkedin, metricas, operador
+from . import desenlaces, metricas, operador
 from .connectors import ConnectorError, deferred, get_connector
 from .models import ActionOutcome, AuditEvent, Conversation, PostComment
 from .permissions import require
 
 READ_CAPS={'comments':20,'threads':20}  # per local day; the autopilot queues the job about every 3 h
 THREAD_PAGE=50  # the answers one thread read brings
+PERSON_ID=re.compile(r'ACo[A-Za-z0-9_\-]{1,100}')  # a member's profile id; a company page's id is another shape
 # Why a due outcome was not written (summary['reasons']): the own comment was not on the page LinkedIn answered; a daily
 # read cap stopped the reads; a read failed (or a pause or «nothing left» stopped them).
 PENDING_REASONS=('sin_comentario','tope_de_lecturas','error_de_lectura')
@@ -86,9 +88,9 @@ def _comment(account,connector,execution,now,summary):
         else:
             thread=connector.list_comment_thread(post.provider_post_id,found['id'],limit=THREAD_PAGE)
             repliers=list(dict.fromkeys(c['author']['id'] for c in thread if not c['is_sender'] and c['author'].get('id')))
-            # A person's id is the same kind on both providers (ids_linkedin); any other author id is not compared.
+            # Only a person's id (`ACo…`) is compared; any other author id (a company page) is not.
             author=post.author_provider_id or ''
-            author_replied=author in repliers if ids_linkedin.PERSON.fullmatch(author) else None
+            author_replied=author in repliers if PERSON_ID.fullmatch(author) else None
     if not _save(execution,'72h',now,source=ActionOutcome.Source.READ,provider_comment_id=str(found['id'])[:255],
                  reactions=found.get('reaction_counter'),replies=replies,author_replied=author_replied,repliers=repliers):
         return None  # another run wrote it: nothing new

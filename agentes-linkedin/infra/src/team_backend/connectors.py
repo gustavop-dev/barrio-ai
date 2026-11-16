@@ -1,16 +1,14 @@
-"""LinkedIn connectors used by the account operator.
+"""What every LinkedIn connector shares: the errors, the answers' shapes and the simulated account.
 
-Each method performs at most one provider call and never retries a write. Unipile v2
-documents no idempotency key, so the operator reconciles uncertain writes by reading
-back the post instead of repeating them.
-Contract: https://developer.unipile.com/v2.0/reference/api-usage.md (consulted 2026-11-06).
+The real account goes through connectors_directo (LinkedIn directo, the navegador service) and own publications
+through connectors_linkedin (official API). Each method performs at most one call and never retries a write: LinkedIn
+gives no idempotency key, so the operator reconciles an uncertain write by reading back instead of repeating it.
+FakeConnector is the in-memory account of tests and QA; the parsers below read its rows.
 """
 import os
 import re
 import uuid
 from datetime import datetime, timedelta, timezone
-from urllib.parse import quote
-import httpx
 
 REACTIONS=('linkedin_like','linkedin_celebrate','linkedin_support','linkedin_love','linkedin_insightful','linkedin_funny')
 
@@ -27,7 +25,7 @@ def deferred(exc):
     """The one rule for «nothing left, wait and try again»: only the navegador service refusing before the call left,
     for a reason that is ours and not the account's (its budget, or the call not sent: browser busy or not ready, another
     internet exit, the service unreachable). Such work waits and is retried; it is never a pause, an executed or failed
-    action, or a verdict on a person or a post. Every other error, of every provider (a 5xx, not found, Unipile's own
+    action, or a verdict on a person or a post. Every other error, of every provider (a 5xx, not found, the simulated
     not_sent…), keeps its meaning."""
     return bool(getattr(exc,'deferrable',False)) and not exc.pause
 
@@ -62,9 +60,9 @@ SIGNAL_FLAGS=('is_creator','is_hiring','is_open_to_work','is_influencer','is_pre
 
 def _signals(data):
     """What a profile or a search result says about the person's reach and moment (Gustavo, 12/11/2026: no community
-    or no established business makes a founder irrelevant). Unipile v2 «Get a user profile» returns followers_count,
-    relations_count, bio and language at the top level and the flags in specifics (read on the real account on
-    12/11/2026); «Perform People Search» returns the counts per result. None means not given, never zero."""
+    or no established business makes a founder irrelevant). A simulated profile carries followers_count,
+    relations_count, bio and language at the top level and the flags in specifics; a search result, the counts. None
+    means not given, never zero."""
     data=data or {};specifics=data.get('specifics') or {}
     def count(key):return _count(data[key] if key in data else specifics.get(key))
     flags={k:bool(specifics.get(k,data.get(k))) for k in SIGNAL_FLAGS if k in specifics or k in data}
@@ -90,7 +88,7 @@ def _invitation(data):
             'message':data.get('message') or '','user':_user(data.get('user'))}
 
 def _count(value):
-    """Unipile v2 reports reactions as [{reaction, count}]; older shapes use an int."""
+    """A counter is a number, or a list of [{reaction, count}] (reactions by kind) to add up; anything else is None."""
     if isinstance(value,list):return sum(int(item.get('count') or 0) for item in value if isinstance(item,dict))
     return value if isinstance(value,int) and not isinstance(value,bool) else None
 
@@ -101,31 +99,30 @@ def _post(data):
             'comments_counter':_count(data.get('comments_counter')),'reactions_counter':_count(data.get('reactions_counter')),
             # A boolean: LinkedIn exposes whether we reacted, not which reaction.
             'user_reacted':bool(data.get('user_reacted')),'is_repost':bool(data.get('is_repost')),
-            # reposts_counter: number, or null when hidden (Unipile v2 «Get a post», consulted 2026-11-06).
+            # reposts_counter: number, or null when hidden.
             'reposts_counter':_count(data.get('reposts_counter')),'impressions':_count(analytics.get('impressions_counter'))}
 
 def _audience(data):
-    """Own profile counters. GET users/me returns followers_count and relations_count at the top level
-    (confirmed against the real account on 2026-11-06); light user objects carry them in specifics."""
+    """Own profile counters: followers_count and relations_count at the top level, or in specifics."""
     specifics=data.get('specifics') or {}
     def pick(key):return _count(data[key] if key in data else specifics.get(key))
     return {'followers':pick('followers_count'),'connections':pick('relations_count')}
 
 def _profile_views(data):
-    """List Profile Views: analytics.views_count covers the requested date_range; analytics is optional."""
+    """Profile views: analytics.views_count covers the window asked for; analytics is optional."""
     return _count((data.get('analytics') or {}).get('views_count'))
 
 def _comment(data):
     return {'id':str(data['id']),'text':data.get('text') or '','created_at':_when(data.get('created_at')),
             'is_sender':bool(data.get('is_sender')),'thread_id':data.get('thread_id'),'author':_user(data.get('author')),
-            # Unipile v2 «List all Post's Comments» (consulted 2026-11-12): how many answers a top-level comment has.
+            # How many answers a top-level comment has.
             'reply_counter':_count(data.get('reply_counter')),
-            # How many reacted to the comment (directo reads LinkedIn's count). No Unipile field for it is confirmed here:
-            # null, never zero.
+            # How many reacted to the comment: directo reads LinkedIn's count; the simulated account has none (null,
+            # never zero).
             'reaction_counter':None}
 
 def _chat(data):
-    """List all Chats (v2): a 1to1 chat names the other member in user_id; last_message is a MessagePreview or a Message."""
+    """A chat: a 1to1 one names the other member in user_id; last_message is a preview or a whole message."""
     last=data.get('last_message') or {}
     kind=data.get('type') or ('group' if data.get('is_group') else 'channel' if data.get('is_channel') else '1to1' if data.get('is_1to1') else '')
     return {'id':str(data['id']),'name':data.get('name') or '','type':kind,'user_id':str(data.get('user_id') or ''),
@@ -134,7 +131,7 @@ def _chat(data):
             'last_message':{'id':str(last.get('id') or ''),'text':last.get('text') or '','is_sender':bool(last.get('is_sender'))} if last else None}
 
 def _message(data):
-    """List all Chat Messages (v2). hidden: deleted, hidden or an event (reaction, announcement…), never shown as text."""
+    """A chat message. hidden: deleted, hidden or an event (reaction, announcement…), never shown as text."""
     return {'id':str(data['id']),'text':data.get('text') or '','at':_when(data.get('timestamp')),'is_sender':bool(data.get('is_sender')),
             'sender_id':str(data.get('sender_id') or ''),'sender':_user(data.get('sender')),
             'hidden':bool(data.get('is_hidden') or data.get('is_deleted') or data.get('is_event')),
@@ -142,155 +139,6 @@ def _message(data):
 
 def same_text(a,b):
     return ' '.join((a or '').split()).casefold()==' '.join((b or '').split()).casefold()
-
-
-class UnipileConnector:
-    provider='unipile'
-    host='https://api.unipile.com'
-
-    def __init__(self,account_id,api_key=None,transport=None):
-        if os.environ.get('LIVE_LINKEDIN','false').lower()!='true':
-            raise ConnectorError('Conector LinkedIn desactivado: configurar LIVE_LINKEDIN=true.',kind='disabled')
-        key=api_key or os.environ.get('UNIPILE_API_KEY')
-        if not key:raise ConnectorError('Falta UNIPILE_API_KEY en el entorno privado.',kind='disabled')
-        if not re.fullmatch(r'acc_[A-Za-z0-9_\-]+',account_id or ''):raise ConnectorError('Identificador de cuenta Unipile inválido.',kind='config')
-        self.account_id=account_id
-        self.http=httpx.Client(base_url=self.host,transport=transport,timeout=httpx.Timeout(30.0,connect=10.0),
-                               headers={'X-API-KEY':key,'accept':'application/json'})
-
-    def _path(self,*parts):
-        return '/v2/'+self.account_id+'/'+'/'.join(quote(str(p),safe='') for p in parts)
-
-    def _error(self,response):
-        try:body=response.json()
-        except ValueError:body={}
-        kind=body.get('type') or 'http_error';status=response.status_code
-        # Conservative adapter contract. A generic quota/422 never authorizes a second write.
-        # No unverified provider error code is guessed; absent explicit scope/outcome stays an error.
-        if (status in (400,422) and body.get('scope')=='invitation_note' and
-                body.get('reason')=='monthly_limit' and body.get('invitation_created') is False and
-                str(kind).split('/')[-1]!='cannot_resend_yet'):
-            return InvitationNoteQuota(f'Unipile: cuota de notas rechazada sin crear invitación ({kind}).',status)
-        # Re-authentication, permission/restriction signals and rate limits stop the account.
-        pause=status in (401,403,429) or kind in ('api/account_restricted','provider/invalid_authorization')
-        return ConnectorError(f'Unipile: HTTP {status} ({kind}).',status=status,kind=kind,pause=pause)
-
-    def _read(self,path,params=None):
-        try:response=self.http.get(path,params=params)
-        except httpx.HTTPError as exc:raise ConnectorError(f'Unipile no respondió: {type(exc).__name__}.',kind='network') from None
-        if response.status_code>=400:raise self._error(response)
-        return response.json()
-
-    def _query(self,path,body,params=None):
-        """A read sent as POST (search): failures are definite, never uncertain."""
-        try:response=self.http.post(path,json=body,params=params)
-        except httpx.HTTPError as exc:raise ConnectorError(f'Unipile no respondió: {type(exc).__name__}.',kind='network') from None
-        if response.status_code>=400:raise self._error(response)
-        return response.json()
-
-    def _write(self,path,body):
-        try:response=self.http.post(path,json=body)
-        except (httpx.ConnectError,httpx.ConnectTimeout):
-            raise ConnectorError('Unipile: no fue posible conectar; la acción no se envió.',kind='not_sent') from None
-        except httpx.HTTPError as exc:
-            raise ConnectorUncertain(f'Unipile: respuesta incierta ({type(exc).__name__}).') from None
-        # Gateway/provider timeouts and server errors may hide an applied write.
-        if response.status_code>=500:raise ConnectorUncertain(f'Unipile: HTTP {response.status_code}; resultado incierto.')
-        if response.status_code>=400:raise self._error(response)
-        try:return response.json()
-        except ValueError:raise ConnectorUncertain('Unipile: respuesta ilegible tras escribir.') from None
-
-    def account_status(self):
-        # running = operational; errored/disconnected/degraded/partial require attention.
-        for item in self._read('/v2/accounts',{'provider':'linkedin','limit':'100'}).get('data',[]):
-            if item.get('id')==self.account_id:
-                return {'status':item.get('status') or 'unknown','is_locked':bool(item.get('is_locked'))}
-        return {'status':'missing','is_locked':True}
-
-    def get_user(self,identifier):return _user(self._read(self._path('users',identifier)))
-
-    def list_user_posts(self,user_id,limit=10):
-        return [_post(p) for p in self._read(self._path('users',user_id,'posts'),{'limit':limit}).get('data',[])]
-
-    def get_post(self,post_id):return _post(self._read(self._path('posts',post_id)))
-
-    def list_comments(self,post_id,limit=50):
-        data=self._read(self._path('posts',post_id,'comments'),{'limit':limit,'sort_by':'MOST_RECENT'})
-        return [_comment(c) for c in data.get('data',[])]
-
-    def create_comment(self,post_id,text):return _comment(self._write(self._path('posts',post_id,'comments'),{'text':text}))
-
-    # -- INT-04, comments on own posts (Unipile v2 «List all Comment's Replies», «Reply to a comment» and comment
-    # reactions, consulted 2026-11-12). The answers of a comment form its thread; LinkedIn keeps one level, so the team
-    # always writes on the top-level comment. No method name says «reply»: the inbox guarantee (INB-08) forbids it.
-    def list_comment_thread(self,post_id,comment_id,limit=50):
-        data=self._read(self._path('posts',post_id,'comments',comment_id,'replies'),{'limit':limit})
-        return [_comment(c) for c in data.get('data',[])]
-
-    def comment_in_thread(self,post_id,comment_id,text):
-        return _comment(self._write(self._path('posts',post_id,'comments',comment_id),{'text':text}))
-
-    def react_to_comment(self,post_id,comment_id,reaction):
-        if reaction not in REACTIONS:raise ConnectorError('Reacción no admitida.',kind='invalid')
-        self._write(self._path('posts',post_id,'comments',comment_id,'reactions'),{'reaction':reaction})
-        return {'reaction':reaction}
-
-    def add_reaction(self,post_id,reaction):
-        if reaction not in REACTIONS:raise ConnectorError('Reacción no admitida.',kind='invalid')
-        self._write(self._path('posts',post_id,'reactions'),{'reaction':reaction})
-        return {'reaction':reaction}
-
-    # -- network (DESC-02/03, RED-01/02/03/04); profile reads do not notify a visit
-    def get_profile(self,user_id):return _profile(self._read(self._path('users',user_id)))
-
-    def search_people(self,keywords,location=None,profile_language=None):
-        """Classic «Perform People Search» (v2, consulted 12/11/2026): `location` takes parameter ids and
-        `profile_language` two-letter codes."""
-        body={'keywords':keywords}
-        if location:body['location']=list(location)
-        if profile_language:body['profile_language']=list(profile_language)
-        data=self._query(self._path('linkedin','search','people'),body)
-        return [dict(_user(p),location=p.get('location') or '',network_distance=p.get('network_distance') or '',signals=_signals(p))
-                for p in data.get('data',[]) if p.get('id')]
-
-    def search_parameters(self,kind,keywords,limit=5):
-        """«List Search Parameters» (v2): ids of a location, company… for the search filters."""
-        data=self._read(self._path('linkedin','search','parameters'),{'type':kind,'keywords':keywords,'limit':str(limit)})
-        return [{'id':str(p['id']),'name':p.get('name') or ''} for p in data.get('data',[]) if p.get('id')]
-
-    def follow_user(self,user_id):
-        self._write(self._path('users','me','follow',user_id),{});return {'user_id':user_id}
-
-    def send_invitation(self,user_id,note=None):
-        payload={'user_id':user_id}
-        if note:payload['message']=note
-        return _invitation(self._write(self._path('users','me','relation-requests'),payload))
-
-    def list_invitations(self,kind,limit=100):
-        if kind not in ('sent','received'):raise ConnectorError('Tipo de invitación inválido.',kind='invalid')
-        data=self._read(self._path('users','me','relation-requests'),{'type':kind,'limit':limit})
-        return [_invitation(i) for i in data.get('data',[])]
-
-    def accept_invitation(self,request_id):
-        self._write(self._path('users','me','relation-requests',request_id,'accept'),{});return {'request_id':request_id}
-
-    # -- own audience (APRE-01, metricas.py): reads only
-    def own_audience(self):return _audience(self._read(self._path('users','me')))
-
-    def profile_views(self,days=14):
-        # date_range accepts 14, 28, 90 or 365; a free account gets analytics.views_count (checked 2026-11-06).
-        return _profile_views(self._read(self._path('linkedin','analytics','profile-views'),{'date_range':days,'limit':1}))
-
-    # -- inbox (conversaciones.py): reads only. There is deliberately no method that sends, marks as read or edits a
-    # message: answering or committing terms stays with Gustavo. Unipile v2 reference «List all Chats» and «List all
-    # Chat Messages» (consulted 2026-11-07): GET chats?limit and GET chats/{chat_id}/messages?limit, both newest first.
-    def list_chats(self,limit=20,inbox='CLASSIC_PRIMARY'):
-        # LinkedIn has no «List all Chats» in v2 (it answers 501 api/not_implemented): chats are listed per inbox
-        # («List inbox Chats»), e.g. CLASSIC_PRIMARY or a company page's COMPANY_<id>_PRIMARY (GET /v2/{acc}/inboxes).
-        return [_chat(c) for c in self._read(self._path('inboxes',inbox,'chats'),{'limit':limit}).get('data',[]) if c.get('id')]
-
-    def list_chat_messages(self,chat_id,limit=10):
-        return [_message(m) for m in self._read(self._path('chats',chat_id,'messages'),{'limit':limit}).get('data',[]) if m.get('id')]
 
 
 class FakeConnector:
@@ -343,7 +191,7 @@ class FakeConnector:
         return [_post(p) for p in self.state['posts'].values() if p['author']['id']==user_id][:limit]
 
     def seed_own_post(self,text,impressions=None):
-        """A post of the connected member, as Unipile returns it for list_user_posts('me') (opaque id)."""
+        """A post of the connected member, as list_user_posts('me') returns it."""
         pid=f'activity:me-{len(self.state["posts"])}'
         self.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':text,
             'created_at':datetime.now(timezone.utc).isoformat(),'author':{'id':'me','display_name':'Cuenta conectada'},
@@ -353,14 +201,14 @@ class FakeConnector:
         return pid
 
     def set_post_counters(self,post_id,impressions=None,reactions=None,comments=None,reposts=None):
-        """Counters as Unipile v2 returns them; None means hidden or absent (null), never zero."""
+        """Counters as the account reports them; None means hidden or absent (null), never zero."""
         post=self.state['posts'][post_id]
         post.update(reactions_counter=[{'reaction':'👍','count':reactions}] if reactions is not None else None,
                     comments_counter=comments,reposts_counter=reposts,
                     analytics={'impressions_counter':impressions} if impressions is not None else {})
 
     def seed_audience(self,followers=None,connections=None,views=None):
-        """Own profile (GET users/me) and List Profile Views; a None leaves the field out, as when LinkedIn hides it."""
+        """Own profile and profile views; a None leaves the field out, as when LinkedIn hides it."""
         me={'object':'UserProfile','id':'me','display_name':'Cuenta conectada','provider':'LINKEDIN','specifics':{'network_distance':'SELF'}}
         if followers is not None:me['followers_count']=followers
         if connections is not None:me['relations_count']=connections
@@ -381,7 +229,7 @@ class FakeConnector:
         return [_comment(c) for c in reversed(rows)][:limit]
 
     def comment_on_own_post(self,post_id,user_id,text,thread=None,at=None):
-        """Someone comments on an own post (or answers in the thread of `thread`), as Unipile shows it: no headline."""
+        """Someone comments on an own post (or answers in the thread of `thread`), as LinkedIn lists it: no headline."""
         user=self.state['users'][user_id]
         author={k:user[k] for k in ('id','display_name','profile_url','public_identifier','type') if k in user}
         comment={'id':'comment:'+uuid.uuid4().hex[:12],'text':text,'is_sender':False,'author':author,
@@ -433,7 +281,7 @@ class FakeConnector:
         self.state['users'][public_id]=user;self.state['users'][user['id']]=user
         self.state['network'][user['id']]={'network_distance':distance,'is_following':False,'relation_request_status':''}
         if comment_on:
-            # Like Unipile v2, a comment author carries name, id and URL but no headline.
+            # As on LinkedIn, a comment author carries name, id and URL but no headline.
             author={k:user[k] for k in ('id','display_name','profile_url','type')}
             self.state['comments'][comment_on].append({'id':'comment:'+uuid.uuid4().hex[:12],'text':comment,'is_sender':False,
                 'created_at':datetime(2026,11,6,13,0,tzinfo=timezone.utc).isoformat(),'author':author})
@@ -547,7 +395,6 @@ class FakeConnector:
 
 
 def get_connector(account):
-    if account.provider=='unipile':return UnipileConnector(account.external_account_id)
     if account.provider=='fake':return FakeConnector(account.external_account_id)
     if account.provider=='directo':
         from .connectors_directo import DirectoConnector

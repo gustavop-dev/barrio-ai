@@ -241,7 +241,7 @@
       "contrato_ejecutable": false,
       "estado": "parcial",
       "runtime": {
-        "implementa": ["team_backend/conversaciones.py: read_inbox (lecturas por Unipile con topes diarios)", "team_backend/conversaciones.py: _questions / assess (Jev)"],
+        "implementa": ["team_backend/conversaciones.py: read_inbox (lecturas por LinkedIn directo con topes diarios)", "team_backend/conversaciones.py: _questions / assess (Jev)"],
         "modelo": "TYPESAFE_MODEL (jev-1.14.0) vía providers.typesafe",
         "effort": "no aplica: juicios tipados con probabilidad",
         "proposito_ledger": "inbox-assess",

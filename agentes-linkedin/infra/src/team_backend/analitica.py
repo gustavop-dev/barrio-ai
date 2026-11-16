@@ -29,7 +29,7 @@ from django.db.models import F, Max, Min, Q
 from django.utils import timezone
 from linkedin_directo.analitica import post_urn
 from linkedin_directo.permitidas import ANALYTICS_DAYS
-from . import ids_linkedin, operador
+from . import operador
 from .connectors import ConnectorError, get_connector
 from .resultados import kpi, ratio_kpi
 from .models import (ActionExecution, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange, AnalyticsSnapshot,
@@ -110,23 +110,14 @@ def url_key(value):
     if parts.scheme not in ('http','https') or not parts.netloc or not parts.path.strip('/'):return ''
     return parts.netloc.lower().removeprefix('www.')+parts.path.rstrip('/')
 
-def unipile_urns(value):
-    """The urns inside a Unipile post id (base64 of a JSON list of urns, ids_linkedin): its activity (the later one of a
-    repost pair, as ids_linkedin.to_directo) and its ugcPost; [] for any other shape."""
-    try:pairs=ids_linkedin.post_urns(value)
-    except ids_linkedin.Untranslatable:return []
-    try:activity=[f'urn:li:activity:{ids_linkedin.to_directo("post",value)}']
-    except ids_linkedin.Untranslatable:activity=[]
-    return activity+[f'urn:li:ugcPost:{n}' for kind,n in pairs if kind=='ugcPost']
-
 def post_keys(value):
-    """The keys one stored id or link names its post by: the urn a link or an urn names (post_urn), else directo's bare
-    activity number, else the urns of a Unipile id; and a link's url_key. Never another urn kind: nothing in the code
+    """The keys one stored id or link names its post by: the urn a link or an urn names (post_urn), else the bare
+    activity number the connector uses as a post's id; and a link's url_key. Never another urn kind: nothing in the code
     base turns an activity into the share or ugcPost of the same post, so those only meet through the link."""
     value=str(value or '').strip()
     if not value:return []
     urn=post_urn(value) or (f'urn:li:activity:{value}' if ACTIVITY.fullmatch(value) else '')
-    return [k for k in ([urn] if urn else unipile_urns(value))+[url_key(value)] if k]
+    return [k for k in (urn,url_key(value)) if k]
 
 def match(index,urn,url):
     """The piece id known_posts() gives a post LinkedIn linked as `url` (urn `urn`): by its urn, else by the link."""
@@ -134,7 +125,7 @@ def match(index,urn,url):
 
 def known_posts(pieces=None):
     """post key (post_keys) -> piece id of the CONT-09 publications, from every id we keep of them: the official API's
-    urn or the Unipile id the publish found (ActionExecution), the Unipile id, activity id or link a metrics read found
+    urn or the activity id the publish found (ActionExecution), the activity id or link a metrics read found
     (PostMetric, EditorialPiece.metrics) and the post id the replies read used (PostComment, and its replies.scanned
     audit, for a publication only). The first source to name a key wins. `pieces` (ids) limits it to those pieces.
     Not filtered by account: pieces belong to the publishing account, the analytics to the directo one, and both are
@@ -149,7 +140,7 @@ def known_posts(pieces=None):
     for piece,provider_id,url in only(PostMetric.objects,'piece_id').values_list('piece_id','provider_post_id','share_url'):
         add(provider_id,piece);add(url,piece)
     for piece,metrics in only(EditorialPiece.objects.exclude(metrics={}),'id').values_list('id','metrics'):
-        add((metrics or {}).get('unipile_post_id'),piece);add((metrics or {}).get('share_url'),piece)
+        add((metrics or {}).get('provider_post_id'),piece);add((metrics or {}).get('share_url'),piece)
     for piece,post_id in only(PostComment.objects,'piece_id').order_by().values_list('piece_id','provider_post_id').distinct():
         add(post_id,piece)
     scans=AuditEvent.objects.filter(action='replies.scanned',metadata__has_key='post_id')

@@ -9,7 +9,7 @@
   "runtime": "Diseño, no ejecutable: el runtime no lee este contrato. Estado real, código, prompt y modelo del rol en infra/docs/mapa-agentes-runtime.md y arquitectura/indice-agentes-v1.json.",
   "fecha": "2026-11-06",
   "proposito": {
-    "mision": "Ser el único ejecutor de escrituras en LinkedIn (Unipile v2) y en la API oficial, y la pasarela de lectura de la cuenta: comprobar, ejecutar una sola vez, confirmar, conciliar y detener ante cualquier riesgo de la cuenta.",
+    "mision": "Ser el único ejecutor de escrituras en LinkedIn (LinkedIn directo, por el servicio navegador) y en la API oficial, y la pasarela de lectura de la cuenta: comprobar, ejecutar una sola vez, confirmar, conciliar y detener ante cualquier riesgo de la cuenta.",
     "contribucion_al_objetivo_del_equipo": "Que las decisiones de los agentes, aprobadas por la política autónoma (o por Gustavo en modo approval), se apliquen exactamente una vez, con evidencia, sin duplicados y sin poner en riesgo la cuenta.",
     "resultado_del_que_responde": "execution_record confirmado, sin_efecto_confirmado o incierto; estado de cuenta (D15); pendientes de notificaciones (ADM-01); parada total (ADM-04); historial conciliado (ADM-05).",
     "fuera_de_responsabilidad": [
@@ -25,7 +25,7 @@
     "unidades": [],
     "temas_prioritarios": [
       "políticas versionadas de reparto-acciones-v1",
-      "contratos de Unipile v2 y de la API oficial verificados en piloto"
+      "contrato del conector directo con el servicio navegador (infra/docs/navegador-contrato.md) y de la API oficial, verificados en piloto"
     ],
     "relaciones_con_otras_unidades": [],
     "acceso_no_exclusivo": true,
@@ -61,7 +61,7 @@
     "eventos_que_lo_activan": [
       "execution_request recibido",
       "vencimiento de un trabajo programado (CONT-08)",
-      "webhook de Unipile (mensajes, relaciones, seguidores) y consulta periódica configurada",
+      "consulta periódica configurada de la cuenta de LinkedIn (bandeja, red, comentarios de los posts propios y métricas); LinkedIn directo no recibe webhooks",
       "ventana de conciliación de un incierto",
       "orden de parada, pausa, veto o reanudación de Gustavo; cambio de configuración (OPERATOR_*)"
     ],
@@ -89,8 +89,8 @@
       "Comprobar parada total, pausas, D15 (identidad, permiso efectivo, restricciones, vigencia del acceso), topes por día, semana, tipo y destinatario, ventana, espaciado entre escrituras públicas, caducidad y antigüedad del post.",
       "Comprobar precondiciones del objeto en D13/D14: no conectado ni con invitación pendiente (RED-02), hilo sin mensajes nuevos desde la aprobación (CHAT), post existente (INT), sin intervención de Gustavo, sin ejecución previa con la misma clave.",
       "Registrar la intención con la clave de idempotencia en estado reservado antes de llamar.",
-      "Ejecutar una sola llamada a un único proveedor: Unipile v2 para relaciones, interacción, mensajes y perfil; Posts API oficial (w_member_social) para publicar, editar o retirar posts.",
-      "Confirmar releyendo el resultado: invitación en la lista de enviadas, mensaje en el chat, comentario o reacción en el objeto, campo de perfil igual al aprobado, URN/ID del post y lectura posterior permitida o por Unipile.",
+      "Ejecutar una sola llamada a un único proveedor: LinkedIn directo (conector directo y servicio navegador) para relaciones e interacción (seguir, invitar, aceptar invitaciones, reaccionar, comentar y responder); Posts API oficial (w_member_social) para publicar, editar o retirar posts. Enviar mensajes y editar el perfil no tienen vía automática: son tarea manual de Gustavo.",
+      "Confirmar releyendo el resultado: invitación en la lista de enviadas, comentario o reacción en el objeto, campo de perfil igual al aprobado (tras aplicarlo Gustavo a mano), URN/ID del post y lectura posterior permitida o por LinkedIn directo.",
       "Clasificar como confirmado, sin_efecto_confirmado o incierto; los inciertos entran en conciliación por lectura durante la ventana configurada y, si no se resuelven, se pausa la capacidad, se bloquea el objeto y se alerta a Gustavo.",
       "Publicar execution_record (D14), actualizar topes consumidos y notificar al solicitante y al aprendizaje."
     ],
@@ -116,7 +116,7 @@
   },
   "herramientas_y_autoridad": {
     "herramientas_necesarias": [
-      "Unipile v2 con la cuenta de Gustavo conectada (credenciales y 2FA custodiados por Unipile): búsqueda, perfiles, posts, comentarios, reacciones, invitaciones, seguir, chats y edición del perfil propio; webhooks de mensajes y relaciones",
+      "LinkedIn directo con la cuenta de Gustavo (conector directo y servicio navegador): la sesión vive en el perfil de navegador de la cuenta en nuestro servidor; Gustavo entra a mano con su clave y su 2FA y Barrio no los guarda. Lee búsqueda de personas, perfiles, posts, comentarios, invitaciones y la bandeja; escribe seguir, invitar, aceptar invitaciones, reaccionar, comentar y responder. Sin envío de mensajes, edición del perfil propio ni webhooks: todo se lee por consulta periódica",
       "API oficial de LinkedIn: Posts API con w_member_social (Share on LinkedIn); memberCreatorPostAnalytics y memberFollowersCount solo si Community Management concede r_member_postAnalytics/r_member_profileAnalytics",
       "Django/PostgreSQL y cola persistente: solicitudes, aprobaciones, programaciones, registro de ejecución, política autónoma, topes, ventana, pausas, alertas y parada total",
       "almacén de secretos del backend; los agentes nunca reciben tokens"
@@ -169,7 +169,7 @@
     {
       "id": "RED-03",
       "papel": "ejecuta",
-      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. Sincronización y consulta de estados; no deducir aceptación del envío ni del silencio."
+      "politica": "Nivel A. Sirve la lectura o sincronización por LinkedIn directo/API oficial sin exponer credenciales y con topes. Sincronización y consulta de estados; no deducir aceptación del envío ni del silencio."
     },
     {
       "id": "RED-03",
@@ -274,7 +274,7 @@
     {
       "id": "INT-06",
       "papel": "ejecuta",
-      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Compartir con atribución y criterio propio; un único ejecutor y una sola vía (API oficial o Unipile) registrada por pieza; entra en el calendario del director."
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Compartir con atribución y criterio propio; un único ejecutor y una sola vía registrada por pieza (la API oficial: LinkedIn directo no comparte posts); entra en el calendario del director."
     },
     {
       "id": "INT-06",
@@ -334,7 +334,7 @@
     {
       "id": "CONT-09",
       "papel": "ejecuta",
-      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Posts API (w_member_social) con la versión aprobada por la política autónoma, sin revisión humana final; guardar URN y confirmar por lectura permitida o Unipile; timeout no activa segundo ejecutor."
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Posts API (w_member_social) con la versión aprobada por la política autónoma, sin revisión humana final; guardar URN y confirmar por lectura permitida o por LinkedIn directo; timeout no activa segundo ejecutor."
     },
     {
       "id": "CONT-09",
@@ -374,7 +374,7 @@
     {
       "id": "CHAT-01",
       "papel": "ejecuta",
-      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. Sincronización inicial e incremental por Unipile; leer el hilo completo disponible; acceso restringido a conversaciones_inbox y extractos mínimos para otros roles."
+      "politica": "Nivel A. Sirve la lectura o sincronización por LinkedIn directo/API oficial sin exponer credenciales y con topes. Lectura periódica de la bandeja por LinkedIn directo (sin webhooks); leer los mensajes recientes disponibles del hilo; acceso restringido a conversaciones_inbox y extractos mínimos para otros roles."
     },
     {
       "id": "CHAT-01",
@@ -444,7 +444,7 @@
     {
       "id": "CHAT-10",
       "papel": "ejecuta",
-      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Estados internos libres; archivar nativamente solo hilos cerrados; nunca marcar como leído un mensaje no atendido; campos nativos por verificar en Unipile."
+      "politica": "Nivel A. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Estados internos libres; LinkedIn directo solo lee la bandeja: archivar un hilo cerrado en LinkedIn es tarea manual de Gustavo; nunca marcar como leído un mensaje no atendido."
     },
     {
       "id": "CHAT-10",
@@ -454,7 +454,7 @@
     {
       "id": "PERF-02",
       "papel": "ejecuta",
-      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Titular (specifics) y Acerca de (bio) vía Unipile tras la verificación automática; versión anterior y posterior confirmadas por lectura (PERF-10)."
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Titular (specifics) y Acerca de (bio): LinkedIn directo no escribe en el perfil, así que Gustavo aplica a mano la versión aprobada tras la verificación automática y el operador registra la confirmación; versión anterior y posterior confirmadas por lectura (PERF-10)."
     },
     {
       "id": "PERF-02",
@@ -464,7 +464,7 @@
     {
       "id": "PERF-03",
       "papel": "ejecuta",
-      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Experiencia, educación y habilidades vía Unipile; proyectos y campos no cubiertos quedan como tarea manual de Gustavo; no fabricar certificaciones."
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Experiencia, educación, habilidades, proyectos y demás campos quedan como tarea manual de Gustavo (LinkedIn directo no escribe en el perfil) y el operador registra la confirmación; no fabricar certificaciones."
     },
     {
       "id": "PERF-03",
@@ -474,7 +474,7 @@
     {
       "id": "PERF-04",
       "papel": "ejecuta",
-      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. picture y background_picture vía Unipile con assets autorizados; comprobar recorte en vistas observables."
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. picture y background_picture: tarea manual de Gustavo con assets autorizados (LinkedIn directo no escribe en el perfil); comprobar recorte en vistas observables."
     },
     {
       "id": "PERF-04",
@@ -494,7 +494,7 @@
     {
       "id": "PERF-07",
       "papel": "ejecuta",
-      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Solo a personas con trabajo real verificable; mensaje contextual vía Unipile; formulario nativo manual; un borrador orientativo nunca es testimonio recibido."
+      "politica": "Nivel B. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Solo a personas con trabajo real verificable; mensaje contextual y formulario nativo, ambos manuales de Gustavo (LinkedIn directo no envía mensajes); un borrador orientativo nunca es testimonio recibido."
     },
     {
       "id": "PERF-07",
@@ -514,7 +514,7 @@
     {
       "id": "PERF-10",
       "papel": "ejecuta",
-      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. Comparar campos leídos con la versión aprobada; vista propia no acredita visibilidad pública; Gustavo puede confirmar la vista pública o móvil sin bloquear el ciclo."
+      "politica": "Nivel A. Sirve la lectura o sincronización por LinkedIn directo/API oficial sin exponer credenciales y con topes. Comparar campos leídos con la versión aprobada; vista propia no acredita visibilidad pública; Gustavo puede confirmar la vista pública o móvil sin bloquear el ciclo."
     },
     {
       "id": "PERF-10",
@@ -524,7 +524,7 @@
     {
       "id": "APRE-01",
       "papel": "ejecuta",
-      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes. API oficial (memberCreatorPostAnalytics, memberFollowersCount) solo si Community Management se aprueba; si no, importación manual con procedencia; dato ausente no es cero."
+      "politica": "Nivel A. Sirve la lectura o sincronización por LinkedIn directo/API oficial sin exponer credenciales y con topes. La analítica de creador llega por la exportación de LinkedIn directo (infra/docs/metricas-resultados.md); API oficial (memberCreatorPostAnalytics, memberFollowersCount) solo si Community Management se aprueba; si falta, importación manual con procedencia; dato ausente no es cero."
     },
     {
       "id": "APRE-07",
@@ -539,7 +539,7 @@
     {
       "id": "ADM-01",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Eventos Unipile y consultas periódicas convertidos en pendientes deduplicados y enrutados al rol dueño; la notificación es señal, no estado."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Consultas periódicas de LinkedIn directo convertidas en pendientes deduplicados y enrutados al rol dueño; la notificación es señal, no estado."
     },
     {
       "id": "ADM-01",
@@ -549,7 +549,7 @@
     {
       "id": "ADM-01",
       "papel": "ejecuta",
-      "politica": "Nivel A. Sirve la lectura o sincronización por Unipile/API oficial sin exponer credenciales y con topes."
+      "politica": "Nivel A. Sirve la lectura o sincronización por LinkedIn directo/API oficial sin exponer credenciales y con topes."
     },
     {
       "id": "ADM-01",
@@ -569,7 +569,7 @@
     {
       "id": "ADM-03",
       "papel": "ejecuta",
-      "politica": "Nivel B, política estricta. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Política estricta: bloqueo vía Unipile solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; el reporte sigue siendo manual de Gustavo; alerta a Gustavo."
+      "politica": "Nivel B, política estricta. Ejecuta una sola vez con clave de idempotencia tras comprobar parada total y pausas, D14/D15, aprobación, topes, ventana, espaciado y caducidad; confirma releyendo y concilia lo incierto sin reintentar. Política estricta: bloqueo solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; LinkedIn directo no bloquea: el bloqueo y el reporte los aplica Gustavo a mano; alerta a Gustavo."
     },
     {
       "id": "ADM-03",
@@ -721,7 +721,7 @@
       "relaciones_comunidad, conversaciones_inbox, perfil y director_editorial: execution_request",
       "política autónoma: approval_ref tras la verificación automática, con el review_record del editor_verificador referenciado",
       "Gustavo: configuración (OPERATOR_*), vetos, reversiones, pausa, parada y reanudación; aprobaciones solo para capacidades en modo approval",
-      "Unipile y API oficial: respuestas, webhooks y lecturas"
+      "LinkedIn directo (servicio navegador) y API oficial: respuestas y lecturas"
     ],
     "entrega_a": [
       "solicitante: execution_result",
@@ -760,7 +760,7 @@
         "estado": "propuesto_no_ejecutado"
       },
       {
-        "caso": "Unipile devuelve 429",
+        "caso": "LinkedIn devuelve 429 al conector directo",
         "resultado_esperado": "Pausa de la cuenta, alerta e incident_report; no reintenta.",
         "estado": "propuesto_no_ejecutado"
       },
@@ -854,7 +854,7 @@
     "tratamiento_de_fallo_incierto": "conciliar por lectura; escalar si no se resuelve; nunca repetir a ciegas"
   },
   "pendientes_para_activacion": [
-    "conectar la cuenta en Unipile (credenciales y 2FA de Gustavo) y verificar cada operación en piloto controlado",
+    "entrar a mano en el navegador de la cuenta en el servicio navegador (Gustavo escribe su clave y su 2FA en la propia página de LinkedIn; Barrio no los guarda) y verificar cada operación en piloto controlado",
     "obtener w_member_social mediante OAuth de Gustavo; solicitar Community Management si se quiere analítica",
     "implementar en Django: solicitudes, política autónoma y compuerta de verificación, modo por capacidad, cola, idempotencia, conciliación, topes, ventana, espaciado, caducidad, degradación, alertas y parada total",
     "configurar con Gustavo OPERATOR_ALERT_WEBHOOK, OPERATOR_DAILY_LLM_USD, el cupo real de notas y el umbral de incidencias; el resto tiene valor por defecto en reparto v1.1",
@@ -880,7 +880,7 @@
       "uso": "Precondiciones de relación",
       "necesidad": "obligatorio para RED",
       "si_falta": "rechazar",
-      "fuente_y_campos": "Unipile v2: relaciones, seguidos e invitaciones enviadas y recibidas."
+      "fuente_y_campos": "LinkedIn directo: tarjeta del perfil (grado de red, si ya se le sigue, invitación pendiente) e invitaciones enviadas y recibidas."
     },
     {
       "catalogo_id": "D14",
@@ -894,7 +894,7 @@
       "uso": "Identidad, permisos efectivos, restricciones y salud",
       "necesidad": "obligatorio",
       "si_falta": "parada",
-      "fuente_y_campos": "Estado de la cuenta en Unipile, alcance OAuth de la API oficial y errores recientes."
+      "fuente_y_campos": "Estado de la cuenta de LinkedIn directo (sesión comprobada con /me, paradas del servicio navegador y prueba diaria), alcance OAuth de la API oficial y errores recientes."
     }
   ],
   "contrato_transversal": {

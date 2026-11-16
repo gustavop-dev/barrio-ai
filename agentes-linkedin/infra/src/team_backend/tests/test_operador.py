@@ -5,15 +5,14 @@ import os
 import uuid
 from datetime import timedelta
 from unittest.mock import patch
-import httpx
 from django.contrib.auth.models import Permission, User
 from django.db import connection
-from django.test import TransactionTestCase
+from django.test import SimpleTestCase, TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from knowledge import db
 from team_backend import jobs, operador, orquestacion
-from team_backend.connectors import ConnectorError, ConnectorUncertain, FakeConnector, UnipileConnector, public_identifier
+from team_backend.connectors import ConnectorError, FakeConnector, public_identifier
 from team_backend.models import (ActionExecution, ActionOutcome, ActionProposal, ApiCredential, AuditEvent, ConnectorAccount, CycleLedger, Job,
                                  ObservedPost, Worker)
 
@@ -22,7 +21,7 @@ ALL=['access_knowledge','run_agents','use_paid_providers','operate_linkedin','ap
 class OperatorBase(TransactionTestCase):
     def setUp(self):
         self.assertTrue(connection.settings_dict['NAME'].startswith('test_'))
-        env=patch.dict(os.environ,{'LIVE_PROVIDERS':'false','LIVE_LINKEDIN':'false','OPERATOR_ALLOW_FAKE':'true',
+        env=patch.dict(os.environ,{'LIVE_PROVIDERS':'false','OPERATOR_ALLOW_FAKE':'true',
                                    'OPERATOR_DAILY_LIMITS':'','OPERATOR_WEEKLY_LIMITS':'','OPERATOR_PAUSED':'false',
                                    'OPERATOR_WINDOW':'00:00-24:00','OPERATOR_MIN_SPACING_SECONDS':'0','OPERATOR_AUTONOMY':'',
                                    'OPERATOR_ALERT_WEBHOOK':'','OPERATOR_DAILY_LLM_USD':'1','OPERATOR_DAILY_PROPOSALS':'6',
@@ -270,55 +269,12 @@ class OperatorTests(OperatorBase):
             with self.assertRaises(ConnectorError):FakeConnector('acc_fake1')
 
 
-class UnipileContractTests(TransactionTestCase):
-    """HTTP contract of Unipile v2 against a mock transport; no real network."""
-    def connector(self,handler):
-        with patch.dict(os.environ,{'LIVE_LINKEDIN':'true'}):
-            return UnipileConnector('acc_TEST1',api_key='k-test',transport=httpx.MockTransport(handler))
-
-    def test_disabled_without_explicit_switch(self):
-        with patch.dict(os.environ,{'LIVE_LINKEDIN':'false'}):
-            with self.assertRaises(ConnectorError) as ctx:UnipileConnector('acc_TEST1',api_key='k')
-        self.assertEqual(ctx.exception.kind,'disabled')
-
-    def test_paths_headers_and_parsing(self):
-        seen=[]
-        def handler(request):
-            seen.append((request.method,request.url.raw_path.split(b'?')[0].decode(),request.headers.get('X-API-KEY')))
-            if request.method=='POST':
-                self.assertEqual(json.loads(request.content),{'text':'Hola'})
-                return httpx.Response(201,json={'object':'Comment','id':'c1','text':'Hola','is_sender':True,'created_at':'2026-11-06T12:00:00Z'})
-            if request.url.path.endswith('/posts'):
-                return httpx.Response(200,json={'data':[{'id':'activity:1','text':'t','share_url':'u','created_at':'2026-11-06T10:00:00.000Z',
-                    'author':{'id':'ACo1','display_name':'Ana','public_identifier':'ana'}}],'next_cursor':None})
-            return httpx.Response(200,json={'id':'ACo1','display_name':'Ana','public_identifier':'ana','profile_url':'https://www.linkedin.com/in/ana'})
-        c=self.connector(handler)
-        self.assertEqual(c.get_user(public_identifier('https://www.linkedin.com/in/ana/'))['id'],'ACo1')
-        self.assertEqual(c.list_user_posts('ACo1')[0]['id'],'activity:1')
-        self.assertEqual(c.create_comment('activity:1','Hola')['id'],'c1')
-        self.assertEqual(seen[0],('GET','/v2/acc_TEST1/users/ana','k-test'))
-        self.assertEqual(seen[1][1],'/v2/acc_TEST1/users/ACo1/posts')
-        self.assertEqual(seen[2][:2],('POST','/v2/acc_TEST1/posts/activity%3A1/comments'))
-
-    def test_write_outcomes_are_classified(self):
-        def rate_limited(request):return httpx.Response(429,json={'type':'provider/too_many_requests','status':429})
-        with self.assertRaises(ConnectorError) as ctx:self.connector(rate_limited).create_comment('p','x')
-        self.assertTrue(ctx.exception.pause)
-        def gateway_timeout(request):return httpx.Response(504,json={'type':'provider/timeout'})
-        with self.assertRaises(ConnectorUncertain):self.connector(gateway_timeout).create_comment('p','x')
-        def read_timeout(request):raise httpx.ReadTimeout('slow',request=request)
-        with self.assertRaises(ConnectorUncertain):self.connector(read_timeout).create_comment('p','x')
-        def refused(request):raise httpx.ConnectError('down',request=request)
-        with self.assertRaises(ConnectorError) as ctx:self.connector(refused).create_comment('p','x')
-        self.assertEqual(ctx.exception.kind,'not_sent')
-        def rejected(request):return httpx.Response(422,json={'type':'provider/unprocessable_entity'})
-        with self.assertRaises(ConnectorError) as ctx:self.connector(rejected).create_comment('p','x')
-        self.assertFalse(ctx.exception.pause)
-
+class SharedShapeTests(SimpleTestCase):
+    """What every connector shares (connectors.py): a post's counters and the public identifier."""
     def test_real_post_payload_is_normalized(self):
-        """Shape observed from Unipile v2 on 2026-11-06: reactions are a per-type list, user_reacted a bool."""
+        """Reactions may come as a per-type list to add up; user_reacted is a bool."""
         from team_backend.connectors import _post
-        post=_post({'object':'Post','id':'WyJhY3Rpdml0eTo3NDk3Il0=','share_url':'https://www.linkedin.com/feed/update/x','text':'t',
+        post=_post({'object':'Post','id':'7497','share_url':'https://www.linkedin.com/feed/update/x','text':'t',
                     'created_at':'2026-08-23T12:00:00.000Z','user_reacted':False,'comments_counter':2,'reposts_counter':0,
                     'reactions_counter':[{'reaction':'like','count':3},{'reaction':'celebrate','count':1}],'is_repost':False,
                     'author':{'id':'ACo1','display_name':'Ana','public_identifier':'ana'},'analytics':{'impressions_counter':321}})

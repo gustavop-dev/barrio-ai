@@ -1,5 +1,7 @@
 # Reparto de acciones y política de autoridad
 
+> Registro histórico (noviembre de 2026): desde el 14/11/2026 la cuenta opera con LinkedIn directo, sin Unipile; ver [plan-linkedin-directo](../../../docs/plan-linkedin-directo.md).
+
 Versión 1.1 · 6 de noviembre de 2026 · Diseño, no activado.
 
 Este documento completa el paso «reparto de responsabilidades» del [catálogo de 72 capacidades](catalogo-acciones-linkedin.md). Indica para cada acción quién propone, decide, ejecuta, verifica y aprende, con qué nivel de autoridad y con qué herramienta de la [selección v2](herramientas-linkedin-v2.md). La [especificación estructurada](../../arquitectura/reparto-acciones-v1.json) contiene las 72 filas, la verificación automática, la degradación, los topes, las alertas y la parada total. No implementa software, no conecta cuentas ni concede permisos efectivos.

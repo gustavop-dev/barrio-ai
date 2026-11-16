@@ -34,7 +34,7 @@ from .exceptions import Conflict
 from .models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, PostComment, TeamQuestion
 from .permissions import require
 
-PROVIDERS=('unipile','fake','directo')
+PROVIDERS=('fake','directo')
 REPLY=ActionProposal.Capability.REPLY
 REACT=ActionProposal.Capability.REACT
 READ_CAPS={'posts':6,'comments':30,'threads':40,'people_posts':6}  # per local day; the autopilot reads about every 30 min
@@ -110,7 +110,7 @@ def _read(account,kind,now=None):
     AuditEvent.objects.create(action='replies.read',target=str(account.id),metadata={'kind':kind},created_at=now)
 
 def reader_account():
-    """The Unipile account that reads and answers on his posts (the first one); the official API cannot."""
+    """The operating account that reads and answers on his posts (the first one); the official API cannot."""
     return ConnectorAccount.objects.filter(provider__in=PROVIDERS).order_by('created_at').first()
 
 def publications(now=None):
@@ -140,7 +140,7 @@ def reading_due(account,now=None):
     return bool(reader and reader.pk==account.pk and not account.paused and due_pieces(now))
 
 def _post_id(account,connector,execution,piece,now):
-    """The Unipile id of the own post: the one metrics, an earlier scan or the write found (metricas._known_id), or
+    """The connector's id of the own post: the one metrics, an earlier scan or the write found (metricas._known_id), or
     found once by its exact text. It is kept in the scan's audit, never in piece.metrics, which belongs to metricas."""
     from .metricas import _known_id, posts_limit
     known=_known_id(piece,execution,account)
@@ -193,7 +193,7 @@ def _store(account,piece,post_id,data,thread=''):
 def read(user,account,now=None,origin_job=''):
     """read_own_comments job: the comments (and their threads) of the own posts that are due, then the free triage."""
     require(user,'operate_linkedin')
-    if account.provider not in PROVIDERS:raise ValueError('Los comentarios de tus posts se leen con la cuenta Unipile.')
+    if account.provider not in PROVIDERS:raise ValueError('Los comentarios de tus posts se leen con la cuenta de LinkedIn directo.')
     now=now or timezone.now();connector=get_connector(account)
     summary={'pieces':0,'new':0,'threads':0,'not_found':0,'errors':0,'stopped':''}
     for execution,piece in due_pieces(now)[:int(setting('REPLIES_PIECES_PER_RUN','4'))]:

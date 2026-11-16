@@ -21,11 +21,11 @@ Se conservan las rutas actuales para mantener las referencias entre documentaci�
 
 **Diseño más reciente:** [72 acciones para operar el LinkedIn de Gustavo](agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md): descubrir referentes, construir el barrio, interactuar, publicar, conversar, mantener el perfil y aprender. Primero se define el alcance; después se repartirán responsabilidades y se elegirán herramientas.
 
-**Herramientas seleccionadas para validar:** [selección revisada y huecos de cobertura](agentes-linkedin/infra/docs/herramientas-linkedin-v2.md). Unipile v2, API oficial de LinkedIn, programación en Django, investigación de noticias/blogs/opiniones con Claude, imágenes de OpenAI y fotos reales. La analítica oficial depende de permisos aún no comprobados; ninguna integración nueva conectada. La comparación v1 queda como historial.
+**Herramientas de LinkedIn:** la cuenta opera con LinkedIn directo, un conector propio que hace cada llamada desde la página de LinkedIn con la sesión abierta ([plan](docs/plan-linkedin-directo.md), [servicio navegador](agentes-linkedin/navegador/README.md)), y publica los posts con la API oficial de LinkedIn. La selección del 6/11/2026 queda como registro histórico: [selección revisada y huecos de cobertura](agentes-linkedin/infra/docs/herramientas-linkedin-v2.md), con la v1 como historial.
 
-**Búsqueda de prospectos:** [lemlist frente a Unipile y Sales Navigator](agentes-linkedin/infra/docs/comparacion-lemlist-unipile.md). Diferencias entre base B2B, búsqueda de la cuenta, cobertura operativa y costes; recomendación pendiente de piloto.
+**Búsqueda de prospectos (registro histórico):** [lemlist frente al proveedor de entonces y Sales Navigator](agentes-linkedin/infra/docs/comparacion-lemlist-unipile.md). Diferencias entre base B2B, búsqueda de la cuenta, cobertura operativa y costes, del 6/11/2026.
 
-1. [Plan del proyecto](agentes-linkedin/infra/docs/plan-equipo-autonomo.md).
+1. [Plan del proyecto](agentes-linkedin/infra/docs/plan-equipo-autonomo.md) (registro histórico de noviembre de 2026).
 2. [Ciclos de los cinco equipos](agentes-linkedin/infra/docs/circuitos-equipo.md).
 3. [Datos externos necesarios](agentes-linkedin/infra/docs/datos-externos-por-equipo.md).
 4. [Índice de los trece agentes](agentes-linkedin/arquitectura/indice-agentes-v1.json).

@@ -113,7 +113,7 @@ export function referentFixture(id = 'r-1', extra: Partial<Referent> = {}): Refe
 }
 
 export function accountFixture(id = 'acc-1', label = 'LinkedIn de Gustavo'): Account {
-  return { id, label, provider: 'unipile', status: 'ok', is_locked: false, paused: false, paused_reason: '', last_checked_at: null };
+  return { id, label, provider: 'directo', status: 'ok', is_locked: false, paused: false, paused_reason: '', last_checked_at: null };
 }
 
 /** A DRF page. */

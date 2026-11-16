@@ -1,19 +1,21 @@
-# Plan: LinkedIn directo (sin Unipile) y analítica propia
+# Plan: LinkedIn directo y analítica propia
 
 Un solo lugar para lo que se investigó el 13/11/2026, lo que quedó demostrado, lo que falta y el orden de
 construcción. La prueba exploratoria vive en `spikes/linkedin-directo/` (rama `spike/linkedin-directo`); su README
-tiene el detalle técnico de cada operación. Aprobado por Gustavo el 13/11/2026; nada de aquí está todavía en producción.
+tiene el detalle técnico de cada operación. Aprobado por Gustavo el 13/11/2026. Desde el 14/11/2026 la cuenta de
+Gustavo opera en producción con el conector directo; el proveedor de pago anterior ya no se usa ni está en el código.
 
 ## Objetivo
 
-Que el equipo haga en LinkedIn todo lo que hoy hace a través de Unipile (leer, buscar, comentar, responder,
-reaccionar, seguir, invitar, aceptar, leer mensajes) con un conector propio, pagando por usuario solo lo que cueste
-su conexión, y que además traiga la analítica de la cuenta (impresiones, alcance, seguidores, público) a la app.
+Que el equipo haga en LinkedIn todo lo que hacía a través de Unipile, el proveedor de pago de entonces (leer, buscar,
+comentar, responder, reaccionar, seguir, invitar, aceptar, leer mensajes) con un conector propio, pagando por usuario
+solo lo que cueste su conexión, y que además traiga la analítica de la cuenta (impresiones, alcance, seguidores,
+público) a la app.
 
 ## Por qué
 
-- Unipile cuesta 49 € al mes hasta 10 cuentas (después, 5 € por cuenta). La prueba gratuita vence alrededor del
-  13/11/2026, 7:30 p. m. hora de Bogotá (la cuenta se conectó el 6/11 a esa hora).
+- Unipile cuesta 49 € al mes hasta 10 cuentas (después, 5 € por cuenta). Su prueba gratuita venció el 13/11/2026,
+  hacia las 7:30 p. m. hora de Bogotá (la cuenta se conectó el 6/11 a esa hora).
 - Gustavo prefiere un costo por usuario y no depender de un tercero, pensando en sumar a su CTO y, más adelante,
   en ofrecer la herramienta.
 - La API oficial que cubriría parte (Community Management) exige organización legal, correo corporativo, Página,
@@ -50,8 +52,8 @@ anteriores al 10/10/2025.
 
 - **Aguante en el tiempo:** fue una tarde, en una cuenta de prueba casi vacía. No se sabe cómo reacciona LinkedIn a
   10 comentarios, 20 seguimientos y 16 invitaciones diarias durante semanas.
-- **La cuenta real:** ahí solo se leyó la analítica con clics. Ninguna de las 21 operaciones se ha ejecutado en ella
-  por esta vía.
+- **La cuenta real:** al 13/11/2026 ahí solo se leyó la analítica con clics; ninguna de las 21 operaciones se había
+  ejecutado en ella por esta vía. Desde el 14/11/2026 opera por aquí (arriba, «Hecho y lo que falta»).
 - **El servidor en el tiempo:** desde la IP del servidor (centro de datos) solo corrió la prueba diaria, una vez y
   sin escrituras. Si LinkedIn tolera esa IP días seguidos y con escrituras es lo que mide la
   [fase 4](#fase-4-rodaje-de-la-cuenta-de-prueba).
@@ -62,7 +64,7 @@ anteriores al 10/10/2025.
 
 ## Riesgos
 
-- **Términos de LinkedIn:** automatizar así los incumple, igual que hace Unipile por debajo. La diferencia es que la
+- **Términos de LinkedIn:** automatizar así los incumple, igual que hacía por debajo el proveedor de pago. La diferencia es que la
   detección y los bloqueos pasan a ser asunto nuestro.
 - **Mantenimiento continuo:** dos rutas ya estaban retiradas el día de la prueba; los identificadores rotan y la
   interfaz nueva cambia con cada despliegue de LinkedIn. Hace falta la prueba diaria y alguien que arregle.
@@ -71,9 +73,9 @@ anteriores al 10/10/2025.
 
 ## Arquitectura propuesta
 
-1. **Conector `directo` en el backend.** Un proveedor más junto a `unipile` y `fake`, con la misma interfaz y las
-   mismas formas de respuesta, de modo que operador, autopiloto, respuestas y métricas no cambian. La cuenta decide
-   su proveedor: se puede pasar una cuenta sin tocar las demás y volver atrás cambiando un campo.
+1. **Conector `directo` en el backend.** Con la misma interfaz y las mismas formas de respuesta que el conector
+   anterior, de modo que operador, autopiloto, respuestas y métricas no cambiaron. Hoy es el único proveedor real de la
+   cuenta, junto al simulado (`fake`) de las pruebas; la API oficial (`linkedin`) sigue aparte, para publicar.
 2. **Servicio «navegador».** Un proceso aparte con un Chromium por cuenta y su perfil persistente. Recibe las
    operaciones del backend por una API interna con token y las ejecuta dentro de la página. Lleva las protecciones
    de la prueba: pausas aleatorias, tope por sesión y por día, escrituras por lista permitida, y parada dura ante
@@ -97,7 +99,7 @@ anteriores al 10/10/2025.
    nunca un valor; quedan las 30 últimas. Si no pudo correr (servicio ocupado, caído o sin cupo), lo intenta otra vez
    a la hora, hasta 3 veces al día. Avisa en Notificaciones (`linkedin_canary`) una vez cuando algo se rompe o no pudo
    correr en todo el día, y otra cuando vuelve a pasar. Si el servicio paró la cuenta o no tiene sesión, la pausa en
-   Barrio como una restricción de Unipile, con qué hacer en el motivo, y avisa una sola vez. La última prueba de cada
+   Barrio como cualquier restricción de LinkedIn, con qué hacer en el motivo, y avisa una sola vez. La última prueba de cada
    cuenta llega en `canary` de `GET /api/v1/operador/overview` y `/operador/accounts`. A mano:
    `python -m navegador canario <cuenta>`.
 
@@ -149,22 +151,20 @@ Hecho y probado con respuestas inventadas y el navegador falso de las pruebas; n
 
 Hecho en el servidor: entrar a mano por el túnel y noVNC, y una prueba diaria de 14 de 14 desde su IP (arriba).
 
+Hecho el 14/11/2026: la cuenta de Gustavo pasó a directo en la misma fila, con sus ids traducidos. Después se retiraron
+del código el proveedor anterior y la herramienta de ese cambio: no queda vuelta atrás ni proveedor de respaldo.
+
 Falta:
 
 - El rodaje de la fase 4 en el servidor y, si su IP no aguanta, el túnel de casa.
 - La prueba diaria en la PWA.
 - Conectar desde la app en el servidor: entrar de verdad en LinkedIn desde el teléfono y que la sesión quede.
-- Pasar la cuenta de Gustavo de Unipile a directo. El cambio en la misma fila y la traducción de sus ids están hechos
-  (`operador cambiar-proveedor`, con las formas reales de Unipile, los originales guardados para volver y la bandeja
-  sin juzgar ni avisar dos veces;
-  [Cambiar de proveedor](../agentes-linkedin/infra/docs/navegador-contrato.md#cambiar-de-proveedor)). Falta la prueba
-  (`--prueba`) contra la base de producción, y cambiar solo si no lista ninguna fila sin traducir.
 
 Límite conocido para la fase de varios usuarios, sin cambiar todavía: una cuenta en pausa frena las escrituras de
 todas. La ejecución se niega si hay cualquier `ConnectorAccount` en pausa («Otro conector de la misma cuenta está en
-pausa», `team_backend/operador.py:732`), y el último control antes de escribir también
-(`final_write_gate`, `operador.py:644`). Con una sola persona eso es lo prudente; con varias, la pausa de una (o la
-que pide `cambiar-proveedor`) pararía a las demás. Habrá que acotarla a las cuentas de la misma persona.
+pausa», en `execute` de `team_backend/operador.py`), y el último control antes de escribir también
+(`final_write_gate`). Con una sola persona eso es lo prudente; con varias, la pausa de una pararía a las demás.
+Habrá que acotarla a las cuentas de la misma persona.
 
 Servidor actual: 1 CPU, 4 GB de memoria, unos 2,4 GB disponibles. Medido el 13/11/2026: con el navegador de una
 cuenta abierto tras un canario de 16 llamadas, el contenedor del servicio ocupaba cerca de 1 GiB y quedaron unos 1,5 GB
@@ -233,12 +233,12 @@ LinkedIn desde producción.
 
 | Fase | Qué se construye | Cómo se comprueba |
 | --- | --- | --- |
-| 0 | Decisiones abiertas y el puente con Unipile | — |
+| 0 | Decisiones abiertas y el puente con el proveedor anterior | — |
 | 1 | Conector `directo` en el backend: las 21 operaciones con la interfaz actual, traducción de respuestas, pruebas con respuestas grabadas sin datos personales | CI; cuenta de prueba desde el computador de Gustavo |
 | 2 | Servicio «navegador»: contenedor, perfiles por cuenta, API interna, protecciones, inicio de sesión, pausa y aviso | Cuenta de prueba en el entorno elegido |
 | 3 | Analítica: importación diaria, carga inicial, modelos y pantalla de Resultados con intervalos. 3a (el backend) y 3b en la app están hechas; falta la vista en la PWA | Cuenta de prueba (3a); datos de la cuenta de Gustavo, solo lectura |
 | 4 | Prueba de resistencia: la cuenta de prueba trabajando 1 a 2 semanas a ritmo real, con la prueba diaria ([rodaje](#fase-4-rodaje-de-la-cuenta-de-prueba)) | El criterio de esa sección: 10 días seguidos sin alarmas y la prueba diaria bien |
-| 5 | Paso de la cuenta de Gustavo: primero lecturas, luego una capacidad de escritura cada vez; Unipile queda de respaldo hasta el final | Una semana estable por capacidad |
+| 5 | Paso de la cuenta de Gustavo. Hecho el 14/11/2026, de una vez: el proveedor anterior ya no estaba para quedar de respaldo | Una semana estable por capacidad |
 | 6 | Segundo usuario (CTO) y multitenant: alta con inicio de sesión propio, identidad fuera del código | Ver `barrio-multitenant` en la memoria del proyecto |
 
 Estimación, sin diseño detallado: fases 1 a 3, alrededor de una semana de trabajo; la fase 4 es tiempo de espera;
@@ -248,7 +248,7 @@ la 5, una a dos semanas según cómo responda LinkedIn.
 
 | Decisión | Qué implica |
 | --- | --- |
-| No se paga Unipile; nos desligamos | Cuando venza la prueba, el backend pausa sola la cuenta de Unipile ante el rechazo (401/403) y avisa. Comentarios, red, lectura de referentes y métricas quedan detenidos hasta la fase 5. Publicar los posts sigue: va por la API oficial. |
+| No se paga Unipile; nos desligamos | Hecho: desde el 14/11/2026 la cuenta opera con directo y el proveedor anterior se retiró del código. Publicar los posts sigue por la API oficial. |
 | El navegador corre en el servidor y sale a internet por la conexión de su casa | Un túnel desde el servidor a un equipo de su casa que haga de salida. Ese equipo tiene que estar encendido a toda hora (su computador se apaga: hará falta uno pequeño siempre encendido). Se monta hacia el final, en la fase 4. |
 | El repositorio sigue público por ahora | Se hará privado más adelante. Los PR no llevan datos personales, capturas ni identificadores de cuentas. |
 

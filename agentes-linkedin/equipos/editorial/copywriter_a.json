@@ -366,7 +366,7 @@
       "Lectura de artefactos y evidencia autorizada compartida",
       "Almacén de borradores versionados y comparación de cambios",
       "Cola de handoffs con ACK y contador global; capacidades propuestas no activadas",
-      "Sin acceso directo a Unipile, API oficial ni búsqueda web: reciben la evidencia por el brief del director"
+      "Sin acceso directo a LinkedIn (conector directo), API oficial ni búsqueda web: reciben la evidencia por el brief del director"
     ],
     "acciones_autorizadas": [
       "En este incremento: diseñar contratos documentales",

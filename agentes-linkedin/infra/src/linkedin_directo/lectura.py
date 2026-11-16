@@ -7,7 +7,7 @@ Voyager answers are normalized (`application/vnd.linkedin.normalized+json+2.1`):
 `entityUrn`, and a `*field` holds the urn of another entity. A union may come wrapped in its type name
 (`{"com.linkedin...MemberActor": {...}}`); `unwrap` takes it out.
 
-Ids (docs/navegador-contrato.md): a person is the fsd_profile id (`ACo…`, Unipile's provider id); a post, the activity
+Ids (docs/navegador-contrato.md): a person is the fsd_profile id (`ACo…`); a post, the activity
 number; a comment, its own number (the post goes alongside); an invitation, the number of its urn; a chat, the messaging
 thread id (`2-…`); a message, the id after the comma in its urn."""
 import json
@@ -270,7 +270,7 @@ def highlighted(answer, activity_id, members=None):
 
 
 def commenter_user(comment, by, members=None):
-    """Who wrote a comment: the MemberActor (`commenter`) and its mini profile. Like Unipile's comment author, no
+    """Who wrote a comment: the MemberActor (`commenter`) and its mini profile. A comment author carries no
     headline: the callers read the profile when they need one (and get distance and signals with it)."""
     actor = unwrap(comment.get('commenter'))
     dash = comment.get('commenterForDashConversion') if isinstance(comment.get('commenterForDashConversion'), dict) else {}

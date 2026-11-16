@@ -145,7 +145,7 @@ describe('Layout · banners', () => {
       tuTurnoFixture(),
       overviewFixture({
         accounts: [
-          { id: 'acc-1', label: 'LinkedIn Gustavo', provider: 'unipile', status: 'running', is_locked: false, paused: true, paused_reason: 'LinkedIn limitó las invitaciones', last_checked_at: null },
+          { id: 'acc-1', label: 'LinkedIn Gustavo', provider: 'directo', status: 'running', is_locked: false, paused: true, paused_reason: 'LinkedIn limitó las invitaciones', last_checked_at: null },
         ],
       }),
     );

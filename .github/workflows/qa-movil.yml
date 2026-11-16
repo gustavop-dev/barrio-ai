@@ -1,7 +1,7 @@
 name: QA móvil
 # UI QA of the 0ff1ce app on Android emulators, against a seeded demo backend on each runner.
 # Nothing here reaches production, LinkedIn or a paid provider: the API runs with FakeConnector
-# (LIVE_LINKEDIN=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
+# (LIVE_LINKEDIN_DIRECTO=false, LIVE_PROVIDERS=false, OPERATOR_ALLOW_FAKE=true) and the app is built with
 # EXPO_PUBLIC_API_URL=http://10.0.2.2:8787 (the runner, as the emulator sees it). See movil/.maestro/README.md.
 #
 # Jobs: plan (paths or explicit selection, split in up to 10 emulators by the seconds each flow took on main)
@@ -229,7 +229,7 @@ jobs:
       DJANGO_SECRET_KEY: qa-only-non-production-secret-0123456789
       DJANGO_ALLOWED_HOSTS: 10.0.2.2,127.0.0.1,localhost
       LIVE_PROVIDERS: 'false'
-      LIVE_LINKEDIN: 'false'
+      LIVE_LINKEDIN_DIRECTO: 'false'
       LIVE_LINKEDIN_OFFICIAL: 'false'
       OPERATOR_ALLOW_FAKE: 'true'
       # The seeded inbox conversation shows as a Tu turno card only with the inbox on (nothing reads LinkedIn: no worker runs).

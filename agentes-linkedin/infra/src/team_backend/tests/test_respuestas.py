@@ -43,7 +43,7 @@ class RepliesBase(NetworkBase):
                     'fixture-hash','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''',(uid,int(uid[3:5]),uid))
 
     def publish(self,text=POST,hours_ago=5):
-        """A CONT-09 publication confirmed `hours_ago`, and the own post Unipile shows for it."""
+        """A CONT-09 publication confirmed `hours_ago`, and the own post the account shows for it."""
         when=timezone.now()-timedelta(hours=hours_ago);self.slots+=1
         piece=EditorialPiece.objects.create(account=self.account,slot_date=timezone.now().date()-timedelta(days=400+self.slots),scheduled_for=when,
                                             state='ready',final_text=text,brief={'thesis':'Nobody owns the evals','approach':'opinion'})

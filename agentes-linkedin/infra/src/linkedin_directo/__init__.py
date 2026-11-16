@@ -1,4 +1,4 @@
-"""LinkedIn without Unipile (docs/plan-linkedin-directo.md): everything LinkedIn-specific in one place, with no Django
+"""LinkedIn directo (docs/plan-linkedin-directo.md): everything LinkedIn-specific in one place, with no Django
 and no browser import, so the backend's connector and the navegador service (phase 2) share it.
 
 - rutas: routes, query ids and request builders of both APIs LinkedIn's web app uses.
@@ -6,7 +6,7 @@ and no browser import, so the backend's connector and the navegador service (pha
 - transporte: Request, Answer, the Transport interface and how an answer is judged.
 - lectura: answers read into the connector's shapes.
 - analitica: the creator analytics workbook (the export dialog's answer) read into typed rows.
-- cliente: the 21 operations (Cliente), with UnipileConnector's arguments and answers.
+- cliente: the 21 operations (Cliente), with the arguments and answers the backend's connector gives.
 - servicio: ServiceTransport, the backend's HTTP client of the navegador service (imports httpx; not loaded here).
 """
 from .cliente import Cliente

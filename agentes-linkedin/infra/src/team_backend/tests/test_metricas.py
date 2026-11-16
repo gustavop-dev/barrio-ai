@@ -1,25 +1,23 @@
 """Metrics and Resultados: own-post snapshots at 24 h/72 h/7 d, the daily audience, autopilot queueing and the endpoint.
-No network and no spend: the fake Unipile connector stands in for LinkedIn, the Unipile contract runs on MockTransport
+No network and no spend: the simulated connector stands in for LinkedIn
 and the directo account answers with the hand-written LinkedIn fixtures (directo_fixtures.py) through its real parser."""
 import os
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from unittest.mock import patch
-import httpx
 from django.contrib.auth.models import User
 from django.db import IntegrityError
-from django.test import SimpleTestCase, TransactionTestCase
+from django.test import SimpleTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from knowledge import db
 from linkedin_directo import rutas
 from team_backend import autopiloto, connectors_directo, jobs, metricas, operador
-from team_backend.connectors import ConnectorError, FakeConnector, UnipileConnector, _post
+from team_backend.connectors import ConnectorError, FakeConnector, _audience, _post, _profile_views
 from team_backend.models import (ActionExecution, ActionOutcome, ActionProposal, AnalyticsPost, AudienceSnapshot, AuditEvent, ConnectorAccount,
                                  Contact, EditorialPiece, Job, ObservedPost, PostMetric)
 from team_backend.tests import directo_fixtures as F
-from team_backend.tests.test_ids_linkedin import ACTIVITY, UGC, unipile_post
 from team_backend.tests.test_operador import OperatorBase
 
 TEXT_A='Before writing a line of code for a new feature, ask which decision it helps someone make.'
@@ -41,7 +39,7 @@ class MetricsBase(OperatorBase):
         return timezone.now().astimezone(operador.local_tz()).date()
 
     def publish(self,text,hours_ago,pillar='applied_ai',seed=True,slot=None,state='confirmed',wrote=True):
-        """A CONT-09 publication confirmed `hours_ago` and, when seeded, the own post Unipile shows for it."""
+        """A CONT-09 publication confirmed `hours_ago` and, when seeded, the own post the account shows for it."""
         when=timezone.now()-timedelta(hours=hours_ago);self.slots+=1
         piece=EditorialPiece.objects.create(account=self.account,slot_date=slot or self.today()-timedelta(days=400+self.slots),scheduled_for=when,
                                             state='ready',final_text=text,brief={'pillar':pillar,'thesis':'Tesis '+text[:20]})
@@ -76,7 +74,7 @@ class PostSnapshotTests(MetricsBase):
         self.assertGreaterEqual(metric.captured_at-metric.published_at,timedelta(hours=24))
         piece.refresh_from_db();fresh.refresh_from_db()
         # EditorialPiece.metrics keeps the latest values read (backwards compatible keys) for every recent publication.
-        self.assertEqual((piece.metrics['impressions'],piece.metrics['reposts'],piece.metrics['source'],piece.metrics['unipile_post_id']),(150,None,'unipile',pid))
+        self.assertEqual((piece.metrics['impressions'],piece.metrics['reposts'],piece.metrics['source'],piece.metrics['provider_post_id']),(150,None,'linkedin',pid))
         self.assertEqual(fresh.metrics['impressions'],40);self.assertFalse(PostMetric.objects.filter(piece=fresh).exists())
 
         self.fake.set_post_counters(pid,impressions=300,reactions=9,comments=2,reposts=1)
@@ -120,7 +118,7 @@ class PostSnapshotTests(MetricsBase):
     def test_late_snapshots_are_all_captured_and_a_known_id_outlives_edits_and_the_recent_list(self):
         old,old_pid=self.publish(TEXT_A,hours_ago=9*24)  # the collector was down: every age is due at once
         self.fake.set_post_counters(old_pid,impressions=900,reactions=30,comments=4,reposts=2)
-        ghost,_=self.publish('A post Unipile never shows back.',hours_ago=30,seed=False)
+        ghost,_=self.publish('A post the account never shows back.',hours_ago=30,seed=False)
         job=self.collect()
         self.assertEqual(job.result_status,'cortes:3 pend:1 aud:creada')
         self.assertEqual(sorted(PostMetric.objects.filter(piece=old).values_list('kind',flat=True)),['24h','72h','7d'])
@@ -274,7 +272,7 @@ class AutopilotMetricsTests(MetricsBase):
         self.publish(TEXT_A,hours_ago=28)
         self.assertEqual(autopiloto.tick(self.bot,now=t0+timedelta(minutes=5))['metrics'],0)  # same bucket: its id was already used
         self.assertEqual(autopiloto.tick(self.bot,now=later)['metrics'],1)  # the bucket nothing was due in queues now
-        self.assertFalse(Job.objects.filter(kind='collect_metrics',params__account=str(official.id)).exists())  # only Unipile reads
+        self.assertFalse(Job.objects.filter(kind='collect_metrics',params__account=str(official.id)).exists())  # only the operating account reads
         Job.objects.filter(kind='collect_metrics').delete()
         with patch.dict(os.environ,{'METRICS_EVERY_MINUTES':'0'}):self.assertEqual(autopiloto.tick(self.bot)['metrics'],0)
         with patch('team_backend.metricas.due',side_effect=RuntimeError('boom')):report=autopiloto.tick(self.bot)
@@ -351,7 +349,7 @@ class DirectoMetricsTests(MetricsBase):
                                        (far,'Otro post propio de esa mañana.',F.OWN,{'impressions':90})]))
         metric=PostMetric.objects.get(piece=piece)
         self.assertEqual((metric.provider_post_id,metric.impressions),(F.POST,150))
-        piece.refresh_from_db();self.assertEqual(piece.metrics['unipile_post_id'],F.POST)  # found once, known from now on
+        piece.refresh_from_db();self.assertEqual(piece.metrics['provider_post_id'],F.POST)  # found once, known from now on
 
     def test_two_own_posts_dated_near_the_write_leave_it_pending(self):
         piece=self.written(TEXT_A,F.POSTED)
@@ -388,29 +386,19 @@ class DirectoMetricsTests(MetricsBase):
 
 class SamePostTests(SimpleTestCase):
     def test_post_ids_are_compared_like_with_like(self):
-        unipile=unipile_post(f'activity:{ACTIVITY}',f'ugcPost:{UGC}')
-        self.assertEqual(metricas._urns(unipile),{('activity',ACTIVITY),('ugcPost',UGC)})
-        self.assertTrue(metricas._urns(f'urn:li:ugcPost:{UGC}')&metricas._urns(unipile))  # the Posts API's urn inside Unipile's id
-        self.assertFalse(metricas._urns(f'urn:li:share:{UGC}')&metricas._urns(unipile))  # same number, another kind
+        self.assertEqual(metricas._urns(f'urn:li:ugcPost:{F.POST}'),{('ugcPost',F.POST)})
+        self.assertFalse(metricas._urns(f'urn:li:share:{F.POST}')&metricas._urns(F.POST))  # same number, another kind
         self.assertEqual(metricas._urns(F.POST,f'https://www.linkedin.com/feed/update/urn:li:activity:{F.POST}/'),{('activity',F.POST)})
         self.assertEqual(metricas._urns('activity:me-0','',None),set())  # the fake's ids name no urn
 
 
-class UnipileMetricsContractTests(TransactionTestCase):
+class SharedMetricShapeTests(SimpleTestCase):
     def test_audience_profile_views_and_reposts_shapes(self):
-        """Shapes confirmed against the real account on 2026-11-06 (fields only)."""
-        seen=[]
-        def handler(request):
-            seen.append((request.url.path,dict(request.url.params)))
-            if request.url.path.endswith('/users/me'):
-                return httpx.Response(200,json={'object':'UserProfile','id':'ACoMe','display_name':'G','provider':'LINKEDIN','is_blocked':False,
-                    'specifics':{'network_distance':'SELF'},'followers_count':1234,'relations_count':567})
-            return httpx.Response(200,json={'object':'ProfileViews','entities':[],'analytics':{'object':'ProfileViewsAnalytics','views_count':42}})
-        with patch.dict(os.environ,{'LIVE_LINKEDIN':'true'}):
-            connector=UnipileConnector('acc_TEST1',api_key='k-test',transport=httpx.MockTransport(handler))
-        self.assertEqual(connector.own_audience(),{'followers':1234,'connections':567})
-        self.assertEqual(connector.profile_views(14),42)
-        self.assertEqual(seen,[('/v2/acc_TEST1/users/me',{}),('/v2/acc_TEST1/linkedin/analytics/profile-views',{'date_range':'14','limit':'1'})])
+        self.assertEqual(_audience({'id':'ACoMe','specifics':{'network_distance':'SELF'},'followers_count':1234,'relations_count':567}),
+                         {'followers':1234,'connections':567})
+        self.assertEqual(_audience({'specifics':{'followers_count':9}}),{'followers':9,'connections':None})
+        self.assertEqual(_profile_views({'entities':[],'analytics':{'views_count':42}}),42)
+        self.assertIsNone(_profile_views({'entities':[]}))
         self.assertEqual(_post({'id':'p','reposts_counter':3})['reposts_counter'],3)
         self.assertIsNone(_post({'id':'p','reposts_counter':None})['reposts_counter'])
 

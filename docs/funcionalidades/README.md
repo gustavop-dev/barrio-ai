@@ -170,4 +170,4 @@ Todo el catálogo sale de leer el código; no se ejecutó nada. Quedan sin compr
 - si el reproductor de audio de la app envía la cabecera `Authorization` en Android;
 - el manifiesto final de Android (`CAMERA`, `POST_NOTIFICATIONS`);
 - la conexión de LinkedIn desde la app de principio a fin;
-- la forma real de los datos de Unipile en el inbox (ids de hilo y de remitente), que `conversaciones-inbox.md` deja «por comprobar».
+- si la bandeja leída por LinkedIn directo mezcla InMails patrocinados o conversaciones archivadas, que `conversaciones-inbox.md` deja «por comprobar».

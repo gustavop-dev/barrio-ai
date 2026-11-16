@@ -14,7 +14,8 @@ import uuid
 from collections import Counter
 from datetime import timedelta
 from decimal import Decimal
-from django.db.models import Case, Count, Q, When
+from django.db.models import Case, Count, Max, Q, When
+from django.db.models.functions import Coalesce
 from django.utils import timezone
 from knowledge import db, memory
 from . import guardas, idioma, lider, oficina_eventos, operador, red
@@ -460,9 +461,9 @@ def _every(name,default):
     return timedelta(minutes=int(setting(name,default)))
 
 def _network(user,account,now):
-    """DESC/RED: queue discovery, classification, planning and sync for the Unipile account, each on its own clock.
+    """DESC/RED: queue discovery, classification, planning and sync for the operating account, each on its own clock.
     Reads and the cheaper classifier run on their own; follows, invitations and acceptances become proposals."""
-    if not red.enabled() or account.provider not in ('unipile','fake','directo'):return 0
+    if not red.enabled() or account.provider not in ('fake','directo'):return 0
     queued=0
     def enqueue(kind,every,condition=True):
         nonlocal queued
@@ -480,7 +481,7 @@ def _network(user,account,now):
 
 def _metrics(user,account,now):
     """APRE-01: queue collect_metrics (own posts at 24 h/72 h/7 d, daily audience) about every METRICS_EVERY_MINUTES,
-    one at a time and only when something is due, for the Unipile account. METRICS_EVERY_MINUTES=0 turns it off."""
+    one at a time and only when something is due, for the operating account. METRICS_EVERY_MINUTES=0 turns it off."""
     from . import metricas
     every=_every('METRICS_EVERY_MINUTES','180')
     if account.provider not in metricas.PROVIDERS or every<=timedelta(0) or _pending('collect_metrics',account=str(account.id)):return 0
@@ -523,7 +524,7 @@ def _canary(user,account,now):
     return int(created)
 
 def _inbox(user,account,now):
-    """conversaciones_inbox: queue read_inbox about every INBOX_EVERY_MINUTES, one at a time, for a Unipile account that
+    """conversaciones_inbox: queue read_inbox about every INBOX_EVERY_MINUTES, one at a time, for an operating account that
     is not paused (the job itself refreshes the status and only reads a running account). Off unless INBOX_ENABLED."""
     from . import conversaciones
     every=conversaciones.every()
@@ -564,6 +565,19 @@ def _monthly_review(user,now):
     from . import revision_mensual
     return revision_mensual.queue(user,now)
 
+RETRY_BASE,RETRY_CAP=timedelta(minutes=1),timedelta(hours=1)
+
+def _stopped_recently(proposal,now):
+    """A gate only operador.execute knows (the shared profile reads, a stopped experiment, the thread of a reply, another
+    connector in pause…) stops the job and leaves the proposal approved. The first stop is tried again at once; from the
+    second on the proposal waits 2, 4, 8… minutes up to an hour after its last stopped job, and meanwhile the others
+    go: one proposal was queued again every minute for hours (573 failed jobs) and nothing else was executed."""
+    stops=Job.objects.filter(kind='execute_action',state=Job.State.FAILED,params__proposal=str(proposal.id))
+    count=stops.count()
+    if count<2:return False
+    last=stops.aggregate(at=Max(Coalesce('finished_at','created_at')))['at']
+    return bool(last) and now-last<min(RETRY_BASE*2**min(count-1,10),RETRY_CAP)
+
 def _execute(user,account,now):
     from .orquestacion import cycle_issues
     if not operador.within_window(now):return 0
@@ -582,6 +596,7 @@ def _execute(user,account,now):
         if not operador.spacing_ok(account,now,proposal.capability):continue
         if operador.capped(proposal) and operador.capacity_left(account,proposal.capability,now)<=0:continue
         if not proposal.piece_id and operador.deferred_until(account,proposal.capability,now):continue  # its last write left nothing
+        if _stopped_recently(proposal,now):continue  # a gate keeps stopping it: it waits and the next one goes
         job=operador.enqueue_execution(user,proposal)
         return int(job.state==Job.State.QUEUED)
     return 0

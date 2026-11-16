@@ -1,6 +1,6 @@
 # Operador de cuenta — primer recorrido con manos y ojos
 
-Fecha: 2026-11-06. Estado: **implementado y probado con conector simulado**. La conexión real espera la cuenta de Unipile de Gustavo. Implementa el primer corte vertical del [catálogo de acciones](catalogo-acciones-linkedin.md) con las herramientas elegidas en [herramientas v2](herramientas-linkedin-v2.md).
+Fecha: 2026-11-06. Estado: **implementado**. Desde el 14/11/2026 opera la cuenta de Gustavo con LinkedIn directo: el conector `directo` y el servicio navegador ([contrato](navegador-contrato.md)). Implementa el primer corte vertical del [catálogo de acciones](catalogo-acciones-linkedin.md) con las herramientas elegidas entonces en [herramientas v2](herramientas-linkedin-v2.md) (registro histórico).
 
 ## Qué hace
 
@@ -17,9 +17,9 @@ flowchart LR
 
 | Capacidad | Implementado |
 | --- | --- |
-| DESC-04 | Leer los posts recientes de referentes con Unipile, sin duplicados. |
+| DESC-04 | Leer los posts recientes de referentes con LinkedIn directo, sin duplicados. |
 | INT-03 | Comentar: el agente de relaciones redacta con Claude a partir de las unidades B04/B06/B15 del curso; también admite texto de Gustavo. |
-| INT-02 | Reaccionar con los tipos admitidos por Unipile. |
+| INT-02 | Reaccionar con los tipos que admiten el conector directo y su lista permitida. |
 | ADM-04 | Pausa por cuenta, pausa global, topes diarios y detención ante 401/403/429 o una cuenta no `running`. |
 | ADM-05 | Conciliación por lectura y resolución humana de incertidumbres. |
 
@@ -58,11 +58,11 @@ Cuando una cuenta se pausa (429, restricción, reautenticación o estado distint
 - **Una sola ejecución.** `ActionExecution` es `OneToOne` con la propuesta y tiene clave de idempotencia; el trabajo de ejecución tiene un id determinista.
 - **Una acción abierta por post y capacidad.** Lo impone una restricción en la base de datos.
 - **Sin duplicados.** Antes de comentar se busca un comentario propio idéntico en el hilo; si existe, se confirma sin escribir otro.
-- **Sin reintentos a ciegas.** Unipile v2 no documenta claves de idempotencia. Un timeout, un 5xx o una respuesta ilegible tras escribir dejan la acción en `uncertain`, y la conciliación solo lee.
+- **Sin reintentos a ciegas.** LinkedIn no ofrece claves de idempotencia (el `request_id` del servicio navegador solo evita que el propio servicio repita un envío). Un timeout, un 5xx o una respuesta ilegible tras escribir dejan la acción en `uncertain`, y la conciliación solo lee.
 - **Paradas.** `OPERATOR_PAUSED=true` detiene todo, incluido el ciclo autónomo. `ConnectorAccount.paused` detiene una cuenta. También frenan la ejecución la ventana horaria, el espaciado y los topes diarios y semanales. Un 429, una reautenticación o una restricción pausan la cuenta y envían una alerta; solo Gustavo la reanuda. Con el conector `directo`, una parada del servicio navegador (cuenta detenida, 409; sin sesión, 423) pausa igual, y el motivo dice qué hacer en el servicio antes de reanudar. La alerta sale una vez por pausa: los trabajos en cola que chocan con la misma parada solo actualizan el motivo.
 - **Prueba diaria (`directo`).** El trabajo `check_linkedin` comprueba una vez al día que las 14 lecturas del conector siguen trayendo sus campos (`canario.py`; detalle en el [plan](../../../docs/plan-linkedin-directo.md)). Una lectura rota no pausa nada: avisa en Notificaciones (`linkedin_canary`) y otra vez cuando vuelve a pasar. Si en la prueba el servicio paró la cuenta, la pausa como cualquier otra lectura.
-- **Lo que no salió, espera.** Si el servicio navegador del conector `directo` no deja salir una escritura por algo suyo y no de la cuenta (su tope agotado, `budget`; no enviada, `not_sent`: navegador ocupado o sin abrir, el servicio caído; u otra salida a internet, `egress`), no cuenta como ejecutada ni como fallida, no pausa nada y no la leen las reglas de límite de la red: la ejecución se deshace, la propuesta vuelve a `approved` y su capacidad espera hasta `retry_at` (lo que diga el servicio, o 30 min), en un evento `operator.write_deferred`. El autopiloto y `execute` no la intentan antes. Las lecturas hacen lo mismo a su manera: la vuelta se corta y lo que faltaba se lee en la siguiente (la clasificación deja a la persona sin revisar en vez de juzgarla a ciegas; la captura de métricas se guarda igual, con quién comentó en `null`). Cualquier otro error (un 5xx, no encontrado, el `not_sent` de Unipile) y cualquier otro proveedor siguen como antes (`connectors.deferred`). El post propio (CONT-09) no entra aquí: va por la API oficial. La otra salida a internet es lo único de esa lista que no se arregla solo: avisa una vez en Notificaciones (`navegador_salida`) con qué hacer en el servidor, sin pausar la cuenta (nada llegó a LinkedIn, y una pausa frenaría también las escrituras de las demás cuentas).
-- **El conector real está apagado por defecto.** Requiere `LIVE_LINKEDIN=true` y `UNIPILE_API_KEY`. El simulado requiere `OPERATOR_ALLOW_FAKE=true`. El conector `directo` (LinkedIn sin Unipile, por el servicio navegador) requiere `LIVE_LINKEDIN_DIRECTO=true`, `NAVEGADOR_URL` y `NAVEGADOR_TOKEN`; su contrato está en [navegador-contrato.md](navegador-contrato.md).
+- **Lo que no salió, espera.** Si el servicio navegador del conector `directo` no deja salir una escritura por algo suyo y no de la cuenta (su tope agotado, `budget`; no enviada, `not_sent`: navegador ocupado o sin abrir, el servicio caído; u otra salida a internet, `egress`), no cuenta como ejecutada ni como fallida, no pausa nada y no la leen las reglas de límite de la red: la ejecución se deshace, la propuesta vuelve a `approved` y su capacidad espera hasta `retry_at` (lo que diga el servicio, o 30 min), en un evento `operator.write_deferred`. El autopiloto y `execute` no la intentan antes. Las lecturas hacen lo mismo a su manera: la vuelta se corta y lo que faltaba se lee en la siguiente (la clasificación deja a la persona sin revisar en vez de juzgarla a ciegas; la captura de métricas se guarda igual, con quién comentó en `null`). Cualquier otro error (un 5xx, no encontrado) y cualquier otro proveedor siguen como antes (`connectors.deferred`). El post propio (CONT-09) no entra aquí: va por la API oficial. La otra salida a internet es lo único de esa lista que no se arregla solo: avisa una vez en Notificaciones (`navegador_salida`) con qué hacer en el servidor, sin pausar la cuenta (nada llegó a LinkedIn, y una pausa frenaría también las escrituras de las demás cuentas).
+- **El conector real está apagado por defecto.** El conector `directo` (LinkedIn directo, por el servicio navegador) requiere `LIVE_LINKEDIN_DIRECTO=true`, `NAVEGADOR_URL` y `NAVEGADOR_TOKEN`; su contrato está en [navegador-contrato.md](navegador-contrato.md). El simulado requiere `OPERATOR_ALLOW_FAKE=true`.
 - **Un comentario por persona a la vez.** Nunca se comenta a un mismo referente más de una vez dentro de `OPERATOR_AUTHOR_COOLDOWN_HOURS` (48 h por defecto). El redactor salta sus posts mientras tenga un comentario abierto o reciente, y la compuerta descarta un segundo comentario si el primero ya está aprobado o publicado.
 - **Idioma.** Decisión de Gustavo (12/11/2026): el comentario va en español si la publicación o su conversación están en español; si no, en inglés. Es una regla fija (`idioma.py`, por palabras frecuentes): un comentario del agente en inglés sobre una publicación en español se reescribe una vez y, si sigue igual, se descarta. Español sobre un post en inglés se acepta, porque puede venir de la conversación, que solo ve el redactor. Las respuestas en posts propios van en el idioma de quien comentó. Jev ya no juzga el idioma: puntuaba 0,04 un comentario en inglés sobre un post en inglés.
 - **Afirmaciones por verificar.** El redactor marca solo hechos presentados como ciertos sin respaldo en sus hechos públicos ni en la publicación. Las opiniones, las preguntas y las cifras del post atribuidas a su autor no cuentan: antes descartaban 4 de cada 12 comentarios buenos (medición en sombra del 12/11/2026).
@@ -72,23 +72,18 @@ Cuando una cuenta se pausa (429, restricción, reautenticación o estado distint
 
 ## Activación real (pasos para Gustavo)
 
-1. Crear la cuenta en Unipile, conectar LinkedIn (credenciales y 2FA) y anotar el `account_id` (`acc_…`) y una API key limitada a esa cuenta.
-2. En el `.env` privado del runtime, añadir `UNIPILE_API_KEY=…`, `LIVE_LINKEDIN=true`, `OPERATOR_AUTOPILOT=true` y `OPERATOR_ALERT_WEBHOOK=…` (por ejemplo, un tema de ntfy en el móvil), y revisar las variables `OPERATOR_*` de `.env.example`. Para que el agente redacte se necesitan `LIVE_PROVIDERS=true` y saldo en el presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD`, 100 USD al mes, y `AI_DAILY_FUSE_USD`, 15 USD al día); `ANTHROPIC_LIMIT_USD` es opcional y, si se fija, añade un techo mensual a Anthropic. Cada propuesta con `claude-opus-5-5` reserva unos USD 0,2.
-3. Desplegar este código: aplicar la migración `0003_operador` y reiniciar api y worker.
+1. Entrar a mano en LinkedIn en el navegador de la cuenta, dentro del servicio navegador: por el túnel y noVNC ([README del servicio, «En el servidor»](../../navegador/README.md#en-el-servidor)) o, con `LINKEDIN_CONEXION_APP=true`, desde Ajustes › Máquina, «Conectar LinkedIn». Gustavo escribe su clave y su 2FA en la propia página de LinkedIn; Barrio no los ve ni los guarda, y la sesión queda en el perfil de ese navegador en el servidor. El nombre de la cuenta en el servicio (minúsculas, números, `-` y `_`) es su id en Barrio.
+2. En el `.env` privado del runtime, añadir `LIVE_LINKEDIN_DIRECTO=true`, `NAVEGADOR_URL=http://navegador:8790`, `NAVEGADOR_TOKEN=…` (el mismo del servicio), `OPERATOR_AUTOPILOT=true` y `OPERATOR_ALERT_WEBHOOK=…` (por ejemplo, un tema de ntfy en el móvil), y revisar las variables `OPERATOR_*` de `.env.example`. Para que el agente redacte se necesitan `LIVE_PROVIDERS=true` y saldo en el presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD`, 100 USD al mes, y `AI_DAILY_FUSE_USD`, 15 USD al día); `ANTHROPIC_LIMIT_USD` es opcional y, si se fija, añade un techo mensual a Anthropic. Cada propuesta con `claude-opus-5-5` reserva unos USD 0,2.
+3. Desplegar este código: aplicar las migraciones y reiniciar api y worker, con el servicio `navegador` arriba.
 4. Primer uso:
    ```
-   python manage.py operador --usuario gustavo cuenta --account-id acc_… --etiqueta "LinkedIn Gustavo"
+   python manage.py operador --usuario gustavo cuenta --account-id <cuenta> --etiqueta "LinkedIn Gustavo"   # proveedor directo
    python manage.py operador --usuario gustavo comprobar --cuenta <uuid>
    python manage.py operador --usuario gustavo referente --cuenta <uuid> --perfil https://www.linkedin.com/in/… --motivo "…"
    python manage.py operador --usuario gustavo observar --cuenta <uuid>
    ```
 5. Arrancar el servicio `autopilot` de Docker Compose. A partir de ahí el ciclo observa, redacta, aprueba por política, ejecuta y concilia solo. Lo que hace queda en `/admin/` (Propuestas de acción, Auditoría) y se puede rechazar desde allí.
 6. Prueba de aceptación: un comentario aprobado por la política aparece una vez en LinkedIn, con `external_id`, estado `confirmed` y eventos de auditoría.
-
-Pasar una cuenta ya registrada de Unipile a LinkedIn directo, o al revés, sin perder su historia: `operador
-cambiar-proveedor` ([navegador-contrato.md](navegador-contrato.md#cambiar-de-proveedor)). Con la cuenta en pausa:
-traduce en la misma transacción los ids que guarda (posts, invitaciones, conversaciones), guarda los originales para
-volver y se niega, listándolos, si alguno no se puede traducir. `--prueba` dice antes qué haría.
 
 ## API (`/api/v1/operador/…`)
 
@@ -124,7 +119,6 @@ Permisos nuevos: `operate_linkedin`, `approve_actions` y `execute_actions`. El r
 - Pantalla de supervisión en la oficina publicada (operaciones nuevas del puente).
 - Revisión por modelo (editor_verificador) como segunda compuerta de la política autónoma; hoy la compuerta es determinista.
 - Programación nativa y edición o retirada de publicaciones propias (CONT-08/10/11). La publicación diaria (CONT-01..07 y CONT-09) ya está implementada: ver [publicación diaria](publicacion-diaria.md).
-- Inbox (CHAT) y edición de perfil (PERF) con el mismo patrón de propuesta, aprobación, ejecución y confirmación. La red (DESC-02/03/05/07, RED-01/02/03/04/09) ya está implementada: ver [red del barrio](red-barrio.md).
+- Inbox (CHAT) y edición de perfil (PERF) con el mismo patrón de propuesta, aprobación, ejecución y confirmación. El conector directo no envía mensajes ni escribe en el perfil (su lista permitida no lo deja): hoy los aplicaría Gustavo a mano. La red (DESC-02/03/05/07, RED-01/02/03/04/09) ya está implementada: ver [red del barrio](red-barrio.md).
 - Programador periódico para la observación.
 - Unificar el runtime con este repositorio, para que Docker construya desde `barrio-ai`.
-- Prueba real con la cuenta de Unipile.

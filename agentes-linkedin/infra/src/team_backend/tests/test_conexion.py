@@ -102,8 +102,8 @@ class StartTests(ConnectBase):
         self.assertTrue(AuditEvent.objects.filter(action='linkedin.login_started', target=str(self.account.id)).exists())
 
     def test_other_providers_off_and_no_permission_are_refused(self):
-        unipile = ConnectorAccount.objects.create(provider='unipile', external_account_id='acc_x', label='Unipile')
-        self.assertEqual(self.start(account=unipile)[0], 400)
+        official = ConnectorAccount.objects.create(provider='linkedin', external_account_id='urn:li:person:x', label='Oficial')
+        self.assertEqual(self.start(account=official)[0], 400)
         with patch.dict(os.environ, {'LINKEDIN_CONEXION_APP': 'false'}):
             self.assertEqual(self.start()[0], 404)
         viewer = User.objects.create_user('lectora', password='x')
@@ -249,10 +249,10 @@ class EndTests(ConnectBase):
         rows = account['results'] if isinstance(account, dict) else account
         connect = rows[0]['connect']
         self.assertEqual((connect['enabled'], connect['last']['state']), (True, 'esperando'))
-        ConnectorAccount.objects.create(provider='unipile', external_account_id='acc_y', label='Unipile')
+        ConnectorAccount.objects.create(provider='linkedin', external_account_id='urn:li:person:y', label='Oficial')
         rows = self.human.get('/api/v1/operador/accounts').json()
         rows = rows['results'] if isinstance(rows, dict) else rows
-        self.assertIsNone(next(r for r in rows if r['provider'] == 'unipile')['connect'])
+        self.assertIsNone(next(r for r in rows if r['provider'] == 'linkedin')['connect'])
 
     def test_the_token_goes_to_the_service_and_nowhere_else(self):
         _, body = self.start()

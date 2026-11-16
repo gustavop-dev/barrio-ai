@@ -1,7 +1,7 @@
-// Ajustes › Máquina: total stop and resume (overview.control) and the Unipile account pause.
+// Ajustes › Máquina: total stop and resume (overview.control) and the operating account's pause.
 import { useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
-import { accountStatus, controlReason, providerLabel, stoppedFromServer, unipileAccounts } from '../../../../compartido/src/logic/ajustes';
+import { accountStatus, controlReason, providerLabel, stoppedFromServer, operatingAccounts } from '../../../../compartido/src/logic/ajustes';
 import { useOverview, useSetAccountPaused, useSetControl } from '../../api/hooks';
 import { keys } from '../../api/queryClient';
 import type { Account, Control, Overview } from '../../api/types';
@@ -11,7 +11,7 @@ import { timeAgo } from '../../lib/format';
 import { Row } from './shared';
 
 // Shared with the native app: compartido/src/logic/ajustes.ts.
-export { unipileAccounts } from '../../../../compartido/src/logic/ajustes';
+export { operatingAccounts } from '../../../../compartido/src/logic/ajustes';
 
 function ControlCard({ control }: { control: Control }) {
   const client = useQueryClient();
@@ -182,7 +182,7 @@ function AccountCard({ account }: { account: Account }) {
 
 export function MaquinaSection() {
   const overview = useOverview();
-  const accounts = unipileAccounts(overview.data?.accounts);
+  const accounts = operatingAccounts(overview.data?.accounts);
   return (
     <Section label="Máquina" id="maquina">
       {overview.isPending ? <Skeleton variant="card" count={2} label="Cargando la máquina…" /> : null}
@@ -191,7 +191,7 @@ export function MaquinaSection() {
       {accounts.map((account) => (
         <AccountCard key={account.id} account={account} />
       ))}
-      {overview.data && !accounts.length ? <p className="t-detalle text-suave">No hay ninguna cuenta de Unipile configurada.</p> : null}
+      {overview.data && !accounts.length ? <p className="t-detalle text-suave">No hay ninguna cuenta de LinkedIn configurada.</p> : null}
     </Section>
   );
 }

@@ -1,5 +1,5 @@
 """The provider `directo` (docs/plan-linkedin-directo.md, docs/navegador-contrato.md): each of the 21 connector
-operations builds the expected LinkedIn request and answers in Unipile's shapes; ids round-trip between operations;
+operations builds the expected LinkedIn request and answers in the connector's shapes; ids round-trip between operations;
 pushback pauses and a write of unknown fate is uncertain; the allowlist refuses before anything leaves; the provider is
 wired and stays off without its configuration. Every LinkedIn answer is a hand-written fixture with invented values
 (directo_fixtures.py); nothing here reaches a network."""
@@ -14,7 +14,7 @@ from django.test import SimpleTestCase, TestCase
 from linkedin_directo import Answer, Cliente, LinkedInError, NoteQuota, Request, Uncertain, cliente, permitidas, rutas
 from linkedin_directo.servicio import ServiceTransport
 from team_backend import connectors, connectors_directo, conversaciones, metricas, operador, respuestas
-from team_backend.connectors import ConnectorError, ConnectorUncertain, InvitationNoteQuota, UnipileConnector, get_connector
+from team_backend.connectors import ConnectorError, ConnectorUncertain, FakeConnector, InvitationNoteQuota, get_connector
 from team_backend.connectors_directo import DirectoConnector
 from team_backend.models import AuditEvent, ConnectorAccount, Notification
 from team_backend.serializers import AccountInput
@@ -22,7 +22,7 @@ from team_backend.tests import directo_fixtures as F
 from team_backend.tests.directo_fixtures import ANA, LUIS, OWN, POST, html, ok, stream
 
 UTC=timezone.utc
-# Unipile's shapes, from its own normalizers: the direct provider must give the same keys.
+# The connector's shapes, from the shared normalizers the simulated account answers with: directo gives the same keys.
 USER=set(connectors._user({}))
 POST_KEYS=set(connectors._post({'id':'1'}))
 COMMENT_KEYS=set(connectors._comment({'id':'1'}))
@@ -201,7 +201,7 @@ class PostAndCommentTests(SimpleTestCase):
         self.assertEqual(set(found[0]),COMMENT_KEYS)
         self.assertEqual(found[0],{'id':F.COMMENT_A,'text':'Muy buen punto','created_at':datetime(2026,11,10,16,tzinfo=UTC),
                                    'is_sender':False,'thread_id':None,'reply_counter':1,'reaction_counter':1,
-                                   # Like Unipile's comment author: no headline (the callers read the profile).
+                                   # A comment author carries no headline (the callers read the profile).
                                    'author':{'id':ANA[0],'public_identifier':'ana-ficticia','display_name':'Ana Ficticia',
                                              'profile_url':ana_url(),'headline':'','type':'individual'}})
         self.assertTrue(found[1]['is_sender'])
@@ -473,7 +473,7 @@ class InboxTests(SimpleTestCase):
 
 
 class IdRoundTripTests(SimpleTestCase):
-    """An id one operation returns is what the next one takes, as with Unipile."""
+    """An id one operation returns is what the next one takes."""
 
     def test_a_post_id_reads_and_reacts(self):
         c,t=connector(('GET',r'profileUpdatesV2',ok(F.posts((POST,'Uno',OWN,{'impressions':50})))),
@@ -725,7 +725,7 @@ class ServiceTransportTests(SimpleTestCase):
             connector=DirectoConnector('cuenta-prueba',transport=self.service(handler))
             with self.subTest(case=i),self.assertRaises(ConnectorError) as e:connector.account_status()
             self.assertEqual(connectors.deferred(e.exception),waits)
-        for other in (ConnectorError('Unipile: no fue posible conectar.',kind='not_sent'),
+        for other in (ConnectorError('Simulado: sin conexión.',kind='not_sent'),
                       ConnectorError('Simulado: HTTP 500.',status=500,kind='provider/server_error'),
                       ConnectorError('x',status=422,kind='budget'),ConnectorError('x',kind='network'),
                       ConnectorError('x',status=503,kind='egress')):
@@ -783,15 +783,16 @@ class DirectoConnectorTests(SimpleTestCase):
         clean={k:v for k,v in os.environ.items() if k not in ('LIVE_LINKEDIN_DIRECTO','NAVEGADOR_URL','NAVEGADOR_TOKEN')}
         with patch.dict(os.environ,{**clean,**env},clear=True):return DirectoConnector(account)
 
-    def test_the_same_methods_and_arguments_as_unipile(self):
+    def test_the_same_methods_and_arguments_as_the_simulated_account(self):
         def methods(cls):return {n:str(inspect.signature(f)) for n,f in inspect.getmembers(cls,inspect.isfunction) if not n.startswith('_')}
         own=methods(DirectoConnector)
         # One read more, only here: the creator analytics; callers check hasattr (test_analitica.py).
         self.assertEqual(own.pop('analytics'),'(self, start, end, order=None)')
-        self.assertFalse(hasattr(UnipileConnector,'analytics'))
+        self.assertFalse(hasattr(FakeConnector,'analytics'))
         self.assertEqual(own.pop('canary'),'(self)')  # and the daily canary (test_canario.py)
-        self.assertFalse(hasattr(UnipileConnector,'canary'))
-        self.assertEqual(own,methods(UnipileConnector))
+        self.assertFalse(hasattr(FakeConnector,'canary'))
+        simulated=methods(FakeConnector)
+        self.assertEqual(own,{name:simulated.get(name) for name in own})  # the simulated one also has its seeding helpers
         self.assertEqual(len(own),21)
         self.assertEqual(DirectoConnector.provider,'directo')
 
@@ -839,7 +840,7 @@ class ProviderWiringTests(TestCase):
             with self.assertRaises(ConnectorError) as e:get_connector(account)
         self.assertEqual(e.exception.kind,'disabled')
 
-    def test_the_provider_is_accepted_where_unipile_is(self):
+    def test_the_provider_is_accepted_everywhere_the_account_operates(self):
         self.assertIn('directo',ConnectorAccount.Provider.values)
         self.assertTrue(AccountInput(data={'provider':'directo','external_account_id':'cuenta-prueba','label':'Prueba'}).is_valid())
         for providers in (metricas.PROVIDERS,conversaciones.PROVIDERS,respuestas.PROVIDERS):

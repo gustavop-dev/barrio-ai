@@ -1,8 +1,8 @@
 # Servicio navegador
 
-LinkedIn sin Unipile (fase 2 de `docs/plan-linkedin-directo.md`). Un Chromium por cuenta, con su perfil guardado,
-que hace **cada** llamada a LinkedIn desde la página de LinkedIn con la sesión abierta, como la haría la propia
-página. Nada sale hacia LinkedIn desde fuera de esa página. El servicio devuelve la respuesta de LinkedIn tal cual;
+Cómo Barrio habla con la cuenta de LinkedIn (fase 2 de `docs/plan-linkedin-directo.md`). Un Chromium por cuenta,
+con su perfil guardado, que hace **cada** llamada a LinkedIn desde la página de LinkedIn con la sesión abierta, como
+la haría la propia página. Nada sale hacia LinkedIn desde fuera de esa página. El servicio devuelve la respuesta de LinkedIn tal cual;
 quien la juzga y la lee es el backend (`agentes-linkedin/infra/src/linkedin_directo`, conector `directo`).
 
 El contrato entre los dos lados está en `agentes-linkedin/infra/docs/navegador-contrato.md`.

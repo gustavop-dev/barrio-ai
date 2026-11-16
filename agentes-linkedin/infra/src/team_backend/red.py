@@ -491,7 +491,7 @@ def search_location(account,connector,summary):
     name=setting('NETWORK_SEARCH_LOCATION','United States').strip()
     if not name:return None
     events=AuditEvent.objects.filter(action='network.search_location',target=str(account.id),metadata__name=name)
-    if account.switched_at:events=events.filter(created_at__gt=account.switched_at)  # the other provider's ids
+    if account.ids_since:events=events.filter(created_at__gt=account.ids_since)  # ids of the scheme before
     event=events.order_by('-created_at').first()
     if event:return event.metadata['ids'] or None
     try:
@@ -578,7 +578,7 @@ def _signals_read(account,allowance):
     return True
 
 def _enrich(account,contacts):
-    """DESC-03 before DESC-07: comment authors arrive without a headline (Unipile v2 sends name and id only), and
+    """DESC-03 before DESC-07: comment authors arrive without a headline (LinkedIn lists name and id only), and
     classifying them blind discards good people. Read each profile once, within the daily profile cap; whoever
     cannot be read today waits for tomorrow instead of being judged without data. Whoever has a headline but no
     signals is read within NETWORK_SIGNALS_PER_DAY; once it or the cap is spent they are judged on the headline, as
