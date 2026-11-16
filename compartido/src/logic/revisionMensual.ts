@@ -27,12 +27,13 @@ export const STRATEGY_CHANGE_MAX = 600;
 /** Weeks with measured posts a review needs to compare the month (revision_mensual.FULL_WEEKS). */
 export const FULL_WEEKS = 4;
 
-const CHANGE_ENDPOINT = /^\/api\/v1\/resultados\/revision-mensual\/cambios\/[^/]+\/(aprobar|rechazar|revertir)$/;
+const CHANGE_ENDPOINT = /^\/api\/v1\/resultados\/revision-mensual\/cambios\/[^/]+\/(aprobar|editar|rechazar|revertir)$/;
 
 export type ChangeVerb = 'aprobar' | 'rechazar' | 'revertir';
 
-/** A decision endpoint of a strategy change (…/cambios/<id>/aprobar|rechazar|revertir), optionally of one verb. */
-export function isChangeEndpoint(endpoint: string | null | undefined, verb?: ChangeVerb): boolean {
+/** A decision endpoint of a strategy change (…/cambios/<id>/aprobar|editar|rechazar|revertir), optionally of one verb.
+ * «editar» is «Editar y aprobar»: an approval that must carry its text. */
+export function isChangeEndpoint(endpoint: string | null | undefined, verb?: ChangeVerb | 'editar'): boolean {
   const match = endpoint ? CHANGE_ENDPOINT.exec(endpoint) : null;
   return Boolean(match && (!verb || match[1] === verb));
 }
