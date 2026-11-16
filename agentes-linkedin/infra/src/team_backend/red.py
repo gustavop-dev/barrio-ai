@@ -744,13 +744,14 @@ def check_stages(user,account,now=None,limit=3):
     now=now or timezone.now();summary={'checked':0,'passed':0}
     day,_=operador.period_starts(now)
     due=[c for c in _stage_queue(account) if _stage_due(c,now)]
-    if due and research_silent(now):
-        # Nothing is checked and no attempt is spent. No notification kind fits a failing web tool yet: the pause is
-        # recorded once a day in the audit log.
-        summary['stopped']=STAGE_PAUSED
-        if not _paused_on(account,day):
-            operador._audit(None,'network.stage_check_paused',account.id,day=f'{day:%Y-%m-%d}',pending=len(due),runs=STAGE_BREAKER)
-        return summary
+    # Half-open: while the web research is silent, one buyer a day is checked as a probe. Without findings nobody
+    # spends an attempt and the pause is recorded (no notification kind fits a failing web tool yet: audit log only);
+    # with findings the research works again and the checks go on.
+    silent=bool(due) and research_silent(now)
+    if silent and _paused_on(account,day):
+        summary['stopped']=STAGE_PAUSED;return summary
+    # The probe rotates: a buyer the web knows nothing about must not hold the pause for everyone else.
+    if silent:due.sort(key=lambda c:c.classification['stage_check'].get('probed_at') or '')
     for contact in due:
         if summary['checked']>=limit or stage_checks_left(now)<=0 or budget_left(now)<=0:break
         check=dict(contact.classification['stage_check'])
@@ -761,6 +762,12 @@ def check_stages(user,account,now=None,limit=3):
         if result.status in ('skipped','running') or (not result.findings and not result.usage):
             # The search did not run (allowance, provider or web off): no attempt is spent and nobody leaves for it.
             summary['stopped']=(list(result.limitations) or ['Investigación web no disponible'])[0];break
+        if silent and not result.findings:
+            summary['stopped']=STAGE_PAUSED
+            contact.classification=dict(contact.classification,stage_check=dict(check,probed_at=now.isoformat()));contact.save()
+            operador._audit(None,'network.stage_check_paused',account.id,day=f'{day:%Y-%m-%d}',pending=len(due),runs=STAGE_BREAKER)
+            break
+        silent=False
         verdict=None
         if result.findings:
             try:verdict=_judge_stage(contact,result)

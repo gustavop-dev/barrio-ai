@@ -202,17 +202,26 @@ class StageCheckTests(NetworkBase):
     def test_a_week_of_research_without_findings_pauses_the_checks_without_spending_attempts(self):
         ana=self.buyer('ana-pausa','Ana Pausa');self.silent_runs()
         self.assertTrue(red.stage_pending(self.account))  # the job still runs once, to record the pause
-        with patch('team_backend.research.research') as web,self.judge('semilla_o_mas'):
+        with patch('team_backend.research.research',return_value=NOTHING) as web,self.judge('semilla_o_mas'):
             summary=red.check_stages(self.bot,self.account)
             self.assertEqual(red.check_stages(self.bot,self.account),summary)
-        web.assert_not_called();self.assertEqual(self.judged,[])
+        self.assertEqual(web.call_count,1);self.assertEqual(self.judged,[])  # one probe a day, then nothing
         self.assertEqual(summary,{'checked':0,'passed':0,'stopped':red.STAGE_PAUSED})
         ana.refresh_from_db()
-        self.assertEqual((ana.stage,ana.classification['stage_check']),('fit',{'state':'pending'}))
+        check=ana.classification['stage_check']
+        self.assertEqual((ana.stage,check['state'],check.get('attempts'),bool(check['probed_at'])),('fit','pending',None,True))
         paused=AuditEvent.objects.filter(action='network.stage_check_paused',target=str(self.account.id))
         self.assertEqual((paused.count(),paused.get().metadata['pending']),(1,1))  # once a day
         self.assertFalse(red.stage_pending(self.account))  # and the autopilot stops queueing it for today
         self.assertEqual(red.classify(self.bot,self.account)['stopped'],red.STAGE_PAUSED)  # the classify job tells it
+
+    def test_the_probe_of_the_day_reopens_the_checks_when_the_web_answers_again(self):
+        ana=self.buyer('ana-vuelve','Ana Vuelve');self.silent_runs()
+        with patch('team_backend.research.research',return_value=self.found()),self.judge('semilla_o_mas'):
+            summary=red.check_stages(self.bot,self.account)
+        ana.refresh_from_db()
+        self.assertEqual((summary,ana.classification['stage_check']['state']),({'checked':1,'passed':1},'ok'))
+        self.assertFalse(AuditEvent.objects.filter(action='network.stage_check_paused').exists())
 
     def test_one_research_with_findings_keeps_the_checks_running(self):
         ana=self.buyer('ana-sigue','Ana Sigue');self.silent_runs(findings_in=5)
