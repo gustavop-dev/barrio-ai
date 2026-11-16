@@ -868,6 +868,32 @@ COURSE_CASES={
         'input':{'likes_days':7,'audience_days':90,'likes_delta':-3},
         'expected':{'windows_comparable':False,'change_direction':False},
         'required':['LI-06-V008-K01','LI-06-V008-K02']},
+    # Primera metodología de outbound (clase 09). El único primer mensaje que existe es el dm_opener de INT-04: lo redacta
+    # Relaciones en el segundo turno con cierre permitido, aparece en Tu turno («Mensaje sugerido») cuando la persona ya es
+    # conexión y lo envía Gustavo a mano. Cinco variantes; en ninguna el equipo envía un mensaje. `stopped_by` dice qué
+    # parte lo detiene: «reglas» (código, antes del líder), «juez» (preguntas del líder) o «momento» (no hay conversación).
+    'primer_mensaje':{'id':'BIB-09-primer-mensaje',
+        'units':['LI-09-M002-K04','LI-09-M002-K05','LI-09-M003-K02','LI-09-V011-K01','LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02'],
+        'input':{
+            'thread':{'comment':'Rolling back the payments flow was our hardest week this year: the rollback itself broke '
+                                'reconciliation for two days.',
+                      'follow_up':'Exactly, and we never found out whether the flag or the deploy order caused it. Did you keep '
+                                  'both flows running while you rolled back?'},
+            'P1':{'dm_opener':'Hi Ana — your point about rolling back the payments flow stuck with me; we left that thread '
+                              'half-open. Did you isolate it with a flag or a separate deploy?'},
+            'P2':{'dm_opener':'Hi Ana — your point about rolling back the payments flow stuck with me. Do you have 15 minutes '
+                              'this week? https://cal.com/x'},
+            'P3':{'dm_opener':"Hope you're doing well! We are a leading partner fixing scaling, hiring and fundraising for "
+                              'startups like yours. Looking forward to hearing from you.'},
+            'P4':{'dm_opener':'Thanks for the great chat on my post. How are you approaching engineering these days?'},
+            'P5':{'conversation':False,'accepted':True}},
+        'expected':{'P1_card':True,'P2_card':False,'P2_stopped_by':'reglas','P3_card':False,'P3_stopped_by':'reglas',
+                    'P3_judge_rejects':True,'P4_card':False,'P4_stopped_by':'juez','P5_card':False,'P5_stopped_by':'momento',
+                    'messages_sent':0},
+        'required':['LI-09-M003-K02','LI-09-M003-K03','LI-09-M002-K04','LI-09-M003-K04','LI-09-M004-K02','LI-09-M002-K05'],
+        # Unidades que debe reflejar cada variante (BIB-09): qué criterio del curso la decide.
+        'variants':{'P1':['LI-09-M003-K02','LI-09-M003-K03'],'P2':['LI-09-M002-K04','LI-09-M003-K04'],
+                    'P3':['LI-09-M003-K04','LI-09-M004-K02'],'P4':['LI-09-M003-K02','LI-09-M003-K03'],'P5':['LI-09-M002-K05']}},
 }
 
 
