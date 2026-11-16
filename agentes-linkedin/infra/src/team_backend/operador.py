@@ -1244,6 +1244,11 @@ def _run_job(job):
             from . import resumen_semanal
             summary=resumen_semanal.run(user,date.fromisoformat(params['week']),origin_job=str(job.id))
             return 'complete',f'resumen:{summary.week_start}'[:30],''
+        if job.kind=='monthly_review':
+            from datetime import date
+            from . import revision_mensual
+            review=revision_mensual.run(user,date.fromisoformat(params['month']),origin_job=str(job.id))
+            return 'complete',f'revision:{review.month_start}'[:30],''
         return 'failed','failed','Tipo de trabajo desconocido.'
     except OperatorBlocked as exc:return 'failed','blocked',str(exc)
     except (Conflict,ValueError,ConnectorError) as exc:return 'failed','failed',str(getattr(exc,'detail',exc))

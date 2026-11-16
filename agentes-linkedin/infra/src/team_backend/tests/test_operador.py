@@ -24,6 +24,8 @@ class OperatorBase(TransactionTestCase):
                                    'OPERATOR_ALERT_WEBHOOK':'','OPERATOR_DAILY_LLM_USD':'1','OPERATOR_DAILY_PROPOSALS':'6',
                                    # The weekly summary depends on the real weekday; test_resumen_semanal turns it on.
                                    'WEEKLY_SUMMARY_ENABLED':'false',
+                                   # So does the monthly review (first Monday); test_revision_mensual turns it on.
+                                   'MONTHLY_REVIEW_ENABLED':'false',
                                    # INT-04 reads the comments of every confirmed own post; test_respuestas turns it on.
                                    'REPLIES_ENABLED':'false',
                                    # The GASP type of a day depends on the real weekday; test_estrategia turns it on.

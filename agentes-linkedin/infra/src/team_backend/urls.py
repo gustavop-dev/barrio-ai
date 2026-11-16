@@ -13,6 +13,7 @@ from . import capturas_views as cv
 from . import movil_views as mv
 from .grafo_views import EquipoGrafo
 from .orquestacion_views import CycleDecision
+from . import revision_views as rm
 from . import referentes_views as refs
 from .comunidad_views import Community, WithdrawSource
 from . import estrategia_views as es
@@ -115,4 +116,11 @@ urlpatterns=[
  path('push/expo',mv.ExpoPush.as_view()),
  # Client error reports of the app (CONTRATO-API.md «Errores del cliente»): metadata only, logged and kept.
  path('app/errores',mv.ClientErrors.as_view()),
+ # Monthly review of analista_barrio_resultados: up to three strategy changes, each decided apart (revision-mensual.md).
+ path('resultados/revision-mensual',rm.MonthlyReviews.as_view()),path('resultados/revision-mensual/generar',rm.MonthlyReviewGenerate.as_view()),
+ path('resultados/revision-mensual/<uuid:rid>',rm.MonthlyReviewDetail.as_view()),
+ path('resultados/revision-mensual/<uuid:rid>/visto',rm.MonthlyReviewSeen.as_view()),
+ path('resultados/revision-mensual/cambios/<uuid:cid>/aprobar',rm.StrategyChangeApprove.as_view()),
+ path('resultados/revision-mensual/cambios/<uuid:cid>/rechazar',rm.StrategyChangeReject.as_view()),
+ path('resultados/revision-mensual/cambios/<uuid:cid>/revertir',rm.StrategyChangeRevert.as_view()),
 ]

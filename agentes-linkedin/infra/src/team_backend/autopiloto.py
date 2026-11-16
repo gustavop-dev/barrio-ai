@@ -321,6 +321,8 @@ def tick(user,now=None):
         from . import estrategia
         report['weekly_plan']=estrategia.queue(user,now)  # Sunday afternoon: next week's GASP plan, once
     except Exception as exc:report['weekly_plan_error']=type(exc).__name__  # the plan never stops the rest
+    try:report['monthly_review']=_monthly_review(user,now)
+    except Exception as exc:report['monthly_review_error']=type(exc).__name__  # the monthly review never stops the rest
     return report
 
 def _editorial(user,now):
@@ -555,6 +557,12 @@ def _weekly_summary(user,now):
     (resumen_semanal.queue: one per week, deterministic job id). Off with WEEKLY_SUMMARY_ENABLED=false."""
     from . import resumen_semanal
     return resumen_semanal.queue(user,now)
+
+def _monthly_review(user,now):
+    """analista_barrio_resultados: on the first Monday of the month, an hour after the weekly summary, queue the review of
+    the month that ended (revision_mensual.queue: one per month, deterministic job id). Off with MONTHLY_REVIEW_ENABLED=false."""
+    from . import revision_mensual
+    return revision_mensual.queue(user,now)
 
 def _execute(user,account,now):
     from .orquestacion import cycle_issues

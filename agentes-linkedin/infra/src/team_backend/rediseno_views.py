@@ -318,8 +318,10 @@ class TuTurno(APIView):
                'referentes':monthly_cards}
         approval_cards=[_approval_card(p) for p in awaiting_approval()]
         question_cards=[_question_card(q,now) for q in pending]
+        from . import revision_mensual
+        tasks['estrategia']=strategy_cards=revision_mensual.cards(_card)  # each change of the monthly review, decided apart
         later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)+monthly_later
-        cards=warnings+question_cards+conversation_cards+message_cards+day_cards+summary_cards+approval_cards+profile+monthly_cards
+        cards=warnings+question_cards+conversation_cards+message_cards+day_cards+summary_cards+approval_cards+profile+monthly_cards+strategy_cards
         seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]

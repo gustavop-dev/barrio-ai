@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.8-etapa-compradores",
+  "graph_version": "6.9-revision-mensual",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -174,6 +174,10 @@
       "source": "team_backend.research._claim",
       "description": "WEB_RESEARCH_DAILY_USD=2; WEB_RESEARCH_DAILY_LIMIT=6; una reserva por key; límites de búsqueda/fetch y URLs de settings."
     },
+    "mensual": {
+      "source": "team_backend.revision_mensual.budget",
+      "description": "MONTHLY_REVIEW_MAX_USD=2.00 por mes local; presupuesto independiente de la revisión mensual."
+    },
     "proveedor": {
       "source": "knowledge.providers",
       "description": "Presupuestos y reservas del proveedor en usage_ledger; sin cap dedicado por ciclo."
@@ -248,6 +252,11 @@
       "binding": "team_backend.resumen_semanal.SCHEMA",
       "kind": "json_schema",
       "description": "weekly"
+    },
+    "monthly_review": {
+      "binding": "team_backend.revision_mensual.SCHEMA",
+      "kind": "json_schema",
+      "description": "monthly_review"
     },
     "image_choice": {
       "binding": "team_backend.infografias.CHOICE_SCHEMA",
@@ -408,6 +417,11 @@
       "binding": "team_backend.orquestacion_schemas.BRIEF_INPUT",
       "kind": "json_schema",
       "description": "Contrato ejecutable del adapter de fase 3b."
+    },
+    "strategy_decision": {
+      "binding": "team_backend.revision_mensual.approve",
+      "kind": "python_payload",
+      "description": "Aprobar (con o sin edición), rechazar o revertir cada cambio de estrategia de la revisión mensual por separado; decisión humana."
     },
     "writer_input": {
       "binding": "team_backend.orquestacion_schemas.WRITER_INPUT",
@@ -1664,12 +1678,14 @@
       "output_schemas": [
         "weekly",
         "community_study",
-        "community_analysis"
+        "community_analysis",
+        "monthly_review"
       ],
       "activity": {
         "job_kinds": [
           "weekly_summary",
-          "community_study"
+          "community_study",
+          "monthly_review"
         ],
         "event_roles": [
           "analista_barrio_resultados"
@@ -3765,6 +3781,20 @@
       }
     },
     {
+      "id": "cambio_de_estrategia",
+      "from": "analista_barrio_resultados",
+      "to": "gustavo",
+      "cycles": [
+        "revision_mensual"
+      ],
+      "request_kind": "handoff",
+      "request_schema": "monthly_review",
+      "response_schema": "strategy_decision",
+      "max_calls_per_cycle": 3,
+      "response_required": false,
+      "status": "active"
+    },
+    {
       "id": "evidencia_analista",
       "from": "analista_barrio_resultados",
       "to": "evidencia_compartida",
@@ -4567,6 +4597,48 @@
       }
     },
     {
+      "id": "revision_mensual",
+      "label": "Revisión mensual",
+      "status": "active",
+      "orchestrator": "analista_barrio_resultados",
+      "participants": [
+        "analista_barrio_resultados",
+        "gustavo"
+      ],
+      "triggers": [
+        {
+          "kind": "monthly_review",
+          "cadence": "Primer lunes del mes, una hora después de WEEKLY_SUMMARY_TIME, para el mes que terminó; o «Generar ahora».",
+          "binding": "team_backend.revision_mensual.queue",
+          "deduplication": "IDs deterministas del job; MonthlyReview.month_start único; _pending_job impide duplicar trabajos activos."
+        }
+      ],
+      "loops": [],
+      "gates": [],
+      "limits": {
+        "budget_refs": [
+          "mensual"
+        ],
+        "max_depth": 1,
+        "calls": 1,
+        "cycle_cost_cap": null,
+        "timeout": "Provider timeout.",
+        "scope": "Una llamada por intento (purpose monthly-review) dentro de MONTHLY_REVIEW_MAX_USD por mes local. Como mucho tres cambios; cada uno lo decide Gustavo por separado y solo lo aprobado entra en la orientación."
+      },
+      "ledger": {
+        "status": "existing_records_only",
+        "records": [
+          "Job",
+          "MonthlyReview",
+          "StrategyChange",
+          "AuditEvent",
+          "usage_ledger"
+        ],
+        "checkpoint_resume": false,
+        "note": "Una revisión por mes; los cambios rechazados se recuerdan tres meses y los aprobados se miden en la revisión siguiente."
+      }
+    },
+    {
       "id": "capturas",
       "label": "Capturas",
       "status": "active",
@@ -5065,7 +5137,8 @@
       "advance_experiments": "investigador_lider",
       "community_study": "analista_barrio_resultados",
       "prepare_profile_assets": "perfil",
-      "plan_week": "director_editorial"
+      "plan_week": "director_editorial",
+      "monthly_review": "analista_barrio_resultados"
     },
     "stage_roles": {
       "director": [
