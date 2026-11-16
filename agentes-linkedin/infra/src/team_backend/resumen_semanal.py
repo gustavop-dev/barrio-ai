@@ -419,7 +419,8 @@ Reglas de los números:
   ni sumas, ni porcentajes, ni diferencias. Las comparaciones con la semana anterior ya vienen hechas en
   `estadisticas.comparacion` (diferencia y variacion_pct); úsalas en lugar de calcularlas.
 - null es un dato que falta, nunca un cero. Una sección con disponible=false no se midió: dilo así, no la interpretes.
-- evidencia_compartida es una muestra parcial: encaje usa solo clasificados suficientes y siempre cita cobertura,
+- evidencia_compartida llega resumida (ventana, cobertura, agregados y conteos por referente, sin el registro por
+  persona). Es una muestra parcial: encaje usa solo clasificados suficientes y siempre cita cobertura,
   versión y fecha. Primera observación no es llegada; coincidencia o exposición no prueba causa. Un origen declarado
   sigue siendo una declaración, nunca una conversión exclusiva. Reacciones/seguidores agregados están sin identidad.
 - Un corte "pendiente" aún no cumplió su edad (72 h o 7 días); "sin_dato" la cumplió pero no se pudo leer.
@@ -478,9 +479,23 @@ def gustavo_comments(week_start):
                     'comentario':' '.join(c.text.split())[:800]})
     return out
 
+def _compact(value):
+    """A value without its lists of records (a dict per person, association or exposure)."""
+    if isinstance(value,dict):
+        return {k:_compact(v) for k,v in value.items() if not (isinstance(v,list) and any(isinstance(x,dict) for x in v))}
+    return value
+
+def for_analyst(data):
+    """The stats as the analyst reads them. The shared evidence keeps its window, coverage and aggregates and each
+    referent's counts; the record per person, association and exposure stays only in WeeklySummary.stats: it was 94 %
+    of the first real summary's input (0.94 USD) and holds only ids the analyst may not quote. No number is added."""
+    if 'evidencia_compartida' not in data:return data
+    return dict(data,evidencia_compartida=[dict(_compact(e),referents=[_compact(r) for r in e.get('referents') or []])
+                                           for e in data['evidencia_compartida']])
+
 def message(week_start,data):
     return json.dumps({'semana':{'desde':week_start.isoformat(),'hasta':(week_start+timedelta(days=6)).isoformat()},
-                       'estadisticas':data,
+                       'estadisticas':for_analyst(data),
                        'posicionamiento':{'version':posicionamiento.VERSION,'estado':posicionamiento.STATUS,
                                           'direccion':posicionamiento.editorial_direction()},
                        'orientacion_actual':orientacion.text(),'comentarios_de_gustavo':gustavo_comments(week_start)},
