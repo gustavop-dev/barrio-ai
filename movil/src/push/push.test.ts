@@ -17,6 +17,8 @@ describe('routes for data.url', () => {
     expect(routeForUrl('/calendario/pieza/p-9')).toEqual({ pathname: '/calendario/pieza/p-9', params: {} });
     expect(routeForUrl('/?enviado=1')).toEqual({ pathname: '/', params: { enviado: '1' } });
     expect(routeForUrl('/resultados#resumen')).toEqual({ pathname: '/resultados', params: { ancla: 'resumen' } });
+    // The monthly review is a tab of Resultados (its notification and «Ver la revisión» in Tu turno).
+    expect(routeForUrl('/resultados#revision-mensual')).toEqual({ pathname: '/resultados', params: { pestana: 'mensual' } });
     expect(routeForUrl('/api/v1/linkedin/oauth/start')).toBeNull();
     expect(routeForUrl('//evil.example/x')).toBeNull();
     expect(routeForUrl('https://www.linkedin.com/')).toBeNull();

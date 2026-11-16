@@ -891,7 +891,10 @@ export interface Activity {
 
 /** `resumen`: the weekly summary proposes an orientation (cuando puedas, analista_barrio_resultados).
  *  `mensaje`: someone who conversed on his post is now a connection; a drafted first message he sends himself (INT-04).
- *  `fecha`: he asked for a day that already had a post; a second post that day goes out only if he authorizes it. */
+ *  `fecha`: he asked for a day that already had a post; a second post that day goes out only if he authorizes it.
+ *  `cambio_estrategia`: a change proposed by the monthly review (`strategy_change:<id>`), decided apart.
+ *  The backend adds types over time and an older app still receives them, so the type stays open: a view labels the
+ *  ones it knows and shows any other as a notice. */
 export type TurnoCardType =
   | 'aviso'
   | 'pregunta'
@@ -902,7 +905,8 @@ export type TurnoCardType =
   | 'resumen'
   | 'aprobacion'
   | 'referente'
-  | 'experimento';
+  | 'experimento'
+  | (string & {});
 export type TurnoTone = 'bad' | 'warn' | 'info' | 'ok' | 'muted';
 
 /** A card action: either a POST (`endpoint` + `body`, plus `note` when `note_required`) or a full navigation (`href`). */
@@ -917,6 +921,26 @@ export interface TurnoAction {
   primary?: boolean;
   /** «Marcar como oportunidad»: opens the opportunity form prefilled; nothing is created until Gustavo saves it. */
   opportunity?: TurnoOpportunity;
+  /** «Editar y aprobar»: opens a text field prefilled with `value`; what he writes travels in the body as `field`. */
+  editable?: TurnoEditable;
+}
+
+/** The text an `editable` action lets Gustavo change before sending it (`{[field]: text}`). */
+export interface TurnoEditable {
+  field: string;
+  value: string;
+  /** Characters allowed, when the backend says it. */
+  max_length?: number;
+}
+
+/** The review a `cambio_estrategia` card comes from. */
+export interface TurnoStrategyReview {
+  id: string;
+  month_start: string;
+  /** «Revisión de octubre de 2026». */
+  label: string;
+  partial: boolean;
+  titular: string | null;
 }
 
 /** The prefill of «Marcar como oportunidad» on a conversation card. */
@@ -1036,6 +1060,9 @@ export interface TurnoCard {
   day_request?: TurnoDayRequest | null;
   /** Only on approval cards. */
   approval?: TurnoApproval | null;
+  /** Only on `cambio_estrategia` cards: the change and the review it comes from. */
+  strategy_change?: StrategyChange | null;
+  review?: TurnoStrategyReview | null;
   /** rev 18 priority group (being added to the backend). */
   priority?: TurnoPriority;
   /** rev 18 state: nueva and vista count, pospuesta and caducada go in `later` (being added to the backend). */
@@ -1086,6 +1113,8 @@ export interface TuTurno {
     fechas?: TurnoCard[];
     resumen?: TurnoCard[];
     referentes?: TurnoCard[];
+    /** The monthly review's changes that wait for Gustavo (older backends omit it). */
+    estrategia?: TurnoCard[];
   };
   recent: TurnoRecent[];
   summary: { done_today: DoneToday; next_piece: { id: string; scheduled_for: string } | null };
@@ -1723,5 +1752,159 @@ export interface WeeklySummaryDecision {
 
 export interface WeeklySummaryGenerateResponse {
   week_start: string;
+  job: Job;
+}
+
+// ---------------------------------------------------------------- monthly review (Resultados › Revisión mensual)
+// revision_mensual.py: once a month the results analyst compares the month with the one before and proposes up to
+// three strategy changes, each decided apart (in Tu turno or here). Only an approved one enters the orientation.
+
+/** A claim of the review, tied to the figure of the month's stats it rests on (`cifra`). */
+export interface MonthlyReviewItem {
+  texto: string;
+  cifra: string;
+  course_citations?: string[];
+}
+
+/** What came of a change approved the month before: kept, got worse, or not enough data to say. */
+export type StrategyVerdict = 'se_conserva' | 'sin_dato' | 'empeoro';
+
+export interface MonthlyReviewPreviousChange {
+  id: string;
+  titulo: string;
+  veredicto: StrategyVerdict;
+  texto: string;
+  cifra: string;
+}
+
+export type MonthlyReviewState = 'nuevo' | 'visto';
+export type StrategyChangeState = 'propuesto' | 'aprobado' | 'rechazado' | 'revertido';
+
+/** The figure behind a change and what it is compared with; `refs` are piece or action ids of the stats. */
+export interface StrategyEvidence {
+  cifra: string;
+  comparado_con: string;
+  refs: string[];
+}
+
+/** The metric's value in the reviewed month: what the next review compares with. */
+export interface StrategyBaseline {
+  metrica: string;
+  etiqueta: string;
+  valor: number | null;
+  mes: string;
+  desde: string;
+  hasta: string;
+}
+
+/** Written on an approved change by the next review. */
+export interface StrategyOutcome {
+  veredicto: StrategyVerdict;
+  texto: string;
+  cifra: string;
+  metrica?: string;
+  antes: number | null;
+  despues: number | null;
+  diferencia: number | null;
+  revision?: string;
+  mes?: string;
+}
+
+export interface StrategyChange {
+  id: string;
+  review_id: string;
+  position: number;
+  title: string;
+  /** The sentence that would enter the orientation, written as an instruction to the team. */
+  proposal: string;
+  reason: string;
+  evidence: StrategyEvidence[];
+  /** What should improve and how it will be measured next month. */
+  expected: string;
+  metric: string;
+  metric_label: string;
+  baseline: StrategyBaseline | null;
+  state: StrategyChangeState;
+  state_label: string;
+  /** What entered the orientation (his edit, or the proposal). */
+  final_text: string | null;
+  decided_by: string | null;
+  decided_at: string | null;
+  decision_note: string;
+  reverted_at: string | null;
+  outcome: StrategyOutcome | null;
+  can_decide: boolean;
+  can_revert: boolean;
+  endpoints: { approve: string; reject: string; revert: string };
+}
+
+export interface MonthlyReview {
+  id: string;
+  month_start: string;
+  month_end: string;
+  /** «Revisión de octubre de 2026». */
+  label: string;
+  state: MonthlyReviewState;
+  state_label: string;
+  /** Fewer than four weeks of the month had measured posts. */
+  partial: boolean;
+  titular: string | null;
+  /** «Comparación del mes con el anterior con pocos datos: señala pistas, no es una prueba estadística.» */
+  metodo: string | null;
+  lo_que_paso: MonthlyReviewItem[];
+  lo_que_funciono: MonthlyReviewItem[];
+  lo_que_no: MonthlyReviewItem[];
+  no_concluyente: string[];
+  cambios_previos: MonthlyReviewPreviousChange[];
+  /** What the validator dropped. */
+  advertencias: string[];
+  /** The data gaps found before the analyst wrote (weeks without a summary, pending cuts, sources that did not run). */
+  avisos: string[];
+  semanas_con_datos: number | null;
+  semanas_del_mes: number | null;
+  validacion?: { ok: boolean; descartado: Record<string, unknown>[] } | null;
+  model: string | null;
+  cost_usd: number | null;
+  created_at: string;
+  changes: StrategyChange[];
+  /** Changes still waiting for his decision. */
+  pending: number;
+}
+
+/** «Generar ahora»: offered while the month that ended has no review, none is being prepared and the budget allows it. */
+export interface MonthlyReviewGenerate {
+  month_start: string;
+  month_end: string;
+  label: string;
+  available: boolean;
+  reason: string | null;
+  pending: boolean;
+  last_error: string | null;
+  automatic: boolean;
+  /** The current month's automatic run (its first Monday): already past once that day went by. */
+  automatic_at: string | null;
+  estimated_usd: number;
+  max_usd: number;
+}
+
+/** GET /api/v1/resultados/revision-mensual. */
+export interface MonthlyReviews {
+  latest: MonthlyReview | null;
+  pending: number;
+  previous: MonthlyReview[];
+  generate: MonthlyReviewGenerate;
+}
+
+/** POST …/cambios/<id>/aprobar|rechazar|revertir: the change and the orientation as it is now. A revert that did not
+ * find its text in the orientation answers `found: false` and why. */
+export interface StrategyChangeDecision {
+  change: StrategyChange;
+  orientation?: Orientation;
+  found?: boolean;
+  message?: string | null;
+}
+
+export interface MonthlyReviewGenerateResponse {
+  month_start: string;
   job: Job;
 }

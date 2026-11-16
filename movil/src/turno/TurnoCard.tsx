@@ -8,6 +8,7 @@ import { usePostponePregunta, useTurnoAction } from '@compartido/api/hooks';
 import type { TurnoAction, TurnoCard as TurnoCardData, TurnoOpportunity, TurnoPriority } from '@compartido/api/types';
 import { CONTACT_MODALITY_LABEL, CONTACT_ROLE_LABEL, labelOf } from '@compartido/logic/format';
 import { messageText } from '@compartido/logic/personas';
+import { APPROVE_HINT, evidenceLines, metricName } from '@compartido/logic/revisionMensual';
 import { clock, createdText, dayAndTime, deadlineInfo, extras, longDate, PRIORITY_LABEL } from '@compartido/logic/turno';
 import { router } from 'expo-router';
 import { useState } from 'react';
@@ -206,6 +207,63 @@ function ApprovalDetails({ card }: { card: TurnoCardData }) {
       ) : null}
       <T variant="detalle" soft>
         Si no la apruebas, no sale.
+      </T>
+    </View>
+  );
+}
+
+/**
+ * A change proposed by the monthly review: the review it comes from, why, the figure behind it and what it is compared
+ * with, what should improve and how it will be measured. «Ver la revisión» opens the whole report in Resultados.
+ */
+function StrategyDetails({ card }: { card: TurnoCardData }) {
+  const change = card.strategy_change!;
+  const evidence = evidenceLines(change);
+  return (
+    <View style={styles.block} testID={`strategy-details-${change.id}`}>
+      {card.review?.label ? (
+        <T variant="detalle" soft>
+          {card.review.label}
+          {card.review.partial ? ' · parcial' : ''}
+        </T>
+      ) : null}
+      {change.proposal ? <Quote>{change.proposal}</Quote> : null}
+      {change.reason ? (
+        <View style={styles.block}>
+          <T variant="etiqueta" soft>
+            Por qué
+          </T>
+          <T>{change.reason}</T>
+        </View>
+      ) : null}
+      {evidence.length ? (
+        <View style={styles.block}>
+          <T variant="etiqueta" soft>
+            En qué se basa
+          </T>
+          {evidence.map((line, index) => (
+            <View key={index}>
+              {line.cifra ? <T variant="detalle">{`Dato: ${line.cifra}`}</T> : null}
+              {line.comparado ? <T variant="detalle" soft>{`Comparado con: ${line.comparado}`}</T> : null}
+            </View>
+          ))}
+        </View>
+      ) : null}
+      {change.expected ? (
+        <View style={styles.block}>
+          <T variant="etiqueta" soft>
+            Qué se espera
+          </T>
+          <T>{change.expected}</T>
+        </View>
+      ) : null}
+      {metricName(change) ? (
+        <T variant="detalle" soft>
+          {`Se medirá con: ${metricName(change)}`}
+        </T>
+      ) : null}
+      <T variant="detalle" soft>
+        {APPROVE_HINT}
       </T>
     </View>
   );
@@ -411,6 +469,7 @@ function CardDetails({ card }: { card: TurnoCardData }) {
   if (card.message) return <MessageDetails card={card} />;
   if (card.day_request) return <DayRequestDetails card={card} />;
   if (card.approval) return <ApprovalDetails card={card} />;
+  if (card.strategy_change) return <StrategyDetails card={card} />;
   const text = noticeText(card);
   return text ? <T>{text}</T> : null;
 }
@@ -543,10 +602,12 @@ export function TurnoCard({ card, priority, isNew = false, exit }: TurnoCardProp
       {runner.asking && spec ? (
         <ConfirmSheet
           title={spec.title}
-          confirmLabel={runner.asking.label}
+          confirmLabel={spec.confirmLabel ?? runner.asking.label}
           note={spec.note}
           noteLabel={spec.noteLabel}
           notePlaceholder={spec.placeholder}
+          noteInitial={spec.initial}
+          noteMax={spec.max}
           busy={runner.run.isPending}
           error={runner.run.error}
           onConfirm={(note) => void runner.execute(runner.asking!, note)}

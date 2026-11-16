@@ -1,6 +1,7 @@
 import { APPROVAL_CARD, CONVERSATION_CARD, DAY_REQUEST_CARD, EXPIRING_CARD, questionCard, UNCERTAIN_CARD, cardFixture } from '@compartido/fixtures/turno';
 import type { TurnoCard } from '@compartido/api/types';
 import { APPROVED_MESSAGE } from '@compartido/logic/events';
+import { strategyCardFixture } from '@compartido/fixtures/revision';
 import { cardSummary, cardTitle, hasDetails, modalFor, orderedActions, successMessage, SUMMARY_FITS, swipeIntents, withNote } from './actions';
 import { commitSide, dragOffset, pastCommit, revealProgress } from './swipe';
 
@@ -41,6 +42,32 @@ describe('card actions', () => {
     expect(withNote(UNCERTAIN_CARD.actions[0]!, '')).toEqual({ action: UNCERTAIN_CARD.actions[0] });
   });
 
+  it('a strategy change: «Editar y aprobar» opens its proposal to edit (600 characters) and sends it as `text`', () => {
+    const card = strategyCardFixture();
+    const [approve, edit, reject, review] = card.actions;
+    const proposal = card.strategy_change!.proposal;
+    expect(modalFor(approve!, card)).toBeNull();
+    expect(modalFor(edit!, card)).toMatchObject({ title: 'Editar y aprobar', note: 'required', noteLabel: 'Texto del cambio', initial: proposal, max: 600, confirmLabel: 'Aprobar' });
+    expect(withNote(edit!, 'Mi versión.')).toEqual({ action: { ...edit, body: { text: 'Mi versión.' } } });
+    expect(modalFor(reject!, card)).toMatchObject({ title: 'Rechazar el cambio', note: 'optional', noteLabel: 'Motivo' });
+    expect(modalFor(reject!, card)?.text).toContain('no lo volverá a proponer igual');
+    expect(withNote(reject!, 'No encaja.')).toEqual({ action: reject, note: 'No encaja.' });
+    expect(successMessage(approve!)).toBe('Cambio aprobado. El equipo lo usa desde su próxima tarea.');
+    expect(successMessage(edit!)).toBe('Cambio aprobado. El equipo lo usa desde su próxima tarea.');
+    expect(successMessage(reject!)).toBe('Cambio rechazado');
+    expect(review!.href).toBe('/resultados#revision-mensual');
+    expect(cardTitle(card)).toBe('Más posts de caso práctico');
+    expect(cardSummary(card)).toBe(`“${proposal}”`);
+    expect(hasDetails(card)).toBe(true);
+  });
+
+  it('an editable action of another kind keeps its own limit, or none', () => {
+    const action = { label: 'Editar', endpoint: '/api/v1/otra-cosa/1', editable: { field: 'texto', value: 'Hola', max_length: 80 } };
+    expect(modalFor(action)).toMatchObject({ title: 'Editar', note: 'required', noteLabel: 'Texto', initial: 'Hola', max: 80 });
+    expect(modalFor({ ...action, editable: { field: 'texto', value: '' } })?.max).toBeUndefined();
+    expect(withNote(action, 'Adiós')).toEqual({ action: { ...action, body: { texto: 'Adiós' } } });
+  });
+
   it('puts the primary action first', () => {
     expect(orderedActions(CONVERSATION_CARD.actions).map((a) => a.label)[0]).toBe('Abrir en LinkedIn');
     expect(orderedActions([{ label: 'A' }, { label: 'B', primary: true }]).map((a) => a.label)).toEqual(['B', 'A']);
@@ -66,6 +93,11 @@ describe('swipe intents', () => {
   it('left postpones a question («Más tarde»); a question has no «done» swipe', () => {
     expect(swipeIntents(questionCard())).toEqual({ right: null, left: { kind: 'postpone', questionId: 'q1', label: 'Más tarde' } });
     expect(swipeIntents(CONVERSATION_CARD).left).toBeNull();
+  });
+
+  it('a strategy change is decided with a tap, never with a swipe', () => {
+    expect(swipeIntents(strategyCardFixture())).toEqual({ right: null, left: null });
+    expect(swipeIntents(strategyCardFixture(undefined, { strategy_change: undefined }))).toEqual({ right: null, left: null });
   });
 
   it('expired cards cannot be swiped', () => {
