@@ -144,6 +144,7 @@ JOB_ROLES={'prepare_profile_assets':'perfil','prepare_profile':'perfil','review_
            'discover_network':'investigador_referentes','classify_contacts':'investigador_referentes',
            'plan_network':'relaciones_comunidad','sync_network':'relaciones_comunidad',
            'collect_metrics':'analista_barrio_resultados','import_analytics':'analista_barrio_resultados','check_linkedin':'operador_cuenta',
+           'collect_outcomes':'analista_barrio_resultados',
            'process_capture':'operador_cuenta',
            'weekly_summary':'analista_barrio_resultados','read_inbox':'conversaciones_inbox',
            'community_study':'analista_barrio_resultados','plan_week':'director_editorial'}
@@ -154,6 +155,7 @@ DESCRIPTIONS={'prepare_profile_assets':'Preparando tus fotos y banner','prepare_
               'discover_network':'Buscando personas para el barrio','classify_contacts':'Clasificando personas del barrio',
               'plan_network':'Preparando seguimientos e invitaciones','sync_network':'Revisando invitaciones y conexiones',
               'collect_metrics':'Midiendo los posts y la audiencia','import_analytics':'Trayendo la analítica de LinkedIn',
+              'collect_outcomes':'Mirando qué pasó después de comentar y conectar',
               'check_linkedin':'Probando que LinkedIn responde como siempre',
               'process_capture':'Leyendo lo que enviaste al equipo',
               'weekly_summary':'Escribiendo el resumen de la semana','read_inbox':'Leyendo el inbox de LinkedIn',

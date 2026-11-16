@@ -64,7 +64,7 @@ class PostSnapshotTests(MetricsBase):
         self.fake.set_post_counters(pid,impressions=150,reactions=7,comments=0,reposts=None)  # LinkedIn hides the reposts
         self.fake.set_post_counters(fresh_pid,impressions=40,reactions=1,comments=0,reposts=0)
         job=self.collect()
-        self.assertEqual((job.state,job.result_status,job.error),('complete','cortes:1 audiencia:creada',''))
+        self.assertEqual((job.state,job.result_status,job.error),('complete','cortes:1 pend:0 aud:creada',''))
         metric=PostMetric.objects.get()
         self.assertEqual((metric.piece_id,metric.kind,metric.provider_post_id,metric.impressions,metric.reactions),(piece.id,'24h',pid,150,7))
         self.assertEqual(metric.comments,0);self.assertIsNone(metric.reposts)  # an observed zero is zero; hidden is null
@@ -117,7 +117,7 @@ class PostSnapshotTests(MetricsBase):
         self.fake.set_post_counters(old_pid,impressions=900,reactions=30,comments=4,reposts=2)
         ghost,_=self.publish('A post Unipile never shows back.',hours_ago=30,seed=False)
         job=self.collect()
-        self.assertEqual(job.result_status,'cortes:3 audiencia:creada')
+        self.assertEqual(job.result_status,'cortes:3 pend:1 aud:creada')
         self.assertEqual(sorted(PostMetric.objects.filter(piece=old).values_list('kind',flat=True)),['24h','72h','7d'])
         self.assertTrue(all(m.captured_at-m.published_at>=timedelta(days=9) for m in PostMetric.objects.all()))  # lateness is visible
         self.assertFalse(PostMetric.objects.filter(piece=ghost).exists());self.assertEqual(self.last_summary()['pending'],1)
