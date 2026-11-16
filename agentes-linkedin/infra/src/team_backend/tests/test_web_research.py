@@ -57,6 +57,12 @@ def tool_limits():
 
 
 class PublicURLTests(SimpleTestCase):
+    def test_the_default_web_tools_are_the_ones_that_return_native_citations(self):
+        # The dynamic-filtering tools search from code execution and their text has no citations: zero findings.
+        from linkedin_backend import settings as defaults
+        if not os.environ.get('WEB_SEARCH_TOOL_TYPE'):self.assertEqual(defaults.WEB_SEARCH_TOOL_TYPE,'web_search_20250305')
+        if not os.environ.get('WEB_FETCH_TOOL_TYPE'):self.assertEqual(defaults.WEB_FETCH_TOOL_TYPE,'web_fetch_20250910')
+
     def test_links_from_note_and_transcript_are_deduplicated_without_sentence_punctuation(self):
         text='Lee (https://github.com/example/repo).\nVoz: https://news.example.com/release, y https://github.com/example/repo.'
         self.assertEqual(web_sources.detect_urls(text),['https://github.com/example/repo',URL])

@@ -135,6 +135,15 @@ class ParticipationTests(NetworkBase):
             operador.reserve_spacing(self.now)
         self.assertFalse(operador.spacing_ok(self.account,soon,'CONT-09'))
 
+    def test_an_unconfirmed_write_stops_being_read_back_after_its_window(self):
+        from team_backend import autopiloto
+        proposal=self.approved();proposal.state='sent';proposal.save()
+        execution=ActionExecution.objects.create(proposal=proposal,provider='fake',executed_by=self.gustavo,state='sent',idempotency_key=str(proposal.id))
+        ActionExecution.objects.filter(pk=execution.pk).update(started_at=self.now-timedelta(hours=2))
+        self.assertEqual(autopiloto._reconcile(self.gustavo,self.now),1)
+        ActionExecution.objects.filter(pk=execution.pk).update(started_at=self.now-timedelta(hours=30))
+        self.assertEqual(autopiloto._reconcile(self.gustavo,self.now+timedelta(hours=1)),0)  # it waits for Gustavo, unread
+
     def test_health_excludes_immature_unknown_and_deduplicates_recipients(self):
         people=self.cohort();self.cohort(count=15,accepted=0,age=2);self.cohort(count=2,accepted=0,unknown=2)
         c=people[0];p=self.approved(c);p.state='confirmed';p.save()

@@ -48,8 +48,11 @@ GALLERY_MAX_PHOTOS_PER_REQUEST=10
 # Phase 1 web research. LIVE_PROVIDERS also gates the free GitHub reader.
 WEB_RESEARCH_ENABLED=os.environ.get('WEB_RESEARCH_ENABLED','true').lower()=='true'
 WEB_RESEARCH_MODEL=os.environ.get('WEB_RESEARCH_MODEL','claude-sonnet-5-5')
-WEB_SEARCH_TOOL_TYPE=os.environ.get('WEB_SEARCH_TOOL_TYPE','web_search_20260209')
-WEB_FETCH_TOOL_TYPE=os.environ.get('WEB_FETCH_TOOL_TYPE','web_fetch_20260209')
+# The basic tools, on purpose: research.native_findings keeps only text with native citations. The _20260209 tools
+# (dynamic filtering) search from inside code execution and their text comes back without citations: with them every
+# research in production returned zero findings (9–16/11/2026).
+WEB_SEARCH_TOOL_TYPE=os.environ.get('WEB_SEARCH_TOOL_TYPE','web_search_20250305')
+WEB_FETCH_TOOL_TYPE=os.environ.get('WEB_FETCH_TOOL_TYPE','web_fetch_20250910')
 WEB_SEARCH_MAX_USES=int(os.environ.get('WEB_SEARCH_MAX_USES','2'))
 WEB_FETCH_MAX_USES=int(os.environ.get('WEB_FETCH_MAX_USES','2'))
 WEB_FETCH_MAX_CONTENT_TOKENS=int(os.environ.get('WEB_FETCH_MAX_CONTENT_TOKENS','4000'))

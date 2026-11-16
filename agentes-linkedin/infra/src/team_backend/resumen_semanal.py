@@ -517,7 +517,13 @@ def validate(raw,data,week_start,grounding=None):
             if not isinstance(item,dict):continue
             text=' '.join(str(item.get('texto') or '').split())[:MAX_ITEM_CHARS];figure=' '.join(str(item.get('cifra') or '').split())[:200]
             if text and check(field,text,figure,tethered=True):
-                citations=operador.validate_course_citations(item.get('course_citations'),grounding) if grounding else item.get('course_citations',[])
+                citations=item.get('course_citations') or []
+                if grounding:
+                    # An entry without a retrieved unit is dropped like one with an unknown figure. It used to fail the
+                    # whole summary: no week ever got one (9 and 16/11/2026).
+                    try:citations=operador.validate_course_citations(citations,grounding)
+                    except ValueError:
+                        dropped.append({'campo':field,'texto':text[:MAX_ITEM_CHARS],'sin_cita_del_curso':True});continue
                 items.append({'texto':text,'cifra':figure,'course_citations':citations})
         clean[field]=items
     proposal=' '.join(str(raw.get('orientacion_propuesta') or '').split())[:MAX_ORIENTATION_CHARS]
@@ -526,7 +532,9 @@ def validate(raw,data,week_start,grounding=None):
     if not warnings:warnings=list(data.get('avisos_de_datos') or [])
     causal=sum(bool(d.get('atribucion_no_acreditada')) for d in dropped)
     if causal:warnings.append(f'Se quitaron {causal} frases con atribución causal no acreditada.')
-    if len(dropped)>causal:warnings.append(f'Se quitaron {len(dropped)-causal} frases del análisis con cifras que no están en los datos de la semana.')
+    uncited=sum(bool(d.get('sin_cita_del_curso')) for d in dropped)
+    if uncited:warnings.append(f'Se quitaron {uncited} frases sin un criterio del curso que las sustente.')
+    if len(dropped)>causal+uncited:warnings.append(f'Se quitaron {len(dropped)-causal-uncited} frases del análisis con cifras que no están en los datos de la semana.')
     clean['advertencias']=warnings
     clean['validacion']={'ok':not dropped,'descartado':dropped}
     if grounding:clean.update(grounding)
