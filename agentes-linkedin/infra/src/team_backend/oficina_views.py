@@ -147,7 +147,8 @@ JOB_ROLES={'prepare_profile_assets':'perfil','prepare_profile':'perfil','review_
            'collect_outcomes':'analista_barrio_resultados',
            'process_capture':'operador_cuenta',
            'weekly_summary':'analista_barrio_resultados','read_inbox':'conversaciones_inbox',
-           'community_study':'analista_barrio_resultados','plan_week':'director_editorial'}
+           'community_study':'analista_barrio_resultados','plan_week':'director_editorial',
+           'monthly_review':'analista_barrio_resultados'}
 DESCRIPTIONS={'prepare_profile_assets':'Preparando tus fotos y banner','prepare_profile':'Preparando tu propuesta de perfil','review_referents':'Revisando referentes del mes','advance_experiments':'Midiendo el experimento de referentes','observe':'Leyendo publicaciones de referentes','propose_comment':'Redactando un comentario',
               'read_own_comments':'Leyendo los comentarios de tus posts','propose_reply':'Redactando una respuesta en tu post',
               'execute_action':'Ejecutando una acción aprobada','reconcile_action':'Conciliando una acción',
@@ -159,7 +160,8 @@ DESCRIPTIONS={'prepare_profile_assets':'Preparando tus fotos y banner','prepare_
               'check_linkedin':'Probando que LinkedIn responde como siempre',
               'process_capture':'Leyendo lo que enviaste al equipo',
               'weekly_summary':'Escribiendo el resumen de la semana','read_inbox':'Leyendo el inbox de LinkedIn',
-              'community_study':'Estudiando la comunidad con evidencia pública','plan_week':'Planeando la semana de posts'}
+              'community_study':'Estudiando la comunidad con evidencia pública','plan_week':'Planeando la semana de posts',
+              'monthly_review':'Revisando el mes y proponiendo cambios'}
 STAGE_DESCRIPTIONS={'director':'Eligiendo la idea y el brief del día','redactor':'Redactando dos variantes en inglés',
                     'lectores':'Leyendo las variantes desde su perspectiva','seleccion':'Eligiendo y editando la versión final',
                     'verificador':'Verificando afirmaciones, voz y privacidad',

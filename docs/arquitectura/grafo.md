@@ -2,9 +2,9 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.8-etapa-compradores` · SHA-256 `02977ac7cb79433c43280050489b50712379c694219ac7f3d74b784302540f98`.
+Versión `6.9-revision-mensual` · SHA-256 `942f5fddb430583df7b0712bab32d32810266a4356c00b35e3d5893d9eabc998`.
 
-46 nodos (46 activos), 73 aristas y 16 ciclos.
+46 nodos (46 activos), 74 aristas y 17 ciclos.
 
 Pieza diaria, red, consulta de evidencia, referentes mensuales, experimentos de referentes, comunidad mensual y Perfil ejecutan sus llamadas mediante el registro y un ledger persistido. Las flechas de pasos y gates pertenecen al workflow determinista; no conceden permisos a los especialistas. Las respuestas vuelven al dueño del ciclo. Las variantes A/B de redacción comparten una llamada y los cinco lectores otra; sus contadores sobreviven a un reinicio.
 
@@ -127,6 +127,7 @@ flowchart TD
   capturas -->|"captura_perfil · handoff · ≤1"| perfil
   perfil -->|"perfil_orientacion_editorial · handoff · ≤2"| director_editorial
   relaciones_comunidad -->|"evidencia_red · call · ≤1"| evidencia_compartida
+  analista_barrio_resultados -->|"cambio_de_estrategia · handoff · ≤3"| gustavo
   analista_barrio_resultados -->|"evidencia_analista · call · ≤1"| evidencia_compartida
   investigador_lider -->|"evidencia_referentes · call · ≤1"| evidencia_compartida
   investigador_lider -->|"referentes_producto · call · ≤1"| investigador_producto
@@ -381,6 +382,24 @@ flowchart TD
   director_editorial -->|"plan_a_gustavo · handoff · ≤1"| gustavo
 ```
 
+## Revisión mensual
+
+Estado: `active`. Orquestador: `analista_barrio_resultados`.
+
+- `monthly_review`: Primer lunes del mes, una hora después de WEEKLY_SUMMARY_TIME, para el mes que terminó; o «Generar ahora».
+
+```mermaid
+flowchart TD
+  classDef planned stroke-dasharray: 5 5,fill:#f5f5f5,color:#555;
+  subgraph grupo_observatorio["observatorio"]
+    analista_barrio_resultados["Analista · resultados y comunidad · orchestrator"]
+  end
+  subgraph grupo_operacion["operacion"]
+    gustavo["Gustavo · veto · gate"]
+  end
+  analista_barrio_resultados -->|"cambio_de_estrategia · handoff · ≤3"| gustavo
+```
+
 ## Capturas
 
 Estado: `active`. Orquestador: `capturas`.
@@ -620,6 +639,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `comment` | `json_schema` | [team_backend.operador.COMMENT_SCHEMA](../../agentes-linkedin/infra/src/team_backend/operador.py) |
 | `classification` | `json_schema` | [team_backend.red.CLASSIFY_SCHEMA](../../agentes-linkedin/infra/src/team_backend/red.py) |
 | `weekly` | `json_schema` | [team_backend.resumen_semanal.SCHEMA](../../agentes-linkedin/infra/src/team_backend/resumen_semanal.py) |
+| `monthly_review` | `json_schema` | [team_backend.revision_mensual.SCHEMA](../../agentes-linkedin/infra/src/team_backend/revision_mensual.py) |
 | `image_choice` | `json_schema` | [team_backend.infografias.CHOICE_SCHEMA](../../agentes-linkedin/infra/src/team_backend/infografias.py) |
 | `image_design` | `json_schema` | [team_backend.infografias.DESIGN_SCHEMA](../../agentes-linkedin/infra/src/team_backend/infografias.py) |
 | `image_check` | `json_schema` | [team_backend.connectors_images.CHECK_SCHEMA](../../agentes-linkedin/infra/src/team_backend/connectors_images.py) |
@@ -652,6 +672,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `veto` | `python_payload` | [team_backend.operador.reject](../../agentes-linkedin/infra/src/team_backend/operador.py) |
 | `orientation_decision` | `python_payload` | [team_backend.resumen_semanal.apply](../../agentes-linkedin/infra/src/team_backend/resumen_semanal.py) |
 | `brief_input` | `json_schema` | [team_backend.orquestacion_schemas.BRIEF_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
+| `strategy_decision` | `python_payload` | [team_backend.revision_mensual.approve](../../agentes-linkedin/infra/src/team_backend/revision_mensual.py) |
 | `writer_input` | `json_schema` | [team_backend.orquestacion_schemas.WRITER_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `panel_input` | `json_schema` | [team_backend.orquestacion_schemas.PANEL_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
 | `selection_input` | `json_schema` | [team_backend.orquestacion_schemas.SELECTION_INPUT](../../agentes-linkedin/infra/src/team_backend/orquestacion_schemas.py) |
@@ -763,6 +784,7 @@ Los nombres siguientes enlazan las definiciones existentes. Las aristas con runt
 | `captura_perfil` | `capture` | `profile_proposal` |
 | `perfil_orientacion_editorial` | `profile_proposal` | `profile_proposal` |
 | `evidencia_red` | `evidence_request` | `evidence_result` |
+| `cambio_de_estrategia` | `monthly_review` | `strategy_decision` |
 | `evidencia_analista` | `evidence_request` | `evidence_result` |
 | `evidencia_referentes` | `evidence_request` | `evidence_result` |
 | `referentes_producto` | `research_request` | `research_result` |

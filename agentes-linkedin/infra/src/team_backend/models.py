@@ -1514,3 +1514,71 @@ class ActiveShelf(models.Model):
     catalog=models.ForeignKey(LibraryCatalog,on_delete=models.PROTECT,related_name='active_shelves')
     activated_at=models.DateTimeField(default=timezone.now)
     class Meta:ordering=['shelf']
+
+
+# ---------------------------------------------------------------------------
+# Monthly review (revision_mensual.py): once a month analista_barrio_resultados proposes at most three strategy changes
+# from the month's data. Gustavo approves, edits or rejects each one; only an approved change enters the orientation.
+
+class MonthlyReview(models.Model):
+    """One per month (month_start is its first day): the figures the analyst read and the validated report."""
+    class State(models.TextChoices):
+        NEW='nuevo','Nueva'
+        SEEN='visto','Vista'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    month_start=models.DateField(unique=True)
+    # The inputs, as the analyst read them: proof of where each figure of the report came from.
+    stats=models.JSONField(default=dict,blank=True)
+    # {titular, metodo, lo_que_paso, lo_que_funciono, lo_que_no, no_concluyente, cambios_previos, cambios, validacion, …}.
+    analysis=models.JSONField(default=dict,blank=True)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.NEW,db_index=True)
+    # Fewer than four weeks of the month had measured posts: a hint, not a conclusion.
+    partial=models.BooleanField(default=False)
+    usage=models.JSONField(default=dict,blank=True)
+    cost_usd=models.DecimalField(max_digits=12,decimal_places=6,null=True,blank=True)
+    origin_job=models.CharField(max_length=40,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:ordering=['-month_start']
+    def __str__(self):return f'{self.month_start} · {self.get_state_display()}'
+
+
+class StrategyChange(models.Model):
+    """One proposed change of a monthly review: a sentence for the orientation, the figure behind it and how it will be
+    measured. Approving appends it to the orientation under a marker line that «Revertir» finds again."""
+    class State(models.TextChoices):
+        PROPOSED='propuesto','Propuesto'
+        APPROVED='aprobado','Aprobado'
+        REJECTED='rechazado','Rechazado'
+        REVERTED='revertido','Revertido'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    review=models.ForeignKey(MonthlyReview,on_delete=models.CASCADE,related_name='changes')
+    position=models.PositiveSmallIntegerField(default=0)
+    title=models.CharField(max_length=120)
+    # The sentence that would enter the orientation, written as an instruction to the team.
+    proposal=models.TextField()
+    reason=models.TextField(blank=True)
+    # [{cifra, comparado_con, refs: [piece or action ids]}].
+    evidence=models.JSONField(default=list,blank=True)
+    # What should improve and how it will be measured next month.
+    expected=models.TextField(blank=True)
+    metric=models.CharField(max_length=40)
+    # {metrica, valor, mes, desde, hasta}: the metric when it was proposed.
+    baseline=models.JSONField(default=dict,blank=True)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.PROPOSED,db_index=True)
+    # What was applied: the proposal, or Gustavo's edit of it.
+    final_text=models.TextField(blank=True)
+    decided_by=models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.SET_NULL,null=True,blank=True,related_name='+')
+    decided_at=models.DateTimeField(null=True,blank=True)
+    decision_note=models.TextField(blank=True)
+    # The orientation right before the approval (the record of what it was; «Revertir» removes only the addition).
+    orientation_before=models.TextField(blank=True)
+    reverted_at=models.DateTimeField(null=True,blank=True)
+    # Written by the next review: {veredicto: se_conserva|sin_dato|empeoro, texto, cifra, metrica, antes, despues, …}.
+    outcome=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(auto_now=True)
+    class Meta:
+        ordering=['review','position']
+        constraints=[models.UniqueConstraint(fields=['review','position'],name='one_strategy_change_per_position')]
+    def __str__(self):return f'{self.title} · {self.get_state_display()}'
