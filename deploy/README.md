@@ -41,8 +41,8 @@ En el servidor, desde `deploy/`:
 ```
 
 El script de importación hace cuatro cosas:
-- restaura la base completa (biblioteca de 1.035 unidades, embeddings, memoria, ledger, trabajos y usuarios) en una base vacía;
-- copia el archivo de política que usan los agentes;
+- restaura la base completa (la biblioteca tal como esté en la laptop: 1.035 unidades de 01–06, o 1.656 de 01–12 si ya se aprobó y ejecutó su ingesta; embeddings, memoria, ledger, trabajos y usuarios) en una base vacía;
+- copia los archivos de política de uso: el que usan los agentes y el de las clases 08–12, que ningún agente lee todavía;
 - aplica las migraciones nuevas;
 - levanta todo.
 
