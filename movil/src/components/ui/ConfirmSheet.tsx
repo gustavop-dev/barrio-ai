@@ -15,6 +15,10 @@ export interface ConfirmSheetProps {
   note?: 'required' | 'optional';
   noteLabel?: string;
   notePlaceholder?: string;
+  /** The note's text when the sheet opens («Editar y aprobar» starts from the proposal). */
+  noteInitial?: string;
+  /** Characters the note may have: the field stops there and counts them. */
+  noteMax?: number;
   tone?: 'default' | 'danger';
   busy?: boolean;
   error?: unknown;
@@ -31,6 +35,8 @@ export function ConfirmSheet({
   note,
   noteLabel = 'Nota',
   notePlaceholder,
+  noteInitial = '',
+  noteMax,
   tone = 'default',
   busy,
   error,
@@ -38,7 +44,7 @@ export function ConfirmSheet({
   onClose,
   children,
 }: ConfirmSheetProps) {
-  const [text, setText] = useState('');
+  const [text, setText] = useState(noteInitial);
   const missing = note === 'required' && !text.trim();
   return (
     <Sheet label={title} onClose={busy ? () => {} : onClose} suspended={busy} testID="confirm-sheet">
@@ -55,6 +61,8 @@ export function ConfirmSheet({
           value={text}
           onChangeText={setText}
           multiline
+          maxLength={noteMax}
+          hint={noteMax ? `${text.length} de ${noteMax} caracteres` : undefined}
           editable={!busy}
           testID="confirm-note"
         />

@@ -81,6 +81,7 @@ export function activeCards(data: TuTurno, now: number = Date.now()): TurnoCard[
     ...(data.tasks?.mensajes ?? []),
     ...(data.tasks?.resumen ?? []),
     ...(data.tasks?.referentes ?? []),
+    ...(data.tasks?.estrategia ?? []),
   ];
   return all.sort((a, b) => compareCards(a, b, now));
 }

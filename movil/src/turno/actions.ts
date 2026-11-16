@@ -3,9 +3,11 @@
 import type { TurnoAction, TurnoCard, TurnoCardType, TurnoPriority } from '@compartido/api/types';
 import { APPROVED_MESSAGE, vetoConsequence } from '@compartido/logic/events';
 import { messageText } from '@compartido/logic/personas';
+import { CHANGE_APPROVED, CHANGE_REJECTED, EDIT_CHANGE_TEXT, isChangeEndpoint, REJECT_CHANGE_TEXT, STRATEGY_CHANGE_MAX } from '@compartido/logic/revisionMensual';
 import { extras, longDate } from '@compartido/logic/turno';
 import type { IconName } from '@/components/icons';
 
+/** The labels of the types this app knows; any other type (a newer backend) reads as «Aviso». */
 export const TYPE_LABEL: Record<TurnoCardType, string> = {
   referente: 'Referentes del mes',
   experimento: 'Experimento',
@@ -17,6 +19,7 @@ export const TYPE_LABEL: Record<TurnoCardType, string> = {
   fecha: 'Fecha pedida',
   resumen: 'Resumen semanal',
   aprobacion: 'Aprobación',
+  cambio_estrategia: 'Cambio de estrategia',
 };
 
 export const TYPE_ICON: Record<TurnoCardType, IconName> = {
@@ -30,13 +33,15 @@ export const TYPE_ICON: Record<TurnoCardType, IconName> = {
   fecha: 'calendario',
   resumen: 'resultados',
   aprobacion: 'check',
+  cambio_estrategia: 'resultados',
 };
 
-/** Colour of the type label: alerta for urgent notices, info for questions and conversations, hondo for profile tasks. */
+/** Colour of the type label: alerta for urgent notices, info for questions and conversations, hondo for profile tasks
+ * and for the decisions that change what the team does (approvals, strategy changes). */
 export function typeTone(card: TurnoCard, priority: TurnoPriority | null): 'suave' | 'alerta' | 'hondo' | 'info' {
   if (!priority) return 'suave';
   if (card.type === 'aviso') return priority === 'urgente' ? 'alerta' : 'suave';
-  if (card.type === 'perfil' || card.type === 'aprobacion') return 'hondo';
+  if (card.type === 'perfil' || card.type === 'aprobacion' || card.type === 'cambio_estrategia') return 'hondo';
   return 'info';
 }
 
@@ -54,6 +59,8 @@ const UNCERTAIN_TITLE: Record<string, string> = {
 export function cardTitle(card: TurnoCard): string {
   if (card.question?.question) return card.question.question;
   if (card.attempt && UNCERTAIN_TITLE[card.attempt.capability]) return UNCERTAIN_TITLE[card.attempt.capability]!;
+  // The type label already says «Cambio de estrategia»: the change's own title is enough.
+  if (card.strategy_change?.title) return card.strategy_change.title;
   return card.title;
 }
 
@@ -85,6 +92,7 @@ export function cardSummary(card: TurnoCard): string {
   if (card.day_request) return card.body ?? '';
   if (card.attempt?.text) return `“${card.attempt.text}”`;
   if (card.approval?.text) return `“${card.approval.text}”`;
+  if (card.strategy_change?.proposal) return `“${card.strategy_change.proposal}”`;
   if (card.question) return card.question.purpose || card.body || '';
   return noticeText(card);
 }
@@ -99,6 +107,7 @@ export const SUMMARY_FITS = 90;
 export function hasDetails(card: TurnoCard): boolean {
   if (card.profile_id) return cardSummary(card).length > SUMMARY_FITS;
   if (card.referent_change || card.referent_experiment || card.attempt || card.conversation || card.message || card.approval || card.day_request) return true;
+  if (card.strategy_change) return true;
   return cardSummary(card).length > SUMMARY_FITS;
 }
 
@@ -111,8 +120,14 @@ export const isMessageClose = (action: TurnoAction) => Boolean(action.endpoint?.
 export const isDayDecision = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/capturas/') && action.endpoint.endsWith('/fecha'));
 export const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
 export const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
+/** «Aprobar» / «Editar y aprobar» and «Rechazar» of a strategy change of the monthly review. */
+export const isChangeApprove = (action: TurnoAction) =>
+  isChangeEndpoint(action.endpoint, 'aprobar') || isChangeEndpoint(action.endpoint, 'editar');
+export const isChangeReject = (action: TurnoAction) => isChangeEndpoint(action.endpoint, 'rechazar');
 
 export function successMessage(action: TurnoAction): string {
+  if (isChangeApprove(action)) return CHANGE_APPROVED;
+  if (isChangeReject(action)) return CHANGE_REJECTED;
   if (isResolve(action)) return action.body?.outcome === 'failed' ? 'Anotado: no se aplicó' : 'Anotado: se aplicó';
   if (isConversationClose(action)) return action.body?.how === 'no_responder' ? 'Anotado: no responderás' : 'Anotado: respondiste';
   if (isMessageClose(action)) return action.body?.how === 'no' ? 'Anotado: no le escribirás' : 'Anotado: le escribiste';
@@ -131,11 +146,29 @@ export interface ModalSpec {
   note: 'required' | 'optional';
   noteLabel: string;
   placeholder?: string;
+  /** The field's text when it opens (an `editable` action starts from its value). */
+  initial?: string;
+  /** Characters the field allows, with a counter. */
+  max?: number;
+  /** The sheet's button, when it is not the action's label. */
+  confirmLabel?: string;
 }
 
-/** Which actions ask first: a required note (uncertain actions, «Vetar» and any `note_required`) or the optional reason to resume.
- * `card` gives «Vetar» its consequence (a network action discards the person for good). */
+/** Which actions ask first: an `editable` text, a required note (uncertain actions, «Vetar» and any `note_required`) or
+ * an optional one. `card` gives «Vetar» its consequence (a network action discards the person for good). */
 export function modalFor(action: TurnoAction, card?: TurnoCard): ModalSpec | null {
+  if (action.editable) {
+    const change = isChangeApprove(action);
+    return {
+      title: action.label,
+      text: change ? EDIT_CHANGE_TEXT : null,
+      note: 'required',
+      noteLabel: change ? 'Texto del cambio' : 'Texto',
+      initial: action.editable.value ?? '',
+      max: action.editable.max_length ?? (change ? STRATEGY_CHANGE_MAX : undefined),
+      confirmLabel: change ? 'Aprobar' : undefined,
+    };
+  }
   if (isReject(action)) {
     const approval = card?.approval;
     return {
@@ -159,12 +192,14 @@ export function modalFor(action: TurnoAction, card?: TurnoCard): ModalSpec | nul
   if (action.note_required) return { title: action.label, text: null, note: 'required', noteLabel: 'Nota' };
   if (action.note_optional) {
     return {
-      title: action.label,
+      title: isChangeReject(action) ? 'Rechazar el cambio' : action.label,
       text: isConversationClose(action)
         ? 'La tarjeta sale de la Bandeja hasta que te vuelva a escribir. Nadie le responde por ti.'
         : isMessageClose(action)
           ? 'La tarjeta sale de la Bandeja. Nadie le escribe por ti.'
-          : null,
+          : isChangeReject(action)
+            ? REJECT_CHANGE_TEXT
+            : null,
       note: 'optional',
       noteLabel: 'Motivo',
     };
@@ -175,8 +210,10 @@ export function modalFor(action: TurnoAction, card?: TurnoCard): ModalSpec | nul
   return null;
 }
 
-/** The body to POST: the machine takes its optional reason as `reason`, the rest as `note`. */
+/** The body to POST: an `editable` action sends the text as its `field` («Editar y aprobar»: `{text}`), the machine
+ * takes its optional reason as `reason`, the rest as `note`. */
 export function withNote(action: TurnoAction, note: string): { action: TurnoAction; note?: string } {
+  if (action.editable) return { action: { ...action, body: { ...action.body, [action.editable.field]: note } } };
   if (isMachineResume(action)) return { action: { ...action, body: { ...action.body, ...(note ? { reason: note } : {}) } } };
   return note ? { action, note } : { action };
 }
@@ -214,8 +251,9 @@ export function swipeIntents(card: TurnoCard, expired = false): SwipeIntents {
   if (card.question) {
     return { right: null, left: card.question.state === 'open' || !card.question.state ? { kind: 'postpone', questionId: card.question.id, label: 'Más tarde' } : null };
   }
-  // A second post that day is a decision he takes with a tap on its button, never with a swipe.
-  if (card.day_request) return { right: null, left: null };
+  // A second post that day is a decision he takes with a tap on its button, never with a swipe; so is a strategy
+  // change, which rewrites the orientation every agent reads.
+  if (card.day_request || card.strategy_change || card.type === 'cambio_estrategia') return { right: null, left: null };
   const runnable = orderedActions(card.actions ?? []).find((action) => action.endpoint && !action.href && !action.opportunity) ?? null;
   return { right: runnable ? { kind: 'run', action: runnable, label: runnable.label } : null, left: null };
 }

@@ -2,7 +2,7 @@
 
 El primer lunes de cada mes, el analista de resultados revisa el mes que terminó contra el anterior y, solo si los datos lo respaldan, propone a Gustavo como mucho tres cambios de estrategia. Cada cambio cita la cifra que lo sostiene y frente a qué se compara, dice qué debería mejorar y con qué métrica se medirá. Gustavo aprueba, edita o rechaza cada uno por separado; solo lo aprobado entra en la orientación del equipo y se puede revertir. El resumen semanal solo observa: este es el único sitio donde se propone cambiar la estrategia.
 
-- **Código:** `agentes-linkedin/infra/src/team_backend/revision_mensual.py` (`stats`, `validate`, `run`, `queue`, `generate`, `approve`, `reject`, `revert`, `mark_seen`, `cards`, `overview`, `history`), `revision_views.py`, `rediseno_views.TuTurno` (tarea `estrategia`), `autopiloto._monthly_review`, modelos `MonthlyReview` y `StrategyChange` (migración `0043_revision_mensual`). Interfaz: pendiente.
+- **Código:** `agentes-linkedin/infra/src/team_backend/revision_mensual.py` (`stats`, `validate`, `run`, `queue`, `generate`, `approve`, `reject`, `revert`, `mark_seen`, `cards`, `overview`, `history`), `revision_views.py`, `rediseno_views.TuTurno` (tarea `estrategia`), `autopiloto._monthly_review`, modelos `MonthlyReview` y `StrategyChange` (migración `0043_revision_mensual`). Interfaz en la app móvil: `movil/src/resultados/RevisionMensual.tsx` y `movil/src/turno/` (la PWA aún no la muestra).
 - **Documentación:** este documento; ciclo `revision_mensual` y arista `cambio_de_estrategia` en [`grafo.yaml`](../../agentes-linkedin/equipos/grafo.yaml).
 - **Entorno de prueba:** Claude parcheado, como en `tests/test_revision_mensual.py`.
 
@@ -14,10 +14,10 @@ El primer lunes de cada mes, el analista de resultados revisa el mes que termin�
 | [MEN-02](#men-02) | Cifras del mes y del anterior, solo de la base | backend | funciona |
 | [MEN-03](#men-03) | De cero a tres cambios, cada uno con su evidencia | backend | funciona |
 | [MEN-04](#men-04) | Validador: cifras, métricas, rechazados y compuertas | backend | funciona |
-| [MEN-05](#men-05) | Cada cambio en Tu turno: aprobar, editar o rechazar | backend · interfaz pendiente | parcial |
+| [MEN-05](#men-05) | Cada cambio en Tu turno: aprobar, editar o rechazar | backend · app móvil | implementado |
 | [MEN-06](#men-06) | La orientación cambia por el camino de siempre y se revierte | backend | funciona |
 | [MEN-07](#men-07) | Qué pasó con los cambios del mes anterior | backend | funciona |
-| [MEN-08](#men-08) | Informe en Resultados, «Generar ahora» y aviso | backend · interfaz pendiente | parcial |
+| [MEN-08](#men-08) | Informe en Resultados, «Generar ahora» y aviso | backend · app móvil | implementado |
 | [MEN-09](#men-09) | Presupuesto mensual propio | backend | funciona |
 
 ---

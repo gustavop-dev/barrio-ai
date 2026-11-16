@@ -48,9 +48,13 @@ def _decided(change,**extra):
     return Response(dict({'change':revision_mensual.change_payload(change),'orientation':_orientation_payload()},**extra))
 
 class StrategyChangeApprove(APIView):
-    """POST …/cambios/<id>/aprobar {text?}: «Aprobar» or «Editar y aprobar»."""
+    """POST …/cambios/<id>/aprobar {text?}: «Aprobar». POST …/cambios/<id>/editar {text}: «Editar y aprobar», which
+    refuses an empty text: a client that does not know the editable action must not approve the original by accident."""
+    require_text=False
     def post(self,request,cid):
         human_session(request);get_or_404(StrategyChange,id=cid);data=valid(ApproveInput,request)
+        if self.require_text and not (data.get('text') or '').strip():
+            return Response({'detail':'Escribe el texto del cambio para aprobarlo editado.'},status=400)
         return _decided(revision_mensual.approve(request.user,cid,data.get('text')))
 
 class StrategyChangeReject(APIView):

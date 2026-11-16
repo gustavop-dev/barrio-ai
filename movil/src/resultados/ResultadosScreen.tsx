@@ -1,10 +1,11 @@
-// Resultados, in two tabs (?pestana=, as Personas). «Panorama»: the weekly summary on top, then «¿vamos bien?» in
-// the order business → audience → content → team. Periodo and Modalidad live in the route params
-// (?dias=&modalidad=, as in the PWA); the chips jump to each section. A virtualized list: the sections and every
-// post card are its rows. Pull to refresh. «Analítica de LinkedIn» is AnaliticaLinkedin.tsx.
+// Resultados, in three tabs (?pestana=, as Personas). «Panorama»: the weekly summary on top, the monthly review's
+// teaser under it, then «¿vamos bien?» in the order business → audience → content → team. Periodo and Modalidad live
+// in the route params (?dias=&modalidad=, as in the PWA); the chips jump to each section. A virtualized list: the
+// sections and every post card are its rows. Pull to refresh. «Analítica de LinkedIn» is AnaliticaLinkedin.tsx,
+// «Revisión mensual» RevisionMensual.tsx.
 // Motion (MovResultados): Periodo is a segmented control whose selection slides (`seg`); the figures count
 // and the bars grow (CountUp.tsx).
-import { useResultados, useResumenSemanal } from '@compartido/api/hooks';
+import { useResultados, useResumenSemanal, useRevisionMensual } from '@compartido/api/hooks';
 import type { Resultados, ResultadosPost } from '@compartido/api/types';
 import {
   NOT_SPLIT_BY_MODALITY,
@@ -18,6 +19,7 @@ import {
   type PostSortKey,
   type ResultadosSectionId,
 } from '@compartido/logic/resultados';
+import { REVISION_TAB, revisionTabLabel } from '@compartido/logic/revisionMensual';
 import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
@@ -31,6 +33,7 @@ import { colors, radius, space } from '@/theme/tokens';
 import { AnaliticaLinkedin } from './AnaliticaLinkedin';
 import { PostCard, PostsHeader } from './PostCard';
 import { ResumenSemanal } from './ResumenSemanal';
+import { RevisionMensual, RevisionResumen } from './RevisionMensual';
 import { Contenido, Equipo, Gente, Negocio, SectionBoundary } from './sections';
 
 type Row = { key: ResultadosSectionId; kind: 'section' } | { key: string; kind: 'post'; post: ResultadosPost };
@@ -53,32 +56,44 @@ function readPosts(data: Resultados | undefined): ResultadosPost[] {
   return Array.isArray(posts) ? posts : [];
 }
 
-type Tab = 'panorama' | 'linkedin';
+type Tab = 'panorama' | typeof REVISION_TAB | 'linkedin';
 
-const TABS: readonly { value: Tab; label: string }[] = [
-  { value: 'panorama', label: 'Panorama' },
-  { value: 'linkedin', label: 'Analítica de LinkedIn' },
-];
+function readTab(pestana: string | undefined): Tab {
+  if (pestana === 'linkedin') return 'linkedin';
+  if (pestana === REVISION_TAB) return REVISION_TAB;
+  return 'panorama';
+}
 
 export function ResultadosScreen() {
   const [params, setParams] = useParamState(['pestana'] as const);
-  const tab: Tab = params.pestana === 'linkedin' ? 'linkedin' : 'panorama';
+  const tab = readTab(params.pestana);
+  // The monthly review's tab carries the changes that wait for his decision. It goes last: the other two keep their
+  // place on narrow screens (the bar scrolls sideways), and Panorama shows the review under the weekly summary.
+  const pending = useRevisionMensual().data?.pending;
+  const tabs: readonly { value: Tab; label: string }[] = [
+    { value: 'panorama', label: 'Panorama' },
+    { value: 'linkedin', label: 'Analítica de LinkedIn' },
+    { value: REVISION_TAB, label: revisionTabLabel(pending) },
+  ];
   const top = (
     <View style={styles.top}>
       <PageHeader title="Resultados" />
-      <TabBar<Tab> label="Resultados" tabs={TABS} value={tab} onChange={(next) => setParams({ pestana: next === 'panorama' ? '' : next })} testIDPrefix="res-pestana" />
+      <TabBar<Tab> label="Resultados" tabs={tabs} value={tab} onChange={(next) => setParams({ pestana: next === 'panorama' ? '' : next })} testIDPrefix="res-pestana" />
     </View>
   );
-  return tab === 'linkedin' ? <AnaliticaLinkedin top={top} /> : <Panorama top={top} />;
+  if (tab === 'linkedin') return <AnaliticaLinkedin top={top} />;
+  if (tab === REVISION_TAB) return <RevisionMensual top={top} />;
+  return <Panorama top={top} onOpenRevision={() => setParams({ pestana: REVISION_TAB })} />;
 }
 
-function Panorama({ top }: { top: ReactNode }) {
+function Panorama({ top, onOpenRevision }: { top: ReactNode; onOpenRevision: () => void }) {
   const [params, setParams] = useParamState(['dias', 'modalidad'] as const);
   const route = useLocalSearchParams<{ ancla?: string }>();
   const dias = readDias(params.dias);
   const modalidad = readModalidad(params.modalidad);
   const query = useResultados(dias, modalidad);
   const resumen = useResumenSemanal();
+  const revision = useRevisionMensual();
   const data = query.data;
   const { bottom } = useContentInsets();
   const { reduced } = useMotion();
@@ -106,7 +121,7 @@ function Panorama({ top }: { top: ReactNode }) {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([query.refetch(), resumen.refetch()]);
+      await Promise.all([query.refetch(), resumen.refetch(), revision.refetch()]);
     } finally {
       setRefreshing(false);
     }
@@ -155,6 +170,7 @@ function Panorama({ top }: { top: ReactNode }) {
     <View style={styles.header}>
       {top}
       <ResumenSemanal />
+      <RevisionResumen onOpen={onOpenRevision} />
       <View style={styles.controls}>
         <Segmented label="Periodo" showLabel testID="res-periodo" value={String(dias)} options={PERIOD_OPTIONS} onChange={(value) => setParams({ dias: value === '28' ? '' : value })} />
         <View style={styles.selects}>

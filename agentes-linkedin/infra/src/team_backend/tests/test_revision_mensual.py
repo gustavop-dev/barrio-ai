@@ -428,7 +428,7 @@ class DecisionTests(ReviewBase):
                           'Dedica más días a posts de tipo A.','nueva'))
         base=f'{self.URL}/cambios/{self.a.id}'
         self.assertEqual(card['actions'],[{'label':'Aprobar','endpoint':f'{base}/aprobar','primary':True},
-                                          {'label':'Editar y aprobar','endpoint':f'{base}/aprobar',
+                                          {'label':'Editar y aprobar','endpoint':f'{base}/editar',
                                            'editable':{'field':'text','value':'Dedica más días a posts de tipo A.'}},
                                           {'label':'Rechazar','endpoint':f'{base}/rechazar','note_optional':True},
                                           {'label':'Ver la revisión','href':'/resultados#revision-mensual'}])
@@ -445,6 +445,8 @@ class DecisionTests(ReviewBase):
     def test_approve_appends_to_the_orientation_and_revert_removes_exactly_that(self):
         orientacion.update(self.gustavo,'Orientación de antes.')
         self.assertEqual(self.api.post(f'{self.URL}/cambios/{self.a.id}/aprobar').status_code,403)  # a human session only
+        # «Editar y aprobar» has its own address and refuses an empty text: an older client cannot approve by accident.
+        self.assertEqual(self.human.post(f'{self.URL}/cambios/{self.a.id}/editar',{},format='json').status_code,400)
         response=self.human.post(f'{self.URL}/cambios/{self.a.id}/aprobar',{},format='json')
         self.assertEqual(response.status_code,200,response.content)
         self.a.refresh_from_db();added=revision_mensual.block(self.a)

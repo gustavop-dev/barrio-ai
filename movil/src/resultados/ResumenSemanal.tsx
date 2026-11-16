@@ -30,7 +30,8 @@ import { colors, radius, space } from '@/theme/tokens';
 // runtime («Tried to synchronously call a Remote Function»).
 const FOLD = timing('fold');
 
-function Items({ title, items, empty }: { title: string; items: WeeklySummaryItem[]; empty: string }) {
+/** A list of the analysis: each claim with the figure it rests on (also the monthly review's lists). */
+export function Items({ title, items, empty }: { title: string; items: WeeklySummaryItem[]; empty: string }) {
   return (
     <View style={styles.list}>
       <T variant="etiqueta" soft accessibilityRole="header">

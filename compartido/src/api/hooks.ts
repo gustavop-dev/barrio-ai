@@ -4,6 +4,7 @@ import {
   addHecho,
   answerPregunta,
   aplicarResumen,
+  aprobarCambio,
   asList,
   confirmContactFit,
   correctHecho,
@@ -15,6 +16,7 @@ import {
   deshacerResumen,
   discardContact,
   generarResumen,
+  generarRevision,
   getAccounts,
   getActividad,
   getActivity,
@@ -31,6 +33,7 @@ import {
   getRedSummary,
   getResultados,
   getResumenSemanal,
+  getRevisionMensual,
   getTuTurno,
   listContacts,
   listHechos,
@@ -38,13 +41,16 @@ import {
   listPreguntas,
   listReferents,
   markResumenVisto,
+  markRevisionVista,
   overridePiece,
   planPiece,
   postponePregunta,
   approveAction,
+  rechazarCambio,
   rejectAction,
   resolveAction,
   retireHecho,
+  revertirCambio,
   runTurnoAction,
   saveOrientacion,
   setAccountPaused,
@@ -246,8 +252,10 @@ export function useTurnoAction() {
   const client = useQueryClient();
   return useMutation({
     mutationFn: ({ action, note }: { action: TurnoAction; note?: string }) => runTurnoAction(action, note),
-    // redAll: closing a conversation card changes «Te toca» on the person card.
-    onSettled: () => invalidate(client, keys.tuTurno, keys.overview, keys.actionsAll, keys.calendarioAll, keys.actividadAll, keys.linkedin, keys.redAll, ['referents']),
+    // redAll: closing a conversation card changes «Te toca» on the person card. revisionMensual and orientacion: a
+    // strategy change decided here changes the review in Resultados and, approved, the orientation in Ajustes.
+    onSettled: () =>
+      invalidate(client, keys.tuTurno, keys.overview, keys.actionsAll, keys.calendarioAll, keys.actividadAll, keys.linkedin, keys.redAll, ['referents'], keys.revisionMensual, keys.orientacion),
   });
 }
 
@@ -476,4 +484,44 @@ export function useResumenDecision() {
 export function useGenerarResumen() {
   const client = useQueryClient();
   return useMutation({ mutationFn: (requestId?: string) => generarResumen(requestId), onSettled: () => invalidate(client, keys.resumenSemanal) });
+}
+
+// ================================================================ monthly review (Resultados › Revisión mensual)
+
+/** GET /api/v1/resultados/revision-mensual: the latest review with its changes, the previous months and «Generar ahora». */
+export function useRevisionMensual() {
+  return useQuery({ queryKey: keys.revisionMensual, queryFn: getRevisionMensual, refetchInterval: REFRESH.resultados });
+}
+
+/** nuevo → visto, once the review is opened. */
+export function useRevisionVista() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (reviewId: string) => markRevisionVista(reviewId), onSettled: () => invalidate(client, keys.revisionMensual) });
+}
+
+/** Gustavo's decision on one strategy change: «Aprobar» (with his edit as `text`), «Rechazar» (with his optional note)
+ * or «Revertir». */
+export type CambioDecision =
+  | { changeId: string; decision: 'aprobar'; text?: string }
+  | { changeId: string; decision: 'rechazar'; note?: string }
+  | { changeId: string; decision: 'revertir' };
+
+/** Deciding changes the review, the orientation (Ajustes) and the change's Tu turno card. */
+export function useCambioEstrategia() {
+  const client = useQueryClient();
+  return useMutation({
+    mutationFn: (input: CambioDecision) =>
+      input.decision === 'aprobar'
+        ? aprobarCambio(input.changeId, input.text)
+        : input.decision === 'rechazar'
+          ? rechazarCambio(input.changeId, input.note)
+          : revertirCambio(input.changeId),
+    onSettled: () => invalidate(client, keys.revisionMensual, keys.orientacion, keys.ajustes, keys.tuTurno),
+  });
+}
+
+/** Paid: queues the review of the month that ended (ask for confirmation first, with the estimated cost). */
+export function useGenerarRevision() {
+  const client = useQueryClient();
+  return useMutation({ mutationFn: (requestId?: string) => generarRevision(requestId), onSettled: () => invalidate(client, keys.revisionMensual) });
 }

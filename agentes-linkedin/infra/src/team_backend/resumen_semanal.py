@@ -555,6 +555,10 @@ def unknown_numbers(text,allowed):
         if not any(any(abs(round(v,decimals)-value)<1e-9 for v in allowed) for value,decimals in _readings(token)):bad.append(token)
     return bad
 
+def removed(count,what):
+    """«Se quitó 1 frase …» / «Se quitaron 3 frases …»."""
+    return f'Se quitó 1 frase {what}.' if count==1 else f'Se quitaron {count} frases {what}.'
+
 def validate(raw,data,week_start,grounding=None):
     """Keep only what the stats support. A list entry must quote at least one number and every number must be in the stats;
     otherwise it is dropped. A headline with an unknown number is replaced; the summary records what was dropped."""
@@ -590,10 +594,10 @@ def validate(raw,data,week_start,grounding=None):
     warnings=[w for w in (' '.join(str(x).split())[:MAX_ITEM_CHARS] for x in (raw.get('advertencias') or [])[:5]) if w and check('advertencias',w)]
     if not warnings:warnings=list(data.get('avisos_de_datos') or [])
     causal=sum(bool(d.get('atribucion_no_acreditada')) for d in dropped)
-    if causal:warnings.append(f'Se quitaron {causal} frases con atribución causal no acreditada.')
+    if causal:warnings.append(removed(causal,'con atribución causal no acreditada'))
     uncited=sum(bool(d.get('sin_cita_del_curso')) for d in dropped)
-    if uncited:warnings.append(f'Se quitaron {uncited} frases sin un criterio del curso que las sustente.')
-    if len(dropped)>causal+uncited:warnings.append(f'Se quitaron {len(dropped)-causal-uncited} frases del análisis con cifras que no están en los datos de la semana.')
+    if uncited:warnings.append(removed(uncited,'sin un criterio del curso que las sustente'))
+    if len(dropped)>causal+uncited:warnings.append(removed(len(dropped)-causal-uncited,'del análisis con cifras que no están en los datos de la semana'))
     clean['advertencias']=warnings
     clean['validacion']={'ok':not dropped,'descartado':dropped}
     if grounding:clean.update(grounding)

@@ -1,5 +1,6 @@
 // In-app paths (the PWA's: `data.url` of a push, a notification's `link`, a card's `href`) mapped to
 // Expo Router. Only relative app paths are accepted; API routes and other origins never open in-app.
+import { REVISION_ANCHOR, REVISION_TAB } from '@compartido/logic/revisionMensual';
 
 export interface AppRoute {
   pathname: string;
@@ -50,6 +51,11 @@ export function routeForUrl(url: unknown): AppRoute | null {
   if (pathname === '/referentes') {
     pathname = '/personas';
     params.pestana = 'referentes';
+  }
+  // The monthly review (its notification, «Ver la revisión» in Tu turno) is a tab of Resultados.
+  if (pathname === '/resultados' && params.ancla === REVISION_ANCHOR) {
+    delete params.ancla;
+    params.pestana = REVISION_TAB;
   }
   // The Galería left the app (12/11/2026): its profile photos live in Ajustes › Fotos de perfil.
   if (pathname === '/galeria') {

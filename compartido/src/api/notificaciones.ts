@@ -18,6 +18,8 @@ export type NotificationKind =
   | 'invite_expected'
   | 'machine_paused_env'
   | 'weekly_summary'
+  /** Links to /resultados#revision-mensual. */
+  | 'monthly_review'
   | (string & {});
 
 export interface NotificationItem {

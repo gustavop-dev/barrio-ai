@@ -480,9 +480,9 @@ def validate(raw,data,month_start,grounding=None):
     clean['cambios']=changes
     warnings=[]
     uncited=sum(bool(d.get('sin_cita_del_curso')) for d in dropped)
-    if uncited:warnings.append(f'Se quitaron {uncited} frases sin un criterio del curso que las sustente.')
+    if uncited:warnings.append(resumen_semanal.removed(uncited,'sin un criterio del curso que las sustente'))
     sentences=sum(1 for d in dropped if d['campo']!='cambios' and not d.get('sin_cita_del_curso'))
-    if sentences:warnings.append(f'Se quitaron {sentences} frases con cifras que no están en los datos del mes.')
+    if sentences:warnings.append(resumen_semanal.removed(sentences,'con cifras que no están en los datos del mes'))
     discarded=sum(1 for d in dropped if d['campo']=='cambios')
     if discarded:warnings.append(f'Se descartaron {discarded} cambios propuestos (ver validación).')
     clean['advertencias']=warnings
@@ -659,7 +659,7 @@ def change_payload(change):
             'decided_by':change.decided_by.get_username() if change.decided_by else None,'decided_at':change.decided_at,
             'decision_note':change.decision_note,'reverted_at':change.reverted_at,'outcome':change.outcome or None,
             'can_decide':change.state==StrategyChange.State.PROPOSED,'can_revert':change.state==StrategyChange.State.APPROVED,
-            'endpoints':{'approve':f'{base}/aprobar','reject':f'{base}/rechazar','revert':f'{base}/revertir'}}
+            'endpoints':{'approve':f'{base}/aprobar','edit':f'{base}/editar','reject':f'{base}/rechazar','revert':f'{base}/revertir'}}
 
 def payload(review,with_stats=False):
     analysis,data=review.analysis or {},review.stats or {}
@@ -687,7 +687,7 @@ def cards(card):
     for change in review.changes.filter(state=StrategyChange.State.PROPOSED).select_related('decided_by').order_by('position'):
         item=change_payload(change);endpoints=item['endpoints']
         actions=[{'label':'Aprobar','endpoint':endpoints['approve'],'primary':True},
-                 {'label':'Editar y aprobar','endpoint':endpoints['approve'],'editable':{'field':'text','value':change.proposal}},
+                 {'label':'Editar y aprobar','endpoint':endpoints['edit'],'editable':{'field':'text','value':change.proposal}},
                  {'label':'Rechazar','endpoint':endpoints['reject'],'note_optional':True},
                  {'label':'Ver la revisión','href':LINK}]
         out.append(card(f'strategy_change:{change.id}','cambio_estrategia',f'Cambio de estrategia: {change.title}',change.proposal,actions,

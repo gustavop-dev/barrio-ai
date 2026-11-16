@@ -533,7 +533,7 @@ class RunTests(SummaryBase):
         result=WeeklySummary.objects.get().analysis
         self.assertEqual(result['lo_que_funciono'],[])
         self.assertIn({'campo':'lo_que_funciono','texto':unknown['texto'],'sin_cita_del_curso':True},result['validacion']['descartado'])
-        self.assertIn('Se quitaron 1 frases sin un criterio del curso que las sustente.',result['advertencias'])
+        self.assertIn('Se quitó 1 frase sin un criterio del curso que las sustente.',result['advertencias'])
         self.assertEqual([i['texto'] for i in result['lo_que_no']],['Solo 1 de 2 invitaciones resueltas acabó en conexión.'])  # the rest stays
 
     def test_a_stored_week_is_never_paid_again(self):

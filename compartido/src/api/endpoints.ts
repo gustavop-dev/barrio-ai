@@ -22,6 +22,9 @@ import type {
   LinkedInStatus,
   MemoryFact,
   MemoryItem,
+  MonthlyReview,
+  MonthlyReviewGenerateResponse,
+  MonthlyReviews,
   NewMemoryFact,
   Opportunity,
   OpportunityFilters,
@@ -41,6 +44,7 @@ import type {
   ResultadosModalidad,
   SearchResponse,
   Session,
+  StrategyChangeDecision,
   TokenLogin,
   TuTurno,
   TurnoAction,
@@ -299,3 +303,21 @@ export const deshacerResumen = (summaryId: string) => api.post<WeeklySummaryDeci
 /** Paid: one Claude call for the last week. `request_id` makes a retry the same job. */
 export const generarResumen = (requestId?: string) =>
   api.post<WeeklySummaryGenerateResponse>(`${RESUMEN}/generar`, requestId ? { request_id: requestId } : {});
+
+// ---------------------------------------------------------------- monthly review (analista_barrio_resultados)
+const REVISION = '/api/v1/resultados/revision-mensual';
+/** The latest review with its changes, the previous months and «Generar ahora». */
+export const getRevisionMensual = () => api.get<MonthlyReviews>(REVISION);
+/** nuevo → visto, once the review is opened. */
+export const markRevisionVista = (reviewId: string) => api.post<{ review: MonthlyReview }>(`${REVISION}/${id(reviewId)}/visto`, {});
+/** Paid: one Claude call for the month that ended (202; the same `request_id` answers 200 with the same job; 409 otherwise). */
+export const generarRevision = (requestId?: string) =>
+  api.post<MonthlyReviewGenerateResponse>(`${REVISION}/generar`, requestId ? { request_id: requestId } : {});
+/** «Aprobar» (without `text`) or «Editar y aprobar» (his text, 600 characters at most): appended to the orientation. */
+export const aprobarCambio = (changeId: string, text?: string) =>
+  api.post<StrategyChangeDecision>(`${REVISION}/cambios/${id(changeId)}/aprobar`, text ? { text } : {});
+/** «Rechazar», with his optional note: the next three reviews read it and do not propose it again the same way. */
+export const rechazarCambio = (changeId: string, note = '') =>
+  api.post<StrategyChangeDecision>(`${REVISION}/cambios/${id(changeId)}/rechazar`, note ? { note } : {});
+/** «Revertir» an approved change: removes exactly what «Aprobar» added to the orientation. */
+export const revertirCambio = (changeId: string) => api.post<StrategyChangeDecision>(`${REVISION}/cambios/${id(changeId)}/revertir`, {});
