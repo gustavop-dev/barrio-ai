@@ -2,16 +2,20 @@
 import hashlib
 import json
 import os
+import uuid
+from datetime import timedelta
 from unittest.mock import patch
 import httpx
 from django.contrib.auth.models import Permission, User
 from django.db import connection
 from django.test import TransactionTestCase
+from django.utils import timezone
 from rest_framework.test import APIClient
 from knowledge import db
-from team_backend import jobs, operador
+from team_backend import jobs, operador, orquestacion
 from team_backend.connectors import ConnectorError, ConnectorUncertain, FakeConnector, UnipileConnector, public_identifier
-from team_backend.models import ActionExecution, ActionProposal, ApiCredential, AuditEvent, ConnectorAccount, Job, ObservedPost, Worker
+from team_backend.models import (ActionExecution, ActionOutcome, ActionProposal, ApiCredential, AuditEvent, ConnectorAccount, CycleLedger, Job,
+                                 ObservedPost, Worker)
 
 ALL=['access_knowledge','run_agents','use_paid_providers','operate_linkedin','approve_actions','execute_actions','manage_jobs']
 
@@ -223,6 +227,41 @@ class OperatorTests(OperatorBase):
         job,_=jobs.enqueue_operation(self.gustavo,'propose_comment',{'post':str(other.id)});jobs.process_one(self.worker)
         job.refresh_from_db()
         self.assertEqual(job.state,'failed');self.assertIn('Proveedores desactivados',job.error)
+
+    def earlier_comment(self,author):
+        """An own comment (INT-03) written four days ago on another post by `author`, measured at 72 h."""
+        now=timezone.now()
+        post=ObservedPost.objects.create(account=self.account,provider_post_id='urn:li:activity:earlier',author_provider_id=author,
+                                         author_name='Ana Referente',text='An earlier post about evals.')
+        proposal=ActionProposal.objects.create(account=self.account,post=post,capability='INT-03',payload={'text':'Which eval runs first?'},
+                                               payload_hash='0'*64,state='confirmed')
+        execution=ActionExecution.objects.create(proposal=proposal,provider='fake',executed_by=self.gustavo,state='confirmed',wrote=True,
+                                                 idempotency_key=uuid.uuid4().hex,started_at=now-timedelta(days=4))
+        ActionOutcome.objects.create(execution=execution,kind='72h',source='read',captured_at=now-timedelta(days=1),
+                                     replies=2,reactions=3,author_replied=True)
+        return execution
+
+    def test_the_drafter_reads_how_earlier_comments_landed(self):
+        """comment_outcomes reaches the model and the cycle ledger; with nothing measured the message stays as it was."""
+        first,second=self.observed()
+        answer={'decision':'comment','language':'en','comment':'Evals are where most of the work hides. Which failure mode do you test first?',
+                'rationale':'Adds a concrete angle.','citations':['LI-03-M006-K02'],'claims_needing_evidence':[],'risks':[]}
+        def draft(post):
+            with patch('knowledge.providers.claude',return_value={'text':json.dumps(answer),'model':'claude-opus-5-5'}) as claude:
+                job,_=jobs.enqueue_operation(self.gustavo,'propose_comment',{'post':str(post.id)});jobs.process_one(self.worker)
+            job.refresh_from_db();self.assertEqual((job.state,job.result_status),('complete','proposed'))
+            snapshots=CycleLedger.objects.get(cycle='red',key=str(job.id)).progress_ledger['snapshots']
+            return json.loads(claude.call_args_list[0].args[1]),orquestacion.unpack(snapshots['comment_outcomes'])
+        sent,frozen=draft(first)
+        self.assertEqual(list(sent),['post','existing_comments','public_facts','private_guidance','orientation','referent_evidence',
+                                     'comment_language','recent_own_comments'])
+        self.assertIsNone(frozen)  # the ledger still proves the drafter received nothing
+        execution=self.earlier_comment(first.author_provider_id)
+        sent,frozen=draft(second)
+        expected={'con_este_autor':[{'commented_at':execution.started_at.isoformat(),'replies':2,'reactions':3,'author_replied':True,'kind':'72h'}],
+                  'ultimos_30_dias':{'measured':1,'with_reply':1,'author_replied':1}}
+        self.assertEqual((sent['comment_outcomes'],frozen),(expected,expected))
+        self.assertEqual(self.fake.state['writes'],0)
 
     def test_fake_connector_requires_explicit_flag(self):
         with patch.dict(os.environ,{'OPERATOR_ALLOW_FAKE':'false'}):

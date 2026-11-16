@@ -919,6 +919,14 @@ def recent_own_comments(account,before=None,exclude_post=None,limit=8):
     return [{'author':author,'text':(text or '')[:500]} for author,text in
             rows.order_by('-created_at').values_list('post__author_name','payload__text')[:limit]]
 
+def comment_outcomes(post):
+    """How Gustavo's earlier comments landed (desenlaces): on this author's posts and over the last 30 days. None when
+    nothing was measured, so the draft's message does not grow for nothing. Context for the angle, never a rule."""
+    from . import desenlaces
+    history,rates=desenlaces.comment_history(post.author_provider_id,limit=5),desenlaces.comment_rates(30)
+    if not history and not rates['measured']:return None
+    return {'con_este_autor':history,'ultimos_30_dias':rates}
+
 COMMENT_SCHEMA={'type':'object','additionalProperties':False,
     'required':['decision','language','comment','rationale','citations','claims_needing_evidence','risks'],
     'properties':{'decision':{'type':'string','enum':['comment','skip']},'language':{'type':'string'},
@@ -945,6 +953,10 @@ Criterio (catálogo INT-03, fundamentos B04/B06/B15 del curso en el contexto):
 - No repitas lo que ya dicen otros comentarios.
 - recent_own_comments son los últimos comentarios de Gustavo. No repitas una anécdota, un ejemplo o una experiencia
   propia que ya aparezca ahí, menos aún con el mismo autor; si la única experiencia que encaja ya la usaste, comenta sin ella.
+- comment_outcomes, si viene, dice cómo cayeron comentarios anteriores de Gustavo: con_este_autor (respuestas, reacciones
+  y si el autor contestó) y ultimos_30_dias (cuántos se midieron, cuántos tuvieron respuestas y en cuántos contestó el
+  autor). Es contexto para decidir el ángulo (con este autor, qué tipo de comentario obtuvo respuesta), no una regla ni
+  algo que mencionar; con pocos comentarios medidos no prueba nada.
 - Si no hay un aporte genuino, responde decision="skip" y explica por qué. Saltar es correcto.
 - Si el mensaje trae "revision", es tu borrador anterior y las reglas fijas que incumplió (rule_violations) o las razones
   por las que el líder lo descartó (lead_reasons): reescríbelo para que las cumpla todas sin perder el aporte, o responde
@@ -1065,6 +1077,9 @@ def propose_comment(user,post_id,origin_job='',redraft_of=None):
                                 if runtime else experimentos.signals(post))
     inputs['comment_language']=COMMENT_LANGUAGE
     inputs['recent_own_comments']=recent_own_comments(post.account,exclude_post=post)
+    # Frozen in the cycle ledger like the referent signals: it proves what the drafter received (None: nothing measured).
+    outcomes=runtime.snapshot('comment_outcomes',lambda:comment_outcomes(post)) if runtime else comment_outcomes(post)
+    if outcomes:inputs['comment_outcomes']=outcomes
     from . import oficina_eventos
     oficina_eventos.emit('consulta_biblioteca','relaciones_comunidad','biblioteca','Fundamentos del curso para un comentario')
     if previous is not None:
