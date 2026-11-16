@@ -739,6 +739,34 @@ class ActionExecution(models.Model):
     wrote=models.BooleanField(default=True)
     class Meta:ordering=['-started_at']
 
+class ActionOutcome(models.Model):
+    """What came after an executed action (desenlaces.py): an own comment on someone else's post (INT-03) at 72 h,
+    read on LinkedIn, and a follow, invitation or acceptance (RED-01/02/04) at 7 d, derived from own data. Each age
+    is captured once; null means not read or hidden by LinkedIn, never zero."""
+    class Kind(models.TextChoices):
+        H72='72h','72 horas'
+        D7='7d','7 días'
+    class Source(models.TextChoices):
+        READ='read','Leído en LinkedIn'
+        DERIVED='derived','Derivado de datos propios'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    execution=models.ForeignKey(ActionExecution,on_delete=models.CASCADE,related_name='outcomes')
+    kind=models.CharField(max_length=4,choices=Kind.choices)
+    captured_at=models.DateTimeField(default=timezone.now)
+    source=models.CharField(max_length=10,choices=Source.choices)
+    provider_comment_id=models.CharField(max_length=255,blank=True)
+    reactions=models.PositiveIntegerField(null=True,blank=True)
+    replies=models.PositiveIntegerField(null=True,blank=True)
+    author_replied=models.BooleanField(null=True,blank=True)
+    # Public ids of the people who replied to the comment; never of those who only reacted.
+    repliers=models.JSONField(default=list,blank=True)
+    # Network signals derived from own data: {accepted, commented_own_post, replied_to_comment, invited_us}.
+    signals=models.JSONField(default=dict,blank=True)
+    class Meta:
+        ordering=['captured_at']
+        constraints=[models.UniqueConstraint(fields=['execution','kind'],name='one_outcome_per_age')]
+    def __str__(self):return f'{self.execution_id} · {self.kind}'
+
 
 class OperatorControl(models.Model):
     """Singleton total stop of the autonomous machine, switched by a human from the office."""
