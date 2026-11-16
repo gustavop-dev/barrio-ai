@@ -7,6 +7,7 @@ from unittest.mock import patch
 from django.utils import timezone
 from knowledge import db
 from team_backend import autopiloto, jobs, operador, respuestas
+from team_backend.connectors import FakeConnector
 from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, EditorialPiece, Job, PostComment, TeamQuestion
 from team_backend.tests.test_red import NetworkBase
 
@@ -112,6 +113,27 @@ class ReadingTests(RepliesBase):
         execution=self.execute_proposal(reaction)
         self.assertEqual(execution.state,'confirmed')
         self.assertEqual(self.fake.state['comment_reactions'],{congrats.provider_comment_id:'linkedin_like'})
+
+    def test_a_sent_publication_that_wrote_is_read_too(self):
+        piece,_=self.publish()
+        execution=ActionExecution.objects.get(proposal__piece=piece)
+        execution.state='sent';execution.save(update_fields=['state'])  # a 201 not read back yet: published
+        self.assertEqual([p for _,p in respuestas.publications()],[piece])
+        execution.wrote=False;execution.save(update_fields=['wrote'])  # nothing was written
+        self.assertEqual(respuestas.publications(),[])
+
+    def test_a_thread_read_that_brings_nothing_is_read_again(self):
+        _,pid=self.publish()
+        maria,juan=self.person(),self.person('juan-dev','Juan Dev','Engineer')
+        root=self.fake.comment_on_own_post(pid,maria['id'],QUESTION)
+        for text in (FOLLOW_UP,'We version them apart, next to the fixtures.'):
+            self.fake.comment_on_own_post(pid,juan['id'],text,thread=root)
+        with patch.object(FakeConnector,'list_comment_thread',return_value=[]):self.read()  # the counter says 2, the read brings 0
+        row=PostComment.objects.get(provider_comment_id=root)
+        self.assertEqual(row.reply_count,0)
+        self.rescan()
+        row.refresh_from_db()
+        self.assertEqual((row.reply_count,PostComment.objects.filter(thread_id=root).count()),(2,2))
 
     def test_the_team_steps_back_when_gustavo_answers_himself(self):
         _,pid=self.publish()

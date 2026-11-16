@@ -48,6 +48,9 @@ def reaction_type(reaction):
 
 
 class Cliente:
+    # The one window profile_views answers (LinkedIn's summary card): callers ask for this one (team_backend/metricas).
+    profile_views_days = rutas.VIEWS_DAYS
+
     def __init__(self, transport):
         self.t = transport
         self.me = {}  # public_id, fsd and member of the account, from /me
@@ -178,9 +181,9 @@ class Cliente:
         return analitica.read(stream, first, last, order)
 
     def profile_views(self, days=14):
-        """LinkedIn's summary of profile views counts its own window (VIEWS_DAYS); any other window is not available
-        and stays absent without calling."""
-        if int(days) != rutas.VIEWS_DAYS:
+        """LinkedIn's summary of profile views counts its own window (profile_views_days); any other window is not
+        available and stays absent without calling."""
+        if int(days) != self.profile_views_days:
             return None
         return self._read(lectura.profile_views, self._get('/identity/wvmpCards', operation='profile_views'))
 
