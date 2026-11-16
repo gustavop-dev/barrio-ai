@@ -17,8 +17,8 @@ from datetime import datetime, time, timedelta
 from decimal import Decimal
 from django.utils import timezone
 from knowledge import db
-from . import editorial, metricas, operador, red
-from .models import ActionExecution, AudienceSnapshot, AuditEvent, Contact, EditorialPiece, Job, PostMetric
+from . import desenlaces, editorial, metricas, operador, red
+from .models import ActionExecution, ActionOutcome, AudienceSnapshot, AuditEvent, Contact, EditorialPiece, Job, PostMetric
 
 DAYS=(7,28,90)
 MODALITIES=('todo','personal_startups','projectapp')
@@ -29,6 +29,7 @@ OPPORTUNITIES_PENDING='Mediremos oportunidades cuando registres la primera o con
 ENGAGEMENT='(reacciones + comentarios + republicaciones) / impresiones × 100'
 FUNNEL=['candidate','fit','followed','invited','connected']
 CUT_LABEL={'7d':'a los 7 días','24h':'a las 24 h'}
+OUTCOME_DAYS=30  # desenlaces.py: a fixed trailing window, not the period (an outcome is captured 72 h or 7 d after acting)
 Window=namedtuple('Window','first last start end')
 
 # --------------------------------------------------------------------------- periods and the KPI object
@@ -353,7 +354,16 @@ def contenido(current,previous,now,coverage):
             'by_type':{'cut':cut,'formula':ENGAGEMENT,'items':[{'type':k,'value':_num(statistics.mean(types[k]['values']),2) if types[k]['values'] else None,
                                                                  'median_impressions':_median(types[k]['impressions']),'posts':types[k]['posts']}
                                                                 for k in ('G','A','S','P') if k in types]},
-            'posts':table}
+            'posts':table,'analytics_coverage':analytics_coverage(now)}
+
+def analytics_coverage(now):
+    """Own publications whose LinkedIn analytics were imported (analitica.coverage), over every one up to now."""
+    from . import analitica  # analitica imports this module
+    cov=analitica.coverage(now)
+    return kpi(cov['linked'] if cov['published'] else None,None,
+               'Publicaciones propias con su analítica de LinkedIn importada (cifras de toda su vida), de todas las publicadas hasta hoy; '
+               'no depende del periodo.',reason='Aún no hay publicaciones propias.',comparable=False,
+               denominator=cov['published'],unlinked_piece_ids=cov['unlinked_piece_ids'])
 
 # --------------------------------------------------------------------------- 4. equipo
 
@@ -400,6 +410,23 @@ def spend(now):
                          '(general, editorial, red) muestran su gasto de Anthropic sin tope propio; <PROVEEDOR>_LIMIT_USD es un techo '
                          'mensual opcional de un proveedor.'}
 
+def comments_replied(now):
+    """Own comments (INT-03) with at least one reply, of those whose outcome was read in the last OUTCOME_DAYS."""
+    rates=desenlaces.comment_rates(OUTCOME_DAYS,now)
+    return kpi(rates['with_reply'] if rates['measured'] else None,None,
+               f'Comentarios publicados en posts ajenos que recibieron al menos una respuesta, de los medidos (a las 72 h o los 7 días) '
+               f'en los últimos {OUTCOME_DAYS} días; no depende del periodo.',reason='Aún no leemos las respuestas a tus comentarios.',
+               comparable=False,denominator=rates['measured'],author_replied=rates['author_replied'] if rates['measured'] else None)
+
+def followed_engaged(now):
+    """People followed (RED-01) who engaged afterwards (desenlaces.network_engaged), of those measured in the last OUTCOME_DAYS."""
+    measured=len(set(ActionOutcome.objects.filter(execution__proposal__capability='RED-01',execution__proposal__contact__isnull=False,
+                     captured_at__gt=now-timedelta(days=OUTCOME_DAYS),captured_at__lte=now).values_list('execution__proposal__contact_id',flat=True)))
+    return kpi(len(desenlaces.network_engaged(days=OUTCOME_DAYS,now=now)) if measured else None,None,
+               'Personas que seguiste y que después aceptaron, comentaron tu post, respondieron tu comentario o te invitaron, de las '
+               f'medidas a los 7 días en los últimos {OUTCOME_DAYS} días; no depende del periodo.',
+               reason='Aún no medimos qué hicieron las personas que seguiste.',comparable=False,denominator=measured)
+
 def equipo(current,previous,now,coverage):
     def confirmed(capability):
         return lambda w:ActionExecution.objects.filter(proposal__capability=capability,state='confirmed',**_between('started_at',w)).count()
@@ -413,10 +440,11 @@ def equipo(current,previous,now,coverage):
     def team(measure,definition,ran=coverage.machine):
         return counted(measure,ran,coverage.machine_since,current,previous,definition,'La máquina no funcionó en este periodo.')
     return {'comments_published':team(confirmed('INT-03'),'Comentarios publicados y confirmados en posts ajenos (INT-03).'),
-            'comments_replied':kpi(None,None,'Comentarios publicados que recibieron respuesta.',reason='Aún no leemos las respuestas a tus comentarios.'),
+            'comments_replied':comments_replied(now),
             'follows':team(confirmed('RED-01'),'Personas seguidas y confirmadas (RED-01).'),
             'invites':team(confirmed('RED-02'),'Invitaciones sin nota enviadas y confirmadas (RED-02).'),
             'accepts':team(confirmed('RED-04'),'Invitaciones recibidas aceptadas y confirmadas (RED-04).'),
+            'followed_engaged':followed_engaged(now),
             'pieces_published':team(pieces('published'),'Piezas propias publicadas, por día de la pieza.',ran_or_pieces),
             'pieces_blocked':team(pieces('blocked'),'Piezas que el verificador bloqueó, por día de la pieza.',ran_or_pieces),
             'pieces_vetoed':team(pieces('vetoed'),'Piezas que vetaste antes de su hora, por día de la pieza.',ran_or_pieces),
