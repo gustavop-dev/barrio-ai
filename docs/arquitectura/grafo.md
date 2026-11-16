@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.8-etapa-compradores` · SHA-256 `9ead346f28f51bfe4bff53ab9a6fca930a1c6eb05913d55d6bb108914431a2c3`.
+Versión `6.8-etapa-compradores` · SHA-256 `02977ac7cb79433c43280050489b50712379c694219ac7f3d74b784302540f98`.
 
 46 nodos (46 activos), 73 aristas y 16 ciclos.
 
@@ -325,6 +325,7 @@ flowchart TD
 Estado: `active`. Orquestador: `metricas`.
 
 - `collect_metrics`: METRICS_EVERY_MINUTES=180 si hay cortes pendientes; audiencia diaria.
+- `collect_outcomes`: OUTCOMES_EVERY_MINUTES=180 si hay comentarios propios (INT-03) con 72 h o acciones de red (RED-01/02/04) con 7 d sin desenlace; OUTCOMES_ENABLED=false lo apaga.
 - `import_analytics`: Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días y después los rangos exactos de ANALYTICS_DAILY_RANGES=7,14,28,90,365 (una vez al día, para en el primer fallo); solo cuentas «directo» con el servicio navegador configurado.
 - `check_linkedin`: Prueba diaria: una vez por día UTC desde LINKEDIN_CANARY_AFTER=12:00, las 14 lecturas del conector (16 llamadas, dentro de los topes del servicio navegador); si no pudo correr, otra vez a la hora, hasta 3 al día; solo cuentas «directo» con el servicio navegador configurado.
 
