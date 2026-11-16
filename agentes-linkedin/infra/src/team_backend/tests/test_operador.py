@@ -50,12 +50,14 @@ class OperatorBase(TransactionTestCase):
             c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
                 VALUES('LI-03-M006-K02',3,'Comentarios que aportan','{"title":"Opinión, fundamento y apertura"}','abc','fixture','/units/0','{}')''')
         # Synthetic corpus only; never import private course text into fixtures.
-        role_units=set(operador.COMMENT_UNITS+operador.REFERENTS_UNITS+operador.ANALYSIS_UNITS+operador.NETWORK_UNITS+operador.INBOX_UNITS+operador.LEAD_UNITS)
+        role_units=set(operador.COMMENT_UNITS+operador.REFERENTS_UNITS+operador.ANALYSIS_UNITS+operador.NETWORK_UNITS+operador.INBOX_UNITS+operador.LEAD_UNITS
+                       +operador.FIRST_MESSAGE_UNITS)
         with db.connect() as c:
             for uid in role_units:
                 c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
                     VALUES(%s,%s,%s,'{"title":"Synthetic course fixture","limits_errors":"Do not infer facts or authority"}',
                     'fixture-hash','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''',(uid,int(uid[3:5]),uid))
+        self.addCleanup(self.drop_outbound_units)
         self.gustavo=User.objects.create_user('gustavo-test',password='local-only-password')
         self.grant(self.gustavo,*ALL)
         self.service=User.objects.create_user('service-test')
@@ -68,6 +70,11 @@ class OperatorBase(TransactionTestCase):
         self.fake.seed_user('referente-ai','Ana Referente',posts=['Shipping AI agents to production is mostly evals.','Second post'])
         self.account=operador.register_account(self.gustavo,'fake','acc_fake1','Cuenta simulada')
         self.worker=Worker.objects.create()
+
+    def drop_outbound_units(self):
+        # The class 07–12 rows seeded for activated methodologies (FIRST_MESSAGE_UNITS) never outlive the test: a
+        # migration test that goes back past 0045 restores CHECK(session BETWEEN 1 AND 6) and fails on them.
+        with db.connect() as c:c.execute('DELETE FROM units WHERE session>6')
 
     def grant(self,user,*codes):
         user.user_permissions.add(*Permission.objects.filter(content_type__app_label='team_backend',codename__in=codes))

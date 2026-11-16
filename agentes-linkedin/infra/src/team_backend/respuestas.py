@@ -43,6 +43,7 @@ THREAD_PAGE=50  # replies one thread read asks for
 MAX_DRAFTS=3  # paid drafts per comment: the first, one after Gustavo's answer, one retry after a provider failure
 REACTION='linkedin_like'
 REPLY_UNITS=operador.REPLY_UNITS  # B06/B14/B15, loaded whole for every draft unless the catalog's «responder» core is active
+FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # class 09, added whole only when a second reply closes (dm_opener)
 AGENT='relaciones_comunidad'
 OPEN=['proposed','approved','executing','sent','uncertain']
 WROTE=['confirmed','sent','uncertain']
@@ -562,13 +563,21 @@ def propose(user,comment_id,origin_job=''):
     oficina_eventos.emit('consulta_biblioteca',AGENT,'biblioteca','Fundamentos del curso para una respuesta')
     inputs=context(row,now)
     closing=inputs['closing_allowed']
+    # BIB-09-primer-mensaje: a closing second turn also drafts the first message, with the activated class 09 units loaded
+    # whole. Without them the reply goes out as always and no first message is kept.
+    dm_ready,dm_absent=closing,[]
+    if closing:
+        extra,dm_absent,dm_omitted=operador.course_context([u for u in FIRST_MESSAGE_UNITS if u not in unit_ids],metodologia='primer_mensaje')
+        dm_absent+=dm_omitted
+        if dm_absent:dm_ready=False
+        else:units=units+extra
     answer,data,citations,risks=_draft(json.dumps(inputs,ensure_ascii=False,default=str),units)
     replies=data.get('decision')=='reply' and plain(data.get('reply'))
     issues=_fixable(row,data,citations,risks,closing) if replies else []
-    dm_issues=dm_text_issues(_opener(data,closing),row.text) if replies else []
+    dm_issues=dm_text_issues(_opener(data,dm_ready),row.text) if replies else []
     if (issues or dm_issues) and presupuesto.left(now)>0:
         revision={'previous_reply':data['reply'],'rule_violations':issues,'claims_needing_evidence':list(data.get('claims_needing_evidence',[]))}
-        if dm_issues:revision.update(previous_dm_opener=_opener(data,closing),dm_rule_violations=dm_issues)
+        if dm_issues:revision.update(previous_dm_opener=_opener(data,dm_ready),dm_rule_violations=dm_issues)
         try:
             redraft=_draft(json.dumps(dict(inputs,revision=revision),ensure_ascii=False,default=str),units)
             if issues:
@@ -581,9 +590,10 @@ def propose(user,comment_id,origin_job=''):
         except ValueError as exc:risks.append(f'No se pudo reescribir ({exc}); queda el primer borrador.')
     oficina_eventos.emit('entrega',AGENT,'operador_cuenta','Respuesta redactada')
     if omitted:risks.append('Unidades omitidas por presupuesto de contexto: '+', '.join(omitted))
+    if dm_absent:risks.append('Primer mensaje sin redactar: faltan unidades de la clase 09 ('+', '.join(dm_absent)+').')
     decision=data.get('decision');common={'turn':inputs['turn'],'closing':closing,'model':answer['model'],'rationale':(data.get('rationale') or '')[:500],
                                           'language':(data.get('language') or '')[:10]}
-    opener=_opener(data,closing) if decision=='reply' and plain(data.get('reply')) else ''
+    opener=_opener(data,dm_ready) if decision=='reply' and plain(data.get('reply')) else ''
     rejected=dm_text_issues(opener,row.text)
     if rejected:risks.append('Primer mensaje descartado por las reglas fijas: '+'; '.join(rejected))
     # A dropped first message is never shown: it stays only here, in the audit.

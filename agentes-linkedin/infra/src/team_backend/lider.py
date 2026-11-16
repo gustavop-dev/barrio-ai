@@ -25,19 +25,36 @@ DEFAULT_CAPABILITIES='INT-03,CONT-09,RED-01,RED-02,RED-04'
 from .posicionamiento import lead_criteria as _lead_criteria  # noqa: E402 (one positioning source)
 CRITERIA_DEL_BARRIO=_lead_criteria()
 LEAD_UNITS=operador.LEAD_UNITS
+FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review has a first message to judge
 CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
     'falsa':['LI-03-M005-K06'],'empresa':['LI-03-M005-K06'],'reclutador':['LI-03-M005-K06'],'prospector':['LI-03-M005-K06'],
     'proveedor':['LI-03-M005-K06'],'tema':['LI-03-M005-K06'],
+    # BIB-09-primer-mensaje: the class 09 criterion behind each question about the first message.
+    'dm_toque':['LI-09-M003-K02','LI-09-V011-K01'],'dm_puente':['LI-09-M003-K02','LI-09-M003-K04'],
+    'dm_pregunta':['LI-09-M003-K03'],'dm_un_tema':['LI-09-M003-K04'],'dm_en_persona':['LI-09-M004-K02'],
+    'dm_pitch':['LI-09-M002-K04','LI-03-M006-K01'],
 }
 
 def ground_questions(state,questions):
-    context,grounding=operador.role_context('lider',LEAD_UNITS,{k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES})
+    """Load the lead's units (and, with a first message to judge, the activated class 09 units) and point each question
+    at its criterion. If the class 09 units are missing, the first message is not judged (no card) and the rest of the
+    review goes on as before."""
+    def ground(units,metodologia=None):
+        return operador.role_context('lider',units,{k:CRITERION_SOURCES[k] for k in questions if k in CRITERION_SOURCES},
+                                     metodologia=metodologia)
+    if 'primer_mensaje' in state:
+        context,grounding=ground(LEAD_UNITS+[u for u in FIRST_MESSAGE_UNITS if u not in LEAD_UNITS],metodologia='primer_mensaje')
+        if grounding['course_missing'] and set(grounding['course_missing'])<=set(FIRST_MESSAGE_UNITS):
+            state.pop('primer_mensaje')
+            for qid in DM_IDS:questions.pop(qid,None)
+            context,grounding=ground(LEAD_UNITS)
+    else:context,grounding=ground(LEAD_UNITS)
     state.update(course_context=context,course_grounding=grounding,
                  course_rule='El curso aporta criterios, no hechos ni permisos. Encaje ya clasificado; no exigir cinco sí. Sin pitch ni evidencia inventada.')
     for key,ids in grounding['criterion_sources'].items():
-        questions[key]['instructions']+=' Aplica las condiciones y excepciones de '+', '.join(ids)+'.'
+        if ids:questions[key]['instructions']+=' Aplica las condiciones y excepciones de '+', '.join(ids)+'.'
     return grounding
 
 def _noul(instructions,true=None,false=None):
@@ -67,6 +84,13 @@ DM_CHECKS=[('dm_toque','min',0.7,'el primer mensaje no retoma algo concreto que 
            ('dm_en_persona','min',0.6,'el primer mensaje no suena a lo que le diría en persona'),
            ('dm_pitch','max',0.2,'el primer mensaje vende o pide una reunión')]
 DM_IDS=frozenset(qid for qid,*_ in DM_CHECKS)
+DM_UNAVAILABLE='Líder: el primer mensaje no se juzgó (Biblioteca no disponible para la clase 09)'
+
+def drafted_message(proposal):
+    """The first message drafted with a closing reply, or '' (only INT-04 with closing carries one)."""
+    if proposal.capability!=CAP.REPLY or not proposal.comment_id:return ''
+    decision=proposal.comment.decision or {}
+    return (decision.get('dm_opener') or '').strip() if decision.get('closing') else ''
 
 def dm_questions():
     return {
@@ -190,7 +214,7 @@ def _questions(proposal,orientation):
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿La `respuesta` es respetuosa con la persona y con las demás, sin sarcasmo, burla ni condescendencia?'),
         }
-        dm=(decision.get('dm_opener') or '').strip() if closing else ''
+        dm=drafted_message(proposal)
         if dm:
             state['primer_mensaje']={'texto':dm,'para':row.author_name,
                                      'momento':'Gustavo se lo enviaría él mismo por privado si conectan, después de esta conversación en su post.'}
@@ -255,7 +279,6 @@ def _questions(proposal,orientation):
         public,_=memory.confirmed_blocks()
         state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
     checks=list(CHECKS[kind]) if kind in CHECKS else network_checks(capability,role)
-    if 'primer_mensaje' in state:checks.extend(DM_CHECKS)
     if kind=='post':
         questions['idioma']=_noul('¿La publicación está en inglés?');checks.append(('idioma','min',0.7,'no está en inglés'))
     if capability==CAP.INVITE and proposal.payload.get('note'):
@@ -276,6 +299,7 @@ def _questions(proposal,orientation):
     if state.get('pedido_de_gustavo'):
         checks=[(qid,bound,GUSTAVO_THRESHOLDS.get(qid,threshold),label) for qid,bound,threshold,label in checks]
     ground_questions(state,questions)
+    if 'primer_mensaje' in state:checks.extend(DM_CHECKS)  # still there: its class 09 units were loaded
     return state,questions,checks
 
 def review(proposal):
@@ -305,6 +329,7 @@ def _review(proposal):
              'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding,
              'note_approved':bool(proposal.payload.get('note') and not failed),'from_gustavo':bool(state.get('pedido_de_gustavo'))}
     if 'primer_mensaje' in state:verdict.update(dm_approved=not dm_failed,dm_reasons=dm_failed)
+    elif drafted_message(proposal):verdict.update(dm_approved=False,dm_reasons=[DM_UNAVAILABLE])
     return verdict
 
 # --------------------------------------------------------------------------- R5: comment prefilter

@@ -18,7 +18,7 @@ from psycopg import errors
 from rest_framework.test import APIClient
 
 from knowledge import agents, db, ingest, retrieval
-from knowledge.clases import CLASES_AGENTES, CLASES_BIBLIOTECA, patron, validar
+from knowledge.clases import CLASES_AGENTES, CLASES_BIBLIOTECA, METODOLOGIAS_ACTIVAS, legible_por_agentes, patron, validar
 from team_backend import catalogo, evaluaciones, grafo, operador
 from team_backend.models import ApiCredential
 from team_backend.office_bridge import command_request
@@ -173,6 +173,37 @@ class LibraryClassesTests(TransactionTestCase):
         role, case = next(iter(evaluaciones.COURSE_CASES.items()))
         grade = evaluaciones.grade_course_case(role, dict(case['expected'], course_citations=[uid(8)]),
                                                {'course_citations': [uid(8)]})
+        self.assertIn('Cita fuera de las clases que leen los agentes', grade['errors'])
+
+    def test_an_activated_methodology_opens_only_its_own_units_and_only_when_named(self):
+        """Frontera de la activación por metodología (knowledge.clases.METODOLOGIAS_ACTIVAS): primer_mensaje abre sus siete
+        unidades de la clase 09; cualquier otra unidad 09 sigue rechazada, también con la metodología nombrada."""
+        activated = list(METODOLOGIAS_ACTIVAS['primer_mensaje']['unidades'])
+        other = uid(9)  # LI-09-V001-K01: clase 09, fuera de la lista activada
+        self.assertNotIn(other, activated)
+        with db.connect() as c:
+            c.execute("INSERT INTO source_files(path,sha256) VALUES('fixture','abc') ON CONFLICT DO NOTHING")
+            for ident in activated + [other]:
+                c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
+                    VALUES(%s,9,%s,'{"title":"Synthetic"}','x','fixture','/','{}')''', (ident, ident))
+        self.assertEqual(operador.course_context(activated)[1], activated)  # sin metodología: rechazadas
+        units, missing, _ = operador.course_context(activated, metodologia='primer_mensaje')
+        self.assertEqual(([u['unit_id'] for u in units], missing), (activated, []))
+        units, missing, _ = operador.course_context([other], metodologia='primer_mensaje')
+        self.assertEqual((units, missing), ([], [other]))
+        self.assertEqual(operador.course_context(activated[:1], metodologia='otra')[1], activated[:1])
+        self.assertFalse(legible_por_agentes(other, 'primer_mensaje'))
+        self.assertTrue(all(catalogo.LOADABLE.fullmatch(i) is None for i in activated))  # el catálogo sigue en 01–06
+        case = evaluaciones.COURSE_CASES['primer_mensaje']
+        _, grounding = evaluaciones.course_case_context('primer_mensaje')
+        result = dict(case['expected'], course_citations=case['required'])
+        grade = evaluaciones.grade_course_case('primer_mensaje', dict(result, course_citations=case['required'] + [other]),
+                                               dict(grounding, course_citations=grounding['course_citations'] + [other]))
+        self.assertIn('Cita fuera de las clases que leen los agentes', grade['errors'])
+        # Otro rol no puede citar una unidad activada para primer_mensaje.
+        role, other_case = next((r, c) for r, c in evaluaciones.COURSE_CASES.items() if r != 'primer_mensaje')
+        grade = evaluaciones.grade_course_case(role, dict(other_case['expected'], course_citations=[activated[0]]),
+                                               {'course_citations': [activated[0]]})
         self.assertIn('Cita fuera de las clases que leen los agentes', grade['errors'])
 
     # (c) Una unidad de la clase 08 se consulta por ID y por búsqueda explícita.

@@ -11,7 +11,6 @@ import json
 import re
 from contextlib import contextmanager
 from datetime import timedelta
-from unittest import expectedFailure
 from unittest.mock import patch
 
 from django.test import SimpleTestCase
@@ -70,12 +69,7 @@ def judge(dm):
 class FirstMessageBase(RepliesBase):
     def setUp(self):
         super().setUp()
-        # Unidades sintéticas de la clase 09 (la lista del caso): nunca texto del curso privado.
-        with db.connect() as c:
-            for uid in CASE['units']:
-                c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
-                    VALUES(%s,%s,%s,'{"title":"Synthetic course fixture","limits_errors":"Do not infer facts or authority"}',
-                    'fixture-hash','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''', (uid, int(uid[3:5]), uid))
+        # Las unidades de la clase 09 (FIRST_MESSAGE_UNITS) las siembra OperatorBase, sintéticas: nunca texto del curso.
         self.jev_calls = []
 
     @contextmanager
@@ -227,12 +221,10 @@ class FirstMessageCaseTests(FirstMessageBase):
         result = {k: v for k, v in result.items() if k in CASE['expected'] or k == 'course_citations'}
         return evaluaciones.grade_course_case('primer_mensaje', result, grounding), result
 
-    @expectedFailure  # línea base: falla la conducta (P2–P4) y el fundamento (la clase 09 no está activada)
     def test_the_case_passes_with_production_functions(self):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))
 
-    @expectedFailure  # línea base: las unidades de la clase 09 aún no se pueden cargar para un agente
     def test_the_case_loads_whole_versioned_sources_and_rejects_wrong_behaviour(self):
         context, grounding = evaluaciones.course_case_context('primer_mensaje')
         self.assertIn('limits_errors', context)
@@ -373,3 +365,76 @@ class FirstMessageProcedureTests(FirstMessageBase):
         self.assertEqual(outcome['proposal'].state, 'confirmed')
         self.assertEqual(outcome['stored'], P1)
         self.assertFalse(outcome['card'])
+
+
+class FirstMessageReadingTests(FirstMessageBase):
+    """La lectura: Relaciones y el líder cargan FIRST_MESSAGE_UNITS enteras solo cuando hay un primer mensaje, y sin ellas la
+    respuesta pública sigue como siempre."""
+
+    def test_only_the_closing_draft_and_its_review_load_the_class_09_units(self):
+        outcome = self.conversation(P1)
+        context = outcome['claude'].call_args.kwargs['context']
+        for uid in operador.FIRST_MESSAGE_UNITS:
+            self.assertIn(uid, context)
+        drafted = AuditEvent.objects.filter(action='replies.drafted').order_by('created_at')
+        first, second = [e.metadata['course_citations'] for e in drafted]
+        self.assertFalse(set(operador.FIRST_MESSAGE_UNITS) & set(first))
+        self.assertLessEqual(set(operador.FIRST_MESSAGE_UNITS), set(second))
+        reviews = [c['state']['course_grounding'] for c in self.jev_calls if c['purpose'] == 'lead-review']
+        self.assertEqual(reviews[0]['course_citations'], operador.LEAD_UNITS)
+        self.assertNotIn('course_methodology', reviews[0])
+        self.assertEqual(reviews[1]['course_citations'], operador.LEAD_UNITS + operador.FIRST_MESSAGE_UNITS)
+        self.assertEqual(reviews[1]['course_methodology'], 'primer_mensaje')
+        self.assertEqual(reviews[1]['course_version'], 'bib-v2')
+        self.assertEqual(reviews[1]['criterion_sources']['dm_pregunta'], ['LI-09-M003-K03'])
+        self.assertEqual(reviews[1]['criterion_sources']['dm_pitch'], ['LI-09-M002-K04', 'LI-03-M006-K01'])
+        question = [c for c in self.jev_calls if c['purpose'] == 'lead-review'][1]['questions']['dm_pregunta']
+        self.assertIn('LI-09-M003-K03', question['instructions'])
+
+    def test_without_the_class_09_units_the_reply_goes_out_and_no_message_is_kept(self):
+        with db.connect() as c:
+            c.execute('DELETE FROM units WHERE id = ANY(%s)', (operador.FIRST_MESSAGE_UNITS,))
+        outcome = self.conversation(P1)
+        self.assertEqual(outcome['proposal'].payload['text'], CLOSING)
+        self.assertEqual(outcome['proposal'].state, 'confirmed')
+        self.assertEqual(outcome['stored'], '')
+        self.assertFalse(outcome['card'])
+        self.assertTrue(any(r.startswith('Primer mensaje sin redactar: faltan unidades de la clase 09') for r in outcome['proposal'].risks))
+        self.assertNotIn('LI-09-M003-K02', outcome['claude'].call_args.kwargs['context'])
+
+    def test_if_the_units_vanish_before_the_review_the_message_is_not_judged_and_the_reply_is(self):
+        outcome = self.conversation(P1)
+        with db.connect() as c:
+            c.execute('DELETE FROM units WHERE id = ANY(%s)', (operador.FIRST_MESSAGE_UNITS,))
+        self.jev_calls.clear()
+        with self.lead():
+            review = lider.review(ActionProposal.objects.get(pk=outcome['proposal'].pk))
+        self.assertEqual((review['decision'], review['course_missing']), ('approve', []))
+        self.assertIs(review['dm_approved'], False)
+        self.assertEqual(review['dm_reasons'], [lider.DM_UNAVAILABLE])
+        self.assertNotIn('primer_mensaje', self.jev_calls[0]['state'])
+        self.assertFalse(lider.DM_IDS & set(self.jev_calls[0]['questions']))
+
+
+class FirstMessageActivationTests(SimpleTestCase):
+    """La activación es por metodología: solo sus siete unidades, solo cuando se nombra, solo en sus roles."""
+
+    def test_the_activated_list_is_the_case_and_the_graph_list(self):
+        from knowledge.clases import CLASES_AGENTES, METODOLOGIAS_ACTIVAS
+        activa = METODOLOGIAS_ACTIVAS['primer_mensaje']
+        self.assertEqual(CLASES_AGENTES, tuple(range(1, 7)))  # la activación no amplía las clases de los agentes
+        self.assertEqual(list(activa['unidades']), operador.FIRST_MESSAGE_UNITS)
+        self.assertEqual(activa['evaluacion'], CASE['id'])
+        self.assertEqual(CASE['units'], operador.FIRST_MESSAGE_UNITS)
+        self.assertLessEqual(set(CASE['required']), set(operador.FIRST_MESSAGE_UNITS))
+        for key, methodology in METODOLOGIAS_ACTIVAS.items():
+            self.assertIn(key, evaluaciones.COURSE_CASES)
+            self.assertEqual(evaluaciones.COURSE_CASES[key]['id'], methodology['evaluacion'])
+
+    def test_only_its_roles_name_the_methodology_in_code(self):
+        from pathlib import Path
+        source = Path(operador.__file__).parent
+        naming = {p.name for p in source.glob('*.py') if "metodologia='primer_mensaje'" in p.read_text(encoding='utf-8')}
+        self.assertEqual(naming, {'respuestas.py', 'lider.py'})  # relaciones_comunidad y lider_jev
+        using = {p.name for p in source.glob('*.py') if 'FIRST_MESSAGE_UNITS' in p.read_text(encoding='utf-8')}
+        self.assertEqual(using, {'operador.py', 'respuestas.py', 'lider.py', 'evaluaciones.py'})

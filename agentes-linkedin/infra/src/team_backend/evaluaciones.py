@@ -41,6 +41,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from django.utils import timezone
 from knowledge import db, memory, presupuesto, providers
+from knowledge.clases import METODOLOGIAS_ACTIVAS, legible_por_agentes
 from knowledge.config import live
 from knowledge.ingest import ENC
 from . import autopiloto, catalogo, compuertas, editorial, guardas, lider, operador, orientacion, red, voz
@@ -873,7 +874,7 @@ COURSE_CASES={
     # conexión y lo envía Gustavo a mano. Cinco variantes; en ninguna el equipo envía un mensaje. `stopped_by` dice qué
     # parte lo detiene: «reglas» (código, antes del líder), «juez» (preguntas del líder) o «momento» (no hay conversación).
     'primer_mensaje':{'id':'BIB-09-primer-mensaje',
-        'units':['LI-09-M002-K04','LI-09-M002-K05','LI-09-M003-K02','LI-09-V011-K01','LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02'],
+        'units':operador.FIRST_MESSAGE_UNITS,
         'input':{
             'thread':{'comment':'Rolling back the payments flow was our hardest week this year: the rollback itself broke '
                                 'reconciliation for two days.',
@@ -898,8 +899,9 @@ COURSE_CASES={
 
 
 def course_case_context(role):
+    """The case's units as its role loads them; an activated outbound methodology unlocks only its own units."""
     case=COURSE_CASES[role]
-    return operador.role_context(role,case['units'])
+    return operador.role_context(role,case['units'],metodologia=role if role in METODOLOGIAS_ACTIVAS else None)
 
 
 def grade_course_case(role,result,grounding):
@@ -910,7 +912,9 @@ def grade_course_case(role,result,grounding):
     if not citations or set(citations)-set(grounding.get('course_citations',[])):errors.append('Citas no recuperadas')
     if set(case['required'])-set(citations):errors.append('Falta fundamento del caso')
     # La biblioteca guarda más clases de las que leen los agentes (knowledge.clases): citar una que no leen es un fallo.
-    if any(not operador.AGENT_UNIT.fullmatch(uid) for uid in citations):errors.append('Cita fuera de las clases que leen los agentes')
+    # Un caso de una metodología activada puede citar solo las unidades de esa metodología, además de 01–06.
+    metodologia=role if role in METODOLOGIAS_ACTIVAS else None
+    if any(not legible_por_agentes(uid,metodologia) for uid in citations):errors.append('Cita fuera de las clases que leen los agentes')
     for key,expected in case['expected'].items():
         if result.get(key)!=expected:errors.append('Conducta incorrecta: '+key)
     return {'case':case['id'],'passed':not errors,'errors':errors,'version':grounding.get('course_version')}

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.10-linkedin-directo",
+  "graph_version": "6.11-primer-mensaje",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -147,6 +147,15 @@
       "LI-06-M003-K06",
       "LI-06-M002-K09",
       "LI-06-M002-K10"
+    ],
+    "operador.FIRST_MESSAGE_UNITS": [
+      "LI-09-M002-K04",
+      "LI-09-M002-K05",
+      "LI-09-M003-K02",
+      "LI-09-V011-K01",
+      "LI-09-M003-K03",
+      "LI-09-M003-K04",
+      "LI-09-M004-K02"
     ]
   },
   "budgets": {
@@ -1394,7 +1403,8 @@
       ],
       "course_lists": [
         "operador.COMMENT_UNITS",
-        "operador.REPLY_UNITS"
+        "operador.REPLY_UNITS",
+        "operador.FIRST_MESSAGE_UNITS"
       ],
       "course_units": [
         "LI-03-M006-K02",
@@ -1404,7 +1414,7 @@
         "LI-06-M002-K09",
         "LI-06-M002-K10"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Comentarios en posts ajenos: COMMENT_UNITS; respuestas en posts propios (INT-04): REPLY_UNITS.",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Comentarios en posts ajenos: COMMENT_UNITS; respuestas en posts propios (INT-04): REPLY_UNITS; el cierre del segundo turno suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) para redactar el primer mensaje.",
       "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
       "effort": "medium",
       "model_note": null,
@@ -1708,7 +1718,8 @@
         "memoria"
       ],
       "course_lists": [
-        "operador.LEAD_UNITS"
+        "operador.LEAD_UNITS",
+        "operador.FIRST_MESSAGE_UNITS"
       ],
       "course_units": [
         "LI-03-V020-K02",
@@ -1717,7 +1728,7 @@
         "LI-06-M001-K04",
         "LI-06-M001-K07"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto.",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Con un primer mensaje que juzgar (respuesta de cierre de INT-04) suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) en la misma revisión.",
       "model": "TYPESAFE_MODEL (knowledge.providers.typesafe)",
       "effort": null,
       "model_note": null,

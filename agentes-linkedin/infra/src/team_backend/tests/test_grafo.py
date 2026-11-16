@@ -93,6 +93,21 @@ class GraphTests(SimpleTestCase):
         self.bad(lambda g: g['edges'][0].update(max_calls_per_cycle=0), 'no acotado')
         self.bad(lambda g: g['cycles'][0]['loops'][0].update(max_rounds=3), 'bucle no acotado')
 
+    def test_an_activated_methodology_list_is_exactly_its_units_and_only_its_roles_load_it(self):
+        ref = 'operador.FIRST_MESSAGE_UNITS'
+        nodes = {n['id']: n for n in self.graph['nodes']}
+        self.assertIn(ref, nodes['relaciones_comunidad']['course_lists'])
+        self.assertIn(ref, nodes['lider_jev']['course_lists'])
+        self.assertEqual([nid for nid, n in nodes.items() if ref in n['course_lists']], ['relaciones_comunidad', 'lider_jev'])
+        # Otro nodo no puede enlazarla, y la lista no admite otra unidad 07–12 ni perder una de las suyas.
+        self.bad(lambda g: next(n for n in g['nodes'] if n['id'] == 'conversaciones_inbox')['course_lists'].append(ref),
+                 'solo la cargan sus roles')
+        self.bad(lambda g: g['course_lists'][ref].append('LI-09-M001-K01'), 'solo clases 01–06')
+        self.bad(lambda g: g['course_lists'][ref].pop(), 'no coincide con la metodología primer_mensaje')
+        self.bad(lambda g: g['course_lists'].pop(ref), 'falta su lista')
+        # Sus unidades solo valen en su lista: en otra lista siguen fuera.
+        self.bad(lambda g: g['course_lists']['operador.REPLY_UNITS'].append('LI-09-M003-K02'), 'solo clases 01–06')
+
     def test_executable_paths_cannot_bypass_gates(self):
         for stop in ('editor_verificador', 'lider_jev', 'gustavo'):
             def bypass(g):
