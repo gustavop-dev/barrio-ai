@@ -135,6 +135,15 @@ class ParticipationTests(NetworkBase):
             operador.reserve_spacing(self.now)
         self.assertFalse(operador.spacing_ok(self.account,soon,'CONT-09'))
 
+    def test_an_unconfirmed_write_stops_being_read_back_after_its_window(self):
+        from team_backend import autopiloto
+        proposal=self.approved();proposal.state='sent';proposal.save()
+        execution=ActionExecution.objects.create(proposal=proposal,provider='fake',executed_by=self.gustavo,state='sent',idempotency_key=str(proposal.id))
+        ActionExecution.objects.filter(pk=execution.pk).update(started_at=self.now-timedelta(hours=2))
+        self.assertEqual(autopiloto._reconcile(self.gustavo,self.now),1)
+        ActionExecution.objects.filter(pk=execution.pk).update(started_at=self.now-timedelta(hours=30))
+        self.assertEqual(autopiloto._reconcile(self.gustavo,self.now+timedelta(hours=1)),0)  # it waits for Gustavo, unread
+
     def test_health_excludes_immature_unknown_and_deduplicates_recipients(self):
         people=self.cohort();self.cohort(count=15,accepted=0,age=2);self.cohort(count=2,accepted=0,unknown=2)
         c=people[0];p=self.approved(c);p.state='confirmed';p.save()
@@ -543,7 +552,7 @@ class CourseGroundingTests(NetworkBase):
         result.update(grounded_decision=outcomes[0],pitch_decision=outcomes[1])
         self.assertTrue(evaluaciones.grade_course_case('lider',result,result)['passed'])
 
-    def test_weekly_citations_stay_out_of_numeric_evidence_and_unknown_citations_fail(self):
+    def test_weekly_citations_stay_out_of_numeric_evidence_and_an_entry_with_an_unknown_citation_is_dropped(self):
         _,grounding=operador.role_context('semanal',resumen_semanal.WEEKLY_UNITS)
         data={'value':3}
         raw={'titular':'3 posts','lo_que_funciono':[],'lo_que_no':[],
@@ -552,5 +561,9 @@ class CourseGroundingTests(NetworkBase):
         result=resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
         self.assertTrue(result['validacion']['ok'])
         raw['recomendaciones'][0]['course_citations']=['LI-07-V001-K01']
-        with self.assertRaises(ValueError):resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
+        # A unit that was not retrieved (class 07 is excluded) never reaches the summary; the rest of it survives.
+        result=resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
+        self.assertEqual(result['recomendaciones'],[])
+        self.assertEqual([d.get('sin_cita_del_curso') for d in result['validacion']['descartado']],[True])
+        self.assertFalse(result['validacion']['ok'])
         self.assertIs(resumen_semanal.WEEKLY_UNITS,metricas.ANALYSIS_UNITS)

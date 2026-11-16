@@ -355,6 +355,18 @@ class ValidatorTests(SummaryBase):
         self.assertEqual([(d['campo'],d['cifras_no_encontradas'],d['sin_cifra']) for d in clean['validacion']['descartado']],
                          [('lo_que_funciono',['37'],False),('lo_que_no',[],True),('advertencias',['90'],False)])
 
+    def test_an_entry_without_a_retrieved_course_unit_is_dropped_and_the_summary_survives(self):
+        raw={'titular':'Semana con 3 posts','lo_que_funciono':[
+                {'texto':'La mediana fue de 840 impresiones.','cifra':'semana.mediana: 840','course_citations':['LI-06-V008-K01']},
+                {'texto':'Hubo 3 posts en la semana.','cifra':'semana.posts: 3','course_citations':[]},
+                {'texto':'Los 3 posts salieron a su hora.','cifra':'semana.posts: 3','course_citations':['LI-99-X000-K00']}],
+             'lo_que_no':[],'recomendaciones':[],'orientacion_propuesta':'','advertencias':['Pocos datos: 2 posts.']}
+        clean=resumen_semanal.validate(raw,self.DATA,LABEL_WEEK,{'course_citations':['LI-06-V008-K01','LI-06-V008-K02']})
+        self.assertEqual(clean['lo_que_funciono'],[{'texto':'La mediana fue de 840 impresiones.','cifra':'semana.mediana: 840',
+                                                   'course_citations':['LI-06-V008-K01']}])
+        self.assertEqual([d.get('sin_cita_del_curso') for d in clean['validacion']['descartado']],[True,True])
+        self.assertIn('Se quitaron 2 frases sin un criterio del curso que las sustente.',clean['advertencias'])
+
     def test_an_invented_headline_or_orientation_is_replaced_or_dropped(self):
         raw={'titular':'Las impresiones crecieron 55 %','lo_que_funciono':[],'lo_que_no':[],'recomendaciones':[],
              'orientacion_propuesta':'Publica 5 veces por semana.','advertencias':[]}

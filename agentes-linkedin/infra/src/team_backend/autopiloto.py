@@ -563,8 +563,15 @@ def _execute(user,account,now):
         return int(job.state==Job.State.QUEUED)
     return 0
 
+def reconcile_window():
+    """How long an unconfirmed write keeps being read back. After it the execution stays as it is, with its note, for
+    Gustavo: two follows LinkedIn never showed were read every hour without end, out of the daily profile reads."""
+    try:return timedelta(hours=max(1,int(os.environ.get('OPERATOR_RECONCILE_HOURS','24'))))
+    except ValueError:return timedelta(hours=24)
+
 def _reconcile(user,now):
-    due=ActionExecution.objects.filter(state__in=['sent','uncertain'],started_at__lt=now-timedelta(minutes=10)).filter(
+    due=ActionExecution.objects.filter(state__in=['sent','uncertain'],started_at__lt=now-timedelta(minutes=10),
+                                       started_at__gte=now-reconcile_window()).filter(
         Q(reconciled_at__isnull=True)|Q(reconciled_at__lt=now-timedelta(hours=1)))
     count=0
     for execution in due[:3]:
