@@ -243,7 +243,7 @@ class Cliente:
         find it by reading (own comment with the same text)."""
         cid = lectura.written_comment(stream, aid, thread)
         return {'id': cid, 'text': text, 'created_at': lectura.activity_time(cid) if cid else None, 'is_sender': True,
-                'thread_id': thread, 'reply_counter': None,
+                'thread_id': thread, 'reply_counter': None, 'reaction_counter': None,
                 'author': lectura.user(self.me.get('fsd', ''), self.me.get('public_id', ''), kind='individual')}
 
     def _comment(self, aid, parent, text, operation):

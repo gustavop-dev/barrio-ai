@@ -200,7 +200,7 @@ class PostAndCommentTests(SimpleTestCase):
         self.assertEqual([x['id'] for x in found],[F.COMMENT_A,F.COMMENT_B,'9000009'])
         self.assertEqual(set(found[0]),COMMENT_KEYS)
         self.assertEqual(found[0],{'id':F.COMMENT_A,'text':'Muy buen punto','created_at':datetime(2026,11,10,16,tzinfo=UTC),
-                                   'is_sender':False,'thread_id':None,'reply_counter':1,
+                                   'is_sender':False,'thread_id':None,'reply_counter':1,'reaction_counter':1,
                                    # Like Unipile's comment author: no headline (the callers read the profile).
                                    'author':{'id':ANA[0],'public_identifier':'ana-ficticia','display_name':'Ana Ficticia',
                                              'profile_url':ana_url(),'headline':'','type':'individual'}})
