@@ -16,8 +16,8 @@ from knowledge import db
 from linkedin_directo import rutas
 from team_backend import autopiloto, connectors_directo, jobs, metricas, operador
 from team_backend.connectors import ConnectorError, FakeConnector, UnipileConnector, _post
-from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, ConnectorAccount, Contact, EditorialPiece,
-                                 Job, PostMetric)
+from team_backend.models import (ActionExecution, ActionOutcome, ActionProposal, AnalyticsPost, AudienceSnapshot, AuditEvent, ConnectorAccount,
+                                 Contact, EditorialPiece, Job, ObservedPost, PostMetric)
 from team_backend.tests import directo_fixtures as F
 from team_backend.tests.test_ids_linkedin import ACTIVITY, UGC, unipile_post
 from team_backend.tests.test_operador import OperatorBase
@@ -603,6 +603,43 @@ class ResultadosTests(MetricsBase):
         self.assertEqual(body['equipo']['comments_published']['value'],0)
         rate=body['audiencia']['acceptance_rate']
         self.assertEqual((rate['value'],rate['denominator'],rate['unavailable_reason']),(None,0,'Ninguna invitación se resolvió en el periodo.'))
+
+    def test_replies_followed_people_who_engaged_and_analytics_coverage(self):
+        body=self.get();team=body['equipo'];coverage=body['contenido']['analytics_coverage']
+        self.assertEqual([(team[k]['value'],team[k]['unavailable_reason'],team[k]['denominator']) for k in ('comments_replied','followed_engaged')],
+                         [(None,'Aún no leemos las respuestas a tus comentarios.',0),(None,'Aún no medimos qué hicieron las personas que seguiste.',0)])
+        self.assertIsNone(team['comments_replied']['author_replied'])
+        self.assertEqual((coverage['value'],coverage['unavailable_reason'],coverage['denominator'],coverage['unlinked_piece_ids']),
+                         (None,'Aún no hay publicaciones propias.',0,[]))
+
+        now=timezone.now()
+        def measured(capability,days_ago,kind,**fields):
+            """An action executed `days_ago` and its outcome, captured when its age came (72 h or 7 d later)."""
+            started=now-timedelta(days=days_ago);n=ActionOutcome.objects.count()
+            target=({'post':ObservedPost.objects.create(account=self.account,provider_post_id=f'urn:li:activity:{800+n}',author_provider_id='ACoAutora')}
+                    if capability=='INT-03' else {'contact':self.contact(f'ACofollow-{n}',stage='followed')})
+            proposal=ActionProposal.objects.create(account=self.account,capability=capability,payload={'text':'x'},payload_hash='1'*64,state='confirmed',**target)
+            execution=ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='fake',state='confirmed',
+                                                     executed_by=self.bot,started_at=started)
+            ActionOutcome.objects.create(execution=execution,kind=kind,source='read' if kind=='72h' else 'derived',
+                                         captured_at=started+(timedelta(hours=72) if kind=='72h' else timedelta(days=7)),**fields)
+        measured('INT-03',4,'72h',replies=2,author_replied=True)
+        measured('INT-03',5,'72h',replies=0,author_replied=False)
+        measured('INT-03',45,'72h',replies=3,author_replied=True)  # read more than 30 days ago: out
+        measured('RED-01',9,'7d',signals={'accepted':True,'commented_own_post':False})
+        measured('RED-01',10,'7d',signals={'accepted':False,'commented_own_post':False})
+        measured('RED-01',50,'7d',signals={'accepted':True})  # out of the 30 days too
+        linked,_=self.publish(TEXT_A,hours_ago=48,seed=False);unlinked,_=self.publish(TEXT_B,hours_ago=24,seed=False)
+        AnalyticsPost.objects.create(account=self.account,post_urn='urn:li:activity:7390000000000000002',piece=linked,impressions=640)
+
+        body=self.get(dias='7');team=body['equipo'];coverage=body['contenido']['analytics_coverage']
+        replied=team['comments_replied']  # a trailing 30 days whatever the period: no comparison
+        self.assertEqual((replied['value'],replied['denominator'],replied['author_replied'],replied['comparable'],replied['unavailable_reason']),
+                         (1,2,1,False,None))
+        engaged=team['followed_engaged']
+        self.assertEqual((engaged['value'],engaged['denominator'],engaged['comparable'],engaged['unavailable_reason']),(1,2,False,None))
+        self.assertEqual((coverage['value'],coverage['denominator'],coverage['unlinked_piece_ids'],coverage['comparable']),
+                         (1,2,[str(unlinked.id)],False))
 
 
 class BusinessSectionTests(OperatorBase):
