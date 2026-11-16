@@ -57,6 +57,36 @@ CHECKS={
     'post':[('clara','min',0.6,'no desarrolla una idea clara'),('pitch','max',0.2,'suena a venta o pide contacto'),
             ('inventa','max',0.2,'atribuye a Gustavo algo que no está en sus hechos')],
 }
+# BIB-09-primer-mensaje: the first message drafted with a closing reply (dm_opener) is judged in the same review, with
+# questions 1–5 of the class 09 guide (LI-09-M004-K02) and selling; question 6 (no links, no asking for a meeting) is a
+# fixed rule (respuestas.dm_text_issues). A failing check only sets dm_approved=False: it never discards the public reply.
+DM_CHECKS=[('dm_toque','min',0.7,'el primer mensaje no retoma algo concreto que dijo la persona'),
+           ('dm_puente','min',0.6,'el primer mensaje no dice con honestidad por qué le escribe'),
+           ('dm_pregunta','min',0.6,'el primer mensaje no cierra con una pregunta fácil de contestar'),
+           ('dm_un_tema','min',0.7,'el primer mensaje trata más de un tema'),
+           ('dm_en_persona','min',0.6,'el primer mensaje no suena a lo que le diría en persona'),
+           ('dm_pitch','max',0.2,'el primer mensaje vende o pide una reunión')]
+DM_IDS=frozenset(qid for qid,*_ in DM_CHECKS)
+
+def dm_questions():
+    return {
+        'dm_toque':_noul('¿La primera frase de `primer_mensaje.texto` retoma algo concreto que la persona dijo en `comentario` o en '
+                         'el `hilo`, de modo que no serviría para otra persona?',
+                         'Nombra una idea, un dato o una pregunta concreta de la persona en esta conversación',
+                         'Saluda, agradece o alude a «la conversación» o a «tu post» sin decir de qué'),
+        'dm_puente':_noul('¿`primer_mensaje.texto` dice con honestidad por qué Gustavo le escribe: lo que quedó abierto o les interesa '
+                          'a los dos de esa conversación, y no sus servicios ni a quién ayuda?'),
+        'dm_pregunta':_noul('¿`primer_mensaje.texto` termina con una sola pregunta concreta sobre ese tema que la persona puede contestar '
+                            'en una o dos líneas sin pensarlo mucho?',
+                            'Pregunta acotada: qué hizo, cuál eligió o cómo resolvió algo puntual de lo que hablaron',
+                            'Pregunta filosófica o abierta («¿cómo ves…?», «¿qué opinas de…?»), varias preguntas o ninguna'),
+        'dm_un_tema':_noul('¿`primer_mensaje.texto` trata un solo tema, el de la conversación, sin enumerar varios problemas, servicios o '
+                           'propuestas?'),
+        'dm_en_persona':_noul('¿`primer_mensaje.texto` suena a lo que Gustavo le diría en persona a alguien con quien acaba de '
+                              'conversar, y no a una plantilla de prospección?'),
+        'dm_pitch':_noul('¿`primer_mensaje.texto` vende, ofrece servicios, presenta la empresa de Gustavo, pide una reunión, una llamada '
+                         'o minutos, o lleva un enlace?'),
+    }
 # RED-*: the classifier (red.classify) is the single judge of fit, enforced by red.network_issues. The lead only looks for
 # concrete risks of the person, reads the classifier's role and reason, and asks about selling services only for the
 # buyer hypothesis (measured 14/11/2026: the single compound question sat at 0.3–0.6 for people who fit).
@@ -160,6 +190,11 @@ def _questions(proposal,orientation):
                             'no aparece en `hechos_publicos_de_gustavo`?'),
             'respeto':_noul('¿La `respuesta` es respetuosa con la persona y con las demás, sin sarcasmo, burla ni condescendencia?'),
         }
+        dm=(decision.get('dm_opener') or '').strip() if closing else ''
+        if dm:
+            state['primer_mensaje']={'texto':dm,'para':row.author_name,
+                                     'momento':'Gustavo se lo enviaría él mismo por privado si conectan, después de esta conversación en su post.'}
+            questions.update(dm_questions())
         kind='reply'
     elif capability==CAP.PUBLISH:
         state={'publicacion':proposal.payload['text']}
@@ -220,6 +255,7 @@ def _questions(proposal,orientation):
         public,_=memory.confirmed_blocks()
         state['hechos_publicos_de_gustavo']=[f['fact'] for f in public]
     checks=list(CHECKS[kind]) if kind in CHECKS else network_checks(capability,role)
+    if 'primer_mensaje' in state:checks.extend(DM_CHECKS)
     if kind=='post':
         questions['idioma']=_noul('¿La publicación está en inglés?');checks.append(('idioma','min',0.7,'no está en inglés'))
     if capability==CAP.INVITE and proposal.payload.get('note'):
@@ -259,15 +295,17 @@ def _review(proposal):
     except ValueError as exc:
         return {'decision':'retry','reasons':[str(exc)],'error_at':now.isoformat(),'at':now.isoformat(),**grounding}
     answers={qid:round(float((answer or {}).get('noul',0.5)),3) for qid,answer in result['answers'].items()}
-    failed=[]
+    failed=[];dm_failed=[]
     for qid,bound,threshold,label in checks:
         value=answers.get(qid)
         if value is None or (bound=='min' and value<threshold) or (bound=='max' and value>threshold):
-            failed.append(f'Líder: {label} ({qid}={value if value is not None else "sin respuesta"})')
-    return {'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
-            'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
-            'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding,
-            'note_approved':bool(proposal.payload.get('note') and not failed),'from_gustavo':bool(state.get('pedido_de_gustavo'))}
+            (dm_failed if qid in DM_IDS else failed).append(f'Líder: {label} ({qid}={value if value is not None else "sin respuesta"})')
+    verdict={'decision':'discard' if failed else 'approve','reasons':failed,'answers':answers,
+             'thresholds':{qid:[bound,threshold] for qid,bound,threshold,_ in checks},'model':result['model'],
+             'with_orientation':bool(orientation),'cost_usd':result['estimated_usd'],'at':now.isoformat(),**grounding,
+             'note_approved':bool(proposal.payload.get('note') and not failed),'from_gustavo':bool(state.get('pedido_de_gustavo'))}
+    if 'primer_mensaje' in state:verdict.update(dm_approved=not dm_failed,dm_reasons=dm_failed)
+    return verdict
 
 # --------------------------------------------------------------------------- R5: comment prefilter
 # Before Opus is paid to draft a comment (autopiloto._propose), Jev judges whether the post deserves one from Gustavo.
