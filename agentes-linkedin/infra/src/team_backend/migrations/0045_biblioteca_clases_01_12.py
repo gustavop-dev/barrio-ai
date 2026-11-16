@@ -29,6 +29,6 @@ def session_checks(last):
 
 class Migration(migrations.Migration):
 
-    dependencies = [('team_backend', '0043_revision_mensual')]
+    dependencies = [('team_backend', '0044_sin_unipile')]
 
     operations = [migrations.RunSQL(session_checks(12), reverse_sql=session_checks(6))]

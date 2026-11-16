@@ -31,5 +31,5 @@ pagadas como parte de la documentación.
 - [ ] Ejecutar esas regresiones en entorno autorizado y comprobar el relanzamiento productivo de `perfil_assets 8aa8c51c` con sus blobs confirmados. No se accedió a producción en esta sesión.
 - [x] Tras #92: revisión separada de asset/explicación, reparación de una sección con segunda revisión única, fallback `needs_input`, evidencia de previews y conservación de A/B/topes/checkpoints. Tests con fakes escritos.
 - [ ] Ejecutar `test_perfil_assets_explanation`, `test_perfil_assets`, `test_perfil`, `test_perfil_chroma` y `test_grafo` en entorno autorizado. Sin tests/builds locales ni proveedores pagados en esta sesión.
-- [x] Biblioteca 01–12, fases 0–1: constantes de clases, migración 0044, ingesta 07–12 con fuentes y políticas, alcance de agentes en 01–06 y pruebas sintéticas y con corpus.
+- [x] Biblioteca 01–12, fases 0–1: constantes de clases, migración 0045, ingesta 07–12 con fuentes y políticas, alcance de agentes en 01–06 y pruebas sintéticas y con corpus.
 - [ ] Fase 2, con aprobación de Gustavo: `migrate` y `knowledge ingest` en la base desplegada (montar «Procesamiento clases 08-12» en el compose del runtime) y verificar 1.656 unidades; embeddings de 07–12 aparte.
