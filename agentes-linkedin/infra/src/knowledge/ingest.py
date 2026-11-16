@@ -5,6 +5,7 @@ import unicodedata
 from collections import Counter
 import tiktoken
 from psycopg.types.json import Json,Jsonb
+from .clases import CLASES_BIBLIOTECA,rango
 from .config import root
 from .db import connect
 
@@ -51,10 +52,18 @@ def fragments(unit):
             yield field,start,end,content
             start=end
 
+FIRST='LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/'
+COMPLETE='LinkedIn Sales - Procesamiento completo/'
+LATER='LinkedIn Sales - Procesamiento clases 08-12/'
+# Clases revisadas por bloque: (clases, carpeta de las sesiones revisadas, archivo de fuentes del bloque).
+# Las fuentes de 08–12 no están en revision-independiente, sino junto a su política de uso.
+BLOCKS=((range(2,8),COMPLETE+'revision-independiente/',COMPLETE+'revision-independiente/fuentes.jsonl'),
+        (range(8,13),LATER+'revision-independiente/',LATER+'conocimiento-para-agentes/fuentes.jsonl'))
+# Ambas políticas se registran como fuente con su hash. Los agentes leen hoy solo la primera (agents.run).
+POLICIES=(COMPLETE+'conocimiento-para-agentes/politica-de-uso.json',LATER+'conocimiento-para-agentes/politica-de-uso.json')
+
 def paths():
-    first='LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/'
-    review='LinkedIn Sales - Procesamiento completo/revision-independiente/'
-    return [(1,first+'aprendizajes.json')]+[(n,review+f'session-{n:02}-revisada.json') for n in range(2,7)]
+    return [(1,FIRST+'aprendizajes.json')]+[(n,folder+f'session-{n:02}-revisada.json') for classes,folder,_ in BLOCKS for n in classes]
 
 def load_corpus():
     base=root(); files={}; units=[]; evidence={}; assignments={}
@@ -64,15 +73,14 @@ def load_corpus():
         data=read(path)
         for i,unit in enumerate(data['learning_units']):
             units.append((session,path,i,unit))
-    first='LinkedIn Sales - Entrega clase 01/01 - Clase 01/quality/'
-    sources=read(first+'sources.json')['data']
-    for item in sources['transcript']+sources['materials']+read(first+'visual/evidence.json')['visuals']:
+    sources=read(FIRST+'sources.json')['data']
+    for item in sources['transcript']+sources['materials']+read(FIRST+'visual/evidence.json')['visuals']:
         evidence['01:'+item['id']]={'key':'01:'+item['id'],'session':1,'source_id':item['id'],'original':item}
-    path='LinkedIn Sales - Procesamiento completo/revision-independiente/fuentes.jsonl'
-    raw=(base/path).read_bytes();files[path]=digest(raw)
-    for line in raw.decode().splitlines():
-        item=json.loads(line)
-        if 2<=int(item['session'])<=6:evidence[item['key']]=item
+    for classes,_,path in BLOCKS:
+        raw=(base/path).read_bytes();files[path]=digest(raw)
+        for line in raw.decode().splitlines():
+            item=json.loads(line)
+            if int(item['session']) in classes:evidence[item['key']]=item
     path='agentes-linkedin/equipos/estrategia-perfil/asignacion-clase-02.json'
     if (base/path).exists():
         for item in read(path)['assignments']:assignments[item['unit_id']]=item
@@ -83,9 +91,12 @@ def load_corpus():
             for uid in rule.get('unit_ids',[]):
                 item=assignments.setdefault(uid,{'agents':[]})
                 item['agents']=sorted(set(item['agents']+rule.get('agents',[])))
-    policy=read('LinkedIn Sales - Procesamiento completo/conocimiento-para-agentes/politica-de-uso.json')
+    policy={path:read(path) for path in POLICIES}
     ids=[u['id'] for _,_,_,u in units]
     if len(ids)!=len(set(ids)):raise ValueError('IDs de unidad duplicados')
+    # La búsqueda filtra por la clase guardada y los validadores de agentes por el prefijo del ID: deben coincidir.
+    mismatched=[u['id'] for s,_,_,u in units if not u['id'].startswith(f'LI-{s:02}-')]
+    if mismatched:raise ValueError('IDs de unidad con una clase distinta de la de su archivo: '+str(mismatched[:10]))
     missing=[f'{s:02}:{sid}' for s,_,_,u in units for sid in u.get('source_ids',[]) if f'{s:02}:{sid}' not in evidence]
     if missing:raise ValueError('Evidencias sin resolver: '+str(missing[:10]))
     return files,units,evidence,assignments,policy
@@ -135,7 +146,7 @@ def ingest():
                     totals['edges']+=1
         # Detect source changes while the transaction was being built.
         if any(digest((root()/p).read_bytes())!=sha for p,sha in files.items()):raise ValueError('Las fuentes cambiaron durante la importación')
-    return dict(totals,source_files=len(files),evidence=len(evidence),source_integrity=True,scope='01–06')
+    return dict(totals,source_files=len(files),evidence=len(evidence),source_integrity=True,scope=rango(CLASES_BIBLIOTECA))
 
 def verify():
     files,units,_,_,_=load_corpus()
