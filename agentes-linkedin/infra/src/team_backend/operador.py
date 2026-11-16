@@ -1209,7 +1209,7 @@ def _run_job(job):
             from . import metricas
             r=metricas.collect(user,ConnectorAccount.objects.get(id=params['account']))
             oficina_eventos.job_done(job.kind,r)
-            return 'complete',f"cortes:{r['captured']} pend:{r['pending']} aud:{r['audience']}"[:30],r['stopped']
+            return 'complete',f"cortes:{r['captured']} pend:{len(r['pending'])} aud:{r['audience']}"[:30],r['stopped']
         if job.kind=='collect_outcomes':
             try:from . import desenlaces_captura
             except ImportError:return 'complete','sin_colector',''  # the collector lands in a later change
