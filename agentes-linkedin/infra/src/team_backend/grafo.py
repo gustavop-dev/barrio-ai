@@ -11,6 +11,8 @@ import math
 import re
 from pathlib import Path
 
+from knowledge.clases import CLASES_AGENTES, patron, rango
+
 
 class GraphError(ValueError):
     pass
@@ -80,8 +82,9 @@ def validate_graph(graph):
     budgets = graph.get('budgets', {})
     gates = graph.get('gates', {})
     for ref, units in lists.items():
-        check(isinstance(units, list) and all(isinstance(u, str) and re.fullmatch(r'LI-0[1-6]-[A-Z]\d{3}-K\d{2}', u) for u in units),
-              f'lista {ref}: IDs de unidades inválidos (solo clases 01–06)')
+        # Las listas curadas son lo que cargan los agentes: solo las clases que leen hoy, no toda la biblioteca.
+        check(isinstance(units, list) and all(isinstance(u, str) and re.fullmatch(rf'LI-{patron(CLASES_AGENTES)}-[A-Z]\d{{3}}-K\d{{2}}', u) for u in units),
+              f'lista {ref}: IDs de unidades inválidos (solo clases {rango(CLASES_AGENTES)})')
     for sid, schema in schemas.items():
         check(schema.get('binding') and schema.get('kind'), f'schema {sid}: sin binding/tipo')
     for nid, node in nodes.items():

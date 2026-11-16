@@ -13,6 +13,8 @@ import re
 
 from django.db import transaction
 
+from knowledge.clases import CLASES_AGENTES, patron
+
 from .models import ActiveShelf, CatalogEntry, LibraryCatalog
 
 SHELVES=('cliente','perfil','elegir','conectar','comentar','responder','privado','temas','redactar_post','editar','analizar')
@@ -20,7 +22,7 @@ TIERS=tuple(CatalogEntry.Tier.values)
 REASONS=('','dup','fuera','caso','baja')
 # The core loads on every call of the agent and the prompt cache rarely holds between calls: ~6–8 whole units.
 CORE_TOKEN_BUDGET=16500
-LOADABLE=re.compile(r'LI-0[1-6]-[A-Z0-9]+-K\d+')  # what operador.course_context can read
+LOADABLE=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')  # what operador.course_context can read
 VERSION=re.compile(r'[a-z0-9][a-z0-9._-]{0,39}')
 
 

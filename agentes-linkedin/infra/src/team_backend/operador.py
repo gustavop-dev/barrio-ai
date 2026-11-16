@@ -18,6 +18,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import memory, providers, retrieval
+from knowledge.clases import CLASES_AGENTES, patron
 from knowledge.ingest import ENC
 from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, deferred, get_connector, public_identifier, same_text
 from .exceptions import Conflict
@@ -971,6 +972,9 @@ afirmaciones por verificar las opiniones o perspectivas dichas como tales, las p
 de la publicación atribuidas a su autor. Si una idea necesita un dato que no tienes, dila como opinión o pregunta en vez
 de afirmarla.'''
 
+# Lo que un agente puede cargar por ID: solo las clases que leen hoy los agentes (knowledge.clases), no toda la biblioteca.
+AGENT_UNIT=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
+
 def course_context(unit_ids=COMMENT_UNITS,token_budget=COURSE_TOKEN_BUDGET):
     """Return (whole units, missing/unreadable IDs, IDs omitted only for budget).
 
@@ -979,7 +983,7 @@ def course_context(unit_ids=COMMENT_UNITS,token_budget=COURSE_TOKEN_BUDGET):
     """
     chosen=[];missing=[];omitted=[];tokens=0
     for uid in dict.fromkeys(unit_ids):
-        if not re.fullmatch(r'LI-0[1-6]-[A-Z0-9]+-K\d+',uid):missing.append(uid);continue
+        if not AGENT_UNIT.fullmatch(uid):missing.append(uid);continue
         try:row=retrieval.unit(uid)
         except (ValueError,KnowledgeReadError):missing.append(uid);continue
         entry={'unit_id':uid,'original':row['original'],

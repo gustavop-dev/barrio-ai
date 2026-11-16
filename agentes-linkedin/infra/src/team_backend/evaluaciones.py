@@ -883,7 +883,8 @@ def grade_course_case(role,result,grounding):
     citations=result.get('course_citations',[])
     if not citations or set(citations)-set(grounding.get('course_citations',[])):errors.append('Citas no recuperadas')
     if set(case['required'])-set(citations):errors.append('Falta fundamento del caso')
-    if any(uid.startswith('LI-07-') for uid in citations):errors.append('Clase 07 excluida')
+    # La biblioteca guarda más clases de las que leen los agentes (knowledge.clases): citar una que no leen es un fallo.
+    if any(not operador.AGENT_UNIT.fullmatch(uid) for uid in citations):errors.append('Cita fuera de las clases que leen los agentes')
     for key,expected in case['expected'].items():
         if result.get(key)!=expected:errors.append('Conducta incorrecta: '+key)
     return {'case':case['id'],'passed':not errors,'errors':errors,'version':grounding.get('course_version')}
