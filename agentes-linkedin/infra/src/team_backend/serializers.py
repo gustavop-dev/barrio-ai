@@ -1,5 +1,6 @@
 from django.utils import timezone
 from rest_framework import serializers
+from knowledge.clases import CLASES_BIBLIOTECA
 from .models import Job,KnowledgeUnit,AuditEvent
 
 class UTF8CharField(serializers.CharField):
@@ -14,6 +15,8 @@ class SearchInput(serializers.Serializer):
     agent=serializers.ChoiceField(choices=['posicionamiento','perfil'],required=False,allow_null=True)
     limit=serializers.IntegerField(min_value=1,max_value=20,default=6)
     mode=serializers.ChoiceField(choices=['lexical','hybrid'],default='lexical')
+    # Solo si se piden de forma explícita; sin este campo, las clases que leen los agentes (knowledge.clases).
+    clases=serializers.ListField(child=serializers.IntegerField(),required=False,min_length=1,max_length=len(CLASES_BIBLIOTECA))
 
 class RunInput(serializers.Serializer):
     agent=serializers.ChoiceField(choices=['posicionamiento','perfil'])

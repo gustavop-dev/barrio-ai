@@ -11,9 +11,15 @@ import uuid
 from pathlib import Path
 from urllib.parse import quote
 import httpx
+from knowledge.clases import CLASES_BIBLIOTECA, patron
 
 class BridgeError(Exception):
     pass
+
+# Consulta por ID: cualquier clase que guarda la biblioteca. La búsqueda de la oficina no envía clases y se queda
+# en las que leen los agentes.
+UNIT_ID=re.compile(rf'LI-{patron(CLASES_BIBLIOTECA)}-[A-Za-z0-9-]+')
+SOURCE_KEY=re.compile(rf'{patron(CLASES_BIBLIOTECA)}:[A-Za-z0-9_-]+')
 
 def command_request(command):
     operation=command.get('operation');body=command.get('body')
@@ -23,8 +29,8 @@ def command_request(command):
     if operation=='runs':return 'GET','/api/v1/runs?page_size=30',None
     if operation in ('unit','source'):
         identifier=body.get('id','')
-        pattern=r'LI-0[1-6]-[A-Za-z0-9-]+' if operation=='unit' else r'0[1-6]:[A-Za-z0-9_-]+'
-        if not isinstance(identifier,str) or not re.fullmatch(pattern,identifier):raise ValueError('Referencia inválida')
+        pattern=UNIT_ID if operation=='unit' else SOURCE_KEY
+        if not isinstance(identifier,str) or not pattern.fullmatch(identifier):raise ValueError('Referencia inválida')
         return 'GET',('/api/v1/units/' if operation=='unit' else '/api/v1/sources/')+quote(identifier,safe=':'),None
     if operation in ('run','cancel','confirm'):
         identifier=str(uuid.UUID(body.get('id','')))
