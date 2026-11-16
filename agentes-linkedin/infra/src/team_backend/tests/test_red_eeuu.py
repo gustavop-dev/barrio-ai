@@ -15,7 +15,7 @@ from django.utils import timezone
 from team_backend import autopiloto, operador, orquestacion, red, referentes, research, ubicacion
 from team_backend.connectors import UnipileConnector, _signals
 from team_backend.jobs import Conflict
-from team_backend.models import (ActionProposal, Contact, Notification, ReferentControl, ReferentReview,
+from team_backend.models import (ActionProposal, AuditEvent, Contact, Notification, ReferentControl, ReferentReview,
                                  WebResearchRun)
 from team_backend.tests.test_red import NetworkBase
 
@@ -187,6 +187,40 @@ class StageCheckTests(NetworkBase):
             run,cached=research._claim(research.ResearchRequest(key='piece:editorial-2',public_question='q',search=True),'q')
             self.assertEqual((run,cached.status),(None,'skipped'))  # and the stage check does not free editorial room
             self.assertEqual(red.stage_checks_left(),0)
+
+    def silent_runs(self,findings_in=None):
+        """Six researches that reached the web (they carry usage) and came back empty: two days of stage checks, then
+        the editorial ones. `findings_in` gives one of them a finding. A run that never reached the web does not count."""
+        now=timezone.now()
+        for n,(key,days) in enumerate((('etapa:x:1:a',2),('etapa:y:1:a',2),('etapa:x:2:b',1),('etapa:y:2:b',1),('piece:p1',0),('piece:p2',0))):
+            result={'findings':[{'text':'Acme raised a seed round.','source_ids':['s1']}] if n==findings_in else [],
+                    'limitations':['La web no devolvió hallazgos con citas verificables'],'usage':{'model':'claude-sonnet-5-5'}}
+            WebResearchRun.objects.create(key=key,request_hash='h',state='complete' if n==findings_in else 'unavailable',
+                                          created_at=now-timedelta(days=days,minutes=n),result=result)
+        WebResearchRun.objects.create(key='piece:p3',request_hash='h',state='unavailable',result={'limitations':['Investigación incompleta']})
+
+    def test_a_week_of_research_without_findings_pauses_the_checks_without_spending_attempts(self):
+        ana=self.buyer('ana-pausa','Ana Pausa');self.silent_runs()
+        self.assertTrue(red.stage_pending(self.account))  # the job still runs once, to record the pause
+        with patch('team_backend.research.research') as web,self.judge('semilla_o_mas'):
+            summary=red.check_stages(self.bot,self.account)
+            self.assertEqual(red.check_stages(self.bot,self.account),summary)
+        web.assert_not_called();self.assertEqual(self.judged,[])
+        self.assertEqual(summary,{'checked':0,'passed':0,'stopped':red.STAGE_PAUSED})
+        ana.refresh_from_db()
+        self.assertEqual((ana.stage,ana.classification['stage_check']),('fit',{'state':'pending'}))
+        paused=AuditEvent.objects.filter(action='network.stage_check_paused',target=str(self.account.id))
+        self.assertEqual((paused.count(),paused.get().metadata['pending']),(1,1))  # once a day
+        self.assertFalse(red.stage_pending(self.account))  # and the autopilot stops queueing it for today
+        self.assertEqual(red.classify(self.bot,self.account)['stopped'],red.STAGE_PAUSED)  # the classify job tells it
+
+    def test_one_research_with_findings_keeps_the_checks_running(self):
+        ana=self.buyer('ana-sigue','Ana Sigue');self.silent_runs(findings_in=5)
+        with patch('team_backend.research.research',return_value=self.found()),self.judge('semilla_o_mas'):
+            summary=red.check_stages(self.bot,self.account)
+        ana.refresh_from_db()
+        self.assertEqual((summary,ana.classification['stage_check']['state']),({'checked':1,'passed':1},'ok'))
+        self.assertFalse(AuditEvent.objects.filter(action='network.stage_check_paused').exists())
 
 
 class PlanOrderTests(NetworkBase):

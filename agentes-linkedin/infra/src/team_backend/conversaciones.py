@@ -244,7 +244,7 @@ def read_inbox(user,account,now=None):
     """One run: refresh the account status, list the chats, read what is new (within the caps), judge and propose."""
     require(user,'operate_linkedin')
     now=now or timezone.now()
-    summary={'chats':0,'read':0,'assessed':0,'flagged':0,'stopped':''}
+    summary={'chats':0,'read':0,'vacias':0,'assessed':0,'flagged':0,'stopped':''}
     try:operador.check_account(account,user)  # a non-running or locked account is paused there
     except ConnectorError as exc:
         _pause_on(account,exc);summary['stopped']=str(exc);return summary
@@ -270,6 +270,9 @@ def read_inbox(user,account,now=None):
             _pause_on(account,exc)
             if exc.pause or deferred(exc):summary['stopped']=str(exc);break  # nothing came back: still stale, read next run
             continue
+        # The list says the chat has something new: an empty read is a failed read, never an emptied thread. The stored
+        # snapshot stays and the chat, still stale, is read again next run.
+        if not messages:summary['vacias']+=1;continue
         _from_messages(account,conversation,messages,now);summary['read']+=1
     for conversation in _to_assess(account,now)[:assess_per_run()]:
         if assess(conversation,now):

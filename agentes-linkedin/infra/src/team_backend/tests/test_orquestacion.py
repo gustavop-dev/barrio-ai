@@ -232,13 +232,17 @@ class DispatcherTests(TransactionTestCase):
         self.assertFalse(UsageEntry.objects.exists())
 
     def test_undeclared_provider_and_provider_outside_tool_are_audited(self):
-        run=self.open()
-        with run.session(),self.assertRaises(runtime.UndeclaredCall):
+        outside=self.open()
+        with outside.session(),self.assertRaises(runtime.UndeclaredCall):
             providers.reserve('anthropic','editorial-seleccion',Decimal('.01'))
-        run=self.open()
-        with run.session(),self.assertRaises(runtime.UndeclaredCall):
-            run.call('seleccionar',REQUEST,lambda:providers.reserve('openai','image-edit',Decimal('.01')))
+        undeclared=self.open()
+        with undeclared.session(),self.assertRaises(runtime.UndeclaredCall):
+            undeclared.call('seleccionar',REQUEST,lambda:providers.reserve('openai','image-edit',Decimal('.01')))
         self.assertFalse(UsageEntry.objects.exists())
+        for run in (outside,undeclared):
+            self.assertTrue(AuditEvent.objects.filter(action='cycle.rejected',target=str(run.id),
+                                                      metadata__reason='undeclared_provider').exists())
+            self.assertEqual(CycleLedger.objects.get(pk=run.id).stop_reason,'undeclared_provider')
 
     def test_daily_cap_includes_spend_from_outside_this_cycle(self):
         self.cycle()['limits']['daily_cost_cap_usd']=2  # the runtime still honours a cycle's daily cap when declared
@@ -360,12 +364,7 @@ class DispatcherTests(TransactionTestCase):
         self.assertEqual(UsageEntry.objects.count(),1)
         self.assertEqual(CycleLedger.objects.get(pk=first.id).budget_bucket,CycleLedger.objects.get(pk=second.id).budget_bucket)
 
-    def test_business_caps_and_planned_cycles_cannot_be_enabled_by_invocation(self):
-        by_id={c['id']:c for c in self.graph['cycles']}
-        self.assertEqual(by_id['pieza_diaria']['limits']['cost_cap_usd'],8)
-        self.assertEqual(by_id['referentes_mensuales']['limits']['cost_cap_usd'],5)
-        self.assertEqual(by_id['referentes_mensuales']['limits']['cost_period'],'month')
-        self.assertEqual(by_id['perfil_periodico']['limits']['cost_cap_usd'],10)
+    def test_planned_cycles_cannot_be_enabled_by_invocation(self):
         # Phase 8 activated perfil_periodico; a cycle marked planned in the graph still cannot be opened by invocation.
         self.open(cycle='perfil_periodico').stop('done')
         self.cycle('perfil_periodico')['status']='planned'

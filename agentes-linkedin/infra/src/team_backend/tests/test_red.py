@@ -426,3 +426,70 @@ class EnrichmentTests(NetworkBase):
         self.job('discover_network')
         self.assertEqual(Contact.objects.filter(source='commenter').count(),10)
         self.assertTrue(Contact.objects.filter(source='search').exists())
+
+
+class UncitedVerdictTests(NetworkBase):
+    def people(self,*names):
+        for name in names:
+            person=self.fake.seed_person(name.lower().replace(' ','-'),name,headline='Founder')
+            Contact.objects.create(account=self.account,provider_user_id=person['id'],display_name=name,source='search',stage='candidate')
+
+    def answer(self,without):
+        """Every person fits; those in `without` come back with no retrieved course unit to ground the verdict."""
+        def fake(system,message,**kwargs):
+            out=[{'id':p['id'],'fit':True,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':f'Razón para {p["name"]}',
+                  'confidence':0.9,'course_citations':[] if p['name'] in without else ['LI-03-M005-K06'],'invitation_note':'','note_reason':''}
+                 for p in json.loads(message)['people']]
+            return {'text':json.dumps({'contacts':out}),'model':kwargs.get('model'),'estimated_usd':0.002,'request_id':'req_net'}
+        return patch('knowledge.providers.claude',side_effect=fake)
+
+    def test_an_ungrounded_verdict_waits_one_run_then_leaves_without_losing_the_batch(self):
+        self.people('Ana Cita','Bea Cita','Sin Cita')
+        with self.answer({'Sin Cita'}),patch('team_backend.red.check_stages',wraps=red.check_stages) as stages:
+            job=self.job('classify_contacts')
+        self.assertEqual((job.state,job.result_status,job.error),('complete','encajan:2/2',''))
+        stages.assert_called_once()
+        self.assertEqual(AuditEvent.objects.get(action='network.classified').metadata['uncited'],1)
+        self.assertEqual({c.display_name:c.stage for c in Contact.objects.all()},{'Ana Cita':'fit','Bea Cita':'fit','Sin Cita':'candidate'})
+        waiting=Contact.objects.get(display_name='Sin Cita')
+        self.assertEqual((waiting.classification,waiting.history[-1]['event']),({},'classify_uncited'))
+        with self.answer({'Sin Cita'}):summary=red.classify(self.bot,self.account)
+        self.assertEqual((summary['classified'],summary['fit'],summary['uncited']),(1,0,0))
+        waiting.refresh_from_db()
+        self.assertEqual((waiting.stage,waiting.classification['fit'],waiting.classification['rule'],waiting.classification['course_citations']),
+                         ('discarded',False,red.UNCITED_RULE,[]))
+
+
+class ClassifyJobStageCheckTests(NetworkBase):
+    def test_the_classify_job_checks_a_buyer_stage_inside_its_declared_purposes(self):
+        # Each fake call reserves in the usage ledger as the real ones do, so a purpose the graph does not declare for
+        # «clasificar» stops the job («undeclared_provider») as it did in production.
+        from decimal import Decimal
+        from knowledge import providers
+        from team_backend import research
+        purposes=[]
+        def paid(purpose):
+            purposes.append(purpose);rid=providers.reserve('anthropic',purpose,Decimal('0.001'));providers.settle(rid,'complete',cost='0.001')
+        def claude(system,message,**kwargs):
+            paid(kwargs['purpose'])
+            if kwargs['purpose']=='network-stage':
+                return {'text':json.dumps({'verdict':'semilla_o_mas','evidence':'La fuente dice que levantó una ronda semilla.',
+                                           'source_urls':['https://news.example/acme-seed']}),'model':'claude-sonnet-5-5'}
+            out=[{'id':p['id'],'fit':True,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':'Founder con producto.',
+                  'confidence':0.9,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''} for p in json.loads(message)['people']]
+            return {'text':json.dumps({'contacts':out}),'model':kwargs.get('model'),'estimated_usd':0.001,'request_id':'req_net'}
+        def web(request):
+            paid(request.purpose)
+            source=research.Source('s1','https://news.example/acme-seed','Acme seed','Acme raised a seed round','2026-11-12T00:00:00+00:00')
+            return research.ResearchResult(request.public_question,'complete','2026-11-12T00:00:00+00:00',
+                                           (research.Finding('Acme Robotics raised a seed round.',('s1',)),),(source,),usage={'model':'claude-sonnet-5-5'})
+        person=self.fake.seed_person('ana-acme','Ana Acme',headline='Founder & CEO at Acme Robotics')
+        Contact.objects.create(account=self.account,provider_user_id=person['id'],display_name='Ana Acme',source='search',stage='candidate')
+        with patch.dict(os.environ,{'NETWORK_STAGE_CHECK':'true'}),patch('knowledge.providers.claude',side_effect=claude), \
+             patch('team_backend.research.research',side_effect=web):
+            job=self.job('classify_contacts')
+        self.assertEqual((job.state,job.result_status,job.error),('complete','encajan:1/1',''))
+        self.assertEqual(purposes,['network-classify','web-research-tool','network-stage'])
+        ana=Contact.objects.get(display_name='Ana Acme')
+        self.assertEqual((ana.stage,ana.classification['stage_check']['state']),('fit','ok'))
+        self.assertFalse(AuditEvent.objects.filter(action='cycle.rejected').exists())

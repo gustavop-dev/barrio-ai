@@ -415,7 +415,7 @@ def _findings(study, rows):
 def analyze(study):
     now = timezone.now()
     rows = list(study.sources.filter(retired_at__isnull=True, expires_at__gt=now).order_by('id'))
-    known_units, cited_units, missing, omitted = [], [], [], []
+    known_units, cited_units, missing, omitted, unanswered = [], [], [], [], []
     if rows:
         units, missing, omitted = operador.course_context(operador.ANALYSIS_UNITS)
         if missing: raise ValueError('Biblioteca no disponible para el estudio de comunidad.')
@@ -427,15 +427,23 @@ def analyze(study):
         try:
             data = json.loads(answer['text'])
             orquestacion.validate(data, ANALYSIS_SCHEMA)
-            items = {item['source']: item for item in data['items']}
-            if len(items) != len(data['items']) or set(items) != {str(r.pk) for r in rows}: raise ValueError()
+            # One missing, repeated or unknown item must not lose the paid study: the first answer per known excerpt
+            # counts, unknown ids are dropped, and only an answer for fewer than half of the excerpts is refused.
+            expected, items = {str(r.pk) for r in rows}, {}
+            for item in data['items']:
+                if item['source'] in expected: items.setdefault(item['source'], item)
+            if 2*len(items) < len(rows): raise ValueError()
         except (ValueError, TypeError, KeyError):
             raise ValueError('Análisis comunitario fuera de contrato; no se conserva la respuesta.') from None
         known_units = [u['unit_id'] for u in units]
         cited_units = [c for c in data['citations'] if c in known_units]
+        unanswered = [str(r.pk) for r in rows if str(r.pk) not in items]
         orquestacion.ensure_current()
         for row in rows:
-            item = items[str(row.pk)]
+            item = items.get(str(row.pk))
+            if item is None:  # unanalyzed in this study, out of its findings and recorded in its summary
+                CommunitySource.objects.filter(pk=row.pk).update(analysis={})
+                continue
             if not item['professional'] or item['sensitive'] or item['instruction']:
                 retire(CommunitySource.objects.filter(pk=row.pk), reason='ineligible')
                 continue
@@ -466,7 +474,9 @@ def analyze(study):
         study.summary = {'findings': findings, 'units': known_units, 'citations': cited_units, 'missing_units': missing,
             'course_omitted': omitted,
             'unknown_follow_reason': len(study.selection)-len({r.person_id for r in rows if r.analysis['follow_status'] == 'declared'}),
-            'uncertainties': LIMITATIONS, 'qualitative_people': len(qualitative)}
+            'uncertainties': LIMITATIONS+([f'El análisis no devolvió {len(unanswered)} de los extractos; quedan fuera de los hallazgos.']
+                                          if unanswered else []),
+            'unanalyzed_sources': unanswered, 'qualitative_people': len(qualitative)}
         study.state = 'partial' if findings else 'insufficient'
         study.completed_at = now
         study.coverage['with_text'] = len({r.person_id for r in rows})
