@@ -6,6 +6,7 @@ key on the other cells, readable post links, and six sheets when nobody saw a po
 demographics). Every number, name, label and post id is invented. Two locales: Spanish (d/m/yyyy, «1.234», «12 %»
 with a non-breaking space) and English (m/d/yyyy, «1,234», «12%»)."""
 import json
+import re
 from datetime import date, timedelta
 
 NBSP=' '
@@ -110,6 +111,19 @@ def workbook(start=date(2026,11,1),end=date(2026,11,7),locale='es',letters=False
     s7=demo(demographics(locale,content=True) if content is None else content)
     built=(s1,s2,s3,s4,s5,s6,s7)[:sheets]
     return {'documentTitle':'Analítica','sheets':[sheet(L['sheets'][i],rows) for i,rows in enumerate(built)]}
+
+def changed_format(doc):
+    """An invented format change the reader takes for headers, not for an error: the daily dates (sheets 2 and 5) with a
+    word before them and the latest posts' links (sheet 3) without their scheme. Every such row is skipped, so the
+    workbook reads with no days and no posts; the other sheets read as before."""
+    for number in (1,4):
+        for r in doc['sheets'][number]['rows']:
+            if r['cells'] and re.fullmatch(r'\d{1,2}/\d{1,2}/\d{4}',r['cells'][0]['displayValue']):
+                r['cells'][0]['displayValue']='día '+r['cells'][0]['displayValue']
+    for r in doc['sheets'][2]['rows']:
+        if r['cells'] and r['cells'][0]['displayValue'].startswith('https://'):
+            r['cells'][0]['displayValue']=r['cells'][0]['displayValue'].removeprefix('https://')
+    return doc
 
 def stream(doc,escaped=False):
     """The dialog's answer: a component stream with the workbook somewhere in the middle, junk around it."""
