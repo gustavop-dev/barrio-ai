@@ -121,7 +121,8 @@ export const isDayDecision = (action: TurnoAction) => Boolean(action.endpoint?.s
 export const isApprove = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/approve'));
 export const isReject = (action: TurnoAction) => Boolean(action.endpoint?.startsWith('/api/v1/operador/actions/') && action.endpoint.endsWith('/reject'));
 /** «Aprobar» / «Editar y aprobar» and «Rechazar» of a strategy change of the monthly review. */
-export const isChangeApprove = (action: TurnoAction) => isChangeEndpoint(action.endpoint, 'aprobar');
+export const isChangeApprove = (action: TurnoAction) =>
+  isChangeEndpoint(action.endpoint, 'aprobar') || isChangeEndpoint(action.endpoint, 'editar');
 export const isChangeReject = (action: TurnoAction) => isChangeEndpoint(action.endpoint, 'rechazar');
 
 export function successMessage(action: TurnoAction): string {
