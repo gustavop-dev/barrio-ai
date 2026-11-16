@@ -39,6 +39,7 @@ REPLY=ActionProposal.Capability.REPLY
 REACT=ActionProposal.Capability.REACT
 READ_CAPS={'posts':6,'comments':30,'threads':40,'people_posts':6}  # per local day; the autopilot reads about every 30 min
 MAX_TURNS=2  # public replies per person and thread
+THREAD_PAGE=50  # replies one thread read asks for
 MAX_DRAFTS=3  # paid drafts per comment: the first, one after Gustavo's answer, one retry after a provider failure
 REACTION='linkedin_like'
 REPLY_UNITS=operador.REPLY_UNITS  # B06/B14/B15, loaded whole for every draft unless the catalog's «responder» core is active
@@ -113,9 +114,11 @@ def reader_account():
     return ConnectorAccount.objects.filter(provider__in=PROVIDERS).order_by('created_at').first()
 
 def publications(now=None):
-    """(execution, piece) of the own posts published in the last 7 days, oldest first."""
+    """(execution, piece) of the own posts published in the last 7 days (metricas.PUBLISHED: confirmed, or sent after
+    writing), oldest first."""
+    from .metricas import PUBLISHED
     now=now or timezone.now()
-    rows=(ActionExecution.objects.select_related('proposal__piece').filter(state='confirmed',proposal__capability='CONT-09',
+    rows=(ActionExecution.objects.select_related('proposal__piece').filter(PUBLISHED,proposal__capability='CONT-09',
           proposal__piece__isnull=False,started_at__gte=now-timedelta(days=7)).order_by('started_at'))
     return [(e,e.proposal.piece) for e in rows]
 
@@ -137,12 +140,10 @@ def reading_due(account,now=None):
     return bool(reader and reader.pk==account.pk and not account.paused and due_pieces(now))
 
 def _post_id(account,connector,execution,piece,now):
-    """The Unipile id of the own post: the one metrics or an earlier scan found, or found once by its exact text. It is
-    kept in the scan's audit, never in piece.metrics, which belongs to metricas."""
+    """The Unipile id of the own post: the one metrics, an earlier scan or the write found (metricas._known_id), or
+    found once by its exact text. It is kept in the scan's audit, never in piece.metrics, which belongs to metricas."""
     from .metricas import _known_id, posts_limit
-    scans=AuditEvent.objects.filter(action='replies.scanned',target=str(piece.id),metadata__has_key='post_id')
-    if account.switched_at:scans=scans.filter(created_at__gt=account.switched_at)  # the other provider's id
-    known=_known_id(piece) or scans.order_by('-created_at').values_list('metadata__post_id',flat=True).first()
+    known=_known_id(piece,execution,account)
     if known:return known
     _read(account,'posts',now)
     text=execution.proposal.payload.get('text') or piece.final_text
@@ -209,10 +210,14 @@ def read(user,account,now=None,origin_job=''):
                 if not row.thread_id and counter>(row.reply_count or 0):threads.append((row,counter))
             for root,counter in threads:
                 _read(account,'threads',now)
-                for data in connector.list_comment_thread(post_id,root.provider_comment_id):
+                replies=connector.list_comment_thread(post_id,root.provider_comment_id,limit=THREAD_PAGE)
+                for data in replies:
                     row,created=_store(account,piece,post_id,data,thread=root.provider_comment_id)
                     summary['new']+=int(created and not row.own)
-                PostComment.objects.filter(pk=root.pk).update(reply_count=counter)
+                # Counted only as far as the read went: an empty or short answer is read again on the next scan (a full
+                # page is all one read brings).
+                got=len(replies)
+                PostComment.objects.filter(pk=root.pk).update(reply_count=counter if got>=min(counter,THREAD_PAGE) else got)
                 summary['threads']+=1
             _audit(None,'replies.scanned',piece.id,found=True,post_id=post_id)
             summary['pieces']+=1

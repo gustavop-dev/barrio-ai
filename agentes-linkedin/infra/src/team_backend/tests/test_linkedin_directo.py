@@ -144,9 +144,10 @@ class AccountAndProfileTests(SimpleTestCase):
         audience=c.own_audience()
         self.assertEqual(audience,{'followers':321,'connections':210});self.assertEqual(set(audience),set(connectors._audience({})))
         self.assertIn('variables=(vanityName:cuenta-de-prueba)',t.paths()[1])
-        self.assertIsNone(c.profile_views(14))  # another window than LinkedIn's own: absent, without calling
+        # The connector names the one window it answers (LinkedIn's own), and metricas asks for that one.
+        self.assertEqual((c.profile_views_days,c.client.profile_views_days),(rutas.VIEWS_DAYS,rutas.VIEWS_DAYS))
         self.assertEqual(len(t.sent),2)
-        self.assertEqual(c.profile_views(rutas.VIEWS_DAYS),37)
+        self.assertEqual(c.profile_views(c.profile_views_days),37)
         self.assertEqual(t.paths()[-1],'/voyager/api/identity/wvmpCards')
 
 
