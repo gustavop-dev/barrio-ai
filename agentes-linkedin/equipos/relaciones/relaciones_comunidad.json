@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "tipo": "contrato_documental_no_ejecutable",
   "id": "relaciones_comunidad",
   "nombre": "Relaciones y comunidad",
@@ -28,6 +28,25 @@
       4,
       5,
       6
+    ],
+    "metodologias_activadas": [
+      {
+        "id": "primer_mensaje",
+        "evaluacion": "BIB-09-primer-mensaje",
+        "lista": "operador.FIRST_MESSAGE_UNITS",
+        "unidades": [
+          "LI-09-M002-K04",
+          "LI-09-M002-K05",
+          "LI-09-M003-K02",
+          "LI-09-V011-K01",
+          "LI-09-M003-K03",
+          "LI-09-M003-K04",
+          "LI-09-M004-K02"
+        ],
+        "cuando": "Solo al cerrar el segundo turno de INT-04 (dm_opener), cargadas enteras junto a REPLY_UNITS; el líder las carga en la misma revisión para juzgar ese mensaje.",
+        "activacion": "knowledge.clases.METODOLOGIAS_ACTIVAS: abre solo estas siete unidades de la clase 09, con su evaluación y en relaciones_comunidad y lider_jev. CLASES_AGENTES sigue en 01–06 y cualquier otra unidad 07–12 sigue rechazada.",
+        "registro_de_lectura": "relaciones/registro-lectura-primer-mensaje.json"
+      }
     ],
     "unidades": [
       {
@@ -143,7 +162,8 @@
       "rol separado de conversaciones privadas",
       "niveles A/B/C, topes y degradación automática",
       "invitación sin nota por defecto por cuenta gratuita",
-      "ejecución exclusiva de operador_cuenta"
+      "ejecución exclusiva de operador_cuenta",
+      "primer mensaje: el puente es la conversación del post, no el servicio; sin secuencias ni seguimientos; Gustavo lo envía a mano (INB-08)"
     ]
   },
   "entradas": {
@@ -477,7 +497,7 @@
     {
       "id": "INT-04",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Leer el contexto del comentario; admitir lo desconocido; preguntas valiosas se registran para Editorial; el plazo de 72 h se cuenta desde el comentario al que se responde."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Leer el contexto del comentario; admitir lo desconocido; preguntas valiosas se registran para Editorial; el plazo de 72 h se cuenta desde el comentario al que se responde. Al cerrar el segundo turno redacta además el primer mensaje privado (dm_opener, BIB-09-primer-mensaje): reglas fijas en código (3 líneas, 500 caracteres, sin enlaces ni pedir reunión, sin fórmulas, idioma de la persona), una sola reescritura y, si sigue fallando, se descarta entero; el líder lo juzga en la misma revisión y solo con dm_approved llega a Tu turno. Nunca lo envía: lo envía Gustavo (INB-08)."
     },
     {
       "id": "INT-05",
@@ -795,6 +815,12 @@
         "caso": "Hilo pertinente en un post publicado hace 80 h",
         "resultado_esperado": "No comenta; registra la pregunta si es útil para Editorial.",
         "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "BIB-09-primer-mensaje: cinco variantes del primer mensaje tras una conversación de dos turnos en un post de Gustavo",
+        "resultado_esperado": "P1 concreto llega a Tu turno; P2 (15 minutos y enlace) y P3 (fórmulas y servicios) los paran las reglas fijas; P4 vago lo para el líder (dm_approved=False) sin descartar la respuesta pública; P5, aceptación sin conversación, no redacta nada; ningún mensaje enviado.",
+        "estado": "ejecutado_con_fakes",
+        "pruebas": "infra/src/team_backend/tests/test_primer_mensaje.py; línea base en infra/docs/linea-base-primer-mensaje.md"
       }
     ],
     "evidencia_de_validacion": [

@@ -140,7 +140,7 @@ La dirección editorial general en `posicionamiento.py` sigue siendo independien
 | | |
 | --- | --- |
 | Contrato | `equipos/relaciones/relaciones_comunidad.json` |
-| Código | `operador.py: propose_comment` y `_draft_comment` (INT-03, trabajo `propose_comment`). Deterministas: `red.py: plan` (RED-01, RED-02 y RED-04) y `red.py: sync` (RED-03) |
+| Código | `operador.py: propose_comment` y `_draft_comment` (INT-03, trabajo `propose_comment`); `respuestas.py: propose` (INT-04, trabajo `propose_reply`), que al cerrar el segundo turno redacta además el primer mensaje con `FIRST_MESSAGE_UNITS` y sus reglas fijas (`dm_text_issues`, [BIB-10](../../../docs/funcionalidades/biblioteca-equipos.md#bib-10)). Deterministas: `red.py: plan` (RED-01, RED-02 y RED-04) y `red.py: sync` (RED-03) |
 | Prompt | `operador.py: COMMENT_SYSTEM` con `COMMENT_SCHEMA` y la voz de Gustavo; las unidades del curso van detrás, en un bloque de sistema cacheado (`course_block`, C1) |
 | Modelo · effort | `ANTHROPIC_MODEL` (Opus 5.5) · medium; `max_tokens` = `ANTHROPIC_MAX_TOKENS` (8.000); ledger `propose-comment` |
 | Entradas | La publicación (autor, texto y URL), hasta 10 comentarios existentes leídos por LinkedIn directo, los hechos públicos y la orientación privada de la memoria confirmada (sin la orientación base del brief), la orientación y seis unidades del curso. En la reescritura, además, el borrador anterior y las reglas que incumplió (`revision`) |
@@ -184,7 +184,7 @@ La dirección editorial general en `posicionamiento.py` sigue siendo independien
 | Modelo | `TYPESAFE_MODEL` (Jev 1.14) por `providers.typesafe`; ledger `lead-review` y `comment-prefilter`. Devuelve juicios tipados con probabilidad y no genera texto |
 | Activación | `LEAD_ENABLED=true` y `LEAD_CAPABILITIES` (INT-03, CONT-09, RED-01, RED-02 y RED-04), como mucho `LEAD_MAX_REVIEWS_PER_TICK` (5) revisiones por tick (B3). En el código y en `deploy/.env.example` está en `false` por defecto |
 | Entradas | Comentario: autor y texto de la publicación, el comentario y los hechos públicos. Pieza: el texto y los hechos públicos. Red: nombre, titular, ubicación, grado, origen y evidencia de la persona, con los criterios del barrio; desde R2 solo se le pregunta el riesgo. En todos, la orientación de Gustavo si existe |
-| Salidas | `ActionProposal.review`: aprobar, descartar o reintentar, con respuestas, umbrales y coste |
+| Salidas | `ActionProposal.review`: aprobar, descartar o reintentar, con respuestas, umbrales y coste. En una respuesta de cierre con primer mensaje (INT-04), la misma llamada lleva seis preguntas `dm_*` con `FIRST_MESSAGE_UNITS` y añade `dm_approved` y `dm_reasons`; un fallo no descarta la respuesta pública |
 | Compuertas | Corre después de las reglas deterministas. Un solo umbral fallido descarta, y si Jev no responde se reintenta tras `LEAD_RETRY_MINUTES` |
 | Frente al diseño | No lidera ni prioriza: solo puede descartar. Su modo de fallo es la inacción silenciosa, y `lead_silence` avisa si en 7 días no aprueba nada en una capacidad. |
 
