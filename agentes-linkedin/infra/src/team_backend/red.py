@@ -557,25 +557,52 @@ Reglas:
   una nota escasa frente a invitar sin ella. Cita LI-03-M006-K01. No redactes notas genéricas.
 Devuelve una entrada por cada id recibido.'''
 
+def signals_allowance():
+    """NETWORK_SIGNALS_PER_DAY: profile reads a day for people who arrived with a headline but no signals (bio, followers,
+    connections…), within the shared profile cap; without them most people were judged on the headline alone. 0 judges
+    them on the headline, as before."""
+    return max(0,int(setting('NETWORK_SIGNALS_PER_DAY','15')))
+
+def _has_signals(contact):
+    return any(key!='read_at' for key in (contact.signals or {}))
+
+def _signals_read(account,allowance):
+    """Count a signals read before making it, like _read: False when the day's allowance is spent (nothing read); the
+    profile caps still stop it (ReadCapReached)."""
+    day,_=operador.period_starts()
+    with transaction.atomic():
+        operador.policy_lock()
+        if AuditEvent.objects.filter(action='network.signals_read',target=str(account.id),created_at__gte=day).count()>=allowance:return False
+        _read(account,'profile')
+        AuditEvent.objects.create(action='network.signals_read',target=str(account.id))
+    return True
+
 def _enrich(account,contacts):
     """DESC-03 before DESC-07: comment authors arrive without a headline (Unipile v2 sends name and id only), and
     classifying them blind discards good people. Read each profile once, within the daily profile cap; whoever
-    cannot be read today waits for tomorrow instead of being judged without data."""
-    ready=[];connector=None
-    for contact in contacts:
-        if contact.headline or contact.profile_checked_at:ready.append(contact);continue
+    cannot be read today waits for tomorrow instead of being judged without data. Whoever has a headline but no
+    signals is read within NETWORK_SIGNALS_PER_DAY; once it or the cap is spent they are judged on the headline, as
+    before, and never wait for a read."""
+    ready=[];connector=None;allowance=signals_allowance();room=allowance>0;stop=None
+    for i,contact in enumerate(contacts):
+        if contact.profile_checked_at or (contact.headline and (_has_signals(contact) or not room)):ready.append(contact);continue
         try:
-            _read(account,'profile')
+            if not contact.headline:_read(account,'profile')
+            elif not _signals_read(account,allowance):room=False;ready.append(contact);continue  # the headline alone
             connector=connector or get_connector(account)
             _apply_profile(contact,connector.get_profile(contact.provider_user_id));contact.save()
             operador._audit(None,'network.research_result',account.id,kind='profile',key=contact.provider_user_id,result_count=1)
-        except ReadCapReached:break
+        except ReadCapReached:stop=i;break
         except ConnectorError as exc:
             _pause_on(account,exc)
             # Nothing came back (the service's budget, no answer): unchecked, the person waits for the next round.
-            if exc.pause or deferred(exc):break
-            contact.profile_checked_at=timezone.now();contact.save()  # unreadable profile: classify with what we have
+            if exc.pause or deferred(exc):stop=i;break
+            # Unreadable profile: classified with what we have, once (checked, never retried), and visible in the memory.
+            contact.profile_checked_at=timezone.now()
+            note(contact,'profile_unreadable',f'No se pudo leer el perfil ({str(exc).rstrip(".")}); se clasifica con lo que hay.');contact.save()
         ready.append(contact)
+    # Reads stopped: with the allowance on, whoever has a headline or was checked is classified now; the rest wait.
+    if stop is not None and allowance:ready+=[c for c in contacts[stop:] if c.headline or c.profile_checked_at]
     return ready
 
 def classification_people(contacts):
@@ -945,6 +972,12 @@ def plan(user,account,now=None):
                         .filter(Q(followed_at__lte=now-invite_after())|Q(source=Contact.Source.OWN_POST))
                         .order_by('-classification__confidence','followed_at'))
         candidates=diverse_candidates(candidates)
+        # Whoever answered a follow (desenlaces RED-01: accepted, commented, replied, invited us) goes first among the
+        # eligible; the order inside each group stays. Context for the order, never a new proposal or more volume.
+        from . import desenlaces
+        engaged=desenlaces.network_engaged([c.pk for c in candidates],days=30,now=now) if candidates else {}
+        candidates=sorted(candidates,key=lambda c:c.pk not in engaged)
+        if runtime:runtime.snapshot('network_engaged',lambda:[str(c.pk) for c in candidates if c.pk in engaged])
         # A scarce note goes first to someone who conversed with him on his post, with a slightly lower bar.
         exceptions=sorted((c for c in candidates if c.classification.get('confidence',0)>=(0.8 if (c.evidence or {}).get('conversed') else 0.9) and
             c.classification.get('invitation_note') and c.classification.get('note_reason') and

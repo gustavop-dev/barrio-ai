@@ -1,12 +1,14 @@
 """Neighborhood network: discover, classify, follow, invite without note, accept; caps, gates and vetoes."""
 import json
 import os
+import uuid
 from datetime import timedelta
 from unittest.mock import patch
 from django.contrib.auth.models import User
 from django.utils import timezone
 from team_backend import autopiloto, jobs, operador, orquestacion, red
-from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Capture, Contact, CycleLedger, EditorialPiece, Job
+from team_backend.models import (ActionExecution, ActionOutcome, ActionProposal, AuditEvent, Capture, Contact, CycleLedger, EditorialPiece,
+                                 Job)
 from team_backend.tests.test_operador import OperatorBase
 
 SUBSTANTIVE='The hard part is not the model, it is deciding which step of the sales workflow you automate first.'
@@ -18,7 +20,9 @@ class NetworkBase(OperatorBase):
                                    'NETWORK_INVITE_AFTER_HOURS':'48','NETWORK_DAILY_LLM_USD':'1','NETWORK_READ_CAPS':'',
                                    # The location and stage rules of 12/11/2026 have their own tests (test_red_eeuu).
                                    'NETWORK_BUYER_REGION':'','NETWORK_STAGE_CHECK':'false','NETWORK_SEARCH_LOCATION':'',
-                                   'NETWORK_BATCHES':''})
+                                   'NETWORK_BATCHES':'',
+                                   # Profile reads for people with a headline but no signals have their own tests (SignalsReadTests).
+                                   'NETWORK_SIGNALS_PER_DAY':'0'})
         env.start();self.addCleanup(env.stop)
         self.bot,_=User.objects.get_or_create(username='barrio-autopiloto')
         self.grant(self.bot,'access_knowledge','run_agents','use_paid_providers','operate_linkedin','execute_actions')
@@ -426,6 +430,105 @@ class EnrichmentTests(NetworkBase):
         self.job('discover_network')
         self.assertEqual(Contact.objects.filter(source='commenter').count(),10)
         self.assertTrue(Contact.objects.filter(source='search').exists())
+
+
+class SignalsReadTests(NetworkBase):
+    """People who arrive with a headline but no signals (search results, commenters) get their profile read within
+    NETWORK_SIGNALS_PER_DAY and the shared profile cap; past either they are classified on the headline, as before."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'NETWORK_SIGNALS_PER_DAY':'15'});env.start();self.addCleanup(env.stop)
+
+    def people(self,*names):
+        for name in names:
+            slug=name.lower().replace(' ','-')
+            self.fake.seed_person(slug,name,headline='Founder at a seed-stage startup',signals={'followers':1500,'bio':f'{name} builds tools for founders.'})
+            Contact.objects.create(account=self.account,provider_user_id='ACo'+slug,display_name=name,headline='Founder at a seed-stage startup',
+                                   source='search',stage='candidate')
+
+    def classify(self,*names,**env):
+        with patch.dict(os.environ,env),self.classifier({name:(True,0.9) for name in names}):self.job('classify_contacts')
+        return {p['name']:p['signals'] for p in self.classifier_calls[0]['data']['people']}
+
+    def test_a_headline_without_signals_is_read_and_its_signals_reach_the_classifier(self):
+        with patch.dict(os.environ):
+            os.environ.pop('NETWORK_SIGNALS_PER_DAY');self.assertEqual(red.signals_allowance(),15)
+        self.people('Ana Uno')
+        self.fake.seed_person('bea-dos','Bea Dos',headline='Founder',signals={'followers':40})
+        Contact.objects.create(account=self.account,provider_user_id='ACobea-dos',display_name='Bea Dos',headline='Founder',source='search',
+                               stage='candidate',signals={'followers':300,'read_at':timezone.now().isoformat()})  # the search brought them
+        signals=self.classify('Ana Uno','Bea Dos')
+        self.assertEqual(signals,{'Ana Uno':{'followers':1500,'bio':'Ana Uno builds tools for founders.'},'Bea Dos':{'followers':300}})
+        self.assertEqual((red.reads_today(self.account,'profile'),AuditEvent.objects.filter(action='network.signals_read').count()),(1,1))
+        self.assertEqual(Contact.objects.filter(stage='fit').count(),2)
+
+    def test_without_the_allowance_nobody_with_a_headline_is_read(self):
+        self.people('Ana Uno')
+        self.assertEqual(self.classify('Ana Uno',NETWORK_SIGNALS_PER_DAY='0'),{'Ana Uno':{}})
+        self.assertEqual(red.reads_today(self.account,'profile'),0)
+        ana=Contact.objects.get();self.assertEqual((ana.stage,ana.profile_checked_at),('fit',None))
+
+    def test_the_allowance_stops_at_n_and_the_rest_are_classified_on_the_headline(self):
+        names=('Ana Uno','Bea Dos','Caro Tres');self.people(*names)
+        signals=self.classify(*names,NETWORK_SIGNALS_PER_DAY='2')
+        self.assertEqual([bool(signals[name]) for name in names],[True,True,False])
+        self.assertEqual(red.reads_today(self.account,'profile'),2)
+        self.assertEqual(Contact.objects.filter(stage='fit').count(),3)  # nobody waits for a read
+
+    def test_the_shared_profile_cap_stops_the_reads_and_only_people_without_a_headline_wait(self):
+        self.people('Ana Uno','Bea Dos')
+        person=self.fake.seed_person('dan-sin','Dan Sin Titular',headline='Founder')
+        Contact.objects.create(account=self.account,provider_user_id=person['id'],display_name='Dan Sin Titular',source='commenter',stage='candidate')
+        signals=self.classify('Ana Uno','Bea Dos','Dan Sin Titular',OPERATOR_PROFILE_READ_DAILY_LIMIT='1')
+        self.assertEqual(signals,{'Ana Uno':{'followers':1500,'bio':'Ana Uno builds tools for founders.'},'Bea Dos':{}})
+        self.assertEqual(AuditEvent.objects.filter(action='operator.profile_read').count(),1)
+        self.assertEqual(AuditEvent.objects.filter(action='network.signals_read').count(),1)  # the refused read spent nothing
+        self.assertEqual(Contact.objects.get(display_name='Dan Sin Titular').classification,{})  # waits for a readable profile
+
+    def test_an_unreadable_profile_is_noted_and_the_person_classified_without_retrying(self):
+        Contact.objects.create(account=self.account,provider_user_id='ACogone-eva',display_name='Eva Gone',headline='Founder',source='search',
+                               stage='candidate')  # LinkedIn answers that the profile is not there
+        self.assertEqual(self.classify('Eva Gone'),{'Eva Gone':{}})
+        eva=Contact.objects.get()
+        self.assertEqual(eva.stage,'fit');self.assertIsNotNone(eva.profile_checked_at)
+        self.assertIn('profile_unreadable',[e['event'] for e in eva.history])
+        self.assertEqual(red._enrich(self.account,[eva]),[eva])  # checked: never read again
+        self.assertEqual(red.reads_today(self.account,'profile'),1)
+
+
+class EngagedFirstTests(NetworkBase):
+    """desenlaces RED-01: whoever answered a follow is invited first among the eligible; volume and eligibility stay."""
+    def people(self):
+        self.contact('founder-alta','Alta Confianza',stage='followed',followed_hours=8*24)
+        low=self.contact('founder-baja','Baja Confianza',stage='followed',followed_hours=8*24)
+        low.classification['confidence']=0.7;low.save()
+        return low
+
+    def followed(self,contact,signals):
+        """The follow (RED-01) of `contact`, eight days ago, measured at 7 d with these signals."""
+        now=timezone.now()
+        proposal=ActionProposal.objects.create(account=self.account,contact=contact,capability='RED-01',payload={'user_id':contact.provider_user_id},
+                                               payload_hash='0'*64,state='confirmed')
+        execution=ActionExecution.objects.create(proposal=proposal,provider='fake',executed_by=self.gustavo,state='confirmed',wrote=True,
+                                                 idempotency_key=uuid.uuid4().hex,started_at=now-timedelta(days=8))
+        ActionOutcome.objects.create(execution=execution,kind='7d',source='derived',captured_at=now-timedelta(days=1),signals=signals)
+
+    def invited(self):
+        job=Job.objects.create(owner=self.bot,kind='plan_network')
+        runtime=orquestacion.Runtime.open('red',str(job.id),self.bot,job)
+        with runtime.session():summary=red.plan(self.bot,self.account)
+        names=list(ActionProposal.objects.filter(capability='RED-02').order_by('created_at').values_list('contact__display_name',flat=True))
+        engaged=orquestacion.unpack(CycleLedger.objects.get(pk=runtime.id).progress_ledger['snapshots']['network_engaged'])
+        return summary['invite'],names,engaged
+
+    def test_whoever_answered_a_follow_is_invited_first(self):
+        low=self.people()
+        self.followed(low,{'accepted':False,'commented_own_post':True})
+        self.assertEqual(self.invited(),(2,['Baja Confianza','Alta Confianza'],[str(low.pk)]))
+
+    def test_without_outcomes_the_order_is_the_same_as_before(self):
+        self.people()
+        self.assertEqual(self.invited(),(2,['Alta Confianza','Baja Confianza'],[]))
 
 
 class UncitedVerdictTests(NetworkBase):

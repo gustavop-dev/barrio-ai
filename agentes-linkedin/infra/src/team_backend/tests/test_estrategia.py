@@ -9,9 +9,10 @@ from decimal import Decimal
 from unittest.mock import patch
 from django.test import SimpleTestCase
 from django.utils import timezone
-from team_backend import (autopiloto, compuertas, editorial, estrategia, lider, modelos_crecimiento, operador, research,
+from team_backend import (analitica, autopiloto, compuertas, editorial, estrategia, lider, modelos_crecimiento, operador, research,
                           resumen_semanal, urgente)
-from team_backend.models import ActionProposal, Capture, EditorialPiece, Job, Notification, ObservedPost, Referent, WeeklyPlan
+from team_backend.models import (ActionExecution, ActionProposal, AnalyticsPost, Capture, EditorialPiece, Job, Notification,
+                                 ObservedPost, Referent, WeeklyPlan)
 from team_backend.tests.test_publicacion import GOOD_POST, EditorialBase, answers
 
 MONDAY=date(2026,11,16)  # a normal week; the next one doubles S
@@ -108,6 +109,30 @@ class WeeklyPlanTests(StrategyBase):
         with self.claude({'plan':raw}):plan=estrategia.run(self.gustavo,monday)
         self.assertTrue(all(s['audience_evidence'] is None and not s['evidence_ok'] for s in plan.slots))
         self.assertTrue(any('sin señal de la audiencia' in w for w in plan.warnings))
+
+    def test_the_plan_reads_lifetime_analytics_of_past_pieces_beside_their_cuts(self):
+        monday=self.next_monday;days=[monday+timedelta(days=i) for i in range(7)]
+        def published(days_ago,thesis):
+            when=timezone.now()-timedelta(days=days_ago)
+            piece=EditorialPiece.objects.create(account=self.official,slot_date=when.astimezone(self.tz).date(),scheduled_for=when,
+                                                state='ready',final_text=thesis,brief={'pillar':editorial.PILLARS[0],'thesis':thesis})
+            proposal=ActionProposal.objects.create(account=self.official,piece=piece,capability='CONT-09',payload={'text':thesis},
+                                                   payload_hash='0'*64,state='confirmed')
+            ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='linkedin_fake',state='confirmed',
+                                           executed_by=self.gustavo,started_at=when)
+            return piece
+        linked=published(4,'Con analítica');published(5,'Sin analítica')
+        AnalyticsPost.objects.create(account=self.official,post_urn='urn:li:activity:7100000000000000003',piece=linked,impressions=3100,
+                                     saves=14,sends=5,followers_gained=2,last_seen_at=datetime(2026,11,14,1,tzinfo=self.tz))
+        raw={'days':[{'date':d.isoformat(),'options':[self.option(f'Idea {d}')]} for d in days],'summary':'','signals_read':[]}
+        with self.claude({'plan':raw}),patch.object(analitica,'for_pieces',wraps=analitica.for_pieces) as lookup:
+            estrategia.run(self.gustavo,monday)
+        lookup.assert_called_once()  # one lookup for the whole history
+        history={r['thesis']:r for r in self.calls[0][1]['history']}
+        self.assertEqual(history['Con analítica']['analitica'],{'impressions':3100,'saves':14,'sends':5,'followers_gained':2,'source':'vida'})
+        self.assertIn('results',history['Con analítica'])  # beside its cuts, not instead of them
+        self.assertNotIn('analitica',history['Sin analítica'])
+        self.assertIn('analitica',estrategia.PLAN_SYSTEM);self.assertIn('Es contexto, no una regla',estrategia.PLAN_SYSTEM)
 
     def test_the_plan_is_queued_once_on_sunday_afternoon(self):
         sunday=self.today+timedelta(days=(6-self.today.weekday())%7)

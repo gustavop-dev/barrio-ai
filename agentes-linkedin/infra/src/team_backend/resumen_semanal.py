@@ -1,4 +1,4 @@
-"""analista_barrio_resultados: the weekly results summary that proposes orientation (audit, «Resultados de las piezas en
+"""analista_barrio_resultados: the weekly results summary that observes the week (audit, «Resultados de las piezas en
 el historial del director»). Behaviour in docs/resumen-semanal.md.
 
 - Once per ISO week, on Monday after WEEKLY_SUMMARY_TIME (local, OPERATOR_TIMEZONE), the autopilot queues one
@@ -11,8 +11,10 @@ el historial del director»). Behaviour in docs/resumen-semanal.md.
   all of it is data, never instructions. A validator drops every claim quoting a number the stats do not contain.
 - Spend stays within WEEKLY_SUMMARY_LLM_USD per local ISO week (its own small budget, so comments keep theirs) and the
   provider limit of the usage ledger.
-- Gustavo decides. «Usar como orientación» replaces the team orientation through orientacion.update (the PUT
-  /api/v1/orientacion path) and keeps the text it replaced, so «Deshacer» can restore it; «Descartar» closes the summary.
+- It observes, never proposes an orientation (decision of 2026-11-16: changes to the strategy are the monthly review's).
+  orientacion_propuesta stays in the stored analysis, always null. For a summary stored before, Gustavo still decides:
+  «Usar como orientación» replaces the team orientation through orientacion.update (the PUT /api/v1/orientacion path)
+  and keeps the text it replaced, so «Deshacer» can restore it; «Descartar» closes the summary.
   The editorial director reads the latest recommendations as input (for_director), never as orientation."""
 import json
 import os
@@ -26,11 +28,11 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, providers
-from . import editorial, metricas, operador, orientacion, posicionamiento, red, resultados
+from . import analitica, desenlaces, editorial, metricas, operador, orientacion, posicionamiento, red, resultados
 from .exceptions import Conflict
 from .jobs import audit, enqueue_operation
-from .models import (ActionExecution, ActionProposal, AuditEvent, Capture, ConnectorAccount, Contact, EditorialPiece, Job,
-                     Opportunity, WeeklySummary)
+from .models import (ActionExecution, ActionOutcome, ActionProposal, AuditEvent, Capture, ConnectorAccount, Contact,
+                     EditorialPiece, Job, Opportunity, WeeklySummary)
 from .permissions import require
 
 PURPOSE='weekly-summary'
@@ -38,7 +40,7 @@ ROLE='analista_barrio_resultados'
 WEEKLY_UNITS=operador.ANALYSIS_UNITS
 MAX_TOKENS=12000  # Opus 5.5 always thinks and the thinking counts here: room for it plus a short JSON
 EFFORT='medium'
-MAX_ITEMS=3;MAX_ITEM_CHARS=300;MAX_ORIENTATION_CHARS=600
+MAX_ITEMS=3;MAX_ITEM_CHARS=300
 THIN_POSTS=3  # fewer measured posts than this is a hint, not a conclusion
 DIRECTOR_WEEKS=2  # the director reads recommendations of a summary whose week started at most this many weeks ago
 # Shown before «Generar ahora» until a summary has a real cost: ~10k input tokens and ~4k output tokens on Opus 5.5.
@@ -125,6 +127,13 @@ def _cut(post,kind,now):
             'comentarios_con_sustancia':None if commenters is None else sum(1 for c in commenters if c.get('substantive')),
             'interaccion_pct':_round(resultados.engagement_pct(metric),1)}
 
+def _lifetime(posts):
+    """{piece id: LinkedIn's lifetime figures} of the posts linked to their analytics (analitica.for_pieces, one call):
+    a field of its own, never mixed into the 72 h and 7 d cuts. A figure of one range only ('rango') is not lifetime."""
+    found=analitica.for_pieces([p.piece.id for p in posts])
+    return {piece:{'impresiones':v.get('impressions'),'guardados':v.get('saves'),'envios':v.get('sends'),
+                   'seguidores_ganados':v.get('followers_gained')} for piece,v in found.items() if v.get('source')=='vida'}
+
 def publications(w,now,machine):
     posts=resultados._posts(w)
     pieces=list(EditorialPiece.objects.filter(slot_date__gte=w.first,slot_date__lte=w.last).prefetch_related('proposals'))
@@ -138,14 +147,15 @@ def publications(w,now,machine):
                     'mediana_impresiones':_median([m.impressions for m in measured],0),
                     'mediana_interaccion_pct':_median([resultados.engagement_pct(m) for m in measured],1),
                     'comentarios_con_sustancia':sum(c.get('substantive',False) for cs in read for c in cs) if read else None}
-    rows=[]
+    rows=[];lifetime=_lifetime(posts)
     for p in posts:
         brief=p.piece.brief or {}
         rows.append({'fecha':p.piece.slot_date.isoformat(),'pilar':brief.get('pillar'),'modalidad':brief.get('modality'),
                      **({'tipo':brief['gasp_type']} if brief.get('gasp_type') else {}),
                      'tesis':(brief.get('thesis') or '')[:200],'primera_linea':resultados.first_line(p.piece.final_text),
-                     **{kind:_cut(p,kind,now) for kind in editorial.RESULT_AGES}})
-    return {'disponible':True,'publicados':len(posts),'piezas_por_estado':dict(sorted(states.items())),'cortes':cuts,'posts':rows}
+                     **{kind:_cut(p,kind,now) for kind in editorial.RESULT_AGES},'analitica_vida':lifetime.get(p.piece.id)})
+    return {'disponible':True,'publicados':len(posts),'piezas_por_estado':dict(sorted(states.items())),'cortes':cuts,
+            'con_analitica_vida':sum(1 for r in rows if r['analitica_vida']),'posts':rows}
 
 def by_type(w,now,machine):
     """Per GASP type (estrategia.py): what went out, its 72 h cut and what the audience answered to most: the reader's
@@ -188,7 +198,34 @@ def _draft_fate(p):
     if p.state in ('failed','uncertain'):return 'fallido_o_incierto'
     return 'pendiente'
 
-def comments(w,machine):
+def _outcomes(capability,kind,w,now,**filters):
+    """(outcomes, counts) of the week's executions of `capability` (desenlaces.py), as captured by `now`: total, measured
+    at `kind`, too young for it, pendientes (past its age, the collector still in time) and sin_dato (its window closed).
+    The parts add up to the total, so nothing has to be computed."""
+    age,late=desenlaces.WINDOWS[kind]
+    started=dict(ActionExecution.objects.filter(proposal__capability=capability,state__in=desenlaces.DONE,**filters,
+                                               **_between('started_at',w)).values_list('id','started_at'))
+    measured=list(ActionOutcome.objects.filter(execution_id__in=list(started),kind=kind,captured_at__lte=now))
+    seen={o.execution_id for o in measured};ages=[now-at for pk,at in started.items() if pk not in seen]
+    return measured,{'total':len(started),f'medidos_{kind}':len(measured),f'aun_sin_{kind}':sum(1 for a in ages if a<age),
+                     'pendientes':sum(1 for a in ages if age<=a<=late),'sin_dato':sum(1 for a in ages if a>late)}
+
+def comment_outcomes(w,now):
+    """What came of the week's own comments that wrote (INT-03, 72 h): with a reply (an unread count is not one) and with
+    the post author's reply. Small counts, never rates."""
+    measured,counts=_outcomes(desenlaces.COMMENT,'72h',w,now,wrote=True)
+    return {'escritos':counts.pop('total'),**counts,'con_respuesta':sum(1 for o in measured if o.replies),
+            'con_respuesta_del_autor':sum(1 for o in measured if o.author_replied)}
+
+def follow_outcomes(w,now):
+    """What came of the week's follows (RED-01, 7 d): who engaged afterwards (any true signal) and by signal. The 7 d of
+    a week's follows mostly end after its summary: the measured ones are in semana_anterior."""
+    measured,counts=_outcomes('RED-01','7d',w,now)
+    engaged=[[name for name,value in (o.signals or {}).items() if value] for o in measured]
+    return {'seguidos':counts.pop('total'),**counts,'interactuaron':sum(1 for names in engaged if names),
+            'por_senal':dict(sorted(Counter(name for names in engaged for name in names).items()))}
+
+def comments(w,now,machine):
     if not machine:return unavailable(MACHINE_OFF)
     drafts=list(ActionProposal.objects.filter(capability='INT-03',source='agent',**_between('created_at',w)))
     lead=Counter((p.review or {}).get('decision') for p in drafts if (p.review or {}).get('decision') in ('approve','discard'))
@@ -196,9 +233,10 @@ def comments(w,machine):
     return {'disponible':True,'redactados':len(drafts),
             'publicados':ActionExecution.objects.filter(proposal__capability='INT-03',state='confirmed',**_between('started_at',w)).count(),
             'destino_de_los_borradores':dict(sorted(Counter(_draft_fate(p) for p in drafts).items())),
-            'lider':{'aprobados':lead['approve'],'descartados':lead['discard']},'posts_saltados_por_el_prefiltro':skipped}
+            'lider':{'aprobados':lead['approve'],'descartados':lead['discard']},'posts_saltados_por_el_prefiltro':skipped,
+            'desenlaces':comment_outcomes(w,now)}
 
-def network(w):
+def network(w,now):
     if not resultados.Coverage.network(w):return unavailable('La red no funcionó esta semana.')
     classified=AuditEvent.objects.filter(action='network.classified',**_between('created_at',w)).values_list('metadata',flat=True)
     invited=[resultados._resolution(c) for c in Contact.objects.filter(invited_at__isnull=False).only('history','invited_at','connected_at','stage')]
@@ -216,7 +254,7 @@ def network(w):
             'conectados_que_encajan':Contact.objects.filter(classification__fit=True,**_between('connected_at',w)).count(),
             'invitaciones_recibidas':Contact.objects.filter(source=Contact.Source.INCOMING,**_between('discovered_at',w)).count(),
             'aceptacion':acceptance,'salud_cohortes':red.health_snapshot(w.end),
-            'ritmo':red.weekly_rhythm(w.end,start=w.start,end=w.end)}
+            'ritmo':red.weekly_rhythm(w.end,start=w.start,end=w.end),'desenlaces':follow_outcomes(w,now)}
 
 def opportunities(w):
     everything=list(Opportunity.objects.filter(created_at__lt=w.end))
@@ -311,7 +349,7 @@ def week_stats(w,now):
     machine=resultados.Coverage.machine(w)
     return {'desde':w.first.isoformat(),'hasta':w.last.isoformat(),'publicaciones':publications(w,now,machine),
             'por_tipo':by_type(w,now,machine),
-            'comentarios':comments(w,machine),'red':network(w),'oportunidades':opportunities(w),'conversaciones':conversations(w),
+            'comentarios':comments(w,now,machine),'red':network(w,now),'oportunidades':opportunities(w),'conversaciones':conversations(w),
             'capturas':captures(w),'gasto_ia':spend(w),'lider':lead(w),'pausas_y_bloqueos':stops(w),'compuertas':gates(w)}
 
 # Figures compared with the previous week: (name, path in week_stats).
@@ -349,6 +387,8 @@ def data_warnings(week):
         measured=posts['cortes']['72h']['medidos']
         if not posts['publicados']:out.append('Sin posts publicados esta semana.')
         elif measured<THIN_POSTS:out.append(f'Pocos datos: {measured} de {posts["publicados"]} posts con corte de 72 h.')
+        if posts['con_analitica_vida']<posts['publicados']:
+            out.append(f'Analítica de LinkedIn de toda la vida solo en {posts["con_analitica_vida"]} de {posts["publicados"]} posts publicados.')
     for key,label in (('publicaciones','publicaciones'),('comentarios','comentarios'),('red','red'),('conversaciones','inbox')):
         if not week[key].get('disponible'):out.append(f'Sin datos de {label}: {week[key]["motivo"]}')
     return out
@@ -368,8 +408,8 @@ def _arr(items):return {'type':'array','items':items}
 def _obj(**props):return {'type':'object','additionalProperties':False,'required':list(props),'properties':props}
 
 ITEM=_obj(texto=_s(),cifra=_s(),course_citations=_arr(_s()))
-SCHEMA=_obj(titular=_s(),lo_que_funciono=_arr(ITEM),lo_que_no=_arr(ITEM),recomendaciones=_arr(ITEM),orientacion_propuesta=_s(),
-            advertencias=_arr(_s()))
+# No orientacion_propuesta since 2026-11-16 (the summary observes; validate() keeps the key, null, in what is stored).
+SCHEMA=_obj(titular=_s(),lo_que_funciono=_arr(ITEM),lo_que_no=_arr(ITEM),recomendaciones=_arr(ITEM),advertencias=_arr(_s()))
 
 SYSTEM='''Eres analista_barrio_resultados de 0ff1ce, el equipo de agentes que lleva el LinkedIn de Gustavo. Cada lunes le
 escribes el resumen de la semana que terminó (de lunes a domingo): qué funcionó, qué no y qué cambiar.
@@ -379,10 +419,16 @@ Reglas de los números:
   ni sumas, ni porcentajes, ni diferencias. Las comparaciones con la semana anterior ya vienen hechas en
   `estadisticas.comparacion` (diferencia y variacion_pct); úsalas en lugar de calcularlas.
 - null es un dato que falta, nunca un cero. Una sección con disponible=false no se midió: dilo así, no la interpretes.
-- evidencia_compartida es una muestra parcial: encaje usa solo clasificados suficientes y siempre cita cobertura,
+- evidencia_compartida llega resumida (ventana, cobertura, agregados y conteos por referente, sin el registro por
+  persona). Es una muestra parcial: encaje usa solo clasificados suficientes y siempre cita cobertura,
   versión y fecha. Primera observación no es llegada; coincidencia o exposición no prueba causa. Un origen declarado
   sigue siendo una declaración, nunca una conversión exclusiva. Reacciones/seguidores agregados están sin identidad.
 - Un corte "pendiente" aún no cumplió su edad (72 h o 7 días); "sin_dato" la cumplió pero no se pudo leer.
+- Los desenlaces de los comentarios (`comentarios.desenlaces`) y de los seguimientos (`red.desenlaces`) son conteos
+  pequeños: dilos como conteos («N de M»), nunca como tasas ni porcentajes mientras haya menos de diez medidos. Los que
+  aún no cumplen su edad, pendientes o sin_dato no tienen desenlace: no son ceros.
+- `analitica_vida` de cada post es la analítica de LinkedIn de toda la vida del post y llega tarde: no es comparable con
+  los cortes de 72 h ni de 7 días; nunca la mezcles con ellos.
 - Cualquier cifra que no esté en los datos hace que se quite tu frase entera.
 
 Qué escribir (en español, frases cortas y concretas):
@@ -391,9 +437,7 @@ Qué escribir (en español, frases cortas y concretas):
   con su nombre y su valor tal como están en los datos (por ejemplo «publicaciones.cortes.72h.medidos: 2»). Las
   recomendaciones son acciones para el equipo la próxima semana (qué pilar, modalidad, enfoque, tipo de persona o cadencia
   probar o dejar), cada una atada a un número.
-- orientacion_propuesta: vacía salvo que los datos respalden un cambio de rumbo frente a `orientacion_actual`. Si lo
-  respaldan, un texto corto (como mucho 400 caracteres) que Gustavo podría adoptar tal cual como orientación del equipo,
-  escrito como instrucción al equipo. Con pocos datos, déjala vacía.
+- Los cambios de estrategia los propone una vez al mes la revisión mensual, no este resumen: tú observas la semana.
 - advertencias: cuándo los datos son demasiado pocos para concluir (por ejemplo «pocos datos: 2 posts»), fuentes que no
   corrieron y comparaciones que no se pueden hacer. `estadisticas.avisos_de_datos` trae las que ya se detectaron.
 
@@ -435,9 +479,23 @@ def gustavo_comments(week_start):
                     'comentario':' '.join(c.text.split())[:800]})
     return out
 
+def _compact(value):
+    """A value without its lists of records (a dict per person, association or exposure)."""
+    if isinstance(value,dict):
+        return {k:_compact(v) for k,v in value.items() if not (isinstance(v,list) and any(isinstance(x,dict) for x in v))}
+    return value
+
+def for_analyst(data):
+    """The stats as the analyst reads them. The shared evidence keeps its window, coverage and aggregates and each
+    referent's counts; the record per person, association and exposure stays only in WeeklySummary.stats: it was 94 %
+    of the first real summary's input (0.94 USD) and holds only ids the analyst may not quote. No number is added."""
+    if 'evidencia_compartida' not in data:return data
+    return dict(data,evidencia_compartida=[dict(_compact(e),referents=[_compact(r) for r in e.get('referents') or []])
+                                           for e in data['evidencia_compartida']])
+
 def message(week_start,data):
     return json.dumps({'semana':{'desde':week_start.isoformat(),'hasta':(week_start+timedelta(days=6)).isoformat()},
-                       'estadisticas':data,
+                       'estadisticas':for_analyst(data),
                        'posicionamiento':{'version':posicionamiento.VERSION,'estado':posicionamiento.STATUS,
                                           'direccion':posicionamiento.editorial_direction()},
                        'orientacion_actual':orientacion.text(),'comentarios_de_gustavo':gustavo_comments(week_start)},
@@ -526,8 +584,9 @@ def validate(raw,data,week_start,grounding=None):
                         dropped.append({'campo':field,'texto':text[:MAX_ITEM_CHARS],'sin_cita_del_curso':True});continue
                 items.append({'texto':text,'cifra':figure,'course_citations':citations})
         clean[field]=items
-    proposal=' '.join(str(raw.get('orientacion_propuesta') or '').split())[:MAX_ORIENTATION_CHARS]
-    clean['orientacion_propuesta']=proposal if proposal and check('orientacion_propuesta',proposal) else None
+    # Not asked since 2026-11-16: an older answer that still carries a proposal is ignored; the key stays, null, for the
+    # readers of stored summaries (Tu turno, «Usar como orientación»).
+    clean['orientacion_propuesta']=None
     warnings=[w for w in (' '.join(str(x).split())[:MAX_ITEM_CHARS] for x in (raw.get('advertencias') or [])[:5]) if w and check('advertencias',w)]
     if not warnings:warnings=list(data.get('avisos_de_datos') or [])
     causal=sum(bool(d.get('atribucion_no_acreditada')) for d in dropped)
@@ -586,8 +645,7 @@ def run(user,week_start,origin_job=''):
     from .notificaciones import avisar
     avisar('weekly_summary',f'Resumen de la semana {_week_label(week_start)}',analysis['titular'],link='/resultados#resumen',
            ref=f'weekly_summary:{week_start.isoformat()}')
-    audit(user,'weekly_summary.created',summary.id,week=week_start.isoformat(),dropped=len(analysis['validacion']['descartado']),
-          proposes_orientation=bool(analysis['orientacion_propuesta']))
+    audit(user,'weekly_summary.created',summary.id,week=week_start.isoformat(),dropped=len(analysis['validacion']['descartado']))
     return summary
 
 def queue(user,now=None):
@@ -632,7 +690,8 @@ def mark_seen(user,summary_id):
 
 def apply(user,summary_id):
     """«Usar como orientación»: the proposal becomes the team orientation (orientacion.update, the same path and permission
-    as PUT /api/v1/orientacion); the text it replaced is kept for «Deshacer»."""
+    as PUT /api/v1/orientacion); the text it replaced is kept for «Deshacer». Only a summary stored before 2026-11-16
+    carries a proposal."""
     require(user,'approve_actions')
     with transaction.atomic():
         summary=_locked(summary_id)
@@ -672,7 +731,8 @@ def undo(user,summary_id):
 # --------------------------------------------------------------------------- readers: office, Tu turno, director
 
 def pending_proposal():
-    """The latest summary while its proposed orientation waits for Gustavo's decision (Tu turno card), or None."""
+    """The latest summary while its proposed orientation waits for Gustavo's decision (Tu turno card), or None: always None
+    once the latest summary is one written after 2026-11-16 (orientacion_propuesta null)."""
     latest=WeeklySummary.objects.first()
     if latest and latest.state in (WeeklySummary.State.NEW,WeeklySummary.State.SEEN) and (latest.analysis or {}).get('orientacion_propuesta'):
         return latest

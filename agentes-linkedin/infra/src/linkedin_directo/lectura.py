@@ -306,7 +306,9 @@ def comments(answer, own_fsd='', thread=None, members=None):
                     'created_at': moment(row.get('createdTime')),
                     'is_sender': bool(own_fsd and author['id'] == own_fsd),
                     'thread_id': parent.group(2) if parent else thread, 'author': author,
-                    'reply_counter': number(count.get('numComments'))})
+                    'reply_counter': number(count.get('numComments')),
+                    # How many reacted to the comment; who did is never in this answer.
+                    'reaction_counter': number(count.get('numLikes'))})
     return out
 
 

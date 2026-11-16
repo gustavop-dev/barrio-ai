@@ -119,7 +119,10 @@ def _comment(data):
     return {'id':str(data['id']),'text':data.get('text') or '','created_at':_when(data.get('created_at')),
             'is_sender':bool(data.get('is_sender')),'thread_id':data.get('thread_id'),'author':_user(data.get('author')),
             # Unipile v2 «List all Post's Comments» (consulted 2026-11-12): how many answers a top-level comment has.
-            'reply_counter':_count(data.get('reply_counter'))}
+            'reply_counter':_count(data.get('reply_counter')),
+            # How many reacted to the comment (directo reads LinkedIn's count). No Unipile field for it is confirmed here:
+            # null, never zero.
+            'reaction_counter':None}
 
 def _chat(data):
     """List all Chats (v2): a 1to1 chat names the other member in user_id; last_message is a MessagePreview or a Message."""

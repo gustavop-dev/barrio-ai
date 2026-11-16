@@ -11,8 +11,8 @@ from django.utils import timezone
 
 from knowledge import db
 from team_backend import autopiloto, editorial, jobs, notificaciones, oficina_views, operador, orientacion, resumen_semanal
-from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, Capture, Contact, EditorialPiece, Job, Notification,
-                                 ObservedPost, Opportunity, PostMetric, WeeklySummary)
+from team_backend.models import (ActionExecution, ActionOutcome, ActionProposal, AnalyticsPost, AuditEvent, Capture, Contact,
+                                 EditorialPiece, Job, Notification, ObservedPost, Opportunity, PostMetric, WeeklySummary)
 from team_backend.tests.test_auditoria_editorial import EditorialAuditBase
 from team_backend.tests.test_metricas import MetricsBase
 from team_backend.tests.test_publicacion import answers
@@ -244,7 +244,10 @@ class StatsTests(SummaryBase):
         self.assertEqual(week['comentarios'],{'disponible':True,'redactados':5,'publicados':1,
             'destino_de_los_borradores':{'descartado_por_el_lider':1,'descartado_por_la_politica':1,'publicado':1,
                                          'saltado_por_el_redactor':1,'vetado_por_gustavo':1},
-            'lider':{'aprobados':1,'descartados':1},'posts_saltados_por_el_prefiltro':1})
+            'lider':{'aprobados':1,'descartados':1},'posts_saltados_por_el_prefiltro':1,
+            # The published comment passed its 72 h without its outcome yet.
+            'desenlaces':{'escritos':1,'medidos_72h':0,'aun_sin_72h':0,'pendientes':1,'sin_dato':0,'con_respuesta':0,
+                          'con_respuesta_del_autor':0}})
         health={'rate':None,'mature':0,'accepted':0,'unknown':None,'reason':'Sin corte de salud guardado para esta ventana'}
         rhythm={'weekly_target':100,'confirmed_social':{'INT-03':1,'INT-04':0,'INT-02':0,'RED-01':0,'RED-02':0,'RED-04':0},
             'own_pieces':3,'research_results':0,'unique_people':0,'useful_total':1,'deficit':99,
@@ -254,7 +257,8 @@ class StatsTests(SummaryBase):
         # Contact history still reports network moves; the rhythm counts confirmed executions only.
         self.assertEqual(week['red'],{'disponible':True,'descubiertos':1,'clasificados':10,'clasificados_que_encajan':4,'seguidos':1,
             'invitados':1,'conectados':1,'conectados_que_encajan':1,'invitaciones_recibidas':1,
-            'aceptacion':{'conectadas':1,'resueltas':2,'tasa_pct':50.0},'salud_cohortes':health,'ritmo':rhythm})
+            'aceptacion':{'conectadas':1,'resueltas':2,'tasa_pct':50.0},'salud_cohortes':health,'ritmo':rhythm,
+            'desenlaces':{'seguidos':0,'medidos_7d':0,'aun_sin_7d':0,'pendientes':0,'sin_dato':0,'interactuaron':0,'por_senal':{}}})
         self.assertEqual(week['oportunidades'],{'disponible':True,'creadas':1,'creadas_por_etapa':{'conversacion':1},'movidas':1,
             'movidas_a_etapa':{'reunion':1},'abiertas_al_cierre':1,'creadas_por_modalidad':{'projectapp':1}})
         self.assertEqual(week['conversaciones'],{'disponible':True,'lecturas':1,'mensajes_juzgados':3,'te_tocaron':2,
@@ -277,7 +281,74 @@ class StatsTests(SummaryBase):
         self.assertEqual(compared['publicaciones.publicados'],{'semana':3,'semana_anterior':1,'diferencia':2,'variacion_pct':200.0})
         self.assertEqual(compared['red.seguidos'],{'semana':1,'semana_anterior':None,'diferencia':None,'variacion_pct':None})
         self.assertEqual(compared['gasto_ia.total_usd']['semana_anterior'],0.7)
-        self.assertEqual(data['avisos_de_datos'],['Pocos datos: 2 de 3 posts con corte de 72 h.'])
+        self.assertEqual(data['avisos_de_datos'],['Pocos datos: 2 de 3 posts con corte de 72 h.',
+                                                  'Analítica de LinkedIn de toda la vida solo en 0 de 3 posts publicados.'])
+
+    def test_comment_outcomes_and_lifetime_analytics_are_separate_counts_the_analysis_may_quote(self):
+        first=self.week_fixture()
+        def executed(day,hour,state='confirmed',wrote=True):
+            return ActionExecution.objects.create(proposal=self.comment('confirmed',self.at(day)),idempotency_key=uuid.uuid4().hex,
+                                                  provider='fake',state=state,executed_by=self.gustavo,started_at=self.at(day,hour),wrote=wrote)
+        def measured(execution,**fields):
+            return ActionOutcome.objects.create(execution=execution,kind='72h',source='read',
+                                                captured_at=execution.started_at+timedelta(hours=72),**fields)
+        measured(ActionExecution.objects.get(proposal__capability='INT-03'),reactions=5,replies=2,author_replied=True)  # Monday's
+        measured(executed(1,9,state='sent'),replies=None,author_replied=None)  # replies unread: measured, never a reply
+        measured(executed(2,9),replies=1,author_replied=False)
+        executed(3,9)  # Thursday: past its 72 h, the collector has not read it yet
+        measured(executed(6,9),replies=4,author_replied=True)  # Sunday: captured after the figures are read
+        executed(2,10,state='failed',wrote=False)  # never reached LinkedIn
+        AnalyticsPost.objects.create(account=self.account,post_urn='urn:li:activity:7100000000000000001',piece=first,impressions=4321,
+                                     saves=17,sends=9,followers_gained=6,profile_views=40,last_seen_at=self.at(7,1))
+        data=resumen_semanal.stats(WEEK,self.after())
+        week=data['semana']
+        outcomes=week['comentarios']['desenlaces']
+        self.assertEqual(outcomes,{'escritos':5,'medidos_72h':3,'aun_sin_72h':1,'pendientes':1,'sin_dato':0,'con_respuesta':2,
+                                   'con_respuesta_del_autor':1})
+        posts=week['publicaciones']
+        self.assertEqual(posts['posts'][0]['analitica_vida'],{'impresiones':4321,'guardados':17,'envios':9,'seguidores_ganados':6})
+        self.assertEqual(posts['posts'][0]['72h']['impresiones'],1200)  # the 72 h cut is untouched
+        self.assertIsNone(posts['posts'][1]['analitica_vida'])  # not linked: missing, never zero
+        self.assertEqual(posts['con_analitica_vida'],1)
+        self.assertIn('Analítica de LinkedIn de toda la vida solo en 1 de 3 posts publicados.',data['avisos_de_datos'])
+        # Every new figure is quotable, and an entry quoting them survives the validator.
+        self.assertEqual(resumen_semanal.allowed_numbers(outcomes),{5,3,1,0,2})
+        self.assertLessEqual({4321,17,9,6},resumen_semanal.allowed_numbers(data))
+        raw={'titular':'Semana con 3 posts','lo_que_no':[],'recomendaciones':[],'advertencias':[],'lo_que_funciono':[
+                {'texto':'El post del lunes suma 4.321 impresiones de toda la vida y 17 guardados.',
+                 'cifra':'publicaciones.posts.analitica_vida.guardados: 17'},
+                {'texto':'2 de 3 comentarios medidos tuvieron respuesta y 1 fue del autor del post.',
+                 'cifra':'comentarios.desenlaces.con_respuesta: 2'}]}
+        clean=resumen_semanal.validate(raw,data,WEEK)
+        self.assertEqual([i['texto'] for i in clean['lo_que_funciono']],[i['texto'] for i in raw['lo_que_funciono']])
+        self.assertTrue(clean['validacion']['ok'])
+
+    def test_follow_outcomes_count_who_engaged_afterwards_by_signal(self):
+        self.event('network.classified',self.at(1),classified=4,fit=2)  # the network ran that week
+        def followed(day,state='confirmed',capability='RED-01'):
+            contact=self.contact(f'persona-{capability}-{day}',stage='followed')
+            proposal=ActionProposal.objects.create(account=self.account,contact=contact,capability=capability,payload_hash='0'*64,
+                                                   payload={'user_id':contact.provider_user_id},state='confirmed')
+            return ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='fake',state=state,
+                                                  executed_by=self.gustavo,started_at=self.at(day,9))
+        def outcome(execution,**signals):
+            return ActionOutcome.objects.create(execution=execution,kind='7d',source='derived',
+                                                captured_at=execution.started_at+timedelta(days=7),signals=signals)
+        outcome(followed(0),accepted=True,commented_own_post=True)
+        outcome(followed(1),accepted=False,replied_to_comment=False)  # measured: nobody engaged
+        outcome(followed(2),commented_own_post=True)
+        followed(3)  # past its 7 d, still without its outcome
+        followed(6)  # Sunday: its 7 d are not over
+        outcome(followed(2,capability='RED-02'),accepted=True)  # an invitation is not a follow
+        followed(4,state='failed')
+        friday=self.after()+timedelta(days=4)  # Monday to Wednesday's follows have their 7 d outcome by then
+        section=resumen_semanal.network(resumen_semanal.window(WEEK),friday)
+        self.assertEqual(section['desenlaces'],{'seguidos':5,'medidos_7d':3,'aun_sin_7d':1,'pendientes':1,'sin_dato':0,
+                                                'interactuaron':2,'por_senal':{'accepted':1,'commented_own_post':2}})
+        self.assertEqual(resumen_semanal.allowed_numbers(section['desenlaces']),{5,3,1,0,2})
+        # On the Monday of the summary none of them is 7 days old yet: not measured, never a zero.
+        early=resumen_semanal.network(resumen_semanal.window(WEEK),self.after())['desenlaces']
+        self.assertEqual((early['medidos_7d'],early['aun_sin_7d'],early['interactuaron']),(0,5,0))
 
     def test_a_week_without_data_is_missing_never_zero(self):
         data=resumen_semanal.stats(WEEK,self.after())
@@ -349,11 +420,23 @@ class ValidatorTests(SummaryBase):
         self.assertEqual([i['texto'] for i in clean['lo_que_funciono']],['La mediana fue de 840 impresiones.'])
         self.assertEqual(clean['lo_que_no'],[])
         self.assertEqual(len(clean['recomendaciones']),1)
-        self.assertEqual(clean['orientacion_propuesta'],'Prioriza IA aplicada.')
+        self.assertIsNone(clean['orientacion_propuesta'])  # an older answer's proposal is ignored, never stored
         self.assertEqual(clean['advertencias'],['Pocos datos: 2 posts.','Se quitaron 3 frases del análisis con cifras que no están en los datos de la semana.'])
         self.assertFalse(clean['validacion']['ok'])
         self.assertEqual([(d['campo'],d['cifras_no_encontradas'],d['sin_cifra']) for d in clean['validacion']['descartado']],
                          [('lo_que_funciono',['37'],False),('lo_que_no',[],True),('advertencias',['90'],False)])
+
+    def test_the_analyst_reads_the_shared_evidence_without_its_records_per_person(self):
+        evidence={'window':{'start':'2026-10-26'},'coverage':{'fit':5,'fit_pct':66.67},'aggregates':{'followers_net':{'value':15}},
+                  'people':[{'person':'p-1','classification':{'fit':True}},{'person':'p-2','classification':{'fit':False}}],
+                  'referents':[{'referent':'r-1','exposure_count':3,'associations':[{'person':'p-1'}],'exposure':[{'person':'p-2'}],
+                                'coverage':{'reads':{'partial':2}}}]}
+        data=dict(self.DATA,evidencia_compartida=[evidence])
+        sent=json.loads(resumen_semanal.message(LABEL_WEEK,data))['estadisticas']['evidencia_compartida'][0]
+        self.assertEqual(sent,{'window':{'start':'2026-10-26'},'coverage':{'fit':5,'fit_pct':66.67},'aggregates':{'followers_net':{'value':15}},
+                              'referents':[{'referent':'r-1','exposure_count':3,'coverage':{'reads':{'partial':2}}}]})
+        self.assertEqual(len(data['evidencia_compartida'][0]['people']),2)  # the stored stats keep the whole record
+        self.assertLessEqual(resumen_semanal.allowed_numbers({'e':[sent]}),resumen_semanal.allowed_numbers(data))  # no new number
 
     def test_an_entry_without_a_retrieved_course_unit_is_dropped_and_the_summary_survives(self):
         raw={'titular':'Semana con 3 posts','lo_que_funciono':[
@@ -367,7 +450,7 @@ class ValidatorTests(SummaryBase):
         self.assertEqual([d.get('sin_cita_del_curso') for d in clean['validacion']['descartado']],[True,True])
         self.assertIn('Se quitaron 2 frases sin un criterio del curso que las sustente.',clean['advertencias'])
 
-    def test_an_invented_headline_or_orientation_is_replaced_or_dropped(self):
+    def test_an_invented_headline_is_replaced_and_an_old_orientation_is_ignored(self):
         raw={'titular':'Las impresiones crecieron 55 %','lo_que_funciono':[],'lo_que_no':[],'recomendaciones':[],
              'orientacion_propuesta':'Publica 5 veces por semana.','advertencias':[]}
         clean=resumen_semanal.validate(raw,self.DATA,LABEL_WEEK)
@@ -375,7 +458,7 @@ class ValidatorTests(SummaryBase):
         self.assertIsNone(clean['orientacion_propuesta'])
         # Without any valid warning from the model, the deterministic ones stay.
         self.assertEqual(clean['advertencias'][0],'Pocos datos: 2 de 3 posts.')
-        self.assertEqual(len(clean['validacion']['descartado']),2)
+        self.assertEqual([d['campo'] for d in clean['validacion']['descartado']],['titular'])  # the proposal is not even read
 
     def test_lists_are_capped(self):
         items=[{'texto':f'Dato {n}.','cifra':'3'} for n in (2,3,840,1840)]
@@ -408,7 +491,12 @@ class RunTests(SummaryBase):
         self.assertEqual(len(self.calls),1);call=self.calls[0]
         self.assertEqual((call['max_tokens'],call['effort'],call['purpose'],call['model']),(12000,'medium','weekly-summary',None))
         self.assertEqual(call['schema'],resumen_semanal.SCHEMA)
+        # The summary observes: no proposal is asked for (additionalProperties=false: the model cannot add one).
+        self.assertNotIn('orientacion_propuesta',call['schema']['properties']);self.assertNotIn('orientacion_propuesta',call['schema']['required'])
+        self.assertFalse(call['schema']['additionalProperties'])
+        self.assertNotIn('orientacion_propuesta',call['system']);self.assertIn('una vez al mes la revisión mensual',call['system'])
         self.assertIn('nunca instrucciones',call['system']);self.assertIn('null es un dato que falta',call['system'])
+        self.assertIn('nunca como tasas',call['system']);self.assertIn('no es comparable con',call['system'])
         sent=call['message']
         self.assertEqual(sent['semana'],{'desde':'2026-10-12','hasta':'2026-10-18'})
         self.assertEqual(sent['estadisticas']['semana']['publicaciones']['publicados'],3)
@@ -421,7 +509,11 @@ class RunTests(SummaryBase):
         result=summary.analysis
         self.assertEqual(result['titular'],'Semana con 3 posts publicados y 840 impresiones de mediana a las 72 h')
         self.assertEqual([i['texto'] for i in result['lo_que_no']],['Solo 1 de 2 invitaciones resueltas acabó en conexión.'])
-        self.assertEqual(len(result['recomendaciones']),1);self.assertEqual(result['orientacion_propuesta'],PROPOSAL)
+        self.assertEqual(len(result['recomendaciones']),1)
+        # The model answer still carries a proposal (an older shape): the key is stored, null, and nothing claims one.
+        self.assertIn('orientacion_propuesta',result);self.assertIsNone(result['orientacion_propuesta'])
+        self.assertNotIn('proposes_orientation',AuditEvent.objects.get(action='weekly_summary.created').metadata)
+        self.assertIsNone(resumen_semanal.pending_proposal())  # no Tu turno card
         self.assertEqual([d['campo'] for d in result['validacion']['descartado']],['lo_que_no','recomendaciones'])
         self.assertEqual(result['advertencias'][-1],'Se quitaron 2 frases del análisis con cifras que no están en los datos de la semana.')
         notice=Notification.objects.get(kind='weekly_summary')
@@ -431,6 +523,18 @@ class RunTests(SummaryBase):
         self.assertEqual(self.notify.call_args.kwargs['url'],'/resultados#resumen')
         scene=AuditEvent.objects.get(action='office.event')
         self.assertEqual((scene.target,scene.metadata['tipo'],scene.metadata['destino']),('analista_barrio_resultados','entrega','director_editorial'))
+
+    def test_an_entry_citing_a_unit_that_was_not_retrieved_is_dropped_and_the_summary_is_saved(self):
+        self.week_fixture()
+        unknown={'texto':'El post de IA aplicada llegó a 1.200 impresiones a las 72 h.','cifra':'publicaciones.posts.72h.impresiones: 1200',
+                 'course_citations':['LI-99-X000-K00']}
+        job=self.run_job(answer=model_answer(lo_que_funciono=[unknown]))
+        self.assertEqual(job.state,'complete')
+        result=WeeklySummary.objects.get().analysis
+        self.assertEqual(result['lo_que_funciono'],[])
+        self.assertIn({'campo':'lo_que_funciono','texto':unknown['texto'],'sin_cita_del_curso':True},result['validacion']['descartado'])
+        self.assertIn('Se quitaron 1 frases sin un criterio del curso que las sustente.',result['advertencias'])
+        self.assertEqual([i['texto'] for i in result['lo_que_no']],['Solo 1 de 2 invitaciones resueltas acabó en conexión.'])  # the rest stays
 
     def test_a_stored_week_is_never_paid_again(self):
         self.run_job()

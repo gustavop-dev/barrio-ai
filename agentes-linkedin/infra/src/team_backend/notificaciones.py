@@ -45,6 +45,7 @@ FEED_KINDS={
     'navegador_salida':('sistema',True,'LinkedIn directo: el servicio no abre la cuenta por otra salida a internet'),
     'weekly_summary':('tuyo',True,'Resumen de la semana listo'),
     'weekly_plan':('publicaciones',True,'Plan de la semana listo'),
+    'monthly_review':('tuyo',True,'Revisión mensual lista'),
 }
 
 # Computed every time «Próximo» is read: they push when they happen but are never stored in the feed.

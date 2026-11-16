@@ -6,7 +6,7 @@ import json
 import os
 import re
 import uuid
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone as dt_timezone
 from decimal import Decimal
 from pathlib import Path
 from unittest import SkipTest
@@ -15,8 +15,9 @@ from unittest.mock import patch
 from django.test import SimpleTestCase
 from django.utils import timezone
 
-from team_backend import autopiloto, editorial, guardas, lider, operador, orquestacion, posicionamiento, red
-from team_backend.models import ActionExecution, ActionProposal, CycleLedger, EditorialPiece, Opportunity, PostMetric
+from team_backend import analitica, autopiloto, editorial, guardas, lider, operador, orquestacion, posicionamiento, red
+from team_backend.models import (ActionExecution, ActionProposal, AnalyticsPost, CycleLedger, EditorialPiece, Opportunity,
+                                 PostMetric)
 from team_backend.tests.test_publicacion import GOOD_POST, INVENTED, EditorialBase, answers
 
 FIXED=GOOD_POST.replace('Which decision is your product helping someone make this week?',
@@ -251,6 +252,24 @@ class DirectorResultsTests(EditorialAuditBase):
         self.assertEqual(set(performance['by_modality']),{'personal_startups','projectapp','comunidad'})
         self.assertNotIn('alianzas',performance['by_modality'])
         self.assertIn('performance_30d',editorial.DIRECTOR_SYSTEM);self.assertIn('nunca un cero',editorial.DIRECTOR_SYSTEM)
+
+    def test_lifetime_analytics_reach_the_director_beside_the_cuts_from_one_lookup(self):
+        linked=self.publish(9,'applied_ai','personal_startups',{'72h':{'impressions':400,'reactions':10,'comments':2,'reposts':1}},
+                            thesis='Vinculada')
+        unlinked=self.publish(8,'applied_ai','projectapp',thesis='Sin analitica')
+        AnalyticsPost.objects.create(account=self.official,post_urn='urn:li:activity:7100000000000000002',piece=linked,impressions=2400,
+                                     saves=11,sends=4,followers_gained=3,profile_views=20,
+                                     last_seen_at=datetime(2026,11,14,6,tzinfo=dt_timezone.utc))
+        with patch.object(analitica,'for_pieces',wraps=analitica.for_pieces) as lookup:
+            editorial._history(timezone.now())
+        lookup.assert_called_once()  # one lookup for the whole history, never one per piece
+        self.assertEqual(set(lookup.call_args.args[0]),{linked.id,unlinked.id})
+        self.plan_with(answers(decision='skip'))
+        rows={r['thesis']:r for r in self.message('director')['history']}
+        self.assertEqual(rows['Vinculada 9']['analitica'],{'impressions':2400,'saves':11,'sends':4,'followers_gained':3,'source':'vida'})
+        self.assertEqual(rows['Vinculada 9']['results']['72h']['impressions'],400)  # the cuts stay apart
+        self.assertNotIn('analitica',rows['Sin analitica 8'])
+        self.assertIn('analitica',editorial.DIRECTOR_SYSTEM);self.assertIn('Es contexto, no una regla',editorial.DIRECTOR_SYSTEM)
 
     def test_unpublished_pieces_carry_no_results(self):
         piece=self.publish(3,'applied_ai','projectapp')
