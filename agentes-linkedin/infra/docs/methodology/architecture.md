@@ -18,6 +18,8 @@ flowchart LR
     K --> C[Anthropic generación]
 ```
 
+La biblioteca contiene las clases 01–12 y los agentes leen 01–06: son dos constantes de `knowledge/clases.py`, no dos bases. Las consultas humanas (por ID, listado por clase, búsqueda con `clases` explícito) ven toda la biblioteca; todo lo que llega a un agente (búsqueda por defecto, relaciones, listas curadas, catálogo, grafo, evaluaciones) se queda en sus clases.
+
 El grafo muestra también consultas directas de biblioteca desde DRF. Solo los trabajos de agentes van por la cola. Los proveedores siguen sujetos a LIVE_PROVIDERS, permisos, caché y reservas monetarias existentes. Cada Job pertenece a un usuario; las unidades son compartidas por el equipo. Ningún modelo de Django reescribe el contenido extraído. Los registros originales se adoptan mediante SQL idempotente y modelos unmanaged.
 
 ## Evolución planificada

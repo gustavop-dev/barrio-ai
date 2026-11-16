@@ -146,7 +146,8 @@ otra puerta de entrada de un comprador, junto con el calentamiento y la invitaci
 3. ¿Nota en la invitación a los calentados?
 4. Primer mensaje: ¿solo a compradores o también a la comunidad? (siempre como borrador que él envía).
 5. ¿Cuándo una conversación pasa a oportunidad?
-6. La información de la clase 07 que falta.
+6. La información de la clase 07 que falta. Llegaron las clases 08–12 y la biblioteca ya admite 07–12 (los agentes
+   siguen leyendo 01–06); faltan cargarlas en producción y activar cada metodología con su evaluación.
 7. Umbral de seguidores, cuando haya datos.
 
 ## Orden propuesto
