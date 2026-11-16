@@ -460,7 +460,7 @@ def for_pieces(piece_ids):
     given={str(p):p for p in piece_ids}
     out={}
     for row in AnalyticsPost.objects.filter(piece_id__in=list(given)).order_by('last_seen_at').values('piece_id',*LIFETIME,'last_seen_at'):
-        out[given[str(row.pop('piece_id'))]]={**row,'source':'vida'}
+        key=given[str(row.pop('piece_id'))];out[key]={**row,'source':'vida'}  # the right side is evaluated first: pop before
     left={key for key,p in given.items() if p not in out}
     if left:out.update({given[key]:figures for key,figures in _in_range(left).items()})
     return out
