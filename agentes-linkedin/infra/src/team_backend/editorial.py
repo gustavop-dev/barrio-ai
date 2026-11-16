@@ -175,6 +175,9 @@ Cómo decidir:
   modalidad y enfoque: insiste en lo que funciona sin repetir tesis ni apertura y vuelve a probar lo que aún no
   tiene datos. Con menos de tres piezas medidas es una pista, no una conclusión. Las impresiones no son negocio: no
   abandones la dirección ni la mezcla de modalidades por perseguirlas; orientation pesa más que estos números.
+  analitica (solo en las piezas que la tienen) es la analítica de LinkedIn de toda la vida del post (source vida; rango
+  si es solo de un periodo) y llega tarde, aparte de los cortes: guardados y envíos (saves, sends) dicen más de su
+  utilidad para el lector que las impresiones. Es contexto, no una regla.
 - approach es el ID de uno de los nueve enfoques del curso. format e image.kind: foto, infografia o carrusel.
   image.reason explica la elección por contexto. Las fotos de una propuesta son preferentes; explica si las descartas.
   gallery trae notas, transcripciones, fecha, uso y permiso; las vistas reducidas llevan su ID. Elige solo IDs ofrecidos.
@@ -654,16 +657,24 @@ def _performance(now):
         summary[key]={value:_group([item[3] for item in published if item[index]==value]) for value in values}
     return summary
 
+def _lifetime(piece_ids):
+    """{piece id: LinkedIn's analytics} of published pieces from ONE analitica.for_pieces call for the whole list: lifetime
+    ('vida') or of one range only ('rango'), late. Beside the cuts, never mixed in; a piece without them has no entry."""
+    from . import analitica
+    return {piece:{k:v.get(k) for k in ('impressions','saves','sends','followers_gained','source')}
+            for piece,v in analitica.for_pieces(piece_ids).items()}
+
 def _history(now):
-    rows=[];mix={m:0 for m in MODALITIES}
+    rows=[];mix={m:0 for m in MODALITIES};published={}
     for piece in EditorialPiece.objects.filter(state=EditorialPiece.State.READY).prefetch_related('post_metrics').order_by('-slot_date')[:HISTORY_LIMIT]:
         action=latest_action(piece);label=status(piece,action);brief=piece.brief or {}
         row={'date':piece.slot_date,'status':label,'pillar':brief.get('pillar'),'modality':brief.get('modality'),
              'thesis':brief.get('thesis'),'approach':brief.get('approach'),'image':piece.image_kind or None,
              'opening':piece.final_text[:280],**({'type':brief['gasp_type']} if brief.get('gasp_type') else {})}
-        if label=='published':row['results']=_results(piece,action,now)
+        if label=='published':row['results']=_results(piece,action,now);published[piece.id]=row
         rows.append(row)
         if label=='published' and piece.slot_date>=(now-timedelta(days=30)).date() and brief.get('modality') in mix:mix[brief['modality']]+=1
+    for piece,figures in _lifetime(list(published)).items():published[piece]['analitica']=figures
     return rows,mix
 
 def prepare(user,slot,origin_job='',extra=False):
