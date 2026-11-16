@@ -561,7 +561,8 @@ class CourseGroundingTests(NetworkBase):
         result=resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
         self.assertTrue(result['validacion']['ok'])
         raw['recomendaciones'][0]['course_citations']=['LI-07-V001-K01']
-        # A unit that was not retrieved (class 07 is excluded) never reaches the summary; the rest of it survives.
+        # Una unidad no recuperada (la clase 07 está en la biblioteca, pero los agentes aún no la leen) no llega al
+        # resumen; el resto sobrevive.
         result=resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
         self.assertEqual(result['recomendaciones'],[])
         self.assertEqual([d.get('sin_cita_del_curso') for d in result['validacion']['descartado']],[True])

@@ -5,6 +5,7 @@ from decimal import Decimal
 import httpx
 import pytest
 from knowledge import agents,db,ingest,memory,providers,retrieval
+from knowledge.clases import CLASES_AGENTES,CLASES_BIBLIOTECA
 
 def test_explicit_container_source_root(monkeypatch):
     from pathlib import Path
@@ -16,8 +17,27 @@ def test_explicit_container_source_root(monkeypatch):
 def test_originals_and_scope():
     assert ingest.verify()['passed']
     result=db.status()
-    assert result['units']==1035
-    assert [r['session'] for r in result['classes']]==[1,2,3,4,5,6]
+    # 1.035 unidades de 01–06, 136 de la clase 07 y 485 de 08–12 (104/110/61/120/90).
+    assert result['units']==1656
+    assert [r['session'] for r in result['classes']]==list(CLASES_BIBLIOTECA)
+    by_class={r['session']:r['units'] for r in result['classes']}
+    assert sum(by_class[n] for n in CLASES_AGENTES)==1035
+    assert [by_class[n] for n in range(7,13)]==[136,104,110,61,120,90]
+
+def test_agents_keep_reading_01_06_while_the_library_holds_01_12():
+    query='mensaje secuencia prospecto lemlist campaña seguimiento respuesta'
+    default=retrieval.search(query,limit=20)
+    assert default['scope']==[1,2,3,4,5,6] and default['results']
+    assert {r['session'] for r in default['results']}<=set(CLASES_AGENTES)
+    explicit=retrieval.search(query,limit=20,clases=range(7,13))
+    assert explicit['scope']==list(range(7,13)) and {r['session'] for r in explicit['results']}<=set(range(7,13))
+    for edge in default['relations']:
+        assert edge['source_id'][3:5] in {f'{n:02}' for n in CLASES_AGENTES}
+        assert edge['target_id'][3:5] in {f'{n:02}' for n in CLASES_AGENTES}
+    ctx=agents.context(query,'perfil')
+    assert ctx['units'] and all(u['unit_id'][3:5] in {f'{n:02}' for n in CLASES_AGENTES} for u in ctx['units'])
+    unit=retrieval.unit('LI-08-V001-K01')
+    assert unit['session']==8 and unit['sources'] and all(s['key'].startswith('08:') for s in unit['sources'])
 
 def test_idempotent_ingestion_and_persistent_cache():
     before=db.status()
@@ -54,7 +74,7 @@ def test_no_fake_semantic_search():
 def test_unknown_agent_and_sql_input():
     with pytest.raises(ValueError):retrieval.search('titular',agent='admin')
     retrieval.search("'; DROP TABLE units; --")
-    assert db.status()['units']==1035
+    assert db.status()['units']==1656
 
 def test_context_keeps_limits_and_original():
     ctx=agents.context('compradores referidores divulgadores barrio','perfil')
