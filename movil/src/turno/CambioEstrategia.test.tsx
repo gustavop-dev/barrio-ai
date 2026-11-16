@@ -65,7 +65,7 @@ describe('Tu turno · cambio de estrategia', () => {
   });
 
   it('«Editar y aprobar» opens the proposal to edit, counts its characters and sends his text', async () => {
-    const server = await renderCard({ [`POST ${CHANGE}/aprobar`]: approved() });
+    const server = await renderCard({ [`POST ${CHANGE}/editar`]: approved() });
     await fireEvent.press(card().getByText('Editar y aprobar'));
     const confirm = await sheet();
     expect(confirm.getByText('Lo que escribas entra tal cual en la orientación del equipo. Podrás revertirlo desde Resultados.')).toBeOnTheScreen();
@@ -76,18 +76,18 @@ describe('Tu turno · cambio de estrategia', () => {
     await fireEvent.changeText(field, EDITED);
     expect(confirm.getByText(`${EDITED.length} de 600 caracteres`)).toBeOnTheScreen();
     await fireEvent.press(confirm.getByRole('button', { name: 'Aprobar' }));
-    await waitFor(() => expect(server.find('POST', `${CHANGE}/aprobar`)).toHaveLength(1));
-    expect(server.find('POST', `${CHANGE}/aprobar`)[0]!.body).toEqual({ text: EDITED });
+    await waitFor(() => expect(server.find('POST', `${CHANGE}/editar`)).toHaveLength(1));
+    expect(server.find('POST', `${CHANGE}/editar`)[0]!.body).toEqual({ text: EDITED });
     expect(await screen.findByText(APPROVED)).toBeOnTheScreen();
   });
 
   it('«Editar y aprobar» cannot send an empty text', async () => {
-    const server = await renderCard({ [`POST ${CHANGE}/aprobar`]: approved() });
+    const server = await renderCard({ [`POST ${CHANGE}/editar`]: approved() });
     await fireEvent.press(card().getByText('Editar y aprobar'));
     const confirm = await sheet();
     await fireEvent.changeText(confirm.getByTestId('confirm-note'), '   ');
     expect(confirm.getByRole('button', { name: 'Aprobar' })).toBeDisabled();
-    expect(server.find('POST', `${CHANGE}/aprobar`)).toHaveLength(0);
+    expect(server.find('POST', `${CHANGE}/editar`)).toHaveLength(0);
   });
 
   it('«Rechazar» asks for an optional reason and sends it as the note', async () => {

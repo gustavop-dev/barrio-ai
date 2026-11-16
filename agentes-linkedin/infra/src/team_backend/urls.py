@@ -121,6 +121,7 @@ urlpatterns=[
  path('resultados/revision-mensual/<uuid:rid>',rm.MonthlyReviewDetail.as_view()),
  path('resultados/revision-mensual/<uuid:rid>/visto',rm.MonthlyReviewSeen.as_view()),
  path('resultados/revision-mensual/cambios/<uuid:cid>/aprobar',rm.StrategyChangeApprove.as_view()),
+ path('resultados/revision-mensual/cambios/<uuid:cid>/editar',rm.StrategyChangeApprove.as_view(require_text=True)),
  path('resultados/revision-mensual/cambios/<uuid:cid>/rechazar',rm.StrategyChangeReject.as_view()),
  path('resultados/revision-mensual/cambios/<uuid:cid>/revertir',rm.StrategyChangeRevert.as_view()),
 ]

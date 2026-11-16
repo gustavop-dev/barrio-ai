@@ -36,7 +36,7 @@ export function strategyChangeFixture(overrides: Partial<StrategyChange> = {}): 
     outcome: null,
     can_decide: true,
     can_revert: false,
-    endpoints: { approve: `${base}/aprobar`, reject: `${base}/rechazar`, revert: `${base}/revertir` },
+    endpoints: { approve: `${base}/aprobar`, edit: `${base}/editar`, reject: `${base}/rechazar`, revert: `${base}/revertir` },
     ...overrides,
   };
 }
@@ -114,7 +114,7 @@ export function strategyCardFixture(change: StrategyChange = strategyChangeFixtu
     created_at: hoursFromNow(-30),
     actions: [
       { label: 'Aprobar', endpoint: change.endpoints.approve, primary: true },
-      { label: 'Editar y aprobar', endpoint: change.endpoints.approve, editable: { field: 'text', value: change.proposal } },
+      { label: 'Editar y aprobar', endpoint: change.endpoints.edit ?? change.endpoints.approve, editable: { field: 'text', value: change.proposal } },
       { label: 'Rechazar', endpoint: change.endpoints.reject, note_optional: true },
       { label: 'Ver la revisión', href: '/resultados#revision-mensual' },
     ],

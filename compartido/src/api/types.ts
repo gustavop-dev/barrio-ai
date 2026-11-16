@@ -1835,7 +1835,7 @@ export interface StrategyChange {
   outcome: StrategyOutcome | null;
   can_decide: boolean;
   can_revert: boolean;
-  endpoints: { approve: string; reject: string; revert: string };
+  endpoints: { approve: string; edit?: string; reject: string; revert: string };
 }
 
 export interface MonthlyReview {
