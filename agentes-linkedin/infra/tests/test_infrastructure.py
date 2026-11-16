@@ -39,6 +39,33 @@ def test_agents_keep_reading_01_06_while_the_library_holds_01_12():
     unit=retrieval.unit('LI-08-V001-K01')
     assert unit['session']==8 and unit['sources'] and all(s['key'].startswith('08:') for s in unit['sources'])
 
+def test_first_message_registry_matches_the_real_corpus():
+    """BIB-10: las siete unidades activadas del primer mensaje existen en el corpus real con el hash, el puntero y las
+    fuentes de su registro de lectura; se cargan solo con la metodología nombrada y la evaluación las reconoce."""
+    from pathlib import Path
+    from knowledge.clases import METODOLOGIAS_ACTIVAS,legible_por_agentes
+    activa=METODOLOGIAS_ACTIVAS['primer_mensaje']
+    path=Path(__file__).resolve().parents[2]/'equipos/relaciones/registro-lectura-primer-mensaje.json'
+    if not path.exists():pytest.skip('Registro de equipos no disponible en esta copia')
+    registry=json.loads(path.read_text(encoding='utf-8'))
+    assert [u['unidad_id'] for u in registry['unidades']]==list(activa['unidades'])
+    assert registry['evaluacion']==activa['evaluacion'] and registry['roles']==list(activa['roles'])
+    ids=list(activa['unidades'])
+    with db.connect() as c:
+        rows={r['id']:r for r in c.execute('SELECT id,session,sha256,source_path,pointer FROM units WHERE active AND id=ANY(%s)',(ids,))}
+        linked={}
+        for r in c.execute('SELECT unit_id,source_key FROM unit_evidence WHERE unit_id=ANY(%s)',(ids,)):
+            linked.setdefault(r['unit_id'],set()).add(r['source_key'])
+    for unit in registry['unidades']:
+        row=rows[unit['unidad_id']]
+        assert (row['session'],row['sha256'],row['source_path'],row['pointer'])==(9,unit['hash'],unit['source_path'],unit['pointer'])
+        assert linked[unit['unidad_id']]==set(unit['fuentes_con_prefijo_de_clase'])
+    # Frontera en el corpus real: el resto de la clase 09 sigue fuera, también con la metodología nombrada.
+    with db.connect() as c:
+        others=[r['id'] for r in c.execute("SELECT id FROM units WHERE active AND session=9 AND NOT id=ANY(%s) ORDER BY id",(ids,))]
+    assert others and not any(legible_por_agentes(uid,'primer_mensaje') for uid in others)
+    assert all(legible_por_agentes(uid,'primer_mensaje') and not legible_por_agentes(uid) for uid in ids)
+
 def test_idempotent_ingestion_and_persistent_cache():
     before=db.status()
     with db.connect() as c:

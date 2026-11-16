@@ -33,6 +33,7 @@ The request builders mirror the production calls (editorial._stage/_check/_repai
 red.classify, lider.review): keep them in step. tests/test_evaluaciones.py compares them with the real calls."""
 import copy
 import difflib
+import hashlib
 import json
 import math
 import os
@@ -904,6 +905,40 @@ def course_case_context(role):
     return operador.role_context(role,case['units'],metodologia=role if role in METODOLOGIAS_ACTIVAS else None)
 
 
+def corpus_fingerprint():
+    """La huella de la biblioteca activa: cuántas unidades hay por clase y un sha256 de «id:sha256» en orden. Cambia
+    cuando el corpus crece o cambia cualquier unidad, aunque las del caso sigan iguales."""
+    with db.connect() as c:
+        rows=c.execute('SELECT id,session,sha256 FROM units WHERE active ORDER BY id').fetchall()
+    return {'unidades':len(rows),'por_clase':dict(sorted(Counter(f"{r['session']:02}" for r in rows).items())),
+            'sha256':hashlib.sha256('\n'.join(f"{r['id']}:{r['sha256']}" for r in rows).encode()).hexdigest()}
+
+
+def case_units(role,grounding):
+    """Las unidades del caso tal como se cargaron: ID y hash (None si no se cargó)."""
+    hashes=grounding.get('course_hashes') or {}
+    return {uid:hashes.get(uid) for uid in COURSE_CASES[role]['units']}
+
+
+def case_drift(previous,current):
+    """Avisos si cambiaron las unidades del caso o la biblioteca entre dos calificaciones; [] si nada cambió. Sirve para
+    saber cuándo volver a calificar un caso a medida que el corpus crece: no lo hace fallar."""
+    warnings=[]
+    before,after=previous.get('units') or {},current.get('units') or {}
+    for uid in sorted(set(before)|set(after)):
+        if uid not in after:warnings.append(f'{uid} ya no está en el caso')
+        elif uid not in before:warnings.append(f'{uid} es nueva en el caso')
+        elif before[uid]!=after[uid]:warnings.append(f'{uid} cambió (hash {str(before[uid])[:12]} → {str(after[uid])[:12]})')
+    old,new=previous.get('corpus') or {},current.get('corpus') or {}
+    if old.get('sha256')!=new.get('sha256'):
+        counts=old.get('por_clase') or {},new.get('por_clase') or {}
+        changed=[f'{n}: {counts[0].get(n,0)} → {counts[1].get(n,0)}' for n in sorted(set(counts[0])|set(counts[1]))
+                 if counts[0].get(n,0)!=counts[1].get(n,0)]
+        warnings.append('La biblioteca cambió ('+('; '.join(changed) if changed else 'mismas cantidades, otro contenido')+
+                        '): vuelve a calificar el caso.')
+    return warnings
+
+
 def grade_course_case(role,result,grounding):
     """Used with production outputs/adapters in fake CI. Wrong behaviour fails despite correct IDs."""
     case=COURSE_CASES[role];errors=[]
@@ -917,7 +952,9 @@ def grade_course_case(role,result,grounding):
     if any(not legible_por_agentes(uid,metodologia) for uid in citations):errors.append('Cita fuera de las clases que leen los agentes')
     for key,expected in case['expected'].items():
         if result.get(key)!=expected:errors.append('Conducta incorrecta: '+key)
-    return {'case':case['id'],'passed':not errors,'errors':errors,'version':grounding.get('course_version')}
+    # Unidades con su hash y huella del corpus: case_drift compara dos calificaciones a medida que la biblioteca crece.
+    return {'case':case['id'],'passed':not errors,'errors':errors,'version':grounding.get('course_version'),
+            'units':case_units(role,grounding),'corpus':corpus_fingerprint()}
 
 
 def course_preview():

@@ -438,3 +438,78 @@ class FirstMessageActivationTests(SimpleTestCase):
         self.assertEqual(naming, {'respuestas.py', 'lider.py'})  # relaciones_comunidad y lider_jev
         using = {p.name for p in source.glob('*.py') if 'FIRST_MESSAGE_UNITS' in p.read_text(encoding='utf-8')}
         self.assertEqual(using, {'operador.py', 'respuestas.py', 'lider.py', 'evaluaciones.py'})
+
+
+class FirstMessageRegistryTests(FirstMessageBase):
+    """Cada calificación guarda qué unidades leyó el caso, con su hash, y la huella del corpus: si la biblioteca crece
+    o cambia, case_drift avisa que hay que volver a calificar, sin hacer fallar el caso."""
+
+    def grade(self):
+        _, grounding = evaluaciones.course_case_context('primer_mensaje')
+        return evaluaciones.grade_course_case('primer_mensaje', dict(CASE['expected'], course_citations=CASE['required']),
+                                              grounding)
+
+    def test_each_grade_records_the_case_units_with_their_hash_and_the_corpus(self):
+        grade = self.grade()
+        self.assertTrue(grade['passed'], grade['errors'])
+        self.assertEqual(list(grade['units']), operador.FIRST_MESSAGE_UNITS)
+        self.assertEqual(set(grade['units'].values()), {'fixture-hash'})
+        self.assertEqual(grade['corpus']['por_clase']['09'], 7)
+        self.assertNotIn('10', grade['corpus']['por_clase'])
+        self.assertRegex(grade['corpus']['sha256'], r'^[0-9a-f]{64}$')
+        self.assertEqual(evaluaciones.case_drift(grade, self.grade()), [])
+
+    def test_a_growing_corpus_warns_to_grade_again_without_failing_the_case(self):
+        before = self.grade()
+        with db.connect() as c:
+            c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
+                VALUES('LI-10-M001-K01',10,'Clase 10','{}','fixture-hash','fixture','/units/0','{}')''')
+        after = self.grade()
+        self.assertTrue(after['passed'], after['errors'])
+        self.assertEqual(after['units'], before['units'])
+        self.assertEqual(evaluaciones.case_drift(before, after),
+                         ['La biblioteca cambió (10: 0 → 1): vuelve a calificar el caso.'])
+
+    def test_a_changed_unit_of_the_case_is_named(self):
+        before = self.grade()
+        uid = operador.FIRST_MESSAGE_UNITS[2]
+        with db.connect() as c:
+            c.execute("UPDATE units SET sha256='otro-hash' WHERE id=%s", (uid,))
+        self.assertEqual(evaluaciones.case_drift(before, self.grade()),
+                         [f'{uid} cambió (hash fixture-hash → otro-hash)',
+                          'La biblioteca cambió (mismas cantidades, otro contenido): vuelve a calificar el caso.'])
+
+    def test_a_unit_that_leaves_the_case_is_named(self):
+        before = self.grade()
+        after = dict(before, units={k: v for k, v in before['units'].items() if k != operador.FIRST_MESSAGE_UNITS[0]})
+        self.assertEqual(evaluaciones.case_drift(before, after), [f'{operador.FIRST_MESSAGE_UNITS[0]} ya no está en el caso'])
+        self.assertEqual(evaluaciones.case_drift(after, before), [f'{operador.FIRST_MESSAGE_UNITS[0]} es nueva en el caso'])
+
+
+class FirstMessageReadingRegistryTests(SimpleTestCase):
+    """El registro de lectura nombra exactamente las unidades activadas, con su hash, puntero y fuentes."""
+
+    def test_the_reading_registry_matches_the_activation(self):
+        from pathlib import Path
+        from knowledge.clases import METODOLOGIAS_ACTIVAS
+        path = Path(operador.__file__).resolve().parents[3] / 'equipos/relaciones/registro-lectura-primer-mensaje.json'
+        if not path.exists():
+            self.skipTest('La imagen solo empaqueta grafo.yaml; el registro vive en equipos/relaciones.')
+        registry = json.loads(path.read_text(encoding='utf-8'))
+        activa = METODOLOGIAS_ACTIVAS['primer_mensaje']
+        self.assertEqual(registry['metodologia'], 'primer_mensaje')
+        self.assertEqual(registry['evaluacion'], activa['evaluacion'])
+        self.assertEqual(tuple(registry['roles']), activa['roles'])
+        self.assertEqual(registry['lista'], activa['lista'])
+        self.assertEqual([u['unidad_id'] for u in registry['unidades']], operador.FIRST_MESSAGE_UNITS)
+        self.assertEqual(registry['alcance']['por_clase'], {'09': 7})
+        for unit in registry['unidades']:
+            self.assertEqual(unit['clase'], 9)
+            self.assertTrue(unit['lectura_completa'])
+            self.assertRegex(unit['hash'], r'^[0-9a-f]{64}$')
+            self.assertRegex(unit['pointer'], r'^/learning_units/\d+$')
+            self.assertTrue(unit['criterio_derivado'] and unit['limites_y_excepciones'] and unit['uso'])
+            self.assertTrue(unit['fuentes_con_prefijo_de_clase'])
+            self.assertTrue(all(key.startswith('09:') for key in unit['fuentes_con_prefijo_de_clase']))
+        self.assertTrue(any('nota' in item for item in registry['no_convertido_en_regla']))
+        self.assertIn('Nota de invitación', registry['siguiente_paso'])
