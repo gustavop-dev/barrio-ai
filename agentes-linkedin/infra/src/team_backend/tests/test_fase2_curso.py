@@ -552,7 +552,7 @@ class CourseGroundingTests(NetworkBase):
         result.update(grounded_decision=outcomes[0],pitch_decision=outcomes[1])
         self.assertTrue(evaluaciones.grade_course_case('lider',result,result)['passed'])
 
-    def test_weekly_citations_stay_out_of_numeric_evidence_and_unknown_citations_fail(self):
+    def test_weekly_citations_stay_out_of_numeric_evidence_and_an_entry_with_an_unknown_citation_is_dropped(self):
         _,grounding=operador.role_context('semanal',resumen_semanal.WEEKLY_UNITS)
         data={'value':3}
         raw={'titular':'3 posts','lo_que_funciono':[],'lo_que_no':[],
@@ -561,5 +561,9 @@ class CourseGroundingTests(NetworkBase):
         result=resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
         self.assertTrue(result['validacion']['ok'])
         raw['recomendaciones'][0]['course_citations']=['LI-07-V001-K01']
-        with self.assertRaises(ValueError):resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
+        # A unit that was not retrieved (class 07 is excluded) never reaches the summary; the rest of it survives.
+        result=resumen_semanal.validate(raw,data,timezone.now().date(),grounding)
+        self.assertEqual(result['recomendaciones'],[])
+        self.assertEqual([d.get('sin_cita_del_curso') for d in result['validacion']['descartado']],[True])
+        self.assertFalse(result['validacion']['ok'])
         self.assertIs(resumen_semanal.WEEKLY_UNITS,metricas.ANALYSIS_UNITS)
