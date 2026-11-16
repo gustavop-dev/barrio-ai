@@ -59,6 +59,7 @@ def service_transport(account_id):
 
 class DirectoConnector:
     provider='directo'
+    profile_views_days=Cliente.profile_views_days  # the only window profile_views answers; metricas asks for it
 
     def __init__(self,account_id,transport=None):
         if not ACCOUNT.fullmatch(account_id or ''):raise ConnectorError('Identificador de cuenta del navegador inválido.',kind='config')

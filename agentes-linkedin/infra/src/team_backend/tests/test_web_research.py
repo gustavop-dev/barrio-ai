@@ -52,16 +52,35 @@ def sdk_answer(stop='end_turn'):
                               server_tool_use=SimpleNamespace(web_search_requests=2,web_fetch_requests=0)))
 
 
+def dynamic_answer():
+    """Dynamic filtering (web_search_20260209): the search runs from code execution and the final text carries no
+    native citation. Invented blocks shaped after the 16/11/2026 runs; the server's exact names may differ."""
+    content=[{'type':'server_tool_use','id':'srv_1','name':'code_execution',
+              'input':{'code':f'results = web_search({QUESTION!r})\nprint(results[:3])'}},
+             {'type':'code_execution_tool_result','tool_use_id':'srv_1',
+              'content':{'type':'code_execution_result','stdout':'Release notes: a new public feature','stderr':'','return_code':0}},
+             {'type':'text','text':'The release adds a public feature.'}]
+    return SimpleNamespace(content=[Block(b) for b in content],stop_reason='end_turn',
+        usage=SimpleNamespace(input_tokens=100,output_tokens=20,cache_creation_input_tokens=0,cache_read_input_tokens=0,
+                              server_tool_use=SimpleNamespace(web_search_requests=1,web_fetch_requests=0)))
+
+
 def tool_limits():
-    return providers.WebTools('web_search_20260209','web_fetch_20260209',2,2,4000,25000,Decimal('.01'))
+    # The basic tools: sdk_answer is their shape (a search result block and text with its native citation).
+    return providers.WebTools('web_search_20250305','web_fetch_20250910',2,2,4000,25000,Decimal('.01'))
 
 
 class PublicURLTests(SimpleTestCase):
     def test_the_default_web_tools_are_the_ones_that_return_native_citations(self):
-        # The dynamic-filtering tools search from code execution and their text has no citations: zero findings.
-        from linkedin_backend import settings as defaults
-        if not os.environ.get('WEB_SEARCH_TOOL_TYPE'):self.assertEqual(defaults.WEB_SEARCH_TOOL_TYPE,'web_search_20250305')
-        if not os.environ.get('WEB_FETCH_TOOL_TYPE'):self.assertEqual(defaults.WEB_FETCH_TOOL_TYPE,'web_fetch_20250910')
+        # The dynamic-filtering tools search from code execution and their text has no citations: zero findings. The
+        # defaults are read from the settings source, so the machine's own environment cannot hide them.
+        import ast
+        import inspect
+        from linkedin_backend import settings as config
+        defaults={node.args[0].value:node.args[1].value for node in ast.walk(ast.parse(inspect.getsource(config)))
+                  if isinstance(node,ast.Call) and getattr(node.func,'attr','')=='get' and len(node.args)==2
+                  and all(isinstance(arg,ast.Constant) for arg in node.args)}
+        self.assertEqual((defaults['WEB_SEARCH_TOOL_TYPE'],defaults['WEB_FETCH_TOOL_TYPE']),('web_search_20250305','web_fetch_20250910'))
 
     def test_links_from_note_and_transcript_are_deduplicated_without_sentence_punctuation(self):
         text='Lee (https://github.com/example/repo).\nVoz: https://news.example.com/release, y https://github.com/example/repo.'
@@ -209,6 +228,24 @@ class ResearchTests(OperatorBase):
             self.assertEqual(result.status,'unavailable');self.assertTrue(result.limitations)
             self.assertFalse(result.sources);self.assertEqual(result,again);self.assertEqual(model.call_count,1)
 
+    def test_the_basic_web_tools_give_findings_and_dynamic_filtering_gives_none_and_says_why(self):
+        # 16/11/2026: with web_search_20260209 every research came back without findings for a week.
+        basic=FakeAnthropic(sdk_answer())
+        with patch.dict(os.environ,LIVE),patch.object(providers,'anthropic_client',return_value=basic), \
+             override_settings(WEB_SEARCH_TOOL_TYPE='web_search_20250305',WEB_FETCH_TOOL_TYPE='web_fetch_20250910'):
+            found=self.call('tool:basica')
+        self.assertEqual(basic.calls[-1][1]['tools'][0]['type'],'web_search_20250305')
+        self.assertGreater(len(found.findings),0);self.assertEqual((found.status,found.sources[0].url),('complete',URL))
+        with patch.dict(os.environ,LIVE),patch.object(providers,'anthropic_client',return_value=FakeAnthropic(dynamic_answer())), \
+             override_settings(WEB_SEARCH_TOOL_TYPE='web_search_20260209',WEB_FETCH_TOOL_TYPE='web_fetch_20260209'):
+            empty=self.call('tool:dinamica')
+        self.assertEqual((empty.status,empty.findings,empty.sources),('unavailable',(),()))
+        self.assertTrue(empty.usage)  # it reached the web: red.research_silent counts it
+        stored=WebResearchRun.objects.get(pk='tool:dinamica').result['limitations']
+        for limitation in ('La web no devolvió hallazgos con citas verificables',
+                           'La herramienta web configurada no devuelve citas nativas (filtrado dinámico); revisar WEB_SEARCH_TOOL_TYPE.'):
+            self.assertIn(limitation,empty.limitations);self.assertIn(limitation,stored)
+
     def test_pause_turn_keeps_partial_sources_without_continuing(self):
         with patch.dict(os.environ,LIVE),patch('knowledge.providers.claude',return_value=native_answer('pause_turn')) as model:
             result=self.call()
@@ -264,7 +301,7 @@ class WebLedgerTests(OperatorBase):
         with db.connect() as c:row=c.execute('SELECT * FROM usage_ledger').fetchone()
         self.assertEqual(row['status'],'complete');self.assertEqual(row['usage']['web_search_requests'],2)
         self.assertGreater(row['reserved_usd'],row['actual_usd']);self.assertEqual(row['usage']['cache_read_input_tokens'],70)
-        params=fake.calls[-1][1];self.assertEqual(params['tools'][0]['type'],'web_search_20260209')
+        params=fake.calls[-1][1];self.assertEqual(params['tools'][0]['type'],'web_search_20250305')
         self.assertEqual(params['tools'][1]['max_content_tokens'],4000)
         self.assertIn('cache_control',params['system'][0]);self.assertNotIn('format',params.get('output_config',{}))
 

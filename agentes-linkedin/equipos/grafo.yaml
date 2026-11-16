@@ -1617,6 +1617,7 @@
       "activity": {
         "job_kinds": [
           "collect_metrics",
+          "collect_outcomes",
           "import_analytics",
           "check_linkedin"
         ],
@@ -4442,6 +4443,12 @@
           "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos."
         },
         {
+          "kind": "collect_outcomes",
+          "cadence": "OUTCOMES_EVERY_MINUTES=180 si hay comentarios propios (INT-03) con 72 h o acciones de red (RED-01/02/04) con 7 d sin desenlace; OUTCOMES_ENABLED=false lo apaga.",
+          "binding": "team_backend.autopiloto._outcomes",
+          "deduplication": "IDs deterministas del job; _pending impide duplicar trabajos activos; un ActionOutcome por ejecución y edad."
+        },
+        {
           "kind": "import_analytics",
           "cadence": "Una vez por día UTC desde ANALYTICS_DAILY_AFTER=01:30, últimos ANALYTICS_DAILY_DAYS=14 días y después los rangos exactos de ANALYTICS_DAILY_RANGES=7,14,28,90,365 (una vez al día, para en el primer fallo); solo cuentas «directo» con el servicio navegador configurado.",
           "binding": "team_backend.autopiloto._analytics",
@@ -5047,6 +5054,7 @@
       "plan_network": "relaciones_comunidad",
       "sync_network": "relaciones_comunidad",
       "collect_metrics": "analista_barrio_resultados",
+      "collect_outcomes": "analista_barrio_resultados",
       "import_analytics": "analista_barrio_resultados",
       "check_linkedin": "operador_cuenta",
       "process_capture": "operador_cuenta",
@@ -5094,6 +5102,7 @@
       "check_linkedin",
       "classify_contacts",
       "collect_metrics",
+      "collect_outcomes",
       "discover_network",
       "import_analytics",
       "observe",

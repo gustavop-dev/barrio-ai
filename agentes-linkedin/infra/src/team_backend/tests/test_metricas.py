@@ -1,5 +1,6 @@
 """Metrics and Resultados: own-post snapshots at 24 h/72 h/7 d, the daily audience, autopilot queueing and the endpoint.
-No network and no spend: the fake Unipile connector stands in for LinkedIn and the Unipile contract runs on MockTransport."""
+No network and no spend: the fake Unipile connector stands in for LinkedIn, the Unipile contract runs on MockTransport
+and the directo account answers with the hand-written LinkedIn fixtures (directo_fixtures.py) through its real parser."""
 import os
 import uuid
 from datetime import datetime, timedelta, timezone as dt_timezone
@@ -7,14 +8,18 @@ from decimal import Decimal
 from unittest.mock import patch
 import httpx
 from django.contrib.auth.models import User
-from django.test import TransactionTestCase
+from django.db import IntegrityError
+from django.test import SimpleTestCase, TransactionTestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
 from knowledge import db
-from team_backend import autopiloto, jobs, metricas, operador
+from linkedin_directo import rutas
+from team_backend import autopiloto, connectors_directo, jobs, metricas, operador
 from team_backend.connectors import ConnectorError, FakeConnector, UnipileConnector, _post
-from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, Contact, EditorialPiece, Job,
-                                 PostMetric)
+from team_backend.models import (ActionExecution, ActionProposal, AudienceSnapshot, AuditEvent, ConnectorAccount, Contact, EditorialPiece,
+                                 Job, PostMetric)
+from team_backend.tests import directo_fixtures as F
+from team_backend.tests.test_ids_linkedin import ACTIVITY, UGC, unipile_post
 from team_backend.tests.test_operador import OperatorBase
 
 TEXT_A='Before writing a line of code for a new feature, ask which decision it helps someone make.'
@@ -35,14 +40,14 @@ class MetricsBase(OperatorBase):
     def today(self):
         return timezone.now().astimezone(operador.local_tz()).date()
 
-    def publish(self,text,hours_ago,pillar='applied_ai',seed=True,slot=None,state='confirmed'):
+    def publish(self,text,hours_ago,pillar='applied_ai',seed=True,slot=None,state='confirmed',wrote=True):
         """A CONT-09 publication confirmed `hours_ago` and, when seeded, the own post Unipile shows for it."""
         when=timezone.now()-timedelta(hours=hours_ago);self.slots+=1
         piece=EditorialPiece.objects.create(account=self.account,slot_date=slot or self.today()-timedelta(days=400+self.slots),scheduled_for=when,
                                             state='ready',final_text=text,brief={'pillar':pillar,'thesis':'Tesis '+text[:20]})
         proposal=ActionProposal.objects.create(account=self.account,piece=piece,capability='CONT-09',payload={'text':text},payload_hash='0'*64,state=state)
         ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='linkedin_fake',state=state,executed_by=self.gustavo,
-                                       started_at=when,external_url=f'https://www.linkedin.com/feed/update/urn:li:share:{self.slots}/')
+                                       started_at=when,external_url=f'https://www.linkedin.com/feed/update/urn:li:share:{self.slots}/',wrote=wrote)
         return piece,(self.fake.seed_own_post(text) if seed else None)
 
     def age(self,piece,hours):
@@ -64,7 +69,7 @@ class PostSnapshotTests(MetricsBase):
         self.fake.set_post_counters(pid,impressions=150,reactions=7,comments=0,reposts=None)  # LinkedIn hides the reposts
         self.fake.set_post_counters(fresh_pid,impressions=40,reactions=1,comments=0,reposts=0)
         job=self.collect()
-        self.assertEqual((job.state,job.result_status,job.error),('complete','cortes:1 audiencia:creada',''))
+        self.assertEqual((job.state,job.result_status,job.error),('complete','cortes:1 pend:0 aud:creada',''))
         metric=PostMetric.objects.get()
         self.assertEqual((metric.piece_id,metric.kind,metric.provider_post_id,metric.impressions,metric.reactions),(piece.id,'24h',pid,150,7))
         self.assertEqual(metric.comments,0);self.assertIsNone(metric.reposts)  # an observed zero is zero; hidden is null
@@ -117,10 +122,12 @@ class PostSnapshotTests(MetricsBase):
         self.fake.set_post_counters(old_pid,impressions=900,reactions=30,comments=4,reposts=2)
         ghost,_=self.publish('A post Unipile never shows back.',hours_ago=30,seed=False)
         job=self.collect()
-        self.assertEqual(job.result_status,'cortes:3 audiencia:creada')
+        self.assertEqual(job.result_status,'cortes:3 pend:1 aud:creada')
         self.assertEqual(sorted(PostMetric.objects.filter(piece=old).values_list('kind',flat=True)),['24h','72h','7d'])
         self.assertTrue(all(m.captured_at-m.published_at>=timedelta(days=9) for m in PostMetric.objects.all()))  # lateness is visible
-        self.assertFalse(PostMetric.objects.filter(piece=ghost).exists());self.assertEqual(self.last_summary()['pending'],1)
+        self.assertFalse(PostMetric.objects.filter(piece=ghost).exists())
+        # Visible: which publication, which cuts and why (no own post with its text, none dated near the write).
+        self.assertEqual(self.last_summary()['pending'],[{'piece':str(ghost.id),'cuts':['24h'],'reason':'sin_coincidencia'}])
 
         other,other_pid=self.publish(TEXT_B,hours_ago=25)
         self.fake.set_post_counters(other_pid,impressions=100,reactions=1,comments=1,reposts=0)
@@ -129,18 +136,35 @@ class PostSnapshotTests(MetricsBase):
         self.fake.state['posts'][other_pid]['text']='Edited on LinkedIn after publishing.'
         self.fake.set_post_counters(other_pid,impressions=250,reactions=3,comments=2,reposts=1)
         self.age(other,73)
-        with patch.dict(os.environ,{'METRICS_POSTS_LIMIT':'1'}):self.collect()  # out of the recent list: read by its stored id
+        # Out of the recent list: found by its stored id in the longest list, whose counters carry the impressions.
+        with patch.dict(os.environ,{'METRICS_POSTS_LIMIT':'1'}):self.collect()
         self.assertEqual(PostMetric.objects.get(piece=other,kind='72h').impressions,250)
-        self.assertEqual(metricas.reads_today(self.account,'post'),1)
+        self.assertEqual((metricas.reads_today(self.account,'posts'),metricas.reads_today(self.account,'post')),(4,0))
 
-    def test_read_caps_and_other_states(self):
+    def test_an_evidence_failure_is_not_taken_for_an_already_captured_cut(self):
         piece,pid=self.publish(TEXT_A,hours_ago=25)
-        self.publish(TEXT_B,hours_ago=30,state='sent')  # only confirmed publications are measured
+        with patch('team_backend.evidencia.ingest_metric',side_effect=IntegrityError('Simulado: evidencia rota.')), \
+                self.assertRaisesRegex(IntegrityError,'evidencia rota'):
+            metricas.collect(self.bot,self.account)
+        self.assertFalse(PostMetric.objects.exists())  # undone with its evidence: still due, never silently lost
+        metricas.collect(self.bot,self.account)
+        self.assertEqual(list(PostMetric.objects.values_list('piece_id','kind')),[(piece.id,'24h')])
+        # Only the very duplicate (a concurrent run captured the age first) counts as already captured.
+        execution=ActionExecution.objects.get(proposal__piece=piece)
+        self.assertEqual(metricas._capture(execution,['24h'],self.fake.get_post(pid),timezone.now()),0)
+
+    def test_read_caps_and_which_publications_are_measured(self):
+        piece,pid=self.publish(TEXT_A,hours_ago=25)
+        sent,_=self.publish(TEXT_B,hours_ago=30,state='sent')  # a 201 not read back yet: published, as in the calendar
+        for state,wrote in (('failed',False),('uncertain',True),('executing',True),('sent',False)):  # nothing published
+            self.publish(f'Not measured: {state}, wrote={wrote}.',hours_ago=26,state=state,wrote=wrote)
         with patch.dict(os.environ,{'METRICS_READ_CAPS':'posts=0'}):job=self.collect()
         self.assertEqual(job.state,'complete');self.assertIn('Tope diario',job.error)
         self.assertFalse(PostMetric.objects.exists());self.assertTrue(AudienceSnapshot.objects.exists())  # the audience still ran
+        self.assertEqual(sorted((p['piece'],p['reason']) for p in self.last_summary()['pending']),
+                         sorted((str(p.id),'tope_de_lecturas') for p in (piece,sent)))
         self.collect()
-        self.assertEqual(list(PostMetric.objects.values_list('piece_id',flat=True)),[piece.id])
+        self.assertEqual(set(PostMetric.objects.values_list('piece_id',flat=True)),{piece.id,sent.id})
 
 
 class AudienceTests(MetricsBase):
@@ -240,16 +264,136 @@ class AutopilotMetricsTests(MetricsBase):
         self.assertEqual(autopiloto.tick(self.bot,now=t0)['metrics'],0)  # one at a time
         while jobs.process_one(self.worker):pass
         self.assertEqual(Job.objects.get(kind='collect_metrics').state,'complete')
-        self.assertEqual(autopiloto.tick(self.bot)['metrics'],0)  # nothing due: no job, no read
+        # A new bucket, whose job id is unused: only due() keeps it from queueing. Its local day has its audience
+        # snapshot whatever the wall clock's day was when the job ran.
+        later=t0+timedelta(minutes=181)
+        AudienceSnapshot.objects.get_or_create(day=metricas.local_day(later))
+        self.assertFalse(metricas.due(later))
+        self.assertEqual(autopiloto.tick(self.bot,now=later)['metrics'],0)  # nothing due: no job, no read
+        self.assertEqual(Job.objects.filter(kind='collect_metrics').count(),1)
         self.publish(TEXT_A,hours_ago=28)
         self.assertEqual(autopiloto.tick(self.bot,now=t0+timedelta(minutes=5))['metrics'],0)  # same bucket: its id was already used
-        self.assertEqual(autopiloto.tick(self.bot,now=t0+timedelta(minutes=181))['metrics'],1)
+        self.assertEqual(autopiloto.tick(self.bot,now=later)['metrics'],1)  # the bucket nothing was due in queues now
         self.assertFalse(Job.objects.filter(kind='collect_metrics',params__account=str(official.id)).exists())  # only Unipile reads
         Job.objects.filter(kind='collect_metrics').delete()
         with patch.dict(os.environ,{'METRICS_EVERY_MINUTES':'0'}):self.assertEqual(autopiloto.tick(self.bot)['metrics'],0)
         with patch('team_backend.metricas.due',side_effect=RuntimeError('boom')):report=autopiloto.tick(self.bot)
         self.assertEqual(report['metrics_error'],'RuntimeError')
         self.assertIn('execute',report);self.assertIn('reconcile',report)  # the rest of the tick still ran
+
+
+class DirectoMetricsTests(MetricsBase):
+    """metricas on a directo account at a fixed clock: LinkedIn answers with the hand-written fixtures, read by the
+    connector's real parser."""
+    NOW=F.POSTED+timedelta(hours=25)  # the 24 h cut of a post written at F.POSTED is due
+    LATER=F.POSTED+timedelta(days=8)  # every cut is due
+
+    def setUp(self):
+        super().setUp()
+        self.directo=ConnectorAccount.objects.create(provider='directo',external_account_id='cuenta-prueba',label='Cuenta directa de prueba')
+
+    def written(self,text,at,**execution):
+        """A confirmed CONT-09 publication whose write started at `at`."""
+        self.slots+=1
+        piece=EditorialPiece.objects.create(account=self.directo,slot_date=self.today()-timedelta(days=400+self.slots),scheduled_for=at,
+                                            state='ready',final_text=text,brief={'pillar':'applied_ai','thesis':'Tesis de prueba'})
+        proposal=ActionProposal.objects.create(account=self.directo,piece=piece,capability='CONT-09',payload={'text':text},
+                                               payload_hash='0'*64,state='confirmed')
+        ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='linkedin',state='confirmed',
+                                       executed_by=self.gustavo,started_at=at,**execution)
+        return piece
+
+    def scanned(self,piece,post_id):
+        """The id the replies scan found and kept for the piece (respuestas.read)."""
+        AuditEvent.objects.create(action='replies.scanned',target=str(piece.id),metadata={'found':True,'post_id':post_id})
+
+    def linkedin(self,recent,longest=(),views=37):
+        """The account's LinkedIn: its own posts (F.posts rows; the longest list also has `longest`), get_post of
+        F.POST, no comments, its top card and its profile views summary."""
+        def own_posts(request):return F.ok(F.posts(*recent,*(longest if f'count={metricas.POSTS_MAX}&' in request.path else ())))
+        return F.FakeTransport(('GET',r'^/voyager/api/me$',F.ok(F.me())),('GET',r'^/voyager/api/identity/profileUpdatesV2\?',own_posts),
+                               ('GET',r'^/voyager/api/feed/updates\?q=highlightedFeed',F.ok(F.highlighted(F.POST))),
+                               ('GET',r'^/voyager/api/feed/comments\?',F.ok(F.comments(F.POST,[]))),
+                               ('GET',r'^/voyager/api/graphql\?includeWebMetadata=true&variables=\(vanityName:',F.ok(F.top_card(F.OWN,own=True))),
+                               ('GET',r'^/voyager/api/identity/wvmpCards$',F.ok(F.profile_views(views))))
+
+    def collect_at(self,transport,now=NOW,**env):
+        with patch.object(connectors_directo,'TRANSPORT',transport),patch.dict(os.environ,env):
+            return metricas.collect(self.bot,self.directo,now=now)
+
+    def test_profile_views_are_asked_for_the_window_directo_answers(self):
+        with patch.dict(os.environ):
+            del os.environ['METRICS_PROFILE_VIEWS_DAYS']  # the default (28): not a window directo answers
+            summary=self.collect_at(self.linkedin([]))
+        snapshot=AudienceSnapshot.objects.get()
+        self.assertEqual((snapshot.followers,snapshot.connections,snapshot.profile_views,snapshot.profile_views_days),(120,80,37,rutas.VIEWS_DAYS))
+        self.assertNotIn('views_error',summary)
+        # A summary card without the number: absent, and the run says so.
+        next_day=self.NOW+timedelta(days=1)
+        summary=self.collect_at(self.linkedin([],views=None),now=next_day)
+        self.assertIsNone(AudienceSnapshot.objects.get(day=metricas.local_day(next_day)).profile_views)
+        self.assertIn(f'{rutas.VIEWS_DAYS} días',summary['views_error'])
+
+    def test_a_post_whose_text_changed_is_found_by_the_id_the_replies_scan_kept(self):
+        piece=self.written(TEXT_A,F.POSTED-timedelta(hours=3))  # too far from the post's date for the time fallback
+        self.scanned(piece,F.POST)
+        summary=self.collect_at(self.linkedin([(F.POST,'Texto editado en LinkedIn después de publicar.',F.OWN,{'likes':4,'impressions':210})]))
+        metric=PostMetric.objects.get(piece=piece)
+        self.assertEqual((metric.kind,metric.provider_post_id,metric.share_url,metric.impressions,metric.reactions),
+                         ('24h',F.POST,f'https://www.linkedin.com/feed/update/urn:li:activity:{F.POST}/',210,4))
+        self.assertEqual(summary['pending'],[])
+
+    def test_the_only_own_post_dated_near_the_write_is_that_publication(self):
+        share='urn:li:share:7390000000000000001'  # the Posts API's urn: another kind than directo's activity, never converted
+        piece=self.written(TEXT_A,F.POSTED-timedelta(minutes=6),external_id=share,external_url=f'https://www.linkedin.com/feed/update/{share}/')
+        far=F.snowflake(F.POSTED-timedelta(hours=2),8)
+        self.collect_at(self.linkedin([(F.POST,'El texto como LinkedIn lo muestra.',F.OWN,{'impressions':150}),
+                                       (far,'Otro post propio de esa mañana.',F.OWN,{'impressions':90})]))
+        metric=PostMetric.objects.get(piece=piece)
+        self.assertEqual((metric.provider_post_id,metric.impressions),(F.POST,150))
+        piece.refresh_from_db();self.assertEqual(piece.metrics['unipile_post_id'],F.POST)  # found once, known from now on
+
+    def test_two_own_posts_dated_near_the_write_leave_it_pending(self):
+        piece=self.written(TEXT_A,F.POSTED)
+        summary=self.collect_at(self.linkedin([(F.POST,'Uno.',F.OWN,{}),(F.snowflake(F.POSTED+timedelta(minutes=12),9),'Dos.',F.OWN,{})]))
+        self.assertFalse(PostMetric.objects.exists())
+        self.assertEqual(summary['pending'],[{'piece':str(piece.id),'cuts':['24h'],'reason':'varias_candidatas'}])
+        self.assertEqual(self.last_summary()['pending'],summary['pending'])  # in the metrics.collected audit too
+
+    def test_a_post_another_publication_has_is_never_taken_by_the_time_fallback(self):
+        first=self.written(TEXT_A,F.POSTED-timedelta(minutes=5));second=self.written(TEXT_B,F.POSTED+timedelta(minutes=5))
+        summary=self.collect_at(self.linkedin([(F.POST,TEXT_A,F.OWN,{'impressions':40})]))  # the second never shows back
+        self.assertEqual(list(PostMetric.objects.values_list('piece_id','provider_post_id')),[(first.id,F.POST)])
+        self.assertEqual(summary['pending'],[{'piece':str(second.id),'cuts':['24h'],'reason':'sin_coincidencia'}])
+
+    def test_a_late_cut_of_an_older_post_keeps_its_impressions_from_the_longest_list(self):
+        piece=self.written(TEXT_A,F.POSTED);self.scanned(piece,F.POST)
+        newer=[(F.snowflake(F.POSTED+timedelta(days=d),20+d),f'Post del día {d}.',F.OWN,{}) for d in (1,2)]
+        summary=self.collect_at(self.linkedin(newer,longest=[(F.POST,TEXT_A,F.OWN,{'likes':30,'impressions':900})]),
+                                now=self.LATER,METRICS_POSTS_LIMIT='2')
+        self.assertEqual({m.kind:(m.impressions,m.reactions) for m in PostMetric.objects.filter(piece=piece)},
+                         {'24h':(900,30),'72h':(900,30),'7d':(900,30)})
+        self.assertEqual((metricas.reads_today(self.directo,'posts',self.LATER),metricas.reads_today(self.directo,'post',self.LATER)),(2,0))
+        self.assertEqual((summary['pending'],summary['no_impressions']),([],[]))
+
+    def test_a_post_read_alone_is_captured_without_impressions_and_says_why(self):
+        piece=self.written(TEXT_A,F.POSTED);self.scanned(piece,F.POST)
+        newer=[(F.snowflake(F.POSTED+timedelta(days=1),21),'Post del día siguiente.',F.OWN,{})]
+        summary=self.collect_at(self.linkedin(newer),now=self.LATER,METRICS_POSTS_LIMIT='1')  # in no list: read by its id
+        self.assertEqual({m.kind:(m.impressions,m.reactions) for m in PostMetric.objects.filter(piece=piece)},
+                         {'24h':(None,4),'72h':(None,4),'7d':(None,4)})
+        self.assertEqual(summary['no_impressions'],[{'piece':str(piece.id),'cuts':['24h','72h','7d'],'reason':'lectura_individual'}])
+        self.assertEqual(metricas.reads_today(self.directo,'post',self.LATER),1)
+
+
+class SamePostTests(SimpleTestCase):
+    def test_post_ids_are_compared_like_with_like(self):
+        unipile=unipile_post(f'activity:{ACTIVITY}',f'ugcPost:{UGC}')
+        self.assertEqual(metricas._urns(unipile),{('activity',ACTIVITY),('ugcPost',UGC)})
+        self.assertTrue(metricas._urns(f'urn:li:ugcPost:{UGC}')&metricas._urns(unipile))  # the Posts API's urn inside Unipile's id
+        self.assertFalse(metricas._urns(f'urn:li:share:{UGC}')&metricas._urns(unipile))  # same number, another kind
+        self.assertEqual(metricas._urns(F.POST,f'https://www.linkedin.com/feed/update/urn:li:activity:{F.POST}/'),{('activity',F.POST)})
+        self.assertEqual(metricas._urns('activity:me-0','',None),set())  # the fake's ids name no urn
 
 
 class UnipileMetricsContractTests(TransactionTestCase):

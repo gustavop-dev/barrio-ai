@@ -295,6 +295,8 @@ def tick(user,now=None):
         report['network']=report.get('network',0)+_network(user,account,now)
         try:report['metrics']=report.get('metrics',0)+_metrics(user,account,now)
         except Exception as exc:report['metrics_error']=type(exc).__name__  # metrics never stop the rest of the tick
+        try:report['outcomes']=report.get('outcomes',0)+_outcomes(user,account,now)
+        except Exception as exc:report['outcomes_error']=type(exc).__name__  # outcomes never stop the rest of the tick
         try:report['analytics']=report.get('analytics',0)+_analytics(user,account,now)
         except Exception as exc:report['analytics_error']=type(exc).__name__  # analytics never stop the rest of the tick
         try:report['canary']=report.get('canary',0)+_canary(user,account,now)
@@ -483,6 +485,19 @@ def _metrics(user,account,now):
     if not metricas.due(now):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     _,created=enqueue_operation(user,'collect_metrics',{'account':str(account.id)},request_id=_job_id('metrics',account.id,bucket))
+    return int(created)
+
+def _outcomes(user,account,now):
+    """Desenlaces (desenlaces.py): queue collect_outcomes about every OUTCOMES_EVERY_MINUTES, one at a time and only when
+    an own comment reached 72 h or a network action 7 d without its outcome, for the account that reads LinkedIn.
+    OUTCOMES_ENABLED=false or OUTCOMES_EVERY_MINUTES=0 turns it off."""
+    from . import desenlaces, metricas
+    every=_every('OUTCOMES_EVERY_MINUTES','180')
+    if setting('OUTCOMES_ENABLED','true').strip().lower()!='true' or every<=timedelta(0):return 0
+    if account.provider not in metricas.PROVIDERS or _pending('collect_outcomes',account=str(account.id)):return 0
+    if not desenlaces.due(now).exists():return 0
+    bucket=int(now.timestamp()//every.total_seconds())
+    _,created=enqueue_operation(user,'collect_outcomes',{'account':str(account.id)},request_id=_job_id('outcomes',account.id,bucket))
     return int(created)
 
 def _analytics(user,account,now):

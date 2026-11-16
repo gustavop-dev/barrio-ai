@@ -1,8 +1,10 @@
 """Creator analytics of a `directo` account (docs/metricas-resultados.md, «Analítica de LinkedIn»; RES-10 and RES-11): the
 workbook of LinkedIn's export dialog read in Spanish and English, the allowlist of that one request, the import (upserts,
-idempotency, errors and pauses), the daily job and its guards, and GET /api/v1/resultados/analitica (range math, honesty
-rules, permissions). Every workbook is hand-written with invented values (analitica_fixtures.py); nothing here reaches
-LinkedIn or the navegador service."""
+idempotency, errors, pauses and degraded workbooks), the links from posts to pieces, the figures by piece and the
+coverage, the daily job and its guards, and GET /api/v1/resultados/analitica (range math, honesty rules, permissions).
+Every workbook is hand-written with invented values (analitica_fixtures.py); nothing here reaches LinkedIn or the
+navegador service."""
+import base64
 import json
 import os
 import re
@@ -18,11 +20,12 @@ from rest_framework.test import APIClient
 from linkedin_directo import Answer, Cliente, LinkedInError, Request, permitidas, rutas
 from linkedin_directo import analitica as parser
 from linkedin_directo.analitica import Day, Demographic, ParseError
-from team_backend import analitica, autopiloto, connectors_directo, jobs
-from team_backend.connectors import ConnectorError, FakeConnector, UnipileConnector
+from team_backend import analitica, autopiloto, connectors_directo, ids_linkedin, jobs
+from team_backend.connectors import ConnectorError
 from team_backend.connectors_directo import DirectoConnector
 from team_backend.models import (ActionExecution, ActionProposal, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange,
-                                 AnalyticsSnapshot, AuditEvent, ConnectorAccount, EditorialPiece, Job, OperatorControl, Worker)
+                                 AnalyticsSnapshot, AuditEvent, ConnectorAccount, EditorialPiece, Job, OperatorControl, PostComment,
+                                 Worker)
 from team_backend.tests import analitica_fixtures as A
 from team_backend.tests import directo_fixtures as F
 from team_backend.tests.test_metricas import MetricsBase
@@ -243,10 +246,6 @@ class ExportRequestTests(SimpleTestCase):
                 with self.assertRaises(ConnectorError) as e:c.analytics(START,END)
                 self.assertEqual((e.exception.kind,e.exception.pause),(kind,pause))
 
-    def test_only_the_direct_connector_has_analytics(self):
-        self.assertTrue(callable(getattr(DirectoConnector,'analytics',None)))
-        for other in (UnipileConnector,FakeConnector):self.assertFalse(hasattr(other,'analytics'))
-
 
 class ImportBase(TestCase):
     def setUp(self):
@@ -267,6 +266,12 @@ class ImportBase(TestCase):
 
     def imported(self,start=START,end=END,now=NOW,**kw):
         return analitica.import_range(self.account,start,end,now=now,**kw)
+
+    @staticmethod
+    def frozen():
+        """analitica's clock stopped at NOW, for the paths that take no `now` (the command, the job): a run across
+        midnight UTC still asks the days the test expects."""
+        return patch('team_backend.analitica.timezone',**{'now.return_value':NOW})
 
 
 class ImportTests(ImportBase):
@@ -340,6 +345,29 @@ class ImportTests(ImportBase):
         self.assertFalse(AnalyticsDay.objects.exists());self.assertFalse(AnalyticsRange.objects.exists())
         self.account.refresh_from_db();self.assertFalse(self.account.paused)  # a changed workbook is ours to fix, not a stop
 
+    def test_a_workbook_that_reads_empty_after_good_ones_is_kept_but_degraded(self):
+        """Catch the silent «ok dias:0» of a changed workbook: rows the reader takes for headers are no error, so an
+        import with no days and no posts where earlier ones had them is kept, flagged with its reason and shown."""
+        self.mutate=A.changed_format
+        quiet=self.imported(now=NOW-timedelta(hours=2))  # nothing earlier to compare with: a quiet account, plain ok
+        self.assertEqual((quiet.state,quiet.error_kind,quiet.error,quiet.rows['days'],quiet.rows['posts']),('ok','','',0,0))
+        self.mutate=None
+        self.assertEqual(self.imported(now=NOW-timedelta(hours=1)).error_kind,'')
+        self.mutate=A.changed_format
+        log=self.imported()
+        self.assertEqual((log.state,log.error_kind,log.rows['days'],log.rows['posts'],log.rows['top_by_engagements']),
+                         ('ok','analytics_empty',0,0,3))
+        self.assertIn('sin filas de días ni de publicaciones',log.error);self.assertIn('cambiado de formato',log.error)
+        self.assertTrue(analitica.degraded(log))
+        self.assertEqual((AnalyticsDay.objects.count(),AnalyticsPost.objects.count()),(7,2))  # what earlier imports stored stays
+        self.assertEqual(AnalyticsRange.objects.get().top_by_engagements[0]['value'],54)  # what did read is stored
+        self.assertTrue(AuditEvent.objects.filter(action='analytics.imported',metadata__degraded=['days','posts']).exists())
+        self.assertEqual(analitica.overview(now=NOW)['ultimo_error'],
+                         {'at':NOW,'tipo':'manual','kind':'analytics_empty','error':log.error})
+        self.mutate=None
+        self.imported(now=NOW+timedelta(hours=1))
+        self.assertIsNone(analitica.overview(now=NOW)['ultimo_error'])  # a good import clears it
+
     def test_a_stop_pauses_the_account_and_nothing_more_is_asked(self):
         self.reply=Answer(429,'{}','application/json')
         log=self.imported()
@@ -389,13 +417,114 @@ class ImportTests(ImportBase):
             with self.subTest(chunk=chunk),self.assertRaises(ValueError):analitica.backfill(self.account,chunk=chunk,now=NOW)
 
 
+class PostKeyTests(SimpleTestCase):
+    def test_every_stored_id_names_its_post_and_no_urn_kind_becomes_another(self):
+        n=A.POST_A
+        pair=base64.b64encode(json.dumps([f'activity:{n}',f'ugcPost:{A.POST_B}']).encode()).decode()
+        cases=((n,[f'urn:li:activity:{n}']),  # directo's id: the activity number
+               (ids_linkedin.to_unipile('post',n),[f'urn:li:activity:{n}']),  # Unipile's opaque id
+               (pair,[f'urn:li:activity:{n}',f'urn:li:ugcPost:{A.POST_B}']),
+               (f'urn:li:share:{n}',[f'urn:li:share:{n}']),  # never the activity of the same number: no such conversion
+               (A.url(n)+'/?utm_source=prueba',[f'urn:li:activity:{n}',f'linkedin.com/feed/update/urn:li:activity:{n}']),
+               ('',[]),(None,[]),('no-es-un-id',[]),('https://www.linkedin.com/',[]))
+        for value,keys in cases:
+            with self.subTest(value=value):self.assertEqual(analitica.post_keys(value),keys)
+        # A link with no urn (an article) still meets the same link written another way.
+        index={analitica.url_key('https://www.linkedin.com/pulse/un-articulo-ficticio/'):'pieza-prueba'}
+        self.assertEqual(analitica.match(index,'','http://LinkedIn.com/pulse/un-articulo-ficticio?trk=x'),'pieza-prueba')
+        self.assertIsNone(analitica.match(index,'',''))
+
+
+class LinkTests(ImportBase):
+    """Catch a post left without its piece forever: an id learnt after the post was imported links it on the next import,
+    a link is never moved, and the figures by piece and the coverage read what is stored."""
+    def setUp(self):
+        super().setUp()
+        self.author=User.objects.create_user('autor-prueba');self.slot=0
+
+    def publication(self,state='confirmed',wrote=True,started=NOW-timedelta(days=3),**ids):
+        """A CONT-09 publication of a new piece; `ids` are its execution's external_id / external_url."""
+        self.slot+=1
+        piece=EditorialPiece.objects.create(account=self.account,slot_date=date(2026,10,1)+timedelta(days=self.slot),scheduled_for=started,
+                                            state='ready',final_text=f'Texto de prueba {self.slot}',brief={'pillar':'applied_ai'})
+        proposal=ActionProposal.objects.create(account=self.account,piece=piece,capability='CONT-09',payload={'text':'Texto'},
+                                               payload_hash='0'*64,state=state)
+        ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='linkedin_fake',state=state,
+                                       executed_by=self.author,started_at=started,wrote=wrote,**ids)
+        return piece
+
+    def comment(self,piece,post_id):
+        return PostComment.objects.create(account=self.account,piece=piece,provider_post_id=post_id,
+                                          provider_comment_id=f'comentario-{uuid.uuid4().hex[:8]}')
+
+    def links(self):
+        return {urn:str(pid) if pid else None for urn,pid in AnalyticsPost.objects.values_list('post_urn','piece_id')}
+
+    def test_a_post_imported_before_its_id_is_known_is_linked_by_a_later_import(self):
+        official=self.publication(external_id=f'urn:li:share:{A.POST_A}')  # the export links the activity: another kind
+        quiet=self.publication()  # no id yet
+        self.imported()
+        self.assertEqual(self.links(),{f'urn:li:activity:{A.POST_A}':None,f'urn:li:activity:{A.POST_B}':None})
+        # The replies read found both posts later: one by its Unipile id (kept in its audit), one by directo's id.
+        AuditEvent.objects.create(action='replies.scanned',target=str(official.id),
+                                  metadata={'found':True,'post_id':ids_linkedin.to_unipile('post',A.POST_A)})
+        self.comment(quiet,A.POST_B)
+        self.imported(now=NOW+timedelta(hours=1))
+        self.assertEqual(self.links(),{f'urn:li:activity:{A.POST_A}':str(official.id),f'urn:li:activity:{A.POST_B}':str(quiet.id)})
+        self.assertTrue(AuditEvent.objects.filter(action='analytics.imported',metadata__relinked=2).exists())
+
+    def test_relinking_twice_changes_nothing_and_never_moves_a_link(self):
+        first=self.publication(external_id=A.POST_A)
+        self.imported()
+        self.assertEqual(analitica.relink(),0)  # nothing left to link
+        # The ids change: the first post now looks like another piece's, and the second post gets its piece.
+        ActionExecution.objects.filter(proposal__piece=first).update(external_id='')
+        self.comment(self.publication(),A.POST_A)
+        second=self.publication(external_url=A.url(A.POST_B))
+        self.assertEqual(analitica.relink(),1);self.assertEqual(analitica.relink(),0)
+        self.imported(now=NOW+timedelta(hours=1))
+        self.assertEqual(self.links(),{f'urn:li:activity:{A.POST_A}':str(first.id),f'urn:li:activity:{A.POST_B}':str(second.id)})
+
+    def test_figures_by_piece_in_one_query_and_the_range_for_a_post_no_longer_among_the_latest(self):
+        linked=[self.publication(external_id=n) for n in (A.POST_A,A.POST_B)]
+        old=self.publication()  # an older post: only in LinkedIn's top lists, never among the latest posts
+        nothing=self.publication()
+        self.imported();self.imported(date(2026,10,25),END);self.imported(date(2026,10,1),date(2026,10,31))
+        with self.assertNumQueries(1):figures=analitica.for_pieces([p.id for p in linked])
+        self.assertEqual(figures[linked[0].id],{'impressions':1234,'reactions':25,'comments':4,'shares':1,'saves':2,'sends':0,
+                                                'profile_views':12,'followers_gained':3,'members_reached':800,'last_seen_at':NOW,
+                                                'source':'vida'})
+        self.assertEqual(analitica.for_piece(linked[1])['impressions'],2500)
+        self.assertIsNone(analitica.for_piece(old))
+        # Its id is learnt after the imports: the latest range (ending last, the longest of those) is matched by the
+        # same ids, and nothing is stored for it.
+        self.comment(old,A.OLD_POST)
+        figures=analitica.for_pieces([str(old.id),str(nothing.id),str(linked[0].id)])
+        self.assertEqual(figures[str(old.id)],{'impressions':None,'engagements':20,'source':'rango',
+                                               'label':'14 días, del 2026-10-25 al 2026-11-07','days':14,
+                                               'desde':date(2026,10,25),'hasta':END,'captured_at':NOW})
+        self.assertNotIn(str(nothing.id),figures);self.assertEqual(figures[str(linked[0].id)]['source'],'vida')
+        self.assertEqual(analitica.for_piece(old.id)['source'],'rango')
+        self.assertFalse(AnalyticsPost.objects.filter(piece=old).exists())
+
+    def test_coverage_counts_the_publications_that_wrote_and_names_the_unlinked(self):
+        linked=self.publication(external_id=A.POST_A)
+        pending=self.publication(state='sent',external_id=f'urn:li:share:{A.POST_C}')
+        self.publication(wrote=False,external_id=A.POST_B)  # an identical post was already there: nothing written
+        self.publication(state='failed');self.publication(started=NOW+timedelta(hours=2))
+        self.imported()
+        self.assertEqual(analitica.coverage(NOW+timedelta(hours=1)),{'published':2,'linked':1,'unlinked_piece_ids':[str(pending.id)]})
+        self.assertEqual(AnalyticsPost.objects.get(post_urn=f'urn:li:activity:{A.POST_A}').piece_id,linked.id)
+
+
 class CommandTests(ImportBase):
     def command(self,*args):
         out=StringIO();call_command('analitica',*args,stdout=out)
         return json.loads(out.getvalue())
 
     def test_import_backfill_and_state(self):
-        yesterday=analitica.utc_today()-timedelta(days=1)
+        yesterday=NOW.date()-timedelta(days=1)
+        clock=self.frozen();clock.start();self.addCleanup(clock.stop)
         [result]=self.command('importar','--cuenta','cuenta-prueba','--dias','7')
         self.assertEqual((result['desde'],result['hasta'],result['estado'],result['tipo'],result['filas']['days']),
                          ((yesterday-timedelta(days=6)).isoformat(),yesterday.isoformat(),'ok','manual',7))
@@ -446,11 +575,12 @@ class DailyJobTests(ImportBase):
     def test_the_job_imports_the_last_complete_days(self):
         bot=User.objects.create_user('autopiloto-prueba');grant(bot,'operate_linkedin')
         worker=Worker.objects.create()
+        clock=self.frozen();clock.start();self.addCleanup(clock.stop)
         jobs.enqueue_operation(bot,'import_analytics',{'account':str(self.account.id)})
         jobs.process_one(worker)
         job=Job.objects.get(kind='import_analytics')
         self.assertEqual((job.state,job.result_status,job.error),('complete','analitica:ok dias:14',''))
-        yesterday=analitica.utc_today()-timedelta(days=1)
+        yesterday=NOW.date()-timedelta(days=1)
         log=AnalyticsImport.objects.get()
         self.assertEqual((log.trigger,log.start,log.end),('diaria',yesterday-timedelta(days=13),yesterday))
         self.reply=Answer(429,'')
@@ -528,6 +658,24 @@ class DailyJobTests(ImportBase):
         self.assertEqual([asked(r) for r in self.transport.sent],self.ranges((14,)))
         with patch.dict(os.environ,{'ANALYTICS_DAILY_RANGES':'90,400,90','ANALYTICS_DAILY_DAYS':'7'}):
             self.assertEqual(analitica.daily_ranges(),[90,366])  # deduplicated, at most one export's length
+
+    def test_a_degraded_import_goes_on_with_the_ranges_and_the_job_says_so(self):
+        """Catch «analitica:ok dias:0» for a workbook whose format changed: the batch keeps what still reads (the ranges'
+        top lists), and the job fails with «analitica:degradada» and the reason instead of passing as ok."""
+        bot=User.objects.create_user('autopiloto-prueba');grant(bot,'operate_linkedin')
+        self.assertEqual(self.imported(now=NOW-timedelta(days=1)).error_kind,'')  # earlier imports had days and posts
+        self.mutate=A.changed_format
+        with patch.dict(os.environ,{'ANALYTICS_DAILY_RANGES':'7'}):result=analitica.run(bot,self.account,NOW)
+        self.assertEqual((result['state'],result['days'],result['ranges']),('degradada',0,1))
+        self.assertIn('sin filas de días ni de publicaciones',result['error'])
+        self.assertEqual(list(AnalyticsImport.objects.order_by('id').values_list('state','error_kind')),
+                         [('ok',''),('ok','analytics_empty'),('ok','analytics_empty')])
+        self.assertEqual([len(r.top_by_engagements) for r in AnalyticsRange.objects.all()],[3,3,3])
+        worker=Worker.objects.create()
+        jobs.enqueue_operation(bot,'import_analytics',{'account':str(self.account.id)})
+        with self.frozen():jobs.process_one(worker)
+        job=Job.objects.get(kind='import_analytics')
+        self.assertEqual((job.state,job.result_status,job.error),('failed','analitica:degradada dias:0',result['error']))
 
 
 class AutopilotAnalyticsTests(MetricsBase):

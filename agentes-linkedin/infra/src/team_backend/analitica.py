@@ -4,31 +4,36 @@ Import: LinkedIn's export dialog, one call through the navegador service (linked
 AnalyticsDay (per UTC day), AnalyticsPost (lifetime figures per post), AnalyticsSnapshot (follower total and audience
 demographics per capture day), AnalyticsRange (what only holds for the exact range: totals, top lists, content
 demographics) and AnalyticsImport (one row per export asked, ok or not). Only reads LinkedIn.
-- import_range: one range, upserted. LinkedIn's errors land in the AnalyticsImport row; one that stops the account
-  (login, checkpoint, 401/403/429/999, the service's stop) also pauses it, as the other directo reads do.
+- import_range: one range, upserted, then every post still without its piece linked to it once one of our ids names it
+  (relink). LinkedIn's errors land in the AnalyticsImport row; one that stops the account (login, checkpoint,
+  401/403/429/999, the service's stop) also pauses it, as the other directo reads do. A workbook that reads but brings
+  no days or no posts where earlier imports did (a format change reads as headers only) is kept, state ok, with
+  error_kind EMPTY and the reason (degraded).
 - run: the daily job (import_analytics), queued by the autopilot once per UTC day after ANALYTICS_DAILY_AFTER
   (daily_due): the last ANALYTICS_DAILY_DAYS complete days (the refresh of the recent days), then each exact range of
   ANALYTICS_DAILY_RANGES ending yesterday (the app's presets), one export each, stopping at the first failure; those
-  ranges at most once per UTC day.
+  ranges at most once per UTC day. A degraded import does not stop it, but the job's state is then DEGRADED.
 - backfill: back to the earliest day LinkedIn gives, in chunks of ANALYTICS_CHUNK_DAYS, newest first.
 
-Read side: overview() is GET /api/v1/resultados/analitica, from stored data only; LinkedIn is never called at request
-time. Days are UTC, as LinkedIn counts them. Null is no data, never zero."""
+Read side: overview() is GET /api/v1/resultados/analitica; for_pieces() gives the figures of own posts by piece and
+coverage() how many publications have theirs. All from stored data only; LinkedIn is never called at request time.
+Days are UTC, as LinkedIn counts them. Null is no data, never zero."""
 import os
 import re
 import uuid
 from dataclasses import asdict
 from datetime import date, datetime, time, timedelta, timezone as dt_timezone
+from urllib.parse import unquote, urlsplit
 from django.db import transaction
 from django.db.models import F, Max, Min, Q
 from django.utils import timezone
 from linkedin_directo.analitica import post_urn
 from linkedin_directo.permitidas import ANALYTICS_DAYS
-from . import operador
+from . import ids_linkedin, operador
 from .connectors import ConnectorError, get_connector
 from .resultados import kpi, ratio_kpi
 from .models import (ActionExecution, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange, AnalyticsSnapshot,
-                     ConnectorAccount, EditorialPiece, PostMetric)
+                     AuditEvent, ConnectorAccount, EditorialPiece, PostComment, PostMetric)
 from .permissions import require
 
 EARLIEST=date(2025,10,10)  # LinkedIn gave nothing older on 2026-11-13; ANALYTICS_EARLIEST moves it
@@ -36,8 +41,13 @@ PRESETS={'7d':7,'14d':14,'28d':28,'90d':90,'365d':365}
 POST_FIELDS=('published','kind','impressions','network_pct','outside_pct','members_reached','followers_gained',
              'profile_views','reactions','comments','shares','saves','sends','button_clicks')
 DAY_FIELDS=('impressions','engagements','new_followers')
+LIFETIME=('impressions','reactions','comments','shares','saves','sends','profile_views','followers_gained','members_reached')
 ACTIVITY=re.compile(r'\d{10,25}')
 UTC=dt_timezone.utc
+EMPTY='analytics_empty'  # AnalyticsImport.error_kind of a degraded import (state ok)
+DEGRADED='degradada'  # run()'s state when one of its imports was degraded
+# Rows that never go to zero once seen: every day of a range has its row, and the latest posts ignore the range.
+WATCHED={'days':'días','posts':'publicaciones'}
 
 def setting(name,default):
     return os.environ.get(name,default)
@@ -93,34 +103,82 @@ def clamp(start,end,now=None):
 
 # --------------------------------------------------------------------------- import
 
-def known_posts():
-    """post urn -> piece id of the CONT-09 publications, from every id we keep of them: the official API's urn
-    (ActionExecution), and the activity id or link a read found (PostMetric, EditorialPiece.metrics). Not filtered by
-    account: pieces belong to the publishing account, the analytics to the directo one, and both are the same person."""
-    index={}
+def url_key(value):
+    """A post link as one key, whatever way it was written: no scheme, query, fragment or trailing slash, the host
+    lowercased without «www.». '' for anything that is not a link to a page."""
+    parts=urlsplit(unquote(str(value or '').strip()))
+    if parts.scheme not in ('http','https') or not parts.netloc or not parts.path.strip('/'):return ''
+    return parts.netloc.lower().removeprefix('www.')+parts.path.rstrip('/')
+
+def unipile_urns(value):
+    """The urns inside a Unipile post id (base64 of a JSON list of urns, ids_linkedin): its activity (the later one of a
+    repost pair, as ids_linkedin.to_directo) and its ugcPost; [] for any other shape."""
+    try:pairs=ids_linkedin.post_urns(value)
+    except ids_linkedin.Untranslatable:return []
+    try:activity=[f'urn:li:activity:{ids_linkedin.to_directo("post",value)}']
+    except ids_linkedin.Untranslatable:activity=[]
+    return activity+[f'urn:li:ugcPost:{n}' for kind,n in pairs if kind=='ugcPost']
+
+def post_keys(value):
+    """The keys one stored id or link names its post by: the urn a link or an urn names (post_urn), else directo's bare
+    activity number, else the urns of a Unipile id; and a link's url_key. Never another urn kind: nothing in the code
+    base turns an activity into the share or ugcPost of the same post, so those only meet through the link."""
+    value=str(value or '').strip()
+    if not value:return []
+    urn=post_urn(value) or (f'urn:li:activity:{value}' if ACTIVITY.fullmatch(value) else '')
+    return [k for k in ([urn] if urn else unipile_urns(value))+[url_key(value)] if k]
+
+def match(index,urn,url):
+    """The piece id known_posts() gives a post LinkedIn linked as `url` (urn `urn`): by its urn, else by the link."""
+    return next((index[k] for k in (urn,url_key(url)) if k and k in index),None)
+
+def known_posts(pieces=None):
+    """post key (post_keys) -> piece id of the CONT-09 publications, from every id we keep of them: the official API's
+    urn or the Unipile id the publish found (ActionExecution), the Unipile id, activity id or link a metrics read found
+    (PostMetric, EditorialPiece.metrics) and the post id the replies read used (PostComment, and its replies.scanned
+    audit, for a publication only). The first source to name a key wins. `pieces` (ids) limits it to those pieces.
+    Not filtered by account: pieces belong to the publishing account, the analytics to the directo one, and both are
+    the same person."""
+    index,published={},set()
     def add(value,piece):
-        value=str(value or '')
-        urn=post_urn(value) or (f'urn:li:activity:{value}' if ACTIVITY.fullmatch(value) else '')
-        if urn:index.setdefault(urn,str(piece))
-    for piece,external_id,url in ActionExecution.objects.filter(proposal__capability='CONT-09',proposal__piece__isnull=False
-                                                                ).values_list('proposal__piece_id','external_id','external_url'):
-        add(external_id,piece);add(url,piece)
-    for piece,provider_id,url in PostMetric.objects.values_list('piece_id','provider_post_id','share_url'):
+        for key in post_keys(value):index.setdefault(key,str(piece))
+    def only(rows,field):return rows if pieces is None else rows.filter(**{f'{field}__in':list(pieces)})
+    for piece,external_id,url in only(ActionExecution.objects.filter(proposal__capability='CONT-09',proposal__piece__isnull=False),
+                                      'proposal__piece_id').values_list('proposal__piece_id','external_id','external_url'):
+        add(external_id,piece);add(url,piece);published.add(str(piece))
+    for piece,provider_id,url in only(PostMetric.objects,'piece_id').values_list('piece_id','provider_post_id','share_url'):
         add(provider_id,piece);add(url,piece)
-    for piece,metrics in EditorialPiece.objects.exclude(metrics={}).values_list('id','metrics'):
+    for piece,metrics in only(EditorialPiece.objects.exclude(metrics={}),'id').values_list('id','metrics'):
         add((metrics or {}).get('unipile_post_id'),piece);add((metrics or {}).get('share_url'),piece)
+    for piece,post_id in only(PostComment.objects,'piece_id').order_by().values_list('piece_id','provider_post_id').distinct():
+        add(post_id,piece)
+    scans=AuditEvent.objects.filter(action='replies.scanned',metadata__has_key='post_id')
+    if pieces is not None:scans=scans.filter(target__in=[str(p) for p in pieces])
+    for target,post_id in scans.order_by().values_list('target','metadata__post_id').distinct():
+        if target in published:add(post_id,target)  # an audit target is only text: kept for a publication we know
     return index
+
+def relink(index=None):
+    """Links every AnalyticsPost still without its piece to the one known_posts() now names: an id learnt after the post
+    was imported (a later metrics, replies or reconciliation read). Never unlinks nor moves a linked post, so it can
+    run on every import. Returns how many it linked."""
+    index=known_posts() if index is None else index
+    linked=0
+    for pk,urn,url in AnalyticsPost.objects.filter(piece__isnull=True).values_list('pk','post_urn','url'):
+        piece=match(index,urn,url)
+        if piece:linked+=AnalyticsPost.objects.filter(pk=pk,piece__isnull=True).update(piece_id=piece)
+    return linked
 
 def _plain(item):
     return {k:v.isoformat() if isinstance(v,date) else v for k,v in asdict(item).items()}
 
 def _top(items,index):
-    return [{'post_urn':t.urn,'url':t.url,'piece_id':index.get(t.urn),'published':t.published.isoformat() if t.published else None,
+    return [{'post_urn':t.urn,'url':t.url,'piece_id':match(index,t.urn,t.url),'published':t.published.isoformat() if t.published else None,
              'value':t.value} for t in items]
 
-def store(account,book,now):
-    """Upsert one Workbook; returns how many rows of each kind it brought."""
-    index=known_posts()
+def store(account,book,now,index=None):
+    """Upsert one Workbook; returns how many rows of each kind it brought. Posts are linked to their pieces by relink."""
+    index=known_posts() if index is None else index
     for d in book.daily:
         seen={k:getattr(d,k) for k in DAY_FIELDS if getattr(d,k) is not None}  # a value seen is never erased by a gap
         AnalyticsDay.objects.update_or_create(account=account,day=d.day,defaults={**seen,'updated_at':now})
@@ -128,7 +186,6 @@ def store(account,book,now):
     for p in book.recent_posts:
         if not p.urn:without+=1;continue  # an article or a newsletter: no urn to key it by
         fields={f:getattr(p,f) for f in POST_FIELDS}
-        if index.get(p.urn):fields['piece_id']=index[p.urn]
         AnalyticsPost.objects.update_or_create(account=account,post_urn=p.urn,defaults={**fields,'url':p.url,'last_seen_at':now},
                                                create_defaults={**fields,'url':p.url,'first_seen_at':now,'last_seen_at':now})
     AnalyticsSnapshot.objects.update_or_create(account=account,day=utc_today(now),defaults={
@@ -141,14 +198,27 @@ def store(account,book,now):
             'top_by_engagements':len(book.top_by_engagements),'top_by_impressions':len(book.top_by_impressions),
             'audience':len(book.audience),'content':None if book.content is None else len(book.content)}
 
+def emptied(account,rows,log):
+    """The WATCHED rows this import brought none of while an earlier import of the account did. A workbook whose
+    format changed reads as headers only (linkedin_directo.analitica skips every row before the first it knows), never
+    as an error; [] when nothing earlier had them (a new or quiet account)."""
+    brought={'days':rows['days'],'posts':rows['posts']+rows['posts_without_urn']}
+    earlier=AnalyticsImport.objects.filter(account=account,state=AnalyticsImport.State.OK).exclude(pk=log.pk)
+    return [k for k in WATCHED if not brought[k] and earlier.filter(**{f'rows__{k}__gt':0}).exists()]
+
+def degraded(log):
+    """An import kept although it came back without rows earlier imports had (import_range); log.error says which."""
+    return log.state==AnalyticsImport.State.OK and log.error_kind==EMPTY
+
 def _finish(log,state,**fields):
     for key,value in fields.items():setattr(log,key,value)
     log.state=state;log.finished_at=timezone.now()
     log.save()
 
 def import_range(account,start,end,trigger=AnalyticsImport.Trigger.MANUAL,now=None,connector=None):
-    """One export of [start, end] (UTC days), stored. Returns its AnalyticsImport. Nothing is read while the machine
-    or the account is paused (ValueError)."""
+    """One export of [start, end] (UTC days), stored, then the posts still without their piece relinked. Returns its
+    AnalyticsImport: degraded (state ok, error_kind EMPTY, the reason in error) when it brought no days or no posts
+    where earlier imports did. Nothing is read while the machine or the account is paused (ValueError)."""
     now=now or timezone.now()
     if account.provider!='directo':raise ValueError('La analítica de LinkedIn se importa solo de una cuenta «directo».')
     if operador.globally_paused() or ConnectorAccount.objects.filter(pk=account.pk,paused=True).exists():
@@ -165,9 +235,15 @@ def import_range(account,start,end,trigger=AnalyticsImport.Trigger.MANUAL,now=No
         _finish(log,AnalyticsImport.State.ERROR,error_kind='internal',error=type(exc).__name__)
         raise
     with transaction.atomic():
-        rows=store(account,book,now)
-        _finish(log,AnalyticsImport.State.OK,rows=rows,sheets=list(book.sheets))
-    operador._audit(None,'analytics.imported',account.id,start=start.isoformat(),end=end.isoformat(),trigger=trigger,rows=rows)
+        index=known_posts()
+        rows=store(account,book,now,index)
+        relinked=relink(index)
+        empty=emptied(account,rows,log)
+        reason=(f'LinkedIn devolvió el libro sin filas de {" ni de ".join(WATCHED[k] for k in empty)}, que las importaciones '
+                'anteriores sí traían: puede que haya cambiado de formato. Lo que sí se leyó quedó guardado.') if empty else ''
+        _finish(log,AnalyticsImport.State.OK,rows=rows,sheets=list(book.sheets),error_kind=EMPTY if empty else '',error=reason)
+    operador._audit(None,'analytics.imported',account.id,start=start.isoformat(),end=end.isoformat(),trigger=trigger,rows=rows,
+                    relinked=relinked,degraded=empty)
     return log
 
 def daily_due(account,now=None):
@@ -184,7 +260,9 @@ def run(user,account,now=None):
     """import_analytics job: the last daily_days() complete days (the refresh that upserts the recent days), then each
     daily_ranges() range ending yesterday, one after the other, each with its own AnalyticsImport. Stops at the first
     failure: an account LinkedIn stopped is not asked again. The ranges go at most once per UTC day: one already tried
-    today (a job run twice, or resumed) is not asked again, and none after a failure of the day."""
+    today (a job run twice, or resumed) is not asked again, and none after a failure of the day. A degraded import does
+    not stop the batch (the other sheets still read), but its state is then DEGRADED with the first reason in error:
+    the job's text says «analitica:degradada» instead of a silent ok."""
     require(user,'operate_linkedin')
     # The batch's days come from one moment; each import keeps its own start time (overview orders them by it).
     moment=now or timezone.now()
@@ -192,17 +270,18 @@ def run(user,account,now=None):
     log=import_range(account,start,end,AnalyticsImport.Trigger.DAILY,now)
     result={'state':log.state,'days':(log.rows or {}).get('days',0),'ranges':0,'error':log.error}
     if log.state!=AnalyticsImport.State.OK:return result
+    def outcome(r):return {**r,'state':DEGRADED} if r['error'] else r  # past here only a degraded import sets error
     midnight=datetime.combine(utc_today(moment),time(0),tzinfo=UTC)
     today=AnalyticsImport.objects.filter(account=account,trigger=AnalyticsImport.Trigger.DAILY,started_at__gte=midnight).exclude(pk=log.pk)
-    if today.filter(state=AnalyticsImport.State.ERROR).exists():return result
+    if today.filter(state=AnalyticsImport.State.ERROR).exists():return outcome(result)
     tried=set(today.values_list('start','end'))
     for days in daily_ranges():
         start,end=last_days(days,moment)
         if (start,end) in tried:continue
         log=import_range(account,start,end,AnalyticsImport.Trigger.DAILY,now)
         if log.state!=AnalyticsImport.State.OK:return {**result,'state':log.state,'error':log.error}
-        result['ranges']+=1
-    return result
+        result['ranges']+=1;result['error']=result['error'] or (log.error if degraded(log) else '')
+    return outcome(result)
 
 def backfill(account,start=None,chunk=None,now=None):
     """From yesterday back to `start` (the earliest day LinkedIn gives), `chunk` days per export, newest first. Stops at
@@ -318,7 +397,9 @@ def overview(account_id=None,periodo=None,desde=None,hasta=None,now=None):
     now_rows=[stored[d] for d in _span(first,last) if d in stored];before_rows=[stored[d] for d in _span(*previous) if d in stored]
     ok=AnalyticsImport.objects.filter(account=account,state=AnalyticsImport.State.OK).order_by('-finished_at').first()
     latest=AnalyticsImport.objects.filter(account=account).exclude(state=AnalyticsImport.State.RUNNING).order_by('-started_at').first()
-    failed=latest if latest and latest.state==AnalyticsImport.State.ERROR and (not ok or latest.started_at>ok.started_at) else None
+    # The last import failed, or was kept although it came back empty (degraded): either is shown until one goes well.
+    failed=latest if latest and (latest.state==AnalyticsImport.State.ERROR and (not ok or latest.started_at>ok.started_at)
+                                 or degraded(latest)) else None
     snapshots=list(AnalyticsSnapshot.objects.filter(account=account,day__gte=first,day__lte=last+timedelta(days=1)).order_by('day'))
     audience=AnalyticsSnapshot.objects.filter(account=account).order_by('-day').first()
     top=AnalyticsRange.objects.filter(account=account,start=first,end=last).first()
@@ -349,3 +430,53 @@ def overview(account_id=None,periodo=None,desde=None,hasta=None,now=None):
         'demografia':{'audiencia':{'at':audience.day,'groups':grouped(audience.audience)} if audience else None,
                       'contenido':_content(account,first,last)},
     }
+
+# --------------------------------------------------------------------------- by piece (agents and results views)
+
+def _in_range(pieces):
+    """{piece id: what the latest range imported says of it} for pieces among its top posts: the range ending last, the
+    longest of those (the one most posts fit in). Matched by the same ids as known_posts(), now: an id learnt after
+    the import counts. Values hold for that range only, never for the post's lifetime."""
+    span=AnalyticsRange.objects.order_by('-end','start','-captured_at').first()
+    if span is None:return {}
+    index=known_posts(pieces);days=(span.end-span.start).days+1;out={}
+    for field,top in (('engagements',span.top_by_engagements),('impressions',span.top_by_impressions)):
+        for entry in top or []:
+            piece=entry.get('piece_id') or match(index,entry.get('post_urn') or '',entry.get('url') or '')
+            if piece in pieces:
+                out.setdefault(piece,{'impressions':None,'engagements':None,'source':'rango','label':f'{days} días, del '
+                               f'{span.start.isoformat()} al {span.end.isoformat()}','days':days,'desde':span.start,'hasta':span.end,
+                               'captured_at':span.captured_at})[field]=entry.get('value')
+    return out
+
+def for_pieces(piece_ids):
+    """{piece id, as given: figures} of own posts, for agents and views, from stored data only:
+    - a piece linked to an AnalyticsPost: LIFETIME and last_seen_at, as LinkedIn last listed it among the latest posts,
+      'source': 'vida'. One query for all of them (the post seen last, should two name the same piece);
+    - else a piece among the top posts of the latest range imported (_in_range): impressions and engagements IN THAT
+      RANGE, 'source': 'rango', with its label, days and dates, so they are never taken for lifetime figures. Read
+      only when a piece is left, and nothing is stored for it;
+    - else nothing: the piece is left out (no data, never zero)."""
+    given={str(p):p for p in piece_ids}
+    out={}
+    for row in AnalyticsPost.objects.filter(piece_id__in=list(given)).order_by('last_seen_at').values('piece_id',*LIFETIME,'last_seen_at'):
+        key=given[str(row.pop('piece_id'))];out[key]={**row,'source':'vida'}  # the right side is evaluated first: pop before
+    left={key for key,p in given.items() if p not in out}
+    if left:out.update({given[key]:figures for key,figures in _in_range(left).items()})
+    return out
+
+def for_piece(piece):
+    """for_pieces() of one piece (or its id); None when nothing is stored for it."""
+    pid=getattr(piece,'pk',piece)
+    return for_pieces([pid]).get(pid)
+
+def coverage(now=None):
+    """How many own publications have their LinkedIn analytics: the pieces of CONT-09 executions that wrote (confirmed
+    or sent, wrote=True) and started by `now`, those linked to an AnalyticsPost, and the ids of the others in order of
+    publication (the gap a results view or a diagnosis shows)."""
+    now=now or timezone.now()
+    rows=ActionExecution.objects.filter(proposal__capability='CONT-09',proposal__piece__isnull=False,wrote=True,started_at__lte=now,
+                                        state__in=(ActionExecution.State.CONFIRMED,ActionExecution.State.SENT)).order_by('started_at')
+    pieces=list(dict.fromkeys(str(p) for p in rows.values_list('proposal__piece_id',flat=True)))
+    linked={str(p) for p in AnalyticsPost.objects.filter(piece_id__in=pieces).values_list('piece_id',flat=True)}
+    return {'published':len(pieces),'linked':len(linked),'unlinked_piece_ids':[p for p in pieces if p not in linked]}

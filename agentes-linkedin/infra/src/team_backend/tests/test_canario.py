@@ -11,6 +11,7 @@ import httpx
 from django.contrib.auth.models import Permission, User
 from django.test import TestCase
 from linkedin_directo import LinkedInError, Request, Transport, rutas
+from linkedin_directo import canario as prueba
 from linkedin_directo.servicio import ServiceTransport
 from team_backend import analitica, autopiloto, canario, connectors_directo, jobs, operador
 from team_backend.connectors_directo import DirectoConnector
@@ -19,7 +20,7 @@ from team_backend.serializers import AccountOutput
 from team_backend.tests import directo_fixtures as F
 from team_backend.tests.directo_fixtures import ANA, LUIS, OWN, POST, ok
 from team_backend.tests.test_linkedin_directo import (COMMENTS, CONVERSATIONS, ME, MESSAGES, PROFILES, RECEIVED, SENT_AT, card,
-                                                      sdui, search)
+                                                      sdui, search, thread_comments, top_comments)
 from team_backend.tests.test_metricas import MetricsBase
 
 UTC=dt_timezone.utc
@@ -108,6 +109,27 @@ class CanaryTests(CanaryBase):
         canario.run(self.account,now=self.at(days=3))
         self.assertEqual(self.notices().count(),2)
         self.account.refresh_from_db();self.assertFalse(self.account.paused)  # a broken read never pauses
+
+    def test_the_fields_the_metrics_and_replies_use_are_checked(self):
+        # The metrics count a commenter by author.id and tell the account's own comments by is_sender; a published
+        # piece is matched to its post by the text of the post list.
+        def nameless(request):
+            if 'updateId=comment' in request.path:return ok(thread_comments())
+            answer=top_comments()
+            for row in answer['included']:
+                actor=(row.get('commenter') or {}).get('com.linkedin.voyager.feed.MemberActor')
+                if actor:actor.pop('*miniProfile')
+            return ok(answer)
+        textless=F.posts((POST,'',OWN,{'likes':5,'comments':2,'impressions':300}))
+        self.transport.routes[:0]=[('GET',r'^/voyager/api/feed/comments\?',nameless),
+                                   ('GET',r'^/voyager/api/identity/profileUpdatesV2\?',ok(textless))]
+        log=canario.run(self.account,now=self.at())
+        self.assertEqual((log.state,canario.failing(log)),('roto',['list_user_posts','list_comments']))
+        self.assertEqual({r['operacion']:r['motivo'] for r in log.operations if r['estado']!='ok'},
+                         {'list_user_posts':'faltan campos: text','list_comments':'faltan campos: author.id'})
+        row={'id':'9000001','text':'Muy buen punto','created_at':DAY,'author':{'id':'ACoAAFicticio','display_name':'Ana Ficticia'}}
+        self.assertEqual(prueba.verdict([row],1,prueba.COMMENT),('roto','faltan campos: is_sender',1))
+        self.assertEqual(prueba.verdict([dict(row,is_sender=False)],1,prueba.COMMENT),('ok','',1))
 
     def test_an_answer_too_changed_to_read_is_broken_not_a_crash(self):
         log=canario.run(self.account,now=self.at(),connector=DirectoConnector('cuenta-prueba',transport=Refusing(TypeError('x'))))

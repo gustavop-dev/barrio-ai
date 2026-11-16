@@ -158,11 +158,24 @@ def spacing_range(capability=None,now=None):
     return low,max(low,int(os.environ.get('OPERATOR_MAX_SPACING_SECONDS','2400')))
 
 def reserve_spacing(now=None,capability=None):
-    """Caller holds policy_lock; a restart cannot shorten a reserved random gap."""
+    """Caller holds policy_lock; a restart cannot shorten a reserved random gap. Returns the reserved next_action_at."""
     now=now or timezone.now()
     low,high=spacing_range(capability,now)
     seconds=random.SystemRandom().randint(low,high)
-    _audit(None,'operator.schedule','member',next_action_at=(now+timedelta(seconds=seconds)).isoformat(),gap_seconds=seconds)
+    at=(now+timedelta(seconds=seconds)).isoformat()
+    _audit(None,'operator.schedule','member',next_action_at=at,gap_seconds=seconds)
+    return at
+
+def release_spacing(execution):
+    """An execution that ended without writing gives its reserved gap back (spacing_ok: it does not count). Only while
+    its reservation is still the latest schedule: a later day's opening or another gap is never undone."""
+    reserved=getattr(execution,'_spacing',None)
+    if not isinstance(reserved,str):return
+    execution._spacing=None
+    with transaction.atomic():
+        policy_lock();event=policy_event('operator.schedule')
+        if event is None or event.metadata.get('next_action_at')!=reserved or event.metadata.get('released_for'):return
+        _audit(None,'operator.schedule','member',next_action_at=timezone.now().isoformat(),gap_seconds=0,released_for=str(execution.id))
 
 def post_due(now=None):
     """The own post that any other write started now could push past its hour, or None. Every write reserves a
@@ -595,6 +608,7 @@ def _finish(execution,state,actor,**fields):
     execution.state=state;execution.finished_at=execution.finished_at or timezone.now()
     for key,value in fields.items():setattr(execution,key,value)
     execution.save()
+    if state=='failed' and not execution.wrote:release_spacing(execution)
     ActionProposal.objects.filter(pk=execution.proposal_id).update(state=state)
     proposal=execution.proposal
     if state=='confirmed' and proposal.contact_id:
@@ -665,6 +679,7 @@ def final_write_gate(execution,proposal,user):
         from . import respuestas
         issues.extend(respuestas.execution_issues(proposal))
     if issues:return _finish(execution,'failed',user,error_kind='policy_changed',note='; '.join(issues),wrote=False)
+    execution._spacing=None  # a write request goes out now: its gap holds even if LinkedIn rejects it
     return None
 
 def _publish(execution,proposal,connector,user):
@@ -770,9 +785,10 @@ def execute(user,proposal_id):
             from . import respuestas
             issues=respuestas.execution_issues(proposal)
             if issues:raise OperatorBlocked('; '.join(issues))
-        reserve_spacing(capability=proposal.capability)
+        reserved=reserve_spacing(capability=proposal.capability)
         execution=ActionExecution.objects.create(proposal=proposal,provider=account.provider,executed_by=user,
             idempotency_key=hashlib.sha256(f'{proposal.id}:{proposal.approved_hash}'.encode()).hexdigest())
+        execution._spacing=reserved  # given back by _finish if nothing gets written
         proposal.state=ActionProposal.State.EXECUTING;proposal.save(update_fields=['state'])
         _audit(user,'operator.execution_started',proposal.id,capability=proposal.capability)
     post_id=proposal.post.provider_post_id if proposal.post_id else None
@@ -1193,7 +1209,12 @@ def _run_job(job):
             from . import metricas
             r=metricas.collect(user,ConnectorAccount.objects.get(id=params['account']))
             oficina_eventos.job_done(job.kind,r)
-            return 'complete',f"cortes:{r['captured']} audiencia:{r['audience']}"[:30],r['stopped']
+            return 'complete',f"cortes:{r['captured']} pend:{len(r['pending'])} aud:{r['audience']}"[:30],r['stopped']
+        if job.kind=='collect_outcomes':
+            try:from . import desenlaces_captura
+            except ImportError:return 'complete','sin_colector',''  # the collector lands in a later change
+            r=desenlaces_captura.collect(user,ConnectorAccount.objects.get(id=params['account']),timezone.now())
+            return 'complete',f"desenlaces:{r['captured']} pendientes:{r['pending']}"[:30],r.get('stopped','')
         if job.kind=='import_analytics':
             from . import analitica
             r=analitica.run(user,ConnectorAccount.objects.get(id=params['account']))
