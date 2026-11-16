@@ -74,6 +74,8 @@ def holds(value, kind):
         return isinstance(value, int) and not isinstance(value, bool)
     if kind == 'fecha':
         return isinstance(value, datetime)
+    if kind == 'sino':
+        return isinstance(value, bool)
     return isinstance(value, str) and bool(value.strip())  # texto
 
 
@@ -86,7 +88,9 @@ def lacking(rows, fields):
 PERSON = (('id', 'texto'), ('public_identifier', 'texto'), ('display_name', 'texto'))
 POST = (('id', 'texto'), ('created_at', 'fecha'), ('author.id', 'texto'), ('reactions_counter', 'num'),
         ('comments_counter', 'num'))
-COMMENT = (('id', 'texto'), ('text', 'texto'), ('created_at', 'fecha'), ('author.display_name', 'texto'))
+# author.id: the metrics count a commenter by it; is_sender: without it the account's own comments pass as third-party.
+COMMENT = (('id', 'texto'), ('text', 'texto'), ('created_at', 'fecha'), ('author.id', 'texto'), ('author.display_name', 'texto'),
+           ('is_sender', 'sino'))
 INVITATION = (('id', 'texto'), ('user.id', 'texto'), ('created_at', 'fecha'))
 CHAT = (('id', 'texto'), ('last_message_at', 'fecha'))
 MESSAGE = (('id', 'texto'), ('at', 'fecha'), ('sender_id', 'texto'))
@@ -125,7 +129,9 @@ def steps(client, recorder, found):
         rows = client.list_user_posts('me', 5)
         if rows:
             found['post'] = rows[0]['id']
-        return verdict(rows, 1, POST + (('impressions', 'num'),))
+        # The text matches a published piece to its post; checked on the list, where one post with text is enough (a
+        # repost or a photo alone has none, so get_post's single post is not held to it).
+        return verdict(rows, 1, POST + (('impressions', 'num'), ('text', 'texto')))
 
     def post():
         out = client.get_post(need('post'))

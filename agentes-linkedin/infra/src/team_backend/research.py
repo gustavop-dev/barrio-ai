@@ -198,6 +198,13 @@ def native_findings(answer,at):
         sources[source.id]=source
         findings.append(Finding(source.quoted_text[:6000],(source.id,)))
         limitations.append('Se conservó el extracto literal de una página leída; el resumen no aportó citas nativas para ella')
+    # Dynamic filtering (web_search_2026…) searches from code execution and its text carries no native citations: a run
+    # stored with this says the configuration, not the web, emptied it (16/11/2026: a week of zero findings). Any code
+    # execution block counts (code_execution, bash_code_execution…): the exact names are the server's, not ours.
+    blocks=[b for b in blocks if isinstance(b,dict)]
+    if any('code_execution' in (str(b.get('name')) if b.get('type')=='server_tool_use' else str(b.get('type'))) for b in blocks) and \
+            not any(b.get('type')=='text' and b.get('citations') for b in blocks):
+        limitations.append('La herramienta web configurada no devuelve citas nativas (filtrado dinámico); revisar WEB_SEARCH_TOOL_TYPE.')
     return findings,list(sources.values()),limitations
 
 

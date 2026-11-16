@@ -7,7 +7,7 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from knowledge import db, providers
 from team_backend import autopiloto, conversaciones, jobs
-from team_backend.connectors import FakeConnector, UnipileConnector
+from team_backend.connectors import FakeConnector, UnipileConnector, _chat
 from team_backend.models import Contact, Conversation, Job, Opportunity
 from team_backend.tests.test_operador import OperatorBase
 from team_backend.tests.test_rediseno import JevMock
@@ -82,11 +82,30 @@ class ReadTests(InboxBase):
 
     def test_old_chats_are_kept_from_the_list_only_and_groups_are_skipped(self):
         self.chat([(ASK,False,self.ago(days=40))])
-        self.read_inbox()
+        # A recent group chat: were it taken for a conversation it would be stored and its thread read.
+        group=_chat({'id':'grupo-ficticio','name':'Grupo Ficticio','type':'group','last_message_timestamp':self.ago(hours=1).isoformat(),
+                     'last_message':{'id':'msg-grupo','text':'¿Alguien conoce un buen estudio de IA?','is_sender':False}})
+        original=FakeConnector.list_chats
+        def with_group(connector,limit=20,inbox='CLASSIC_PRIMARY'):
+            return original(connector,limit,inbox=inbox)+[group]
+        with patch.object(FakeConnector,'list_chats',with_group):self.read_inbox()
         conversation=Conversation.objects.get()
+        self.assertEqual(conversation.provider_chat_id,'2-SHVlcnRhTGFicw==')
         self.assertEqual((conversation.messages,conversation.assessment),([],{}))
         self.assertEqual(conversaciones.reads_today(self.account,'messages'),0)
         self.assertEqual(self.jev.requests,[])
+
+    def test_an_empty_thread_read_keeps_the_stored_snapshot_and_reads_it_again(self):
+        self.chat();self.read_inbox()
+        before=Conversation.objects.get().messages
+        self.fake.add_message('2-SHVlcnRhTGFicw==','Te comparto el alcance: dos semanas, un piloto con datos reales.',False)
+        with patch.object(FakeConnector,'list_chat_messages',return_value=[]):
+            summary=conversaciones.read_inbox(self.bot,self.account)
+        self.assertEqual((summary['vacias'],summary['read']),(1,0))
+        self.assertEqual(Conversation.objects.get().messages,before)
+        summary=conversaciones.read_inbox(self.bot,self.account)  # the chat is still stale: the next run reads it
+        self.assertEqual((summary['vacias'],summary['read']),(0,1))
+        self.assertEqual(Conversation.objects.get().messages[-1]['text'],'Te comparto el alcance: dos semanas, un piloto con datos reales.')
 
     def test_read_caps_stop_the_reads(self):
         self.chat()
@@ -283,8 +302,9 @@ class AutopilotTests(InboxBase):
         self.assertEqual(self.inbox_jobs(),0)
 
     def test_the_defaults_keep_the_inbox_off(self):
-        with patch.dict(os.environ,{},clear=False):
-            os.environ.pop('INBOX_ENABLED',None)
+        with patch.dict(os.environ):
+            for name in ('INBOX_ENABLED','INBOX_READ_CAPS'):os.environ.pop(name,None)
             self.assertFalse(conversaciones.enabled())
-        self.assertEqual(conversaciones.read_caps(),{'chats':24,'messages':60})
-        self.assertEqual(conversaciones.thresholds(),{'opportunity':0.6,'reply':0.6,'pitch':0.4})
+            self.assertEqual(conversaciones.read_caps(),conversaciones.READ_CAPS)
+            os.environ['INBOX_READ_CAPS']='messages=5,chats=x,otro=3'  # an unknown or unreadable cap keeps its default
+            self.assertEqual(conversaciones.read_caps(),dict(conversaciones.READ_CAPS,messages=5))

@@ -201,6 +201,31 @@ class CommunityTests(TransactionTestCase):
         self.assertTrue(study.sources.exists())
         self.assertEqual(cm.panel_context(self.account)['status'], 'Sin estudio vigente')
 
+    def test_a_missing_repeated_or_unknown_item_keeps_the_study_and_records_the_gap(self):
+        people = [self.person(i) for i in range(8)]
+        study = self.study(); cm.sample(study)
+        for i, who in enumerate(people): self.source(study, who, i)
+        dropped = []
+        def answer(system, message, **kwargs):
+            sources = [r['source'] for r in json.loads(message)['public_excerpts']]
+            dropped[:] = sources[:1]
+            items = [self.analysis_item(s) for s in sources[1:]]
+            items += [self.analysis_item(sources[1], topic='unknown'), self.analysis_item('invented-source')]
+            return {'text': json.dumps({'items': items, 'citations': []})}
+        with patch('knowledge.providers.claude', side_effect=answer): cm.analyze(study)
+        study.refresh_from_db()
+        self.assertEqual(study.summary['unanalyzed_sources'], dropped)
+        self.assertIn('El análisis no devolvió 1 de los extractos; quedan fuera de los hallazgos.', study.summary['uncertainties'])
+        self.assertEqual(CommunitySource.objects.get(pk=dropped[0]).analysis, {})
+        self.assertEqual(study.sources.exclude(analysis={}).count(), 7)
+        self.assertFalse(study.sources.filter(analysis__topic='unknown').exists())  # the first answer per excerpt counts
+        self.assertTrue(study.summary['findings'])
+        self.assertNotIn(dropped[0], {s for f in study.summary['findings'] for s in f['sources']})
+        few = lambda system, message, **kwargs: {'text': json.dumps({'items': [self.analysis_item(r['source']) for r in
+                                                  json.loads(message)['public_excerpts'][:3]], 'citations': []})}
+        with patch('knowledge.providers.claude', side_effect=few):
+            with self.assertRaisesRegex(ValueError, 'fuera de contrato'): cm.analyze(study)  # fewer than half came back
+
     def test_manual_revision_of_autopilot_artifact_preserves_execution_owner(self):
         study, job, _ = cm.enqueue(self.user, self.account, now=self.now)
         cm.run(job.owner, study.pk, job)
