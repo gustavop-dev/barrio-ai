@@ -5,13 +5,12 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone as utc
 from unittest.mock import patch
 
-import httpx
 from django.db import close_old_connections
 from django.apps import apps
 from django.utils import timezone
 
 from team_backend import conversaciones, evaluaciones, lider, metricas, operador, red, resumen_semanal
-from team_backend.connectors import ConnectorError, ConnectorUncertain, InvitationNoteQuota, UnipileConnector
+from team_backend.connectors import ConnectorError, ConnectorUncertain, InvitationNoteQuota
 from team_backend.models import ActionExecution, ActionProposal, AuditEvent, ConnectorAccount, Contact, Conversation
 from team_backend.tests.test_red import NetworkBase
 
@@ -386,14 +385,6 @@ class ParticipationTests(NetworkBase):
         self.assertEqual(AuditEvent.objects.filter(action='network.account_tier').count(),2)
         self.assertEqual(AuditEvent.objects.filter(action='network.note_reserved').count(),1)
         with patch.dict(os.environ,{'LINKEDIN_ACCOUNT_TIER':'unknown'}),self.assertRaises(ValueError):red.note_policy()
-
-    def test_explicit_note_quota_contract_only(self):
-        connector=object.__new__(UnipileConnector)
-        exact={'scope':'invitation_note','reason':'monthly_limit','invitation_created':False,'type':'fixture/note_limit'}
-        self.assertIsInstance(connector._error(httpx.Response(422,json=exact)),InvitationNoteQuota)
-        for body in ({'type':'quota'},dict(exact,invitation_created=True),dict(exact,type='cannot_resend_yet')):
-            self.assertNotIsInstance(connector._error(httpx.Response(422,json=body)),InvitationNoteQuota)
-        self.assertNotIsInstance(connector._error(httpx.Response(429,json=exact)),InvitationNoteQuota)
 
     def test_table_does_not_turn_leaders_into_invites(self):
         buyer=self.contact('buyer','Buyer',stage='followed',followed_hours=72)

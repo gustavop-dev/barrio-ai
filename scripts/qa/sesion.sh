@@ -119,7 +119,7 @@ iteration() {
 : "${QA_RAMA:?}" "${QA_DEADLINE:?}" "${QA_NATIVE_FINGERPRINT:?}" "${GH_TOKEN:?}"
 git check-ref-format "refs/heads/$QA_RAMA"
 [[ $QA_RAMA != qa-sesion/* ]] || { echo 'Una rama de resultados no puede ser la rama de código.' >&2; exit 2; }
-[[ ${QA_MODE:-} == true && ${LIVE_PROVIDERS:-} == false && ${LIVE_LINKEDIN:-} == false \
+[[ ${QA_MODE:-} == true && ${LIVE_PROVIDERS:-} == false && ${LIVE_LINKEDIN_DIRECTO:-} == false \
    && ${LIVE_LINKEDIN_OFFICIAL:-} == false && ${OPERATOR_ALLOW_FAKE:-} == true \
    && ${DATABASE_URL:-} == postgresql://knowledge:qa-only-ci-password@127.0.0.1:5432/knowledge ]] || exit 2
 mkdir -p "$SESSION"

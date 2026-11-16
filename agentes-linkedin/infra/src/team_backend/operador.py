@@ -640,14 +640,14 @@ def _find_own_comment(connector,post_id,text,comment_id=None):
     return None
 
 def _own_posts_reader():
-    """Unipile (or its fake) can read Gustavo's own posts; w_member_social cannot. None without one."""
-    for account in ConnectorAccount.objects.filter(provider__in=['unipile','fake','directo']).order_by('created_at'):
+    """The directo account (or the simulated one) can read Gustavo's own posts; w_member_social cannot. None without one."""
+    for account in ConnectorAccount.objects.filter(provider__in=['fake','directo']).order_by('created_at'):
         try:return get_connector(account)
         except ConnectorError:continue
     return None
 
 def _find_own_post(text):
-    """(post, readable): the member's recent post with this exact text, by reading back through Unipile."""
+    """(post, readable): the member's recent post with this exact text, by reading back through the directo account."""
     reader=_own_posts_reader()
     if reader is None:return None,False
     try:posts=reader.list_user_posts('me',limit=20)
@@ -655,11 +655,11 @@ def _find_own_post(text):
     return next((p for p in posts if same_text(p['text'],text)),None),True
 
 def _record_metrics(proposal,post):
-    """APRE-01, first metric: impressions of an own post as Unipile reads it back; absent stays absent."""
+    """APRE-01, first metric: impressions of an own post as the directo account reads it back; absent stays absent."""
     if proposal.piece_id and post.get('impressions') is not None:
         from .models import EditorialPiece
         EditorialPiece.objects.filter(pk=proposal.piece_id).update(
-            metrics={'impressions':post['impressions'],'observed_at':timezone.now().isoformat(),'source':'unipile'})
+            metrics={'impressions':post['impressions'],'observed_at':timezone.now().isoformat(),'source':'linkedin'})
 
 @transaction.atomic
 def final_write_gate(execution,proposal,user):
@@ -699,10 +699,10 @@ def _publish(execution,proposal,connector,user):
     found,readable=_find_own_post(text)
     if found:
         _record_metrics(proposal,found)
-        result=_finish(execution,'confirmed',user,reconciled_at=now(),note='Publicada (201) y vista al releer con Unipile.')
+        result=_finish(execution,'confirmed',user,reconciled_at=now(),note='Publicada (201) y vista al releer con la cuenta de LinkedIn.')
     elif readable:result=_finish(execution,'sent',user,note='Publicada (201 con URN); aún no visible al releer. Se conciliará sin repetir.')
     else:result=_finish(execution,'confirmed',user,note='Confirmada por la respuesta 201 de la Posts API (x-restli-id); '
-                        'w_member_social no permite releer y no hay cuenta Unipile.')
+                        'w_member_social no permite releer y no hay cuenta de LinkedIn directo.')
     from .notificaciones import avisar
     thesis=(proposal.piece.brief or {}).get('thesis') if proposal.piece_id else ''
     avisar('piece_published',f'Publicaste «{thesis or text[:80]}»','Las impresiones a las 24 h llegan mañana.',
@@ -875,8 +875,8 @@ def reconcile(user,proposal_id):
             _record_metrics(proposal,found)
             return _finish(execution,'confirmed',user,external_id=execution.external_id or found['id'],
                            external_url=execution.external_url or found['share_url'],reconciled_at=timezone.now())
-        note=('No encontrada al releer con Unipile' if readable else
-              'Sin lectura permitida (w_member_social) ni cuenta Unipile para comprobarla')+'; no se repite. Decide Gustavo.'
+        note=('No encontrada al releer con la cuenta de LinkedIn' if readable else
+              'Sin lectura permitida (w_member_social) ni cuenta de LinkedIn directo para comprobarla')+'; no se repite. Decide Gustavo.'
         return _finish(execution,'uncertain' if stale else execution.state,user,note=note,reconciled_at=timezone.now())
     connector=get_connector(proposal.account)
     if proposal.capability in NETWORK:

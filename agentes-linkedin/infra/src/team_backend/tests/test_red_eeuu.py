@@ -13,7 +13,7 @@ from django.test import SimpleTestCase
 from django.utils import timezone
 
 from team_backend import autopiloto, operador, orquestacion, red, referentes, research, ubicacion
-from team_backend.connectors import UnipileConnector, _signals
+from team_backend.connectors import _signals
 from team_backend.jobs import Conflict
 from team_backend.models import (ActionProposal, AuditEvent, Contact, Notification, ReferentControl, ReferentReview,
                                  WebResearchRun)
@@ -44,17 +44,6 @@ class SignalAndSearchTests(NetworkBase):
         self.assertEqual(_signals(data),{'followers':1520,'connections':480,'is_creator':True,'is_hiring':False,
                                          'is_open_to_work':False,'bio':'Building seed-stage tools.','language':'es'})
         self.assertEqual(_signals({'followers_count':None}),{})  # not given is never zero
-
-    def test_unipile_search_sends_location_and_profile_language(self):
-        connector=object.__new__(UnipileConnector)
-        answer={'data':[{'id':'ACo9','display_name':'Ana','headline':'Founder','location':'Austin, Texas','followers_count':300,
-                         'network_distance':'SECOND_DEGREE'}]}
-        with patch.object(UnipileConnector,'_path',return_value='/v2/acc/linkedin/search/people'), \
-             patch.object(UnipileConnector,'_query',return_value=answer) as query:
-            people=connector.search_people('founder saas',location=['103644278'],profile_language=['es'])
-        query.assert_called_once_with('/v2/acc/linkedin/search/people',
-                                      {'keywords':'founder saas','location':['103644278'],'profile_language':['es']})
-        self.assertEqual((people[0]['location'],people[0]['signals']),('Austin, Texas',{'followers':300}))
 
     def test_discovery_searches_the_united_states_twice_per_run_and_keeps_signals(self):
         self.fake.seed_person('ana-us','Ana US',headline='Founder',search='founder saas',location='Miami, Florida',

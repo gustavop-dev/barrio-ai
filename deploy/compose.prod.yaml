@@ -109,7 +109,7 @@ services:
     restart: unless-stopped
     logging: *logging
   navegador:
-    # LinkedIn without Unipile (docs/plan-linkedin-directo.md): one Chromium per account that makes every call from
+    # LinkedIn directo (docs/plan-linkedin-directo.md): one Chromium per account that makes every call from
     # the logged-in page. OFF until the `navegador` profile is named: a plain `up -d` does not start it. Internal network
     # only: no host port and nothing in the Caddyfile; the backend reaches it at http://navegador:8790 with the token.
     profiles: ["navegador"]

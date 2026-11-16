@@ -71,7 +71,7 @@
       "Editar el curso o los presupuestos",
       "Escribir en LinkedIn o en la API oficial sin pasar por operador_cuenta"
     ],
-    "nota": "Herramientas reales de la selección vigente (Unipile v2 vía operador_cuenta, Posts API oficial, Django/PostgreSQL, Claude Web Search/Fetch, OpenAI Images) o 'sin acceso externo'. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
+    "nota": "Herramientas reales vigentes (LinkedIn directo vía operador_cuenta, Posts API oficial, Django/PostgreSQL, Claude Web Search/Fetch, OpenAI Images) o 'sin acceso externo'. Solo operador_cuenta ejecuta escrituras en LinkedIn y en la API oficial."
   },
   "capacidades_catalogo": [
     {

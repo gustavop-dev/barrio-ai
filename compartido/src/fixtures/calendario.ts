@@ -175,7 +175,7 @@ export function piece(overrides: Partial<PieceDetailFull> = {}): PieceDetailFull
       { stage: 'verificador', model: 'claude', estimated_usd: '0.04' },
     ],
     action_detail: null,
-    metrics: { impressions: 1210, reactions: 31, comments: 9, reposts: 2, observed_at: '2026-11-07T14:30:00Z', source: 'unipile', share_url: null },
+    metrics: { impressions: 1210, reactions: 31, comments: 9, reposts: 2, observed_at: '2026-11-07T14:30:00Z', source: 'linkedin', share_url: null },
     snapshots: [],
     commenters: null,
   };

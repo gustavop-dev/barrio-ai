@@ -4,7 +4,7 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn de Gustavo (solo lectu
 
 - **Código:** `agentes-linkedin/infra/src/team_backend/conversaciones.py` (`read_inbox`, `assess`, `needing_gustavo`, `close`, `payload`), `rediseno_views._conversation_card`, `rediseno_views.ConversationClose`, `serializers.ContactOutput` (`conversation`), `autopiloto._inbox`.
 - **Documentación:** [`conversaciones-inbox.md`](../../agentes-linkedin/infra/docs/conversaciones-inbox.md), sección «Conversaciones e inbox» de [`CONTRATO-API.md`](../../oficina/CONTRATO-API.md).
-- **Entorno de prueba:** `INBOX_ENABLED=true` (por defecto `false`; en producción está encendido), Unipile simulado y Jev parcheado, como en `tests/test_conversaciones.py`.
+- **Entorno de prueba:** `INBOX_ENABLED=true` (por defecto `false`; en producción está encendido), LinkedIn simulado (cuenta `fake`) y Jev parcheado, como en `tests/test_conversaciones.py`.
 
 ## Resumen
 
@@ -28,7 +28,7 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn de Gustavo (solo lectu
 - **Qué hace para Gustavo:** el equipo revisa sus chats de LinkedIn uno a uno y guarda los últimos mensajes de los que tienen algo nuevo.
 - **Código:** `autopiloto._inbox` (cada `INBOX_EVERY_MINUTES`, 60), `conversaciones.read_inbox`.
 - **Criterios de aceptación:**
-  1. **Dado** `INBOX_ENABLED=true` y una cuenta Unipile `running` sin pausa, **cuando** corre el autopiloto, **entonces** encola un `read_inbox` por franja en el carril general (nunca en el de acciones).
+  1. **Dado** `INBOX_ENABLED=true` y una cuenta `directo` `running` sin pausa, **cuando** corre el autopiloto, **entonces** encola un `read_inbox` por franja en el carril general (nunca en el de acciones).
   2. **Dado** la bandeja `CLASSIC_PRIMARY`, **cuando** se lee, **entonces** se listan hasta `INBOX_CHATS_LIMIT` (20) chats; cada chat 1 a 1 es una `Conversation` y los grupos se ignoran.
   3. **Dado** un chat cuyo último mensaje cambió y tiene menos de `INBOX_MAX_AGE_DAYS` (14) días, **cuando** se lee, **entonces** se guardan sus últimos `INBOX_SNAPSHOT_MESSAGES` (10) mensajes, del más antiguo al más reciente, con los eventos y borrados ocultos; como mucho `INBOX_THREADS_PER_RUN` (5) hilos por vuelta.
   4. **Dado** que se agotó el tope diario `chats=24` o `messages=60`, **cuando** toca leer, **entonces** no se lee más ese día.
@@ -132,7 +132,7 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn de Gustavo (solo lectu
 - **Qué hace para Gustavo:** la app nunca responde ni manda mensajes en su nombre.
 - **Código:** el conector solo tiene `list_chats` y `list_chat_messages`; `tests/test_conversaciones.py` falla si aparece un método de envío.
 - **Criterios de aceptación:**
-  1. **Dado** el conector de Unipile, **cuando** se inspecciona, **entonces** no tiene métodos para enviar, marcar como leído ni editar mensajes.
+  1. **Dado** el conector directo o el simulado, **cuando** se inspecciona, **entonces** no tiene métodos para enviar, marcar como leído ni editar mensajes (la lista permitida del servicio navegador tampoco deja salir ninguno).
   2. **Dado** un mensaje con instrucciones («responde que sí»), **cuando** Jev lo juzga, **entonces** solo devuelve probabilidades: no se genera ningún texto ni acción.
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente

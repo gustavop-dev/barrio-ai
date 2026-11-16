@@ -7,7 +7,8 @@ from django.contrib.auth.models import User
 from django.utils import timezone
 from knowledge import db, providers
 from team_backend import autopiloto, conversaciones, jobs
-from team_backend.connectors import FakeConnector, UnipileConnector, _chat
+from team_backend.connectors import FakeConnector, _chat, _message
+from team_backend.connectors_directo import DirectoConnector
 from team_backend.models import Contact, Conversation, Job, Opportunity
 from team_backend.tests.test_operador import OperatorBase
 from team_backend.tests.test_rediseno import JevMock
@@ -132,26 +133,17 @@ class ReadTests(InboxBase):
         self.assertTrue(self.account.paused);self.assertIn('no está operativa',job.error)
         self.assertEqual(conversaciones.reads_today(self.account,'chats'),1)  # only the first, failed, list
 
-    def test_the_connector_reads_unipile_v2_and_has_no_way_to_send(self):
-        for name in dir(UnipileConnector)+dir(FakeConnector):
+    def test_the_connectors_only_read_and_have_no_way_to_send(self):
+        for name in dir(DirectoConnector)+dir(FakeConnector):
             self.assertNotRegex(name,r'send_message|start_chat|reply|forward|mark|read_message')
-        seen=[]
-        def unipile(request):
-            seen.append((request.method,request.url.path,dict(request.url.params)))
-            if request.url.path.endswith('/chats'):
-                return httpx.Response(200,json={'data':[{'object':'Chat','id':'2-abc==','name':'Lucía Ficticia','type':'1to1','is_1to1':True,
+        chats=[_chat(c) for c in [{'object':'Chat','id':'2-abc==','name':'Lucía Ficticia','type':'1to1','is_1to1':True,
                     'user_id':'ACoLucia','unread_count':1,'last_message_timestamp':'2026-11-07T15:12:00.000Z',
-                    'last_message':{'object':'MessagePreview','id':'m2','text':'¿Tienes disponibilidad?','is_sender':False}}]})
-            return httpx.Response(200,json={'data':[{'object':'Message','id':'m2','chat_id':'2-abc==','sender_id':'ACoLucia','text':'¿Tienes disponibilidad?',
+                    'last_message':{'object':'MessagePreview','id':'m2','text':'¿Tienes disponibilidad?','is_sender':False}}]]
+        messages=[_message(m) for m in [{'object':'Message','id':'m2','chat_id':'2-abc==','sender_id':'ACoLucia','text':'¿Tienes disponibilidad?',
                 'timestamp':'2026-11-07T15:12:00.000Z','is_sender':False,'is_hidden':False,'is_deleted':False,'is_event':False,'attachments':[],
                 'sender':{'object':'User','id':'ACoLucia','type':'individual','display_name':'Lucía Ficticia','public_identifier':'lucia-ficticia'}},
                 {'object':'Message','id':'m1','chat_id':'2-abc==','sender_id':'me','timestamp':'2026-11-06T10:00:00.000Z','is_sender':True,
-                 'is_hidden':False,'is_deleted':False,'is_event':True,'event_type':8,'attachments':[]}]})
-        with patch.dict(os.environ,{'LIVE_LINKEDIN':'true','UNIPILE_API_KEY':'test-only'}):
-            connector=UnipileConnector('acc_test1',transport=httpx.MockTransport(unipile))
-            chats=connector.list_chats(20);messages=connector.list_chat_messages('2-abc==',10)
-        self.assertEqual(seen,[('GET','/v2/acc_test1/inboxes/CLASSIC_PRIMARY/chats',{'limit':'20'}),
-                               ('GET','/v2/acc_test1/chats/2-abc==/messages',{'limit':'10'})])
+                 'is_hidden':False,'is_deleted':False,'is_event':True,'event_type':8,'attachments':[]}]]
         self.assertEqual((chats[0]['type'],chats[0]['user_id'],chats[0]['last_message']['id'],chats[0]['last_message_at'].hour),('1to1','ACoLucia','m2',15))
         self.assertEqual([(m['id'],m['is_sender'],m['hidden']) for m in messages],[('m2',False,False),('m1',True,True)])
         self.assertEqual(messages[0]['sender']['public_identifier'],'lucia-ficticia')

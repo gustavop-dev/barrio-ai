@@ -149,7 +149,7 @@ Cuatro preguntas con cifras: ¿genera negocio?, ¿llegamos a la gente correcta?,
   3. **Dado** el tope diario de lecturas de métricas agotado, **cuando** toca leer, **entonces** no se lee y se registra «Tope diario de lecturas de métricas «…» alcanzado (N).».
   4. **Dado** comentarios leídos, **cuando** se guardan, **entonces** cada comentarista lleva si su comentario tiene sustancia, su rol y si encaja.
   5. **Dado** un fallo de las métricas, **cuando** corre el autopiloto, **entonces** el resto del ciclo sigue.
-- **Brechas código/docs:** estos cortes salen de Unipile. Con una cuenta `directo`, la analítica de LinkedIn llega por [RES-10](#res-10); la analítica oficial de la API de LinkedIn sigue sin conectar (`publicacion-diaria.md`).
+- **Brechas código/docs:** estos cortes salen de las lecturas de LinkedIn directo; su analítica de creador llega aparte por [RES-10](#res-10); la analítica oficial de la API de LinkedIn sigue sin conectar (`publicacion-diaria.md`).
 - **Cobertura QA:** pendiente
 
 ### RES-10 · Traer la analítica de LinkedIn <a id="res-10"></a>

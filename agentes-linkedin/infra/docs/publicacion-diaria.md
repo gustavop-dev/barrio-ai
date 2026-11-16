@@ -25,7 +25,7 @@ flowchart LR
     V -->|ready_for_execution| P
     P -->|política autonomia-v1| A[Aprobada + push: se puede vetar]
     A -->|EDITORIAL_POST_TIME| X[Operador: Posts API, una sola vez]
-    X -->|201 + URN| C[Confirmada / conciliada por Unipile]
+    X -->|201 + URN| C[Confirmada / conciliada por LinkedIn directo]
     X -->|timeout o 5xx| U[Incierta: nunca se repite]
 ```
 
@@ -72,9 +72,9 @@ El conector sigue la misma semántica que `connectors.py`:
 | Otros 4xx | Definitivo | No aplicado |
 | 5xx, timeout tras enviar, respuesta sin URN | Incierto | **Nunca se repite**; se concilia |
 
-Conciliación: `w_member_social` no permite leer. Si hay una cuenta Unipile conectada, el operador lee los posts propios (`list_user_posts('me')`) y los **compara por texto**, porque los IDs de Unipile son opacos y no se convierten a URN. También se hace antes de escribir: si ya existe un post propio idéntico, la acción se confirma sin publicar otro. Sin Unipile, un 201 con URN se confirma por esa respuesta y un resultado incierto queda en `uncertain` para que Gustavo lo resuelva (`/operador/actions/<id>/resolve`). Al conciliar, las impresiones que devuelve Unipile se guardan en `EditorialPiece.metrics` como primera métrica (APRE-01). Un dato ausente no equivale a cero.
+Conciliación: `w_member_social` no permite leer. Si hay una cuenta de LinkedIn directo, el operador lee con ella los posts propios (`list_user_posts('me')`) y los **compara por texto**, porque el conector los nombra por su número de actividad y la API oficial devuelve otro URN (`share` o `ugcPost`). También se hace antes de escribir: si ya existe un post propio idéntico, la acción se confirma sin publicar otro. Sin esa cuenta, un 201 con URN se confirma por esa respuesta y un resultado incierto queda en `uncertain` para que Gustavo lo resuelva (`/operador/actions/<id>/resolve`). Al conciliar, las impresiones que lee el conector directo se guardan en `EditorialPiece.metrics` como primera métrica (APRE-01). Un dato ausente no equivale a cero.
 
-`LIVE_LINKEDIN_OFFICIAL=false` por defecto: sin ese interruptor no se publica nada. El conector simulado (`provider='linkedin_fake'`) requiere `OPERATOR_ALLOW_FAKE=true` y tiene los mismos modos de fallo que el de Unipile.
+`LIVE_LINKEDIN_OFFICIAL=false` por defecto: sin ese interruptor no se publica nada. El conector simulado (`provider='linkedin_fake'`) requiere `OPERATOR_ALLOW_FAKE=true` y simula los modos de fallo de la tabla de arriba.
 
 ## Circuito editorial (`editorial.py`)
 
@@ -257,5 +257,5 @@ Notificaciones push (y `OPERATOR_ALERT_WEBHOOK`):
 
 - Solo texto. Imágenes, carruseles y vídeo (CONT-04) llegan en una fase posterior.
 - Mientras la memoria esté vacía, no hay casos ni experiencias de Gustavo. Cuando confirme hechos con `uso_publico: true`, las piezas podrán usarlos.
-- No hay edición ni retirada de posts (CONT-10/11), ni analítica oficial (r_member_postAnalytics); la única métrica son las impresiones que lee Unipile.
+- No hay edición ni retirada de posts (CONT-10/11), ni analítica oficial (r_member_postAnalytics). Las métricas de cada post las lee el conector directo ([métricas](metricas-resultados.md)), junto con la analítica de creador de su exportación.
 - La PWA todavía debe mostrar el calendario, el detalle con el botón de veto y el botón «Conectar LinkedIn».

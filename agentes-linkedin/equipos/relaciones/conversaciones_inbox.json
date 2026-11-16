@@ -165,7 +165,7 @@
   },
   "iniciativa": {
     "eventos_que_lo_activan": [
-      "message_received (webhook Unipile vía operador_cuenta)",
+      "message_received (detectado por la consulta periódica de la bandeja vía operador_cuenta; LinkedIn directo no tiene webhooks)",
       "conversation_context_from_relaciones (CHAT-04/05)",
       "follow_up_due acordado en el hilo",
       "gustavo_intervened en un hilo con propuesta pendiente",
@@ -217,7 +217,7 @@
   },
   "herramientas_y_autoridad": {
     "herramientas_necesarias": [
-      "pasarela de lectura de operador_cuenta: Unipile v2 (inboxes, chats y mensajes; historial inicial y eventos incrementales)",
+      "pasarela de lectura de operador_cuenta: LinkedIn directo (bandeja principal de la cuenta: conversaciones y sus últimos mensajes, por consulta periódica; sin bandejas de páginas de empresa)",
       "operador_cuenta para enviar, responder y cambiar estados nativos del chat",
       "Django/PostgreSQL: oportunidades, estados internos del inbox, propuestas, política autónoma y bandeja de la oficina para vetos, modo approval y asuntos de nivel C (por implementar)",
       "agenda Google/Microsoft opcional, no conectada"
@@ -241,7 +241,7 @@
       "Comprometer salario, disponibilidad o contratos",
       "Tocar credenciales, 2FA, pagos o la propiedad de la cuenta",
       "Editar el curso o los presupuestos",
-      "Llamar directamente a Unipile para enviar",
+      "Llamar directamente a LinkedIn (conector directo) para enviar",
       "Mensajes automáticos por aceptación o secuencias de seguimiento",
       "Compartir hilos completos con roles que no los necesitan"
     ]
@@ -280,7 +280,7 @@
     {
       "id": "CHAT-01",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Sincronización inicial e incremental por Unipile; leer el hilo completo disponible; acceso restringido a conversaciones_inbox y extractos mínimos para otros roles."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Lectura periódica de la bandeja por LinkedIn directo (sin webhooks); leer los mensajes recientes disponibles del hilo; acceso restringido a conversaciones_inbox y extractos mínimos para otros roles."
     },
     {
       "id": "CHAT-01",
@@ -365,7 +365,7 @@
     {
       "id": "CHAT-10",
       "papel": "propone",
-      "politica": "Nivel A. Prepara la solicitud con objeto, motivo y criterio aplicado. Estados internos libres; archivar nativamente solo hilos cerrados; nunca marcar como leído un mensaje no atendido; campos nativos por verificar en Unipile."
+      "politica": "Nivel A. Prepara la solicitud con objeto, motivo y criterio aplicado. Estados internos libres; LinkedIn directo solo lee la bandeja: archivar un hilo cerrado en LinkedIn es tarea manual de Gustavo; nunca marcar como leído un mensaje no atendido."
     },
     {
       "id": "CHAT-10",
@@ -405,7 +405,7 @@
     {
       "id": "ADM-03",
       "papel": "propone",
-      "politica": "Nivel B, política estricta. Propone con motivo y evidencia registrada; la política autónoma solo la aprueba si se cumplen las condiciones estrictas y el editor_verificador confirma la evidencia; solo operador_cuenta ejecuta. Política estricta: bloqueo vía Unipile solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; el reporte sigue siendo manual de Gustavo; alerta a Gustavo."
+      "politica": "Nivel B, política estricta. Propone con motivo y evidencia registrada; la política autónoma solo la aprueba si se cumplen las condiciones estrictas y el editor_verificador confirma la evidencia; solo operador_cuenta ejecuta. Política estricta: bloqueo solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; LinkedIn directo no bloquea: el bloqueo y el reporte los aplica Gustavo a mano; alerta a Gustavo."
     },
     {
       "id": "ADM-03",
@@ -637,7 +637,7 @@
   "pendientes_para_activacion": [
     "revisión humana del diseño y de reparto-acciones-v1",
     "aprobación por Gustavo de neighborhood_criteria; configuración del cupo real de notas y del webhook de alertas",
-    "conectar la cuenta en Unipile con credenciales y 2FA de Gustavo y probar cada operación en piloto",
+    "entrar a mano en el navegador de la cuenta en el servicio navegador (Gustavo escribe su clave y su 2FA en la propia página de LinkedIn; Barrio no los guarda) y probar cada operación en piloto",
     "implementar en Django operador_cuenta, pasarela de lectura, política autónoma, degradación y alertas",
     "implementar y evaluar con casos adversos antes de activar",
     "definir retención y acceso a chats",
@@ -663,7 +663,7 @@
       "uso": "Perfil del interlocutor",
       "necesidad": "para iniciar o retomar",
       "si_falta": "pedir ficha",
-      "fuente_y_campos": "Unipile v2 vía operador_cuenta."
+      "fuente_y_campos": "LinkedIn directo vía operador_cuenta."
     },
     {
       "catalogo_id": "D09",
@@ -677,7 +677,7 @@
       "uso": "Hilos completos, necesidades, compromisos y desenlaces",
       "necesidad": "obligatorio",
       "si_falta": "no responder",
-      "fuente_y_campos": "Inbox sincronizado por Unipile v2 (historial y webhooks) vía operador_cuenta; acceso restringido a este rol."
+      "fuente_y_campos": "Bandeja leída por LinkedIn directo (consulta periódica, sin webhooks) vía operador_cuenta; acceso restringido a este rol."
     },
     {
       "catalogo_id": "D11",

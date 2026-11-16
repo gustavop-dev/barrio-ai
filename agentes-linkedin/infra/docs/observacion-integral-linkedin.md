@@ -116,17 +116,17 @@ Una carga inicial del historial permite entender la cuenta antes de aprender de 
 
 ## Qué está documentado sobre vías de acceso
 
-Verificación documental del 6 de noviembre de 2026; no probamos permisos de una aplicación de Gustavo ni conectamos su cuenta.
+Verificación documental del 6 de noviembre de 2026; no probamos permisos de una aplicación de Gustavo. Las filas del inbox y de la búsqueda se actualizaron en noviembre de 2026 con la vía que usa hoy la cuenta, LinkedIn directo ([plan](../../../docs/plan-linkedin-directo.md)).
 
 | Necesidad | Evidencia encontrada | Qué falta comprobar para Barrio AI |
 | --- | --- | --- |
 | Métricas de publicaciones del miembro | [LinkedIn documenta](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/members/post-statistics) `memberCreatorPostAnalytics` y permiso `r_member_postAnalytics`, con estadísticas por pieza o agregadas | Acceso de nuestra aplicación, versión, campos, ventanas y diferencias con la interfaz |
 | Evolución de seguidores | [LinkedIn documenta](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/members/follower-statistics) `memberFollowersCount` y `r_member_profileAnalytics` | Permisos efectivos; el conteo no acredita acceso a identidades ni a todas las métricas del perfil |
 | Lectura de posts, comentarios y reacciones | [Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api) distingue lectura y escritura; `r_member_social` es restringido. El [overview consultado](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/community-management-overview) indica que no reciben nuevas solicitudes para ese permiso | No asumir que poder publicar o leer analítica permite enumerar todo el contenido |
-| Historial y cambios de inbox | Unipile documenta [lectura paginada de hilos](https://developer.unipile.com/docs/get-messages) y [webhooks de mensajes recibidos/enviados](https://developer.unipile.com/docs/new-messages-webhook) | Cobertura real, sincronización inicial, autenticación, condiciones de uso, límites, costes y estabilidad |
-| Descubrir referentes y posts | Unipile documenta [búsquedas de personas y publicaciones](https://developer.unipile.com/docs/linkedin-search) según la cuenta y su suscripción | Recuperación completa del contenido/hilos y campos disponibles; no inferir métricas privadas a partir de campos vacíos o cero del proveedor |
+| Historial y cambios de inbox | LinkedIn directo lee, desde la página de LinkedIn con la sesión de la cuenta, las conversaciones de la bandeja principal y sus mensajes recientes ([contrato](navegador-contrato.md)); no hay webhooks: la bandeja se consulta cada hora | Hilos largos (solo llegan los mensajes recientes), bandejas de páginas de empresa, condiciones de uso y estabilidad |
+| Descubrir referentes y posts | LinkedIn directo usa la búsqueda de personas de la web (con filtro de ubicación) y lee los posts recientes de una persona; no busca publicaciones ni usa Sales Navigator | Recuperación completa del contenido/hilos y campos disponibles; no inferir métricas privadas a partir de campos vacíos o cero |
 
-[Community Management requiere evaluación de acceso](https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review); un login de LinkedIn no concede por sí solo todas estas capacidades. No se ha confirmado una vía oficial de libre acceso que entregue el inbox y cualquier feed personal completo. Unipile es un candidato documentado a evaluar, distinto de una integración oficial de LinkedIn; no está contratado, conectado ni validado para este proyecto. La capacidad declarada por un proveedor no demuestra aprobación por LinkedIn ni cubre automáticamente todo el acceso deseado.
+[Community Management requiere evaluación de acceso](https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review); un login de LinkedIn no concede por sí solo todas estas capacidades. No se ha confirmado una vía oficial de libre acceso que entregue el inbox y cualquier feed personal completo. LinkedIn directo tampoco es una integración oficial: automatiza la propia sesión de la cuenta, incumple los términos de LinkedIn y no cubre todo el acceso deseado. Que una vía funcione no demuestra aprobación por LinkedIn.
 
 Fuentes primarias de esta comprobación:
 
@@ -135,8 +135,7 @@ Fuentes primarias de esta comprobación:
 - [LinkedIn: Posts API y permisos](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api).
 - [LinkedIn: Community Management y acceso](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/community-management-overview).
 - [LinkedIn: revisión de aplicaciones](https://learn.microsoft.com/en-us/linkedin/marketing/community-management-app-review).
-- [Unipile: lectura de mensajes](https://developer.unipile.com/docs/get-messages) y [eventos de mensajes](https://developer.unipile.com/docs/new-messages-webhook).
-- [Unipile: búsqueda de personas y publicaciones](https://developer.unipile.com/docs/linkedin-search).
+- [Plan de LinkedIn directo](../../../docs/plan-linkedin-directo.md) y [contrato del servicio navegador](navegador-contrato.md): qué lee y qué escribe hoy la cuenta.
 
 ## Recorrido ilustrativo
 

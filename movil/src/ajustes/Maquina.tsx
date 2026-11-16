@@ -1,5 +1,5 @@
 // Ajustes › Máquina: total stop and resume (overview.control) behind a confirmation, a stop from the
-// server that cannot be lifted here, and the pause of each Unipile or directo account with a required reason; a
+// server that cannot be lifted here, and the pause of each operating account (directo, or the simulated one) with a required reason; a
 // directo account also shows its last daily LinkedIn canary and, when the server has it on, «Conectar LinkedIn»:
 // the remote view of the server's browser opens in the in-app browser (no WebView: a native module), and the
 // login's state is asked every 3 s until it ends.
@@ -17,7 +17,7 @@ import {
   loginLine,
   providerLabel,
   stoppedFromServer,
-  unipileAccounts,
+  operatingAccounts,
 } from '@compartido/logic/ajustes';
 import { whenLabel } from '@compartido/logic/capturas';
 import { timeAgo } from '@compartido/logic/format';
@@ -282,7 +282,7 @@ function AccountCard({ account }: { account: Account }) {
 
 export function MaquinaSection() {
   const overview = useOverview();
-  const accounts = unipileAccounts(overview.data?.accounts);
+  const accounts = operatingAccounts(overview.data?.accounts);
   return (
     <Section label="Máquina">
       {overview.isPending ? <Skeleton variant="card" count={2} label="Cargando la máquina…" /> : null}
@@ -293,7 +293,7 @@ export function MaquinaSection() {
       ))}
       {overview.data && !accounts.length ? (
         <T variant="detalle" soft>
-          No hay ninguna cuenta de Unipile configurada.
+          No hay ninguna cuenta de LinkedIn configurada.
         </T>
       ) : null}
     </Section>

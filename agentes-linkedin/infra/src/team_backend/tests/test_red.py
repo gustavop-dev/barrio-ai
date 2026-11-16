@@ -186,6 +186,27 @@ class PostOnTimeTests(NetworkBase):
         self.assertEqual(autopiloto._execute(self.bot,self.account,timezone.now()),1)
         self.assertEqual(Job.objects.get(kind='execute_action',state='queued').params['proposal'],str(follow.id))
 
+    def test_a_proposal_a_gate_keeps_stopping_waits_longer_each_time_and_lets_the_next_one_go(self):
+        stopped=self.follow();now=timezone.now()
+        def stop(at):
+            job=Job.objects.filter(kind='execute_action',state='queued').first() or operador.enqueue_execution(self.bot,stopped)
+            Job.objects.filter(pk=job.pk).update(state='failed',finished_at=at,error='Tope compartido de lecturas de perfil alcanzado; la operación espera.')
+        stop(now)
+        self.assertEqual(autopiloto._execute(self.bot,self.account,now),1)  # one stop: tried again at once
+        stop(now)
+        self.assertEqual(autopiloto._execute(self.bot,self.account,now+timedelta(minutes=1)),0)  # two: it waits 2 minutes
+        self.assertEqual(Job.objects.filter(kind='execute_action').count(),2)  # and no job is queued meanwhile
+        other=self.follow()
+        self.assertEqual(autopiloto._execute(self.bot,self.account,now+timedelta(minutes=1)),1)  # the next one goes
+        self.assertEqual(Job.objects.get(kind='execute_action',state='queued').params['proposal'],str(other.id))
+        Job.objects.filter(kind='execute_action',state='queued').update(state='complete')
+        ActionProposal.objects.filter(pk=other.pk).update(state='confirmed')
+        self.assertEqual(autopiloto._execute(self.bot,self.account,now+timedelta(minutes=3)),1)  # after its wait it is tried again
+        self.assertEqual(Job.objects.get(kind='execute_action',state='queued').params['proposal'],str(stopped.id))
+        stop(now+timedelta(minutes=3))
+        self.assertEqual(autopiloto._execute(self.bot,self.account,now+timedelta(minutes=6)),0)  # three stops: 4 minutes
+        self.assertEqual(autopiloto._execute(self.bot,self.account,now+timedelta(minutes=8)),1)
+
     def test_a_post_beyond_the_gap_does_not_hold_the_network(self):
         follow=self.follow();self.post(45)
         self.assertIsNone(operador.post_due())

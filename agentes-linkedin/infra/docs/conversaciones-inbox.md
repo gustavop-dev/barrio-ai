@@ -19,16 +19,16 @@ flowchart LR
     T[Tick del autopiloto] -->|cada INBOX_EVERY_MINUTES, si INBOX_ENABLED| J[read_inbox, carril general]
     J --> S{¿Cuenta running y sin pausa?}
     S -->|no| P[No lee; la cuenta queda en pausa si el conector no está operativo]
-    S -->|sí| L[GET chats: 1 lectura]
-    L --> M[GET chats/id/messages solo de los hilos recientes con algo nuevo]
+    S -->|sí| L[list_chats: 1 lectura]
+    L --> M[list_chat_messages solo de los hilos recientes con algo nuevo]
     M --> E[Jev juzga el último mensaje de la otra persona]
     E -->|negocio o espera respuesta, y no es venta| C[Tarjeta en Tu turno y una push]
     E -->|venta, spam o nada pendiente| Q[Queda en la ficha, sin tarjeta]
 ```
 
-1. **Programar.** El tick encola `read_inbox` por cuenta Unipile sin pausa, una a la vez y cada `INBOX_EVERY_MINUTES`, con un id determinista por franja. Corre en el carril general (`worker`), nunca en el de acciones.
+1. **Programar.** El tick encola `read_inbox` por cuenta de LinkedIn directo sin pausa, una a la vez y cada `INBOX_EVERY_MINUTES`, con un id determinista por franja. Corre en el carril general (`worker`), nunca en el de acciones.
 2. **Comprobar la cuenta.** El trabajo refresca su estado con `check_account`. Solo lee si queda `running` y sin pausa. Un conector no operativo pausa la cuenta, como en la ejecución.
-3. **Listar.** Por cada bandeja de `INBOX_IDS` (por defecto `CLASSIC_PRIMARY`; Unipile v2 no tiene «List all Chats» para LinkedIn y responde 501, así que se lista por bandeja con `GET /v2/{cuenta}/inboxes/{bandeja}/chats`), lee hasta `INBOX_CHATS_LIMIT` chats; cada bandeja es una lectura del tope `chats` y guarda cada chat 1 a 1 como una `Conversation`: nombre, id del otro miembro, hora y vista previa del último mensaje, y quién lo mandó. Los grupos y canales se ignoran. La persona se enlaza con su `Contact` por id de proveedor o por identificador público.
+3. **Listar.** Por cada bandeja de `INBOX_IDS` (por defecto `CLASSIC_PRIMARY`, la bandeja principal de la cuenta; el conector directo no lee las de páginas de empresa y devuelve una lista vacía para cualquier otra), lee con `list_chats` hasta `INBOX_CHATS_LIMIT` chats; cada bandeja es una lectura del tope `chats` y guarda cada chat 1 a 1 como una `Conversation`: nombre, id del otro miembro, hora y vista previa del último mensaje, y quién lo mandó. Los grupos y canales se ignoran. La persona se enlaza con su `Contact` por id de proveedor o por identificador público.
 4. **Leer los hilos nuevos.** Solo lee los mensajes de un hilo si el último mensaje cambió desde la última lectura y tiene menos de `INBOX_MAX_AGE_DAYS` días, hasta `INBOX_THREADS_PER_RUN` hilos por vuelta. Guarda los últimos `INBOX_SNAPSHOT_MESSAGES`, del más antiguo al más reciente. Los eventos (reacciones, anuncios) y los mensajes borrados quedan marcados como ocultos: no se muestran ni se juzgan, pero así la vuelta siguiente sabe que ya los leyó.
 5. **Juzgar.** Jev juzga el último mensaje de la otra persona una sola vez, con hasta `INBOX_ASSESS_PER_RUN` conversaciones por vuelta (ver abajo).
 6. **Proponer.** Si la conversación le toca a Gustavo, aparece la tarjeta y sale una push. Así se envía una sola por cada mensaje nuevo.
@@ -120,7 +120,5 @@ Además, Jev necesita `LIVE_PROVIDERS=true`, `TYPESAFE_API_KEY` y saldo en el pr
 
 ## Por comprobar contra la cuenta real
 
-La forma de las respuestas sale de la referencia de Unipile v2 («List all Chats» y «List all Chat Messages», consultada el 2026-11-07). Falta verificar con la primera lectura real:
-- que el `id` de un chat de LinkedIn es el id del hilo (`2-…`), que es lo que permite enlazar directamente al hilo; si no lo es, el enlace lleva al inbox;
-- que `user_id` y `sender_id` usan el mismo id de miembro que `Contact.provider_user_id`; si no, el enlace con la persona se hace por identificador público cuando el remitente lo trae;
-- que la lista no mezcla InMails patrocinados ni conversaciones archivadas que convenga filtrar por `folders`.
+Con el conector directo, el `id` de un chat es el id del hilo (`2-…`, el de `linkedin.com/messaging/thread/<id>/`), así que el enlace lleva directo al hilo, y `user_id` y `sender_id` son el id del perfil (`ACo…`), el mismo de `Contact.provider_user_id` ([contrato del navegador](navegador-contrato.md#ids-que-devuelve-el-conector)). Las conversaciones las lee una consulta GraphQL cuyo id busca primero entre las que hizo la propia página ([consultas vivas](navegador-contrato.md#consultas-vivas)); la de los mensajes usa el id fijo. Falta verificar con la cuenta real:
+- que la lista no mezcla InMails patrocinados ni conversaciones archivadas que convenga filtrar.

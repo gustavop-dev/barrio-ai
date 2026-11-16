@@ -6,7 +6,7 @@ Cuando alguien comenta un post de Gustavo, el equipo le responde solo en el hilo
 - **Vistas:** Tu turno (tarjeta `mensaje`), detalle de una pieza («Conversación en el post»), actividad del calendario y «Hoy el equipo…». App móvil (`movil/src/turno/TurnoCard.tsx`, `movil/src/pieza/PostComments.tsx`) y PWA (`oficina/src/pages/turno/TurnoCardView.tsx`, `oficina/src/pages/calendario/PostComments.tsx`).
 - **API:** `GET /api/v1/editorial/pieces/<id>` (`comments`), `GET /api/v1/tu-turno` (`tasks.mensajes`), `POST /api/v1/respuestas/<id>/mensaje` `{how: enviado|no, note?}`.
 - **Catálogo:** `INT-04` de [`catalogo-acciones-linkedin.md`](../../agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md): fundamentos B06, B14 y B15; «leer contexto antes de responder; admitir un dato desconocido y conservar preguntas para futuros contenidos».
-- **Entorno de prueba:** cuenta `fake` (Unipile simulado), Claude y TypeSafe parcheados, como en `tests/test_respuestas.py`.
+- **Entorno de prueba:** cuenta `fake` (LinkedIn simulado), Claude y TypeSafe parcheados, como en `tests/test_respuestas.py`.
 
 ## Resumen
 

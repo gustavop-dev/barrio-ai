@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.9-revision-mensual",
+  "graph_version": "6.10-linkedin-directo",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -1245,7 +1245,7 @@
         "Lee publicaciones de referentes y conserva evidencia"
       ],
       "tools": [
-        "unipile_read",
+        "linkedin_read",
         "biblioteca"
       ],
       "course_lists": [
@@ -1292,7 +1292,7 @@
         "Busca personas para el barrio con topes de lecturas y evidencia"
       ],
       "tools": [
-        "unipile_read",
+        "linkedin_read",
         "biblioteca"
       ],
       "course_lists": [
@@ -1337,7 +1337,7 @@
         "Clasifica encaje y rol con evidencia del curso; no envía invitaciones"
       ],
       "tools": [
-        "unipile_read",
+        "linkedin_read",
         "biblioteca"
       ],
       "course_lists": [
@@ -1387,7 +1387,7 @@
         "Responde comentarios en los posts propios siguiendo el hilo"
       ],
       "tools": [
-        "unipile_read",
+        "linkedin_read",
         "biblioteca",
         "memoria",
         "evidencia_compartida"
@@ -1440,7 +1440,7 @@
         "Propone seguir, invitar y aceptar"
       ],
       "tools": [
-        "unipile_read",
+        "linkedin_read",
         "biblioteca"
       ],
       "course_lists": [
@@ -1489,7 +1489,7 @@
         "Lee invitaciones y conexiones y actualiza sus estados; no escribe en LinkedIn"
       ],
       "tools": [
-        "unipile_read"
+        "linkedin_read"
       ],
       "course_lists": [],
       "course_units": [],
@@ -1525,7 +1525,7 @@
         "Lee chats y coordina los juicios acotados por corrida"
       ],
       "tools": [
-        "unipile_read"
+        "linkedin_read"
       ],
       "course_lists": [],
       "course_units": [],
@@ -1602,7 +1602,7 @@
         "Recoge cortes de posts a 24 h, 72 h y 7 días y audiencia diaria"
       ],
       "tools": [
-        "unipile_read",
+        "linkedin_read",
         "biblioteca"
       ],
       "course_lists": [
@@ -1786,7 +1786,7 @@
       ],
       "tools": [
         "linkedin_write",
-        "unipile_read"
+        "linkedin_read"
       ],
       "course_lists": [],
       "course_units": [],

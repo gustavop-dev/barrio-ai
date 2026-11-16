@@ -204,7 +204,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
   1. **Dado** una pieza `approved` con `scheduled_for` a las 08:30, **cuando** el worker intenta ejecutarla a las 08:29, **entonces** no publica (compuerta de la hora programada).
   2. **Dado** la misma pieza a las 08:30, dentro de `OPERATOR_WINDOW`, sin parada ni pausa, respetando el espaciado y los topes (1 al día, 7 a la semana), **cuando** se ejecuta, **entonces** se hace un solo `POST /rest/posts` con `LinkedIn-Version`, `commentary` escapado en formato `little`, `visibility: PUBLIC`, y con un 201 y `x-restli-id` la acción queda `confirmed` con `external_url` `https://www.linkedin.com/feed/update/<urn>/`.
   3. **Dado** que se publicó, **cuando** termina, **entonces** se guarda la Notificación `piece_published` «Publicaste «<tesis>»» con «Las impresiones a las 24 h llegan mañana.» y push.
-  4. **Dado** que ya existe en el perfil un post propio con el mismo texto (leído por Unipile), **cuando** se va a ejecutar, **entonces** se confirma sin publicar otro.
+  4. **Dado** que ya existe en el perfil un post propio con el mismo texto (leído por LinkedIn directo), **cuando** se va a ejecutar, **entonces** se confirma sin publicar otro.
   5. **Dado** un 401, 403 o 429, **cuando** se publica, **entonces** la acción queda `failed`, la cuenta pasa a pausa con push «LinkedIn: cuenta en pausa» y no se reintenta.
   6. **Dado** un fallo de conexión antes de enviar, **cuando** se publica, **entonces** queda `failed` con `not_sent`.
   7. **Dado** `LIVE_LINKEDIN_OFFICIAL=false` y una cuenta real, **cuando** se intenta ejecutar, **entonces** no se publica nada («API oficial de LinkedIn desactivada…»).
@@ -219,7 +219,7 @@ El circuito que prepara, verifica y publica la pieza diaria de Gustavo en Linked
 - **Código:** `operador.execute` (`ConnectorUncertain`), `operador.reconcile`, `operador.resolve_uncertain`, `rediseno_views.alerts` (tarjeta `uncertain:<id>`).
 - **Criterios de aceptación:**
   1. **Dado** un 5xx, un timeout tras enviar o un 201 sin URN, **cuando** se publica, **entonces** la acción queda `uncertain`, no se reintenta y llega la push «¿Salió o no?» (prioridad alta).
-  2. **Dado** una cuenta Unipile conectada, **cuando** corre la conciliación, **entonces** busca el post propio por texto y, si lo encuentra, la acción pasa a `confirmed`.
+  2. **Dado** una cuenta de LinkedIn directo, **cuando** corre la conciliación, **entonces** busca el post propio por texto y, si lo encuentra, la acción pasa a `confirmed`.
   3. **Dado** que no se puede conciliar, **cuando** Gustavo abre Tu turno, **entonces** ve la tarjeta urgente «¿Salió o no?» con «Sí, se aplicó» y «No se aplicó», que piden nota y llaman a `POST /api/v1/operador/actions/<id>/resolve` (ver [TUR-04](tu-turno.md#tur-04)).
   4. **Dado** una acción que no está en `sent` ni `uncertain`, **cuando** se intenta resolver, **entonces** responde 409 «Solo se resuelven acciones enviadas o inciertas.».
 - **Brechas código/docs:** —

@@ -23,7 +23,7 @@ from .models import ActionExecution, ActionOutcome, AudienceSnapshot, AuditEvent
 DAYS=(7,28,90)
 MODALITIES=('todo','personal_startups','projectapp')
 AGES=('24h','72h','7d')
-PUBLISHED=('confirmed','sent')  # «sent» is a 201 of the Posts API not yet seen by Unipile: published, as in the calendar
+PUBLISHED=('confirmed','sent')  # «sent» is a 201 of the Posts API not yet seen when reading the posts back: published, as in the calendar
 NETWORK_EVENTS=('network.synced','network.planned','network.discovered','network.classified')
 OPPORTUNITIES_PENDING='Mediremos oportunidades cuando registres la primera o conectemos el inbox'
 ENGAGEMENT='(reacciones + comentarios + republicaciones) / impresiones × 100'

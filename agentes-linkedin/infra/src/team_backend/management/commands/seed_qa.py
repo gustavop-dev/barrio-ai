@@ -39,7 +39,7 @@ QA_USERNAME='qa'
 QA_PASSWORD_DEFAULT='qa-0ff1ce-solo-ci'
 NS=uuid.UUID('0ff1ce00-9a5e-4d00-8e00-00000000c1a0')
 EXTRA_DEVICE='Pixel 7 de Gustavo (QA)'
-LIVE_SWITCHES=('LIVE_PROVIDERS','LIVE_LINKEDIN','LIVE_LINKEDIN_OFFICIAL','LIVE_LINKEDIN_DIRECTO')
+LIVE_SWITCHES=('LIVE_PROVIDERS','LIVE_LINKEDIN_OFFICIAL','LIVE_LINKEDIN_DIRECTO')
 FAKE_URL='https://linkedin.example'  # never a real LinkedIn address: nothing in the QA world can open linkedin.com
 
 def uid(name):
@@ -161,7 +161,7 @@ class Command(BaseCommand):
         on=[v for v in LIVE_SWITCHES if os.environ.get(v,'false').strip().lower()=='true']
         if on:raise CommandError(f'seed_qa no corre con proveedores o LinkedIn reales activados: {", ".join(on)}.')
         # The QA «directo» account of --analitica (a fixed uuid5 of the QA namespace) is the only one it may find and replace.
-        real=ConnectorAccount.objects.filter(provider__in=['unipile','directo','linkedin']).exclude(id=uid('account:directo'))
+        real=ConnectorAccount.objects.filter(provider__in=['directo','linkedin']).exclude(id=uid('account:directo'))
         if real.exists() or LinkedInCredential.objects.exists():
             raise CommandError('Esta base tiene una cuenta real de LinkedIn: seed_qa no la toca.')
 
@@ -197,8 +197,8 @@ class Command(BaseCommand):
     # ------------------------------------------------------------------ accounts, referents, posts, people
 
     def accounts(self):
-        # «running» is the status Unipile reports for a working account: Ajustes shows it as «Conectada» (AJU-02).
-        self.fake=ConnectorAccount.objects.create(id=uid('account:unipile'),provider='fake',external_account_id='qa-unipile-gustavo',
+        # «running» is the status of a working account: Ajustes shows it as «Conectada» (AJU-02).
+        self.fake=ConnectorAccount.objects.create(id=uid('account:simulada'),provider='fake',external_account_id='qa-simulada-gustavo',
                                                   label='LinkedIn de Gustavo (simulado)',status='running',last_checked_at=self.ago(hours=1))
         self.official=ConnectorAccount.objects.create(id=uid('account:official'),provider='linkedin_fake',external_account_id='urn:li:person:qa-gustavo',
                                                       label='API oficial (simulada)',status='OK',last_checked_at=self.ago(hours=1))

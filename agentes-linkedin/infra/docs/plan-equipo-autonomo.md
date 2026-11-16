@@ -1,5 +1,7 @@
 # Plan maestro del equipo autónomo de LinkedIn
 
+> Registro histórico (noviembre de 2026): desde el 14/11/2026 la cuenta opera con LinkedIn directo, sin Unipile; ver [plan-linkedin-directo](../../../docs/plan-linkedin-directo.md).
+
 Fecha: 2026-11-06. Versión: 1.1. Estado: planificación; autonomía aún no implementada.
 
 Este documento guía el diseño y la implementación. Antes de trabajar en un grupo, consultar su fase, dependencias y criterio de salida. Registrar aquí cambios de rumbo; los documentos de cada agente desarrollan este plan, no lo sustituyen.

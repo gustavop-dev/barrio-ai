@@ -535,7 +535,7 @@
       "uso": "Composición agregada de relaciones por modalidad para revisar criterios de barrio",
       "necesidad": "opcional, para revisión",
       "si_falta": "mantener criterios como hipótesis",
-      "fuente_y_campos": "Agregados del analista a partir de Unipile v2 vía operador_cuenta; sin identidades individuales."
+      "fuente_y_campos": "Agregados del analista a partir de LinkedIn directo (lecturas y analítica de creador) vía operador_cuenta; sin identidades individuales."
     }
   ],
   "contrato_transversal": {

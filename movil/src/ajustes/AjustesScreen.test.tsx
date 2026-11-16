@@ -56,10 +56,10 @@ const CONNECTED = linkedin({
   connected_at: '2026-11-06T18:00:00Z',
 });
 
-const UNIPILE: Account = {
+const SIMULATED: Account = {
   id: 'acc-1',
   label: 'LinkedIn Gustavo',
-  provider: 'unipile',
+  provider: 'fake',
   status: 'running',
   is_locked: false,
   paused: false,
@@ -70,14 +70,14 @@ const UNIPILE: Account = {
     'INT-02': { daily: 20, weekly: 80, daily_used: 20, weekly_used: 30, left: 0 },
   },
 };
-const OFFICIAL: Account = { ...UNIPILE, id: 'acc-li', label: 'LinkedIn oficial', provider: 'linkedin', capacity: {} };
+const OFFICIAL: Account = { ...SIMULATED, id: 'acc-li', label: 'LinkedIn oficial', provider: 'linkedin', capacity: {} };
 
 function overview(control: Partial<Overview['control']> = {}): Overview {
   return {
     autopilot: { enabled: true, policy_version: 'v1' },
     control: { paused: false, reason: '', source: 'none', updated_at: null, updated_by: null, ...control },
     window: { start: '07:00', end: '21:00', timezone: 'America/Bogota', open_now: true, min_spacing_seconds: 1200 },
-    accounts: [UNIPILE, OFFICIAL],
+    accounts: [SIMULATED, OFFICIAL],
     today: { proposals: {}, llm_spent_usd: '0', llm_daily_cap_usd: '3', drafts: 0, drafts_daily_cap: 10 },
   } as unknown as Overview;
 }
@@ -193,17 +193,17 @@ describe('Ajustes · Máquina', () => {
   it('shows the last daily LinkedIn canary of a directo account', async () => {
     const finished = new Date(Date.now() - 3 * 3600_000).toISOString();
     const directo: Account = {
-      ...UNIPILE,
+      ...SIMULATED,
       id: 'acc-d',
       label: 'LinkedIn prueba',
       provider: 'directo',
       canary: { state: 'no_corrio', started_at: finished, finished_at: finished, calls: 0, failing: [], error_kind: 'network', error: 'El servicio no responde.' },
     };
-    server({ 'GET /api/v1/operador/overview': { body: { ...overview(), accounts: [UNIPILE, directo, OFFICIAL] } } });
+    server({ 'GET /api/v1/operador/overview': { body: { ...overview(), accounts: [SIMULATED, directo, OFFICIAL] } } });
     await renderAjustes();
     expect(await screen.findByText('Prueba diaria: no pudo correr, hace 3 h.')).toBeOnTheScreen();
     expect(screen.getByText('El servicio no responde.')).toBeOnTheScreen();
-    // The Unipile account has no canary: no line.
+    // The simulated account has no canary: no line.
     expect(screen.getAllByText(/^Prueba diaria/)).toHaveLength(1);
   });
 
@@ -212,9 +212,9 @@ describe('Ajustes · Máquina', () => {
     const login = (state: string, extra: Record<string, unknown> = {}) => ({
       id: 'login-1', state, reason: '', still_stopped: false, started_at: new Date().toISOString(), expires_at: LATER, finished_at: null, ...extra,
     });
-    const directo = (connect: Account['connect']): Account => ({ ...UNIPILE, id: 'acc-d', label: 'LinkedIn prueba', provider: 'directo', status: 'unknown', connect });
+    const directo = (connect: Account['connect']): Account => ({ ...SIMULATED, id: 'acc-d', label: 'LinkedIn prueba', provider: 'directo', status: 'unknown', connect });
     const withAccount = (account: Account, extra: Record<string, FakeHandler> = {}) =>
-      server({ 'GET /api/v1/operador/overview': { body: { ...overview(), accounts: [UNIPILE, account, OFFICIAL] } }, ...extra });
+      server({ 'GET /api/v1/operador/overview': { body: { ...overview(), accounts: [SIMULATED, account, OFFICIAL] } }, ...extra });
 
     it('starts a login, opens the remote view in the in-app browser and shows when it is connected', async () => {
       const api = withAccount(directo({ enabled: true, last: null }), {
@@ -266,7 +266,7 @@ describe('Ajustes · Máquina', () => {
       expect(WebBrowser.openBrowserAsync).not.toHaveBeenCalled();
     });
 
-    it('shows nothing when the server has it off, nor for Unipile', async () => {
+    it('shows nothing when the server has it off, nor for the simulated account', async () => {
       withAccount(directo({ enabled: false, last: null }));
       await renderAjustes();
       expect(await screen.findByText('LinkedIn prueba (directo)')).toBeOnTheScreen();
@@ -275,10 +275,10 @@ describe('Ajustes · Máquina', () => {
     });
   });
 
-  it('pauses only the Unipile account, with a reason, and leaves the official one out', async () => {
-    const api = server({ 'POST /api/v1/operador/accounts/acc-1/pause': { body: { ...UNIPILE, paused: true } } });
+  it('pauses only the operating account, with a reason, and leaves the official one out', async () => {
+    const api = server({ 'POST /api/v1/operador/accounts/acc-1/pause': { body: { ...SIMULATED, paused: true } } });
     await renderAjustes();
-    expect(await screen.findByText('LinkedIn Gustavo (Unipile)')).toBeOnTheScreen();
+    expect(await screen.findByText('LinkedIn Gustavo (simulada)')).toBeOnTheScreen();
     expect(screen.queryByText('LinkedIn oficial (linkedin)')).toBeNull();
     await fireEvent.press(screen.getByRole('button', { name: 'Pausar solo esta cuenta: LinkedIn Gustavo' }));
     const sheet = await screen.findByTestId('confirm-sheet');

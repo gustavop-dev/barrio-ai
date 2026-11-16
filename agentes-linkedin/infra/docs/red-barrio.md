@@ -29,7 +29,7 @@ flowchart LR
    - **De una búsqueda.** Ejecuta además una búsqueda de `NETWORK_SEARCH_QUERIES` por turno, rotando entre ellas, y omite las conexiones de primer grado.
    - **Evidencia.** Cada contacto guarda de dónde salió: el post, el referente y su comentario, o la consulta de búsqueda.
 2. **Clasificar** (`classify_contacts`). Una llamada con `NETWORK_CLASSIFIER_MODEL` (por defecto `claude-sonnet-5-5`) clasifica hasta 10 personas.
-   - **Perfil antes de clasificar.** Unipile v2 entrega a quien comenta sin titular: solo nombre e id. Sin titular, el clasificador descartaba a gente valiosa. Por eso, antes de clasificar a alguien sin titular, se lee su perfil (DESC-03), lo que gasta una lectura del cupo `profile`. Quien no puede leerse hoy espera a mañana en lugar de juzgarse a ciegas.
+   - **Perfil antes de clasificar.** LinkedIn entrega a quien comenta sin titular: solo nombre e id (la búsqueda de personas del conector directo, ni eso: solo el id). Sin titular, el clasificador descartaba a gente valiosa. Por eso, antes de clasificar a alguien sin titular, se lee su perfil (DESC-03), lo que gasta una lectura del cupo `profile`. Quien no puede leerse hoy espera a mañana en lugar de juzgarse a ciegas.
    - **Criterio.** Usa los criterios de barrio por modalidad y la orientación privada del brief. La afinidad hispanohablante se toma solo de lo declarado, nunca del nombre ni de la apariencia.
    - **Resultado.** Una persona encaja si el modelo dice que sí con confianza de al menos `NETWORK_MIN_CONFIDENCE`. Si no, queda `discarded`.
    - **Presupuesto.** No tiene tope propio: el gasto (`purpose='network-classify'`) cuenta en el presupuesto de IA de todo el equipo (`AI_MONTHLY_LIMIT_USD` al mes y el tope de seguridad diario `AI_DAILY_FUSE_USD`, ver `knowledge/presupuesto.py`). Sin presupuesto no se clasifica; el resumen de la red da ese tope de seguridad en `llm.daily`.
@@ -122,18 +122,21 @@ Ver `oficina/CONTRATO-API.md`, sección Red. Endpoints:
 
 Las acciones RED-* aparecen en `/api/v1/operador/actions` con `contact` en lugar de `post`.
 
-## Contrato de Unipile (v2, consultado el 2026-11-07)
+## Contrato con LinkedIn (conector directo)
 
-| Uso | Llamada |
-| --- | --- |
-| Perfil | `GET /v2/{account}/users/{id}`. El titular llega en `description`, el grado en `specifics.network_distance` y la invitación en `specifics.relation_request(_status)`. |
-| Búsqueda | `POST /v2/{account}/linkedin/search/people` con `{"keywords"}` |
-| Seguir | `POST /v2/{account}/users/me/follow/{id}` |
-| Invitar | `POST /v2/{account}/users/me/relation-requests` con `{"user_id"}` |
-| Listar invitaciones | `GET /v2/{account}/users/me/relation-requests?type=sent\|received` |
-| Aceptar | `POST /v2/{account}/users/me/relation-requests/{request_id}/accept` |
+La red usa estos métodos del conector `directo` (`src/linkedin_directo/cliente.py`). Cada llamada la hace el servicio navegador desde la página de LinkedIn con la sesión abierta ([contrato del navegador](navegador-contrato.md)).
 
-Las formas de perfil e invitaciones se comprobaron con lecturas reales de la cuenta el 2026-11-07. Unipile recomienda no encadenar invitaciones, y por eso se aplica el espaciado común.
+| Uso | Método | Qué hace |
+| --- | --- | --- |
+| Perfil | `get_profile(id)` | Dos lecturas: el perfil (titular, ubicación, Acerca de) y su tarjeta (grado de red, invitación pendiente, si ya se le sigue, seguidores y conexiones). Leer la tarjeta probablemente cuenta como visita al perfil. |
+| Búsqueda | `search_people(palabras, ubicación)` | La página de búsqueda de personas de la web: 10 resultados con su id, sin nombre, titular ni grado (se completan leyendo el perfil, dentro del tope `profile`). |
+| Ubicaciones | `search_parameters('LOCATION', texto)` | El autocompletado de ubicación de la barra de filtros. |
+| Seguir | `follow_user(id)` | Una escritura, solo «seguir» (`FOLLOW_ACTIVE`); necesita el número de miembro, que guarda la lectura que encontró a la persona. |
+| Invitar | `send_invitation(id, nota)` | Una escritura, con nota opcional de hasta 300 caracteres. Al enviarla, LinkedIn hace además que la cuenta siga a la persona. |
+| Listar invitaciones | `list_invitations('sent' o 'received')` | Una lectura; las recibidas guardan el secreto que hace falta para aceptarlas. |
+| Aceptar | `accept_invitation(id)` | Una escritura con ese secreto. |
+
+Retirar invitaciones, declinarlas o dejar de seguir no existen en el conector: la lista permitida del servicio las rechaza. Las 21 operaciones se comprobaron en la cuenta de prueba el 13/11/2026 ([plan](../../../docs/plan-linkedin-directo.md)). Las invitaciones no se encadenan: se aplica el espaciado común.
 
 ## Pendiente
 

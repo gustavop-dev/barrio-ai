@@ -8,7 +8,7 @@ import { canaryLine, capLines, connectLabel, loginActive, loginLine, controlReas
 import { inUseWarning, isFiltro, photoPatch, rejectedMessage, uploadedMessage } from './galeria';
 import { linkedinReconnected, linkedinReturnMessage } from './linkedin';
 
-const overview = { accounts: [{ provider: 'unipile', capacity: { 'INT-03': { daily: 3, weekly: 12, daily_used: 1, weekly_used: 4, left: 2 } } }] } as unknown as Overview;
+const overview = { accounts: [{ provider: 'directo', capacity: { 'INT-03': { daily: 3, weekly: 12, daily_used: 1, weekly_used: 4, left: 2 } } }] } as unknown as Overview;
 const ajustes = { limits: { 'INT-02': { daily: 20, weekly: 80 } } } as unknown as Ajustes;
 
 describe('Ajustes', () => {

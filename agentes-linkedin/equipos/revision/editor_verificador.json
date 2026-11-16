@@ -565,7 +565,7 @@
       "uso": "Contexto mínimo del hilo para revisar un mensaje",
       "necesidad": "condicional a message_proposal",
       "si_falta": "needs_evidence; no revisar un mensaje aislado",
-      "fuente_y_campos": "Extracto preparado por conversaciones_inbox desde el inbox sincronizado (Unipile v2); no el inbox completo."
+      "fuente_y_campos": "Extracto preparado por conversaciones_inbox desde la bandeja leída por LinkedIn directo; no el inbox completo."
     },
     {
       "catalogo_id": "D13",

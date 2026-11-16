@@ -717,7 +717,7 @@
     "herramientas_necesarias": [
       "recuperación readonly de corpus y contexto versionado",
       "lector de registros/importaciones autorizados como alternativa manual con procedencia",
-      "pasarela de lectura de operador_cuenta: Unipile v2 (posts propios, comentarios, reacciones, relaciones y seguidores) y API oficial (memberCreatorPostAnalytics, memberFollowersCount) sujeta a aprobación de Community Management",
+      "pasarela de lectura de operador_cuenta: LinkedIn directo (posts propios con sus recuentos, comentarios, invitaciones, número de seguidores y conexiones, visitas al perfil y la exportación de analítica de creador) y API oficial (memberCreatorPostAnalytics, memberFollowersCount) sujeta a aprobación de Community Management",
       "Django/PostgreSQL: cálculo determinista de observaciones validadas y propuestas versionadas (por implementar)"
     ],
     "acciones_autorizadas": [
@@ -1423,7 +1423,7 @@
         "neighborhood_role_mix": "interpretación con soporte, admite varios papeles"
       },
       "obligatoriedad": "Opcional para investigar inicialmente; necesaria evidencia de composición para afirmar quién está llegando.",
-      "fuente_y_captura_candidata": "Unipile v2 (relaciones, seguidores y seguidos) y API oficial memberFollowersCount si Community Management lo concede, ambos vía operador_cuenta; captura o exportación manual como alternativa. Acceso por verificar en piloto.",
+      "fuente_y_captura_candidata": "LinkedIn directo (número de seguidores y conexiones, invitaciones y nuevos seguidores por día de la analítica de creador; no lista seguidores ni seguidos) y API oficial memberFollowersCount si Community Management lo concede, ambos vía operador_cuenta; captura o exportación manual como alternativa. Acceso por verificar en piloto.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Contrastar audiencia pertinente con posición sin excluir pares/recomendadores/divulgadores.",
       "frescura": "Guardar fecha de corte y periodo; composición vieja no prueba audiencia actual.",
@@ -1545,7 +1545,7 @@
         "origin_link_strength": "referencia explícita a post/perfil|declaración|inferencia|desconocida"
       },
       "obligatoriedad": "Necesario fragmento/contexto/origen/permiso para llamar real a una señal; opcional para plan inicial.",
-      "fuente_y_captura_candidata": "Comentarios públicos vía Unipile v2 (lectura mediante operador_cuenta). Fragmentos de mensajes directos preparados por conversaciones_inbox desde el inbox sincronizado (D10), minimizados y con permiso de uso; fragmento de reunión aportado por Gustavo.",
+      "fuente_y_captura_candidata": "Comentarios públicos vía LinkedIn directo (lectura mediante operador_cuenta). Fragmentos de mensajes directos preparados por conversaciones_inbox desde el inbox sincronizado (D10), minimizados y con permiso de uso; fragmento de reunión aportado por Gustavo.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Escucha, señales de participación y temas; separar señales reales de lectores simulados.",
       "frescura": "Fecha de conversación/captura; antes de proponer respuesta verificar que el asunto sigue abierto.",
@@ -1599,7 +1599,7 @@
       "id": "D13",
       "nombre": "Estado de relaciones e invitaciones",
       "obligatoriedad": "Necesario para APRE-02 y para medir la distribución por modalidad.",
-      "fuente_y_captura_candidata": "Sincronización de operador_cuenta (Unipile v2) y memoria de relaciones_comunidad.",
+      "fuente_y_captura_candidata": "Sincronización de operador_cuenta (LinkedIn directo) y memoria de relaciones_comunidad.",
       "disponibilidad": "no verificada; sin cuenta conectada en este diseño",
       "finalidad": "Composición y evolución del barrio; invitación enviada no es conexión.",
       "frescura": "Fecha de sincronización.",

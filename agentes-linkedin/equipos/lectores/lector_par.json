@@ -156,7 +156,7 @@
       "recuperación de curso y evidencia por ID",
       "lectura de artefactos autorizados",
       "validación de esquema/versiones",
-      "Sin acceso a cuentas externas (Unipile, API oficial) ni a búsqueda web"
+      "Sin acceso a cuentas externas (LinkedIn directo, API oficial) ni a búsqueda web"
     ],
     "acciones_autorizadas": [
       "proponer, analizar y revisar dentro de su rol una vez activado"
