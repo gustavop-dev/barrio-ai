@@ -930,7 +930,7 @@
     ],
     "fuente_de_datos": "D13/D14 del operador_cuenta y memoria de relaciones; análisis del analista",
     "linea_base": null,
-    "objetivos": "Definir tras el piloto; sin cuotas de volumen.",
+    "objetivos": "Definir tras el piloto; sin cuotas de volumen. Desde el 17/11/2026 (BAR-24) las invitaciones de la semana se reparten por papel con cupos blandos (NETWORK_ROLE_SHARE, proporciones de la tabla del barrio LI-03-V021-K03): deciden a quién le toca, nunca cuántas salen; un papel sin candidatos cede su turno y el aliado comparte el de los recomendadores.",
     "ventana": "configurable por Gustavo",
     "limitaciones_de_atribucion": [
       "aceptación no prueba interés comercial",

@@ -1,4 +1,4 @@
-# Línea base de los compradores (BAR-18-compradores)
+# Línea base de los compradores (BAR-24-compradores)
 
 Medición del estado actual **antes** de cambiar el clasificador, la verificación web y el plan, a pedido de Gustavo
 (17/11/2026: «Siento que puede ser demasiado estricto, o que el verificador hace una pregunta demasiado rígida y no deja
@@ -59,3 +59,34 @@ kept_right: 4/7
 
 En el commit de la línea base la prueba lleva `@expectedFailure`. El marcador se quita con el cambio de los niveles, la
 región y el puntaje (sección «Después», abajo).
+
+## Después (17/11/2026, rama `fix/compradores-menos-rigido` con `origin/main` mezclado)
+
+El caso es el mismo y corre con las mismas funciones de producción y los mismos modelos simulados. Lo que cambia es el
+código: el prompt del clasificador con perfil, nivel y `us_market`, la pregunta a la web según el perfil, los cuatro
+niveles, el puntaje `buyer_score_v1` y la región que ordena sin sacar. El identificador pasó de BAR-18 a **BAR-24**
+porque `main` usa BAR-18 para el recorrido del comprador (outbound, fase 1).
+
+```
+grade_buyers_case: passed True
+errors: (ninguno)
+kept_right: 7/7
+```
+
+| Variante | Antes | Después | Nivel | Puntaje | Desglose (evidencia + mercado + papel + servicios + confianza) |
+| --- | --- | --- | --- | --- | --- |
+| C1 stealth con salida previa | Sale | **Sigue** | probable | 82 | 33 + 20 + 12 + 12 + 5. La web no encontró nada en tres días: el nivel del perfil se mantiene. |
+| C2 «Founder @Lumora» | Sale | **Sigue** | por_confirmar | 62 | 16 + 20 + 12 + **9 (sin dato)** + 5, con el aviso «perfil con poca información»; no pierde puntos. |
+| C3 bootstrapped con clientes | Sigue, sin nivel | Sigue | confirmado | 99 | 50 + 20 + 12 + 12 + 5. La web cita clientes que pagan. |
+| C4 founder en Bogotá | Sale | **Sigue**, después | por_confirmar | 53 | 16 + **8 (Latinoamérica)** + 12 + 12 + 5. |
+| C5 director de ventas | Sale | Sale | no_encaja | — | Evidencia en contra: vende, no decide. |
+| C6 pide no ser contactado | Sale | Sale | no_encaja | — | Evidencia en contra. |
+| C7 presemilla declarada | Sale | Sale | no_encaja | — | Evidencia en contra. |
+
+- **Invitaciones planeadas, en orden:** C3, C1, C2, C4, las cuatro esperadas. Antes solo se invitaba a C3.
+- **Con todos los `BUYER_*_ENABLED` apagados:** el resultado es el mismo y no se escribe ningún recorrido
+  (`test_with_every_buyer_switch_off_the_case_is_the_same_and_nothing_is_recorded`).
+- **Con `BUYER_RECORD_ENABLED`** (encendido por defecto): cada uno de los cuatro que siguen tiene su recorrido.
+- **Cómo se midió:** `manage.py test team_backend.tests.test_compradores_niveles`, sin marcador de fallo esperado.
+- **Lo que esto no mide:** cómo responde el modelo real con el prompt nuevo (haría falta una corrida pagada) ni cuántos
+  compradores reales cambian de nivel. Eso lo dice `manage.py operador reevaluar-compradores` en seco, en producción.

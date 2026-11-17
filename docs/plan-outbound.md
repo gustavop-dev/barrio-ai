@@ -41,6 +41,9 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 | 17/11/2026 | La rampa y los topes se quedan como están; los resultados se miran en un mes (hacia el 17/12/2026). Salvo los comentarios: ver la fila del volumen, abajo. |
 | 17/11/2026 | Carga aceptada: 20 a 30 mensajes por semana enviados por él. |
 | 17/11/2026 | **Seguir comentando a referentes y comentar a posibles clientes; se sube el volumen: 15 comentarios al día, 75 a la semana, 20 borradores al día.** Reparto del día: compradores 8, referentes 5, comunidad 2 (sin fuente todavía: sus cupos pasan a los otros dos). Los fines de semana, la mitad. La rampa de invitaciones y los demás topes no cambian. Ver «Capacidad del día». |
+| 17/11/2026 | **Compradores menos rígidos** ([BAR-24](funcionalidades/red.md#bar-24)): «Siento que puede ser demasiado estricto, o que el verificador hace una pregunta demasiado rígida y no deja pasar a nadie». Hay cuatro niveles (confirmado, probable, por confirmar, no encaja) y solo la evidencia en contra saca a alguien. La pregunta a la web depende del perfil del comprador, y cada comprador tiene un puntaje de 0 a 100 que ordena y nunca excluye. El objetivo sigue siendo semilla o más, o clientes que pagan. |
+| 17/11/2026 | **Compradores de Latinoamérica**: «podríamos prospectarlos al inicio; queremos ir hacia USA pero no los descartamos de una». Entran después de los de EE. UU. (primero los que venden en EE. UU.) y pasan por el mismo recorrido y el mismo calentamiento. |
+| 17/11/2026 | **Reparto de papeles**: «debería ser construido», pero «estamos cortando con una misma tijera a todos; podríamos cambiar las preguntas dependiendo del perfil, pero no ser tan rígidos». Las invitaciones de la semana tienen cupos blandos por papel (`NETWORK_ROLE_SHARE`, tabla del barrio). Un papel sin candidatos cede su turno, y el aliado comparte el turno de los recomendadores. |
 | 17/11/2026 | **Hasta dónde llega la máquina de LinkedIn: la reunión agendada.** De ahí en adelante es la máquina de ventas, que se arma después del outbound, con su propia base de conocimiento y abierta a otras fuentes además de LinkedIn. Agenda con Cal.com. |
 
 ## Lo que ya funciona
@@ -100,7 +103,11 @@ su caso de evaluación y su lista de lectura del curso, como el primer mensaje
 Las señales no crean listas: deciden a quién se atiende primero (LI-08-M004-K02). Para founders bastan señales
 públicas (LI-08-V010-K02): anunció una ronda, abrió vacantes, se expandió, publicó sobre el problema, o ya
 interactuó con nosotros (la más fuerte). Cada señal se guarda con su fuente y su fecha; una señal sin fuente no
-cuenta. La prioridad queda: EE. UU. → comprador → señal reciente → confianza.
+cuenta. La prioridad queda: EE. UU. → comprador → puntaje + temperatura → confianza. Desde el 17/11/2026
+([BAR-24](funcionalidades/red.md#bar-24)): `prioridad = puntaje + 5 × min(peso de temperatura, 8)`. El puntaje
+(0–100) dice quién es la persona y la temperatura, qué hizo de vuelta. La temperatura solo cuenta con el calentamiento
+encendido. Un comprador `por_confirmar` o de Latinoamérica también es elegido, y el embudo separa a los elegidos
+por el nivel y el puntaje con que entraron (`entrada_comprador`).
 
 ### 2. Calentar
 
@@ -475,7 +482,7 @@ mantenga; si no llega, la reserva se empareja por el correo o el nombre, o la em
 
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-23) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-24) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).
