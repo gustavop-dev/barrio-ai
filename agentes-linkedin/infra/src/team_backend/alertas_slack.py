@@ -615,6 +615,76 @@ def secuencia_sin_inbox(now):
         f'{meta.get("personas") or 0} seguimiento(s) vencido(s) esperan: sin leer el inbox no se sabe si respondieron y no se '
         'prepara ninguno. Enciende INBOX_ENABLED o revisa la cuenta y sus cupos de lectura.')]
 
+# --------------------------------------------------------------------------- phase 6: her reply, the meeting, the reading
+
+def _name(contact_id):
+    from .models import Contact
+    return Contact.objects.filter(pk=contact_id).values_list('display_name',flat=True).first() or 'Un comprador'
+
+@vigilante
+def comprador_interesado(now):
+    """Phase 6 (BUYER_REPLY_ENABLED): a buyer replied with interest (respuesta_comprador classified it «interesado»):
+    once per reply, in the tick that classified it. Who; never her text."""
+    from . import respuesta_comprador
+    if not respuesta_comprador.enabled():return []
+    return [Aviso(f'comprador:interesado:{event.pk}',
+                  f'Barrio · Un comprador está interesado: {_name(event.target)} respondió con interés. Su respuesta, con tu enlace de '
+                  'agenda, está en Tu turno: la envías tú desde LinkedIn.',once='ever')
+            for event in AuditEvent.objects.filter(action=respuesta_comprador.CLASSIFIED,metadata__tipo='interesado',
+                                                   created_at__gte=now-timedelta(days=2)).order_by('created_at')]
+
+@vigilante
+def reunion_agendada(now):
+    """Phase 6: a meeting booked (the Cal.com webhook matched it, Gustavo associated it or marked «Agendó») or
+    rescheduled: once per booking event. Who and when; the lead is in Tu turno."""
+    from . import respuesta_comprador
+    from .models import MeetingBooking
+    if not respuesta_comprador.enabled():return []
+    alerts=[]
+    for event in AuditEvent.objects.filter(action='buyer.meeting_booked',created_at__gte=now-timedelta(days=2)).order_by('created_at'):
+        meta=event.metadata or {}
+        booking=MeetingBooking.objects.filter(pk=meta.get('reserva')).first()
+        when=f' para el {_local(booking.start_at):%d/%m a las %H:%M}' if booking and booking.start_at else ''
+        what='Reunión reprogramada' if meta.get('reprograma') else 'Reunión agendada'
+        alerts.append(Aviso(f'comprador:reunion:{event.pk}',
+            f'Barrio · {what} con {_name(event.target)}{when}. La máquina de LinkedIn terminó aquí: la entrega del lead está en Tu '
+            'turno; crea la oportunidad con un toque.',once='ever'))
+    return alerts
+
+@vigilante
+def reserva_sin_emparejar(now):
+    """Phase 6: a Cal.com booking the team could not match with a buyer: once per booking."""
+    from . import agenda_calcom, respuesta_comprador
+    if not respuesta_comprador.enabled():return []
+    return [Aviso(f'comprador:reserva:{booking.pk}',
+                  'Barrio · Reserva de Cal.com sin emparejar'+(f' para el {_local(booking.start_at):%d/%m a las %H:%M}' if booking.start_at else '')+
+                  ': no trae el identificador de tu enlace y ni el correo ni el nombre coinciden con un comprador. Dile al equipo de '
+                  'quién es en Tu turno.',once='ever')
+            for booking in agenda_calcom.unmatched()]
+
+@vigilante
+def falta_enlace_agenda(now):
+    """Phase 6: an interested buyer got no draft because CALCOM_BOOKING_URL is empty: once a day."""
+    from . import operador, respuesta_comprador
+    if not respuesta_comprador.enabled():return []
+    day,_=operador.period_starts(now)
+    count=AuditEvent.objects.filter(action=respuesta_comprador.NO_LINK,created_at__gte=day,created_at__lt=day+timedelta(days=1)).count()
+    if not count:return []
+    return [Aviso('comprador:falta_enlace_agenda',
+        f'Barrio · Falta tu enlace de agenda (CALCOM_BOOKING_URL): {count} respuesta(s) de compradores que quieren hablar o piden '
+        'información quedaron sin borrador. Están en Tu turno para que respondas tú; configura el enlace para que el equipo las redacte.')]
+
+@vigilante
+def lectura_semanal_embudo(now):
+    """Phase 6: on Mondays, inside READ_WINDOW, the weekly reading of the buyer's funnel (lectura_embudo: where it
+    breaks first, its cause and ONE change; the small sample is not judged), five lines at most, on the summaries
+    channel. Once a week."""
+    from . import operador, respuesta_comprador
+    if not respuesta_comprador.enabled() or _local(now).weekday()!=0 or not operador.within_read_window(now):return []
+    _,week=operador.period_starts(now)
+    from . import lectura_embudo
+    return [Aviso(f'comprador:lectura:{week.date().isoformat()}',lambda:lectura_embudo.text(now),once='ever',channel='resumen')]
+
 def expiry_hours():
     """ALERT_PROPOSAL_EXPIRY_HOURS (12): proposals waiting for his approval that expire within this are grouped."""
     return timedelta(hours=_number('ALERT_PROPOSAL_EXPIRY_HOURS',12,1,48))
@@ -778,8 +848,15 @@ def buyer_lines(now):
     split=lambda q:(q.filter(number=1).count(),q.filter(number__gt=1).count())
     p1,p2=split(rows.filter(state=BuyerDraft.State.READY));s1,s2=split(rows.filter(state=BuyerDraft.State.SENT,**today))
     cancelled=rows.filter(state=BuyerDraft.State.CANCELLED,**today).count()
-    return [f'• Compradores: {p1+p2} mensajes esperan en Tu turno ({p1} primeros, {p2} seguimientos); hoy enviaste {s1+s2} '
-            f'({s1} primeros, {s2} seguimientos)'+(f'; {cancelled} seguimientos cancelados porque respondieron' if cancelled else '')]
+    lines=[f'• Compradores: {p1+p2} mensajes esperan en Tu turno ({p1} primeros, {p2} seguimientos); hoy enviaste {s1+s2} '
+           f'({s1} primeros, {s2} seguimientos)'+(f'; {cancelled} seguimientos cancelados porque respondieron' if cancelled else '')]
+    from . import respuesta_comprador
+    if respuesta_comprador.enabled():  # phase 6: the replies to what they wrote
+        drafted,bare=respuesta_comprador.pending_counts(now)
+        replied=BuyerDraft.objects.filter(kind=BuyerDraft.Kind.REPLY,state=BuyerDraft.State.SENT,**today).count()
+        lines.append(f'• Respuestas a compradores: {drafted+bare} esperan en Tu turno ({drafted} con borrador, {bare} necesitan tu '
+                     f'respuesta); hoy respondiste {replied}')
+    return lines
 
 
 def summary_lines(now):
