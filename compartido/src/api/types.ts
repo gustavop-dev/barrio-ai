@@ -979,6 +979,11 @@ export interface TurnoMessage {
    */
   comment_label?: string;
   reply_label?: string;
+  /**
+   * The label of `text`: «Seguimiento 2 de 4»… for a follow-up of the buyer's sequence (BUYER_SEQUENCE_ENABLED, phase 4),
+   * where `comment` is the message Gustavo sent her last. Absent: «Mensaje sugerido».
+   */
+  text_label?: string;
   origin?: 'recorrido';
   person: { id: string; display_name: string; headline: string; profile_url: string; role: string | null };
 }

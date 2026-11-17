@@ -378,7 +378,7 @@ function MessageBody({ card }: { card: TurnoCard }) {
         </div>
       ) : null}
       <div className="turno-block">
-        <p className="turno-label">Mensaje sugerido</p>
+        <p className="turno-label">{message.text_label || 'Mensaje sugerido'}</p>
         <p className="turno-body" data-testid="suggested-message">
           {message.text}
         </p>

@@ -375,7 +375,7 @@ function MessageDetails({ card }: { card: TurnoCardData }) {
       </View>
       <View style={styles.block}>
         <T variant="etiqueta" soft>
-          Mensaje sugerido
+          {message.text_label || 'Mensaje sugerido'}
         </T>
         <View style={styles.quote}>
           <T selectable testID="suggested-message">

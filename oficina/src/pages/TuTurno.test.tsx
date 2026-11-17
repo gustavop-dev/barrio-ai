@@ -209,6 +209,41 @@ describe('Tu turno · Pendiente', () => {
     await waitFor(() => expect(api.find('POST', close)[0]?.body).toEqual({ how: 'no' }));
   });
 
+  it('labels a follow-up of the buyer sequence «Seguimiento 2 de 4» and shows the message he sent her last', async () => {
+    const close = '/api/v1/respuestas/bd-2/mensaje';
+    const followUp = {
+      ...MESSAGE_CARD,
+      id: 'dm:bd-2',
+      title: 'Seguimiento 2 de 4 para Ana Acme',
+      actions: [
+        { label: 'Abrir su perfil', href: 'https://www.linkedin.com/in/ana-acme', primary: true },
+        { label: 'Hecho, le escribí', endpoint: close, body: { how: 'enviado' } },
+        { label: 'No escribirle', endpoint: close, body: { how: 'no' }, note_optional: true },
+      ],
+      message: {
+        ...MESSAGE_CARD.message!,
+        text: 'Ana, the fifth client asking for the same weekly report is usually when the pain stops being small.',
+        text_label: 'Seguimiento 2 de 4',
+        comment: 'Hi Ana, your answer about the spreadsheet stayed with me. Which report do your clients open first?',
+        comment_label: 'Tu mensaje 1 (hace 4 días)',
+        reply: '',
+        reply_label: '',
+        origin: 'recorrido' as const,
+        person: { id: 'c-1', display_name: 'Ana Acme', headline: 'Founder & CEO at Acme', profile_url: 'https://www.linkedin.com/in/ana-acme', role: 'comprador' },
+      },
+    };
+    const api = server(busyTurno({ items: [followUp], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [], mensajes: [followUp] } }), {
+      [`POST ${close}`]: { body: {} },
+    });
+    renderApp('/tu-turno');
+    const view = within(await cardTitled('Seguimiento 2 de 4 para Ana Acme'));
+    expect(view.getByText('Seguimiento 2 de 4')).toBeInTheDocument();
+    expect(view.getByText('Tu mensaje 1 (hace 4 días)')).toBeInTheDocument();
+    expect(view.getByTestId('suggested-message')).toHaveTextContent(followUp.message.text);
+    await userEvent.click(view.getByRole('button', { name: 'Hecho, le escribí' }));
+    await waitFor(() => expect(api.find('POST', close)[0]?.body).toEqual({ how: 'enviado' }));
+  });
+
   it('shows a conversation that is his turn, opens the opportunity form prefilled and closes it with an optional reason', async () => {
     const api = server(busyTurno({ items: [CONVERSATION_CARD], alerts: [], questions: [], tasks: { perfil: [], conversaciones: [CONVERSATION_CARD] } }), {
       'GET /api/v1/red/contacts': { body: { count: 0, next: null, previous: null, results: [] } },

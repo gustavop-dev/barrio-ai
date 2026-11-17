@@ -167,6 +167,28 @@ describe('Tu turno', () => {
     expect(within(card).queryByText('Lo que comentó en tu post')).toBeNull();
   });
 
+  it('labels a follow-up of the buyer sequence «Seguimiento 2 de 4» with the message he sent her last', async () => {
+    const followUp = {
+      ...MESSAGE_CARD,
+      id: 'dm:bd-2',
+      title: 'Seguimiento 2 de 4 para Ana Acme',
+      message: {
+        ...MESSAGE_CARD.message!,
+        text_label: 'Seguimiento 2 de 4',
+        comment_label: 'Tu mensaje 1 (hace 4 días)',
+        reply: '',
+        reply_label: '',
+        origin: 'recorrido' as const,
+      },
+    };
+    await renderTurno(turnoFixture({ count: 1, items: [followUp] }));
+    const card = await screen.findByTestId(`turno-card-${followUp.id}`);
+    await fireEvent.press(within(card).getByTestId(`turno-more-${followUp.id}`));
+    expect(within(card).getByText('Seguimiento 2 de 4')).toBeOnTheScreen();
+    expect(within(card).getByText('Tu mensaje 1 (hace 4 días)')).toBeOnTheScreen();
+    expect(within(card).getByTestId('suggested-message')).toHaveTextContent(MESSAGE_CARD.message!.text);
+  });
+
   it('says at once why a date he asked for cannot be kept, shows his idea and sends his answer', async () => {
     const server = await renderTurno(turnoFixture({ count: 1, items: [DAY_REQUEST_CARD] }), { 'POST /api/v1/capturas/cap-1/fecha': { body: {} } });
     const card = await screen.findByTestId(`turno-card-${DAY_REQUEST_CARD.id}`);
