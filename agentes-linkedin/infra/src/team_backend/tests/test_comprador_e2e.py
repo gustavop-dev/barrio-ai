@@ -8,11 +8,11 @@ route, the classified reply and the meeting) and extend the walk; nothing in it 
 import json
 import os
 import uuid
-from contextlib import ExitStack
+from contextlib import ExitStack, contextmanager
 from datetime import timedelta
 from unittest.mock import patch
 from django.utils import timezone
-from team_backend import autopiloto, calentamiento, comprador, jobs, operador, red, respuestas
+from team_backend import autopiloto, calentamiento, comprador, conversaciones, evaluaciones, jobs, operador, red, respuestas
 from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, BuyerJourney, BuyerTouch, Contact, Job, ObservedPost,
                                  PostComment)
 from team_backend.tests.test_respuestas import CLOSING, FOLLOW_UP, QUESTION, RepliesBase, draft
@@ -619,6 +619,20 @@ def judge_message(text):
             'dm_pitch':0.9 if sells else 0.05,'inventa':0.05}
 
 
+def judge_sequence(number,text):
+    """Jev simulado para los seguimientos (fase 4): el M2 nombra el mismo dolor; el M3 pregunta por la persona indicada sin
+    volver a contar el dolor; el M4 cierra sin rogar ni pedir; ninguno vende."""
+    low=(text or '').lower()
+    sells=any(k in low for k in ('my team','we help','a call','our services'))
+    pain=sum(k in low for k in ('spreadsheet','report','copies','copying'))
+    out={'seg_pitch':0.9 if sells else 0.05,'inventa':0.05}
+    if number==2:out.update(seg_mismo_dolor=0.9 if pain else 0.2,seg_repite=0.1,seg_disculpa=0.05)
+    elif number==3:out.update(seg_persona_indicada=0.9 if 'right person' in low or 'persona indicada' in low else 0.1,
+                              seg_repite_dolor=0.8 if pain>=2 else 0.1)
+    else:out.update(seg_cierre=0.9,seg_ruega=0.05,seg_pide=0.05)
+    return out
+
+
 def judge_note(text):
     """Jev simulado para la nota: un hecho concreto suyo, que sirva para que acepte, sin vender."""
     low=(text or '').lower()
@@ -653,6 +667,9 @@ class FirstMessagePathBase(WarmupPathBase):
             if purpose=='comment-prefilter':scores=PREFILTER
             elif purpose=='lead-review-message':scores=judge_message((state.get('primer_mensaje') or {}).get('texto'))
             elif purpose=='lead-review-note':scores=judge_note((state.get('nota') or {}).get('texto'))
+            elif purpose=='lead-review-sequence':
+                follow=state.get('seguimiento') or {}
+                scores=judge_sequence(follow.get('numero'),follow.get('texto'))
             else:scores={}
             low=LOW|risks|{'dm_pitch'}  # RSP-07: the message drafted with a closing reply does not sell
             return {'answers':{q:{'noul':scores.get(q,0.05 if q in low else 0.9)} for q in questions},'model':'fake-jev','estimated_usd':0}
@@ -669,11 +686,14 @@ class FirstMessagePathBase(WarmupPathBase):
             self.calls.append({'purpose':purpose,'context':kwargs.get('context') or '','system':system,'inputs':data})
             name=(data.get('persona') or {}).get('nombre','')
             facts=data.get('hechos') or []
-            text=self.texts.get((purpose,name),'')
+            number=(data.get('seguimiento') or {}).get('numero')
+            text=self.texts.get((purpose,name,number) if purpose=='buyer-sequence' else (purpose,name),'')
             out={'decision':'write' if text else 'none','language':'en','anchor':facts[0]['id'] if facts else '',
                  'rationale':'Retoma su hecho y le pregunta algo fácil.','claims_needing_evidence':[],'risks':[]}
             if purpose=='invite-note':
                 out.update(note=text,citations=['LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01','LI-03-M006-K01'])
+            elif purpose=='buyer-sequence':
+                out.update(message=text,citations=list(evaluaciones.COURSE_CASES['secuencia_mensajes']['units']))
             else:
                 out.update(message=text,citations=['LI-09-M002-K05','LI-09-M003-K02','LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02'])
             return {'text':json.dumps(out),'model':'claude-opus-5-5'}
@@ -1141,3 +1161,114 @@ class BuyerReadWindowTests(FirstMessagePathBase):
             self.assertEqual((self.drafts_of(ana,'mensaje'),Job.objects.filter(kind='prepare_buyer_draft',params__kind='mensaje').count()),([],0))
             self.prepare(night+timedelta(hours=11))  # 10:00 the next morning
         self.assertEqual(self.drafts_of(ana,'mensaje')[-1].state,'listo')
+
+
+# --------------------------------------------------------------------------- phase 4: messages 2–4 (BAR-21)
+
+def sequence_text(variant,number):
+    """The case's follow-up `number` for `variant`; the flow's when the variant does not change it."""
+    case=evaluaciones.COURSE_CASES['secuencia_mensajes']['input']
+    key=f'mensaje_{number}'
+    return case.get(variant,{}).get(key) or case['flujo'][key]
+
+
+class SequencePathBase(FirstMessagePathBase):
+    """The path with BUYER_SEQUENCE_ENABLED (phase 4): after «Hecho, le escribí» on the first message the team prepares
+    messages 2–4 (BUYER_SEQUENCE_DAYS after each «Hecho»), which Gustavo copies and sends himself, and everything stops
+    when she replies (read in the inbox, INBOX_ENABLED). A simulated clock moves the days. The fake connector's chats are
+    LinkedIn: what Gustavo sends by hand after each «Hecho» and what she answers; the team never writes one. Before phase
+    4 the steps find nothing to do, which is what the baseline measures."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'BUYER_SEQUENCE_ENABLED':'true','INBOX_ENABLED':'true','BUYER_POSTS_READ_DAILY_LIMIT':'20'})
+        env.start();self.addCleanup(env.stop)
+        self.start=timezone.now()+LATER  # the first «Hecho»: two hours after the acceptance
+        self.chats={}
+
+    @contextmanager
+    def clock(self,moment):
+        """The world at `moment`: timezone.now and the models' default dates (Django binds those when models load)."""
+        from django.apps import apps
+        with ExitStack() as stack:
+            stack.enter_context(patch('django.utils.timezone.now',return_value=moment))
+            for model in apps.get_app_config('team_backend').get_models():
+                for field in model._meta.fields:
+                    if getattr(field.default,'__module__','')=='django.utils.timezone':
+                        stack.enter_context(patch.object(field,'_get_default',new=lambda:timezone.now()))
+            yield moment
+
+    def gustavo_api(self):
+        from rest_framework.test import APIClient
+        client=APIClient();client.force_authenticate(self.gustavo)  # a session would not outlive the clock
+        return client
+
+    # -- LinkedIn, by hand
+    def chat(self,contact):
+        if contact.pk not in self.chats:self.chats[contact.pk]=self.fake.seed_chat(contact.provider_user_id,[])
+        return self.chats[contact.pk]
+
+    def by_hand(self,contact,text,at):
+        """Gustavo sends it himself from LinkedIn after «Hecho, le escribí»."""
+        self.fake.add_message(self.chat(contact),text,True,at)
+
+    def she_replies(self,contact,text,at):
+        self.fake.add_message(self.chat(contact),text,False,at)
+
+    # -- Tu turno at a moment
+    def turn_at(self,at):
+        with self.clock(at):
+            response=self.gustavo_api().get('/api/v1/tu-turno')
+        self.assertEqual(response.status_code,200,response.content)
+        return response.json()
+
+    def cards_at(self,contact,at):
+        return [c for c in self.turn_at(at)['tasks']['mensajes'] if ((c.get('message') or {}).get('person') or {}).get('id')==str(contact.pk)]
+
+    def close_at(self,card,how,at,note=''):
+        """Gustavo closes the card at `at`: «Hecho, le escribí» (and he sends it on LinkedIn) or «No escribirle»."""
+        action=next(a for a in card['actions'] if (a.get('body') or {}).get('how')==how)
+        with self.clock(at):
+            response=self.gustavo_api().post(action['endpoint'],dict({'how':how},**({'note':note} if note else {})),format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        if how=='enviado':self.by_hand(Contact.objects.get(pk=card['message']['person']['id']),card['message']['text'],at)
+        return response.json()
+
+    # -- steps
+    def messaged(self,slug,name,at=None):
+        """Chosen, warmed, invited, accepted and «Hecho, le escribí» on the first message of the journey (phase 3) at `at`."""
+        contact=self.answered(slug,name)
+        self.texts[('buyer-message',name)]=case_text('primer_mensaje_comprador','M1')
+        self.invite(contact)
+        contact=self.accepted(contact)
+        self.prepare()
+        cards=self.cards_of(contact,LATER)
+        self.assertEqual(len(cards),1)
+        self.close_at(cards[0],'enviado',at or self.start)
+        return Contact.objects.get(pk=contact.pk)
+
+    def follow_ups(self,contact,variant='flujo'):
+        """Claude simulado escribe, para esta persona, los seguimientos 2–4 de la variante."""
+        for number in (2,3,4):self.texts[('buyer-sequence',contact.display_name,number)]=sequence_text(variant,number)
+
+    def cycle(self,at):
+        """One autopilot cycle at `at`: the inbox read (when on) and the buyer-draft step with its jobs."""
+        with self.clock(at):
+            if conversaciones.enabled():
+                with self.lead():self.job('read_inbox')
+            self.prepare(at)
+        return at
+
+    # -- reads
+    def numbers(self,contact):
+        """The follow-ups (2–4) the team decided for her in this attempt: prepared or stopped."""
+        attempt=self.journey(contact).attempt
+        return sorted(d.number for d in self.drafts_of(contact,'mensaje') if d.number>1 and d.decided_at and d.attempt==attempt)
+
+    def draft(self,contact,number):
+        return next((d for d in self.drafts_of(contact,'mensaje') if d.number==number),None)
+
+    def sequence_cards(self,contact,at):
+        """Her follow-up cards in Tu turno at `at` (the first message's card is not one)."""
+        first=self.draft(contact,1)
+        return [c for c in self.cards_at(contact,at) if not first or c['id']!=f'dm:{first.pk}']
+

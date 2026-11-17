@@ -1000,6 +1000,53 @@ COURSE_CASES={
                     'N2':['LI-09-M002-K06'],'N3':['LI-09-M002-K06','LI-09-V008-K04'],'N4':['LI-09-M002-K06','LI-03-M006-K01'],
                     'N5':['LI-09-M002-K01'],'N6':['LI-03-M006-K01'],'N7':['LI-09-V008-K04'],'N8':['LI-09-V008-K04'],
                     'N9':['LI-09-M002-K01'],'G':['LI-09-M002-K01']}},
+    # Cuarta metodología de outbound (clase 09, con las reglas de detención de la clase 10): la secuencia de mensajes 2 a 4
+    # después del primero (Gustavo, 17/11/2026: el seguimiento es la secuencia del curso, siempre en borradores que él
+    # copia y envía; la app nunca envía). M2 a los 4 días del «Hecho» del M1: el mismo dolor contado de otra forma, con una
+    # historia corta, sin repetir el M1 ni disculparse. M3 a los 5 días del «Hecho» del M2: «¿no eres la persona
+    # indicada?», busca un referido. M4 a los 7 días del «Hecho» del M3: cierra con elegancia, sin rogar ni pedir nada.
+    # Si responde, se detiene todo; sin respuesta tras el M4, descanso de 90 días.
+    # flujo: los tres seguimientos a tiempo y el descanso. S2: responde con el M3 en Tu turno: se cancela, sin M4. S3:
+    # Gustavo no envió el M2: no hay M3. S4: inbox apagado: ningún seguimiento y un aviso. S5–S8: las reglas fijas por número
+    # (M2 que repite el M1, M2 que se disculpa, M3 sin la pregunta de la persona indicada, M4 que pide algo). S9: el líder
+    # rechaza un M3 que repite el dolor. S10: «No escribirle» en el M3 es una salida definitiva. S11: interruptor apagado.
+    'secuencia_mensajes':{'id':'BIB-09-secuencia-mensajes',
+        'units':['LI-09-M003-K05','LI-09-V014-K01','LI-09-V014-K02','LI-09-V014-K03','LI-10-V013-K02','LI-10-M001-K08'],
+        'input':{
+            'flujo':{'mensaje_2':('Ana, a pattern that shows up after a spreadsheet pilot: the fifth client asks for the same weekly '
+                                  'report and somebody ends up copying numbers between tabs every Friday night. That is usually '
+                                  'the week the reporting pain stops being small.'),
+                     'mensaje_3':('Ana, maybe you are not the right person for this. Who on your side owns the weekly numbers now '
+                                  'that the pilot became a product?'),
+                     'mensaje_4':('Ana, I will leave it here: it may not be the moment, or you already have the weekly numbers '
+                                  'solved. Thanks for your time, and good luck with the onboarding work.'),
+                     'dias':[4,5,7],'descanso_dias':90},
+            'S2':{'responde':'con el M3 en Tu turno','respuesta':'Good timing: the weekly numbers are a mess right now. What would you look at first?'},
+            'S3':{'no_envia':2},
+            'S4':{'inbox':False},
+            'S5':{'mensaje_2':('Ana, your answer about the spreadsheet solving a real reporting pain stayed with me. Which report do '
+                               'your clients open first each week?')},
+            'S6':{'mensaje_2':('Sorry to bother you again, Ana. The fifth client asking for the same weekly report is usually when '
+                               'copying numbers between tabs every Friday stops being small.')},
+            'S7':{'mensaje_3':('Ana, the weekly numbers usually move to a dashboard right after the pilot becomes a product. Which '
+                               'dashboard did your clients ask for first?')},
+            'S8':{'mensaje_4':'Ana, I will leave it here, but could you please just let me know if this is useful at all? Thanks.'},
+            'S9':{'mensaje_3':('Ana, the spreadsheet behind the weekly report keeps coming back: every client asks for it and someone '
+                               'copies the numbers on Fridays. Maybe you are not the right person, so who owns that report on your side?')},
+            'S10':{'no_escribirle':3},
+            'S11':{'interruptor':False}},
+        'expected':{'borrador_con_metodologia':True,'flujo_numeros':[2,3,4],'flujo_dias':[4,5,7],'flujo_antes_de_tiempo':False,
+                    'flujo_descanso':'secuencia_sin_respuesta','flujo_descanso_dias':90,
+                    'S2_paso':'respondio','S2_numeros':[2,3],'S2_cancelados':[3],'S2_respondio_tras':2,
+                    'S3_numeros':[2],'S4_numeros':[],'S4_aviso':True,
+                    'S5_stopped_by':'reglas','S6_stopped_by':'reglas','S7_stopped_by':'reglas','S8_stopped_by':'reglas',
+                    'S9_stopped_by':'juez','tarjetas_paradas':0,
+                    'S10_salida':'descartado_por_gustavo','S10_numeros':[2,3],'S11_numeros':[],'mensajes_enviados':0},
+        'required':['LI-09-M003-K05','LI-09-V014-K01','LI-09-V014-K02','LI-09-V014-K03','LI-10-V013-K02','LI-10-M001-K08'],
+        'variants':{'flujo':['LI-09-M003-K05','LI-09-V014-K01'],'S2':['LI-09-M003-K05','LI-10-V013-K02','LI-10-M001-K08'],
+                    'S3':['LI-09-M003-K05'],'S4':['LI-10-V013-K02'],'S5':['LI-09-V014-K02'],'S6':['LI-09-V014-K02'],
+                    'S7':['LI-09-V014-K02'],'S8':['LI-09-V014-K03'],'S9':['LI-09-V014-K02'],'S10':['LI-09-M003-K05'],
+                    'S11':['LI-09-M003-K05']}},
 }
 
 def case_methodology(role):
