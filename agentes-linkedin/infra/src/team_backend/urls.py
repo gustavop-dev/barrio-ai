@@ -8,6 +8,7 @@ from . import conexion_views as cx
 from . import editorial_views as ed
 from . import red_views as rd
 from . import resultados_views as rs
+from . import comprador_views as cb
 from . import rediseno_views as rv
 from . import capturas_views as cv
 from . import movil_views as mv
@@ -54,6 +55,15 @@ urlpatterns=[
  path('resultados/analitica',rs.Analitica.as_view()),
  # The buyer's funnel: chosen → warmed → invited → accepted → message → replied → interested → meeting (docs/plan-outbound.md).
  path('resultados/embudo-comprador',rs.EmbudoComprador.as_view()),
+ # Phase 6 of the buyer's system: Cal.com's webhook, «Agendó», the referral, unmatched bookings, the lead handoff and the
+ # weekly reading (docs/plan-outbound.md; oficina/CONTRATO-API.md «Comprador»).
+ path('comprador/calcom/webhook',cb.CalcomWebhook.as_view()),
+ path('comprador/respuestas/<uuid:did>/agendo',cb.ReplyBooked.as_view()),
+ path('comprador/respuestas/<uuid:did>/referido',cb.ReplyReferral.as_view()),
+ path('comprador/reservas/<uuid:bid>/emparejar',cb.BookingMatch.as_view()),
+ path('comprador/entregas',cb.Handoffs.as_view()),path('comprador/entregas/<uuid:hid>',cb.HandoffDetail.as_view()),
+ path('comprador/entregas/<uuid:hid>/oportunidad',cb.HandoffOpportunity.as_view()),
+ path('comprador/lectura-semanal',cb.WeeklyReading.as_view()),
  path('perfil/<uuid:pid>',pv.Detail.as_view()),path('perfil/<uuid:pid>/decision',pv.Decision.as_view()),
  path('perfil/<uuid:pid>/documento',pv.Document.as_view()),path('perfil/<uuid:pid>/assets/<uuid:aid>',pv.Asset.as_view()),
  path('perfil/<uuid:pid>/descarga',pv.DownloadTicket.as_view()),path('perfil/<uuid:pid>/descarga/<str:token>',pv.Download.as_view()),

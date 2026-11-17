@@ -46,7 +46,8 @@ def create(user,data):
     _apply(item,data);_set_stage(item,data.get('stage') or 'conversacion')
     item.save();audit(user,'opportunity.created',item.id,modality=item.modality,stage=item.stage)
     if item.contact_id:
-        from . import comprador
+        from . import comprador, entrega_lead
+        entrega_lead.on_opportunity(item)  # phase 6: a lead waiting for this person is handed over to it (PRS-09: he created it)
         comprador.on_contact(item.contact,'oportunidad')
     _notify(item)
     return item

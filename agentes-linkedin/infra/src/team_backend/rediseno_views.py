@@ -311,18 +311,26 @@ class TuTurno(APIView):
         monthly_cards=referent_cards(request.user,_card,now)
         monthly_later=[c for c in monthly_cards if c.get('state_override')=='pospuesta']
         monthly_cards=[c for c in monthly_cards if c.get('state_override')!='pospuesta']
-        from . import mensajes_comprador, respuestas, secuencia_comprador, urgente
-        # RSP-07 first; one card per person; then the follow-ups 2–4 of the sequence (phase 4), each with its label.
-        message_cards=respuestas.cards(_card,now)+mensajes_comprador.cards(_card,now)+secuencia_comprador.cards(_card,now)
+        from . import agenda_calcom, entrega_lead, mensajes_comprador, respuesta_comprador, respuestas, secuencia_comprador, urgente
+        # RSP-07 first; one card per person; then the follow-ups 2–4 of the sequence (phase 4), each with its label; then the
+        # replies to what a buyer wrote (phase 6), whose conversation does not show twice.
+        reply_cards=respuesta_comprador.cards(_card,now)
+        message_cards=respuestas.cards(_card,now)+mensajes_comprador.cards(_card,now)+secuencia_comprador.cards(_card,now)+reply_cards
+        covered=respuesta_comprador.covered(reply_cards)
+        conversation_cards=[c for c in conversation_cards if ((c.get('conversation') or {}).get('contact_id') or '') not in covered]
+        # Phase 6: the leads handed over and the Cal.com bookings nobody matched.
+        buyer_cards=entrega_lead.cards(_card,now)+agenda_calcom.cards(_card,now)
         day_cards=urgente.cards(_card,now)
         tasks={'perfil':profile,'conversaciones':conversation_cards,'mensajes':message_cards,'fechas':day_cards,'resumen':summary_cards,
                'referentes':monthly_cards}
+        if buyer_cards:tasks['comprador']=buyer_cards
         approval_cards=[_approval_card(p) for p in awaiting_approval()]
         question_cards=[_question_card(q,now) for q in pending]
         from . import revision_mensual
         tasks['estrategia']=strategy_cards=revision_mensual.cards(_card)  # each change of the monthly review, decided apart
         later=[_question_card(q,now) for q in later_q]+profile_cards(request.user,_card,postponed=True)+monthly_later
-        cards=warnings+question_cards+conversation_cards+message_cards+day_cards+summary_cards+approval_cards+profile+monthly_cards+strategy_cards
+        cards=(warnings+question_cards+conversation_cards+message_cards+buyer_cards+day_cards+summary_cards+approval_cards+profile
+               +monthly_cards+strategy_cards)
         seen=set(InboxSeen.objects.filter(item_id__in=[c['id'] for c in cards]).values_list('item_id',flat=True))
         items=_ordered(_with_state(cards,seen));_with_state(later,seen)
         active=[c for c in items if c['state'] in ('nueva','vista')]
@@ -333,7 +341,7 @@ class TuTurno(APIView):
                          'top':items[0] if items else None,'items':items,
                          'alerts':[c for c in items if c['type']=='aviso'],'questions':[c for c in items if c['type']=='pregunta'],'later':later,
                          'tasks':tasks,'recent':preguntas.recently_resolved()+_resolved_alerts()+conversaciones.recently_resolved()+respuestas.recently_resolved()
-                                   +mensajes_comprador.recently_resolved()+urgente.recently_resolved(),
+                                   +mensajes_comprador.recently_resolved()+respuesta_comprador.recently_resolved()+urgente.recently_resolved(),
                          'notifications_unread':notificaciones.unread(),'summary':_today_summary(now)})
 
 class TuTurnoSeen(APIView):
@@ -375,6 +383,11 @@ class SuggestedMessageClose(APIView):
         note=data.get('note') or ''
         if data.get('how') not in respuestas.CLOSE_HOW or not isinstance(note,str) or len(note)>1000:
             raise ValidationError('how debe ser enviado o no; note, un texto de hasta 1000 caracteres')
+        if not PostComment.objects.filter(id=cid).exists() and BuyerDraft.objects.filter(id=cid,kind=BuyerDraft.Kind.REPLY).exists():
+            from . import respuesta_comprador  # phase 6: the reply to what she wrote; «no» never exits
+            draft=respuesta_comprador.close(request.user,cid,data['how'],note)
+            return Response({'id':str(draft.id),'closed':{'how':'enviado' if draft.state==BuyerDraft.State.SENT else 'no',
+                                                          'at':draft.closed_at.isoformat() if draft.closed_at else None,'note':draft.closed_note}})
         if not PostComment.objects.filter(id=cid).exists() and BuyerDraft.objects.filter(id=cid,kind=BuyerDraft.Kind.MESSAGE).exists():
             draft=mensajes_comprador.close(request.user,cid,data['how'],note)
             return Response({'id':str(draft.id),'closed':{'how':'enviado' if draft.state==BuyerDraft.State.SENT else 'no',
