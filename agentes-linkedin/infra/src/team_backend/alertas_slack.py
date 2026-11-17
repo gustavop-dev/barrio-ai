@@ -567,6 +567,54 @@ def conversacion_espera(now):
             'Está en Tu turno; el equipo no responde mensajes.',once='ever'))
     return alerts
 
+@vigilante
+def seguimiento_vence_hoy(now):
+    """Phase 4 (BUYER_SEQUENCE_ENABLED): the buyer follow-ups that wait for Gustavo today (ready in Tu turno, or due
+    before the local day ends): one grouped message a day, the first time the watcher runs inside READ_WINDOW (the
+    morning). Who and which follow-up; never the text."""
+    from . import operador, secuencia_comprador
+    if not secuencia_comprador.enabled() or not operador.within_read_window(now):return []
+    items=secuencia_comprador.due_today(now)
+    if not items:return []
+    shown=', '.join(f'{name} ({secuencia_comprador.label(number).lower()})' for name,number,_ in items[:8])
+    more=f' y {len(items)-8} más' if len(items)>8 else ''
+    return [Aviso('comprador:seguimientos_hoy',
+        f'Barrio · {len(items)} {"seguimiento" if len(items)==1 else "seguimientos"} de compradores para hoy: {shown}{more}. '
+        'Están en Tu turno (o llegan al vencer, si no respondieron): los envías tú desde LinkedIn y marcas «Hecho, le escribí».')]
+
+@vigilante
+def comprador_respondio(now):
+    """Phase 4: a buyer replied while in the sequence (secuencia_comprador audits buyer.sequence_replied when it stops
+    it): once per reply, in the same tick that saw it. Who and after which message; never her text."""
+    from . import secuencia_comprador
+    from .models import Contact
+    if not secuencia_comprador.enabled():return []
+    alerts=[]
+    for event in AuditEvent.objects.filter(action=secuencia_comprador.REPLIED,created_at__gte=now-timedelta(days=2)).order_by('created_at'):
+        meta=event.metadata or {}
+        name=Contact.objects.filter(pk=event.target).values_list('display_name',flat=True).first() or 'Un comprador'
+        cancelled=' y se cancelaron los seguimientos pendientes' if meta.get('cancelados') else ''
+        alerts.append(Aviso(f'comprador:respondio:{event.pk}',
+            f'Barrio · {name} respondió después de tu mensaje {meta.get("numero")} de 4. La secuencia se detuvo{cancelled}. '
+            'Respóndele tú desde LinkedIn; el equipo no responde mensajes.',once='ever'))
+    return alerts
+
+@vigilante
+def secuencia_sin_inbox(now):
+    """Phase 4: follow-ups were due but the sequence waited because the inbox is off or was not read lately (it never
+    assumes «she did not answer»): once a day, with the reason."""
+    from . import operador, secuencia_comprador
+    if not secuencia_comprador.enabled():return []
+    day,_=operador.period_starts(now)
+    event=(AuditEvent.objects.filter(action=secuencia_comprador.WAITING,created_at__gte=day,created_at__lt=day+timedelta(days=1))
+           .order_by('-created_at').first())
+    if event is None:return []
+    meta=event.metadata or {}
+    return [Aviso('comprador:secuencia_sin_inbox',
+        f'Barrio · La secuencia de compradores está detenida: {meta.get("motivo") or "no se leyó el inbox"}. '
+        f'{meta.get("personas") or 0} seguimiento(s) vencido(s) esperan: sin leer el inbox no se sabe si respondieron y no se '
+        'prepara ninguno. Enciende INBOX_ENABLED o revisa la cuenta y sus cupos de lectura.')]
+
 def expiry_hours():
     """ALERT_PROPOSAL_EXPIRY_HOURS (12): proposals waiting for his approval that expire within this are grouped."""
     return timedelta(hours=_number('ALERT_PROPOSAL_EXPIRY_HOURS',12,1,48))
@@ -717,7 +765,21 @@ def activity_lines(now):
             f'• Red: {written("RED-01")} seguimientos, {written("RED-02")} invitaciones, {written("RED-04")} aceptaciones; '
             f'{accepted} personas nuevas en tu red',
             f'• IA: {spend}',
-            f'• Trabajos fallidos o interrumpidos: {failed}; avisos enviados: {alerts}']
+            f'• Trabajos fallidos o interrumpidos: {failed}; avisos enviados: {alerts}',*buyer_lines(now)]
+
+def buyer_lines(now):
+    """The buyer journey's messages (phases 3 and 4, only with one of them on): waiting in Tu turno and sent today, first
+    messages and follow-ups apart, and the follow-ups cancelled today because she replied."""
+    from . import mensajes_comprador, operador, secuencia_comprador
+    from .models import BuyerDraft
+    if not (mensajes_comprador.enabled() or secuencia_comprador.enabled()):return []
+    day,_=operador.period_starts(now);today={'closed_at__gte':day,'closed_at__lt':day+timedelta(days=1)}
+    rows=BuyerDraft.objects.filter(kind=BuyerDraft.Kind.MESSAGE)
+    split=lambda q:(q.filter(number=1).count(),q.filter(number__gt=1).count())
+    p1,p2=split(rows.filter(state=BuyerDraft.State.READY));s1,s2=split(rows.filter(state=BuyerDraft.State.SENT,**today))
+    cancelled=rows.filter(state=BuyerDraft.State.CANCELLED,**today).count()
+    return [f'• Compradores: {p1+p2} mensajes esperan en Tu turno ({p1} primeros, {p2} seguimientos); hoy enviaste {s1+s2} '
+            f'({s1} primeros, {s2} seguimientos)'+(f'; {cancelled} seguimientos cancelados porque respondieron' if cancelled else '')]
 
 
 def summary_lines(now):
