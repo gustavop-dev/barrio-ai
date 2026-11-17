@@ -519,7 +519,8 @@ def observe(user,account,referent_ids=None,limit=5):
                 'referent':referent,'share_url':post['share_url'],'author_name':post['author']['display_name'],
                 'author_public_identifier':post['author']['public_identifier'],'author_provider_id':post['author']['id'],
                 'text':post['text'],'posted_at':post['created_at'],'comments_count':post['comments_counter'],
-                'reactions_count':post['reactions_counter'],'is_repost':post['is_repost']})
+                'reactions_count':post['reactions_counter'],'is_repost':post['is_repost'],
+                'reposts_count':post.get('reposts_counter'),'media':str(post.get('media') or '')[:20]})
             summary['new_posts' if created else 'seen_posts']+=1
             summary['evidence'].append({'post_id':post['id'],'referent':str(referent.id),'url':post['share_url'],
                                         'scope':'Observed public post; no inferred audience or causality'})

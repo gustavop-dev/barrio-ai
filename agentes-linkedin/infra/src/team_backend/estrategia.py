@@ -19,6 +19,7 @@ Per-type checks are findings with an issue code that feed the existing repair ro
 each code is in the one severity table (compuertas.HARD/SOFT). The brief carries the day's gate_policy (compuertas): one
 conversational call to action on a Sales post, none on the others."""
 import json
+import logging
 import os
 import re
 import statistics
@@ -33,6 +34,8 @@ from . import compuertas, operador, posicionamiento
 from .exceptions import Conflict
 from .models import Capture, EditorialPiece, Job, ObservedPost, PostComment, WeeklyPlan
 from .permissions import require
+
+logger=logging.getLogger(__name__)
 
 TYPES=('G','A','S','P')
 LABELS={'G':'Crecimiento','A':'Autoridad','S':'Venta','P':'Personal'}
@@ -245,10 +248,18 @@ def results_by_type(now,days=30):
     return [{'id':f'tipo:{t}','type':t,**values} for t,values in rows.items()]
 
 def audience_signals(now=None):
+    """With REFERENTES_ANALISIS on, two more, apart and not citeable as evidence (analisis_referentes.editorial_signals):
+    `estructura_sostenida`, structures that work for the industry referents beyond one post, one author and one week
+    (or hypotheses below that), and `tema_en_tendencia`, what several of them talk about now, with its expiry date."""
     now=now or timezone.now()
-    return {'referent_outlier':growth_models(now),'comment_question':comment_questions(now),
-            'owner_capture':owner_captures(now),'results_by_type':results_by_type(now),
-            'audience_question':audience_questions(now)}
+    out={'referent_outlier':growth_models(now),'comment_question':comment_questions(now),
+         'owner_capture':owner_captures(now),'results_by_type':results_by_type(now),
+         'audience_question':audience_questions(now)}
+    from . import analisis_referentes
+    if analisis_referentes.enabled():
+        try:out['estructura_sostenida'],out['tema_en_tendencia']=analisis_referentes.editorial_signals(now)
+        except Exception:logger.exception('referent_analysis_signals_failed')
+    return out
 
 def offered(signals):
     return {kind:{str(item['id']) for item in signals.get(kind) or []} for kind in EVIDENCE_KINDS}

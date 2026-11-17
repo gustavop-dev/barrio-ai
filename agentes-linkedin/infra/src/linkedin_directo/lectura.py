@@ -229,6 +229,31 @@ def actor_user(actor, by, members=None):
                 text(actor.get('description')) or mini.get('occupation'), kind)
 
 
+# The component an UpdateV2 carries under `content`, by the name of its key or $type, first match wins. Not checked
+# against a real answer yet (the fixtures are synthetic): anything else is 'otro', and no `content` is '' (unknown),
+# never «text only». Whether an image is a photo, a chart, a screenshot or an infographic needs the image itself.
+MEDIA = (('LinkedInVideoComponent', 'video'), ('ExternalVideoComponent', 'video'), ('VideoComponent', 'video'),
+         ('DocumentComponent', 'documento'), ('CarouselComponent', 'carrusel'), ('ImageComponent', 'imagen'),
+         ('PollComponent', 'encuesta'), ('ArticleComponent', 'enlace'), ('EventComponent', 'evento'))
+
+
+def media(update):
+    """'video', 'documento' (a PDF carousel), 'carrusel', 'imagen' or 'imagenes', 'encuesta', 'enlace', 'evento',
+    'otro', or '' when the update says nothing about its content."""
+    content = update.get('content')
+    if not isinstance(content, dict) or not content:
+        return ''
+    names = ' '.join([*map(str, content), str(content.get('$type') or '')])
+    for marker, kind in MEDIA:
+        if marker in names:
+            if kind == 'imagen':
+                body = next((v for k, v in content.items() if marker in str(k)), content)
+                images = body.get('images') if isinstance(body, dict) else None
+                return 'imagenes' if isinstance(images, list) and len(images) > 1 else 'imagen'
+            return kind
+    return 'otro'
+
+
 def post(update, by, counts, author_fsd=None, members=None):
     """One UpdateV2 as the connector's _post, or None when it is not an activity. In a person's activity list, an
     update whose author is someone else is a repost."""
@@ -244,7 +269,7 @@ def post(update, by, counts, author_fsd=None, members=None):
             'comments_counter': number(count.get('numComments')), 'reactions_counter': number(count.get('numLikes')),
             'user_reacted': bool(count.get('liked')),
             'is_repost': reshared or bool(author_fsd and author['id'] and author['id'] != author_fsd),
-            'reposts_counter': number(count.get('numShares')),
+            'reposts_counter': number(count.get('numShares')), 'media': media(update),
             # A number only in a list of the account's own posts; get_post leaves it null.
             'impressions': number(count.get('numImpressions'))}
 

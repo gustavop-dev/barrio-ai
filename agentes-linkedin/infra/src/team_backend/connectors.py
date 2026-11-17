@@ -100,7 +100,9 @@ def _post(data):
             # A boolean: LinkedIn exposes whether we reacted, not which reaction.
             'user_reacted':bool(data.get('user_reacted')),'is_repost':bool(data.get('is_repost')),
             # reposts_counter: number, or null when hidden.
-            'reposts_counter':_count(data.get('reposts_counter')),'impressions':_count(analytics.get('impressions_counter'))}
+            'reposts_counter':_count(data.get('reposts_counter')),'impressions':_count(analytics.get('impressions_counter')),
+            # analisis_referentes: the media type when the provider says it ('' = not known).
+            'media':str(data.get('media') or '')[:20]}
 
 def _audience(data):
     """Own profile counters: followers_count and relations_count at the top level, or in specifics."""

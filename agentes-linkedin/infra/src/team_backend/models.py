@@ -282,6 +282,12 @@ class ObservedPost(models.Model):
     outlier=models.JSONField(default=dict,blank=True)
     structure=models.JSONField(default=dict,blank=True)
     audience=models.JSONField(default=dict,blank=True)
+    # «Qué les funciona y qué no» (analisis_referentes.py): shares as LinkedIn counts them (null: hidden or read before
+    # this field), the media the connector recognized ('' = not known, never «text only») and the post's decomposition
+    # (topic, hook, body, closing, length, topical signals) as labels, cached by a hash of its text and media.
+    reposts_count=models.IntegerField(null=True,blank=True)
+    media=models.CharField(max_length=20,blank=True,default='')
+    analysis=models.JSONField(default=dict,blank=True)
     class Meta:
         ordering=['-posted_at','-observed_at']
         constraints=[models.UniqueConstraint(fields=['account','provider_post_id'],name='unique_observed_post')]
