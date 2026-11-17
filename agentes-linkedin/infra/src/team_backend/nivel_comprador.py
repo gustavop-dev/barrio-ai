@@ -19,10 +19,15 @@ delante»). What changes is that the absence of public evidence is no longer evi
   ones (entry_funnel, inside comprador.funnel)."""
 import re
 import unicodedata
+from datetime import timedelta
 
 from django.utils import timezone
 
-PROFILES=('startup_financiada','bootstrapped','stealth','ejecutivo')
+from . import projectapp
+
+# BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): two more profiles, the buyers of the ProjectApp line (projectapp.PROFILES).
+# With the switch off the classifier's schema never offers them.
+PROFILES=('startup_financiada','bootstrapped','stealth','ejecutivo',*projectapp.PROFILES)
 FOUNDER_PROFILES=('startup_financiada','bootstrapped','stealth')
 LEVELS=('confirmado','probable','por_confirmar','no_encaja')
 LEVEL_RANK={level:n for n,level in enumerate(LEVELS)}
@@ -52,6 +57,22 @@ QUESTIONS={
         'juez':'Ejecutivo en una empresa establecida: ¿decide o influye en contratar desarrollo y qué tamaño tiene la empresa? '
                'Empresa con ingresos o ronda y un cargo que decide o influye es confirmado o probable; si no decide ni influye '
                '(vende, recluta o ejecuta para otros), no_encaja.'},
+    # BAR-25: the ProjectApp buyer. The same research call also asks for the size (tamano) and the class 08 signals
+    # (red.STAGE_SCHEMA_PROJECTAPP): hiring developers, a digital launch, a legacy system to replace, growth.
+    'dueno_empresa_tradicional':{
+        'web':'{company}: number of employees, industry, location in the United States; open software or IT jobs, new '
+              'digital products, online store or platform, legacy systems being replaced, growth or new locations.',
+        'juez':'Dueño o CEO de una empresa tradicional en EE. UU.: ¿cuántas personas tiene (el objetivo es de 20 a 200) y '
+               'opera de verdad (clientes, sedes, años)? Una fuente que muestre la empresa operando con un tamaño de 20 a 200 '
+               'es confirmado; la empresa operando sin tamaño, o el tamaño sin operación, probable; más de 1000 personas, '
+               'cerrada, o la persona no es dueña ni dirige, no_encaja.'},
+    'lider_tecnologia':{
+        'web':'{company}: number of employees, industry, location in the United States; who leads technology; open software '
+              'engineering or IT jobs, new digital products, legacy systems being replaced, growth.',
+        'juez':'Líder de tecnología (CTO, VP, Head o Director de ingeniería o TI, gerente de sistemas) de una empresa '
+               'tradicional en EE. UU.: ¿cuántas personas tiene (el objetivo es de 20 a 200) y la persona dirige tecnología '
+               'allí? Una fuente con la empresa operando, de 20 a 200 personas, y su cargo es confirmado; la empresa operando '
+               'sin tamaño, probable; más de 1000 personas, cerrada, o no dirige tecnología (vende o recluta), no_encaja.'},
 }
 DEFAULT_QUESTION={
     'web':'Funding stage (pre-seed, seed, Series A or later) or paying customers of {company}.',
@@ -105,6 +126,11 @@ def from_classifier(contact,result,fit):
 
 def judge_question(contact):
     return QUESTIONS.get(_buyer(contact).get('profile'),DEFAULT_QUESTION)['juez']
+
+def papel_of(contact):
+    """BAR-25: what a ProjectApp buyer is inside her company, `dueno` or `lider_tecnologia` ('' when the headline does
+    not say it); '' for anyone who is not a ProjectApp buyer."""
+    return projectapp.papel_of(contact) if projectapp.line_of(contact)=='projectapp' else ''
 
 # --------------------------------------------------------------------------- score
 
@@ -166,9 +192,10 @@ def _services(contact):
 
 def score(contact,level=None):
     """{score, breakdown: {component: {points, max, value, why}}, warnings, version, level} for a buyer; {} otherwise.
-    The points of the breakdown always add up to the score."""
+    The points of the breakdown always add up to the score. With NETWORK_PROJECTAPP_BUYER_ENABLED, buyer_score_v2."""
     level=level or level_of(contact)
     if level is None:return {}
+    if projectapp.enabled():return score_v2(contact,level)
     market,market_why=_market(contact);role,role_why=_role(contact);services,services_why=_services(contact)
     confidence=max(0.0,min(1.0,float((contact.classification or {}).get('confidence') or 0)))
     breakdown={
@@ -184,13 +211,96 @@ def score(contact,level=None):
     return {'score':sum(part['points'] for part in breakdown.values()),'breakdown':breakdown,'warnings':warnings,
             'version':SCORE_VERSION,'level':level}
 
+# --------------------------------------------------------------------------- score v2 (BAR-25)
+
+SCORE_VERSION_V2='buyer_score_v2'
+# v2, with NETWORK_PROJECTAPP_BUYER_ENABLED. The startup line keeps v1's components and points. The ProjectApp line
+# weighs what Gustavo asked for on 17/11/2026: the size (20 to 200 people), the class 08 signal with its source and
+# date (hiring developers first, LI-08-M004-K01/K02: «la señal no crea campañas, decide a quién primero») and whether
+# the person decides on technology (owner/CEO or technology leader, LI-08-M001-K05). In both lines a missing datum takes
+# exactly the middle of its component's known values (sin_dato), so a thin profile never loses points; it only raises a
+# notice. Each component's points and why go in the breakdown, which always adds up to the score.
+V2_EVIDENCE={'confirmado':32,'probable':21,'por_confirmar':10,'no_encaja':0}
+V2_SIZE={'20_a_200':26,'sin_dato':13,'201_a_1000':8,'menos_de_20':2,'mas_de_1000':0}
+V2_SIGNAL={'contrata_desarrolladores':10,'reciente':8,'antigua':6,'sin_dato':5}
+V2_MARKET={'objetivo':14,'negocio_en_eeuu':10,'sin_dato':8,'latam':4,'otro':2}
+V2_PAPEL={'decide':12,'sin_dato':8,'otro':4}
+V2_CONFIDENCE_MAX=6
+SIGNAL_RECENT=timedelta(days=90)  # «más reciente y más cerca, más fuerte» (LI-08-M004-K01): age when the web check saw it
+
+def _size(contact):
+    size=projectapp.size_of(contact)
+    if not size:return 'sin_dato','La empresa no dice su tamaño: valor neutro'
+    basis='la web' if _buyer(contact).get('size_basis')=='web' else 'su perfil'
+    return size,f'{projectapp.SIZE_LABELS[size].capitalize()} según {basis}'
+
+def _signal(contact):
+    """The strongest class 08 signal with its source and date: hiring developers, then any other, recent or old."""
+    from . import calentamiento
+    best=None
+    for s in calentamiento.buying_signals(contact):
+        at=calentamiento._signal_date(s);seen=_seen(s)
+        if at is None:continue  # a signal needs a date (17/11/2026)
+        recent=seen is None or seen-at<=SIGNAL_RECENT
+        value='contrata_desarrolladores' if recent and s['tipo']=='contrata_desarrolladores' else 'reciente' if recent else 'antigua'
+        if best is None or V2_SIGNAL[value]>V2_SIGNAL[best[0]]:best=(value,s)
+    if best is None:return 'sin_dato','Sin señal con fuente y fecha: valor neutro'
+    value,s=best
+    return value,f'{calentamiento.SIGNAL_LABELS.get(s["tipo"],s["tipo"])} ({s.get("fecha")}, {s["fuente"]})'
+
+def _seen(signal):
+    from django.utils.dateparse import parse_datetime
+    try:return parse_datetime(str(signal.get('visto') or ''))
+    except ValueError:return None
+
+def _papel_v2(contact):
+    papel=projectapp.papel_of(contact)
+    if papel:return 'decide',f'{projectapp.PAPEL_LABELS[papel]}: decide sobre tecnología'
+    if thin(contact):return 'sin_dato','Su titular no dice su cargo: valor neutro'
+    return 'otro','Ni dueño ni líder de tecnología según su titular'
+
+def score_v2(contact,level):
+    """buyer_score_v2: v1's components for the startup line; for the ProjectApp line evidence, size, signal, market,
+    papel and confidence (V2_*)."""
+    confidence=max(0.0,min(1.0,float((contact.classification or {}).get('confidence') or 0)))
+    market,market_why=_market(contact)
+    if projectapp.line_of(contact)!='projectapp':
+        role,role_why=_role(contact);services,services_why=_services(contact)
+        breakdown={
+            'evidencia':{'points':EVIDENCE[level],'max':EVIDENCE['confirmado'],'value':level,'why':'Nivel de evidencia de etapa'},
+            'mercado':{'points':MARKET[market],'max':MARKET['objetivo'],'value':market,'why':market_why},
+            'papel':{'points':ROLE[role],'max':ROLE['decide'],'value':role,'why':role_why},
+            'servicios':{'points':SERVICES[services],'max':SERVICES['coincide'],'value':services,'why':services_why},
+            'confianza':{'points':round(CONFIDENCE_MAX*confidence),'max':CONFIDENCE_MAX,'value':round(confidence,2),
+                         'why':'Confianza del clasificador'}}
+        line='startup'
+    else:
+        size,size_why=_size(contact);signal,signal_why=_signal(contact);papel,papel_why=_papel_v2(contact)
+        breakdown={
+            'evidencia':{'points':V2_EVIDENCE[level],'max':V2_EVIDENCE['confirmado'],'value':level,'why':'Nivel de evidencia'},
+            'tamano':{'points':V2_SIZE[size],'max':V2_SIZE['20_a_200'],'value':size,'why':size_why},
+            'senal':{'points':V2_SIGNAL[signal],'max':V2_SIGNAL['contrata_desarrolladores'],'value':signal,'why':signal_why},
+            'mercado':{'points':V2_MARKET[market],'max':V2_MARKET['objetivo'],'value':market,'why':market_why},
+            'papel':{'points':V2_PAPEL[papel],'max':V2_PAPEL['decide'],'value':papel,'why':papel_why},
+            'confianza':{'points':round(V2_CONFIDENCE_MAX*confidence),'max':V2_CONFIDENCE_MAX,'value':round(confidence,2),
+                         'why':'Confianza del clasificador'}}
+        line='projectapp'
+    warnings=[THIN_NOTICE] if thin(contact) else []
+    if market=='sin_dato':warnings.append('sin ubicación')
+    if line=='projectapp' and breakdown['tamano']['value']=='sin_dato':warnings.append('sin tamaño de empresa')
+    return {'score':sum(part['points'] for part in breakdown.values()),'breakdown':breakdown,'warnings':warnings,
+            'version':SCORE_VERSION_V2,'level':level,'line':line}
+
+def score_version():
+    return SCORE_VERSION_V2 if projectapp.enabled() else SCORE_VERSION
+
 def with_score(contact,buyer):
     """`buyer` (the classification's buyer block) with the score of its level; contact.classification is not changed."""
     previous=contact.classification
     contact.classification=dict(previous or {},buyer=buyer)
     try:result=score(contact,buyer.get('level'))
     finally:contact.classification=previous
-    return dict(buyer,score=result.get('score'),score_breakdown=result.get('breakdown'),score_version=SCORE_VERSION,
+    return dict(buyer,score=result.get('score'),score_breakdown=result.get('breakdown'),score_version=score_version(),
                 warnings=result.get('warnings',[]))
 
 # --------------------------------------------------------------------------- with the temperature of the outbound
@@ -232,7 +342,7 @@ def entry_funnel(journeys):
     by_level={level:counts([j for j in journeys if (j.entry_level or 'sin_nivel')==level]) for level in levels}
     by_band={label:counts([j for j in journeys if j.entry_score is not None and band(j.entry_score)==label]) for _,label in BANDS}
     by_band['sin_puntaje']=counts([j for j in journeys if j.entry_score is None])
-    return {'por_nivel':by_level,'por_puntaje':by_band,'version':SCORE_VERSION}
+    return {'por_nivel':by_level,'por_puntaje':by_band,'version':score_version()}
 
 # --------------------------------------------------------------------------- who left before 17/11/2026
 
@@ -246,6 +356,37 @@ ABSENCE=re.compile(r'sin evidencia|no hay evidencia|ninguna evidencia|hip[oó]te
 SAID_NO=('rejected','discarded')
 ACTIONS={'fuera_de_eeuu':'restaurar','sin_evidencia_web':'restaurar','sin_evidencia_clasificador':'reclasificar',
          'sin_nivel':'completar'}
+# BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): the buyers of before get their line (and segment), whoever was not acted on
+# yet goes back to the classifier to be judged with both lines, and the agencies discarded for selling to «another
+# public» go back to it too, because they may be partners.
+ACTIONS_PROJECTAPP={'linea':'completar','otra_linea':'reclasificar','posible_partner':'reclasificar'}
+PARTNER_ROLES=('aliado','recomendador','divulgador')
+AGENCY=re.compile(r'(?<![a-z])(agenc(?:y|ia|ies|ias)|studio|estudio|consultanc(?:y|ies)|consultora|consulting)(?![a-z])')
+AGENCY_WORK=re.compile(r'(?<![a-z])(marketing|design|disen\w*|brand\w*|web\w*|digital|product\w*|ux|creativ\w*|growth)(?![a-z])')
+OPEN_STATES=('proposed','approved','executing','sent','uncertain')
+REQUEUED_PROJECTAPP=('Vuelve al clasificador con el comprador de ProjectApp y el partner (17/11/2026): puede ser de la otra '
+                     'línea o un partner.')
+
+
+def actions():
+    return {**ACTIONS,**ACTIONS_PROJECTAPP} if projectapp.enabled() else dict(ACTIONS)
+
+
+def _projectapp_group(contact):
+    """BAR-25: linea (a fitting buyer in course without a line: completar, by her profile), otra_linea (one the team has
+    not acted on yet: reclasificar, so the classifier may say ProjectApp, startup or partner) or posible_partner (an
+    agency discarded as aliado, recomendador or divulgador: reclasificar). None otherwise."""
+    c=contact.classification or {};role=c.get('role')
+    # Whoever already went back once is not sent again: the classifier judged her with both lines and the partner.
+    requeued=any(event.get('event')=='requeued' and event.get('detail')==REQUEUED_PROJECTAPP[:300] for event in contact.history or [])
+    if role=='comprador' and c.get('fit') and contact.stage in ('fit','followed','invited','connected') and not (c.get('buyer') or {}).get('line'):
+        untouched=(contact.stage=='fit' and not c.get('confirmed_by_gustavo') and not contact.followed_at and not contact.invited_at
+                   and not contact.proposals.filter(state__in=OPEN_STATES).exists())
+        return 'otra_linea' if untouched and not requeued else 'linea'
+    if role in PARTNER_ROLES and not c.get('fit') and contact.stage=='discarded' and not requeued:
+        text=_plain(' '.join([contact.headline or '',(contact.signals or {}).get('bio') or '',c.get('reason') or '']))
+        if AGENCY.search(text) and AGENCY_WORK.search(text):return 'posible_partner'
+    return None
 
 
 def reevaluation_group(contact):
@@ -257,8 +398,12 @@ def reevaluation_group(contact):
     - sin_nivel: a buyer in course without level or score (completar, nothing else changes).
     Nobody Gustavo or LinkedIn said no to, nobody he confirmed, nobody invited, connected or closed."""
     c=contact.classification or {}
-    if c.get('role')!='comprador' or c.get('confirmed_by_gustavo') or contact.stage not in ('discarded','fit','followed'):return None
     if any(event.get('event') in SAID_NO for event in contact.history or []):return None
+    # BAR-25: a buyer without a level is completed first (with her line); then the line and the partners.
+    if projectapp.enabled() and not (c.get('role')=='comprador' and c.get('fit') and contact.stage in ('fit','followed') and not c.get('buyer')):
+        group=_projectapp_group(contact)
+        if group:return group
+    if c.get('role')!='comprador' or c.get('confirmed_by_gustavo') or contact.stage not in ('discarded','fit','followed'):return None
     check=c.get('stage_check') or {};rule=c.get('rule') or ''
     if c.get('fit'):return 'sin_nivel' if contact.stage!='discarded' and not c.get('buyer') else None
     if rule.startswith(REGION_RULE):return 'fuera_de_eeuu'
@@ -277,6 +422,7 @@ def _restored(contact,group,now):
     elif red.stage_check_enabled() and check.get('state')!='ok':c['stage_check']={'state':'pending'}
     buyer={'profile':'','level':'por_confirmar','us_market':False,'evidence':(c.get('reason') or '')[:400],
            'sources':[contact.profile_url] if contact.profile_url else [],'basis':'perfil'}
+    if projectapp.enabled():buyer=projectapp.complete(contact,buyer)  # BAR-25: a buyer of before is a startup buyer
     return c,buyer
 
 
@@ -292,22 +438,34 @@ def reevaluate(user,account,confirm=False,now=None):
     from .permissions import require
     require(user,'operate_linkedin')
     now=now or timezone.now()
-    rows=[]
-    for contact in Contact.objects.filter(account=account,classification__role='comprador').order_by('discovered_at'):
+    rows=[];groups=actions()
+    roles=('comprador',*PARTNER_ROLES) if projectapp.enabled() else ('comprador',)
+    for contact in Contact.objects.filter(account=account,classification__role__in=roles).order_by('discovered_at'):
         group=reevaluation_group(contact)
         if group is None:continue
-        level='por_confirmar' if group!='sin_nivel' else level_of(contact)
-        if group=='sin_nivel':result=score(contact,level)
-        else:
+        level='por_confirmar' if group not in ('sin_nivel',*ACTIONS_PROJECTAPP) else level_of(contact)
+        line=''
+        if group=='posible_partner':result={};line='partner?'
+        elif group=='sin_nivel' and not projectapp.enabled():result=score(contact,level)
+        elif group in ('sin_nivel','linea','otra_linea'):
             previous=contact.classification
-            contact.classification=dict(previous,fit=True,buyer=_restored(contact,group,now)[1])
+            buyer=projectapp.complete(contact,dict((previous or {}).get('buyer') or {}))
+            contact.classification=dict(previous,buyer=buyer);line=buyer.get('line') or ''
             try:result=score(contact,level)
             finally:contact.classification=previous
-        rows.append({'id':str(contact.pk),'name':contact.display_name,'group':group,'action':ACTIONS[group],'level':level,
-                     'score':result.get('score'),'provisional':group=='sin_evidencia_clasificador',
-                     'reason':((contact.classification or {}).get('rule') or (contact.classification or {}).get('reason') or '')[:160]})
+        else:
+            previous=contact.classification
+            buyer=_restored(contact,group,now)[1];line=buyer.get('line') or ''
+            contact.classification=dict(previous,fit=True,buyer=buyer)
+            try:result=score(contact,level)
+            finally:contact.classification=previous
+        row={'id':str(contact.pk),'name':contact.display_name,'group':group,'action':groups[group],'level':level,
+             'score':result.get('score'),'provisional':groups[group]=='reclasificar',
+             'reason':((contact.classification or {}).get('rule') or (contact.classification or {}).get('reason') or '')[:160]}
+        if projectapp.enabled():row['line']=line
+        rows.append(row)
     rows.sort(key=lambda row:(-(row['score'] or 0),row['name']))
-    found={group:sum(row['group']==group for row in rows) for group in ACTIONS}
+    found={group:sum(row['group']==group for row in rows) for group in groups}
     applied=0
     if confirm:
         for row in rows:
@@ -319,13 +477,18 @@ def reevaluate(user,account,confirm=False,now=None):
                     contact.classification={}
                     red._stage(contact,'candidate','requeued','Vuelve al clasificador con los niveles del comprador (17/11/2026): '
                                'antes salió por falta de evidencia pública.')
-                elif group=='sin_nivel':
+                elif group in ('otra_linea','posible_partner'):
+                    contact.classification={}
+                    red._stage(contact,'candidate','requeued',REQUEUED_PROJECTAPP)
+                elif group in ('sin_nivel','linea'):
                     buyer=dict(contact.classification.get('buyer') or {},level=level_of(contact))
                     buyer.setdefault('evidence',(contact.classification.get('reason') or '')[:400])
                     buyer.setdefault('sources',[contact.profile_url] if contact.profile_url else [])
                     buyer.setdefault('basis','perfil')
+                    if projectapp.enabled():buyer=projectapp.complete(contact,buyer)
                     contact.classification=dict(contact.classification,buyer=with_score(contact,buyer))
-                    red.note(contact,'reevaluated',f"Nivel {buyer['level']} y puntaje del comprador (17/11/2026).")
+                    what=f"línea {buyer['line']}" if group=='linea' else f"nivel {buyer['level']} y puntaje"
+                    red.note(contact,'reevaluated',f"{what.capitalize()} del comprador (17/11/2026).")
                 else:
                     classification,buyer=_restored(contact,group,now)
                     contact.classification=classification
@@ -335,7 +498,7 @@ def reevaluate(user,account,confirm=False,now=None):
                                'contra saca a un comprador.')
                 contact.save()
                 if contact.classification:record_classification(contact,observed_at=now)
-                operador._audit(user,REEVALUATED,contact.pk,group=group,step=ACTIONS[group],score=row['score'])
+                operador._audit(user,REEVALUATED,contact.pk,group=group,step=groups[group],score=row['score'])
                 applied+=1
             comprador.on_contact(contact,'reevaluacion')  # the journey (and its entry) of whoever is a buyer again
     return {'found':found,'total':len(rows),'applied':applied,'people':rows}

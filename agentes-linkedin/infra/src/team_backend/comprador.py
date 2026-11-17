@@ -427,6 +427,11 @@ def _project(journey,state,contact,has_posts):
     if not journey.entry_level or not (first.get('warming') or invited):
         from . import nivel_comprador
         for field,value in nivel_comprador.entry_of(contact).items():setattr(journey,field,value)
+    # BAR-25: her line and segment, the same way (fixed by the first follow or invitation; once more while still empty).
+    from . import projectapp
+    if projectapp.enabled() and (not journey.line or not (first.get('warming') or invited)):
+        line=projectapp.line_of(contact)
+        if line:journey.line=line;journey.segment=projectapp.segment_of(contact)
     journey.updated_at=timezone.now()
 
 # --------------------------------------------------------------------------- exits and reopenings the contact shows
@@ -884,7 +889,16 @@ def funnel(weeks=8,now=None,account=None):
     count=lambda field,values:{v:sum(1 for j in outbound if getattr(j,field)==v) for v in values}
     from . import sin_posts
     route=sin_posts.funnel(outbound) if sin_posts.active() else None  # phase 5: only with its switch on
-    return {**({'ruta_sin_posts':route} if route else {}),
+    # BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): the funnel by line and by segment of the ProjectApp buyers (the ones they
+    # entered with), each with the course rule on the sample (block: under 30 invitations nothing is judged), and the
+    # three-month test's progress. Off, none of it.
+    from . import projectapp
+    test={}
+    if projectapp.enabled():
+        test={'por_linea':{line:block(j for j in outbound if (j.line or 'startup')==line) for line in projectapp.LINES},
+              'por_segmento':{s:block(j for j in outbound if j.line=='projectapp' and j.segment==s) for s in projectapp.SEGMENTS},
+              'prueba_projectapp':projectapp.test_progress(account,now)}
+    return {**({'ruta_sin_posts':route} if route else {}),**test,
             'generado':now.isoformat(),'zona_horaria':str(operador.local_tz()),'definiciones':DEFINITIONS,
             'acumulado':block(outbound),'semanas':weekly,
             'comparaciones':{

@@ -268,6 +268,11 @@ def inputs(contact,journey,facts,at,number):
     data['momento']={'que_es':f'Mensaje {number} de 4. No respondió a los anteriores; Gustavo lo envía a mano.',
                      'dias_desde_el_anterior':round((at-last).total_seconds()/86400,1) if last else None}
     data['seguimiento']={'numero':number,'de':LAST,'trabajo':JOBS[number],'anteriores':earlier}
+    # BAR-25: message 2 tells the pain with a short story; with the ProjectApp buyer on, the case of her segment (only
+    # its confirmed facts) may be that story (projectapp.case_for: None for any other buyer).
+    from . import projectapp
+    case=projectapp.case_for(contact) if number==2 else None
+    if case:data['caso_projectapp']=case
     return data
 
 # --------------------------------------------------------------------------- the autopilot's step

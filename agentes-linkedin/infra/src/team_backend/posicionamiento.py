@@ -55,6 +55,24 @@ SERVICES={
         'source':'modalidad personal_startups, pilar architecture_delivery','terms':('fractional cto','technical leadership')},
 }
 
+# BAR-25, Gustavo 17/11/2026: «no se verticaliza el contenido: se verticaliza a quién se le escribe y con qué prueba». The
+# editorial direction (identity, pillars, purposes) does not change, so VERSION stays; who the network goes after for
+# ProjectApp, the offer and the proof do (only with NETWORK_PROJECTAPP_BUYER_ENABLED: projectapp.py). Three audiences:
+# the ProjectApp buyer, the startup buyer (the one before) and the partner (a new role, not an `aliado`).
+PROJECTAPP_BUYER=('empresas tradicionales de 20 a 200 personas en EE. UU. que necesitan digitalizarse, o que ya tienen '
+                  'software y quieren ampliarlo: su dueño o CEO, o su líder de tecnología (CTO, VP, Head o Director de '
+                  'ingeniería o de TI, gerente de sistemas)')
+PARTNER=('agencias de marketing, diseño, consultoría o producto que subcontratan el desarrollo de software de sus clientes '
+         '(partners: traen contratos, no compran para sí)')
+# What ProjectApp offers, as Gustavo said it (17/11/2026). Approximate prices, never a quote: «desde unos».
+OFFER={'equipo_dedicado':'un equipo dedicado, desde unos 20 millones de pesos colombianos al mes (unos 5.000 USD)',
+       'proyecto':'un proyecto por requerimientos, desde unos 20 millones de pesos colombianos',
+       'argumento':'nearshore: buena calidad a menor costo'}
+# The only confirmed facts of ProjectApp's cases (17/11/2026). Nothing else is confirmed: no client names, figures,
+# durations or results until Gustavo answers the case questions (projectapp.ask_case_questions).
+CASES={'educacion_en_linea':'ProjectApp construyó una plataforma grande a la medida de educación en línea',
+       'retail_ecommerce':'ProjectApp construyó una plataforma grande a la medida de retail'}
+
 # Canonical modality -> what it is for Gustavo (editorial) and who belongs to it (neighborhood criteria).
 MODALITIES={
     'personal_startups':{'purpose':'oportunidades de trabajo personal en startups',
@@ -62,7 +80,8 @@ MODALITIES={
         'neighborhood':'founders técnicos o de negocio de startups con ronda semilla o posterior, o con clientes que pagan, '
                        'líderes técnicos y personas que recomiendan talento en startups'},
     'projectapp':{'purpose':'contratos para ProjectApp, el equipo que Gustavo lidera',
-        'neighborhood':'founders u operadores que necesitan una entrega externa, un proyecto definido o un equipo continuo'},
+        'neighborhood':f'{PROJECTAPP_BUYER}; founders u operadores de startups que necesitan una entrega externa, un proyecto '
+                       f'definido o un equipo continuo; y {PARTNER}'},
     'alianzas':{'purpose':'relaciones con quienes recomiendan talento o proveedores',
         'neighborhood':'estudios o agencias complementarios, freelancers senior, aceleradoras, inversores o comunidades que '
                        'recomiendan talento o proveedores'},
@@ -72,6 +91,10 @@ MODALITIES={
 }
 
 # Domain -> {canonical id: stored value}. Order follows MODALITIES.
+# With NETWORK_PROJECTAPP_BUYER_ENABLED off the classifier and the lead read the neighborhood as before 17/11/2026, word
+# for word: off is exactly today's behavior (projectapp.enabled).
+NEIGHBORHOOD_BEFORE={'projectapp':'founders u operadores que necesitan una entrega externa, un proyecto definido o un equipo continuo'}
+
 VOCABULARIES={
     'editorial':{'personal_startups':'personal_startups','projectapp':'projectapp','alianzas':'alianzas','comunidad':'comunidad'},
     'red':{'personal_startups':'personal_startups','projectapp':'projectapp','alianzas':'alianzas','comunidad':'comunidad_autoridad'},
@@ -101,13 +124,25 @@ def editorial_direction():
                       f'- Pilares provisionales: {pillars}.',f'- Modalidades: {modes}. No conviertas cada pieza en una oferta.',
                       f'- Prohibido: {LIMITS}.'])
 
-def network_criteria():
-    """Who Gustavo is and the neighborhood criteria per modality, in the classifier's stored vocabulary."""
-    lines=[f'- {to_stored("red",key)}: {item["neighborhood"]}.' for key,item in MODALITIES.items()]
-    return '\n'.join([f'{IDENTITY} {PROJECTAPP}','',f'Criterios de barrio por modalidad ({VERSION}):',*lines,'',
+def neighborhood(key,projectapp_buyer=False):
+    """Who belongs to a modality: the refined ProjectApp neighborhood only with the ProjectApp buyer on (BAR-25)."""
+    return MODALITIES[key]['neighborhood'] if projectapp_buyer else NEIGHBORHOOD_BEFORE.get(key,MODALITIES[key]['neighborhood'])
+
+def offer_text():
+    """What ProjectApp offers and the only confirmed facts of its cases, for the classifier and the lead."""
+    return (f'Oferta de ProjectApp: {OFFER["equipo_dedicado"]}, o {OFFER["proyecto"]}; {OFFER["argumento"]}. Casos reales '
+            f'confirmados: {CASES["educacion_en_linea"]}, y {CASES["retail_ecommerce"]}; ningún otro dato de esos casos está '
+            'confirmado (ni nombres, ni cifras, ni plazos, ni resultados).')
+
+def network_criteria(projectapp_buyer=False):
+    """Who Gustavo is and the neighborhood criteria per modality, in the classifier's stored vocabulary. Without
+    `projectapp_buyer` the exact text of before 17/11/2026."""
+    lines=[f'- {to_stored("red",key)}: {neighborhood(key,projectapp_buyer)}.' for key in MODALITIES]
+    extra=['',offer_text()] if projectapp_buyer else []
+    return '\n'.join([f'{IDENTITY} {PROJECTAPP}','',f'Criterios de barrio por modalidad ({VERSION}):',*lines,*extra,'',
                       f'Ubicación: {LOCATION}'])
 
-def lead_criteria():
+def lead_criteria(projectapp_buyer=False):
     """One paragraph for the lead agent's `criterios_del_barrio` (Jev reads it as state)."""
-    return (f'{IDENTITY} {PROJECTAPP} Su barrio en LinkedIn: '+'; '.join(i['neighborhood'] for i in MODALITIES.values())+
-            f'. Ubicación: {LOCATION} {NOT_WANTED}')
+    return (f'{IDENTITY} {PROJECTAPP} Su barrio en LinkedIn: '+'; '.join(neighborhood(key,projectapp_buyer) for key in MODALITIES)+
+            f'. Ubicación: {LOCATION} {NOT_WANTED}'+(f' {offer_text()}' if projectapp_buyer else ''))

@@ -13,7 +13,8 @@ journey's next_at says so, exactly as before. Caps and ramp are never touched: t
   BUYER_NO_POSTS_READS reads within 10 days takes the route «sin_posts» (phase 5 builds that route).
 - Comment groups (autopiloto._propose): the day's INT-03 cap is shared compradores/comunidad/referentes by
   BUYER_COMMENT_SHARE (8/2/5 of 15, 4/1/2 of a weekend's 7); a group with nothing to comment passes its slots on to the
-  next one. «comunidad» has no source of posts yet, so its slots always go on.
+  next one. «comunidad» has posts only with NETWORK_PROJECTAPP_BUYER_ENABLED: the partners' (projectapp.partner_posts,
+  read in the buyers' read cap by projectapp.read_partner_posts); off, its slots always go on.
 - invite_at: the moment the warm-up is done: the BUYER_WARMUP_COMMENTS-th comment of the attempt, a reciprocity signal
   in the last 30 days (they answered a comment of the team, commented on Gustavo's post, invited him or wrote to him) or
   BUYER_WARMUP_MAX_DAYS after the follow, whichever comes first.
@@ -128,6 +129,13 @@ BUY_SIGNAL_WEIGHT=2  # class 08: «La señal no crea listas: ordena a quién pri
 # they already invited him or wrote to him.
 ACCELERATORS=(Kind.REPLIED_COMMENT,Kind.COMMENTED_POST,Kind.INVITED_US,Kind.OPENED_CONVERSATION,Kind.REPLIED_MESSAGE)
 BUY_SIGNAL_KINDS=('ronda','contratacion','expansion')
+# BAR-25: the class 08 signals of a ProjectApp buyer (red.STAGE_SCHEMA_PROJECTAPP). Only that judge offers them, so
+# with NETWORK_PROJECTAPP_BUYER_ENABLED off no stored signal has one of these kinds.
+from .projectapp import SIGNAL_KINDS as PROJECTAPP_SIGNAL_KINDS  # noqa: E402
+BUY_SIGNAL_KINDS=BUY_SIGNAL_KINDS+PROJECTAPP_SIGNAL_KINDS
+SIGNAL_LABELS={'ronda':'Ronda','contratacion':'Contratación','expansion':'Expansión',
+               'contrata_desarrolladores':'Contrata desarrolladores','lanzamiento_digital':'Lanzamiento de un producto digital',
+               'sistema_legado':'Sistema heredado por reemplazar','crecimiento':'Crecimiento'}
 
 def _age_factor(at,now):
     return 0.5 if at is None or now-at>OLD_SIGNAL else 1.0
@@ -301,20 +309,24 @@ def quotas(cap):
     for g in sorted(GROUPS,key=lambda g:(-(exact[g]-out[g]),GROUPS.index(g)))[:cap-sum(out.values())]:out[g]+=1
     return out
 
-def group_of(post,buyers):
+def group_of(post,buyers,community=()):
+    """The comment group of a post: a referent's, a buyer's (or her bridge's) or, with the ProjectApp buyer on (BAR-25),
+    a partner's: the «comunidad» share (projectapp.partner_ids)."""
     if post.referent_id:return 'referentes'
-    return 'compradores' if post.author_provider_id and post.author_provider_id in buyers else None
+    if post.author_provider_id and post.author_provider_id in buyers:return 'compradores'
+    return 'comunidad' if post.author_provider_id and post.author_provider_id in community else None
 
 def used(account,now):
     """Per group: today's comments that wrote (what the cap counts) plus the ones waiting for their turn."""
-    day,_=operador.period_starts(now);buyers=buyer_ids(account)
+    from . import projectapp
+    day,_=operador.period_starts(now);buyers=buyer_ids(account);community=projectapp.partner_ids(account)
     rows=list(ActionExecution.objects.filter(proposal__account=account,proposal__capability='INT-03',wrote=True,started_at__gte=day)
               .values_list('proposal__post__referent_id','proposal__post__author_provider_id'))
     rows+=list(ActionProposal.objects.filter(account=account,capability='INT-03',state__in=['proposed','approved'],execution__isnull=True)
                .values_list('post__referent_id','post__author_provider_id'))
     out={g:0 for g in GROUPS}
     for referent,author in rows:
-        group='referentes' if referent else 'compradores' if author in buyers else None
+        group='referentes' if referent else 'compradores' if author in buyers else 'comunidad' if author in community else None
         if group:out[group]+=1
     return out
 

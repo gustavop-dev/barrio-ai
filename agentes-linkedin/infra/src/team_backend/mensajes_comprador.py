@@ -38,7 +38,7 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from knowledge import memory, providers
-from . import calentamiento, comprador, idioma, operador, orientacion, voz
+from . import calentamiento, comprador, idioma, operador, orientacion, projectapp, voz
 from .exceptions import Conflict
 from .models import AuditEvent, BuyerDraft, BuyerJourney, BuyerTouch, Contact, Job
 from .permissions import require
@@ -377,6 +377,7 @@ def _write(kind,data,units,number=1):
     if any(f.get('tipo')=='puente' for f in data.get('hechos') or []):system+=BRIDGE_RULES
     if any(f.get('tipo')=='lo_que_dijo' for f in data.get('hechos') or []):system+=RETURN_RULES
     if any(f.get('tipo')=='referido' for f in data.get('hechos') or []):system+=REFERRAL_RULES
+    if data.get('caso_projectapp'):system+=projectapp.CASE_RULES  # BAR-25: the case of her segment, confirmed facts only
     answer=providers.claude(voz.with_voice(system),json.dumps(data,ensure_ascii=False,default=str),output_schema=schema,effort='medium',
                             purpose=purpose,context=operador.course_block(units))
     try:out=json.loads(answer['text'])
@@ -435,8 +436,9 @@ def _draft(contact,journey,kind,at,number=1):
     earlier=[m['texto'] for m in (data.get('seguimiento') or {}).get('anteriores',[]) if m.get('texto')]
     def issues_of(text,anchor):
         if not text:return []
-        if follow_up:return sequence.text_issues(number,text,earlier,said)
-        return text_issues(kind,text,facts,anchor,said)
+        # BAR-25: a case of ProjectApp only to a buyer of its segment and without unconfirmed figures ([] when off).
+        if follow_up:return sequence.text_issues(number,text,earlier,said)+projectapp.case_issues(text,contact)
+        return text_issues(kind,text,facts,anchor,said)+projectapp.case_issues(text,contact)
     answer,out,citations,risks=_write(kind,data,units,number)
     text=_text(out,kind);issues=issues_of(text,out.get('anchor'))
     redrafted=False
@@ -449,6 +451,7 @@ def _draft(contact,journey,kind,at,number=1):
     anchor=next((f for f in facts if f['id']==out.get('anchor')),{})
     kept={'hechos':facts,'persona':data['persona'],'momento':data['momento'],'reescrito':redrafted,'riesgos':risks}
     if follow_up:kept['seguimiento']=data['seguimiento']
+    if data.get('caso_projectapp'):kept['caso_projectapp']=data['caso_projectapp']
     fields={'text':text,'language':(out.get('language') or '')[:10],'anchor':anchor,'inputs':kept,'citations':citations,
             'model':answer.get('model') or ''}
     if not text:

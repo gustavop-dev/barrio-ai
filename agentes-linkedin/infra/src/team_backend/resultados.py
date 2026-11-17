@@ -203,7 +203,7 @@ def audiencia(current,previous,modality,coverage):
         return events.count('connected'),len(events)
     roles=None
     if coverage.network(current):
-        roles={r:0 for r in red.ROLES}
+        roles={r:0 for r in red.roles()}  # BAR-25: partner only with the ProjectApp buyer on
         for role in fit_connected(current).values_list('classification__role',flat=True):roles[role or 'sin_rol']=roles.get(role or 'sin_rol',0)+1
     contacts=_modality(Contact.objects.all(),modality)
     return {

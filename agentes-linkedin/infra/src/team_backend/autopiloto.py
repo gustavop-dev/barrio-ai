@@ -422,9 +422,10 @@ def _observe(user,account,now):
     bucket=int(now.timestamp()//every.total_seconds())
     if not referents_due:
         # Phase 2: the buyers warming up have their own reads; when only they are due, observe reads only them.
-        from . import calentamiento, sin_posts
-        # Phase 5: a bridge search or a bridge's posts due count as the buyers' reads.
-        if not (calentamiento.enabled() and (calentamiento.reading_due(account,now) or sin_posts.reading_due(account,now))):return 0
+        from . import calentamiento, projectapp, sin_posts
+        # Phase 5: a bridge search or a bridge's posts due count as the buyers' reads; BAR-25: so do the partners' posts.
+        if not (calentamiento.enabled() and (calentamiento.reading_due(account,now) or sin_posts.reading_due(account,now)
+                                             or projectapp.reading_due(account,now))):return 0
         _,created=enqueue_operation(user,'observe',{'account':str(account.id),'limit':5,'referents':[],'solo_compradores':True},
                                     request_id=_job_id('observe-buyers',account.id,bucket))
         return int(created)
@@ -504,7 +505,10 @@ def _propose_groups(user,account,now,max_age,prefilter):
                    .exclude(author_provider_id__in=list(authors)).exclude(id__in=skips).order_by('-posted_at')[:30])
     focus=experimentos.active_focus(account,now)
     if focus:referents.sort(key=lambda post:post.referent_id!=focus.referent_id)
-    groups={'compradores':calentamiento.buyer_posts(account,now,authors,skips)[:30],'comunidad':[],'referentes':referents}
+    # BAR-25: «comunidad» is the partners' posts with NETWORK_PROJECTAPP_BUYER_ENABLED; off it has none, as before.
+    from . import projectapp
+    groups={'compradores':calentamiento.buyer_posts(account,now,authors,skips)[:30],
+            'comunidad':projectapp.partner_posts(account,now,authors,skips)[:30],'referentes':referents}
     room=calentamiento.rooms(account,now,{group for group,posts in groups.items() if posts})
     asked=0
     for group in calentamiento.GROUPS:
