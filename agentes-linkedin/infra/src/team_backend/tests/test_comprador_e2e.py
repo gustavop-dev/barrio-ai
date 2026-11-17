@@ -2492,3 +2492,113 @@ class ReplyBuyerPathTests(ReplyPathBase):
         self.assertEqual(reading['borradores'],{'pendientes':1,'enviados':2})  # her reply waits; both first messages went
         self.assertIn('Muestra chica: 2 invitaciones en total, menos de 30',reading['lineas'][1])
         # Where it breaks first at scale (acceptance, then the reply): test_respuesta_comprador.WeeklyReadingTests.
+
+
+class ProjectAppPathTests(WarmupPathBase):
+    """BAR-25 (NETWORK_PROJECTAPP_BUYER_ENABLED): the ProjectApp buyer and the partner end to end, through discovery by
+    audience, the classifier with the class 08 methodology, the web check with size and dated signals, the follow, the
+    warm-up comments (the buyer's group, or «comunidad» for the partner), the invitation and the funnel by segment."""
+    CTO='CTO at Lone Star Outfitters · family retail chain, 80 people · hiring software engineers'
+    AGENCY='Founder at Brightside Marketing · campaigns and websites for local businesses, built with our development partners'
+
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'NETWORK_PROJECTAPP_BUYER_ENABLED':'true'});env.start();self.addCleanup(env.stop)
+
+    def providers(self,fit=True,note=''):
+        from team_backend import research
+        url='https://lonestar.example/careers'
+        def claude(system,message,**kwargs):
+            if kwargs['purpose']=='network-stage':
+                self.assertIn('tamano',kwargs['output_schema']['properties'])  # the ProjectApp judge, not the startup one
+                return {'text':json.dumps({'verdict':'confirmado','evidence':'Unas 80 personas y dos vacantes de Software Engineer.',
+                                           'source_urls':[url],'tamano':'20_a_200',
+                                           'senales':[{'tipo':'contrata_desarrolladores','fecha':'2026-11-10','source_url':url,
+                                                       'evidencia':'Dos vacantes de Software Engineer.'}]}),'model':'claude-sonnet-5-5'}
+            self.assertIn('buyer_segment',system)
+            out=[]
+            for p in json.loads(message)['people']:
+                if 'Marketing' in (p.get('headline') or ''):
+                    row={'role':'partner','buyer_profile':'','buyer_level':'','buyer_segment':'','company_size':'',
+                         'reason':'Agencia de marketing que subcontrata el desarrollo web de sus clientes.',
+                         'course_citations':['LI-03-M005-K06','LI-08-M001-K05']}
+                else:
+                    row={'role':'comprador','buyer_profile':'lider_tecnologia','buyer_level':'probable','buyer_segment':'retail_ecommerce',
+                         'company_size':'20_a_200','reason':'Líder de tecnología de una cadena de retail de 80 personas que contrata.',
+                         'course_citations':['LI-03-M005-K06','LI-08-M001-K05','LI-08-M004-K01']}
+                out.append({'id':p['id'],'fit':fit,'modality':'projectapp','affinity':'desconocida','confidence':0.9,'us_market':True,
+                            'invitation_note':'','note_reason':'',**row})
+            return {'text':json.dumps({'contacts':out}),'model':kwargs.get('model'),'estimated_usd':0.001,'request_id':'req_pa'}
+        def web(request):
+            source=research.Source('s1',url,'Careers','Lone Star Outfitters has about 80 employees and two open Software Engineer jobs.',
+                                   '2026-11-12T00:00:00+00:00')
+            return research.ResearchResult(request.public_question,'complete','2026-11-12T00:00:00+00:00',
+                                           (research.Finding('About 80 employees; two Software Engineer openings.',('s1',)),),(source,),
+                                           usage={'model':'claude-sonnet-5-5'})
+        claude_patch=patch('knowledge.providers.claude',side_effect=claude);web_patch=patch('team_backend.research.research',side_effect=web)
+        claude_patch.start();web_patch.start()
+        return lambda:(claude_patch.stop(),web_patch.stop())
+
+    def found(self,slug,name,headline,search,location):
+        """discover_network finds her with the search of her audience; classify_contacts classifies and checks the web."""
+        person=self.fake.seed_person(slug,name,headline=headline,search=search,location=location)
+        self.job('discover_network')
+        stop=self.providers()
+        try:job=self.job('classify_contacts')
+        finally:stop()
+        self.assertEqual(job.state,'complete',job.error)
+        return Contact.objects.get(account=self.account,provider_user_id=person['id'])
+
+    def test_a_projectapp_buyer_chosen_by_her_audiences_search_warmed_invited_and_counted_in_her_segment(self):
+        tomas=self.found('tomas-retail','Tomas Retail',self.CTO,'CTO retail','Dallas, Texas')
+        self.assertEqual(AuditEvent.objects.get(action='network.searched',metadata__query='CTO retail').metadata['audience'],'projectapp')
+        c=tomas.classification;b=c['buyer']
+        self.assertEqual((tomas.stage,c['role'],c['course_methodology']),('fit','comprador','con_quien'))
+        self.assertEqual({k:b[k] for k in ('line','papel','segment','company_size','level','score','score_version')},
+                         {'line':'projectapp','papel':'lider_tecnologia','segment':'retail_ecommerce','company_size':'20_a_200',
+                          'level':'confirmado','score':99,'score_version':'buyer_score_v2'})
+        self.assertEqual(c['stage_check']['senales'][0]['tipo'],'contrata_desarrolladores')
+        journey=self.journey(tomas)
+        self.assertEqual((journey.line,journey.segment,journey.entry_score_version),('projectapp','retail_ecommerce','buyer_score_v2'))
+
+        follow=self.step_follow(tomas)
+        self.assertEqual(follow.state,'confirmed')
+        first,second=self.warm_up(tomas)
+        self.plan()
+        invite=self.approve_open(tomas,'RED-02')
+        self.assertEqual(invite.state,'confirmed')
+        tomas=self.step_accept(tomas)
+        self.assertEqual(self.journey(tomas).step,'acepto')
+
+        funnel=self.funnel()
+        self.assertEqual((funnel['por_linea']['projectapp']['invitaciones'],funnel['por_linea']['startup']['invitaciones']),(1,0))
+        self.assertEqual(funnel['por_segmento']['retail_ecommerce']['invitaciones'],1)
+        self.assertEqual(funnel['prueba_projectapp']['por_segmento']['retail_ecommerce']['aceptaron'],1)
+        from team_backend import lectura_embudo
+        self.assertTrue(any(line.startswith('Prueba ProjectApp') for line in lectura_embudo.read(account=self.account)['lineas']))
+
+    def test_a_partner_is_followed_commented_as_community_and_invited_without_a_journey_or_messages(self):
+        from team_backend import projectapp
+        from team_backend.models import BuyerDraft
+        with patch.dict(os.environ,{'NETWORK_SEARCH_AUDIENCE_SHARE':'partner=12'}):
+            marco=self.found('marco-agencia','Marco Agencia',self.AGENCY,'marketing agency founder development partners',
+                             'Austin, Texas')
+        c=marco.classification
+        self.assertEqual((marco.stage,c['role'],c['fit'],c['modality']),('fit','partner',True,'projectapp'))
+        self.assertNotIn('buyer',c);self.assertNotIn('stage_check',c)
+        follow=self.step_follow(marco)
+        self.assertEqual((follow.state,marco.stage),('confirmed','followed'))
+        # His posts are read like a warming buyer's (within the buyers' read cap) and feed the «comunidad» share.
+        self.their_new_post(marco,'We launched a booking site for a dental clinic with our development partner in six weeks.')
+        self.observe()
+        self.assertTrue(AuditEvent.objects.filter(action=projectapp.PARTNER_READ).exists())
+        post=ObservedPost.objects.get(author_provider_id=marco.provider_user_id)
+        self.assertIsNone(post.referent_id)
+        comment=self.autopilot_comment('Six weeks for a booking flow is fast. What did the clinic stop doing by hand first?')
+        self.assertEqual((comment.state,comment.post_id),('confirmed',post.pk))
+        self.assertEqual(calentamiento.group_of(post,calentamiento.buyer_ids(self.account),projectapp.partner_ids(self.account)),'comunidad')
+        self.assertEqual(calentamiento.used(self.account,timezone.now())['comunidad'],1)
+        invite=self.step_invite(marco)
+        self.assertEqual((invite.state,marco.stage),('confirmed','invited'))
+        self.assertFalse(BuyerJourney.objects.filter(contact=marco).exists())
+        self.assertFalse(BuyerDraft.objects.exists())
