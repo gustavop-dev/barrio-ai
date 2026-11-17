@@ -309,9 +309,21 @@ def reserve_note(proposal):
     return True
 
 
+def note_approved(proposal):
+    """The note was approved by the lead's review of this invitation (review.note_approved). Only an approved note is
+    ever sent: Gustavo's «Sí, encaja» (confirmed_by_gustavo) and LEAD_ENABLED=false skip that review, and their
+    invitation goes out without the note instead of staying blocked until it expires (docs/plan-outbound.md, fase 3)."""
+    return bool((proposal.review or {}).get('note_approved'))
+
+NOTE_UNREVIEWED='Nota sin aprobación del líder (Gustavo confirmó a la persona o el líder está apagado): sale sin nota, la alternativa aprobada'
+
 def send_invitation(execution,proposal,connector,user):
     from .connectors import InvitationNoteQuota
     uid=proposal.payload['user_id'];text=proposal.payload.get('note')
+    if text and not note_approved(proposal):
+        # Never reserve a monthly note for a text nobody reviewed; the approved alternative is the same invitation without it.
+        operador._audit(user,'network.note_omitted',proposal.id,reason=NOTE_UNREVIEWED)
+        text=None
     use_note=bool(text and len(text)<=note_policy()['max_chars'] and reserve_note(proposal))
     if text and not use_note:
         operador._audit(user,'network.note_omitted',proposal.id,reason='Local cap or provider note block; approved alternative')
@@ -353,7 +365,10 @@ def execution_issues(proposal,now=None):
                 text=proposal.payload.get('note')
                 if not (isinstance(text,str) and len(text)>note_policy()['max_chars'] and proposal.payload.get('without_note_fallback') is True):
                     issues.append(str(exc))
-            if not proposal.review.get('note_approved'):issues.append('Nota pendiente de verificador/líder: inglés, sin pitch y sin hechos inventados')
+            # A note without the lead's approval only blocks an invitation that has no approved alternative without it;
+            # red.plan always gives one (without_note_fallback) and send_invitation then leaves the note out.
+            if not note_approved(proposal) and proposal.payload.get('without_note_fallback') is not True:
+                issues.append('Nota pendiente de verificador/líder: inglés, sin pitch y sin hechos inventados')
     return issues
 
 

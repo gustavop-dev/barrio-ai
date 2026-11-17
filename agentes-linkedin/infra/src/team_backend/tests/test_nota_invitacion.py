@@ -129,8 +129,6 @@ class NoteCaseTests(NoteCaseBase):
         run = self.run_variant('N9')
         self.assertEqual((run['con_nota'], run['stopped_by'], run['invitada']), (False, 'cupo', True))
 
-    # Línea base: el error: la nota sin revisión bloquea la invitación hasta caducar.
-    @expectedFailure
     def test_g_a_person_gustavo_confirmed_is_invited(self):
         run = self.run_variant('G')
         self.assertEqual(run['proposal'].state, 'confirmed', run['proposal'].risks)
@@ -191,8 +189,6 @@ class ConfirmedNoteBugTests(NoteCaseBase):
         self.assertEqual(proposal.payload.get('note'), CLASSIFIER_NOTE)
         return contact, proposal
 
-    # Línea base: el error: bloqueada en red.execution_issues hasta caducar.
-    @expectedFailure
     def test_confirmed_by_gustavo_the_invitation_goes_out_without_the_unreviewed_note(self):
         contact, proposal = self.invited_with_a_classifier_note('bug-rosa', 'Rosa Bug', confirm=True)
         proposal = self.gate_and_send(proposal)
@@ -202,8 +198,6 @@ class ConfirmedNoteBugTests(NoteCaseBase):
         self.assertIn('líder', omitted.metadata['reason'])
         self.assertFalse(AuditEvent.objects.filter(action='network.note_reserved', target=str(proposal.pk)).exists())
 
-    # Línea base: el error: bloqueada en red.execution_issues hasta caducar.
-    @expectedFailure
     def test_with_the_lead_off_the_invitation_goes_out_without_the_unreviewed_note(self):
         contact, proposal = self.invited_with_a_classifier_note('bug-sol', 'Sol Bug')
         from team_backend import autopiloto
