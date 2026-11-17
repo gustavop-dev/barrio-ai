@@ -314,12 +314,10 @@ class ScoreV2Tests(SimpleTestCase):
                     buyer=dict(buyer('dueno_empresa_tradicional','por_confirmar',line='projectapp'),us_market=False,papel=''))
         thin.classification['buyer']['profile']=''  # neither the profile nor the headline says the papel
         result=self.scored(thin);parts=result['breakdown']
-        for component,table in (('tamano',nivel_comprador.V2_SIZE),('senal',nivel_comprador.V2_SIGNAL),
-                                ('mercado',nivel_comprador.V2_MARKET),('papel',nivel_comprador.V2_PAPEL)):
-            known=[v for k,v in table.items() if k!='sin_dato']
-            self.assertEqual(parts[component]['value'],'sin_dato',component)
-            self.assertEqual(parts[component]['points'],(max(known)+(0 if component=='senal' else min(known)))//2,component)
-        self.assertEqual(result['score'],sum(p['points'] for p in parts.values()))
+        missing={component:(parts[component]['value'],parts[component]['points']) for component in ('tamano','senal','mercado','papel')}
+        # Hand-checked middles: size (26+0)/2, signal 10/2, market (14+2)/2, papel (12+4)/2.
+        self.assertEqual(missing,{'tamano':('sin_dato',13),'senal':('sin_dato',5),'mercado':('sin_dato',8),'papel':('sin_dato',8)})
+        self.assertEqual(result['score'],10+13+5+8+8+3)
         self.assertIn('sin tamaño de empresa',result['warnings'])
 
     def test_a_signal_needs_a_date_and_an_old_one_weighs_less(self):
@@ -532,7 +530,9 @@ class SearchRotationTests(SimpleTestCase):
         self.assertEqual(done,{'projectapp':7,'startup':3,'partner':3})
         self.assertEqual(seen[:4],[('projectapp','CTO retail'),('startup','founder pre-seed'),
                                    ('partner','marketing agency founder development partners'),('projectapp','Director of IT ecommerce')])
-        self.assertEqual([q for a,q in seen if a=='projectapp'],projectapp.DEFAULT_QUERIES['projectapp'].split(';')[:7])
+        self.assertEqual([q for a,q in seen if a=='projectapp'],
+                         ['CTO retail','Director of IT ecommerce','Head of Technology online education','Owner online academy',
+                          'VP Engineering retail','CEO family business','dueño de empresa [es]'])
 
     def test_a_bad_share_is_ignored_and_an_audience_without_queries_never_gets_a_turn(self):
         with patch.dict(os.environ,dict(ON,NETWORK_SEARCH_QUERIES='',NETWORK_SEARCH_AUDIENCE_SHARE='projectapp=x,partner=12')):
@@ -612,7 +612,8 @@ class WhoActivationTests(SimpleTestCase):
             self.assertEqual(unit['clase'],8);self.assertTrue(unit['lectura_completa'])
             self.assertRegex(unit['hash'],r'^[0-9a-f]{64}$');self.assertRegex(unit['pointer'],r'^/learning_units/\d+$')
             self.assertTrue(unit['criterio_derivado'] and unit['limites_y_excepciones'] and unit['uso'])
-            self.assertTrue(all(key.startswith('08:') for key in unit['fuentes_con_prefijo_de_clase']))
+            sources=unit['fuentes_con_prefijo_de_clase']
+            self.assertTrue(sources and all(key.startswith('08:') for key in sources),unit['unidad_id'])
         decisions=' '.join(registry['decisiones_vigentes_que_ganan'])
         for item in ('60 %','LI-08-M004-K04','28','NETWORK_PROJECTAPP_BUYER_ENABLED=false'):self.assertIn(item,decisions)
         not_adopted=' '.join(registry['no_convertido_en_regla'])
