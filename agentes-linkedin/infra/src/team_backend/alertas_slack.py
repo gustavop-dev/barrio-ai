@@ -590,7 +590,135 @@ def propuestas_por_caducar(now):
         f'Barrio · {len(soon)} propuesta(s) esperan tu aprobación y caducan en menos de {int(expiry_hours().total_seconds()//3600)} h '
         f'({what}); la primera caduca {at_text(soon[0][0],now)}. Apruébalas o recházalas en Tu turno; si no, caducan sin salir.')]
 
+# --------------------------------------------------------------------------- what should have happened and did not
+
+def post_late_minutes():
+    """ALERT_POST_LATE_MINUTES (60): how late the daily post may be."""
+    return timedelta(minutes=_number('ALERT_POST_LATE_MINUTES',60,10,12*60))
+
+PIECE_STAGE={'preparing':'sigue preparándose','ready':'está lista pero sin publicación propuesta','blocked':'la verificación la bloqueó','failed':'su preparación falló',
+             'awaiting_approval':'espera tu aprobación en Tu turno','scheduled':'está aprobada pero no salió',
+             'publishing':'se está publicando','uncertain':'no se sabe si salió («¿Salió o no?» en Tu turno)',
+             'failed_action':'la publicación falló','vetoed':'la vetaste','discarded':'el líder la descartó',
+             'expired':'caducó sin publicarse','superseded':'se reemplazó por otra versión'}
+
+@vigilante
+def post_del_dia(now):
+    """The day's post (EDITORIAL_POST_TIME) not out ALERT_POST_LATE_MINUTES after its hour, when the editorial runs
+    (CONT-09 not off and an account that can publish). A day skipped on purpose says nothing. Once a day."""
+    from . import editorial
+    from .autopiloto import autonomy
+    from .models import EditorialPiece
+    if autonomy('CONT-09')=='off' or not editorial.can_publish(editorial.publishing_account()):return []
+    today=_local(now).date()
+    try:hour=editorial.scheduled_for(today)
+    except ValueError:return []
+    if now<hour+post_late_minutes():return []
+    piece=EditorialPiece.objects.filter(slot_date=today,second_of_day=False).order_by('-created_at').first()
+    if piece is None:stage='no hay pieza preparada para hoy'
+    elif piece.state==EditorialPiece.State.SKIPPED:return []
+    else:
+        action=editorial.latest_action(piece);status=editorial.status(piece,action)
+        if status=='published':return []
+        if status=='failed' and action is not None:status='failed_action'
+        stage=f'la pieza {PIECE_STAGE.get(status,status)}'
+    return [Aviso('nada:post_del_dia',
+        f'Barrio · El post de hoy no salió a su hora ({hhmm(hour)}): {stage}. Míralo en el calendario.')]
+
+def no_comments_hours():
+    """ALERT_NO_COMMENTS_HOURS (24): window hours without one comment of his published on someone else's post."""
+    return timedelta(hours=_number('ALERT_NO_COMMENTS_HOURS',24,4,24*7))
+
+def _operator_window():
+    from . import operador
+    start,_,end=setting('OPERATOR_WINDOW','07:00-21:00').partition('-')
+    return operador._minutes(start),operador._minutes(end)
+
+@vigilante
+def sin_comentarios(now):
+    """No INT-03 comment written in the last ALERT_NO_COMMENTS_HOURS hours of OPERATOR_WINDOW, when they are expected
+    (INT-03 not off and active referents to comment on): once a day, with what happened to the drafts of that time."""
+    from .autopiloto import autonomy
+    from .models import ActionExecution, ActionProposal, Referent
+    if autonomy('INT-03')=='off' or not Referent.objects.filter(active=True).exists():return []
+    last=(ActionExecution.objects.filter(proposal__capability='INT-03',wrote=True,state__in=['confirmed','sent','uncertain'])
+          .order_by('-started_at').values_list('started_at',flat=True).first())
+    since=max(last or now-timedelta(days=7),now-timedelta(days=7))
+    if window_time(since,now,_operator_window())<no_comments_hours():return []
+    drafts=ActionProposal.objects.filter(capability='INT-03',created_at__gte=since)
+    counts={label:drafts.filter(state=state).count() for state,label in (('discarded','descartados'),('proposed','esperando'),
+            ('approved','aprobados sin salir'),('expired','caducados'),('rejected','vetados'),('failed','fallidos'))}
+    seen=', '.join(f'{n} {label}' for label,n in counts.items() if n) or 'ninguno'
+    when=f'el último, {since_text(last,now)}' if last else 'ninguno en 7 días'
+    return [Aviso('nada:comentarios',
+        f'Barrio · Ningún comentario tuyo publicado en posts de otros en {int(no_comments_hours().total_seconds()//3600)} horas '
+        f'de ventana ({when}). Borradores desde entonces: {seen}. Revisa el calendario («Mostrar lo que no salió»).')]
+
+@vigilante
+def sin_invitaciones(now):
+    """A weekday with the invitation ramp running (red on, RED-02 not off, ramp enabled, neither paused nor at 0, and
+    invitations sent in the last 7 days) that closes without one: once, at the close of the window."""
+    from . import operador, red
+    from .autopiloto import autonomy
+    if now<close_of_day(now) or operador.is_weekend(now) or not red.enabled() or autonomy('RED-02')=='off':return []
+    if setting('OPERATOR_INVITE_RAMP_ENABLED','true').strip().lower()!='true':return []
+    daily=min(operador.limits(now)['RED-02'][0],red.ramp_limits(None,now)[0])
+    if daily<=0:return []
+    day,_=operador.period_starts(now);sent=operador.writes(None,'RED-02')
+    if sent.filter(started_at__gte=day).exists() or not sent.filter(started_at__gte=now-timedelta(days=7)).exists():return []
+    from .models import ActionProposal
+    waiting=ActionProposal.objects.filter(capability='RED-02',state__in=['proposed','approved'],execution__isnull=True).count()
+    return [Aviso('nada:invitaciones',
+        f'Barrio · Hoy no salió ninguna invitación con la rampa abierta (cupo {daily}). Propuestas de invitación sin salir: '
+        f'{waiting}. Si no hay ninguna, no hay candidatos que encajen: revisa Personas y el descubrimiento.')]
+
+def lead_discard_ratio():
+    """ALERT_LEAD_DISCARD_RATIO (0.8) of ALERT_LEAD_DISCARD_MIN (5) or more reviews of the day."""
+    return _number('ALERT_LEAD_DISCARD_RATIO',0.8,0.3,1.0),int(_number('ALERT_LEAD_DISCARD_MIN',5,1,100))
+
+@vigilante
+def lider_descarta(now):
+    """The leader (Jev) discarded more than ALERT_LEAD_DISCARD_RATIO of what it reviewed today (operator.lead_reviewed),
+    with at least ALERT_LEAD_DISCARD_MIN reviews: once a day."""
+    from .operador import period_starts
+    ratio,minimum=lead_discard_ratio();day,_=period_starts(now)
+    decisions=list(AuditEvent.objects.filter(action='operator.lead_reviewed',created_at__gte=day,created_at__lt=day+timedelta(days=1),
+                                            metadata__decision__in=['approve','discard']).values_list('metadata__decision',flat=True))
+    discarded=decisions.count('discard')
+    if len(decisions)<minimum or discarded<=ratio*len(decisions):return []
+    return [Aviso('nada:lider_descarta',
+        f'Barrio · El líder descartó {discarded} de {len(decisions)} borradores que revisó hoy ({discarded/len(decisions):.0%}). '
+        'Casi nada sale: mira los motivos en el calendario («Mostrar lo que no salió»).')]
+
 # --------------------------------------------------------------------------- the daily summary
+
+def activity_lines(now):
+    """The day in a few lines: comments on his posts, what went out, AI spend, errors and alerts."""
+    from knowledge import presupuesto
+    from . import operador, respuestas
+    from .models import Contact, Job, PostComment
+    day,_=operador.period_starts(now);today={'created_at__gte':day,'created_at__lt':day+timedelta(days=1)}
+    received=PostComment.objects.filter(own=False,commented_at__gte=day,commented_at__lt=day+timedelta(days=1)).count()
+    written=lambda capability:operador.writes(None,capability).filter(started_at__gte=day,started_at__lt=day+timedelta(days=1)).count()
+    pending=0
+    for row in PostComment.objects.select_related('piece').filter(own=False,state__in=['new','asked','reply'],
+                                                                  commented_at__gte=now-respuestas.window()):
+        if row.state=='new' and 'turn' not in (row.decision or {}):continue
+        pending+=int(_stuck(row) is not None)
+    accepted=Contact.objects.filter(connected_at__gte=day,connected_at__lt=day+timedelta(days=1)).count()
+    try:
+        money=presupuesto.status(now)
+        spend=f'{usd(money["today_usd"])} USD hoy; {usd(money["month_usd"])} de {usd(money["monthly_limit_usd"])} USD en el mes'
+    except Exception:spend='sin dato (no se pudo leer el registro de gasto)'
+    failed=Job.objects.filter(state__in=[Job.State.FAILED,Job.State.INTERRUPTED],finished_at__gte=day,finished_at__lt=day+timedelta(days=1)).count()
+    alerts=AuditEvent.objects.filter(action=ACTION,**today).exclude(target__startswith='resumen:').count()
+    return [f'• Comentarios en tus posts: {received} recibidos hoy, {written("INT-04")} respuestas publicadas, {pending} esperando respuesta',
+            f'• Comentarios tuyos en posts de otros: {written("INT-03")}',
+            f'• Red: {written("RED-01")} seguimientos, {written("RED-02")} invitaciones, {written("RED-04")} aceptaciones; '
+            f'{accepted} personas nuevas en tu red',
+            f'• IA: {spend}',
+            f'• Trabajos fallidos o interrumpidos: {failed}; avisos enviados: {alerts}']
+
 
 def summary_lines(now):
     """One line per cap with used/cap, then the hours the comments of his posts were read."""
@@ -609,11 +737,12 @@ def summary_lines(now):
     return lines
 
 def summary_text(now):
-    return '\n'.join([f'Barrio · Resumen del {_local(now):%d/%m} al cierre de la ventana ({hhmm(close_of_day(now))}), usado/tope:',
-                      *summary_lines(now)])
+    return '\n'.join([f'Barrio · Resumen del {_local(now):%d/%m} al cierre de la ventana ({hhmm(close_of_day(now))})',
+                      *activity_lines(now),'Cupos del día (usado/tope):',*summary_lines(now)])
 
 @vigilante
 def resumen_diario(now):
-    """At the close of the read window (SLACK_DAILY_SUMMARY, on with a webhook): once a day, on the summaries channel."""
+    """At the close of the read window (SLACK_DAILY_SUMMARY, on with a webhook): the day's activity and every cap, once a
+    day, on the summaries channel."""
     if not summary_enabled() or now<close_of_day(now):return []
     return [Aviso('resumen:diario',lambda:summary_text(now),channel='resumen')]

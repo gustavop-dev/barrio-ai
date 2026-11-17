@@ -8,8 +8,9 @@ from unittest.mock import patch
 import httpx
 from knowledge import db, providers
 from team_backend import alertas_slack, autopiloto, operador
-from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Conversation, Job, PostComment, Worker
-from team_backend.tests.test_ventana_lectura import WindowBase, at
+from team_backend.models import (ActionExecution, ActionProposal, AuditEvent, Contact, Conversation, EditorialPiece, Job, ObservedPost,
+                                 PostComment, Worker)
+from team_backend.tests.test_ventana_lectura import DAY, WindowBase, at
 
 ALERTS='https://hooks.slack.test/services/ALERTAS'
 SUMMARY='https://hooks.slack.test/services/RESUMEN'
@@ -410,3 +411,92 @@ class GustavoAlertTests(SlackBase):
         texts=[t for t in self.texts() if 'caducan' in t]
         self.assertEqual(texts,['Barrio · 2 propuesta(s) esperan tu aprobación y caducan en menos de 12 h (2 × Seguir a una persona); '
                                 'la primera caduca a las 15:00. Apruébalas o recházalas en Tu turno; si no, caducan sin salir.'])
+
+
+class NothingHappenedTests(SlackBase):
+    def with_word(self,word):
+        return [t for t in self.texts() if word in t]
+
+    def publisher_piece(self,state='ready'):
+        publisher=operador.register_account(self.gustavo,'linkedin_fake','pub-1','Publicación')
+        return EditorialPiece.objects.create(account=publisher,slot_date=DAY.date(),scheduled_for=at(8,30),state=state,final_text='Hoy')
+
+    def write(self,capability,when,**target):
+        proposal=ActionProposal.objects.create(account=self.account,capability=capability,payload={'text':'x'},
+                                               payload_hash=uuid.uuid4().hex+uuid.uuid4().hex,state='confirmed',**target)
+        return ActionExecution.objects.create(proposal=proposal,idempotency_key=uuid.uuid4().hex,provider='linkedin_fake',
+                                              state='confirmed',executed_by=self.gustavo,started_at=when,wrote=True)
+
+    def test_the_post_of_the_day_late_with_where_it_is(self):
+        piece=self.publisher_piece()
+        ActionProposal.objects.create(account=piece.account,piece=piece,capability='CONT-09',payload={'text':'Hoy'},payload_hash='6'*64,
+                                      state='proposed')
+        self.watch(at(9,15))
+        self.assertEqual(self.with_word('post de hoy'),[])  # 45 min late: not yet
+        self.watch(at(9,31));self.watch(at(12))
+        self.assertEqual(self.with_word('post de hoy'),['Barrio · El post de hoy no salió a su hora (08:30): la pieza espera tu '
+                                                        'aprobación en Tu turno. Míralo en el calendario.'])
+
+    def test_a_day_skipped_on_purpose_says_nothing(self):
+        self.publisher_piece(state='skipped')
+        self.watch(at(12))
+        self.assertEqual(self.with_word('post de hoy'),[])
+
+    def test_no_comment_for_24_window_hours_only_with_referents(self):
+        env=patch.dict('os.environ',{'OPERATOR_WINDOW':'07:00-21:00'});env.start();self.addCleanup(env.stop)
+        self.watch(at(12))
+        self.assertEqual(self.with_word('Ningún comentario'),[])  # nobody to comment on: nothing expected
+        operador.add_referent(self.gustavo,self.account,'https://www.linkedin.com/in/referente-ai/','Habla de agentes')
+        post=ObservedPost.objects.create(account=self.account,provider_post_id='op-1',text='x')
+        self.write('INT-03',at(10,0,-1),post=post)  # 11 window hours by 07:00, 16 by 12:00
+        self.watch(at(12))
+        self.assertEqual(self.with_word('Ningún comentario'),[])
+        ActionProposal.objects.create(account=self.account,post=post,capability='INT-03',payload={'text':'y'},payload_hash='7'*64,
+                                      state='discarded',created_at=at(15,0,-1))
+        self.watch(at(20))
+        texts=self.with_word('Ningún comentario')
+        self.assertEqual(texts,['Barrio · Ningún comentario tuyo publicado en posts de otros en 24 horas de ventana (el último, el '
+                                '03/11 a las 10:00). Borradores desde entonces: 1 descartados. Revisa el calendario («Mostrar lo '
+                                'que no salió»).'])
+
+    def test_no_invitation_on_a_weekday_with_the_ramp_running(self):
+        contact=Contact.objects.create(account=self.account,provider_user_id='u-1',display_name='P',source='manual')
+        self.write('RED-02',at(10,0,-2),contact=contact)
+        self.watch(at(20,30))
+        self.assertEqual(self.with_word('invitación'),[])  # before the close
+        self.watch(at(21))
+        texts=self.with_word('ninguna invitación')
+        self.assertEqual(len(texts),1)
+        self.assertIn('Hoy no salió ninguna invitación con la rampa abierta (cupo 16)',texts[0])
+        with patch('team_backend.operador.is_weekend',return_value=True):self.watch(at(21,0,1))
+        self.assertEqual(len(self.with_word('ninguna invitación')),1)  # the weekend sends none on purpose
+
+    def test_the_leader_discarding_almost_everything(self):
+        for decision in ['discard']*4+['approve','retry']:
+            operador._audit(None,'operator.lead_reviewed',uuid.uuid4(),decision=decision)
+        AuditEvent.objects.filter(action='operator.lead_reviewed').update(created_at=at(10))
+        self.watch(at(11))
+        self.assertEqual(self.with_word('líder descartó'),[])  # 4 of 5: 80 % is not more than 80 %
+        operador._audit(None,'operator.lead_reviewed',uuid.uuid4(),decision='discard')
+        AuditEvent.objects.filter(action='operator.lead_reviewed').update(created_at=at(10))
+        self.watch(at(12));self.watch(at(13))
+        self.assertEqual(self.with_word('líder descartó'),['Barrio · El líder descartó 5 de 6 borradores que revisó hoy (83%). Casi '
+                                                          'nada sale: mira los motivos en el calendario («Mostrar lo que no salió»).'])
+
+
+class FullSummaryTests(SlackBase):
+    def test_the_summary_has_the_day_and_every_cap(self):
+        piece,_=self.post_at(at(8,0,-1),'Post de ayer.')
+        PostComment.objects.create(account=self.account,piece=piece,provider_post_id='p',provider_comment_id='c1',author_name='Ana',
+                                   text='¿Cómo empiezo?',commented_at=at(9),observed_at=at(9),decision={'turn':1})
+        self.reads(3,at(9))
+        Job.objects.create(owner=self.bot,request_hash='h',agent='operador',task='t',kind='read_inbox',state='failed',
+                           created_at=at(9),finished_at=at(9,1))
+        with patch.dict('os.environ',{'AI_MONTHLY_LIMIT_USD':'100'}):self.watch(at(21))
+        text=self.texts()[-1]
+        for line in ('Barrio · Resumen del 04/11 al cierre de la ventana (21:00)',
+                     '• Comentarios en tus posts: 1 recibidos hoy, 0 respuestas publicadas, 1 esperando respuesta',
+                     '• Comentarios tuyos en posts de otros: 0','• Red: 0 seguimientos, 0 invitaciones, 0 aceptaciones; 0 personas nuevas en tu red',
+                     '• IA: 0,00 USD hoy; 0,00 de 100,00 USD en el mes','• Trabajos fallidos o interrumpidos: 1',
+                     'Cupos del día (usado/tope):','• Lecturas respuestas.comments: 3/100'):
+            self.assertIn(line,text)
