@@ -153,6 +153,44 @@ El curso no lo trata. Ruta aprobada, medida aparte de los calentados con comenta
 4. Invitar a los 14 días. Con una señal fuerte y reciente, usar una de las 3 notas citando esa señal.
 5. Al aceptar, primer mensaje con la señal o algo en común como primera línea.
 
+### Reciprocidad: lo que la persona hace de vuelta (17/11/2026)
+
+Decisión de Gustavo: el calentamiento es de ambos lados. Lo que la persona hace sube su prioridad y cambia el paso
+siguiente. Con estas señales cada comprador queda frío, tibio o caliente (LI-07-M003-K01).
+
+| Señal de la persona | Fuerza | Qué cambia |
+| --- | --- | --- |
+| Nos invita ella | Máxima | Se acepta y pasa al primer mensaje |
+| Responde a un comentario nuestro | Alta | Se invita ya, sin esperar el segundo comentario; el equipo le contesta en el hilo |
+| Comenta un post de Gustavo | Alta | Igual; candidata a una de las 3 notas |
+| Nos sigue | Media | Sube en la cola de invitación |
+| Reacciona a un post de Gustavo | Media | Sube en la cola; no acelera sola |
+| Acepta rápido | Media | El primer mensaje sale antes |
+
+- A quien ya interactuó se le escribe apenas acepte (LI-09-M002-K05), y la primera línea cita esa interacción real.
+- Una señal de más de 30 días pesa menos.
+- «Nos sigue» y «reacciona» tienen tipo en el registro pero todavía ninguna fuente automática.
+
+### Cuando no funciona: descanso y reintento (17/11/2026)
+
+Nadie se elimina por no responder. La única salida definitiva es que diga que no le interesa, pida no ser contactado
+o Gustavo lo descarte. Los plazos son la propuesta inicial, no cifras del curso; se ajustan con los datos del mes.
+
+| Qué pasó | Qué hace el sistema | Cuándo vuelve |
+| --- | --- | --- |
+| Dos comentarios sin reacción y no acepta en 3 semanas | Descanso; no gasta más comentarios | 60 días, o antes con una señal |
+| Aceptó y no respondió a los 4 mensajes | Queda como conexión, en descanso | 90 días, con otro motivo |
+| «No es el momento» | Descanso | 90 días o la fecha que dijo |
+| No publica y la ruta alterna no dio resultado | Puente por otra persona de su empresa | Cuando esa persona acepte |
+
+- El reintento cambia de ángulo (otra señal, otro tema, otra persona de la empresa); cada intento guarda el suyo
+  (LI-08-M003-K05, LI-09-V008-K03).
+- Una señal durante el descanso (ronda, post sobre el problema, interacción con nosotros) lo despierta de inmediato.
+- Tres intentos; después, descanso de un año, sin borrarlo.
+- Mientras una invitación siga pendiente no se puede reinvitar, y retirarla es manual: el reintento de quien no aceptó
+  es seguir calentando y esperar. El sistema le da a Gustavo la lista de invitaciones viejas.
+- Alcance cerrado aquí (17/11/2026): los cambios siguientes se deciden con los resultados.
+
 ### 7. Medir
 
 - Embudo (LI-12-M001-K03): elegidos → calentados → invitados → aceptaron → recibieron mensaje → respondieron →
