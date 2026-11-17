@@ -325,7 +325,7 @@
     {
       "id": "CHAT-04",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Solo con interacción, conexión o afinidad declarada concreta; nunca automático por aceptación; sin pitch encubierto ni secuencia. La secuencia del comprador del recorrido (BAR-21) no es de este rol: la redacta relaciones_comunidad como borradores que Gustavo envía a mano."
     },
     {
       "id": "CHAT-04",

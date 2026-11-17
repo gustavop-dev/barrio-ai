@@ -32,9 +32,9 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 | 12/11/2026 | La clase 07 del curso (outbound) se puede consultar; el sistema completo de outbound viene después, con la información del curso que Gustavo trae. |
 | 12/11/2026 | Café virtual semanal para reactivar contactos: pospuesto. |
 | 12/11/2026 | **10 comentarios al día** (antes 5), y los comentarios son parte del outbound: calentar a los posibles compradores. |
-| Vigente | La app nunca envía mensajes en nombre de Gustavo ([INB-08](funcionalidades/inbox.md#inb-08)). Un primer mensaje solo se redacta para que él lo copie y lo envíe ([RSP-07](funcionalidades/respuestas.md#rsp-07)). Catálogo CHAT-04: no escribir automáticamente por cada aceptación; interés real, sin pitch encubierto ni secuencias de campaña. |
+| Vigente | La app nunca envía mensajes en nombre de Gustavo ([INB-08](funcionalidades/inbox.md#inb-08)). Un primer mensaje solo se redacta para que él lo copie y lo envíe ([RSP-07](funcionalidades/respuestas.md#rsp-07)). Catálogo CHAT-04: no escribir automáticamente por cada aceptación; interés real, sin pitch encubierto; sin secuencias de campaña salvo la del comprador (fila del 17/11/2026). |
 | Vigente | En sus posts, el equipo responde solo, con el contexto del post, del hilo y del perfil; en el segundo turno puede proponer conectar y seguir por privado ([RSP-06](funcionalidades/respuestas.md#rsp-06)). |
-| 17/11/2026 | **Seguimiento: la secuencia de 4 mensajes del curso**, como borradores que él envía. La regla «sin secuencias de campaña» (CHAT-04, BIB-10) era para limitar el alcance en su momento; deja de regir para el comprador cuando esto se construya. |
+| 17/11/2026 | **Seguimiento: la secuencia de 4 mensajes del curso**, como borradores que él envía. La regla «sin secuencias de campaña» (CHAT-04, BIB-10) era para limitar el alcance en su momento; deja de regir para el comprador cuando esto se construya. Construido como fase 4 ([BAR-21](funcionalidades/red.md#bar-21)); CHAT-04 y BIB-10 actualizados. |
 | 17/11/2026 | Las 3 notas de invitación del mes se reservan para compradores ya calentados, con un hecho concreto que citar. |
 | 17/11/2026 | El comprador que no publica tiene su propia ruta (abajo), incluida la entrada por el cofundador o alguien de su equipo. |
 | 17/11/2026 | Los agentes siguen comentando ellos, con la revisión del líder: tienen una base de conocimiento amplia sobre nosotros. La advertencia del curso («nunca comentes con bots») no se adopta. |
@@ -370,7 +370,22 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
      sale sin la nota en vez de quedar bloqueada hasta caducar.
    - El recorrido muestra cada borrador; el embudo separa los del recorrido y las notas (preparados, enviados, parados
      por motivo). Para desplegar: migración 0047 y la clase 09 cargada.
-4. **Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.
+4. ~~**Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.~~ Hecho en la misma rama
+   ([BAR-21](funcionalidades/red.md#bar-21), [BIB-13](funcionalidades/biblioteca-equipos.md#bib-13)), sin desplegar y
+   detrás de `BUYER_SEQUENCE_ENABLED` (apagado por defecto; apagado, el recorrido termina en el primer mensaje):
+   - Cuándo: M2, M3 y M4 a los `BUYER_SEQUENCE_DAYS` (4, 5 y 7) días del «Hecho, le escribí» del anterior; si el
+     anterior no se envió, el siguiente no se prepara. De lunes a viernes, dentro de la ventana de lectura.
+   - Qué: la metodología `secuencia_mensajes` (seis unidades de las clases 09 y 10, caso `BIB-09-secuencia-mensajes`
+     con su línea base). Reglas fijas por número (el M2 no repite ni se disculpa, el M3 pregunta por la persona
+     indicada, el M4 no pide ni ruega), una reescritura y el líder con sus preguntas por número. Siempre borradores:
+     la tarjeta del primer mensaje con «Seguimiento n de 4» (decisión de Gustavo del 17/11/2026).
+   - Parada: si responde, se cancelan los pendientes, el recorrido pasa a `respondio` y Slack avisa. Sin el inbox
+     encendido y leído en las últimas 3 h no se prepara nada y Slack lo dice una vez al día. El inbox lee primero los
+     hilos de estos compradores.
+   - Después del M4: 7 días sin respuesta y descanso de 90 días (`secuencia_sin_respuesta`); una señal suya la despierta.
+   - Para la fase 6: `REPLY_HANDLERS` (qué hacer cuando responde) y `link_referral` (el referido del M3).
+   - Embudo: cuántos recibieron M1 a M4, tras qué mensaje respondieron y los borradores por número. Para desplegar:
+     migración 0048 y el inbox encendido.
 5. **Ruta del que no publica.**
 6. **Respuesta, enlace de agenda (Cal.com) y entrega del lead.**
 7. **Lectura semanal del embudo.**
@@ -379,7 +394,7 @@ Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, u
 
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-20) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-21) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).

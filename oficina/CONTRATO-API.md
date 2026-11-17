@@ -283,6 +283,14 @@ Con `BUYER_FIRST_MESSAGE_ENABLED=true` (por defecto `false`) y el líder encendi
 - **`POST /api/v1/respuestas/<id>/mensaje`** `{how: "enviado" | "no", note?}` acepta también el id de un borrador del recorrido. Devuelve `{ "id": "uuid", "closed": { "how": "enviado" | "no", "at": "ISO", "note": "…" } }`; repetirlo devuelve el mismo cierre. «No escribirle» saca a la persona del recorrido (`descartado_por_gustavo`). 409 si el borrador ya no está en Tu turno; 404 si el id no es ni un comentario ni un borrador de mensaje. La app nunca envía el mensaje.
 - **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma en `borradores` (acumulado): `fuentes: ["mensaje_sugerido", "recorrido"]`, `recorrido: { preparados, pendientes, enviados, no_enviados, parados: { reglas, juez, hecho, cupo, conversacion } }` y `notas: { preparadas, con_invitacion, enviadas, parados: { … } }`. `pendientes` y `enviados` cuentan las dos fuentes.
 
+### Seguimientos 2 a 4 del comprador (fase 4)
+
+Con `BUYER_SEQUENCE_ENABLED=true` (por defecto `false`), la fase 3, el líder y el inbox encendidos (ficha BAR-21). Apagado, nada de esto aparece.
+
+- **Tu turno.** `tasks.mensajes` suma, después de las de la fase 3, las tarjetas `mensaje` de los seguimientos: `id: "dm:<borrador>"`, `title: "Seguimiento {n} de 4 para {persona}"`, prioridad `importante`, `agent: "relaciones_comunidad"`. Mismas acciones y mismo endpoint que el primer mensaje. `message` trae un campo opcional nuevo, `text_label: "Seguimiento {n} de 4"` (la etiqueta del texto sugerido; sin él, la PWA y la app ponen «Mensaje sugerido»), `comment` con el último mensaje que Gustavo le envió y `comment_label: "Tu mensaje {n-1} (hace X días)"`, `reply` y `reply_label` vacíos y `origin: "recorrido"`. La tarjeta no aparece si ella respondió ni si el inbox no se leyó en las últimas 24 h. `recent` dice «Seguimiento {n} de 4 para {persona}».
+- **`POST /api/v1/respuestas/<id>/mensaje`** acepta el id de un seguimiento. «Hecho, le escribí» registra el mensaje n y empieza a contar el plazo del siguiente; «No escribirle», salida definitiva. 409 si se canceló porque ella respondió.
+- **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma `secuencia: { recibieron: {"1".."4"}, respondieron_tras: {"1".."4"}, comprobacion: { curso, respuestas, tras_2_o_3, tras_2_o_3_pct, muestra_chica }, descansan, activa }` y, en `borradores`, `por_numero: {"1".."4": { preparados, pendientes, enviados, no_enviados, cancelados, parados }}`. `borradores.recorrido` sigue contando solo el primer mensaje; `pendientes` suma los seguimientos listos con el interruptor encendido. `descanso` puede traer `secuencia_sin_respuesta`.
+
 ### Trabajos y roles (escena de la oficina)
 
 Hay cuatro trabajos nuevos (`Job.kind`). Sus roles se derivan en `/api/v1/oficina/actividad`, sin cambios en la PWA:

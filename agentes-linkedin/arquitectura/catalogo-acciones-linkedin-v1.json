@@ -1580,7 +1580,7 @@
         "D15"
       ],
       "resultado_verificable": "Primer mensaje identificado y motivo de contacto registrado",
-      "criterio": "No enviar automáticamente por cada aceptación; interés real sin pitch encubierto ni secuencia de campaña.",
+      "criterio": "No enviar automáticamente por cada aceptación; interés real sin pitch encubierto. Sin secuencia de campaña, salvo la del comprador del recorrido (decisión de Gustavo del 17/11/2026, BAR-21): los mensajes 2 a 4 del curso a quien no respondió, a los 4, 5 y 7 días del anterior, siempre como borradores que Gustavo envía a mano (INB-08) y detenidos si responde.",
       "etapa": "alcance_principal",
       "responsable": null,
       "herramienta": null,

@@ -34,6 +34,7 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn de Gustavo (solo lectu
   4. **Dado** que se agotó el tope diario `chats=24` o `messages=60`, **cuando** toca leer, **entonces** no se lee más ese día.
   5. **Dado** una cuenta no operativa, **cuando** se comprueba, **entonces** no se lee y la cuenta pasa a pausa.
   6. **Dado** un remitente que es un contacto conocido, **cuando** se guarda, **entonces** la conversación queda enlazada a su `Contact` por id de proveedor o identificador público.
+- **Secuencia del comprador ([BAR-21](red.md#bar-21), con `BUYER_SEQUENCE_ENABLED`):** la regla «si responde, se detiene todo» se lee de aquí. Los hilos de compradores en la secuencia van primero (`secuencia_comprador.prioritize`: primero los que tienen el último mensaje de ella, después los que tienen un seguimiento que vence en un día), dentro de los mismos topes; no hay lecturas nuevas. Sin `INBOX_ENABLED` o sin una lectura (`inbox.read_run`) en las últimas `BUYER_SEQUENCE_INBOX_FRESH_HOURS` (3) no se prepara ningún seguimiento y Slack lo avisa una vez al día.
 - **Brechas código/docs:** el doc deja «Por comprobar contra la cuenta real» si el id del chat es el del hilo (`2-…`) y si los ids de remitente coinciden con `Contact.provider_user_id`. No se pudo verificar sin la cuenta.
 - **Cobertura QA:** pendiente
 
@@ -129,7 +130,7 @@ El agente `conversaciones_inbox` lee el inbox de LinkedIn de Gustavo (solo lectu
 
 - **Dónde:** backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** la app nunca responde ni manda mensajes en su nombre.
+- **Qué hace para Gustavo:** la app nunca responde ni manda mensajes en su nombre. Tampoco los seguimientos 2 a 4 del comprador ([BAR-21](red.md#bar-21)): son borradores en Tu turno que él copia y envía (decisión de Gustavo del 17/11/2026).
 - **Código:** el conector solo tiene `list_chats` y `list_chat_messages`; `tests/test_conversaciones.py` falla si aparece un método de envío.
 - **Criterios de aceptación:**
   1. **Dado** el conector directo o el simulado, **cuando** se inspecciona, **entonces** no tiene métodos para enviar, marcar como leído ni editar mensajes (la lista permitida del servicio navegador tampoco deja salir ninguno).
