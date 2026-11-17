@@ -261,6 +261,18 @@ GET `/api/v1/red/summary` (permiso `operate_linkedin`):
 - `enabled=false` significa que el bloque está apagado (`NETWORK_ENABLED=false`). La PWA lo avisa y sigue mostrando lo guardado.
 - `reads_today.execution` cuenta las lecturas de las ejecuciones de red: la comprobación previa, la relectura y la conciliación. No tiene tope (no aparece en `read_caps`), porque ninguna escritura sale sin su comprobación previa.
 
+### Invitaciones pendientes viejas (fase 2 del comprador)
+
+GET `/api/v1/red/invitaciones-pendientes?dias=21` (permiso `operate_linkedin`; `dias` entre 1 y 365, por defecto 21; fuera de rango, 400 con `detail`; `account` opcional, 404 si no existe). Solo lectura y nunca llama a LinkedIn. Lista las invitaciones de Gustavo que siguen pendientes después de `dias`, la más vieja primero, para que él decida si retira alguna a mano en LinkedIn: el equipo nunca retira una invitación ni vuelve a invitar mientras siga pendiente.
+```json
+{ "generado": "ISO", "dias": 21, "total": 1,
+  "invitaciones": [ { "persona": "uuid", "nombre": "Ana Buyer", "titular": "…", "perfil": "https://www.linkedin.com/in/…",
+                      "invitada": "ISO", "dias": 25, "papel": "comprador",
+                      "recorrido": { "paso": "descanso", "comentarios": 2, "intento": 1, "descanso_hasta": "ISO|null" } } ],
+  "nota": "Retirar una invitación es manual, en LinkedIn. …" }
+```
+`recorrido` es `null` para quien no tiene recorrido de comprador (pares, recomendadores…). Con `BUYER_WARMUP_ENABLED=true`, un comprador con dos comentarios que no aceptó en `BUYER_REST_AFTER_DAYS` (21) pasa a `paso: "descanso"` con su fecha de fin. La PWA todavía no lo muestra.
+
 La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente al tope de seguridad diario del equipo y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
 
 ### Trabajos y roles (escena de la oficina)
@@ -371,7 +383,7 @@ Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos c
 
 **Analítica de LinkedIn.** `GET /api/v1/resultados/analitica?periodo=7d|14d|28d|90d|365d` (por defecto `28d`) o `?desde=AAAA-MM-DD&hasta=AAAA-MM-DD`, con `cuenta` opcional. Es la analítica de creador de una cuenta `directo`, servida desde lo importado: nunca llama a LinkedIn. Días UTC. Trae `disponible`, `periodo`, `limites`, `actualizado`, `ultimo_error`, `totales` (fichas KPI con `days` y `days_with_data`), `serie`, `seguidores`, `posts` y `demografia`. La forma completa y sus reglas están en «Analítica de LinkedIn» de `agentes-linkedin/infra/docs/metricas-resultados.md`. La importa el trabajo `import_analytics`, una vez al día, con el rol `analista_barrio_resultados` en la escena.
 
-**Embudo del comprador.** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; fuera de rango, 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Trae el acumulado y cada semana (la cohorte de elegidos y su actividad), por etapa: elegidos → calentados (1 y 2 comentarios) → invitados → aceptaron → recibieron mensaje → respondieron → interesados → reunión. Cada etapa trae `personas`, `paso_pct` y `desde_elegidos_pct`. Incluye las comparaciones (ruta, calentamiento, nota, señal antes de invitar, entrada), los borradores pendientes frente a enviados y `muestra_chica` con menos de 30 invitaciones. La forma completa está en «Embudo del comprador» de `agentes-linkedin/infra/docs/metricas-resultados.md` (ficha BAR-18). La PWA todavía no lo muestra.
+**Embudo del comprador.** `GET /api/v1/resultados/embudo-comprador?semanas=1..26` (por defecto 8; fuera de rango, 400 con `detail`). Es solo lectura, con el permiso `operate_linkedin`, y nunca llama a LinkedIn. Trae el acumulado y cada semana (la cohorte de elegidos y su actividad), por etapa: elegidos → calentados (1 y 2 comentarios) → invitados → aceptaron → recibieron mensaje → respondieron → interesados → reunión. Cada etapa trae `personas`, `paso_pct` y `desde_elegidos_pct`. Incluye las comparaciones (ruta, calentamiento, nota, señal antes de invitar, señal de compra con fuente, entrada), los borradores pendientes frente a enviados y `muestra_chica` con menos de 30 invitaciones. La forma completa está en «Embudo del comprador» de `agentes-linkedin/infra/docs/metricas-resultados.md` (ficha BAR-18). La PWA todavía no lo muestra.
 
 
 ## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes

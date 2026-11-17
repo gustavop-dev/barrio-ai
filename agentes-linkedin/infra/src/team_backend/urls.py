@@ -46,6 +46,7 @@ urlpatterns=[
  path('linkedin/status',li.Status.as_view()),
  path('red/contacts',rd.Contacts.as_view()),path('red/contacts/<uuid:cid>',rd.ContactDetail.as_view()),
  path('red/contacts/<uuid:cid>/discard',rd.ContactDiscard.as_view()),path('red/contacts/<uuid:cid>/encaja',rd.ContactConfirmFit.as_view()),path('red/summary',rd.Summary.as_view()),
+ path('red/invitaciones-pendientes',rd.OldInvitations.as_view()),
  # Resultados: own-post and audience metrics against the previous period (docs/metricas-resultados.md).
  path('resultados',rs.Resultados.as_view()),
  # LinkedIn's own analytics of the directo account, from stored imports only (docs/metricas-resultados.md).
