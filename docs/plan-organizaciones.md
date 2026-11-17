@@ -13,7 +13,10 @@ Nada de esto está construido. Las fichas del catálogo siguen siendo la fuente 
 | 17/11/2026 | **Modelo basado en organizaciones**: la base de datos se comparte porque el objetivo es el mismo. |
 | 17/11/2026 | **Cada uno con su cuenta y su inicio de sesión**; cada uno maneja lo suyo. |
 | 17/11/2026 | Se intenta con el servidor actual (1 vCPU, 4 GB). |
-| 17/11/2026 | El CTO: rol «CTO», cuenta de LinkedIn gratuita. Sus textos (voz) llegan después. |
+| 17/11/2026 | El CTO: rol «CTO», cuenta de LinkedIn gratuita. |
+| 17/11/2026 | **Su voz se aprende de su uso**, no de textos previos: de los audios que grabe y de cómo responda y corrija lo que el equipo le propone. |
+| 17/11/2026 | **Oportunidades: un solo embudo de la empresa**, visible para los dos. |
+| 17/11/2026 | El outbound del comprador se mezcla primero (PR #135, apagado) y las organizaciones se construyen encima. |
 
 ## Diagnóstico (exploración del 17/11/2026, sobre `main`)
 
@@ -44,7 +47,7 @@ Lo que se rompería al conectar hoy una segunda persona:
 - Lista de referentes (se observan una sola vez para todos).
 - **Registro de personas**: una sola ficha por persona de LinkedIn en toda la organización, con el miembro que la
   atiende. Evita que dos socios contacten a la misma persona o empresa (LI-08-V006-K02).
-- Embudo de oportunidades de la empresa.
+- Embudo de oportunidades de la empresa (uno solo, visible para todos los miembros).
 - Presupuesto de IA (sin límite por miembro) y canales de Slack (cada aviso nombra al miembro).
 
 **Miembro** (Gustavo, el CTO): lo que es de cada uno.
@@ -61,7 +64,7 @@ Lo que se rompería al conectar hoy una segunda persona:
 **Qué ve cada uno:** cada miembro ve y maneja lo suyo. Del registro compartido de personas ve la ficha básica y quién
 la atiende; no ve las conversaciones ni los borradores de otro miembro. La parada total sigue siendo de toda la máquina.
 
-**Por definir con Gustavo:** si las oportunidades son un solo embudo visible para los dos (propuesta) o uno por miembro.
+Las oportunidades son un solo embudo de la empresa, visible para los dos; cada oportunidad dice qué miembro la trajo.
 
 ## Fases
 
@@ -86,16 +89,29 @@ memoria por servicio, cierre del navegador inactivo, alerta a Slack por memoria 
 ampliar (si la base de datos o los workers se reinician por memoria, o si los chequeos de salud fallan a diario).
 Las dos cuentas saldrían por la misma IP del servidor; el conector admite una salida propia por cuenta si hiciera falta.
 
+## La voz de un miembro nuevo
+
+El CTO no trae textos propios. Su voz se construye con lo que haga en la app (decisión del 17/11/2026):
+
+- **Audios y notas** que grabe con el botón de captura: de ahí salen sus temas, sus expresiones y sus hechos
+  (que él confirma antes de que cuenten como memoria).
+- **Sus respuestas y correcciones:** cada vez que edita, aprueba, rechaza o reescribe un borrador, y lo que contesta a
+  las preguntas del equipo, es una señal de estilo.
+- **Arranque:** mientras no haya muestra suficiente, el equipo escribe con una voz neutra y sobria, marca cada
+  borrador como «voz provisional» y le pide revisión (autonomía en «aprobación»). Con muestra suficiente (mínimos
+  explícitos de textos suyos aceptados), se genera su documento de voz, que él revisa y confirma; después se
+  actualiza con sus correcciones.
+- Lo que nunca se hace: usar la voz, los hechos o las fotos de otro miembro.
+
+Esto vive en la fase 3 (documento de voz por miembro) y en la fase 7 (arranque en voz provisional).
+
 ## Orden respecto del outbound
 
-El outbound del comprador (PR #135, sin mezclar) y este plan tocan los mismos archivos centrales (`operador.py`,
-`red.py`, `autopiloto.py`, `lider.py`, `respuestas.py`). Hacerlos en paralelo obliga a una fusión grande y arriesgada.
-Recomendación: mezclar primero el outbound (entra apagado, no cambia el comportamiento) y construir las organizaciones
-encima; así el recorrido del comprador nace ya por miembro.
+Decidido el 17/11/2026: el outbound del comprador (PR #135) se mezcló primero, apagado, y las organizaciones se
+construyen encima; así el recorrido del comprador nace ya por miembro. Los dos trabajos tocan los mismos archivos
+centrales (`operador.py`, `red.py`, `autopiloto.py`, `lider.py`, `respuestas.py`).
 
 ## Lo que falta de Gustavo
 
-1. Confirmar el orden respecto del outbound.
-2. Oportunidades: ¿un embudo de la empresa visible para los dos, o uno por miembro?
-3. Del CTO, antes de la fase 7: unos textos suyos para su voz, su trayectoria en pocas líneas, fotos, y sus temas.
-4. ¿El CTO publica a diario desde el principio o empieza con red y comentarios mientras llegan sus textos?
+1. Del CTO, antes de la fase 7: su trayectoria en pocas líneas, fotos y sus temas. La voz se aprende de su uso.
+2. ¿El CTO publica desde el principio con voz provisional y aprobación, o empieza con red y comentarios?
