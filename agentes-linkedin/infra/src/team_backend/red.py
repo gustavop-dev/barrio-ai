@@ -22,7 +22,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import db, providers
-from . import guardas, operador, ubicacion
+from . import comprador, guardas, operador, ubicacion
 from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .models import OPEN_ACTION_STATES, ActionExecution, ActionProposal, AuditEvent, Contact, ObservedPost, Referent
@@ -687,6 +687,7 @@ def _classify_batch(user,account,now,batch):
         with transaction.atomic():
             contact.save()
             record_classification(contact,observed_at=classified_at)
+        comprador.on_contact(contact,'clasificacion')  # buyer's journey: passive record, never stops the classification
     operador._audit(user,'network.classified',account.id,classified=classified,fit=fits,uncited=uncited,model=answer.get('model'),**grounding)
     return {'classified':classified,'fit':fits,'uncited':uncited,**grounding}
 
@@ -817,6 +818,7 @@ def check_stages(user,account,now=None,limit=3):
         with transaction.atomic():
             contact.save()
             if not passed:record_classification(contact,observed_at=now)
+        comprador.on_contact(contact,'verificacion_etapa')
         summary['passed']+=int(passed)
     return summary
 
@@ -926,9 +928,11 @@ def outbound_rules(account,now):
             if contact.stage=='fit':_stage(contact,'discarded','classified',classification['rule'])
             else:note(contact,'classified',classification['rule'])
             contact.save();record_classification(contact,observed_at=now);swept['outside']+=1
+            comprador.on_contact(contact,'reglas_comprador')
             continue
         if stage_check_enabled():classification['stage_check']={'state':'pending'};swept['stage_check']+=1
         contact.classification=classification;contact.save()
+        comprador.on_contact(contact,'reglas_comprador')
     return swept
 
 @transaction.atomic
@@ -1064,6 +1068,7 @@ def sync(user,account,now=None):
         from .evidencia import relationship
         relationship(contact,'invitation',f'received:{invitation["id"]}',now,
                      event_at=invitation.get('created_at'),direction='received')
+        comprador.on_contact(contact,'invitacion_recibida')
     sent_to={i['user']['id'] for i in sent}
     for contact in Contact.objects.filter(account=account,stage='invited',provider_user_id__in=sent_to):
         contact.evidence=dict(contact.evidence,invitation_checked_at=now.isoformat());contact.save(update_fields=['evidence'])
@@ -1079,6 +1084,7 @@ def sync(user,account,now=None):
                 respuestas.on_connected(contact)
             elif contact.stage in ('invited','incoming') and profile.get('relation_request_status')!='PENDING':
                 _stage(contact,'closed','closed','La invitación ya no está pendiente y no hay conexión.');contact.save();summary['closed']+=1
+            comprador.on_contact(contact,'sincronizacion')
     except ReadCapReached as exc:summary['stopped']=str(exc)
     except ConnectorError as exc:_pause_on(account,exc);summary['stopped']=str(exc)
     operador._audit(user,'network.synced',account.id,**summary)
@@ -1205,6 +1211,7 @@ def on_rejected(proposal,note_text=''):
     contact=Contact.objects.select_for_update().get(pk=proposal.contact_id)
     if contact.stage not in ('connected','invited','closed'):
         _stage(contact,'discarded','rejected',note_text or f'Rechazaste {proposal.capability}.');contact.save()
+        comprador.on_contact(contact,'veto')
 
 def discard(user,contact_id,note_text):
     require(user,'approve_actions')
@@ -1221,6 +1228,7 @@ def discard(user,contact_id,note_text):
             operador._audit(user,'operator.rejected',proposal.id)
         _stage(contact,'discarded','discarded',note_text.strip());contact.save()
         operador._audit(user,'network.contact_discarded',contact.id)
+        comprador.on_contact(contact,'descarte')
     return contact
 
 def requeue(user,account,before,confirm=False):
@@ -1281,6 +1289,7 @@ def confirm_fit(user,contact_id):
         contact.classification=dict(contact.classification,confirmed_by_gustavo={'at':timezone.now().isoformat(),'by':user.get_username()})
         note(contact,'confirmed_fit','Gustavo confirmó que encaja; el líder no vuelve a frenarla.');contact.save()
         operador._audit(user,'network.fit_confirmed',contact.id)
+        comprador.on_contact(contact,'encaja')
     return contact
 
 def confirmed_by_gustavo(proposal):

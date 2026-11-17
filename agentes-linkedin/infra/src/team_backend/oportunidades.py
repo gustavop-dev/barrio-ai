@@ -45,6 +45,9 @@ def create(user,data):
     item=Opportunity(created_by=user,modality=data['modality'])
     _apply(item,data);_set_stage(item,data.get('stage') or 'conversacion')
     item.save();audit(user,'opportunity.created',item.id,modality=item.modality,stage=item.stage)
+    if item.contact_id:
+        from . import comprador
+        comprador.on_contact(item.contact,'oportunidad')
     _notify(item)
     return item
 
@@ -64,6 +67,9 @@ def update(user,opportunity_id,data):
         moved=bool(data.get('stage'))
         item.updated_at=timezone.now();item.save()
     audit(user,'opportunity.updated',item.id,stage=item.stage)
+    if item.contact_id:
+        from . import comprador
+        comprador.on_contact(item.contact,'oportunidad')
     if moved:_notify(item)
     return item
 

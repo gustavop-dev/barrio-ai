@@ -216,6 +216,9 @@ def _from_messages(account,conversation,messages,now):
         conversation.last_from_me=shown[-1]['from_me']
         if shown[-1]['text']:conversation.last_message_preview=' '.join(shown[-1]['text'].split())[:300]
     conversation.updated_at=now;conversation.save()
+    if conversation.contact_id:
+        from . import comprador
+        comprador.on_contact(conversation.contact,'conversacion')  # the buyer's messages, before they leave the snapshot
 
 def read_inbox(user,account,now=None):
     """One run: refresh the account status, list the chats, read what is new (within the caps), judge and propose."""

@@ -635,6 +635,10 @@ def _finish(execution,state,actor,**fields):
         oficina_eventos.emit('publicacion','operador_cuenta','linkedin',
                              {ActionProposal.Capability.PUBLISH:'Publicación propia',ActionProposal.Capability.COMMENT:'Comentario publicado'}
                              .get(proposal.capability,'Respuesta en tu post'))
+    if proposal.contact_id or proposal.comment_id or proposal.post_id:
+        # The buyer's journey (comprador.py) only records what happened; a failure there is audited, never raised.
+        from . import comprador
+        comprador.on_execution(proposal,execution)
     _audit(actor,'operator.execution_'+state,execution.proposal_id,external_id=execution.external_id,
            error_kind=execution.error_kind,http_status=execution.http_status)
     return execution
