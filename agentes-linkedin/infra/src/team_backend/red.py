@@ -1022,7 +1022,8 @@ def plan(user,account,now=None):
     for row in BARRIO_TABLE:
         count=Contact.objects.filter(account=account,classification__fit=True,classification__role=row['role']).count()
         summary['distribution'].append(dict(row,available=count,gap=max(0,row['profiles']-count),
-            adaptation='Referencia adaptable de perfiles; no cuota de invitaciones. Faltantes requieren descubrimiento, nunca relleno.'))
+            adaptation='Referencia de perfiles del curso; las invitaciones siguen el reparto suave NETWORK_ROLE_SHARE '
+                       '(role_quota). Faltantes requieren descubrimiento, nunca relleno.'))
     if grounding['course_missing'] or operador.globally_paused() or account.paused:
         summary['stopped']='Biblioteca no disponible' if grounding['course_missing'] else 'Cuenta pausada'
         operador._audit(user,'network.planned',account.id,**summary);return summary
@@ -1051,6 +1052,10 @@ def plan(user,account,now=None):
         engaged=desenlaces.network_engaged([c.pk for c in candidates],days=30,now=now) if candidates else {}
         candidates=sorted(candidates,key=lambda c:c.pk not in engaged)
         if runtime:runtime.snapshot('network_engaged',lambda:[str(c.pk) for c in candidates if c.pk in engaged])
+        # BAR-18 (17/11/2026): the weekly role shares decide whose turn it is; the order inside each role stays.
+        from . import reparto
+        candidates,summary['role_quota']=reparto.order(candidates,account,now)
+        invited=[]
         # A scarce note goes first to someone who conversed with him on his post, with a slightly lower bar.
         exceptions=sorted((c for c in candidates if c.classification.get('confidence',0)>=(0.8 if (c.evidence or {}).get('conversed') else 0.9) and
             c.classification.get('invitation_note') and c.classification.get('note_reason') and
@@ -1065,7 +1070,10 @@ def plan(user,account,now=None):
                 payload.update(note=c['invitation_note'],note_reason=c['note_reason'],without_note_fallback=True)
                 try:operador.validate_payload(RED.INVITE,payload)
                 except ValueError:payload={'user_id':contact.provider_user_id}
-            summary['invite']+=bool(_propose(user,contact,RED.INVITE,payload,grounding))
+            proposal=_propose(user,contact,RED.INVITE,payload,grounding)
+            summary['invite']+=bool(proposal)
+            if proposal:invited.append(contact)
+        reparto.planned(summary['role_quota'],invited)
     if autonomy(RED.FOLLOW)!='off':
         # Leaders are followed too (their posts are where the team comments); only invitations leave them out.
         for contact in prioritized(waiting(RED.FOLLOW,stage='fit').exclude(id__in=stage_waiting()).order_by('discovered_at')):
@@ -1095,7 +1103,7 @@ def diverse_candidates(contacts):
 
     The community is not only buyers («el curso dice que no solo deben ser buyers»): every role is invited except the
     leaders, who get comments instead (LI-03-V021-K03, M006-K05). Since 17/11/2026 a Latin American buyer is a target,
-    after the US ones. No uniform rotation or invented percentages: the table's attention goals stay separate.
+    after the US ones, and whose turn it is across roles is the soft weekly share of reparto (NETWORK_ROLE_SHARE).
     """
     return prioritized(c for c in contacts if c.classification.get('role') not in (None,'','lider'))
 

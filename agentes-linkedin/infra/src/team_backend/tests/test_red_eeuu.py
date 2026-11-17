@@ -235,7 +235,7 @@ class PlanOrderTests(NetworkBase):
         contact.location=location;contact.classification.update(role=role,confidence=confidence);contact.save()
         return contact
 
-    def test_invitations_fill_from_us_buyers_to_the_latam_community_with_its_buyer_first(self):
+    def test_invitations_take_turns_by_role_share_and_a_latam_buyer_is_invited_too(self):
         self.person('latam-par','Par LatAm','par','Bogotá, Colombia',confidence=0.99)
         self.person('us-ally','Aliado US','aliado','New York, NY',confidence=0.7)
         self.person('us-buyer','Comprador US','comprador','Austin, Texas',confidence=0.6)
@@ -247,8 +247,9 @@ class PlanOrderTests(NetworkBase):
             summary=red.plan(self.bot,self.account)
         self.assertEqual((summary['invite'],summary['follow'],summary['outbound_rules']['outside']),(4,0,1))
         invited=list(ActionProposal.objects.filter(capability='RED-02').order_by('created_at').values_list('contact__display_name',flat=True))
-        # 17/11/2026: the Latin American buyer is invited too, after the US and first in Latin America.
-        self.assertEqual(invited,['Comprador US','Aliado US','Comprador MX','Par LatAm'])
+        # Every share starts the week at zero: the buyer wins the tie, then each turn goes to the share furthest below its
+        # own (allies share the recommenders'), and the Latin American buyer comes back when the buyers' turn does.
+        self.assertEqual(invited,['Comprador US','Aliado US','Par LatAm','Comprador MX'])
         self.assertFalse(ActionProposal.objects.filter(contact=leader).exists())
         abroad.refresh_from_db();self.assertTrue(abroad.classification['fit'])  # classified before 12/11: he stays
 

@@ -12,7 +12,7 @@ from datetime import datetime, timedelta
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
 
-from team_backend import evaluaciones, lider, nivel_comprador, red, research
+from team_backend import evaluaciones, lider, nivel_comprador, red, reparto, research
 from team_backend.models import ActionProposal, AuditEvent, Contact
 from team_backend.tests.test_red import NetworkBase
 
@@ -261,4 +261,52 @@ class ScoreTests(BuyerBase):
         funnel=self.human.get('/api/v1/red/summary').json()['buyers']
         self.assertEqual(funnel['por_nivel']['probable'],{'entraron':1,'seguidos':1,'invitados':0,'aceptaron':0})
         self.assertEqual(sum(row['entraron'] for row in funnel['por_puntaje'].values()),1)
+
+
+class QuotaTests(BuyerBase):
+    def person(self,slug,role,stage='followed'):
+        contact=self.contact(slug,slug.title(),stage=stage,followed_hours=72)
+        contact.location='Austin, Texas';contact.classification=dict(contact.classification,role=role);contact.save()
+        return contact
+
+    def test_the_shares_are_read_and_a_bad_value_is_a_configuration_error(self):
+        self.assertEqual(reparto.shares(),[(('comprador',),20),(('recomendador','aliado'),15),(('divulgador',),20),(('par',),25)])
+        for raw in ('lider=10','comprador=20,comprador=5','vendedor=5','comprador=0','comprador'):
+            with self.subTest(raw),patch.dict(os.environ,{'NETWORK_ROLE_SHARE':raw}),self.assertRaises(ValueError):reparto.shares()
+        people=[self.person('q-par','par'),self.person('q-buyer','comprador')]
+        with patch.dict(os.environ,{'NETWORK_ROLE_SHARE':''}):
+            self.assertEqual(reparto.order(people,self.account),(people,[]))  # off: the plan's order as it was
+
+    def test_the_role_furthest_below_its_share_goes_first_and_the_others_take_what_is_left(self):
+        pars=[self.person(f'q-par{n}','par') for n in range(3)]
+        for par in pars[:2]:operador_proposal(self,par)  # two invitations to peers already this week
+        ally=self.person('q-ally','aliado');buyer=self.person('q-buyer','comprador');spreader=self.person('q-div','divulgador')
+        ordered,report=reparto.order([pars[2],ally,spreader,buyer],self.account)
+        self.assertEqual([c.display_name for c in ordered],['Q-Buyer','Q-Ally','Q-Div','Q-Par2'])
+        rows={tuple(row['roles']):row for row in report}
+        self.assertEqual((rows[('par',)]['invited'],rows[('par',)]['ready']),(2,1))
+        self.assertEqual(rows[('recomendador','aliado')]['ready'],1)  # an ally takes the recommenders' turn
+        only=[self.person(f'q-solo{n}','par') for n in range(2)]
+        self.assertEqual(reparto.order(only,self.account)[0],only)  # without buyers the peers take the turns
+
+    def test_the_weekly_target_follows_the_ramp(self):
+        for stage,target in ((0,10),(1,20),(2,25)):
+            red._save_ramp({'stage':stage,'stage_since':'2026-11-01T00:00:00+00:00','freeze_until':'2026-11-01T00:00:00+00:00',
+                            'pause_until':None},'fixture',datetime(2026,11,1,tzinfo=BOGOTA))
+            with self.subTest(stage):
+                _,report=reparto.order([self.person(f'q-r{stage}','comprador')],self.account)
+                self.assertEqual(report[0]['weekly_target'],target)
+
+    def test_the_plan_records_the_shares_with_what_it_planned(self):
+        self.person('q-p1','par');self.person('q-b1','comprador')
+        summary=red.plan(self.bot,self.account)
+        rows={tuple(row['roles']):row for row in summary['role_quota']}
+        self.assertEqual((rows[('comprador',)]['planned'],rows[('par',)]['planned'],rows[('divulgador',)]['planned']),(1,1,0))
+        event=AuditEvent.objects.filter(action='network.planned').latest('created_at')
+        self.assertEqual(event.metadata['role_quota'],summary['role_quota'])
+
+
+def operador_proposal(case,contact):
+    from team_backend import operador
+    operador.create_proposal(case.bot,None,'RED-02',{'user_id':contact.provider_user_id},source='agent',contact=contact)
 
