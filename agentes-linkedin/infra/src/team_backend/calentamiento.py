@@ -227,9 +227,12 @@ def _store(account,post):
 
 def read_posts(account,connector,now=None):
     """A. Read the recent posts of the buyers due (to_read), within today's buyer reads. Returns a summary; a connector
-    failure stops like observe does (a pausing error pauses the account, a deferred one waits for the next run)."""
+    failure stops like observe does (a pausing error pauses the account, a deferred one waits for the next run). Only
+    inside READ_WINDOW, like every periodic read of the team: an observe Gustavo asks for at night reads his referents,
+    never the buyers (`fuera_de_ventana`)."""
     now=now or timezone.now()
     out={'personas':0,'nuevos':0,'vistos':0,'comentables':0,'sin_posts':0,'tope':False,'errores':[]}
+    if not operador.within_read_window(now):return dict(out,fuera_de_ventana=True)
     for journey in to_read(account,now):
         contact=journey.contact
         try:

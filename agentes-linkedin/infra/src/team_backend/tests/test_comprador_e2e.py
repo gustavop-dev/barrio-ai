@@ -1099,3 +1099,45 @@ class FirstMessageSwitchOffPathTests(FirstMessagePathBase):
             self.assertFalse(BuyerDraft.objects.exists())
             drafts=self.funnel()['borradores']
             self.assertEqual((drafts['recorrido']['preparados'],drafts['notas']['preparadas']),(0,0))
+
+
+class BuyerReadWindowTests(FirstMessagePathBase):
+    """READ_WINDOW (#133) also covers the buyer's periodic work (merge of 17/11/2026): reading her posts
+    (calentamiento.read_posts, the observe only for buyers) and preparing her drafts (autopiloto._buyer_drafts) happen only
+    inside the window, like every other background read; an observe Gustavo asks for at night reads only the referents."""
+    WINDOW={'READ_WINDOW':'07:00-21:00','OPERATOR_TIMEZONE':'America/Bogota'}
+
+    def local(self,hour,days=0):
+        """Today (or `days` later) at `hour`, Bogotá time, never in the past."""
+        from zoneinfo import ZoneInfo
+        moment=timezone.now().astimezone(ZoneInfo('America/Bogota')).replace(hour=hour,minute=0,second=0,microsecond=0)+timedelta(days=days)
+        return moment if moment>timezone.now() else moment+timedelta(days=1)
+
+    def test_her_posts_are_read_only_inside_the_window(self):
+        ana=self.chosen_and_followed()
+        self.their_new_post(ana)
+        night=self.local(23);morning=night+timedelta(hours=11)
+        connector=operador.get_connector(self.account)
+        with patch.dict(os.environ,self.WINDOW):
+            self.assertEqual(autopiloto._observe(self.bot,self.account,night),0)  # nothing queued at night
+            with patch('django.utils.timezone.now',return_value=night):
+                out=calentamiento.read_posts(self.account,connector,night)  # an observe asked for at night
+            self.assertEqual((out['personas'],out.get('fuera_de_ventana')),(0,True))
+            self.assertFalse(AuditEvent.objects.filter(action=calentamiento.READ_ACTION).exists())
+            self.assertEqual(autopiloto._observe(self.bot,self.account,morning),1)  # the observe only for buyers
+            self.assertTrue(Job.objects.get(kind='observe').params['solo_compradores'])
+            with patch('django.utils.timezone.now',return_value=morning):
+                out=calentamiento.read_posts(self.account,connector,morning)
+        self.assertEqual((out['personas'],out.get('fuera_de_ventana')),(1,None))
+
+    def test_her_drafts_are_prepared_only_inside_the_window(self):
+        ana=self.answered('ana-acme','Ana Acme')
+        self.texts[('buyer-message','Ana Acme')]=case_text('primer_mensaje_comprador','M1')
+        self.invite(ana)
+        ana=self.accepted(ana)
+        night=self.local(23)
+        with patch.dict(os.environ,self.WINDOW):
+            self.assertEqual(self.prepare(night),0)
+            self.assertEqual((self.drafts_of(ana,'mensaje'),Job.objects.filter(kind='prepare_buyer_draft',params__kind='mensaje').count()),([],0))
+            self.prepare(night+timedelta(hours=11))  # 10:00 the next morning
+        self.assertEqual(self.drafts_of(ana,'mensaje')[-1].state,'listo')

@@ -561,10 +561,12 @@ def _buyer_drafts(user,account,now):
     """Phase 3 (BUYER_FIRST_MESSAGE_ENABLED, with the lead on): the decisions that need no paid call (nothing real to cite,
     no note left, a conversation already, drafts that no longer apply) and then one paid draft at a time
     (prepare_buyer_draft): the note of a warmed buyer about to be invited, or the first message of an accepted one when
-    it is due. Never sends anything (INB-08). Returns the decisions plus the job queued."""
+    it is due. Never sends anything (INB-08). Returns the decisions plus the job queued. Only inside READ_WINDOW, like the
+    periodic reads: a draft builds on what the reads brought (her posts, the inbox), and its card is for the day."""
     from . import mensajes_comprador
     from knowledge import presupuesto
     if not mensajes_comprador.active() or account.provider not in ('fake','directo'):return 0
+    if not operador.within_read_window(now):return 0
     if _pending('prepare_buyer_draft'):return 0
     decided,item=mensajes_comprador.step(account,now)
     if item is None or presupuesto.left(now)<=0:return decided
