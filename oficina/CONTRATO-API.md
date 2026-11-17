@@ -248,7 +248,7 @@ En estas acciones, `post` y `piece_id` son **siempre `null`**. Se aprueban, veta
 | `incoming` | Te invitó | Te invitó; se aceptará si encaja. |
 
 Valores que muestra la PWA:
-- `role`: `par` → Par, `recomendador` → Recomendador, `lider` → Líder, `comprador` → Comprador, `divulgador` → Divulgador, `aliado` → Aliado.
+- `role`: `par` → Par, `recomendador` → Recomendador, `lider` → Líder, `comprador` → Comprador, `divulgador` → Divulgador, `aliado` → Aliado, `partner` → Partner (BAR-25, solo con `NETWORK_PROJECTAPP_BUYER_ENABLED`).
 - `modality`: `personal_startups` → «Startups (personal)», `projectapp` → «ProjectApp», `alianzas` → «Alianzas», `comunidad_autoridad` → «Comunidad». Son las modalidades de la red; el calendario editorial usa las suyas (`comunidad`, «Personal · startups»).
 - `affinity`: `hispanohablante_declarada` → «Hispanohablante (declarado)», `otra` → «Otra», `desconocida` → «Sin dato».
 - `source`: `commenter` → «Comentó en un post de <referent>», `search` → «Búsqueda: <query>», `incoming` → «Te invitó», `manual` → «Añadido a mano».
@@ -480,6 +480,21 @@ Desde el 17/11/2026 (BAR-24) trae además `entrada_comprador`, de solo lectura, 
 ```
 
 `calentados` cuenta a quien recibió al menos un comentario antes de la invitación. `sin_nivel` y `sin_puntaje` agrupan los recorridos anteriores a BAR-24.
+
+Desde el 17/11/2026 (BAR-25), solo con `NETWORK_PROJECTAPP_BUYER_ENABLED=true`, el embudo suma tres claves de solo lectura (apagado, no aparecen):
+
+```text
+"por_linea":    { "projectapp|startup": <bloque> },
+"por_segmento": { "educacion_en_linea|retail_ecommerce|duenos_latinos_eeuu|otro": <bloque> },
+"prueba_projectapp": { "semana", "de": 13, "desde": "2026-11-17", "revision": "2027-02-17", "activo",
+                       "por_segmento": { "<segmento>": { "invitaciones", "aceptaron", "respondieron", "reunion", "muestra" } },
+                       "por_linea":    { "projectapp|startup": { …lo mismo… } },
+                       "partner": { "invitaciones", "muestra" }, "regla" } }
+```
+
+`<bloque>` tiene la forma de `acumulado` (`personas`, `etapas`, `invitaciones`, `muestra_chica`, `aviso`). La línea y el segmento son los de la entrada del recorrido (`BuyerJourney.line`/`segment`, migración `0054`); un recorrido anterior sin línea cuenta como `startup`. `muestra` es `true` desde 30 invitaciones: antes no se juzga.
+
+En `ContactOutput.classification`, el comprador (`buyer`) puede traer además `line` (`projectapp|startup`) y, solo en la línea ProjectApp, `papel` (`lider_tecnologia|dueno`), `segment`, `also_segments`, `company_size` (`menos_de_20|20_a_200|201_a_1000|mas_de_1000|""`), `size_basis` (`web` cuando lo dio la verificación web), `score_version: "buyer_score_v2"` y, en `score_breakdown`, las piezas del puntaje v2 (`evidencia`, `tamano`, `senal`, `mercado`, `papel`, `confianza`). El rol nuevo `partner` (agencia o consultora que podría derivar desarrollo) aparece solo con el interruptor encendido.
 
 
 ## Rediseño (DISENO-VISTAS.md): Tu turno, Calendario, Personas, Ajustes

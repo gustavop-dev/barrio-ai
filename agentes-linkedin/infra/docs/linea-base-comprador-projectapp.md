@@ -54,3 +54,36 @@ right: 2/8
 La prueba `test_antes_the_case_shows_where_the_buyer_of_today_is_only_a_startup_buyer` fija estos errores exactos. Después
 del cambio sigue corriendo con `NETWORK_PROJECTAPP_BUYER_ENABLED=false`: si el interruptor apagado da otra cosa que esta
 línea base, el apagado ya no es el comportamiento de hoy y la prueba falla.
+
+## Después (mismo caso, `NETWORK_PROJECTAPP_BUYER_ENABLED=true`)
+
+- **Fecha:** 17/11/2026, rama `feat/comprador-projectapp`. Mismo entorno, mismas personas sintéticas, mismas funciones de
+  producción; el modelo simulado responde lo que pide el prompt nuevo (`despues`). Prueba:
+  `test_despues_with_the_switch_on_every_person_goes_where_gustavo_said`.
+
+| Variante | Observado después | Por qué |
+| --- | --- | --- |
+| P1 | ProjectApp, líder de tecnología, retail, `confirmado`, **99** (evidencia 32 + tamaño 26 + contrata desarrolladores 10 + mercado 14 + decide 12 + confianza 5) | La revisión web de ProjectApp lee el tamaño (20 a 200) y la vacante con fuente y fecha. |
+| P2 | ProjectApp, dueña, educación en línea y también dueños latinos en EE. UU., `por_confirmar`, **72** (10 + 26 + sin señal 5 + 14 + 12 + 5) | El segmento de industria gana; la coincidencia latina queda en `also_segments`. |
+| P3 | ProjectApp, dueño, otro, `por_confirmar`, **48** (10 + menos de 20: 2 + 5 + 14 + 12 + 5): el más bajo, sigue en el barrio | El puntaje v2 mira el tamaño; nadie sale por falta de datos. |
+| P4 | **Fuera** con `projectapp.SIZE_RULE` (más de 1000 personas) aunque el modelo dijo `probable` | Regla fija en código, no confianza en el modelo. |
+| P5 | `partner`, se sigue y se invita (cupo de partner), **sin recorrido** de comprador | Papel nuevo distinto del aliado. |
+| P6 | `par` | Igual que antes. |
+| P7 | Comprador línea startup, `confirmado`, 99 (componentes de v1) | La línea startup conserva el puntaje de antes. |
+| P8 | `aliado` | Igual que antes. |
+
+Invitaciones a compradores de ProjectApp, en orden: **P1, P2, P3** (ciclo 1: P1, P7, P5, P8, P6 por el reparto
+28/12/12/8/10/10; ciclo 2: P2, P3).
+
+```
+grade_projectapp_case: passed True
+errors: (ninguno)
+right: 8/8
+BIB-08-con-quien (grade_course_case): passed, citas de las 9 unidades de la clase 08
+```
+
+Con el interruptor apagado la misma prueba da exactamente la línea base (2/8, los mismos 15 errores y el orden P1, P4,
+P2, P3): `test_antes_the_case_shows_where_the_buyer_of_today_is_only_a_startup_buyer`.
+
+Lo que esto no prueba: cómo responde el modelo real al prompt nuevo (no se hizo una corrida pagada). La primera semana en
+producción lo mide: `manage.py operador reevaluar-compradores` en seco y la lectura del lunes por segmento.
