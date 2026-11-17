@@ -229,3 +229,110 @@ def entry_funnel(account=None):
             row['entraron']+=1;row['seguidos']+=bool(contact.followed_at);row['invitados']+=bool(contact.invited_at)
             row['aceptaron']+=bool(contact.connected_at)
     return out
+
+# --------------------------------------------------------------------------- who left before 17/11/2026
+
+REEVALUATED='network.buyer_reevaluated'
+REGION_RULE='Comprador fuera de EE. UU.'
+# The classifier's reasons for a buyer it discarded for lack of public evidence, not for evidence against.
+ABSENCE=re.compile(r'sin evidencia|no hay evidencia|ninguna evidencia|hip[oó]tesis|falta (?:de )?(?:informaci[oó]n|evidencia|datos)|'
+                   r'sin (?:datos|informaci[oó]n|se[nñ]ales)|no (?:se )?(?:muestra|ve|menciona|consta|indica|declara)|'
+                   r'no (?:est[aá] )?claro|insuficiente|sin (?:ronda|clientes|tracci[oó]n) visible',re.I)
+# What a person's memory keeps when Gustavo (a veto, a discard) or LinkedIn (a restricted profile) said no.
+SAID_NO=('rejected','discarded')
+ACTIONS={'fuera_de_eeuu':'restaurar','sin_evidencia_web':'restaurar','sin_evidencia_clasificador':'reclasificar',
+         'sin_nivel':'completar'}
+
+
+def reevaluation_group(contact):
+    """Why a buyer is reevaluated under the levels of 17/11/2026, or None:
+    - fuera_de_eeuu: the region rule of 12/11 took out someone the classifier said fits (restaurar, in place);
+    - sin_evidencia_web: three web checks without findings took them out (restaurar, por_confirmar, no new search);
+    - sin_evidencia_clasificador: the classifier said no for lack of public evidence (reclasificar: back to the queue,
+      the normal classify job judges them with the new prompt);
+    - sin_nivel: a buyer in course without level or score (completar, nothing else changes).
+    Nobody Gustavo or LinkedIn said no to, nobody he confirmed, nobody invited, connected or closed."""
+    c=contact.classification or {}
+    if c.get('role')!='comprador' or c.get('confirmed_by_gustavo') or contact.stage not in ('discarded','fit','followed'):return None
+    if any(event.get('event') in SAID_NO for event in contact.history or []):return None
+    check=c.get('stage_check') or {};rule=c.get('rule') or ''
+    if c.get('fit'):return 'sin_nivel' if contact.stage!='discarded' and not c.get('buyer') else None
+    if rule.startswith(REGION_RULE):return 'fuera_de_eeuu'
+    if check.get('state')=='failed' and check.get('verdict')=='sin_evidencia':return 'sin_evidencia_web'
+    if not rule and contact.stage=='discarded' and ABSENCE.search(c.get('reason') or ''):return 'sin_evidencia_clasificador'
+    return None
+
+
+def _restored(contact,group,now):
+    """The classification of a buyer who comes back in place, at por_confirmar."""
+    from . import red
+    c=dict(contact.classification);c.pop('rule',None);c['fit']=True
+    check=c.get('stage_check') or {}
+    if group=='sin_evidencia_web':
+        c['stage_check']=dict(check,state='ok',verdict='por_confirmar',reevaluated_at=now.isoformat())
+    elif red.stage_check_enabled() and check.get('state')!='ok':c['stage_check']={'state':'pending'}
+    buyer={'profile':'','level':'por_confirmar','us_market':False,'evidence':(c.get('reason') or '')[:400],
+           'sources':[contact.profile_url] if contact.profile_url else [],'basis':'perfil'}
+    return c,buyer
+
+
+def reevaluate(user,account,confirm=False,now=None):
+    """The buyers who left or stayed without a level under the rules before 17/11/2026, with the action each one gets.
+    Without `confirm` it only lists them (no change, no paid call). With it, each one changes in its own transaction
+    and leaves an audit event; running it again finds nobody (idempotent). Restoring and completing spend nothing;
+    whoever is sent back to the classifier is judged by the normal classify job, in its batches and budget."""
+    from django.db import transaction
+    from . import operador, red
+    from .evidencia import record_classification
+    from .models import Contact
+    from .permissions import require
+    require(user,'operate_linkedin')
+    now=now or timezone.now()
+    rows=[]
+    for contact in Contact.objects.filter(account=account,classification__role='comprador').order_by('discovered_at'):
+        group=reevaluation_group(contact)
+        if group is None:continue
+        level='por_confirmar' if group!='sin_nivel' else level_of(contact)
+        if group=='sin_nivel':result=score(contact,level)
+        else:
+            previous=contact.classification
+            contact.classification=dict(previous,fit=True,buyer=_restored(contact,group,now)[1])
+            try:result=score(contact,level)
+            finally:contact.classification=previous
+        rows.append({'id':str(contact.pk),'name':contact.display_name,'group':group,'action':ACTIONS[group],'level':level,
+                     'score':result.get('score'),'provisional':group=='sin_evidencia_clasificador',
+                     'reason':((contact.classification or {}).get('rule') or (contact.classification or {}).get('reason') or '')[:160]})
+    rows.sort(key=lambda row:(-(row['score'] or 0),row['name']))
+    found={group:sum(row['group']==group for row in rows) for group in ACTIONS}
+    applied=0
+    if confirm:
+        for row in rows:
+            with transaction.atomic():
+                contact=Contact.objects.select_for_update().get(pk=row['id'])
+                group=reevaluation_group(contact)
+                if group!=row['group'] or contact.proposals.filter(state__in=['executing','sent','uncertain']).exists():continue
+                if group=='sin_evidencia_clasificador':
+                    contact.classification={}
+                    red._stage(contact,'candidate','requeued','Vuelve al clasificador con los niveles del comprador (17/11/2026): '
+                               'antes salió por falta de evidencia pública.')
+                elif group=='sin_nivel':
+                    buyer=dict(contact.classification.get('buyer') or {},level=level_of(contact))
+                    buyer.setdefault('evidence',(contact.classification.get('reason') or '')[:400])
+                    buyer.setdefault('sources',[contact.profile_url] if contact.profile_url else [])
+                    buyer.setdefault('basis','perfil')
+                    contact.classification=dict(contact.classification,buyer=with_score(contact,buyer))
+                    red.note(contact,'reevaluated',f"Nivel {buyer['level']} y puntaje del comprador (17/11/2026).")
+                else:
+                    classification,buyer=_restored(contact,group,now)
+                    contact.classification=classification
+                    contact.classification['buyer']=with_score(contact,buyer)
+                    stage='fit' if contact.stage=='discarded' else contact.stage
+                    red._stage(contact,stage,'reevaluated','Vuelve al barrio por confirmar (17/11/2026): solo la evidencia en '
+                               'contra saca a un comprador.')
+                if contact.classification:
+                    contact.classification['buyer']['entry']=record_entry(contact,now)
+                contact.save()
+                if contact.classification:record_classification(contact,observed_at=now)
+                operador._audit(user,REEVALUATED,contact.pk,group=group,step=ACTIONS[group],score=row['score'])
+                applied+=1
+    return {'found':found,'total':len(rows),'applied':applied,'people':rows}

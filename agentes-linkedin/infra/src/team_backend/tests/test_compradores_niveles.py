@@ -9,8 +9,11 @@ answer, not how the real model answers. Synthetic people and sources only."""
 import json
 import os
 from datetime import datetime, timedelta
+from io import StringIO
 from unittest.mock import patch
 from zoneinfo import ZoneInfo
+
+from django.core.management import call_command
 
 from team_backend import evaluaciones, lider, nivel_comprador, red, reparto, research
 from team_backend.models import ActionProposal, AuditEvent, Contact
@@ -310,3 +313,56 @@ def operador_proposal(case,contact):
     from team_backend import operador
     operador.create_proposal(case.bot,None,'RED-02',{'user_id':contact.provider_user_id},source='agent',contact=contact)
 
+
+class ReevaluationTests(BuyerBase):
+    def setUp(self):
+        super().setUp()
+        def left(slug,name,location='Austin, Texas',stage='discarded',events=('classified',),**classification):
+            contact=self.contact(slug,name,stage=stage,followed_hours=72 if stage=='followed' else None)
+            contact.location=location;contact.headline='Founder & CEO at Acme · SaaS'
+            contact.classification=dict(contact.classification,**classification)
+            contact.history=[{'at':'2026-11-13T00:00:00+00:00','event':event,'detail':''} for event in events];contact.save()
+            return contact
+        self.region=left('r-region','Rosa Region',location='Bogotá, Colombia',fit=False,
+                         rule='Comprador fuera de EE. UU.: el barrio busca founders allí (Gustavo, 12/11/2026).')
+        self.web=left('r-web','Walter Web',fit=False,rule='Sin ronda semilla o clientes visibles en la web: no es comprador (Gustavo, 12/11/2026).',
+                      stage_check={'state':'failed','verdict':'sin_evidencia','attempts':3},events=('classified','stage_checked'))
+        self.absent=left('r-absent','Ada Ausente',fit=False,reason='Founder en EE. UU., sin evidencia de ronda semilla ni clientes que pagan.')
+        self.against=left('r-against','Gabi Idea',fit=False,reason='Presemilla declarada, en etapa de idea y sin ingresos.')
+        self.vetoed=left('r-veto','Vera Veto',location='Lima, Peru',fit=False,events=('classified','discarded'),
+                         rule='Comprador fuera de EE. UU.: el barrio busca founders allí (Gustavo, 12/11/2026).')
+        self.followed=left('r-seguido','Sergio Seguido',location='Mexico City',stage='followed',fit=True)
+        self.invited=left('r-invitado','Ines Invitada',stage='invited',fit=False,
+                          rule='Comprador fuera de EE. UU.: el barrio busca founders allí (Gustavo, 12/11/2026).')
+
+    def test_the_dry_run_lists_by_score_and_changes_nothing(self):
+        before={c.pk:(c.stage,c.classification) for c in Contact.objects.all()}
+        result=nivel_comprador.reevaluate(self.bot,self.account)
+        self.assertEqual(result['found'],{'fuera_de_eeuu':1,'sin_evidencia_web':1,'sin_evidencia_clasificador':1,'sin_nivel':1})
+        self.assertEqual((result['total'],result['applied']),(4,0))
+        scores=[row['score'] for row in result['people']]
+        self.assertEqual(scores,sorted(scores,reverse=True))
+        self.assertEqual({row['name'] for row in result['people']},{'Rosa Region','Walter Web','Ada Ausente','Sergio Seguido'})
+        self.assertEqual({c.pk:(c.stage,c.classification) for c in Contact.objects.all()},before)
+        out=StringIO()
+        call_command('operador','--usuario','gustavo-test','reevaluar-compradores','--cuenta',str(self.account.id),stdout=out)
+        self.assertIn('Compradores a reevaluar: 4',out.getvalue());self.assertIn('Sin --confirmar no se cambia nada.',out.getvalue())
+        self.assertIn('Ada Ausente',out.getvalue())
+
+    def test_confirming_restores_requeues_and_completes_once(self):
+        result=nivel_comprador.reevaluate(self.bot,self.account,confirm=True)
+        self.assertEqual(result['applied'],4)
+        for contact in (self.region,self.web,self.absent,self.against,self.vetoed,self.followed,self.invited):contact.refresh_from_db()
+        self.assertEqual((self.region.stage,self.region.classification['fit'],self.region.classification['stage_check']),('fit',True,{'state':'pending'}))
+        self.assertNotIn('rule',self.region.classification)
+        self.assertEqual((self.web.stage,self.web.classification['stage_check']['state'],self.web.classification['stage_check']['verdict']),
+                         ('fit','ok','por_confirmar'))
+        for contact in (self.region,self.web,self.followed):
+            with self.subTest(contact.display_name):
+                buyer=contact.classification['buyer']
+                self.assertEqual((buyer['level'],buyer['entry']['level'],buyer['score']),('por_confirmar','por_confirmar',red.buyer_score(contact)['score']))
+        self.assertEqual((self.absent.stage,self.absent.classification),('candidate',{}))
+        self.assertEqual((self.against.stage,self.vetoed.stage,self.invited.stage,self.followed.stage),('discarded','discarded','invited','followed'))
+        self.assertEqual(AuditEvent.objects.filter(action=nivel_comprador.REEVALUATED).count(),4)
+        again=nivel_comprador.reevaluate(self.bot,self.account,confirm=True)
+        self.assertEqual((again['total'],again['applied']),(0,0))
