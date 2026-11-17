@@ -57,7 +57,7 @@ class OfficeTests(OperatorBase):
         data=self.browser.get('/api/v1/operador/overview').json()
         self.assertEqual(data['control']['source'],'none')
         capacity=data['accounts'][0]['capacity']['INT-03']
-        self.assertEqual(capacity,{'daily':5,'weekly':25,'daily_used':1,'weekly_used':1,'left':4})
+        self.assertEqual(capacity,{'daily':15,'weekly':75,'daily_used':1,'weekly_used':1,'left':14})
         self.assertEqual(data['today']['proposals']['confirmed'],1)
         self.assertEqual(data['counts']['posts'],2)
         self.assertEqual(data['autopilot']['policy_version'],autopiloto.POLICY_VERSION)

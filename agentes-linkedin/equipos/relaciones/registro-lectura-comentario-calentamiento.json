@@ -113,7 +113,7 @@
         "No se completa el número con elogios: la condición «de valor» se conserva."
       ],
       "uso": {
-        "regla_fija": "calentamiento.quotas: el tope diario de INT-03 se reparte compradores 6, comunidad 2, referentes 2 (BUYER_COMMENT_SHARE, decisión de Gustavo del plan, no la cifra del curso); los topes no cambian",
+        "regla_fija": "calentamiento.quotas: el tope diario de INT-03 se reparte compradores 8, comunidad 2, referentes 5 (BUYER_COMMENT_SHARE, decisión de Gustavo del 17/11/2026, no la cifra del curso); el tope de INT-03 pasó a 15/75 por esa decisión, no por esta unidad",
         "pregunta_del_lider": "ninguna propia"
       },
       "source_path": "LinkedIn Sales - Procesamiento completo/revision-independiente/session-07-revisada.json",
@@ -203,7 +203,7 @@
   "decisiones_vigentes_que_ganan": [
     "LI-07-M007-K05 dice «La IA propone, tú decides. Nunca comentes con bots». Gana la decisión de Gustavo: los agentes redactan y publican los comentarios de calentamiento con las reglas fijas y la revisión del líder (Jev), dentro de los topes de INT-03, y él puede pasar INT-03 a modo approval u off. Esta unidad no se activa ni se convierte en regla.",
     "Sin mensajes privados automáticos (INB-08): el calentamiento solo comenta en público y prepara la invitación (RED-02, sin nota por defecto).",
-    "Sin cambios de topes de INT-03 ni de la rampa de RED-02: el reparto 6/2/2 es dentro del tope del día.",
+    "Sin cambios de la rampa de RED-02. El tope de INT-03 sube a 15 al día y 75 a la semana por decisión de Gustavo (17/11/2026: seguir comentando a referentes y comentar a posibles clientes), no por el curso: el reparto 8/2/5 es dentro de ese tope.",
     "El comentario va en el idioma de la publicación (Gustavo, 12/11/2026).",
     "Nunca se retira una invitación ni se vuelve a invitar mientras siga pendiente: retirarla es manual (GET /api/v1/red/invitaciones-pendientes)."
   ],

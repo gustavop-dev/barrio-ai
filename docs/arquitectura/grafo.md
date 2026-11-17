@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.12-comentario-calentamiento` · SHA-256 `c22d9ea5f3402837b930f42a77fce5cba5c490c93c9b6843b9c941c4d7ae0555`.
+Versión `6.12-comentario-calentamiento` · SHA-256 `098d9b44387b067e1c75a61ff970d49f5fda27428c89324b88caf205a2d2b4ed`.
 
 46 nodos (46 activos), 74 aristas y 17 ciclos.
 

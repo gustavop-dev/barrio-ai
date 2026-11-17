@@ -72,8 +72,9 @@ def _audit(actor,action,target,**metadata):
 
 # --------------------------------------------------------------------------- policy
 
-# Prudent initial caps from reparto-acciones-v1 (not LinkedIn limits), per local day and week.
-DEFAULT_LIMITS={'INT-03':(5,25),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(20,100),'RED-02':(20,100),'RED-04':(10,40)}
+# Prudent initial caps from reparto-acciones-v1 (not LinkedIn limits), per local day and week. INT-03 went from 5/25 to
+# 15/75 on 17/11/2026 (Gustavo: keep commenting on referents and also on possible buyers; docs/plan-outbound.md).
+DEFAULT_LIMITS={'INT-03':(15,75),'INT-04':(10,40),'INT-02':(20,100),'CONT-09':(1,7),'RED-01':(20,100),'RED-02':(20,100),'RED-04':(10,40)}
 
 def _parse_caps(variable):
     caps={}

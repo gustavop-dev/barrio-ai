@@ -38,8 +38,9 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 | 17/11/2026 | Las 3 notas de invitación del mes se reservan para compradores ya calentados, con un hecho concreto que citar. |
 | 17/11/2026 | El comprador que no publica tiene su propia ruta (abajo), incluida la entrada por el cofundador o alguien de su equipo. |
 | 17/11/2026 | Los agentes siguen comentando ellos, con la revisión del líder: tienen una base de conocimiento amplia sobre nosotros. La advertencia del curso («nunca comentes con bots») no se adopta. |
-| 17/11/2026 | La rampa y los topes se quedan como están; los resultados se miran en un mes (hacia el 17/12/2026). |
+| 17/11/2026 | La rampa y los topes se quedan como están; los resultados se miran en un mes (hacia el 17/12/2026). Salvo los comentarios: ver la fila del volumen, abajo. |
 | 17/11/2026 | Carga aceptada: 20 a 30 mensajes por semana enviados por él. |
+| 17/11/2026 | **Seguir comentando a referentes y comentar a posibles clientes; se sube el volumen: 15 comentarios al día, 75 a la semana, 20 borradores al día.** Reparto del día: compradores 8, referentes 5, comunidad 2 (sin fuente todavía: sus cupos pasan a los otros dos). Los fines de semana, la mitad. La rampa de invitaciones y los demás topes no cambian. Ver «Capacidad del día». |
 | 17/11/2026 | **Hasta dónde llega la máquina de LinkedIn: la reunión agendada.** De ahí en adelante es la máquina de ventas, que se arma después del outbound, con su propia base de conocimiento y abierta a otras fuentes además de LinkedIn. Agenda con Cal.com. |
 
 ## Lo que ya funciona
@@ -57,7 +58,9 @@ Que LinkedIn posicione a Gustavo en EE. UU. y que su red se llene de personas qu
 - **Personas › Conexiones (PR #119):** la lista de quienes aceptaron, por etiqueta, como base de datos de personas.
 - **Tope de comentarios en 10/día (12/11/2026):** en producción por `.env`: `OPERATOR_DAILY_LIMITS=INT-03=10` y
   `OPERATOR_WEEKLY_LIMITS=INT-03=50` (copia previa `.env.bak-20261112-comentarios-10`). Los fines de semana rige la
-  mitad (5). El valor por defecto del código sigue en 5/25: se cambia en el PR de outbound.
+  mitad (5). El valor por defecto del código sigue en 5/25: se cambia en el PR de outbound. **Hecho en la rama
+  `feat/outbound-comprador` (17/11/2026):** por defecto 15/75 y 20 borradores; al desplegar hay que cambiar también el
+  `.env` de producción, que fija 10/50 y 6 borradores.
 
 ## Diagnóstico (12/11/2026)
 
@@ -105,8 +108,29 @@ cuenta. La prioridad queda: EE. UU. → comprador → señal reciente → confia
 - El comentario: un aporte propio y concreto más una pregunta, 25 a 40 palabras, sin vender ni aplaudir
   (LI-07-M005-K05). Mismas reglas fijas, idioma y revisión del líder que los comentarios de hoy.
 - Una persona cada 48 h como mínimo; la espera se cuenta por autor del post, no por referente.
-- Con los topes actuales (10 comentarios al día, 50 a la semana) caben unos 15 compradores nuevos por semana. Se
-  mantiene así un mes.
+- Con 15 comentarios al día y 75 a la semana (17/11/2026), 8 de cada 15 van a compradores: unos 40 comentarios a la
+  semana, unos 20 compradores nuevos con sus dos comentarios, si publican y si la agenda deja sitio (abajo). Se mantiene
+  así un mes.
+
+### Capacidad del día (17/11/2026)
+
+Cálculo con el código y los ajustes actuales, sin tocar la separación:
+
+- **Navegador:** su presupuesto propio es de 30 escrituras de tipo comentario al día (comentarios y respuestas juntos,
+  `NAVEGADOR_COMENTARIOS_DIA`). 15 comentarios + 10 respuestas (INT-04) = 25: caben en el día local. La ventana del
+  navegador es móvil (24 h) y el aviso de su código es que puede ver hasta 1,5 veces los topes del operador (37 con
+  25): en la práctica la separación impide que se junten, porque nunca salen más de unos 22 en 24 h (siguiente punto).
+- **Separación:** entre dos escrituras públicas hay 20 a 40 minutos al azar (`OPERATOR_MIN_SPACING_SECONDS=1200`,
+  `OPERATOR_MAX_SPACING_SECONDS=2400`), en la ventana 07:00–21:00 (840 minutos). Durante las dos rondas de red
+  (09–11 y 15–17, 240 minutos) los comentarios esperan y la red sale cada 3 a 8 minutos. Fuera de las rondas quedan
+  unos 600 minutos. Una simulación de 20.000 días con esas reglas da **20 escrituras que no son de red al día** (19 en
+  el 5 % peor, 22 en el 5 % mejor; 17 a 24 en los extremos).
+- **No caben 15 comentarios + 10 respuestas + el post del día** (26) con esta separación: caben unos 20. Los
+  comentarios llegan a 15 solo en días con 4 respuestas o menos. No se forzó: subir el ritmo es acortar la separación
+  (por ejemplo 15 a 30 minutos daría unas 27), y eso es una decisión aparte de Gustavo. Lo que no cabe espera al día
+  siguiente; nunca sale en ráfaga.
+- **Semana:** con 15 al día de lunes a viernes se llega a 75 el viernes, así que el fin de semana (7 al día) solo
+  comenta si algún día laborable se quedó corto. Igual que antes con 5/25 y 10/50.
 
 ### 3. Invitar
 
@@ -315,6 +339,7 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
      activadas, caso `BIB-09-comentario-calentamiento` con su línea base): reglas fijas (25–40 palabras, una sola
      pregunta al final, sin aplauso ni ofrecer servicios) y tres preguntas del líder. Espera de 48 h por autor del post.
      El tope de INT-03 del día se reparte compradores 6, comunidad 2, referentes 2; un grupo sin posts cede sus cupos.
+     Desde el 17/11/2026: 15 al día repartidos 8/2/5 (fin de semana 7: 4/1/2) y 20 borradores al día.
    - Invitación tras el segundo comentario, antes si responde un comentario, comenta un post de Gustavo, lo invita o
      le escribe, y a los 14 días como máximo (también quien no publica: ruta `sin_posts` tras dos lecturas vacías).
    - Sin aceptar en 21 días tras dos comentarios: descanso de 60 días (un año desde el tercer intento); una señal lo

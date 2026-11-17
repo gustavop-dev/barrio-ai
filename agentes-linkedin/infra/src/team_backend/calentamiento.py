@@ -12,7 +12,7 @@ journey's next_at says so, exactly as before. Caps and ramp are never touched: t
   BUYER_POSTS_REREAD_HOURS. Stored as ObservedPost without a referent. A buyer without a commentable post in
   BUYER_NO_POSTS_READS reads within 10 days takes the route «sin_posts» (phase 5 builds that route).
 - Comment groups (autopiloto._propose): the day's INT-03 cap is shared compradores/comunidad/referentes by
-  BUYER_COMMENT_SHARE (6/2/2 of 10, 3/1/1 of a weekend's 5); a group with nothing to comment passes its slots on to the
+  BUYER_COMMENT_SHARE (8/2/5 of 15, 4/1/2 of a weekend's 7); a group with nothing to comment passes its slots on to the
   next one. «comunidad» has no source of posts yet, so its slots always go on.
 - invite_at: the moment the warm-up is done: the BUYER_WARMUP_COMMENTS-th comment of the attempt, a reciprocity signal
   in the last 30 days (they answered a comment of the team, commented on Gustavo's post, invited him or wrote to him) or
@@ -256,10 +256,12 @@ def _maybe_no_posts(journey,now):
 # --------------------------------------------------------------------------- B. the comment groups
 
 GROUPS=('compradores','comunidad','referentes')
-DEFAULT_SHARE={'compradores':6,'comunidad':2,'referentes':2}
+# 17/11/2026 (Gustavo): keep commenting on referents and comment on possible buyers, 15 a day: 8 buyers, 5 referents and
+# 2 for the community, which has no source of posts yet, so its 2 pass on. Off, the 15 all go to referents as before.
+DEFAULT_SHARE={'compradores':8,'comunidad':2,'referentes':5}
 
 def shares():
-    """BUYER_COMMENT_SHARE='compradores=6,comunidad=2,referentes=2': the weights of each group in the day's INT-03 cap."""
+    """BUYER_COMMENT_SHARE='compradores=8,comunidad=2,referentes=5': the weights of each group in the day's INT-03 cap."""
     out=dict(DEFAULT_SHARE)
     for item in filter(None,setting('BUYER_COMMENT_SHARE','').split(',')):
         key,_,value=item.partition('=')
@@ -267,7 +269,7 @@ def shares():
     return out if sum(out.values())>0 else dict(DEFAULT_SHARE)
 
 def quotas(cap):
-    """The day's INT-03 cap split by the shares, largest remainder first: 10 → 6/2/2, a weekend's 5 → 3/1/1."""
+    """The day's INT-03 cap split by the shares, largest remainder first: 15 → 8/2/5, a weekend's 7 → 4/1/2."""
     share=shares();total=sum(share.values());cap=max(int(cap),0)
     exact={g:cap*share[g]/total for g in GROUPS}
     out={g:int(exact[g]) for g in GROUPS}

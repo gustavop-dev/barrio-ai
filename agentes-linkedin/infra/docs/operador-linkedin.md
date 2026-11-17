@@ -42,7 +42,7 @@ El servicio `autopilot` (`python manage.py autopiloto`) ejecuta un ciclo cada 60
    - el post tiene menos de `OPERATOR_MAX_POST_AGE_HOURS` (72) y no es un repost;
    - todavía no se le preparó ningún comentario;
    - queda cupo de comentarios en la cuenta;
-   - no se superan `OPERATOR_DAILY_PROPOSALS` (6) en el día y queda presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD` al mes y el tope de seguridad diario `AI_DAILY_FUSE_USD`; los comentarios no tienen tope propio);
+   - no se superan `OPERATOR_DAILY_PROPOSALS` (20 desde el 17/11/2026) en el día y queda presupuesto de IA del equipo (`AI_MONTHLY_LIMIT_USD` al mes y el tope de seguridad diario `AI_DAILY_FUSE_USD`; los comentarios no tienen tope propio);
    - con el agente líder activo, Jev confirma antes que el post merece un comentario de Gustavo: tiene sustancia, es de su barrio y no es una vacante, una promoción pura ni un hito personal. Si no, se prueba el siguiente post, y el veredicto se recuerda (prefiltro de comentarios, en el [rediseño](rediseno-backend.md#agente-líder-liderpy)).
 
    El redactor recibe las instrucciones, la voz y las 6 unidades del curso como bloques de `system` cacheados, y el post con su contexto en el mensaje. Así, los borradores seguidos leen las unidades a precio de caché. Si el borrador solo incumple una regla fija de la compuerta (hashtag, enlace, longitud, pitch, afirmación sin evidencia, falta de cita, filtración), se pide **una** reescritura que nombra cada regla incumplida, dentro del mismo presupuesto de IA y solo en modo `auto`. La propuesta lo anota en sus riesgos. Si la reescritura vuelve a fallar, la compuerta la descarta como antes.

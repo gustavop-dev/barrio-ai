@@ -173,7 +173,7 @@
     },
     "general": {
       "source": "team_backend.autopiloto._propose",
-      "description": "OPERATOR_DAILY_LLM_USD=1 y OPERATOR_DAILY_PROPOSALS=6; presupuestos globales del proveedor además del guard del autopiloto."
+      "description": "OPERATOR_DAILY_LLM_USD=1 y OPERATOR_DAILY_PROPOSALS=20; presupuestos globales del proveedor además del guard del autopiloto."
     },
     "red": {
       "source": "team_backend.red.daily_budget",

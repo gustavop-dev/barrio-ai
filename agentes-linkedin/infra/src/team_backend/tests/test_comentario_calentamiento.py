@@ -62,9 +62,9 @@ def judge(text):
 class WarmupCommentBase(BuyerPathBase):
     def setUp(self):
         super().setUp()
-        # Varios compradores en un día: las comprobaciones de etapa y el tope de comentarios de producción (10/día).
+        # Varios compradores en un día: las comprobaciones de etapa y el tope de comentarios (15/día desde el 17/11/2026).
         env = patch.dict(os.environ, {'BUYER_WARMUP_ENABLED': 'true', 'NETWORK_STAGE_CHECKS_PER_DAY': '20',
-                                      'OPERATOR_DAILY_LIMITS': 'INT-03=10', 'OPERATOR_WEEKLY_LIMITS': 'INT-03=50'})
+                                      'OPERATOR_DAILY_LIMITS': 'INT-03=15', 'OPERATOR_WEEKLY_LIMITS': 'INT-03=75'})
         env.start()
         self.addCleanup(env.stop)
         self.jev_calls, self.drafts, self.texts = [], [], {}

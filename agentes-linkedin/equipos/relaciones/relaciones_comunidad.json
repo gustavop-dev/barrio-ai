@@ -180,7 +180,7 @@
       "invitación sin nota por defecto por cuenta gratuita",
       "ejecución exclusiva de operador_cuenta",
       "primer mensaje: el puente es la conversación del post, no el servicio; sin secuencias ni seguimientos; Gustavo lo envía a mano (INB-08)",
-      "comentario de calentamiento: lo publican los agentes con reglas fijas y la revisión del líder, aunque LI-07-M007-K05 diga «nunca comentes con bots» (decisión de Gustavo, registro-lectura-comentario-calentamiento.json); reparto 6/2/2 dentro del tope de INT-03"
+      "comentario de calentamiento: lo publican los agentes con reglas fijas y la revisión del líder, aunque LI-07-M007-K05 diga «nunca comentes con bots» (decisión de Gustavo, registro-lectura-comentario-calentamiento.json); reparto 8/2/5 dentro del tope de INT-03 (15 al día desde el 17/11/2026)"
     ]
   },
   "entradas": {
@@ -509,7 +509,7 @@
     {
       "id": "INT-03",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Comentario con opinión sustentada y apertura pertinente; sin pitch ni experiencia inventada; solo en posts de 72 h o menos. Con BUYER_WARMUP_ENABLED también comenta los posts de los compradores que se calientan (BAR-19, BIB-09-comentario-calentamiento): posts de 168 h o menos (BUYER_POST_MAX_AGE_HOURS), un aporte propio y concreto más una sola pregunta al final, 25–40 palabras, sin aplausos ni ofrecer servicios (reglas fijas), el líder suma cal_aporte, cal_pregunta y cal_aplauso; una espera de 48 h por autor del post; el tope del día se reparte compradores 6, comunidad 2, referentes 2 y un grupo sin posts cede sus cupos."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Comentario con opinión sustentada y apertura pertinente; sin pitch ni experiencia inventada; solo en posts de 72 h o menos. Con BUYER_WARMUP_ENABLED también comenta los posts de los compradores que se calientan (BAR-19, BIB-09-comentario-calentamiento): posts de 168 h o menos (BUYER_POST_MAX_AGE_HOURS), un aporte propio y concreto más una sola pregunta al final, 25–40 palabras, sin aplausos ni ofrecer servicios (reglas fijas), el líder suma cal_aporte, cal_pregunta y cal_aplauso; una espera de 48 h por autor del post; el tope del día (15 desde el 17/11/2026) se reparte compradores 8, comunidad 2, referentes 5 y un grupo sin posts cede sus cupos."
     },
     {
       "id": "INT-04",

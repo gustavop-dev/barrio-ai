@@ -153,6 +153,11 @@ ajustes de producción: hasta 10 comentarios al día (5 el fin de semana), respu
 (`OPERATOR_DAILY_PROPOSALS`) y dos rondas de red (`NETWORK_BATCHES`). El post del día sale por la API oficial y no
 pasa por este servicio. «Llamada» es una petición a LinkedIn; es lo que cuentan los topes.
 
+Cambio del 17/11/2026 (rama `feat/outbound-comprador`, sin desplegar): el operador pasa a 15 comentarios al día y 20
+borradores. Con 10 respuestas son 25 escrituras de tipo comentario, dentro de las 30 del presupuesto de este servicio;
+la separación de 20 a 40 minutos deja unas 20 escrituras que no son de red al día, así que en la práctica salen menos.
+Las cifras de abajo siguen siendo las del 13/11/2026.
+
 **Escrituras.** Cada ejecución empieza leyendo `/me` (`operador.execute`) y confirma releyendo:
 
 | Capacidad | Escrituras al día | Lecturas por escritura | Lecturas al día |

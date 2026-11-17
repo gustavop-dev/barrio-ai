@@ -289,10 +289,10 @@ LOW={'pitch','inventa','cal_aplauso'}
 
 class WarmupPathBase(BuyerPathBase):
     """The path with BUYER_WARMUP_ENABLED: the team reads the buyer's posts, comments them through the autopilot (rules
-    and the lead, Jev simulated) and invites once the warm-up is done. Production caps: 10 comments a day, 50 a week."""
+    and the lead, Jev simulated) and invites once the warm-up is done. Caps of 17/11/2026: 15 comments a day, 75 a week."""
     def setUp(self):
         super().setUp()
-        env=patch.dict(os.environ,{'BUYER_WARMUP_ENABLED':'true','OPERATOR_DAILY_LIMITS':'INT-03=10','OPERATOR_WEEKLY_LIMITS':'INT-03=50'})
+        env=patch.dict(os.environ,{'BUYER_WARMUP_ENABLED':'true','OPERATOR_DAILY_LIMITS':'INT-03=15','OPERATOR_WEEKLY_LIMITS':'INT-03=75'})
         env.start();self.addCleanup(env.stop)
         self.drafts=[];self.jev=[]
 
@@ -523,9 +523,10 @@ class WarmupBuyerPathTests(WarmupPathBase):
         self.assertEqual(ActionProposal.objects.filter(contact=ana,capability='RED-02').count(),1)
         self.assertEqual(Contact.objects.get(pk=ana.pk).stage,'invited')
 
-    def test_5_the_day_is_shared_6_2_2_and_a_group_without_posts_passes_its_slots(self):
-        self.assertEqual(calentamiento.quotas(10),{'compradores':6,'comunidad':2,'referentes':2})
-        self.assertEqual(calentamiento.quotas(5),{'compradores':3,'comunidad':1,'referentes':1})
+    def test_5_the_day_is_shared_8_2_5_and_a_group_without_posts_passes_its_slots(self):
+        # 17/11/2026: 15 a day, 8 buyers, 5 referents, 2 community (no source yet: they pass on); a weekend's 7 → 4/1/2.
+        self.assertEqual(calentamiento.quotas(15),{'compradores':8,'comunidad':2,'referentes':5})
+        self.assertEqual(calentamiento.quotas(7),{'compradores':4,'comunidad':1,'referentes':2})
         ana=self.chosen_and_followed()
         self.their_new_post(ana)
         self.observe()
@@ -533,18 +534,18 @@ class WarmupBuyerPathTests(WarmupPathBase):
         jobs.enqueue_operation(self.bot,'observe',{'account':str(self.account.id),'limit':5,'referents':[]},request_id=uuid.uuid4())
         self.drain()
         now=timezone.now()
-        self.assertEqual(calentamiento.rooms(self.account,now,{'compradores','referentes'}),{'compradores':6,'comunidad':0,'referentes':4})
+        self.assertEqual(calentamiento.rooms(self.account,now,{'compradores','referentes'}),{'compradores':8,'comunidad':0,'referentes':7})
         # Buyers first: her post before the referent's.
         first=self.autopilot_comment(WARM_1)
         self.assertIsNone(first.post.referent_id)
         # With the buyers' slots spent, the referent's post still gets its own; without buyers' posts, all slots go on.
-        with patch.object(calentamiento,'used',return_value={'compradores':6,'comunidad':0,'referentes':0}):
+        with patch.object(calentamiento,'used',return_value={'compradores':8,'comunidad':0,'referentes':0}):
             room=calentamiento.rooms(self.account,now,{'referentes'})
-            self.assertEqual(room,{'compradores':0,'comunidad':0,'referentes':4})
+            self.assertEqual(room,{'compradores':0,'comunidad':0,'referentes':7})
             second=self.autopilot_comment('Evals become the product once customers ask how you know it works. Which eval did your customers ask for first?')
         self.assertIsNotNone(second.post.referent_id)
-        self.assertEqual(calentamiento.rooms(self.account,now,set()),{'compradores':5,'comunidad':2,'referentes':1})
-        self.assertEqual(calentamiento.rooms(self.account,now,{'referentes'})['referentes'],8)
+        self.assertEqual(calentamiento.rooms(self.account,now,set()),{'compradores':7,'comunidad':2,'referentes':4})
+        self.assertEqual(calentamiento.rooms(self.account,now,{'referentes'})['referentes'],13)
 
     def test_6_peers_and_recommenders_keep_todays_rule(self):
         par=self.contact('par-luis','Luis Par',stage='followed',followed_hours=49)

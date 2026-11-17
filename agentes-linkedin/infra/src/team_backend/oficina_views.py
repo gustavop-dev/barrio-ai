@@ -108,7 +108,7 @@ class Overview(APIView):
             'today':{'proposals':proposals,'llm_spent_usd':str(autopiloto.llm_spent_today(now)),
                      'llm_daily_cap_usd':str(presupuesto.daily_fuse()),  # the team's daily safety fuse; no per-area caps
                      'drafts':ActionProposal.objects.filter(source='agent',created_at__gte=day).count(),
-                     'drafts_daily_cap':int(os.environ.get('OPERATOR_DAILY_PROPOSALS','6')),
+                     'drafts_daily_cap':autopiloto.daily_proposals(),
                      'editorial_llm_spent_usd':str(editorial.spent_today(now)),'editorial_llm_daily_cap_usd':str(presupuesto.daily_fuse())},
             'counts':{'referents':Referent.objects.filter(active=True).count(),'posts':ObservedPost.objects.count(),
                       'uncertain':ActionExecution.objects.filter(state='uncertain').count()}})

@@ -58,6 +58,11 @@ POST_MAX_HASHTAGS=3
 def setting(name,default):
     return os.environ.get(name,default)
 
+def daily_proposals():
+    """Paid comment drafts a day (OPERATOR_DAILY_PROPOSALS). 20 since 17/11/2026: 15 comments a day with the lead
+    discarding some need room for their redrafts (docs/plan-outbound.md)."""
+    return int(setting('OPERATOR_DAILY_PROPOSALS','20'))
+
 # Capabilities that existed when Gustavo chose the autonomous machine default to auto; any newer capability
 # (the network block RED-*) waits for human approval until OPERATOR_AUTONOMY lists it. INT-04 (replies on his own posts)
 # is autonomous from the start by his decision (12/11/2026), with the lead as its gate.
@@ -449,7 +454,7 @@ def _propose(user,account,now):
     day,_=operador.period_starts(now)
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
     pending=Job.objects.filter(kind='propose_comment',state__in=[Job.State.QUEUED,Job.State.RUNNING]).count()
-    room=int(setting('OPERATOR_DAILY_PROPOSALS','6'))-drafted-pending
+    room=daily_proposals()-drafted-pending
     if room<=0 or pending:return 0  # one paid draft at a time keeps spend within the daily cap
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
     prefilter=prefilter_enabled()
@@ -477,7 +482,7 @@ def _propose(user,account,now):
 
 def _propose_groups(user,account,now,max_age,prefilter):
     """Phase 2 (BUYER_WARMUP_ENABLED): the same one-draft-at-a-time within the same caps, budget and daily drafts, but
-    the day's INT-03 slots are shared by group (calentamiento.rooms: compradores 6, comunidad 2, referentes 2 of 10) and a
+    the day's INT-03 slots are shared by group (calentamiento.rooms: compradores 8, comunidad 2, referentes 5 of 15) and a
     group with nothing to comment passes its slots on. Buyers' posts first, warmest author first; then the referents' as
     today. The wait is per author of the post. The prefilter judges both, with the buyer's own wording for a buyer."""
     from . import calentamiento, experimentos
@@ -516,7 +521,7 @@ def _lead_redraft(user,account,now):
         return 0
     day,_=operador.period_starts(now)
     drafted=ActionProposal.objects.filter(account=account,capability=ActionProposal.Capability.COMMENT,source='agent',created_at__gte=day).count()
-    if int(setting('OPERATOR_DAILY_PROPOSALS','6'))-drafted<=0:return 0
+    if daily_proposals()-drafted<=0:return 0
     max_age=timedelta(hours=int(setting('OPERATOR_MAX_POST_AGE_HOURS','72')))
     from . import calentamiento
     warm=calentamiento.enabled()

@@ -301,7 +301,7 @@ class SharesTests(SimpleTestCase):
         with patch.dict(os.environ, {'BUYER_COMMENT_SHARE': 'compradores=8,comunidad=0,referentes=2,otro=5'}):
             self.assertEqual(calentamiento.quotas(10), {'compradores': 8, 'comunidad': 0, 'referentes': 2})
         with patch.dict(os.environ, {'BUYER_COMMENT_SHARE': 'compradores=0,comunidad=0,referentes=0'}):
-            self.assertEqual(calentamiento.quotas(10), {'compradores': 6, 'comunidad': 2, 'referentes': 2})
+            self.assertEqual(calentamiento.quotas(15), {'compradores': 8, 'comunidad': 2, 'referentes': 5})
         for cap in range(0, 30):
             self.assertEqual(sum(calentamiento.quotas(cap).values()), cap)
 
