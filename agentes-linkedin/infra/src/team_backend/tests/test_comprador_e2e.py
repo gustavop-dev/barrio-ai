@@ -2410,3 +2410,17 @@ class ReplyBuyerPathTests(ReplyPathBase):
         self.assertFalse(any(BOOKING_URL in json.dumps(c['inputs']) for c in self.calls))
         # A message 1–4 carrying the link would not pass its rules (RSP-07's: no links).
         self.assertIn('Primer mensaje con enlaces',respuestas.dm_text_issues(texts[0]+' '+BOOKING_URL,texts[0]))
+
+    def test_11_the_weekly_reading_reads_this_funnel_and_a_small_sample_is_not_judged(self):
+        ivo,_=self.messaged('resp-e2e-ivo','Ivo Lectura'),self.messaged('resp-e2e-jon','Jon Lectura')
+        self.write_reply(ivo,reply_input('flujo','borrador'))
+        self.she_replies(ivo,reply_input('flujo'),self.start+DAY)
+        self.cycle(self.start+DAY+HOUR)
+        response=self.human.get('/api/v1/comprador/lectura-semanal')
+        self.assertEqual(response.status_code,200,response.content)
+        reading=response.json()
+        self.assertEqual((reading['activa'],reading['muestra_chica'],reading['invitaciones'],reading['se_rompe'],reading['cambio']),
+                         (True,True,2,None,None))
+        self.assertEqual(reading['borradores'],{'pendientes':1,'enviados':2})  # her reply waits; both first messages went
+        self.assertIn('Muestra chica: 2 invitaciones en total, menos de 30',reading['lineas'][1])
+        # Where it breaks first at scale (acceptance, then the reply): test_respuesta_comprador.WeeklyReadingTests.

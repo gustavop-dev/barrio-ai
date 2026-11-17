@@ -77,11 +77,12 @@ mismos ajustes del arnés; el caso corre con `BUYER_REPLY_ENABLED=true`, `CALCOM
 prueba (la variante I lo apaga y la E vacía el enlace). Sin marcadores de fallo esperado.
 
 - **Caso completo:** pasa. Una corrida en serie, 30,9 s.
-- **`test_respuesta_comprador.py`:** 26 pruebas, todas pasan (31,9 s con `--parallel 2`), entre ellas las reglas fijas,
+- **`test_respuesta_comprador.py`:** 27 pruebas, todas pasan (31,8 s con `--parallel 2`), entre ellas las reglas fijas,
   la decisión con umbral y margen, las fechas de «no es el momento», la firma y la recepción del webhook, el pliegue de la
   reunión y la lectura semanal.
-- **Camino completo:** `test_comprador_e2e.ReplyBuyerPathTests`, 15 pruebas, todas pasan (73,5 s): el camino entero hasta
-  la entrega y las variantes 1 a 11 de la fase.
+- **Camino completo:** `test_comprador_e2e.ReplyBuyerPathTests`, 16 pruebas, todas pasan: el camino entero hasta la
+  entrega y las variantes 1 a 11 de la fase (la 11, la lectura semanal con la muestra chica del camino real; dónde se
+  rompe primero, a escala, en `WeeklyReadingTests`).
 
 | Variante | Antes | Después |
 | --- | --- | --- |
