@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "graph_version": "6.14-secuencia-mensajes",
+  "graph_version": "6.15-respuesta-comprador",
   "scope": "runtime",
   "description": "Inventario del código actual. No concede permisos ni despacha llamadas. Las aristas workflow_step pertenecen al código; los eventos de la escena no son invocaciones entre especialistas.",
   "groups": {
@@ -177,6 +177,14 @@
       "LI-09-V014-K03",
       "LI-10-V013-K02",
       "LI-10-M001-K08"
+    ],
+    "operador.BUYER_REPLY_UNITS": [
+      "LI-11-M006-K01",
+      "LI-11-M006-K02",
+      "LI-11-M006-K03",
+      "LI-11-M006-K06",
+      "LI-08-M003-K05",
+      "LI-12-M001-K04"
     ]
   },
   "budgets": {
@@ -1428,7 +1436,8 @@
         "operador.FIRST_MESSAGE_UNITS",
         "operador.WARMUP_COMMENT_UNITS",
         "operador.INVITE_NOTE_UNITS",
-        "operador.SEQUENCE_UNITS"
+        "operador.SEQUENCE_UNITS",
+        "operador.BUYER_REPLY_UNITS"
       ],
       "course_units": [
         "LI-03-M006-K02",
@@ -1438,7 +1447,7 @@
         "LI-06-M002-K09",
         "LI-06-M002-K10"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Comentarios en posts ajenos: COMMENT_UNITS; respuestas en posts propios (INT-04): REPLY_UNITS; el cierre del segundo turno suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) para redactar el primer mensaje; con BUYER_WARMUP_ENABLED, el comentario en el post de un comprador que se calienta suma WARMUP_COMMENT_UNITS (clases 07 y 10, metodología activada comentario_calentamiento). Con BUYER_FIRST_MESSAGE_ENABLED (fase 3, mensajes_comprador): el primer mensaje al comprador que acepta carga FIRST_MESSAGE_UNITS (metodología primer_mensaje) y la nota de la invitación a un comprador calentado, INVITE_NOTE_UNITS (clase 09, metodología activada nota_invitacion) más LI-03-M006-K01. Con BUYER_SEQUENCE_ENABLED (fase 4, secuencia_comprador): los mensajes 2 a 4 de la secuencia a quien no respondió cargan SEQUENCE_UNITS (clases 09 y 10, metodología activada secuencia_mensajes).",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Comentarios en posts ajenos: COMMENT_UNITS; respuestas en posts propios (INT-04): REPLY_UNITS; el cierre del segundo turno suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) para redactar el primer mensaje; con BUYER_WARMUP_ENABLED, el comentario en el post de un comprador que se calienta suma WARMUP_COMMENT_UNITS (clases 07 y 10, metodología activada comentario_calentamiento). Con BUYER_FIRST_MESSAGE_ENABLED (fase 3, mensajes_comprador): el primer mensaje al comprador que acepta carga FIRST_MESSAGE_UNITS (metodología primer_mensaje) y la nota de la invitación a un comprador calentado, INVITE_NOTE_UNITS (clase 09, metodología activada nota_invitacion) más LI-03-M006-K01. Con BUYER_SEQUENCE_ENABLED (fase 4, secuencia_comprador): los mensajes 2 a 4 de la secuencia a quien no respondió cargan SEQUENCE_UNITS (clases 09 y 10, metodología activada secuencia_mensajes). Con BUYER_REPLY_ENABLED (fase 6, respuesta_comprador): la contestación a un comprador que respondió, por tipo, carga BUYER_REPLY_UNITS (clases 08, 11 y 12, metodología activada respuesta_comprador); el código agrega el enlace de Cal.com solo en interesado y pide_informacion.",
       "model": "ANTHROPIC_MODEL (knowledge.providers.claude_model)",
       "effort": "medium",
       "model_note": null,
@@ -1747,7 +1756,8 @@
         "operador.FIRST_MESSAGE_UNITS",
         "operador.WARMUP_COMMENT_UNITS",
         "operador.INVITE_NOTE_UNITS",
-        "operador.SEQUENCE_UNITS"
+        "operador.SEQUENCE_UNITS",
+        "operador.BUYER_REPLY_UNITS"
       ],
       "course_units": [
         "LI-03-V020-K02",
@@ -1756,7 +1766,7 @@
         "LI-06-M001-K04",
         "LI-06-M001-K07"
       ],
-      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Con un primer mensaje que juzgar (respuesta de cierre de INT-04) suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) en la misma revisión; con un comentario de calentamiento (post de un comprador, BUYER_WARMUP_ENABLED) suma WARMUP_COMMENT_UNITS (metodología comentario_calentamiento) y sus tres preguntas cal_*. Con BUYER_FIRST_MESSAGE_ENABLED revisa los borradores del comprador (review_buyer_draft): el primer mensaje con las seis preguntas dm_* sobre sus hechos y la nota con INVITE_NOTE_UNITS (metodología nota_invitacion) y sus cinco preguntas nota_*. Con BUYER_SEQUENCE_ENABLED (fase 4, secuencia_comprador) revisa también los seguimientos 2 a 4 con SEQUENCE_UNITS (clases 09 y 10, metodología activada secuencia_mensajes) y sus preguntas seg_* por número.",
+      "course_note": "Listas curadas; se cargan unidades completas dentro del presupuesto de contexto. Con un primer mensaje que juzgar (respuesta de cierre de INT-04) suma FIRST_MESSAGE_UNITS (clase 09, metodología activada primer_mensaje) en la misma revisión; con un comentario de calentamiento (post de un comprador, BUYER_WARMUP_ENABLED) suma WARMUP_COMMENT_UNITS (metodología comentario_calentamiento) y sus tres preguntas cal_*. Con BUYER_FIRST_MESSAGE_ENABLED revisa los borradores del comprador (review_buyer_draft): el primer mensaje con las seis preguntas dm_* sobre sus hechos y la nota con INVITE_NOTE_UNITS (metodología nota_invitacion) y sus cinco preguntas nota_*. Con BUYER_SEQUENCE_ENABLED (fase 4, secuencia_comprador) revisa también los seguimientos 2 a 4 con SEQUENCE_UNITS (clases 09 y 10, metodología activada secuencia_mensajes) y sus preguntas seg_* por número. Con BUYER_REPLY_ENABLED (fase 6, respuesta_comprador) Jev clasifica la respuesta del comprador leyendo toda la conversación (buyer-reply-classify, cinco tipos con umbral y margen; sin confianza, otro) y el líder revisa la contestación (lead-review-reply) con BUYER_REPLY_UNITS (metodología activada respuesta_comprador) y sus preguntas resp_* por tipo.",
       "model": "TYPESAFE_MODEL (knowledge.providers.typesafe)",
       "effort": null,
       "model_note": null,
@@ -4397,7 +4407,7 @@
         },
         {
           "kind": "prepare_buyer_draft",
-          "cadence": "Tick 60 s, antes del plan de red; con BUYER_FIRST_MESSAGE_ENABLED y el líder encendido, un borrador pagado a la vez: la nota de un comprador calentado que se va a invitar o el primer mensaje de uno que aceptó, cuando toca; con BUYER_SEQUENCE_ENABLED e INBOX_ENABLED, también los mensajes 2 a 4 a quien no respondió (4, 5 y 7 días después del «Hecho» del anterior, lunes a viernes, con el inbox leído en las últimas 3 h).",
+          "cadence": "Tick 60 s, antes del plan de red; con BUYER_FIRST_MESSAGE_ENABLED y el líder encendido, un borrador pagado a la vez: la nota de un comprador calentado que se va a invitar o el primer mensaje de uno que aceptó, cuando toca; con BUYER_SEQUENCE_ENABLED e INBOX_ENABLED, también los mensajes 2 a 4 a quien no respondió (4, 5 y 7 días después del «Hecho» del anterior, lunes a viernes, con el inbox leído en las últimas 3 h); con BUYER_REPLY_ENABLED, la clasificación y la contestación a quien respondió (kind respuesta, una por mensaje suyo, hasta 5 por intento).",
           "binding": "team_backend.autopiloto._buyer_drafts",
           "deduplication": "IDs deterministas del job por persona, tipo, intento, número de mensaje (2–4) y número de intento (hasta 3); una decisión por persona, tipo, número e intento (one_buyer_draft_per_step); _pending impide dos a la vez."
         },

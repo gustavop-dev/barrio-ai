@@ -8,6 +8,7 @@ responde), el paso de borradores del autopiloto con sus jobs, Tu turno y los cie
 Cal.com (lo publica el cliente de pruebas) y la entrega. Claude y Jev simulados (test_comprador_e2e.judge_reply_type y
 judge_reply_draft); unidades del curso sintéticas, sin red, sin Cal.com ni proveedores pagados. El equipo nunca envía un
 mensaje: las respuestas son borradores que Gustavo copia y envía (INB-08)."""
+import json
 import os
 from datetime import date, timedelta
 from unittest import expectedFailure
@@ -139,7 +140,6 @@ class ReplyCaseTests(ReplyCaseBase):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))
 
-    @expectedFailure  # Línea base: `respuesta_comprador` no está activada; sus seis unidades no se cargan
     def test_the_case_loads_whole_versioned_sources_and_rejects_wrong_behaviour(self):
         context, grounding = evaluaciones.course_case_context('respuesta_comprador')
         self.assertEqual(grounding['course_missing'], [])
@@ -161,3 +161,66 @@ class ReplyRulesTests(SimpleTestCase):
             for variant, kind in (('flujo', 'interesado'), ('P', 'pide_informacion'), ('N1', 'no_es_el_momento'),
                                   ('X', 'no_le_interesa'), ('O', 'otra_persona')):
                 self.assertEqual(respuesta_comprador.text_issues(kind, reply_input(variant, 'borrador'), reply_input(variant)), [], variant)
+
+
+class ReplyActivationTests(SimpleTestCase):
+    """La activación es por metodología: solo sus seis unidades de las clases 08, 11 y 12, solo cuando se nombra, solo en
+    sus roles."""
+
+    def test_the_activated_list_is_the_case_and_the_graph_list(self):
+        from knowledge.clases import CLASES_AGENTES, METODOLOGIAS_ACTIVAS, legible_por_agentes
+        activa = METODOLOGIAS_ACTIVAS['respuesta_comprador']
+        self.assertEqual(CLASES_AGENTES, tuple(range(1, 7)))
+        self.assertEqual(list(activa['unidades']), operador.BUYER_REPLY_UNITS)
+        self.assertEqual((activa['evaluacion'], activa['lista']), (CASE['id'], 'operador.BUYER_REPLY_UNITS'))
+        self.assertEqual(CASE['units'], operador.BUYER_REPLY_UNITS)
+        self.assertEqual(set(CASE['required']), set(CASE['units']))
+        self.assertEqual(activa['roles'], ('relaciones_comunidad', 'lider_jev'))
+        for uid in operador.BUYER_REPLY_UNITS:
+            self.assertTrue(legible_por_agentes(uid, 'respuesta_comprador'))
+            self.assertFalse(legible_por_agentes(uid))
+            self.assertFalse(legible_por_agentes(uid, 'secuencia_mensajes'))
+        # LI-09-V004-K02 is not adopted; the rest of classes 08, 11 and 12 and the sequence's units stay closed.
+        for uid in ('LI-09-V004-K02', 'LI-11-M006-K04', 'LI-11-M006-K05', 'LI-12-M001-K03', 'LI-12-M004-K01', 'LI-09-M003-K05'):
+            self.assertFalse(legible_por_agentes(uid, 'respuesta_comprador'), uid)
+        from team_backend.orquestacion import load_graph
+        graph = load_graph()
+        self.assertEqual(graph['course_lists']['operador.BUYER_REPLY_UNITS'], operador.BUYER_REPLY_UNITS)
+        self.assertEqual([n['id'] for n in graph['nodes'] if 'operador.BUYER_REPLY_UNITS' in n['course_lists']],
+                         ['relaciones_comunidad', 'lider_jev'])
+
+
+class ReplyReadingRegistryTests(SimpleTestCase):
+    """El registro de lectura nombra exactamente las unidades activadas, con su hash, puntero y fuentes; las decisiones de
+    Gustavo que ganan al curso (la reserva manda sobre el «sí») y lo que no se convirtió en regla."""
+
+    def test_the_reading_registry_matches_the_activation(self):
+        from pathlib import Path
+        from knowledge.clases import METODOLOGIAS_ACTIVAS
+        activa = METODOLOGIAS_ACTIVAS['respuesta_comprador']
+        self.assertEqual(activa['registro'], 'relaciones/registro-lectura-respuesta-comprador.json')
+        path = Path(operador.__file__).resolve().parents[3] / 'equipos' / activa['registro']
+        if not path.exists():
+            self.skipTest('La imagen solo empaqueta grafo.yaml; el registro vive en equipos/relaciones.')
+        registry = json.loads(path.read_text(encoding='utf-8'))
+        self.assertEqual((registry['metodologia'], registry['evaluacion'], registry['lista']),
+                         ('respuesta_comprador', activa['evaluacion'], activa['lista']))
+        self.assertEqual(tuple(registry['roles']), activa['roles'])
+        self.assertEqual([u['unidad_id'] for u in registry['unidades']], operador.BUYER_REPLY_UNITS)
+        self.assertEqual(registry['alcance']['por_clase'], {'08': 1, '11': 4, '12': 1})
+        for unit in registry['unidades']:
+            prefix = unit['unidad_id'][3:5]
+            self.assertEqual(unit['clase'], int(prefix))
+            self.assertTrue(unit['lectura_completa'])
+            self.assertRegex(unit['hash'], r'^[0-9a-f]{64}$')
+            self.assertRegex(unit['pointer'], r'^/learning_units/\d+$')
+            self.assertTrue(unit['criterio_derivado'] and unit['limites_y_excepciones'] and unit['uso'])
+            self.assertTrue(unit['fuentes_con_prefijo_de_clase'])
+            self.assertTrue(all(key.startswith(prefix + ':') for key in unit['fuentes_con_prefijo_de_clase']))
+        decisions = ' '.join(registry['decisiones_vigentes_que_ganan'])
+        self.assertIn('REUNIÓN AGENDADA', decisions)
+        self.assertIn('Cal.com', decisions)
+        self.assertIn('«sí»', decisions)
+        not_adopted = ' '.join(registry['no_convertido_en_regla'])
+        for item in ('envío automático', 'CRM', 'calificación', 'LI-09-V004-K02'):
+            self.assertIn(item, not_adopted)

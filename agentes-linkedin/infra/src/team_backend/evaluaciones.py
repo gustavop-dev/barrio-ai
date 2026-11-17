@@ -1057,7 +1057,7 @@ COURSE_CASES={
     # interesa, salida definitiva y nada más. O: otra persona, entra como contacto nuevo referido. B: poca confianza →
     # «otro», sin borrador. E: sin enlace de agenda, sin borrador y con aviso. I: interruptor apagado.
     'respuesta_comprador':{'id':'BIB-11-respuesta-comprador',
-        'units':['LI-11-M006-K01','LI-11-M006-K02','LI-11-M006-K03','LI-11-M006-K06','LI-08-M003-K05','LI-12-M001-K04'],
+        'units':operador.BUYER_REPLY_UNITS,
         'input':{
             'flujo':{'respuesta':'Good timing: the weekly report is still a spreadsheet every Friday. Happy to talk about how others solved it.',
                      'borrador':('Ana, the Friday spreadsheet behind the weekly report is the part worth looking at first. Pick any slot '

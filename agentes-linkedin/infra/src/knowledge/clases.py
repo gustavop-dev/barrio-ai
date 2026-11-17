@@ -51,6 +51,12 @@ METODOLOGIAS_ACTIVAS={
                           'registro':'relaciones/registro-lectura-secuencia-mensajes.json',
                           'unidades':('LI-09-M003-K05','LI-09-V014-K01','LI-09-V014-K02','LI-09-V014-K03',
                                       'LI-10-V013-K02','LI-10-M001-K08')},
+    # Fase 6 del comprador: clasificar su respuesta y contestarla hasta la reunión agendada (clase 11, con la 08 y la 12).
+    'respuesta_comprador':{'evaluacion':'BIB-11-respuesta-comprador','lista':'operador.BUYER_REPLY_UNITS',
+                           'roles':('relaciones_comunidad','lider_jev'),
+                           'registro':'relaciones/registro-lectura-respuesta-comprador.json',
+                           'unidades':('LI-11-M006-K01','LI-11-M006-K02','LI-11-M006-K03','LI-11-M006-K06',
+                                       'LI-08-M003-K05','LI-12-M001-K04')},
 }
 _DE_AGENTES=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
 

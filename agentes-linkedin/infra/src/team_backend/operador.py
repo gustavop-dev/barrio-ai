@@ -61,6 +61,11 @@ INVITE_NOTE_UNITS=list(METODOLOGIAS_ACTIVAS['nota_invitacion']['unidades'])
 # when the sequence stops (phase 4, secuencia_comprador.py). Loaded whole, only with the methodology named, by Relaciones
 # when it drafts a follow-up and by the lead when it reviews one. Baseline: docs/linea-base-secuencia-mensajes.md.
 SEQUENCE_UNITS=list(METODOLOGIAS_ACTIVAS['secuencia_mensajes']['unidades'])
+# BIB-11-respuesta-comprador (class 11 with 08 and 12, activated in METODOLOGIAS_ACTIVAS): classify her reply and answer
+# it up to the booked meeting (phase 6, respuesta_comprador.py). Loaded whole, only with the methodology named, by Jev when
+# it classifies, by Relaciones when it drafts the reply and by the lead when it reviews it.
+# Baseline: docs/linea-base-respuesta-comprador.md.
+BUYER_REPLY_UNITS=list(METODOLOGIAS_ACTIVAS['respuesta_comprador']['unidades'])
 # bib-v2: agents may load the units of an activated outbound methodology (class 09: the first message). Grounding
 # envelopes and classifier criterion versions written with bib-v1 stay as they were; new ones say bib-v2.
 COURSE_VERSION='bib-v2'
