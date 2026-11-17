@@ -9,6 +9,8 @@ x-app: &app
   volumes:
     - "${SOURCE_ROOT:?Configure SOURCE_ROOT}/LinkedIn Sales - Entrega clase 01:/workspace/LinkedIn Sales - Entrega clase 01:ro"
     - "${SOURCE_ROOT}/LinkedIn Sales - Procesamiento completo:/workspace/LinkedIn Sales - Procesamiento completo:ro"
+    # Clases 08–12: solo biblioteca (knowledge/clases.py); los agentes siguen leyendo 01–06.
+    - "${SOURCE_ROOT}/LinkedIn Sales - Procesamiento clases 08-12:/workspace/LinkedIn Sales - Procesamiento clases 08-12:ro"
     - "${SOURCE_ROOT}/agentes-linkedin/equipos:/workspace/agentes-linkedin/equipos:ro"
     # Private files of the capture button and the Galería, shared by api and worker (docs/capturas-galeria.md).
     - "media:/app/media"

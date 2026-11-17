@@ -130,9 +130,8 @@ class UsageEntry(models.Model):
 
 class ConnectorAccount(models.Model):
     class Provider(models.TextChoices):
-        UNIPILE='unipile','Unipile v2'
         FAKE='fake','Simulado (pruebas)'
-        # LinkedIn without Unipile, through the navegador service; external_account_id is the account's name there.
+        # The real account, through the navegador service; external_account_id is the account's name there.
         DIRECTO='directo','LinkedIn directo (navegador)'
         # Official API (Share on LinkedIn): own publications only; external_account_id is the member URN.
         LINKEDIN='linkedin','API oficial de LinkedIn'
@@ -148,33 +147,13 @@ class ConnectorAccount(models.Model):
     paused_reason=models.TextField(blank=True)
     last_checked_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
-    # The provider and external id before the last switch (proveedor.py: Unipile <-> directo on the same row), which
-    # `cambiar-proveedor --volver` puts back: {provider, external_account_id, until, by}. Empty if never switched.
-    previous_provider=models.JSONField(default=dict,blank=True)
+    # When the LinkedIn ids kept for the account changed scheme (2026-11-14 on the first account, when it moved to
+    # directo), or null. Ids an audit event kept before then are of the scheme before and are never reused
+    # (metricas._known_id, red.search_location).
+    ids_since=models.DateTimeField(null=True,blank=True)
     class Meta:
         constraints=[models.UniqueConstraint(fields=['provider','external_account_id'],name='unique_connector_account')]
     def __str__(self):return f'{self.label} ({self.provider})'
-    @property
-    def switched_at(self):
-        """When the account last changed provider, or None. Ids an audit event kept before then are the other provider's."""
-        from django.utils.dateparse import parse_datetime
-        return parse_datetime((self.previous_provider or {}).get('until') or '')
-
-class ProviderIdOriginal(models.Model):
-    """A stored LinkedIn id as it was before a provider switch rewrote it (proveedor.py), so switching back puts the
-    exact value back even where the translation is not one to one. `provider` is the one the original belongs to;
-    `field` names the column or the JSON path. Kept until `cambiar-proveedor --olvidar-originales`."""
-    id=models.BigAutoField(primary_key=True)
-    account=models.ForeignKey(ConnectorAccount,on_delete=models.CASCADE,related_name='provider_id_originals')
-    provider=models.CharField(max_length=20)
-    model=models.CharField(max_length=40)
-    object_id=models.CharField(max_length=64)
-    field=models.CharField(max_length=60)
-    original=models.TextField()
-    translated=models.TextField()
-    created_at=models.DateTimeField(default=timezone.now)
-    class Meta:
-        constraints=[models.UniqueConstraint(fields=['account','provider','model','object_id','field'],name='unique_provider_id_original')]
 
 class Referent(models.Model):
     class Kind(models.TextChoices):
@@ -391,7 +370,7 @@ class EditorialPiece(models.Model):
     citations=models.JSONField(default=list,blank=True)
     signals=models.JSONField(default=list,blank=True)
     usage=models.JSONField(default=list,blank=True)
-    # APRE-01, first metric: impressions read through Unipile when the publication is reconciled (null ≠ 0).
+    # APRE-01, first metric: impressions read back when the publication is reconciled (null ≠ 0).
     metrics=models.JSONField(default=dict,blank=True)
     note=models.TextField(blank=True)
     origin_job=models.CharField(max_length=40,blank=True)
@@ -410,7 +389,7 @@ class EditorialPiece(models.Model):
     def __str__(self):return f'{self.slot_date} · {self.get_state_display()}'
 
 class PostMetric(models.Model):
-    """APRE-01: cumulative counters of an own published post at a fixed age, read through Unipile (metricas.py).
+    """APRE-01: cumulative counters of an own published post at a fixed age, read through the directo account (metricas.py).
     Each age is captured once, late if need be (captured_at - published_at tells how late). Null means no data
     (hidden by LinkedIn, absent or unread), never zero."""
     class Kind(models.TextChoices):
@@ -419,7 +398,7 @@ class PostMetric(models.Model):
         D7='7d','7 días'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     piece=models.ForeignKey(EditorialPiece,on_delete=models.CASCADE,related_name='post_metrics')
-    provider_post_id=models.CharField(max_length=200,blank=True)  # opaque Unipile id, not the official URN
+    provider_post_id=models.CharField(max_length=200,blank=True)  # the connector's id (activity number), not the official URN
     share_url=models.TextField(blank=True)
     kind=models.CharField(max_length=4,choices=Kind.choices)
     impressions=models.IntegerField(null=True,blank=True)
@@ -436,7 +415,7 @@ class PostMetric(models.Model):
     def __str__(self):return f'{self.piece_id} · {self.kind}'
 
 class PostComment(models.Model):
-    """INT-04 (respuestas.py): a comment on one of Gustavo's own posts (a published piece), read through Unipile. His own
+    """INT-04 (respuestas.py): a comment on one of Gustavo's own posts (a published piece), read through the directo account. His own
     replies are kept too (own=True), so the team sees the whole thread before answering and never answers twice. The
     text of other people is third-party data: shown and judged as data, never followed as instructions."""
     class State(models.TextChoices):
@@ -450,7 +429,7 @@ class PostComment(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='post_comments')
     piece=models.ForeignKey(EditorialPiece,on_delete=models.CASCADE,related_name='post_comments')
-    provider_post_id=models.CharField(max_length=200)  # opaque Unipile id of the own post
+    provider_post_id=models.CharField(max_length=200)  # the connector's id of the own post
     provider_comment_id=models.CharField(max_length=200)
     # The top-level comment this one replies to ('' for a top-level comment): LinkedIn threads have one level.
     thread_id=models.CharField(max_length=200,blank=True,db_index=True)
@@ -458,7 +437,7 @@ class PostComment(models.Model):
     author_name=models.CharField(max_length=200,blank=True)
     author_public_identifier=models.CharField(max_length=100,blank=True)
     author_profile_url=models.TextField(blank=True)
-    author_kind=models.CharField(max_length=20,blank=True)  # individual | organization, as Unipile says
+    author_kind=models.CharField(max_length=20,blank=True)  # individual | organization
     text=models.TextField(blank=True)
     commented_at=models.DateTimeField(null=True,blank=True)
     own=models.BooleanField(default=False)
@@ -478,7 +457,7 @@ class PostComment(models.Model):
     def __str__(self):return f'{self.author_name}: {self.text[:60]}'
 
 class AudienceSnapshot(models.Model):
-    """APRE-01: Gustavo's own audience once per local day (OPERATOR_TIMEZONE), read through Unipile.
+    """APRE-01: Gustavo's own audience once per local day (OPERATOR_TIMEZONE), read through the directo account.
     Cumulative counters: net growth is the difference between two snapshots. Null means no data, never zero."""
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     day=models.DateField(unique=True)
@@ -1122,7 +1101,7 @@ class InboxSeen(models.Model):
 
 
 class Conversation(models.Model):
-    """conversaciones_inbox (conversaciones.py): one LinkedIn 1to1 chat read through Unipile, read-only. The team
+    """conversaciones_inbox (conversaciones.py): one LinkedIn 1to1 chat read through the directo account, read-only. The team
     proposes it to Gustavo (Tu turno) when it looks like business or needs his reply; it never answers. Messages are
     third-party data: shown and judged as data, never followed as instructions."""
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
@@ -1141,9 +1120,6 @@ class Conversation(models.Model):
     assessment=models.JSONField(default=dict,blank=True)
     # Inbound message id at which Gustavo closed the card («Hecho, respondí» / «No responder»); a newer one reopens it.
     closed_message_id=models.CharField(max_length=200,blank=True)
-    # Set by a provider switch (proveedor.py): {from, at}. The next read of the thread brings the same messages with the
-    # other provider's ids; conversaciones.carry moves what the old ids had (judged, closed, seen) onto the new ones.
-    carry=models.JSONField(default=dict,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
     class Meta:

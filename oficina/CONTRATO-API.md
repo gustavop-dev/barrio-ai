@@ -24,7 +24,7 @@ GET `/api/v1/operador/overview`:
   "autopilot": { "enabled": true, "policy_version": "autonomia-v1" },
   "control": { "paused": false, "reason": "", "source": "db|env|none", "updated_at": "ISO|null", "updated_by": "username|null" },
   "window": { "start": "07:00", "end": "21:00", "timezone": "America/Bogota", "open_now": true, "min_spacing_seconds": 1200 },
-  "accounts": [ { "id": "uuid", "label": "…", "provider": "unipile|fake|directo|linkedin|linkedin_fake", "status": "running|token_expired|…",
+  "accounts": [ { "id": "uuid", "label": "…", "provider": "directo|fake|linkedin|linkedin_fake", "status": "running|token_expired|…",
                   "is_locked": false, "paused": false, "paused_reason": "", "last_checked_at": "ISO|null",
                   "canary": { "state": "ok|roto|alto|no_corrio", "started_at": "ISO", "finished_at": "ISO", "calls": 16,
                               "failing": ["profile_views"], "error_kind": "", "error": "" } | null,
@@ -365,7 +365,7 @@ Reglas para la PWA:
 - `snapshots: [{ kind: "24h|72h|7d", impressions, reactions, comments, reposts, engagement_pct, captured_at, age_hours }]`;
 - `commenters: [{ provider_user_id, name, substantive, role, fit }] | null`, que es `null` si los comentarios nunca se leyeron.
 
-`metrics` sí se serializa: lleva los últimos valores leídos (`impressions`, `reactions`, `comments`, `reposts`, `observed_at`, `source`, `unipile_post_id` y `share_url`).
+`metrics` sí se serializa: lleva los últimos valores leídos (`impressions`, `reactions`, `comments`, `reposts`, `observed_at`, `source` (`linkedin`), `provider_post_id` y `share_url`).
 
 Hay un trabajo nuevo, `collect_metrics`, que el autopiloto encola más o menos cada `METRICS_EVERY_MINUTES`. No tiene rol en la escena de la oficina.
 
@@ -791,7 +791,7 @@ Un `desde` inválido devuelve 400.
 
 ## Conversaciones e inbox (solo lectura)
 
-El agente `conversaciones_inbox` lee el inbox de LinkedIn con Unipile y propone a Gustavo las conversaciones que le tocan. Nunca envía mensajes ni crea oportunidades. Detalle en `agentes-linkedin/infra/docs/conversaciones-inbox.md`. Está apagado por defecto (`INBOX_ENABLED=false`): mientras lo esté, no hay tarjetas y `conversation` es `null` en las personas sin conversación leída.
+El agente `conversaciones_inbox` lee el inbox de LinkedIn con LinkedIn directo y propone a Gustavo las conversaciones que le tocan. Nunca envía mensajes ni crea oportunidades. Detalle en `agentes-linkedin/infra/docs/conversaciones-inbox.md`. Está apagado por defecto (`INBOX_ENABLED=false`): mientras lo esté, no hay tarjetas y `conversation` es `null` en las personas sin conversación leída.
 
 **`Conversation`**, tal como lo devuelven la ficha y la tarjeta:
 

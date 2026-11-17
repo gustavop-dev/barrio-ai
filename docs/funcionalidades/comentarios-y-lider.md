@@ -4,7 +4,7 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
 
 - **Código:** `agentes-linkedin/infra/src/team_backend/operador.py` (`observe`, `propose_comment`, `_draft_comment`, `execute`), `autopiloto.py` (`_observe`, `_lead_redraft`, `_propose`, `_prefilter`, `policy_review`, `content_issues`, `lead_silence`), `lider.py` (`review`, `comment_worthy`).
 - **Documentación:** [`rediseno-backend.md`](../../agentes-linkedin/infra/docs/rediseno-backend.md), [`mapa-agentes-runtime.md`](../../agentes-linkedin/infra/docs/mapa-agentes-runtime.md), [`operador-linkedin.md`](../../agentes-linkedin/infra/docs/operador-linkedin.md).
-- **Entorno de prueba:** cuenta `fake` (Unipile simulado), Claude y TypeSafe parcheados, como en `tests/test_operador.py` y `tests/test_auditoria_lider.py`.
+- **Entorno de prueba:** cuenta `fake` (LinkedIn simulado), Claude y TypeSafe parcheados, como en `tests/test_operador.py` y `tests/test_auditoria_lider.py`.
 
 ## Resumen
 

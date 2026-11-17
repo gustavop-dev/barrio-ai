@@ -1,5 +1,7 @@
 # Herramientas para operar Barrio AI sobre LinkedIn
 
+> Registro histórico (noviembre de 2026): desde el 14/11/2026 la cuenta opera con LinkedIn directo, sin Unipile; ver [plan-linkedin-directo](../../../docs/plan-linkedin-directo.md).
+
 Investigación del 6 de noviembre de 2026. Recomendación para implementar después, sin contratar, conectar cuentas ni ejecutar acciones. Cubre las 72 capacidades del [catálogo](catalogo-acciones-linkedin.md); el reparto entre agentes continúa pendiente. Gustavo llevará la ejecución del trabajo con Claude.
 
 ## Combinación propuesta

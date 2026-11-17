@@ -18,6 +18,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
 from knowledge import memory, providers, retrieval
+from knowledge.clases import CLASES_AGENTES, METODOLOGIAS_ACTIVAS, legible_por_agentes, patron
 from knowledge.ingest import ENC
 from .connectors import REACTIONS, ConnectorError, ConnectorUncertain, deferred, get_connector, public_identifier, same_text
 from .exceptions import Conflict
@@ -45,7 +46,12 @@ NETWORK_UNITS=['LI-03-M005-K05','LI-03-M005-K06','LI-03-V018-K02','LI-03-V018-K0
 REPLY_UNITS=['LI-03-M006-K02','LI-05-V005-K05','LI-06-V020-K01','LI-06-M003-K06','LI-06-M002-K09','LI-06-M002-K10']
 INBOX_UNITS=['LI-03-V019-K03','LI-03-V019-K04','LI-03-V020-K01','LI-06-V006-K04']
 LEAD_UNITS=['LI-03-V020-K02','LI-03-M006-K01','LI-03-M005-K06','LI-06-M001-K04','LI-06-M001-K07']
-COURSE_VERSION='bib-v1'
+# BIB-09-primer-mensaje (class 09, activated in knowledge.clases.METODOLOGIAS_ACTIVAS): loaded whole, only with
+# the methodology named, by Relaciones when a second reply closes and by the lead when it judges that first message.
+FIRST_MESSAGE_UNITS=list(METODOLOGIAS_ACTIVAS['primer_mensaje']['unidades'])
+# bib-v2: agents may load the units of an activated outbound methodology (class 09: the first message). Grounding
+# envelopes and classifier criterion versions written with bib-v1 stay as they were; new ones say bib-v2.
+COURSE_VERSION='bib-v2'
 # Whole curated lists (including editorial's writing guide) share this allowance.
 # The local corpus needs ~23k for network; even the writing guide with every
 # possible approach stays below 54k, including original sources and relations.
@@ -640,14 +646,14 @@ def _find_own_comment(connector,post_id,text,comment_id=None):
     return None
 
 def _own_posts_reader():
-    """Unipile (or its fake) can read Gustavo's own posts; w_member_social cannot. None without one."""
-    for account in ConnectorAccount.objects.filter(provider__in=['unipile','fake','directo']).order_by('created_at'):
+    """The directo account (or the simulated one) can read Gustavo's own posts; w_member_social cannot. None without one."""
+    for account in ConnectorAccount.objects.filter(provider__in=['fake','directo']).order_by('created_at'):
         try:return get_connector(account)
         except ConnectorError:continue
     return None
 
 def _find_own_post(text):
-    """(post, readable): the member's recent post with this exact text, by reading back through Unipile."""
+    """(post, readable): the member's recent post with this exact text, by reading back through the directo account."""
     reader=_own_posts_reader()
     if reader is None:return None,False
     try:posts=reader.list_user_posts('me',limit=20)
@@ -655,11 +661,11 @@ def _find_own_post(text):
     return next((p for p in posts if same_text(p['text'],text)),None),True
 
 def _record_metrics(proposal,post):
-    """APRE-01, first metric: impressions of an own post as Unipile reads it back; absent stays absent."""
+    """APRE-01, first metric: impressions of an own post as the directo account reads it back; absent stays absent."""
     if proposal.piece_id and post.get('impressions') is not None:
         from .models import EditorialPiece
         EditorialPiece.objects.filter(pk=proposal.piece_id).update(
-            metrics={'impressions':post['impressions'],'observed_at':timezone.now().isoformat(),'source':'unipile'})
+            metrics={'impressions':post['impressions'],'observed_at':timezone.now().isoformat(),'source':'linkedin'})
 
 @transaction.atomic
 def final_write_gate(execution,proposal,user):
@@ -699,10 +705,10 @@ def _publish(execution,proposal,connector,user):
     found,readable=_find_own_post(text)
     if found:
         _record_metrics(proposal,found)
-        result=_finish(execution,'confirmed',user,reconciled_at=now(),note='Publicada (201) y vista al releer con Unipile.')
+        result=_finish(execution,'confirmed',user,reconciled_at=now(),note='Publicada (201) y vista al releer con la cuenta de LinkedIn.')
     elif readable:result=_finish(execution,'sent',user,note='Publicada (201 con URN); aún no visible al releer. Se conciliará sin repetir.')
     else:result=_finish(execution,'confirmed',user,note='Confirmada por la respuesta 201 de la Posts API (x-restli-id); '
-                        'w_member_social no permite releer y no hay cuenta Unipile.')
+                        'w_member_social no permite releer y no hay cuenta de LinkedIn directo.')
     from .notificaciones import avisar
     thesis=(proposal.piece.brief or {}).get('thesis') if proposal.piece_id else ''
     avisar('piece_published',f'Publicaste «{thesis or text[:80]}»','Las impresiones a las 24 h llegan mañana.',
@@ -875,8 +881,8 @@ def reconcile(user,proposal_id):
             _record_metrics(proposal,found)
             return _finish(execution,'confirmed',user,external_id=execution.external_id or found['id'],
                            external_url=execution.external_url or found['share_url'],reconciled_at=timezone.now())
-        note=('No encontrada al releer con Unipile' if readable else
-              'Sin lectura permitida (w_member_social) ni cuenta Unipile para comprobarla')+'; no se repite. Decide Gustavo.'
+        note=('No encontrada al releer con la cuenta de LinkedIn' if readable else
+              'Sin lectura permitida (w_member_social) ni cuenta de LinkedIn directo para comprobarla')+'; no se repite. Decide Gustavo.'
         return _finish(execution,'uncertain' if stale else execution.state,user,note=note,reconciled_at=timezone.now())
     connector=get_connector(proposal.account)
     if proposal.capability in NETWORK:
@@ -971,7 +977,11 @@ afirmaciones por verificar las opiniones o perspectivas dichas como tales, las p
 de la publicación atribuidas a su autor. Si una idea necesita un dato que no tienes, dila como opinión o pregunta en vez
 de afirmarla.'''
 
-def course_context(unit_ids=COMMENT_UNITS,token_budget=COURSE_TOKEN_BUDGET):
+# Lo que un agente puede cargar por ID: solo las clases que leen hoy los agentes (knowledge.clases), no toda la biblioteca.
+# Las unidades de una metodología activada se cargan solo cuando quien llama la nombra (`metodologia`).
+AGENT_UNIT=re.compile(rf'LI-{patron(CLASES_AGENTES)}-[A-Z0-9]+-K\d+')
+
+def course_context(unit_ids=COMMENT_UNITS,token_budget=COURSE_TOKEN_BUDGET,metodologia=None):
     """Return (whole units, missing/unreadable IDs, IDs omitted only for budget).
 
     Read every requested unit even after the budget fills: a real absence still blocks.
@@ -979,7 +989,7 @@ def course_context(unit_ids=COMMENT_UNITS,token_budget=COURSE_TOKEN_BUDGET):
     """
     chosen=[];missing=[];omitted=[];tokens=0
     for uid in dict.fromkeys(unit_ids):
-        if not re.fullmatch(r'LI-0[1-6]-[A-Z0-9]+-K\d+',uid):missing.append(uid);continue
+        if not legible_por_agentes(uid,metodologia):missing.append(uid);continue
         try:row=retrieval.unit(uid)
         except (ValueError,KnowledgeReadError):missing.append(uid);continue
         entry={'unit_id':uid,'original':row['original'],
@@ -994,13 +1004,13 @@ def course_block(units):
     """Course units as stable system context: the same units in the same order every time, so they stay cached."""
     return 'Unidades del curso (course_units):\n'+json.dumps(units,ensure_ascii=False,default=str)
 
-def role_context(role,unit_ids,criteria=None,token_budget=COURSE_TOKEN_BUDGET):
+def role_context(role,unit_ids,criteria=None,token_budget=COURSE_TOKEN_BUDGET,metodologia=None):
     """Stable complete source block and a versioned envelope. No retrieval identity impersonation.
 
     Sources are data, never authorization. Read current active units each time so a retired/changed
     unit invalidates the provider's prefix cache; historical envelopes retain their content hashes.
     """
-    units,missing,omitted=course_context(unit_ids,token_budget)
+    units,missing,omitted=course_context(unit_ids,token_budget,metodologia)
     loaded=[u['unit_id'] for u in units]
     sources={key:[uid for uid in ids if uid in loaded] for key,ids in (criteria or {'contexto':unit_ids}).items()}
     metadata={'course_role':role,'course_citations':loaded,'criterion_sources':sources,
@@ -1009,6 +1019,7 @@ def role_context(role,unit_ids,criteria=None,token_budget=COURSE_TOKEN_BUDGET):
               'orientation_hash':hashlib.sha256(orientacion.text().encode()).hexdigest(),
               'course_missing':missing,'course_omitted':omitted,'course_mode':'curated_ids','course_base':list(unit_ids),'course_additional':[],
               'course_status':'Biblioteca no disponible' if missing else 'disponible'}
+    if metodologia:metadata['course_methodology']=metodologia
     return course_block(units),metadata
 
 def validate_course_citations(citations,grounding):

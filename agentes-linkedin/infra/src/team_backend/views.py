@@ -12,6 +12,7 @@ from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound,PermissionDenied
 from knowledge import db,ingest,memory,providers,retrieval
+from knowledge.clases import CLASES_BIBLIOTECA,rango
 from . import jobs
 from .models import KnowledgeUnit,KnowledgeRun,Worker,AuditEvent,ApiCredential
 from .permissions import require
@@ -48,14 +49,15 @@ class Units(ListAPIView):
         qs=KnowledgeUnit.objects.filter(active=True).defer('original')
         session=self.request.query_params.get('session')
         if session:
-            if session not in ['1','2','3','4','5','6']:raise ValueError('Clase fuera del alcance 01–06')
+            if session not in [str(n) for n in CLASES_BIBLIOTECA]:raise ValueError(f'Clase fuera de la biblioteca ({rango(CLASES_BIBLIOTECA)})')
             qs=qs.filter(session=int(session))
         return qs
 
 class UnitDetail(APIView):
     def get(self,request,uid):
         if not KnowledgeUnit.objects.filter(id=uid,active=True).exists():raise NotFound('Unidad no encontrada')
-        return Response(retrieval.unit(uid))
+        # Consulta de la biblioteca, no contexto de un agente: muestra todas sus relaciones.
+        return Response(retrieval.unit(uid,clases=CLASES_BIBLIOTECA))
 
 class SourceDetail(APIView):
     def get(self,request,key):

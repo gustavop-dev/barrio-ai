@@ -80,7 +80,8 @@ class BackendTests(TransactionTestCase):
         result=self.client.post('/api/v1/search',{'query':'titular'},format='json')
         self.assertEqual(result.status_code,200)
         self.assertEqual(result.json()['results'][0]['id'],'LI-01-M001-K01')
-        self.assertEqual(self.client.get('/api/v1/units/LI-07-V001-K01').status_code,404)
+        # Una clase que la biblioteca no contiene (07–12 ya pueden estar en ella).
+        self.assertEqual(self.client.get('/api/v1/units/LI-13-V001-K01').status_code,404)
 
     def test_lists_bounded_and_no_original_blob(self):
         """Large page_size cannot return unbounded units or full original blobs."""

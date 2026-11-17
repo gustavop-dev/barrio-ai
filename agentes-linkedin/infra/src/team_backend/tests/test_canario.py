@@ -223,7 +223,7 @@ class CanaryTests(CanaryBase):
         with patch.dict(os.environ,{'LINKEDIN_CANARY_AFTER':'15:30'}):
             self.assertFalse(canario.daily_due(self.account,self.at(hours=15)+timedelta(minutes=29)))
             self.assertTrue(canario.daily_due(self.account,self.at(hours=15)+timedelta(minutes=30)))
-        other=ConnectorAccount.objects.create(provider='unipile',external_account_id='acc_prueba',label='Unipile')
+        other=ConnectorAccount.objects.create(provider='linkedin',external_account_id='urn:li:person:otra',label='Oficial')
         self.assertFalse(canario.daily_due(other,at))
         with self.assertRaises(ValueError):canario.run(other,now=at)
         self.assertTrue(canario.daily_due(self.account,at))

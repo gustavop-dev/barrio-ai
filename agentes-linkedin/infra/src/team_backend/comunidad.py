@@ -147,7 +147,7 @@ def enqueue(user, account, *, refresh=False, now=None):
 
 
 def schedule(user, account, now):
-    if account.paused or account.provider not in ('unipile', 'fake', 'directo'):
+    if account.paused or account.provider not in ('fake', 'directo'):
         return 0
     period, _ = month(now)
     latest = CommunityStudy.objects.filter(account=account, period=period).order_by('-version').first()

@@ -1,6 +1,6 @@
-"""LinkedIn without Unipile (docs/plan-linkedin-directo.md): the provider `directo`, with exactly UnipileConnector's
-methods, arguments and answers, so operador, autopiloto, respuestas, red, metricas and conversaciones do not change.
-Two more, only here: `analytics`, the account's creator analytics (team_backend/analitica.py), and `canary`, the daily
+"""LinkedIn directo (docs/plan-linkedin-directo.md): the provider `directo`, the connector operador, autopiloto,
+respuestas, red, metricas and conversaciones use for the real account (FakeConnector mirrors its methods, arguments
+and answers for tests and QA). Two more, only here: `analytics`, the account's creator analytics (team_backend/analitica.py), and `canary`, the daily
 check of the reads (team_backend/canario.py).
 
 LinkedIn itself (routes, parsing, the write allowlist) lives in the linkedin_directo package; every call is made from
@@ -95,11 +95,11 @@ class DirectoConnector:
     def accept_invitation(self,request_id):return self._do('accept_invitation',request_id)
     def own_audience(self):return self._do('own_audience')
     def profile_views(self,days=14):return self._do('profile_views',days)
-    # Inbox: reads only, like UnipileConnector. Nothing here sends, marks as read or edits a message.
+    # Inbox: reads only. Nothing here sends, marks as read or edits a message.
     def list_chats(self,limit=20,inbox='CLASSIC_PRIMARY'):return self._do('list_chats',limit,inbox)
     def list_chat_messages(self,chat_id,limit=10):return self._do('list_chat_messages',chat_id,limit)
-    # Only here: the account's creator analytics (linkedin_directo.analitica.Workbook). Unipile has no such read, so
-    # callers check `hasattr(connector,'analytics')` (analitica.py) instead of a stub on the other providers.
+    # Only here: the account's creator analytics (linkedin_directo.analitica.Workbook). The simulated account has no such
+    # read, so callers check `hasattr(connector,'analytics')` (analitica.py) instead of a stub there.
     def analytics(self,start,end,order=None):return self._do('analytics',start,end,order)
     # Only here too: the daily canary (team_backend/canario.py). The reads and what each must carry stay with LinkedIn's
     # knowledge in linkedin_directo/canario.py; it never raises, a stop ends up in the report's `error`.

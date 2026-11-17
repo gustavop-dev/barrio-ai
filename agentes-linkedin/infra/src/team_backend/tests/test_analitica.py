@@ -4,7 +4,6 @@ idempotency, errors, pauses and degraded workbooks), the links from posts to pie
 coverage, the daily job and its guards, and GET /api/v1/resultados/analitica (range math, honesty rules, permissions).
 Every workbook is hand-written with invented values (analitica_fixtures.py); nothing here reaches LinkedIn or the
 navegador service."""
-import base64
 import json
 import os
 import re
@@ -20,7 +19,7 @@ from rest_framework.test import APIClient
 from linkedin_directo import Answer, Cliente, LinkedInError, Request, permitidas, rutas
 from linkedin_directo import analitica as parser
 from linkedin_directo.analitica import Day, Demographic, ParseError
-from team_backend import analitica, autopiloto, connectors_directo, ids_linkedin, jobs
+from team_backend import analitica, autopiloto, connectors_directo, jobs
 from team_backend.connectors import ConnectorError
 from team_backend.connectors_directo import DirectoConnector
 from team_backend.models import (ActionExecution, ActionProposal, AnalyticsDay, AnalyticsImport, AnalyticsPost, AnalyticsRange,
@@ -384,7 +383,7 @@ class ImportTests(ImportBase):
         OperatorControl.objects.filter(pk=1).update(paused=False)
         ConnectorAccount.objects.filter(pk=self.account.pk).update(paused=True)
         with self.assertRaises(ValueError):self.imported()  # the object in hand is stale: the stored pause wins
-        other=ConnectorAccount.objects.create(provider='unipile',external_account_id='acc_prueba',label='Unipile')
+        other=ConnectorAccount.objects.create(provider='linkedin',external_account_id='urn:li:person:otra',label='Oficial')
         with self.assertRaises(ValueError):analitica.import_range(other,START,END,now=NOW)
         self.assertEqual(self.transport.sent,[]);self.assertFalse(AnalyticsImport.objects.exists())
 
@@ -420,10 +419,8 @@ class ImportTests(ImportBase):
 class PostKeyTests(SimpleTestCase):
     def test_every_stored_id_names_its_post_and_no_urn_kind_becomes_another(self):
         n=A.POST_A
-        pair=base64.b64encode(json.dumps([f'activity:{n}',f'ugcPost:{A.POST_B}']).encode()).decode()
         cases=((n,[f'urn:li:activity:{n}']),  # directo's id: the activity number
-               (ids_linkedin.to_unipile('post',n),[f'urn:li:activity:{n}']),  # Unipile's opaque id
-               (pair,[f'urn:li:activity:{n}',f'urn:li:ugcPost:{A.POST_B}']),
+               (f'urn:li:ugcPost:{n}',[f'urn:li:ugcPost:{n}']),
                (f'urn:li:share:{n}',[f'urn:li:share:{n}']),  # never the activity of the same number: no such conversion
                (A.url(n)+'/?utm_source=prueba',[f'urn:li:activity:{n}',f'linkedin.com/feed/update/urn:li:activity:{n}']),
                ('',[]),(None,[]),('no-es-un-id',[]),('https://www.linkedin.com/',[]))
@@ -465,9 +462,9 @@ class LinkTests(ImportBase):
         quiet=self.publication()  # no id yet
         self.imported()
         self.assertEqual(self.links(),{f'urn:li:activity:{A.POST_A}':None,f'urn:li:activity:{A.POST_B}':None})
-        # The replies read found both posts later: one by its Unipile id (kept in its audit), one by directo's id.
+        # The replies read found both posts later: one kept in its scan's audit, one in its comments.
         AuditEvent.objects.create(action='replies.scanned',target=str(official.id),
-                                  metadata={'found':True,'post_id':ids_linkedin.to_unipile('post',A.POST_A)})
+                                  metadata={'found':True,'post_id':A.POST_A})
         self.comment(quiet,A.POST_B)
         self.imported(now=NOW+timedelta(hours=1))
         self.assertEqual(self.links(),{f'urn:li:activity:{A.POST_A}':str(official.id),f'urn:li:activity:{A.POST_B}':str(quiet.id)})
@@ -568,7 +565,7 @@ class DailyJobTests(ImportBase):
         at=datetime(2026,11,13,2,tzinfo=UTC)
         for env in ({'LIVE_LINKEDIN_DIRECTO':'false'},{'NAVEGADOR_URL':' '},{'NAVEGADOR_TOKEN':''},{'ANALYTICS_DAILY_DAYS':'0'}):
             with self.subTest(env=env),patch.dict(os.environ,env):self.assertFalse(analitica.daily_due(self.account,at))
-        other=ConnectorAccount.objects.create(provider='unipile',external_account_id='acc_prueba',label='Unipile')
+        other=ConnectorAccount.objects.create(provider='linkedin',external_account_id='urn:li:person:otra',label='Oficial')
         self.assertFalse(analitica.daily_due(other,at))
         self.assertTrue(analitica.daily_due(self.account,at))
 
@@ -853,7 +850,7 @@ class ApiTests(TestCase):
 
     def test_without_a_directo_account_or_an_import(self):
         ConnectorAccount.objects.filter(pk=self.account.pk).delete()
-        ConnectorAccount.objects.create(provider='unipile',external_account_id='acc_prueba',label='Unipile')
+        ConnectorAccount.objects.create(provider='linkedin',external_account_id='urn:li:person:otra',label='Oficial')
         self.assertEqual(analitica.overview(now=NOW),{'disponible':False,'motivo':analitica.NO_ACCOUNT})
         account=ConnectorAccount.objects.create(provider='directo',external_account_id='cuenta-nueva',label='Cuenta nueva')
         body=analitica.overview(now=NOW)
@@ -869,10 +866,10 @@ class ApiTests(TestCase):
         self.assertEqual((body['cuenta']['id'],body['periodo']['dias'],body['periodo']['zona_horaria']),(str(self.account.id),7,'UTC'))
         custom=self.api.get(self.URL,{'cuenta':str(self.account.id),'desde':'2026-10-01','hasta':'2026-10-10'}).json()
         self.assertEqual((custom['periodo']['desde'],custom['totales']['impressions']['value']),('2026-10-01',50))
-        unipile=ConnectorAccount.objects.create(provider='unipile',external_account_id='acc_prueba',label='Unipile')
+        official=ConnectorAccount.objects.create(provider='linkedin',external_account_id='urn:li:person:otra',label='Oficial')
         for params in ({'periodo':'30d'},{'desde':'2026-10-01'},{'desde':'1/10/2026','hasta':'2026-10-10'},
                        {'desde':'2026-10-10','hasta':'2026-10-01'},{'desde':'2025-10-10','hasta':'2026-10-11'},{'cuenta':'x'},
-                       {'cuenta':str(unipile.id)},{'cuenta':str(uuid.uuid4())}):
+                       {'cuenta':str(official.id)},{'cuenta':str(uuid.uuid4())}):
             with self.subTest(params=params):self.assertEqual(self.api.get(self.URL,params).status_code,400)
         stranger=APIClient();stranger.force_login(User.objects.create_user('sin-permisos'))
         self.assertEqual(stranger.get(self.URL).status_code,403)

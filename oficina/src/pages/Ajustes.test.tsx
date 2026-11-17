@@ -42,10 +42,10 @@ const CONNECTED = linkedin({
   connected_at: '2026-11-06T18:00:00Z',
 });
 
-const UNIPILE = {
+const SIMULATED = {
   id: 'acc-1',
   label: 'LinkedIn Gustavo',
-  provider: 'unipile',
+  provider: 'fake',
   status: 'running',
   is_locked: false,
   paused: false,
@@ -56,7 +56,7 @@ const UNIPILE = {
     'INT-02': { daily: 20, weekly: 80, daily_used: 20, weekly_used: 30, left: 0 },
   },
 };
-const OFFICIAL = { ...UNIPILE, id: 'acc-li', label: 'LinkedIn oficial', provider: 'linkedin', capacity: {} };
+const OFFICIAL = { ...SIMULATED, id: 'acc-li', label: 'LinkedIn oficial', provider: 'linkedin', capacity: {} };
 
 const AJUSTES: AjustesConPush = {
   autonomy: { 'INT-03': 'auto', 'INT-02': 'auto', 'CONT-09': 'auto', 'RED-01': 'auto', 'RED-02': 'approval', 'RED-04': 'off' },
@@ -96,7 +96,7 @@ const RED = {
 };
 
 function server(
-  { overview = overviewFixture({ accounts: [UNIPILE, OFFICIAL] }), status = CONNECTED, ajustes = AJUSTES }: { overview?: Overview; status?: LinkedInStatus; ajustes?: AjustesConPush } = {},
+  { overview = overviewFixture({ accounts: [SIMULATED, OFFICIAL] }), status = CONNECTED, ajustes = AJUSTES }: { overview?: Overview; status?: LinkedInStatus; ajustes?: AjustesConPush } = {},
   extra: Record<string, Handler | Reply> = {},
 ) {
   return fakeServer({
@@ -200,12 +200,12 @@ describe('Ajustes · Máquina', () => {
     expect(within(machine).getByText(/OPERATOR_PAUSED=true/)).toBeInTheDocument();
   });
 
-  it('pauses only the Unipile account, with a reason, and leaves the official one out', async () => {
-    const api = server(undefined, { 'POST /api/v1/operador/accounts/acc-1/pause': { body: { ...UNIPILE, paused: true } } });
+  it('pauses only the operating account, with a reason, and leaves the official one out', async () => {
+    const api = server(undefined, { 'POST /api/v1/operador/accounts/acc-1/pause': { body: { ...SIMULATED, paused: true } } });
     const user = userEvent.setup();
     renderAt('/ajustes', routes);
     const machine = await screen.findByRole('region', { name: 'Máquina' });
-    expect(await within(machine).findByText('LinkedIn Gustavo (Unipile)')).toBeInTheDocument();
+    expect(await within(machine).findByText('LinkedIn Gustavo (simulada)')).toBeInTheDocument();
     expect(within(machine).getByText('Conectada')).toBeInTheDocument();
     expect(within(machine).getByText('Comprobada hace 4 min')).toBeInTheDocument();
     expect(within(machine).queryByText(/LinkedIn oficial/)).not.toBeInTheDocument();

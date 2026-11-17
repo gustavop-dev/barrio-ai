@@ -43,7 +43,7 @@ class RepliesBase(NetworkBase):
                     'fixture-hash','fixture','/units/0','{}') ON CONFLICT(id) DO NOTHING''',(uid,int(uid[3:5]),uid))
 
     def publish(self,text=POST,hours_ago=5):
-        """A CONT-09 publication confirmed `hours_ago`, and the own post Unipile shows for it."""
+        """A CONT-09 publication confirmed `hours_ago`, and the own post the account shows for it."""
         when=timezone.now()-timedelta(hours=hours_ago);self.slots+=1
         piece=EditorialPiece.objects.create(account=self.account,slot_date=timezone.now().date()-timedelta(days=400+self.slots),scheduled_for=when,
                                             state='ready',final_text=text,brief={'thesis':'Nobody owns the evals','approach':'opinion'})
@@ -239,7 +239,15 @@ class ReplyTests(RepliesBase):
         self.assertEqual((message['turn'],message['closing_allowed'],message['already_connected']),(2,True,False))
         self.assertEqual([t['text'] for t in message['thread']][:2],[QUESTION,REPLY])
         proposal=ActionProposal.objects.get(capability='INT-04',comment=second)
-        self.assertEqual(self.execute_proposal(proposal).state,'confirmed')
+        # The lead judges the drafted first message in the same review as the reply (BIB-09-primer-mensaje): Tu turno only
+        # brings a message it approved.
+        def jev(state,questions,**kwargs):
+            low={'pitch':0.05,'inventa':0.05,'dm_pitch':0.05}
+            return {'answers':{q:{'noul':low.get(q,0.9)} for q in questions},'model':'fake-jev','estimated_usd':0}
+        with patch.dict('os.environ',{'LEAD_ENABLED':'true'}),patch('knowledge.providers.typesafe',side_effect=jev) as typesafe:
+            self.assertEqual(self.execute_proposal(proposal).state,'confirmed')
+        self.assertEqual(typesafe.call_args.args[0]['primer_mensaje']['texto'],opener)
+        self.assertIs(ActionProposal.objects.get(pk=proposal.pk).review['dm_approved'],True)
         self.assertEqual([c['text'] for c in self.fake.state['threads'][root] if c['is_sender']],[REPLY,CLOSING])
         contact=Contact.objects.get(pk=first.contact_id)
         self.assertTrue(contact.evidence['conversed'])

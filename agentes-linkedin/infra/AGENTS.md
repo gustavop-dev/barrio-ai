@@ -4,7 +4,10 @@ User-approved stack: Django + PostgreSQL/pgvector. Project presets come from
 https://github.com/gustavop-dev/ai_skills_project.git at the commit in
 docs/stack/source.json. Apply relevant local skills, not unrelated fleet workflows.
 
-- Original classes 01–06 are immutable. Class07 is excluded. Never rewrite units.
+- Original classes 01–12 are immutable. Never rewrite units. The library holds 01–12;
+  agents read only 01–06 until each outbound methodology is activated with its
+  evaluation. Both ranges live in src/knowledge/clases.py (CLASES_BIBLIOTECA,
+  CLASES_AGENTES); do not repeat class numbers in validators.
 - Keep provider keys in ignored .env; never log them or copy into frontend/code.
 - Existing cache, runs, memory and ledger are durable data; never reset budgets.
 - Tests default to LIVE_PROVIDERS=false and use temporary PostgreSQL data.

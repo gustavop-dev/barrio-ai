@@ -1,14 +1,12 @@
 """APRE-01: snapshots of own-post metrics (24 h, 72 h and 7 d) and of the audience (once per local day).
 
-Sources, all reads through the Unipile account (docs/metricas-resultados.md):
-- own posts: GET users/me/posts, and GET posts/{id} once the Unipile id of a publication is known. Impressions come
-  from analytics.impressions_counter, reactions from reactions_counter ([{reaction, count}]), comments from
-  comments_counter and reposts from reposts_counter. Each capture also reads the post's comments once (GET
-  posts/{id}/comments) to keep who commented, whether with substance (≥ 80 characters) and their neighborhood role;
-- audience: GET users/me (followers_count, relations_count) and GET linkedin/analytics/profile-views
-  (analytics.views_count over a trailing window of METRICS_PROFILE_VIEWS_DAYS, or the connector's own window when it
-  counts only one: directo's summary card, 90 days).
-directo answers in the same shapes (connectors_directo.py). Null means no data (hidden, absent or unread), never zero.
+Sources, all reads through the directo account (docs/metricas-resultados.md):
+- own posts: list_user_posts('me'), and get_post once the id of a publication is known. Impressions, reactions,
+  comments and reposts are the post's counters. Each capture also reads the post's comments once (list_comments) to
+  keep who commented, whether with substance (≥ 80 characters) and their neighborhood role;
+- audience: own_audience (followers, connections) and profile_views (over a trailing window of
+  METRICS_PROFILE_VIEWS_DAYS, or the connector's own window when it counts only one: directo's summary card, 90 days).
+Null means no data (hidden, absent or unread), never zero.
 A snapshot is captured once its age is reached, late if need be, and never twice; one that cannot be captured yet
 stays pending with its reason in metrics.collected. Reads count against daily caps through the audit log
 (metrics.read), like the network."""
@@ -18,7 +16,7 @@ from datetime import timedelta
 from django.db import IntegrityError, transaction
 from django.db.models import Q
 from django.utils import timezone
-from . import ids_linkedin, operador
+from . import operador
 from .connectors import ConnectorError, get_connector, same_text
 from .models import ActionExecution, AudienceSnapshot, AuditEvent, Contact, EditorialPiece, PostMetric
 from .permissions import require
@@ -28,13 +26,14 @@ ANALYSIS_UNITS=operador.ANALYSIS_UNITS
 READ_CAPS={'posts':12,'post':20,'comments':20,'profile':3,'views':3}  # per local day; the autopilot runs ~8 times a day
 SUBSTANTIVE_CHARS=80  # same threshold as a substantive comment in network discovery
 VIEWS_RANGES=(14,28,90,365)  # date_range accepted by List Profile Views
-PROVIDERS=('unipile','fake','directo')
+PROVIDERS=('fake','directo')
 # Published, as in the calendar and Resultados: confirmed, or sent after writing (a 201 of the Posts API not read back
 # yet; the reconcile stops re-reading it after OPERATOR_RECONCILE_HOURS). Failed, uncertain and executing are not.
 PUBLISHED=Q(state='confirmed')|Q(state='sent',wrote=True)
 POSTS_MAX=100  # the longest own-post list one read asks for (METRICS_POSTS_LIMIT's ceiling)
 NEAR=timedelta(minutes=20)  # the only own post LinkedIn dates this close to the write is that publication
 POST_URN=re.compile(r'urn:li:(activity|ugcPost|share):(\d{1,25})')
+ACTIVITY_ID=re.compile(r'\d{1,25}')  # the connector's post id (linkedin_directo/rutas.py)
 # Why a due cut was not captured (summary['pending']): no own post matched; several own posts were dated around the
 # write; a daily read cap stopped the read; the read failed or LinkedIn did not find the post.
 PENDING_REASONS=('sin_coincidencia','varias_candidatas','tope_de_lecturas','sin_lectura')
@@ -109,15 +108,15 @@ def due(now=None):
 
 def _known_id(piece,execution=None,account=None):
     """The reading account's id of a publication, once something found it: a metrics read (PostMetric, piece.metrics;
-    both rewritten on a provider switch), a replies scan (respuestas keeps the id in replies.scanned) or the execution,
-    when its write found the post already there and kept the reader's id. Those two only count when made after the
-    account's last provider switch. A Posts API urn is not the reader's id: _urns compares it like with like."""
+    both kept in the connector's ids), a replies scan (respuestas keeps the id in replies.scanned) or the execution,
+    when its write found the post already there and kept the reader's id. Those two only count when made after
+    the account's ids last changed scheme (ConnectorAccount.ids_since). A Posts API urn is not the reader's id: _urns compares it like with like."""
     stored=next((m.provider_post_id for m in piece.post_metrics.all() if m.provider_post_id),'')
-    stored=stored or (piece.metrics or {}).get('unipile_post_id') or ''
+    stored=stored or (piece.metrics or {}).get('provider_post_id') or ''
     if stored:return stored
-    switched=account.switched_at if account is not None else None
+    switched=account.ids_since if account is not None else None
     scans=AuditEvent.objects.filter(action='replies.scanned',target=str(piece.id),metadata__has_key='post_id')
-    if switched:scans=scans.filter(created_at__gt=switched)  # the other provider's id
+    if switched:scans=scans.filter(created_at__gt=switched)  # an id of the scheme before
     scanned=scans.order_by('-created_at').values_list('metadata__post_id',flat=True).first()
     if scanned:return scanned
     own=str(getattr(execution,'external_id','') or '')
@@ -125,16 +124,13 @@ def _known_id(piece,execution=None,account=None):
     return ''
 
 def _urns(*values):
-    """(kind, number) of each LinkedIn post urn the values name: a link or urn (activity, ugcPost, share), a Unipile id
-    (its list of urns, ids_linkedin.post_urns) or directo's id (the activity number). Kinds are never converted into
+    """(kind, number) of each LinkedIn post urn the values name: a link or urn (activity, ugcPost, share) or
+    the connector's id (the activity number). Kinds are never converted into
     each other, so two posts are the same only by the same kind and number."""
     found=set()
     for value in (str(v) for v in values if v):
         found.update(POST_URN.findall(value))
-        if ids_linkedin.NUMBER.fullmatch(value):found.add(('activity',value))
-        else:
-            try:found.update(ids_linkedin.post_urns(value))
-            except ids_linkedin.Untranslatable:pass
+        if ACTIVITY_ID.fullmatch(value):found.add(('activity',value))
     return found
 
 def _near(recent,execution,rows,known):
@@ -164,7 +160,7 @@ def _longest(account,connector,now):
 
 def _latest(post,now):
     return {'impressions':post['impressions'],'reactions':post['reactions_counter'],'comments':post['comments_counter'],
-            'reposts':post['reposts_counter'],'observed_at':now.isoformat(),'source':'unipile','unipile_post_id':post['id'],
+            'reposts':post['reposts_counter'],'observed_at':now.isoformat(),'source':'linkedin','provider_post_id':post['id'],
             'share_url':post['share_url']}
 
 def substantive(text):
@@ -283,7 +279,7 @@ def collect(user,account,now=None):
     lists each publication with due cuts not captured ({piece, cuts, reason}; len() is the number pending) and
     `no_impressions` the cuts captured without impressions and why."""
     require(user,'operate_linkedin')
-    if account.provider not in PROVIDERS:raise ValueError('Las métricas se leen con la cuenta Unipile.')
+    if account.provider not in PROVIDERS:raise ValueError('Las métricas se leen con la cuenta de LinkedIn directo.')
     now=now or timezone.now();connector=get_connector(account)
     context,grounding=operador.role_context('analista',ANALYSIS_UNITS,
         {'ventanas':['LI-06-V008-K01','LI-06-V008-K02'],'limites_de_inferencia':['LI-06-V006-K04','LI-06-V007-K05']})

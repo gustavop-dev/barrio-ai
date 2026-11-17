@@ -1,6 +1,6 @@
 """The 21 operations Barrio asks of LinkedIn, made directly (ported from spikes/linkedin-directo/directo.py), with the
-same arguments and answers as team_backend.connectors.UnipileConnector, plus `analytics` (the account's own creator
-analytics, analitica.py), which Unipile does not have.
+arguments and answers of the backend's connector (team_backend.connectors_directo.DirectoConnector), plus `analytics`
+(the account's own creator analytics, analitica.py).
 
 Every call goes through `_send`: the allowlist first (permitidas.check), then the Transport, then check_answer. Some
 operations need more than one call (shown per method); a write never makes a read after sending, so a failure after

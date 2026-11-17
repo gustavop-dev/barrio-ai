@@ -11,6 +11,8 @@ import math
 import re
 from pathlib import Path
 
+from knowledge.clases import CLASES_AGENTES, METODOLOGIAS_ACTIVAS, patron, rango
+
 
 class GraphError(ValueError):
     pass
@@ -79,9 +81,20 @@ def validate_graph(graph):
     lists = graph.get('course_lists', {})
     budgets = graph.get('budgets', {})
     gates = graph.get('gates', {})
+    # Una metodología activada (knowledge.clases.METODOLOGIAS_ACTIVAS) declara su lista y los nodos que la cargan.
+    methodologies = {m['lista']: (key, m) for key, m in METODOLOGIAS_ACTIVAS.items()}
     for ref, units in lists.items():
-        check(isinstance(units, list) and all(isinstance(u, str) and re.fullmatch(r'LI-0[1-6]-[A-Z]\d{3}-K\d{2}', u) for u in units),
-              f'lista {ref}: IDs de unidades inválidos (solo clases 01–06)')
+        # Las listas curadas son lo que cargan los agentes: solo las clases que leen hoy, no toda la biblioteca, salvo la
+        # lista de una metodología activada, que es exactamente sus unidades.
+        own = set(methodologies[ref][1]['unidades']) if ref in methodologies else set()
+        check(isinstance(units, list) and all(isinstance(u, str) and (
+                  re.fullmatch(rf'LI-{patron(CLASES_AGENTES)}-[A-Z]\d{{3}}-K\d{{2}}', u) or u in own) for u in units),
+              f'lista {ref}: IDs de unidades inválidos (solo clases {rango(CLASES_AGENTES)} o las de su metodología activada)')
+        if ref in methodologies:
+            check(units == list(methodologies[ref][1]['unidades']), f'lista {ref}: no coincide con la metodología {methodologies[ref][0]}')
+    for ref, (key, methodology) in methodologies.items():
+        check(ref in lists, f'metodología {key}: falta su lista {ref}')
+        check(set(methodology['roles']) <= set(nodes), f'metodología {key}: rol desconocido')
     for sid, schema in schemas.items():
         check(schema.get('binding') and schema.get('kind'), f'schema {sid}: sin binding/tipo')
     for nid, node in nodes.items():
@@ -95,6 +108,10 @@ def validate_graph(graph):
               f'nodo {nid}: descripción/skills/tools inválidos')
         check(node['budget_ref'] in budgets, f'nodo {nid}: presupuesto desconocido')
         check(all(ref in lists for ref in node['course_lists']), f'nodo {nid}: lista curada desconocida')
+        for ref in node['course_lists']:
+            if ref in methodologies:
+                check(nid in methodologies[ref][1]['roles'], f'nodo {nid}: la lista {ref} es de la metodología '
+                                                              f'{methodologies[ref][0]} y solo la cargan sus roles')
         allowed = {u for ref in node['course_lists'] for u in lists[ref]}
         check(set(node['course_units']) <= allowed, f'nodo {nid}: unidad fuera de listas curadas')
         check(len(node['course_units']) == len(set(node['course_units'])), f'nodo {nid}: unidad duplicada')

@@ -493,7 +493,7 @@
     ],
     "acciones_prohibidas": [
       "Llamadas pagadas por este diseño",
-      "Llamar directamente a la API oficial o a Unipile, comentar o enviar mensajes: la programación y la publicación solo las ejecuta operador_cuenta",
+      "Llamar directamente a la API oficial o a LinkedIn (conector directo), comentar o enviar mensajes: la programación y la publicación solo las ejecuta operador_cuenta",
       "Modificar corpus, hechos confirmados, permisos o límites",
       "Aceptar mayoría de lectores como verificación factual",
       "Convertir dato privado en copy público sin permiso"
@@ -528,7 +528,7 @@
     {
       "id": "INT-06",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Compartir con atribución y criterio propio; un único ejecutor y una sola vía (API oficial o Unipile) registrada por pieza; entra en el calendario del director."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Compartir con atribución y criterio propio; un único ejecutor y una sola vía registrada por pieza (la API oficial: LinkedIn directo no comparte posts); entra en el calendario del director."
     },
     {
       "id": "INT-06",
@@ -648,7 +648,7 @@
     {
       "id": "CONT-09",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Posts API (w_member_social) con la versión aprobada por la política autónoma, sin revisión humana final; guardar URN y confirmar por lectura permitida o Unipile; timeout no activa segundo ejecutor."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Posts API (w_member_social) con la versión aprobada por la política autónoma, sin revisión humana final; guardar URN y confirmar por lectura permitida o por LinkedIn directo; timeout no activa segundo ejecutor."
     },
     {
       "id": "CONT-09",
@@ -1168,7 +1168,7 @@
         "permiso_w_member_social_efectivo",
         "parada_total"
       ],
-      "origen_posible": "Registro de operador_cuenta y cola Django; API oficial (Posts API) y lectura Unipile para confirmar.",
+      "origen_posible": "Registro de operador_cuenta y cola Django; API oficial (Posts API) y lectura por LinkedIn directo para confirmar.",
       "need": "Obligatorio para planificar el calendario y afirmar que una pieza se publicó.",
       "use": "Evitar duplicados, conciliar inciertos y no planificar sobre una cuenta en parada.",
       "fallback": "Estado desconocido; no reprogramar ni republicar hasta conciliar."

@@ -41,8 +41,8 @@ En el servidor, desde `deploy/`:
 ```
 
 El script de importación hace cuatro cosas:
-- restaura la base completa (biblioteca de 1.035 unidades, embeddings, memoria, ledger, trabajos y usuarios) en una base vacía;
-- copia el archivo de política que usan los agentes;
+- restaura la base completa (la biblioteca tal como esté en la laptop: 1.035 unidades de 01–06, o 1.656 de 01–12 si ya se aprobó y ejecutó su ingesta; embeddings, memoria, ledger, trabajos y usuarios) en una base vacía;
+- copia los archivos de política de uso: el que usan los agentes y el de las clases 08–12, que ningún agente lee todavía;
 - aplica las migraciones nuevas;
 - levanta todo.
 
@@ -65,8 +65,10 @@ Después, en Ajustes → activar notificaciones → «Probar».
 
 ## 5. Encender la máquina
 
+Antes, el servicio `navegador` arriba y la sesión de LinkedIn abierta en él: [En el servidor](../agentes-linkedin/navegador/README.md#en-el-servidor) (o «Conectar LinkedIn» desde la app, abajo). La clave y el 2FA los escribe Gustavo en la propia página de LinkedIn; Barrio no los guarda.
+
 En `.env`:
-- `UNIPILE_API_KEY` y `LIVE_LINKEDIN=true`;
+- `LIVE_LINKEDIN_DIRECTO=true`, `NAVEGADOR_URL=http://navegador:8790` y `NAVEGADOR_TOKEN`, el mismo que usa el servicio;
 - `AI_MONTHLY_LIMIT_USD`, el presupuesto de IA de todo el equipo por mes (100 USD acordados), y `AI_DAILY_FUSE_USD`, su tope de seguridad diario;
 - `OPERATOR_AUTOPILOT=true`.
 
@@ -74,7 +76,7 @@ Luego aplica los cambios y da de alta la cuenta y los referentes:
 
 ```bash
 docker compose -f compose.prod.yaml --env-file .env up -d
-docker compose -f compose.prod.yaml exec api python manage.py operador --usuario gustavo cuenta --account-id acc_… --etiqueta "LinkedIn Gustavo"
+docker compose -f compose.prod.yaml exec api python manage.py operador --usuario gustavo cuenta --account-id <cuenta> --etiqueta "LinkedIn Gustavo"   # <cuenta>: su nombre en el servicio navegador
 docker compose -f compose.prod.yaml exec api python manage.py operador --usuario gustavo comprobar --cuenta <uuid>
 docker compose -f compose.prod.yaml exec api python manage.py operador --usuario gustavo referente --cuenta <uuid> --perfil https://www.linkedin.com/in/… --motivo "…"
 ```

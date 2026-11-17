@@ -3,13 +3,13 @@ CREATE TABLE IF NOT EXISTS source_files (
  path text PRIMARY KEY, sha256 text NOT NULL, imported_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE TABLE IF NOT EXISTS units (
- id text PRIMARY KEY, session integer NOT NULL CHECK(session BETWEEN 1 AND 6),
+ id text PRIMARY KEY, session integer NOT NULL CHECK(session BETWEEN 1 AND 12),
  title text NOT NULL, original json NOT NULL, sha256 text NOT NULL,
  source_path text NOT NULL REFERENCES source_files(path), pointer text NOT NULL,
  metadata jsonb NOT NULL, active boolean NOT NULL DEFAULT true
 );
 CREATE TABLE IF NOT EXISTS evidence (
- key text PRIMARY KEY, session integer NOT NULL CHECK(session BETWEEN 1 AND 6), original json NOT NULL
+ key text PRIMARY KEY, session integer NOT NULL CHECK(session BETWEEN 1 AND 12), original json NOT NULL
 );
 CREATE TABLE IF NOT EXISTS unit_revisions (
  unit_id text NOT NULL, sha256 text NOT NULL, original json NOT NULL,

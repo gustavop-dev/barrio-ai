@@ -1,5 +1,7 @@
 # Herramientas de Barrio AI: selección revisada
 
+> Registro histórico (noviembre de 2026): desde el 14/11/2026 la cuenta opera con LinkedIn directo, sin Unipile; ver [plan-linkedin-directo](../../../docs/plan-linkedin-directo.md).
+
 Actualizado el 6 de noviembre de 2026 por las decisiones de Gustavo. Sustituye la recomendación de [herramientas v1](herramientas-linkedin-v1.md), conservada como historial. Es diseño documental: no hay nuevas conexiones, llamadas pagadas ni acciones sobre LinkedIn. Los ciclos y la asignación de autoridad todavía requieren implementación.
 
 ## Selección vigente

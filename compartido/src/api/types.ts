@@ -690,7 +690,7 @@ export interface StageUsage {
   missing_units?: string[];
 }
 
-/** APRE-01: impressions read through Unipile when the publication is reconciled. Missing is not zero. */
+/** APRE-01: impressions read back from LinkedIn when the publication is reconciled. Missing is not zero. */
 export interface PieceMetrics {
   impressions?: number | null;
   reactions?: number | null;
@@ -698,7 +698,7 @@ export interface PieceMetrics {
   reposts?: number | null;
   observed_at?: string | null;
   source?: string;
-  unipile_post_id?: string | null;
+  provider_post_id?: string | null;
   share_url?: string | null;
 }
 

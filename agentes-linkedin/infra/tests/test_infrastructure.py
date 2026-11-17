@@ -5,6 +5,7 @@ from decimal import Decimal
 import httpx
 import pytest
 from knowledge import agents,db,ingest,memory,providers,retrieval
+from knowledge.clases import CLASES_AGENTES,CLASES_BIBLIOTECA
 
 def test_explicit_container_source_root(monkeypatch):
     from pathlib import Path
@@ -16,8 +17,54 @@ def test_explicit_container_source_root(monkeypatch):
 def test_originals_and_scope():
     assert ingest.verify()['passed']
     result=db.status()
-    assert result['units']==1035
-    assert [r['session'] for r in result['classes']]==[1,2,3,4,5,6]
+    # 1.035 unidades de 01–06, 136 de la clase 07 y 485 de 08–12 (104/110/61/120/90).
+    assert result['units']==1656
+    assert [r['session'] for r in result['classes']]==list(CLASES_BIBLIOTECA)
+    by_class={r['session']:r['units'] for r in result['classes']}
+    assert sum(by_class[n] for n in CLASES_AGENTES)==1035
+    assert [by_class[n] for n in range(7,13)]==[136,104,110,61,120,90]
+
+def test_agents_keep_reading_01_06_while_the_library_holds_01_12():
+    query='mensaje secuencia prospecto lemlist campaña seguimiento respuesta'
+    default=retrieval.search(query,limit=20)
+    assert default['scope']==[1,2,3,4,5,6] and default['results']
+    assert {r['session'] for r in default['results']}<=set(CLASES_AGENTES)
+    explicit=retrieval.search(query,limit=20,clases=range(7,13))
+    assert explicit['scope']==list(range(7,13)) and {r['session'] for r in explicit['results']}<=set(range(7,13))
+    for edge in default['relations']:
+        assert edge['source_id'][3:5] in {f'{n:02}' for n in CLASES_AGENTES}
+        assert edge['target_id'][3:5] in {f'{n:02}' for n in CLASES_AGENTES}
+    ctx=agents.context(query,'perfil')
+    assert ctx['units'] and all(u['unit_id'][3:5] in {f'{n:02}' for n in CLASES_AGENTES} for u in ctx['units'])
+    unit=retrieval.unit('LI-08-V001-K01')
+    assert unit['session']==8 and unit['sources'] and all(s['key'].startswith('08:') for s in unit['sources'])
+
+def test_first_message_registry_matches_the_real_corpus():
+    """BIB-10: las siete unidades activadas del primer mensaje existen en el corpus real con el hash, el puntero y las
+    fuentes de su registro de lectura; se cargan solo con la metodología nombrada y la evaluación las reconoce."""
+    from pathlib import Path
+    from knowledge.clases import METODOLOGIAS_ACTIVAS,legible_por_agentes
+    activa=METODOLOGIAS_ACTIVAS['primer_mensaje']
+    path=Path(__file__).resolve().parents[2]/'equipos/relaciones/registro-lectura-primer-mensaje.json'
+    if not path.exists():pytest.skip('Registro de equipos no disponible en esta copia')
+    registry=json.loads(path.read_text(encoding='utf-8'))
+    assert [u['unidad_id'] for u in registry['unidades']]==list(activa['unidades'])
+    assert registry['evaluacion']==activa['evaluacion'] and registry['roles']==list(activa['roles'])
+    ids=list(activa['unidades'])
+    with db.connect() as c:
+        rows={r['id']:r for r in c.execute('SELECT id,session,sha256,source_path,pointer FROM units WHERE active AND id=ANY(%s)',(ids,))}
+        linked={}
+        for r in c.execute('SELECT unit_id,source_key FROM unit_evidence WHERE unit_id=ANY(%s)',(ids,)):
+            linked.setdefault(r['unit_id'],set()).add(r['source_key'])
+    for unit in registry['unidades']:
+        row=rows[unit['unidad_id']]
+        assert (row['session'],row['sha256'],row['source_path'],row['pointer'])==(9,unit['hash'],unit['source_path'],unit['pointer'])
+        assert linked[unit['unidad_id']]==set(unit['fuentes_con_prefijo_de_clase'])
+    # Frontera en el corpus real: el resto de la clase 09 sigue fuera, también con la metodología nombrada.
+    with db.connect() as c:
+        others=[r['id'] for r in c.execute("SELECT id FROM units WHERE active AND session=9 AND NOT id=ANY(%s) ORDER BY id",(ids,))]
+    assert others and not any(legible_por_agentes(uid,'primer_mensaje') for uid in others)
+    assert all(legible_por_agentes(uid,'primer_mensaje') and not legible_por_agentes(uid) for uid in ids)
 
 def test_idempotent_ingestion_and_persistent_cache():
     before=db.status()
@@ -54,7 +101,7 @@ def test_no_fake_semantic_search():
 def test_unknown_agent_and_sql_input():
     with pytest.raises(ValueError):retrieval.search('titular',agent='admin')
     retrieval.search("'; DROP TABLE units; --")
-    assert db.status()['units']==1035
+    assert db.status()['units']==1656
 
 def test_context_keeps_limits_and_original():
     ctx=agents.context('compradores referidores divulgadores barrio','perfil')

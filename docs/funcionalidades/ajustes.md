@@ -10,7 +10,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 | ID | Función | Dónde | Estado |
 | --- | --- | --- | --- |
 | [AJU-01](#aju-01) | Parada total y reanudar la máquina | PWA · app · backend | funciona |
-| [AJU-02](#aju-02) | Pausar o reanudar una cuenta de Unipile | PWA · app · backend | funciona |
+| [AJU-02](#aju-02) | Pausar o reanudar la cuenta de LinkedIn | PWA · app · backend | funciona |
 | [AJU-03](#aju-03) | Orientación para el equipo | PWA · app · backend | funciona |
 | [AJU-04](#aju-04) | Autonomía y límites | PWA · app · backend | funciona |
 | [AJU-05](#aju-05) | Gasto de IA | PWA · app · backend | funciona |
@@ -43,18 +43,18 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 - **Brechas código/docs:** —
 - **Cobertura QA:** pendiente
 
-### AJU-02 · Pausar o reanudar una cuenta de Unipile <a id="aju-02"></a>
+### AJU-02 · Pausar o reanudar la cuenta de LinkedIn <a id="aju-02"></a>
 
 - **Dónde:** PWA · app · backend
 - **Estado:** funciona
-- **Qué hace para Gustavo:** pausa solo la cuenta de LinkedIn conectada por Unipile, sin parar el resto de la máquina.
+- **Qué hace para Gustavo:** pausa solo la cuenta de LinkedIn con la que actúa el equipo (LinkedIn directo), sin parar el resto de la máquina.
 - **Código:** `POST /api/v1/operador/accounts/<id>/pause {paused, reason}`.
 - **Criterios de aceptación:**
-  1. **Dado** una cuenta de Unipile, **cuando** abre Ajustes › Máquina, **entonces** ve su nombre, el proveedor («Unipile» o «simulada»), «Conectada», «Sin comprobar» o «Token caducado», «En pausa» o «Bloqueada» si aplica, y «Comprobada hace X».
+  1. **Dado** una cuenta `directo` (o la simulada), **cuando** abre Ajustes › Máquina, **entonces** ve su nombre, el proveedor («directo» o «simulada»), «Conectada», «Sin comprobar» o «Token caducado», «En pausa» o «Bloqueada» si aplica, y «Comprobada hace X».
   2. **Dado** «Pausar solo esta cuenta», **cuando** confirma con un motivo obligatorio, **entonces** aparece «Cuenta en pausa.» y el equipo deja de actuar con ella.
   3. **Dado** una cuenta en pausa, **cuando** pulsa «Reanudar la cuenta», **entonces** se reanuda sin confirmación y aparece «Cuenta reanudada.».
-  4. **Dado** que no hay cuentas de Unipile, **cuando** abre la sección, **entonces** ve «No hay ninguna cuenta de Unipile configurada.».
-  5. **Dado** una cuenta `directo` con su prueba diaria de LinkedIn (`canary` de la cuenta), **cuando** abre Ajustes › Máquina, **entonces** ve en su tarjeta «Prueba diaria: todo bien, hace X.»; si no pasó, una nota con «algo cambió en LinkedIn (falla …)», «se detuvo» o «no pudo correr» y el motivo. Si la parada ya pausó la cuenta, el motivo sale solo en la nota de la pausa. Una cuenta de Unipile o sin prueba todavía no muestra la línea.
+  4. **Dado** que no hay ninguna cuenta `directo` ni simulada, **cuando** abre la sección, **entonces** ve «No hay ninguna cuenta de LinkedIn configurada.».
+  5. **Dado** una cuenta `directo` con su prueba diaria de LinkedIn (`canary` de la cuenta), **cuando** abre Ajustes › Máquina, **entonces** ve en su tarjeta «Prueba diaria: todo bien, hace X.»; si no pasó, una nota con «algo cambió en LinkedIn (falla …)», «se detuvo» o «no pudo correr» y el motivo. Si la parada ya pausó la cuenta, el motivo sale solo en la nota de la pausa. Una cuenta simulada o sin prueba todavía no muestra la línea.
 - **Brechas código/docs:** la cuenta de la API oficial de LinkedIn no aparece aquí (se gestiona en [AJU-06](#aju-06)). La PWA todavía no muestra la prueba diaria (criterio 5); la app sí.
 - **Cobertura QA:** App (`AjustesScreen.test.tsx`, «Ajustes · Máquina»): criterios 1, 2 y 5. `compartido` (`ajustes.test.ts`): la línea de la prueba diaria en cada estado. Sin E2E: ningún flujo de Maestro tiene una cuenta `directo`.
 
@@ -217,7 +217,7 @@ Los controles que Gustavo toca poco: la parada total, la orientación para el eq
 - **Qué hace para Gustavo:** entra en LinkedIn desde el teléfono, en el navegador del servidor que usa una cuenta `directo`, sin túnel SSH: escribe la clave y el código en la página de LinkedIn, que ve a distancia, y la cuenta queda con su sesión. La cuenta se crea antes en el servidor (`operador cuenta --proveedor directo`); la app no la crea.
 - **Código:** `POST /api/v1/operador/accounts/<id>/conexion`, `GET /api/v1/operador/conexiones/<id>`, `POST …/<id>/enlace`, `POST …/<id>/cancelar`, `GET /api/v1/linkedin/pantalla/entrar?ticket=` y `GET /api/v1/linkedin/pantalla/permitir` (`team_backend/conexion.py`, `conexion_views.py`, modelo `BrowserLogin`); `overview.accounts[].connect`; servicio `navegador/conexion.py` (`POST /v1/cuentas/<cuenta>/conexion`, `GET|DELETE /v1/conexiones/<sesion>`); ruta `/conectar/` de `deploy/Caddyfile`; app `ajustes/Maquina.tsx` (`ConnectLinkedIn`); común `compartido/src/logic/ajustes.ts` (`connectLabel`, `loginLine`, `LOGIN_PRIVACY`). Diseño de seguridad en el [README del servicio](../../agentes-linkedin/navegador/README.md#conectar-desde-la-app).
 - **Criterios de aceptación:**
-  1. **Dado** una cuenta `directo` y `LINKEDIN_CONEXION_APP=true`, **cuando** abre Ajustes › Máquina, **entonces** ve en su tarjeta «Conectar LinkedIn» («Volver a conectar» si la cuenta ya tuvo sesión) y debajo «Escribes la clave y el código en la propia página de LinkedIn, abierta en un navegador del servidor de Barrio. Barrio no los guarda.». Con el interruptor apagado, o en una cuenta de Unipile, no hay botón y la API responde 404 (apagado) o 400 (otro proveedor).
+  1. **Dado** una cuenta `directo` y `LINKEDIN_CONEXION_APP=true`, **cuando** abre Ajustes › Máquina, **entonces** ve en su tarjeta «Conectar LinkedIn» («Volver a conectar» si la cuenta ya tuvo sesión) y debajo «Escribes la clave y el código en la propia página de LinkedIn, abierta en un navegador del servidor de Barrio. Barrio no los guarda.». Con el interruptor apagado, o en una cuenta que no es `directo` (la simulada), no hay botón y la API responde 404 (apagado) o 400 (otro proveedor).
   2. **Dado** el botón, **cuando** lo pulsa, **entonces** el servidor abre su navegador en la página de entrada de LinkedIn y la app abre en el navegador del sistema un enlace de un solo uso (vale 2 minutos) con esa pantalla; mientras dura ve «Esperando a que entres en LinkedIn (hasta las HH:MM).», «Abrir de nuevo» y «Cancelar la conexión».
   3. **Dado** que entra en LinkedIn en esa pantalla, **cuando** llega al inicio, **entonces** la conexión termina sola, el servidor cierra la pantalla y la app muestra «LinkedIn conectado hace X.»; si la cuenta estaba en pausa porque el servicio se detuvo o se quedó sin sesión, la pausa se levanta. Una pausa por otro motivo, o una parada del servicio por un 429, un 999 o un reto, se queda («Sesión guardada …, pero la cuenta sigue detenida en el servidor: hay que revisarla allí.»).
   4. **Dado** que no entra, **cuando** pasan 10 minutos (`NAVEGADOR_CONEXION_MIN`) o pulsa «Cancelar la conexión», **entonces** la pantalla se cierra y ve «Se acabó el tiempo sin entrar en LinkedIn (hace X). Vuelve a intentarlo.» o «Conexión cancelada hace X.».

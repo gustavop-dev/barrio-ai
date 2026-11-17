@@ -5,6 +5,7 @@ import re
 from urllib.parse import urlsplit
 from psycopg import Error as KnowledgeDatabaseError
 from knowledge import retrieval, providers
+from knowledge.clases import CLASES_AGENTES, patron
 from . import guardas, infografias as schema, orquestacion, perfil_galeria as gallery, perfil_marca as brand
 from .perfil_marca import BRAND_VERSION
 
@@ -99,7 +100,7 @@ def library(mode):
     # Lexical search has no model cost and cannot expose private context to a provider.
     try:
         found=retrieval.search('perfil utilidad comprador posicionamiento destacados',agent='perfil',limit=4,mode='lexical')
-        ids+= [r['id'] for r in found['results'] if re.fullmatch(r'LI-0[1-6]-[A-Z]\d{3}-K\d{2}',r['id']) and r['id'] not in ids]
+        ids+= [r['id'] for r in found['results'] if re.fullmatch(rf'LI-{patron(CLASES_AGENTES)}-[A-Z]\d{{3}}-K\d{{2}}',r['id']) and r['id'] not in ids]
     except (ValueError,KnowledgeDatabaseError):pass
     units=[];missing=[]
     for uid in ids:

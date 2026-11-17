@@ -1,6 +1,6 @@
 # Catálogo de la biblioteca
 
-Las 1.035 unidades del curso (clases 01–06) se organizan en **estantes**, uno por tarea de agente, y dentro de cada estante en tres **niveles**:
+Las 1.035 unidades que leen los agentes (clases 01–06) se organizan en **estantes**, uno por tarea de agente, y dentro de cada estante en tres **niveles**. La biblioteca guarda también las clases 07–12, pero el núcleo solo admite las clases de `CLASES_AGENTES` (`knowledge/clases.py`): `catalogo.LOADABLE` rechaza una unidad de 07–12 como núcleo hasta que se active su metodología de outbound.
 
 | Nivel | Qué es | Cuándo se carga |
 | --- | --- | --- |

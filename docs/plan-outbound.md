@@ -118,7 +118,11 @@ Falta, en este orden:
    en frío. Es la pieza central.
 2. **Comentar a compradores.** Los comentarios solo apuntan a posts de referentes activos (`referent__active`).
 3. **Borrador del primer mensaje en la Bandeja.** La app no envía mensajes (INB-08): lo envía Gustavo, así que el
-   volumen queda limitado a lo que él alcance a mandar.
+   volumen queda limitado a lo que él alcance a mandar. **Metodología activada el 16/11/2026** para el único primer
+   mensaje que existe hoy, el de una conversación de dos turnos en un post de Gustavo
+   ([BIB-10](funcionalidades/biblioteca-equipos.md#bib-10), [RSP-07](funcionalidades/respuestas.md#rsp-07)): clase 09,
+   reglas fijas, juicio del líder y tarjeta solo si lo aprueba. Falta el primer mensaje tras calentar a un comprador
+   (depende del motor de secuencias).
 4. **Lo que pasa fuera de LinkedIn:** el recurso descargable, la página, el formulario y el correo (sección
    siguiente). El sistema no guarda hoy correos ni contactos que no vengan de LinkedIn.
 
@@ -146,7 +150,10 @@ otra puerta de entrada de un comprador, junto con el calentamiento y la invitaci
 3. ¿Nota en la invitación a los calentados?
 4. Primer mensaje: ¿solo a compradores o también a la comunidad? (siempre como borrador que él envía).
 5. ¿Cuándo una conversación pasa a oportunidad?
-6. La información de la clase 07 que falta.
+6. La información de la clase 07 que falta. Llegaron las clases 08–12 y la biblioteca ya admite 07–12 (los agentes
+   siguen leyendo 01–06); faltan cargarlas en producción y activar cada metodología con su evaluación. La primera
+   activada es el primer mensaje (siete unidades de la clase 09, BIB-10); la siguiente es la nota de invitación, que
+   ya está en producción (sin nota por defecto, hasta 3 al mes) y necesita su propia evaluación antes de tocarla.
 7. Umbral de seguidores, cuando haya datos.
 
 ## Orden propuesto

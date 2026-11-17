@@ -158,7 +158,7 @@ def post_body(author,text,media=None):
 
 class LinkedInOfficialConnector:
     """Writes only. w_member_social cannot read posts back; confirmation comes from the 201 response
-    or from reading the member's own posts through Unipile (operador._find_own_post)."""
+    or from reading the member's own posts through the directo account (operador._find_own_post)."""
     provider='linkedin'
 
     def __init__(self,account):

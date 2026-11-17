@@ -1,0 +1,307 @@
+{
+  "version": "1.0",
+  "estado": "registro_de_lectura_de_metodologia_activada",
+  "grupo": "relaciones",
+  "metodologia": "primer_mensaje",
+  "evaluacion": "BIB-09-primer-mensaje",
+  "fecha": "2026-11-16",
+  "metodo": "python -I; lectura de session-09-revisada.json del corpus privado, sin escribir en él. hash = sha256 del JSON canónico de la unidad (knowledge.ingest.canonical), el mismo que guarda la biblioteca en units.sha256.",
+  "alcance": {
+    "unidades_leidas_completas": 7,
+    "por_clase": {
+      "09": 7
+    },
+    "lectura_integral_del_corpus": false,
+    "advertencia": "Lectura completa de estas 7 unidades de la clase 09, no de toda la clase ni de las clases 07–12. Solo estas unidades están activadas para los agentes (knowledge.clases.METODOLOGIAS_ACTIVAS)."
+  },
+  "roles": [
+    "relaciones_comunidad",
+    "lider_jev"
+  ],
+  "lista": "operador.FIRST_MESSAGE_UNITS",
+  "unidades": [
+    {
+      "unidad_id": "LI-09-M002-K04",
+      "clase": 9,
+      "titulo": "Principio rector: el primer mensaje busca una respuesta, no una reunión",
+      "hash": "c67937c55cf681b74fb26b7b6da027038ee3f9dcf8dd331cf565dfe7673be664",
+      "lectura_completa": true,
+      "lectura": "original completo leído del JSON revisado (solo lectura)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "El primer mensaje busca una respuesta, no una reunión: su única llamada a la acción es una respuesta fácil.",
+      "limites_y_excepciones": [
+        "El éxito se mide en respuestas, no en reuniones.",
+        "Pedir reunión, minutos o mandar un enlace queda para cuando ya hay conversación."
+      ],
+      "uso": {
+        "regla_fija": "respuestas.dm_text_issues: sin enlaces, sin pedir minutos, llamadas o reuniones (DM_ASK, SELL)",
+        "pregunta_del_lider": "dm_pitch (máx. 0,2)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/93",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p010"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-M002-K05",
+      "clase": 9,
+      "titulo": "¿Cuándo le escribo? Matriz de decisión según urgencia, interacción previa y aceptación",
+      "hash": "5f119ce5f61f33b33ced68684d33f1c3584435f7a71114b522ed7fa9c49956fe",
+      "lectura_completa": true,
+      "lectura": "original completo leído del JSON revisado (solo lectura)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Cuándo escribir: si ya interactuó (comentó, conversó), apenas acepte; a un desconocido no se le escribe al aceptar.",
+      "limites_y_excepciones": [
+        "El curso reconoce que hay opiniones distintas y que depende de la autoridad de quien escribe.",
+        "Solo se usa la fila «ya interactuó»: el equipo solo redacta tras una conversación de dos turnos en un post de Gustavo."
+      ],
+      "uso": {
+        "momento": "respuestas._dm_rows: solo comentarios con segundo turno y cierre; una aceptación sin conversación no redacta nada (P5)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/94",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p011",
+        "09:qt00202"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-M003-K02",
+      "clase": 9,
+      "titulo": "Anatomía del primer mensaje: tres líneas que responden tres preguntas (toque personal, puente honesto, pregunta fácil)",
+      "hash": "39f9afcffb12da7edfdc021a191a1bec9fa439a7fdd267bf4a0c5fe778da3ee5",
+      "lectura_completa": true,
+      "lectura": "original completo leído del JSON revisado (solo lectura)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Tres líneas que responden tres preguntas del lector: toque personal (por qué a mí), puente honesto (por qué me escribes) y pregunta fácil (qué quieres que haga).",
+      "limites_y_excepciones": [
+        "Es una guía, no una regla fija; el destinatario no conoce la técnica.",
+        "Adaptación de Gustavo: el puente es la conversación que quedó abierta en el post, no sus servicios ni a quién ayuda."
+      ],
+      "uso": {
+        "regla_fija": "como mucho 3 líneas (DM_MAX_LINES)",
+        "pregunta_del_lider": "dm_toque (mín. 0,7) y dm_puente (mín. 0,6)",
+        "redaccion": "REPLY_SYSTEM: toque, puente honesto y una pregunta fácil"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/98",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p015",
+        "09:d68888515e0f53845f66:p016",
+        "09:qt00238",
+        "09:qt00239",
+        "09:qt00240",
+        "09:qt00242",
+        "09:qt00244",
+        "09:qt00246",
+        "09:qt00247",
+        "09:qt00249",
+        "09:qt00250",
+        "09:qt00253",
+        "09:qt00254",
+        "09:qt00255",
+        "09:qt00258",
+        "09:qt00259",
+        "09:qt00261",
+        "09:qt00262",
+        "09:qt00263",
+        "09:qt00265",
+        "09:qt00268",
+        "09:qt00270",
+        "09:qt00272",
+        "09:qt00274",
+        "09:qt00277",
+        "09:qt00278",
+        "09:qt00279",
+        "09:qt00282",
+        "09:qt00283",
+        "09:qt00284",
+        "09:qt00287",
+        "09:qt00297",
+        "09:qt00299",
+        "09:qt00302",
+        "09:qt00312",
+        "09:qt00313",
+        "09:qt00380",
+        "09:qt00381",
+        "09:d68888515e0f53845f66:p022",
+        "09:d68888515e0f53845f66:p028",
+        "09:d68888515e0f53845f66:p029"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-V011-K01",
+      "clase": 9,
+      "titulo": "Las tres líneas del primer mensaje como checklist flexible, no como fórmula escrita en piedra",
+      "hash": "3664da769ea89dc5ea9692583544b363840454717befb37781565711918d8111",
+      "lectura_completa": true,
+      "lectura": "original completo leído del JSON revisado (solo lectura)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Las tres líneas son un checklist flexible para editar: lo que no responde a ninguna de las tres preguntas sobra.",
+      "limites_y_excepciones": [
+        "No convertir la estructura en fórmula: el líder juzga si el toque es concreto, no si hay una frase de plantilla."
+      ],
+      "uso": {
+        "pregunta_del_lider": "dm_toque (mín. 0,7)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/42",
+      "fuentes_con_prefijo_de_clase": [
+        "09:qt00284",
+        "09:qt00285",
+        "09:qt00286",
+        "09:qt00287",
+        "09:qt00130",
+        "09:qt00131",
+        "09:qt00241",
+        "09:qt00257",
+        "09:qt00378",
+        "09:qt00386",
+        "09:d68888515e0f53845f66:p016",
+        "09:d68888515e0f53845f66:p022"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-M003-K03",
+      "clase": 9,
+      "titulo": "«La pregunta lo decide todo»: astuta, no filosófica; concreta, busca el «no» y la promesa de no terminar en «quedo atento»",
+      "hash": "03d1bf6e82c1593021f2bd1adf77fd7558ac5cc3ef4b74a128336e14eb1b1e68",
+      "lectura_completa": true,
+      "lectura": "original completo leído del JSON revisado (solo lectura)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "La pregunta decide si responden: concreta y fácil (A/B o sí/no), nunca filosófica; nunca cerrar con «quedo atento».",
+      "limites_y_excepciones": [
+        "Una pregunta muy cerrada puede acabar en un «sí»: en esta clase se optimiza la respuesta.",
+        "La variante «buscar el no» no se adopta como regla."
+      ],
+      "uso": {
+        "pregunta_del_lider": "dm_pregunta (mín. 0,6)",
+        "regla_fija": "«quedo atento» entre las fórmulas (DM_FORMULAS)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/99",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p017",
+        "09:qt00287",
+        "09:qt00290",
+        "09:qt00293",
+        "09:qt00294",
+        "09:qt00408",
+        "09:qt00415",
+        "09:qt00434",
+        "09:qt00435",
+        "09:qt00442",
+        "09:qt00444",
+        "09:qt00498",
+        "09:qt00500",
+        "09:qt00508",
+        "09:qt00528",
+        "09:qt00547"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-M003-K04",
+      "clase": 9,
+      "titulo": "Lo que mata un mensaje: fórmulas y prácticas prohibidas, y la regla «un mensaje, un dolor»",
+      "hash": "3df8861341c86b2454b2ce1f1132d83da03309d370e7c246d5aa5083acfa2161",
+      "lectura_completa": true,
+      "lectura": "original completo leído del JSON revisado (solo lectura)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Lo que mata un mensaje: «quedo atento», «gracias por conectar», «espero que estés muy bien», «ser parte de mi red», «¿tienes 15 minutos?», un enlace, tres problemas a la vez, «somos líderes en…», un párrafo de 8 líneas. Un mensaje, un dolor.",
+      "limites_y_excepciones": [
+        "Cumplir la lista no basta: un mensaje sin errores puede no enganchar.",
+        "Las fórmulas son frases completas: una palabra suelta no cuenta.",
+        "Pedir el correo antes de la confianza también cuenta como pedir demasiado pronto."
+      ],
+      "uso": {
+        "regla_fija": "DM_FORMULAS, DM_ASK, enlaces, correo y 500 caracteres / 3 líneas",
+        "pregunta_del_lider": "dm_un_tema (mín. 0,7) y dm_puente (mín. 0,6)"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/100",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p018",
+        "09:qt00061",
+        "09:qt00066",
+        "09:qt00067",
+        "09:qt00069",
+        "09:qt00070",
+        "09:qt00071",
+        "09:qt00072",
+        "09:qt00073",
+        "09:qt00083",
+        "09:qt00084",
+        "09:qt00085",
+        "09:qt00118",
+        "09:qt00131",
+        "09:qt00220",
+        "09:qt00295",
+        "09:qt00299",
+        "09:qt00382",
+        "09:qt00480",
+        "09:qt00486"
+      ]
+    },
+    {
+      "unidad_id": "LI-09-M004-K02",
+      "clase": 9,
+      "titulo": "La guía de las seis preguntas: checklist antes de mandar un mensaje",
+      "hash": "402ad50d670563d2760930e2d32332d0545a6a90b03eee06254612e33cbd2721",
+      "lectura_completa": true,
+      "lectura": "original completo leído del JSON revisado (solo lectura)",
+      "fecha": "2026-11-16",
+      "criterio_derivado": "Seis preguntas antes de enviar: algo concreto de la persona, por qué le escribes, pregunta fácil, un solo problema, lo dirías en persona, libre de enlaces y de pedir reunión.",
+      "limites_y_excepciones": [
+        "Tensión: la diapositiva es tajante («si una dice no, no está listo») y en clase es una guía; el líder decide con umbrales, no con cinco síes.",
+        "La pregunta 6 aplica «por ahora»: con conversación abierta ya se puede proponer más; aquí es regla fija porque es el primer mensaje."
+      ],
+      "uso": {
+        "regla_fija": "pregunta 6 (enlaces y pedir reunión)",
+        "pregunta_del_lider": "preguntas 1–5: dm_toque, dm_puente, dm_pregunta, dm_un_tema, dm_en_persona"
+      },
+      "source_path": "LinkedIn Sales - Procesamiento clases 08-12/revision-independiente/session-09-revisada.json",
+      "pointer": "/learning_units/103",
+      "fuentes_con_prefijo_de_clase": [
+        "09:d68888515e0f53845f66:p022",
+        "09:qt00284",
+        "09:qt00285",
+        "09:qt00380",
+        "09:qt00381",
+        "09:qt00382",
+        "09:qt00383",
+        "09:qt00384",
+        "09:qt00385",
+        "09:qt00386",
+        "09:qt00010",
+        "09:qt00066",
+        "09:qt00071",
+        "09:qt00083",
+        "09:qt00085",
+        "09:qt00289",
+        "09:qt00379",
+        "09:d68888515e0f53845f66:p016",
+        "09:d68888515e0f53845f66:p023",
+        "09:d68888515e0f53845f66:p024",
+        "09:d68888515e0f53845f66:p025",
+        "09:d68888515e0f53845f66:p004"
+      ]
+    }
+  ],
+  "decisiones_vigentes_que_ganan": [
+    "Sin pitch: el puente es la conversación del post, no el servicio ni «a quién ayudo».",
+    "Sin secuencias ni seguimientos: el equipo redacta un solo primer mensaje y Gustavo lo envía a mano.",
+    "Sin cambios de topes del operador (BIB-08) ni de la rampa: el equipo nunca envía mensajes privados (INB-08).",
+    "El mensaje va en el idioma de la persona."
+  ],
+  "no_convertido_en_regla": [
+    "la secuencia de 4 mensajes (diapositiva 20)",
+    "la prueba A/B «Un bloque» frente a «Tres líneas» (p021)",
+    "ritmos: 1–3 semanas de calentamiento, 5 conexiones por día",
+    "el email u otro ángulo cuando no acepta en 2–3 semanas",
+    "la variante «buscar el no»",
+    "la cifra de un participante de 50–60 % más aceptación al calentar",
+    "las notas de invitación (la nota es la siguiente metodología, con su propia evaluación)"
+  ],
+  "siguiente_paso": "Nota de invitación: ya en producción (por defecto sin nota, hasta 3 al mes con LINKEDIN_INVITE_NOTE_MONTHLY_LIMIT; el envío admite hasta 300 caracteres). Necesita su propia evaluación antes de tocarla."
+}

@@ -498,7 +498,7 @@
     "herramientas_necesarias": [
       "recuperación readonly de corpus y contexto versionado",
       "lector de registros/importaciones autorizados",
-      "Unipile v2 en lectura mediante la pasarela de operador_cuenta: búsqueda Classic de personas y posts (Sales Navigator solo si se contrata), perfiles, posts, comentarios y reacciones con paginación",
+      "LinkedIn directo en lectura mediante la pasarela de operador_cuenta: búsqueda de personas (sin búsqueda de posts ni Sales Navigator), perfiles, posts de una persona, comentarios con sus respuestas y recuentos de reacciones",
       "Django/PostgreSQL: propuestas versionadas y biblioteca interna de contenido guardado (INT-07), por implementar",
       "Claude Web Search y Web Fetch para noticias, blogs, opiniones y fuentes primarias",
       "RSS/Atom en backend cuando la fuente lo ofrezca (por implementar)"
@@ -526,7 +526,7 @@
     {
       "id": "DESC-01",
       "papel": "propone",
-      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Lectura vía pasarela del operador (Unipile) y web; aplica criterios de barrio por modalidad de posicionamiento; la insignia es opcional y la popularidad no sustituye pertinencia."
+      "politica": "Nivel A. Prepara el encargo, la pregunta o el artefacto. Lectura vía pasarela del operador (LinkedIn directo) y web; aplica criterios de barrio por modalidad de posicionamiento; la insignia es opcional y la popularidad no sustituye pertinencia."
     },
     {
       "id": "DESC-01",
@@ -935,7 +935,7 @@
         "selection_status": "candidato|verificado|descartado con motivo"
       },
       "obligatoriedad": "Necesarios localizador, procedencia y evidencia profesional para recomendar un perfil real. Cargo, idioma, tamaño y distintivo son opcionales; desconocido explícito.",
-      "fuente_y_captura_candidata": "Unipile v2 (búsqueda Classic y perfiles; Sales Navigator solo si se contrata) mediante operador_cuenta; Claude Web Search/Fetch para contraste; lista aportada por Gustavo. Acceso efectivo por probar en piloto.",
+      "fuente_y_captura_candidata": "LinkedIn directo (búsqueda de personas y perfiles; sin Sales Navigator) mediante operador_cuenta; Claude Web Search/Fetch para contraste; lista aportada por Gustavo. Acceso efectivo por probar en piloto.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Descubrir líderes, referentes y participantes pertinentes al mercado y a las dos modalidades.",
       "frescura": "Comprobar actividad, cargo y distintivo antes de usar recomendación; registrar fecha y marcar pendiente si no se puede revalidar. Caducidad operativa por acordar.",
@@ -975,7 +975,7 @@
         "audience_role_evidence": "papel profesional observable con incertidumbre"
       },
       "obligatoriedad": "Necesario contenido contextual y fecha para analizar una conversación concreta; números de interacción opcionales.",
-      "fuente_y_captura_candidata": "Unipile v2: posts, comentarios, respuestas y reacciones accesibles con paginación (lectura vía operador_cuenta); enlaces aportados como alternativa. Sin métricas privadas de terceros.",
+      "fuente_y_captura_candidata": "LinkedIn directo: posts, comentarios y respuestas, con recuentos de reacciones (lectura vía operador_cuenta; la primera página de cada lista); enlaces aportados como alternativa. Sin métricas privadas de terceros.",
       "disponibilidad": "no verificada; no se ha conectado, consultado ni contratado fuente externa en este diseño",
       "finalidad": "Encontrar preguntas, problemas, objeciones, ejemplos y lugares donde aportar.",
       "frescura": "Registrar edad de conversación y fecha de captura; revisar si cambió/eliminó antes de proponer participación.",
@@ -1027,7 +1027,7 @@
       "id": "D13",
       "nombre": "Estado de relaciones e invitaciones de candidatos",
       "obligatoriedad": "Necesario antes de entregar un candidato para RED-02.",
-      "fuente_y_captura_candidata": "Sincronización de relaciones de operador_cuenta (Unipile v2) y memoria de relaciones_comunidad.",
+      "fuente_y_captura_candidata": "Sincronización de relaciones de operador_cuenta (LinkedIn directo) y memoria de relaciones_comunidad.",
       "disponibilidad": "no verificada; sin cuenta conectada en este diseño",
       "finalidad": "Evitar duplicados y proponer el siguiente paso pertinente.",
       "frescura": "Fecha de última sincronización; lista parcial no prueba ausencia de relación.",

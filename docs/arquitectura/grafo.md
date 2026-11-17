@@ -2,7 +2,7 @@
 
 <!-- Generado por scripts/grafo/mermaid.py. No editar a mano. -->
 
-Versión `6.9-revision-mensual` · SHA-256 `942f5fddb430583df7b0712bab32d32810266a4356c00b35e3d5893d9eabc998`.
+Versión `6.11-primer-mensaje` · SHA-256 `45d131dc6bc068f3a5eef581e22de0fa43e0cf6c20b0ea4100e0515810286aaa`.
 
 46 nodos (46 activos), 74 aristas y 17 ciclos.
 

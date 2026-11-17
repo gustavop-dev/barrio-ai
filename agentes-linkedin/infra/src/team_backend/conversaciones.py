@@ -23,14 +23,13 @@ from .connectors import ConnectorError, deferred, get_connector
 from .exceptions import Conflict
 from .jobs import audit
 from .lider import _noul
-from .models import AuditEvent, Contact, Conversation, InboxSeen, Opportunity
+from .models import AuditEvent, Contact, Conversation, Opportunity
 from .permissions import require
 
 READ_CAPS={'chats':24,'messages':60}  # per local day: one list per run at the default hourly clock, a few threads each
-PROVIDERS=('unipile','fake','directo')
+PROVIDERS=('fake','directo')
 CLOSE_HOW={'respondi':'Respondiste','no_responder':'Sin responder'}
 THREAD=re.compile(r'2-[A-Za-z0-9_=\-]+')  # LinkedIn messaging thread ids (linkedin.com/messaging/thread/<id>/)
-CARRY_SLACK=timedelta(minutes=2)  # the two providers may stamp the same message a little apart
 
 LINES=('Gustavo es ingeniero de producto con criterio de negocio y fundador de ProjectApp. Sus líneas de negocio son: '
        'asesoría o trabajo con startups tempranas (su línea personal: producto, arquitectura e IA aplicada); proyectos de '
@@ -59,7 +58,7 @@ def max_age():
     return timedelta(days=int(setting('INBOX_MAX_AGE_DAYS','14')))
 
 def inboxes():
-    """LinkedIn inboxes to read (Unipile «List inbox Chats»). CLASSIC_PRIMARY is Gustavo's main inbox; a company page
+    """LinkedIn inboxes to read (list_chats takes one). CLASSIC_PRIMARY is Gustavo's main inbox; a company page
     adds COMPANY_<id>_PRIMARY. Spam, archived, jobs and InMail stay out unless listed."""
     return [i.strip() for i in setting('INBOX_IDS','CLASSIC_PRIMARY').split(',') if i.strip()] or ['CLASSIC_PRIMARY']
 
@@ -197,30 +196,9 @@ def _from_list(account,chat,now):
     if waiting and conversation.last_from_me:audit(None,'conversation.replied',conversation.id,message_id=(latest_inbound(conversation) or {}).get('id'))
     return conversation,stale
 
-def _same_message(old,new):
-    """The same inbound message read through two providers: same text, and the same moment within CARRY_SLACK."""
-    if not old or not new or ' '.join((old.get('text') or '').split())!=' '.join((new.get('text') or '').split()):return False
-    a,b=_at(old.get('at')),_at(new.get('at'))
-    return bool(a and b and abs(a-b)<=CARRY_SLACK)
-
-def carry(conversation,before,seen):
-    """After a provider switch (proveedor.py) the thread comes back with the other provider's message ids, and nothing
-    ties those to the old ones. When the new latest inbound message is the old one (`before`), what the old id had moves
-    to the new id: Jev's judgment, Gustavo's closing and the card seen in Tu turno. So nothing is judged, pushed or shown
-    as new again. A message that arrived since is judged as usual. The mark goes away either way."""
-    conversation.carry={}
-    inbound=latest_inbound(conversation)
-    if not _same_message(before,inbound):return
-    if (conversation.assessment or {}).get('message_id')==before['id']:
-        conversation.assessment=dict(conversation.assessment,message_id=inbound['id'])
-    if conversation.closed_message_id==before['id']:conversation.closed_message_id=inbound['id']
-    if seen:InboxSeen.objects.get_or_create(item_id=card_id(conversation))
-
 def _from_messages(account,conversation,messages,now):
     """Keep the newest messages, oldest first. Events and deleted messages stay in the snapshot (so the next run knows
     they were read) but are never shown or judged."""
-    before=latest_inbound(conversation) if conversation.carry else None
-    seen=bool(before) and InboxSeen.objects.filter(item_id=card_id(conversation)).exists()
     rows=[]
     for m in reversed(messages):
         row={'id':m['id'],'at':m['at'].isoformat() if m['at'] else None,'from_me':m['is_sender'],'text':(m['text'] or '')[:2000]}
@@ -237,7 +215,6 @@ def _from_messages(account,conversation,messages,now):
     if shown:
         conversation.last_from_me=shown[-1]['from_me']
         if shown[-1]['text']:conversation.last_message_preview=' '.join(shown[-1]['text'].split())[:300]
-    if conversation.carry:carry(conversation,before,seen)
     conversation.updated_at=now;conversation.save()
 
 def read_inbox(user,account,now=None):

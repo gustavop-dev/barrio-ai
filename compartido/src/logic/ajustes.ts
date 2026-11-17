@@ -39,7 +39,7 @@ export const ACCOUNT_STATUS: Record<string, { label: string; tone: Tone }> = {
   token_expired: { label: 'Token caducado', tone: 'bad' },
 };
 
-export const PROVIDER_LABEL: Record<string, string> = { unipile: 'Unipile', fake: 'simulada' };
+export const PROVIDER_LABEL: Record<string, string> = { fake: 'simulada' };
 
 export function accountStatus(account: Pick<Account, 'status'>): { label: string; tone: Tone } {
   return ACCOUNT_STATUS[account.status] ?? { label: account.status, tone: 'warn' };
@@ -49,8 +49,8 @@ export function providerLabel(account: Pick<Account, 'provider'>): string {
   return PROVIDER_LABEL[account.provider] ?? account.provider;
 }
 
-/** The accounts the machine acts with through Unipile; the official LinkedIn one lives in its own section. */
-export function unipileAccounts(accounts: Account[] | undefined): Account[] {
+/** The accounts the machine acts with (LinkedIn directo, or the simulated one); the official LinkedIn one lives in its own section. */
+export function operatingAccounts(accounts: Account[] | undefined): Account[] {
   return (accounts ?? []).filter((account) => !account.provider.startsWith('linkedin'));
 }
 

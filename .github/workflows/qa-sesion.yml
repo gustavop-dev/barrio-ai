@@ -49,7 +49,7 @@ jobs:
       DJANGO_SECRET_KEY: qa-only-non-production-secret-0123456789
       DJANGO_ALLOWED_HOSTS: 10.0.2.2,127.0.0.1,localhost
       LIVE_PROVIDERS: 'false'
-      LIVE_LINKEDIN: 'false'
+      LIVE_LINKEDIN_DIRECTO: 'false'
       LIVE_LINKEDIN_OFFICIAL: 'false'
       OPERATOR_ALLOW_FAKE: 'true'
       # The seeded inbox conversation shows as a Tu turno card only with the inbox on (nothing reads LinkedIn: no worker runs).

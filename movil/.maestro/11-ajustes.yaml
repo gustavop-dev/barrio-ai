@@ -1,7 +1,7 @@
 # cubre: AJU-01, AJU-02, AJU-03, AJU-04, AJU-05, AJU-06, AJU-07, AJU-08, AJU-09, AJU-11, OFI-07, IMG-16
 # Ajustes, opened from the top bar, from Máquina to Captura (Notificaciones, devices, «Lo que el equipo sabe
 # de ti», the section links and the session are in 15-ajustes-sesion): «Parada total» with its required reason, a
-# first try that fails (failure switch) and a second that stops the machine, the banner and «Reanudar»; pausing and resuming the simulated Unipile account; the orientation («Descartar cambios»,
+# first try that fails (failure switch) and a second that stops the machine, the banner and «Reanudar»; pausing and resuming the simulated account; the orientation («Descartar cambios»,
 # then «Guardar orientación»); Autonomía y límites unfolded; Gasto de IA; LinkedIn oficial and «Conectar LinkedIn»,
 # which opens the office web in the phone's browser and refreshes on return; the microphone and the AI edit default,
 # off and on, and back on when saving fails. Everything it changes is undone or re-seeded before the next flow (scripts/qa/correr-maestro.sh runs
@@ -134,7 +134,7 @@ tags: [ajustes]
     timeout: 20000
 - takeScreenshot: 11-ajustes-05-en-marcha
 
-# ---------------------------------------------------------------- Máquina: pause only the Unipile account
+# ---------------------------------------------------------------- Máquina: pause only the simulated account
 # cubre: AJU-02
 - scrollUntilVisible:
     element:

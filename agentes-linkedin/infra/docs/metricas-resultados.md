@@ -13,22 +13,19 @@ Antes, las impresiones de un post propio se guardaban una sola vez, segundos des
 
 ## Fuentes
 
-Todo se lee con la cuenta Unipile (o su simulada en pruebas). La API oficial de LinkedIn (`w_member_social`) solo publica: no permite leer métricas.
+Todo se lee con la cuenta de LinkedIn directo (o su simulada en pruebas), por el servicio navegador ([contrato](navegador-contrato.md)). La API oficial de LinkedIn (`w_member_social`) solo publica: no permite leer métricas.
 
-| Dato | Llamada a Unipile v2 | Campo |
+| Dato | Lectura del conector directo | Campo |
 | --- | --- | --- |
-| Impresiones de un post propio | `GET users/me/posts`, o `GET posts/{id}` cuando ya se conoce su id | `analytics.impressions_counter` |
-| Reacciones | ídem | `reactions_counter`, una lista `[{reaction, count}]` que se suma |
+| Impresiones de un post propio | `list_user_posts('me')` (los posts propios recientes) | `impressions`: solo llega en esa lista; `get_post` la deja en `null` |
+| Reacciones | `list_user_posts('me')`, o `get_post(id)` cuando ya se conoce su id | `reactions_counter` |
 | Comentarios | ídem | `comments_counter` |
 | Republicaciones | ídem | `reposts_counter` (número, o `null` si LinkedIn lo oculta) |
-| Quién comentó | `GET posts/{id}/comments` | autor, texto e `is_sender` |
-| Seguidores y conexiones | `GET users/me` | `followers_count` y `relations_count`, en la raíz del perfil |
-| Visitas al perfil | `GET linkedin/analytics/profile-views?date_range=N` | `analytics.views_count` |
+| Quién comentó | `list_comments(id)` | autor, texto e `is_sender` |
+| Seguidores y conexiones | `own_audience()`: la tarjeta del perfil propio | `followers` y `connections` |
+| Visitas al perfil | `profile_views(90)`: la tarjeta de resumen de visitas | el recuento; LinkedIn solo da la ventana de 90 días |
 
-**Comprobado contra la cuenta real el 2026-11-06**, con dos lecturas GET y mirando solo la forma de la respuesta:
-- `GET users/me` devuelve `followers_count` y `relations_count` como enteros en la raíz, no dentro de `specifics`.
-- `List Profile Views` funciona con la cuenta gratuita y devuelve `analytics.views_count` y `entities`. La documentación avisa de que sin Premium los datos son limitados y los filtros no funcionan; el recuento total sí llega.
-- El esquema de un post (documentación de «Get a post») trae `reposts_counter`. No hay otro contador de compartidos.
+Las rutas de LinkedIn detrás de cada lectura están en `src/linkedin_directo/cliente.py`. La prueba diaria (`check_linkedin`) comprueba que siguen trayendo estos campos.
 
 ## Captura
 
@@ -39,7 +36,7 @@ Todo se lee con la cuenta Unipile (o su simulada en pruebas). La API oficial de 
 - **Cortes tardíos.** Llegar tarde está bien; perder un corte, no. Si la captura estuvo parada, la siguiente vuelta toma todos los cortes pendientes a la vez. `captured_at - published_at` deja ver el retraso.
 - **Nunca dos veces.** La restricción única `(piece, kind)` impide capturar el mismo corte dos veces, aunque corran dos vueltas a la vez.
 - **Cómo se encuentra el post.**
-  - Primero por su id de Unipile, si una lectura anterior ya lo encontró. Ese id es opaco: no es el URN de la API oficial.
+  - Primero por su id, si una lectura anterior ya lo encontró: el número de la actividad (`urn:li:activity:<n>`), que no es el URN `share` o `ugcPost` que devuelve la API oficial al publicar.
   - Si no, por el texto exacto entre los posts propios recientes, como hace la conciliación (`same_text`), descartando las republicaciones.
   - Si el post ya no aparece en la lista reciente pero su id es conocido, se lee por id. Así un corte de 7 días tardío no se pierde.
 - **Quién comentó.** Cada captura lee una vez los comentarios del post; si se toman varios cortes a la vez, comparten esa lectura. Se guarda una lista compacta en `PostMetric.commenters`:
@@ -48,13 +45,13 @@ Todo se lee con la cuenta Unipile (o su simulada en pruebas). La API oficial de 
   - `role` viene de `Contact.classification.role` si la persona ya es un contacto. Se añade también `fit`.
   - Las respuestas del propio Gustavo (`is_sender`) no cuentan.
   - Si la lectura falla, `commenters` queda en `null` («no leído»), nunca en `[]`.
-- **Compatibilidad.** `EditorialPiece.metrics` guarda los últimos valores leídos de cada publicación reciente: `impressions`, `reactions`, `comments`, `reposts`, `observed_at`, `source`, `unipile_post_id` y `share_url`. Conserva las claves de antes.
+- **Compatibilidad.** `EditorialPiece.metrics` guarda los últimos valores leídos de cada publicación reciente: `impressions`, `reactions`, `comments`, `reposts`, `observed_at`, `source` (`linkedin`), `provider_post_id` (el id del post en el conector) y `share_url`. Conserva las claves de antes; las del proveedor anterior pasaron a `provider_post_id` y `source: linkedin` con la migración 0044 de `team_backend`.
 - **Ventana.** Solo se leen publicaciones de los últimos `METRICS_MAX_AGE_DAYS` días (30 por defecto, y nunca menos de 8). Si un post no aparece en ese plazo, su corte queda sin dato.
 
 ### Audiencia diaria (`AudienceSnapshot`)
 
 - Hay una foto por día local (`OPERATOR_TIMEZONE`) con `followers`, `connections`, `profile_views` y `profile_views_days`. Las tres métricas aceptan `null`.
-- Las visitas son las que LinkedIn informa para una ventana móvil de `METRICS_PROFILE_VIEWS_DAYS` días, que puede ser 14, 28 (por defecto), 90 o 365. La ventana se guarda con el dato, y dos fotos con ventanas distintas no se comparan.
+- Las visitas son las que LinkedIn informa para una ventana móvil. Con `directo` es la de su tarjeta de resumen, 90 días, la única que da; `METRICS_PROFILE_VIEWS_DAYS` (14, 28 por defecto, 90 o 365) solo cuenta con un conector que acepte otras ventanas, como el simulado. La ventana se guarda con el dato, y dos fotos con ventanas distintas no se comparan.
 - Si LinkedIn rechaza las visitas, la foto se guarda igual con `profile_views=null`, y la cuenta no se pausa por eso.
 - El crecimiento neto es la diferencia entre dos fotos. No dice cuántas altas y bajas hubo.
 
@@ -63,7 +60,7 @@ Todo se lee con la cuenta Unipile (o su simulada en pruebas). La API oficial de 
 - **Encolado.** El autopiloto (`autopiloto._metrics`) encola `collect_metrics` más o menos cada `METRICS_EVERY_MINUTES` (180 por defecto; con 0 queda apagado).
   - Va de uno en uno, con id determinista por franja y el mismo patrón `_pending` que la red.
   - Solo encola si hay algo pendiente: un corte vencido sin capturar, o la foto de hoy.
-  - Solo corre con la cuenta `unipile`, `directo` o `fake`.
+  - Solo corre con la cuenta `directo` o `fake`.
 - **Si falla.** Un fallo al encolar nunca detiene el resto del ciclo: el informe del tick lleva `metrics_error`.
 - **Pausas.** Con la parada total no corre, como el resto del ciclo. Tampoco corre con la cuenta pausada.
 - **Permiso.** El trabajo requiere `operate_linkedin`. No gasta en modelos y su `result_status` es corto, por ejemplo `cortes:2 audiencia:creada`.
@@ -227,7 +224,7 @@ Todas las fichas tienen la misma forma:
 
 ## Analítica de LinkedIn (cuenta «directo»)
 
-Con el proveedor `directo` (LinkedIn sin Unipile, [plan](../../../docs/plan-linkedin-directo.md)) se lee la analítica de creador de LinkedIn: lo mismo que da su ventana «Exportar» de la página de analítica. Es una fuente aparte. No cambia los cortes ni la foto de la audiencia de arriba, y Resultados y el resumen semanal siguen igual.
+Con el proveedor `directo` (LinkedIn directo, [plan](../../../docs/plan-linkedin-directo.md)) se lee la analítica de creador de LinkedIn: lo mismo que da su ventana «Exportar» de la página de analítica. Es una fuente aparte. No cambia los cortes ni la foto de la audiencia de arriba, y Resultados y el resumen semanal siguen igual.
 
 - **Código:** `src/linkedin_directo/analitica.py` lee el libro; `src/team_backend/analitica.py` importa, guarda y responde; `management/commands/analitica.py` es el comando.
 - **Pruebas:** `tests/test_analitica.py`, con libros escritos a mano y cifras inventadas (`tests/analitica_fixtures.py`).
@@ -266,7 +263,7 @@ Con el proveedor `directo` (LinkedIn sin Unipile, [plan](../../../docs/plan-link
 | `AnalyticsRange` | cuenta y rango exacto | Lo que solo vale para ese rango: impresiones, miembros alcanzados, las dos listas de LinkedIn y la demografía del contenido (`null` si faltó la hoja). |
 | `AnalyticsImport` | exportación pedida | Rango, tipo (`diaria`, `manual`, `carga_inicial`), estado, filas de cada clase, nombres de las hojas y error. |
 
-`PostMetric` y `AudienceSnapshot` no se tocan: miden otra cosa (cortes a una edad fija y la foto diaria de Unipile).
+`PostMetric` y `AudienceSnapshot` no se tocan: miden otra cosa (cortes a una edad fija y la foto diaria de la tarjeta del perfil).
 
 Una publicación se une a su pieza editorial por cualquiera de los ids que guardamos de ella: el urn de la ejecución CONT-09, y el id o el enlace de `PostMetric` y de `EditorialPiece.metrics`. LinkedIn enlaza unas veces el urn `activity` y otras el `share`. Si no coincide con el guardado, la publicación queda sin pieza.
 

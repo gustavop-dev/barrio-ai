@@ -34,7 +34,7 @@ jobs:
       DATABASE_URL: postgresql://knowledge:test-only-ci-password@127.0.0.1:5432/knowledge
       DJANGO_SECRET_KEY: ci-only-non-production-secret-0123456789
       LIVE_PROVIDERS: 'false'
-      LIVE_LINKEDIN: 'false'
+      LIVE_LINKEDIN_DIRECTO: 'false'
     defaults:
       run:
         working-directory: agentes-linkedin/infra

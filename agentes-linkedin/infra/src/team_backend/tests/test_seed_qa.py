@@ -43,10 +43,10 @@ class SeedQaTests(MediaMixin,OperatorBase):
         """Catch the seed (which empties tables) running against a real office."""
         with patch.dict(os.environ,{'QA_SEED':''}):
             with self.assertRaises(CommandError):self.seed()
-        with patch.dict(os.environ,{'LIVE_LINKEDIN':'true'}):
+        with patch.dict(os.environ,{'LIVE_LINKEDIN_DIRECTO':'true'}):
             with self.assertRaises(CommandError):self.seed()
         before=ConnectorAccount.objects.count()
-        real=ConnectorAccount.objects.create(provider='unipile',external_account_id='real',label='Cuenta real')
+        real=ConnectorAccount.objects.create(provider='directo',external_account_id='real',label='Cuenta real')
         with self.assertRaises(CommandError):self.seed()
         self.assertEqual(ConnectorAccount.objects.count(),before+1)
         self.assertTrue(ConnectorAccount.objects.filter(pk=real.pk).exists())
@@ -151,8 +151,8 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.assertEqual((turno['count'],turno['urgent_count']),(10,1))
         self.assertEqual(turno['counts'],{'avisos':1,'preguntas':3,'tareas':4,'aprobaciones':2})
         self.assertEqual([c['id'] for c in turno['tasks']['perfil']],[f'perfil:{profile.id}'])
-        self.assertEqual([c['id'] for c in turno['tasks']['referentes']],[f'referents_setup:{uid("account:unipile")}'])
-        self.assertFalse(ReferentControl.objects.get(account_id=uid('account:unipile')).initialized)
+        self.assertEqual([c['id'] for c in turno['tasks']['referentes']],[f'referents_setup:{uid("account:simulada")}'])
+        self.assertFalse(ReferentControl.objects.get(account_id=uid('account:simulada')).initialized)
         self.assertTrue(turno['critical']);self.assertEqual(sorted(c['state'] for c in turno['later']),['caducada','pospuesta'])
         queued=app.get('/api/v1/actividad').json()['upcoming']['queued']
         self.assertEqual(sorted(q['capability'] for q in queued if q['awaiting_approval']),['RED-01','RED-02'])
@@ -168,7 +168,7 @@ class SeedQaTests(MediaMixin,OperatorBase):
         for path in ('/api/v1/calendario','/api/v1/actividad','/api/v1/resultados?dias=7','/api/v1/resultados?dias=90',
                      '/api/v1/resultados/resumen-semanal','/api/v1/red/contacts','/api/v1/red/summary','/api/v1/oportunidades',
                      '/api/v1/operador/referents','/api/v1/galeria','/api/v1/capturas','/api/v1/oficina/actividad','/api/v1/operador/overview',
-                     f'/api/v1/comunidad?account={uid("account:unipile")}','/api/v1/referentes/revisiones'):
+                     f'/api/v1/comunidad?account={uid("account:simulada")}','/api/v1/referentes/revisiones'):
             self.assertEqual(app.get(path).status_code,200,path)
         self.assertEqual((CommunityStudy.objects.count(),CommunitySource.objects.count()),(1,6))
         self.assertEqual(ReferentReview.objects.count(),0)  # Monthly proposals are opt-in for flow 19.
@@ -195,7 +195,7 @@ class SeedQaTests(MediaMixin,OperatorBase):
         self.seed(referentes_mensual=True)
         first=self.counts()
         app=self.device()
-        account_id=uid('account:unipile')
+        account_id=uid('account:simulada')
         control=ReferentControl.objects.get(account_id=account_id)
         self.assertTrue(control.initialized)
         self.assertEqual(set(control.initial_main),{str(uid(f'main:{n}')) for n in range(1,6)})

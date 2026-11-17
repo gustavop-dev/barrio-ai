@@ -32,7 +32,7 @@ El mercado inicial es Estados Unidos, con afinidad por founders hispanohablantes
 
 Autoridad y comunidad ayudan a alcanzar esos objetivos. La idea de **barrio**, tomada del curso, incluye compradores, pares, recomendadores, líderes y divulgadores. Por eso el sistema no evalúa cada pieza únicamente por su capacidad de vender de inmediato.
 
-El alcance operativo actual son las **clases 01–06**. La clase 07 también se procesó, pero quedó fuera de la biblioteca activa porque abre la parte de outbound. Calentamiento, campañas y contacto de leads se incorporarán cuando completemos y revisemos esa mitad del curso.
+El alcance operativo actual son las **clases 01–06**: es lo que leen los agentes. La biblioteca admite ya las **clases 01–12**; la 07 abre la parte de outbound y las 08–12 la completan. Esas clases se pueden consultar por ID o con una búsqueda que las pida explícitamente, pero ningún agente las lee hasta que cada metodología de outbound se active con su evaluación. No hay outreach externo activo (`OPERATOR_EXTERNAL_OUTREACH_ACTIVE=false`) y lemlist no se ejecuta. Cargar 07–12 en la base desplegada y generar sus embeddings es un paso aparte que aprueba Gustavo.
 
 ## 2. Cómo evolucionó el proyecto
 
@@ -43,6 +43,7 @@ El alcance operativo actual son las **clases 01–06**. La clase 07 también se 
 | Campaña de clases 02–07 | Extendimos el procesamiento con caché, reanudación y presupuesto global | 226 tareas de extracción, seguidas por auditoría y correcciones |
 | Revisión para uso por agentes | Contrastamos hallazgos contra fuentes y retiramos obligaciones meramente administrativas | Exportación revisada con límites explícitos y cambios registrados |
 | Biblioteca común | Importamos las clases 01–06 sin reemplazar sus unidades por resúmenes nuevos | 1.035 unidades consultables y evidencia asociada |
+| Biblioteca 01–12 | La ingesta y el esquema admiten las clases 07–12 con sus fuentes y su política de uso; los agentes siguen leyendo 01–06 | 1.656 unidades en la carga en seco del corpus; carga en la base desplegada pendiente de aprobación |
 | Infraestructura de IA | Añadimos embeddings, recuperación híbrida, memoria, proveedores y contabilidad | Un motor reutilizable para agentes especializados |
 | Backend Django | Incorporamos usuarios, permisos, API, administración y trabajos persistentes | Base operativa con pruebas de integración |
 | Oficina visual | Diseñamos un apartamento startup con pixel art e integramos la interfaz con Django | Un espacio visual para consultar fuentes y ejecutar los dos roles disponibles |
@@ -117,16 +118,24 @@ Por ejemplo, `LI-03-M005-K05` recoge los cinco papeles del barrio. Esa unidad pu
 
 ### Entregas y cantidades
 
-| Clase | Unidades en la entrega usada como referencia | Dentro de la biblioteca activa |
-| --- | ---: | --- |
-| 01 | 139 | Sí |
-| 02 | 192 | Sí |
-| 03 | 150 | Sí |
-| 04 | 212 | Sí |
-| 05 | 127 | Sí |
-| 06 | 215 | Sí |
-| 07 | 136 | No; reservada para la fase outbound |
-| **Total 01–06** | **1.035** | **Alcance actual de Barrio AI** |
+| Clase | Unidades en la entrega usada como referencia | Biblioteca | La leen los agentes |
+| --- | ---: | --- | --- |
+| 01 | 139 | Sí | Sí |
+| 02 | 192 | Sí | Sí |
+| 03 | 150 | Sí | Sí |
+| 04 | 212 | Sí | Sí |
+| 05 | 127 | Sí | Sí |
+| 06 | 215 | Sí | Sí |
+| **Total 01–06** | **1.035** | **Sí** | **Alcance actual de Barrio AI** |
+| 07 | 136 | Admitida | No; bloque outbound, hasta activar cada metodología con su evaluación |
+| 08 | 104 | Admitida | No |
+| 09 | 110 | Admitida | No |
+| 10 | 61 | Admitida | No |
+| 11 | 120 | Admitida | No |
+| 12 | 90 | Admitida | No |
+| **Total 01–12** | **1.656** | **Admitida** | **Solo 01–06** |
+
+«Admitida» significa que el código y el esquema la aceptan y que la carga en seco del corpus la resuelve sin IDs duplicados ni evidencias sin resolver; cargarla en la base desplegada es un paso aparte que aprueba Gustavo. Las fuentes de 08–12 viven en `LinkedIn Sales - Procesamiento clases 08-12/conocimiento-para-agentes/fuentes.jsonl` y su política de uso se conserva junto a la de 02–07.
 
 La campaña de clases 02–07 abarcó aproximadamente **14 horas y 34 minutos**, **321 páginas PDF** y **226 tareas de extracción**. Su exportación revisada contiene 1.032 unidades. Ese número corresponde a clases 02–07; las 1.035 unidades del backend corresponden a clases 01–06. Son conjuntos diferentes.
 
@@ -413,8 +422,10 @@ Los permisos y la identidad delimitan quién puede consultar trabajos, gastar o 
 | Área | Estado que podemos sostener |
 | --- | --- |
 | Extracción de clases disponibles 01–07 | Terminada, con entregas y límites registrados |
+| Extracción de clases 08–12 | Terminada en una campaña aparte, con revisión local de hallazgos (485 unidades); revisión humana pendiente |
 | Revisión de hallazgos para uso por agentes | Cerrada en su alcance; aceptación humana integral no realizada |
 | Biblioteca activa 01–06 | Importada, indexada y con integridad comprobada |
+| Clases 07–12 en la biblioteca | Admitidas por código y esquema; carga y embeddings en la base desplegada pendientes de aprobación; ningún agente las lee |
 | Búsqueda textual e híbrida | Implementadas; evaluación ciega ampliada pendiente |
 | Backend Django y controles monetarios | Implementados y probados en los alcances documentados |
 | Oficina y puente | Integrados; el backend necesita el equipo local encendido |

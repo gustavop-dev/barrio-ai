@@ -2,11 +2,11 @@
 
 Cuando alguien comenta un post de Gustavo, el equipo le responde solo en el hilo, con el contexto del post, de la conversación y del perfil de quien comenta, fundamentado en las unidades del curso. En el segundo turno puede cerrar invitando a conectar y seguir por privado; si la persona encaja, la invita. Nunca envía mensajes directos: deja a Gustavo un primer mensaje redactado para que lo envíe él.
 
-- **Código:** `agentes-linkedin/infra/src/team_backend/respuestas.py` (lectura, reglas del hilo, redacción, ejecución, tarjeta «Mensaje sugerido»), `autopiloto._replies`, `operador` (`REPLY_UNITS`, `execute`, `_run_job` `read_own_comments` y `propose_reply`), `lider.py` (`CHECKS['reply']`), `red.py` (invitación sin calentamiento para `own_post`).
+- **Código:** `agentes-linkedin/infra/src/team_backend/respuestas.py` (lectura, reglas del hilo, redacción, ejecución, reglas del primer mensaje `dm_text_issues`, tarjeta «Mensaje sugerido»), `autopiloto._replies`, `operador` (`REPLY_UNITS`, `FIRST_MESSAGE_UNITS`, `execute`, `_run_job` `read_own_comments` y `propose_reply`), `lider.py` (`CHECKS['reply']`, `DM_CHECKS`), `red.py` (invitación sin calentamiento para `own_post`).
 - **Vistas:** Tu turno (tarjeta `mensaje`), detalle de una pieza («Conversación en el post»), actividad del calendario y «Hoy el equipo…». App móvil (`movil/src/turno/TurnoCard.tsx`, `movil/src/pieza/PostComments.tsx`) y PWA (`oficina/src/pages/turno/TurnoCardView.tsx`, `oficina/src/pages/calendario/PostComments.tsx`).
 - **API:** `GET /api/v1/editorial/pieces/<id>` (`comments`), `GET /api/v1/tu-turno` (`tasks.mensajes`), `POST /api/v1/respuestas/<id>/mensaje` `{how: enviado|no, note?}`.
 - **Catálogo:** `INT-04` de [`catalogo-acciones-linkedin.md`](../../agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md): fundamentos B06, B14 y B15; «leer contexto antes de responder; admitir un dato desconocido y conservar preguntas para futuros contenidos».
-- **Entorno de prueba:** cuenta `fake` (Unipile simulado), Claude y TypeSafe parcheados, como en `tests/test_respuestas.py`.
+- **Entorno de prueba:** cuenta `fake` (LinkedIn simulado), Claude y TypeSafe parcheados, como en `tests/test_respuestas.py`.
 
 ## Resumen
 
@@ -87,11 +87,15 @@ Cuando alguien comenta un post de Gustavo, el equipo le responde solo en el hilo
 - **Dónde:** app · PWA · backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** cuando alguien con quien el equipo conversó en su post ya es su conexión, Tu turno le deja un primer mensaje redactado para copiar y enviar él desde LinkedIn.
+- **Metodología:** la clase 09, primera metodología de outbound activada ([BIB-10](biblioteca-equipos.md#bib-10), caso `BIB-09-primer-mensaje`). Al cerrar el segundo turno, Relaciones carga además `FIRST_MESSAGE_UNITS` y redacta un toque concreto de lo que dijo la persona, el puente honesto (la conversación que quedó abierta, nunca los servicios) y una pregunta fácil.
 - **Criterios de aceptación:**
   1. La tarjeta muestra a la persona, su comentario, la respuesta del equipo y el mensaje con «Copiar».
   2. «Hecho, le escribí» y «No escribirle» (nota opcional) la cierran con `POST /api/v1/respuestas/<id>/mensaje`.
   3. La push `dm_ready` sale una sola vez por comentario.
   4. La app nunca envía mensajes en nombre de Gustavo (INB-08).
+  5. Reglas fijas (`respuestas.dm_text_issues`): como mucho 3 líneas y 500 caracteres; sin enlaces, correos, teléfonos ni hashtags; sin pedir minutos, una llamada o una reunión; sin las fórmulas que matan un mensaje («quedo atento», «gracias por conectar», «espero que estés bien», «ser parte de mi red», «somos líderes»…); en el idioma de la persona. Una violación va a la única reescritura (la respuesta pública se queda como estaba); si persiste, el mensaje se descarta entero, sin recortarlo, y su texto solo queda en la auditoría (`replies.drafted` `dm_rejected`).
+  6. El líder lo juzga en la misma revisión de la respuesta de cierre (toque, puente, pregunta fácil, un tema, en persona y venta). Un fallo deja `dm_approved=False` y no descarta la respuesta pública.
+  7. La tarjeta solo aparece con `dm_approved=True` en la revisión de esa respuesta confirmada; sin revisión del líder no hay tarjeta. Una aceptación sin conversación previa no redacta nada.
 
 ### RSP-08 · La conversación del post en el detalle de la pieza <a id="rsp-08"></a>
 

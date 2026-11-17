@@ -33,6 +33,7 @@ The request builders mirror the production calls (editorial._stage/_check/_repai
 red.classify, lider.review): keep them in step. tests/test_evaluaciones.py compares them with the real calls."""
 import copy
 import difflib
+import hashlib
 import json
 import math
 import os
@@ -41,6 +42,7 @@ from datetime import date, datetime, time, timedelta
 from decimal import Decimal
 from django.utils import timezone
 from knowledge import db, memory, presupuesto, providers
+from knowledge.clases import METODOLOGIAS_ACTIVAS, legible_por_agentes
 from knowledge.config import live
 from knowledge.ingest import ENC
 from . import autopiloto, catalogo, compuertas, editorial, guardas, lider, operador, orientacion, red, voz
@@ -868,12 +870,73 @@ COURSE_CASES={
         'input':{'likes_days':7,'audience_days':90,'likes_delta':-3},
         'expected':{'windows_comparable':False,'change_direction':False},
         'required':['LI-06-V008-K01','LI-06-V008-K02']},
+    # Primera metodología de outbound (clase 09). El único primer mensaje que existe es el dm_opener de INT-04: lo redacta
+    # Relaciones en el segundo turno con cierre permitido, aparece en Tu turno («Mensaje sugerido») cuando la persona ya es
+    # conexión y lo envía Gustavo a mano. Cinco variantes; en ninguna el equipo envía un mensaje. `stopped_by` dice qué
+    # parte lo detiene: «reglas» (código, antes del líder), «juez» (preguntas del líder) o «momento» (no hay conversación).
+    'primer_mensaje':{'id':'BIB-09-primer-mensaje',
+        'units':operador.FIRST_MESSAGE_UNITS,
+        'input':{
+            'thread':{'comment':'Rolling back the payments flow was our hardest week this year: the rollback itself broke '
+                                'reconciliation for two days.',
+                      'follow_up':'Exactly, and we never found out whether the flag or the deploy order caused it. Did you keep '
+                                  'both flows running while you rolled back?'},
+            'P1':{'dm_opener':'Hi Ana — your point about rolling back the payments flow stuck with me; we left that thread '
+                              'half-open. Did you isolate it with a flag or a separate deploy?'},
+            'P2':{'dm_opener':'Hi Ana — your point about rolling back the payments flow stuck with me. Do you have 15 minutes '
+                              'this week? https://cal.com/x'},
+            'P3':{'dm_opener':"Hope you're doing well! We are a leading partner fixing scaling, hiring and fundraising for "
+                              'startups like yours. Looking forward to hearing from you.'},
+            'P4':{'dm_opener':'Thanks for the great chat on my post. How are you approaching engineering these days?'},
+            'P5':{'conversation':False,'accepted':True}},
+        'expected':{'P1_card':True,'P2_card':False,'P2_stopped_by':'reglas','P3_card':False,'P3_stopped_by':'reglas',
+                    'P3_judge_rejects':True,'P4_card':False,'P4_stopped_by':'juez','P5_card':False,'P5_stopped_by':'momento',
+                    'messages_sent':0},
+        'required':['LI-09-M003-K02','LI-09-M003-K03','LI-09-M002-K04','LI-09-M003-K04','LI-09-M004-K02','LI-09-M002-K05'],
+        # Unidades que debe reflejar cada variante (BIB-09): qué criterio del curso la decide.
+        'variants':{'P1':['LI-09-M003-K02','LI-09-M003-K03'],'P2':['LI-09-M002-K04','LI-09-M003-K04'],
+                    'P3':['LI-09-M003-K04','LI-09-M004-K02'],'P4':['LI-09-M003-K02','LI-09-M003-K03'],'P5':['LI-09-M002-K05']}},
 }
 
 
 def course_case_context(role):
+    """The case's units as its role loads them; an activated outbound methodology unlocks only its own units."""
     case=COURSE_CASES[role]
-    return operador.role_context(role,case['units'])
+    return operador.role_context(role,case['units'],metodologia=role if role in METODOLOGIAS_ACTIVAS else None)
+
+
+def corpus_fingerprint():
+    """La huella de la biblioteca activa: cuántas unidades hay por clase y un sha256 de «id:sha256» en orden. Cambia
+    cuando el corpus crece o cambia cualquier unidad, aunque las del caso sigan iguales."""
+    with db.connect() as c:
+        rows=c.execute('SELECT id,session,sha256 FROM units WHERE active ORDER BY id').fetchall()
+    return {'unidades':len(rows),'por_clase':dict(sorted(Counter(f"{r['session']:02}" for r in rows).items())),
+            'sha256':hashlib.sha256('\n'.join(f"{r['id']}:{r['sha256']}" for r in rows).encode()).hexdigest()}
+
+
+def case_units(role,grounding):
+    """Las unidades del caso tal como se cargaron: ID y hash (None si no se cargó)."""
+    hashes=grounding.get('course_hashes') or {}
+    return {uid:hashes.get(uid) for uid in COURSE_CASES[role]['units']}
+
+
+def case_drift(previous,current):
+    """Avisos si cambiaron las unidades del caso o la biblioteca entre dos calificaciones; [] si nada cambió. Sirve para
+    saber cuándo volver a calificar un caso a medida que el corpus crece: no lo hace fallar."""
+    warnings=[]
+    before,after=previous.get('units') or {},current.get('units') or {}
+    for uid in sorted(set(before)|set(after)):
+        if uid not in after:warnings.append(f'{uid} ya no está en el caso')
+        elif uid not in before:warnings.append(f'{uid} es nueva en el caso')
+        elif before[uid]!=after[uid]:warnings.append(f'{uid} cambió (hash {str(before[uid])[:12]} → {str(after[uid])[:12]})')
+    old,new=previous.get('corpus') or {},current.get('corpus') or {}
+    if old.get('sha256')!=new.get('sha256'):
+        counts=old.get('por_clase') or {},new.get('por_clase') or {}
+        changed=[f'{n}: {counts[0].get(n,0)} → {counts[1].get(n,0)}' for n in sorted(set(counts[0])|set(counts[1]))
+                 if counts[0].get(n,0)!=counts[1].get(n,0)]
+        warnings.append('La biblioteca cambió ('+('; '.join(changed) if changed else 'mismas cantidades, otro contenido')+
+                        '): vuelve a calificar el caso.')
+    return warnings
 
 
 def grade_course_case(role,result,grounding):
@@ -883,10 +946,15 @@ def grade_course_case(role,result,grounding):
     citations=result.get('course_citations',[])
     if not citations or set(citations)-set(grounding.get('course_citations',[])):errors.append('Citas no recuperadas')
     if set(case['required'])-set(citations):errors.append('Falta fundamento del caso')
-    if any(uid.startswith('LI-07-') for uid in citations):errors.append('Clase 07 excluida')
+    # La biblioteca guarda más clases de las que leen los agentes (knowledge.clases): citar una que no leen es un fallo.
+    # Un caso de una metodología activada puede citar solo las unidades de esa metodología, además de 01–06.
+    metodologia=role if role in METODOLOGIAS_ACTIVAS else None
+    if any(not legible_por_agentes(uid,metodologia) for uid in citations):errors.append('Cita fuera de las clases que leen los agentes')
     for key,expected in case['expected'].items():
         if result.get(key)!=expected:errors.append('Conducta incorrecta: '+key)
-    return {'case':case['id'],'passed':not errors,'errors':errors,'version':grounding.get('course_version')}
+    # Unidades con su hash y huella del corpus: case_drift compara dos calificaciones a medida que la biblioteca crece.
+    return {'case':case['id'],'passed':not errors,'errors':errors,'version':grounding.get('course_version'),
+            'units':case_units(role,grounding),'corpus':corpus_fingerprint()}
 
 
 def course_preview():

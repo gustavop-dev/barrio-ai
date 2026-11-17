@@ -1,5 +1,5 @@
 {
-  "version": "1.1",
+  "version": "1.2",
   "tipo": "contrato_documental_no_ejecutable",
   "id": "relaciones_comunidad",
   "nombre": "Relaciones y comunidad",
@@ -28,6 +28,25 @@
       4,
       5,
       6
+    ],
+    "metodologias_activadas": [
+      {
+        "id": "primer_mensaje",
+        "evaluacion": "BIB-09-primer-mensaje",
+        "lista": "operador.FIRST_MESSAGE_UNITS",
+        "unidades": [
+          "LI-09-M002-K04",
+          "LI-09-M002-K05",
+          "LI-09-M003-K02",
+          "LI-09-V011-K01",
+          "LI-09-M003-K03",
+          "LI-09-M003-K04",
+          "LI-09-M004-K02"
+        ],
+        "cuando": "Solo al cerrar el segundo turno de INT-04 (dm_opener), cargadas enteras junto a REPLY_UNITS; el líder las carga en la misma revisión para juzgar ese mensaje.",
+        "activacion": "knowledge.clases.METODOLOGIAS_ACTIVAS: abre solo estas siete unidades de la clase 09, con su evaluación y en relaciones_comunidad y lider_jev. CLASES_AGENTES sigue en 01–06 y cualquier otra unidad 07–12 sigue rechazada.",
+        "registro_de_lectura": "relaciones/registro-lectura-primer-mensaje.json"
+      }
     ],
     "unidades": [
       {
@@ -143,7 +162,8 @@
       "rol separado de conversaciones privadas",
       "niveles A/B/C, topes y degradación automática",
       "invitación sin nota por defecto por cuenta gratuita",
-      "ejecución exclusiva de operador_cuenta"
+      "ejecución exclusiva de operador_cuenta",
+      "primer mensaje: el puente es la conversación del post, no el servicio; sin secuencias ni seguimientos; Gustavo lo envía a mano (INB-08)"
     ]
   },
   "entradas": {
@@ -224,7 +244,7 @@
   },
   "herramientas_y_autoridad": {
     "herramientas_necesarias": [
-      "pasarela de lectura de operador_cuenta: Unipile v2 (perfiles, posts, comentarios, reacciones, relaciones, invitaciones enviadas y recibidas, seguidores)",
+      "pasarela de lectura de operador_cuenta: LinkedIn directo (perfiles con su grado de red, posts, comentarios, recuentos de reacciones, invitaciones enviadas y recibidas, número de seguidores)",
       "operador_cuenta para toda escritura (seguir, invitar, aceptar, declinar, retirar, reaccionar, comentar, responder, compartir, bloquear)",
       "Django/PostgreSQL: memoria de relaciones, propuestas versionadas, política autónoma y bandeja de la oficina para vetos y modo approval (por implementar)"
     ],
@@ -248,7 +268,7 @@
       "Comprometer salario, disponibilidad o contratos",
       "Tocar credenciales, 2FA, pagos o la propiedad de la cuenta",
       "Editar el curso o los presupuestos",
-      "Llamar directamente a Unipile o a la API oficial para escribir",
+      "Llamar directamente a LinkedIn (conector directo) o a la API oficial para escribir",
       "Enviar mensajes directos: corresponde a conversaciones_inbox",
       "Invitar a una persona ya conectada, con invitación pendiente o previamente retirada o rechazada sin decisión de Gustavo"
     ]
@@ -477,7 +497,7 @@
     {
       "id": "INT-04",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Leer el contexto del comentario; admitir lo desconocido; preguntas valiosas se registran para Editorial; el plazo de 72 h se cuenta desde el comentario al que se responde."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Leer el contexto del comentario; admitir lo desconocido; preguntas valiosas se registran para Editorial; el plazo de 72 h se cuenta desde el comentario al que se responde. Al cerrar el segundo turno redacta además el primer mensaje privado (dm_opener, BIB-09-primer-mensaje): reglas fijas en código (3 líneas, 500 caracteres, sin enlaces ni pedir reunión, sin fórmulas, idioma de la persona), una sola reescritura y, si sigue fallando, se descarta entero; el líder lo juzga en la misma revisión y solo con dm_approved llega a Tu turno. Nunca lo envía: lo envía Gustavo (INB-08)."
     },
     {
       "id": "INT-05",
@@ -487,7 +507,7 @@
     {
       "id": "INT-06",
       "papel": "propone",
-      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Compartir con atribución y criterio propio; un único ejecutor y una sola vía (API oficial o Unipile) registrada por pieza; entra en el calendario del director."
+      "politica": "Nivel B. Propone la versión exacta con destinatario u objeto, contexto y motivo; la política autónoma la aprueba por hash tras la verificación automática; solo operador_cuenta ejecuta. Compartir con atribución y criterio propio; un único ejecutor y una sola vía registrada por pieza (la API oficial: LinkedIn directo no comparte posts); entra en el calendario del director."
     },
     {
       "id": "INT-07",
@@ -577,7 +597,7 @@
     {
       "id": "ADM-03",
       "papel": "propone",
-      "politica": "Nivel B, política estricta. Propone con motivo y evidencia registrada; la política autónoma solo la aprueba si se cumplen las condiciones estrictas y el editor_verificador confirma la evidencia; solo operador_cuenta ejecuta. Política estricta: bloqueo vía Unipile solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; el reporte sigue siendo manual de Gustavo; alerta a Gustavo."
+      "politica": "Nivel B, política estricta. Propone con motivo y evidencia registrada; la política autónoma solo la aprueba si se cumplen las condiciones estrictas y el editor_verificador confirma la evidencia; solo operador_cuenta ejecuta. Política estricta: bloqueo solo por spam, acoso o suplantación con evidencia confirmada por el verificador; nunca por bajo encaje, crítica o competencia; LinkedIn directo no bloquea: el bloqueo y el reporte los aplica Gustavo a mano; alerta a Gustavo."
     },
     {
       "id": "ADM-03",
@@ -795,6 +815,12 @@
         "caso": "Hilo pertinente en un post publicado hace 80 h",
         "resultado_esperado": "No comenta; registra la pregunta si es útil para Editorial.",
         "estado": "propuesto_no_ejecutado"
+      },
+      {
+        "caso": "BIB-09-primer-mensaje: cinco variantes del primer mensaje tras una conversación de dos turnos en un post de Gustavo",
+        "resultado_esperado": "P1 concreto llega a Tu turno; P2 (15 minutos y enlace) y P3 (fórmulas y servicios) los paran las reglas fijas; P4 vago lo para el líder (dm_approved=False) sin descartar la respuesta pública; P5, aceptación sin conversación, no redacta nada; ningún mensaje enviado.",
+        "estado": "ejecutado_con_fakes",
+        "pruebas": "infra/src/team_backend/tests/test_primer_mensaje.py; línea base en infra/docs/linea-base-primer-mensaje.md"
       }
     ],
     "evidencia_de_validacion": [
@@ -836,7 +862,7 @@
   "pendientes_para_activacion": [
     "revisión humana del diseño y de reparto-acciones-v1",
     "aprobación por Gustavo de neighborhood_criteria; configuración del cupo real de notas y del webhook de alertas",
-    "conectar la cuenta en Unipile con credenciales y 2FA de Gustavo y probar cada operación en piloto",
+    "entrar a mano en el navegador de la cuenta en el servicio navegador (Gustavo escribe su clave y su 2FA en la propia página de LinkedIn; Barrio no los guarda) y probar cada operación en piloto",
     "implementar en Django operador_cuenta, pasarela de lectura, política autónoma, degradación y alertas",
     "implementar y evaluar con casos adversos antes de activar"
   ],
@@ -853,21 +879,21 @@
       "uso": "Ficha del candidato",
       "necesidad": "obligatorio para RED",
       "si_falta": "pedir ficha al investigador",
-      "fuente_y_campos": "Unipile v2 vía operador_cuenta; fichas del investigador."
+      "fuente_y_campos": "LinkedIn directo vía operador_cuenta; fichas del investigador."
     },
     {
       "catalogo_id": "D05",
       "uso": "Post donde aportar",
       "necesidad": "para INT",
       "si_falta": "no comentar",
-      "fuente_y_campos": "Unipile v2 vía operador_cuenta."
+      "fuente_y_campos": "LinkedIn directo vía operador_cuenta."
     },
     {
       "catalogo_id": "D06",
       "uso": "Hilo completo y participantes",
       "necesidad": "para INT",
       "si_falta": "no comentar sobre un fragmento",
-      "fuente_y_campos": "Unipile v2 vía operador_cuenta (comentarios y reacciones con paginación)."
+      "fuente_y_campos": "LinkedIn directo vía operador_cuenta (comentarios y respuestas, con recuentos de reacciones)."
     },
     {
       "catalogo_id": "D09",
@@ -895,7 +921,7 @@
       "uso": "Conexión, seguimiento e invitaciones del destinatario",
       "necesidad": "obligatorio antes de RED",
       "si_falta": "no proponer invitación",
-      "fuente_y_campos": "Sincronización de operador_cuenta (Unipile v2)."
+      "fuente_y_campos": "Sincronización de operador_cuenta (LinkedIn directo)."
     },
     {
       "catalogo_id": "D14",

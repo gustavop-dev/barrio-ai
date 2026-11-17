@@ -337,10 +337,10 @@ class EditorialCircuitTests(EditorialBase):
         self.assertEqual(self.linkedin.state['writes'],1)
         self.assertEqual(self.linkedin.state['posts'][0]['body']['commentary'],li.little_text(GOOD_POST))
         self.assertTrue(execution.external_id.startswith('urn:li:share:'));self.assertIn('/feed/update/urn:li:share:',execution.external_url)
-        self.assertEqual(proposal.state,'sent')  # Unipile reads own posts but LinkedIn does not show it yet
-        self.fake.seed_own_post(GOOD_POST,impressions=321)  # settled by text: Unipile ids are opaque, never URNs
+        self.assertEqual(proposal.state,'sent')  # the account reads own posts but LinkedIn does not show it yet
+        self.fake.seed_own_post(GOOD_POST,impressions=321)  # settled by text: the reader's ids are not the Posts API's URNs
         self.assertEqual(operador.reconcile(self.gustavo,proposal.id).state,'confirmed')
-        piece.refresh_from_db();self.assertEqual((piece.metrics['impressions'],piece.metrics['source']),(321,'unipile'))
+        piece.refresh_from_db();self.assertEqual((piece.metrics['impressions'],piece.metrics['source']),(321,'linkedin'))
         # The API exposes the action with a null post and the piece behind it.
         listed=self.human.get('/api/v1/operador/actions',{'state':'confirmed'}).json()['results']
         self.assertEqual((listed[0]['post'],listed[0]['piece_id'],listed[0]['capability']),(None,str(piece.id),'CONT-09'))
@@ -442,7 +442,7 @@ class EditorialCircuitTests(EditorialBase):
         self.assertEqual(operador.execute(self.autobot,proposal.id).id,execution.id)
         autopiloto.tick(self.autobot);self.drain()
         self.assertEqual(self.linkedin.state['writes'],1)
-        self.fake.seed_own_post(GOOD_POST)  # Unipile shows Gustavo's own post: settled by text, without writing
+        self.fake.seed_own_post(GOOD_POST)  # the account shows Gustavo's own post: settled by text, without writing
         self.assertEqual(operador.reconcile(self.gustavo,proposal.id).state,'confirmed')
         self.assertEqual(self.linkedin.state['writes'],1)
 

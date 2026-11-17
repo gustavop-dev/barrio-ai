@@ -356,7 +356,7 @@ class IndustryWorkflowTests(IndustryMixin, TestCase):
 class IndustrySearchRunTests(IndustryMixin, TestCase):
     def setUp(self):
         self.set_up_industry()
-        env = patch.dict(os.environ, {'OPERATOR_ALLOW_FAKE': 'true', 'LIVE_PROVIDERS': 'false', 'LIVE_LINKEDIN': 'false'})
+        env = patch.dict(os.environ, {'OPERATOR_ALLOW_FAKE': 'true', 'LIVE_PROVIDERS': 'false'})
         env.start()
         self.addCleanup(env.stop)
         FakeConnector.reset()

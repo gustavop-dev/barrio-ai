@@ -1,15 +1,17 @@
 import argparse
 import json
 from . import agents,db,ingest,providers,retrieval,evaluation
+from .clases import CLASES_AGENTES,CLASES_BIBLIOTECA,rango
 
 def main():
-    parser=argparse.ArgumentParser(description='Biblioteca compartida LinkedIn 01–06')
+    parser=argparse.ArgumentParser(description=f'Biblioteca compartida LinkedIn {rango(CLASES_BIBLIOTECA)}; los agentes leen {rango(CLASES_AGENTES)}')
     commands=parser.add_subparsers(dest='command',required=True)
     for name in ['init','ingest','verify','status']:commands.add_parser(name)
     p=commands.add_parser('embed');p.add_argument('--execute',action='store_true')
     p=commands.add_parser('evaluate');p.add_argument('--mode',choices=['lexical','hybrid'],default='lexical')
     p=commands.add_parser('authorize-retry');p.add_argument('rid');p.add_argument('--reason',required=True)
     p=commands.add_parser('search');p.add_argument('query');p.add_argument('--agent',choices=list(retrieval.AGENTS));p.add_argument('--mode',choices=['lexical','hybrid'],default='lexical')
+    p.add_argument('--clases',type=int,nargs='+',help=f'Clases explícitas (por defecto {rango(CLASES_AGENTES)}, las que leen los agentes)')
     p=commands.add_parser('run');p.add_argument('agent',choices=list(retrieval.AGENTS));p.add_argument('task');p.add_argument('--execute',action='store_true');p.add_argument('--mode',choices=['lexical','hybrid'],default='lexical');p.add_argument('--request-id')
     args=vars(parser.parse_args());command=args.pop('command')
     try:

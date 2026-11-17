@@ -1,5 +1,7 @@
 # Lemlist y Unipile para Barrio AI
 
+> Registro histórico (noviembre de 2026): desde el 14/11/2026 la cuenta opera con LinkedIn directo, sin Unipile; ver [plan-linkedin-directo](../../../docs/plan-linkedin-directo.md).
+
 Investigación del 6 de noviembre de 2026, solicitada por Gustavo para decidir si lemlist sustituye a Unipile y si aporta acceso a la base de Sales Navigator. Fuentes públicas primarias; no se conectaron cuentas ni se probaron resultados reales. Complementa la [selección v2](herramientas-linkedin-v2.md), sin sustituirla ni modificar contratos de agentes.
 
 ## Conclusión para nuestro diseño
