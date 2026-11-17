@@ -139,8 +139,8 @@ Cálculo con el código y los ajustes actuales, sin tocar la separación:
   algo en común o una señal), en menos de 200 caracteres, y su único trabajo es que acepte (LI-09-M002-K06). La nota
   se redacta al invitar, con los comentarios del calentamiento como contexto, no al clasificar.
 - Retirar invitaciones viejas sigue bloqueado: el sistema solo le da la lista a Gustavo.
-- A corregir aquí: una invitación con nota a una persona confirmada por Gustavo queda bloqueada hasta caducar, porque
-  nadie marca la nota como aprobada.
+- Corregido (16/11/2026, `78cadb5`): una invitación con nota a una persona confirmada por Gustavo, o con el líder
+  apagado, sale sin la nota que nadie revisó en vez de quedar bloqueada hasta caducar.
 
 ### 4. Primer mensaje
 
@@ -350,7 +350,26 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
      quién comentar y a quién invitar primero.
    - Pendiente: responder en el hilo del comprador (no hay acción permitida), el grupo «comunidad» (sin fuente de
      posts todavía) y despertar por una señal de compra durante el descanso (la verificación web corre una vez).
-3. **Primer mensaje al aceptar**, con la nota para calentados.
+3. ~~**Primer mensaje al aceptar**, con la nota para calentados.~~ Hecho en la misma rama
+   ([BAR-20](funcionalidades/red.md#bar-20), [BIB-12](funcionalidades/biblioteca-equipos.md#bib-12)), sin desplegar y
+   detrás de `BUYER_FIRST_MESSAGE_ENABLED` (apagado por defecto; apagado, todo es como antes):
+   - Cuándo: si interactuó en el último mes, el borrador se prepara en el ciclo que ve la aceptación y la tarjeta sale
+     una hora después; si no, antes un comentario más en un post nuevo suyo y el borrador a los
+     `BUYER_FIRST_MESSAGE_AFTER_DAYS` (7) días; a los 21 días se prepara igual.
+   - Qué: las tres líneas de `primer_mensaje` con la primera citando algo real (su respuesta, su comentario en un post
+     de Gustavo, su post que el equipo comentó, una señal de compra con fuente). Sin nada real no hay mensaje ni
+     llamada pagada y queda el motivo. Reglas fijas de RSP-07, una reescritura y el líder; lo que no pasa se descarta y
+     se audita. Tarjeta «Mensaje sugerido» con «Abrir su perfil», «Hecho, le escribí» (`mensaje_1`) y «No escribirle»
+     (salida definitiva). Una tarjeta por persona: la conversación en su post gana. La app nunca envía el mensaje.
+   - Nota: las 3 del mes van a calentados con un hecho concreto, los más calientes primero, redactadas al invitar con
+     los comentarios y las señales como contexto (metodología `nota_invitacion`, tres unidades de la clase 09, caso
+     `BIB-09-nota-invitacion` con su línea base). Reglas fijas (menos de 200 caracteres, sin vender, sin «ser parte de
+     mi red» ni elogio genérico, el hecho nombrado, su idioma) y cinco preguntas del líder. Una nota parada nunca frena
+     la invitación. El clasificador deja de poner notas con el interruptor encendido. Sin la prueba A/B del curso.
+   - Corregido (también apagado): una invitación con nota a una persona que Gustavo confirmó, o con el líder apagado,
+     sale sin la nota en vez de quedar bloqueada hasta caducar.
+   - El recorrido muestra cada borrador; el embudo separa los del recorrido y las notas (preparados, enviados, parados
+     por motivo). Para desplegar: migración 0047 y la clase 09 cargada.
 4. **Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.
 5. **Ruta del que no publica.**
 6. **Respuesta, enlace de agenda (Cal.com) y entrega del lead.**
@@ -360,7 +379,7 @@ Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, u
 
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-19) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-20) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).

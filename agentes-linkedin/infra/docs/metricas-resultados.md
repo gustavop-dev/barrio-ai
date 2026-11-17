@@ -399,7 +399,9 @@ Los mensajes 2 a 4 aparecen como pasos en `estado_actual`.
                      "senal": { "con_senal": Bloque, "sin_senal": Bloque },
                      "senal_de_compra": { "con_senal_de_compra": Bloque, "sin_senal_de_compra": Bloque },
                      "entrada": { "saliente": Bloque, "entrante": Bloque } },
-  "borradores": { "pendientes", "enviados", "no_enviados", "enviados_pct", "fuentes": ["mensaje_sugerido"] },
+  "borradores": { "pendientes", "enviados", "no_enviados", "enviados_pct", "fuentes": ["mensaje_sugerido", "recorrido"],
+                  "recorrido": { "preparados", "pendientes", "enviados", "no_enviados", "parados": { "<motivo>": n } },
+                  "notas": { "preparadas", "con_invitacion", "enviadas", "parados": { "<motivo>": n } } },
   "estado_actual": { "elegido|calentando|…|reunion|descanso|salio": n },
   "descanso": { "<motivo>": n }, "salidas": { "<motivo>": n } }
 ```
@@ -410,7 +412,7 @@ Los mensajes 2 a 4 aparecen como pasos en `estado_actual`.
   - `nota`: una invitación sin dato de nota (anterior al registro de notas) no cuenta en ninguno de los dos.
   - `senal`: `con_senal` es una señal de la persona antes de su primera invitación: comentó un post de Gustavo, respondió un comentario del equipo, lo invitó o le escribió.
   - `senal_de_compra`: la verificación web de su empresa citó una señal de compra con fuente (ronda, contratación o expansión; clase 08). Solo se guardan con `BUYER_WARMUP_ENABLED`, así que antes de encenderlo todos van en `sin_senal_de_compra`.
-- **Borradores:** hoy el único es el «Mensaje sugerido» ([RSP-07](../../../docs/funcionalidades/respuestas.md#rsp-07)). Está pendiente mientras su tarjeta espera en Tu turno, enviado con «Hecho, le escribí» y no enviado con «No escribirle».
+- **Borradores:** el «Mensaje sugerido» de una conversación en un post de Gustavo ([RSP-07](../../../docs/funcionalidades/respuestas.md#rsp-07)) y, con `BUYER_FIRST_MESSAGE_ENABLED`, el primer mensaje del recorrido a quien aceptó ([BAR-20](../../../docs/funcionalidades/red.md#bar-20)). Está pendiente mientras su tarjeta espera en Tu turno, enviado con «Hecho, le escribí» y no enviado con «No escribirle»; `pendientes`, `enviados` y `no_enviados` cuentan las dos fuentes. `recorrido` desglosa los del recorrido: `preparados` (el líder los aprobó), los tres estados y `parados` por motivo (`reglas`, `juez`, `hecho`: nada real que citar, `cupo`, `conversacion`: ya había una conversación). `notas` hace lo mismo con las notas de invitación de los calentados: `preparadas`, `con_invitacion` (puestas en una invitación), `enviadas` y `parados`. La comparación `nota` (con nota frente a sin nota) sigue en `comparaciones`.
 - **Comando:**
   - `manage.py comprador embudo --semanas N` imprime lo mismo en JSON.
   - `manage.py comprador reconstruir [--cuenta ID] [--seco]` rellena los recorridos desde el historial. Es idempotente y cada persona se guarda por separado.

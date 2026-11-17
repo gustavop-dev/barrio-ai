@@ -66,3 +66,31 @@ En el commit de la evaluación, las ocho pruebas que fallan llevan `@expectedFai
 su motivo desaparece: con el paso de borradores (`autopiloto._buyer_drafts`, `mensajes_comprador.prepare`), el toque
 después de aceptar (calentamiento 2), las reglas, el líder y la tarjeta de Tu turno, todo detrás de
 `BUYER_FIRST_MESSAGE_ENABLED`.
+
+## Después de activar (16/11/2026)
+
+Mismo caso, mismas pruebas y mismo juez simulado, ya sin marcadores, con `BUYER_FIRST_MESSAGE_ENABLED=true` y el líder
+encendido: `manage.py test team_backend.tests.test_primer_mensaje_comprador` (en serie). Resultado: las 11 pruebas
+pasan, y `grade_course_case` aprueba el caso completo (`passed: True`, sin errores) con las citas de `LEAD_UNITS` más las
+siete de `FIRST_MESSAGE_UNITS`.
+
+```
+passed: True
+result: borrador_con_metodologia=True, M1_mismo_ciclo=True, M1_tarjeta=True, M1_cita=respondio_comentario,
+        M2_antes_de_tiempo=False, M2_toque=True, M2_tarjeta=True, M3_tarjeta=False, M3_stopped_by=hecho, M3_pagado=False,
+        M4_tarjeta=False, M4_stopped_by=reglas, M5_tarjeta=False, M5_stopped_by=juez, M6_tarjetas=1,
+        M6_origen=conversacion, mensajes_enviados=0
+```
+
+| Variante | Antes | Ahora | Qué lo cambió |
+| --- | --- | --- | --- |
+| M1 | Ni borrador ni tarjeta | Borrador en el ciclo que ve la aceptación; tarjeta una hora después que cita su respuesta | `autopiloto._buyer_drafts`, `mensajes_comprador.prepare` (`message_at`, `anchors`, `SHOW_AFTER`) |
+| M2 | Ni toque ni borrador | Un comentario más en un post nuevo suyo y el borrador a los 7 días | `calentamiento.second_touch` en `to_read` y `buyer_posts`; `BUYER_FIRST_MESSAGE_AFTER_DAYS` |
+| M3 | Sin motivo | Sin mensaje ni llamada pagada, motivo `hecho` | `anchors` vacío → `stop(..., hecho)` antes de pagar |
+| M4 | Sin borrador | Lo paran las reglas tras la reescritura | `message_text_issues` (las de RSP-07 más el hecho declarado) |
+| M5 | Sin borrador | Lo para el líder | `lider.review_buyer_draft` (`BUYER_MESSAGE_CHECKS`) |
+| M6 | Una tarjeta | Una tarjeta, la de la conversación | `mensajes_comprador.cards` y `_messages` respetan `respuestas._dm_rows` |
+| Interruptor apagado | Nada nuevo | Nada nuevo; RSP-07 intacto | `mensajes_comprador.enabled()` |
+
+El camino completo y las variantes 1–10 del encargo están además en `test_comprador_e2e.py`
+(`FirstMessageBuyerPathTests`, `FirstMessageSwitchOffPathTests`).

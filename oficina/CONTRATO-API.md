@@ -275,6 +275,14 @@ GET `/api/v1/red/invitaciones-pendientes?dias=21` (permiso `operate_linkedin`; `
 
 La pantalla `/red` muestra el resumen (capacidad de hoy con su modo, lecturas frente a sus topes, gasto del modelo frente al tope de seguridad diario del equipo y avisos) y la lista de contactos, filtrable por etapa (`/red?etapa=fit`) con fichas que llevan el recuento de cada etapa. Cada contacto enseña su clasificación, su evidencia, los tres últimos eventos del historial, su acción abierta (enlazada a `/acciones` con su estado y capacidad) y, cuando corresponde, «Descartar».
 
+### Primer mensaje al aceptar y nota para calentados (fase 3 del comprador)
+
+Con `BUYER_FIRST_MESSAGE_ENABLED=true` (por defecto `false`) y el líder encendido (ficha BAR-20). Apagado, nada de esto aparece.
+
+- **Tu turno.** `tasks.mensajes` suma, después de las de RSP-07, las tarjetas `mensaje` del recorrido del comprador: `id: "dm:<borrador>"`, `title: "{persona} aceptó tu invitación"`, prioridad `importante`, `agent: "relaciones_comunidad"`, `created_at` igual a la hora en que se muestra (una hora después de aceptar como pronto). Mismas acciones que RSP-07 («Abrir su perfil», «Hecho, le escribí» `{how: "enviado"}`, «No escribirle» `{how: "no"}` con nota opcional) contra el mismo endpoint, con el id del borrador. `message` trae los campos de siempre (`piece_id` y `topic` vacíos) más tres opcionales: `comment_label` y `reply_label` (qué son `comment` y `reply`: «Su post» y «Lo que comentó el equipo», «Lo que comentó en tu post»…; `reply_label` vacío si no hay `reply`) y `origin: "recorrido"`. Sin esos campos, la tarjeta es la de RSP-07 y la PWA y la app usan sus etiquetas de siempre. Una tarjeta por persona: si hay una de RSP-07, no hay otra del recorrido. `recent` suma «Mensaje sugerido para {persona}» con `how` «Le escribiste» o «No le escribiste».
+- **`POST /api/v1/respuestas/<id>/mensaje`** `{how: "enviado" | "no", note?}` acepta también el id de un borrador del recorrido. Devuelve `{ "id": "uuid", "closed": { "how": "enviado" | "no", "at": "ISO", "note": "…" } }`; repetirlo devuelve el mismo cierre. «No escribirle» saca a la persona del recorrido (`descartado_por_gustavo`). 409 si el borrador ya no está en Tu turno; 404 si el id no es ni un comentario ni un borrador de mensaje. La app nunca envía el mensaje.
+- **Embudo.** `GET /api/v1/resultados/embudo-comprador` suma en `borradores` (acumulado): `fuentes: ["mensaje_sugerido", "recorrido"]`, `recorrido: { preparados, pendientes, enviados, no_enviados, parados: { reglas, juez, hecho, cupo, conversacion } }` y `notas: { preparadas, con_invitacion, enviadas, parados: { … } }`. `pendientes` y `enviados` cuentan las dos fuentes.
+
 ### Trabajos y roles (escena de la oficina)
 
 Hay cuatro trabajos nuevos (`Job.kind`). Sus roles se derivan en `/api/v1/oficina/actividad`, sin cambios en la PWA:

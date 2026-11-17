@@ -65,3 +65,32 @@ entonces.
 Las doce que fallan llevan `@expectedFailure` con su motivo. Se quitan cuando su motivo desaparece: la corrección del
 error (G y `ConfirmedNoteBugTests`), la activación de `nota_invitacion` (fuentes y carga de unidades), la redacción al
 invitar con sus reglas fijas y las preguntas del líder (N1–N9) detrás de `BUYER_FIRST_MESSAGE_ENABLED`.
+
+## Después de activar (16/11/2026)
+
+Mismo caso, mismas pruebas y mismo juez simulado, ya sin marcadores, con `BUYER_FIRST_MESSAGE_ENABLED=true`, el líder
+encendido y la metodología `nota_invitacion` activada (tres unidades de la clase 09 en `METODOLOGIAS_ACTIVAS`, registro de
+lectura, grafo `6.13-primer-mensaje-comprador-y-nota`): `manage.py test team_backend.tests.test_nota_invitacion` (en
+serie). Resultado: las 16 pruebas del módulo pasan (las 13 de la línea base más dos de activación y una del registro), y
+`grade_course_case` aprueba el caso completo (`passed: True`, sin errores) con las citas de `LEAD_UNITS` más las tres de
+`INVITE_NOTE_UNITS`.
+
+```
+passed: True
+result: redactada_al_invitar=True, nota_con_metodologia=True, G_invitada=True, invitaciones_sin_salir=0,
+        N1_con_nota=True, N2…N6_con_nota=False (stopped_by=reglas), N7_con_nota=False (juez), N8_con_nota=False (hecho),
+        N9_con_nota=False (cupo)
+```
+
+| Variante | Antes | Ahora | Qué lo cambió |
+| --- | --- | --- | --- |
+| N1 | Sin nota | Redactada al invitar, con el comentario del calentamiento como contexto, sale con la invitación | `mensajes_comprador._notes`, `red.plan` (`note_hold`, `ready_notes`, `use_note`), `red.note_approved` (`approved_note`) |
+| N2–N6 | Sin motivo | Las paran las reglas; la invitación (N2) sale sin nota | `note_text_issues`: fórmulas, `NOTE_PRAISE`, `NOTE_SELL`, 200 caracteres, idioma |
+| N7 | Sin motivo | La para el líder; sale invitada sin nota | `lider.review_buyer_draft` (`NOTE_CHECKS`, `nota_pitch`) |
+| N8 | Sin motivo | No se redacta, sin llamada pagada (`hecho`) | Sin calentamiento ni hecho → `stop` |
+| N9 | Sin motivo | Sale sin nota (`cupo`) | `red.note_room` antes de redactar |
+| G | Aprobada y bloqueada | Invitada | `78cadb5` (la nota sin revisión no bloquea) y la nota del comprador aprobada por su propia revisión |
+| Regresión | Sale con nota | Sale con nota | — |
+
+`ConfirmedNoteBugTests` (interruptor apagado) pasa desde `78cadb5`. `course_case_context('nota_invitacion')` ya carga las
+tres unidades (`course_missing` vacío) y el recorrido genérico de `test_fase2_curso` ya no salta este caso.
