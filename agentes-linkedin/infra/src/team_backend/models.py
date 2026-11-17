@@ -197,8 +197,10 @@ class ReferentReview(models.Model):
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT)
     month=models.DateField()
     # mensual: the monthly batch (and the extraordinary one, which takes its place); industria: the search Gustavo starts
-    # by hand (operador referentes-industria), at most one a month, never applied by silence.
+    # by hand (operador referentes-industria), never applied by silence: one a month, plus another attempt when every
+    # earlier one ended without proposals (attempt 2, 3…; the earlier one is closed, referentes_industria.supersede).
     kind=models.CharField(max_length=16,default='mensual')
+    attempt=models.PositiveSmallIntegerField(default=1)
     state=models.CharField(max_length=24,default='preparing')
     dossier=models.JSONField(default=dict)
     expected_revision=models.PositiveIntegerField(default=1)
@@ -207,7 +209,7 @@ class ReferentReview(models.Model):
     closed_at=models.DateTimeField(null=True,blank=True)
     created_at=models.DateTimeField(default=timezone.now)
     class Meta:
-        constraints=[models.UniqueConstraint(fields=['account','month','kind'],name='unique_referent_month_kind')]
+        constraints=[models.UniqueConstraint(fields=['account','month','kind','attempt'],name='unique_referent_month_kind_attempt')]
 
 
 class ReferentChange(models.Model):

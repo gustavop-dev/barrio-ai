@@ -20,11 +20,14 @@ class Command(BaseCommand):
         cola=sub.add_parser('reclasificar-cola',help='Devuelve al clasificador a las personas que siguen en cola (encajan, sin seguir ni invitar) clasificadas antes de una fecha; sin --confirmar solo cuenta')
         cola.add_argument('--cuenta',required=True);cola.add_argument('--antes',required=True,help='Fecha y hora ISO con zona, por ejemplo 2026-11-12T20:40:00+00:00')
         cola.add_argument('--confirmar',action='store_true')
-        ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada)')
+        ind=sub.add_parser('referentes-industria',help='Busca referentes grandes de tu industria en EE. UU. (de pago; imprime el costo y sin --confirmar no encola nada). Si la del mes terminó sin propuestas, se puede repetir')
         ind.add_argument('--cuenta',required=True);ind.add_argument('--confirmar',action='store_true',help='Encola la búsqueda tras mostrar el costo')
         ind.add_argument('--tope-usd',default=None,help='Tope duro en USD de esta búsqueda (por defecto REFERENTES_INDUSTRIA_TOPE_USD o 3)')
-        ind.add_argument('--candidatos',type=int,default=6,help='Personas a medir en LinkedIn (1-9)')
-        ind.add_argument('--busquedas',type=int,default=4,help='Búsquedas de personas en LinkedIn (0-8)')
+        ind.add_argument('--candidatos',type=int,default=6,help='Personas a medir en LinkedIn con sus posts (1-9)')
+        ind.add_argument('--busquedas',type=int,default=5,help='Búsquedas de personas en LinkedIn (0-8), en el orden fijo de referentes_industria.QUERIES')
+        ind.add_argument('--empresas',default='',help='Empresas semilla separadas por comas (p. ej. "Imagine Apps,Northwind Labs"): se buscan sus fundadores y van primero')
+        ind.add_argument('--perfiles',default='',help='Perfiles semilla separados por comas (URL linkedin.com/in/... o identificador): se miden primero con los mismos criterios')
+        ind.add_argument('--informe',action='store_true',help='Solo imprime el embudo de las búsquedas de industria de este mes (no encola nada)')
 
     def handle(self,**o):
         user=User.objects.filter(username=o['usuario'],is_active=True).first()
@@ -58,12 +61,23 @@ class Command(BaseCommand):
             elif o['accion']=='referentes-industria':
                 from decimal import Decimal, InvalidOperation
                 from team_backend import referentes_industria
+                if o['informe']:
+                    for line in referentes_industria.report_lines(account):self.stdout.write(line)
+                    return
                 try:tope=Decimal(o['tope_usd']) if o['tope_usd'] is not None else None
                 except InvalidOperation:raise CommandError('--tope-usd debe ser un número') from None
                 if tope is not None and not (tope.is_finite() and tope>0):raise CommandError('--tope-usd debe ser positivo')
+                split=lambda value:[x.strip() for x in (value or '').split(',') if x.strip()]
                 job,report=referentes_industria.enqueue(user,account,tope_usd=tope,candidatos=o['candidatos'],
-                                                        busquedas=o['busquedas'],confirm=o['confirmar'])
+                                                        busquedas=o['busquedas'],empresas=split(o['empresas']),
+                                                        perfiles=split(o['perfiles']),confirm=o['confirmar'])
                 est=report['estimate'];reads=est['reads']
+                scope={'us':'EE. UU.','global':'sin filtro de lugar'}
+                for name in report['empresas']:
+                    self.stdout.write(f'Búsqueda de empresa semilla: {referentes_industria.COMPANY_QUERY.format(name)} (sin filtro de lugar)')
+                for n,q in enumerate(report['queries'],1):
+                    self.stdout.write(f"Búsqueda {n}: {q['keywords']} ({scope[q['scope']]}; {q['service']})")
+                if report['perfiles']:self.stdout.write('Perfiles semilla: '+', '.join(report['perfiles']))
                 self.stdout.write(f"Costo máximo (reserva): {est['usd_max']} USD = {est['web_calls']} investigaciones web × "
                                   f"{est['web_call_usd']} + selección {est['selection_usd']}. El real suele ser menor.")
                 self.stdout.write(f"Tope duro de esta búsqueda: {report['tope_usd']} USD. Quedan {report['cycle_left_usd']} USD "
