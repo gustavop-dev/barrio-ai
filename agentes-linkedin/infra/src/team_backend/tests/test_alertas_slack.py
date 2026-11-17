@@ -6,7 +6,7 @@ from datetime import timedelta
 from decimal import Decimal
 from unittest.mock import patch
 import httpx
-from knowledge import providers
+from knowledge import db, providers
 from team_backend import alertas_slack, autopiloto, operador
 from team_backend.models import ActionExecution, ActionProposal, AuditEvent, Contact, Job, PostComment, Worker
 from team_backend.tests.test_ventana_lectura import WindowBase, at
@@ -345,3 +345,35 @@ class UrgentAlertTests(SlackBase):
         self.assertEqual(len(texts),2)
         self.assertIn('3 escrituras aplazadas sin salir desde las 09:00',texts[0])
         self.assertIn('no abre «Cuenta simulada» por otra salida a internet (desde las 09:25)',texts[1])
+
+
+class MoneyAlertTests(SlackBase):
+    def spend(self,amount,when):
+        with db.connect() as c:
+            c.execute("INSERT INTO usage_ledger(id,provider,purpose,reserved_usd,actual_usd,status,usage,created_at) "
+                      "VALUES(%s,'anthropic','prueba',%s,%s,'complete','{}',%s)",(str(uuid.uuid4()),amount,amount,when))
+
+    def test_the_month_spend_at_80_and_spent_once_each(self):
+        with patch.dict('os.environ',{'AI_MONTHLY_LIMIT_USD':'100','AI_DAILY_FUSE_USD':'1000'}):
+            self.spend(79,at(9))
+            self.watch(at(10));self.assertEqual(self.texts(),[])
+            self.spend(2,at(10))
+            self.watch(at(11));self.watch(at(11,0,1))
+            self.spend(20,at(12,0,1))
+            self.watch(at(13,0,1));self.watch(at(14,0,2))
+        texts=[t for t in self.texts() if ' IA ' in t]
+        self.assertEqual(len(texts),2)
+        self.assertIn('Gasto de IA del mes al 80 %: 81,00 de 100,00 USD (AI_MONTHLY_LIMIT_USD)',texts[0])
+        self.assertIn('Tope mensual de IA agotado: 101,00 de 100,00 USD',texts[1])
+
+    def test_low_acceptance_once_per_sample(self):
+        health={'rate':0.3,'mature':20,'accepted':6,'sample_key':'a'*64}
+        operador._audit(None,'network.ramp','member',stage=1,pause_until=None,health=health)
+        self.watch(at(10));self.watch(at(10,0,1))
+        texts=[t for t in self.texts() if 'Aceptación' in t]
+        self.assertEqual(len(texts),1)
+        self.assertIn('Aceptación de invitaciones baja: 6 de 20 (30%), bajo el 40% (OPERATOR_INVITE_ACCEPTANCE_MIN)',texts[0])
+        operador._audit(None,'network.ramp','member',stage=1,pause_until=None,health=dict(health,mature=10,sample_key='b'*64))
+        operador._audit(None,'network.ramp','member',stage=1,pause_until=None,health=dict(health,rate=0.45,sample_key='c'*64))
+        self.watch(at(10,0,2))  # too few mature invitations, then a healthy rate: nothing to say
+        self.assertEqual(len([t for t in self.texts() if 'Aceptación' in t]),1)

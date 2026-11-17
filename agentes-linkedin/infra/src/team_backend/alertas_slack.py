@@ -22,6 +22,7 @@ import math
 import os
 import re
 from datetime import datetime, timedelta
+from decimal import Decimal
 from typing import Callable, NamedTuple, Union
 import httpx
 from django.db import transaction
@@ -496,6 +497,45 @@ def navegador_no_disponible(now):
             'el servidor: python -m navegador salida <cuenta> (con --aceptar solo si el cambio de salida es a propósito).',
             once='ever'))
     return alerts
+
+# --------------------------------------------------------------------------- money and the invitation health
+
+def usd(value):
+    return f'{float(value):,.2f}'.replace(',','X').replace('.',',').replace('X','.')
+
+@vigilante
+def gasto_ia(now):
+    """The month's AI spend (knowledge.presupuesto, AI_MONTHLY_LIMIT_USD) at ALERT_CAP_THRESHOLD and spent: once a month each."""
+    from knowledge import presupuesto
+    status=presupuesto.status(now);spent,limit=status['month_usd'],status['monthly_limit_usd']
+    if limit<=0:return []
+    month=f'{_local(now):%Y-%m}';pct=round(cap_threshold()*100)
+    if spent>=limit:
+        return [Aviso(f'ia:mes:{month}:agotado',
+            f'Barrio · Tope mensual de IA agotado: {usd(spent)} de {usd(limit)} USD (AI_MONTHLY_LIMIT_USD). Hasta el 1 del mes '
+            'que viene, o hasta subirlo, se para toda llamada de IA pagada: borradores, piezas, el líder y la clasificación.',
+            once='ever')]
+    if spent>=limit*Decimal(str(cap_threshold())):
+        return [Aviso(f'ia:mes:{month}:{pct}',
+            f'Barrio · Gasto de IA del mes al {pct} %: {usd(spent)} de {usd(limit)} USD (AI_MONTHLY_LIMIT_USD). Al llegar al '
+            'tope se para toda llamada de IA pagada (borradores, piezas, el líder, la clasificación) hasta el mes que viene.',
+            once='ever')]
+    return []
+
+@vigilante
+def aceptacion_baja(now):
+    """The ramp's last saved health cut (red.review_health) with enough mature invitations and an acceptance under
+    OPERATOR_INVITE_ACCEPTANCE_MIN: once per sample."""
+    from . import red
+    health=red.ramp_state(now).get('health') or {}
+    minimum=max(0.4,float(setting('OPERATOR_INVITE_ACCEPTANCE_MIN','0.40')))
+    enough=max(20,int(setting('OPERATOR_INVITE_SAMPLE_MIN','20')))
+    rate=health.get('rate')
+    if rate is None or health.get('mature',0)<enough or rate>=minimum:return []
+    return [Aviso(f'red:aceptacion:{str(health.get("sample_key",""))[:16]}',
+        f'Barrio · Aceptación de invitaciones baja: {health.get("accepted",0)} de {health["mature"]} ({rate:.0%}), bajo el '
+        f'{minimum:.0%} (OPERATOR_INVITE_ACCEPTANCE_MIN). La rampa baja una etapa y no sube en una semana; bajo el 25 % las '
+        'invitaciones se pausan. Revisa en Personas a quién se está invitando.',once='ever')]
 
 # --------------------------------------------------------------------------- the daily summary
 
