@@ -311,8 +311,9 @@ class TuTurno(APIView):
         monthly_cards=referent_cards(request.user,_card,now)
         monthly_later=[c for c in monthly_cards if c.get('state_override')=='pospuesta']
         monthly_cards=[c for c in monthly_cards if c.get('state_override')!='pospuesta']
-        from . import mensajes_comprador, respuestas, urgente
-        message_cards=respuestas.cards(_card,now)+mensajes_comprador.cards(_card,now)  # RSP-07 first; one card per person
+        from . import mensajes_comprador, respuestas, secuencia_comprador, urgente
+        # RSP-07 first; one card per person; then the follow-ups 2–4 of the sequence (phase 4), each with its label.
+        message_cards=respuestas.cards(_card,now)+mensajes_comprador.cards(_card,now)+secuencia_comprador.cards(_card,now)
         day_cards=urgente.cards(_card,now)
         tasks={'perfil':profile,'conversaciones':conversation_cards,'mensajes':message_cards,'fechas':day_cards,'resumen':summary_cards,
                'referentes':monthly_cards}
@@ -363,8 +364,9 @@ class ConversationClose(APIView):
 class SuggestedMessageClose(APIView):
     """POST /api/v1/respuestas/<id>/mensaje {how: enviado | no, note?}: Gustavo closes the «Mensaje sugerido» card. The team
     never sends it (INB-08): he sends it himself from LinkedIn and says so here. The id is the comment of a conversation
-    on his post (RSP-07) or, with BUYER_FIRST_MESSAGE_ENABLED, the first message of a buyer who accepted (BuyerDraft):
-    there «no» is a definitive exit of the journey."""
+    on his post (RSP-07) or, with BUYER_FIRST_MESSAGE_ENABLED, the first message of a buyer who accepted (BuyerDraft;
+    with BUYER_SEQUENCE_ENABLED also a follow-up 2–4, «Seguimiento n de 4»): there «no» is a definitive exit of the
+    journey and «enviado» starts the clock of the next follow-up."""
     def post(self,request,cid):
         human_session(request)
         from . import mensajes_comprador, respuestas

@@ -1251,11 +1251,12 @@ class SequencePathBase(FirstMessagePathBase):
         for number in (2,3,4):self.texts[('buyer-sequence',contact.display_name,number)]=sequence_text(variant,number)
 
     def cycle(self,at):
-        """One autopilot cycle at `at`: the inbox read (when on) and the buyer-draft step with its jobs."""
+        """One autopilot cycle at `at`: the inbox read (when on) and the buyer-draft step with its jobs, tick after tick
+        (one paid draft each) until it queues nothing: a few minutes of the real autopilot."""
         with self.clock(at):
             if conversaciones.enabled():
                 with self.lead():self.job('read_inbox')
-            self.prepare(at)
+            self.prepare(at,rounds=30)
         return at
 
     # -- reads
@@ -1272,3 +1273,251 @@ class SequencePathBase(FirstMessagePathBase):
         first=self.draft(contact,1)
         return [c for c in self.cards_at(contact,at) if not first or c['id']!=f'dm:{first.pk}']
 
+
+
+MINUTE=timedelta(minutes=1);HOUR=timedelta(hours=1);DAY=timedelta(days=1)
+
+
+class SequenceBuyerPathTests(SequencePathBase):
+    """BAR-21 de punta a punta con las funciones de producción y el reloj simulado: M1 → M2 a los 4 días del «Hecho» →
+    M3 a los 5 → M4 a los 7 → sin respuesta, descanso de 90 días; y sus variantes."""
+
+    def send_follow_up(self,contact,number,at,sent):
+        """The follow-up `number` is drafted when due (BUYER_SEQUENCE_DAYS after `sent`), reviewed and shown; Gustavo
+        sends it an hour later. Returns that moment."""
+        due=sent+timedelta(days={2:4,3:5,4:7}[number])
+        self.cycle(due-MINUTE)
+        self.assertNotIn(number,self.numbers(contact))  # never a minute early
+        self.cycle(due+MINUTE)
+        cards=self.sequence_cards(contact,due+HOUR)
+        self.assertEqual(len(cards),1,number)
+        self.close_at(cards[0],'enviado',due+HOUR)
+        return due+HOUR
+
+    def rested_after_a_stopped_follow_up(self,slug,name):
+        """M2 stopped by the fixed rules (it apologises): BUYER_SEQUENCE_REST_AFTER_DAYS after M1 she rests."""
+        contact=self.messaged(slug,name);self.follow_ups(contact,'S6')
+        self.cycle(self.start+4*DAY+MINUTE)
+        self.assertEqual(self.draft(contact,2).stopped_by,'reglas')
+        rest=self.cycle(self.start+7*DAY+MINUTE)
+        self.assertEqual((self.journey(contact).step,self.journey(contact).rest_reason),('descanso','secuencia_sin_respuesta'))
+        return contact,rest
+
+    def test_the_whole_sequence_until_the_rest(self):
+        ana=self.messaged('seq-e2e-ana','Ana Ruta');self.follow_ups(ana)
+        writes=self.fake.state['writes'];sent=self.start
+        self.assertEqual(self.journey(ana).next_at,self.start+4*DAY)  # comprador.next_at: M2 is due 4 days after «Hecho»
+        for number in (2,3,4):
+            due=sent+timedelta(days={2:4,3:5,4:7}[number])
+            self.cycle(due-MINUTE)
+            self.assertNotIn(number,self.numbers(ana))
+            self.cycle(due+MINUTE)
+            draft=self.draft(ana,number)
+            self.assertEqual((draft.state,draft.stopped_by,draft.attempt),('listo','',1))
+            self.assertEqual(draft.text,sequence_text('flujo',number))
+            self.assertEqual(draft.review['decision'],'approve')  # the lead with its questions per number
+            review=next(j for j in reversed(self.jev) if j['purpose']=='lead-review-sequence')
+            self.assertEqual(review['state']['seguimiento']['numero'],number)
+            self.assertTrue({f'seg_{q}' for q in {2:('mismo_dolor','repite','disculpa'),3:('persona_indicada','repite_dolor'),
+                                                  4:('cierre','ruega','pide')}[number]}<=set(review['questions']))
+            # The drafter got what Gustavo already sent her and the sequence's units, whole.
+            call=next(c for c in reversed(self.calls) if c['purpose']=='buyer-sequence')
+            self.assertEqual([m['numero'] for m in call['inputs']['seguimiento']['anteriores']],list(range(1,number)))
+            self.assertIn('LI-09-V014-K02',call['context'])
+            cards=self.sequence_cards(ana,due+HOUR)
+            self.assertEqual(len(cards),1)
+            card=cards[0]
+            self.assertEqual((card['title'],card['message']['text_label'],card['message']['text']),
+                             (f'Seguimiento {number} de 4 para Ana Ruta',f'Seguimiento {number} de 4',draft.text))
+            self.assertEqual([a['label'] for a in card['actions']],['Abrir su perfil','Hecho, le escribí','No escribirle'])
+            self.assertEqual(card['actions'][1]['endpoint'],f'/api/v1/respuestas/{draft.pk}/mensaje')
+            sent=due+HOUR;self.close_at(card,'enviado',sent)
+            journey=self.journey(ana)
+            self.assertEqual((journey.step,journey.messages_sent),(f'mensaje_{number}',number))
+            self.assertEqual(self.sequence_cards(ana,sent+MINUTE),[])
+        # Seven days after message 4 without a reply: she rests 90 days and stays a connection.
+        self.assertEqual(self.journey(ana).next_at,sent+7*DAY)
+        self.cycle(sent+7*DAY-MINUTE)
+        self.assertEqual(self.journey(ana).step,'mensaje_4')
+        rest=self.cycle(sent+7*DAY+MINUTE)
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.rest_reason,round((journey.rest_until-rest)/DAY)),('descanso','secuencia_sin_respuesta',90))
+        self.assertEqual(Contact.objects.get(pk=ana.pk).stage,'connected')
+        self.assertTrue(AuditEvent.objects.filter(action='buyer.sequence_rested',target=str(ana.pk)).exists())
+        self.assertEqual(self.numbers(ana),[2,3,4])
+        self.assertEqual(self.fake.state['writes'],writes)  # the team never writes a message (INB-08)
+        sequence=self.funnel()['secuencia']
+        self.assertEqual(sequence['recibieron'],{'1':1,'2':1,'3':1,'4':1})
+        self.assertEqual(sequence['descansan'],1)
+        drafts=self.funnel()['borradores']['por_numero']
+        self.assertEqual([drafts[n]['enviados'] for n in '1234'],[1,1,1,1])
+
+    def test_1_a_reply_after_message_2_stops_everything(self):
+        handled=[]
+        bea=self.messaged('seq-e2e-bea','Bea Para');self.follow_ups(bea)
+        sent2=self.send_follow_up(bea,2,None,self.start)
+        with patch('team_backend.secuencia_comprador.REPLY_HANDLERS',[lambda journey,at,after:handled.append((journey.contact_id,after))]):
+            self.she_replies(bea,'Good timing, the weekly numbers are a mess.',sent2+2*DAY)
+            self.cycle(sent2+2*DAY+HOUR)
+            self.cycle(sent2+5*DAY+MINUTE)  # message 3 would be due
+            self.cycle(sent2+12*DAY+MINUTE)
+        journey=self.journey(bea)
+        self.assertEqual(journey.step,'respondio')
+        self.assertEqual(self.numbers(bea),[2])
+        self.assertIn(('respondio_mensaje','entrante'),self.kinds(bea))
+        event=AuditEvent.objects.get(action='buyer.sequence_replied',target=str(bea.pk))
+        self.assertEqual((event.metadata['numero'],event.metadata['cancelados']),(2,[]))
+        self.assertEqual(handled,[(bea.pk,2)])  # phase 6's hook, once
+        self.assertEqual(self.funnel()['secuencia']['respondieron_tras'],{'1':0,'2':1,'3':0,'4':0})
+
+    def test_1b_a_reply_with_message_3_waiting_cancels_it_and_hides_its_card(self):
+        bea=self.messaged('seq-e2e-bea2','Bea Espera');self.follow_ups(bea)
+        sent2=self.send_follow_up(bea,2,None,self.start)
+        self.cycle(sent2+5*DAY+MINUTE)
+        self.assertEqual(self.draft(bea,3).state,'listo')
+        self.she_replies(bea,'Sorry for the delay: yes, the reports.',sent2+5*DAY+HOUR)
+        # The next inbox read sees her reply: the card is gone and message 3 is cancelled.
+        self.cycle(sent2+5*DAY+2*HOUR)
+        self.assertEqual(self.sequence_cards(bea,sent2+5*DAY+2*HOUR),[])
+        self.assertEqual((self.draft(bea,3).state,self.journey(bea).step),('cancelado','respondio'))
+        with self.clock(sent2+5*DAY+3*HOUR):  # «Hecho» on the cancelled card: it is no longer in Tu turno
+            response=self.gustavo_api().post(f'/api/v1/respuestas/{self.draft(bea,3).pk}/mensaje',{'how':'enviado'},format='json')
+        self.assertEqual(response.status_code,409,response.content)
+        self.assertEqual(self.journey(bea).messages_sent,2)
+
+    def test_2_message_2_not_sent_means_no_message_3(self):
+        cris=self.messaged('seq-e2e-cris','Cris Nunca');self.follow_ups(cris)
+        self.cycle(self.start+4*DAY+MINUTE)
+        self.assertEqual(self.draft(cris,2).state,'listo')
+        for days in (9,10,16,30):self.cycle(self.start+days*DAY+MINUTE)
+        self.assertEqual(self.numbers(cris),[2])
+        self.assertEqual((self.journey(cris).step,self.draft(cris,2).state),('mensaje_1','listo'))
+
+    def test_3_with_the_inbox_off_nothing_is_prepared_and_it_says_so(self):
+        dani=self.messaged('seq-e2e-dani','Dani Sin');self.follow_ups(dani)
+        with patch.dict(os.environ,{'INBOX_ENABLED':'false'}):
+            self.cycle(self.start+4*DAY+MINUTE);self.cycle(self.start+4*DAY+HOUR)
+            self.assertEqual(self.numbers(dani),[])
+            self.assertEqual(Job.objects.filter(kind='prepare_buyer_draft',params__number=2).count(),0)  # nothing paid
+            events=AuditEvent.objects.filter(action='buyer.sequence_waiting')
+            self.assertEqual(events.count(),1)  # once a day
+            self.assertIn('INBOX_ENABLED=false',events.get().metadata['motivo'])
+            self.assertEqual(self.journey(dani).step,'mensaje_1')  # never «no respondió»
+        # A stale read (no read of the chat list in the last 3 h) waits too; a fresh one unblocks it.
+        with self.clock(self.start+4*DAY+5*HOUR):
+            with self.writer(),self.lead():autopiloto._buyer_drafts(self.bot,self.account,timezone.now())
+        self.assertEqual(self.numbers(dani),[])
+        self.cycle(self.start+4*DAY+6*HOUR)
+        self.assertEqual(self.numbers(dani),[2])
+
+    def test_4_a_follow_up_the_rules_or_the_lead_reject_never_shows(self):
+        eva=self.messaged('seq-e2e-eva','Eva Regla');self.follow_ups(eva,'S6')
+        hugo=self.messaged('seq-e2e-hugo','Hugo Lider');self.follow_ups(hugo,'S9')
+        self.cycle(self.start+4*DAY+MINUTE)
+        self.assertEqual((self.draft(eva,2).state,self.draft(eva,2).stopped_by),('descartado','reglas'))
+        self.assertIn('Mensaje 2 que se disculpa por escribir de nuevo',self.draft(eva,2).issues)
+        self.assertEqual(self.sequence_cards(eva,self.start+4*DAY+HOUR),[])
+        sent2=self.start+4*DAY+HOUR;self.close_at(self.sequence_cards(hugo,sent2)[0],'enviado',sent2)
+        self.cycle(sent2+5*DAY+MINUTE)
+        self.assertEqual((self.draft(hugo,3).state,self.draft(hugo,3).stopped_by),('descartado','juez'))
+        self.assertEqual(self.sequence_cards(hugo,sent2+5*DAY+HOUR),[])
+        stopped=AuditEvent.objects.filter(action='buyer.draft_stopped',target=str(hugo.pk),metadata__numero=3)
+        self.assertEqual(stopped.get().metadata['por'],'juez')
+        # No message 4 after a stopped one; 7 days after the last «Hecho» she rests.
+        self.cycle(sent2+7*DAY+MINUTE)
+        self.assertEqual((self.numbers(hugo),self.journey(hugo).step),([2,3],'descanso'))
+
+    def test_5_no_escribirle_on_message_3_is_a_definitive_exit(self):
+        ines=self.messaged('seq-e2e-ines','Ines Fuera');self.follow_ups(ines)
+        sent2=self.send_follow_up(ines,2,None,self.start)
+        self.cycle(sent2+5*DAY+MINUTE)
+        self.close_at(self.sequence_cards(ines,sent2+5*DAY+HOUR)[0],'no',sent2+5*DAY+HOUR,note='No insistir.')
+        self.cycle(sent2+12*DAY+MINUTE);self.cycle(sent2+30*DAY)
+        journey=self.journey(ines)
+        self.assertEqual((journey.step,journey.exit_reason,self.numbers(ines)),('salio','descartado_por_gustavo',[2,3]))
+        self.assertEqual(self.draft(ines,3).state,'no_enviado')
+
+    def test_6_with_the_switch_off_the_journey_ends_at_the_first_message(self):
+        with patch.dict(os.environ,{'BUYER_SEQUENCE_ENABLED':'false'}):
+            fer=self.messaged('seq-e2e-fer','Fer Apagado');self.follow_ups(fer)
+            journey=self.journey(fer)
+            self.assertEqual((journey.step,journey.next_at),('mensaje_1',None))
+            for days in (4,9,16,30):self.cycle(self.start+days*DAY+MINUTE)
+            self.assertEqual((self.numbers(fer),self.journey(fer).step),([],'mensaje_1'))
+            self.assertFalse(AuditEvent.objects.filter(action__startswith='buyer.sequence').exists())
+            self.assertFalse(any(c['purpose']=='buyer-sequence' for c in self.calls))
+            self.assertFalse(self.funnel()['secuencia']['activa'])
+
+    def test_7_a_signal_during_the_rest_wakes_her_with_a_new_first_message(self):
+        gil,rest=self.rested_after_a_stopped_follow_up('seq-e2e-gil','Gil Despierta')
+        self.cycle(rest+10*DAY)
+        self.assertEqual(self.journey(gil).step,'descanso')
+        comprador.record(self.journey(gil),BuyerTouch.Kind.REACTED_POST,at=rest+20*DAY,key='prueba:reaccion')
+        self.cycle(rest+20*DAY+HOUR)
+        journey=self.journey(gil)
+        self.assertEqual((journey.attempt,journey.step),(2,'acepto'))
+        self.assertTrue(journey.touches.filter(kind='reintento',detail__por_senal=True).exists())
+        self.cycle(rest+20*DAY+2*HOUR)
+        first=next(d for d in self.drafts_of(gil,'mensaje') if d.attempt==2)
+        self.assertEqual((first.number,first.state),(1,'listo'))  # phase 3 again, for the new attempt
+
+    def test_8_deadlines_run_from_hecho_not_from_the_draft(self):
+        hal=self.messaged('seq-e2e-hal','Hal Tarde');self.follow_ups(hal)
+        drafted=self.cycle(self.start+4*DAY+MINUTE)
+        self.assertEqual(self.numbers(hal),[2])
+        sent2=drafted+2*DAY  # Gustavo sends it two days later
+        self.assertEqual(self.sequence_cards(hal,sent2),[])  # no inbox read in 24 h: her reply could be there, no card
+        self.cycle(sent2-HOUR)
+        self.close_at(self.sequence_cards(hal,sent2)[0],'enviado',sent2)
+        self.assertEqual(self.journey(hal).next_at,sent2+5*DAY)
+        self.cycle(drafted+5*DAY+MINUTE)
+        self.assertEqual(self.numbers(hal),[2])
+        self.cycle(sent2+5*DAY+MINUTE)
+        self.assertEqual(self.numbers(hal),[2,3])
+
+    def test_a_weekend_waits_for_monday(self):
+        ivo=self.messaged('seq-e2e-ivo','Ivo Lunes');self.follow_ups(ivo)
+        with patch('team_backend.operador.is_weekend',return_value=True):
+            self.cycle(self.start+4*DAY+MINUTE)
+        self.assertEqual(self.numbers(ivo),[])
+        self.cycle(self.start+6*DAY)
+        self.assertEqual(self.numbers(ivo),[2])
+
+    def test_her_reply_in_the_chat_list_stops_it_before_her_thread_is_read(self):
+        jo=self.messaged('seq-e2e-jo','Jo Lista');self.follow_ups(jo)
+        sent2=self.send_follow_up(jo,2,None,self.start)
+        self.she_replies(jo,'Interesting, tell me more.',sent2+DAY)
+        with patch.dict(os.environ,{'INBOX_THREADS_PER_RUN':'0'}):  # the list sees it; no thread is read this run
+            self.cycle(sent2+DAY+HOUR)
+        journey=self.journey(jo)
+        stand_in=journey.touches.get(kind='respondio_mensaje')
+        self.assertTrue(stand_in.key.startswith('lista:'))
+        self.assertEqual(journey.step,'respondio')
+        self.cycle(sent2+DAY+2*HOUR)  # the thread is read: its message replaces the stand-in
+        self.assertEqual([t.key.split(':')[0] for t in comprador.current(self.journey(jo).touches.filter(kind='respondio_mensaje'))],
+                         ['conversacion'])
+        self.assertEqual(AuditEvent.objects.filter(action='buyer.sequence_replied',target=str(jo.pk)).count(),1)
+
+    def test_an_overdue_follow_up_is_not_written_late(self):
+        with patch.dict(os.environ,{'BUYER_SEQUENCE_ENABLED':'false'}):
+            kai=self.messaged('seq-e2e-kai','Kai Viejo');self.follow_ups(kai)
+        self.cycle(self.start+20*DAY)  # the switch turned on 20 days after the first message
+        self.assertEqual(self.numbers(kai),[])
+        self.assertEqual((self.journey(kai).step,self.journey(kai).rest_reason),('descanso','secuencia_sin_respuesta'))
+
+    def test_phase_6_links_a_referral_to_message_3(self):
+        from team_backend import secuencia_comprador
+        lu=self.messaged('seq-e2e-lu','Lu Refiere');self.follow_ups(lu)
+        mia=self.messaged('seq-e2e-mia','Mia Referida')
+        self.assertIsNone(secuencia_comprador.referral_asked(self.journey(lu)))
+        with self.assertRaises(ValueError):secuencia_comprador.link_referral(self.journey(mia),self.journey(lu))
+        sent2=self.send_follow_up(lu,2,None,self.start)
+        sent3=self.send_follow_up(lu,3,None,sent2)
+        asked=secuencia_comprador.referral_asked(self.journey(lu))
+        self.assertEqual((asked['texto'],asked['borrador']),(sequence_text('flujo',3),str(self.draft(lu,3).pk)))
+        touch=secuencia_comprador.link_referral(self.journey(mia),self.journey(lu),at=sent3+DAY,note='Me dijo que hablara con ella.')
+        self.assertEqual((touch.kind,touch.direction,touch.detail['de']),('referido','estado',str(lu.pk)))
+        self.assertEqual(self.journey(mia).referred_by_id,self.journey(lu).pk)
+        secuencia_comprador.link_referral(self.journey(mia),self.journey(lu))  # once
+        self.assertEqual(self.journey(mia).touches.filter(kind='referido').count(),1)
+        with self.assertRaises(ValueError):secuencia_comprador.link_referral(self.journey(lu),self.journey(lu))

@@ -562,18 +562,27 @@ def _buyer_drafts(user,account,now):
     no note left, a conversation already, drafts that no longer apply) and then one paid draft at a time
     (prepare_buyer_draft): the note of a warmed buyer about to be invited, or the first message of an accepted one when
     it is due. Never sends anything (INB-08). Returns the decisions plus the job queued. Only inside READ_WINDOW, like the
-    periodic reads: a draft builds on what the reads brought (her posts, the inbox), and its card is for the day."""
-    from . import mensajes_comprador
+    periodic reads: a draft builds on what the reads brought (her posts, the inbox), and its card is for the day.
+    Phase 4 (BUYER_SEQUENCE_ENABLED, secuencia_comprador.step): messages 2–4 to whoever did not reply, the same job with
+    its `number`; her reply, her rest after message 4 and the inbox-off notice are decided there too, without a paid call."""
+    from . import mensajes_comprador, secuencia_comprador
     from knowledge import presupuesto
     if not mensajes_comprador.active() or account.provider not in ('fake','directo'):return 0
     if not operador.within_read_window(now):return 0
     if _pending('prepare_buyer_draft'):return 0
     decided,item=mensajes_comprador.step(account,now)
+    if secuencia_comprador.active():
+        more,follow_up=secuencia_comprador.step(account,now)
+        decided+=more;item=item or follow_up
     if item is None or presupuesto.left(now)<=0:return decided
-    contact,kind,attempt=item
-    tries=mensajes_comprador.tries(contact,kind,attempt)
-    _,created=enqueue_operation(user,'prepare_buyer_draft',{'contact':str(contact.pk),'kind':kind,'attempt':attempt,'at':now.isoformat()},
-                                request_id=_job_id('buyer_draft',contact.pk,kind,attempt,tries))
+    contact,kind,attempt,number=item
+    tries=mensajes_comprador.tries(contact,kind,attempt,number)
+    params={'contact':str(contact.pk),'kind':kind,'attempt':attempt,'at':now.isoformat()}
+    if number>1:
+        params['number']=number
+        request_id=_job_id('buyer_draft',contact.pk,kind,attempt,number,tries)
+    else:request_id=_job_id('buyer_draft',contact.pk,kind,attempt,tries)
+    _,created=enqueue_operation(user,'prepare_buyer_draft',params,request_id=request_id)
     return decided+int(created)
 
 def _every(name,default):

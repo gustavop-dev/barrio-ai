@@ -38,7 +38,7 @@ STEPS=[Step.CHOSEN,Step.WARMING,Step.INVITED,Step.ACCEPTED,Step.MESSAGE_1,Step.M
 MESSAGE_STEPS=[Step.MESSAGE_1,Step.MESSAGE_2,Step.MESSAGE_3,Step.MESSAGE_4]
 OUT=Direction.OUT;IN=Direction.IN;STATE=Direction.STATE
 DIRECTION={Kind.CHOSEN:STATE,Kind.ROUTE:STATE,Kind.ANGLE:STATE,Kind.REST:STATE,Kind.RETRY:STATE,Kind.EXIT:STATE,Kind.REOPENED:STATE,
-           Kind.ALREADY_CONNECTED:STATE,Kind.NO_MESSAGE:STATE,Kind.DRAFT:STATE,Kind.OPPORTUNITY:STATE,Kind.INTERESTED:STATE,
+           Kind.ALREADY_CONNECTED:STATE,Kind.NO_MESSAGE:STATE,Kind.DRAFT:STATE,Kind.OPPORTUNITY:STATE,Kind.INTERESTED:STATE,Kind.REFERRED:STATE,
            Kind.FOLLOW:OUT,Kind.COMMENT:OUT,Kind.REACTION:OUT,Kind.THREAD_REPLY:OUT,Kind.VISIT:OUT,Kind.INVITATION:OUT,
            Kind.ACCEPTED_THEIRS:OUT,Kind.MESSAGE:OUT,Kind.MESSAGE_SEEN:OUT,
            Kind.REPLIED_COMMENT:IN,Kind.COMMENTED_POST:IN,Kind.REACTED_POST:IN,Kind.FOLLOWED_US:IN,Kind.INVITED_US:IN,
@@ -255,6 +255,8 @@ class _Fold:
     def _attempt(self):
         self.invited_at=None;self.messages=0;self.seen=self.replied=self.interested=self.meeting=False;self.attempt_comments=[]
         self.drafted=False  # phase 3: the first message of this attempt was prepared, or the team decided not to write it
+        self.sent=[]  # phase 4: this attempt's «Hecho, le escribí» (MESSAGE touches), in order
+        self.replied_at=None  # phase 4: her first reply to a message of this attempt
     def mark(self,name,at):
         if name not in self.first or at<self.first[name]:self.first[name]=at
     def wake(self):
@@ -286,12 +288,13 @@ class _Fold:
         elif kind in CONNECTION:self.mark('accepted',at);self.connected=True
         elif kind in (Kind.MESSAGE,Kind.MESSAGE_SEEN):
             self.mark('first_message',at);self.last_message=max(filter(None,(self.last_message,at)))
-            if kind==Kind.MESSAGE:self.messages+=1
+            if kind==Kind.MESSAGE:self.messages+=1;self.sent.append(t)
             else:self.seen=True
-        elif kind==Kind.REPLIED_MESSAGE:self.mark('replied',at);self.replied=True
+        elif kind==Kind.REPLIED_MESSAGE:
+            self.mark('replied',at);self.replied=True;self.replied_at=self.replied_at or at
         elif kind==Kind.INTERESTED:self.mark('interested',at);self.interested=True
         elif kind==Kind.MEETING:self.mark('meeting',at);self.meeting=True
-        elif kind==Kind.DRAFT:self.drafted=self.drafted or d.get('tipo')==BuyerDraft.Kind.MESSAGE
+        elif kind==Kind.DRAFT:self.drafted=self.drafted or (d.get('tipo')==BuyerDraft.Kind.MESSAGE and d.get('numero',1)==1)
         elif kind==Kind.ROUTE:self.route=d.get('ruta') or self.route
         elif kind==Kind.ANGLE:self.attempts[-1]['angulo']=d.get('angulo','')
         elif kind==Kind.REST:
@@ -307,8 +310,9 @@ class _Fold:
         if kind in WAKE:self.wake()
 
 # A fact read from the contact's dates or history stands in for one with its own row (an execution, the evidence) only
-# until that row shows up: the log keeps both, the fold and the reads use the best one.
-FALLBACK_RANK={'historial:':1,'contacto:':2}
+# until that row shows up: the log keeps both, the fold and the reads use the best one. Phase 4: her reply seen in the
+# chat list (secuencia_comprador._stop) stands in until the inbox reads her thread.
+FALLBACK_RANK={'historial:':1,'contacto:':2,'lista:':3}
 
 def _rank(touch):
     key=getattr(touch,'key','') or ''
@@ -332,9 +336,14 @@ def next_at(journey,state,contact):
     """When something is due. Phase 1 mirrors today's rule: a followed person may be invited NETWORK_INVITE_AFTER_HOURS
     after the follow (right away when they commented on his post); a rest ends at its date. Phase 2, with
     BUYER_WARMUP_ENABLED: when the warm-up is done (calentamiento.invite_at). Phase 3, with BUYER_FIRST_MESSAGE_ENABLED:
-    when the first message is due after the acceptance (mensajes_comprador.message_at). Each phase adds its own."""
+    when the first message is due after the acceptance (mensajes_comprador.message_at). Phase 4, with
+    BUYER_SEQUENCE_ENABLED: when the next follow-up (or her rest after message 4) is due (secuencia_comprador.due). Each
+    phase adds its own."""
     step=state.step()
     if step==Step.RESTING:return state.rest[1]
+    if step in MESSAGE_STEPS:
+        from . import secuencia_comprador
+        return secuencia_comprador.due(state) if secuencia_comprador.enabled() else None
     if step==Step.ACCEPTED:
         from . import mensajes_comprador
         return mensajes_comprador.message_at(state) if mensajes_comprador.enabled() else None
@@ -661,26 +670,34 @@ def drafts(journeys=None):
     """Messages drafted for buyers: pending (a card waiting in Tu turno), sent («Hecho, le escribí») and not sent («No
     escribirle»), from both sources: the suggested first message after a conversation on his post (RSP-07) and the
     first message of the journey (phase 3, BuyerDraft). `recorrido` breaks the phase 3 drafts down (prepared, stopped and
-    by whom) and `notas` the invitation notes. Phase 4 adds messages 2–4 here."""
+    by whom) and `notas` the invitation notes. Phase 4: `por_numero` breaks the journey's messages down by number (1 the
+    first, 2–4 the follow-ups of the sequence), with the cancelled ones (she replied)."""
     from .respuestas import _dm_rows
     rows=list(journeys) if journeys is not None else list(BuyerJourney.objects.all())
     people={j.contact_id for j in rows};ids=[j.pk for j in rows]
     State=BuyerDraft.State
     own=BuyerDraft.objects.filter(contact_id__in=people)
     messages=own.filter(kind=BuyerDraft.Kind.MESSAGE);notes=own.filter(kind=BuyerDraft.Kind.NOTE)
-    from . import mensajes_comprador
-    ready=messages.filter(state=State.READY).count()
-    # A journey draft is pending only while its card can show (switch on); RSP-07's as before.
-    pending=sum(1 for row in _dm_rows() if row.contact_id in people)+(ready if mensajes_comprador.enabled() else 0)
+    from . import mensajes_comprador, secuencia_comprador
+    first=messages.filter(number=1)
+    ready=first.filter(state=State.READY).count();follow_ups=messages.filter(number__gt=1,state=State.READY).count()
+    # A journey draft is pending only while its card can show (its switch on); RSP-07's as before.
+    pending=(sum(1 for row in _dm_rows() if row.contact_id in people)+(ready if mensajes_comprador.enabled() else 0)
+             +(follow_ups if secuencia_comprador.enabled() else 0))
     sent=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.MESSAGE).count()
     declined=BuyerTouch.objects.filter(journey_id__in=ids,kind=Kind.NO_MESSAGE).count()
     def stopped(q):
         return {by:q.filter(stopped_by=by).count() for by in BuyerDraft.StoppedBy.values}
     return {'pendientes':pending,'enviados':sent,'no_enviados':declined,'enviados_pct':_pct(sent,sent+pending),
             'fuentes':['mensaje_sugerido','recorrido'],
-            'recorrido':{'preparados':messages.filter(stopped_by='',decided_at__isnull=False).count(),
-                         'pendientes':ready,'enviados':messages.filter(state=State.SENT).count(),
-                         'no_enviados':messages.filter(state=State.NOT_SENT).count(),'parados':stopped(messages)},
+            'recorrido':{'preparados':first.filter(stopped_by='',decided_at__isnull=False).count(),
+                         'pendientes':ready,'enviados':first.filter(state=State.SENT).count(),
+                         'no_enviados':first.filter(state=State.NOT_SENT).count(),'parados':stopped(first)},
+            'por_numero':{str(n):{'preparados':q.filter(stopped_by='',decided_at__isnull=False).count(),
+                                  'pendientes':q.filter(state=State.READY).count(),'enviados':q.filter(state=State.SENT).count(),
+                                  'no_enviados':q.filter(state=State.NOT_SENT).count(),'cancelados':q.filter(state=State.CANCELLED).count(),
+                                  'parados':sum(stopped(q).values())}
+                          for n,q in ((n,messages.filter(number=n)) for n in range(1,5))},
             'notas':{'preparadas':notes.filter(stopped_by='',decided_at__isnull=False).count(),
                      'con_invitacion':notes.filter(state__in=[State.USED,State.SENT,State.NOT_SENT]).count(),
                      'enviadas':notes.filter(state=State.SENT).count(),'parados':stopped(notes)}}
@@ -708,6 +725,8 @@ DEFINITIONS={
     'respondieron':'Un mensaje de la persona después del primero de Gustavo.',
     'interesados':'Fase 6: la respuesta clasificada como interés. En cero hasta entonces.',
     'reunion':'Fase 6: reunión agendada (Cal.com). En cero hasta entonces.',
+    'secuencia':('Fase 4: cuántos recibieron los mensajes 1 a 4 (por «Hecho, le escribí», en algún intento) y tras cuántos '
+                 'mensajes respondieron los que respondieron. El curso dice que la mayoría responde al 2.º o 3.º: se mide, no se asume.'),
     'muestra_chica':SMALL_SAMPLE_TEXT,
     'con_senal':'La persona dio una señal (comentó su post, respondió un comentario, lo invitó, le escribió…) antes de su primera invitación.',
     'acumulado':'Todos los compradores elegidos por el equipo (entrada saliente); los que llegaron con su invitación van en comparaciones.entrada.'}
@@ -741,6 +760,10 @@ def _activity(journeys,touches,start,end):
 def _buying(journey):
     from . import calentamiento
     return bool(calentamiento.buying_signals(journey.contact))
+
+def _sequence(journeys):
+    from . import secuencia_comprador
+    return secuencia_comprador.funnel(journeys)
 
 def funnel(weeks=8,now=None,account=None):
     """The buyer's funnel (GET /api/v1/resultados/embudo-comprador): cumulative and by week (cohorts by the week they
@@ -782,5 +805,5 @@ def funnel(weeks=8,now=None,account=None):
                 'senal_de_compra':{'con_senal_de_compra':block(j for j in outbound if _buying(j)),
                                    'sin_senal_de_compra':block(j for j in outbound if not _buying(j))},
                 'entrada':{'saliente':block(outbound),'entrante':block(inbound)}},
-            'borradores':drafts(outbound),'estado_actual':steps,
+            'borradores':drafts(outbound),'secuencia':_sequence(outbound),'estado_actual':steps,
             'descanso':count('rest_reason',RestReason.values),'salidas':count('exit_reason',ExitReason.values)}

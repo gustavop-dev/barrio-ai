@@ -392,6 +392,19 @@ def invitable(contacts,now=None):
 def _last_rest(journey):
     return journey.touches.filter(kind=Kind.REST).order_by('-at','-created_at').first()
 
+def wake(journey,now=None):
+    """A resting buyer: a signal of hers since the rest began wakes her (retry with that signal as the angle); the end of
+    the rest, a new attempt with another post and topic. Returns 'despiertan', 'reintentos' or None. The warm-up's sweep
+    and the sequence's rests (secuencia_comprador) use it."""
+    now=now or timezone.now()
+    began=_last_rest(journey)
+    signal=(journey.touches.filter(direction=BuyerTouch.Direction.IN,at__gt=began.at).order_by('at').first() if began else None)
+    if signal:
+        comprador.retry(journey,f'Señal en el descanso: {Kind(signal.kind).label}',at=now,signal=True);return 'despiertan'
+    if journey.rest_until and journey.rest_until<=now:
+        comprador.retry(journey,'Nuevo intento tras el descanso: otro post y otro tema',at=now);return 'reintentos'
+    return None
+
 def sweep(account,now=None):
     """From red.plan: rest the buyers who got their comments, were invited and did not accept within
     BUYER_REST_AFTER_DAYS (the invitation stays pending: never sent again, never withdrawn); wake a resting buyer who gave
@@ -415,19 +428,11 @@ def sweep(account,now=None):
         comprador.rest(journey,RestReason.INVITE_NOT_ACCEPTED,until,at=now,
                        note=f'{journey.warm_comments} comentarios e invitación sin aceptar en {rest_after().days} días.')
         return True
-    def wake(journey):
-        began=_last_rest(journey)
-        signal=(journey.touches.filter(direction=BuyerTouch.Direction.IN,at__gt=began.at).order_by('at').first() if began else None)
-        if signal:
-            comprador.retry(journey,f'Señal en el descanso: {Kind(signal.kind).label}',at=now,signal=True);return 'despiertan'
-        if journey.rest_until and journey.rest_until<=now:
-            comprador.retry(journey,'Nuevo intento tras el descanso: otro post y otro tema',at=now);return 'reintentos'
-        return None
     pending=BuyerJourney.objects.select_related('contact').filter(contact__account=account,contact__stage='invited',
                                                                   step__in=[Step.INVITED,Step.WARMING])
     for journey in pending:out['descanso']+=int(bool(guarded(rest,journey)))
     for journey in BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.RESTING):
-        result=guarded(wake,journey)
+        result=guarded(lambda j:wake(j,now),journey)
         if result:out[result]+=1
     for journey in BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.WARMING):
         at=invite_at(comprador._fold(comprador._touches(journey)),journey.contact,now)

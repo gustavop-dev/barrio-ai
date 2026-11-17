@@ -65,3 +65,34 @@ entonces. `SequenceRulesTests` falla con `ImportError`: no hay reglas fijas por 
 Las tres llevan `@expectedFailure` con su motivo. Se quitan cuando su motivo desaparece: la activación de
 `secuencia_mensajes` (fuentes y carga de unidades), las reglas fijas por número (`secuencia_comprador.text_issues`) y la
 secuencia completa detrás de `BUYER_SEQUENCE_ENABLED`.
+
+## Después de activar (17/11/2026)
+
+Con la metodología activada (`1b498b9`) y la secuencia detrás de `BUYER_SEQUENCE_ENABLED`
+(`secuencia_comprador.py`), las tres pruebas pasan sin marcadores de fallo esperado, más las de activación, del
+registro de lectura y la de que solo sus roles nombran la metodología: `manage.py test
+team_backend.tests.test_secuencia_mensajes` → 6 pruebas, OK (unos 40 s).
+
+```
+passed: True
+result: flujo_numeros=[2,3,4], flujo_dias=[4,5,7], flujo_antes_de_tiempo=False, flujo_descanso=secuencia_sin_respuesta,
+        flujo_descanso_dias=90, S2_paso=respondio, S2_numeros=[2,3], S2_cancelados=[3], S2_respondio_tras=2,
+        S3_numeros=[2], S4_numeros=[], S4_aviso=True, S5…S8_stopped_by=reglas, S9_stopped_by=juez, S10_salida=
+        descartado_por_gustavo, S10_numeros=[2,3], S11_numeros=[], tarjetas_paradas=0, mensajes_enviados=0,
+        borrador_con_metodologia=True, course_citations= las cinco del líder y las seis de la secuencia
+```
+
+| Variante | Antes | Después |
+| --- | --- | --- |
+| Flujo | ningún seguimiento | M2, M3 y M4 a los 4, 5 y 7 días del «Hecho» anterior; nada un minuto antes; descanso de 90 días a los 7 días del M4 |
+| S2 | sin M2 ni M3 | M3 cancelado al leer su respuesta, sin M4, `respondio`, respondió tras el 2 |
+| S3 | sin M2 | M2 en Tu turno sin enviar: sin M3 |
+| S4 | sin aviso | ningún seguimiento y `buyer.sequence_waiting` (una vez al día; Slack `secuencia_sin_inbox`) |
+| S5–S8 | sin motivo | reglas fijas por número (`text_issues`): repite, se disculpa, sin «¿persona indicada?», pide |
+| S9 | sin motivo | el líder (`seg_repite_dolor`) |
+| S10 | sin M3 | «No escribirle» en el M3: salida definitiva |
+| S11 | nada | nada (interruptor apagado) |
+
+Ajuste del arnés al medir: un ciclo del arnés corre el paso de borradores hasta que no encola nada (30 vueltas en vez
+de 8), como lo hace el autopiloto real en los minutos siguientes: con nueve personas que vencen el mismo minuto, 8
+vueltas dejaban a la novena para el ciclo siguiente.

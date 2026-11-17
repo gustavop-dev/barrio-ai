@@ -242,6 +242,9 @@ def read_inbox(user,account,now=None):
         if chat['type'] not in ('1to1',''):continue  # groups and channels are not conversations with one person
         conversation,stale=_from_list(account,chat,now);summary['chats']+=1
         if stale and chat['last_message_at'] and chat['last_message_at']>=now-max_age():due.append(conversation)
+    # Phase 4 (BUYER_SEQUENCE_ENABLED): the threads of buyers in the sequence first, a possible reply before anything else.
+    from . import secuencia_comprador
+    due=secuencia_comprador.prioritize(due,now)
     for conversation in due[:threads_per_run()]:
         try:
             _read(account,'messages',now);messages=connector.list_chat_messages(conversation.provider_chat_id,snapshot_size())

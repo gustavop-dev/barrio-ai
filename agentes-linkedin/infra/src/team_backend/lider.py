@@ -28,6 +28,7 @@ LEAD_UNITS=operador.LEAD_UNITS
 FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review has a first message to judge
 WARMUP_COMMENT_UNITS=operador.WARMUP_COMMENT_UNITS  # loaded only when the review judges a warm-up comment on a buyer's post
 INVITE_NOTE_UNITS=operador.INVITE_NOTE_UNITS  # loaded only when the lead reviews a buyer's invitation note (phase 3)
+SEQUENCE_UNITS=operador.SEQUENCE_UNITS  # loaded only when the lead reviews a follow-up 2–4 of the sequence (phase 4)
 CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
@@ -411,14 +412,62 @@ def note_questions():
                              'cliente o un resultado que no está en `hechos_publicos_de_gustavo`?'),
     }
 
+# BIB-09-secuencia-mensajes: each follow-up with the questions of its number (seg_*), plus «pitch» and «inventa».
+SEQUENCE_COMMON=[('seg_pitch','max',0.2,'el seguimiento vende o pide una reunión'),
+                 ('inventa','max',0.2,'el seguimiento atribuye a Gustavo o a la persona algo que no está en sus hechos')]
+SEQUENCE_CHECKS={
+    2:[('seg_mismo_dolor','min',0.7,'el mensaje 2 no nombra el mismo dolor del primero con otra forma o una historia corta'),
+       ('seg_repite','max',0.3,'el mensaje 2 repite el primero'),
+       ('seg_disculpa','max',0.2,'el mensaje 2 se disculpa o reprocha que no respondió')],
+    3:[('seg_persona_indicada','min',0.7,'el mensaje 3 no pregunta si es la persona indicada ni quién se encarga'),
+       ('seg_repite_dolor','max',0.3,'el mensaje 3 vuelve a contar el dolor')],
+    4:[('seg_cierre','min',0.7,'el mensaje 4 no cierra con elegancia ni deja la puerta abierta'),
+       ('seg_ruega','max',0.2,'el mensaje 4 ruega o insiste'),
+       ('seg_pide','max',0.2,'el mensaje 4 pide algo')]}
+
+def sequence_questions(number):
+    texto='`seguimiento.texto`'
+    common={'seg_pitch':_noul(f'¿{texto} vende o lo insinúa: ofrece servicios, dice a quién ayuda Gustavo, o pide una llamada, '
+                              'minutos o una reunión?'),
+            'inventa':_noul(f'¿{texto} afirma algo de la persona que no está en `hechos` ni en `seguimiento.anteriores`, o atribuye a '
+                            'Gustavo una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')}
+    if number==2:own={
+        'seg_mismo_dolor':_noul(f'¿{texto} vuelve al mismo dolor o tema del primer mensaje de `seguimiento.anteriores`, contado de otra '
+                                'forma o con una historia corta (un caso típico)?','El mismo tema con otro ángulo o un caso',
+                                'Otro tema, o solo «¿viste mi mensaje?»'),
+        'seg_repite':_noul(f'¿{texto} repite el primer mensaje casi con las mismas palabras o la misma pregunta?'),
+        'seg_disculpa':_noul(f'¿{texto} se disculpa por escribir de nuevo («perdón por insistir», «siento molestar») o le reprocha que '
+                             'no respondiera?')}
+    elif number==3:own={
+        'seg_persona_indicada':_noul(f'¿{texto} pregunta si quizá no es la persona indicada y quién se encarga de ese tema en su '
+                                     'empresa, para llegar a esa persona?','Pregunta quién se encarga',
+                                     'Vuelve a preguntar por el tema o pide ayuda en general'),
+        'seg_repite_dolor':_noul(f'¿{texto} vuelve a contar el dolor o el caso de los mensajes anteriores en vez de solo preguntar por '
+                                 'la persona indicada?')}
+    else:own={
+        'seg_cierre':_noul(f'¿{texto} cierra con elegancia: agradece su tiempo, asume que quizá no es el momento o que ya lo tienen '
+                           'resuelto y deja la puerta abierta?'),
+        'seg_ruega':_noul(f'¿{texto} ruega, insiste o da a entender que es la última oportunidad?'),
+        'seg_pide':_noul(f'¿{texto} le pide algo: que responda, que avise, una pregunta, minutos o una llamada?')}
+    return {**own,**common}
+
 def review_buyer_draft(draft):
     """The lead's review of a buyer's draft (mensajes_comprador): {'decision': 'approve' | 'discard' | 'retry', 'reasons',
-    'answers', 'thresholds', 'model', 'cost_usd', 'at', **course grounding}."""
+    'answers', 'thresholds', 'model', 'cost_usd', 'at', **course grounding}. A follow-up 2–4 of the sequence
+    (secuencia_comprador) with the questions of its number and the methodology «secuencia_mensajes»."""
     now=timezone.now();orientation=_orientation()
     facts=(draft.inputs or {}).get('hechos') or [];person=(draft.inputs or {}).get('persona') or {}
     public,_=memory.confirmed_blocks()
     state={'persona':person,'hechos':facts,'hechos_publicos_de_gustavo':[f['fact'] for f in public]}
-    if draft.kind=='mensaje':
+    if draft.kind=='mensaje' and draft.number>1:
+        follow=(draft.inputs or {}).get('seguimiento') or {}
+        state['seguimiento']={'numero':draft.number,'de':4,'texto':draft.text,'para':person.get('nombre'),
+                              'trabajo':follow.get('trabajo',''),'anteriores':follow.get('anteriores',[]),
+                              'momento':'No respondió a los mensajes anteriores; Gustavo se lo enviaría a mano.'}
+        questions=sequence_questions(draft.number)
+        checks=SEQUENCE_CHECKS[draft.number]+SEQUENCE_COMMON
+        units,metodologia,purpose=SEQUENCE_UNITS,'secuencia_mensajes','lead-review-sequence'
+    elif draft.kind=='mensaje':
         state['primer_mensaje']={'texto':draft.text,'para':person.get('nombre'),
                                  'momento':'Aceptó la invitación de Gustavo; él se lo enviaría a mano como primer mensaje privado.'}
         questions=dm_questions('recorrido')

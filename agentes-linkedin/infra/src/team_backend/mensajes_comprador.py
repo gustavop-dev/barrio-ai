@@ -26,7 +26,9 @@ invitation (RED-02) that passes the same gates, ramp and monthly note quota as a
 - Tu turno: one card per person. «Hecho, le escribí» records the message (step mensaje_1); «No escribirle» is a
   definitive exit (descartado_por_gustavo).
 
-Phases 4–6 read and write here: BuyerDraft (number 2–4 for the sequence), anchors(), cards(), close()."""
+Phase 4 (secuencia_comprador.py, BUYER_SEQUENCE_ENABLED) drafts messages 2–4 here too: the same job, one redraft and the
+lead, with its own methodology, rules and card; `number` says which. Phases 5–6 read and write here: BuyerDraft,
+anchors(), cards(), close()."""
 import json
 import os
 import re
@@ -312,9 +314,13 @@ def inputs_for(contact,journey,kind,facts,at):
                          'comentarios_del_equipo_en_sus_posts':journey.warm_comments}
     return data
 
-def _write(kind,data,units):
-    """One paid draft: instructions, voice and the course units in cached system blocks; the person's facts in the message."""
-    system,schema,purpose=(MESSAGE_SYSTEM,MESSAGE_SCHEMA,'buyer-message') if kind==MESSAGE else (NOTE_SYSTEM,NOTE_SCHEMA,'invite-note')
+def _write(kind,data,units,number=1):
+    """One paid draft: instructions, voice and the course units in cached system blocks; the person's facts in the message.
+    A follow-up (number 2–4) with the sequence's instructions for that number."""
+    if kind==MESSAGE and number>1:
+        from . import secuencia_comprador
+        system,schema,purpose=secuencia_comprador.system(number),MESSAGE_SCHEMA,secuencia_comprador.PURPOSE
+    else:system,schema,purpose=(MESSAGE_SYSTEM,MESSAGE_SCHEMA,'buyer-message') if kind==MESSAGE else (NOTE_SYSTEM,NOTE_SCHEMA,'invite-note')
     answer=providers.claude(voz.with_voice(system),json.dumps(data,ensure_ascii=False,default=str),output_schema=schema,effort='medium',
                             purpose=purpose,context=operador.course_block(units))
     try:out=json.loads(answer['text'])
@@ -338,55 +344,66 @@ def _record(contact):
     """The journey shows the decision (a «borrador» touch); never stops the draft."""
     comprador.on_contact(contact,'borrador')
 
-def stop(contact,journey,kind,by,reason,**fields):
+def stop(contact,journey,kind,by,reason,number=1,**fields):
     """A decision not to use a text: sin_borrador (nothing real, no note left, a conversation already) or descartado (the
-    fixed rules or the lead), with its reason, audited (buyer.draft_stopped) and shown in the journey."""
+    fixed rules or the lead), with its reason, audited (buyer.draft_stopped) and shown in the journey. `number`: 1 the
+    first message (or the note), 2–4 a follow-up of the sequence."""
     now=timezone.now()
-    row,created=BuyerDraft.objects.get_or_create(contact=contact,kind=kind,number=1,attempt=journey.attempt,defaults={
+    row,created=BuyerDraft.objects.get_or_create(contact=contact,kind=kind,number=number,attempt=journey.attempt,defaults={
         'state':State.NONE if by in STOPPED else State.DISCARDED,'stopped_by':by,'reason':reason[:2000],'decided_at':now,**fields})
     if not created and row.state==State.REVIEWING:
         row.state=State.DISCARDED;row.stopped_by=by;row.reason=reason[:2000];row.decided_at=now
         for key,value in fields.items():setattr(row,key,value)
         row.save()
     elif not created:return row
-    _audit(None,'buyer.draft_stopped',contact.pk,tipo=kind,por=by,motivo=reason[:500],borrador=str(row.pk))
+    _audit(None,'buyer.draft_stopped',contact.pk,tipo=kind,numero=number,por=by,motivo=reason[:500],borrador=str(row.pk))
     _record(contact)
     return row
 
-def _draft(contact,journey,kind,at):
+def _draft(contact,journey,kind,at,number=1):
     """Draft one text (one paid call, one redraft if a fixed rule fails). Returns the BuyerDraft: en_revision for the
-    lead, or the decision not to use it."""
+    lead, or the decision not to use it. `number` 2–4: a follow-up of the sequence (secuencia_comprador), with its
+    methodology, what Gustavo already sent her and its rules per number; her facts are context, not a condition."""
     from knowledge import presupuesto
+    from . import secuencia_comprador as sequence
+    follow_up=number>1
     facts=anchors(contact,journey)
-    if not facts:
+    if not facts and not follow_up:
         return stop(contact,journey,kind,StoppedBy.FACT,'Nada real que citar: ni interacción, ni un post suyo que el equipo '
                     'comentó, ni una señal de compra con fuente.')
-    units,missing=_units(kind)
+    units,missing=sequence.units() if follow_up else _units(kind)
     if missing or not units:raise ValueError('Biblioteca no disponible para el borrador ('+', '.join(missing)+').')
     if presupuesto.left(timezone.now())<=0:raise ValueError('Presupuesto de IA agotado (AI_MONTHLY_LIMIT_USD o AI_DAILY_FUSE_USD).')
-    data=inputs_for(contact,journey,kind,facts,at)
+    data=sequence.inputs(contact,journey,facts,at,number) if follow_up else inputs_for(contact,journey,kind,facts,at)
     said=reference(facts)
-    answer,out,citations,risks=_write(kind,data,units)
-    text=_text(out,kind);issues=text_issues(kind,text,facts,out.get('anchor'),said) if text else []
+    earlier=[m['texto'] for m in (data.get('seguimiento') or {}).get('anteriores',[]) if m.get('texto')]
+    def issues_of(text,anchor):
+        if not text:return []
+        if follow_up:return sequence.text_issues(number,text,earlier,said)
+        return text_issues(kind,text,facts,anchor,said)
+    answer,out,citations,risks=_write(kind,data,units,number)
+    text=_text(out,kind);issues=issues_of(text,out.get('anchor'))
     redrafted=False
     if issues and presupuesto.left(timezone.now())>0:
         try:
-            answer,out,citations,risks=_write(kind,dict(data,revision={'previous':text,'rule_violations':issues}),units)
+            answer,out,citations,risks=_write(kind,dict(data,revision={'previous':text,'rule_violations':issues}),units,number)
             redrafted=True;text=_text(out,kind)
-            issues=text_issues(kind,text,facts,out.get('anchor'),said) if text else []
+            issues=issues_of(text,out.get('anchor'))
         except ValueError as exc:risks.append(f'No se pudo reescribir ({exc}); queda el primer borrador.')
     anchor=next((f for f in facts if f['id']==out.get('anchor')),{})
     kept={'hechos':facts,'persona':data['persona'],'momento':data['momento'],'reescrito':redrafted,'riesgos':risks}
+    if follow_up:kept['seguimiento']=data['seguimiento']
     fields={'text':text,'language':(out.get('language') or '')[:10],'anchor':anchor,'inputs':kept,'citations':citations,
             'model':answer.get('model') or ''}
     if not text:
-        return stop(contact,journey,kind,StoppedBy.FACT,(out.get('rationale') or 'El redactor no encontró un hecho concreto para escribir.')[:500],
-                    **fields)
+        why='El redactor no encontró qué decir sin repetirse.' if follow_up else 'El redactor no encontró un hecho concreto para escribir.'
+        return stop(contact,journey,kind,StoppedBy.FACT,(out.get('rationale') or why)[:500],number=number,**fields)
     if issues:
-        return stop(contact,journey,kind,StoppedBy.RULES,'Reglas fijas tras la reescritura: '+'; '.join(issues),issues=issues,**fields)
-    row=BuyerDraft.objects.create(contact=contact,kind=kind,number=1,attempt=journey.attempt,state=State.REVIEWING,
+        return stop(contact,journey,kind,StoppedBy.RULES,'Reglas fijas tras la reescritura: '+'; '.join(issues),number=number,
+                    issues=issues,**fields)
+    row=BuyerDraft.objects.create(contact=contact,kind=kind,number=number,attempt=journey.attempt,state=State.REVIEWING,
                                   reason=(out.get('rationale') or '')[:2000],**fields)
-    _audit(None,'buyer.drafted',contact.pk,tipo=kind,borrador=str(row.pk),reescrito=redrafted,citas=citations,
+    _audit(None,'buyer.drafted',contact.pk,tipo=kind,numero=number,borrador=str(row.pk),reescrito=redrafted,citas=citations,
            course_citations=[u['unit_id'] for u in units])
     return row
 
@@ -400,13 +417,14 @@ def _judge(row,journey,at):
         return {'decision':'retry','reasons':verdict['reasons']}
     if verdict['decision']=='discard':
         row.review=verdict;row.save(update_fields=['review'])
-        stop(row.contact,journey,row.kind,StoppedBy.JUDGE,'; '.join(verdict['reasons']))
+        stop(row.contact,journey,row.kind,StoppedBy.JUDGE,'; '.join(verdict['reasons']),number=row.number)
         return {'decision':'discard','stopped_by':StoppedBy.JUDGE}
     now=timezone.now()
     row.state=State.READY;row.review=verdict;row.decided_at=now
-    if row.kind==MESSAGE:row.show_at=max(at,(journey.accepted_at or at)+SHOW_AFTER)
+    # The first message never the minute she accepted; a follow-up when it is due (it was drafted then).
+    if row.kind==MESSAGE:row.show_at=max(at,(journey.accepted_at or at)+SHOW_AFTER) if row.number==1 else at
     row.save(update_fields=['state','review','decided_at','show_at'])
-    _audit(None,'buyer.draft_ready',row.contact_id,tipo=row.kind,borrador=str(row.pk),
+    _audit(None,'buyer.draft_ready',row.contact_id,tipo=row.kind,numero=row.number,borrador=str(row.pk),
            show_at=row.show_at.isoformat() if row.show_at else None)
     _record(row.contact)
     return {'decision':'ready','draft':str(row.pk)}
@@ -418,23 +436,36 @@ def prepare(user,params,origin_job=''):
     require(user,'operate_linkedin');require(user,'use_paid_providers')
     contact=Contact.objects.get(pk=params['contact']);kind=params['kind']
     if kind not in (MESSAGE,NOTE):raise ValueError('kind debe ser mensaje o nota')
+    try:number=int(params.get('number') or 1)
+    except (TypeError,ValueError):raise ValueError('number debe ser 1, 2, 3 o 4') from None
+    if number not in (1,2,3,4) or (number>1 and kind!=MESSAGE):raise ValueError('number debe ser 1, 2, 3 o 4 (2–4 solo para mensajes)')
     at=_when(params.get('at')) or timezone.now()
     journey=comprador.journey(contact)
     if journey is None:return {'decision':'skip','reason':'Sin recorrido de comprador.'}
-    if not active():return {'decision':'skip','reason':'Fase 3 o líder apagados.'}
-    row=decision(contact,kind,journey.attempt)
+    from . import secuencia_comprador
+    if number>1 and not secuencia_comprador.active():return {'decision':'skip','reason':'Fase 4, fase 3 o líder apagados.'}
+    if number==1 and not active():return {'decision':'skip','reason':'Fase 3 o líder apagados.'}
+    row=decision(contact,kind,journey.attempt,number)
     if row is not None and row.state!=State.REVIEWING:return {'decision':'skip','reason':'Ya hay una decisión.'}
+    if number>1:
+        # Right before paying: her reply, the inbox read and the due date, again (the job may have waited).
+        ok,why=secuencia_comprador.ready(journey,number,timezone.now())
+        if not ok:return {'decision':'skip','reason':why}
     from . import oficina_eventos
-    oficina_eventos.emit('consulta_biblioteca',AGENT,'biblioteca','Primer mensaje al comprador' if kind==MESSAGE else 'Nota de la invitación')
+    topic=(secuencia_comprador.label(number)+' al comprador' if number>1 else
+           'Primer mensaje al comprador' if kind==MESSAGE else 'Nota de la invitación')
+    oficina_eventos.emit('consulta_biblioteca',AGENT,'biblioteca',topic)
     if row is None:
-        row=_draft(contact,journey,kind,at)
+        row=_draft(contact,journey,kind,at,number)
         if row.state!=State.REVIEWING:return {'decision':row.state,'stopped_by':row.stopped_by}
     return _judge(row,journey,at)
 
 # --------------------------------------------------------------------------- the autopilot's step
 
-def tries(contact,kind,attempt):
-    return Job.objects.filter(kind=JOB,params__contact=str(contact.pk),params__kind=kind,params__attempt=attempt).count()
+def tries(contact,kind,attempt,number=1):
+    """Paid jobs queued for this person, kind, attempt and number (the first message's jobs carry no number)."""
+    rows=Job.objects.filter(kind=JOB,params__contact=str(contact.pk),params__kind=kind,params__attempt=attempt)
+    return (rows.exclude(params__has_key='number') if number==1 else rows.filter(params__number=number)).count()
 
 def _ready_to_invite(journey,now):
     if calentamiento.enabled():return calentamiento.invite_ready(journey.contact,now)
@@ -461,13 +492,14 @@ def _notes(account,now):
         if room<=0:
             stop(journey.contact,journey,NOTE,StoppedBy.QUOTA,'No quedan notas este mes: la invitación sale sin nota.')
             decided+=1;continue
-        if item is None and tries(journey.contact,NOTE,journey.attempt)<MAX_TRIES:item=(journey.contact,NOTE,journey.attempt)
+        if item is None and tries(journey.contact,NOTE,journey.attempt)<MAX_TRIES:item=(journey.contact,NOTE,journey.attempt,1)
     return decided,item
 
 def _messages(account,now):
     """Accepted buyers whose first message is due (message_at): a conversation already open → «conversacion»; nothing
     real to cite → «hecho»; else the next one to draft. A conversation on his post (RSP-07) wins: skipped while its card
-    waits, and once Gustavo closed it either way."""
+    waits, and once Gustavo closed it either way. Per attempt: a buyer woken from a rest (a new attempt) gets a new first
+    message; what was written in an earlier attempt does not count."""
     from .respuestas import _dm_rows
     rsp={row.contact_id for row in _dm_rows()}
     decided=0;item=None
@@ -476,33 +508,39 @@ def _messages(account,now):
         contact=journey.contact
         if contact.pk in rsp or decision(contact,MESSAGE,journey.attempt):continue
         touches=comprador._touches(journey)
-        if any(t.kind in (Kind.MESSAGE,Kind.NO_MESSAGE) for t in touches):continue
+        began=max((t.at for t in touches if t.kind==Kind.RETRY),default=None)
+        mine=[t for t in touches if began is None or t.at>=began]
+        if any(t.kind in (Kind.MESSAGE,Kind.NO_MESSAGE) for t in mine):continue
         at=message_at(comprador._fold(touches))
         if at is None or at>now:continue
-        if any(t.kind in CONVERSATION for t in touches):
+        if any(t.kind in CONVERSATION for t in mine):
             stop(contact,journey,MESSAGE,StoppedBy.CONVERSATION,'Ya hay una conversación con la persona: Gustavo responde en el inbox.')
             decided+=1;continue
         if not anchors(contact,journey):
             stop(contact,journey,MESSAGE,StoppedBy.FACT,'Nada real que citar: ni interacción, ni un post suyo que el equipo comentó, '
                  'ni una señal de compra con fuente. Sin mensaje.')
             decided+=1;continue
-        if item is None and tries(contact,MESSAGE,journey.attempt)<MAX_TRIES:item=(contact,MESSAGE,journey.attempt)
+        if item is None and tries(contact,MESSAGE,journey.attempt)<MAX_TRIES:item=(contact,MESSAGE,journey.attempt,1)
     return decided,item
 
-def _to_review(account,now):
-    """A draft whose review waited for Jev, once LEAD_RETRY_MINUTES passed."""
+def _to_review(account,now,numbers=(1,)):
+    """A draft whose review waited for Jev, once LEAD_RETRY_MINUTES passed: (contact, kind, attempt, number). Only the
+    numbers whose phase is on (1: phase 3; 2–4: the sequence)."""
     minutes=int(os.environ.get('LEAD_RETRY_MINUTES','10'))
-    for row in BuyerDraft.objects.select_related('contact').filter(contact__account=account,state=State.REVIEWING).order_by('created_at'):
+    rows=(BuyerDraft.objects.select_related('contact').filter(contact__account=account,state=State.REVIEWING,number__in=list(numbers))
+          .order_by('created_at'))
+    for row in rows:
         at=_when((row.review or {}).get('error_at'))
-        if (at is None or at<=now-timedelta(minutes=minutes)) and tries(row.contact,row.kind,row.attempt)<MAX_TRIES:
-            return (row.contact,row.kind,row.attempt)
+        if (at is None or at<=now-timedelta(minutes=minutes)) and tries(row.contact,row.kind,row.attempt,row.number)<MAX_TRIES:
+            return (row.contact,row.kind,row.attempt,row.number)
     return None
 
 def _retire(account,now):
     """Drafts that no longer apply: a first message whose person already got one (RSP-07) or left the step; a note whose
     person was invited another way, or unused for NOTE_TTL."""
     count=0
-    for row in BuyerDraft.objects.select_related('contact__buyer_journey').filter(contact__account=account,state=State.READY):
+    # The follow-ups (number 2–4) are the sequence's: cancelled when she replies (secuencia_comprador).
+    for row in BuyerDraft.objects.select_related('contact__buyer_journey').filter(contact__account=account,state=State.READY,number=1):
         journey=getattr(row.contact,'buyer_journey',None)
         if row.kind==MESSAGE:
             gone=journey is None or journey.step!=Step.ACCEPTED or journey.attempt!=row.attempt
@@ -521,7 +559,8 @@ def _retire(account,now):
 def _announce(account,now):
     """Push once when a first message's card shows in Tu turno (dm_ready, like RSP-07's)."""
     from .notificaciones import avisar
-    for row in BuyerDraft.objects.select_related('contact').filter(contact__account=account,kind=MESSAGE,state=State.READY,show_at__lte=now):
+    for row in BuyerDraft.objects.select_related('contact').filter(contact__account=account,kind=MESSAGE,number=1,state=State.READY,
+                                                                   show_at__lte=now):
         if AuditEvent.objects.filter(action='buyer.dm_ready',target=str(row.pk)).exists():continue
         name=row.contact.display_name or 'Alguien'
         avisar('dm_ready',f'{name} aceptó tu invitación','El equipo te dejó un primer mensaje en la Bandeja; lo envías tú desde LinkedIn.')
@@ -529,12 +568,15 @@ def _announce(account,now):
 
 def step(account,now=None):
     """The autopilot's buyer-draft step (autopiloto._buyer_drafts): (decisions taken without a paid call, the next
-    (contact, kind, attempt) to draft or None). Notes first: a warmed buyer's invitation waits for its note."""
+    (contact, kind, attempt, number) to draft or None). Notes first: a warmed buyer's invitation waits for its note.
+    With the sequence on, a follow-up whose review waited for Jev is retried here too; its new follow-ups come from
+    secuencia_comprador.step."""
     now=now or timezone.now()
     if not active():return 0,None
+    from . import secuencia_comprador
     decided=_retire(account,now)
     _announce(account,now)
-    item=_to_review(account,now)
+    item=_to_review(account,now,(1,2,3,4) if secuencia_comprador.active() else (1,))
     if item:return decided,item
     n,note_item=_notes(account,now)
     m,message_item=_messages(account,now)
@@ -603,7 +645,7 @@ def cards(card,now=None):
     from .respuestas import _dm_rows
     rsp={row.contact_id for row in _dm_rows()}
     out=[]
-    rows=(BuyerDraft.objects.select_related('contact__buyer_journey').filter(kind=MESSAGE,state=State.READY)
+    rows=(BuyerDraft.objects.select_related('contact__buyer_journey').filter(kind=MESSAGE,number=1,state=State.READY)
           .filter(Q(show_at__isnull=True)|Q(show_at__lte=now)).order_by('show_at','created_at'))
     for row in rows:
         contact=row.contact;journey=getattr(contact,'buyer_journey',None)
@@ -623,8 +665,9 @@ def cards(card,now=None):
     return out
 
 def close(user,draft_id,how,note_text=''):
-    """Gustavo closes the card: «enviado» records the message (mensaje_1); «no» is a definitive exit of the journey
-    (descartado_por_gustavo). The team never sends it."""
+    """Gustavo closes the card: «enviado» records the message (mensaje_1, or mensaje_n for a follow-up: its «Hecho» starts
+    the clock of the next one); «no» is a definitive exit of the journey (descartado_por_gustavo). The team never sends
+    it. A follow-up cancelled because she replied is no longer in Tu turno."""
     require(user,'approve_actions')
     from .respuestas import CLOSE_HOW
     if how not in CLOSE_HOW:raise ValueError('how debe ser enviado o no')
@@ -647,9 +690,13 @@ def close(user,draft_id,how,note_text=''):
     return row
 
 def recently_resolved(days=7):
-    """Tu turno → Hecho recientemente: the journey's first messages Gustavo closed."""
+    """Tu turno → Hecho recientemente: the journey's messages Gustavo closed (the first one and the follow-ups)."""
     since=timezone.now()-timedelta(days=days)
     events=list(AuditEvent.objects.filter(action='buyer.dm_closed',created_at__gte=since).order_by('-created_at')[:20])
-    names={str(k):v for k,v in BuyerDraft.objects.filter(id__in=[e.target for e in events]).values_list('id','contact__display_name')}
-    return [{'kind':'mensaje','id':f'dm:{e.target}','title':f'Mensaje sugerido para {names.get(e.target) or "alguien"}','at':e.created_at,
+    rows={str(k):(name,number) for k,name,number in BuyerDraft.objects.filter(id__in=[e.target for e in events])
+          .values_list('id','contact__display_name','number')}
+    def title(target):
+        name,number=rows.get(target,('',1))
+        return (f'Seguimiento {number} de 4 para ' if number>1 else 'Mensaje sugerido para ')+(name or 'alguien')
+    return [{'kind':'mensaje','id':f'dm:{e.target}','title':title(e.target),'at':e.created_at,
              'how':'Le escribiste' if (e.metadata or {}).get('how')=='enviado' else 'No le escribiste'} for e in events]

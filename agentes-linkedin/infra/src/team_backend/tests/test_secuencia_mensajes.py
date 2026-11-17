@@ -9,10 +9,9 @@ envía un mensaje: los seguimientos son borradores que Gustavo copia y envía (I
 import json
 import os
 from datetime import timedelta
-from unittest import expectedFailure
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 from team_backend import evaluaciones, operador
 from team_backend.models import AuditEvent
 from team_backend.tests.test_comprador_e2e import SequencePathBase, case_text, sequence_text
@@ -125,7 +124,6 @@ class SequenceCaseBase(SequencePathBase):
 class SequenceCaseTests(SequenceCaseBase):
     """El caso completo. Línea base: docs/linea-base-secuencia-mensajes.md."""
 
-    @expectedFailure  # Línea base: nadie prepara los mensajes 2 a 4 ni detiene, descansa o avisa (fase 4)
     def test_the_case_passes_with_production_functions(self):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))
@@ -140,7 +138,7 @@ class SequenceCaseTests(SequenceCaseBase):
             self.assertFalse(evaluaciones.grade_course_case('secuencia_mensajes', dict(result, **wrong), grounding)['passed'], wrong)
 
 
-class SequenceRulesTests(SimpleTestCase):
+class SequenceRulesTests(TestCase):  # the first message's rules read Gustavo's public and private blocks
     """Las reglas fijas de cada seguimiento, además de las del primer mensaje (sin enlaces, sin pedir una reunión, sin
     fórmulas): el M2 no repite el M1 ni se disculpa; el M3 pregunta por la persona indicada; el M4 no pide nada."""
     M1 = case_text('primer_mensaje_comprador', 'M1')
@@ -150,7 +148,6 @@ class SequenceRulesTests(SimpleTestCase):
         from team_backend import secuencia_comprador
         return secuencia_comprador.text_issues(number, text, previous=self.M1, reference=self.REFERENCE)
 
-    @expectedFailure  # Línea base: no hay reglas fijas por número de seguimiento (secuencia_comprador.text_issues)
     def test_the_case_follow_ups(self):
         for number in (2, 3, 4):
             self.assertEqual(self.issues(number, sequence_text('flujo', number)), [], number)
@@ -184,6 +181,15 @@ class SequenceActivationTests(SimpleTestCase):
         self.assertEqual(graph['course_lists']['operador.SEQUENCE_UNITS'], operador.SEQUENCE_UNITS)
         self.assertEqual([n['id'] for n in graph['nodes'] if 'operador.SEQUENCE_UNITS' in n['course_lists']],
                          ['relaciones_comunidad', 'lider_jev'])
+
+    def test_only_its_roles_name_the_methodology_in_code(self):
+        from pathlib import Path
+        source = Path(operador.__file__).parent
+        naming = {p.name for p in source.glob('*.py') if "'secuencia_mensajes'" in p.read_text(encoding='utf-8')}
+        # The list (operador), the case (evaluaciones), relaciones_comunidad (secuencia_comprador) and lider_jev (lider).
+        self.assertEqual(naming, {'operador.py', 'evaluaciones.py', 'secuencia_comprador.py', 'lider.py'})
+        using = {p.name for p in source.glob('*.py') if 'SEQUENCE_UNITS' in p.read_text(encoding='utf-8')}
+        self.assertEqual(using, {'operador.py', 'evaluaciones.py', 'secuencia_comprador.py', 'lider.py'})
 
 
 class SequenceReadingRegistryTests(SimpleTestCase):
