@@ -8,15 +8,20 @@ responde), el paso de borradores del autopiloto con sus jobs, Tu turno y los cie
 Cal.com (lo publica el cliente de pruebas) y la entrega. Claude y Jev simulados (test_comprador_e2e.judge_reply_type y
 judge_reply_draft); unidades del curso sintéticas, sin red, sin Cal.com ni proveedores pagados. El equipo nunca envía un
 mensaje: las respuestas son borradores que Gustavo copia y envía (INB-08)."""
+import hashlib
+import hmac
 import json
 import os
-from datetime import date, timedelta
-from unittest import expectedFailure
+from datetime import date, datetime, timedelta
+from datetime import timezone as utc_tz
+from types import SimpleNamespace
 from unittest.mock import patch
 
-from django.test import SimpleTestCase
-from team_backend import evaluaciones, operador
-from team_backend.models import AuditEvent, BuyerDraft, Contact
+from django.test import SimpleTestCase, TestCase
+from django.utils import timezone
+from team_backend import agenda_calcom, alertas_slack, comprador, evaluaciones, lectura_embudo, operador, respuesta_comprador
+from team_backend.models import AuditEvent, BuyerDraft, BuyerJourney, Contact, MeetingBooking
+from team_backend.tests.test_comprador import BuyerBase
 from team_backend.tests.test_comprador_e2e import BOOKING_URL, DAY, HOUR, ReplyPathBase, reply_input
 
 CASE = evaluaciones.COURSE_CASES['respuesta_comprador']
@@ -135,7 +140,6 @@ class ReplyCaseBase(ReplyPathBase):
 class ReplyCaseTests(ReplyCaseBase):
     """El caso completo. Línea base: docs/linea-base-respuesta-comprador.md."""
 
-    @expectedFailure  # Línea base: nadie clasifica su respuesta, ni redacta, ni agenda, ni entrega el lead (fase 6)
     def test_the_case_passes_with_production_functions(self):
         grade, result = self.run_case()
         self.assertTrue(grade['passed'], (grade['errors'], result))
@@ -154,13 +158,313 @@ class ReplyRulesTests(SimpleTestCase):
     """Las reglas fijas de la respuesta: el único enlace es el de la agenda y solo en interesado y pide información; sin
     fórmulas de venta, precios, promesas ni presión; en su idioma; corta. Y el enlace de agenda nunca en el M1–M4."""
 
-    @expectedFailure  # Línea base: no hay reglas fijas de la respuesta (respuesta_comprador.text_issues)
     def test_the_case_replies(self):
-        from team_backend import respuesta_comprador
         with patch('team_backend.guardas.blocks', return_value=([], [])):
             for variant, kind in (('flujo', 'interesado'), ('P', 'pide_informacion'), ('N1', 'no_es_el_momento'),
                                   ('X', 'no_le_interesa'), ('O', 'otra_persona')):
                 self.assertEqual(respuesta_comprador.text_issues(kind, reply_input(variant, 'borrador'), reply_input(variant)), [], variant)
+
+    def test_each_fixed_rule_names_what_breaks_it(self):
+        her = reply_input('flujo')
+        cases = (('interesado', 'Ana, our services cover exactly that. Pick a slot that suits you.', 'vende u ofrece servicios'),
+                 ('pide_informacion', 'Bea, it is $4,000 per project. Pick a slot that suits you.', 'precios o tarifas'),
+                 ('interesado', 'Ana, we will deliver it in two weeks. Pick a slot that suits you.', 'promete resultados'),
+                 ('interesado', 'Ana, this is the last chance this month. Pick a slot that suits you.', 'presiona o insiste'),
+                 ('no_le_interesa', 'Eva, thanks for telling me. Please reconsider when the reports hurt again.', 'presiona o insiste'),
+                 ('no_es_el_momento', 'Cris, thanks for telling me. A quick call in February about the report?', 'llamada o una reunión'),
+                 ('otra_persona', 'Fer, thanks. Could you book a meeting with Bruno for me?', 'llamada o una reunión'),
+                 ('interesado', 'Ana, see https://acme.example/case first. Pick a slot that suits you.', 'enlace propio'),
+                 ('interesado', 'Ana, write me at gustavo@barrio.example about the report. Pick a slot.', 'correo'),
+                 ('interesado', 'Ana, the Friday report is the place to start. ' * 12, 'más de 500 caracteres'),
+                 ('interesado', 'Ana, the Friday report.\nThe spreadsheet behind it.\nWho owns it.\nPick a slot that suits you.',
+                  'más de 3 líneas'),
+                 ('interesado', 'Ana, gracias por contarme lo del reporte de los viernes. Elige el horario que te quede mejor y '
+                                'lo revisamos juntos con tus números.', 'fuera del idioma'))
+        with patch('team_backend.guardas.blocks', return_value=([], [])):
+            for kind, text, issue in cases:
+                found = ' | '.join(respuesta_comprador.text_issues(kind, text, her))
+                self.assertIn(issue, found, (kind, text))
+            # The same call offer is right where she asked for it.
+            self.assertEqual(respuesta_comprador.text_issues('interesado', 'Ana, happy to. A quick call about the Friday report?', her), [])
+
+    def test_the_booking_link_is_one_at_the_end_and_only_where_it_belongs(self):
+        link = f'{BOOKING_URL}?metadata%5Bbarrio%5D=abcdEFGH1234'
+        body = reply_input('flujo', 'borrador')
+        self.assertEqual(respuesta_comprador.link_issues('interesado', f'{body}\n{link}', link), [])
+        self.assertEqual(respuesta_comprador.link_issues('pide_informacion', f'{body}\n{link}\n', link), [])
+        self.assertEqual(respuesta_comprador.link_issues('interesado', body, link), ['La respuesta debe terminar con el enlace de tu agenda'])
+        self.assertEqual(respuesta_comprador.link_issues('interesado', f'{body}\n{link}', ''), ['La respuesta debe terminar con el enlace de tu agenda'])
+        self.assertEqual(respuesta_comprador.link_issues('interesado', f'{body} acme.io\n{link}', link),
+                         ['La respuesta lleva otro enlace además del de tu agenda'])
+        for kind in ('no_es_el_momento', 'no_le_interesa', 'otra_persona'):
+            self.assertEqual(respuesta_comprador.link_issues(kind, f'{body}\n{link}', ''), ['Enlace en una respuesta que no lo lleva'])
+            self.assertEqual(respuesta_comprador.link_issues(kind, body, ''), [])
+
+    def test_her_link_carries_the_identifier_and_only_an_https_url(self):
+        journey = SimpleNamespace(booking_ref='abcdEFGH1234')
+        with patch.dict(os.environ, {'CALCOM_BOOKING_URL': BOOKING_URL}):
+            self.assertEqual(respuesta_comprador.link_for(journey), f'{BOOKING_URL}?metadata%5Bbarrio%5D=abcdEFGH1234')
+        with patch.dict(os.environ, {'CALCOM_BOOKING_URL': BOOKING_URL + '?duration=30'}):
+            self.assertEqual(respuesta_comprador.link_for(journey), f'{BOOKING_URL}?duration=30&metadata%5Bbarrio%5D=abcdEFGH1234')
+        for bad in ('', 'http://cal.com/gustavo', 'cal.com/gustavo', 'https://cal.com/a b'):
+            with patch.dict(os.environ, {'CALCOM_BOOKING_URL': bad}):
+                self.assertEqual(respuesta_comprador.link_for(journey), '', bad)
+
+
+class ReplyDecisionTests(SimpleTestCase):
+    """«otro» unless one type is confident (BUYER_REPLY_MIN) and ahead of the next one (BUYER_REPLY_MARGIN)."""
+
+    def probabilities(self, **values):
+        return {t: values.get(t, 0.05) for t in respuesta_comprador.TYPES}
+
+    def test_the_type_needs_confidence_and_a_margin(self):
+        decide = respuesta_comprador.decide
+        self.assertEqual(decide(self.probabilities(interesado=0.9)), 'interesado')
+        self.assertEqual(decide(self.probabilities(otra_persona=0.7)), 'otra_persona')  # the minimum itself passes
+        self.assertEqual(decide(self.probabilities(interesado=0.69)), 'otro')
+        self.assertEqual(decide(self.probabilities(interesado=0.9, pide_informacion=0.75)), 'otro')
+        self.assertEqual(decide(self.probabilities(interesado=0.95, pide_informacion=0.7)), 'interesado')
+        self.assertEqual(decide({}), 'otro')
+        self.assertEqual(decide({'otro': 0.99, 'interesado': 0.1}), 'otro')  # only the five types count
+
+    def test_the_thresholds_come_from_the_environment_within_bounds(self):
+        with patch.dict(os.environ, {'BUYER_REPLY_MIN': '0.95'}):
+            self.assertEqual(respuesta_comprador.decide(self.probabilities(interesado=0.9)), 'otro')
+        with patch.dict(os.environ, {'BUYER_REPLY_MARGIN': '0.05'}):
+            self.assertEqual(respuesta_comprador.decide(self.probabilities(interesado=0.9, pide_informacion=0.8)), 'interesado')
+        with patch.dict(os.environ, {'BUYER_REPLY_MIN': 'x', 'BUYER_REPLY_MARGIN': '-3'}):
+            self.assertEqual((respuesta_comprador.minimum(), respuesta_comprador.margin() >= 0), (0.7, True))
+
+
+class ReplyDateTests(SimpleTestCase):
+    """«No es el momento»: the date she said, read in code (English and Spanish), or 90 days."""
+    TODAY = date(2026, 11, 17)
+
+    def test_what_she_said_becomes_a_date(self):
+        for text, expected in (('Write me after January.', date(2027, 2, 1)), ('Busy until March, sorry.', date(2027, 3, 1)),
+                               ('Escríbeme después de enero.', date(2027, 2, 1)), ('Mejor en marzo de 2027.', date(2027, 3, 1)),
+                               ('Try me next quarter.', date(2027, 1, 1)), ('el próximo año', date(2027, 1, 1)),
+                               ('Ask again in 6 weeks.', date(2026, 12, 29)), ('in two months', date(2027, 1, 17)),
+                               ('dentro de 10 días', date(2026, 11, 27)), ('Q2 2027 works', date(2027, 4, 1)),
+                               ('After 2027-02-15 please.', date(2027, 2, 15)), ('desde el 15/02/2027', date(2027, 2, 15)),
+                               ('In March, or maybe after April.', date(2027, 3, 1))):
+            self.assertEqual(respuesta_comprador.said_date(text, self.TODAY), expected, text)
+        for text in ('Not now, too busy.', 'Ahora no es el momento.', '', None):
+            self.assertIsNone(respuesta_comprador.said_date(text, self.TODAY), text)
+
+    def test_the_rest_ends_at_her_date_at_nine_or_after_ninety_days(self):
+        at = datetime(2026, 11, 17, 18, 0, tzinfo=utc_tz.utc)
+        until, said = respuesta_comprador.rest_until('Write me after January.', at)
+        local = until.astimezone(operador.local_tz())
+        self.assertEqual((local.date(), local.hour, said), (date(2027, 2, 1), 9, True))
+        for text in ('Not now.', 'after 2026-01-10', '2028-06-01 maybe'):  # nothing, in the past, beyond a year
+            self.assertEqual(respuesta_comprador.rest_until(text, at), (at + timedelta(days=90), False), text)
+
+    def test_the_profile_she_named(self):
+        self.assertEqual(respuesta_comprador.profile_in(reply_input('O')), 'bruno-globex')
+        self.assertEqual(respuesta_comprador.profile_in('https://www.linkedin.com/in/lia-initech/'), 'lia-initech')
+        self.assertEqual(respuesta_comprador.profile_in('Talk to Lia from operations.'), '')
+
+
+SECRET = 'calcom-unit-secret'
+
+
+def sign(raw, secret=SECRET):
+    return hmac.new(secret.encode(), raw, hashlib.sha256).hexdigest()
+
+
+def delivery(trigger='BOOKING_CREATED', **payload):
+    body = {'uid': 'u-1', 'startTime': '2026-11-20T15:00:00Z', 'endTime': '2026-11-20T15:30:00Z',
+            'attendees': [{'name': 'Ana Acme', 'email': 'ana@acme.example'}], 'metadata': {}}
+    return json.dumps({'triggerEvent': trigger, 'createdAt': '2026-11-17T12:00:00Z', 'payload': {**body, **payload}}).encode()
+
+
+class WebhookSignatureTests(SimpleTestCase):
+    """X-Cal-Signature-256 = HMAC-SHA256(secret, raw body), hex (Cal.com's sendPayload.ts); the body only to match."""
+
+    def test_only_the_exact_body_signed_with_the_secret_passes(self):
+        raw = delivery()
+        with patch.dict(os.environ, {'CALCOM_WEBHOOK_SECRET': SECRET}):
+            self.assertTrue(agenda_calcom.signed(raw, sign(raw)))
+            self.assertTrue(agenda_calcom.signed(raw, sign(raw).upper()))
+            self.assertFalse(agenda_calcom.signed(raw + b' ', sign(raw)))
+            self.assertFalse(agenda_calcom.signed(raw, sign(raw, 'other')))
+            self.assertFalse(agenda_calcom.signed(raw, ''))
+        with patch.dict(os.environ, {'CALCOM_WEBHOOK_SECRET': ''}):
+            self.assertFalse(agenda_calcom.signed(raw, sign(raw, '')))
+
+    def test_the_body_gives_only_checked_fields(self):
+        fields = agenda_calcom._fields({'uid': ' u-9 ', 'rescheduleUid': 'u-8', 'startTime': '2026-11-20T15:00:00Z', 'endTime': '2026-11-20',
+                                        'attendees': [{'name': 'Ana', 'email': 'ANA@Acme.Example'}],
+                                        'metadata': {'barrio': 'abcdEFGH1234'}})
+        self.assertEqual((fields['uid'], fields['previous'], fields['email'], fields['ref'], fields['end']),
+                         ('u-9', 'u-8', 'ana@acme.example', 'abcdEFGH1234', None))
+        self.assertEqual(fields['start'], datetime(2026, 11, 20, 15, 0, tzinfo=utc_tz.utc))
+        bad = agenda_calcom._fields({'uid': 7, 'fromReschedule': 'u-7', 'attendees': 'Ana', 'metadata': {'barrio': "x' OR 1=1"},
+                                     'startTime': '2026-11-20T15:00:00'})
+        self.assertEqual((bad['uid'], bad['previous'], bad['name'], bad['email'], bad['ref'], bad['start']), ('', 'u-7', '', '', '', None))
+        self.assertEqual(agenda_calcom._fields({'attendees': [{'email': 'not-an-email'}], 'metadata': {'barrio': 'short'}})['email'], '')
+
+
+class WebhookReceiveTests(TestCase):
+    """agenda_calcom.receive: what is rejected, ignored, stored and processed once."""
+
+    def setUp(self):
+        env = patch.dict(os.environ, {'CALCOM_WEBHOOK_SECRET': SECRET, 'BUYER_REPLY_ENABLED': 'true'})
+        env.start()
+        self.addCleanup(env.stop)
+
+    def test_rejections_store_nothing_and_audit_once_an_hour(self):
+        raw = delivery()
+        now = timezone.now()
+        self.assertEqual(agenda_calcom.receive(b'x' * (64 * 1024 + 1), sign(b'x'), now)[0], 413)
+        self.assertEqual(agenda_calcom.receive(raw, 'f' * 64, now)[0], 403)
+        self.assertEqual(agenda_calcom.receive(raw, 'f' * 64, now)[0], 403)
+        with patch.dict(os.environ, {'CALCOM_WEBHOOK_SECRET': ''}):
+            self.assertEqual(agenda_calcom.receive(raw, sign(raw), now), (403, {'detail': 'Webhook sin configurar.'}))
+        with patch.dict(os.environ, {'BUYER_REPLY_ENABLED': 'false'}):
+            self.assertEqual(agenda_calcom.receive(raw, sign(raw), now)[0], 202)
+        self.assertFalse(MeetingBooking.objects.exists())
+        self.assertEqual(sorted(AuditEvent.objects.filter(action='calcom.rejected').values_list('target', flat=True)), ['firma', 'sin_secreto'])
+
+    def test_malformed_or_foreign_deliveries(self):
+        now = timezone.now()
+        for raw, status in ((b'not json', 400), (b'[1, 2]', 400), (delivery(uid=''), 400), (delivery('MEETING_ENDED'), 200)):
+            self.assertEqual(agenda_calcom.receive(raw, sign(raw), now)[0], status, raw)
+        self.assertFalse(MeetingBooking.objects.exists())
+
+    def test_a_booking_nobody_matches_is_stored_once(self):
+        raw = delivery(metadata={'barrio': 'unknownREF123'})
+        now = timezone.now()
+        status, body = agenda_calcom.receive(raw, sign(raw), now)
+        self.assertEqual((status, body['emparejada_por'], body['estado']), (200, 'sin_emparejar', 'agendada'))
+        self.assertEqual(agenda_calcom.receive(raw, sign(raw), now), (200, {'repetido': True}))
+        booking = MeetingBooking.objects.get()
+        self.assertEqual((booking.uid, booking.ref, booking.journey_id, len(booking.events)), ('u-1', 'unknownREF123', None, 1))
+        self.assertEqual(list(agenda_calcom.unmatched()), [booking])
+        # Cancelled: it leaves the unmatched list; a late «created» does not revive it.
+        cancel = delivery('BOOKING_CANCELLED')
+        self.assertEqual(agenda_calcom.receive(cancel, sign(cancel), now)[1]['estado'], 'cancelada')
+        late = delivery(endTime='2026-11-20T15:45:00Z')
+        self.assertEqual(agenda_calcom.receive(late, sign(late), now)[1]['estado'], 'cancelada')
+        self.assertEqual(list(agenda_calcom.unmatched()), [])
+
+    def test_gustavos_note_gives_the_date(self):
+        local = operador.local_tz()
+        self.assertEqual(agenda_calcom.note_date('20/11/2026 10:30 por correo'), datetime(2026, 11, 20, 10, 30, tzinfo=local))
+        self.assertEqual(agenda_calcom.note_date('el 20/11/2026'), datetime(2026, 11, 20, 9, 0, tzinfo=local))
+        self.assertEqual(agenda_calcom.note_date('2026-11-20T10:30:00+00:00'), datetime(2026, 11, 20, 10, 30, tzinfo=utc_tz.utc))
+        for text in ('', 'por LinkedIn', '31/02/2026'):
+            self.assertIsNone(agenda_calcom.note_date(text), text)
+
+
+class MeetingFoldTests(SimpleTestCase):
+    """The fold with phase 6's touches: a meeting, its reschedule and its cancellation."""
+    START = datetime(2026, 11, 17, 12, 0, tzinfo=utc_tz.utc)
+
+    def touch(self, kind, at, key='', **detail):
+        return SimpleNamespace(kind=kind, at=at, key=key, direction=comprador.DIRECTION[kind], detail=detail)
+
+    def replied(self):
+        s = self.START
+        return [self.touch('elegido', s), self.touch('acepto_invitacion', s + HOUR), self.touch('mensaje', s + 2 * HOUR),
+                self.touch('respondio_mensaje', s + DAY), self.touch('respuesta_clasificada', s + DAY, tipo='interesado'),
+                self.touch('interesado', s + DAY)]
+
+    def test_a_reschedule_moves_the_date_and_keeps_when_she_booked(self):
+        s = self.START
+        state = comprador._fold(self.replied() + [
+            self.touch('reunion', s + 2 * DAY, reserva='b1', inicio=(s + 5 * DAY).isoformat()),
+            self.touch('reunion', s + 3 * DAY, reserva='b2', inicio=(s + 8 * DAY).isoformat(), reemplaza='b1')])
+        self.assertEqual((state.step(), state.meeting_date(), state.first['meeting'], state.reply_type),
+                         ('reunion', s + 8 * DAY, s + 2 * DAY, 'interesado'))
+
+    def test_a_cancellation_goes_back_to_interested_and_stops_counting(self):
+        s = self.START
+        booked = self.replied() + [self.touch('reunion', s + 2 * DAY, reserva='b1', inicio=(s + 5 * DAY).isoformat())]
+        state = comprador._fold(booked + [self.touch('reunion_cancelada', s + 3 * DAY, reserva='b1')])
+        self.assertEqual((state.step(), state.meeting_date(), 'meeting' in state.first), ('interesado', None, False))
+        # Another booking after it counts from its own date.
+        state = comprador._fold(booked + [self.touch('reunion_cancelada', s + 3 * DAY, reserva='b1'),
+                                          self.touch('reunion', s + 4 * DAY, reserva='b3', inicio=(s + 9 * DAY).isoformat())])
+        self.assertEqual((state.step(), state.meeting_date(), state.first['meeting']), ('reunion', s + 9 * DAY, s + 4 * DAY))
+        # Cancelling a booking she does not have changes nothing.
+        state = comprador._fold(booked + [self.touch('reunion_cancelada', s + 3 * DAY, reserva='other')])
+        self.assertEqual((state.step(), state.first['meeting']), ('reunion', s + 2 * DAY))
+
+    def test_her_reply_type_belongs_to_the_attempt(self):
+        s = self.START
+        state = comprador._fold(self.replied()[:5] + [
+            self.touch('respuesta_clasificada', s + DAY, tipo='no_es_el_momento'),
+            self.touch('descanso', s + DAY, motivo='no_es_el_momento', hasta=(s + 60 * DAY).isoformat()),
+            self.touch('reintento', s + 60 * DAY, angulo='Lo que dijo', tipo='lo_que_dijo')])
+        self.assertEqual((state.step(), state.reply_type, state.attempt), ('acepto', '', 2))
+
+
+class WeeklyReadingTests(BuyerBase):
+    """LI-12-M001-K04: the first stage under its threshold, its most probable cause and ONE change; under 30 invitations
+    nothing is judged."""
+
+    def journeys(self, n, **fields):
+        made = []
+        for i in range(n):
+            _, journey = self.buyer(f'lect-{len(self.made)}', f'Lectura {len(self.made)}')
+            self.made.append(journey)
+            made.append(journey)
+        BuyerJourney.objects.filter(pk__in=[j.pk for j in made]).update(**fields)
+        return made
+
+    def setUp(self):
+        super().setUp()
+        self.made = []
+        self.now = timezone.now()
+
+    def test_it_breaks_at_acceptance_first(self):
+        week = self.now - 2 * DAY
+        # Five accepted of 32 (15.6 %) and none of the five who replied booked: two stages break, the first one wins.
+        self.journeys(5, invited_at=week, accepted_at=week, first_message_at=week, replied_at=week)
+        self.journeys(27, invited_at=week)
+        reading = lectura_embudo.read(self.now)
+        self.assertEqual((reading['muestra_chica'], reading['invitaciones'], reading['se_rompe']), (False, 32, 'aceptacion'))
+        self.assertEqual((reading['causa'], reading['cambio']), ('Lista equivocada o perfil que no convence', 'Afina la lista y tu perfil'))
+        rows = {r['etapa']: r for r in reading['tabla']}
+        self.assertEqual([r['etapa'] for r in reading['tabla'] if r['rota']], ['aceptacion', 'reunion'])
+        row = rows['aceptacion']
+        self.assertEqual((row['n'], row['de'], row['valor_pct'], row['umbral_pct'], row['fuente_umbral']), (5, 32, 15.6, 20, 'curso'))
+        self.assertLessEqual(len(reading['lineas']), 5)
+        self.assertIn('Se rompe primero en la aceptación', reading['lineas'][1])
+        self.assertIn('Un solo cambio esta semana: afina la lista y tu perfil', reading['lineas'][2])
+
+    def test_it_breaks_at_the_reply_when_acceptance_is_fine(self):
+        week = self.now - 2 * DAY
+        self.journeys(1, invited_at=week, accepted_at=week, first_message_at=week, replied_at=week)
+        self.journeys(29, invited_at=week, accepted_at=week, first_message_at=week)
+        self.journeys(2, invited_at=week)
+        reading = lectura_embudo.read(self.now)
+        self.assertEqual((reading['se_rompe'], reading['cambio']), ('respuesta', 'Reescribe solo el mensaje 1'))
+        self.assertFalse(next(r for r in reading['tabla'] if r['etapa'] == 'aceptacion')['rota'])
+        self.assertEqual(reading['semana_actual']['invitados'] + reading['semana_anterior']['invitados'], 32)
+
+    def test_a_small_sample_is_not_judged(self):
+        week = self.now - 2 * DAY
+        self.journeys(5, invited_at=week)
+        reading = lectura_embudo.read(self.now)
+        self.assertEqual((reading['muestra_chica'], reading['se_rompe'], reading['causa'], reading['cambio']), (True, None, None, None))
+        self.assertIn('Muestra chica: 5 invitaciones en total, menos de 30', reading['lineas'][1])
+        self.assertTrue(next(r for r in reading['tabla'] if r['etapa'] == 'aceptacion')['rota'])  # the table still shows it
+
+    def test_it_goes_to_slack_on_mondays_inside_the_window_once_a_week(self):
+        self.journeys(3, invited_at=self.now - 2 * DAY)
+        local = operador.local_tz()
+        monday = datetime(2026, 11, 16, 10, 0, tzinfo=local)
+        with patch.dict(os.environ, {'BUYER_REPLY_ENABLED': 'true', 'READ_WINDOW': '08:00-20:00'}):
+            alerts = alertas_slack.lectura_semanal_embudo(monday)
+            self.assertEqual([(a.key, a.once, a.channel) for a in alerts], [('comprador:lectura:2026-11-16', 'ever', 'resumen')])
+            self.assertLessEqual(len(alerts[0].text().splitlines()), 5)
+            self.assertEqual(alertas_slack.lectura_semanal_embudo(monday + DAY), [])
+            self.assertEqual(alertas_slack.lectura_semanal_embudo(monday.replace(hour=6)), [])
+        with patch.dict(os.environ, {'BUYER_REPLY_ENABLED': 'false'}):
+            self.assertEqual(alertas_slack.lectura_semanal_embudo(monday), [])
 
 
 class ReplyActivationTests(SimpleTestCase):

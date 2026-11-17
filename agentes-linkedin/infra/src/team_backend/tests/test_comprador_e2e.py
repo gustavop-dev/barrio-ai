@@ -1976,9 +1976,11 @@ class ReplyPathBase(SequencePathBase):
         env.start();self.addCleanup(env.stop)
 
     # -- steps (production code only)
-    def replied(self,slug,name,text,at=None,headline='Founder & CEO at Acme'):
-        """M1 «Hecho» at self.start, she answers a day later and the next cycle reads and classifies it."""
+    def replied(self,slug,name,text,at=None,headline='Founder & CEO at Acme',draft='',faltan=(),referido=''):
+        """M1 «Hecho» at self.start, she answers a day later and the next cycle reads and classifies it (and the drafter,
+        simulated, writes `draft`)."""
         contact=self.messaged(slug,name,headline=headline)
+        if draft:self.write_reply(contact,draft,faltan=faltan,referido=referido)
         at=at or self.start+DAY
         self.she_replies(contact,text,at)
         self.cycle(at+HOUR)
@@ -2015,7 +2017,11 @@ class ReplyPathBase(SequencePathBase):
         return rows[-1] if rows else None
 
     def reply_cards(self,contact,at):
-        return [c for c in self.cards_at(contact,at) if (c.get('message') or {}).get('origin')=='respuesta' or c['id'].startswith('respuesta:')]
+        """Her reply cards in Tu turno (tasks.mensajes): «Mensaje sugerido» with the draft, or the conversation card «necesita
+        tu respuesta» when there is none (otro, no booking link)."""
+        def who(card):
+            return (((card.get('message') or {}).get('person')) or ((card.get('conversation') or {}).get('person')) or {}).get('id')
+        return [c for c in self.turn_at(at)['tasks']['mensajes'] if c['id'].startswith('respuesta:') and who(c)==str(contact.pk)]
 
     def booking_ref(self,contact):
         return getattr(self.journey(contact),'booking_ref',None)
@@ -2039,3 +2045,367 @@ class ReplyPathBase(SequencePathBase):
             response=self.gustavo_api().post(action['endpoint'],action.get('body') or {},format='json')
         self.assertEqual(response.status_code,200,response.content)
         return (self.handoff_of(contact,at) or {}).get('oportunidad')
+
+
+
+class ReplyBuyerPathTests(ReplyPathBase):
+    """BAR-23 de punta a punta con las funciones de producción y el reloj simulado: elegida → calentada (dos comentarios
+    y su respuesta) → invitada → aceptó → M1 «Hecho» → responde con interés → borrador con su enlace → «Hecho» → webhook
+    firmado de Cal.com → reunión → entrega del lead → oportunidad con un toque → embudo con cada etapa en 1; y sus
+    variantes."""
+
+    def warm_messaged(self,slug,name,headline='Founder & CEO at Acme'):
+        """Chosen, followed, the two warm-up comments and her answer to the second, invited, accepted and «Hecho, le
+        escribí» on the first message at self.start."""
+        contact=self.chosen_and_followed(slug,name,headline=headline)
+        _,second=self.warm_up(contact)
+        self.step_their_answer(contact,second)
+        self.texts[('buyer-message',name)]=case_text('primer_mensaje_comprador','M1')
+        self.invite(contact)
+        contact=self.accepted(contact)
+        self.prepare()
+        cards=self.cards_of(contact,LATER)
+        self.assertEqual(len(cards),1)
+        self.close_at(cards[0],'enviado',self.start)
+        return Contact.objects.get(pk=contact.pk)
+
+    def link(self,contact):
+        return f'{BOOKING_URL}?metadata%5Bbarrio%5D={self.booking_ref(contact)}'
+
+    def interested(self,people):
+        """Several buyers messaged first (one timeline), then each replies «flujo» a day later: [contact]."""
+        contacts=[self.messaged(slug,name) for slug,name in people]
+        for contact in contacts:
+            self.write_reply(contact,reply_input('flujo','borrador'))
+            self.she_replies(contact,reply_input('flujo'),self.start+DAY)
+        self.cycle(self.start+DAY+HOUR)
+        return [Contact.objects.get(pk=c.pk) for c in contacts]
+
+    def test_the_whole_path_until_the_lead_is_handed_over(self):
+        from team_backend.models import BuyerDraft, Conversation, Opportunity
+        ana=self.warm_messaged('resp-e2e-ana','Ana Agenda')
+        self.write_reply(ana,reply_input('flujo','borrador'))
+        writes=self.fake.state['writes']
+        at=self.start+DAY
+        self.she_replies(ana,reply_input('flujo'),at)
+        self.cycle(at+HOUR)
+
+        # A. Classified with the methodology, reading the whole conversation: interesado.
+        journey=self.journey(ana);row=self.reply(ana)
+        self.assertEqual((journey.step,journey.reply_type,row.inputs['clasificacion']['tipo']),('interesado','interesado','interesado'))
+        classify=next(j for j in self.jev if j['purpose']=='buyer-reply-classify')
+        self.assertEqual(set(classify['questions']),{'interesado','pide_informacion','no_es_el_momento','no_le_interesa','otra_persona'})
+        self.assertIn('LI-11-M006-K01',classify['state']['course_context'])
+        self.assertEqual([(m['de'],m['texto']) for m in classify['state']['conversacion']],
+                         [('Gustavo',case_text('primer_mensaje_comprador','M1')),('ella',reply_input('flujo'))])
+        self.assertIn(('respuesta_clasificada','estado'),self.kinds(ana))
+
+        # B. The draft: what the drafter wrote plus her booking link (appended by the code), reviewed by the lead.
+        self.assertEqual(row.text,reply_input('flujo','borrador')+'\n'+self.link(ana))
+        self.assertEqual((row.state,row.review['decision']),('listo','approve'))
+        review=next(j for j in self.jev if j['purpose']=='lead-review-reply')
+        self.assertEqual(set(review['questions']),{'resp_responde','resp_pitch','resp_presiona','resp_inventa','resp_paso_facil'})
+        drafted=next(c for c in self.calls if c['purpose']=='buyer-reply')
+        self.assertNotIn(BOOKING_URL,json.dumps(drafted['inputs']))  # the drafter never writes the link
+        self.assertEqual((drafted['inputs']['tipo'],drafted['inputs']['su_mensaje']),('interesado',reply_input('flujo')))
+        for uid in ('LI-11-M006-K01','LI-12-M001-K04','LI-08-M003-K05'):self.assertIn(uid,drafted['context'])
+
+        # Tu turno: her card with its own label and «Agendó»; her inbox conversation does not show twice.
+        cards=self.reply_cards(ana,at+2*HOUR)
+        self.assertEqual(len(cards),1)
+        card=cards[0]
+        self.assertEqual((card['type'],card['title'],card['message']['text_label'],card['message']['text'],card['message']['comment']),
+                         ('mensaje','Ana Agenda quiere hablar','Respuesta sugerida · con tu agenda',row.text,reply_input('flujo')))
+        self.assertEqual([a['label'] for a in card['actions']],['Abrir la conversación','Hecho, le escribí','No escribirle','Agendó'])
+        self.assertEqual(card['actions'][1]['endpoint'],f'/api/v1/respuestas/{row.pk}/mensaje')
+        turn=self.turn_at(at+2*HOUR)
+        self.assertFalse([c for c in turn['tasks']['conversaciones'] if (c.get('conversation') or {}).get('contact_id')==str(ana.pk)])
+
+        # «Hecho, le escribí»: Gustavo sends it himself; the card goes, the journey keeps it.
+        self.close_at(card,'enviado',at+2*HOUR)
+        row.refresh_from_db()
+        self.assertEqual(row.state,'enviado')
+        self.assertIn(('respuesta_enviada','saliente'),self.kinds(ana))
+        self.assertEqual(self.reply_cards(ana,at+3*HOUR),[])
+
+        # C. She books through the link: Cal.com's signed webhook, matched by the link's identifier.
+        booked=at+DAY;start=(booked+3*DAY).replace(microsecond=0)
+        response=self.webhook('BOOKING_CREATED','e2e-booking-1',start=start,ref=self.booking_ref(ana),name='Ana Agenda',
+                              email='ana@acme.example',at=booked)
+        self.assertEqual((response.status_code,response.json()['emparejada_por']),(200,'enlace'),response.content)
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.meeting_date,journey.meeting_at),('reunion',start,booked))
+
+        # D. The lead, handed over source-neutral and without qualification.
+        handoff=self.handoff_of(ana,booked+HOUR)
+        self.assertEqual((handoff['fuente'],handoff['estado'],handoff['oportunidad']),('linkedin','lista',None))
+        self.assertEqual((handoff['persona']['contacto'],handoff['persona']['nombre']),(str(ana.pk),'Ana Agenda'))
+        self.assertEqual(handoff['empresa'],{'nombre':'Acme','fuente':'titular de LinkedIn'})
+        path=handoff['recorrido']
+        self.assertEqual([(m['tipo'],m['numero']) for m in path['mensajes_enviados']],[('mensaje',1),('respuesta',1)])
+        self.assertEqual((path['respondio_a']['numero'],path['respuesta']['tipo'],path['respuesta']['texto']),(1,'interesado',reply_input('flujo')))
+        self.assertEqual((path['senal_de_entrada']['entrada'],path['senal_de_entrada']['senal']['tipo']),('saliente','respondio_comentario'))
+        self.assertEqual((path['toques']['comentarios'],path['puente'],path['referido_por']),(2,[],None))
+        self.assertEqual(len(handoff['conversacion']),3)
+        self.assertIn(reply_input('flujo')[:40],handoff['conversacion'][1])
+        self.assertEqual((handoff['reunion']['inicio'],handoff['reunion']['emparejada_por'],handoff['reunion']['correo']),
+                         (start.isoformat(),'enlace','ana@acme.example'))
+        self.assertIn({'hecho':'Trabaja en Acme: Founder & CEO at Acme','fuente':'titular de LinkedIn'},handoff['negocio'])
+        self.assertTrue(all(f['hecho'] for f in handoff['negocio']))
+        self.assertFalse({'calificacion','preguntas','presupuesto','necesidad'}&set(handoff))
+        chat=Conversation.objects.get(contact=ana)
+        self.assertEqual((handoff['recorrido_id'],handoff['conversacion_id']),(str(journey.pk),str(chat.pk)))
+
+        # PRS-09: only Gustavo creates the opportunity, with one tap; the handoff links it to the conversation and journey.
+        self.assertFalse(Opportunity.objects.filter(contact=ana).exists())
+        opportunity=self.confirm_opportunity(ana,booked+2*HOUR)
+        self.assertEqual(opportunity['etapa'],'reunion')
+        item=Opportunity.objects.get(contact=ana)
+        self.assertEqual((str(item.pk),item.channel,item.next_action_at,item.company),(opportunity['id'],'linkedin',start,'Acme'))
+        handoff=self.handoff_of(ana,booked+2*HOUR)
+        self.assertEqual((handoff['estado'],handoff['conversacion_id'],handoff['recorrido_id']),('confirmada',str(chat.pk),str(journey.pk)))
+        self.assertFalse([c for c in self.turn_at(booked+3*HOUR)['items'] if c['id'].startswith('entrega:')])
+
+        # H. The funnel: every stage at 1, her reply by type and the hours from her reply to the meeting.
+        funnel=self.funnel()
+        self.assertEqual(self.stages(funnel['acumulado']),{s:1 for s in ('elegidos','calentados','calentados_2','invitados','aceptaron',
+                                                                       'recibieron_mensaje','respondieron','interesados','reunion')})
+        replies=funnel['respuestas']
+        self.assertEqual((replies['activa'],replies['clasificadas'],replies['por_tipo']['interesado'],replies['reuniones']),(True,1,1,1))
+        self.assertEqual(replies['horas_respuesta_a_reunion'],{'mediana':round((booked-journey.replied_at)/HOUR,1),'personas':1})
+        self.assertEqual(funnel['borradores']['respuestas']['enviados'],1)
+        self.assertEqual(self.fake.state['writes'],writes)  # the team never wrote a message (INB-08)
+        self.assertFalse(BuyerDraft.objects.filter(contact=ana,state__in=['listo','en_revision']).exists())
+        self.assertFalse(AuditEvent.objects.filter(action__in=['buyer.record_failed','buyer.reply_failed']).exists())
+
+    def test_1_she_asks_for_information(self):
+        bea=self.replied('resp-e2e-bea','Bea Pregunta',reply_input('P'),draft=reply_input('P','borrador'),faltan=reply_input('P','faltan'))
+        row=self.reply(bea)
+        self.assertEqual((row.inputs['clasificacion']['tipo'],row.state),('pide_informacion','listo'))
+        self.assertTrue(row.text.endswith(self.link(bea)))
+        self.assertEqual(self.journey(bea).step,'respondio')  # asking is not interest yet
+        card=self.reply_cards(bea,self.start+DAY+2*HOUR)[0]
+        self.assertIn('Falta confirmar antes de enviar: '+reply_input('P','faltan')[0],card['body'])
+        self.assertEqual((card['message']['reply'],card['message']['reply_label']),(reply_input('P','faltan')[0],'Falta confirmar'))
+        self.assertIn('Agendó',[a['label'] for a in card['actions']])
+
+    def test_2_not_the_moment_with_a_date_rests_until_then_and_comes_back_with_what_she_said(self):
+        cris=self.replied('resp-e2e-cris','Cris Enero',reply_input('N1'),draft=reply_input('N1','borrador'))
+        journey=self.journey(cris);row=self.reply(cris)
+        self.assertEqual((journey.step,journey.rest_reason,row.inputs['descanso']['lo_dijo']),('descanso','no_es_el_momento',True))
+        until=journey.rest_until.astimezone(operador.local_tz())
+        self.assertEqual((until.month,until.day,until.hour),(2,1,9))
+        self.assertNotIn('http',row.text)
+        card=self.reply_cards(cris,self.start+DAY+2*HOUR)[0]
+        self.assertIn(f'descansa hasta {until:%d/%m/%Y}',card['body'])
+        self.assertNotIn('Agendó',[a['label'] for a in card['actions']])
+        self.close_at(card,'enviado',self.start+DAY+2*HOUR)
+        # Before her date nothing happens; at her date she comes back with what she said as the angle.
+        self.cycle(journey.rest_until-HOUR)
+        self.assertEqual(self.journey(cris).step,'descanso')
+        self.texts[('buyer-message','Cris Enero')]='Cris, you said after January was better, with the round closed. How is the Friday report doing now?'
+        self.cycle(journey.rest_until+MINUTE)
+        self.cycle(journey.rest_until+HOUR)
+        journey=self.journey(cris)
+        self.assertEqual(journey.attempt,2)
+        retry=journey.touches.get(kind='reintento')
+        self.assertEqual((retry.detail['tipo'],retry.detail['texto']),('lo_que_dijo',reply_input('N1')))
+        first=next(d for d in self.drafts_of(cris,'mensaje') if d.attempt==2)
+        self.assertEqual((first.number,first.state,first.anchor['tipo']),(1,'listo','lo_que_dijo'))
+        call=next(c for c in reversed(self.calls) if c['purpose']=='buyer-message')
+        self.assertEqual(call['inputs']['hechos'][0]['texto'],reply_input('N1'))
+        self.assertIn('"lo_que_dijo"',call['system'])
+
+    def test_2b_not_the_moment_without_a_date_rests_ninety_days_and_her_message_wakes_her(self):
+        dani=self.replied('resp-e2e-dani','Dani Ahora',reply_input('N2'),draft=reply_input('N2','borrador'))
+        journey=self.journey(dani)
+        rest=journey.touches.get(kind='descanso')
+        self.assertEqual((journey.rest_reason,round((journey.rest_until-rest.at)/DAY),self.reply(dani).inputs['descanso']['lo_dijo']),
+                         ('no_es_el_momento',90,False))
+        # She writes during the rest: that wakes her by itself and her new message is classified.
+        self.write_reply(dani,'Dani, glad to hear it. Pick any slot that suits you and we look at the launch numbers.')
+        self.she_replies(dani,'Actually things calmed down, happy to talk now.',self.start+5*DAY)
+        self.cycle(self.start+5*DAY+HOUR)
+        journey=self.journey(dani)
+        self.assertEqual((journey.step,journey.attempt),('interesado',1))
+        self.assertEqual([r.number for r in self.replies_of(dani)],[1,2])
+
+    def test_3_not_interested_is_definitive(self):
+        eva=self.replied('resp-e2e-eva','Eva Fuera',reply_input('X'),draft=reply_input('X','borrador'))
+        journey=self.journey(eva)
+        self.assertEqual((journey.step,journey.exit_reason),('salio','no_le_interesa'))
+        self.assertIn('nadie le vuelve a escribir',self.reply_cards(eva,self.start+DAY+2*HOUR)[0]['body'])
+        before=len(self.drafts_of(eva,'mensaje'))+len(self.replies_of(eva))
+        self.she_replies(eva,reply_input('X','despues'),self.start+2*DAY)
+        for days in (2,6,30,120):self.cycle(self.start+days*DAY+HOUR)
+        self.assertEqual(len(self.drafts_of(eva,'mensaje'))+len(self.replies_of(eva)),before)
+        self.assertEqual((self.journey(eva).step,self.journey(eva).attempt),('salio',1))
+
+    def test_4_another_person_becomes_a_linked_contact_with_her_own_journey(self):
+        from team_backend import mensajes_comprador
+        self.fake.seed_person('bruno-globex','Bruno Ruiz','Head of Operations at Globex',location='Austin, Texas')
+        fer=self.replied('resp-e2e-fer','Fer Redirige',reply_input('O'),headline='Founder & CEO at Globex',
+                         draft=reply_input('O','borrador'),referido=reply_input('O','referido'))
+        self.cycle(self.start+DAY+2*HOUR)
+        bruno=Contact.objects.get(public_identifier='bruno-globex')
+        journey=self.journey(bruno)
+        self.assertEqual((bruno.source,bruno.stage,bruno.classification['referido_por']),('referido','fit',str(fer.pk)))
+        self.assertEqual(journey.referred_by_id,self.journey(fer).pk)
+        self.assertEqual(journey.touches.get(kind='referido').detail['respuesta'],str(self.reply(fer).pk))
+        self.assertEqual(self.reply(fer).inputs['referido']['estado'],'creado')
+        fact=mensajes_comprador.anchors(bruno)[0]  # her first note or message may name who referred her
+        self.assertEqual((fact['tipo'],fact['nombre_de_quien_refiere']),('referido','Fer Redirige'))
+        self.assertTrue(mensajes_comprador.warmed(journey))
+        self.assertIn('Bruno Ruiz ya es un contacto',self.reply_cards(fer,self.start+DAY+3*HOUR)[0]['body'])
+
+    def test_4b_without_her_profile_gustavo_pastes_it(self):
+        gus=self.replied('resp-e2e-gus','Gus Redirige','I am not the right person for this, talk to Lia from operations.',
+                         headline='Founder & CEO at Initech',draft='Gus, thanks for pointing me to Lia.',referido='Lia')
+        card=self.reply_cards(gus,self.start+DAY+2*HOUR)[0]
+        self.assertIn('Falta el perfil de Lia',card['body'])
+        paste=next(a for a in card['actions'] if a['label']=='Pegar su perfil')
+        self.fake.seed_person('lia-initech','Lia Ops','COO at Initech',location='Austin, Texas')
+        with self.clock(self.start+DAY+2*HOUR):
+            bad=self.gustavo_api().post(paste['endpoint'],{'note':'Lia'},format='json')
+            good=self.gustavo_api().post(paste['endpoint'],{'note':'https://www.linkedin.com/in/lia-initech/'},format='json')
+        self.assertEqual((bad.status_code,good.status_code),(400,200),good.content)
+        self.cycle(self.start+DAY+3*HOUR)
+        self.assertEqual(self.journey(Contact.objects.get(public_identifier='lia-initech')).referred_by_id,self.journey(gus).pk)
+
+    def test_5_low_confidence_is_otro_with_a_card_and_no_draft(self):
+        gil=self.replied('resp-e2e-gil','Gil Duda',reply_input('B'))
+        row=self.reply(gil)
+        self.assertEqual((row.inputs['clasificacion']['tipo'],row.text,row.state),('otro','','listo'))
+        self.assertEqual(self.journey(gil).step,'respondio')
+        self.assertFalse([c for c in self.calls if c['purpose']=='buyer-reply'])  # nothing paid to draft
+        card=self.reply_cards(gil,self.start+DAY+2*HOUR)[0]
+        self.assertEqual((card['type'],card['title']),('conversacion','Gil Duda te respondió: necesita tu respuesta'))
+        self.assertIn('Sin confianza suficiente',card['body'])
+        self.assertEqual([a['label'] for a in card['actions']],['Abrir la conversación','Hecho, le escribí','No escribirle'])
+        self.assertEqual(card['conversation']['messages'][-1]['text'],reply_input('B'))
+        self.close_at(card,'no',self.start+DAY+2*HOUR)
+        self.assertEqual((self.reply(gil).state,self.journey(gil).step),('no_enviado','respondio'))  # «no» never exits her
+
+    def test_6_without_the_booking_link_there_is_no_draft_and_an_alert(self):
+        from team_backend import alertas_slack
+        with patch.dict(os.environ,{'CALCOM_BOOKING_URL':''}):
+            hugo=self.replied('resp-e2e-hugo','Hugo Sinenlace',reply_input('E'),draft=reply_input('flujo','borrador'))
+            row=self.reply(hugo)
+            self.assertEqual((row.inputs['clasificacion']['tipo'],row.text,row.stopped_by),('interesado','','agenda'))
+            self.assertEqual(self.journey(hugo).step,'interesado')
+            self.assertFalse([c for c in self.calls if c['purpose']=='buyer-reply'])
+            self.assertIsNone(self.booking_ref(hugo))
+            card=self.reply_cards(hugo,self.start+DAY+2*HOUR)[0]
+            self.assertIn('CALCOM_BOOKING_URL',card['body'])
+            self.assertTrue(AuditEvent.objects.filter(action='buyer.reply_no_link',target=str(hugo.pk)).exists())
+            self.assertEqual([a.key for a in alertas_slack.falta_enlace_agenda(self.start+DAY+2*HOUR)],['comprador:falta_enlace_agenda'])
+
+    def test_7_the_webhook_rejects_repeats_reschedules_and_cancels(self):
+        from team_backend.models import MeetingBooking
+        ana,=self.interested([('resp-e2e-wh','Ana Webhook')])
+        ref=self.booking_ref(ana);at=self.start+2*DAY;start=(at+3*DAY).replace(microsecond=0)
+        # Rejected: a bad signature, and no secret configured; nothing is stored.
+        self.assertEqual(self.webhook('BOOKING_CREATED','wh-1',ref=ref,secret='wrong',at=at).status_code,403)
+        with patch.dict(os.environ,{'CALCOM_WEBHOOK_SECRET':''}):
+            self.assertEqual(self.webhook('BOOKING_CREATED','wh-1',ref=ref,at=at).status_code,403)
+        self.assertFalse(MeetingBooking.objects.exists())
+        self.assertEqual(self.journey(ana).step,'interesado')
+        # Created, then the same delivery again: processed once.
+        body=json.dumps({'triggerEvent':'BOOKING_CREATED','createdAt':at.isoformat(),'payload':{
+            'uid':'wh-1','startTime':start.isoformat(),'endTime':(start+30*MINUTE).isoformat(),
+            'attendees':[{'name':'Ana Webhook','email':'ana@acme.example'}],'metadata':{'barrio':ref}}}).encode()
+        first=self.webhook('BOOKING_CREATED','wh-1',body=body,at=at)
+        again=self.webhook('BOOKING_CREATED','wh-1',body=body,at=at+MINUTE)
+        self.assertEqual((first.status_code,again.status_code,again.json()),(200,200,{'repetido':True}))
+        self.assertEqual((MeetingBooking.objects.count(),self.journey(ana).touches.filter(kind='reunion').count()),(1,1))
+        self.assertEqual(self.journey(ana).meeting_date,start)
+        # Rescheduled: the new booking replaces the old one, the date moves, still one handoff.
+        later=start+2*DAY
+        self.webhook('BOOKING_RESCHEDULED','wh-2',start=later,ref=ref,previous='wh-1',at=at+HOUR)
+        self.assertEqual(MeetingBooking.objects.get(uid='wh-1').state,'reprogramada')
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.meeting_date),('reunion',later))
+        self.assertEqual(self.handoff_of(ana,at+2*HOUR)['reunion']['inicio'],later.isoformat())
+        self.assertEqual(len(self.handoffs(at+2*HOUR)),1)
+        # Cancelled: back to «interesado», the handoff cancelled, the funnel no longer counts the meeting.
+        self.webhook('BOOKING_CANCELLED','wh-2',start=later,ref=ref,at=at+3*HOUR)
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.meeting_date,journey.meeting_at),('interesado',None,None))
+        self.assertEqual(self.handoff_of(ana,at+4*HOUR)['estado'],'cancelada')
+        self.assertEqual(self.stages(self.funnel()['acumulado'])['reunion'],0)
+
+    def test_7b_an_unmatched_booking_waits_for_gustavo(self):
+        from team_backend import alertas_slack
+        from team_backend.models import MeetingBooking
+        ana,=self.interested([('resp-e2e-wh2','Ana Sinref')])
+        at=self.start+2*DAY
+        response=self.webhook('BOOKING_CREATED','wh-x',name='Someone Else',email='someone@else.example',at=at)
+        self.assertEqual(response.json()['emparejada_por'],'sin_emparejar')
+        booking=MeetingBooking.objects.get(uid='wh-x')
+        self.assertEqual((booking.journey_id,self.journey(ana).step),(None,'interesado'))
+        self.assertEqual([a.key for a in alertas_slack.reserva_sin_emparejar(at)],[f'comprador:reserva:{booking.pk}'])
+        card=next(c for c in self.turn_at(at+HOUR)['items'] if c['id']==f'reserva:{booking.pk}')
+        self.assertEqual([a['label'] for a in card['actions']],['Es Ana Sinref','No es de un comprador'])
+        with self.clock(at+HOUR):
+            response=self.gustavo_api().post(card['actions'][0]['endpoint'],card['actions'][0]['body'],format='json')
+        self.assertEqual((response.status_code,response.json()['emparejada_por']),(200,'gustavo'),response.content)
+        self.assertEqual(self.journey(ana).step,'reunion')
+        self.assertFalse([c for c in self.turn_at(at+2*HOUR)['items'] if c['id']==f'reserva:{booking.pk}'])
+
+    def test_7c_her_email_in_the_conversation_or_her_exact_name_match_a_booking_without_the_identifier(self):
+        ana,bea=self.interested([('resp-e2e-wh3','Ana Correo'),('resp-e2e-wh4','Béa Nombre')])
+        self.she_replies(ana,'Booked it, my work email is ana.correo@acme.example',self.start+2*DAY)
+        self.cycle(self.start+2*DAY+HOUR)
+        response=self.webhook('BOOKING_CREATED','wh-mail',name='A. C.',email='ana.correo@acme.example',at=self.start+2*DAY+2*HOUR)
+        self.assertEqual((response.json()['emparejada_por'],self.journey(ana).step),('correo','reunion'))
+        response=self.webhook('BOOKING_CREATED','wh-name',name='bea  nombre',email='x@y.example',at=self.start+2*DAY+3*HOUR)
+        self.assertEqual((response.json()['emparejada_por'],self.journey(bea).step),('nombre','reunion'))
+
+    def test_8_gustavo_marks_it_booked_by_hand(self):
+        ana,=self.interested([('resp-e2e-man','Ana Mano')])
+        at=self.start+DAY+2*HOUR
+        card=self.reply_cards(ana,at)[0]
+        booked=next(a for a in card['actions'] if a['label']=='Agendó')
+        when=(self.start+4*DAY).astimezone(operador.local_tz())
+        with self.clock(at):
+            first=self.gustavo_api().post(booked['endpoint'],{'note':f'{when:%d/%m/%Y} 10:30 por correo'},format='json')
+            second=self.gustavo_api().post(booked['endpoint'],{},format='json')
+        self.assertEqual((first.status_code,second.status_code),(200,200),first.content)
+        self.assertEqual(first.json()['reserva'],second.json()['reserva'])
+        journey=self.journey(ana)
+        local=journey.meeting_date.astimezone(operador.local_tz())
+        self.assertEqual((journey.step,local.date(),local.hour,local.minute),('reunion',when.date(),10,30))
+        handoff=self.handoff_of(ana,at+HOUR)
+        self.assertEqual((handoff['reunion']['emparejada_por'],handoff['reunion']['proveedor']),('manual','manual'))
+        self.assertEqual(self.reply(ana).state,'cancelado')  # she booked: the draft no longer applies
+        self.assertEqual(self.reply_cards(ana,at+HOUR),[])
+
+    def test_9_with_the_switch_off_everything_is_as_in_phases_1_to_5(self):
+        from team_backend.models import MeetingBooking
+        with patch.dict(os.environ,{'BUYER_REPLY_ENABLED':'false'}):
+            ana=self.replied('resp-e2e-off','Ana Apagada',reply_input('flujo'),draft=reply_input('flujo','borrador'))
+            self.assertEqual((self.replies_of(ana),self.journey(ana).step),([],'respondio'))
+            self.assertFalse([j for j in self.jev if j['purpose'] in ('buyer-reply-classify','lead-review-reply')])
+            self.assertEqual(self.webhook('BOOKING_CREATED','off-1',name='Ana Apagada',at=self.start+2*DAY).status_code,202)
+            self.assertFalse(MeetingBooking.objects.exists())
+            self.assertEqual(self.reply_cards(ana,self.start+2*DAY),[])
+            self.assertEqual(self.handoffs(self.start+2*DAY),[])
+            self.assertFalse(self.funnel()['respuestas']['activa'])
+            self.assertTrue(AuditEvent.objects.filter(action='buyer.sequence_replied',target=str(ana.pk)).exists())
+
+    def test_10_the_booking_link_never_goes_in_messages_1_to_4(self):
+        ana=self.messaged('resp-e2e-seq','Ana Secuencia');self.follow_ups(ana)
+        sent=self.start
+        for number in (2,3,4):
+            due=sent+timedelta(days={2:4,3:5,4:7}[number])
+            self.cycle(due+MINUTE)
+            cards=self.sequence_cards(ana,due+HOUR)
+            self.assertEqual(len(cards),1,number)
+            self.close_at(cards[0],'enviado',due+HOUR);sent=due+HOUR
+        texts=[d.text for d in self.drafts_of(ana,'mensaje')]
+        self.assertEqual(len(texts),4)
+        self.assertFalse(any('cal.com' in t or 'metadata' in t for t in texts))
+        self.assertIsNone(self.booking_ref(ana))  # no link was ever made for her
+        self.assertFalse(any(BOOKING_URL in json.dumps(c['inputs']) for c in self.calls))
+        # A message 1–4 carrying the link would not pass its rules (RSP-07's: no links).
+        self.assertIn('Primer mensaje con enlaces',respuestas.dm_text_issues(texts[0]+' '+BOOKING_URL,texts[0]))

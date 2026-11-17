@@ -456,14 +456,18 @@ class FirstMessageRegistryTests(FirstMessageBase):
         self.assertTrue(grade['passed'], grade['errors'])
         self.assertEqual(list(grade['units']), operador.FIRST_MESSAGE_UNITS)
         self.assertEqual(set(grade['units'].values()), {'fixture-hash'})
-        # The synthetic corpus seeds every activated class 09 list: the first message (7) and the note (3).
-        self.assertEqual(grade['corpus']['por_clase']['09'], len(operador.FIRST_MESSAGE_UNITS + operador.INVITE_NOTE_UNITS))
-        self.assertNotIn('11', grade['corpus']['por_clase'])
+        # The synthetic corpus seeds every activated list of class 09: the first message (7), the note (3) and the
+        # sequence's (4).
+        class_09 = {uid for uid in operador.FIRST_MESSAGE_UNITS + operador.INVITE_NOTE_UNITS + operador.SEQUENCE_UNITS if uid.startswith('LI-09-')}
+        self.assertEqual(grade['corpus']['por_clase']['09'], len(class_09))
+        # Class 11 holds only the activated units of the buyer's reply (phase 6): four of BUYER_REPLY_UNITS.
+        self.assertEqual(grade['corpus']['por_clase']['11'], sum(1 for uid in operador.BUYER_REPLY_UNITS if uid.startswith('LI-11-')))
         self.assertRegex(grade['corpus']['sha256'], r'^[0-9a-f]{64}$')
         self.assertEqual(evaluaciones.case_drift(grade, self.grade()), [])
 
     def test_a_growing_corpus_warns_to_grade_again_without_failing_the_case(self):
         before = self.grade()
+        seeded = before['corpus']['por_clase'].get('11', 0)  # the activated units of class 11 the base seeds
         with db.connect() as c:
             c.execute('''INSERT INTO units(id,session,title,original,sha256,source_path,pointer,metadata)
                 VALUES('LI-11-M001-K01',11,'Clase 11','{}','fixture-hash','fixture','/units/0','{}')''')
@@ -471,7 +475,7 @@ class FirstMessageRegistryTests(FirstMessageBase):
         self.assertTrue(after['passed'], after['errors'])
         self.assertEqual(after['units'], before['units'])
         self.assertEqual(evaluaciones.case_drift(before, after),
-                         ['La biblioteca cambió (11: 0 → 1): vuelve a calificar el caso.'])
+                         [f'La biblioteca cambió (11: {seeded} → {seeded + 1}): vuelve a calificar el caso.'])
 
     def test_a_changed_unit_of_the_case_is_named(self):
         before = self.grade()
