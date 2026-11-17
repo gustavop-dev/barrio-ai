@@ -248,6 +248,8 @@ def tick(user,now=None):
     try:referentes.tick(user,now)
     except Exception as exc:report['referents_error']=type(exc).__name__
     comunidad.maintain(now)  # retention also runs when collection/the machine is paused
+    from . import alertas_slack
+    report['slack']=alertas_slack.vigilar(now)  # reads the state, also with the machine stopped; never raises
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
     stopped={(cycle,key):reason for cycle,key,reason in CycleLedger.objects.filter(state='stopped').exclude(
         stop_reason='cost_cap').values_list('cycle','key','stop_reason')}
@@ -364,6 +366,7 @@ def recent_comment_authors(account,now,states=LIVE_COMMENT_STATES,exclude=None):
     return set(qs.values_list('post__referent_id',flat=True))
 
 def _observe(user,account,now):
+    if not operador.within_read_window(now):return 0
     every=timedelta(minutes=int(setting('OPERATOR_OBSERVE_EVERY_MINUTES','180')))
     last=account.referents.filter(active=True).order_by('last_observed_at').values_list('last_observed_at',flat=True).first()
     if not account.referents.filter(active=True).exists() or (last and last>now-every) or _pending('observe',account=str(account.id)):return 0
@@ -462,21 +465,22 @@ def _every(name,default):
 
 def _network(user,account,now):
     """DESC/RED: queue discovery, classification, planning and sync for the operating account, each on its own clock.
-    Reads and the cheaper classifier run on their own; follows, invitations and acceptances become proposals."""
+    Reads and the cheaper classifier run on their own; follows, invitations and acceptances become proposals. Discovery,
+    classification (profile reads, web checks) and sync read LinkedIn: only inside READ_WINDOW. The plan reads nothing."""
     if not red.enabled() or account.provider not in ('fake','directo'):return 0
-    queued=0
+    queued=0;reading=operador.within_read_window(now)
     def enqueue(kind,every,condition=True):
         nonlocal queued
         if not condition or _pending(kind,account=str(account.id)):return
         bucket=int(now.timestamp()//every.total_seconds())
         _,created=enqueue_operation(user,kind,{'account':str(account.id)},request_id=_job_id(kind,account.id,bucket))
         queued+=int(created)
-    enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'),red.discovery_room(account)>0)  # B4
+    enqueue('discover_network',_every('NETWORK_DISCOVER_EVERY_MINUTES','360'),reading and red.discovery_room(account)>0)  # B4
     unclassified=Contact.objects.filter(account=account,classification={},stage__in=['candidate','incoming']).exists()
     enqueue('classify_contacts',_every('NETWORK_CLASSIFY_EVERY_MINUTES','30'),
-            (unclassified or red.stage_pending(account,now)) and red.budget_left(now)>0)
+            reading and (unclassified or red.stage_pending(account,now)) and red.budget_left(now)>0)
     enqueue('plan_network',_every('NETWORK_PLAN_EVERY_MINUTES','60'))
-    enqueue('sync_network',_every('NETWORK_SYNC_EVERY_MINUTES','360'))
+    enqueue('sync_network',_every('NETWORK_SYNC_EVERY_MINUTES','360'),reading)
     return queued
 
 def _metrics(user,account,now):
@@ -484,6 +488,7 @@ def _metrics(user,account,now):
     one at a time and only when something is due, for the operating account. METRICS_EVERY_MINUTES=0 turns it off."""
     from . import metricas
     every=_every('METRICS_EVERY_MINUTES','180')
+    if not operador.within_read_window(now):return 0
     if account.provider not in metricas.PROVIDERS or every<=timedelta(0) or _pending('collect_metrics',account=str(account.id)):return 0
     if not metricas.due(now):return 0
     bucket=int(now.timestamp()//every.total_seconds())
@@ -496,7 +501,7 @@ def _outcomes(user,account,now):
     OUTCOMES_ENABLED=false or OUTCOMES_EVERY_MINUTES=0 turns it off."""
     from . import desenlaces, metricas
     every=_every('OUTCOMES_EVERY_MINUTES','180')
-    if setting('OUTCOMES_ENABLED','true').strip().lower()!='true' or every<=timedelta(0):return 0
+    if setting('OUTCOMES_ENABLED','true').strip().lower()!='true' or every<=timedelta(0) or not operador.within_read_window(now):return 0
     if account.provider not in metricas.PROVIDERS or _pending('collect_outcomes',account=str(account.id)):return 0
     if not desenlaces.due(now).exists():return 0
     bucket=int(now.timestamp()//every.total_seconds())
@@ -507,6 +512,7 @@ def _analytics(user,account,now):
     """Creator analytics (analitica.py): queue import_analytics once per UTC day after ANALYTICS_DAILY_AFTER for a
     `directo` account whose navegador service is configured; one job a day, whatever its outcome."""
     from . import analitica
+    if not operador.within_read_window(now):return 0
     if _pending('import_analytics',account=str(account.id)) or not analitica.daily_due(account,now):return 0
     day=analitica.utc_today(now)
     _,created=enqueue_operation(user,'import_analytics',{'account':str(account.id)},request_id=_job_id('analytics',account.id,day))
@@ -517,6 +523,7 @@ def _canary(user,account,now):
     account whose navegador service is configured; a run that could not run is queued again an hour later, up to
     canario.TRIES a day (the attempt number keeps each try's job id apart)."""
     from . import analitica, canario
+    if not operador.within_read_window(now):return 0
     if _pending('check_linkedin',account=str(account.id)) or not canario.daily_due(account,now):return 0
     day=analitica.utc_today(now)
     _,created=enqueue_operation(user,'check_linkedin',{'account':str(account.id)},
@@ -529,21 +536,26 @@ def _inbox(user,account,now):
     from . import conversaciones
     every=conversaciones.every()
     if not conversaciones.enabled() or account.provider not in conversaciones.PROVIDERS or every<=timedelta(0):return 0
+    if not operador.within_read_window(now):return 0
     if _pending('read_inbox',account=str(account.id)):return 0
     bucket=int(now.timestamp()//every.total_seconds())
     _,created=enqueue_operation(user,'read_inbox',{'account':str(account.id)},request_id=_job_id('inbox',account.id,bucket))
     return int(created)
 
 def _replies(user,account,now):
-    """INT-04: read the comments on his recent own posts when one is due (respuestas.cadence), then one paid draft at a
-    time for the oldest comment waiting for one, while the INT-04 caps leave a slot after the replies already waiting."""
+    """INT-04: read the comments on his recent own posts when one is due and the day's share leaves room
+    (respuestas.reading_due), then one paid draft at a time for the oldest comment waiting for one, while the INT-04 caps
+    leave a slot after the replies already waiting. Only inside READ_WINDOW: a draft reads the commenter's profile too."""
     from . import respuestas
     from knowledge import presupuesto
-    if not respuestas.enabled() or account.provider not in respuestas.PROVIDERS:return 0
+    if not respuestas.enabled() or account.provider not in respuestas.PROVIDERS or not operador.within_read_window(now):return 0
     queued=0
-    if respuestas.reading_due(account,now) and not _pending('read_own_comments',account=str(account.id)):
+    due=respuestas.reading_due(account,now)
+    if due and not _pending('read_own_comments',account=str(account.id)):
+        # One read per half hour and first post: the newest post never waits for the slot another post's read took.
         bucket=int(now.timestamp()//1800)
-        _,created=enqueue_operation(user,'read_own_comments',{'account':str(account.id)},request_id=_job_id('replies',account.id,bucket))
+        _,created=enqueue_operation(user,'read_own_comments',{'account':str(account.id)},
+                                    request_id=_job_id('replies',account.id,bucket,due[0][1].pk))
         queued+=int(created)
     if _pending('read_own_comments') or _pending('propose_reply'):return queued
     if operador.capacity_left(account,'INT-04',now)-respuestas.open_replies(account)<=0 or presupuesto.left(now)<=0:return queued

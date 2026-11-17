@@ -112,6 +112,28 @@ def within_window(now=None):
     current=local.hour*60+local.minute
     return _minutes(start)<=current<_minutes(end)
 
+def read_window():
+    """READ_WINDOW='07:00-21:00' in OPERATOR_TIMEZONE: the hours the autopilot queues its background reads of LinkedIn
+    (Gustavo, 16/11/2026: read in normal hours, which are also the US east coast's). (start, end) in minutes, or None
+    when it is empty: any hour, as before."""
+    raw=os.environ.get('READ_WINDOW','07:00-21:00').strip()
+    if not raw:return None
+    start,_,end=raw.partition('-')
+    return _minutes(start),_minutes(end)
+
+def within_read_window(now=None):
+    """Whether the autopilot may queue a background read now. Only the queuing of periodic reads asks: writes, their
+    pre-checks and reconciliation, and whatever Gustavo asks for from the app never do."""
+    window=read_window()
+    if window is None:return True
+    local=(now or timezone.now()).astimezone(local_tz());current=local.hour*60+local.minute
+    return window[0]<=current<window[1]
+
+def read_bounds(now=None):
+    """(start, end) of today's read window as aware datetimes; the whole local day without READ_WINDOW."""
+    day,_=period_starts(now);start,end=read_window() or (0,1440)
+    return day+timedelta(minutes=start),day+timedelta(minutes=end)
+
 def network_batches():
     """NETWORK_BATCHES='09:00-11:00,15:00-17:00' in OPERATOR_TIMEZONE: the two daily rounds of follows, invitations and
     acceptances («20 solicitudes diarias, distribuidas en dos tandas y sin ejecutarlas rapidísimamente», LI-03-V014-K03).

@@ -143,12 +143,23 @@ def post(url,**kwargs):
             if attempt==2:raise
             time.sleep(0.5*(attempt+1))
 
+# Called with (provider, http_status) when a paid provider refuses its credentials (HTTP 401/403): team_backend registers
+# its Slack alert here (apps.ready), so this package stays without Django. A listener never breaks the call.
+CREDENTIAL_LISTENERS=[]
+
+def credentials_refused(provider,status):
+    if status not in (401,403):return
+    for listener in list(CREDENTIAL_LISTENERS):
+        try:listener(provider,status)
+        except Exception:pass
+
 def request(provider,url,payload,reservation,headers):
     try:
         response=post(url,headers=headers,json=payload,timeout=120)
         if response.status_code>=400:
             # Do not expose provider bodies (may contain inputs); do not retry paid calls.
             settle(reservation,'rejected' if response.status_code in (400,401,403,404,413,422,429) else 'uncertain',{'http_status':response.status_code})
+            credentials_refused(provider,response.status_code)
             raise ValueError(f'{provider}: HTTP {response.status_code}. Sin reintento automático.')
         return response.json()
     except (httpx.ConnectError,httpx.ConnectTimeout) as exc:
@@ -304,6 +315,7 @@ def _claude(system,message,max_tokens,output_schema,effort,purpose,model,context
     except anthropic.APIError as exc:
         # Nothing was reserved or generated yet: an account or service failure here can go straight to the fallback.
         error='Conteo de Claude no disponible; no se envió la generación.'
+        credentials_refused('anthropic',getattr(exc,'status_code',None))
         if fallback and fallback_reason(exc):raise _Fallback(fallback_reason(exc),error) from None
         raise ValueError(error) from None
     except (AttributeError,TypeError,ValueError):
@@ -336,6 +348,7 @@ def _claude(system,message,max_tokens,output_schema,effort,purpose,model,context
         # A definite refusal answered by OpenAI is not a call of the cycle (orquestacion counts the fallback once).
         if reason and definite:record['fallback']='openai'
         settle(rid,'rejected' if definite else 'uncertain',record)
+        credentials_refused('anthropic',exc.status_code)
         error=f'anthropic: HTTP {exc.status_code}. Sin reintento automático.'
         # An ambiguous 5xx may have been processed by Anthropic; OpenAI answering it costs at most one extra call.
         if reason:raise _Fallback(reason,error) from None
@@ -549,6 +562,7 @@ def typesafe(state,questions,purpose='lead-review'):
         settle(rid,'uncertain',{'error_type':type(exc).__name__});raise ValueError('TypeSafe: respuesta incierta.') from None
     if response.status_code>=400:
         settle(rid,'uncertain' if response.status_code>=500 else 'rejected',{'http_status':response.status_code})
+        credentials_refused('typesafe',response.status_code)
         raise ValueError(f'TypeSafe: HTTP {response.status_code}. Sin reintento automático.')
     try:
         data=response.json();answers=data['answers']
