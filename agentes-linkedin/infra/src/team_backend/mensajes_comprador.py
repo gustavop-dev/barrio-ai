@@ -45,7 +45,7 @@ from .permissions import require
 
 Kind=BuyerTouch.Kind;Step=BuyerJourney.Step;Route=BuyerJourney.Route
 State=BuyerDraft.State;StoppedBy=BuyerDraft.StoppedBy
-MESSAGE=BuyerDraft.Kind.MESSAGE;NOTE=BuyerDraft.Kind.NOTE
+MESSAGE=BuyerDraft.Kind.MESSAGE;NOTE=BuyerDraft.Kind.NOTE;REPLY=BuyerDraft.Kind.REPLY
 AGENT='relaciones_comunidad'
 JOB='prepare_buyer_draft'
 FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS
@@ -132,8 +132,10 @@ FACT_LABELS={
     'nos_invito':('Lo que te escribió al invitarte',''),
     'senal_de_compra':('Señal de compra de su empresa',''),
     'puente':('Su colega (el puente)',''),  # phase 5 (sin_posts.fact)
+    'lo_que_dijo':('Lo que te dijo cuando no era el momento',''),  # phase 6: the angle of her return (respuesta_comprador._wake)
+    'referido':('Quién te la refirió',''),  # phase 6: «otra persona» named her (secuencia_comprador.link_referral)
 }
-OWN_WORDS=('respondio_comentario','comentario_en_su_post','comento_post','nos_invito')  # what she wrote: her language
+OWN_WORDS=('respondio_comentario','comentario_en_su_post','comento_post','nos_invito','lo_que_dijo')  # what she wrote: her language
 
 def anchors(contact,journey=None,limit=6):
     """The real facts a first message or a note may cite, interactions first, then her posts the team commented (newest
@@ -151,6 +153,18 @@ def anchors(contact,journey=None,limit=6):
             if post.pk in posts:return
             posts.add(post.pk)
         facts.append(fact)
+    # Phase 6, first: what she said when it was not the moment (the angle of this attempt) and who referred her.
+    said=next((t for t in touches if t.kind==Kind.RETRY and (t.detail or {}).get('tipo')=='lo_que_dijo'),None)
+    if said is not None and journey is not None and (said.detail or {}).get('numero')==journey.attempt and (said.detail or {}).get('texto'):
+        add({'tipo':'lo_que_dijo','texto':said.detail['texto'][:600],
+             'que_paso':'Te dijo que no era el momento y cuándo volver a escribirle; ahora es ese momento.','fecha':said.at.isoformat(),
+             'fuente':'su respuesta en LinkedIn'})
+    referral=next((t for t in touches if t.kind==Kind.REFERRED),None)
+    if referral is not None:
+        detail=referral.detail or {}
+        add({'tipo':'referido','texto':f'{detail.get("nombre") or "Una persona de su empresa"} te dijo que esto lo ve ella.'[:600],
+             'nombre_de_quien_refiere':detail.get('nombre',''),'que_paso':'Quien la refirió respondió que esto lo ve ella.',
+             'fecha':referral.at.isoformat(),'fuente':'respuesta de quien la refirió en LinkedIn'})
     for t in touches:
         when=t.at.isoformat()
         if t.kind==Kind.REPLIED_COMMENT and (t.execution_id or t.outcome_id):
@@ -194,8 +208,9 @@ def reference(facts):
     return ' '.join(f['texto'] for f in facts if f.get('tipo') in OWN_WORDS)
 
 def warmed(journey,now=None):
-    """A warmed buyer: one warm-up comment or more in this attempt, or an interaction of the last 30 days."""
-    return journey.warm_comments>=1 or interacted(_state(journey),now or timezone.now())
+    """A warmed buyer: one warm-up comment or more in this attempt, or an interaction of the last 30 days. Phase 6: a
+    person someone referred (she answered «esto lo ve…») is warm too."""
+    return journey.warm_comments>=1 or bool(journey.referred_by_id) or interacted(_state(journey),now or timezone.now())
 
 # --------------------------------------------------------------------------- fixed rules
 
@@ -314,6 +329,15 @@ invitación a conectar ligada a ese hecho («quiero seguir leyéndote»). Sin «
 para cualquiera («me encanta lo que escribes»), sin propuesta de valor («ayudo a empresas como la tuya»), sin preguntar si
 hablamos, sin enlaces ni hashtags. Si no hay nada concreto que decir, decision="none": la invitación sale sin nota.'''+COMMON_RULES
 
+# Phase 6: only added when one of the facts is what she said when it was not the moment, or who referred her.
+RETURN_RULES='''
+Un hecho de tipo "lo_que_dijo" es lo que la persona le respondió a Gustavo cuando no era el momento (y cuándo volver):
+este mensaje es ese regreso. Retómalo con naturalidad («me dijiste que después de enero…»), sin reproche ni presión, y
+no repitas los mensajes del intento anterior.'''
+REFERRAL_RULES='''
+Un hecho de tipo "referido" dice quién le pasó el tema a esta persona: puedes nombrar a quien la refirió («X me dijo que
+esto lo ves tú»). No inventes lo que esa persona dijo más allá del hecho.'''
+
 # Phase 5: only added to the instructions when one of the facts is her bridge's (sin_posts.fact).
 BRIDGE_RULES='''
 Un hecho de tipo "puente" es lo que hizo un colega suyo de la misma empresa (el puente): aceptó la invitación de Gustavo o
@@ -351,6 +375,8 @@ def _write(kind,data,units,number=1):
         system,schema,purpose=secuencia_comprador.system(number),MESSAGE_SCHEMA,secuencia_comprador.PURPOSE
     else:system,schema,purpose=(MESSAGE_SYSTEM,MESSAGE_SCHEMA,'buyer-message') if kind==MESSAGE else (NOTE_SYSTEM,NOTE_SCHEMA,'invite-note')
     if any(f.get('tipo')=='puente' for f in data.get('hechos') or []):system+=BRIDGE_RULES
+    if any(f.get('tipo')=='lo_que_dijo' for f in data.get('hechos') or []):system+=RETURN_RULES
+    if any(f.get('tipo')=='referido' for f in data.get('hechos') or []):system+=REFERRAL_RULES
     answer=providers.claude(voz.with_voice(system),json.dumps(data,ensure_ascii=False,default=str),output_schema=schema,effort='medium',
                             purpose=purpose,context=operador.course_block(units))
     try:out=json.loads(answer['text'])
@@ -464,8 +490,11 @@ def prepare(user,params,origin_job=''):
     paid draft (one redraft if a fixed rule fails) and the lead's review; or only the review of a draft whose review
     waited for Jev. Never sends anything."""
     require(user,'operate_linkedin');require(user,'use_paid_providers')
+    if params.get('kind')==REPLY:  # phase 6: her reply (respuesta_comprador)
+        from . import respuesta_comprador
+        return respuesta_comprador.prepare(user,params,origin_job)
     contact=Contact.objects.get(pk=params['contact']);kind=params['kind']
-    if kind not in (MESSAGE,NOTE):raise ValueError('kind debe ser mensaje o nota')
+    if kind not in (MESSAGE,NOTE):raise ValueError('kind debe ser mensaje, nota o respuesta')
     try:number=int(params.get('number') or 1)
     except (TypeError,ValueError):raise ValueError('number debe ser 1, 2, 3 o 4') from None
     if number not in (1,2,3,4) or (number>1 and kind!=MESSAGE):raise ValueError('number debe ser 1, 2, 3 o 4 (2–4 solo para mensajes)')
@@ -493,9 +522,10 @@ def prepare(user,params,origin_job=''):
 # --------------------------------------------------------------------------- the autopilot's step
 
 def tries(contact,kind,attempt,number=1):
-    """Paid jobs queued for this person, kind, attempt and number (the first message's jobs carry no number)."""
+    """Paid jobs queued for this person, kind, attempt and number (the first message's jobs carry no number; a reply's
+    always do: it is her n-th reply of the attempt)."""
     rows=Job.objects.filter(kind=JOB,params__contact=str(contact.pk),params__kind=kind,params__attempt=attempt)
-    return (rows.exclude(params__has_key='number') if number==1 else rows.filter(params__number=number)).count()
+    return (rows.exclude(params__has_key='number') if number==1 and kind!=REPLY else rows.filter(params__number=number)).count()
 
 def _ready_to_invite(journey,now):
     if calentamiento.enabled():return calentamiento.invite_ready(journey.contact,now)
@@ -569,8 +599,8 @@ def _to_review(account,now,numbers=(1,)):
     """A draft whose review waited for Jev, once LEAD_RETRY_MINUTES passed: (contact, kind, attempt, number). Only the
     numbers whose phase is on (1: phase 3; 2–4: the sequence)."""
     minutes=int(os.environ.get('LEAD_RETRY_MINUTES','10'))
-    rows=(BuyerDraft.objects.select_related('contact').filter(contact__account=account,state=State.REVIEWING,number__in=list(numbers))
-          .order_by('created_at'))
+    rows=(BuyerDraft.objects.select_related('contact').filter(contact__account=account,state=State.REVIEWING,number__in=list(numbers),
+                                                             kind__in=[MESSAGE,NOTE]).order_by('created_at'))  # replies: respuesta_comprador
     for row in rows:
         at=_when((row.review or {}).get('error_at'))
         if (at is None or at<=now-timedelta(minutes=minutes)) and tries(row.contact,row.kind,row.attempt,row.number)<MAX_TRIES:
@@ -582,7 +612,8 @@ def _retire(account,now):
     person was invited another way, or unused for NOTE_TTL."""
     count=0
     # The follow-ups (number 2–4) are the sequence's: cancelled when she replies (secuencia_comprador).
-    for row in BuyerDraft.objects.select_related('contact__buyer_journey').filter(contact__account=account,state=State.READY,number=1):
+    for row in BuyerDraft.objects.select_related('contact__buyer_journey').filter(contact__account=account,state=State.READY,number=1,
+                                                                                  kind__in=[MESSAGE,NOTE]):
         journey=getattr(row.contact,'buyer_journey',None)
         if row.kind==MESSAGE:
             gone=journey is None or journey.step!=Step.ACCEPTED or journey.attempt!=row.attempt

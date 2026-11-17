@@ -29,6 +29,7 @@ FIRST_MESSAGE_UNITS=operador.FIRST_MESSAGE_UNITS  # loaded only when the review 
 WARMUP_COMMENT_UNITS=operador.WARMUP_COMMENT_UNITS  # loaded only when the review judges a warm-up comment on a buyer's post
 INVITE_NOTE_UNITS=operador.INVITE_NOTE_UNITS  # loaded only when the lead reviews a buyer's invitation note (phase 3)
 SEQUENCE_UNITS=operador.SEQUENCE_UNITS  # loaded only when the lead reviews a follow-up 2–4 of the sequence (phase 4)
+BUYER_REPLY_UNITS=operador.BUYER_REPLY_UNITS  # loaded only when the lead reviews the reply to what a buyer wrote (phase 6)
 CRITERION_SOURCES={
     'aporta':['LI-03-V020-K02'],'sustancia':['LI-03-V020-K02'],'responde':['LI-03-V020-K02'],'hilo':['LI-03-V020-K02'],'clara':['LI-06-M001-K04'],
     'pitch':['LI-03-M006-K01'],'inventa':['LI-06-M001-K07'],
@@ -43,6 +44,10 @@ CRITERION_SOURCES={
     # BIB-09-nota-invitacion: the class 09 criterion behind each question about a buyer's invitation note.
     'nota_hecho':['LI-09-M002-K06','LI-09-V008-K04'],'nota_aceptar':['LI-09-V008-K04'],'nota_generica':['LI-09-M002-K06','LI-09-V008-K04'],
     'nota_pitch':['LI-09-M002-K06','LI-03-M006-K01'],'nota_inventa':['LI-06-M001-K07'],
+    # BIB-11-respuesta-comprador: the class 11, 08 and 12 criterion behind each question about the reply to a buyer.
+    'resp_responde':['LI-11-M006-K01'],'resp_pitch':['LI-11-M006-K01','LI-08-M003-K05'],'resp_presiona':['LI-08-M003-K05'],
+    'resp_inventa':['LI-11-M006-K01'],'resp_paso_facil':['LI-12-M001-K04'],'resp_insiste':['LI-11-M006-K03','LI-08-M003-K05'],
+    'resp_agradece':['LI-11-M006-K02'],
 }
 
 def ground_questions(state,questions):
@@ -453,15 +458,60 @@ def sequence_questions(number):
         'seg_pide':_noul(f'¿{texto} le pide algo: que responda, que avise, una pregunta, minutos o una llamada?')}
     return {**own,**common}
 
+# BIB-11-respuesta-comprador: the reply to what a buyer wrote, with the questions of its type (resp_*).
+REPLY_COMMON=[('resp_responde','min',0.7,'la respuesta no responde a lo que ella dijo'),
+              ('resp_pitch','max',0.2,'la respuesta vende, da precios o promete'),
+              ('resp_presiona','max',0.2,'la respuesta presiona o mete urgencia'),
+              ('resp_inventa','max',0.2,'la respuesta inventa hechos de la persona o de Gustavo')]
+REPLY_CHECKS={'interesado':[('resp_paso_facil','min',0.6,'la respuesta no propone un siguiente paso concreto y fácil')],
+              'pide_informacion':[('resp_paso_facil','min',0.6,'la respuesta no propone un siguiente paso concreto y fácil')],
+              'no_es_el_momento':[('resp_insiste','max',0.2,'la respuesta insiste cuando no es el momento'),
+                                  ('resp_agradece','min',0.6,'la respuesta no agradece')],
+              'no_le_interesa':[('resp_insiste','max',0.2,'la respuesta insiste ante un no'),
+                                ('resp_agradece','min',0.6,'la respuesta no agradece')],
+              'otra_persona':[('resp_agradece','min',0.6,'la respuesta no agradece que le diga quién lo ve')]}
+
+def reply_questions(kind):
+    texto='`respuesta.texto`'
+    questions={
+        'resp_responde':_noul(f'¿{texto} responde a lo que la persona dijo en `respuesta.su_mensaje`, leído con toda '
+                              '`respuesta.conversacion`?','Responde a lo que dijo','Ignora lo que dijo o responde otra cosa'),
+        'resp_pitch':_noul(f'¿{texto} vende: ofrece servicios, dice a quién ayuda Gustavo o su equipo, da precios, descuentos o promete '
+                           'resultados o plazos? Proponer elegir un horario a quien quiere hablar o pide información NO es vender.'),
+        'resp_presiona':_noul(f'¿{texto} presiona: mete urgencia, plazos artificiales o insiste en que decida ya?'),
+        'resp_inventa':_noul(f'¿{texto} afirma algo de la persona que no está en `hechos` ni en `respuesta.conversacion`, o atribuye a '
+                             'Gustavo una experiencia, un cliente, una cifra o un resultado que no está en `hechos_publicos_de_gustavo`?')}
+    if kind in ('interesado','pide_informacion'):
+        questions['resp_paso_facil']=_noul(f'¿{texto} propone un siguiente paso concreto y fácil de aceptar (elegir un horario), sin '
+                                           'presión?','Un paso concreto y fácil','Sin paso, o uno difícil o vago')
+    if kind in ('no_es_el_momento','no_le_interesa'):
+        questions['resp_insiste']=_noul(f'¿{texto} insiste: intenta que cambie de opinión, propone una llamada o le pide que lo '
+                                        'reconsidere?')
+    if kind in ('no_es_el_momento','no_le_interesa','otra_persona'):
+        questions['resp_agradece']=_noul(f'¿{texto} agradece lo que la persona dijo (su respuesta, su honestidad o que le dijera a quién '
+                                         'escribir)?')
+    return questions
+
 def review_buyer_draft(draft):
     """The lead's review of a buyer's draft (mensajes_comprador): {'decision': 'approve' | 'discard' | 'retry', 'reasons',
     'answers', 'thresholds', 'model', 'cost_usd', 'at', **course grounding}. A follow-up 2–4 of the sequence
-    (secuencia_comprador) with the questions of its number and the methodology «secuencia_mensajes»."""
+    (secuencia_comprador) with the questions of its number and the methodology «secuencia_mensajes». Phase 6: the reply to
+    what she wrote (respuesta_comprador) with the questions of its type and the methodology «respuesta_comprador»."""
     now=timezone.now();orientation=_orientation()
     facts=(draft.inputs or {}).get('hechos') or [];person=(draft.inputs or {}).get('persona') or {}
     public,_=memory.confirmed_blocks()
     state={'persona':person,'hechos':facts,'hechos_publicos_de_gustavo':[f['fact'] for f in public]}
-    if draft.kind=='mensaje' and draft.number>1:
+    if draft.kind=='respuesta':
+        kept=draft.inputs or {};kind=(kept.get('clasificacion') or {}).get('tipo','')
+        state['respuesta']={'tipo':kind,'texto':draft.text,'para':person.get('nombre'),
+                            'su_mensaje':(kept.get('mensaje') or {}).get('texto',''),'conversacion':kept.get('conversacion') or [],
+                            'faltan':kept.get('faltan') or [],
+                            'momento':('Respondió a los mensajes de Gustavo; él le enviaría esta respuesta a mano. El enlace de agenda '
+                                       'final lo agrega el sistema y solo cuando ella quiere hablar o pide información.')}
+        questions=reply_questions(kind)
+        checks=REPLY_COMMON+REPLY_CHECKS.get(kind,[])
+        units,metodologia,purpose=BUYER_REPLY_UNITS,'respuesta_comprador','lead-review-reply'
+    elif draft.kind=='mensaje' and draft.number>1:
         follow=(draft.inputs or {}).get('seguimiento') or {}
         state['seguimiento']={'numero':draft.number,'de':4,'texto':draft.text,'para':person.get('nombre'),
                               'trabajo':follow.get('trabajo',''),'anteriores':follow.get('anteriores',[]),

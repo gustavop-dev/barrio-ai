@@ -39,9 +39,9 @@ MESSAGE_STEPS=[Step.MESSAGE_1,Step.MESSAGE_2,Step.MESSAGE_3,Step.MESSAGE_4]
 OUT=Direction.OUT;IN=Direction.IN;STATE=Direction.STATE
 DIRECTION={Kind.CHOSEN:STATE,Kind.ROUTE:STATE,Kind.ANGLE:STATE,Kind.REST:STATE,Kind.RETRY:STATE,Kind.EXIT:STATE,Kind.REOPENED:STATE,
            Kind.ALREADY_CONNECTED:STATE,Kind.NO_MESSAGE:STATE,Kind.DRAFT:STATE,Kind.OPPORTUNITY:STATE,Kind.INTERESTED:STATE,Kind.REFERRED:STATE,
-           Kind.BRIDGE:STATE,Kind.RECHECK:STATE,
+           Kind.BRIDGE:STATE,Kind.RECHECK:STATE,Kind.REPLY_CLASSIFIED:STATE,Kind.MEETING_CANCELLED:STATE,
            Kind.FOLLOW:OUT,Kind.COMMENT:OUT,Kind.REACTION:OUT,Kind.THREAD_REPLY:OUT,Kind.VISIT:OUT,Kind.INVITATION:OUT,
-           Kind.ACCEPTED_THEIRS:OUT,Kind.MESSAGE:OUT,Kind.MESSAGE_SEEN:OUT,
+           Kind.ACCEPTED_THEIRS:OUT,Kind.MESSAGE:OUT,Kind.MESSAGE_SEEN:OUT,Kind.REPLY_SENT:OUT,
            Kind.REPLIED_COMMENT:IN,Kind.COMMENTED_POST:IN,Kind.REACTED_POST:IN,Kind.FOLLOWED_US:IN,Kind.INVITED_US:IN,
            Kind.ACCEPTED_OURS:IN,Kind.OPENED_CONVERSATION:IN,Kind.REPLIED_MESSAGE:IN,Kind.MEETING:IN,
            Kind.BRIDGE_SIGNAL:IN}  # phase 5: her colleague (the bridge) accepted or interacted (sin_posts.relayed)
@@ -225,6 +225,10 @@ def _draft_facts(contact):
     for d in BuyerDraft.objects.filter(contact=contact).exclude(decided_at__isnull=True).order_by('decided_at'):
         out.append(_fact(Kind.DRAFT,d.decided_at,f'borrador:{d.pk}',{'tipo':d.kind,'numero':d.number,'intento':d.attempt,
                          'resultado':'parado' if d.stopped_by else 'listo','por':d.stopped_by}))
+        if d.kind==BuyerDraft.Kind.REPLY and d.closed_at and d.state==State.SENT:
+            # Phase 6: Gustavo answered what she wrote («Hecho, le escribí» on the reply card).
+            out.append(_fact(Kind.REPLY_SENT,d.closed_at,f'borrador:{d.pk}:enviado',{'fuente':'respuesta','numero':d.number,
+                             'intento':d.attempt}))
         if d.kind!=BuyerDraft.Kind.MESSAGE or not d.closed_at:continue
         if d.state==State.SENT:
             out.append(_fact(Kind.MESSAGE,d.closed_at,f'borrador:{d.pk}:enviado',{'fuente':'recorrido','numero':d.number}))
@@ -262,12 +266,16 @@ class _Fold:
     def __init__(self):
         self.first={};self.attempt=1;self.attempts=[{'numero':1,'desde':None,'angulo':'','hasta':None,'motivo':''}]
         self.following=self.connected=False;self.rest=None;self.exit=None;self.route=None;self.invite_note=None
-        self.visits=0;self.comments=[];self.inbound=[];self.last_message=None;self._attempt()
+        self.visits=0;self.comments=[];self.inbound=[];self.last_message=None
+        self.booked={}  # phase 6: every meeting still booked, across attempts, {booking: when it was booked}
+        self._attempt()
     def _attempt(self):
         self.invited_at=None;self.messages=0;self.seen=self.replied=self.interested=self.meeting=False;self.attempt_comments=[]
         self.drafted=False  # phase 3: the first message of this attempt was prepared, or the team decided not to write it
         self.sent=[]  # phase 4: this attempt's «Hecho, le escribí» (MESSAGE touches), in order
         self.replied_at=None  # phase 4: her first reply to a message of this attempt
+        self.reply_type=''    # phase 6: the type of her latest classified reply in this attempt
+        self.bookings={}      # phase 6: this attempt's meetings still booked, {booking: its start or None}
     def mark(self,name,at):
         if name not in self.first or at<self.first[name]:self.first[name]=at
     def wake(self):
@@ -304,7 +312,10 @@ class _Fold:
         elif kind==Kind.REPLIED_MESSAGE:
             self.mark('replied',at);self.replied=True;self.replied_at=self.replied_at or at
         elif kind==Kind.INTERESTED:self.mark('interested',at);self.interested=True
-        elif kind==Kind.MEETING:self.mark('meeting',at);self.meeting=True
+        elif kind==Kind.MEETING:self._meeting(t,at,d)
+        elif kind==Kind.MEETING_CANCELLED:self._cancelled(d.get('reserva') or '')
+        elif kind==Kind.REPLY_CLASSIFIED:self.reply_type=d.get('tipo','')
+        elif kind==Kind.REPLY_SENT:self.last_message=max(filter(None,(self.last_message,at)))
         elif kind==Kind.DRAFT:self.drafted=self.drafted or (d.get('tipo')==BuyerDraft.Kind.MESSAGE and d.get('numero',1)==1)
         elif kind==Kind.ROUTE:self.route=d.get('ruta') or self.route
         elif kind==Kind.ANGLE:self.attempts[-1]['angulo']=d.get('angulo','')
@@ -319,6 +330,24 @@ class _Fold:
         elif kind==Kind.REOPENED:
             if self.exit and self.exit[0] not in DEFINITIVE:self.exit=None
         if kind in WAKE:self.wake()
+    def _meeting(self,t,at,d):
+        """Phase 6 (agenda_calcom): a booked meeting. A reschedule (`reemplaza`) replaces the booking it moves and keeps
+        when the first one was booked; the milestone is the earliest meeting still booked."""
+        ref=d.get('reserva') or t.key;old=d.get('reemplaza') or ''
+        booked=self.booked.pop(old,at) if old else at
+        self.bookings.pop(old,None)
+        self.bookings[ref]=_when(d.get('inicio'));self.booked[ref]=min(booked,self.booked.get(ref,booked))
+        self.meeting=True;self.first['meeting']=min(self.booked.values())
+    def _cancelled(self,ref):
+        """Phase 6: the meeting was cancelled. With none left booked the journey goes back to «interesado» and the
+        funnel no longer counts the meeting."""
+        self.bookings.pop(ref,None);self.booked.pop(ref,None)
+        self.meeting=bool(self.bookings)
+        if self.booked:self.first['meeting']=min(self.booked.values())
+        else:self.first.pop('meeting',None)
+    def meeting_date(self):
+        starts=[at for at in self.bookings.values() if at]
+        return max(starts) if starts else None
 
 # A fact read from the contact's dates or history stands in for one with its own row (an execution, the evidence) only
 # until that row shows up: the log keeps both, the fold and the reads use the best one. Phase 4: her reply seen in the
@@ -385,6 +414,8 @@ def _project(journey,state,contact,has_posts):
     journey.signal_before_invite=any(not invited or t.at<invited for t in state.inbound if t.kind!=Kind.BRIDGE_SIGNAL)
     journey.route=state.route or (Route.COMMENTS if state.comments or has_posts else Route.UNKNOWN)
     journey.attempt=state.attempt
+    journey.reply_type=state.reply_type
+    journey.meeting_date=state.meeting_date() if state.meeting else None
     journey.attempts=[dict(a,desde=a['desde'].isoformat() if a['desde'] else None,hasta=a['hasta'].isoformat() if a['hasta'] else None)
                       for a in state.attempts]
     journey.rest_reason,journey.rest_until=(state.rest[0],state.rest[1]) if state.rest else ('',None)
@@ -517,7 +548,9 @@ def rest(journey,reason,until,at=None,note=''):
     if not until or until<=at:raise ValueError('El descanso necesita una fecha de vuelta posterior.')
     if journey.step in (Step.RESTING,Step.LEFT):raise ValueError(f'No se pasa a descanso desde «{journey.step}».')
     if journey.step==Step.MEETING:raise ValueError('Con la reunión agendada el recorrido terminó: se entrega el lead.')
-    return _write(journey,Kind.REST,at,f'descanso:{journey.attempt}',
+    # Phase 6: a signal may end a rest without a new attempt (she wrote again); the next rest of that attempt keeps its own key.
+    n=journey.touches.filter(kind=Kind.REST,detail__intento=journey.attempt).count()
+    return _write(journey,Kind.REST,at,f'descanso:{journey.attempt}'+(f':{n}' if n else ''),
                   {'motivo':reason,'hasta':until.isoformat(),'intento':journey.attempt,'nota':(note or '')[:300]})
 
 @transaction.atomic
@@ -721,7 +754,19 @@ def drafts(journeys=None):
                           for n,q in ((n,messages.filter(number=n)) for n in range(1,5))},
             'notas':{'preparadas':notes.filter(stopped_by='',decided_at__isnull=False).count(),
                      'con_invitacion':notes.filter(state__in=[State.USED,State.SENT,State.NOT_SENT]).count(),
-                     'enviadas':notes.filter(state=State.SENT).count(),'parados':stopped(notes)}}
+                     'enviadas':notes.filter(state=State.SENT).count(),'parados':stopped(notes)},
+            # Phase 6: the replies to what she wrote (BuyerDraft «respuesta»); pending only while their cards can show.
+            'respuestas':_replies_drafts(own)}
+
+def _replies_drafts(own):
+    from . import respuesta_comprador
+    State=BuyerDraft.State;rows=own.filter(kind=BuyerDraft.Kind.REPLY)
+    shown=respuesta_comprador.enabled()
+    return {'preparados':rows.filter(stopped_by='',decided_at__isnull=False).exclude(text='').count(),
+            'pendientes':rows.filter(state=State.READY).exclude(text='').count() if shown else 0,
+            'sin_borrador':rows.filter(state=State.READY,text='').count() if shown else 0,
+            'enviados':rows.filter(state=State.SENT).count(),'no_enviados':rows.filter(state=State.NOT_SENT).count(),
+            'parados':{by:rows.filter(stopped_by=by).exclude(state=State.READY).count() for by in BuyerDraft.StoppedBy.values}}
 
 # --------------------------------------------------------------------------- the funnel (LI-12-M001-K03)
 
@@ -744,8 +789,12 @@ DEFINITIONS={
     'aceptaron':'Conectados: aceptó la invitación de Gustavo o Gustavo aceptó la suya.',
     'recibieron_mensaje':'Gustavo marcó «Hecho, le escribí» o el inbox muestra un mensaje suyo.',
     'respondieron':'Un mensaje de la persona después del primero de Gustavo.',
-    'interesados':'Fase 6: la respuesta clasificada como interés. En cero hasta entonces.',
-    'reunion':'Fase 6: reunión agendada (Cal.com). En cero hasta entonces.',
+    'interesados':('Fase 6 (BUYER_REPLY_ENABLED): su respuesta clasificada como interés, o una reunión agendada (quien agenda '
+                   'mostró interés). En cero con la fase apagada.'),
+    'reunion':('Fase 6: reunión agendada por su enlace de Cal.com (el webhook firmado) o marcada a mano («Agendó»); una '
+               'reunión cancelada sin otra agendada deja de contar.'),
+    'respuestas':('Fase 6: sus respuestas por tipo (la clasificación de Jev, «otro» cuando no hay confianza), los borradores de '
+                  'respuesta (pendientes en Tu turno, enviados y no enviados) y las horas de su primera respuesta a la reunión.'),
     'secuencia':('Fase 4: cuántos recibieron los mensajes 1 a 4 (por «Hecho, le escribí», en algún intento) y tras cuántos '
                  'mensajes respondieron los que respondieron. El curso dice que la mayoría responde al 2.º o 3.º: se mide, no se asume.'),
     'muestra_chica':SMALL_SAMPLE_TEXT,
@@ -785,6 +834,10 @@ def _buying(journey):
 def _sequence(journeys):
     from . import secuencia_comprador
     return secuencia_comprador.funnel(journeys)
+
+def _replies(journeys):
+    from . import respuesta_comprador
+    return respuesta_comprador.funnel(journeys)
 
 def funnel(weeks=8,now=None,account=None):
     """The buyer's funnel (GET /api/v1/resultados/embudo-comprador): cumulative and by week (cohorts by the week they
@@ -829,5 +882,5 @@ def funnel(weeks=8,now=None,account=None):
                 'senal_de_compra':{'con_senal_de_compra':block(j for j in outbound if _buying(j)),
                                    'sin_senal_de_compra':block(j for j in outbound if not _buying(j))},
                 'entrada':{'saliente':block(outbound),'entrante':block(inbound)}},
-            'borradores':drafts(outbound),'secuencia':_sequence(outbound),'estado_actual':steps,
+            'borradores':drafts(outbound),'secuencia':_sequence(outbound),'respuestas':_replies(outbound),'estado_actual':steps,
             'descanso':count('rest_reason',RestReason.values),'salidas':count('exit_reason',ExitReason.values)}

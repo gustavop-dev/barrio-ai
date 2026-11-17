@@ -377,11 +377,14 @@ def step(account,now=None):
 
 def prioritize(conversations,now=None):
     """conversaciones.read_inbox, within its caps: the threads of buyers in the sequence go first, hers when her message
-    is the last one (a reply that stops it), then the ones with a follow-up due within a day. Same order otherwise."""
+    is the last one (a reply that stops it), then the ones with a follow-up due within a day. Same order otherwise. Phase
+    6 (BUYER_REPLY_ENABLED): a buyer who replied or is interested writing again goes first too."""
     if not active() or not conversations:return conversations
     now=now or timezone.now()
     ids=[c.contact_id for c in conversations if c.contact_id]
-    journeys={j.contact_id:j for j in BuyerJourney.objects.filter(contact_id__in=ids,step__in=STEPS)}
+    from . import respuesta_comprador
+    steps=[*STEPS,*respuesta_comprador.STEPS] if respuesta_comprador.enabled() else STEPS
+    journeys={j.contact_id:j for j in BuyerJourney.objects.filter(contact_id__in=ids,step__in=steps)}
     def rank(item):
         index,conversation=item;journey=journeys.get(conversation.contact_id)
         if journey is None:return (2,index)
@@ -445,20 +448,23 @@ def referral_asked(journey):
     return {'enviado':row.closed_at.isoformat() if row.closed_at else None,'texto':row.text,'borrador':str(row.pk)}
 
 @transaction.atomic
-def link_referral(journey,referrer,at=None,note=''):
+def link_referral(journey,referrer,at=None,note='',reply=None):
     """Phase 6: `journey` is the person `referrer` pointed to after her message 3 («tal persona me dijo que viniera
-    contigo»). Records it once on the new person's log (a «referido» touch) and in BuyerJourney.referred_by. Raises
-    ValueError when the referrer never got message 3, or for the same person."""
+    contigo»), or in any reply of hers classified «otra persona» (`reply`, her BuyerDraft «respuesta»: respuesta_comprador).
+    Records it once on the new person's log (a «referido» touch) and in BuyerJourney.referred_by. Raises ValueError when
+    the referrer neither got message 3 nor answered «otra persona», or for the same person."""
     if journey.pk==referrer.pk:raise ValueError('Una persona no se refiere a sí misma.')
     asked=referral_asked(referrer)
-    if asked is None:raise ValueError('Quien refiere no recibió el mensaje 3 de su secuencia.')
+    if asked is None and reply is None:raise ValueError('Quien refiere no recibió el mensaje 3 de su secuencia.')
+    asked=asked or {'borrador':''}
     at=at or timezone.now()
     BuyerJourney.objects.filter(pk=journey.pk).update(referred_by=referrer)
     referrer_name=Contact.objects.filter(pk=referrer.contact_id).values_list('display_name',flat=True).first() or ''
     touch=comprador.record(journey,Kind.REFERRED,at=at,key=f'referido:{referrer.pk}',
                            detail={'de':str(referrer.contact_id),'nombre':referrer_name[:200],'mensaje_3':asked['borrador'],
-                                   'nota':(note or '')[:300]})
-    _audit('buyer.referral_linked',journey.contact_id,de=str(referrer.contact_id),mensaje_3=asked['borrador'])
+                                   'respuesta':str(reply.pk) if reply is not None else '','nota':(note or '')[:300]})
+    _audit('buyer.referral_linked',journey.contact_id,de=str(referrer.contact_id),mensaje_3=asked['borrador'],
+           respuesta=str(reply.pk) if reply is not None else '')
     return touch
 
 # --------------------------------------------------------------------------- what Slack and the funnel read

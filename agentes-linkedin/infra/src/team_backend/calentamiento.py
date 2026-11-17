@@ -480,7 +480,13 @@ def sweep(account,now=None):
     pending=BuyerJourney.objects.select_related('contact').filter(contact__account=account,contact__stage='invited',
                                                                   step__in=[Step.INVITED,Step.WARMING])
     for journey in pending:out['descanso']+=int(bool(guarded(rest,journey)))
-    for journey in BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.RESTING):
+    resting=BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.RESTING)
+    from . import respuesta_comprador
+    if respuesta_comprador.active():
+        # Phase 6: «no es el momento» comes back on the date she said, with what she said (respuesta_comprador._wake);
+        # a message of hers during the rest wakes her by itself (comprador.WAKE).
+        resting=resting.exclude(rest_reason=BuyerJourney.RestReason.NOT_NOW)
+    for journey in resting:
         result=guarded(lambda j:wake(j,now),journey)
         if result:out[result]+=1
     for journey in BuyerJourney.objects.select_related('contact').filter(contact__account=account,step=Step.WARMING):

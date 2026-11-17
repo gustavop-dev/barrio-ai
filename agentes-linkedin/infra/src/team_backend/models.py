@@ -311,6 +311,7 @@ class Contact(models.Model):
         SEARCH='search','Búsqueda'
         INCOMING='incoming','Invitación recibida'
         MANUAL='manual','Añadido a mano'
+        REFERRAL='referido','Referido por un comprador que respondió (fase 6)'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     account=models.ForeignKey(ConnectorAccount,on_delete=models.PROTECT,related_name='contacts')
     provider_user_id=models.CharField(max_length=200)
@@ -1654,6 +1655,12 @@ class BuyerJourney(models.Model):
     # Phase 6: the person who pointed to this one after her message 3 («¿no eres la persona indicada?»;
     # secuencia_comprador.link_referral). Null when nobody referred her.
     referred_by=models.ForeignKey('self',on_delete=models.SET_NULL,null=True,blank=True,related_name='referrals')
+    # Phase 6 (respuesta_comprador.py): the type of her latest classified reply (interesado, pide_informacion,
+    # no_es_el_momento, no_le_interesa, otra_persona, otro); the identifier that travels in her booking link
+    # (?metadata[barrio]=…, agenda_calcom matches the Cal.com booking with it); and the date of the booked meeting.
+    reply_type=models.CharField(max_length=20,blank=True)
+    booking_ref=models.CharField(max_length=24,null=True,blank=True,unique=True)
+    meeting_date=models.DateTimeField(null=True,blank=True)
     origin=models.CharField(max_length=12,choices=Origin.choices,default=Origin.LIVE)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
@@ -1685,6 +1692,8 @@ class BuyerTouch(models.Model):
         REFERRED='referido','Llegó referido por otra persona (su mensaje 3)'
         BRIDGE='puente','Puente por otra persona de su empresa (fase 5)'
         RECHECK='reverificacion','Reverificación de sus señales de compra al terminar un descanso (fase 5)'
+        REPLY_CLASSIFIED='respuesta_clasificada','Su respuesta clasificada (fase 6)'
+        MEETING_CANCELLED='reunion_cancelada','Reunión cancelada (fase 6)'
         # saliente
         FOLLOW='seguir','Seguir (RED-01)'
         COMMENT='comentario','Comentario en un post suyo (INT-03)'
@@ -1695,6 +1704,7 @@ class BuyerTouch(models.Model):
         ACCEPTED_THEIRS='aceptaste_invitacion','Gustavo aceptó su invitación (RED-04)'
         MESSAGE='mensaje','Mensaje enviado por Gustavo («Hecho, le escribí»)'
         MESSAGE_SEEN='mensaje_visto','Mensaje de Gustavo leído en el inbox'
+        REPLY_SENT='respuesta_enviada','Respuesta enviada por Gustavo a lo que ella escribió (fase 6)'
         # entrante
         REPLIED_COMMENT='respondio_comentario','Respondió a un comentario del equipo'
         COMMENTED_POST='comento_post','Comentó en un post de Gustavo'
@@ -1744,6 +1754,7 @@ class BuyerDraft(models.Model):
     class Kind(models.TextChoices):
         MESSAGE='mensaje','Mensaje privado (el primero después de aceptar; fase 4: los seguimientos 2 a 4)'
         NOTE='nota','Nota de la invitación'
+        REPLY='respuesta','Respuesta a lo que ella escribió (fase 6; `number`: su n-ésima respuesta del intento)'
     class State(models.TextChoices):
         REVIEWING='en_revision','Esperando la revisión del líder'
         READY='listo','Listo: en Tu turno (mensaje) o esperando la invitación (nota)'
@@ -1761,9 +1772,10 @@ class BuyerDraft(models.Model):
         FACT='hecho','Nada real que citar'
         QUOTA='cupo','Sin cupo de notas este mes'
         CONVERSATION='conversacion','Ya hay una conversación'
+        LINK='agenda','Sin enlace de agenda (CALCOM_BOOKING_URL vacío)'
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     contact=models.ForeignKey(Contact,on_delete=models.CASCADE,related_name='buyer_drafts')
-    kind=models.CharField(max_length=8,choices=Kind.choices)
+    kind=models.CharField(max_length=12,choices=Kind.choices)
     number=models.PositiveSmallIntegerField(default=1)  # 1: the first message; phase 4: the follow-ups 2–4
     attempt=models.PositiveSmallIntegerField(default=1)  # the journey's attempt it belongs to
     state=models.CharField(max_length=12,choices=State.choices,db_index=True)
@@ -1788,3 +1800,73 @@ class BuyerDraft(models.Model):
         ordering=['-created_at']
         constraints=[models.UniqueConstraint(fields=['contact','kind','number','attempt'],name='one_buyer_draft_per_step')]
     def __str__(self):return f'{self.contact} · {self.kind} {self.number} · {self.state}'
+
+class MeetingBooking(models.Model):
+    """Phase 6 (agenda_calcom.py): a meeting a buyer booked through Gustavo's Cal.com link, as its signed webhook told it
+    (BOOKING_CREATED, BOOKING_RESCHEDULED, BOOKING_CANCELLED), or that Gustavo marked by hand («Agendó»). The body is only
+    trusted to match it with a journey: the identifier the link carries (metadata[barrio] → `ref`), else the attendee's
+    email or name against what Barrio knows; nothing matched stays «sin_emparejar» for Gustavo to associate."""
+    class State(models.TextChoices):
+        BOOKED='agendada','Agendada'
+        RESCHEDULED='reprogramada','Reprogramada: la reemplaza otra reserva'
+        CANCELLED='cancelada','Cancelada'
+        DISCARDED='descartada','Descartada por Gustavo (no era de un comprador)'
+    class MatchedBy(models.TextChoices):
+        LINK='enlace','Identificador del enlace'
+        EMAIL='correo','Correo que ella escribió en la conversación'
+        NAME='nombre','Nombre exacto, una sola candidata'
+        PREVIOUS='reserva_anterior','La reserva que reprograma'
+        GUSTAVO='gustavo','Gustavo la asoció'
+        MANUAL='manual','«Agendó» a mano'
+        NONE='sin_emparejar','Sin emparejar'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    provider=models.CharField(max_length=20,default='calcom')
+    uid=models.CharField(max_length=200,unique=True)  # Cal.com's booking uid; «manual:<draft>» for «Agendó»
+    previous_uid=models.CharField(max_length=200,blank=True)  # the booking it reschedules (payload.rescheduleUid)
+    state=models.CharField(max_length=14,choices=State.choices,default=State.BOOKED,db_index=True)
+    start_at=models.DateTimeField(null=True,blank=True)
+    end_at=models.DateTimeField(null=True,blank=True)
+    attendee_name=models.CharField(max_length=200,blank=True)
+    attendee_email=models.CharField(max_length=254,blank=True)
+    ref=models.CharField(max_length=40,blank=True)  # what travelled in the link (metadata[barrio])
+    journey=models.ForeignKey(BuyerJourney,on_delete=models.SET_NULL,null=True,blank=True,related_name='bookings')
+    contact=models.ForeignKey(Contact,on_delete=models.SET_NULL,null=True,blank=True,related_name='bookings')
+    matched_by=models.CharField(max_length=16,choices=MatchedBy.choices,default=MatchedBy.NONE)
+    matched_at=models.DateTimeField(null=True,blank=True)
+    events=models.JSONField(default=list,blank=True)  # [{evento, at, cuerpo_sha256}] each webhook that touched it
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    class Meta:
+        ordering=['-created_at']
+    def __str__(self):return f'{self.uid} · {self.state}'
+
+class LeadHandoff(models.Model):
+    """Phase 6 (entrega_lead.py): the lead handed to the sales machine once the meeting is booked, source-neutral (today
+    only «linkedin»): who and the company, the journey (entry signal, touches, messages sent, the one she replied to, the
+    bridge or the referral), the conversation in three lines, the meeting and what the team knows of the business with
+    its sources. No qualification: that is the sales machine's. A model and not a JSON on the journey: the sales machine
+    reads every source the same way and by state, and the opportunity, the conversation and the journey hang from it.
+    Only Gustavo creates the opportunity (PRS-09): «Crear la oportunidad» confirms it with one tap."""
+    class Source(models.TextChoices):
+        LINKEDIN='linkedin','LinkedIn (máquina del comprador)'
+    class State(models.TextChoices):
+        READY='lista','Lista: espera que Gustavo cree o vincule la oportunidad'
+        CONFIRMED='confirmada','Oportunidad creada o vinculada'
+        CANCELLED='cancelada','La reunión se canceló'
+    id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
+    key=models.CharField(max_length=120,unique=True)  # «linkedin:<journey>:<attempt>»: one handoff per journey attempt
+    source=models.CharField(max_length=20,choices=Source.choices,default=Source.LINKEDIN)
+    state=models.CharField(max_length=12,choices=State.choices,default=State.READY,db_index=True)
+    contact=models.ForeignKey(Contact,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    journey=models.ForeignKey(BuyerJourney,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    booking=models.ForeignKey(MeetingBooking,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    conversation=models.ForeignKey(Conversation,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    opportunity=models.ForeignKey(Opportunity,on_delete=models.SET_NULL,null=True,blank=True,related_name='handoffs')
+    meeting_at=models.DateTimeField(null=True,blank=True)
+    data=models.JSONField(default=dict,blank=True)
+    created_at=models.DateTimeField(default=timezone.now)
+    updated_at=models.DateTimeField(default=timezone.now)
+    confirmed_at=models.DateTimeField(null=True,blank=True)
+    class Meta:
+        ordering=['-created_at']
+    def __str__(self):return f'{self.source} · {self.contact} · {self.state}'

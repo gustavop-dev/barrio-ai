@@ -569,8 +569,10 @@ def _buyer_drafts(user,account,now):
     it is due. Never sends anything (INB-08). Returns the decisions plus the job queued. Only inside READ_WINDOW, like the
     periodic reads: a draft builds on what the reads brought (her posts, the inbox), and its card is for the day.
     Phase 4 (BUYER_SEQUENCE_ENABLED, secuencia_comprador.step): messages 2–4 to whoever did not reply, the same job with
-    its `number`; her reply, her rest after message 4 and the inbox-off notice are decided there too, without a paid call."""
-    from . import mensajes_comprador, secuencia_comprador
+    its `number`; her reply, her rest after message 4 and the inbox-off notice are decided there too, without a paid call.
+    Phase 6 (BUYER_REPLY_ENABLED, respuesta_comprador.step): her reply classified and answered (a draft he sends), the
+    same job with kind «respuesta» and her reply's `number`; the rests that end and the referrals, without a paid call."""
+    from . import mensajes_comprador, respuesta_comprador, secuencia_comprador
     from knowledge import presupuesto
     if not mensajes_comprador.active() or account.provider not in ('fake','directo'):return 0
     if not operador.within_read_window(now):return 0
@@ -579,11 +581,15 @@ def _buyer_drafts(user,account,now):
     if secuencia_comprador.active():
         more,follow_up=secuencia_comprador.step(account,now)
         decided+=more;item=item or follow_up
+    if respuesta_comprador.active():
+        # Phase 6 (BUYER_REPLY_ENABLED): her reply goes first; the sequence's step already stopped it and moved her to «respondio».
+        more,reply=respuesta_comprador.step(account,now)
+        decided+=more;item=reply or item
     if item is None or presupuesto.left(now)<=0:return decided
     contact,kind,attempt,number=item
     tries=mensajes_comprador.tries(contact,kind,attempt,number)
     params={'contact':str(contact.pk),'kind':kind,'attempt':attempt,'at':now.isoformat()}
-    if number>1:
+    if number>1 or kind==mensajes_comprador.REPLY:
         params['number']=number
         request_id=_job_id('buyer_draft',contact.pk,kind,attempt,number,tries)
     else:request_id=_job_id('buyer_draft',contact.pk,kind,attempt,tries)
