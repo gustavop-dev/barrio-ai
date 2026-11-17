@@ -50,6 +50,8 @@ urlpatterns=[
  path('resultados',rs.Resultados.as_view()),
  # LinkedIn's own analytics of the directo account, from stored imports only (docs/metricas-resultados.md).
  path('resultados/analitica',rs.Analitica.as_view()),
+ # The buyer's funnel: chosen → warmed → invited → accepted → message → replied → interested → meeting (docs/plan-outbound.md).
+ path('resultados/embudo-comprador',rs.EmbudoComprador.as_view()),
  path('perfil/<uuid:pid>',pv.Detail.as_view()),path('perfil/<uuid:pid>/decision',pv.Decision.as_view()),
  path('perfil/<uuid:pid>/documento',pv.Document.as_view()),path('perfil/<uuid:pid>/assets/<uuid:aid>',pv.Asset.as_view()),
  path('perfil/<uuid:pid>/descarga',pv.DownloadTicket.as_view()),path('perfil/<uuid:pid>/descarga/<str:token>',pv.Download.as_view()),
