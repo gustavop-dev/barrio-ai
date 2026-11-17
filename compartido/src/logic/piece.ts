@@ -179,7 +179,7 @@ export function cutPending(kind: PieceSnapshot['kind'], published: string, timeZ
   return { badge: 'Aún no', text: `Llega el ${longDay(dayOf(due, timeZone) ?? '')} a las ${formatTime(due.toISOString(), timeZone)}.` };
 }
 
-const ROLE_ORDER = ['comprador', 'par', 'recomendador', 'divulgador', 'lider', 'aliado'];
+const ROLE_ORDER = ['comprador', 'partner', 'par', 'recomendador', 'divulgador', 'lider', 'aliado'];
 
 /** Who commented, counted per role of the barrio in the design's order, and those without a role. */
 export function commenterRoles(commenters: readonly PieceCommenter[]): { roles: { role: string; label: string; count: number }[]; unclassified: number } {

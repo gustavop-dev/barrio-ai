@@ -323,7 +323,7 @@ export const MODALITY_SPLIT_MISSING = 'Sin dato: aún no hay oportunidades con m
 
 // ================================================================ 2 · gente
 
-const ROLE_ORDER = ['comprador', 'par', 'recomendador', 'divulgador', 'lider', 'aliado'];
+const ROLE_ORDER = ['comprador', 'partner', 'par', 'recomendador', 'divulgador', 'lider', 'aliado'];
 const ASIDE_LABEL: Record<string, string> = { discarded: 'Descartados', closed: 'Cerrados', incoming: 'Te invitaron' };
 
 /** The new fitting connections by role, in the design order (Comprador first), as funnel steps. */

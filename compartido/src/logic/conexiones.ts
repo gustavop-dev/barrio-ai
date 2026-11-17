@@ -10,7 +10,7 @@ export const NO_ROLE = 'sin_etiqueta';
 export const NO_ROLE_LABEL = 'Sin etiqueta';
 
 /** The order of the role chips; a role this table does not know goes after them, and «Sin etiqueta» last. */
-const ROLE_ORDER = ['comprador', 'par', 'recomendador', 'divulgador', 'lider', 'aliado', 'puente'];
+const ROLE_ORDER = ['comprador', 'partner', 'par', 'recomendador', 'divulgador', 'lider', 'aliado', 'puente'];
 
 const ROLE_PLURAL: Record<string, string> = {
   comprador: 'Compradores',
@@ -19,6 +19,7 @@ const ROLE_PLURAL: Record<string, string> = {
   divulgador: 'Divulgadores',
   lider: 'Líderes',
   aliado: 'Aliados',
+  partner: 'Partners',
   puente: 'Puentes',
 };
 
