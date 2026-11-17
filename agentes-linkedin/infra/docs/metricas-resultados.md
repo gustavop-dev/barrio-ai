@@ -366,7 +366,7 @@ Con `top_linkedin`: `{ "desde", "hasta", "captured_at", "por_interacciones": [{ 
 | --- | --- |
 | `elegidos` | el equipo eligió como comprador |
 | `calentados` | tuvo al menos un comentario del equipo en un post suyo antes de su primera invitación |
-| `calentados_2` | tuvo dos o más |
+| `calentados_2` | tuvo dos o más: el calentamiento completo de la fase 2 ([BAR-19](../../../docs/funcionalidades/red.md#bar-19)) |
 | `invitados` | recibió la invitación |
 | `aceptaron` | quedó conectado: aceptó la invitación o Gustavo aceptó la suya |
 | `recibieron_mensaje` | recibió un mensaje: «Hecho, le escribí» o un mensaje de Gustavo visto en el inbox |
@@ -397,6 +397,7 @@ Los mensajes 2 a 4 aparecen como pasos en `estado_actual`.
                      "calentamiento": { "calentados": Bloque, "no_calentados": Bloque },
                      "nota": { "con_nota": Bloque, "sin_nota": Bloque },
                      "senal": { "con_senal": Bloque, "sin_senal": Bloque },
+                     "senal_de_compra": { "con_senal_de_compra": Bloque, "sin_senal_de_compra": Bloque },
                      "entrada": { "saliente": Bloque, "entrante": Bloque } },
   "borradores": { "pendientes", "enviados", "no_enviados", "enviados_pct", "fuentes": ["mensaje_sugerido"] },
   "estado_actual": { "elegido|calentando|…|reunion|descanso|salio": n },
@@ -408,6 +409,7 @@ Los mensajes 2 a 4 aparecen como pasos en `estado_actual`.
 - **Comparaciones:**
   - `nota`: una invitación sin dato de nota (anterior al registro de notas) no cuenta en ninguno de los dos.
   - `senal`: `con_senal` es una señal de la persona antes de su primera invitación: comentó un post de Gustavo, respondió un comentario del equipo, lo invitó o le escribió.
+  - `senal_de_compra`: la verificación web de su empresa citó una señal de compra con fuente (ronda, contratación o expansión; clase 08). Solo se guardan con `BUYER_WARMUP_ENABLED`, así que antes de encenderlo todos van en `sin_senal_de_compra`.
 - **Borradores:** hoy el único es el «Mensaje sugerido» ([RSP-07](../../../docs/funcionalidades/respuestas.md#rsp-07)). Está pendiente mientras su tarjeta espera en Tu turno, enviado con «Hecho, le escribí» y no enviado con «No escribirle».
 - **Comando:**
   - `manage.py comprador embudo --semanas N` imprime lo mismo en JSON.

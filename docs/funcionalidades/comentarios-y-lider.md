@@ -22,6 +22,7 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
 | [COM-10](#com-10) | Gestionar referentes | PWA · app · backend | funciona |
 | [COM-11](#com-11) | Relaciones usa la evidencia de referentes y de su audiencia | backend | funciona |
 | [COM-12](#com-12) | Un comentario que el líder descartó se reescribe una vez con sus razones | backend | implementado |
+| [COM-13](#com-13) | Comentario de calentamiento en el post de un comprador | backend | implementado, apagado |
 
 ---
 
@@ -196,8 +197,24 @@ El equipo observa los posts de los referentes de Gustavo, escribe comentarios en
   4. **Dado** un post que ya tiene dos borradores de comentario, **cuando** corre el autopiloto o se pide otra reescritura, **entonces** no se encola nada y `propose_comment` responde «Este comentario ya se reescribió una vez con las razones del líder…».
   5. **Dado** un descarte por las reglas (no por Jev), una decisión del redactor de no comentar o un descarte de hace más de 24 h, **cuando** corre el autopiloto, **entonces** no hay reescritura por el líder.
   6. **Dado** la auditoría de compuertas, **cuando** la reescritura se aprueba, **entonces** cuenta en «Líder (Jev) · INT-03» como «pasó tras reintento», y «Descartes sin reescritura» cuenta los descartes que no tuvieron otro borrador.
-- **Brechas código/docs:** las respuestas INT-04 no tienen esta reescritura.
+- **Brechas código/docs:** las respuestas INT-04 no tienen esta reescritura. Con `BUYER_WARMUP_ENABLED`, también se reescribe el comentario descartado en el post de un comprador que se calienta (posts de hasta `BUYER_POST_MAX_AGE_HOURS`, con la espera por autor y el cupo de su grupo, [COM-13](#com-13)).
 - **Cobertura QA:** `tests/test_compuertas.py` (`LeadRedraftTests`), escrito; CI pendiente.
+
+### COM-13 · Comentario de calentamiento en el post de un comprador <a id="com-13"></a>
+
+- **Dónde:** backend
+- **Estado:** implementado detrás de `BUYER_WARMUP_ENABLED` (por defecto `false`), sin desplegar. Apagado, un post sin referente no se propone y un comentario en él pasa las reglas de siempre.
+- **Qué hace para Gustavo:** en el post de un posible cliente al que todavía no le escribió, el equipo deja un comentario que se recuerde: algo propio y concreto sobre lo que cuenta el autor y una sola pregunta al final, de 25 a 40 palabras, sin aplaudir ni vender. Es el calentamiento de [BAR-19](red.md#bar-19) antes de invitarlo.
+- **Metodología:** `comentario_calentamiento`, activada con su evaluación `BIB-09-comentario-calentamiento` ([BIB-11](biblioteca-equipos.md#bib-11)). Rige solo si el autor tiene recorrido de comprador y el post no es de un referente (`calentamiento.warmup_post`).
+- **Código:** `operador.propose_comment` (`warmup_units`, `comment_system(warm)`, `WARMUP_SYSTEM`, `inputs.calentamiento`), `autopiloto.warmup_text_issues` (dentro de `comment_text_issues`, así que también en la reescritura por reglas de [COM-04](#com-04)), `lider._questions` (`warmup_questions`, `CAL_CHECKS`), `lider.ground_questions`, `lider.comment_worthy`, `evaluaciones.comment_request`.
+- **Criterios de aceptación:**
+  1. **Dado** el post de un comprador que se calienta, **cuando** Relaciones redacta, **entonces** carga `COMMENT_UNITS` y las seis `WARMUP_COMMENT_UNITS` enteras con la metodología nombrada (`operator.comment_grounded` lleva `course_methodology`) y recibe `calentamiento` (autor, titular, comentarios previos y para qué). Sin esas unidades no hay borrador: «Biblioteca no disponible para el comentario de calentamiento».
+  2. **Dado** un comentario de calentamiento fuera de 25–40 palabras, que no termina en una pregunta, con más de una, que aplaude o felicita («great post», «felicidades», 👏, 🔥…) o que ofrece ayuda o servicios, **cuando** pasa por las reglas, **entonces** va a la única reescritura y, si sigue fallando, se descarta sin pagar la revisión del líder.
+  3. **Dado** que pasa las reglas, **cuando** el líder lo revisa, **entonces** además de `aporta`, `pitch`, `inventa`, `respeto` e `idioma` responde `cal_aporte` (≥ 0,7), `cal_pregunta` (≥ 0,6) y `cal_aplauso` (≤ 0,2), fundamentadas en `LEAD_UNITS` más las seis unidades; sin ellas la revisión espera (`retry`).
+  4. **Dado** el mismo texto en el post de un referente, **cuando** se redacta y revisa, **entonces** nada de lo anterior se aplica.
+  5. **Dado** el post de un comprador que habla de su empresa o su producto, **cuando** corre el prefiltro, **entonces** eso es el tema a comentar y solo se salta un anuncio sin nada que preguntarle.
+- **Lo que gana sobre el curso:** el curso dice «la IA propone, tú decides; nunca comentes con bots» (LI-07-M007-K05). Gana la decisión de Gustavo: los agentes redactan y publican con reglas fijas y la revisión del líder, dentro de los topes, y él puede pasar INT-03 a `approval` u `off`. El rango es 25–40 (LI-07-M001-K04), no el 25–35 «sin emojis» del prompt 7.2; se prohíbe el aplauso, no todo emoji.
+- **Cobertura QA:** `tests/test_comentario_calentamiento.py` (caso completo con funciones de producción, reglas, procedimiento, activación y registro) y el camino de punta a punta de [BAR-19](red.md#bar-19). Línea base y resultado en `agentes-linkedin/infra/docs/linea-base-comentario-calentamiento.md`.
 
 ## Retiradas
 

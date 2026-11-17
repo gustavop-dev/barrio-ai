@@ -304,7 +304,27 @@ Hecho: 10 comentarios al día (12/11/2026); biblioteca 01–12 y primer mensaje 
      enviados. Con menos de 30 invitaciones avisa «muestra chica».
    - Las fases 2 a 6 escriben con `record`, `rest`, `retry` y `leave`, y leen `temperature` (señales con su edad, sin
      pesos), `due` y `funnel`. Para desplegar: migración 0046 y luego `comprador reconstruir --seco` y sin `--seco`.
-2. **Calentamiento:** leer y comentar posts de compradores, e invitar tras el segundo comentario.
+2. ~~**Calentamiento:** leer y comentar posts de compradores, e invitar tras el segundo comentario.~~ Hecho en la
+   misma rama ([BAR-19](funcionalidades/red.md#bar-19), [COM-13](funcionalidades/comentarios-y-lider.md#com-13),
+   [BIB-11](funcionalidades/biblioteca-equipos.md#bib-11)), sin desplegar y detrás de `BUYER_WARMUP_ENABLED`
+   (apagado por defecto; apagado, todo es como antes):
+   - Lectura de los posts recientes de quien se calienta (y de quien tiene el seguimiento en camino), con su propio
+     tope diario (`BUYER_POSTS_READ_DAILY_LIMIT`, 8) dentro de las lecturas de perfil compartidas; cada persona como
+     mucho cada 72 h. Se guardan sin referente.
+   - Comentario de calentamiento con la metodología `comentario_calentamiento` (clases 07 y 10, seis unidades
+     activadas, caso `BIB-09-comentario-calentamiento` con su línea base): reglas fijas (25–40 palabras, una sola
+     pregunta al final, sin aplauso ni ofrecer servicios) y tres preguntas del líder. Espera de 48 h por autor del post.
+     El tope de INT-03 del día se reparte compradores 6, comunidad 2, referentes 2; un grupo sin posts cede sus cupos.
+   - Invitación tras el segundo comentario, antes si responde un comentario, comenta un post de Gustavo, lo invita o
+     le escribe, y a los 14 días como máximo (también quien no publica: ruta `sin_posts` tras dos lecturas vacías).
+   - Sin aceptar en 21 días tras dos comentarios: descanso de 60 días (un año desde el tercer intento); una señal lo
+     despierta. Nunca se reenvía ni se retira la invitación: `GET /api/v1/red/invitaciones-pendientes` le da la lista
+     a Gustavo.
+   - La temperatura pesa las señales (Máxima 5, Alta 3, Media 1; la mitad pasados 30 días) y las señales de compra con
+     fuente que la verificación web de la etapa ya cita (ronda, contratación, expansión), sin llamadas nuevas. Ordena a
+     quién comentar y a quién invitar primero.
+   - Pendiente: responder en el hilo del comprador (no hay acción permitida), el grupo «comunidad» (sin fuente de
+     posts todavía) y despertar por una señal de compra durante el descanso (la verificación web corre una vez).
 3. **Primer mensaje al aceptar**, con la nota para calentados.
 4. **Secuencia M2 a M4**, con la lectura del inbox y la regla de parada.
 5. **Ruta del que no publica.**
@@ -315,7 +335,7 @@ Revisión de resultados hacia el 17/12/2026. Después: referentes por niveles, u
 
 ## Fichas relacionadas
 
-[red.md](funcionalidades/red.md) (BAR-10 a BAR-18) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
+[red.md](funcionalidades/red.md) (BAR-10 a BAR-19) · [comentarios-y-lider.md](funcionalidades/comentarios-y-lider.md) ·
 [respuestas.md](funcionalidades/respuestas.md) · [inbox.md](funcionalidades/inbox.md) ·
 [personas-oportunidades.md](funcionalidades/personas-oportunidades.md) · [backlog.md](backlog.md) ·
 catálogo de acciones `agentes-linkedin/infra/docs/catalogo-acciones-linkedin.md` (CHAT-04 a CHAT-07).

@@ -70,3 +70,24 @@ porque pasan. Los marcadores se quitan cuando su motivo desaparece:
 - C2, C4, C5: con las reglas fijas del calentamiento (aplauso, 25–40 palabras, una pregunta al final).
 - C6: con las preguntas del líder sobre el calentamiento (`cal_aporte`, `cal_pregunta`, `cal_aplauso`).
 - Carga de unidades, caso completo y fuentes: con la activación de las seis unidades de las clases 07 y 10.
+
+## Después de activar la metodología (16/11/2026)
+
+Mismo caso, mismas pruebas y mismo juez simulado, ya sin marcadores, con `BUYER_WARMUP_ENABLED=true`:
+`manage.py test team_backend.tests.test_comentario_calentamiento`. Resultado: las 11 pruebas del caso pasan, y
+`grade_course_case` aprueba el caso completo (`passed: True`, sin errores) con las citas de `LEAD_UNITS` más las seis
+unidades.
+
+| Variante | Antes | Ahora | Qué lo cambió |
+| --- | --- | --- | --- |
+| Flujo | Ni se lee ni se propone | Se lee (`calentamiento.read_posts`) y se propone (`autopiloto._propose_groups`) | Lectura de compradores y propuesta por grupos |
+| C1 | Publicado, sin las unidades | Publicado y el borrador carga las seis unidades | `operador.warmup_units` con la metodología nombrada |
+| C2 | Lo para el juez | Lo paran las reglas (aplauso), sin pagar la revisión | `autopiloto.warmup_text_issues` (`APPLAUSE`) |
+| C3 | Reglas | Reglas (pitch y ofrecer servicios) | `PITCH` y `WARMUP_SELL` |
+| C4 | Publicado | Lo paran las reglas (58 palabras) | 25–40 palabras (`WARMUP_WORDS`) |
+| C5 | Publicado | Lo paran las reglas (sin pregunta) | Pregunta final |
+| C6 | Publicado | Lo para el juez | `cal_aporte` (≥ 0,7) del líder |
+| R | Publicado | Publicado | La metodología no rige a los referentes |
+
+Con el interruptor apagado, un comentario de 58 palabras en el post de un comprador guardado a mano se sigue
+publicando como antes (`WarmupProcedureTests.test_with_the_switch_off_a_buyer_comment_is_judged_as_any_comment`).
