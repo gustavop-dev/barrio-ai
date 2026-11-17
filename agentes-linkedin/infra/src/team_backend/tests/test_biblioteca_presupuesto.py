@@ -78,7 +78,7 @@ class CourseBudgetTests(SimpleTestCase):
     def test_evaluation_classifier_uses_complete_curated_context_but_rejects_real_absences(self):
         # Use the real evaluation cache without constructing a run that reads memory.
         cache=SimpleNamespace(_units={})
-        run=SimpleNamespace(private=[],orientation='',context=lambda *args:evaluaciones.Run.context(cache,*args))
+        run=SimpleNamespace(private=[],orientation='',context=lambda *args,**kwargs:evaluaciones.Run.context(cache,*args,**kwargs))
         request=evaluaciones.classify_request(run,[])
         units=json.loads(request['context'].split('\n',1)[1])
         self.assertEqual([u['unit_id'] for u in units],operador.NETWORK_UNITS)
