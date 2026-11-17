@@ -31,14 +31,17 @@ class BuyerPathBase(RepliesBase):
         env.start();self.addCleanup(env.stop)
 
     # -- providers: the classifier says «comprador», the web finds a seed round (no paid call, no network)
-    def providers(self,fit=True):
+    def providers(self,fit=True,note=''):
+        """`note`: the classifier also proposes an invitation note (today's only source of notes, red.plan)."""
         from team_backend import research
         def claude(system,message,**kwargs):
             if kwargs['purpose']=='network-stage':
                 return {'text':json.dumps({'verdict':'semilla_o_mas','evidence':'La fuente dice que levantó una ronda semilla.',
                                            'source_urls':['https://news.example/acme-seed']}),'model':'claude-sonnet-5-5'}
+            cited=['LI-03-M005-K06']+(['LI-03-M006-K01'] if note else [])
             out=[{'id':p['id'],'fit':fit,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':'Founder con producto.',
-                  'confidence':0.9,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''} for p in json.loads(message)['people']]
+                  'confidence':0.9,'course_citations':cited,'invitation_note':note,'note_reason':'Conversamos en su post.' if note else ''}
+                 for p in json.loads(message)['people']]
             return {'text':json.dumps({'contacts':out}),'model':kwargs.get('model'),'estimated_usd':0.001,'request_id':'req_net'}
         def web(request):
             source=research.Source('s1','https://news.example/acme-seed','Acme seed','Acme raised a seed round','2026-11-12T00:00:00+00:00')
@@ -64,11 +67,11 @@ class BuyerPathBase(RepliesBase):
         return {s['etapa']:s['personas'] for s in block['etapas']}
 
     # -- steps (production code only)
-    def step_choose(self,slug='ana-acme',name='Ana Acme',location='Austin, Texas'):
+    def step_choose(self,slug='ana-acme',name='Ana Acme',location='Austin, Texas',note=''):
         """discover_network finds the person in a search; classify_contacts classifies and checks the stage on the web."""
         person=self.fake.seed_person(slug,name,headline='Founder & CEO at Acme',search='founder pre-seed',location=location)
         self.job('discover_network')
-        stop=self.providers()
+        stop=self.providers(note=note)
         try:job=self.job('classify_contacts')
         finally:stop()
         self.assertEqual(job.state,'complete',job.error)
@@ -315,8 +318,8 @@ class WarmupPathBase(BuyerPathBase):
         return patch('knowledge.providers.claude',side_effect=claude)
 
     # -- steps (production code only)
-    def chosen_and_followed(self,slug='ana-acme',name='Ana Acme'):
-        contact=self.step_choose(slug,name)
+    def chosen_and_followed(self,slug='ana-acme',name='Ana Acme',note=''):
+        contact=self.step_choose(slug,name,note=note)
         follow=self.step_follow(contact)
         self.assertEqual(follow.state,'confirmed')
         contact.refresh_from_db()
@@ -596,3 +599,180 @@ class WarmupSwitchOffTests(BuyerPathBase):
             self.assertTrue(ActionProposal.objects.filter(contact=ana,capability='RED-02').exists())
             self.assertNotIn('peso',comprador.temperature(ana))
             self.assertEqual(follow.state,'confirmed')
+
+
+# --------------------------------------------------------------------------- phase 3: the first message and the note (BAR-20)
+
+WARM_3=('Moving the weekly report off the spreadsheet usually shows who owned the numbers; teams that name one owner per '
+        'report keep the habit. Which report did your clients notice first?')
+AFTER_POST='We moved the weekly report off the spreadsheet. Next is onboarding without a call for every new client.'
+
+
+def judge_message(text):
+    """Jev simulado para el primer mensaje: retoma algo concreto, pregunta acotada, sin vender."""
+    low=(text or '').lower()
+    concrete=any(k in low for k in ('spreadsheet','report','pilot','manual step','onboarding'))
+    generic=any(k in low for k in ('great to be connected','how are you thinking','what do you think'))
+    sells=any(k in low for k in ('my team','we help','minutes','a call'))
+    return {'dm_toque':0.9 if concrete and not generic else 0.15,'dm_puente':0.85 if concrete else 0.3,
+            'dm_pregunta':0.2 if generic else 0.85,'dm_un_tema':0.9,'dm_en_persona':0.3 if generic else 0.85,
+            'dm_pitch':0.9 if sells else 0.05,'inventa':0.05}
+
+
+def judge_note(text):
+    """Jev simulado para la nota: un hecho concreto suyo, que sirva para que acepte, sin vender."""
+    low=(text or '').lower()
+    sells=any(k in low for k in ('my team solves','we help','i help','our services'))
+    concrete=any(k in low for k in ('spreadsheet','pilot','report','onboarding','piloto'))
+    return {'nota_hecho':0.9 if concrete else 0.1,'nota_aceptar':0.2 if sells else 0.85,'nota_generica':0.05 if concrete else 0.9,
+            'nota_pitch':0.9 if sells else 0.05,'nota_inventa':0.05}
+
+
+class FirstMessagePathBase(WarmupPathBase):
+    """The path with BUYER_FIRST_MESSAGE_ENABLED (phase 3): when a warmed buyer accepts, the team prepares a first message
+    that Gustavo sends himself (Tu turno «Mensaje sugerido»); the month's notes go to warmed buyers, drafted at invite
+    time. The steps call the production entry points; where today's code has none (before phase 3), the step does
+    nothing, which is what the baselines measure."""
+    def setUp(self):
+        super().setUp()
+        # 17/11/2026: 20 paid comment drafts a day (OperatorBase keeps the old 6 for the other suites).
+        env=patch.dict(os.environ,{'BUYER_FIRST_MESSAGE_ENABLED':'true','NETWORK_STAGE_CHECKS_PER_DAY':'20','OPERATOR_DAILY_PROPOSALS':'20'})
+        env.start();self.addCleanup(env.stop)
+        # Several acceptances in one test day: each one is a sync_network read (4 a day in production).
+        caps=patch.dict(red.READ_CAPS,{'sync':20});caps.start();self.addCleanup(caps.stop)
+        self.texts={};self.calls=[]
+
+    # -- providers
+    def lead(self):
+        """The lead with Jev simulated for every review of this path: comments, people, first messages and notes."""
+        from team_backend import lider
+        risks=set(lider.NETWORK_RISKS)
+        def answer(state,questions,**kwargs):
+            purpose=kwargs.get('purpose')
+            self.jev.append({'purpose':purpose,'questions':dict(questions),'state':state})
+            if purpose=='comment-prefilter':scores=PREFILTER
+            elif purpose=='lead-review-message':scores=judge_message((state.get('primer_mensaje') or {}).get('texto'))
+            elif purpose=='lead-review-note':scores=judge_note((state.get('nota') or {}).get('texto'))
+            else:scores={}
+            low=LOW|risks|{'dm_pitch'}  # RSP-07: the message drafted with a closing reply does not sell
+            return {'answers':{q:{'noul':scores.get(q,0.05 if q in low else 0.9)} for q in questions},'model':'fake-jev','estimated_usd':0}
+        stack=ExitStack()
+        stack.enter_context(patch.dict(os.environ,{'LEAD_ENABLED':'true'}))
+        stack.enter_context(patch('knowledge.providers.typesafe',side_effect=answer))
+        return stack
+
+    def writer(self):
+        """Claude simulado para el primer mensaje y la nota: el texto de cada persona (self.texts[(purpose, nombre)]),
+        citando el primer hecho que le dieron."""
+        def claude(system,message,**kwargs):
+            purpose=kwargs.get('purpose');data=json.loads(message)
+            self.calls.append({'purpose':purpose,'context':kwargs.get('context') or '','system':system,'inputs':data})
+            name=(data.get('persona') or {}).get('nombre','')
+            facts=data.get('hechos') or []
+            text=self.texts.get((purpose,name),'')
+            out={'decision':'write' if text else 'none','language':'en','anchor':facts[0]['id'] if facts else '',
+                 'rationale':'Retoma su hecho y le pregunta algo fácil.','claims_needing_evidence':[],'risks':[]}
+            if purpose=='invite-note':
+                out.update(note=text,citations=['LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01','LI-03-M006-K01'])
+            else:
+                out.update(message=text,citations=['LI-09-M002-K05','LI-09-M003-K02','LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02'])
+            return {'text':json.dumps(out),'model':'claude-opus-5-5'}
+        return patch('knowledge.providers.claude',side_effect=claude)
+
+    # -- reads
+    def drafts_of(self,contact,kind):
+        """The person's drafts (BuyerDraft, phase 3); [] before it exists."""
+        from team_backend import models
+        model=getattr(models,'BuyerDraft',None)
+        return list(model.objects.filter(contact=contact,kind=kind).order_by('created_at')) if model else []
+
+    def stopped(self,contact,kind):
+        """Who stopped the person's draft: «reglas», «juez», «hecho» (nothing real to cite) or «cupo» (no note left)."""
+        event=(AuditEvent.objects.filter(action='buyer.draft_stopped',target=str(contact.pk),metadata__tipo=kind)
+               .order_by('-created_at').first())
+        return event.metadata.get('por') if event else None
+
+    def paid(self,contact,purpose):
+        return any(c['purpose']==purpose and (c['inputs'].get('persona') or {}).get('nombre')==contact.display_name for c in self.calls)
+
+    def turn(self,later=timedelta(0)):
+        """Tu turno → mensajes, read `later` from now (a card may wait for its hour)."""
+        from rest_framework.test import APIClient
+        client=APIClient();client.force_authenticate(self.gustavo)  # the session would not outlive a clock days ahead
+        with patch('django.utils.timezone.now',return_value=timezone.now()+later):
+            response=client.get('/api/v1/tu-turno')
+        self.assertEqual(response.status_code,200,response.content)
+        return response.json()['tasks']['mensajes']
+
+    def cards_of(self,contact,later=timedelta(0)):
+        return [c for c in self.turn(later) if ((c.get('message') or {}).get('person') or {}).get('id')==str(contact.pk)]
+
+    def sent_invitation(self,contact):
+        return next((i for i in self.fake.state['invitations']['sent'].values() if i['user']['id']==contact.provider_user_id),None)
+
+    def messages_sent(self):
+        """Private messages the account wrote: the team never sends one (INB-08)."""
+        return sum(m['is_sender'] for chat in self.fake.state['chats'].values() for m in chat['messages'])
+
+    # -- steps (production code only)
+    def prepare(self,now=None,rounds=8):
+        """The autopilot's buyer-draft step (phase 3: autopiloto._buyer_drafts) and its jobs, until it queues nothing.
+        Before phase 3 there is no such step: nobody prepares a first message or a note."""
+        step=getattr(autopiloto,'_buyer_drafts',None)
+        if step is None:return 0
+        queued=0
+        with self.writer(),self.lead():
+            for _ in range(rounds):
+                n=step(self.bot,self.account,now or timezone.now())
+                self.drain()
+                if not n:break
+                queued+=n
+        return queued
+
+    def close(self,card,how):
+        action=next(a for a in card['actions'] if (a.get('body') or {}).get('how')==how)
+        response=self.human.post(action['endpoint'],{'how':how},format='json')
+        self.assertEqual(response.status_code,200,response.content)
+        return response.json()
+
+    def answered(self,slug,name,note=''):
+        """Chosen, followed, one warm-up comment and her answer to it: warmed and ready to be invited (an accelerator)."""
+        contact=self.chosen_and_followed(slug,name,note=note)
+        self.their_new_post(contact)
+        self.observe()
+        first=self.autopilot_comment(WARM_1)
+        self.assertEqual(first.state,'confirmed',first.risks)
+        self.step_their_answer(contact,first)
+        return Contact.objects.get(pk=contact.pk)
+
+    def two_comments(self,slug,name):
+        """Chosen, followed and the two warm-up comments, without an answer of hers."""
+        contact=self.chosen_and_followed(slug,name)
+        first,second=self.warm_up(contact)
+        return Contact.objects.get(pk=contact.pk),second
+
+    def without_posts(self,slug,name):
+        """Chosen and followed, two reads without a post: the route without posts, ready at 14 days. Returns the moment."""
+        contact=self.chosen_and_followed(slug,name)
+        self.observe();self.observe(later=True)
+        return contact,self.journey(contact).touches.get(kind='seguir').at+timedelta(days=14,minutes=1)
+
+    def invite(self,contact,now=None,auto=False):
+        """The plan proposes the invitation; Gustavo approves it (approval, as today) or, with `auto`, the autopilot's gate
+        (RED-02 autonomous, the lead) approves it; the operator sends it. Returns the proposal."""
+        self.plan(now)
+        proposal=ActionProposal.objects.filter(contact=contact,capability='RED-02').order_by('-created_at').first()
+        if proposal is None:return None
+        if not auto:
+            with self.lead():return self.approve_open(contact,'RED-02')
+        with self.lead(),patch.dict(os.environ,{'OPERATOR_AUTONOMY':'RED-02=auto'}):
+            proposal=autopiloto.policy_review(ActionProposal.objects.get(pk=proposal.pk))
+            if proposal.state=='approved':
+                try:operador.execute(self.gustavo,proposal.id)
+                except operador.OperatorBlocked:pass  # the gate stopped the send: it stays approved
+        return ActionProposal.objects.get(pk=proposal.pk)
+
+    def accepted(self,contact):
+        contact=self.step_accept(contact)
+        self.assertEqual(self.journey(contact).step,'acepto')
+        return contact

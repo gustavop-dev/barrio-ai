@@ -939,13 +939,79 @@ COURSE_CASES={
                     'C1':['LI-07-M005-K05','LI-07-M001-K04'],'C2':['LI-07-M005-K05','LI-07-M001-K04'],'C3':['LI-07-M001-K04'],
                     'C4':['LI-07-M001-K04'],'C5':['LI-07-M005-K05','LI-07-M001-K04'],'C6':['LI-07-M005-K05'],
                     'R':['LI-07-M005-K07']}},
+    # Fase 3 del comprador (docs/plan-outbound.md): el primer mensaje a un comprador calentado que acepta. Caso hermano de
+    # BIB-09-primer-mensaje, con la misma metodología activada (`metodologia`): el origen es el recorrido, no una
+    # conversación en un post de Gustavo. M1: ya interactuó (respondió un comentario del equipo): borrador en el mismo ciclo
+    # de la aceptación, citando esa interacción. M2: no interactuó: nada antes de los N días, un toque más de calentamiento
+    # y después el borrador. M3: nada real que citar: ningún mensaje ni llamada pagada. M4: el borrador rompe una regla fija
+    # también tras la única reescritura. M5: el líder lo rechaza. M6: conversó en un post de Gustavo y tiene recorrido: una
+    # sola tarjeta, la de la conversación (RSP-07). En ninguna el equipo envía un mensaje.
+    'primer_mensaje_comprador':{'id':'BIB-09-primer-mensaje-comprador','metodologia':'primer_mensaje',
+        'units':operador.FIRST_MESSAGE_UNITS,
+        'input':{
+            'M1':{'interaccion':'respondio_comentario',
+                  'mensaje':'Hi Ana, your answer about the spreadsheet solving a real reporting pain stayed with me. Which report '
+                            'do your clients open first each week?'},
+            'M2':{'interaccion':None,'dias':7,
+                  'mensaje':'Hi Ana, your post about moving the pilot to a real product stayed with me. Which manual step is the '
+                            'first one you are automating?'},
+            'M3':{'interaccion':None,'posts':0,'senales_de_compra':0},
+            'M4':{'mensaje':'Thanks for connecting! Do you have 15 minutes this week? https://cal.com/gustavo'},
+            'M5':{'mensaje':'Hi Ana, great to be connected. How are you thinking about growth these days?'},
+            'M6':{'conversacion_en_su_post':True,'recorrido':True}},
+        'expected':{'borrador_con_metodologia':True,'M1_mismo_ciclo':True,'M1_tarjeta':True,'M1_cita':'respondio_comentario',
+                    'M2_antes_de_tiempo':False,'M2_toque':True,'M2_tarjeta':True,'M3_tarjeta':False,'M3_stopped_by':'hecho',
+                    'M3_pagado':False,'M4_tarjeta':False,'M4_stopped_by':'reglas','M5_tarjeta':False,'M5_stopped_by':'juez',
+                    'M6_tarjetas':1,'M6_origen':'conversacion','mensajes_enviados':0},
+        'required':['LI-09-M002-K05','LI-09-M003-K02','LI-09-M003-K03','LI-09-M003-K04','LI-09-M004-K02'],
+        'variants':{'flujo':['LI-09-M002-K05'],'M1':['LI-09-M002-K05','LI-09-M003-K02'],'M2':['LI-09-M002-K05'],
+                    'M3':['LI-09-M003-K02'],'M4':['LI-09-M003-K04','LI-09-M004-K02'],'M5':['LI-09-M003-K02','LI-09-M003-K03'],
+                    'M6':['LI-09-M002-K05']}},
+    # Tercera metodología de outbound (clase 09): la nota de invitación, reservada a compradores calentados con un hecho
+    # concreto (Gustavo, 17/11/2026). Se redacta al invitar, con los comentarios del calentamiento y las señales como
+    # contexto; su único trabajo es que acepte (LI-09-M002-K06). N1: una nota concreta sale con la invitación. N2–N6: la
+    # paran las reglas fijas («ser parte de mi red», elogio genérico, pitch, más de 200 caracteres, otro idioma) y la
+    # invitación sale sin nota. N7: el líder la rechaza. N8: sin hecho concreto no se redacta. N9: sin cupo de notas en el
+    # mes, la invitación sale sin nota. G: Gustavo confirmó a la persona: la nota ya no la deja bloqueada.
+    'nota_invitacion':{'id':'BIB-09-nota-invitacion',
+        'units':['LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01'],
+        'input':{
+            'N1':{'nota':'Ana, your post on moving a paid pilot off a spreadsheet stayed with me. Connecting to keep reading you.'},
+            'N2':{'nota':'Hi Ana, I would like you to be part of my network.'},
+            'N3':{'nota':'Ana, I love what you write. Let us connect!'},
+            'N4':{'nota':'Ana, I help companies like yours build product teams. Shall we talk?'},
+            'N5':{'nota':('Ana, your post on moving a paid pilot off a spreadsheet stayed with me, and the part about the client '
+                          'paying before the product existed even more so. Connecting to keep reading you and learn how it ends.')},
+            'N6':{'nota':'Ana, tu post sobre pasar el piloto de una hoja de cálculo a producto me dejó pensando. Conectemos.'},
+            'N7':{'nota':'Ana, your post on moving the pilot off a spreadsheet is exactly the kind of problem my team solves. '
+                         'Connecting.'},
+            'N8':{'calentado':False,'senales_de_compra':0},
+            'N9':{'cupo_de_notas':0},
+            'G':{'confirmado_por_gustavo':True}},
+        'expected':{'redactada_al_invitar':True,'nota_con_metodologia':True,'N1_con_nota':True,'N2_con_nota':False,
+                    'N2_stopped_by':'reglas','N3_con_nota':False,'N3_stopped_by':'reglas','N4_con_nota':False,
+                    'N4_stopped_by':'reglas','N5_con_nota':False,'N5_stopped_by':'reglas','N6_con_nota':False,
+                    'N6_stopped_by':'reglas','N7_con_nota':False,'N7_stopped_by':'juez','N8_con_nota':False,
+                    'N8_stopped_by':'hecho','N9_con_nota':False,'N9_stopped_by':'cupo','G_invitada':True,
+                    'invitaciones_sin_salir':0},
+        'required':['LI-09-M002-K06','LI-09-V008-K04','LI-09-M002-K01','LI-03-M006-K01'],
+        'variants':{'flujo':['LI-09-M002-K06','LI-09-M002-K01'],'N1':['LI-09-M002-K06','LI-09-V008-K04'],
+                    'N2':['LI-09-M002-K06'],'N3':['LI-09-M002-K06','LI-09-V008-K04'],'N4':['LI-09-M002-K06','LI-03-M006-K01'],
+                    'N5':['LI-09-M002-K01'],'N6':['LI-03-M006-K01'],'N7':['LI-09-V008-K04'],'N8':['LI-09-V008-K04'],
+                    'N9':['LI-09-M002-K01'],'G':['LI-09-M002-K01']}},
 }
+
+def case_methodology(role):
+    """The activated methodology a case reads: its own key, or the one a sibling case names (`metodologia`)."""
+    case=COURSE_CASES[role]
+    key=case.get('metodologia',role)
+    return key if key in METODOLOGIAS_ACTIVAS else None
 
 
 def course_case_context(role):
     """The case's units as its role loads them; an activated outbound methodology unlocks only its own units."""
     case=COURSE_CASES[role]
-    return operador.role_context(role,case['units'],metodologia=role if role in METODOLOGIAS_ACTIVAS else None)
+    return operador.role_context(role,case['units'],metodologia=case_methodology(role))
 
 
 def corpus_fingerprint():
@@ -991,7 +1057,7 @@ def grade_course_case(role,result,grounding):
     if set(case['required'])-set(citations):errors.append('Falta fundamento del caso')
     # La biblioteca guarda más clases de las que leen los agentes (knowledge.clases): citar una que no leen es un fallo.
     # Un caso de una metodología activada puede citar solo las unidades de esa metodología, además de 01–06.
-    metodologia=role if role in METODOLOGIAS_ACTIVAS else None
+    metodologia=case_methodology(role)
     if any(not legible_por_agentes(uid,metodologia) for uid in citations):errors.append('Cita fuera de las clases que leen los agentes')
     for key,expected in case['expected'].items():
         if result.get(key)!=expected:errors.append('Conducta incorrecta: '+key)
