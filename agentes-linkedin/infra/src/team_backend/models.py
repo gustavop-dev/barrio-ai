@@ -1640,6 +1640,9 @@ class BuyerJourney(models.Model):
     inbound_signals=models.PositiveIntegerField(default=0)
     last_inbound_at=models.DateTimeField(null=True,blank=True)
     signal_before_invite=models.BooleanField(default=False)
+    # Phase 6: the person who pointed to this one after her message 3 («¿no eres la persona indicada?»;
+    # secuencia_comprador.link_referral). Null when nobody referred her.
+    referred_by=models.ForeignKey('self',on_delete=models.SET_NULL,null=True,blank=True,related_name='referrals')
     origin=models.CharField(max_length=12,choices=Origin.choices,default=Origin.LIVE)
     created_at=models.DateTimeField(default=timezone.now)
     updated_at=models.DateTimeField(default=timezone.now)
@@ -1668,6 +1671,7 @@ class BuyerTouch(models.Model):
         DRAFT='borrador','Borrador preparado o descartado (fase 3)'
         OPPORTUNITY='oportunidad','Oportunidad registrada'
         INTERESTED='interesado','Respuesta con interés'
+        REFERRED='referido','Llegó referido por otra persona (su mensaje 3)'
         # saliente
         FOLLOW='seguir','Seguir (RED-01)'
         COMMENT='comentario','Comentario en un post suyo (INT-03)'
@@ -1720,10 +1724,11 @@ class BuyerTouch(models.Model):
 class BuyerDraft(models.Model):
     """A text the team prepared for a buyer (phase 3, mensajes_comprador.py): the first message after the acceptance, which
     Gustavo sends himself from LinkedIn (INB-08: the app never sends one), or the note of an invitation. One decision per
-    person, kind, number and attempt, including the decision not to write (sin_borrador) and the reason. Phase 4 adds
-    messages 2–4 with `number`. It hangs from the Contact, so it outlives a rebuilt journey."""
+    person, kind, number and attempt, including the decision not to write (sin_borrador) and the reason. Phase 4
+    (secuencia_comprador.py) adds messages 2–4 with `number`, cancelled when she replies. It hangs from the Contact, so it
+    outlives a rebuilt journey."""
     class Kind(models.TextChoices):
-        MESSAGE='mensaje','Primer mensaje (después de aceptar)'
+        MESSAGE='mensaje','Mensaje privado (el primero después de aceptar; fase 4: los seguimientos 2 a 4)'
         NOTE='nota','Nota de la invitación'
     class State(models.TextChoices):
         REVIEWING='en_revision','Esperando la revisión del líder'
@@ -1735,6 +1740,7 @@ class BuyerDraft(models.Model):
         NONE='sin_borrador','Sin borrador: nada real que citar, sin cupo de notas o ya hay conversación'
         EXPIRED='caducado','Caducado sin usar'
         REPLACED='reemplazado','Reemplazado: ya hubo otro primer mensaje o la persona ya no está en ese paso'
+        CANCELLED='cancelado','Cancelado: la persona respondió y la secuencia se detuvo'
     class StoppedBy(models.TextChoices):
         RULES='reglas','Reglas fijas'
         JUDGE='juez','Líder (Jev)'
@@ -1744,7 +1750,7 @@ class BuyerDraft(models.Model):
     id=models.UUIDField(primary_key=True,default=uuid.uuid4,editable=False)
     contact=models.ForeignKey(Contact,on_delete=models.CASCADE,related_name='buyer_drafts')
     kind=models.CharField(max_length=8,choices=Kind.choices)
-    number=models.PositiveSmallIntegerField(default=1)  # 1: the first message; phase 4: 2–4
+    number=models.PositiveSmallIntegerField(default=1)  # 1: the first message; phase 4: the follow-ups 2–4
     attempt=models.PositiveSmallIntegerField(default=1)  # the journey's attempt it belongs to
     state=models.CharField(max_length=12,choices=State.choices,db_index=True)
     stopped_by=models.CharField(max_length=12,choices=StoppedBy.choices,blank=True)
