@@ -67,9 +67,9 @@ class BuyerPathBase(RepliesBase):
         return {s['etapa']:s['personas'] for s in block['etapas']}
 
     # -- steps (production code only)
-    def step_choose(self,slug='ana-acme',name='Ana Acme',location='Austin, Texas',note=''):
+    def step_choose(self,slug='ana-acme',name='Ana Acme',location='Austin, Texas',note='',headline='Founder & CEO at Acme'):
         """discover_network finds the person in a search; classify_contacts classifies and checks the stage on the web."""
-        person=self.fake.seed_person(slug,name,headline='Founder & CEO at Acme',search='founder pre-seed',location=location)
+        person=self.fake.seed_person(slug,name,headline=headline,search='founder pre-seed',location=location)
         self.job('discover_network')
         stop=self.providers(note=note)
         try:job=self.job('classify_contacts')
@@ -318,8 +318,8 @@ class WarmupPathBase(BuyerPathBase):
         return patch('knowledge.providers.claude',side_effect=claude)
 
     # -- steps (production code only)
-    def chosen_and_followed(self,slug='ana-acme',name='Ana Acme',note=''):
-        contact=self.step_choose(slug,name,note=note)
+    def chosen_and_followed(self,slug='ana-acme',name='Ana Acme',note='',headline='Founder & CEO at Acme'):
+        contact=self.step_choose(slug,name,note=note,headline=headline)
         follow=self.step_follow(contact)
         self.assertEqual(follow.state,'confirmed')
         contact.refresh_from_db()
@@ -771,9 +771,9 @@ class FirstMessagePathBase(WarmupPathBase):
         first,second=self.warm_up(contact)
         return Contact.objects.get(pk=contact.pk),second
 
-    def without_posts(self,slug,name):
+    def without_posts(self,slug,name,headline='Founder & CEO at Acme'):
         """Chosen and followed, two reads without a post: the route without posts, ready at 14 days. Returns the moment."""
-        contact=self.chosen_and_followed(slug,name)
+        contact=self.chosen_and_followed(slug,name,headline=headline)
         self.observe();self.observe(later=True)
         return contact,self.journey(contact).touches.get(kind='seguir').at+timedelta(days=14,minutes=1)
 
@@ -1521,3 +1521,406 @@ class SequenceBuyerPathTests(SequencePathBase):
         secuencia_comprador.link_referral(self.journey(mia),self.journey(lu))  # once
         self.assertEqual(self.journey(mia).touches.filter(kind='referido').count(),1)
         with self.assertRaises(ValueError):secuencia_comprador.link_referral(self.journey(lu),self.journey(lu))
+
+
+# --------------------------------------------------------------------------- phase 5: the buyer who does not post (BAR-22)
+
+SEED_URL='https://news.example/acme-seed'
+HIRING_URL='https://jobs.example/acme-account-executive'
+SIGNAL_NOTE='Ana, saw Acme raised its seed round to turn the pilot into a real product. Connecting to follow how it goes.'
+SIGNAL_MESSAGE=('Hi Ana, saw Acme raised its seed round to turn the pilot into a real product. Which manual step of the pilot '
+                'are you automating first?')
+TALK_MESSAGE=('Hi Ana, I talked with Bruno from your team about moving the pilot off spreadsheets. Which report does Acme want '
+              'to automate first?')
+
+
+class NoPostsPathBase(SequencePathBase):
+    """The path with BUYER_NO_POSTS_ROUTE_ENABLED (phase 5, sin_posts.py) on top of phases 2–4: the buyer who does not
+    post, his bridge (a colleague who does) and the retries. The fake connector's search by company name returns the
+    people seeded with `search=<company>`; the web check may cite buying signals (self.stage_signals)."""
+    def setUp(self):
+        super().setUp()
+        env=patch.dict(os.environ,{'BUYER_NO_POSTS_ROUTE_ENABLED':'true'})
+        env.start();self.addCleanup(env.stop)
+        self.stage_signals=[];self.web_keys=[]
+        self.human=self.gustavo_api()  # the clock moves weeks ahead: a session would not outlive it
+
+    def signal(self,kind='ronda',days=10,url=SEED_URL,evidence='Acme raised a seed round to turn its pilot into a product.'):
+        return {'tipo':kind,'fecha':(timezone.now()-timedelta(days=days)).date().isoformat(),'source_url':url,'evidencia':evidence}
+
+    def providers(self,fit=True,note=''):
+        """BuyerPathBase's, with the web check citing self.stage_signals (each one with its source among the findings)."""
+        from team_backend import research
+        def claude(system,message,**kwargs):
+            if kwargs['purpose']=='network-stage':
+                return {'text':json.dumps({'verdict':'semilla_o_mas','evidence':'La fuente dice que levantó una ronda semilla.',
+                                           'source_urls':[SEED_URL],'senales':list(self.stage_signals)}),'model':'claude-sonnet-5-5'}
+            out=[{'id':p['id'],'fit':fit,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':'Founder con producto.',
+                  'confidence':0.9,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''}
+                 for p in json.loads(message)['people']]
+            return {'text':json.dumps({'contacts':out}),'model':kwargs.get('model'),'estimated_usd':0.001,'request_id':'req_net'}
+        def web(request):
+            self.web_keys.append(request.key)
+            urls=[SEED_URL]+[s['source_url'] for s in self.stage_signals if s['source_url']!=SEED_URL]
+            sources=tuple(research.Source(f's{i}',url,'Acme','Acme news','2026-11-12T00:00:00+00:00') for i,url in enumerate(urls,1))
+            return research.ResearchResult(request.public_question,'complete','2026-11-12T00:00:00+00:00',
+                                           (research.Finding('Acme raised a seed round.',tuple(s.id for s in sources)),),sources,
+                                           usage={'model':'claude-sonnet-5-5'})
+        claude_patch=patch('knowledge.providers.claude',side_effect=claude);web_patch=patch('team_backend.research.research',side_effect=web)
+        claude_patch.start();web_patch.start()
+        return lambda:(claude_patch.stop(),web_patch.stop())
+
+    # -- LinkedIn
+    def candidate(self,slug,name,headline,company='Acme',posts=True,distance='SECOND_DEGREE'):
+        """Someone the search by `company` finds; with `posts`, a recent post of theirs."""
+        user=self.fake.seed_person(slug,name,headline=headline,search=company,distance=distance)
+        if posts:
+            pid=f'activity:{slug}-p1'
+            self.fake.state['posts'][pid]={'id':pid,'share_url':'https://www.linkedin.com/feed/update/urn:li:'+pid,'text':BUYER_POST,
+                'created_at':(timezone.now()-timedelta(hours=2)).isoformat(),'author':user,'comments_counter':0,
+                'reactions_counter':[],'reposts_counter':0,'user_reacted':False,'is_repost':False}
+            self.fake.state['comments'][pid]=[]
+        return user
+
+    # -- reads
+    def bridge(self,buyer):
+        return Contact.objects.filter(bridge_for__contact=buyer).first()
+
+    def bridge_states(self,buyer):
+        return [(t.detail['estado'],t.detail.get('motivo')) for t in self.journey(buyer).touches.filter(kind='puente').order_by('at','created_at')]
+
+    def searched(self):
+        return [c['keywords'] for c in self.fake.state.get('search_calls',[])]
+
+    def reads(self):
+        """The reads phase 5 may spend: its searches (and the «search» cap), profile reads (and the shared cap) and the
+        posts reads of the buyers' cap made to see whether a candidate posts."""
+        network=lambda kind:AuditEvent.objects.filter(action='network.read',metadata__kind=kind).count()
+        return {'busquedas':AuditEvent.objects.filter(action='buyer.bridge_search').count(),'search':network('search'),
+                'perfil':network('profile'),'perfil_compartido':AuditEvent.objects.filter(action='operator.profile_read',
+                                                                                            metadata__purpose='buyer_bridge').count(),
+                'posts_candidatos':AuditEvent.objects.filter(action=calentamiento.READ_ACTION,metadata__contact__startswith='puente:').count()}
+
+    def angles(self,contact):
+        return [t.detail.get('tipo') for t in self.journey(contact).touches.filter(kind='reintento').order_by('at')]
+
+
+class NoPostsBuyerPathTests(NoPostsPathBase):
+    """BAR-22 end to end with the production functions: the route without posts, the bridge, the note by signal, the
+    first message and the retries."""
+
+    def test_1_no_posts_invited_at_14_days_with_a_note_and_a_first_message_on_her_signal(self):
+        self.stage_signals=[self.signal()]
+        ana,at=self.without_posts('ana-acme','Ana Acme')
+        self.assertEqual((self.journey(ana).route,len(calentamiento.buying_signals(Contact.objects.get(pk=ana.pk)))),('sin_posts',1))
+        # She has a sourced signal to cite: no bridge is asked for. «Comment where she comments»: the connector cannot
+        # read her comments, so nothing is commented or invented; the funnel says so.
+        self.plan()
+        self.assertEqual(self.bridge_states(ana),[])
+        self.assertFalse(self.journey(ana).touches.filter(kind__in=['comentario','visita']).exists())
+        route=self.funnel()['ruta_sin_posts']
+        self.assertEqual((route['donde_comenta']['disponible'],route['visitas']['disponible']),(False,False))
+        # 13 days: not yet. 14 days: invited with one of the month's notes, citing her signal.
+        self.texts[('invite-note','Ana Acme')]=SIGNAL_NOTE;self.texts[('buyer-message','Ana Acme')]=SIGNAL_MESSAGE
+        follow=self.journey(ana).touches.get(kind='seguir').at
+        self.prepare(follow+timedelta(days=13));self.plan(follow+timedelta(days=13))
+        self.assertFalse(self.invite_proposed(ana))
+        with self.clock(at):invite=self.invite(ana,at)  # the note is drafted and sent that day
+        self.assertEqual(invite.state,'confirmed',invite.risks)
+        note=self.drafts_of(ana,'nota')[-1]
+        self.assertEqual((note.state,note.anchor['tipo'],note.anchor['fuente'],note.text),('enviado','senal_de_compra',SEED_URL,SIGNAL_NOTE))
+        self.assertEqual(self.sent_invitation(ana)['message'],SIGNAL_NOTE)
+        # She accepts; on this route there is no touch to wait for: the message a week later, on the same signal.
+        ana=self.accepted(ana)
+        accepted=self.journey(ana).accepted_at
+        self.assertEqual(self.journey(ana).next_at,accepted+timedelta(days=7))
+        self.prepare(accepted+timedelta(days=7,minutes=1))
+        message=self.drafts_of(ana,'mensaje')[-1]
+        self.assertEqual((message.state,message.anchor['tipo'],message.anchor['fuente'],message.text),
+                         ('listo','senal_de_compra',SEED_URL,SIGNAL_MESSAGE))
+        cards=self.cards_of(ana,timedelta(days=7,hours=2))
+        self.assertEqual([c['message']['comment_label'] for c in cards],['Señal de compra de su empresa'])
+        self.assertEqual((self.messages_sent(),self.searched().count('Acme')),(0,0))
+
+    def test_1b_the_note_by_signal_waits_behind_the_buyers_warmed_with_comments(self):
+        self.stage_signals=[self.signal()]
+        ana,at=self.without_posts('ana-acme','Ana Acme')
+        bea=self.chosen_and_followed('bea-globex','Bea Globex',headline='Founder & CEO at Globex')
+        self.their_new_post(bea);self.observe()
+        self.assertEqual(self.autopilot_comment(WARM_1).state,'confirmed')  # Bea: warmed with one comment, not ready yet
+        self.texts[('invite-note','Ana Acme')]=SIGNAL_NOTE
+        with patch('team_backend.red.note_room',return_value=1):  # one note left this month
+            self.prepare(at)
+        self.assertEqual(self.stopped(ana,'nota'),'cupo')
+        self.assertFalse(self.paid(ana,'invite-note'))
+        self.assertIn('calentó con comentarios',self.drafts_of(ana,'nota')[-1].reason)
+
+    def test_2_no_signal_her_bridge_is_found_warmed_accepts_and_her_message_cites_the_real_interaction(self):
+        from team_backend import mensajes_comprador
+        ana,at=self.without_posts('ana-acme','Ana Acme')
+        # Nothing real to cite: the sweep asks for her bridge right away.
+        self.plan()
+        self.assertEqual(self.bridge_states(ana),[('pedido','sin_ancla')])
+        # The search by her company: same role (CEO, like her), another company, then her co-founder who posts.
+        self.candidate('carla-acme','Carla Acme','CEO at Acme')
+        self.candidate('dora-globex','Dora Globex','CTO at Globex Acme Partners Inc',posts=True)
+        self.candidate('bruno-acme','Bruno Acme','Co-founder & CTO at Acme')
+        before=self.reads()
+        self.observe()
+        bruno=self.bridge(ana)
+        self.assertEqual((bruno.display_name,bruno.classification['role'],bruno.stage,bruno.bridge_for_id),
+                         ('Bruno Acme','puente','fit',self.journey(ana).pk))
+        self.assertEqual(bruno.classification['puente']['cargo'],'cto')
+        self.assertEqual(self.bridge_states(ana),[('pedido','sin_ancla'),('encontrado','busqueda')])
+        after=self.reads()
+        self.assertEqual({k:after[k]-before[k] for k in after},{'busquedas':1,'search':1,'perfil':0,'perfil_compartido':0,'posts_candidatos':1})
+        self.assertFalse(BuyerJourney.objects.filter(contact=bruno).exists())  # its own role, never a second buyer
+        # Followed, warmed with two comments (warm-up rules, the bridge's own purpose) and invited without a note.
+        self.plan()
+        self.assertEqual(self.approve_open(bruno,'RED-01').state,'confirmed')
+        first=self.autopilot_comment(WARM_1)
+        self.assertEqual((first.state,first.post.author_provider_id),('confirmed',bruno.provider_user_id))
+        self.assertIn('Colega de un posible cliente',self.drafts[-1]['inputs']['calentamiento']['para_que'])
+        self.plan()
+        self.assertFalse(self.invite_proposed(bruno))  # one comment is not the warm-up
+        self.their_new_post(bruno,NEXT_POST,suffix='p2',hours_ago=1)
+        self.observe(later=True)
+        self.a_day_later(first)
+        self.assertEqual(self.autopilot_comment(WARM_2).state,'confirmed')
+        self.plan()
+        self.assertEqual(self.approve_open(bruno,'RED-02').state,'confirmed')
+        self.assertNotIn('note',ActionProposal.objects.get(contact=bruno,capability='RED-02').payload)
+        # He accepts: a signal of hers (senal_puente); her heat goes up; not a signal she gave before the invitation.
+        self.assertEqual(comprador.temperature(ana,weigh=True)['peso'],0)
+        self.step_accept(bruno)
+        journey=self.journey(ana)
+        signal=journey.touches.get(kind='senal_puente')
+        self.assertEqual((signal.direction,signal.detail['tipo'],signal.detail['interaccion']),('entrante','acepto',False))
+        self.assertEqual((comprador.temperature(ana,weigh=True)['peso'],journey.signal_before_invite),(1.0,False))
+        # Only an acceptance: a text that says Gustavo talked with him breaks a fixed rule.
+        facts=mensajes_comprador.anchors(Contact.objects.get(pk=ana.pk))
+        self.assertEqual([(f['tipo'],f['interaccion']) for f in facts],[('puente',False)])
+        self.assertIn('Dice que habló con alguien sin una interacción real que lo respalde',
+                      mensajes_comprador.message_text_issues(TALK_MESSAGE,facts,facts[0]['id']))
+        # He answers the team's comment: a real interaction.
+        self.step_their_answer(bruno,first)
+        self.assertEqual(sorted(t.detail['tipo'] for t in self.journey(ana).touches.filter(kind='senal_puente')),['acepto','respondio_comentario'])
+        # She is invited at 14 days (no note text: it goes without one), accepts, and her first message cites the interaction.
+        self.texts[('buyer-message','Ana Acme')]=TALK_MESSAGE
+        self.assertEqual(self.invite(ana,at).state,'confirmed')
+        ana=self.accepted(ana)
+        accepted=self.journey(ana).accepted_at
+        self.prepare(accepted+timedelta(days=7,minutes=1))
+        message=self.drafts_of(ana,'mensaje')[-1]
+        self.assertEqual((message.state,message.text,message.anchor['tipo'],message.anchor['interaccion']),('listo',TALK_MESSAGE,'puente',True))
+        call=next(c for c in self.calls if c['purpose']=='buyer-message')
+        self.assertIn('Un hecho de tipo "puente"',call['system'])
+        cards=self.cards_of(ana,timedelta(days=7,hours=2))
+        self.assertEqual([c['message']['comment_label'] for c in cards],['Su colega (el puente)'])
+        # Never the same to the second person of a company: a comment on his post that says her message again.
+        post=ObservedPost.objects.filter(author_provider_id=bruno.provider_user_id).first()
+        repeated=ActionProposal(account=self.account,capability='INT-03',post=post,payload={'text':TALK_MESSAGE},source='human')
+        self.assertIn('Comentario que repite lo que el equipo le escribió a Ana Acme, de su misma empresa',autopiloto.comment_text_issues(repeated))
+        fresh=ActionProposal(account=self.account,capability='INT-03',post=post,payload={'text':WARM_3},source='human')
+        self.assertFalse([i for i in autopiloto.comment_text_issues(fresh) if 'repite' in i])
+        # The funnel: the route with a bridge, the bridge followed, invited and accepted, one buyer with its interaction.
+        route=self.funnel()['ruta_sin_posts']
+        self.assertEqual((route['comparacion']['con_puente']['personas'],route['comparacion']['sin_puente']['personas']),(1,0))
+        self.assertEqual({k:route['puentes'][k] for k in ('pedidos','busquedas','encontrados','seguidos','invitados','aceptaron',
+                                                         'compradores_con_senal_del_puente','compradores_con_interaccion_del_puente')},
+                         {'pedidos':1,'busquedas':1,'encontrados':1,'seguidos':1,'invitados':1,'aceptaron':1,
+                          'compradores_con_senal_del_puente':1,'compradores_con_interaccion_del_puente':1})
+        self.assertEqual(comprador.rebuild()['toques_nuevos'],0)
+        self.assertEqual(self.messages_sent(),0)
+        self.assertFalse(AuditEvent.objects.filter(action__in=['buyer.record_failed','buyer.warmup_failed']).exists())
+
+    def test_3_never_more_than_two_people_per_company_nor_two_with_the_same_role(self):
+        with patch.dict(os.environ,{'BUYER_NO_POSTS_ROUTE_ENABLED':'false'}):  # both chosen before any bridge is asked for
+            ana,_=self.without_posts('ana-acme','Ana Acme')
+            eva,_=self.without_posts('eva-acme','Eva Acme',headline='CTO at Acme')  # a second buyer of the same company
+        self.candidate('bruno-acme','Bruno Acme','Co-founder & COO at Acme')
+        self.plan();self.observe()
+        # Ana and Eva are already two people of Acme: no third one, not even a search.
+        for buyer in (ana,eva):self.assertEqual(self.bridge_states(buyer),[('pedido','sin_ancla'),('sin_puente','empresa_completa')])
+        self.assertNotIn('Acme',self.searched())
+        # Another company where the search only finds people with his own role (CEO) or of another company.
+        gil,_=self.without_posts('gil-globex','Gil Globex',headline='Founder & CEO at Globex')
+        self.candidate('carl-globex','Carl Globex','Chief Executive Officer, Globex',company='Globex')
+        self.candidate('dan-initech','Dan Initech','CTO at Initech',company='Globex')
+        self.plan();self.observe()
+        self.assertEqual(self.bridge_states(gil),[('pedido','sin_ancla'),('sin_puente','mismo_cargo')])
+        self.assertEqual(self.searched().count('Globex'),1)
+        self.assertFalse(Contact.objects.filter(bridge_for__isnull=False).exists())
+        self.assertEqual(self.funnel()['ruta_sin_posts']['puentes']['sin_puente'],{'empresa_completa':2,'mismo_cargo':1})
+
+    def test_4_nothing_real_to_cite_and_no_bridge_no_message(self):
+        ana,at=self.without_posts('ana-acme','Ana Acme')
+        self.plan();self.observe()  # asked for, searched: nobody at Acme
+        self.assertEqual(self.bridge_states(ana),[('pedido','sin_ancla'),('sin_puente','sin_resultados')])
+        self.texts[('buyer-message','Ana Acme')]=SIGNAL_MESSAGE
+        self.assertEqual(self.invite(ana,at).state,'confirmed')
+        self.assertEqual(self.stopped(ana,'nota'),'hecho')
+        ana=self.accepted(ana)
+        self.prepare(self.journey(ana).accepted_at+timedelta(days=7,minutes=1))
+        draft=self.drafts_of(ana,'mensaje')[-1]
+        self.assertEqual((draft.state,draft.stopped_by,draft.text),('sin_borrador','hecho',''))
+        self.assertFalse(self.paid(ana,'buyer-message'))
+        self.assertEqual(self.cards_of(ana,timedelta(days=8)),[])
+
+    def test_5_invited_with_one_comment_and_not_accepted_in_21_days_rests(self):
+        ana=self.answered('ana-acme','Ana Acme')  # one comment and her answer: invited without the second
+        self.assertEqual(self.invite(ana).state,'confirmed')
+        journey=self.journey(ana)
+        self.assertEqual((journey.comments_before_invite,journey.route),(1,'comentarios'))
+        invited=journey.touches.get(kind='invitacion').at
+        self.plan(now=invited+timedelta(days=20))
+        self.assertEqual(self.journey(ana).step,'invitado')
+        later=invited+timedelta(days=21,hours=1)
+        summary=self.plan(now=later)
+        self.assertEqual(summary['calentamiento']['descanso'],1)
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.rest_reason,journey.rest_until),('descanso','invitacion_no_aceptada',later+timedelta(days=60)))
+
+    def test_6_each_retry_changes_its_angle_and_the_third_attempt_rests_a_year(self):
+        self.stage_signals=[self.signal()]
+        ana,at=self.without_posts('ana-acme','Ana Acme')
+        with patch.dict(os.environ,{'NETWORK_STAGE_CHECK':'false'}):  # the re-check has its own test (7)
+            self.plan()
+            self.assertEqual(self.bridge_states(ana),[])  # a signal to cite: no bridge yet
+            self.assertEqual(self.invite(ana,at).state,'confirmed')  # no note text: invited without one
+            invited=self.journey(ana).touches.get(kind='invitacion').at
+            # 21 days without accepting: on this route the bridge goes first; nobody at Acme posts, so she rests.
+            due=invited+timedelta(days=21,hours=1)
+            summary=self.plan(now=due)
+            self.assertEqual((summary['calentamiento']['descanso'],summary['calentamiento']['puente_antes_del_descanso']),(0,1))
+            self.assertEqual(self.bridge_states(ana),[('pedido','ruta_sin_resultado')])
+            self.observe()
+            self.plan(now=due+HOUR)
+            journey=self.journey(ana)
+            self.assertEqual((journey.step,journey.attempt,journey.rest_until),('descanso',1,due+HOUR+timedelta(days=60)))
+            self.assertEqual(self.bridge_states(ana),[('sin_puente','sin_resultados'),('pedido','ruta_sin_resultado')])
+            # The end of the rest: attempt 2 with her signal (no text cited it yet).
+            end=journey.rest_until+MINUTE
+            self.plan(now=end)
+            journey=self.journey(ana)
+            self.assertEqual((journey.step,journey.attempt,self.angles(ana)),('calentando',2,['senal_nueva']))
+            self.assertEqual(journey.touches.get(kind='reintento').detail['senal'],SEED_URL)
+            # Her invitation is still pending (never sent again): 21 days from this attempt's start she rests again,
+            # without a second search for the bridge.
+            self.plan(now=end+timedelta(days=21,hours=1))
+            journey=self.journey(ana)
+            self.assertEqual((journey.step,journey.attempt),('descanso',2))
+            self.assertEqual(self.searched().count('Acme'),1)
+            # Attempt 3: another angle (another topic; the signal and the bridge were used), and then a year.
+            end=journey.rest_until+MINUTE
+            self.plan(now=end)
+            self.assertEqual((self.journey(ana).attempt,self.angles(ana)),(3,['senal_nueva','otro_tema']))
+            last=end+timedelta(days=21,hours=1)
+            self.plan(now=last)
+            journey=self.journey(ana)
+            self.assertEqual((journey.step,journey.attempt,journey.rest_until),('descanso',3,last+timedelta(days=365)))
+            self.assertEqual(ActionProposal.objects.filter(contact=ana,capability='RED-02').count(),1)
+        retries=self.funnel()['ruta_sin_posts']['reintentos']['por_angulo']
+        self.assertEqual(retries,{'senal_nueva':1,'otro_tema':1})
+
+    def test_7_one_re_check_of_her_signals_when_a_rest_ends(self):
+        ana=self.answered('ana-acme','Ana Acme')
+        self.invite(ana)
+        invited=self.journey(ana).touches.get(kind='invitacion').at
+        self.plan(now=invited+timedelta(days=21,hours=1))
+        end=self.journey(ana).rest_until+MINUTE
+        # The rest ends: the retry waits for one web re-check of her buying signals, inside the day's stage checks.
+        self.plan(now=end)
+        journey=self.journey(ana)
+        self.assertEqual((journey.step,journey.touches.filter(kind='reverificacion').count()),('descanso',1))
+        self.assertTrue(red.stage_pending(self.account,end))
+        with patch.object(red,'stage_checks_left',return_value=0):  # no allowance left today: it waits
+            self.job('classify_contacts')
+        self.assertEqual([k for k in self.web_keys if 'reverificacion' in k],[])
+        self.stage_signals=[self.signal('contratacion',days=3,url=HIRING_URL,evidence='Acme is hiring its first account executive.')]
+        stop=self.providers()
+        try:
+            self.job('classify_contacts')
+            self.job('classify_contacts')  # once: a second run does not check her again
+        finally:stop()
+        self.assertEqual(len([k for k in self.web_keys if 'reverificacion' in k]),1)
+        ana=Contact.objects.get(pk=ana.pk)
+        self.assertEqual([s['fuente'] for s in calentamiento.buying_signals(ana)],[HIRING_URL])
+        self.assertEqual((ana.classification['stage_check']['state'],ana.classification['fit']),('ok',True))  # the verdict stays
+        self.assertFalse(red.stage_pending(self.account,end))
+        # The retry now has a new angle: the signal the re-check found.
+        self.plan(now=end+HOUR)
+        journey=self.journey(ana)
+        retry=journey.touches.get(kind='reintento')
+        self.assertEqual((journey.attempt,retry.detail['tipo'],retry.detail['senal']),(2,'senal_nueva',HIRING_URL))
+        self.assertEqual(self.funnel()['ruta_sin_posts']['reverificaciones'],{'pedidas':1,'hechas':1,'con_senal_nueva':1,'vencidas':0})
+
+    def test_9_reads_stay_inside_their_caps_and_no_visit_is_simulated(self):
+        from team_backend.connectors import FakeConnector
+        search=FakeConnector.search_people
+        companies={'Acme','Globex','Initech'}
+        def page(connector,keywords,location=None,profile_language=None):
+            """The real search page by company: ids only, no name, headline or distance (linkedin_directo.cliente)."""
+            found=search(connector,keywords,location,profile_language)
+            if keywords not in companies:return found
+            return [dict(p,headline='',display_name='',network_distance='') for p in found]
+        with patch.dict(os.environ,{'BUYER_BRIDGE_SEARCHES_PER_DAY':'2','BUYER_BRIDGE_PROFILES_PER_SEARCH':'2'}),\
+             patch.object(FakeConnector,'search_people',autospec=True,side_effect=page):
+            with patch.dict(os.environ,{'BUYER_NO_POSTS_ROUTE_ENABLED':'false'}):  # both chosen before any bridge is asked for
+                ana,_=self.without_posts('ana-acme','Ana Acme')
+                gil,_=self.without_posts('gil-globex','Gil Globex',headline='Founder & CEO at Globex')
+            for slug,name in (('carla-acme','Carla Acme'),('cora-acme','Cora Acme')):self.candidate(slug,name,'CEO at Acme')
+            self.candidate('bruno-acme','Bruno Acme','CTO at Acme')
+            self.candidate('gus-globex','Gus Globex','COO at Globex',company='Globex')
+            before=self.reads()
+            self.plan();self.observe()
+            after=self.reads()
+            # Two searches (its own cap); a profile read only for a result without a headline, at most two per search
+            # (Acme: two CEOs, like her; the CTO is never read); one posts read to see that Gus posts.
+            self.assertEqual({k:after[k]-before[k] for k in after},
+                             {'busquedas':2,'search':2,'perfil':3,'perfil_compartido':3,'posts_candidatos':1})
+            self.assertEqual(self.bridge_states(ana)[-1],('sin_puente','sin_lectura'))
+            self.assertEqual(self.bridge(gil).display_name,'Gus Globex')
+            # A third buyer the same day: the day's searches are spent, the request waits for tomorrow.
+            ivo,_=self.without_posts('ivo-initech','Ivo Initech',headline='Founder & CEO at Initech')
+            self.candidate('ian-initech','Ian Initech','CTO at Initech',company='Initech')
+            self.plan();self.observe()
+            self.assertEqual(self.bridge_states(ivo),[('pedido','sin_ancla')])
+            self.assertEqual(self.reads()['busquedas'],2)
+            # The shared profile cap rules too: spent, nothing is read and the request still waits.
+            with patch.dict(os.environ,{'OPERATOR_PROFILE_READ_DAILY_LIMIT':'0','BUYER_BRIDGE_SEARCHES_PER_DAY':'3'}):
+                self.observe()
+            self.assertEqual(self.bridge_states(ivo),[('pedido','sin_ancla')])
+            self.assertEqual((self.reads()['perfil_compartido'],self.bridge(ivo)),(3,None))
+            # Tomorrow: searched again, read and found.
+            with self.clock(timezone.now()+timedelta(days=1)):self.observe()
+            self.assertEqual(self.bridge(ivo).display_name,'Ian Initech')
+        self.assertFalse(BuyerTouch.objects.filter(kind='visita').exists())  # no visit is simulated
+        self.assertFalse(AuditEvent.objects.filter(action='network.read',metadata__kind='visit').exists())
+
+
+class NoPostsSwitchOffTests(NoPostsPathBase):
+    def test_8_with_the_switch_off_the_path_is_the_one_of_phases_2_to_4(self):
+        from team_backend import mensajes_comprador
+        with patch.dict(os.environ,{'BUYER_NO_POSTS_ROUTE_ENABLED':'false'}):
+            self.stage_signals=[self.signal()]
+            ana,at=self.without_posts('ana-acme','Ana Acme')
+            self.candidate('bruno-acme','Bruno Acme','Co-founder & CTO at Acme')
+            self.plan();self.observe()
+            self.assertEqual((self.bridge_states(ana),self.searched().count('Acme')),([],0))
+            self.assertFalse(Contact.objects.filter(bridge_for__isnull=False).exists())
+            # Her signal does not give her a note (phase 3: notes only for warmed buyers).
+            self.texts[('invite-note','Ana Acme')]=SIGNAL_NOTE
+            self.assertEqual(self.invite(ana,at).state,'confirmed')
+            self.assertEqual(self.stopped(ana,'nota'),'hecho')
+            self.assertFalse(self.paid(ana,'invite-note'))
+            # Invited with fewer than two comments (none) and not accepted: no rest (phase 2 asks for the two comments).
+            invited=self.journey(ana).touches.get(kind='invitacion').at
+            summary=red.plan(self.bot,self.account,invited+timedelta(days=22))
+            self.assertEqual(summary['calentamiento'],{'descanso':0,'despiertan':0,'reintentos':0,'proximo':0,'fallos':0})
+            self.assertEqual(self.journey(ana).step,'invitado')
+            self.assertNotIn('ruta_sin_posts',self.funnel())
+            facts=[{'id':'h1','tipo':'senal_de_compra','texto':'x'}]
+            self.assertNotIn('Dice que habló con alguien sin una interacción real que lo respalde',
+                             mensajes_comprador.message_text_issues(TALK_MESSAGE,facts,'h1'))
+            self.assertFalse(BuyerTouch.objects.filter(kind__in=['puente','senal_puente','reverificacion']).exists())
