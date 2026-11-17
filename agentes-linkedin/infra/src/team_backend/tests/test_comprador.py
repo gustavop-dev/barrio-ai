@@ -82,8 +82,9 @@ class LogTests(BuyerBase):
 
     def test_every_kind_has_one_direction_and_the_signals_are_the_persons(self):
         self.assertEqual(set(comprador.DIRECTION),set(BuyerTouch.Kind.values))
+        # Phase 5: what her bridge did (senal_puente) is relayed as one of her signals; nothing the team does is.
         self.assertEqual(set(comprador.SIGNALS),{'respondio_comentario','comento_post','reacciono_post','nos_siguio','nos_invito',
-                                                 'acepto_invitacion','abrio_conversacion','respondio_mensaje','reunion'})
+                                                 'acepto_invitacion','abrio_conversacion','respondio_mensaje','reunion','senal_puente'})
 
 
 class ChosenTests(BuyerBase):
