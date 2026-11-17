@@ -26,6 +26,8 @@ class OperatorBase(TransactionTestCase):
                                    'OPERATOR_WINDOW':'00:00-24:00','OPERATOR_MIN_SPACING_SECONDS':'0','OPERATOR_AUTONOMY':'',
                                    # The read window depends on the real hour; test_ventana_lectura turns it on.
                                    'READ_WINDOW':'',
+                                   # Slack alerts never leave a test run; test_alertas_slack turns them on with a fake transport.
+                                   'SLACK_WEBHOOK_URL':'','SLACK_WEBHOOK_RESUMEN':'',
                                    'OPERATOR_ALERT_WEBHOOK':'','OPERATOR_DAILY_LLM_USD':'1','OPERATOR_DAILY_PROPOSALS':'6',
                                    # The weekly summary depends on the real weekday; test_resumen_semanal turns it on.
                                    'WEEKLY_SUMMARY_ENABLED':'false',

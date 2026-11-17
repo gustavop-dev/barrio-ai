@@ -28,7 +28,7 @@ Cuando alguien comenta un post de Gustavo, el equipo le responde solo en el hilo
 - **Dónde:** backend
 - **Estado:** funciona
 - **Qué hace para Gustavo:** el equipo sabe quién comentó cada post y qué dijo, sin que él tenga que avisar.
-- **Código:** `autopiloto._replies` → `respuestas.reading_due` (`plan`, `cadence`, `reading_room`, `to_read`) → trabajo `read_own_comments` → `respuestas.read`. Ventana: `operador.within_read_window`.
+- **Código:** `autopiloto._replies` → `respuestas.reading_due` (`plan`, `cadence`, `reading_room`, `to_read`) → trabajo `read_own_comments` → `respuestas.read`. Ventana: `operador.within_read_window`. Avisos: `alertas_slack.py`.
 - **Criterios de aceptación:**
   1. **Dado** un post publicado hace menos de 72 h, **cuando** corre el autopiloto dentro de `READ_WINDOW` (07:00-21:00), **entonces** se leen sus comentarios: el post más nuevo cada `REPLIES_FRESH_EVERY_MINUTES` (120) durante sus primeras `REPLIES_NEWEST_HOURS` (48); otro post cada 120 mientras sus lecturas traigan comentarios y el doble por cada lectura seguida sin nada nuevo, hasta `REPLIES_IDLE_MAX_MINUTES` (240); un comentario nuevo lo devuelve a 120. De 72 h al día 7, cada `REPLIES_LATE_EVERY_MINUTES` (720).
   2. **Dado** varios posts que tocan a la vez, **entonces** se leen primero el más nuevo, después los que trajeron comentarios en su última lectura y luego el resto, del más reciente al más viejo (`REPLIES_PIECES_PER_RUN`, 4 por vez).
@@ -36,6 +36,7 @@ Cuando alguien comenta un post de Gustavo, el equipo le responde solo en el hilo
   4. **Dado** el tope diario de lecturas (`REPLIES_READ_CAPS`, `comments=100`), **entonces** se reparte a lo largo de `READ_WINDOW` (los demás posts no pasan de tope × (tiempo transcurrido + 1 h) / ventana) y siempre deja al post más nuevo sus lecturas hasta el cierre. **Cuando** se agota, la lectura para, queda un solo `replies.read_cap_reached` ese día y el autopiloto no encola más lecturas hasta el día siguiente; el hilo pendiente se relee la próxima vez.
   5. **Dado** que es de noche (fuera de `READ_WINDOW`), **entonces** el autopiloto no encola lecturas ni borradores (un borrador lee el perfil de quien comenta); lo que Gustavo pide desde la app, las respuestas ya aprobadas y su conciliación no esperan. `READ_WINDOW` vacío = a cualquier hora, como antes.
   6. La lectura nunca escribe en `piece.metrics` (es de métricas): el id del post queda en la auditoría `replies.scanned`, con `new` (comentarios nuevos que trajo, lo que usa la cadencia).
+  7. Avisos en Slack (`SLACK_WEBHOOK_URL`): un comentario que merece respuesta y lleva más de `ALERT_REPLY_PENDING_HOURS` (4) horas de ventana sin respuesta publicada ni decisión de no responder, una vez por comentario, con quién, qué post, hace cuánto y dónde está atascado; más de `ALERT_READS_GAP_HOURS` (3) horas de ventana sin leer comentarios con un post esperando, una vez al día, con el motivo probable; el cupo al 80 % y agotado.
 - **Un día con 8 posts** (4 de menos de 72 h; simulación de `tests/test_ventana_lectura.py`, reloj simulado): unas 28 lecturas, ninguna fuera de la ventana; el comentario de las 16:00 en el post más nuevo se lee en 30 min. Antes (cada 2 h a toda hora y tope 30) se agotaba a las 12:00 tras 20 lecturas nocturnas.
 
 ### RSP-02 · Decidir qué merece respuesta, reacción o nada <a id="rsp-02"></a>

@@ -248,6 +248,8 @@ def tick(user,now=None):
     try:referentes.tick(user,now)
     except Exception as exc:report['referents_error']=type(exc).__name__
     comunidad.maintain(now)  # retention also runs when collection/the machine is paused
+    from . import alertas_slack
+    report['slack']=alertas_slack.vigilar(now)  # reads the state, also with the machine stopped; never raises
     if operador.globally_paused():return dict(report,stopped='OPERATOR_PAUSED')
     stopped={(cycle,key):reason for cycle,key,reason in CycleLedger.objects.filter(state='stopped').exclude(
         stop_reason='cost_cap').values_list('cycle','key','stop_reason')}
