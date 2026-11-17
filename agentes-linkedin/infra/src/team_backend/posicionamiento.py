@@ -34,9 +34,12 @@ PILLARS={
 LIMITS=('humo y promesas; temas que Gustavo no domina; experiencias, clientes, cifras o resultados inventados; pitch '
         'agresivo; datos privados de cualquier persona')
 NOT_WANTED='No buscan vendedores ni reclutadores masivos.'
-# Gustavo, 12/11/2026: «la idea es que linkedin nos mande a posicionarnos allá».
-LOCATION=('el barrio se construye en EE. UU.: los compradores (founders) deben estar allí; el resto de la comunidad va '
-          'primero si está allí y también puede venir de Latinoamérica.')
+# Gustavo, 12/11/2026: «la idea es que linkedin nos mande a posicionarnos allá»; 17/11/2026, de los compradores de
+# Latinoamérica: «podríamos prospectarlos al inicio; queremos ir hacia USA pero no los descartamos de una». Only who the
+# network goes after changes, not the editorial direction (identity, pillars, modalities): VERSION stays, so the reader
+# study and the experiments tied to it stay valid; the classifier's criterion_version hashes this text anyway.
+LOCATION=('el barrio se construye en EE. UU.: compradores (founders) y comunidad van primero si están allí; los de '
+          'Latinoamérica también entran, después.')
 
 # What Gustavo sells, restated from IDENTITY, PROJECTAPP, PILLARS and the two business modalities below; no new direction,
 # so VERSION stays. An «industry referent» (referentes_industria.py) must sell one of these. `terms` are the English words

@@ -597,7 +597,7 @@ class ClassifyJobStageCheckTests(NetworkBase):
         def claude(system,message,**kwargs):
             paid(kwargs['purpose'])
             if kwargs['purpose']=='network-stage':
-                return {'text':json.dumps({'verdict':'semilla_o_mas','evidence':'La fuente dice que levantó una ronda semilla.',
+                return {'text':json.dumps({'verdict':'confirmado','evidence':'La fuente dice que levantó una ronda semilla.',
                                            'source_urls':['https://news.example/acme-seed']}),'model':'claude-sonnet-5-5'}
             out=[{'id':p['id'],'fit':True,'role':'comprador','modality':'projectapp','affinity':'desconocida','reason':'Founder con producto.',
                   'confidence':0.9,'course_citations':['LI-03-M005-K06'],'invitation_note':'','note_reason':''} for p in json.loads(message)['people']]
